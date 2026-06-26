@@ -1,85 +1,20 @@
-# TODO / Backlog
+# TODO — feature/grazing-grating
 
-Items live on `feature/...` / `bugfix/...` / `docs/...` branches, not `main`, until finished.
-Full detail for an in-progress item lives on its branch (or its design doc);
-`main` keeps only a one-line summary + pointer, enforced by /docs:todo-sync.
-Priorities weigh value-to-goal (line-flux / enhancement predictions + the publication's validation story)
-against effort and risk.
+This branch carries one backlog item; the full triaged backlog lives on `main`.
 
-Item generation:
-----------------
+## Grazing-incidence soft X-ray diffraction grating (P3 — exploratory)
 
-1. Create and move to branch of relevant type
-2. Overwrite branch TODO.md with concise, 2-3 sentence problem summary + implementation path, scoped only to the relevant item, then publish to `origin`
-3. Move to `main`, create 1 sentence summary of new item, then triage into existing TODO.md items and push tightly scoped `docs(todo)` commit to main
+*Dispersion scaffold IMPLEMENTED.*
 
-**NOTE:** If the user has written a detailed item summary directly into `TODO.md` on
-main, fold it into a branch (steps 1-2 above), then slim it back to a one-line summary
-on `main` once the branch exists.
+With an Eagle XO or an Alex detector, like those from Ultrafast Innovations — a new
+experimental modality: disperse the soft-X-ray spectrum with a grazing-incidence reflection
+grating and read the spatial image, for spectral resolution beyond the ~130 eV EDS width.
 
-## P1 - high value (physics accuracy + publication validation)
+`src/cxr_mc/grating.py` implements the dispersion geometry (grating equation
+`sinβ = mλ/d − sinα`, angular dispersion, flux-conserving `disperse_spectrum`, pixel-limited
+resolving power), cross-checked in `tests/test_grating.py`.
 
-1. **Crystal mosaicity - measured-data validation.** MC route implemented; validate
-   broadened line widths vs. a measured HOPG rocking-curve / EDS dataset
-   (data-dependent). Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
-2. **Multilayer film-on-substrate - measured-data validation.** Model implemented;
-   validate vs. a measured film-on-substrate dataset (data-dependent). Design:
-   [`docs/multilayer-materials.md`](docs/multilayer-materials.md).
-
-## P2 - medium (experiment match + usability)
-
-1. **External crystallography library adapters.** `codex/diffpy-structure-importer`
-   implements `diffpy.structure` CIF/import support; `codex/dans-diffraction-research`
-   implements optional `Dans_Diffraction` validation-oracle checks. Next: review/merge
-   those branches, then decide whether the original `crystals` package still offers
-   unique value.
-2. **Polars investigation.** Evaluate Polars for packaging large parameter-sweep metadata.
-3. **pyelsepa / ELSEPA transport.** -> `feature/elsepa-port` Adapter landed + **validated** (C 2.19%,
-   Si 4.42% max rel vs NIST); image now builds tarball-free from
-   `github.com/eScatter/elsepa`. Remaining gate: the image/venv live outside the repo
-   (`C:/dev/pyelsepa`), so the driver stays gated in CI. Tied to P2 #2.
-4. **Codebase de-duplication follow-through.** `refactor/dedup-followthrough` — merged
-   (now on `main`). Two items intentionally out of scope, tracked only in
-   [`docs/dedup-inventory.md`](docs/dedup-inventory.md): M4 (wide-brem overlay
-   physics x4) and the M7 `line_fwhm_eV`/escape-helper sub-items.
-5. **Material filters.** Model calibration filters (e.g. sheets of Al foil) between the
-   x-ray beam and detector, for detector calibration against filtered spectra.
-6. **Finite electron beam size.** Confirm the input beam is finite, then model it as a
-   ~1 mm diameter Gaussian beam incident on the crystal.
-7. **Sweep cache standardization.** Round parametric angular sweeps to the nearest
-   degree; standardize energy-grid sizes/spacings so thickness/angle/etc. sweeps share
-   one cached-data store that is always checked before running.
-8. **`analysis_app.py` parameter-sweep views.** Support parameter sweeps (e.g. the
-   crystal-thickness sweeps in the current h-BN work); today the app silently shows only
-   the thinnest crystal.
-9. **Checkpoint union tooling.** Union a live material checkpoint with an archived one
-   for the same material; archive the current pickle first by default, leave the source
-   archive intact — both overridable (skip archive / delete old archive).
-10. **`remote.py stop` ergonomics.** Make `stop <material>` stop the sole running job
-    with no arg (one job at a time); add `stop -a/--all` to clear the queue and
-    `stop <mat...>` to drop specific queued materials.
-
-## P3 - lower / exploratory
-
-1. **Marimo/Altair follow-ups.** Core migration landed from `feature/marimo-transfer`;
-   `feature/marimo-altair-followups` closed out the remaining fixes (blank detector
-   tabs, mos2 multilayer penetration, angle selector, intrinsic-spectra controls,
-   heatmap sizing/ticks, `scan_app.py` material dropdown). Two small deferred items:
-   - `eaglexo_charge_chart` doesn't yet take `x_domain=` (only the two
-     detected-vs-incident charts do).
-   - The dense penetration-grid accordion (matplotlib, Penetration tab) is still
-     fixed at `energy=30` regardless of the angle selector above it.
-   - The x/y plot-limit entry boxes should move into the Spectra tab they belong to.
-2. **Grazing-incidence soft X-ray diffraction grating.** -> `feature/grazing-grating`.
-   Dispersion scaffold implemented; next is grating reflectivity + detected-image model.
-3. **`remote.py start` and `remote.py start --follow` hang.** Launches the task but hangs afterward and `--follow` never
-   attaches the tqdm progress bar.
-4. **Git history cleanup.** Squash minor upkeep/doc commits; evaluate other repo
-   structure/history improvements.
-5. **Dynamic GPU chunk sizing.** Evaluate config-driven chunk-size selection for
-   `dev/remote.py` GPU runs (probe a few test cases against the config's array sizes),
-   including a write-up of what chunking is and how config values drive it.
-
-## Long term features
-
-1. `Geant4` or similar integration to support high-energy electron beams
+**Remaining (next high-value step):** grating reflectivity / groove efficiency `R(E,α)`
+(xraydb → Fresnel at grazing angle), then a detected-image forward model beside the
+Timepix / Eagle XO ones, and validation vs measured data. Design + phased plan:
+[`docs/grazing-grating.md`](docs/grazing-grating.md).
