@@ -97,6 +97,9 @@ ignore = [
     "B008",  # np.deg2rad() in default args — pure math call, not a real bug
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"*.ipynb" = ["F821"]  # cross-cell references are always undefined to static analysis
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"

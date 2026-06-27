@@ -33,7 +33,7 @@ sys.path.insert(0, "src")
 # Interactive click-through viewers (browse) work on the inline backend; the
 # ipympl "widget" canvas is OPTIONAL. Try it, but fall back to inline if ipympl
 # isn't installed -- browse()'s slider only needs ipywidgets, not ipympl, so it
-# still works. (export_pdf.py forces inline; browse() then stacks every tilt.)
+# still works. (scripts/export_pdf.py forces inline; browse() then stacks every tilt.)
 try:
     get_ipython().run_line_magic("matplotlib", "widget")
 except Exception:

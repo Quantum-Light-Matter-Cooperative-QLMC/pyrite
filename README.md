@@ -74,7 +74,7 @@ delta-function of the closed-form theory.
 scan.ipynb         RUNNER:  pick MATERIAL → Sweep → run_sweep → checkpoints/<material>.pkl
 analysis.ipynb     VIZ:     load that checkpoint → all figures (no sweeps here)
 scan.py            root shim → cxr_mc.scan (guarded; python scan.py, or cxr scan)
-export_pdf.py      root shim → cxr_mc.export (analysis.ipynb → PDF, or cxr export)
+scripts/export_pdf.py  shim → cxr_mc.export (analysis.ipynb → PDF, or cxr export)
 src/cxr_mc/     importable package: physics modules + the cxr CLI entry point
 src/cxr_mc/data/  crystal_structures.toml, atomic_scattering_factors/, mott_transport_cross_sections/, *_qe.csv
 checks/            validation scripts + notebooks (Feranchuk anchor, Zhai Fig 1c, kinematic audit)

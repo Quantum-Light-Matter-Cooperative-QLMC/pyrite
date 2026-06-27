@@ -39,7 +39,7 @@ when the job finishes; to DISCONNECT, just Ctrl-C (or close the terminal / drop
 the link) -- that tears down the viewer only, and the job runs to completion.
 Reconnect any time with `attach`/`status`/`logs`, then `pull` once state is `done`.
 
-Then locally: open analysis.ipynb (same MATERIAL) or run export_pdf.py.
+Then locally: open analysis.ipynb (same MATERIAL) or run scripts/export_pdf.py.
 
 Transport is ssh/scp only (uses the 'qlmc' host in ~/.ssh/config, cloudflared
 ProxyCommand and all) -- no rsync dependency, so it works from Windows Git Bash.
@@ -451,7 +451,7 @@ def main(argv=None):
         pull([stem])
         print(
             f"\ndone. checkpoints/{stem}.pkl is local; open analysis.ipynb with "
-            f"MATERIAL='{stem}' (or run export_pdf.py) -- all viz/PDF stays local."
+            f"MATERIAL='{stem}' (or run scripts/export_pdf.py) -- all viz/PDF stays local."
         )
     elif args.cmd == "start":
         jobid = start_queue(args.materials, args.quick, args.workers, args.no_sync, args.dry_run)

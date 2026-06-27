@@ -12,7 +12,7 @@ repos:
     rev: 1.9.1  # pin a stable version
     hooks:
       - id: nbqa-ruff
-        args: [--fix]
+        args: [--fix, "--extend-ignore=F821"]  # F821 is always a false positive across notebook cells
 
   # Strip notebook outputs
   - repo: https://github.com/kynan/nbstripout
