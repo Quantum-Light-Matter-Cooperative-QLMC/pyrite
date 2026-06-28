@@ -71,10 +71,10 @@ delta-function of the closed-form theory.
 ## Repository layout
 
 ```
-scan.ipynb         RUNNER:  pick MATERIAL → Sweep → run_sweep → checkpoints/<material>.pkl
-analysis.ipynb     VIZ:     load that checkpoint → all figures (no sweeps here)
+notebooks/scan.ipynb      RUNNER:  pick MATERIAL → Sweep → run_sweep → checkpoints/<material>.pkl
+notebooks/analysis.ipynb  VIZ:     load that checkpoint → all figures (no sweeps here)
 scan.py            root shim → cxr_mc.scan (guarded; python scan.py, or cxr scan)
-export_pdf.py      root shim → cxr_mc.export (analysis.ipynb → PDF, or cxr export)
+export_pdf.py      root shim → cxr_mc.export (notebooks/analysis.ipynb → PDF, or cxr export)
 src/cxr_mc/     importable package: physics modules + the cxr CLI entry point
 src/cxr_mc/data/  crystal_structures.toml, atomic_scattering_factors/, mott_transport_cross_sections/, *_qe.csv
 checks/            validation scripts + notebooks (Feranchuk anchor, Zhai Fig 1c, kinematic audit)
@@ -157,10 +157,10 @@ The workflow is **two notebooks that share the grids in `config.py`** — edit a
 material's thickness / energies / tilts / energy-grids there once and both
 notebooks pick it up.
 
-1. **`scan.ipynb`** (the runner): set `MATERIAL`, then
+1. **`notebooks/scan.ipynb`** (the runner): set `MATERIAL`, then
    `material_sweep(MATERIAL)` → `build_cases` → `run_sweep`, which writes
    `checkpoints/<material>.pkl` and streams the per-tilt statistics tables live.
-2. **`analysis.ipynb`** (the viz): set the same `MATERIAL`, `load_checkpoint`,
+2. **`notebooks/analysis.ipynb`** (the viz): set the same `MATERIAL`, `load_checkpoint`,
    `cases_from_results`, then `browse` / heatmaps / Eagle XO / Timepix /
    penetration figures. No sweeps run here.
 

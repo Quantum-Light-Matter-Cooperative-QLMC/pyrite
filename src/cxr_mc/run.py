@@ -26,17 +26,22 @@ import os
 import pickle
 import time
 from collections import defaultdict
+from pathlib import Path
 
 from .montecarlo import run_cases
 from .results import store_result
 
+# Anchored to the repo root (src/cxr_mc/run.py → parents[2] = repo root) so
+# checkpoint lookup works regardless of the notebook's kernel cwd.
+_DEFAULT_CHECKPOINT_DIR = str(Path(__file__).resolve().parents[2] / "checkpoints")
 
-def checkpoint_path_for(material, checkpoint_dir="checkpoints"):
+
+def checkpoint_path_for(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
     """Path to the per-material results checkpoint run_sweep writes."""
     return os.path.join(checkpoint_dir, f"{material}.pkl")
 
 
-def load_checkpoint(material, checkpoint_dir="checkpoints"):
+def load_checkpoint(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
     """Load a per-material results checkpoint (``checkpoints/<material>.pkl``)
     written by :func:`run_sweep`, WITHOUT re-running anything -- this is how the
     visualization notebook (analysis.ipynb) gets its ``results`` after the
@@ -73,7 +78,7 @@ def run_sweep(
     cases,
     results,
     *,
-    checkpoint_dir="checkpoints",
+    checkpoint_dir=_DEFAULT_CHECKPOINT_DIR,
     checkpoint_path=None,
     resume=True,
     max_workers=None,

@@ -35,7 +35,7 @@ Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
   `checkpoints/<material>.pkl`. Root shim: `scan.py`.
 - **`cxr slim <checkpoint>`** → `slim:slim_checkpoint` → `results.slim_results`:
   shrink a checkpoint pickle for transfer (drop wide-brem / float32 / filter configs).
-- **Notebooks**: `scan.ipynb` (sweep) → `analysis.ipynb` (viz); both read the
+- **Notebooks**: `notebooks/scan.ipynb` (sweep) → `notebooks/analysis.ipynb` (viz); both read the
   per-material grids in `config.py`.
 - **Sweep worker**: `montecarlo.run_case` (module-level so it pickles into the
   `run_cases` process pool).

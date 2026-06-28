@@ -5,7 +5,7 @@ description: Edit, validate, and sanitize the repository notebooks.
 
 # Use this skill when
 
-Use this skill when changing `scan.ipynb`, `analysis.ipynb`, or any notebook under `checks/`.
+Use this skill when changing `notebooks/scan.ipynb`, `notebooks/analysis.ipynb`, or any notebook under `checks/`.
 
 # Rules
 
