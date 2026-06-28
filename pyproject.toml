@@ -101,6 +101,12 @@ ignore = [
     "UP038",  # optional (numpy isinstance suggestions)
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# marimo notebooks (notebooks/*_app.py) display a cell's value as its bare last
+# expression (e.g. a UI element on its own line) -- that's the framework's render
+# mechanism, not a useless statement.
+"notebooks/*_app.py" = ["B018"]
+
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
