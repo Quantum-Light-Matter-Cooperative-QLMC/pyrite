@@ -37,7 +37,7 @@ def _():
         penetration_survival_chart,
         trajectory_chart,
     )
-    from cxr_mc.results import filter_results, records, show_top, sweep_values
+    from cxr_mc.results import filter_results, records, sweep_values, top_geometries
     from cxr_mc.run import cases_from_results, load_checkpoint
     from cxr_mc.sweep import MATERIAL_LABELS, build_cases
 
@@ -61,10 +61,10 @@ def _():
         plot_trajectory_grid,
         records,
         scan_charts,
-        show_top,
         spectrum_chart,
         sweep_values,
         timepix_detected_chart,
+        top_geometries,
         trajectory_chart,
         trajectory_sweep,
     )
@@ -73,15 +73,9 @@ def _():
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    # Bulk-crystal CXR — analysis & visualization (marimo)
-
+    # Bulk-crystal Coherent X-ray Radiation — analysis & visualization
     Loads the checkpoint written by **`scan_app.py`** and draws every figure — no
-    sweep runs here (only the cheap, CPU-only electron transport behind the
-    penetration figures). Interactive Vega-Lite charts (intrinsic spectra, detector
-    views, parametric scans, survival) replace the matplotlib `browse()` sliders;
-    pick the material + polar tilt below and everything re-renders reactively. A few
-    figures stay on matplotlib (efficiency curves, the datashader trajectory grid,
-    the cross-material comparison).
+    sweep runs here.
     """)
     return
 
@@ -119,21 +113,17 @@ def _(cases_from_results, default_settings, filter_results, load_checkpoint, mat
 
 
 @app.cell
-def _(MATERIAL, mo, records, res, settings, show_top):
-    # Compact, ranked "best geometries" table (bright + well-defined line).
-    mo.stop(
-        not records(res),
-        mo.md(f"**No checkpoint for `{MATERIAL}`** — run `scan_app.py` for it first."),
-    )
-    show_top(res, settings, top_n=15, select="quality_peak")
-    return
-
-
-@app.cell
 def _(mo, records, res, sweep_values):
     # What's actually in this checkpoint -- swept knobs and their values (a pickle
     # accumulates every case ever run). Slice with results.select_results if needed.
-    sweep_values(res) if records(res) else mo.md("*(load a checkpoint above)*")
+    # Tucked in a collapsible accordion: secondary detail, open it when you need it.
+    mo.accordion(
+        {
+            "Checkpoint contents (swept knobs & values)": (
+                sweep_values(res) if records(res) else mo.md("*(load a checkpoint above)*")
+            )
+        }
+    )
     return
 
 
@@ -147,180 +137,216 @@ def _(mo, records, res):
     return (tilt_ui,)
 
 
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Intrinsic spectra
-
-    The coherent line spectrum at the selected polar tilt, one line per beam energy
-    (brem as a faint dashed underlay). Pan/zoom directly in the chart.
-    """)
-    return
-
-
 @app.cell
-def _(mo, res, settings, spectrum_chart, tilt_ui):
-    _chart = spectrum_chart(res, settings, tilt_deg=tilt_ui.value)
-    _chart if _chart is not None else mo.md("*No spectra — run the scan first.*")
-    return
+def _(
+    MATERIAL,
+    MATERIAL_LABELS,
+    build_cases,
+    cases,
+    eaglexo_charge_chart,
+    eaglexo_detected_chart,
+    load_checkpoint,
+    metric_vs_chart,
+    mo,
+    penetration_survival_chart,
+    plot_best_spectra,
+    plot_eaglexo_charge_map,
+    plot_eaglexo_efficiency,
+    plot_material_comparison,
+    plot_timepix_efficiency,
+    plot_trajectory_grid,
+    records,
+    res,
+    scan_charts,
+    settings,
+    spectrum_chart,
+    tilt_ui,
+    timepix_detected_chart,
+    top_geometries,
+    trajectory_chart,
+    trajectory_sweep,
+):
+    # All figures live in one lazy, tabbed layout. Each tab value is a zero-arg
+    # builder closure (not a pre-built object), so `lazy=True` defers the *compute*
+    # — only the open tab runs. The expensive matplotlib panels are nested in
+    # `lazy` accordions; the builders return a Figure, which marimo renders on
+    # expand. Closures capture `tilt_ui.value`, so switching tilt rebuilds the
+    # tabs and the next view recomputes with the new tilt.
+    _tilt = tilt_ui.value
 
+    def _rankings_tab():
+        df = top_geometries(res, settings, top_n=20, select="quality_peak")
+        if df.empty:
+            return mo.md(f"**No checkpoint for `{MATERIAL}`** — run `scan_app.py` first.")
+        return mo.vstack(
+            [
+                mo.md(
+                    f"Top 20 geometries ranked by *quality × peak flux* "
+                    f"({settings.beam_current_na:g} nA beam; quality score in [0, 1])."
+                ),
+                mo.ui.table(
+                    df,
+                    pagination=False,
+                    selection=None,
+                    show_column_summaries=False,
+                    show_data_types=False,
+                    style_cell=lambda col, row_id, val: {"white-space": "nowrap"},
+                ),
+            ]
+        )
 
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Geometry selection & parameter scans
+    def _spectra_tab():
+        _md = mo.md(
+            "The coherent line spectrum at the selected polar tilt, one line per "
+            "beam energy (brem as a faint dashed underlay). Pan/zoom in the chart."
+        )
+        _chart = spectrum_chart(res, settings, tilt_deg=_tilt)
+        return mo.vstack(
+            [_md, _chart if _chart is not None else mo.md("*No spectra — run the scan first.*")]
+        )
 
-    `scan_charts` auto-picks a heatmap (both axes sweep many values) or line scans
-    (an axis is fixed / sparse), one chart per quantity. Below it: the best dozen
-    geometries (matplotlib) and explicit 1-D metric scans.
-    """)
-    return
+    def _scans_tab():
+        # Each plot is a separate mo.lazy(fn) so the tab returns instantly with
+        # placeholders; scans, metric lines, and the best-spectra accordion each
+        # compute and render independently as they become visible.
+        def _scan_charts_item():
+            charts = scan_charts(res, settings, cases=cases, line_metric="prominence")
+            return mo.vstack(charts) if charts else mo.md("*No scan results.*")
 
+        def _metric_lines_item():
+            line = metric_vs_chart(res, settings, x="tilt_deg", metric="line_flux", hue="E0_keV")
+            peak = metric_vs_chart(res, settings, x="tilt_deg", metric="peak_flux", hue="E0_keV")
+            parts = [c for c in (line, peak) if c is not None]
+            return mo.vstack(parts) if parts else mo.md("*No metric results.*")
 
-@app.cell
-def _(cases, mo, res, scan_charts, settings):
-    _charts = scan_charts(res, settings, cases=cases, line_metric="prominence")
-    mo.vstack(_charts) if _charts else mo.md("*No results to scan.*")
-    return
+        return mo.vstack(
+            [
+                mo.md(
+                    "`scan_charts` auto-picks a heatmap or line scans (one per swept quantity); "
+                    "then 1-D metric scans vs polar tilt. Each section loads as it becomes "
+                    "visible. The best-spectra panel loads on expand."
+                ),
+                mo.lazy(_scan_charts_item, show_loading_indicator=True),
+                mo.lazy(_metric_lines_item, show_loading_indicator=True),
+                mo.accordion(
+                    {
+                        "Best spectra (matplotlib)": lambda: plot_best_spectra(
+                            res, settings, top_n=12, select="quality_peak"
+                        )
+                    },
+                    lazy=True,
+                ),
+            ]
+        )
 
+    def _detectors_tab():
+        # Eagle XO and Timepix3 are nested sub-tabs (lazy=True) rather than a
+        # dropdown: a mo.ui.dropdown created inside a lazy builder isn't in
+        # marimo's reactive DAG, so it can't drive re-renders. Nested tabs manage
+        # their own state and defer each detector's compute until selected.
+        def _eaglexo_inner():
+            _md = mo.md(
+                "Raptor Eagle XO direct-detection CCD (`solid_angle x QE(E)`): soft PXR "
+                "lines pass at ~90% QE, hard brem is crushed by the thin sensor. "
+                "Photon density (detected vs incident), then recorded-charge density."
+            )
+            _detected = eaglexo_detected_chart(res, settings, tilt_deg=_tilt)
+            _charge = eaglexo_charge_chart(res, settings, tilt_deg=_tilt)
+            _parts = [_md, *(c for c in (_detected, _charge) if c is not None)]
+            _parts.append(
+                mo.accordion(
+                    {
+                        "Efficiency: QE + solid angle + resolution (matplotlib)": lambda: (
+                            plot_eaglexo_efficiency(sensor="4240")
+                        ),
+                        "Charge geometry map (matplotlib)": lambda: (
+                            plot_eaglexo_charge_map(res, settings, cases=cases)
+                            if records(res)
+                            else mo.md("*No results.*")
+                        ),
+                    },
+                    lazy=True,
+                )
+            )
+            return mo.vstack(_parts)
 
-@app.cell
-def _(metric_vs_chart, mo, res, settings):
-    _line = metric_vs_chart(res, settings, x="tilt_deg", metric="line_flux", hue="E0_keV")
-    _peak = metric_vs_chart(res, settings, x="tilt_deg", metric="peak_flux", hue="E0_keV")
-    mo.vstack([c for c in (_line, _peak) if c is not None]) or mo.md("*No results.*")
-    return
+        def _timepix_inner():
+            _md = mo.md(
+                "Si quad forward model: photoabsorption → charge sharing → per-pixel "
+                "threshold counting. Detected vs incident at the selected tilt."
+            )
+            _detected = timepix_detected_chart(res, settings, tilt_deg=_tilt)
+            _parts = [_md, *([_detected] if _detected is not None else [])]
+            _parts.append(
+                mo.accordion(
+                    {
+                        "Efficiency curve (matplotlib)": lambda: plot_timepix_efficiency(
+                            thickness_um=300.0, bias_v=100.0
+                        )
+                    },
+                    lazy=True,
+                )
+            )
+            return mo.vstack(_parts)
 
+        return mo.ui.tabs({"Eagle XO": _eaglexo_inner, "Timepix3": _timepix_inner}, lazy=True)
 
-@app.cell
-def _(plot_best_spectra, res, settings):
-    plot_best_spectra(res, settings, top_n=12, select="quality_peak")
-    return
+    def _penetration_tab():
+        _md = mo.md(
+            "Surviving-electron fraction vs depth (one curve per beam energy) and "
+            "an interactive low-Ne track cross-section. These run the cheap CPU-only "
+            "transport directly — no checkpoint needed. Dense grid loads on expand."
+        )
+        _sweep = trajectory_sweep(MATERIAL, n_tilts=9, energies=(30, 60))
+        _traj = build_cases(_sweep, settings.n_electrons, settings.n_electrons_brem)
+        if not _traj:
+            return mo.vstack([_md, mo.md("*No trajectory cases.*")])
+        _survival = penetration_survival_chart(_traj, Ne=500)
+        # Pick closest to normal incidence at the lowest energy: grazing cases
+        # produce near-invisible horizontal tracks in the beam-detector frame.
+        _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"]), c["E0_keV"]))
+        _track = trajectory_chart(_nc, Ne=40)
+        _parts = [_md, *(p for p in (_survival, _track) if p is not None)]
+        _parts.append(
+            mo.accordion(
+                {
+                    "Dense penetration grid (datashader, matplotlib)": lambda: plot_trajectory_grid(
+                        _traj, energy=30, Ne=120
+                    )
+                },
+                lazy=True,
+            )
+        )
+        return mo.vstack(_parts)
 
+    def _cross_material_tab():
+        _md = mo.md(
+            "For every material whose checkpoint exists, the single best geometry's "
+            "dominant line: energy vs flux, coloured by line quality."
+        )
+        _by_material = {}
+        for _m in MATERIAL_LABELS:
+            _r = load_checkpoint(_m)
+            if _r:
+                _by_material[MATERIAL_LABELS[_m]] = _r
+        if len(_by_material) >= 2:
+            return mo.vstack(
+                [_md, plot_material_comparison(_by_material, settings, select="quality_peak")]
+            )
+        return mo.vstack(
+            [_md, mo.md("*Run `scan_app.py` for more materials to populate this comparison.*")]
+        )
 
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Eagle XO detector response
-
-    The Raptor Eagle XO direct-detection CCD (`solid_angle x QE(E)`): soft PXR lines
-    pass at ~90% QE while hard brem is crushed by the thin sensor. Photon-density
-    (detected vs incident, with the QE envelope), then the recorded-charge density —
-    a CCD integrates charge, weighting each photon by E/W_Si.
-    """)
-    return
-
-
-@app.cell
-def _(plot_eaglexo_efficiency):
-    plot_eaglexo_efficiency(sensor="4240")  # QE + solid angle + resolution
-    return
-
-
-@app.cell
-def _(eaglexo_detected_chart, mo, res, settings, tilt_ui):
-    _chart = eaglexo_detected_chart(res, settings, tilt_deg=tilt_ui.value)
-    _chart if _chart is not None else mo.md("*No detector spectra yet.*")
-    return
-
-
-@app.cell
-def _(eaglexo_charge_chart, mo, res, settings, tilt_ui):
-    _chart = eaglexo_charge_chart(res, settings, tilt_deg=tilt_ui.value)
-    _chart if _chart is not None else mo.md("*No charge spectra yet.*")
-    return
-
-
-@app.cell
-def _(cases, mo, plot_eaglexo_charge_map, res, records, settings):
-    # Geometry map of the recorded charge rate (best per cell); auto-lines a thin axis.
-    plot_eaglexo_charge_map(res, settings, cases=cases) if records(res) else mo.md("*No results.*")
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Timepix3 detector response (optional comparison)
-
-    The Si quad forward model: photoabsorption → charge sharing → per-pixel
-    threshold counting. Detected vs incident at the selected tilt.
-    """)
-    return
-
-
-@app.cell
-def _(plot_timepix_efficiency):
-    plot_timepix_efficiency(thickness_um=300.0, bias_v=100.0)
-    return
-
-
-@app.cell
-def _(mo, res, settings, timepix_detected_chart, tilt_ui):
-    _chart = timepix_detected_chart(res, settings, tilt_deg=tilt_ui.value)
-    _chart if _chart is not None else mo.md("*No detector spectra yet.*")
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Electron penetration
-
-    Surviving-electron fraction vs depth (one curve per beam energy), an interactive
-    low-Ne trajectory cross-section, and the dense datashader penetration grid
-    (matplotlib). These run the cheap CPU-only transport directly — no checkpoint
-    needed.
-    """)
-    return
-
-
-@app.cell
-def _(MATERIAL, build_cases, penetration_survival_chart, settings, trajectory_sweep):
-    traj_sweep = trajectory_sweep(MATERIAL, n_tilts=9, energies=(30, 60))
-    traj_cases = build_cases(traj_sweep, settings.n_electrons, settings.n_electrons_brem)
-    penetration_survival_chart(traj_cases, Ne=500)
-    return (traj_cases,)
-
-
-@app.cell
-def _(mo, traj_cases, trajectory_chart):
-    # Interactive vector cross-section (low Ne) -- pan/zoom/hover individual tracks.
-    _chart = trajectory_chart(traj_cases[0], Ne=40) if traj_cases else None
-    _chart if _chart is not None else mo.md("*No trajectory cases.*")
-    return
-
-
-@app.cell
-def _(plot_trajectory_grid, traj_cases):
-    # Dense datashader penetration grid (one beam energy); stays on matplotlib.
-    plot_trajectory_grid(traj_cases, energy=30, Ne=120)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Cross-material comparison
-
-    For every material whose checkpoint exists, the single best geometry's dominant
-    line: energy vs flux, coloured by line quality. (Run the scan for several
-    materials first.)
-    """)
-    return
-
-
-@app.cell
-def _(MATERIAL_LABELS, load_checkpoint, mo, plot_material_comparison, settings):
-    _by_material = {}
-    for _m in MATERIAL_LABELS:
-        _r = load_checkpoint(_m)
-        if _r:
-            _by_material[MATERIAL_LABELS[_m]] = _r
-    (
-        plot_material_comparison(_by_material, settings, select="quality_peak")
-        if len(_by_material) >= 2
-        else mo.md("*Run `scan_app.py` for more materials to populate this comparison.*")
+    mo.ui.tabs(
+        {
+            "Top geometries": _rankings_tab,
+            "Intrinsic spectra": _spectra_tab,
+            "Geometry & scans": _scans_tab,
+            "Detectors": _detectors_tab,
+            "Penetration": _penetration_tab,
+            "Cross-material": _cross_material_tab,
+        },
+        lazy=True,
     )
     return
 

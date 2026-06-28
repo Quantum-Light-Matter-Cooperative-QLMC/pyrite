@@ -29,6 +29,8 @@ dependencies = [
     "scipy>=1.17.1",
     "tabulate>=0.10.0",
     "tqdm>=4.68.2",
+    "vegafusion>=2.0.3",
+    "vl-convert-python>=1.9.0.post1",
     "xraydb>=4.5.8",
 ]
 
@@ -67,7 +69,7 @@ addopts = "-q"
 formats = "ipynb,md:myst"
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py313"
 line-length = 100
 
 # keep this tight; avoid duplicate exclusion logic
@@ -98,7 +100,6 @@ ignore = [
     "SIM108",
     "SIM115",
     "UP007",  # optional if you don't want typing churn
-    "UP038",  # optional (numpy isinstance suggestions)
 ]
 
 [tool.ruff.lint.per-file-ignores]

@@ -118,7 +118,8 @@ def _trajectory_data(case, Ne, seed):
         pts=np.column_stack([px, py]),  # for the shared-frame extent
         E=segs["E_keV"],
         t_fs=segs["t_ang"] / C_ANG_PER_FS,
-        z_u=r[:, 2] / u,  # penetration depth below the surface, display units
+        z_u=(r[:, 2] + 0.5 * L * v[:, 2])
+        / u,  # depth of segment ENDPOINT; transmitted electrons reach thick exactly
         elec_id=segs["elec_id"],  # emitting electron index, per segment
         L=segs["L_ang"],
         ndet=ndet,

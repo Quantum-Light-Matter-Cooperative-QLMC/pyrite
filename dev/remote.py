@@ -77,7 +77,7 @@ _MATERIAL_RE = re.compile(r"^[A-Za-z0-9_]+$")
 # what `sync` ships up: the code that changes (the src/ package now also carries
 # data/, so it travels too), plus the root scan.py shim the box invokes and
 # pyproject.toml. Not checkpoints/ (the output we pull back the other way).
-SYNC_PATHS = ["src", "scan.py", "pyproject.toml"]
+SYNC_PATHS = ["src", "scan.py", "pyproject.toml", "uv.lock", "README.md"]
 
 # text extensions whose CRLF is normalized to LF before tarring (see _add_to_tar):
 # the laptop is Windows so its working files are CRLF, and shipping those over the
@@ -93,7 +93,7 @@ def _run(cmd, **kw):
 def _ssh_capture(remote_cmd):
     """Run a remote command over ssh and return its stdout (text). Prints the
     box's stderr and aborts on a nonzero exit."""
-    r = subprocess.run(["ssh", HOST, remote_cmd], text=True, capture_output=True)
+    r = subprocess.run(["ssh", "-n", HOST, remote_cmd], text=True, capture_output=True)
     if r.returncode != 0:
         sys.stderr.write(r.stderr)
         raise SystemExit(f"ssh command failed (exit {r.returncode})")
@@ -149,11 +149,15 @@ def sync_code():
                 else:
                     _add_to_tar(t, local, p)
         _run(["scp", tarpath, f"{HOST}:/tmp/cxr_code.tgz"])
+    # -n: redirect ssh's stdin from null. Without it, ssh.exe inherits the
+    # interactive console stdin and its stdin-forwarding thread never sees EOF,
+    # so the client hangs after the remote command (tar) has already exited.
     _run(
         [
             "ssh",
+            "-n",
             HOST,
-            f"cd {REMOTE_DIR} && tar xzf /tmp/cxr_code.tgz && rm -f /tmp/cxr_code.tgz",
+            f"mkdir -p {REMOTE_DIR} && cd {REMOTE_DIR} && tar xzf /tmp/cxr_code.tgz && rm -f /tmp/cxr_code.tgz",
         ]
     )
 
@@ -164,7 +168,7 @@ def remote_scan(material, quick=False, workers=None):
         cmd += " --quick"
     if workers is not None:
         cmd += f" --workers {workers}"
-    _run(["ssh", HOST, cmd])
+    _run(["ssh", "-n", HOST, cmd])
 
 
 def pull(stems):
@@ -209,6 +213,7 @@ echo $$ > "$JOBDIR/pid"
 {{ echo "job: {jobid}"; echo "materials: {mats}"; echo "quick: {bool(quick)}"; \
 echo "workers: {workers}"; echo "started: $(date -Is)"; echo "pid: $$"; \
 }} > "$JOBDIR/meta"
+{REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 mats=({mats})
 total=${{#mats[@]}}
 n=0
@@ -252,14 +257,15 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
 
     if not no_sync:
         sync_code()
-    # create the job dir and write run.sh (script piped over stdin)
+    # create the job dir and write run.sh (script piped over stdin).
+    # Send as LF-only bytes: text=True on Windows translates \n->\r\n,
+    # which produces a CRLF run.sh that bash silently refuses to execute.
     subprocess.run(
         ["ssh", HOST, f"mkdir -p '{jobdir}' && cat > '{jobdir}/run.sh'"],
-        input=script,
-        text=True,
+        input=script.replace("\r\n", "\n").encode(),
         check=True,
     )
-    _run(["ssh", HOST, launch])
+    _run(["ssh", "-n", HOST, launch])
 
     stems = _stems(materials, quick)
     print(
@@ -386,7 +392,7 @@ def stop_job(jobid):
         'echo "stopped [{0}] $(date -Is)" > "$D/state"; '
         'echo "sent SIGTERM to job {0} (pgid $P)"'
     ).format(jobid)
-    _run(["ssh", HOST, remote])
+    _run(["ssh", "-n", HOST, remote])
 
 
 def main(argv=None):
@@ -439,34 +445,37 @@ def main(argv=None):
     sub.add_parser("sync", help="push the current code to the box only")
 
     args = ap.parse_args(argv)
-    if args.cmd == "sync":
-        sync_code()
-    elif args.cmd == "pull":
-        pull(args.material)
-    elif args.cmd == "scan":
-        if not args.no_sync:
+    match args.cmd:
+        case "sync":
             sync_code()
-        remote_scan(args.material, args.quick, args.workers)
-        stem = f"{args.material}_quick" if args.quick else args.material
-        pull([stem])
-        print(
-            f"\ndone. checkpoints/{stem}.pkl is local; open analysis.ipynb with "
-            f"MATERIAL='{stem}' (or run export_pdf.py) -- all viz/PDF stays local."
-        )
-    elif args.cmd == "start":
-        jobid = start_queue(args.materials, args.quick, args.workers, args.no_sync, args.dry_run)
-        if args.follow and not args.dry_run:
-            attach(jobid)
-    elif args.cmd == "attach":
-        attach(args.jobid)
-    elif args.cmd == "jobs":
-        list_jobs()
-    elif args.cmd == "status":
-        job_status(args.jobid)
-    elif args.cmd == "logs":
-        tail_logs(args.jobid, args.follow)
-    elif args.cmd == "stop":
-        stop_job(args.jobid)
+        case "pull":
+            pull(args.material)
+        case "scan":
+            if not args.no_sync:
+                sync_code()
+            remote_scan(args.material, args.quick, args.workers)
+            stem = f"{args.material}_quick" if args.quick else args.material
+            pull([stem])
+            print(
+                f"\ndone. checkpoints/{stem}.pkl is local; open analysis.ipynb with "
+                f"MATERIAL='{stem}' (or run export_pdf.py) -- all viz/PDF stays local."
+            )
+        case "start":
+            jobid = start_queue(
+                args.materials, args.quick, args.workers, args.no_sync, args.dry_run
+            )
+            if args.follow and not args.dry_run:
+                attach(jobid)
+        case "attach":
+            attach(args.jobid)
+        case "jobs":
+            list_jobs()
+        case "status":
+            job_status(args.jobid)
+        case "logs":
+            tail_logs(args.jobid, args.follow)
+        case "stop":
+            stop_job(args.jobid)
 
 
 if __name__ == "__main__":
