@@ -12,7 +12,7 @@ Use this skill when the task is to locate code, choose the right module, assess 
 - Prefer `src/cxr_mc/` for implementation changes.
 - Use `tests/` for fast CPU checks.
 - Use `checks/` for heavier physics validation anchors.
-- Treat `scan.ipynb` as the sweep runner and `analysis.ipynb` as the viz notebook.
+- Treat `notebooks/scan.ipynb` as the sweep runner and `notebooks/analysis.ipynb` as the viz notebook.
 - Do not rewrite `README.md`, `TODO.md`, or `docs/` unless the task is about those files.
 
 # Canonical commands

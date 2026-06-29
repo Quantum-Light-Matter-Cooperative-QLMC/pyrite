@@ -81,7 +81,7 @@ The checkpoints are the only output you need off the cluster:
 rsync -avz login-node:~/cxr-mc/checkpoints/ ./checkpoints/
 ```
 
-Then open `analysis.ipynb` (set the same `MATERIAL`) or run `cxr export` locally —
+Then open `notebooks/analysis.ipynb` (set the same `MATERIAL`) or run `cxr export` locally —
 all the matplotlib / webpdf work stays on your workstation, where that toolchain
 lives.
 

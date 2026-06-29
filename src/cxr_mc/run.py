@@ -27,12 +27,17 @@ import pickle
 import time
 from collections import defaultdict
 from functools import partial
+from pathlib import Path
 
 from .montecarlo import run_cases
 from .results import store_result
 
+# Anchored to the repo root (src/cxr_mc/run.py -> parents[2] = repo root) so
+# checkpoint lookup works regardless of the notebook's kernel cwd.
+_DEFAULT_CHECKPOINT_DIR = str(Path(__file__).resolve().parents[2] / "checkpoints")
 
-def checkpoint_path_for(material, checkpoint_dir="checkpoints"):
+
+def checkpoint_path_for(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
     """Path to the per-material results checkpoint run_sweep writes."""
     return os.path.join(checkpoint_dir, f"{material}.pkl")
 
@@ -49,11 +54,11 @@ def _checkpoint_save(checkpoint_path, results):
     os.replace(tmp, checkpoint_path)
 
 
-def load_checkpoint(material, checkpoint_dir="checkpoints"):
+def load_checkpoint(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
     """Load a per-material results checkpoint (``checkpoints/<material>.pkl``)
     written by :func:`run_sweep`, WITHOUT re-running anything -- this is how the
-    visualization notebook (analysis.ipynb) gets its ``results`` after the
-    scan-runner notebook (scan.ipynb) has produced them. Returns the
+    visualization notebook (notebooks/analysis.ipynb) gets its ``results`` after the
+    scan-runner notebook (notebooks/scan.ipynb) has produced them. Returns the
     ``{name: {E0: record}}`` store (empty dict if the checkpoint is missing).
 
     Reconstruct the sweep's case list straight from it with
@@ -61,7 +66,7 @@ def load_checkpoint(material, checkpoint_dir="checkpoints"):
     carry their own cases, so the viz notebook needs no Sweep to filter/plot."""
     path = checkpoint_path_for(material, checkpoint_dir)
     if not os.path.exists(path):
-        print(f"no checkpoint at {path} -- run scan.ipynb for {material!r} first")
+        print(f"no checkpoint at {path} -- run notebooks/scan.ipynb for {material!r} first")
         return {}
     with open(path, "rb") as f:
         results = pickle.load(f)
@@ -86,7 +91,7 @@ def run_sweep(
     cases,
     results,
     *,
-    checkpoint_dir="checkpoints",
+    checkpoint_dir=_DEFAULT_CHECKPOINT_DIR,
     checkpoint_path=None,
     resume=True,
     max_workers=None,

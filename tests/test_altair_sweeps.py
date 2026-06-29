@@ -1,0 +1,126 @@
+"""Guard tests for the Altair sweep renderers (cxr_mc.plots.altair_sweeps).
+
+Like test_altair_plots.py, these exercise only the NEW rendering layer on
+synthetic records (no GPU, no checkpoint), small enough to stay under Vega-Lite's
+default 5000-row cap so ``chart.to_dict()`` serializes. The metric prep
+(results.line_metrics / selection_score) is shared with the matplotlib path.
+"""
+
+from types import SimpleNamespace
+
+import altair as alt
+import numpy as np
+
+from cxr_mc.plots.altair_sweeps import (
+    heatmap_chart,
+    heatmap_frame,
+    metric_vs_chart,
+    metric_vs_frame,
+    scan_charts,
+)
+
+
+def _settings():
+    return SimpleNamespace(beam_current_na=1.0)
+
+
+def _record(name, E0, tilt, azim, amp, n=80):
+    E = np.linspace(1000.0, 5000.0, n)
+    spec = amp * np.exp(-(((E - 2500.0) / 40.0) ** 2))
+    brem = np.linspace(0.5, 0.1, n)
+    return {
+        "E_grid": E,
+        "spec": spec,
+        "brem": brem,
+        "scale": 1.0,
+        "case": {
+            "name": name,
+            "crystal": "HOPG",
+            "E0_keV": E0,
+            "tilt_deg": tilt,
+            "tilt_azim_deg": azim,
+            "thickness_ang": 5.0e4,
+        },
+    }
+
+
+def _store():
+    # 2 tilts x 2 azimuths (distinct configs) x 2 beam energies = 8 records.
+    store = {}
+    for tilt in (-20.0, -10.0):
+        for azim in (0.0, 30.0):
+            name = f"HOPG t{tilt} a{azim}"
+            store[name] = {
+                E0: _record(name, E0, tilt, azim, amp=abs(tilt) + 0.1 * E0 + 0.01 * azim)
+                for E0 in (30.0, 60.0)
+            }
+    return store
+
+
+# ---- metric_vs ---------------------------------------------------------------
+def test_metric_vs_frame_shape():
+    df = metric_vs_frame(_store(), _settings(), x="tilt_deg", metric="peak_flux", hue="E0_keV")
+    assert list(df.columns) == ["x", "metric", "hue"]
+    # 2 beam energies x 2 tilt values (azimuth reduced to best)
+    assert len(df) == 4
+    assert set(df["hue"]) == {"30 keV", "60 keV"}
+
+
+def test_metric_vs_frame_single_valued_x_falls_back():
+    # thickness has one value -> guard substitutes a swept knob (tilt_deg)
+    df = metric_vs_frame(_store(), _settings(), x="thickness_ang", metric="peak_flux", hue="E0_keV")
+    assert len(df) == 4  # 2 energies x 2 tilts, not a single stacked x
+
+
+def test_metric_vs_chart_builds_valid_spec():
+    chart = metric_vs_chart(_store(), _settings(), x="tilt_deg", metric="peak_flux")
+    assert isinstance(chart, alt.Chart)
+    chart.to_dict()  # raises if malformed
+
+
+def test_metric_vs_chart_none_on_empty():
+    assert metric_vs_chart({}, _settings()) is None
+
+
+# ---- heatmap -----------------------------------------------------------------
+def test_heatmap_frame_shape():
+    df = heatmap_frame(
+        _store(), _settings(), quantity="peak_flux", x="tilt_azim_deg", y="tilt_deg", panel="E0_keV"
+    )
+    assert list(df.columns) == ["x", "y", "panel", "value"]
+    # 2 panels x (2 azimuths x 2 tilts) = 8 cells (peak_flux is never gated)
+    assert len(df) == 8
+    assert set(df["panel"]) == {"30 keV", "60 keV"}
+
+
+def test_heatmap_chart_builds_valid_spec():
+    chart = heatmap_chart(_store(), _settings(), quantity="peak_flux")
+    spec = chart.to_dict()  # raises if malformed
+    assert "facet" in spec
+
+
+def test_heatmap_chart_accepts_quantity_triple():
+    chart = heatmap_chart(_store(), _settings(), quantity=("peak_flux", "my label", "magma"))
+    spec = chart.to_dict()
+    assert spec["spec"]["encoding"]["color"]["scale"]["scheme"] == "magma"
+
+
+def test_heatmap_chart_none_on_empty():
+    assert heatmap_chart({}, _settings()) is None
+
+
+# ---- scan (auto-pick) --------------------------------------------------------
+def test_scan_charts_force_lines_one_per_quantity():
+    charts = scan_charts(_store(), _settings(), force="lines")
+    assert len(charts) == 8  # the default _HEATMAP_QUANTITIES set
+    assert all(isinstance(c, alt.Chart) for c in charts)
+
+
+def test_scan_charts_force_heatmap():
+    charts = scan_charts(_store(), _settings(), force="heatmap")
+    assert len(charts) == 8
+    assert all("facet" in c.to_dict() for c in charts)
+
+
+def test_scan_charts_empty():
+    assert scan_charts({}, _settings()) == []

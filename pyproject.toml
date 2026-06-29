@@ -5,7 +5,8 @@ description = "Coherent X-ray radiation (PXR + coherent bremsstrahlung) from tab
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "cupy-cuda13x>=14.1.1",
+    "altair>=6.2.2",
+    "cupy-cuda13x[ctk]>=14.1.1",
     "datashader>=0.19.1",
     "ipykernel>=7.3.0",
     "ipympl>=0.10.0",
@@ -13,6 +14,7 @@ dependencies = [
     "jupyter-mcp-server>=1.0.2",
     "jupyterlab==4.4.1",
     "jupytext>=1.19.4",
+    "marimo[recommended]>=0.23.11",
     "matplotlib>=3.11.0",
     "nbconvert>=7.17.1",
     "nbqa>=1.9.1",
@@ -27,6 +29,8 @@ dependencies = [
     "scipy>=1.17.1",
     "tabulate>=0.10.0",
     "tqdm>=4.68.2",
+    "vegafusion>=2.0.3",
+    "vl-convert-python>=1.9.0.post1",
     "xraydb>=4.5.8",
 ]
 
@@ -68,7 +72,7 @@ formats = "ipynb,md:myst"
 include = ["src"]
 
 [tool.ruff]
-target-version = "py312"
+target-version = "py313"
 line-length = 100
 
 # keep this tight; avoid duplicate exclusion logic
@@ -99,6 +103,10 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "*.ipynb" = ["F821"]  # cross-cell references are always undefined to static analysis
+# marimo notebooks (notebooks/*_app.py) display a cell's value as its bare last
+# expression (e.g. a UI element on its own line) -- that's the framework's render
+# mechanism, not a useless statement.
+"notebooks/*_app.py" = ["B018"]
 
 [tool.ruff.format]
 quote-style = "double"

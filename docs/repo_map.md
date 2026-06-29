@@ -35,7 +35,7 @@ Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
   `checkpoints/<material>.pkl`. Root shim: `scan.py`.
 - **`cxr slim <checkpoint>`** → `slim:slim_checkpoint` → `results.slim_results`:
   shrink a checkpoint pickle for transfer (drop wide-brem / float32 / filter configs).
-- **Notebooks**: `scan.ipynb` (sweep) → `analysis.ipynb` (viz); both read the
+- **Notebooks**: `notebooks/scan.ipynb` (sweep) → `notebooks/analysis.ipynb` (viz); both read the
   per-material grids in `config.py`.
 - **Sweep worker**: `montecarlo.run_case` (module-level so it pickles into the
   `run_cases` process pool).
@@ -150,6 +150,13 @@ freezes the export set). Submodule DAG (leaf → driver):
 - `interactive` — `browse`, `browse_plotly`, `stream_chunk`, `plot_chunk`
   (the slider/streaming drivers that dispatch to the `spectra`/`detectors`
   drawers). Top of the DAG. Deps: `_style`, `_common`, `spectra`, `detectors`.
+- `altair_spectra` — Altair/Vega-Lite renderer for the intrinsic spectra
+  (`spectrum_chart`, `spectrum_frame`): a fast, interactive alternative to the
+  matplotlib `spectra` figures, sharing `_common._line_brem` so the physics is
+  identical. Intentionally **NOT** re-exported from the package (would break the
+  frozen export guard) — import via `cxr_mc.plots.altair_spectra`. First slice of
+  the matplotlib → altair migration (`tests/test_altair_plots.py`). Deps:
+  `_common`, `results`, `altair`, `pandas`.
 - Deps: `montecarlo`, `results`, `timepix_response`, `eaglexo_response`.
 
 ## Detector forward models

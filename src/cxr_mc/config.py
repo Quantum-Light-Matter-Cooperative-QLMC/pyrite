@@ -187,11 +187,19 @@ def trajectory_sweep(material, *, n_tilts=9, energies=(30, 60), tilt_span=80.0):
     """A small dedicated geometry sweep for the electron-penetration figures: a
     handful of polar tilts at normal azimuth, two beam energies (transport only,
     so the energy grids are irrelevant -- kept for build_cases). ``n_tilts`` panels
-    span +-``tilt_span`` degrees."""
+    span +-``tilt_span`` degrees.
+
+    Always uses ONE representative thickness: the geometric midpoint of the
+    material's thickness array if it is a sweep (e.g. HOPG), or the scalar
+    itself. This avoids inheriting a 40-element thickness loop that would (a)
+    make penetration_survival_chart silently pick the thinnest slab and (b)
+    make trajectory_chart plot nearly-invisible grazing tracks."""
     p = material_grid(material)
+    thick_arr = np.atleast_1d(np.asarray(p["thickness_ang"], dtype=float))
+    thick = float(thick_arr[len(thick_arr) // 2])
     return Sweep(
         material=material,
-        thickness_ang=p["thickness_ang"],
+        thickness_ang=thick,
         energy_keV=list(energies),
         tilt_deg=np.linspace(-tilt_span, tilt_span, n_tilts, endpoint=True),
         tilt_azim_deg=0.0,
