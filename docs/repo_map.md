@@ -54,9 +54,11 @@ imports work from any cwd.
 ### `crystallography.py`
 Crystal database, structure factors, and X-ray optical constants — the physics
 data layer under the Monte Carlo.
-- Public: `load_crystals`, `reciprocal_g_vector`, `g_mag`, `debye_waller`,
-  `structure_factor`, `chi_g`, `U_g`, `absorption_length_ang`,
-  `dominant_reflections`, `beta_from_Ee`; the `CRYSTALS` registry.
+- Public: `load_crystals`, `load_crystal_from_cif`,
+  `diffpy_structure_to_crystal_info`, `reciprocal_g_vector`, `g_mag`,
+  `debye_waller`, `structure_factor`, `chi_g`, `U_g`,
+  `absorption_length_ang`, `dominant_reflections`, `beta_from_Ee`; the
+  `CRYSTALS` registry.
 - Deps: `atomic_form_factors`, `DATA_DIR`.
 
 ### `atomic_form_factors.py`

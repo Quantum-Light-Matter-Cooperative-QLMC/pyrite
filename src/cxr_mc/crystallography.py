@@ -24,6 +24,9 @@ CRYSTALS dict; see that file for the format. Depends on atomic_form_factors.py
 """
 
 import tomllib
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Protocol, cast
 
 import numpy as np
 
@@ -127,6 +130,80 @@ def _reciprocal_basis(lattice):
         B = 2.0 * np.pi * np.array([_cross3(a2, a3), _cross3(a3, a1), _cross3(a1, a2)]) / V
         _RECIP_BASIS_CACHE[key] = B
     return B
+
+
+class _DiffpyLatticeLike(Protocol):
+    a: float
+    b: float
+    c: float
+    alpha: float
+    beta: float
+    gamma: float
+
+
+class _DiffpyAtomLike(Protocol):
+    element: str
+    xyz: object
+
+
+class _DiffpyStructureLike(Protocol):
+    lattice: _DiffpyLatticeLike
+
+    def __iter__(self) -> Iterator[_DiffpyAtomLike]: ...
+
+
+def diffpy_structure_to_crystal_info(
+    structure: _DiffpyStructureLike, mosaic_fwhm_deg: float | None = None
+) -> dict[str, object]:
+    """
+    Convert a ``diffpy.structure.Structure``-like object to a CRYSTALS entry.
+
+    The adapter is intentionally structural only: it copies lattice lengths,
+    lattice angles, and fractional atom coordinates into the existing internal
+    representation so ``structure_factor``/``chi_g`` continue to use cxr_mc's
+    X-ray form-factor physics.
+
+    Validation: diffpy-structure-adapter
+    """
+    lattice_source = structure.lattice
+    lattice = {
+        "system": "general",
+        "a": float(lattice_source.a),
+        "b": float(lattice_source.b),
+        "c": float(lattice_source.c),
+        "alpha": float(lattice_source.alpha),
+        "beta": float(lattice_source.beta),
+        "gamma": float(lattice_source.gamma),
+    }
+    basis = [(str(atom.element), np.array(atom.xyz, dtype=float)) for atom in structure]
+
+    a1, a2, a3 = _direct_lattice_vectors(lattice)
+    return {
+        "lattice": lattice,
+        "basis": basis,
+        "V_cell": float(np.dot(a1, np.cross(a2, a3))),
+        "mosaic_fwhm_deg": mosaic_fwhm_deg,
+    }
+
+
+def load_crystal_from_cif(
+    path: str | Path, mosaic_fwhm_deg: float | None = None
+) -> dict[str, object]:
+    """
+    Load a CIF file with ``diffpy.structure`` and return a CRYSTALS entry.
+
+    The TOML database remains the packaged fallback. This helper is the explicit
+    import path for external structures whose lattice and fractional basis are
+    supplied by CIF, while cxr_mc retains ownership of X-ray scattering physics.
+
+    Validation: diffpy-structure-adapter
+    """
+    from diffpy.structure import Structure
+
+    structure = Structure(filename=str(path), format="cif")
+    return diffpy_structure_to_crystal_info(
+        cast(_DiffpyStructureLike, structure), mosaic_fwhm_deg=mosaic_fwhm_deg
+    )
 
 
 def reciprocal_g_vector(hkl, lattice):

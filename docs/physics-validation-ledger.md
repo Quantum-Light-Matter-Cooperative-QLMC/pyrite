@@ -7,7 +7,7 @@ The single source of truth for **what physics `cxr-mc` claims and whether it has
 
 **Status:** `unverified` → `filtered` (units+limits+signs) → `rederived` (independent derivation matches) → `anchored` (regression test green) → `signed-off` (human-certified). `discrepancy` = a check failed.
 
-Progress: **0 / 20 signed-off** · 1 rederived · 1 filtered · 1 blocked.
+Progress: **0 / 23 signed-off** · 1 rederived · 1 anchored · 1 filtered · 1 blocked.
 
 ## Core coherent physics (highest risk — verify first)
 
@@ -26,6 +26,7 @@ Progress: **0 / 20 signed-off** · 1 rederived · 1 filtered · 1 blocked.
 | id | claim | code | source | status | checks | anchor | notes |
 |----|-------|------|--------|--------|--------|--------|-------|
 | `structure-factor` | structure factor `F(g)` + Debye–Waller | `crystallography.py::structure_factor`, `::debye_waller` | standard crystallography | unverified | — | — | |
+| `diffpy-structure-adapter` | `diffpy.structure.Structure`/CIF lattice + fractional basis conversion into the internal `CRYSTALS` entry shape | `crystallography.py::diffpy_structure_to_crystal_info`, `::load_crystal_from_cif` | diffpy.structure 3.4.0 API / CIF parser | anchored | lattice lengths/angles + basis + volume round trip | `tests/test_crystallography.py::test_diffpy_structure_adapter_accepts_installed_diffpy_structure`, `tests/test_crystallography.py::test_load_crystal_from_cif_uses_diffpy_structure` | structural-data importer only; X-ray form factors and coherent amplitudes remain in cxr_mc |
 | `atomic-form-factor` | `F(g,E) = f0(g) + f'(E) + i·f''(E)` | `atomic_form_factors.py::atomic_form_factor` | Waasmaier–Kirfel f0 + Chantler/FFAST (xraydb) | filtered | provenance re-validated | — | see `docs/atomic-data-sources.md` |
 | `mote2-bulk-structure` | 2H-MoTe2 bulk lattice + basis (a=3.517 Å, c=13.96 Å) | `data/crystal_structures.toml::mote2` | literature / Materials Project | unverified | cell volume + stoichiometry check | `tests/test_crystallography.py::test_mote2_structure_sane` | bulk material, used in bare MoTe2 scans |
 | `mote2-product-structure` | 2H-MoTe2 product-page lattice + basis used for few-layer MoTe2-on-sapphire scans | `data/crystal_structures.toml::mote2_product` | 2D Semiconductors product page | unverified | unit conversion nm→Å + cell-volume check | `tests/test_crystallography.py::test_mote2_product_structure_sane` | product-page lattice (a=3.50 Å, c=13.41 Å) differs from bulk for thin films |
