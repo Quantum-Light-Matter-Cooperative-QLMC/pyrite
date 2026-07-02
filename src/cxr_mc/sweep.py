@@ -108,22 +108,56 @@ def substrate_composition(substrate):
     )
 
 
+@dataclass(frozen=True)
+class Layer:
+    """One substrate-side layer of a stack (the film is NOT a Layer -- it is the
+    Sweep's material/thickness, which sweeps; stack layers are fixed per run).
+
+    material : a crystal key in CRYSTALS (the layer radiates its own PXR/CBS)
+        or an amorphous preset key ('sio2': absorption + brem only).
+    beam_uvw : direct-lattice direction along the surface normal (+z). None ->
+        the per-material default from crystal_params (e.g. sapphire stays c-cut,
+        matching the commercial c-cut substrates). Ignored for amorphous layers.
+    azimuth_deg : in-plane rotation of THIS layer's lattice about the surface
+        normal, relative to the film's azimuth -- i.e. which in-plane g of the
+        layer lines up with the film's. Ignored for amorphous layers.
+    """
+
+    material: str
+    thickness_ang: float
+    beam_uvw: tuple | None = None
+    azimuth_deg: float = 0.0
+
+
+def stack_layers(film_composition, film_thickness_ang, stack):
+    """Absorber stack [(z_top, z_bot, composition), ...] for a film at the
+    entrance face (z=0..t_film) followed by each :class:`Layer` in ``stack``,
+    boundaries accumulating downward. Attach as a case's ``abs_layers`` so
+    emitted lines/brem are attenuated by the WHOLE stack (each crystalline
+    layer still RADIATES via its own layer_radiator). Beam enters the film
+    side; with negative tilt (front exit) the lower layers sit BEHIND the
+    emission and do not attenuate -- they bite the back-exit / transmission
+    geometry. See docs/multilayer-materials.md."""
+    t_f = float(film_thickness_ang)
+    layers = [(0.0, t_f, [(el, float(n)) for el, n in film_composition])]
+    z = t_f
+    for lay in stack:
+        t = float(lay.thickness_ang)
+        layers.append((z, z + t, substrate_composition(lay.material)))
+        z += t
+    return layers
+
+
 def film_on_substrate_layers(
     film_composition, film_thickness_ang, substrate, substrate_thickness_ang
 ):
-    """Absorber stack [(z_top, z_bot, composition), ...] for a film at the
-    entrance face (z=0..t_film) on a substrate (t_film..t_film+t_sub). Attach as
-    a case's ``abs_layers`` so emitted lines/brem are attenuated by the WHOLE
-    stack (the film still RADIATES via the case's crystal/hkl_list). Beam enters
-    the film side; with negative tilt (front exit) the substrate sits BEHIND the
-    emission and does not attenuate -- it bites the back-exit / transmission
-    geometry. See docs/multilayer-materials.md."""
-    t_f = float(film_thickness_ang)
-    t_s = float(substrate_thickness_ang)
-    return [
-        (0.0, t_f, [(el, float(n)) for el, n in film_composition]),
-        (t_f, t_f + t_s, substrate_composition(substrate)),
-    ]
+    """The 2-layer special case of :func:`stack_layers`: one film on one
+    substrate (kept as the stable public name for that common stack)."""
+    return stack_layers(
+        film_composition,
+        film_thickness_ang,
+        (Layer(substrate, substrate_thickness_ang),),
+    )
 
 
 def substrate_radiator(substrate, n_families=4):
@@ -148,6 +182,20 @@ def substrate_radiator(substrate, n_families=4):
         f"unknown substrate {substrate!r}; use one of {list(_SUBSTRATE_COMP)} "
         f"or a crystal key in {list(CRYSTALS)}"
     )
+
+
+def layer_radiator(layer: "Layer", n_families: int = 4):
+    """Coherent radiator params for one stack :class:`Layer`, or None if the
+    layer is amorphous. Same dict as :func:`substrate_radiator` plus the
+    per-layer orientation: ``beam_uvw`` (overridden if the Layer sets one) and
+    ``azimuth_rad`` (the Layer's in-plane rotation, radians)."""
+    rad = substrate_radiator(layer.material, n_families)
+    if rad is None:
+        return None
+    if layer.beam_uvw is not None:
+        rad["beam_uvw"] = tuple(layer.beam_uvw)
+    rad["azimuth_rad"] = float(np.deg2rad(layer.azimuth_deg))
+    return rad
 
 
 def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
@@ -324,6 +372,12 @@ class Sweep:
     # only brem + absorption.
     substrate: str | None = None  # "sio2" | a crystal key e.g. "silicon"/"sapphire"
     substrate_thickness_ang: float = 5e6  # 0.5 mm default
+    # general N-layer stack under the film (mutually exclusive with substrate=;
+    # substrate="x" is sugar for stack=(Layer("x", substrate_thickness_ang),)).
+    # Each Layer carries its own thickness + orientation (beam_uvw, azimuth_deg),
+    # so e.g. a few-layer film / thin a-SiO2 / thick crystalline Si device stack
+    # is stack=(Layer("sio2", 2850), Layer("silicon", 5e6)).
+    stack: Sequence[Layer] | None = None
 
 
 def _seq(x):
@@ -381,6 +435,13 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
 
     line_triple, brem_triple = _triple(line_grid), _triple(brem_grid)
 
+    # normalize the substrate sugar onto the general stack (mutually exclusive)
+    stack = sweep.stack
+    if sweep.substrate is not None:
+        if stack is not None:
+            raise ValueError("give either substrate= or stack=, not both")
+        stack = (Layer(sweep.substrate, sweep.substrate_thickness_ang),)
+
     cases = []
     for i_c, (thickness, tilt, azim) in enumerate(
         product(_seq(sweep.thickness_ang), _seq(sweep.tilt_deg), _seq(sweep.tilt_azim_deg))
@@ -388,26 +449,23 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
         name = f"{label} {fmt_thickness(thickness)} pol={tilt:g} az={azim:g}"
         abs_layers = None
         layer_radiators = None
-        if sweep.substrate is not None:
-            name = f"{name} on {sweep.substrate}"
-            abs_layers = film_on_substrate_layers(
-                cp["composition"],
-                thickness,
-                sweep.substrate,
-                sweep.substrate_thickness_ang,
-            )
+        if stack is not None:
+            name = f"{name} on {'+'.join(lay.material for lay in stack)}"
+            abs_layers = stack_layers(cp["composition"], thickness, stack)
             # per-layer coherent radiators, aligned with abs_layers: the film (its
-            # own crystal params) and the substrate (crystal params if crystalline,
-            # None if amorphous). This is what lets a crystalline substrate emit
-            # its own PXR/CBS lines (per-layer radiation, slice 3).
+            # own crystal params) then one per stack Layer (crystal params + the
+            # Layer's own orientation if crystalline, None if amorphous). This is
+            # what lets a crystalline substrate emit its own PXR/CBS lines
+            # (per-layer radiation, slice 3).
             layer_radiators = [
                 dict(
                     crystal=cp["crystal"],
                     hkl_list=cp["hkl_list"],
                     B_ang2=cp["B_ang2"],
                     beam_uvw=beam_uvw,
+                    azimuth_rad=0.0,  # stack azimuths are relative to the film
                 ),
-                substrate_radiator(sweep.substrate, sweep.n_families),
+                *(layer_radiator(lay, sweep.n_families) for lay in stack),
             ]
         for i_e, E0 in enumerate(energies):
             cases.append(

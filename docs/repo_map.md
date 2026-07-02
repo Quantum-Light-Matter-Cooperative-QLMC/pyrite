@@ -90,8 +90,10 @@ re-exported from the package**, so `from cxr_mc.montecarlo import X` is unchange
 
 ### `sweep.py`
 Turns a `Sweep` definition into the Cartesian product of `run_case` dicts.
-- Public: `Sweep` (dataclass of all knobs), `build_cases`, `crystal_params`,
-  `substrate_composition`, `film_on_substrate_layers`, `geometry_table`,
+- Public: `Sweep` (dataclass of all knobs), `Layer` (one stack layer: material,
+  thickness, orientation), `build_cases`, `crystal_params`,
+  `substrate_composition`, `stack_layers`, `film_on_substrate_layers`,
+  `layer_radiator`, `substrate_radiator`, `geometry_table`,
   `fmt_thickness`; the `MATERIAL_LABELS` registry.
 - Deps: `crystallography`.
 

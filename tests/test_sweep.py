@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from cxr_mc.config import MATERIALS, material_grid, material_sweep
+from cxr_mc.config import MATERIALS, material_grid, material_sweep, trajectory_sweep
 from cxr_mc.sweep import MATERIAL_LABELS, Sweep, build_cases, crystal_params
 
 ALL = [
@@ -90,3 +90,42 @@ def test_mote2_material_grid_matches_few_layer_sapphire_product():
 
     override = material_sweep("mote2", substrate="sio2")
     assert override.substrate == "sio2"
+
+
+def test_named_stack_registered():
+    # a registry key can name a full STACK: film crystal + substrate-side layers,
+    # runnable via `cxr scan <key>` like any single material
+    assert "mos2-on-sio2-si" in MATERIALS
+    sweep = material_sweep("mos2-on-sio2-si")
+    assert sweep.material == "mos2"
+    assert sweep.stack is not None
+    assert [lay.material for lay in sweep.stack] == ["sio2", "silicon"]
+
+    case = build_cases(sweep, 10, 5)[0]
+    assert case["crystal"] == "mos2"
+    assert len(case["abs_layers"]) == 3
+
+    # the penetration-figure sweep resolves the FILM crystal too
+    assert trajectory_sweep("mos2-on-sio2-si").material == "mos2"
+
+
+def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
+    # the checkpoint must be named for the REGISTRY key, not the film crystal --
+    # otherwise `cxr scan mos2-on-sio2-si` would clobber/resume plain mos2.pkl
+    # (run_sweep's default derives the name from cases[0]["crystal"]).
+    import argparse
+
+    from cxr_mc import scan
+
+    seen = {}
+
+    def fake_run_sweep(cases, results, checkpoint_dir=None, checkpoint_path=None, **kw):
+        seen["path"] = checkpoint_path
+
+    monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
+    args = argparse.Namespace(
+        material="mos2-on-sio2-si", workers=0, quick=False, checkpoint_dir=str(tmp_path)
+    )
+    scan.run(args)
+    assert seen["path"] is not None
+    assert seen["path"].endswith("mos2-on-sio2-si.pkl")

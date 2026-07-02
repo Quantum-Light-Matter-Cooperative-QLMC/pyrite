@@ -72,13 +72,13 @@ def run(args):
         f"{len({c['name'] for c in cases})} configs" + (" (quick grid)" if args.quick else "")
     )
 
+    # Always pass an explicit path named for the REGISTRY key: run_sweep's
+    # default derives the name from the film crystal, which would make a named
+    # stack (e.g. mos2-on-sio2-si) clobber/resume the plain film's checkpoint.
     # A --quick smoke test writes to its OWN checkpoint (<material>_quick.pkl), so
     # its coarse off-grid points never contaminate the real per-material sweep.
-    ckpt = (
-        os.path.join(args.checkpoint_dir, f"{args.material}_quick.pkl")
-        if args.quick
-        else None  # None -> run_sweep derives <material>.pkl
-    )
+    stem = f"{args.material}_quick" if args.quick else args.material
+    ckpt = os.path.join(args.checkpoint_dir, f"{stem}.pkl")
     results = {}
     run_sweep(
         cases,
@@ -88,7 +88,6 @@ def run(args):
         max_workers=args.workers,
     )
     n = sum(len(v) for v in results.values())
-    stem = f"{args.material}_quick" if args.quick else args.material
     print(f"done -> {args.checkpoint_dir}/{stem}.pkl ({n} records)")
 
 

@@ -17,9 +17,12 @@ from cxr_mc.montecarlo import (
     simulate_trajectories,
 )
 from cxr_mc.sweep import (
+    Layer,
     Sweep,
     build_cases,
     film_on_substrate_layers,
+    layer_radiator,
+    stack_layers,
     substrate_composition,
     substrate_radiator,
 )
@@ -206,3 +209,130 @@ def test_build_cases_layer_radiators_match_stack():
     )[0]
     assert cryst["layer_radiators"][1]["crystal"] == "sapphire"
     assert len(cryst["layer_radiators"]) == len(cryst["abs_layers"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# N-layer stacks (Sweep.stack / Layer): the film plus an arbitrary list of
+# substrate-side layers, each with its own thickness + crystal orientation.
+
+
+def test_stack_layers_three_layer_boundaries():
+    # film (0..t_f) then each stack layer stacked below with cumulative z bounds
+    film = [("Mo", 0.011), ("S", 0.023)]
+    layers = stack_layers(film, 100.0, [Layer("sio2", 900.0), Layer("silicon", 5e6)])
+    assert [(z0, z1) for z0, z1, _ in layers] == [
+        (0.0, 100.0),
+        (100.0, 1000.0),
+        (1000.0, 1000.0 + 5e6),
+    ]
+    assert layers[0][2] == [("Mo", 0.011), ("S", 0.023)]
+    assert layers[1][2] == substrate_composition("sio2")
+    assert layers[2][2] == substrate_composition("silicon")
+
+
+def test_layer_radiator_orientation_overrides():
+    # amorphous layer -> no coherent radiator
+    assert layer_radiator(Layer("sio2", 900.0)) is None
+    # crystalline layer: beam_uvw + in-plane azimuth are per-layer specifiable
+    rad = layer_radiator(Layer("silicon", 5e6, beam_uvw=(1, 1, 1), azimuth_deg=30.0))
+    assert rad is not None
+    assert rad["crystal"] == "silicon"
+    assert rad["beam_uvw"] == (1, 1, 1)
+    assert rad["azimuth_rad"] == pytest.approx(np.pi / 6)
+    # sapphire keeps its hardcoded c-cut default when not overridden
+    sap = layer_radiator(Layer("sapphire", 5e6))
+    assert sap is not None
+    assert sap["beam_uvw"] == (0, 0, 1)
+    assert sap["azimuth_rad"] == 0.0
+
+
+def test_build_cases_stack_three_layers():
+    sw = Sweep(
+        material="mos2",
+        thickness_ang=100.0,
+        tilt_deg=-30.0,
+        energy_keV=30.0,
+        stack=(Layer("sio2", 900.0), Layer("silicon", 5e6, azimuth_deg=15.0)),
+    )
+    case = build_cases(sw)[0]
+    assert len(case["abs_layers"]) == len(case["layer_radiators"]) == 3
+    film_rad, oxide, si = case["layer_radiators"]
+    assert film_rad["crystal"] == "mos2"
+    assert oxide is None
+    assert si["crystal"] == "silicon"
+    assert si["azimuth_rad"] == pytest.approx(np.deg2rad(15.0))
+    assert case["abs_layers"][2][0] == pytest.approx(1000.0)
+    assert "on sio2+silicon" in case["name"]
+
+
+def test_build_cases_substrate_sugar_matches_single_layer_stack():
+    kw: dict[str, Any] = dict(material="mose2", tilt_deg=-30.0, energy_keV=30.0)
+    a = build_cases(Sweep(**kw, substrate="sapphire", substrate_thickness_ang=1e6))[0]
+    b = build_cases(Sweep(**kw, stack=(Layer("sapphire", 1e6),)))[0]
+    assert a["abs_layers"] == b["abs_layers"]
+    assert a["layer_radiators"] == b["layer_radiators"]
+    assert a["name"] == b["name"]
+
+
+def test_build_cases_rejects_substrate_plus_stack():
+    with pytest.raises(ValueError):
+        build_cases(
+            Sweep(
+                material="mose2",
+                tilt_deg=-30.0,
+                energy_keV=30.0,
+                substrate="sio2",
+                stack=(Layer("silicon", 5e6),),
+            )
+        )
+
+
+def test_spectrum_case_passes_per_layer_azimuth(monkeypatch):
+    # each layer's radiator must reach mc_spectrum with ITS OWN azimuth_rad
+    from cxr_mc.montecarlo import runner
+
+    calls = []
+
+    def fake_spec(segs, E_grid, **kw):
+        calls.append(kw)
+        return np.zeros_like(E_grid)
+
+    monkeypatch.setattr(runner, "mc_spectrum", fake_spec)
+    monkeypatch.setattr(runner, "mc_brem_spectrum", lambda *a, **k: np.zeros(3))
+
+    E = np.linspace(1000.0, 3000.0, 3)
+    segs = dict(
+        layer=np.array([0, 1, 1]),
+        L_ang=np.array([1.0, 2.0, 3.0]),
+        n_backscattered=0,
+        Ne=1,
+        n_layers=2,
+    )
+    tp = dict(E_grid=E, E_brem=E, n_hat=np.array([0.0, 0.0, 1.0]), segs=segs, segs_b=segs)
+    comp = [("Mo", 0.011)]
+    case = dict(
+        crystal="mose2",
+        E0_keV=30.0,
+        composition=comp,
+        hkl_list=[(0, 0, 2)],
+        B_ang2=0.6,
+        abs_layers=[(0.0, 10.0, comp), (10.0, 20.0, [("Si", 0.05)])],
+        layer_radiators=[
+            dict(
+                crystal="mose2",
+                hkl_list=[(0, 0, 2)],
+                B_ang2=0.6,
+                beam_uvw=(0, 0, 2),
+                azimuth_rad=0.0,
+            ),
+            dict(
+                crystal="silicon",
+                hkl_list=[(2, 2, 0)],
+                B_ang2=0.46,
+                beam_uvw=(4, 4, 0),
+                azimuth_rad=0.5,
+            ),
+        ],
+    )
+    runner._spectrum_case(case, tp)
+    assert [c["azimuth_rad"] for c in calls] == [0.0, 0.5]

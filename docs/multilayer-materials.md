@@ -196,17 +196,23 @@ needs it before (A) lands.
 
 ---
 
-## Registry / "adding a stack" checklist
+## Registry / "adding a stack" checklist (implemented)
+
+N-layer stacks are live: `Sweep.stack` takes a tuple of `sweep.Layer(material,
+thickness_ang, beam_uvw=None, azimuth_deg=0.0)` — each crystalline layer radiates
+with its OWN zone axis + in-plane azimuth (relative to the film); `substrate=` remains
+the 2-layer sugar. To register a NAMED stack runnable as `cxr scan <key>`:
 
 1. `data/crystal_structures.toml` — add any crystalline substrate not present (Si and
    sapphire exist; fused-silica SiO₂ is amorphous → no entry, just a `composition`).
    **No atomic-data edits** — xraydb covers O/Al.
-2. `src/sweep.py` — `stack_params(name)` returning `layers=[…]`; add to `MATERIAL_LABELS`.
-3. `src/config.py` — a grid entry for the stack (thicknesses become per-layer).
-4. `src/montecarlo.py` — the stack-aware `T_abs`, the per-layer radiation loop, and
-   (phase A) the per-layer transport.
-5. `src/results.py` / `src/plots.py` — labels only (metrics unchanged).
-6. `CLAUDE.md` — document the stack key.
+2. `src/config.py` — a `_MATERIAL_GRIDS` entry keyed by the stack name with a
+   `"stack": (Layer(...), ...)` field, plus the key → film-crystal mapping in
+   `_STACK_FILMS`. The registry key is the CLI + checkpoint name (e.g.
+   `mos2-on-sio2-si` → `checkpoints/mos2-on-sio2-si.pkl`); the film key drives the
+   crystallography and pretty label.
+3. Done — transport, per-layer radiation, cross-stack absorption, and the plots need
+   no per-stack edits.
 
 ---
 

@@ -152,7 +152,9 @@ def _spectrum_case(case, tp):
                 B_ang2=rad["B_ang2"],
                 composition=abs_layers[L][2],
                 beam_uvw=rad.get("beam_uvw"),
-                azimuth_rad=case.get("azimuth_rad", 0.0),
+                # per-layer in-plane orientation (Layer.azimuth_deg); radiators
+                # from pre-stack checkpoints lack the key -> case-level fallback
+                azimuth_rad=rad.get("azimuth_rad", case.get("azimuth_rad", 0.0)),
                 sinc_cutoff=case.get("sinc_cutoff"),
                 chunk=spec_chunk,
                 layers=abs_layers,

@@ -24,14 +24,19 @@ from typing import NotRequired, TypedDict
 import numpy as np
 
 from .results import Settings
-from .sweep import ScalarOrSeq, Sweep
+from .sweep import Layer, ScalarOrSeq, Sweep
 
 
 class MaterialGrid(TypedDict):
     """The per-material scan grid: the geometry + energy fields that vary per
     material and are spread into :class:`sweep.Sweep`. Typing the grids with this
     (rather than ``dict[str, Any]``) lets pyright validate the literals in
-    :data:`_MATERIAL_GRIDS` and the ``**grid`` spread in :func:`material_sweep`."""
+    :data:`_MATERIAL_GRIDS` and the ``**grid`` spread in :func:`material_sweep`.
+
+    A registry key can also name a full STACK (film + substrate-side layers):
+    ``stack`` holds the :class:`sweep.Layer` list under the film, and
+    :data:`_STACK_FILMS` maps the registry key (the CLI/checkpoint name, e.g.
+    ``cxr scan mos2-on-sio2-si``) to the film crystal key."""
 
     thickness_ang: ScalarOrSeq
     energy_keV: ScalarOrSeq
@@ -40,6 +45,14 @@ class MaterialGrid(TypedDict):
     E_grid_line: np.ndarray
     E_grid_brem: np.ndarray
     substrate: NotRequired[str]
+    stack: NotRequired[tuple[Layer, ...]]
+
+
+# named-stack registry keys -> the FILM crystal key (a CRYSTALS material). Keys
+# absent here are their own film (the single-material default).
+_STACK_FILMS = {
+    "mos2-on-sio2-si": "mos2",
+}
 
 
 # When the azimuth is swept, collapse it: for each (polar tilt, energy) keep only
@@ -48,6 +61,9 @@ COLLAPSE_AZIMUTH = True
 
 # Product target: few-layer 2H-MoTe2 with c = 13.41 A (two layers per cell).
 _MOTE2_PRODUCT_LAYER_PITCH_ANG = 13.41 / 2.0
+
+# Few-layer 2H-MoS2: c = 12.294 A (crystal_structures.toml), two layers per cell.
+_MOS2_LAYER_PITCH_ANG = 12.294 / 2.0
 
 
 def default_settings():
@@ -168,6 +184,18 @@ _MATERIAL_GRIDS: dict[str, MaterialGrid] = {
         "E_grid_line": np.arange(50.0, 4500.0, 1.0),
         "E_grid_brem": np.arange(0.0, 60000.0, 25.0),
     },
+    # Named device stack: few-layer 2H-MoS2 on a thin thermal a-SiO2 (285 nm,
+    # the common device oxide -- adjust to the actual wafer) over thick
+    # crystalline Si. Run as `cxr scan mos2-on-sio2-si`.
+    "mos2-on-sio2-si": {
+        "thickness_ang": _MOS2_LAYER_PITCH_ANG * np.arange(3, 7),
+        "energy_keV": [30, 45, 60],
+        "tilt_deg": np.linspace(-85, 85, 40, endpoint=True),
+        "tilt_azim_deg": np.linspace(-85, -0.1, 15, endpoint=True),
+        "stack": (Layer("sio2", 2850.0), Layer("silicon", 5e6)),
+        "E_grid_line": np.arange(50.0, 4500.0, 1.0),
+        "E_grid_brem": np.arange(0.0, 60000.0, 25.0),
+    },
 }
 
 MATERIALS = tuple(_MATERIAL_GRIDS)
@@ -180,15 +208,18 @@ def material_grid(material) -> MaterialGrid:
     return _MATERIAL_GRIDS[material]
 
 
-def material_sweep(material, *, theta_obs_deg=90.0, **overrides):
+def material_sweep(material: str, *, theta_obs_deg=90.0, **overrides):
     """The full parametric :class:`sweep.Sweep` for ``material`` (the geometry
     the runner scans and the viz notebook reduces). ``overrides`` replace any grid
-    field, e.g. ``material_sweep("ptse2", thickness_ang=2e4)``."""
-    sweep = Sweep(material=material, theta_obs_deg=theta_obs_deg, **material_grid(material))
+    field, e.g. ``material_sweep("ptse2", thickness_ang=2e4)``. For a named-stack
+    key (:data:`_STACK_FILMS`) the Sweep's material is the film crystal; the
+    registry key stays the CLI/checkpoint name."""
+    film = _STACK_FILMS.get(material, material)
+    sweep = Sweep(material=film, theta_obs_deg=theta_obs_deg, **material_grid(material))
     return replace(sweep, **overrides) if overrides else sweep
 
 
-def trajectory_sweep(material, *, n_tilts=9, energies=(30, 60), tilt_span=80.0):
+def trajectory_sweep(material: str, *, n_tilts=9, energies=(30, 60), tilt_span=80.0):
     """A small dedicated geometry sweep for the electron-penetration figures: a
     handful of polar tilts at normal azimuth, two beam energies (transport only,
     so the energy grids are irrelevant -- kept for build_cases). ``n_tilts`` panels
@@ -203,7 +234,7 @@ def trajectory_sweep(material, *, n_tilts=9, energies=(30, 60), tilt_span=80.0):
     thick_arr = np.atleast_1d(np.asarray(p["thickness_ang"], dtype=float))
     thick = float(thick_arr[len(thick_arr) // 2])
     return Sweep(
-        material=material,
+        material=_STACK_FILMS.get(material, material),  # named stacks: the film
         thickness_ang=thick,
         energy_keV=list(energies),
         tilt_deg=np.linspace(-tilt_span, tilt_span, n_tilts, endpoint=True),
