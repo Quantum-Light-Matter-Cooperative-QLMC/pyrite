@@ -51,6 +51,7 @@ MATERIAL_LABELS = {
     "hopg": "HOPG",
     "diamond": "diamond",
     "silicon": "silicon",
+    "sapphire": "sapphire",
 }
 
 ScalarOrSeq = float | Sequence[float] | np.ndarray
@@ -86,13 +87,12 @@ def pm(*hkls):
 #   n_formula = rho[g/cc] * 0.602214 / M[g/mol], then * per-element stoichiometry
 _SUBSTRATE_COMP = {
     "sio2": [("Si", 0.02205), ("O", 0.04410)],  # fused silica, rho=2.20, M=60.08
-    "al2o3": [("Al", 0.04702), ("O", 0.07053)],  # sapphire,     rho=3.98, M=101.96
 }
 
 
 def substrate_composition(substrate):
     """Number-density composition [(element, n_per_Ang3), ...] for a substrate.
-    Amorphous presets ('sio2', 'al2o3') come from bulk density; a crystalline
+    Amorphous presets ('sio2') come from bulk density; a crystalline
     substrate already in CRYSTALS (e.g. 'silicon') uses its unit-cell density."""
     if substrate.lower() in _SUBSTRATE_COMP:
         return [(el, n) for el, n in _SUBSTRATE_COMP[substrate.lower()]]
@@ -130,7 +130,7 @@ def substrate_radiator(substrate, n_families=4):
     """Coherent-radiation crystal params for a substrate, or None if it radiates
     no lines. A CRYSTALLINE substrate (a CRYSTALS key, e.g. 'silicon') returns
     {crystal, hkl_list, B_ang2, beam_uvw} (from crystal_params) so it emits its
-    own PXR/CBS; an AMORPHOUS preset ('sio2', 'al2o3') returns None (it only
+    own PXR/CBS; an AMORPHOUS preset ('sio2') returns None (it only
     absorbs + brems). This is the per-layer-radiation half of the multilayer
     feature -- the absorber stack (film_on_substrate_layers) is the other half.
     See docs/multilayer-materials.md."""
@@ -229,6 +229,18 @@ def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
             B_ang2=0.46,
             E_grid=np.arange(100.0, 5000.0, 3.0),
         )
+    if material == "sapphire":
+        return dict(
+            crystal="sapphire",
+            composition=[
+                ("Al", n_of("sapphire", "Al")),
+                ("O", n_of("sapphire", "O")),
+            ],
+            hkl_list=dominant_reflections("sapphire", n_families=n_families, B_ang2=0.5),
+            beam_uvw=(0, 0, 1),  # c-cut sapphire: c-axis normal to the film
+            B_ang2=0.5,
+            E_grid=np.arange(100.0, 5000.0, 3.0),
+        )
     if material == "hopg":
         # HOPG is fiber-textured: only the (00l) c-axis reflections are coherent.
         return dict(
@@ -308,9 +320,9 @@ class Sweep:
     # backscatter into the film + substrate bremsstrahlung) AND cross-stack
     # self-absorption of the film's lines/brem. Every CRYSTALLINE layer radiates its
     # own coherent PXR/CBS lines (the film, and a crystalline substrate e.g.
-    # "silicon"), summed incoherently; an amorphous substrate ("sio2"/"al2o3") adds
+    # "silicon" or "sapphire"), summed incoherently; an amorphous substrate ("sio2") adds
     # only brem + absorption.
-    substrate: str | None = None  # "sio2" | "al2o3" | a crystal key e.g. "silicon"
+    substrate: str | None = None  # "sio2" | a crystal key e.g. "silicon"/"sapphire"
     substrate_thickness_ang: float = 5e6  # 0.5 mm default
 
 

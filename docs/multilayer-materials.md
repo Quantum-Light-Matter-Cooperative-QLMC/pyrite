@@ -44,6 +44,7 @@ upgrade to an ordered stack of layers.
 
 The codebase is closer than it looks — the single-material path is a clean special case:
 
+
 | Concern | Today (single slab) | Code site |
 |---|---|---|
 | Sample def | `crystal` + `composition` + `hkl_list` + `B_ang2` + `thickness_ang` in the case dict | `sweep.crystal_params`, `sweep.build_cases` |
@@ -53,11 +54,13 @@ The codebase is closer than it looks — the single-material path is a clean spe
 | Brem | one `composition`, same single-µ escape | `mc_brem_spectrum` |
 | Geometry | whole slab shares one normal/tilt | `montecarlo.tilted_geometry` |
 | Compound µ | `composition=[(el,n),…]` already supported | `_normalize_composition`, `_mu_total_inv_ang` |
-| Crystalline Si | `silicon` is already a crystal | `data/crystal_structures.toml`, `crystal_params` |
+| Crystalline Si/sapphire | `silicon` and `sapphire` are crystals | `data/crystal_structures.toml`, `crystal_params` |
 
 Two things the recent **xraydb migration** already unblocked: substrate elements (O, Al for
 SiO₂ / sapphire) need **no** hand-added atomic data — `henke_dispersion`/`load_henke` resolve
 any element — and `composition`-based compound absorption already works for amorphous layers.
+Sapphire itself is now represented as crystalline corundum, so it also carries its own
+PXR/CBS radiator.
 
 ---
 
@@ -195,9 +198,9 @@ needs it before (A) lands.
 
 ## Registry / "adding a stack" checklist
 
-1. `data/crystal_structures.toml` — add any crystalline substrate not present (Si exists;
-   add sapphire `Al2O3` if its weak lines are wanted; fused-silica SiO₂ is amorphous → no
-   entry, just a `composition`). **No atomic-data edits** — xraydb covers O/Al.
+1. `data/crystal_structures.toml` — add any crystalline substrate not present (Si and
+   sapphire exist; fused-silica SiO₂ is amorphous → no entry, just a `composition`).
+   **No atomic-data edits** — xraydb covers O/Al.
 2. `src/sweep.py` — `stack_params(name)` returning `layers=[…]`; add to `MATERIAL_LABELS`.
 3. `src/config.py` — a grid entry for the stack (thicknesses become per-layer).
 4. `src/montecarlo.py` — the stack-aware `T_abs`, the per-layer radiation loop, and
@@ -253,11 +256,3 @@ remains.
   Eagle XO). Data-dependent — no in-repo dataset yet.
 
 ---
-
-## The 1T′-MoTe₂ block (scope note)
-
-The CLAUDE.md TODO's "blocked on a reliable 1T′-MoTe₂ CIF" is **partial**: it only affects
-the **1T′-MoTe₂** layer's exact coordinates. The general machinery and every **2H** film
-(MoSe₂ / MoS₂ / WS₂, and 2H-MoTe₂ which is already in `crystal_structures.toml`) on a
-Si / SiO₂ / sapphire substrate need no MoTe₂ CIF, so the feature is fully actionable now;
-1T′-MoTe₂ slots in as one more layer definition once the CIF is in hand.

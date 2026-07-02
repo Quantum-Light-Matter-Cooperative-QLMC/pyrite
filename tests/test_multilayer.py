@@ -95,8 +95,12 @@ def test_substrate_composition_presets_and_crystal():
     assert sio2["O"] == pytest.approx(2 * sio2["Si"], rel=1e-3)  # SiO2 stoichiometry
     si = dict(substrate_composition("silicon"))  # crystalline, from CRYSTALS
     assert 0.04 < si["Si"] < 0.06
+    sapphire = dict(substrate_composition("sapphire"))  # crystalline, from CRYSTALS
+    assert sapphire["O"] == pytest.approx(1.5 * sapphire["Al"])
     with pytest.raises(ValueError):
         substrate_composition("unobtainium")
+    with pytest.raises(ValueError):
+        substrate_composition("al2o3")
 
 
 def test_film_on_substrate_layers_structure():
@@ -163,12 +167,18 @@ def test_substrate_radiator_crystalline_vs_amorphous():
     # a crystalline substrate carries its own radiator (crystal params); an
     # amorphous preset radiates no coherent lines (None)
     assert substrate_radiator("sio2") is None
-    assert substrate_radiator("al2o3") is None
+    with pytest.raises(ValueError):
+        substrate_radiator("al2o3")
     si = substrate_radiator("silicon")
     assert si is not None
     assert si["crystal"] == "silicon"
     assert set(si) == {"crystal", "hkl_list", "B_ang2", "beam_uvw"}
     assert len(si["hkl_list"]) > 0
+    sapphire = substrate_radiator("sapphire")
+    assert sapphire is not None
+    assert sapphire["crystal"] == "sapphire"
+    assert set(sapphire) == {"crystal", "hkl_list", "B_ang2", "beam_uvw"}
+    assert len(sapphire["hkl_list"]) > 0
     with pytest.raises(ValueError):
         substrate_radiator("unobtainium")
 
@@ -190,9 +200,9 @@ def test_build_cases_layer_radiators_match_stack():
     assert film["B_ang2"] == amorph["B_ang2"]
     assert film["beam_uvw"] == amorph["beam_uvw"]
 
-    # crystalline substrate -> [film radiator, silicon radiator]
+    # crystalline substrate -> [film radiator, substrate radiator]
     cryst = build_cases(
-        Sweep(material="mose2", tilt_deg=-30.0, energy_keV=30.0, substrate="silicon")
+        Sweep(material="mose2", tilt_deg=-30.0, energy_keV=30.0, substrate="sapphire")
     )[0]
-    assert cryst["layer_radiators"][1]["crystal"] == "silicon"
+    assert cryst["layer_radiators"][1]["crystal"] == "sapphire"
     assert len(cryst["layer_radiators"]) == len(cryst["abs_layers"]) == 2

@@ -19,7 +19,7 @@ notebooks pick it up.
 """
 
 from dataclasses import replace
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 import numpy as np
 
@@ -39,11 +39,15 @@ class MaterialGrid(TypedDict):
     tilt_azim_deg: ScalarOrSeq
     E_grid_line: np.ndarray
     E_grid_brem: np.ndarray
+    substrate: NotRequired[str]
 
 
 # When the azimuth is swept, collapse it: for each (polar tilt, energy) keep only
 # the azimuth with the highest spectral peak. False -> show every azimuth.
 COLLAPSE_AZIMUTH = True
+
+# Product target: few-layer 2H-MoTe2 with c = 13.41 A (two layers per cell).
+_MOTE2_PRODUCT_LAYER_PITCH_ANG = 13.41 / 2.0
 
 
 def default_settings():
@@ -116,10 +120,11 @@ _MATERIAL_GRIDS: dict[str, MaterialGrid] = {
         "E_grid_brem": np.arange(0.0, 60000.0, 25.0),
     },
     "mote2": {
-        "thickness_ang": 1e4,
+        "thickness_ang": _MOTE2_PRODUCT_LAYER_PITCH_ANG * np.arange(3, 7),
         "energy_keV": [30, 45, 60],
-        "tilt_deg": np.linspace(-89, 89, 40, endpoint=True),
-        "tilt_azim_deg": np.linspace(-89, -0.1, 15, endpoint=True),
+        "tilt_deg": np.linspace(-85, 85, 40, endpoint=True),
+        "tilt_azim_deg": np.linspace(-85, -0.1, 15, endpoint=True),
+        "substrate": "sapphire",
         "E_grid_line": np.arange(50.0, 4500.0, 1.0),
         "E_grid_brem": np.arange(0.0, 60000.0, 25.0),
     },

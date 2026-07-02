@@ -20,6 +20,7 @@ EXPECTED = {
     "mose2",
     "wse2",
     "mote2",
+    "sapphire",
     "mos2",
     "ws2",
     "ptse2",
@@ -71,14 +72,25 @@ def test_dominant_reflections_nonempty_triples():
 
 
 def test_mote2_structure_sane():
-    # 2H-MoTe2 a=3.519, c=13.964 hexagonal: V = (sqrt(3)/2) a^2 c ~ 149.7 A^3,
-
-    # 2 f.u. (2 Mo + 4 Te) per cell.
-
+    # Product-page 2H-MoTe2 a=b=0.350 nm, c=1.341 nm: V =
+    # (sqrt(3)/2) a^2 c ~= 142.27 A^3; 2 f.u. (2 Mo + 4 Te) per cell.
     info = CRYSTALS["mote2"]
 
-    assert info["V_cell"] == pytest.approx(149.75, abs=1.0)
-
+    assert info["lattice"]["a"] == pytest.approx(3.50)
+    assert info["lattice"]["c"] == pytest.approx(13.41)
+    assert info["V_cell"] == pytest.approx(142.27, abs=0.1)
     assert len(info["basis"]) == 6
-
     assert sum(1 for el, _ in info["basis"] if el == "Te") == 4
+
+
+def test_sapphire_structure_sane():
+    # Alpha-Al2O3 / sapphire in the conventional hexagonal corundum cell:
+    # a ~= 4.759 A, c ~= 12.991 A, Z=6 -> 12 Al + 18 O atoms per cell.
+    info = CRYSTALS["sapphire"]
+
+    assert info["lattice"]["a"] == pytest.approx(4.7589, abs=1e-4)
+    assert info["lattice"]["c"] == pytest.approx(12.991, abs=1e-3)
+    assert info["V_cell"] == pytest.approx(254.9, abs=0.2)
+    assert len(info["basis"]) == 30
+    assert sum(1 for el, _ in info["basis"] if el == "Al") == 12
+    assert sum(1 for el, _ in info["basis"] if el == "O") == 18

@@ -52,6 +52,49 @@ basis = [
     { element = "F",  pos = [0.0, 0.0, 0.5] },
 ]
 
+# Alpha-Al2O3 / sapphire, corundum R-3c in the conventional hexagonal cell
+# (30 atoms, Z=6). Lattice and internal parameters from Newnham & de Haan,
+# Z. Kristallogr. 117, 235 (1962): a=4.7589 A, c=12.991 A,
+# Al 12c z=0.35216, O 18e x=0.30624. R-centered Wyckoff sites are expanded
+# explicitly because the loader does not apply space-group symmetry.
+# Validation: sapphire-corundum-structure
+[sapphire]
+system = "hexagonal"
+a = 4.7589
+c = 12.991
+basis = [
+    { element = "Al", pos = [0.00000000, 0.00000000, 0.35216000] },
+    { element = "Al", pos = [0.00000000, 0.00000000, 0.64784000] },
+    { element = "Al", pos = [0.00000000, 0.00000000, 0.85216000] },
+    { element = "Al", pos = [0.00000000, 0.00000000, 0.14784000] },
+    { element = "Al", pos = [0.66666667, 0.33333333, 0.68549333] },
+    { element = "Al", pos = [0.66666667, 0.33333333, 0.98117333] },
+    { element = "Al", pos = [0.66666667, 0.33333333, 0.18549333] },
+    { element = "Al", pos = [0.66666667, 0.33333333, 0.48117333] },
+    { element = "Al", pos = [0.33333333, 0.66666667, 0.01882667] },
+    { element = "Al", pos = [0.33333333, 0.66666667, 0.31450667] },
+    { element = "Al", pos = [0.33333333, 0.66666667, 0.51882667] },
+    { element = "Al", pos = [0.33333333, 0.66666667, 0.81450667] },
+    { element = "O",  pos = [0.30624000, 0.00000000, 0.25000000] },
+    { element = "O",  pos = [0.00000000, 0.30624000, 0.25000000] },
+    { element = "O",  pos = [0.69376000, 0.69376000, 0.25000000] },
+    { element = "O",  pos = [0.69376000, 0.00000000, 0.75000000] },
+    { element = "O",  pos = [0.00000000, 0.69376000, 0.75000000] },
+    { element = "O",  pos = [0.30624000, 0.30624000, 0.75000000] },
+    { element = "O",  pos = [0.97290667, 0.33333333, 0.58333333] },
+    { element = "O",  pos = [0.66666667, 0.63957333, 0.58333333] },
+    { element = "O",  pos = [0.36042667, 0.02709333, 0.58333333] },
+    { element = "O",  pos = [0.36042667, 0.33333333, 0.08333333] },
+    { element = "O",  pos = [0.66666667, 0.02709333, 0.08333333] },
+    { element = "O",  pos = [0.97290667, 0.63957333, 0.08333333] },
+    { element = "O",  pos = [0.63957333, 0.66666667, 0.91666667] },
+    { element = "O",  pos = [0.33333333, 0.97290667, 0.91666667] },
+    { element = "O",  pos = [0.02709333, 0.36042667, 0.91666667] },
+    { element = "O",  pos = [0.02709333, 0.66666667, 0.41666667] },
+    { element = "O",  pos = [0.33333333, 0.36042667, 0.41666667] },
+    { element = "O",  pos = [0.63957333, 0.97290667, 0.41666667] },
+]
+
 # AB-stacked (Bernal) highly-oriented pyrolytic graphite, 4 atoms per cell.
 # mosaic_fwhm_deg: c-axis (00l) rocking-curve FWHM of the mosaic-block spread.
 # 0.8 deg = ZYB research grade (ZYA 0.4 / ZYB 0.8 / ZYH 3.5). OPTIONAL per crystal:
@@ -108,13 +151,14 @@ basis = [
 
 # 2H-MoTe2 (alpha-MoTe2, semiconducting; P6_3/mmc) -- isostructural with MoSe2:
 # Mo on Wyckoff 2c (1/3,2/3,1/4), Te on 4f with z = 0.621 (delta = |0.75 - 0.621|
-# = 0.129 from its Mo plane). Lattice a = 3.519, c = 13.964 A (Puotinen & Newnham,
-# Acta Cryst. 14, 691 (1961); Materials Project mp-602). The Mo-Te bond
-# sqrt((a/sqrt(3))^2 + (0.129 c)^2) = 2.72 A matches the refined ~2.73 A.
+# = 0.129 from its Mo plane). Lattice a = 3.50, c = 13.41 A from the referenced
+# few-layer product page (reported as a=b=0.350 nm, c=1.341 nm). The Mo-Te bond
+# sqrt((a/sqrt(3))^2 + (0.129 c)^2) = 2.66 A, close to the bulk refined ~2.73 A.
+# Validation: mote2-product-structure
 [mote2]
 system = "hexagonal"
-a = 3.519
-c = 13.964
+a = 3.50
+c = 13.41
 basis = [
     { element = "Mo", pos = [0.3333333333333333, 0.6666666666666667, 0.25] },
     { element = "Te", pos = [0.6666666666666667, 0.3333333333333333, 0.379] },
