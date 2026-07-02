@@ -72,9 +72,21 @@ def test_dominant_reflections_nonempty_triples():
 
 
 def test_mote2_structure_sane():
+    # Bulk 2H-MoTe2 a=3.517 A, c=13.96 A: V = (sqrt(3)/2) a^2 c ~= 149.5 A^3.
+    # 2 f.u. (2 Mo + 4 Te) per cell.
+    info = CRYSTALS["mote2"]
+
+    assert info["lattice"]["a"] == pytest.approx(3.517, abs=1e-3)
+    assert info["lattice"]["c"] == pytest.approx(13.96, abs=1e-2)
+    assert info["V_cell"] == pytest.approx(149.5, abs=0.2)
+    assert len(info["basis"]) == 6
+    assert sum(1 for el, _ in info["basis"] if el == "Te") == 4
+
+
+def test_mote2_product_structure_sane():
     # Product-page 2H-MoTe2 a=b=0.350 nm, c=1.341 nm: V =
     # (sqrt(3)/2) a^2 c ~= 142.27 A^3; 2 f.u. (2 Mo + 4 Te) per cell.
-    info = CRYSTALS["mote2"]
+    info = CRYSTALS["mote2_product"]
 
     assert info["lattice"]["a"] == pytest.approx(3.50)
     assert info["lattice"]["c"] == pytest.approx(13.41)

@@ -136,6 +136,14 @@ _MATERIAL_GRIDS: dict[str, MaterialGrid] = {
         "E_grid_brem": np.arange(0.0, 60000.0, 25.0),
     },
     "mote2": {
+        "thickness_ang": 1e4,
+        "energy_keV": [30, 45, 60],
+        "tilt_deg": np.linspace(-85, 85, 40, endpoint=True),
+        "tilt_azim_deg": np.linspace(-85, -0.1, 15, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 1.0),
+        "E_grid_brem": np.arange(0.0, 60000.0, 25.0),
+    },
+    "mote2_product": {
         "thickness_ang": _MOTE2_PRODUCT_LAYER_PITCH_ANG * np.arange(3, 7),
         "energy_keV": [30, 45, 60],
         "tilt_deg": np.linspace(-85, 85, 40, endpoint=True),

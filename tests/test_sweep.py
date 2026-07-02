@@ -76,15 +76,27 @@ def test_mote2_registered():
     assert "mote2" in MATERIALS
 
 
-def test_mote2_material_grid_matches_few_layer_sapphire_product():
+def test_mote2_material_grid_is_bulk():
+    # Bulk 2H-MoTe2 without substrate (default ~1 um thickness).
+    grid = material_grid("mote2")
+
+    assert "substrate" not in grid  # bulk material, no substrate in default grid
+    assert grid["thickness_ang"] == 1e4
+
+    sweep = material_sweep("mote2")
+    assert sweep.substrate is None
+    assert sweep.thickness_ang == 1e4
+
+
+def test_mote2_product_material_grid_matches_few_layer_sapphire():
     # Product target: 3-6 layers of 2H-MoTe2 on c-cut crystalline sapphire.
     layer_pitch_ang = 13.41 / 2.0
-    grid = material_grid("mote2")
+    grid = material_grid("mote2_product")
 
     assert grid["substrate"] == "sapphire"
     np.testing.assert_allclose(grid["thickness_ang"], layer_pitch_ang * np.arange(3, 7))
 
-    sweep = material_sweep("mote2")
+    sweep = material_sweep("mote2_product")
     assert sweep.substrate == "sapphire"
     np.testing.assert_allclose(sweep.thickness_ang, grid["thickness_ang"])
 

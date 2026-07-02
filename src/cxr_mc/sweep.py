@@ -43,6 +43,7 @@ MATERIAL_LABELS = {
     "mose2": "MoSe2",
     "wse2": "WSe2",
     "mote2": "MoTe2",
+    "mote2_product": "MoTe2 (product)",
     "mos2": "MoS2",
     "ws2": "WS2",
     "ptse2": "PtSe2",
@@ -223,13 +224,24 @@ def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
             E_grid=np.arange(350.0, 2500.0, 3.0),
         )
     if material == "mote2":
-        # 2H-MoTe2 (alpha), isostructural with MoSe2. Te has no NIST Mott table
+        # 2H-MoTe2 (alpha) bulk, isostructural with MoSe2. Te has no NIST Mott table
         # -> transport falls back to analytic screened-Rutherford screening for Te
         # (see montecarlo), as for W/S/Pt/Hf/Zr.
         return dict(
             crystal="mote2",
             composition=[("Mo", n_of("mote2", "Mo")), ("Te", n_of("mote2", "Te"))],
             hkl_list=dominant_reflections("mote2", n_families=n_families, B_ang2=0.6),
+            beam_uvw=(0, 0, 2),
+            B_ang2=0.6,
+            E_grid=np.arange(350.0, 2500.0, 3.0),
+        )
+    if material == "mote2_product":
+        # 2H-MoTe2 product-page variant (few-layer, on sapphire substrate).
+        # Same phonon/crystal params as bulk; only lattice differs.
+        return dict(
+            crystal="mote2_product",
+            composition=[("Mo", n_of("mote2_product", "Mo")), ("Te", n_of("mote2_product", "Te"))],
+            hkl_list=dominant_reflections("mote2_product", n_families=n_families, B_ang2=0.6),
             beam_uvw=(0, 0, 2),
             B_ang2=0.6,
             E_grid=np.arange(350.0, 2500.0, 3.0),
@@ -284,9 +296,9 @@ def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
                 ("Al", n_of("sapphire", "Al")),
                 ("O", n_of("sapphire", "O")),
             ],
-            hkl_list=dominant_reflections("sapphire", n_families=n_families, B_ang2=0.5),
+            hkl_list=dominant_reflections("sapphire", n_families=n_families, B_ang2=0.25),
             beam_uvw=(0, 0, 1),  # c-cut sapphire: c-axis normal to the film
-            B_ang2=0.5,
+            B_ang2=0.25,
             E_grid=np.arange(100.0, 5000.0, 3.0),
         )
     if material == "hopg":

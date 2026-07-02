@@ -151,11 +151,27 @@ basis = [
 
 # 2H-MoTe2 (alpha-MoTe2, semiconducting; P6_3/mmc) -- isostructural with MoSe2:
 # Mo on Wyckoff 2c (1/3,2/3,1/4), Te on 4f with z = 0.621 (delta = |0.75 - 0.621|
-# = 0.129 from its Mo plane). Lattice a = 3.50, c = 13.41 A from the referenced
-# few-layer product page (reported as a=b=0.350 nm, c=1.341 nm). The Mo-Te bond
-# sqrt((a/sqrt(3))^2 + (0.129 c)^2) = 2.66 A, close to the bulk refined ~2.73 A.
-# Validation: mote2-product-structure
+# = 0.129 from its Mo plane). Bulk lattice a = 3.517, c = 13.96 A (literature/Materials
+# Project). The Mo-Te bond sqrt((a/sqrt(3))^2 + (0.129 c)^2) = 2.73 A.
+# Validation: mote2-bulk-structure
 [mote2]
+system = "hexagonal"
+a = 3.517
+c = 13.96
+basis = [
+    { element = "Mo", pos = [0.3333333333333333, 0.6666666666666667, 0.25] },
+    { element = "Te", pos = [0.6666666666666667, 0.3333333333333333, 0.379] },
+    { element = "Te", pos = [0.6666666666666667, 0.3333333333333333, 0.121] },
+    { element = "Mo", pos = [0.6666666666666667, 0.3333333333333333, 0.75] },
+    { element = "Te", pos = [0.3333333333333333, 0.6666666666666667, 0.879] },
+    { element = "Te", pos = [0.3333333333333333, 0.6666666666666667, 0.621] },
+]
+
+# 2H-MoTe2 product-page variant: few-layer material with lattice a = 3.50, c = 13.41 A
+# from the referenced product page (reported as a=b=0.350 nm, c=1.341 nm). The Mo-Te bond
+# sqrt((a/sqrt(3))^2 + (0.129 c)^2) = 2.66 A, slightly shorter than bulk.
+# Validation: mote2-product-structure
+[mote2_product]
 system = "hexagonal"
 a = 3.50
 c = 13.41
