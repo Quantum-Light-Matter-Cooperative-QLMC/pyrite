@@ -19,32 +19,40 @@ on `main` once the branch exists.
 
 ## P1 - high value (physics accuracy + publication validation)
 
-1. **Crystal mosaicity - measured-data validation.** MC route implemented; validate
+1. **Multilayer film-on-substrate.** ***VERY IMPORTANT*** Add sapphire as a crystalline material,
+   not just an amorphous backing. Replace `al2o3` altogether. *Do this on main, not a separate branch.*
+2. **Crystal mosaicity - measured-data validation.** MC route implemented; validate
    broadened line widths vs. a measured HOPG rocking-curve / EDS dataset
    (data-dependent). Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
-2. **Multilayer film-on-substrate - measured-data validation.** Model implemented;
+3. **Multilayer film-on-substrate - measured-data validation.** Model implemented;
    validate vs. a measured film-on-substrate dataset (data-dependent). Design:
    [`docs/multilayer-materials.md`](docs/multilayer-materials.md).
 
 ## P2 - medium (experiment match + usability)
 
-1. **pyelsepa / ELSEPA transport.** -> `feature/elsepa-port` Adapter landed + **validated** (C 2.19%,
+1. **`crystals` Library.** Evaluate and, if found to be valuable, implement use of the `crystals`
+   Python library, changing our syntax to match that of the library as needed, and reserving
+   our hand-made database as only a fallback for those materials missing from theirs.
+2. **Polars investigation.** Evaluate Polars for packaging large parameter-sweep metadata.
+3. **pyelsepa / ELSEPA transport.** -> `feature/elsepa-port` Adapter landed + **validated** (C 2.19%,
    Si 4.42% max rel vs NIST); image now builds tarball-free from
    `github.com/eScatter/elsepa`. Remaining gate: the image/venv live outside the repo
    (`C:/dev/pyelsepa`), so the driver stays gated in CI. Tied to P2 #2.
-2. **Polars investigation.** Evaluate Polars for packaging large parameter-sweep metadata.
 
 ## P3 - lower / exploratory
 
 1. **Marimo/Altair follow-ups.** Core migration landed from `feature/marimo-transfer`;
-   decide whether the marimo apps become canonical, then retire legacy notebook pairs
-   and port any still-needed spectra chunk/full views.
+   `marimo` notebook/plot cleanup & fixes remain.
 2. **Grazing-incidence soft X-ray diffraction grating.** -> `feature/grazing-grating`.
    Dispersion scaffold implemented; next is grating reflectivity + detected-image model.
 
-## PA - meta / cleanup
+## Meta / cleanup
 
-1. **Repo ownership & name change.** `cxr_model` -> `cxr-mc` DONE; awaiting GitHub
-   admin permissions (standing reminder, no code action).
-2. **Agent skill & command review.** Triage project-specific skills/commands; fix the
-   useful-but-rough ones, remove the extraneous.
+1. **Repo ownership & name change.** DONE. `cxr-mc` ownership perms given to Alex.
+2. **dev/remote.py bugfix.** Right now, when user runs `uv run dev/remote.py start mote2 --follow`,
+   they get an output stating the task was launched, but no progress bar. They must disconnect
+   and rerun `uv run dev/remote.py attach` to see the progress.
+
+## Long term features
+
+1. Geant4 or similar integration to support high-energy electron beams

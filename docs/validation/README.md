@@ -25,20 +25,22 @@ unverified → filtered → rederived → anchored → signed-off
                        discrepancy  (any failed check — tracked loudly)
 ```
 
-| status | meaning |
-|--------|---------|
-| `unverified` | ledgered, nothing checked yet |
-| `filtered` | units + limiting cases + sign/convention checks pass |
-| `rederived` | an independent fresh-context derivation matches the implementation |
-| `anchored` | a regression test pins it to a reference value, green in CI |
-| `signed-off` | **a human** read the source and the diff and certified it — the only state that gates publication |
-| `discrepancy` | a check failed; under investigation |
+
+| status        | meaning                                                                                            |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| `unverified`  | ledgered, nothing checked yet                                                                      |
+| `filtered`    | units + limiting cases + sign/convention checks pass                                               |
+| `rederived`   | an independent fresh-context derivation matches the implementation                                 |
+| `anchored`    | a regression test pins it to a reference value, green in CI                                        |
+| `signed-off`  | **a human** read the source and the diff and certified it — the only state that gates publication |
+| `discrepancy` | a check failed; under investigation                                                                |
 
 ## Workflow
 
 **Cheap filters first** (before any expensive re-derivation): dimensional consistency, limiting cases (η→0, t→∞, non-relativistic, single-segment→closed-form), sign/symmetry/convention. Survivors advance; failures go straight to `discrepancy`.
 
 **Adversarial re-derivation** (the core of independent verification):
+
 1. Pick an `unverified`/`filtered` id.
 2. A **fresh context — ideally a different model — that has NOT seen the implementation** gets only `{the cited source, what the function should compute, its signature}` and writes the independent expression to `docs/validation/<id>.md`.
 3. Diff the independent expression against the code (symbolic/dimensional; numeric where possible).
