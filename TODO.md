@@ -30,9 +30,11 @@ on `main` once the branch exists.
 
 ## P2 - medium (experiment match + usability)
 
-1. **`crystals` Library.** Evaluate and, if found to be valuable, implement use of the `crystals`
-   Python library, changing our syntax to match that of the library as needed, and reserving
-   our hand-made database as only a fallback for those materials missing from theirs.
+1. **External crystallography library adapters.** `codex/diffpy-structure-importer`
+   implements `diffpy.structure` CIF/import support; `codex/dans-diffraction-research`
+   implements optional `Dans_Diffraction` validation-oracle checks. Next: review/merge
+   those branches, then decide whether the original `crystals` package still offers
+   unique value.
 2. **Polars investigation.** Evaluate Polars for packaging large parameter-sweep metadata.
 3. **pyelsepa / ELSEPA transport.** -> `feature/elsepa-port` Adapter landed + **validated** (C 2.19%,
    Si 4.42% max rel vs NIST); image now builds tarball-free from
