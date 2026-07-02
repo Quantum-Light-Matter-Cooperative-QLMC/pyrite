@@ -1,5 +1,16 @@
-# TODO: diffpy.structure structural importer
+# TODO: Dans_Diffraction validation oracle
 
-Implement TODO P2 #1 using `diffpy.structure` rather than `crystals`: add a thin importer/adapter that converts a `diffpy.structure.Structure` into the existing `cxr_mc.crystallography.CRYSTALS` shape, leaving the X-ray physics (`structure_factor`, `chi_g`, `U_g`) in `cxr_mc`.
+Implement the backend that lets `Dans_Diffraction` act as an optional,
+independent validation oracle without becoming production physics.
 
-Keep `src/cxr_mc/data/crystal_structures.toml` as the canonical fallback and use the adapter first for explicit CIF/Structure import workflows. First slice: test and implement conversion of lattice parameters, fractional coordinates, and composition preservation without changing downstream physics APIs.
+Scope for this branch:
+
+- Add lazy optional loading/building of `Dans_Diffraction.Crystal` objects from
+  internal `CRYSTALS` entries and CIF paths.
+- Compare lattice parameters, unit-cell volume, reciprocal-vector magnitudes,
+  and `|F_hkl|^2` for selected HKLs.
+- Add fast unit tests using fake oracle objects so the core test suite does not
+  require `Dans-Diffraction`.
+- Add a checks-level example script for a few representative materials.
+- Keep cxr_mc atomic form factors and structure-factor calculations as the
+  production implementation; use `Dans_Diffraction` only as a comparator.
