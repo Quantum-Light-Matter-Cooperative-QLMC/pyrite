@@ -12,6 +12,7 @@ from ..montecarlo import (
 )
 from ..results import (
     detected_background,
+    line_metrics,
 )
 
 # cache of the (expensive) Timepix efficiency-curve response, keyed by hardware +
@@ -39,6 +40,31 @@ def _best_azimuth(grp, collapse_azimuth):
     if collapse_azimuth and len(grp) > 1:
         return [max(grp, key=_peak_line)]
     return grp
+
+
+def _case_title(case, tail="", *, latex=True, e0_keV=None, tilt_fmt="0.1f"):
+    """Case-identifying title prefix -- material, thickness (um), polar tilt --
+    shared by every spectra/detector title, with an optional inline beam energy
+    (``e0_keV``) and a trailing renderer-specific clause (``tail``). ``latex=True``
+    (matplotlib) renders `$\\mu$m` / `\\degree` math; ``latex=False`` (Vega-Lite)
+    renders plain ASCII (`um` / `deg`) and joins ``tail`` with `--` instead of an
+    em dash."""
+    mat = case["name"].split()[0]
+    thick = case["thickness_ang"] / 1e4
+    tilt = format(case["tilt_deg"], tilt_fmt)
+    if latex:
+        e0 = f", {e0_keV:g} keV" if e0_keV is not None else ""
+        head = rf"{mat}, {thick:.1f} $\mu$m{e0}, $\theta_\mathrm{{tilt}}={tilt}\degree$"
+        return f"{head} — {tail}" if tail else head
+    e0 = f", {e0_keV:g} keV" if e0_keV is not None else ""
+    head = f"{mat}, {thick:.1f} um{e0}, theta_tilt={tilt} deg"
+    return f"{head} -- {tail}" if tail else head
+
+
+def _metrics_map(recs, settings, rel_prominence, line_metric):
+    """``id(rec) -> line_metrics(rec)`` for every record -- the same per-record
+    metric dict every sweep draw (matplotlib and altair) builds, computed once."""
+    return {id(r): line_metrics(r, settings, rel_prominence, metric=line_metric) for r in recs}
 
 
 def _line_brem(r, settings, convolve=None):

@@ -17,14 +17,15 @@ from ..montecarlo import (
 )
 from ..results import (
     best_azimuth,
-    line_metrics,
     records,
     records_for_cases,
     selection_score,
 )
 from ._common import (
     _best_azimuth,
+    _case_title,
     _line_brem,
+    _metrics_map,
     _per_tilt_figs,
 )
 from ._style import (
@@ -55,10 +56,8 @@ def plot_tilt_panel(ax, group, settings, include_brem=True, collapse_azimuth=Fal
         if include_brem:
             ax.plot(r["E_grid"] / 1e3, brem_det * r["scale"], color=c, ls="--", lw=0.7)
     case = group[0]["case"]
-    mat = case["name"].split()[0]
     ax.set_title(
-        rf"{mat}, {case['thickness_ang'] / 1e4:.1f} $\mu$m, {case['E0_keV']:g} keV, "
-        rf"$\theta_\mathrm{{tilt}}={case['tilt_deg']:g}\degree$",
+        _case_title(case, "", e0_keV=case["E0_keV"], tilt_fmt="g"),
         fontsize=11,
     )
     ax.set_xlabel("Photon energy (keV)", fontsize=10)
@@ -93,9 +92,7 @@ def _draw_by_energy(fig, trecs, settings, include_brem=True, collapse_azimuth=Tr
     case = trecs[0]["case"]
     tag = "best azimuth/energy" if collapse_azimuth else "all azimuths"
     ax.set_title(
-        rf"{case['name'].split()[0]}, {case['thickness_ang'] / 1e4:.1f} "
-        rf"$\mu$m, $\theta_\mathrm{{tilt}}={case['tilt_deg']:0.1f}\degree$ — intrinsic "
-        rf"({tag})",
+        _case_title(case, f"intrinsic ({tag})"),
         fontsize=12,
     )
     ax.set_xlabel("Photon energy (eV)")
@@ -163,9 +160,7 @@ def _draw_full_spectrum(
             ybrem_lo = min(ybrem_lo, float(np.percentile(bpos, 1)))
     case = trecs[0]["case"]
     ax.set_title(
-        rf"{case['name'].split()[0]}, {case['thickness_ang'] / 1e4:.1f} "
-        rf"$\mu$m, $\theta_\mathrm{{tilt}}={case['tilt_deg']:0.1f}\degree$ — full "
-        rf"measured range, intrinsic (dashed = brem)",
+        _case_title(case, "full measured range, intrinsic (dashed = brem)"),
         fontsize=12,
     )
     if logy and ymax > 0:
@@ -328,7 +323,7 @@ def plot_best_spectra(
     if not recs:
         print("no results yet")
         return None
-    metrics = {id(r): line_metrics(r, settings, rel_prominence, metric=line_metric) for r in recs}
+    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
     ranked = sorted(recs, key=lambda r: selection_score(metrics[id(r)], select), reverse=True)[
         :top_n
     ]
@@ -397,9 +392,7 @@ def plot_material_comparison(
         recs = records(results)
         if not recs:
             continue
-        metrics = {
-            id(r): line_metrics(r, settings, rel_prominence, metric=line_metric) for r in recs
-        }
+        metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
         best = max(recs, key=lambda r: selection_score(metrics[id(r)], select))
         m = metrics[id(best)]
         pts.append((label, m["line_eV"], m["line_flux"], m["line_quality"], best["case"]))

@@ -29,10 +29,11 @@ attack*; this file carries the *full findings with line numbers and rationale*.
 | LOW nits | dead-expr / dead-statement / redundant-import one-liners | `e6edc50` |
 | M1   | best-azimuth collapse idiom → `_best_azimuth`/`_peak_line` in `plots/_common.py` (~11 sites) | `6f51ced` |
 | M7 (prologue) | `cases→names` prologue → `results.records_for_cases` (9 sites) | `6f51ced` |
+| M7 (remainder) | `_case_title`/`_metrics_map` hoisted into `plots/_common.py` (8 + 5 sites) | this branch, uncommitted |
 
-**Remaining** (suggested order in `TODO.md`): M7 remainder (`_case_title`, `_metrics_map`),
-M2, M3, M5, `results.py` split, M6. **Plus two items that fell out of the TODO summary and
-must not be lost: M4, and the M7 `line_fwhm_eV` / escape-helper sub-items — see below.**
+**Remaining** (suggested order in `TODO.md`): M2, M3, M5, `results.py` split, M6. **Plus two
+items that fell out of the TODO summary and must not be lost: M4, and the M7 `line_fwhm_eV`
+/ escape-helper sub-items — see below.**
 
 ---
 
@@ -98,9 +99,14 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   - `records_for_cases(results, cases)` — the `cases→names` prologue ×9. *(DONE — `6f51ced`.)*
   - `_case_title` — extract from `altair_detectors._title(...)`; title recipe reimplemented
     inline ~12× across `spectra.py`, `detectors.py`, `sweeps.py`, `altair_sweeps.py`,
-    `interactive.py`. Target: `plots/_common.py` next to `_best_azimuth`/`_peak_line`. *(TODO)*
+    `interactive.py`. Target: `plots/_common.py` next to `_best_azimuth`/`_peak_line`.
+    *(DONE — this branch, uncommitted; 8 call sites swapped. `sweeps.py` had no case-title
+    code, so only the other 4 files needed edits. Left alone: `interactive.py`'s plotly
+    slider title and `spectra.py`'s mosaic title — genuine format divergences, not the same
+    recipe.)*
   - `_metrics_map` — extract from `altair_sweeps._metrics_map(...)`; reimplemented ×5. Same
-    target module. *(TODO)*
+    target module. *(DONE — this branch, uncommitted; 5 call sites swapped across
+    `altair_sweeps.py`, `spectra.py`, `sweeps.py`.)*
   - `line_fwhm_eV(case, E_pk, mosaic_rad)` — `store_result` (`results.py:64-80`) and
     `plot_mosaic_comparison` (`spectra.py:254-275`) duplicate the EDS² + aperture² +
     capped-mosaic quadrature. *(TODO — NOT in the TODO summary; preserved here.)*

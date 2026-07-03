@@ -7,10 +7,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ..results import (
-    line_metrics,
     records_for_cases,
     selection_score,
 )
+from ._common import _metrics_map
 from ._style import (
     COLORS,
     energy_color,
@@ -156,7 +156,7 @@ def plot_heatmaps(
         print("no results yet")
         return []
     quantities = quantities or _HEATMAP_QUANTITIES
-    metrics = {id(r): line_metrics(r, settings, rel_prominence, metric=line_metric) for r in recs}
+    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
     panel_vals = sorted({r["case"][panel] for r in recs})
 
     figs = []
@@ -375,7 +375,7 @@ def plot_metric_vs(
                 f"sweeps -> single point(s)."
             )
 
-    metrics = {id(r): line_metrics(r, settings, rel_prominence, metric=line_metric) for r in recs}
+    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
     hue_vals = sorted({r["case"][hue] for r in recs})
     div_x = _AXIS_SPECS.get(x, (None, 1.0))[1]
     fig, ax = plt.subplots(figsize=(8, 5))

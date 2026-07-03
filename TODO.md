@@ -9,6 +9,14 @@ plots/detector/sweep layers. **Done already** (on `main`, commits `e6edc50` + `6
 the HIGH correctness bug (`repair_brem_wide` multilayer drift), the LOW dead-code nits,
 the best-azimuth collapse idiom (`_best_azimuth`/`_peak_line` in `plots/_common.py`,
 ~11 sites), and the `cases→names` prologue (`results.records_for_cases`, 9 sites).
+**Also done** (this branch): the M7 remainder — `_case_title` and `_metrics_map` hoisted
+into `plots/_common.py`, 8 and 5 call sites swapped respectively (verified with a
+scratch literal-vs-helper diff against a representative case, since no test asserts
+title text; one intentional cosmetic LaTeX shift at `detectors.py`'s Eagle
+charge-density title — equals sign moved inside `\theta_\mathrm{tilt}` math mode for
+consistency, spacing only). Left alone: `interactive.py`'s plotly slider `_title`
+(distinct compact unicode label, not a byte duplicate) and `spectra.py`'s mosaic
+title (uses `$E_0$=` notation, a genuine format divergence, not the same recipe).
 
 Full original inventory + rationale (tracked, self-contained — includes M4 and the M7
 `line_fwhm_eV`/escape-helper sub-items not summarized below):
@@ -27,15 +35,7 @@ Full original inventory + rationale (tracked, self-contained — includes M4 and
 
 ### Remaining work, in suggested order
 
-1. **M7 remainder — title/metrics hoists.**
-   - `_case_title` — extract from `altair_detectors._title(...)`; the same title recipe
-     is reimplemented inline ~12x across `spectra.py`, `detectors.py`, `sweeps.py`,
-     `altair_sweeps.py`, `interactive.py`. Move to `plots/_common.py` next to
-     `_best_azimuth`/`_peak_line`; swap each site to call it.
-   - `_metrics_map` — extract from `altair_sweeps._metrics_map(...)`; reimplemented ~5x.
-     Same target module.
-
-2. **M2 — shared `_si_sensor.py` detector-response module.** `timepix_response.py` and
+1. **M2 — shared `_si_sensor.py` detector-response module.** `timepix_response.py` and
    `eaglexo_response.py` duplicate: the Si constants (`W_EHP_EV`, `FANO_SI`,
    `SI_DENSITY_G_CM3`, `SI_A`, `SI_N_PER_ANG3`), the `_RESPONSE_CACHE` + `get_response`
    grid-key caching pattern, the `poisson_counts` core, and the `apply()` shape-guard
@@ -45,24 +45,24 @@ Full original inventory + rationale (tracked, self-contained — includes M4 and
    `docs/physics-validation-ledger.md` whether the extracted pieces need ledger entries
    (pure refactor of already-validated pieces should not, but check before assuming).
 
-3. **M3 — `plot_eaglexo_charge_map` → `plot_heatmaps` delegation.**
+2. **M3 — `plot_eaglexo_charge_map` → `plot_heatmaps` delegation.**
    `plots/detectors.py:562-677` reimplements ~90 lines of `sweeps.py`'s best-per-cell /
    `_cell_edges` / shared vmin-vmax / colorbar machinery, plus the thin-axis→line
    fallback. Give `plot_heatmaps` a `value=callable(record)` parameter; rewrite
    `plot_eaglexo_charge_map` as a ~20-line wrapper around it.
 
-4. **M5 — `sweep.crystal_params` data registry.** The 110-line if-chain in `sweep.py`
+3. **M5 — `sweep.crystal_params` data registry.** The 110-line if-chain in `sweep.py`
    should become a registry mirroring `config._MATERIAL_GRIDS` (a `TypedDict` table),
    with composition derived from the crystal `basis` the way `substrate_composition`
    already does via `Counter` — don't hand-list compositions per material. Also unify
    the three radiator-dict constructions (`substrate_radiator`, `layer_radiator`, the
    inline film dict at `sweep.py:472-479`) into one constructor.
 
-5. **`results.py` package split.** 656 lines; split into a `results/` package (store/
+4. **`results.py` package split.** 656 lines; split into a `results/` package (store/
    selection, line-metrics, scoring, tables) behind a **new** export-freeze test —
    follow the same pattern `montecarlo/` and `plots/` already used when they split.
 
-6. **M6 — renderer-neutral frame builders (largest item, aligns with the altair
+5. **M6 — renderer-neutral frame builders (largest item, aligns with the altair
    migration).** `plots/sweeps.py`'s `heatmap_frame`/`metric_vs_frame`/`scan_charts`/
    `_effective_x` re-derive the same reduction logic as `plot_heatmaps`/`plot_metric_vs`/
    `plot_scan`, just for altair instead of matplotlib — duplicating *reduction*, not just

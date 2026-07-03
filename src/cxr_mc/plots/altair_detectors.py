@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 
 from .. import eaglexo_response as eag
-from ._common import _best_azimuth
+from ._common import _best_azimuth, _case_title
 from .altair_spectra import _tilt_records
 from .detectors import (
     SI_K_EDGE_EV,
@@ -58,11 +58,7 @@ def _collapsed(recs, *, collapse_azimuth):
 
 
 def _title(recs, tail):
-    case = recs[0]["case"]
-    return (
-        f"{case['name'].split()[0]}, {case['thickness_ang'] / 1e4:.1f} um, "
-        f"theta_tilt={case['tilt_deg']:.1f} deg -- {tail}"
-    )
+    return _case_title(recs[0]["case"], tail, latex=False)
 
 
 # ---- Timepix3 detected vs incident -------------------------------------------

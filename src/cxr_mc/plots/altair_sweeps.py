@@ -22,10 +22,10 @@ import altair as alt
 import pandas as pd
 
 from ..results import (
-    line_metrics,
     records_for_cases,
     selection_score,
 )
+from ._common import _metrics_map
 from .sweeps import (
     _AXIS_SPECS,
     _FLUX_GATED,
@@ -56,12 +56,6 @@ def _scheme(cmap):
 
 def _ndistinct(recs, field):
     return len({r["case"][field] for r in recs if field in r["case"]})
-
-
-def _metrics_map(recs, settings, rel_prominence, line_metric):
-    """``id(rec) -> line_metrics(rec)`` for every record -- the same per-record
-    metric dict the matplotlib sweeps build, computed once."""
-    return {id(r): line_metrics(r, settings, rel_prominence, metric=line_metric) for r in recs}
 
 
 # ---- 1-D metric scan ---------------------------------------------------------

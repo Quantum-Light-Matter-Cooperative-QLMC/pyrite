@@ -16,6 +16,7 @@ from ..results import (
 from ._common import (
     _EFF_CACHE,
     _best_azimuth,
+    _case_title,
     _peak_line,
     _per_tilt_figs,
 )
@@ -155,9 +156,7 @@ def _draw_timepix_detected(
         ax.set_yscale("log")
         ax.set_ylim(ymax * floor_frac, ymax * 2)
     ax.set_title(
-        rf"{case['name'].split()[0]}, {case['thickness_ang'] / 1e4:.1f} $\mu$m, "
-        rf"$\theta_\mathrm{{tilt}}={case['tilt_deg']:0.1f}\degree$ — Timepix3 detected "
-        rf"(solid) vs incident (dotted)",
+        _case_title(case, "Timepix3 detected (solid) vs incident (dotted)"),
         fontsize=12,
     )
     ax.set_xlabel("Photon energy (eV)")
@@ -404,9 +403,7 @@ def _draw_eaglexo_detected(
         ax.set_xlim(xlo, xhi)
     blur = ", energy-resolved" if resolve_energy else ""
     ax.set_title(
-        rf"{case['name'].split()[0]}, {case['thickness_ang'] / 1e4:.1f} $\mu$m, "
-        rf"$\theta_\mathrm{{tilt}}={case['tilt_deg']:0.1f}\degree$ — Eagle XO "
-        rf"detected (solid) vs incident (dotted), {coating}{blur}",
+        _case_title(case, f"Eagle XO detected (solid) vs incident (dotted), {coating}{blur}"),
         fontsize=11,
     )
     ax.set_xlabel("Photon energy (eV)")
@@ -528,9 +525,7 @@ def _draw_eaglexo_charge(
     if xhi > 0:
         ax.set_xlim(max(xlo, 1.0), xhi)
     ax.set_title(
-        rf"{case['name'].split()[0]}, {case['thickness_ang'] / 1e4:.1f} $\mu$m, "
-        rf"$\theta_\mathrm{{tilt}}$={case['tilt_deg']:0.1f}$\degree$ — Eagle XO recorded "
-        rf"charge density ({coating}, dashed = brem)",
+        _case_title(case, f"Eagle XO recorded charge density ({coating}, dashed = brem)"),
         fontsize=11,
     )
     ax.set_xlabel("Photon energy (eV)")
