@@ -30,10 +30,11 @@ attack*; this file carries the *full findings with line numbers and rationale*.
 | M1   | best-azimuth collapse idiom → `_best_azimuth`/`_peak_line` in `plots/_common.py` (~11 sites) | `6f51ced` |
 | M7 (prologue) | `cases→names` prologue → `results.records_for_cases` (9 sites) | `6f51ced` |
 | M7 (remainder) | `_case_title`/`_metrics_map` hoisted into `plots/_common.py` (8 + 5 sites) | `f6f0dd2` |
-| M2   | Si constants + `grid_key`/`prep_spectrum`/`poisson_core` hoisted into `_si_sensor.py` | this branch, uncommitted |
-| M3   | `plot_eaglexo_charge_map` rewritten as a wrapper around `plot_heatmaps`' new `value=` mode | this branch, uncommitted |
+| M2   | Si constants + `grid_key`/`prep_spectrum`/`poisson_core` hoisted into `_si_sensor.py` | `28e20ec` |
+| M3   | `plot_eaglexo_charge_map` rewritten as a wrapper around `plot_heatmaps`' new `value=` mode | `28e20ec` |
+| M5   | `sweep.crystal_params` if-chain → `_CRYSTAL_PARAMS` registry; radiator-dict constructions unified into `_radiator()` | this branch, uncommitted |
 
-**Remaining** (suggested order in `TODO.md`): M5, `results.py` split, M6. **Plus two
+**Remaining** (suggested order in `TODO.md`): `results.py` split, M6. **Plus two
 items that fell out of the TODO summary and must not be lost: M4, and the M7 `line_fwhm_eV`
 / escape-helper sub-items — see below.**
 
@@ -88,13 +89,25 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   and `eaglexo_charge_frame`. Extract `_eag_wide_brem(r, coating)` / `_eag_wide_charge(r, coating)`
   next to `_eag_detected`.
 
-- **M5 — `sweep.crystal_params` 110-line if-chain.**  *(TODO)*
-  Every branch returns `{crystal, composition, hkl_list, beam_uvw, B_ang2, E_grid}`. Collapse
-  to a data registry mirroring `config._MATERIAL_GRIDS` (a `TypedDict` table), with composition
-  derived from the crystal `basis` via `Counter` the way `substrate_composition` already does —
-  don't hand-list compositions per material. Also unify the three radiator-dict constructions
-  (`substrate_radiator`, `layer_radiator`, the inline film dict at `sweep.py:472-479`) into one
-  constructor. Removes ~80 lines from the 550-line `sweep.py`.
+- **M5 — `sweep.crystal_params` 110-line if-chain.**  *(DONE — this branch, uncommitted.)*
+  Every branch returned `{crystal, composition, hkl_list, beam_uvw, B_ang2, E_grid}`. Collapsed
+  to `_CRYSTAL_PARAMS`, a data registry mirroring `config._MATERIAL_GRIDS` (a `CrystalParamsGrid`
+  `TypedDict` table keyed by material, holding just `B_ang2`/`beam_uvw`/`E_grid` plus an optional
+  `hkl_list` override); `crystal` and `composition` follow mechanically from the key
+  (`composition=substrate_composition(material)`, reusing its existing `Counter`-over-`basis`
+  logic instead of hand-listing per material — verified the basis order in
+  `crystal_structures.toml` puts the metal/majority element first for every material, matching
+  the old hand-written tuples). HOPG keeps its fixed `hkl_list` (fiber-textured — skips the
+  automatic `dominant_reflections` family search) as the registry's one override; every other
+  material derives `hkl_list` from `dominant_reflections(material, n_families, B_ang2)` as
+  before. Also unified the three radiator-dict constructions (`substrate_radiator`,
+  `layer_radiator`, the inline film dict at old `sweep.py:472-479`) into one `_radiator(cp, *,
+  beam_uvw=None, azimuth_rad=None)` constructor — `azimuth_rad` is only added to the dict when
+  given, preserving `substrate_radiator`'s narrower 4-key contract
+  (`test_substrate_radiator_crystalline_vs_amorphous` asserts the exact key set). Deleted the
+  now-dead `n_of` helper (only caller was the removed hand-listed composition tuples).
+  `sweep.py` went 550 → 520 lines net (the registry table + its `TypedDict`/comments add lines
+  back against the if-chain's removal). 198 tests / 0 ruff / 0 pyright unchanged.
 
 - **M6 — matplotlib `sweeps` vs `altair_sweeps` duplicate the reduction, not just rendering.**
   *(TODO — do last.)*  `heatmap_frame` / `metric_vs_frame` / `scan_charts` / `_effective_x`
@@ -102,7 +115,7 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   which is exactly what these modules' docstrings promise not to do. (`metric_vs_chart` also
   double-computes records + `_effective_x`.) Move the frame builders into a renderer-neutral
   `plots/_frames.py` (or fold into `results.py`) consumed by both renderers. Largest surface,
-  easiest to get wrong — do after items 1-5 have moved things underneath it.
+  easiest to get wrong — do after the `results.py` split has moved things underneath it.
 
 - **M7 — smaller mechanical hoists.**
   - `records_for_cases(results, cases)` — the `cases→names` prologue ×9. *(DONE — `6f51ced`.)*
@@ -147,7 +160,7 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
 - **`montecarlo/spectrum.py` (564) — handle with care.** Pure moves only (E_tab union-grid
   builder, the M7 escape/`n_hat` helpers). Don't restructure the `_accumulate` closure.
   Validation obligations apply.
-- **`sweep.py` (550)** — M5 removes ~80 lines.
+- **`sweep.py` (550 → 520 after M5).**
 - **Leave alone:** `plots/trajectories.py` (530, cohesive) and `checks/feranchuk_spence.py`
   (1056, standalone validation anchor) — not part of this cleanup.
 - **`analysis.py` (453, matplotlib) vs `notebooks/analysis_app.py` (355, altair)** — parallel

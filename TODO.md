@@ -24,7 +24,16 @@ move, no pre-existing `Validation:` markers). M3 — `plot_heatmaps` gained a
 `value=callable(record)` mode (factored into `sweeps._value_heatmap`, with its own
 `auto_lines` thin-axis fallback); `plot_eaglexo_charge_map` is now a ~25-line wrapper
 around it, smoke-tested against the `wse2` checkpoint (heatmap, `exposure_s`, and
-thin-axis line-plot paths).
+thin-axis line-plot paths). **Also done** (this branch): M5 — `sweep.crystal_params`'s
+110-line if-chain collapsed into a `_CRYSTAL_PARAMS` registry (a `TypedDict` table
+mirroring `config._MATERIAL_GRIDS`), with `composition` now derived via
+`substrate_composition(material)` (reusing its existing `Counter`-over-`basis` logic)
+instead of hand-listed per material; HOPG's fixed `hkl_list` (fiber-textured, skips
+the automatic `dominant_reflections` family search) is the one registry override.
+`substrate_radiator`, `layer_radiator`, and the inline film-radiator dict in
+`build_cases` now all build off one `_radiator(cp, beam_uvw=, azimuth_rad=)`
+constructor. `sweep.py` 550 -> 520 lines net (registry table + its TypedDict/comments
+add lines back; the dead `n_of` helper, now unused, was also deleted).
 
 Full original inventory + rationale (tracked, self-contained — includes M4 and the M7
 `line_fwhm_eV`/escape-helper sub-items not summarized below):
@@ -43,25 +52,18 @@ Full original inventory + rationale (tracked, self-contained — includes M4 and
 
 ### Remaining work, in suggested order
 
-1. **M5 — `sweep.crystal_params` data registry.** The 110-line if-chain in `sweep.py`
-   should become a registry mirroring `config._MATERIAL_GRIDS` (a `TypedDict` table),
-   with composition derived from the crystal `basis` the way `substrate_composition`
-   already does via `Counter` — don't hand-list compositions per material. Also unify
-   the three radiator-dict constructions (`substrate_radiator`, `layer_radiator`, the
-   inline film dict at `sweep.py:472-479`) into one constructor.
-
-2. **`results.py` package split.** 656 lines; split into a `results/` package (store/
+1. **`results.py` package split.** 656 lines; split into a `results/` package (store/
    selection, line-metrics, scoring, tables) behind a **new** export-freeze test —
    follow the same pattern `montecarlo/` and `plots/` already used when they split.
 
-3. **M6 — renderer-neutral frame builders (largest item, aligns with the altair
+2. **M6 — renderer-neutral frame builders (largest item, aligns with the altair
    migration).** `plots/sweeps.py`'s `heatmap_frame`/`metric_vs_frame`/`scan_charts`/
    `_effective_x` re-derive the same reduction logic as `plot_heatmaps`/`plot_metric_vs`/
    `plot_scan`, just for altair instead of matplotlib — duplicating *reduction*, not just
    *rendering*, which is exactly what these modules' docstrings promise not to do. Move
    the frame builders into a renderer-neutral `plots/_frames.py` (or fold into
    `results.py`) consumed by both the matplotlib and altair renderers. Do this last —
-   it's the biggest surface and easiest to get wrong once items 1-2 have already moved
+   it's the biggest surface and easiest to get wrong once item 1 has already moved
    things around underneath it.
 
 ### Notes carried from the analysis session
