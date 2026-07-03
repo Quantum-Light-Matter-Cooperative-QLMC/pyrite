@@ -10,8 +10,9 @@ the HIGH correctness bug (`repair_brem_wide` multilayer drift), the LOW dead-cod
 the best-azimuth collapse idiom (`_best_azimuth`/`_peak_line` in `plots/_common.py`,
 ~11 sites), and the `cases→names` prologue (`results.records_for_cases`, 9 sites).
 
-Full original inventory + rationale:
-[`CC-Session-Logs/2026-07-02_22-21-cxr-mc-duplication-analysis.md`](CC-Session-Logs/2026-07-02_22-21-cxr-mc-duplication-analysis.md).
+Full original inventory + rationale (tracked, self-contained — includes M4 and the M7
+`line_fwhm_eV`/escape-helper sub-items not summarized below):
+[`docs/dedup-inventory.md`](docs/dedup-inventory.md).
 
 **Hard constraints on every item below:**
 - `tests/test_plots_exports.py` + `tests/test_montecarlo_exports.py` freeze every
