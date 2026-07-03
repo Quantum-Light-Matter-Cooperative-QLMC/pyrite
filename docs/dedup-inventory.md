@@ -33,7 +33,7 @@ attack*; this file carries the *full findings with line numbers and rationale*.
 | M2   | Si constants + `grid_key`/`prep_spectrum`/`poisson_core` hoisted into `_si_sensor.py` | `28e20ec` |
 | M3   | `plot_eaglexo_charge_map` rewritten as a wrapper around `plot_heatmaps`' new `value=` mode | `28e20ec` |
 | M5   | `sweep.crystal_params` if-chain → `_CRYSTAL_PARAMS` registry; radiator-dict constructions unified into `_radiator()` | `546fd5c` |
-| —    | `results.py` package split (`store`/`selection`/`metrics`/`scoring`/`tables` + `test_results_exports.py`) | this branch, uncommitted |
+| —    | `results.py` package split (`store`/`selection`/`metrics`/`scoring`/`tables` + `test_results_exports.py`) | `279e709` |
 
 **Remaining** (suggested order in `TODO.md`): M6. **Plus two
 items that fell out of the TODO summary and must not be lost: M4, and the M7 `line_fwhm_eV`
@@ -61,8 +61,8 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   `altair_detectors.py`. Hoisted `_peak_line(r)` and `_best_azimuth(grp, collapse_azimuth)`
   into `plots/_common.py` (added `import numpy as np`). Internal helpers, not re-exported.
 
-- **M2 — timepix vs eaglexo response share verbatim blocks.**  *(DONE — this branch,
-  uncommitted.)* `timepix_response.py` and `eaglexo_response.py` duplicated: the Si constants
+- **M2 — timepix vs eaglexo response share verbatim blocks.**  *(DONE — `28e20ec`.)*
+  `timepix_response.py` and `eaglexo_response.py` duplicated: the Si constants
   (`W_EHP_EV`, `FANO_SI`, `SI_DENSITY_G_CM3`, `SI_A`, `SI_N_PER_ANG3`), the
   `_RESPONSE_CACHE` + `get_response` grid-key caching pattern, the `poisson_counts` core,
   and the `apply()` shape-guard text. Extracted a new `_si_sensor.py` holding the constants +
@@ -73,8 +73,8 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   to preserve (both ledger rows were already `unverified`/`blocked` pre-refactor), confirmed
   against `docs/physics-validation-ledger.md` before assuming so.
 
-- **M3 — `plot_eaglexo_charge_map` re-implements `plot_heatmaps`.**  *(DONE — this branch,
-  uncommitted.)* `plots/detectors.py:562-677` duplicated ~90 lines of `sweeps.py` best-per-cell /
+- **M3 — `plot_eaglexo_charge_map` re-implements `plot_heatmaps`.**  *(DONE — `28e20ec`.)*
+  `plots/detectors.py:562-677` duplicated ~90 lines of `sweeps.py` best-per-cell /
   `_cell_edges` / shared vmin-vmax / colorbar machinery, plus the thin-axis→line fallback. Gave
   `plot_heatmaps` a `value=callable(record)` mode (factored into a new `sweeps._value_heatmap`
   helper: max-reduces `value` per cell instead of going through line_metrics/`selection_score`,
@@ -110,7 +110,7 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   `sweep.py` went 550 → 520 lines net (the registry table + its `TypedDict`/comments add lines
   back against the if-chain's removal). 198 tests / 0 ruff / 0 pyright unchanged.
 
-- **`results.py` package split.**  *(DONE — this branch, uncommitted.)* 663 lines split
+- **`results.py` package split.**  *(DONE — `279e709`.)* 663 lines split
   verbatim (no logic changes) into a `results/` package following the `montecarlo`/`plots`
   precedent: `store.py` (`Settings`, `store_result`, `detected_background`), `selection.py`
   (`records`/`records_for_cases`/`filter_results`/`sweep_values`/`select_results`/
@@ -130,19 +130,19 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   which is exactly what these modules' docstrings promise not to do. (`metric_vs_chart` also
   double-computes records + `_effective_x`.) Move the frame builders into a renderer-neutral
   `plots/_frames.py` (or fold into `results/`) consumed by both renderers. Largest surface,
-  easiest to get wrong — do now that the `results.py` split has moved things underneath it.
+  easiest to get wrong — do now that the `results/` split has moved things underneath it.
 
 - **M7 — smaller mechanical hoists.**
   - `records_for_cases(results, cases)` — the `cases→names` prologue ×9. *(DONE — `6f51ced`.)*
   - `_case_title` — extract from `altair_detectors._title(...)`; title recipe reimplemented
     inline ~12× across `spectra.py`, `detectors.py`, `sweeps.py`, `altair_sweeps.py`,
     `interactive.py`. Target: `plots/_common.py` next to `_best_azimuth`/`_peak_line`.
-    *(DONE — this branch, uncommitted; 8 call sites swapped. `sweeps.py` had no case-title
+    *(DONE — `f6f0dd2`; 8 call sites swapped. `sweeps.py` had no case-title
     code, so only the other 4 files needed edits. Left alone: `interactive.py`'s plotly
     slider title and `spectra.py`'s mosaic title — genuine format divergences, not the same
     recipe.)*
   - `_metrics_map` — extract from `altair_sweeps._metrics_map(...)`; reimplemented ×5. Same
-    target module. *(DONE — this branch, uncommitted; 5 call sites swapped across
+    target module. *(DONE — `f6f0dd2`; 5 call sites swapped across
     `altair_sweeps.py`, `spectra.py`, `sweeps.py`.)*
   - `line_fwhm_eV(case, E_pk, mosaic_rad)` — `store_result` (`results.py:64-80`) and
     `plot_mosaic_comparison` (`spectra.py:254-275`) duplicate the EDS² + aperture² +

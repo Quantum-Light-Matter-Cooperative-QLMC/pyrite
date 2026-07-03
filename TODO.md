@@ -68,9 +68,9 @@ Full original inventory + rationale (tracked, self-contained — includes M4 and
    `plot_scan`, just for altair instead of matplotlib — duplicating *reduction*, not just
    *rendering*, which is exactly what these modules' docstrings promise not to do. Move
    the frame builders into a renderer-neutral `plots/_frames.py` (or fold into
-   `results/`) consumed by both the matplotlib and altair renderers. Do this last —
-   it's the biggest surface and easiest to get wrong once the `results.py` split has
-   already moved things around underneath it.
+   `results/`) consumed by both the matplotlib and altair renderers. Biggest surface and
+   easiest to get wrong; the `results/` split has already moved things around underneath
+   it, so do it now with that settled.
 
 ### Notes carried from the analysis session
 - `plots/detectors.py` (677 → 599 lines after M1+M3) is the best large-file refactor
