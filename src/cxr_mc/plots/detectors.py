@@ -11,9 +11,12 @@ from .. import timepix_response as tpx
 from ..results import (
     PER_NA,
     records,
+    records_for_cases,
 )
 from ._common import (
     _EFF_CACHE,
+    _best_azimuth,
+    _peak_line,
     _per_tilt_figs,
 )
 from ._style import (
@@ -129,8 +132,7 @@ def _draw_timepix_detected(
         grp = [r for r in trecs if r["case"]["E0_keV"] == E0]
         if not grp:
             continue
-        if collapse_azimuth and len(grp) > 1:
-            grp = [max(grp, key=lambda r: float(np.max(r["spec"])))]
+        grp = _best_azimuth(grp, collapse_azimuth)
         c = energy_color(E0, energies)
         for r in sorted(grp, key=lambda r: r["case"]["tilt_azim_deg"]):
             inc, det = _tpx_detected(r, settings, thickness_um, bias_v, n_mc, seed)
@@ -226,7 +228,7 @@ def plot_timepix_poisson(
     )
     for ax, E0 in zip(axes.ravel(), energies, strict=False):
         grp = [r for r in recs if r["case"]["E0_keV"] == E0]
-        r = max(grp, key=lambda r: float(np.max(r["spec"])))
+        r = max(grp, key=_peak_line)
         _, det = _tpx_detected(r, settings, thickness_um, bias_v, n_mc, seed)
         counts, expected = tpx.poisson_counts(
             r["E_grid"], det * settings.beam_current_na, integration_s, rng
@@ -357,8 +359,7 @@ def _draw_eaglexo_detected(
         grp = [r for r in trecs if r["case"]["E0_keV"] == E0]
         if not grp:
             continue
-        if collapse_azimuth and len(grp) > 1:
-            grp = [max(grp, key=lambda r: float(np.max(r["spec"])))]
+        grp = _best_azimuth(grp, collapse_azimuth)
         c = energy_color(E0, energies)
         for r in sorted(grp, key=lambda r: r["case"]["tilt_azim_deg"]):
             inc, det = _eag_detected(r, settings, coating, resolve_energy)
@@ -490,8 +491,7 @@ def _draw_eaglexo_charge(
         grp = [r for r in trecs if r["case"]["E0_keV"] == E0]
         if not grp:
             continue
-        if collapse_azimuth and len(grp) > 1:
-            grp = [max(grp, key=lambda r: float(np.max(r["spec"])))]
+        grp = _best_azimuth(grp, collapse_azimuth)
         c = energy_color(E0, energies)
         for r in sorted(grp, key=lambda r: r["case"]["tilt_azim_deg"]):
             resp = eag.get_response(r["E_grid"], coating=coating)
@@ -583,8 +583,7 @@ def plot_eaglexo_charge_map(
     to one sweep (cf. plot_heatmaps). Honors the same thin-axis -> line-plot
     fallback as plot_heatmaps (``auto_lines``): a single-valued x or y becomes a
     line plot (signal vs the varying axis, one line per the other)."""
-    names = None if cases is None else {c["name"] for c in cases}
-    recs = records(results, names)
+    recs = records_for_cases(results, cases)
     if not recs:
         print("no results yet")
         return None

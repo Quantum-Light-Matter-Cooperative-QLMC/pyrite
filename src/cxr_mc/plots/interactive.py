@@ -15,7 +15,9 @@ from ..results import (
     show_summary,
 )
 from ._common import (
+    _best_azimuth,
     _line_brem,
+    _peak_line,
     _per_tilt_figs,
 )
 from ._style import (
@@ -185,16 +187,11 @@ def browse_plotly(
     # the axes don't jump while paging); mirrors _draw_full_spectrum's floor logic.
     ymax, ybrem_lo, xmin, xmax = 0.0, np.inf, np.inf, 0.0
 
-    def _collapse(grp):
-        if collapse_azimuth and len(grp) > 1:
-            return [max(grp, key=lambda r: float(np.max(r["spec"])))]
-        return grp
-
     for ti, t in enumerate(tilts):
         trecs = [r for r in recs if r["case"]["tilt_deg"] == t]
         tilt_case0[ti] = trecs[0]["case"]
         for E0 in energies:
-            grp = _collapse([r for r in trecs if r["case"]["E0_keV"] == E0])
+            grp = _best_azimuth([r for r in trecs if r["case"]["E0_keV"] == E0], collapse_azimuth)
             for r in sorted(grp, key=lambda r: r["case"]["tilt_azim_deg"]):
                 col = energy_color(E0, energies)
                 az = r["case"]["tilt_azim_deg"]
@@ -330,7 +327,7 @@ def _draw_chunk(fig, trecs, settings):
     for E0 in energies:
         grp = [r for r in trecs if r["case"]["E0_keV"] == E0]
         if grp:
-            best.append(max(grp, key=lambda r: float(np.max(r["spec"]))))
+            best.append(max(grp, key=_peak_line))
     if not best:
         return
     ax_tot, ax_cxr = fig.subplots(1, 2, sharex=True)

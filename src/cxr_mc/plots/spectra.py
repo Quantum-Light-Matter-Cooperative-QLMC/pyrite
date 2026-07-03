@@ -19,9 +19,11 @@ from ..results import (
     best_azimuth,
     line_metrics,
     records,
+    records_for_cases,
     selection_score,
 )
 from ._common import (
+    _best_azimuth,
     _line_brem,
     _per_tilt_figs,
 )
@@ -35,8 +37,7 @@ from ._style import (
 def plot_tilt_panel(ax, group, settings, include_brem=True, collapse_azimuth=False):
     """One panel at fixed (energy, polar tilt): one curve per azimuth, or just
     the best azimuth if ``collapse_azimuth``."""
-    if collapse_azimuth and len(group) > 1:
-        group = [max(group, key=lambda r: float(np.max(r["spec"])))]
+    group = _best_azimuth(group, collapse_azimuth)
     group = sorted(group, key=lambda r: r["case"]["tilt_azim_deg"])
     for i, r in enumerate(group):
         c = COLORS[i % len(COLORS)]
@@ -79,8 +80,7 @@ def _draw_by_energy(fig, trecs, settings, include_brem=True, collapse_azimuth=Tr
         grp = [r for r in trecs if r["case"]["E0_keV"] == E0]
         if not grp:
             continue
-        if collapse_azimuth and len(grp) > 1:
-            grp = [max(grp, key=lambda r: float(np.max(r["spec"])))]
+        grp = _best_azimuth(grp, collapse_azimuth)
         c = energy_color(E0, energies)
         for r in sorted(grp, key=lambda r: r["case"]["tilt_azim_deg"]):
             az = r["case"]["tilt_azim_deg"]
@@ -143,8 +143,7 @@ def _draw_full_spectrum(
         grp = [r for r in trecs if r["case"]["E0_keV"] == E0 and r.get("brem_wide") is not None]
         if not grp:
             continue
-        if collapse_azimuth and len(grp) > 1:
-            grp = [max(grp, key=lambda r: float(np.max(r["spec"])))]
+        grp = _best_azimuth(grp, collapse_azimuth)
         r = grp[0]
         c = energy_color(E0, energies)
         az = r["case"]["tilt_azim_deg"]
@@ -325,8 +324,7 @@ def plot_best_spectra(
     every polar tilt, see the best dozen at a glance. ``select`` defaults to
     peak_flux x line_quality (bright AND well-defined), not the raw peak the
     per-tilt browser collapses on -- so spurious tall spikes don't win."""
-    names = None if cases is None else {c["name"] for c in cases}
-    recs = records(results, names)
+    recs = records_for_cases(results, cases)
     if not recs:
         print("no results yet")
         return None

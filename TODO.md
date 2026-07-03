@@ -39,12 +39,14 @@ on `main` once the branch exists.
    `github.com/eScatter/elsepa`. Remaining gate: the image/venv live outside the repo
    (`C:/dev/pyelsepa`), so the driver stays gated in CI. Tied to P2 #2.
 4. **Codebase de-duplication follow-through.** `/sc:analyze` (2026-07-02) inventoried
-   7 MEDIUM duplication clusters across the plots/detector/sweep layers; the HIGH
-   correctness bug (`repair_brem_wide` multilayer drift) and the LOW dead-code nits
-   are now fixed. Remaining: mechanical hoists into `plots/_common.py`, a shared
-   `_si_sensor.py` detector-response module, `plot_eaglexo_charge_map`→`plot_heatmaps`
-   delegation, a `crystal_params` data registry, a `results.py` package split, and
-   renderer-neutral frame builders. Full inventory + order-of-attack:
+   7 MEDIUM duplication clusters across the plots/detector/sweep layers. Done: the
+   HIGH correctness bug (`repair_brem_wide` multilayer drift), the LOW dead-code nits,
+   and the first mechanical hoists — the best-azimuth collapse idiom (`_best_azimuth`/
+   `_peak_line` in `plots/_common.py`, ~11 sites) and the `cases→names` prologue
+   (`results.records_for_cases`, 9 sites). Remaining: `_case_title`/`_metrics_map`
+   hoists, a shared `_si_sensor.py` detector-response module, `plot_eaglexo_charge_map`
+   →`plot_heatmaps` delegation, a `crystal_params` data registry, a `results.py`
+   package split, and renderer-neutral frame builders. Full inventory + order-of-attack:
    [`CC-Session-Logs/2026-07-02_22-21-cxr-mc-duplication-analysis.md`](CC-Session-Logs/2026-07-02_22-21-cxr-mc-duplication-analysis.md).
 
 ## P3 - lower / exploratory

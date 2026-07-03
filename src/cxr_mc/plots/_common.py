@@ -4,6 +4,7 @@ Shared figure plumbing: per-record line/brem split and the per-tilt figure loop.
 """
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from ..montecarlo import (
     convolve_detector,
@@ -22,6 +23,22 @@ _EFF_CACHE = {}
 
 def _mode(settings):
     return "EDS-convolved" if getattr(settings, "convolve_with_det", False) else "intrinsic"
+
+
+def _peak_line(r):
+    """Intrinsic line-spectrum peak of one record -- the azimuth-selection key
+    (strongest line wins)."""
+    return float(np.max(r["spec"]))
+
+
+def _best_azimuth(grp, collapse_azimuth):
+    """Collapse a same-energy record group to its single strongest-line azimuth
+    when ``collapse_azimuth`` (and there's more than one to choose from); else
+    return ``grp`` unchanged. The per-energy azimuth selection shared by every
+    spectra/detector draw."""
+    if collapse_azimuth and len(grp) > 1:
+        return [max(grp, key=_peak_line)]
+    return grp
 
 
 def _line_brem(r, settings, convolve=None):

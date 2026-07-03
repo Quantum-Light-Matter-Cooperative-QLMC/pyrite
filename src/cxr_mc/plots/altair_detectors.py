@@ -32,6 +32,7 @@ import numpy as np
 import pandas as pd
 
 from .. import eaglexo_response as eag
+from ._common import _best_azimuth
 from .altair_spectra import _tilt_records
 from .detectors import (
     SI_K_EDGE_EV,
@@ -52,9 +53,7 @@ def _collapsed(recs, *, collapse_azimuth):
     every detector draw. Yields ``(E0_keV, [records])`` in ascending energy."""
     energies = sorted({r["case"]["E0_keV"] for r in recs})
     for E0 in energies:
-        grp = [r for r in recs if r["case"]["E0_keV"] == E0]
-        if collapse_azimuth and len(grp) > 1:
-            grp = [max(grp, key=lambda r: float(np.max(r["spec"])))]
+        grp = _best_azimuth([r for r in recs if r["case"]["E0_keV"] == E0], collapse_azimuth)
         yield E0, grp
 
 

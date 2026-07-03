@@ -8,7 +8,7 @@ import numpy as np
 
 from ..results import (
     line_metrics,
-    records,
+    records_for_cases,
     selection_score,
 )
 from ._style import (
@@ -151,8 +151,7 @@ def plot_heatmaps(
     sweep's configs -- otherwise a checkpoint accumulating several sweeps yields a
     sparse UNION of grids. Returns the list of figs.
     """
-    names = None if cases is None else {c["name"] for c in cases}
-    recs = records(results, names)
+    recs = records_for_cases(results, cases)
     if not recs:
         print("no results yet")
         return []
@@ -336,8 +335,7 @@ def plot_metric_vs(
 
     ``metric`` is any line_metrics key. Generalizes plot_peak_vs_tilt
     (x="tilt_deg", metric="peak_flux", hue="E0_keV")."""
-    names = None if cases is None else {c["name"] for c in cases}
-    recs = records(results, names)
+    recs = records_for_cases(results, cases)
     if not recs:
         print("no results yet")
         return None
@@ -456,8 +454,7 @@ def plot_scan(
     ``hue`` overrides the line-mode grouping (e.g. ``hue="E0_keV"`` for one line
     per beam energy). All other args match plot_heatmaps / plot_metric_vs. Returns
     the list of figures (empty if there are no results)."""
-    names = None if cases is None else {c["name"] for c in cases}
-    recs = records(results, names)
+    recs = records_for_cases(results, cases)
     if not recs:
         print("no results yet")
         return []

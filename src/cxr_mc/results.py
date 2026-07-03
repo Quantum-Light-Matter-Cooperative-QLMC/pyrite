@@ -119,6 +119,15 @@ def records(results, names=None):
     return [results[n][E0] for n in keys for E0 in results[n]]
 
 
+def records_for_cases(results, cases):
+    """Flat record list restricted to the configs in ``cases`` (``cases=None``
+    -> every record). The ``cases``-facing wrapper over :func:`records` that
+    folds the ``{c["name"] for c in cases}`` prologue every sweep/detector plot
+    repeats."""
+    names = None if cases is None else {c["name"] for c in cases}
+    return records(results, names)
+
+
 def filter_results(results, cases):
     """Subset ``results`` to just the configs in ``cases`` (e.g. the current
     sweep from build_cases), dropping anything left in the checkpoint from

@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 
 from ..results import records
-from ._common import _line_brem
+from ._common import _best_azimuth, _line_brem
 
 _FRAME_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "component"]
 
@@ -57,9 +57,7 @@ def spectrum_frame(recs, settings, *, include_brem=True, collapse_azimuth=True):
     energies = sorted({r["case"]["E0_keV"] for r in recs})
     frames = []
     for E0 in energies:
-        grp = [r for r in recs if r["case"]["E0_keV"] == E0]
-        if collapse_azimuth and len(grp) > 1:
-            grp = [max(grp, key=lambda r: float(np.max(r["spec"])))]
+        grp = _best_azimuth([r for r in recs if r["case"]["E0_keV"] == E0], collapse_azimuth)
         for r in grp:
             E = np.asarray(r["E_grid"], dtype=float)
             line_det, brem_det = _line_brem(r, settings, convolve=False)

@@ -23,7 +23,7 @@ import pandas as pd
 
 from ..results import (
     line_metrics,
-    records,
+    records_for_cases,
     selection_score,
 )
 from .sweeps import (
@@ -95,8 +95,7 @@ def metric_vs_frame(
     :func:`cxr_mc.plots.plot_metric_vs`, including the single-valued-x fallback.
     ``x`` is in DISPLAY units (e.g. thickness in microns). Columns:
     ``x, metric, hue`` (``hue`` is the ``"30 keV"``-style value label)."""
-    names = None if cases is None else {c["name"] for c in cases}
-    recs = records(results, names)
+    recs = records_for_cases(results, cases)
     if not recs:
         return pd.DataFrame(columns=["x", "metric", "hue"])
     x = _effective_x(recs, x, hue)
@@ -138,8 +137,7 @@ def metric_vs_chart(
     ``hue`` value (best geometry per point). The Altair counterpart of
     :func:`cxr_mc.plots.plot_metric_vs`. Returns an :class:`altair.Chart`, or
     ``None`` when there are no records."""
-    names = None if cases is None else {c["name"] for c in cases}
-    recs = records(results, names)
+    recs = records_for_cases(results, cases)
     if not recs:
         return None
     eff_x = _effective_x(recs, x, hue)
@@ -192,8 +190,7 @@ def heatmap_frame(
     near-zero emission or an ill-defined line (dropped rows -> gaps), mirroring
     :func:`cxr_mc.plots.plot_heatmaps`. ``x`` / ``y`` are in DISPLAY units.
     Columns: ``x, y, panel, value``."""
-    names = None if cases is None else {c["name"] for c in cases}
-    recs = records(results, names)
+    recs = records_for_cases(results, cases)
     if not recs:
         return pd.DataFrame(columns=["x", "y", "panel", "value"])
     metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
@@ -305,8 +302,7 @@ def scan_charts(
     >= ``heatmap_min`` values; otherwise lines (denser axis on x, sparser as hue).
     ``force`` overrides ("heatmap" | "lines"). Returns a LIST of
     :class:`altair.Chart` (empty when there are no records)."""
-    names = None if cases is None else {c["name"] for c in cases}
-    recs = records(results, names)
+    recs = records_for_cases(results, cases)
     if not recs:
         return []
     quantities = [_resolve_quantity(q) for q in (quantities or _HEATMAP_QUANTITIES)]
