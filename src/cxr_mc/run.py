@@ -44,11 +44,18 @@ def checkpoint_path_for(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
 
 def _checkpoint_save(checkpoint_path, results):
     """Atomically pickle ``results`` to ``checkpoint_path``: write a sibling
-    ``.tmp`` then ``os.replace`` it into place. The replace is atomic on a single
-    filesystem, so a crash/OOM mid-write never leaves a half-written ``.pkl`` --
-    the old checkpoint survives intact and the run stays resumable. Shared by
-    :func:`run_sweep` (per-config crash-safe saves) and :func:`repair_checkpoint`."""
-    tmp = checkpoint_path + ".tmp"
+    ``.<pid>.tmp`` then ``os.replace`` it into place. The replace is atomic on a
+    single filesystem, so a crash/OOM mid-write never leaves a half-written
+    ``.pkl`` -- the old checkpoint survives intact and the run stays resumable.
+
+    The pid in the temp name keeps two processes writing the *same* checkpoint
+    from sharing one ``.tmp``: with a fixed name they clobber each other's temp
+    and race on the rename -- the first ``os.replace`` consumes it, the second
+    dies with ``FileNotFoundError``. (The remote runner also guards against
+    concurrent same-material jobs, but this makes the save safe on its own.)
+    Shared by :func:`run_sweep` (per-config crash-safe saves) and
+    :func:`repair_checkpoint`."""
+    tmp = f"{checkpoint_path}.{os.getpid()}.tmp"
     with open(tmp, "wb") as f:
         pickle.dump(results, f)
     os.replace(tmp, checkpoint_path)

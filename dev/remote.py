@@ -92,8 +92,19 @@ def _run(cmd, **kw):
 
 def _ssh_capture(remote_cmd):
     """Run a remote command over ssh and return its stdout (text). Prints the
-    box's stderr and aborts on a nonzero exit."""
-    r = subprocess.run(["ssh", "-n", HOST, remote_cmd], text=True, capture_output=True)
+    box's stderr and aborts on a nonzero exit.
+
+    Decode as UTF-8 explicitly: the Linux box emits UTF-8 (job logs carry tqdm's
+    block-glyph progress bars, e.g. `████▌`), but `text=True` alone would decode
+    with the Windows locale (cp1252), which chokes on those bytes -- so `status`,
+    `jobs`, and `logs` would crash mid-read. `errors="replace"` keeps any stray
+    non-UTF-8 byte from aborting the whole command."""
+    r = subprocess.run(
+        ["ssh", "-n", HOST, remote_cmd],
+        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     if r.returncode != 0:
         sys.stderr.write(r.stderr)
         raise SystemExit(f"ssh command failed (exit {r.returncode})")
@@ -232,10 +243,60 @@ echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
 """
 
 
+def _live_jobs():
+    """[(jobid, quick, [materials])] for every job on the box whose runner
+    process is still alive (pid file present and `kill -0` succeeds). Reads the
+    material list + quick flag straight from each job's meta."""
+    remote = (
+        f'JOBS="{REMOTE_DIR}/{JOBS_SUBDIR}"; [ -d "$JOBS" ] || exit 0; '
+        'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
+        'p=$(cat "$d/pid" 2>/dev/null) || continue; '
+        'kill -0 "$p" 2>/dev/null || continue; '
+        'q=$(sed -n "s/^quick: //p" "$d/meta" 2>/dev/null); '
+        'm=$(sed -n "s/^materials: //p" "$d/meta" 2>/dev/null); '
+        'printf "%s\\t%s\\t%s\\n" "$(basename "$d")" "$q" "$m"; done'
+    )
+    jobs = []
+    for line in _ssh_capture(remote).splitlines():
+        parts = line.split("\t")
+        if len(parts) < 3:
+            continue
+        jobid, q, mats = parts[0].strip(), parts[1].strip(), parts[2].split()
+        jobs.append((jobid, q == "True", mats))
+    return jobs
+
+
+def _refuse_if_busy(materials, quick):
+    """Abort `start` if a live job is already producing any checkpoint this run
+    would write. Two runs writing the same `<stem>.pkl` share one `<stem>.pkl.tmp`
+    and race on `os.replace` -- the first rename consumes the temp, the second
+    dies with FileNotFoundError (see run.py:_checkpoint_save). Comparing *stems*
+    (material, or material_quick) not bare materials lets a `--quick` smoke test
+    run alongside a full sweep of the same material, since they write different
+    files."""
+    wanted = set(_stems(materials, quick))
+    busy = [
+        (jid, sorted(clash))
+        for jid, jquick, jmats in _live_jobs()
+        if (clash := wanted.intersection(_stems(jmats, jquick)))
+    ]
+    if busy:
+        detail = "\n".join(f"  job {jid} is running -> {', '.join(s)}" for jid, s in busy)
+        raise SystemExit(
+            "refusing to start: a live job is already producing the same "
+            "checkpoint(s), and two runs writing one <stem>.pkl race on its "
+            f".tmp and crash.\n{detail}\n"
+            "attach to it (python dev/remote.py attach <jobid>) or stop it "
+            "(python dev/remote.py stop <jobid>) first, or run different materials."
+        )
+
+
 def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=False):
     """Launch a detached queue on the box: sync code, write the per-job runner,
     and `nohup setsid` it so it survives ssh disconnect. Returns the job id."""
     _check_materials(materials)
+    if not dry_run:
+        _refuse_if_busy(materials, quick)
     jobid = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     script = _queue_script(jobid, materials, quick, workers)
@@ -368,7 +429,17 @@ def attach(jobid=None):
         f'D="{jobdir}"; '
         f'[ -d "$D" ] || {{ echo "no such job: {jobid}"; exit 1; }}; '
         'tail -n 50 -f "$D/log" 2>/dev/null & TP=$!; '
-        'if [ -f "$D/pid" ]; then P=$(cat "$D/pid"); '
+        # `start --follow` attaches the instant after launch, which can beat the
+        # detached runner writing its pid (the runner does it as its first act,
+        # but bash/setsid startup is not instantaneous). Poll for the pid instead
+        # of testing once -- otherwise we find it missing, skip the wait below,
+        # and tear the tail down right away, wrongly reporting "job finished".
+        "P=; for _ in $(seq 1 30); do "
+        'if [ -s "$D/pid" ]; then P=$(cat "$D/pid"); break; fi; sleep 1; done; '
+        # Then hold (keeping the tail live) until the runner process exits. A job
+        # that already finished still has its pid file, so kill -0 fails at once
+        # and we fall straight through to the teardown -- correct for that case.
+        'if [ -n "$P" ]; then '
         'while kill -0 "$P" 2>/dev/null; do sleep 2; done; fi; '
         'sleep 1; kill "$TP" 2>/dev/null; '
         'printf "\\n--- job finished ---\\n"; cat "$D/state" 2>/dev/null'
@@ -396,6 +467,16 @@ def stop_job(jobid):
 
 
 def main(argv=None):
+    # The box's output is UTF-8 (job logs embed tqdm block-glyph progress bars
+    # like `████▌`). On Windows stdout defaults to cp1252 -- and when it is,
+    # printing that text raises UnicodeEncodeError, so `status`/`jobs`/`logs`
+    # would crash on the glyphs. Force UTF-8 with replacement so they never do.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+
     ap = argparse.ArgumentParser(prog="remote.py", description=__doc__.splitlines()[1])
     sub = ap.add_subparsers(dest="cmd", required=True)
 
@@ -451,6 +532,9 @@ def main(argv=None):
         case "pull":
             pull(args.material)
         case "scan":
+            # same checkpoint-collision guard as `start`: a foreground scan and a
+            # detached job writing the same <stem>.pkl would race on its .tmp.
+            _refuse_if_busy([args.material], args.quick)
             if not args.no_sync:
                 sync_code()
             remote_scan(args.material, args.quick, args.workers)
