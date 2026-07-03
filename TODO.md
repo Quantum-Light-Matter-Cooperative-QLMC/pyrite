@@ -17,6 +17,14 @@ charge-density title — equals sign moved inside `\theta_\mathrm{tilt}` math mo
 consistency, spacing only). Left alone: `interactive.py`'s plotly slider `_title`
 (distinct compact unicode label, not a byte duplicate) and `spectra.py`'s mosaic
 title (uses `$E_0$=` notation, a genuine format divergence, not the same recipe).
+**Also done** (this branch): M2 — Si constants + `grid_key`/`prep_spectrum`/
+`poisson_core` hoisted into a new `_si_sensor.py`, imported by both
+`timepix_response.py` and `eaglexo_response.py` (no ledger entries needed — verbatim
+move, no pre-existing `Validation:` markers). M3 — `plot_heatmaps` gained a
+`value=callable(record)` mode (factored into `sweeps._value_heatmap`, with its own
+`auto_lines` thin-axis fallback); `plot_eaglexo_charge_map` is now a ~25-line wrapper
+around it, smoke-tested against the `wse2` checkpoint (heatmap, `exposure_s`, and
+thin-axis line-plot paths).
 
 Full original inventory + rationale (tracked, self-contained — includes M4 and the M7
 `line_fwhm_eV`/escape-helper sub-items not summarized below):
@@ -35,47 +43,31 @@ Full original inventory + rationale (tracked, self-contained — includes M4 and
 
 ### Remaining work, in suggested order
 
-1. **M2 — shared `_si_sensor.py` detector-response module.** `timepix_response.py` and
-   `eaglexo_response.py` duplicate: the Si constants (`W_EHP_EV`, `FANO_SI`,
-   `SI_DENSITY_G_CM3`, `SI_A`, `SI_N_PER_ANG3`), the `_RESPONSE_CACHE` + `get_response`
-   grid-key caching pattern, the `poisson_counts` core, and the `apply()` shape-guard
-   text. Extract a new `_si_sensor.py` holding the constants + `grid_key(E)` +
-   Poisson core; each response model keeps its own physics on top. This touches
-   detector-response code, not core `montecarlo/` transport — confirm with
-   `docs/physics-validation-ledger.md` whether the extracted pieces need ledger entries
-   (pure refactor of already-validated pieces should not, but check before assuming).
-
-2. **M3 — `plot_eaglexo_charge_map` → `plot_heatmaps` delegation.**
-   `plots/detectors.py:562-677` reimplements ~90 lines of `sweeps.py`'s best-per-cell /
-   `_cell_edges` / shared vmin-vmax / colorbar machinery, plus the thin-axis→line
-   fallback. Give `plot_heatmaps` a `value=callable(record)` parameter; rewrite
-   `plot_eaglexo_charge_map` as a ~20-line wrapper around it.
-
-3. **M5 — `sweep.crystal_params` data registry.** The 110-line if-chain in `sweep.py`
+1. **M5 — `sweep.crystal_params` data registry.** The 110-line if-chain in `sweep.py`
    should become a registry mirroring `config._MATERIAL_GRIDS` (a `TypedDict` table),
    with composition derived from the crystal `basis` the way `substrate_composition`
    already does via `Counter` — don't hand-list compositions per material. Also unify
    the three radiator-dict constructions (`substrate_radiator`, `layer_radiator`, the
    inline film dict at `sweep.py:472-479`) into one constructor.
 
-4. **`results.py` package split.** 656 lines; split into a `results/` package (store/
+2. **`results.py` package split.** 656 lines; split into a `results/` package (store/
    selection, line-metrics, scoring, tables) behind a **new** export-freeze test —
    follow the same pattern `montecarlo/` and `plots/` already used when they split.
 
-5. **M6 — renderer-neutral frame builders (largest item, aligns with the altair
+3. **M6 — renderer-neutral frame builders (largest item, aligns with the altair
    migration).** `plots/sweeps.py`'s `heatmap_frame`/`metric_vs_frame`/`scan_charts`/
    `_effective_x` re-derive the same reduction logic as `plot_heatmaps`/`plot_metric_vs`/
    `plot_scan`, just for altair instead of matplotlib — duplicating *reduction*, not just
    *rendering*, which is exactly what these modules' docstrings promise not to do. Move
    the frame builders into a renderer-neutral `plots/_frames.py` (or fold into
    `results.py`) consumed by both the matplotlib and altair renderers. Do this last —
-   it's the biggest surface and easiest to get wrong once items 1-5 have already moved
+   it's the biggest surface and easiest to get wrong once items 1-2 have already moved
    things around underneath it.
 
 ### Notes carried from the analysis session
-- `plots/detectors.py` (677 lines) is the best large-file refactor target: M1 (done) +
-  M3 + M2's constant-hoisting together remove ~200 lines; what's left splits cleanly at
-  the existing `# ---- Timepix` / `# ---- Eagle XO` comment seams.
+- `plots/detectors.py` (677 → 599 lines after M1+M3) is the best large-file refactor
+  target left; what's left splits cleanly at the existing `# ---- Timepix` /
+  `# ---- Eagle XO` comment seams.
 - Leave `plots/trajectories.py` (530, cohesive) and `checks/feranchuk_spence.py`
   (1056, standalone validation anchor) alone — not part of this cleanup.
 - `analysis.py` (matplotlib, 453) vs `notebooks/analysis_app.py` (altair, 355) are

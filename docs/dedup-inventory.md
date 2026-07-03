@@ -29,9 +29,11 @@ attack*; this file carries the *full findings with line numbers and rationale*.
 | LOW nits | dead-expr / dead-statement / redundant-import one-liners | `e6edc50` |
 | M1   | best-azimuth collapse idiom → `_best_azimuth`/`_peak_line` in `plots/_common.py` (~11 sites) | `6f51ced` |
 | M7 (prologue) | `cases→names` prologue → `results.records_for_cases` (9 sites) | `6f51ced` |
-| M7 (remainder) | `_case_title`/`_metrics_map` hoisted into `plots/_common.py` (8 + 5 sites) | this branch, uncommitted |
+| M7 (remainder) | `_case_title`/`_metrics_map` hoisted into `plots/_common.py` (8 + 5 sites) | `f6f0dd2` |
+| M2   | Si constants + `grid_key`/`prep_spectrum`/`poisson_core` hoisted into `_si_sensor.py` | this branch, uncommitted |
+| M3   | `plot_eaglexo_charge_map` rewritten as a wrapper around `plot_heatmaps`' new `value=` mode | this branch, uncommitted |
 
-**Remaining** (suggested order in `TODO.md`): M2, M3, M5, `results.py` split, M6. **Plus two
+**Remaining** (suggested order in `TODO.md`): M5, `results.py` split, M6. **Plus two
 items that fell out of the TODO summary and must not be lost: M4, and the M7 `line_fwhm_eV`
 / escape-helper sub-items — see below.**
 
@@ -57,21 +59,28 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   `altair_detectors.py`. Hoisted `_peak_line(r)` and `_best_azimuth(grp, collapse_azimuth)`
   into `plots/_common.py` (added `import numpy as np`). Internal helpers, not re-exported.
 
-- **M2 — timepix vs eaglexo response share verbatim blocks.**  *(TODO)*
-  `timepix_response.py` and `eaglexo_response.py` duplicate: the Si constants
+- **M2 — timepix vs eaglexo response share verbatim blocks.**  *(DONE — this branch,
+  uncommitted.)* `timepix_response.py` and `eaglexo_response.py` duplicated: the Si constants
   (`W_EHP_EV`, `FANO_SI`, `SI_DENSITY_G_CM3`, `SI_A`, `SI_N_PER_ANG3`), the
   `_RESPONSE_CACHE` + `get_response` grid-key caching pattern, the `poisson_counts` core,
-  and the `apply()` shape-guard text. Extract `_si_sensor.py` holding constants + `grid_key(E)`
-  + Poisson core; each model keeps its own physics on top. This is detector-response code,
-  not core `montecarlo/` transport — but **check `docs/physics-validation-ledger.md`** before
-  assuming the extracted pieces need no ledger entries (pure refactor of already-validated
-  pieces should not, but confirm).
+  and the `apply()` shape-guard text. Extracted a new `_si_sensor.py` holding the constants +
+  `grid_key(E)` + `prep_spectrum(spec, E_grid, module_name)` (the shape guard) +
+  `poisson_core(E_grid, detected_per_s, time_s, rng)`; both modules import the constants and
+  delegate to the three helpers, keeping their own physics (charge-sharing MC, QE table, ...)
+  untouched. No ledger entries needed — verbatim relocation, no existing `Validation:` markers
+  to preserve (both ledger rows were already `unverified`/`blocked` pre-refactor), confirmed
+  against `docs/physics-validation-ledger.md` before assuming so.
 
-- **M3 — `plot_eaglexo_charge_map` re-implements `plot_heatmaps`.**  *(TODO)*
-  `plots/detectors.py:562-677` duplicates ~90 lines of `sweeps.py` best-per-cell /
-  `_cell_edges` / shared vmin-vmax / colorbar machinery, plus the thin-axis→line fallback.
-  Give `plot_heatmaps` a `value=callable(record)` parameter; rewrite `plot_eaglexo_charge_map`
-  as a ~20-line wrapper.
+- **M3 — `plot_eaglexo_charge_map` re-implements `plot_heatmaps`.**  *(DONE — this branch,
+  uncommitted.)* `plots/detectors.py:562-677` duplicated ~90 lines of `sweeps.py` best-per-cell /
+  `_cell_edges` / shared vmin-vmax / colorbar machinery, plus the thin-axis→line fallback. Gave
+  `plot_heatmaps` a `value=callable(record)` mode (factored into a new `sweeps._value_heatmap`
+  helper: max-reduces `value` per cell instead of going through line_metrics/`selection_score`,
+  with its own `auto_lines` thin-axis → line-plot fallback since `plot_heatmaps` callers other
+  than `plot_scan` don't get that decision for free). `plot_eaglexo_charge_map` is now a
+  ~25-line wrapper building the `_val`/`label` closure and delegating; smoke-tested against the
+  `wse2` checkpoint (heatmap mode, `exposure_s` well-fill mode, and the thin-axis line-plot
+  fallback via `x="thickness_ang"`, which is single-valued in that checkpoint).
 
 - **M4 — wide-brem overlay physics ×4.**  *(TODO — NOT in the TODO summary; preserved here.)*
   `inc_b = brem_wide*scale; det_b = inc_b*qe(...)` (plus the charge variant `*Eb/W_EHP_EV`)
@@ -130,7 +139,7 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
 
 ## Large-file refactor roadmap
 
-- **`plots/detectors.py` (677) — best target.** M1 (done) + M3 + M4 remove ~200 lines; what's
+- **`plots/detectors.py` (677 → 599 after M1+M3) — best target.** M4 removes more; what's
   left splits cleanly at the existing `# ---- Timepix` / `# ---- Eagle XO` comment seams.
 - **`results.py` (656)** — split into a `results/` package (store/selection, line-metrics,
   scoring, tables) behind a **new** export-freeze test — same pattern `montecarlo/` and

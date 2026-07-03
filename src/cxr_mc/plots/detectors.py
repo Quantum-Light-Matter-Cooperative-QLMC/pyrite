@@ -11,7 +11,6 @@ from .. import timepix_response as tpx
 from ..results import (
     PER_NA,
     records,
-    records_for_cases,
 )
 from ._common import (
     _EFF_CACHE,
@@ -20,17 +19,8 @@ from ._common import (
     _peak_line,
     _per_tilt_figs,
 )
-from ._style import (
-    COLORS,
-    energy_color,
-)
-from .sweeps import (
-    _AXIS_SPECS,
-    _axis_disp,
-    _axis_label,
-    _cell_edges,
-    _value_label,
-)
+from ._style import energy_color
+from .sweeps import plot_heatmaps
 
 
 # ---- Timepix3 detector view --------------------------------------------------
@@ -577,11 +567,9 @@ def plot_eaglexo_charge_map(
     close the brightest geometry comes to saturating the well. ``cases`` restricts
     to one sweep (cf. plot_heatmaps). Honors the same thin-axis -> line-plot
     fallback as plot_heatmaps (``auto_lines``): a single-valued x or y becomes a
-    line plot (signal vs the varying axis, one line per the other)."""
-    recs = records_for_cases(results, cases)
-    if not recs:
-        print("no results yet")
-        return None
+    line plot (signal vs the varying axis, one line per the other). A thin
+    wrapper around plot_heatmaps' ``value=`` mode -- see there for the shared
+    panel/line machinery."""
     cur = settings.beam_current_na
 
     def _val(r):
@@ -595,77 +583,17 @@ def plot_eaglexo_charge_map(
         if exposure_s is not None
         else "detected charge rate  (e$^-$/s)"
     )
-
-    if auto_lines:
-        nx = len({r["case"][x] for r in recs})
-        ny = len({r["case"][y] for r in recs})
-        if nx < 2 or ny < 2:
-            line_x, thin = (x, y) if nx >= ny else (y, x)
-            n_panel = len({r["case"][panel] for r in recs})
-            hue = panel if n_panel > 1 else thin
-            print(
-                f"plot_eaglexo_charge_map: axis {thin!r} has <2 values -> line plot "
-                f"(signal vs {line_x!r}, one line per {hue!r})."
-            )
-            hue_vals = sorted({r["case"][hue] for r in recs})
-            div_x = _AXIS_SPECS.get(line_x, (None, 1.0))[1]
-            fig, ax = plt.subplots(figsize=(8, 5))
-            for j, hv in enumerate(hue_vals):
-                hr = [r for r in recs if r["case"][hue] == hv]
-                xs = sorted({r["case"][line_x] for r in hr})
-                ys = [max(_val(r) for r in hr if r["case"][line_x] == xv) for xv in xs]
-                col = energy_color(hv, hue_vals) if hue == "E0_keV" else COLORS[j % len(COLORS)]
-                ax.plot(
-                    [v / div_x for v in xs],
-                    ys,
-                    "o-",
-                    color=col,
-                    lw=1.8,
-                    label=_value_label(hue, hv),
-                )
-            ax.set_xlabel(_axis_label(line_x))
-            ax.set_ylabel(label)
-            ax.set_title(f"Eagle XO recorded signal ({coating}, best per point)", fontsize=12)
-            ax.grid(alpha=0.3)
-            ax.legend(title=_AXIS_SPECS.get(hue, (hue,))[0], fontsize=9)
-            fig.tight_layout()
-            return fig
-
-    panel_vals = sorted({r["case"][panel] for r in recs})
-    panels = []
-    for pv in panel_vals:
-        er = [r for r in recs if r["case"][panel] == pv]
-        xs = sorted({r["case"][x] for r in er})
-        ys = sorted({r["case"][y] for r in er})
-        xi = {v: i for i, v in enumerate(xs)}
-        yi = {v: j for j, v in enumerate(ys)}
-        best = {}  # (xv, yv) -> max signal
-        for r in er:
-            ck = (r["case"][x], r["case"][y])
-            v = _val(r)
-            if ck not in best or v > best[ck]:
-                best[ck] = v
-        Z = np.full((len(ys), len(xs)), np.nan)
-        for (xv, yv), v in best.items():
-            Z[yi[yv], xi[xv]] = v
-        panels.append((pv, Z, _cell_edges(_axis_disp(x, xs)), _cell_edges(_axis_disp(y, ys))))
-    finite = [Z[np.isfinite(Z)] for _, Z, _, _ in panels]
-    finite = np.concatenate(finite) if any(a.size for a in finite) else np.array([0.0, 1.0])
-    vmin, vmax = float(finite.min()), float(finite.max())
-    fig, axes = plt.subplots(
-        1,
-        len(panels),
-        figsize=(min(3.6 * len(panels) + 1.2, 12.0), 4.2),
-        squeeze=False,
-        constrained_layout=True,
+    figs = plot_heatmaps(
+        results,
+        settings,
+        cases=cases,
+        x=x,
+        y=y,
+        panel=panel,
+        value=_val,
+        value_label=label,
+        value_cmap="inferno",
+        auto_lines=auto_lines,
+        title=f"Eagle XO recorded signal: {label}  ({coating}, best per cell)",
     )
-    im = None
-    for ax, (pv, Z, xe, ye) in zip(axes.ravel(), panels, strict=False):
-        im = ax.pcolormesh(xe, ye, Z, cmap="inferno", vmin=vmin, vmax=vmax)
-        ax.set_title(f"{_AXIS_SPECS.get(panel, (panel,))[0]} = {_value_label(panel, pv)}")
-        ax.set_xlabel(_axis_label(x))
-        ax.set_ylabel(_axis_label(y))
-    assert im is not None
-    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.85)
-    fig.suptitle(f"Eagle XO recorded signal: {label}  ({coating}, best per cell)", fontsize=13)
-    return fig
+    return figs[0] if figs else None

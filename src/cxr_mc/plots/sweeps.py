@@ -102,6 +102,87 @@ def _cell_edges(disp_vals):
     return np.concatenate([[v[0] - (mids[0] - v[0])], mids, [v[-1] + (v[-1] - mids[-1])]])
 
 
+def _value_heatmap(recs, x, y, panel, value, value_label, cmap, auto_lines, title):
+    """Single-figure heatmap (or line plot, if ``auto_lines`` and an axis is
+    thin) of ``value(record)``, max-reduced per cell -- the ``value=`` mode of
+    :func:`plot_heatmaps`, factored out so it doesn't clutter the
+    quantities/line_metrics path above."""
+    label = value_label or "value"
+    if auto_lines:
+        nx = len({r["case"][x] for r in recs})
+        ny = len({r["case"][y] for r in recs})
+        if nx < 2 or ny < 2:
+            line_x, thin = (x, y) if nx >= ny else (y, x)
+            n_panel = len({r["case"][panel] for r in recs})
+            hue = panel if n_panel > 1 else thin
+            print(
+                f"plot_heatmaps: axis {thin!r} has <2 values -> line plot "
+                f"(value vs {line_x!r}, one line per {hue!r})."
+            )
+            hue_vals = sorted({r["case"][hue] for r in recs})
+            div_x = _AXIS_SPECS.get(line_x, (None, 1.0))[1]
+            fig, ax = plt.subplots(figsize=(8, 5))
+            for j, hv in enumerate(hue_vals):
+                hr = [r for r in recs if r["case"][hue] == hv]
+                xs = sorted({r["case"][line_x] for r in hr})
+                ys = [max(value(r) for r in hr if r["case"][line_x] == xv) for xv in xs]
+                col = energy_color(hv, hue_vals) if hue == "E0_keV" else COLORS[j % len(COLORS)]
+                ax.plot(
+                    [v / div_x for v in xs],
+                    ys,
+                    "o-",
+                    color=col,
+                    lw=1.8,
+                    label=_value_label(hue, hv),
+                )
+            ax.set_xlabel(_axis_label(line_x))
+            ax.set_ylabel(label)
+            ax.set_title(title or f"{label} (best per point)", fontsize=12)
+            ax.grid(alpha=0.3)
+            ax.legend(title=_AXIS_SPECS.get(hue, (hue,))[0], fontsize=9)
+            fig.tight_layout()
+            return [fig]
+
+    panel_vals = sorted({r["case"][panel] for r in recs})
+    panels = []
+    for pv in panel_vals:
+        er = [r for r in recs if r["case"][panel] == pv]
+        xs = sorted({r["case"][x] for r in er})
+        ys = sorted({r["case"][y] for r in er})
+        xi = {v: i for i, v in enumerate(xs)}
+        yi = {v: j for j, v in enumerate(ys)}
+        best = {}  # (xv, yv) -> max value
+        for r in er:
+            ck = (r["case"][x], r["case"][y])
+            v = value(r)
+            if ck not in best or v > best[ck]:
+                best[ck] = v
+        Z = np.full((len(ys), len(xs)), np.nan)
+        for (xv, yv), v in best.items():
+            Z[yi[yv], xi[xv]] = v
+        panels.append((pv, Z, _cell_edges(_axis_disp(x, xs)), _cell_edges(_axis_disp(y, ys))))
+    finite = [Z[np.isfinite(Z)] for _, Z, _, _ in panels]
+    finite = np.concatenate(finite) if any(a.size for a in finite) else np.array([0.0, 1.0])
+    vmin, vmax = float(finite.min()), float(finite.max())
+    fig, axes = plt.subplots(
+        1,
+        len(panels),
+        figsize=(min(3.6 * len(panels) + 1.2, 12.0), 4.2),
+        squeeze=False,
+        constrained_layout=True,
+    )
+    im = None
+    for ax, (pv, Z, xe, ye) in zip(axes.ravel(), panels, strict=False):
+        im = ax.pcolormesh(xe, ye, Z, cmap=cmap, vmin=vmin, vmax=vmax)
+        ax.set_title(f"{_AXIS_SPECS.get(panel, (panel,))[0]} = {_value_label(panel, pv)}")
+        ax.set_xlabel(_axis_label(x))
+        ax.set_ylabel(_axis_label(y))
+    assert im is not None
+    fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.85)
+    fig.suptitle(title or f"{label}    (best per cell)", fontsize=13)
+    return [fig]
+
+
 def plot_heatmaps(
     results,
     settings,
@@ -115,13 +196,20 @@ def plot_heatmaps(
     line_metric="sharpness",
     min_flux_frac=0.02,
     min_line_quality=0.2,
+    *,
+    value=None,
+    value_label=None,
+    value_cmap="viridis",
+    auto_lines=False,
+    title=None,
 ):
     """Parametric heatmaps over ANY two swept parameters ``x`` x ``y``, one panel
     per value of ``panel``, one figure per quantity.
 
     For two axes that may or may not both sweep, prefer :func:`plot_scan`, which
     auto-picks this heatmap or a line plot from how many values each axis has;
-    this function always draws the map.
+    this function always draws the map (unless ``auto_lines`` is set with
+    ``value``, see below).
 
     ``x`` / ``y`` / ``panel`` are case-dict keys -- any of "tilt_deg",
     "tilt_azim_deg", "E0_keV", "thickness_ang", "B_ang2", ... The defaults
@@ -150,11 +238,24 @@ def plot_heatmaps(
     Pass ``cases`` (the current sweep from build_cases) to restrict to THIS
     sweep's configs -- otherwise a checkpoint accumulating several sweeps yields a
     sparse UNION of grids. Returns the list of figs.
+
+    ``value`` bypasses ``quantities``/line_metrics/``select`` entirely: pass a
+    ``callable(record) -> float`` and each cell shows the MAX of ``value`` over
+    its records (there is no separate quality score -- the record achieving that
+    max IS the "best" one). Produces exactly one figure, labelled
+    ``value_label`` (colorbar/axis) on ``value_cmap``, with ``title`` as the
+    suptitle (a generic default if omitted). With ``auto_lines=True`` a
+    single-valued x or y axis renders a line plot (value vs the varying axis,
+    one line per the other) instead of a degenerate 1-wide/1-tall heatmap --
+    for consumers of ``value`` (e.g. plot_eaglexo_charge_map) that don't go
+    through plot_scan's own heatmap-vs-lines choice.
     """
     recs = records_for_cases(results, cases)
     if not recs:
         print("no results yet")
         return []
+    if value is not None:
+        return _value_heatmap(recs, x, y, panel, value, value_label, value_cmap, auto_lines, title)
     quantities = quantities or _HEATMAP_QUANTITIES
     metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
     panel_vals = sorted({r["case"][panel] for r in recs})
