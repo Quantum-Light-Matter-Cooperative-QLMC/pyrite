@@ -32,9 +32,10 @@ attack*; this file carries the *full findings with line numbers and rationale*.
 | M7 (remainder) | `_case_title`/`_metrics_map` hoisted into `plots/_common.py` (8 + 5 sites) | `f6f0dd2` |
 | M2   | Si constants + `grid_key`/`prep_spectrum`/`poisson_core` hoisted into `_si_sensor.py` | `28e20ec` |
 | M3   | `plot_eaglexo_charge_map` rewritten as a wrapper around `plot_heatmaps`' new `value=` mode | `28e20ec` |
-| M5   | `sweep.crystal_params` if-chain → `_CRYSTAL_PARAMS` registry; radiator-dict constructions unified into `_radiator()` | this branch, uncommitted |
+| M5   | `sweep.crystal_params` if-chain → `_CRYSTAL_PARAMS` registry; radiator-dict constructions unified into `_radiator()` | `546fd5c` |
+| —    | `results.py` package split (`store`/`selection`/`metrics`/`scoring`/`tables` + `test_results_exports.py`) | this branch, uncommitted |
 
-**Remaining** (suggested order in `TODO.md`): `results.py` split, M6. **Plus two
+**Remaining** (suggested order in `TODO.md`): M6. **Plus two
 items that fell out of the TODO summary and must not be lost: M4, and the M7 `line_fwhm_eV`
 / escape-helper sub-items — see below.**
 
@@ -89,7 +90,7 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   and `eaglexo_charge_frame`. Extract `_eag_wide_brem(r, coating)` / `_eag_wide_charge(r, coating)`
   next to `_eag_detected`.
 
-- **M5 — `sweep.crystal_params` 110-line if-chain.**  *(DONE — this branch, uncommitted.)*
+- **M5 — `sweep.crystal_params` 110-line if-chain.**  *(DONE — `546fd5c`.)*
   Every branch returned `{crystal, composition, hkl_list, beam_uvw, B_ang2, E_grid}`. Collapsed
   to `_CRYSTAL_PARAMS`, a data registry mirroring `config._MATERIAL_GRIDS` (a `CrystalParamsGrid`
   `TypedDict` table keyed by material, holding just `B_ang2`/`beam_uvw`/`E_grid` plus an optional
@@ -109,13 +110,27 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   `sweep.py` went 550 → 520 lines net (the registry table + its `TypedDict`/comments add lines
   back against the if-chain's removal). 198 tests / 0 ruff / 0 pyright unchanged.
 
+- **`results.py` package split.**  *(DONE — this branch, uncommitted.)* 663 lines split
+  verbatim (no logic changes) into a `results/` package following the `montecarlo`/`plots`
+  precedent: `store.py` (`Settings`, `store_result`, `detected_background`), `selection.py`
+  (`records`/`records_for_cases`/`filter_results`/`sweep_values`/`select_results`/
+  `slim_results`/`best_azimuth`), `metrics.py` (`line_metrics` + its peak-finding helpers),
+  `scoring.py` (`selection_score`/`top_geometries`/`show_top`), `tables.py`
+  (`results_dataframe`/`summary_table`/`show_summary`); `__init__.py` re-exports every name
+  (public and internal) the old module defined. New `tests/test_results_exports.py` freezes
+  the set, mirroring `test_montecarlo_exports.py`/`test_plots_exports.py`. Verified against
+  the pre-split module with an AST-based source diff of every moved function/constant
+  (byte-identical; the sole flagged "diff" was `inspect.getsource` including the `@dataclass`
+  decorator line that the AST body-segment comparison for the old class didn't capture — a
+  comparison artifact, not a content change) plus the full 201-test suite / 0 ruff / 0 pyright.
+
 - **M6 — matplotlib `sweeps` vs `altair_sweeps` duplicate the reduction, not just rendering.**
   *(TODO — do last.)*  `heatmap_frame` / `metric_vs_frame` / `scan_charts` / `_effective_x`
   re-derive `plot_heatmaps` / `plot_metric_vs` / `plot_scan` logic — duplicating *reduction*,
   which is exactly what these modules' docstrings promise not to do. (`metric_vs_chart` also
   double-computes records + `_effective_x`.) Move the frame builders into a renderer-neutral
-  `plots/_frames.py` (or fold into `results.py`) consumed by both renderers. Largest surface,
-  easiest to get wrong — do after the `results.py` split has moved things underneath it.
+  `plots/_frames.py` (or fold into `results/`) consumed by both renderers. Largest surface,
+  easiest to get wrong — do now that the `results.py` split has moved things underneath it.
 
 - **M7 — smaller mechanical hoists.**
   - `records_for_cases(results, cases)` — the `cases→names` prologue ×9. *(DONE — `6f51ced`.)*

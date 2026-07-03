@@ -33,15 +33,25 @@ the automatic `dominant_reflections` family search) is the one registry override
 `substrate_radiator`, `layer_radiator`, and the inline film-radiator dict in
 `build_cases` now all build off one `_radiator(cp, beam_uvw=, azimuth_rad=)`
 constructor. `sweep.py` 550 -> 520 lines net (registry table + its TypedDict/comments
-add lines back; the dead `n_of` helper, now unused, was also deleted).
+add lines back; the dead `n_of` helper, now unused, was also deleted). **Also done**
+(this branch): the `results.py` package split — 663 lines split verbatim into a
+`results/` package (`store.py`: `Settings`/`store_result`/`detected_background`;
+`selection.py`: `records`/filter/select/slim helpers/`best_azimuth`; `metrics.py`:
+`line_metrics` and its peak-finding helpers; `scoring.py`: `selection_score`/
+`top_geometries`/`show_top`; `tables.py`: `results_dataframe`/`summary_table`), behind
+a new `tests/test_results_exports.py` mirroring the `montecarlo`/`plots` export-freeze
+pattern. Verified against the pre-split module by an AST source-diff of every moved
+function/constant (byte-identical bodies; the one AST "diff" was a decorator-boundary
+artifact of `inspect.getsource`, not a content change) plus the full suite.
 
 Full original inventory + rationale (tracked, self-contained — includes M4 and the M7
 `line_fwhm_eV`/escape-helper sub-items not summarized below):
 [`docs/dedup-inventory.md`](docs/dedup-inventory.md).
 
 **Hard constraints on every item below:**
-- `tests/test_plots_exports.py` + `tests/test_montecarlo_exports.py` freeze every
-  re-exported name (`set(p.__all__) == FROZEN_EXPORTS`). Adding names is fine; removing
+- `tests/test_plots_exports.py` + `tests/test_montecarlo_exports.py` +
+  `tests/test_results_exports.py` freeze every re-exported name
+  (`set(pkg.__all__) == FROZEN_EXPORTS`). Adding names is fine; removing
   or failing to re-export breaks the test. `altair_*` modules are intentionally NOT
   re-exported — don't add them.
 - Anything touching `montecarlo/` or `crystallography.py` triggers the physics-validation-ledger
@@ -52,19 +62,15 @@ Full original inventory + rationale (tracked, self-contained — includes M4 and
 
 ### Remaining work, in suggested order
 
-1. **`results.py` package split.** 656 lines; split into a `results/` package (store/
-   selection, line-metrics, scoring, tables) behind a **new** export-freeze test —
-   follow the same pattern `montecarlo/` and `plots/` already used when they split.
-
-2. **M6 — renderer-neutral frame builders (largest item, aligns with the altair
+1. **M6 — renderer-neutral frame builders (largest item, aligns with the altair
    migration).** `plots/sweeps.py`'s `heatmap_frame`/`metric_vs_frame`/`scan_charts`/
    `_effective_x` re-derive the same reduction logic as `plot_heatmaps`/`plot_metric_vs`/
    `plot_scan`, just for altair instead of matplotlib — duplicating *reduction*, not just
    *rendering*, which is exactly what these modules' docstrings promise not to do. Move
    the frame builders into a renderer-neutral `plots/_frames.py` (or fold into
-   `results.py`) consumed by both the matplotlib and altair renderers. Do this last —
-   it's the biggest surface and easiest to get wrong once item 1 has already moved
-   things around underneath it.
+   `results/`) consumed by both the matplotlib and altair renderers. Do this last —
+   it's the biggest surface and easiest to get wrong once the `results.py` split has
+   already moved things around underneath it.
 
 ### Notes carried from the analysis session
 - `plots/detectors.py` (677 → 599 lines after M1+M3) is the best large-file refactor
