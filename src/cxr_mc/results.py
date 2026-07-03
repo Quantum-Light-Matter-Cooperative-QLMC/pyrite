@@ -289,8 +289,6 @@ def results_dataframe(
         (defaults to ``Settings()``). False -> just the case knobs + the cheap
         stored scalars (``E_pk``, ``eta``), skipping the peak-finding.
     """
-    import pandas as pd
-
     if settings is None:
         settings = Settings()
     rows = []

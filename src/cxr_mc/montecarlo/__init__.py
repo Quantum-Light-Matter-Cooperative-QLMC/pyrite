@@ -72,6 +72,7 @@ from .materials import (
     _stack_tau,
 )
 from .runner import (
+    _brem_for_case,
     _spectrum_case,
     _transport_case,
     _worker_init,
@@ -162,6 +163,7 @@ __all__ = [
     "run_case",
     "_transport_case",
     "_spectrum_case",
+    "_brem_for_case",
     "_worker_init",
     "run_cases",
 ]

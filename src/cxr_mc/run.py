@@ -136,7 +136,7 @@ def run_sweep(
     # the crystal and keep them together in their own subdir.
     material = cases[0]["crystal"] if cases else "mixed"
     if checkpoint_path is None:
-        checkpoint_path = os.path.join(checkpoint_dir, f"{material}.pkl")
+        checkpoint_path = checkpoint_path_for(material, checkpoint_dir)
     os.makedirs(os.path.dirname(checkpoint_path) or ".", exist_ok=True)
 
     def _crystal_of(rec_map):
@@ -228,6 +228,12 @@ def repair_brem_wide(results, only_nonfinite=True, progress=True, save_every=0, 
     and rewrites ``r["brem_wide"]`` / ``r["brem"]`` in place; the line ``spec`` is
     left untouched. Everything needed is already stored in ``r["case"]``.
 
+    The transport + per-layer brem sum is delegated to the runner's
+    ``_brem_for_case`` -- the SAME path a live sweep takes -- so a film-on-
+    substrate / multilayer record is repaired with its full stacked brem
+    (``layers=abs_layers``, per-layer Z^2 sum, ``brem_chunk`` honored) rather
+    than being silently rewritten as single-slab brem.
+
     only_nonfinite : skip records whose ``brem_wide`` is already all-finite
         (default), so only the stale ones are touched. Set False to redo all.
     save_every / save_cb : if both set, call ``save_cb(results)`` every
@@ -239,11 +245,7 @@ def repair_brem_wide(results, only_nonfinite=True, progress=True, save_every=0, 
     """
     import numpy as np
 
-    from .montecarlo import (
-        mc_brem_spectrum,
-        simulate_trajectories,
-        tilted_geometry,
-    )
+    from .montecarlo import _brem_for_case
 
     todo = []
     for name in results:
@@ -267,21 +269,7 @@ def repair_brem_wide(results, only_nonfinite=True, progress=True, save_every=0, 
             step_b = c.get("brem_step_eV", 10.0)
             eg = np.asarray(r["E_grid"], float)
             E_brem = np.arange(eg[0], eg[-1] + step_b, step_b)
-        beam, n_hat = tilted_geometry(
-            c["theta_obs_rad"],
-            np.deg2rad(c.get("tilt_deg", 0.0)),
-            np.deg2rad(c.get("tilt_azim_deg", 0.0)),
-        )
-        segs_b = simulate_trajectories(
-            c["E0_keV"],
-            c["Ne_brem"],
-            c["thickness_ang"],
-            composition=c["composition"],
-            E_cut_keV=c.get("E_cut_brem_keV", 1.0),
-            seed=c["seed"] + 1,
-            beam_dir=beam,
-        )
-        brem_wide = mc_brem_spectrum(segs_b, E_brem, composition=c["composition"], n_hat=n_hat)
+        brem_wide = _brem_for_case(c, E_brem)
         r["brem_wide"] = brem_wide
         r["E_grid_brem"] = E_brem
         r["brem"] = np.interp(np.asarray(r["E_grid"], float), E_brem, brem_wide)

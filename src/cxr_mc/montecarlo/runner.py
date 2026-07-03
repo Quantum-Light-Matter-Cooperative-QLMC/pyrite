@@ -95,6 +95,72 @@ def _transport_case(case):
     return dict(E_grid=E_grid, E_brem=E_brem, n_hat=n_hat, segs=segs, segs_b=segs_b)
 
 
+def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers):
+    """Bremsstrahlung background on ``E_brem`` from already-transported brem
+    segments ``segs_b``. EVERY layer radiates with its OWN composition (each
+    Z^2 cross section) and self-absorbs through the WHOLE stack
+    (``layers=abs_layers``); the per-layer contributions are summed. A single
+    layer (``n_layers == 1``) is exactly the old single-material brem. Honors
+    ``brem_chunk`` (segments per GPU matmul). Pure move of _spectrum_case's brem
+    block; shared with :func:`_brem_for_case` so a brem-only repair regenerates
+    the SAME multilayer background as a live sweep."""
+    brem_chunk = case.get("brem_chunk") or 20000
+    n_lay = int(segs_b.get("n_layers", 1))
+    if n_lay == 1:
+        return mc_brem_spectrum(
+            segs_b,
+            E_brem,
+            composition=case["composition"],
+            n_hat=n_hat,
+            chunk=brem_chunk,
+            layers=abs_layers,
+        )
+    brem_wide = np.zeros(E_brem.shape, dtype=float)
+    for L in range(n_lay):
+        sL = _segments_in_layer(segs_b, L)
+        if sL["L_ang"].size == 0:
+            continue
+        brem_wide = brem_wide + mc_brem_spectrum(
+            sL,
+            E_brem,
+            composition=abs_layers[L][2],
+            n_hat=n_hat,
+            chunk=brem_chunk,
+            layers=abs_layers,
+        )
+    return brem_wide
+
+
+def _brem_for_case(case, E_brem):
+    """Regenerate a case's bremsstrahlung background on ``E_brem`` from scratch:
+    build the tilted geometry, transport ``Ne_brem`` electrons through the stack
+    (``layers=abs_layers``, same ``seed + 1`` offset as a live run), and sum brem
+    per layer via :func:`_brem_wide_from_segments`. Returns ``brem_wide``.
+
+    This is the brem half of run_case's transport + spectrum phases factored out
+    so :func:`cxr_mc.run.repair_brem_wide` reuses the EXACT live-sweep path.
+    Previously the repair rebuilt single-slab brem by hand -- ``layers=`` omitted,
+    no per-layer sum, ``brem_chunk`` ignored -- silently dropping substrate
+    backscatter/brem and cross-stack absorption on stacked/multilayer records."""
+    abs_layers = case.get("abs_layers")
+    beam, n_hat = tilted_geometry(
+        case["theta_obs_rad"],
+        np.deg2rad(case.get("tilt_deg", 0.0)),
+        np.deg2rad(case.get("tilt_azim_deg", 0.0)),
+    )
+    segs_b = simulate_trajectories(
+        case["E0_keV"],
+        case["Ne_brem"],
+        case["thickness_ang"],
+        composition=case["composition"],
+        E_cut_keV=case.get("E_cut_brem_keV", 1.0),
+        seed=case["seed"] + 1,
+        beam_dir=beam,
+        layers=abs_layers,
+    )
+    return _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers)
+
+
 def _spectrum_case(case, tp):
     """GPU phase of run_case: line spectrum + brem from the already-transported
     segments ``tp`` (from _transport_case). Runs in the main process, so only one
@@ -103,7 +169,6 @@ def _spectrum_case(case, tp):
     segs, segs_b = tp["segs"], tp["segs_b"]
     # optional film-on-substrate stack (None -> single slab, unchanged)
     abs_layers = case.get("abs_layers")
-    n_lay = int(segs.get("n_layers", 1))
 
     # LINES: each CRYSTALLINE layer radiates its own PXR/CBS lines, summed
     # INCOHERENTLY (separate crystals -> no cross-layer coherence); every line
@@ -162,32 +227,11 @@ def _spectrum_case(case, tp):
             )
 
     # BREM: EVERY layer radiates with its OWN composition (each Z^2 cross
-    # section); each layer's brem self-absorbs through the whole stack. Summed
-    # over layers; a single layer is exactly the old single-material brem.
-    brem_chunk = case.get("brem_chunk") or 20000
-    if n_lay == 1:
-        brem_wide = mc_brem_spectrum(
-            segs_b,
-            E_brem,
-            composition=case["composition"],
-            n_hat=n_hat,
-            chunk=brem_chunk,
-            layers=abs_layers,
-        )
-    else:
-        brem_wide = np.zeros(E_brem.shape, dtype=float)
-        for L in range(n_lay):
-            sL = _segments_in_layer(segs_b, L)
-            if sL["L_ang"].size == 0:
-                continue
-            brem_wide = brem_wide + mc_brem_spectrum(
-                sL,
-                E_brem,
-                composition=abs_layers[L][2],
-                n_hat=n_hat,
-                chunk=brem_chunk,
-                layers=abs_layers,
-            )
+    # section); each layer's brem self-absorbs through the whole stack, summed
+    # over layers (a single layer is exactly the old single-material brem).
+    # Factored into _brem_wide_from_segments so run.repair_brem_wide reuses this
+    # SAME path (via _brem_for_case) and can't drift back to single-slab brem.
+    brem_wide = _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers)
     brem = np.interp(E_grid, E_brem, brem_wide)  # brem under the lines (line grid)
     # Hand this case's GPU scratch back to the OS so the CuPy memory pool can't
     # accumulate (and fragment) across a long sweep until it fills the card.

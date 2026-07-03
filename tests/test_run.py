@@ -253,3 +253,41 @@ def test_repair_brem_wide_skips_already_finite():
     )
     n = repair_brem_wide({"cfg_a": {30.0: record}}, only_nonfinite=True, progress=False)
     assert n == 0
+
+
+def test_repair_brem_wide_delegates_stacked_case_to_runner(monkeypatch):
+    """A stale film-on-substrate record is repaired through the runner's
+    ``_brem_for_case`` (the live-sweep path), which is handed the case's full
+    ``abs_layers`` stack -- NOT the old hand-rolled single-slab brem that
+    dropped ``layers=``. Regression for the multilayer-drift bug (H1)."""
+    Eb = np.arange(0.0, 500.0, 50.0)
+    case = _fake_case("cfg_a", 30.0)
+    # two-layer stack: (name, thickness_ang, composition) -- what the old repair
+    # path silently ignored, regenerating brem for the film slab alone.
+    case["abs_layers"] = [
+        ("film", 1e4, [("Mo", 1.0), ("S", 2.0)]),
+        ("substrate", 5e6, [("Al", 2.0), ("O", 3.0)]),
+    ]
+    record = dict(
+        E_grid=np.arange(*case["E_grid"]),
+        spec=np.ones(10),
+        brem=np.ones(10) * 0.01,
+        E_grid_brem=Eb,
+        brem_wide=np.full_like(Eb, np.nan),  # stale -> selected for repair
+        eta=0.05,
+        scale=1.0,
+        case=case,
+    )
+    seen: dict[str, Any] = {}
+
+    def _spy(c, E_brem):
+        seen["abs_layers"] = c["abs_layers"]
+        return np.full(np.asarray(E_brem, float).shape, 0.002)
+
+    # run.repair_brem_wide does `from .montecarlo import _brem_for_case` at call
+    # time, so patch the name on the package it resolves against.
+    monkeypatch.setattr("cxr_mc.montecarlo._brem_for_case", _spy)
+    n = repair_brem_wide({"cfg_a": {30.0: record}}, only_nonfinite=True, progress=False)
+    assert n == 1
+    assert seen["abs_layers"] == case["abs_layers"]  # full stack reached the runner
+    assert np.allclose(record["brem_wide"], 0.002)  # repaired in place

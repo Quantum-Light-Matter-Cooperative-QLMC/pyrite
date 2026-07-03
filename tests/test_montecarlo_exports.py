@@ -69,6 +69,7 @@ FROZEN_EXPORTS = frozenset(
         "run_case",
         "_transport_case",
         "_spectrum_case",
+        "_brem_for_case",
         "_worker_init",
         "run_cases",
     }

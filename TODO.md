@@ -19,12 +19,10 @@ on `main` once the branch exists.
 
 ## P1 - high value (physics accuracy + publication validation)
 
-1. **Multilayer film-on-substrate.** ***VERY IMPORTANT*** Add sapphire as a crystalline material,
-   not just an amorphous backing. Replace `al2o3` altogether. *Do this on main, not a separate branch.*
-2. **Crystal mosaicity - measured-data validation.** MC route implemented; validate
+1. **Crystal mosaicity - measured-data validation.** MC route implemented; validate
    broadened line widths vs. a measured HOPG rocking-curve / EDS dataset
    (data-dependent). Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
-3. **Multilayer film-on-substrate - measured-data validation.** Model implemented;
+2. **Multilayer film-on-substrate - measured-data validation.** Model implemented;
    validate vs. a measured film-on-substrate dataset (data-dependent). Design:
    [`docs/multilayer-materials.md`](docs/multilayer-materials.md).
 
@@ -40,6 +38,14 @@ on `main` once the branch exists.
    Si 4.42% max rel vs NIST); image now builds tarball-free from
    `github.com/eScatter/elsepa`. Remaining gate: the image/venv live outside the repo
    (`C:/dev/pyelsepa`), so the driver stays gated in CI. Tied to P2 #2.
+4. **Codebase de-duplication follow-through.** `/sc:analyze` (2026-07-02) inventoried
+   7 MEDIUM duplication clusters across the plots/detector/sweep layers; the HIGH
+   correctness bug (`repair_brem_wide` multilayer drift) and the LOW dead-code nits
+   are now fixed. Remaining: mechanical hoists into `plots/_common.py`, a shared
+   `_si_sensor.py` detector-response module, `plot_eaglexo_charge_map`→`plot_heatmaps`
+   delegation, a `crystal_params` data registry, a `results.py` package split, and
+   renderer-neutral frame builders. Full inventory + order-of-attack:
+   [`CC-Session-Logs/2026-07-02_22-21-cxr-mc-duplication-analysis.md`](CC-Session-Logs/2026-07-02_22-21-cxr-mc-duplication-analysis.md).
 
 ## P3 - lower / exploratory
 
@@ -47,13 +53,6 @@ on `main` once the branch exists.
    `marimo` notebook/plot cleanup & fixes remain.
 2. **Grazing-incidence soft X-ray diffraction grating.** -> `feature/grazing-grating`.
    Dispersion scaffold implemented; next is grating reflectivity + detected-image model.
-
-## Meta / cleanup
-
-1. **Repo ownership & name change.** DONE. `cxr-mc` ownership perms given to Alex.
-2. **dev/remote.py bugfix.** Right now, when user runs `uv run dev/remote.py start mote2 --follow`,
-   they get an output stating the task was launched, but no progress bar. They must disconnect
-   and rerun `uv run dev/remote.py attach` to see the progress.
 
 ## Long term features
 

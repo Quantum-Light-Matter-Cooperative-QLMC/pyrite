@@ -312,7 +312,6 @@ class EagleResponse:
         if self.resolve_energy:
             from .montecarlo import convolve_detector
 
-            self.E[1] - self.E[0]
             fwhm = float(np.median(energy_fwhm_eV(self.E, self.n_pix)))
             det = convolve_detector(self.E, det, fwhm)  # ~const, sqrt(E)-weak
         return det

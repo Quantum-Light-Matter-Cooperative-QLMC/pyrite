@@ -152,7 +152,6 @@ def _draw_full_spectrum(
         Eb = r["E_grid_brem"]
         qe_b = detector_efficiency(Eb) if settings.apply_detector_qe else 1.0
         brem_wide_det = r["brem_wide"] * qe_b * r["scale"]
-        float(Eb[0])
         xmax = max(xmax, float(Eb[-1]))  # full brem grid -> beam energy
         line_det, brem_det = _line_brem(r, settings, convolve=False)
         total_line = (line_det + brem_det) * r["scale"]
