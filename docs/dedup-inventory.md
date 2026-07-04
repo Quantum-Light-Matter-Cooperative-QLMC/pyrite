@@ -34,7 +34,7 @@ attack*; this file carries the *full findings with line numbers and rationale*.
 | M3   | `plot_eaglexo_charge_map` rewritten as a wrapper around `plot_heatmaps`' new `value=` mode | `28e20ec` |
 | M5   | `sweep.crystal_params` if-chain → `_CRYSTAL_PARAMS` registry; radiator-dict constructions unified into `_radiator()` | `546fd5c` |
 | —    | `results.py` package split (`store`/`selection`/`metrics`/`scoring`/`tables` + `test_results_exports.py`) | `279e709` |
-| M6   | `heatmap_frame`/`metric_vs_frame`/`_effective_x`/`_ndistinct`/`scan_mode`/`pick_hue` hoisted into `plots/_frames.py`; `sweeps.py` renders from them (this branch, uncommitted) |
+| M6   | `heatmap_frame`/`metric_vs_frame`/`_effective_x`/`_ndistinct`/`scan_mode`/`pick_hue` hoisted into `plots/_frames.py`; `sweeps.py` renders from them | `83e16b9` |
 
 **Remaining:** nothing queued in `TODO.md`'s numbered backlog. **Two items that fell out of
 the TODO summary and must not be lost: M4, and the M7 `line_fwhm_eV`
@@ -126,7 +126,7 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   comparison artifact, not a content change) plus the full 201-test suite / 0 ruff / 0 pyright.
 
 - **M6 — matplotlib `sweeps` vs `altair_sweeps` duplicate the reduction, not just rendering.**
-  *(DONE -- this branch, uncommitted.)* Moved `heatmap_frame`/`metric_vs_frame`/
+  *(DONE -- `83e16b9`.)* Moved `heatmap_frame`/`metric_vs_frame`/
   `_effective_x`/`_ndistinct`/`scan_mode`/`pick_hue` into a new renderer-neutral
   `plots/_frames.py`. `sweeps.py`'s `plot_heatmaps`/`plot_metric_vs`/`plot_scan`
   now render from the same tidy-data frames `altair_sweeps.py`'s
