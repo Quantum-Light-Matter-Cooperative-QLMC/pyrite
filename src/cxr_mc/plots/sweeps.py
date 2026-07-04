@@ -14,6 +14,10 @@ from ._frames import (
     _effective_x,
     _ndistinct,
     _value_label,
+    heatmap_frame,
+    metric_vs_frame,
+    pick_hue,
+    scan_mode,
 )
 from ._style import (
     COLORS,
@@ -230,7 +234,6 @@ def plot_heatmaps(
         return []
     if value is not None:
         return _value_heatmap(recs, x, y, panel, value, value_label, value_cmap, auto_lines, title)
-    from ._frames import heatmap_frame  # local import: avoids a module-level cycle note above
 
     quantities = quantities or _HEATMAP_QUANTITIES
     panel_vals = sorted({r["case"][panel] for r in recs})
@@ -414,8 +417,6 @@ def plot_metric_vs(
 
     ``metric`` is any line_metrics key. Generalizes plot_peak_vs_tilt
     (x="tilt_deg", metric="peak_flux", hue="E0_keV")."""
-    from ._frames import metric_vs_frame
-
     recs = records_for_cases(results, cases)
     if not recs:
         print("no results yet")
@@ -523,8 +524,6 @@ def plot_scan(
     # accept bare metric keys as well as (key, label, cmap) triples
     quantities = quantities or _HEATMAP_QUANTITIES
     quantities = [_resolve_quantity(q) for q in quantities]
-
-    from ._frames import pick_hue, scan_mode
 
     mode = scan_mode(recs, x, y, heatmap_min, force)
 
