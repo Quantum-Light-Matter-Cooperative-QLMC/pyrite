@@ -6,12 +6,15 @@ Sweep/metric figures: heatmaps, facets, metric-vs, scan overview.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from ..results import (
-    records_for_cases,
-    selection_score,
+from ..results import records_for_cases
+from ._frames import (
+    _AXIS_SPECS,
+    _FLUX_GATED,  # noqa: F401  -- re-exported via plots.__init__ (frozen export set)
+    _axis_disp,
+    _effective_x,
+    _ndistinct,
+    _value_label,
 )
-from ._common import _metrics_map
-from ._frames import _AXIS_SPECS, _FLUX_GATED, _axis_disp, _value_label
 from ._style import (
     COLORS,
     energy_color,
@@ -227,36 +230,40 @@ def plot_heatmaps(
         return []
     if value is not None:
         return _value_heatmap(recs, x, y, panel, value, value_label, value_cmap, auto_lines, title)
+    from ._frames import heatmap_frame  # local import: avoids a module-level cycle note above
+
     quantities = quantities or _HEATMAP_QUANTITIES
-    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
     panel_vals = sorted({r["case"][panel] for r in recs})
 
     figs = []
     for key, label, cmap in quantities:
-        gated = key in _FLUX_GATED
+        df = heatmap_frame(
+            results,
+            settings,
+            quantity=key,
+            x=x,
+            y=y,
+            panel=panel,
+            select=select,
+            cases=cases,
+            rel_prominence=rel_prominence,
+            line_metric=line_metric,
+            min_flux_frac=min_flux_frac,
+            min_line_quality=min_line_quality,
+        )
         panels = []  # (panel_value, Z, x_edges, y_edges)
         for pv in panel_vals:
+            pv_label = _value_label(panel, pv)
             er = [r for r in recs if r["case"][panel] == pv]
-            xs = sorted({r["case"][x] for r in er})
-            ys = sorted({r["case"][y] for r in er})
-            xi = {v: i for i, v in enumerate(xs)}
-            yi = {v: j for j, v in enumerate(ys)}
-            fmax = max((metrics[id(r)]["peak_flux"] for r in er), default=0.0)
-            floor = min_flux_frac * fmax
-            # reduce every (x, y) cell to its single best record (selection_score)
-            best = {}  # (xv, yv) -> (score, rec)
-            for r in er:
-                ck = (r["case"][x], r["case"][y])
-                s = selection_score(metrics[id(r)], select)
-                if ck not in best or s > best[ck][0]:
-                    best[ck] = (s, r)
-            Z = np.full((len(ys), len(xs)), np.nan)
-            for (xv, yv), (_, r) in best.items():
-                m = metrics[id(r)]
-                if gated and (m["peak_flux"] < floor or m["line_quality"] < min_line_quality):
-                    continue  # near-zero emission / ill-defined line -> blank
-                Z[yi[yv], xi[xv]] = m[key]
-            panels.append((pv, Z, _cell_edges(_axis_disp(x, xs)), _cell_edges(_axis_disp(y, ys))))
+            xs_disp = sorted(set(_axis_disp(x, [r["case"][x] for r in er])))
+            ys_disp = sorted(set(_axis_disp(y, [r["case"][y] for r in er])))
+            xi = {v: i for i, v in enumerate(xs_disp)}
+            yi = {v: j for j, v in enumerate(ys_disp)}
+            Z = np.full((len(ys_disp), len(xs_disp)), np.nan)
+            sub = df[df["panel"] == pv_label]
+            for _, row in sub.iterrows():
+                Z[yi[row["y"]], xi[row["x"]]] = row["value"]  # type: ignore[reportArgumentType]
+            panels.append((pv, Z, _cell_edges(xs_disp), _cell_edges(ys_disp)))
         finite = [Z[np.isfinite(Z)] for _, Z, _, _ in panels]
         finite = np.concatenate(finite) if any(a.size for a in finite) else np.array([0.0, 1.0])
         vmin, vmax = float(finite.min()), float(finite.max())
@@ -407,75 +414,57 @@ def plot_metric_vs(
 
     ``metric`` is any line_metrics key. Generalizes plot_peak_vs_tilt
     (x="tilt_deg", metric="peak_flux", hue="E0_keV")."""
+    from ._frames import metric_vs_frame
+
     recs = records_for_cases(results, cases)
     if not recs:
         print("no results yet")
         return None
-
-    def _ndistinct(field):
-        return len({r["case"][field] for r in recs if field in r["case"]})
 
     # Guard a single-valued x: with only one x value every hue collapses to a
     # vertical stack of points at that x (the "line_flux draws as stacked points"
     # bug -- e.g. x="E0_keV" on a single-energy sweep). Substitute a parameter
     # that actually sweeps so the curve is meaningful, rather than silently
     # connecting points that share an x.
-    if _ndistinct(x) < 2:
-        alt = next(
-            (
-                f
-                for f in (
-                    "tilt_deg",
-                    "thickness_ang",
-                    "E0_keV",
-                    "tilt_azim_deg",
-                    "B_ang2",
-                )
-                if f != x and f != hue and _ndistinct(f) >= 2
-            ),
-            None,
+    eff_x = _effective_x(recs, x, hue)
+    if eff_x != x:
+        print(
+            f"plot_metric_vs: x={x!r} has <2 swept values -> using x={eff_x!r} "
+            f"instead (it actually sweeps)."
         )
-        if alt is not None:
-            print(
-                f"plot_metric_vs: x={x!r} has <2 swept values -> using x={alt!r} "
-                f"instead (it actually sweeps)."
-            )
-            x = alt
-        else:
-            print(
-                f"plot_metric_vs: x={x!r} has <2 swept values and nothing else "
-                f"sweeps -> single point(s)."
-            )
+    elif _ndistinct(recs, x) < 2:
+        print(
+            f"plot_metric_vs: x={x!r} has <2 swept values and nothing else "
+            f"sweeps -> single point(s)."
+        )
 
-    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
-    hue_vals = sorted({r["case"][hue] for r in recs})
-    div_x = _AXIS_SPECS.get(x, (None, 1.0))[1]
+    df = metric_vs_frame(
+        results,
+        settings,
+        x=x,
+        metric=metric,
+        hue=hue,
+        select=select,
+        cases=cases,
+        rel_prominence=rel_prominence,
+        line_metric=line_metric,
+    )
     fig, ax = plt.subplots(figsize=(8, 5))
-    for j, hv in enumerate(hue_vals):
-        hr = [r for r in recs if r["case"][hue] == hv]
-        xs = sorted({r["case"][x] for r in hr})
-        ys = []
-        for xv in xs:
-            cell = [r for r in hr if r["case"][x] == xv]
-            best = max(cell, key=lambda r: selection_score(metrics[id(r)], select))
-            ys.append(metrics[id(best)][metric])
+    hue_vals = sorted({r["case"][hue] for r in recs})
+    for j, (hv, hl) in enumerate(
+        zip(hue_vals, [_value_label(hue, hv) for hv in hue_vals], strict=True)
+    ):
+        sub = df[df["hue"] == hl].sort_values("x")  # type: ignore[reportCallIssue]
         col = energy_color(hv, hue_vals) if hue == "E0_keV" else COLORS[j % len(COLORS)]
-        ax.plot(
-            [v / div_x for v in xs],
-            ys,
-            "o-",
-            color=col,
-            lw=1.8,
-            label=_value_label(hue, hv),
-        )
+        ax.plot(sub["x"], sub["metric"], "o-", color=col, lw=1.8, label=hl)
     if logx:
         ax.set_xscale("log")
     if logy:
         ax.set_yscale("log")
-    ax.set_xlabel(_axis_label(x))
+    ax.set_xlabel(_axis_label(eff_x))
     ax.set_ylabel(_METRIC_LABELS.get(metric, metric))
     ax.set_title(
-        f"{_METRIC_LABELS.get(metric, metric)} vs {_axis_label(x)}  (best per point: {select})",
+        f"{_METRIC_LABELS.get(metric, metric)} vs {_axis_label(eff_x)}  (best per point: {select})",
         fontsize=11,
     )
     ax.grid(alpha=0.3, which="both")
@@ -535,16 +524,9 @@ def plot_scan(
     quantities = quantities or _HEATMAP_QUANTITIES
     quantities = [_resolve_quantity(q) for q in quantities]
 
-    def _ndistinct(field):
-        return len({r["case"][field] for r in recs if field in r["case"]})
+    from ._frames import pick_hue, scan_mode
 
-    nx, ny = _ndistinct(x), _ndistinct(y)
-    if force in ("heatmap", "lines"):
-        mode = force
-    elif nx >= heatmap_min and ny >= heatmap_min:
-        mode = "heatmap"
-    else:
-        mode = "lines"
+    mode = scan_mode(recs, x, y, heatmap_min, force)
 
     if mode == "heatmap":
         print(f"plot_scan: heatmap mode ({x} x {y}, panel per {panel})")
@@ -564,14 +546,7 @@ def plot_scan(
         )
 
     # line mode: denser axis -> x, sparser -> hue (unless hue is given)
-    line_x, other = (x, y) if nx >= ny else (y, x)
-    if hue is None:
-        if _ndistinct(other) >= 2:
-            hue = other
-        elif _ndistinct(panel) >= 2:
-            hue = panel
-        else:
-            hue = other  # nothing else varies -> a single line
+    line_x, hue = pick_hue(recs, x, y, panel, hue)
     print(f"plot_scan: line mode ({line_x} on x, one line per {hue})")
     return [
         plot_metric_vs(

@@ -34,9 +34,10 @@ attack*; this file carries the *full findings with line numbers and rationale*.
 | M3   | `plot_eaglexo_charge_map` rewritten as a wrapper around `plot_heatmaps`' new `value=` mode | `28e20ec` |
 | M5   | `sweep.crystal_params` if-chain → `_CRYSTAL_PARAMS` registry; radiator-dict constructions unified into `_radiator()` | `546fd5c` |
 | —    | `results.py` package split (`store`/`selection`/`metrics`/`scoring`/`tables` + `test_results_exports.py`) | `279e709` |
+| M6   | `heatmap_frame`/`metric_vs_frame`/`_effective_x`/`_ndistinct`/`scan_mode`/`pick_hue` hoisted into `plots/_frames.py`; `sweeps.py` renders from them (this branch, uncommitted) |
 
-**Remaining** (suggested order in `TODO.md`): M6. **Plus two
-items that fell out of the TODO summary and must not be lost: M4, and the M7 `line_fwhm_eV`
+**Remaining:** nothing queued in `TODO.md`'s numbered backlog. **Two items that fell out of
+the TODO summary and must not be lost: M4, and the M7 `line_fwhm_eV`
 / escape-helper sub-items — see below.**
 
 ---
@@ -125,12 +126,16 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   comparison artifact, not a content change) plus the full 201-test suite / 0 ruff / 0 pyright.
 
 - **M6 — matplotlib `sweeps` vs `altair_sweeps` duplicate the reduction, not just rendering.**
-  *(TODO — do last.)*  `heatmap_frame` / `metric_vs_frame` / `scan_charts` / `_effective_x`
-  re-derive `plot_heatmaps` / `plot_metric_vs` / `plot_scan` logic — duplicating *reduction*,
-  which is exactly what these modules' docstrings promise not to do. (`metric_vs_chart` also
-  double-computes records + `_effective_x`.) Move the frame builders into a renderer-neutral
-  `plots/_frames.py` (or fold into `results/`) consumed by both renderers. Largest surface,
-  easiest to get wrong — do now that the `results/` split has moved things underneath it.
+  *(DONE -- this branch, uncommitted.)* Moved `heatmap_frame`/`metric_vs_frame`/
+  `_effective_x`/`_ndistinct`/`scan_mode`/`pick_hue` into a new renderer-neutral
+  `plots/_frames.py`. `sweeps.py`'s `plot_heatmaps`/`plot_metric_vs`/`plot_scan`
+  now render from the same tidy-data frames `altair_sweeps.py`'s
+  `heatmap_chart`/`metric_vs_chart`/`scan_charts` already did -- both renderers
+  share one reduction. `_AXIS_SPECS`/`_axis_disp`/`_value_label`/`_FLUX_GATED`
+  moved from `sweeps.py` into `_frames.py` (sweeps.py imports them back) to
+  keep the `_frames -> sweeps` dependency acyclic. Verified via a scratch
+  before/after diff script (matplotlib line/mesh data byte-identical) plus
+  the full suite.
 
 - **M7 — smaller mechanical hoists.**
   - `records_for_cases(results, cases)` — the `cases→names` prologue ×9. *(DONE — `6f51ced`.)*

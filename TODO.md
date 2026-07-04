@@ -42,7 +42,16 @@ add lines back; the dead `n_of` helper, now unused, was also deleted). **Also do
 a new `tests/test_results_exports.py` mirroring the `montecarlo`/`plots` export-freeze
 pattern. Verified against the pre-split module by an AST source-diff of every moved
 function/constant (byte-identical bodies; the one AST "diff" was a decorator-boundary
-artifact of `inspect.getsource`, not a content change) plus the full suite.
+artifact of `inspect.getsource`, not a content change) plus the full suite. **Also done**
+(this branch): M6 — the renderer-neutral frame builders `heatmap_frame`/`metric_vs_frame`/
+`_effective_x`/`_ndistinct`/`scan_mode`/`pick_hue` moved into a new `plots/_frames.py`;
+`sweeps.py`'s `plot_heatmaps`/`plot_metric_vs`/`plot_scan` now render from those same
+functions instead of re-deriving the per-cell/per-point best-record reduction inline, so
+matplotlib and Altair (`altair_sweeps.py`) share one reduction instead of two. Verified
+byte-identical against the pre-refactor code via a scratch before/after diff script over
+synthetic records (mesh/line data unchanged) plus the full suite. This closes the branch's
+numbered TODO backlog (M4 and the M7 `line_fwhm_eV`/escape-helper sub-items remain tracked
+only in `docs/dedup-inventory.md`, out of this branch's scope).
 
 Full original inventory + rationale (tracked, self-contained — includes M4 and the M7
 `line_fwhm_eV`/escape-helper sub-items not summarized below):
@@ -62,15 +71,9 @@ Full original inventory + rationale (tracked, self-contained — includes M4 and
 
 ### Remaining work, in suggested order
 
-1. **M6 — renderer-neutral frame builders (largest item, aligns with the altair
-   migration).** `plots/sweeps.py`'s `heatmap_frame`/`metric_vs_frame`/`scan_charts`/
-   `_effective_x` re-derive the same reduction logic as `plot_heatmaps`/`plot_metric_vs`/
-   `plot_scan`, just for altair instead of matplotlib — duplicating *reduction*, not just
-   *rendering*, which is exactly what these modules' docstrings promise not to do. Move
-   the frame builders into a renderer-neutral `plots/_frames.py` (or fold into
-   `results/`) consumed by both the matplotlib and altair renderers. Biggest surface and
-   easiest to get wrong; the `results/` split has already moved things around underneath
-   it, so do it now with that settled.
+This branch's numbered TODO backlog is now empty — M6 (the last item) is done above. M4
+and the M7 `line_fwhm_eV`/escape-helper sub-items remain tracked only in
+`docs/dedup-inventory.md`, out of this branch's scope.
 
 ### Notes carried from the analysis session
 - `plots/detectors.py` (677 → 599 lines after M1+M3) is the best large-file refactor
