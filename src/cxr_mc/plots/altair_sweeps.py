@@ -19,22 +19,21 @@ is rarely an issue here).
 """
 
 import altair as alt
-import pandas as pd
 
-from ..results import (
-    records_for_cases,
-    selection_score,
+from ..results import records_for_cases
+from ._frames import (
+    _effective_x,
+    heatmap_frame,
+    metric_vs_frame,
+    pick_hue,
+    scan_mode,
 )
-from ._common import _metrics_map
 from .sweeps import (
     _AXIS_SPECS,
-    _FLUX_GATED,
     _HEATMAP_QUANTITIES,
     _METRIC_LABELS,
-    _axis_disp,
     _axis_label,
     _resolve_quantity,
-    _value_label,
 )
 
 # matplotlib colormap name -> Vega-Lite colour scheme
@@ -47,70 +46,12 @@ _VEGA_SCHEME = {
     "Greens": "greens",
 }
 
-_FALLBACK_X = ("tilt_deg", "thickness_ang", "E0_keV", "tilt_azim_deg", "B_ang2")
-
 
 def _scheme(cmap):
     return _VEGA_SCHEME.get(cmap, str(cmap).lower())
 
 
-def _ndistinct(recs, field):
-    return len({r["case"][field] for r in recs if field in r["case"]})
-
-
 # ---- 1-D metric scan ---------------------------------------------------------
-def _effective_x(recs, x, hue):
-    """Mirror :func:`cxr_mc.plots.plot_metric_vs`'s single-valued-x guard: if ``x``
-    sweeps <2 values, substitute the first fallback knob that actually sweeps (and
-    isn't the hue), so the curve is meaningful instead of a vertical stack."""
-    if _ndistinct(recs, x) >= 2:
-        return x
-    return next(
-        (f for f in _FALLBACK_X if f != x and f != hue and _ndistinct(recs, f) >= 2),
-        x,
-    )
-
-
-def metric_vs_frame(
-    results,
-    settings,
-    *,
-    x="thickness_ang",
-    metric="line_flux",
-    hue="E0_keV",
-    select="quality_peak",
-    cases=None,
-    rel_prominence=0.03,
-    line_metric="sharpness",
-):
-    """Tidy long-form table for a 1-D metric scan: one row per (hue value, x value),
-    ``metric`` reduced over every OTHER swept dimension to its best geometry
-    (``results.selection_score`` ``select``). Mirrors the data behind
-    :func:`cxr_mc.plots.plot_metric_vs`, including the single-valued-x fallback.
-    ``x`` is in DISPLAY units (e.g. thickness in microns). Columns:
-    ``x, metric, hue`` (``hue`` is the ``"30 keV"``-style value label)."""
-    recs = records_for_cases(results, cases)
-    if not recs:
-        return pd.DataFrame(columns=["x", "metric", "hue"])
-    x = _effective_x(recs, x, hue)
-    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
-    div_x = _AXIS_SPECS.get(x, (None, 1.0))[1]
-    rows = []
-    for hv in sorted({r["case"][hue] for r in recs}):
-        hr = [r for r in recs if r["case"][hue] == hv]
-        for xv in sorted({r["case"][x] for r in hr}):
-            cell = [r for r in hr if r["case"][x] == xv]
-            best = max(cell, key=lambda r: selection_score(metrics[id(r)], select))
-            rows.append(
-                {
-                    "x": float(xv) / div_x,
-                    "metric": float(metrics[id(best)][metric]),
-                    "hue": _value_label(hue, hv),
-                }
-            )
-    return pd.DataFrame(rows, columns=["x", "metric", "hue"])
-
-
 def metric_vs_chart(
     results,
     settings,
@@ -163,58 +104,6 @@ def metric_vs_chart(
 
 
 # ---- 2-D parametric heatmap --------------------------------------------------
-def heatmap_frame(
-    results,
-    settings,
-    *,
-    quantity="peak_flux",
-    x="tilt_azim_deg",
-    y="tilt_deg",
-    panel="E0_keV",
-    select="quality_peak",
-    cases=None,
-    rel_prominence=0.03,
-    line_metric="sharpness",
-    min_flux_frac=0.02,
-    min_line_quality=0.2,
-):
-    """Tidy long-form table for one heatmap quantity over ``x`` x ``y``, one block
-    per ``panel`` value. Each (x, y) cell is reduced to its best record
-    (``selection_score`` ``select``); flux-gated quantities blank out cells with
-    near-zero emission or an ill-defined line (dropped rows -> gaps), mirroring
-    :func:`cxr_mc.plots.plot_heatmaps`. ``x`` / ``y`` are in DISPLAY units.
-    Columns: ``x, y, panel, value``."""
-    recs = records_for_cases(results, cases)
-    if not recs:
-        return pd.DataFrame(columns=["x", "y", "panel", "value"])
-    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
-    gated = quantity in _FLUX_GATED
-    rows = []
-    for pv in sorted({r["case"][panel] for r in recs}):
-        er = [r for r in recs if r["case"][panel] == pv]
-        fmax = max((metrics[id(r)]["peak_flux"] for r in er), default=0.0)
-        floor = min_flux_frac * fmax
-        best = {}  # (xv, yv) -> (score, rec)
-        for r in er:
-            ck = (r["case"][x], r["case"][y])
-            s = selection_score(metrics[id(r)], select)
-            if ck not in best or s > best[ck][0]:
-                best[ck] = (s, r)
-        for (xv, yv), (_, r) in best.items():
-            m = metrics[id(r)]
-            if gated and (m["peak_flux"] < floor or m["line_quality"] < min_line_quality):
-                continue  # near-zero emission / ill-defined line -> blank
-            rows.append(
-                {
-                    "x": _axis_disp(x, [xv])[0],
-                    "y": _axis_disp(y, [yv])[0],
-                    "panel": _value_label(panel, pv),
-                    "value": float(m[quantity]),
-                }
-            )
-    return pd.DataFrame(rows, columns=["x", "y", "panel", "value"])
-
-
 def heatmap_chart(
     results,
     settings,
@@ -301,13 +190,7 @@ def scan_charts(
         return []
     quantities = [_resolve_quantity(q) for q in (quantities or _HEATMAP_QUANTITIES)]
 
-    nx, ny = _ndistinct(recs, x), _ndistinct(recs, y)
-    if force in ("heatmap", "lines"):
-        mode = force
-    elif nx >= heatmap_min and ny >= heatmap_min:
-        mode = "heatmap"
-    else:
-        mode = "lines"
+    mode = scan_mode(recs, x, y, heatmap_min, force)
 
     if mode == "heatmap":
         charts = [
@@ -330,14 +213,7 @@ def scan_charts(
         return [c for c in charts if c is not None]
 
     # line mode: denser axis -> x, sparser -> hue (unless hue is given)
-    line_x, other = (x, y) if nx >= ny else (y, x)
-    if hue is None:
-        if _ndistinct(recs, other) >= 2:
-            hue = other
-        elif _ndistinct(recs, panel) >= 2:
-            hue = panel
-        else:
-            hue = other
+    line_x, hue = pick_hue(recs, x, y, panel, hue)
     charts = [
         metric_vs_chart(
             results,

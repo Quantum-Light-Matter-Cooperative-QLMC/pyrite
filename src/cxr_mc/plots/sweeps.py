@@ -11,22 +11,13 @@ from ..results import (
     selection_score,
 )
 from ._common import _metrics_map
+from ._frames import _AXIS_SPECS, _FLUX_GATED, _axis_disp, _value_label
 from ._style import (
     COLORS,
     energy_color,
 )
 
 # ---- parametric heatmaps + parameter scans -----------------------------------
-# Per case field: (axis label, divide-to-display, display unit, value format).
-# Lets ANY swept knob be a heatmap/scan axis with sensible labels and units.
-_AXIS_SPECS = {
-    "tilt_deg": ("polar tilt", 1.0, "deg", "{:g}"),
-    "tilt_azim_deg": ("azimuthal tilt", 1.0, "deg", "{:g}"),
-    "E0_keV": ("beam energy", 1.0, "keV", "{:g}"),
-    "thickness_ang": ("thickness", 1e4, r"$\mu$m", "{:g}"),
-    "B_ang2": ("B-factor", 1.0, r"$\AA^2$", "{:g}"),
-}
-
 # (metric key, label + units, colormap)
 _HEATMAP_QUANTITIES = [
     ("peak_flux", "peak spectral flux  (Phs/eV/s)", "viridis"),
@@ -65,29 +56,9 @@ def _resolve_quantity(q):
     return (q, _METRIC_LABELS.get(q, q), "viridis")
 
 
-# Line-characterization maps are meaningless where the line is ill-defined --
-# either near-zero emission OR a broad ramp / a cluster of comparable peaks
-# (low line_quality, see results.line_quality). Gate these by BOTH peak flux
-# and line_quality. The always-well-defined maps (peak_flux, coherent_flux,
-# total_flux) and the diagnostic line_quality map itself are never gated.
-_FLUX_GATED = {"line_eV", "fwhm_eV", "line_frac", "line_flux"}
-
-
 def _axis_label(key):
     spec = _AXIS_SPECS.get(key)
     return key if spec is None else f"{spec[0]} ({spec[2]})"
-
-
-def _axis_disp(key, vals):
-    """Swept raw values -> display units (e.g. thickness Angstrom -> microns)."""
-    div = _AXIS_SPECS.get(key, (None, 1.0))[1]
-    return [float(v) / div for v in vals]
-
-
-def _value_label(key, v):
-    """'30 keV' / '17 um' style label for one swept value."""
-    _lbl, div, unit, fmt = _AXIS_SPECS.get(key, (key, 1.0, "", "{:g}"))
-    return f"{fmt.format(float(v) / div)} {unit}".strip()
 
 
 def _cell_edges(disp_vals):
