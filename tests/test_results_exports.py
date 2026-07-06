@@ -28,6 +28,7 @@ FROZEN_EXPORTS = frozenset(
         "select_results",
         "_RECORD_ARRAY_FIELDS",
         "_WIDE_BREM_FIELDS",
+        "_grid_names",
         "slim_results",
         "_peak",
         "best_azimuth",

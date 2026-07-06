@@ -41,6 +41,7 @@ from .scoring import (
 from .selection import (
     _RECORD_ARRAY_FIELDS,
     _WIDE_BREM_FIELDS,
+    _grid_names,
     _peak,
     best_azimuth,
     filter_results,
@@ -78,6 +79,7 @@ __all__ = [
     "select_results",
     "_RECORD_ARRAY_FIELDS",
     "_WIDE_BREM_FIELDS",
+    "_grid_names",
     "slim_results",
     "_peak",
     "best_azimuth",

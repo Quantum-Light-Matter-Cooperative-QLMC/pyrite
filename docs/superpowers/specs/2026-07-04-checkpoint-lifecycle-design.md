@@ -1,7 +1,7 @@
 # Checkpoint lifecycle: grid-filtered pull, local archive, remote clear
 
 **Date:** 2026-07-04
-**Status:** Design — approved, pending spec review
+**Status:** Implemented (2026-07-06) on `feature/checkpoint-lifecycle`
 **Scope:** `dev/remote.py`, `src/cxr_mc/{slim,cli}.py`, `src/cxr_mc/results/selection.py`, a new `src/cxr_mc/archive.py`
 
 ## Problem
