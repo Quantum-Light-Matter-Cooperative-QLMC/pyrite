@@ -16,6 +16,7 @@ from ..results import (
 )
 from ._common import (
     _best_azimuth,
+    _case_title,
     _line_brem,
     _peak_line,
     _per_tilt_figs,
@@ -344,9 +345,7 @@ def _draw_chunk(fig, trecs, settings):
         ax_cxr.plot(E, line_raw * r["scale"], color=c, lw=1.2, label=lbl)
     case = best[0]["case"]
     fig.suptitle(
-        rf"{case['name'].split()[0]}, {case['thickness_ang'] / 1e4:.1f} $\mu$m, "
-        rf"$\theta_\mathrm{{tilt}}={case['tilt_deg']:g}\degree$ — best azimuth per "
-        rf"energy (intrinsic)",
+        _case_title(case, "best azimuth per energy (intrinsic)", tilt_fmt="g"),
         fontsize=13,
     )
     for ax, title, leg in (

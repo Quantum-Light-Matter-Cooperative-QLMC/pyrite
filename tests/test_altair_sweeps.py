@@ -11,11 +11,10 @@ from types import SimpleNamespace
 import altair as alt
 import numpy as np
 
+from cxr_mc.plots._frames import heatmap_frame, metric_vs_frame
 from cxr_mc.plots.altair_sweeps import (
     heatmap_chart,
-    heatmap_frame,
     metric_vs_chart,
-    metric_vs_frame,
     scan_charts,
 )
 

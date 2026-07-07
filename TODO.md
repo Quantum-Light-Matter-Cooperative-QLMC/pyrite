@@ -38,11 +38,14 @@ on `main` once the branch exists.
    Si 4.42% max rel vs NIST); image now builds tarball-free from
    `github.com/eScatter/elsepa`. Remaining gate: the image/venv live outside the repo
    (`C:/dev/pyelsepa`), so the driver stays gated in CI. Tied to P2 #2.
-4. **Codebase de-duplication follow-through.** -> `refactor/dedup-followthrough`. HIGH
-   bug, dead-code nits, and the first two mechanical hoists are done on `main`; the
-   branch carries the remaining `/sc:analyze` items (title/metrics hoists, shared
-   sensor module, charge-map delegation, crystal-params registry, `results.py` split,
-   renderer-neutral frame builders).
+4. **Codebase de-duplication follow-through.** `refactor/dedup-followthrough` — merged
+   (now on `main`). All mechanical hoists landed: title/metrics hoists into
+   `plots/_common.py`, shared `_si_sensor.py`, `plot_heatmaps` value= mode + Eagle
+   charge-map delegation, `sweep.crystal_params` registry collapse, the `results.py` ->
+   `results/` package split, and renderer-neutral plot frame builders
+   (`plots/_frames.py`) shared by matplotlib/Altair. Two items intentionally out of
+   scope, tracked only in [`docs/dedup-inventory.md`](docs/dedup-inventory.md): M4
+   (wide-brem overlay physics x4) and the M7 `line_fwhm_eV`/escape-helper sub-items.
 
 ## P3 - lower / exploratory
 

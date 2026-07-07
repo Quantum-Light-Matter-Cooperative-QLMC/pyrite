@@ -131,19 +131,26 @@ All plotting — Matplotlib/Plotly. Split from a single module into submodules b
 figure type; **every public and internal name is re-exported from the package**,
 so `from cxr_mc.plots import X` is unchanged (`tests/test_plots_exports.py`
 freezes the export set). Submodule DAG (leaf → driver):
-`_style → _common → sweeps → {spectra, detectors, trajectories} → interactive`.
+`_style → _common → _frames → sweeps → {spectra, detectors, trajectories} → interactive`.
 - `_style` — `COLORS`, `_ENERGY_PALETTE`, `energy_color` (per-energy colour map
   consistent across every figure). Leaf; no sibling deps.
 - `_common` — shared figure plumbing: `_line_brem` (per-record line/brem split),
   `_per_tilt_figs` (one-figure-per-tilt loop), `_mode`, `_EFF_CACHE`. Deps:
   `montecarlo`, `results`.
+- `_frames` — renderer-neutral tidy-data builders (`heatmap_frame`, `metric_vs_frame`,
+  `scan_mode`, `pick_hue`, `_effective_x`/`_ndistinct`, the axis/value-label registries
+  `_AXIS_SPECS`/`_axis_disp`/`_value_label`/`_FLUX_GATED`): the per-cell/per-point
+  best-record reduction shared by matplotlib `sweeps.py` and `altair_sweeps.py`. Leaf-most
+  of the sweep-figure modules; no matplotlib/Altair imports. Deps: `_common`, `results`,
+  `pandas`.
 - `spectra` — `plot_by_energy`, `plot_full_spectrum`, `plot_peak_vs_tilt`,
   `plot_mosaic_comparison`, `plot_best_spectra`, `plot_material_comparison`,
   `plot_tilt_panel`, the `_draw_*` spectral drawers. Deps: `_style`, `_common`,
   `montecarlo`, `results`.
 - `sweeps` — `plot_heatmaps`, `facet_metric` (small-multiples over many knobs),
   `plot_metric_vs`, `plot_scan`; the `_HEATMAP_QUANTITIES` / `_METRIC_LABELS`
-  tables + axis helpers. Deps: `_style`, `results`.
+  tables + axis helpers. Renders from `_frames`' tidy DataFrames rather than
+  re-deriving the best-record reduction inline. Deps: `_style`, `_frames`, `results`.
 - `detectors` — `plot_timepix_efficiency` / `_detected` / `_poisson`,
   `plot_eaglexo_efficiency` / `_detected` / `_charge` / `_charge_map`. Deps:
   `_style`, `_common`, `sweeps`, `results`, `timepix_response`, `eaglexo_response`.

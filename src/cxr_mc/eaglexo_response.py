@@ -85,17 +85,9 @@ is W_Si = 3.65 eV/pair (each absorbed photon of energy E makes E/W_Si electrons)
 
 import numpy as np
 
-from . import DATA_DIR
+from . import DATA_DIR, _si_sensor
+from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
 from .crystallography import absorption_length_ang
-
-# ---- silicon sensor physics (fixed material constants) -----------------------
-W_EHP_EV = 3.65  # mean energy to make one electron-hole pair [eV]
-FANO_SI = 0.115  # Fano factor: Var(N) = F * N (sub-Poisson) for Si
-SI_DENSITY_G_CM3 = 2.329
-SI_A = 28.085  # Si molar mass [g/mol]
-# number density n = rho/A * N_A, converted cm^-3 -> Ang^-3 (the unit
-# absorption_length_ang wants). 0.602214076 = N_A * 1e-24.
-SI_N_PER_ANG3 = SI_DENSITY_G_CM3 / SI_A * 0.602214076
 
 # ---- sensor variants (fixed, from the Eagle XO datasheet) --------------------
 # Active area and pixel pitch for the two CCD options; the active area (with the
@@ -301,13 +293,7 @@ class EagleResponse:
         as the input (e.g. Phs/eV/s/nA): ``spec * QE(E)``, optionally blurred by
         the photon-counting energy resolution. NaN/inf samples (a bad-geometry
         case) are treated as zero flux rather than poisoning the result."""
-        spec = np.nan_to_num(np.asarray(spec, dtype=float), nan=0.0, posinf=0.0, neginf=0.0)
-        if spec.shape != self.E.shape:
-            raise ValueError(
-                f"spec length {spec.shape} != response grid {self.E.shape}. "
-                f"Build a matching response with "
-                f"eaglexo_response.get_response(E_grid, ...)."
-            )
+        spec = _si_sensor.prep_spectrum(spec, self.E, "eaglexo_response")
         det = spec * self.qe
         if self.resolve_energy:
             from .montecarlo import convolve_detector
@@ -363,14 +349,7 @@ def get_response(E_grid_eV, *, coating="BN", resolve_energy=False, n_pix=4):
     signature and reused. Prefer this over constructing EagleResponse directly
     when looping over many spectra so each gets a response matching ITS grid."""
     E = np.asarray(E_grid_eV, dtype=float)
-    key = (
-        E.size,
-        round(float(E[0]), 6),
-        round(float(E[-1]), 6),
-        coating.upper(),
-        bool(resolve_energy),
-        int(n_pix),
-    )
+    key = _si_sensor.grid_key(E) + (coating.upper(), bool(resolve_energy), int(n_pix))
     resp = _RESPONSE_CACHE.get(key)
     if resp is None:
         resp = EagleResponse(E, coating=coating, resolve_energy=resolve_energy, n_pix=n_pix)
@@ -395,9 +374,8 @@ def poisson_counts(
     Returns (counts_per_bin, expected_per_bin): the integer draw and its mean."""
     rng = np.random.default_rng() if rng is None else rng
     E = np.asarray(E_grid_eV, dtype=float)
-    dE = E[1] - E[0]
-    expected = np.clip(np.asarray(detected_per_s, dtype=float) * dE * time_s, 0.0, None)
-    counts = rng.poisson(expected).astype(float)
+    counts, expected = _si_sensor.poisson_core(E_grid_eV, detected_per_s, time_s, rng)
+    counts = counts.astype(float)
     if add_read_dark:
         # read noise in charge -> equivalent photon-count jitter per bin, plus
         # accumulated dark charge; both small for a deep-cooled, low-noise CCD

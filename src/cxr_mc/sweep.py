@@ -23,7 +23,7 @@ this module is cheap to import and test.
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import product
-from typing import Any
+from typing import Any, NotRequired, TypedDict
 
 import numpy as np
 
@@ -67,13 +67,6 @@ def fmt_thickness(t_ang):
     if t_ang < 1e7:
         return f"{t_ang / 1e4:g}um"
     return f"{t_ang / 1e7:g}mm"
-
-
-def n_of(crystal, element):
-    """Number density [1/Ang^3] of one element in a crystal's unit cell."""
-    info = CRYSTALS[crystal]
-    count = sum(1 for el, _ in info["basis"] if el == element)
-    return count / info["V_cell"]
 
 
 def pm(*hkls):
@@ -161,6 +154,24 @@ def film_on_substrate_layers(
     )
 
 
+def _radiator(cp, *, beam_uvw=None, azimuth_rad=None):
+    """Coherent-radiator dict from a :func:`crystal_params` result ``cp``: crystal,
+    hkl_list, B_ang2, and beam_uvw (``cp``'s own default unless overridden). The
+    ``azimuth_rad`` key is included only when given -- a bare substrate radiator
+    carries no azimuth of its own (:func:`substrate_radiator`); only a stack/film
+    use of a radiator (:func:`layer_radiator`, :func:`build_cases`) does. The one
+    constructor behind all three radiator-dict call sites."""
+    rad: dict[str, Any] = dict(
+        crystal=cp["crystal"],
+        hkl_list=cp["hkl_list"],
+        B_ang2=cp["B_ang2"],
+        beam_uvw=cp["beam_uvw"] if beam_uvw is None else tuple(beam_uvw),
+    )
+    if azimuth_rad is not None:
+        rad["azimuth_rad"] = float(azimuth_rad)
+    return rad
+
+
 def substrate_radiator(substrate, n_families=4):
     """Coherent-radiation crystal params for a substrate, or None if it radiates
     no lines. A CRYSTALLINE substrate (a CRYSTALS key, e.g. 'silicon') returns
@@ -172,13 +183,7 @@ def substrate_radiator(substrate, n_families=4):
     if substrate.lower() in _SUBSTRATE_COMP:
         return None  # amorphous: no coherent lines
     if substrate in CRYSTALS:
-        cp = crystal_params(substrate, n_families)
-        return dict(
-            crystal=cp["crystal"],
-            hkl_list=cp["hkl_list"],
-            B_ang2=cp["B_ang2"],
-            beam_uvw=cp["beam_uvw"],
-        )
+        return _radiator(crystal_params(substrate, n_families))
     raise ValueError(
         f"unknown substrate {substrate!r}; use one of {list(_SUBSTRATE_COMP)} "
         f"or a crystal key in {list(CRYSTALS)}"
@@ -199,119 +204,89 @@ def layer_radiator(layer: "Layer", n_families: int = 4):
     return rad
 
 
+class CrystalParamsGrid(TypedDict):
+    """Fixed per-material crystallography that :func:`crystal_params` spreads into
+    its returned dict, mirroring :data:`config._MATERIAL_GRIDS`/``MaterialGrid``.
+    ``hkl_list`` is present only for materials where the automatic
+    :func:`~cxr_mc.crystallography.dominant_reflections` family search isn't right
+    (fiber-textured HOPG); everyone else gets it derived from ``B_ang2``."""
+
+    B_ang2: float
+    beam_uvw: tuple[int, int, int]
+    E_grid: np.ndarray
+    hkl_list: NotRequired[list[tuple[int, ...]]]
+
+
+# per-material crystallography registry: B-factor, beam zone axis, default
+# photon-energy grid. ``crystal`` (== the registry key) and ``composition``
+# (derived from the crystal's basis, like substrate_composition already does
+# for substrates) are NOT stored here -- they follow mechanically from the key.
+_CRYSTAL_PARAMS: dict[str, CrystalParamsGrid] = {
+    "mose2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 2), "E_grid": np.arange(350.0, 1750.0, 3.0)},
+    # isostructural with MoSe2; W has no NIST Mott table so transport falls back to
+    # analytic screened-Rutherford screening for W (see montecarlo).
+    "wse2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 2), "E_grid": np.arange(350.0, 2500.0, 3.0)},
+    # 2H-MoTe2 (alpha) bulk, isostructural with MoSe2. Te has no NIST Mott table ->
+    # transport falls back to analytic screened-Rutherford screening for Te (see
+    # montecarlo), as for W/S/Pt/Hf/Zr.
+    "mote2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 2), "E_grid": np.arange(350.0, 2500.0, 3.0)},
+    # 2H-MoTe2 product-page variant (few-layer, on sapphire substrate). Same
+    # phonon/crystal params as bulk; only the lattice differs (crystal_structures.toml).
+    "mote2_product": {
+        "B_ang2": 0.6,
+        "beam_uvw": (0, 0, 2),
+        "E_grid": np.arange(350.0, 2500.0, 3.0),
+    },
+    # 2H disulfides, isostructural with WSe2/MoSe2 (small in-plane a -> bright). S has
+    # no NIST Mott table -> analytic SR screening fallback.
+    "ws2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 2), "E_grid": np.arange(350.0, 2500.0, 3.0)},
+    "mos2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 2), "E_grid": np.arange(350.0, 2500.0, 3.0)},
+    # 1T (CdI2-type): heavy metal at the ORIGIN -> every (00l) stays strong, so the
+    # bright basal series marches up in energy with the tight c. These metals
+    # (Pt/Hf/Zr) have no NIST Mott table -> analytic SR screening.
+    "ptse2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 1), "E_grid": np.arange(350.0, 3500.0, 3.0)},
+    "hfse2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 1), "E_grid": np.arange(350.0, 3500.0, 3.0)},
+    "zrse2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 1), "E_grid": np.arange(350.0, 3500.0, 3.0)},
+    "diamond": {"B_ang2": 0.21, "beam_uvw": (4, 0, 0), "E_grid": np.arange(100.0, 5000.0, 2.0)},
+    "silicon": {"B_ang2": 0.46, "beam_uvw": (4, 4, 0), "E_grid": np.arange(100.0, 5000.0, 3.0)},
+    # c-cut sapphire: c-axis normal to the film.
+    "sapphire": {
+        "B_ang2": 0.25,
+        "beam_uvw": (0, 0, 1),
+        "E_grid": np.arange(100.0, 5000.0, 3.0),
+    },
+    # HOPG is fiber-textured: only the (00l) c-axis reflections are coherent, so the
+    # automatic dominant_reflections family search is skipped via hkl_list.
+    "hopg": {
+        "B_ang2": 0.8,
+        "beam_uvw": (0, 0, 1),
+        "E_grid": np.arange(100.0, 5000.0, 3.0),
+        "hkl_list": pm((0, 0, 2), (0, 0, 4)),
+    },
+}
+
+
 def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
     """Fixed crystallography for a material: composition, the dominant
     reflections, the beam zone axis [uvw], the (isotropic) B-factor, and a
     sensible default photon-energy grid. Override the grid via Sweep.e_grid_eV."""
-    if material == "mose2":
-        return dict(
-            crystal="mose2",
-            composition=[("Mo", n_of("mose2", "Mo")), ("Se", n_of("mose2", "Se"))],
-            hkl_list=dominant_reflections("mose2", n_families=n_families, B_ang2=0.6),
-            beam_uvw=(0, 0, 2),
-            B_ang2=0.6,
-            E_grid=np.arange(350.0, 1750.0, 3.0),
-        )
-    if material == "wse2":
-        # isostructural with MoSe2; W has no NIST Mott table so transport falls
-        # back to analytic screened-Rutherford screening for W (see montecarlo).
-        return dict(
-            crystal="wse2",
-            composition=[("W", n_of("wse2", "W")), ("Se", n_of("wse2", "Se"))],
-            hkl_list=dominant_reflections("wse2", n_families=n_families, B_ang2=0.6),
-            beam_uvw=(0, 0, 2),
-            B_ang2=0.6,
-            E_grid=np.arange(350.0, 2500.0, 3.0),
-        )
-    if material == "mote2":
-        # 2H-MoTe2 (alpha) bulk, isostructural with MoSe2. Te has no NIST Mott table
-        # -> transport falls back to analytic screened-Rutherford screening for Te
-        # (see montecarlo), as for W/S/Pt/Hf/Zr.
-        return dict(
-            crystal="mote2",
-            composition=[("Mo", n_of("mote2", "Mo")), ("Te", n_of("mote2", "Te"))],
-            hkl_list=dominant_reflections("mote2", n_families=n_families, B_ang2=0.6),
-            beam_uvw=(0, 0, 2),
-            B_ang2=0.6,
-            E_grid=np.arange(350.0, 2500.0, 3.0),
-        )
-    if material == "mote2_product":
-        # 2H-MoTe2 product-page variant (few-layer, on sapphire substrate).
-        # Same phonon/crystal params as bulk; only lattice differs.
-        return dict(
-            crystal="mote2_product",
-            composition=[("Mo", n_of("mote2_product", "Mo")), ("Te", n_of("mote2_product", "Te"))],
-            hkl_list=dominant_reflections("mote2_product", n_families=n_families, B_ang2=0.6),
-            beam_uvw=(0, 0, 2),
-            B_ang2=0.6,
-            E_grid=np.arange(350.0, 2500.0, 3.0),
-        )
-    if material in ("ws2", "mos2"):
-        # 2H disulfides, isostructural with WSe2/MoSe2 (small in-plane a -> bright).
-        # S has no NIST Mott table -> analytic SR screening fallback.
-        metal = {"ws2": "W", "mos2": "Mo"}[material]
-        return dict(
-            crystal=material,
-            composition=[(metal, n_of(material, metal)), ("S", n_of(material, "S"))],
-            hkl_list=dominant_reflections(material, n_families=n_families, B_ang2=0.6),
-            beam_uvw=(0, 0, 2),
-            B_ang2=0.6,
-            E_grid=np.arange(350.0, 2500.0, 3.0),
-        )
-    if material in ("ptse2", "hfse2", "zrse2"):
-        # 1T (CdI2-type): heavy metal at the ORIGIN -> every (00l) stays strong,
-        # so the bright basal series marches up in energy with the tight c. These
-        # metals (Pt/Hf/Zr) have no NIST Mott table -> analytic SR screening.
-        metal = {"ptse2": "Pt", "hfse2": "Hf", "zrse2": "Zr"}[material]
-        return dict(
-            crystal=material,
-            composition=[(metal, n_of(material, metal)), ("Se", n_of(material, "Se"))],
-            hkl_list=dominant_reflections(material, n_families=n_families, B_ang2=0.6),
-            beam_uvw=(0, 0, 1),  # c-axis along the beam (1T: 1 layer/cell)
-            B_ang2=0.6,
-            E_grid=np.arange(350.0, 3500.0, 3.0),
-        )
-    if material == "diamond":
-        return dict(
-            crystal="diamond",
-            composition=[("C", n_of("diamond", "C"))],
-            hkl_list=dominant_reflections("diamond", n_families=n_families, B_ang2=0.21),
-            beam_uvw=(4, 0, 0),
-            B_ang2=0.21,
-            E_grid=np.arange(100.0, 5000.0, 2.0),
-        )
-    if material == "silicon":
-        return dict(
-            crystal="silicon",
-            composition=[("Si", n_of("silicon", "Si"))],
-            hkl_list=dominant_reflections("silicon", n_families=n_families, B_ang2=0.46),
-            beam_uvw=(4, 4, 0),
-            B_ang2=0.46,
-            E_grid=np.arange(100.0, 5000.0, 3.0),
-        )
-    if material == "sapphire":
-        return dict(
-            crystal="sapphire",
-            composition=[
-                ("Al", n_of("sapphire", "Al")),
-                ("O", n_of("sapphire", "O")),
-            ],
-            hkl_list=dominant_reflections("sapphire", n_families=n_families, B_ang2=0.25),
-            beam_uvw=(0, 0, 1),  # c-cut sapphire: c-axis normal to the film
-            B_ang2=0.25,
-            E_grid=np.arange(100.0, 5000.0, 3.0),
-        )
-    if material == "hopg":
-        # HOPG is fiber-textured: only the (00l) c-axis reflections are coherent.
-        return dict(
-            crystal="hopg",
-            composition=[("C", n_of("hopg", "C"))],
-            hkl_list=pm((0, 0, 2), (0, 0, 4)),
-            beam_uvw=(0, 0, 1),
-            B_ang2=0.8,
-            E_grid=np.arange(100.0, 5000.0, 3.0),
-        )
-    raise ValueError(f"unknown material {material!r} (have {list(MATERIAL_LABELS)})")
+    if material not in _CRYSTAL_PARAMS:
+        raise ValueError(f"unknown material {material!r} (have {list(MATERIAL_LABELS)})")
+    grid = _CRYSTAL_PARAMS[material]
+    B_ang2 = grid["B_ang2"]
+    hkl_list = grid.get("hkl_list")
+    if hkl_list is None:
+        hkl_list = dominant_reflections(material, n_families=n_families, B_ang2=B_ang2)
+    else:
+        hkl_list = list(hkl_list)  # fresh copy per call, like the derived path
+    return dict(
+        crystal=material,
+        composition=substrate_composition(material),
+        hkl_list=hkl_list,
+        beam_uvw=grid["beam_uvw"],
+        B_ang2=B_ang2,
+        E_grid=grid["E_grid"],
+    )
 
 
 @dataclass
@@ -470,13 +445,8 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
             # what lets a crystalline substrate emit its own PXR/CBS lines
             # (per-layer radiation, slice 3).
             layer_radiators = [
-                dict(
-                    crystal=cp["crystal"],
-                    hkl_list=cp["hkl_list"],
-                    B_ang2=cp["B_ang2"],
-                    beam_uvw=beam_uvw,
-                    azimuth_rad=0.0,  # stack azimuths are relative to the film
-                ),
+                # stack azimuths are relative to the film -> azimuth_rad=0.0
+                _radiator(cp, beam_uvw=beam_uvw, azimuth_rad=0.0),
                 *(layer_radiator(lay, sweep.n_families) for lay in stack),
             ]
         for i_e, E0 in enumerate(energies):

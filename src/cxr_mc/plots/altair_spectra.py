@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 
 from ..results import records
-from ._common import _best_azimuth, _line_brem
+from ._common import _best_azimuth, _case_title, _line_brem
 
 _FRAME_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "component"]
 
@@ -118,11 +118,7 @@ def spectrum_chart(
     if df.empty:
         return None
 
-    case = recs[0]["case"]
-    title = (
-        f"{case['name'].split()[0]}, {case['thickness_ang'] / 1e4:.1f} um, "
-        f"theta_tilt={case['tilt_deg']:.1f} deg -- intrinsic"
-    )
+    title = _case_title(recs[0]["case"], "intrinsic", latex=False)
 
     base = alt.Chart(df).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)"),

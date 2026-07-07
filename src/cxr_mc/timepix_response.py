@@ -85,16 +85,10 @@ quoted front-end figures convert as:
 import numpy as np
 from scipy.special import erf
 
+from . import _si_sensor
+from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
 from .crystallography import absorption_length_ang
 
-# ---- silicon sensor physics (fixed material constants) -----------------------
-W_EHP_EV = 3.65  # mean energy to make one electron-hole pair [eV]
-FANO_SI = 0.115  # Fano factor: Var(N) = F * N (sub-Poisson) for Si
-SI_DENSITY_G_CM3 = 2.329
-SI_A = 28.085  # Si molar mass [g/mol]
-# number density n = rho/A * N_A, converted cm^-3 -> Ang^-3 (the unit
-# absorption_length_ang wants). 0.602214076 = N_A * 1e-24.
-SI_N_PER_ANG3 = SI_DENSITY_G_CM3 / SI_A * 0.602214076
 K_OVER_Q_V_PER_K = 8.617333e-5  # Boltzmann constant / elementary charge [V/K]
 
 # ---- hardware / operating point (### FILL IN with the real quad values) -------
@@ -392,13 +386,7 @@ class TimepixResponse:
         coarse-OUTPUT bin (R already carries absorption + counting efficiency);
         dividing by dE_out makes it a density again; interp lifts it back onto
         the fine grid. Total detected photons are conserved through the chain."""
-        spec = np.nan_to_num(np.asarray(spec, dtype=float), nan=0.0, posinf=0.0, neginf=0.0)
-        if spec.shape != self.E.shape:
-            raise ValueError(
-                f"spec length {spec.shape} != response grid {self.E.shape}. "
-                f"Build a matching response with "
-                f"timepix_response.get_response(E_grid, ...)."
-            )
+        spec = _si_sensor.prep_spectrum(spec, self.E, "timepix_response")
         n_in = np.bincount(
             self.idx_in, weights=spec * self.dE_fine, minlength=self.n_in
         )  # photons / coarse bin
@@ -441,17 +429,7 @@ def get_response(
     bias = BIAS_VOLTAGE_V if bias_v is None else bias_v
     # grid identity = (size, endpoints) since the grids are uniform; plus the
     # hardware/MC settings that change the matrix
-    key = (
-        E.size,
-        round(float(E[0]), 6),
-        round(float(E[-1]), 6),
-        dE_mc,
-        dE_out,
-        n_mc,
-        seed,
-        thick,
-        bias,
-    )
+    key = _si_sensor.grid_key(E) + (dE_mc, dE_out, n_mc, seed, thick, bias)
     resp = _RESPONSE_CACHE.get(key)
     if resp is None:
         resp = TimepixResponse(
@@ -481,8 +459,4 @@ def poisson_counts(E_grid_eV, detected_per_s, time_s, rng=None):
     mean, per energy bin -- plot counts as the 'measurement', expected as the
     smooth truth."""
     rng = np.random.default_rng() if rng is None else rng
-    E = np.asarray(E_grid_eV, dtype=float)
-    dE = E[1] - E[0]
-    expected = np.asarray(detected_per_s, dtype=float) * dE * time_s
-    expected = np.clip(expected, 0.0, None)  # guard tiny negative noise
-    return rng.poisson(expected), expected
+    return _si_sensor.poisson_core(E_grid_eV, detected_per_s, time_s, rng)
