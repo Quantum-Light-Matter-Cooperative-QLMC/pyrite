@@ -56,4 +56,5 @@ on `main` once the branch exists.
 
 ## Long term features
 
-1. Geant4 or similar integration to support high-energy electron beams
+1. `Geant4` or similar integration to support high-energy electron beams
+2. Add support for `Numba with CUDA` to significantly speed up calcs
