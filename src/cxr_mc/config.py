@@ -186,11 +186,12 @@ _MATERIAL_GRIDS: dict[str, MaterialGrid] = {
     },
     "mos2": {
         "thickness_ang": 1e4,
-        "energy_keV": [30, 45, 60],
-        "tilt_deg": np.linspace(-89, 89, 60, endpoint=True),
-        "tilt_azim_deg": np.linspace(-85, -0.1, 15, endpoint=True),
+        "energy_keV": [20, 30],
+        "tilt_deg": np.linspace(-85, -0.1, 25, endpoint=True),
+        "tilt_azim_deg": np.linspace(-85, -0.1, 10, endpoint=True),
+        "substrate": "sapphire",
         "E_grid_line": np.arange(50.0, 4500.0, 1.0),
-        "E_grid_brem": np.arange(0.0, 60000.0, 25.0),
+        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     # Named device stack: few-layer 2H-MoS2 on a thin thermal a-SiO2 (285 nm,
     # the common device oxide -- adjust to the actual wafer) over thick
