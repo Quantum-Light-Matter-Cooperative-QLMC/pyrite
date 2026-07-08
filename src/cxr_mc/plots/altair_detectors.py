@@ -130,6 +130,7 @@ def timepix_detected_chart(
     n_mc=80000,
     seed=0,
     collapse_azimuth=True,
+    x_domain=None,
     width=720,
     height=360,
 ):
@@ -137,7 +138,9 @@ def timepix_detected_chart(
     spectra at ONE polar tilt, one colour per beam energy, with the counting
     threshold marked. The Altair counterpart of
     :func:`cxr_mc.plots.plot_timepix_detected` / ``browse(kind="timepix")``.
-    Returns an :class:`altair.Chart`, or ``None`` when there are no records."""
+    ``x_domain=(lo, hi)`` fixes the photon-energy axis limits (default:
+    autoscale). Returns an :class:`altair.Chart`, or ``None`` when there are no
+    records."""
     recs = _tilt_records(results, tilt_deg)
     if not recs:
         return None
@@ -153,6 +156,14 @@ def timepix_detected_chart(
     if df.empty:
         return None
     incident, detected = _detected_layers(df)
+    if x_domain is not None:
+        x_scale = alt.Scale(domain=list(x_domain))
+        incident = incident.encode(
+            x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale)
+        )
+        detected = detected.encode(
+            x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale)
+        )
     thr = (
         alt.Chart(pd.DataFrame({"E": [_thr_keV() * 1e3]}))
         .mark_rule(color="gray", strokeDash=[4, 4])
@@ -222,6 +233,7 @@ def eaglexo_detected_chart(
     resolve_energy=False,
     collapse_azimuth=True,
     show_qe=True,
+    x_domain=None,
     width=720,
     height=360,
 ):
@@ -231,7 +243,9 @@ def eaglexo_detected_chart(
     signature, soft PXR lines passing at ~90% QE while the hard brem is crushed by
     the thin sensor. The Altair counterpart of
     :func:`cxr_mc.plots.plot_eaglexo_detected` / ``browse(kind="eaglexo")``.
-    Returns an :class:`altair.Chart`, or ``None`` when there are no records."""
+    ``x_domain=(lo, hi)`` fixes the photon-energy axis limits (default:
+    autoscale). Returns an :class:`altair.Chart`, or ``None`` when there are no
+    records."""
     recs = _tilt_records(results, tilt_deg)
     if not recs:
         return None
@@ -245,8 +259,9 @@ def eaglexo_detected_chart(
     if df.empty:
         return None
     incident, detected = _detected_layers(df)
-    incident = incident.encode(x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=_logx()))
-    detected = detected.encode(x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=_logx()))
+    xsc = _logx(x_domain)
+    incident = incident.encode(x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=xsc))
+    detected = detected.encode(x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=xsc))
     layers = [
         incident,
         detected,
@@ -264,7 +279,7 @@ def eaglexo_detected_chart(
             alt.Chart(qe_df)
             .mark_line(color="gray", opacity=0.5)
             .encode(
-                x=alt.X("energy_eV:Q", scale=_logx()),
+                x=alt.X("energy_eV:Q", scale=xsc),
                 y=alt.Y("QE:Q", title="QE", scale=alt.Scale(domain=[0, 1.05])),
             )
         )
@@ -372,7 +387,10 @@ def eaglexo_charge_chart(
     )
 
 
-def _logx():
+def _logx(domain=None):
     """A log x-scale that tolerates the brem grid's E=0 row (Vega-Lite drops
-    non-positive values on a log axis)."""
-    return alt.Scale(type="log")
+    non-positive values on a log axis). ``domain=(lo, hi)`` fixes the axis
+    limits (default: autoscale to the data)."""
+    return (
+        alt.Scale(type="log", domain=list(domain)) if domain is not None else alt.Scale(type="log")
+    )

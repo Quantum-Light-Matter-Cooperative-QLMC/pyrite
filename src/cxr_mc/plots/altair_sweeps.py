@@ -36,6 +36,20 @@ from .sweeps import (
     _resolve_quantity,
 )
 
+# Tick-label format for numeric axes (d3-format): 3 significant digits, no
+# trailing zeros -- keeps a 25-tilt sweep (e.g. np.linspace(-85, -0.1, 25),
+# which produces values like -33.300000000000004) from spamming full-precision
+# floats down the heatmap axes.
+_TICK_FMT = ".3~g"
+
+# Fixed OVERALL chart footprint for heatmap_chart -- independent of how many
+# distinct x/y values are swept. Vega-Lite auto-divides an ordinal scale's
+# fixed range into equal bands, so a 40-tilt sweep gets thinner cells rather
+# than a wider chart (the "heatmaps expand with axis size" bug).
+_HEATMAP_WIDTH = 360
+_HEATMAP_HEIGHT = 300
+
+
 # matplotlib colormap name -> Vega-Lite colour scheme
 _VEGA_SCHEME = {
     "viridis": "viridis",
@@ -93,8 +107,8 @@ def metric_vs_chart(
     x_scale = alt.Scale(type="log") if logx else alt.Scale()
     y_scale = alt.Scale(type="log") if logy else alt.Scale()
     base = alt.Chart(df).encode(
-        x=alt.X("x:Q", title=_axis_label(eff_x), scale=x_scale),
-        y=alt.Y("metric:Q", title=metric_label, scale=y_scale),
+        x=alt.X("x:Q", title=_axis_label(eff_x), scale=x_scale, axis=alt.Axis(format=_TICK_FMT)),
+        y=alt.Y("metric:Q", title=metric_label, scale=y_scale, axis=alt.Axis(format=_TICK_FMT)),
         color=alt.Color("hue:N", title=_AXIS_SPECS.get(hue, (hue,))[0]),
         tooltip=["hue:N", "x:Q", "metric:Q"],
     )
@@ -118,13 +132,17 @@ def heatmap_chart(
     line_metric="sharpness",
     min_flux_frac=0.02,
     min_line_quality=0.2,
-    cell=44,
+    width=_HEATMAP_WIDTH,
+    height=_HEATMAP_HEIGHT,
 ):
     """Interactive parametric heatmap of one quantity over ``x`` x ``y``, faceted
     into one panel per ``panel`` value, best record per cell. The Altair
     counterpart of :func:`cxr_mc.plots.plot_heatmaps` (one quantity). ``quantity``
-    is a bare metric key or a ``(key, label, cmap)`` triple. Returns an
-    :class:`altair.Chart`, or ``None`` when there are no records."""
+    is a bare metric key or a ``(key, label, cmap)`` triple. ``width``/``height``
+    are the FIXED per-panel footprint (independent of how many x/y values are
+    swept -- Vega-Lite auto-divides the ordinal scale's fixed range into equal
+    bands, so a dense sweep gets thinner cells rather than a wider chart).
+    Returns an :class:`altair.Chart`, or ``None`` when there are no records."""
     key, label, cmap = _resolve_quantity(quantity)
     df = heatmap_frame(
         results,
@@ -146,12 +164,12 @@ def heatmap_chart(
         alt.Chart(df)
         .mark_rect()
         .encode(
-            x=alt.X("x:O", title=_axis_label(x), sort="ascending"),
-            y=alt.Y("y:O", title=_axis_label(y), sort="ascending"),
+            x=alt.X("x:O", title=_axis_label(x), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
+            y=alt.Y("y:O", title=_axis_label(y), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
             color=alt.Color("value:Q", title=label, scale=alt.Scale(scheme=_scheme(cmap))),  # type: ignore[arg-type]
             tooltip=["panel:N", "x:O", "y:O", "value:Q"],
         )
-        .properties(width=cell * max(df["x"].nunique(), 1), height=cell * max(df["y"].nunique(), 1))
+        .properties(width=width, height=height)
         .facet(column=alt.Column("panel:N", title=_AXIS_SPECS.get(panel, (panel,))[0]))
         .properties(title=f"{label}    (best per cell: {select})")
     )

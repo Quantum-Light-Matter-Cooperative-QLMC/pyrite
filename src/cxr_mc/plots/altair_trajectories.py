@@ -279,6 +279,15 @@ def trajectory_chart(
             .mark_line(color="#666666", strokeWidth=1.2, opacity=0.9)
             .encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
         )
+    # internal layer boundaries (film-on-substrate stacks, e.g. mos2 on sapphire):
+    # a dashed line at each interior interface, matching the matplotlib panel.
+    for zb in data.get("layer_bounds", ()):
+        c = float(zb) * nslab
+        faces.append(
+            alt.Chart(_segment_df(-W * tang + c, W * tang + c))
+            .mark_line(color="#666666", strokeWidth=0.8, strokeDash=[4, 3], opacity=0.8)
+            .encode(x=alt.X("x:Q", scale=xscale), y=alt.Y("y:Q", scale=yscale))
+        )
 
     aL = 0.16 * (xhi - xlo)
     beam = (
