@@ -15,6 +15,3 @@ Remaining on this branch:
    bash but has not been re-driven on the box. Then decide merge to `main`.
 2. **Default `remote.py pull <material>` to `--grid`.** Make the grid-filtered pull
    the default and move the current full-pickle pull behind a `-f/--full` flag.
-3. **mos2 checkpoint size anomaly.** Local `mos2.pkl` is 52 MB vs 435 MB on the box,
-   and no grid-pull could have produced it (the box lacked the feature code at the
-   time). Needs user input on what that checkpoint should contain before digging.
