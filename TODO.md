@@ -44,7 +44,7 @@ on `main` once the branch exists.
    physics x4) and the M7 `line_fwhm_eV`/escape-helper sub-items.
 5. **Checkpoint lifecycle.** -> `feature/checkpoint-lifecycle`. Slim/archive/restore +
    grid-filtered pull + remote clear landed; remaining: on-box `clear` re-verify,
-   `pull --grid` as default, mos2 checkpoint-size anomaly.
+   `pull --grid` as default.
 6. **Material filters.** Model calibration filters (e.g. sheets of Al foil) between the
    x-ray beam and detector, for detector calibration against filtered spectra.
 7. **Finite electron beam size.** Confirm the input beam is finite, then model it as a
