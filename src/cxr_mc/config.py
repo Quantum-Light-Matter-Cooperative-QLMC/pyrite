@@ -185,8 +185,8 @@ _MATERIAL_GRIDS: dict[str, MaterialGrid] = {
         "E_grid_brem": np.arange(0.0, 60000.0, 25.0),
     },
     "mos2": {
-        "thickness_ang": 1e4,
-        "energy_keV": [20, 30],
+        "thickness_ang": _MOS2_LAYER_PITCH_ANG * 3,
+        "energy_keV": [25, 30],
         "tilt_deg": np.linspace(-85, -0.1, 25, endpoint=True),
         "tilt_azim_deg": np.linspace(-85, -0.1, 10, endpoint=True),
         "substrate": "sapphire",
@@ -204,6 +204,14 @@ _MATERIAL_GRIDS: dict[str, MaterialGrid] = {
         "stack": (Layer("sio2", 2850.0), Layer("silicon", 5e6)),
         "E_grid_line": np.arange(50.0, 4500.0, 1.0),
         "E_grid_brem": np.arange(0.0, 60000.0, 25.0),
+    },
+    "sapphire": {
+        "thickness_ang": 5e6,
+        "energy_keV": [25, 30],
+        "tilt_deg": np.linspace(-80, -0.1, 20, endpoint=True),
+        "tilt_azim_deg": np.linspace(-75, -0.1, 15, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 1.0),
+        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
 }
 
