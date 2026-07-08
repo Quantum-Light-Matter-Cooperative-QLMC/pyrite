@@ -26,7 +26,8 @@ Detached QUEUE (survives ssh disconnect -- launch, walk away, reconnect later):
     python dev/remote.py jobs                     # list jobs on the box + their state
     python dev/remote.py status [JOBID]           # one job: meta + state + log tail (default: latest)
     python dev/remote.py logs [JOBID] --follow    # tail the remote log (live)
-    python dev/remote.py stop JOBID               # SIGTERM a running job's process group
+    python dev/remote.py stop mose2 wse2          # SIGTERM live job(s) by material
+    python dev/remote.py stop --all               # SIGTERM every live job
     python dev/remote.py pull mose2 wse2 mos2     # fetch the finished checkpoints (grid-filtered)
 
 `start` returns immediately: it ships the code, writes a small runner under
@@ -327,7 +328,7 @@ def _refuse_if_busy(materials, quick):
             "checkpoint(s), and two runs writing one <stem>.pkl race on its "
             f".tmp and crash.\n{detail}\n"
             "attach to it (python dev/remote.py attach <jobid>) or stop it "
-            "(python dev/remote.py stop <jobid>) first, or run different materials."
+            "(python dev/remote.py stop <material>) first, or run different materials."
         )
 
 
@@ -352,7 +353,7 @@ def clear_remote(material, yes=False):
         raise SystemExit(
             "refusing to clear: a live job is still producing one of these "
             f"checkpoints, and clearing it would race a running sweep.\n{detail}\n"
-            "stop it (python dev/remote.py stop <jobid>) first, or wait for it to finish."
+            "stop it (python dev/remote.py stop <material>) first, or wait for it to finish."
         )
     # which of the two stems actually exist on the box; the `|| true` keeps a
     # missing last stem's failed `[ -f ]` from becoming the loop's -- and hence
@@ -491,7 +492,7 @@ def _disconnect_hint(jobid):
         f"\n\ndisconnected from job {jobid} -- it keeps running on {HOST}.\n"
         f"  reconnect: python dev/remote.py attach {jobid}\n"
         f"  status:    python dev/remote.py status {jobid}\n"
-        f"  stop:      python dev/remote.py stop   {jobid}"
+        "  stop:      python dev/remote.py stop <material>"
     )
 
 
@@ -535,7 +536,7 @@ def attach(jobid=None):
         _disconnect_hint(jobid)
 
 
-def stop_job(jobid):
+def _stop_jobid(jobid):
     """SIGTERM a running job's whole process group (the runner + scan.py + its
     transport worker pool), then mark the job stopped."""
     _check_materials([jobid.replace("-", "")])
@@ -548,6 +549,42 @@ def stop_job(jobid):
         'echo "sent SIGTERM to job {0} (pgid $P)"'
     ).format(jobid)
     _run(["ssh", "-n", HOST, remote])
+
+
+def stop_jobs(materials=None, all_jobs=False):
+    """Stop live queue jobs by material name, or every live job with ``all_jobs``.
+
+    Each material can only be owned by one live job because start/scan refuse
+    checkpoint-stem collisions, so material names are the useful user-facing
+    handle and job ids stay an internal implementation detail.
+    """
+    if all_jobs:
+        if materials:
+            raise SystemExit("stop --all does not take material names")
+        live = _live_jobs()
+        jobids = [jobid for jobid, _quick, _materials in live]
+        if not jobids:
+            print("(no live jobs to stop)")
+            return
+    else:
+        if not materials:
+            raise SystemExit("stop needs material(s), or use --all")
+        _check_materials(materials)
+        wanted = set(materials)
+        live = _live_jobs()
+        matches = [
+            (jobid, wanted.intersection(jmats))
+            for jobid, _quick, jmats in live
+            if wanted.intersection(jmats)
+        ]
+        found = {material for _jobid, matched in matches for material in matched}
+        missing = sorted(wanted - found)
+        if missing:
+            raise SystemExit("no live job found for material(s): " + ", ".join(missing))
+        jobids = sorted({jobid for jobid, _matched in matches})
+
+    for jobid in jobids:
+        _stop_jobid(jobid)
 
 
 def main(argv=None):
@@ -606,8 +643,9 @@ def main(argv=None):
     lg.add_argument("jobid", nargs="?", default=None)
     lg.add_argument("--follow", "-f", action="store_true", help="stream live")
 
-    sp = sub.add_parser("stop", help="SIGTERM a running job")
-    sp.add_argument("jobid")
+    sp = sub.add_parser("stop", help="SIGTERM live job(s) by material, or every live job")
+    sp.add_argument("materials", nargs="*", help="material name(s) owned by live jobs")
+    sp.add_argument("-a", "--all", action="store_true", help="stop every live job")
 
     p = sub.add_parser("pull", help="fetch one or more existing checkpoints from the box")
     p.add_argument("material", nargs="+", help="checkpoint stem(s), e.g. mose2 mose2_quick")
@@ -692,7 +730,7 @@ def main(argv=None):
         case "logs":
             tail_logs(args.jobid, args.follow)
         case "stop":
-            stop_job(args.jobid)
+            stop_jobs(args.materials, args.all)
 
 
 if __name__ == "__main__":

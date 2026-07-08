@@ -70,6 +70,67 @@ def test_stems_quick_suffix():
     assert remote._stems(["mose2"], False) == ["mose2"]
 
 
+def test_stop_materials_resolve_unique_live_jobs(monkeypatch):
+    stopped = []
+    monkeypatch.setattr(
+        remote,
+        "_live_jobs",
+        lambda: [("job1", False, ["hopg"]), ("job2", False, ["mose2", "wse2"])],
+    )
+    monkeypatch.setattr(remote, "_stop_jobid", stopped.append)
+
+    remote.stop_jobs(["wse2", "mose2"])
+
+    assert stopped == ["job2"]
+
+
+def test_stop_all_stops_every_live_job(monkeypatch):
+    stopped = []
+    monkeypatch.setattr(
+        remote,
+        "_live_jobs",
+        lambda: [("job1", False, ["hopg"]), ("job2", True, ["mose2"])],
+    )
+    monkeypatch.setattr(remote, "_stop_jobid", stopped.append)
+
+    remote.stop_jobs(all_jobs=True)
+
+    assert stopped == ["job1", "job2"]
+
+
+def test_stop_rejects_bad_material_before_live_job_lookup(monkeypatch):
+    monkeypatch.setattr(
+        remote,
+        "_live_jobs",
+        lambda: pytest.fail("must validate before checking live jobs"),
+    )
+
+    with pytest.raises(SystemExit):
+        remote.stop_jobs(["bad;material"])
+
+
+def test_stop_cli_accepts_materials(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        remote, "stop_jobs", lambda materials, all_jobs: calls.append((materials, all_jobs))
+    )
+
+    remote.main(["stop", "hopg", "mose2"])
+
+    assert calls == [(["hopg", "mose2"], False)]
+
+
+def test_stop_cli_accepts_all(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        remote, "stop_jobs", lambda materials, all_jobs: calls.append((materials, all_jobs))
+    )
+
+    remote.main(["stop", "--all"])
+
+    assert calls == [([], True)]
+
+
 # ---- clear <material> (checkpoint lifecycle, component 3) ----------------------
 def _no_live_jobs(monkeypatch):
     monkeypatch.setattr(remote, "_live_jobs", lambda: [])
