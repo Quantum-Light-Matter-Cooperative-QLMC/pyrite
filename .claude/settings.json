@@ -11,5 +11,20 @@
       "Write(*)",
       "Edit(*)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "f=.venv/Scripts/python.exe; [ -x \"$f\" ] || f=.venv/bin/python; \"$f\" .claude/hooks/on_edit.py 2>/dev/null || true",
+            "statusMessage": "Formatting edited file"
+          }
+        ]
+      }
+    ]
   }
 }
