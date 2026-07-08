@@ -6,6 +6,12 @@ __pycache__/
 # C extensions
 *.so
 
+.codex/*
+!.codex/hooks.json
+!.codex/scripts/
+!.codex/scripts/sync-session-logs.ps1
+.superpowers/
+
 *.png
 *.pdf
 *.html
@@ -240,4 +246,5 @@ zhai_run_checkpoint.pkl
 jobs/
 
 # Local session logs (full conversation transcripts written by the /compress skill)
-CC-Session-Logs/
+/CC-Session-Logs/*
+!/CC-Session-Logs/.gitkeep
