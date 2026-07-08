@@ -13,7 +13,8 @@ One-shot (foreground, holds the ssh session open until the sweep finishes):
     python dev/remote.py scan mose2               # sync code up, run sweep, pull checkpoint
     python dev/remote.py scan mose2 --quick       # tiny grid smoke test
     python dev/remote.py scan mose2 --no-sync     # skip the code upload (code unchanged)
-    python dev/remote.py pull mose2 wse2          # fetch one or more existing checkpoints
+    python dev/remote.py pull mose2 wse2          # fetch existing checkpoints (grid-filtered)
+    python dev/remote.py pull mose2 --full        # fetch the full, un-filtered checkpoint
     python dev/remote.py sync                     # only push the current code
 
 Detached QUEUE (survives ssh disconnect -- launch, walk away, reconnect later):
@@ -26,7 +27,7 @@ Detached QUEUE (survives ssh disconnect -- launch, walk away, reconnect later):
     python dev/remote.py status [JOBID]           # one job: meta + state + log tail (default: latest)
     python dev/remote.py logs [JOBID] --follow    # tail the remote log (live)
     python dev/remote.py stop JOBID               # SIGTERM a running job's process group
-    python dev/remote.py pull mose2 wse2 mos2     # fetch the finished checkpoints
+    python dev/remote.py pull mose2 wse2 mos2     # fetch the finished checkpoints (grid-filtered)
 
 `start` returns immediately: it ships the code, writes a small runner under
 <remote>/jobs/<jobid>/ and launches it with `nohup setsid` so it keeps running
@@ -182,20 +183,47 @@ def remote_scan(material, quick=False, workers=None):
     _run(["ssh", "-n", HOST, cmd])
 
 
-def pull(stems):
+def pull(stems, grid=False, drop_wide_brem=False, downcast=False, no_sync=False):
     """Fetch checkpoints/<stem>.pkl back from the box for each stem (stem =
-    material, or material_quick for a --quick run)."""
+    material, or material_quick for a --quick run).
+
+    With ``grid``, filter on the box BEFORE the transfer: slim each checkpoint to
+    just the material's current grid (``cxr slim --grid``, plus the optional byte
+    trimmers) into a box temp, scp that smaller file into the local active slot,
+    and delete the temp. ``sync_code()`` runs first (unless ``no_sync``) so the
+    box rebuilds the grid from the same ``config.py`` the laptop has -- closing
+    sync drift. Without ``grid`` this is the plain whole-file scp."""
     dest = LOCAL_ROOT / "checkpoints"
     dest.mkdir(exist_ok=True)
+    if grid and not no_sync:
+        sync_code()  # box must rebuild the grid from the same config.py
     for stem in stems:
-        _run(
-            [
-                "scp",
-                f"{HOST}:{REMOTE_DIR}/checkpoints/{stem}.pkl",
-                str(dest / f"{stem}.pkl"),
-            ]
-        )
-        print(f"pulled -> checkpoints/{stem}.pkl")
+        local = dest / f"{stem}.pkl"
+        if grid:
+            flags = " --grid"
+            if drop_wide_brem:
+                flags += " --drop-wide-brem"
+            if downcast:
+                flags += " --downcast"
+            remote_tmp = f"/tmp/{stem}.grid.pkl"
+            ckpt = f"{REMOTE_DIR}/checkpoints/{stem}.pkl"
+            # slim on the box; a missing checkpoint makes this exit nonzero (via
+            # _run's check=True), so the scp below is never reached for that stem.
+            _run(
+                [
+                    "ssh",
+                    "-n",
+                    HOST,
+                    f"cd {REMOTE_DIR} && {REMOTE_UV} run --no-sync cxr slim "
+                    f"{ckpt}{flags} -o {remote_tmp}",
+                ]
+            )
+            _run(["scp", f"{HOST}:{remote_tmp}", str(local)])
+            _run(["ssh", "-n", HOST, f"rm -f {remote_tmp}"])
+            print(f"pulled (grid) -> checkpoints/{stem}.pkl")
+        else:
+            _run(["scp", f"{HOST}:{REMOTE_DIR}/checkpoints/{stem}.pkl", str(local)])
+            print(f"pulled -> checkpoints/{stem}.pkl")
 
 
 # ---- detached job queue -------------------------------------------------------
@@ -289,6 +317,51 @@ def _refuse_if_busy(materials, quick):
             "attach to it (python dev/remote.py attach <jobid>) or stop it "
             "(python dev/remote.py stop <jobid>) first, or run different materials."
         )
+
+
+def clear_remote(material, yes=False):
+    """Delete a material's accumulated checkpoints on the box: both
+    ``checkpoints/<material>.pkl`` and ``checkpoints/<material>_quick.pkl``.
+
+    Refuses (before touching anything) if a live job is producing either stem,
+    reusing the same ``_live_jobs`` guard as ``start``/``scan`` so a clear can't
+    yank a checkpoint out from under a running sweep. Without ``yes`` this is a
+    safe dry preview: it prints exactly which of the two files exist and would be
+    deleted, then stops. With ``yes`` it ``rm -f``s them and reports what went."""
+    _check_materials([material])  # interpolated into a remote shell command
+    wanted = {material, f"{material}_quick"}
+    busy = [
+        (jid, sorted(clash))
+        for jid, jquick, jmats in _live_jobs()
+        if (clash := wanted.intersection(_stems(jmats, jquick)))
+    ]
+    if busy:
+        detail = "\n".join(f"  job {jid} is producing -> {', '.join(s)}" for jid, s in busy)
+        raise SystemExit(
+            "refusing to clear: a live job is still producing one of these "
+            f"checkpoints, and clearing it would race a running sweep.\n{detail}\n"
+            "stop it (python dev/remote.py stop <jobid>) first, or wait for it to finish."
+        )
+    # which of the two stems actually exist on the box; the `|| true` keeps a
+    # missing last stem's failed `[ -f ]` from becoming the loop's -- and hence
+    # ssh's -- exit status, which would make _ssh_capture abort the whole clear
+    listing = (
+        f"cd {REMOTE_DIR}/checkpoints 2>/dev/null || exit 0; "
+        f'for f in {material}.pkl {material}_quick.pkl; do [ -f "$f" ] && echo "$f" || true; done'
+    )
+    existing = _ssh_capture(listing).split()
+    if not existing:
+        print(f"(nothing to clear for {material})")
+        return
+    if not yes:
+        print("would delete on the box (re-run with --yes to delete):")
+        for f in existing:
+            print(f"  checkpoints/{f}")
+        return
+    _run(["ssh", "-n", HOST, f"cd {REMOTE_DIR}/checkpoints && rm -f {' '.join(existing)}"])
+    print("cleared on the box:")
+    for f in existing:
+        print(f"  checkpoints/{f}")
 
 
 def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=False):
@@ -485,6 +558,11 @@ def main(argv=None):
     s.add_argument("--quick", action="store_true")
     s.add_argument("--workers", type=int, default=None)
     s.add_argument("--no-sync", action="store_true", help="skip the code upload")
+    s.add_argument(
+        "--grid", action="store_true", help="grid-filter the checkpoint on the box before pulling"
+    )
+    s.add_argument("--drop-wide-brem", action="store_true", help="with --grid: drop wide-brem too")
+    s.add_argument("--downcast", action="store_true", help="with --grid: downcast to float32 too")
 
     st = sub.add_parser(
         "start",
@@ -522,6 +600,27 @@ def main(argv=None):
 
     p = sub.add_parser("pull", help="fetch one or more existing checkpoints from the box")
     p.add_argument("material", nargs="+", help="checkpoint stem(s), e.g. mose2 mose2_quick")
+    p.add_argument(
+        "-f",
+        "--full",
+        action="store_true",
+        help="pull the full, un-filtered checkpoint instead of the default grid-filtered pull",
+    )
+    p.add_argument(
+        "--drop-wide-brem", action="store_true", help="with grid pull: drop wide-brem too"
+    )
+    p.add_argument(
+        "--downcast", action="store_true", help="with grid pull: downcast to float32 too"
+    )
+    p.add_argument(
+        "--no-sync", action="store_true", help="with grid pull: skip the pre-pull code sync"
+    )
+
+    c = sub.add_parser("clear", help="delete a material's accumulated checkpoints on the box")
+    c.add_argument(
+        "material", help="crystal key; clears both <material>.pkl and <material>_quick.pkl"
+    )
+    c.add_argument("--yes", action="store_true", help="actually delete (default: dry preview only)")
 
     sub.add_parser("sync", help="push the current code to the box only")
 
@@ -530,8 +629,22 @@ def main(argv=None):
         case "sync":
             sync_code()
         case "pull":
-            pull(args.material)
+            pull(
+                args.material,
+                grid=not args.full,
+                drop_wide_brem=args.drop_wide_brem,
+                downcast=args.downcast,
+                no_sync=args.no_sync,
+            )
+        case "clear":
+            clear_remote(args.material, args.yes)
         case "scan":
+            if args.quick and args.grid:
+                raise SystemExit(
+                    "scan --quick --grid: quick checkpoints aren't grid-filterable "
+                    "(their grid isn't reproducible from material_sweep), so the "
+                    "trailing pull would fail after the whole sweep ran. Drop --grid."
+                )
             # same checkpoint-collision guard as `start`: a foreground scan and a
             # detached job writing the same <stem>.pkl would race on its .tmp.
             _refuse_if_busy([args.material], args.quick)
@@ -539,7 +652,15 @@ def main(argv=None):
                 sync_code()
             remote_scan(args.material, args.quick, args.workers)
             stem = f"{args.material}_quick" if args.quick else args.material
-            pull([stem])
+            # code is already synced above, so the trailing grid-pull skips its
+            # own sync (no_sync=True); forward the same grid/trim flags.
+            pull(
+                [stem],
+                grid=args.grid,
+                drop_wide_brem=args.drop_wide_brem,
+                downcast=args.downcast,
+                no_sync=True,
+            )
             print(
                 f"\ndone. checkpoints/{stem}.pkl is local; open notebooks/analysis.ipynb "
                 f"with MATERIAL='{stem}' (or run scripts/export_pdf.py) -- all viz/PDF "

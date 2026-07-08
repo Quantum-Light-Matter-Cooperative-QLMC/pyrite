@@ -13,11 +13,11 @@ Progress: **0 / 20 signed-off** · 1 filtered · 1 blocked.
 
 | id | claim | code | source | status | checks | anchor | notes |
 |----|-------|------|--------|--------|--------|--------|-------|
-| `coherent-line-spectrum` | `\|A_PXR + A_CBS\|²` segment-sum line spectrum, exact mosaic average | `montecarlo.py::mc_spectrum` | Feranchuk–Spence 2000 Eq.(10),(12); Zhai 2025 | unverified | — | `checks/anchor_figures.py::single_segment_anchor` | interference is non-separable; highest priority |
-| `finite-time-lineshape` | `\|Q\|² = t_L²·sinc²(P·t_L)` (replaces absorption-limited δ) | `montecarlo.py::mc_spectrum` | Feranchuk 2000 (finite interaction length) | unverified | — | _t→∞ → δ limit test (to add)_ | |
+| `coherent-line-spectrum` | `\|A_PXR + A_CBS\|²` segment-sum line spectrum, exact mosaic average | `montecarlo/spectrum.py::mc_spectrum` | Feranchuk–Spence 2000 Eq.(10),(12); Zhai 2025 | unverified | — | `checks/anchor_figures.py::single_segment_anchor` | interference is non-separable; highest priority |
+| `finite-time-lineshape` | `\|Q\|² = t_L²·sinc²(P·t_L)` (replaces absorption-limited δ) | `montecarlo/spectrum.py::mc_spectrum` | Feranchuk 2000 (finite interaction length) | unverified | — | _t→∞ → δ limit test (to add)_ | |
 | `pxr-amplitude` | `χ_g` PXR susceptibility amplitude | `crystallography.py::chi_g` | Feranchuk 2000 | unverified | — | — | |
-| `cbs-amplitude` | `U_g` CBS potential amplitude + relativistic 1/γ braced terms | `crystallography.py::U_g` (+ amplitude assembly in `montecarlo.py`) | Feranchuk 2000 | unverified | — | — | 1/γ matters ≳100 keV |
-| `line-energy-dispersion` | `ω = v·g / (1 − v·n̂)` tunable line energy | `montecarlo.py::tilted_geometry` / `checks/anchor_figures.py::line_energy_eV` | Zhai 2025 Eq.(10) | unverified | — | `checks/anchor_figures.py::theory_line_energies` | |
+| `cbs-amplitude` | `U_g` CBS potential amplitude + relativistic 1/γ braced terms | `crystallography.py::U_g` (+ amplitude assembly in `montecarlo/spectrum.py`) | Feranchuk 2000 | unverified | — | — | 1/γ matters ≳100 keV |
+| `line-energy-dispersion` | `ω = v·g / (1 − v·n̂)` tunable line energy | `montecarlo/geometry.py::tilted_geometry` / `checks/anchor_figures.py::line_energy_eV` | Zhai 2025 Eq.(10) | unverified | — | `checks/anchor_figures.py::theory_line_energies` | |
 | `closed-form-flux` | Eq.(12) closed-form line flux (single-segment reference) | `checks/anchor_figures.py::feranchuk_line_flux` | Feranchuk 2000 Eq.(12) | unverified | — | `checks/anchor_figures.py::single_segment_anchor` (ratio≈1) | reference, not pipeline |
 | `enhancement-bulk-film` | bulk-vs-film line enhancement | `checks/anchor_figures.py::figure_enhancement` | Zhai 2025 | unverified | — | `checks/anchor_figures.py::figure_enhancement` | |
 
@@ -31,22 +31,22 @@ Progress: **0 / 20 signed-off** · 1 filtered · 1 blocked.
 | `mote2-product-structure` | 2H-MoTe2 product-page lattice + basis used for few-layer MoTe2-on-sapphire scans | `data/crystal_structures.toml::mote2_product` | 2D Semiconductors product page | unverified | unit conversion nm→Å + cell-volume check | `tests/test_crystallography.py::test_mote2_product_structure_sane` | product-page lattice (a=3.50 Å, c=13.41 Å) differs from bulk for thin films |
 | `sapphire-corundum-structure` | α-Al2O3/sapphire corundum lattice + explicit conventional-cell basis, B_ang2=0.25 | `data/crystal_structures.toml::sapphire` | Newnham & de Haan 1962; B_ang2 literature ~0.25 | unverified | cell volume + stoichiometry check | `tests/test_crystallography.py::test_sapphire_structure_sane` | expanded from R-3c Wyckoff sites because the loader does not apply symmetry; Debye-Waller B_ang2 updated from 0.5 Ų to 0.25 Ų (literature range 0.20–0.30) |
 | `absorption-length` | X-ray absorption length / μ | `crystallography.py::absorption_length_ang` | Henke f2 / Beer–Lambert | unverified | — | — | |
-| `self-absorption` | per-segment Beer–Lambert path-to-surface, cross-stack | `montecarlo.py::mc_spectrum` | Beer–Lambert | unverified | — | — | reduces across multilayer |
+| `self-absorption` | per-segment Beer–Lambert path-to-surface, cross-stack | `montecarlo/spectrum.py::mc_spectrum` | Beer–Lambert | unverified | — | — | reduces across multilayer |
 
 ## Transport & background
 
 | id | claim | code | source | status | checks | anchor | notes |
 |----|-------|------|--------|--------|--------|--------|-------|
-| `electron-transport` | Joy–Luo slowing-down + Mott/screened-Rutherford elastic scattering → radiating segments | `montecarlo.py::simulate_trajectories` | Joy–Luo; NIST SRD 64 Mott; Browning free paths | unverified | — | — | CASINO-style single-scattering MC; upstream of all spectra |
-| `brem-spectrum` | bremsstrahlung background, Born + Elwert | `montecarlo.py::mc_brem_spectrum` | Born + Elwert | unverified | — | — | benign 0-eV divide-by-zero clamped |
+| `electron-transport` | Joy–Luo slowing-down + Mott/screened-Rutherford elastic scattering → radiating segments | `montecarlo/transport.py::simulate_trajectories` | Joy–Luo; NIST SRD 64 Mott; Browning free paths | unverified | — | — | CASINO-style single-scattering MC; upstream of all spectra |
+| `brem-spectrum` | bremsstrahlung background, Born + Elwert | `montecarlo/spectrum.py::mc_brem_spectrum` | Born + Elwert | unverified | — | — | benign 0-eV divide-by-zero clamped |
 
 ## Mosaicity & multilayer (code-cross-checked; need sign-off + measured data)
 
 | id | claim | code | source | status | checks | anchor | notes |
 |----|-------|------|--------|--------|--------|--------|-------|
-| `mosaic-analytic` | analytic broadening `FWHM = E·\|tan ψ\|·η` | `montecarlo.py::mosaic_fwhm_eV` | `docs/crystal-mosaicity.md` | unverified | — | `checks/mosaic_mc_check.py` | energy-shift only; `tan ψ` capped near grazing |
-| `mosaic-mc` | exact per-orientation incoherent average (2-D Gauss–Hermite) | `montecarlo.py::mc_spectrum` (`mosaic_route="mc"`) | `docs/crystal-mosaicity.md` | unverified | η→0 bit-for-bit; small-η→analytic (in check) | `checks/mosaic_mc_check.py` | broadens PXR+CBS; no grazing divergence |
-| `multilayer-stack` | film-on-substrate transport + absorption | `montecarlo.py::simulate_trajectories` (`layers=`) | `docs/multilayer-materials.md` | unverified | — | `checks/multilayer_validation_check.py` | substrate-dominance prediction lives here |
+| `mosaic-analytic` | analytic broadening `FWHM = E·\|tan ψ\|·η` | `montecarlo/detector.py::mosaic_fwhm_eV` | `docs/crystal-mosaicity.md` | unverified | — | `checks/mosaic_mc_check.py` | energy-shift only; `tan ψ` capped near grazing |
+| `mosaic-mc` | exact per-orientation incoherent average (2-D Gauss–Hermite) | `montecarlo/spectrum.py::mc_spectrum` (`mosaic_route="mc"`) | `docs/crystal-mosaicity.md` | unverified | η→0 bit-for-bit; small-η→analytic (in check) | `checks/mosaic_mc_check.py` | broadens PXR+CBS; no grazing divergence |
+| `multilayer-stack` | film-on-substrate transport + absorption | `montecarlo/transport.py::simulate_trajectories` (`layers=`) | `docs/multilayer-materials.md` | unverified | — | `checks/multilayer_validation_check.py` | substrate-dominance prediction lives here |
 
 ## Detector forward models (downstream — lower risk)
 

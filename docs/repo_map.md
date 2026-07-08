@@ -24,17 +24,24 @@ plots   ◄── montecarlo, results, timepix_response, eaglexo_response
 cli     ◄── scan, export          (the `cxr` console script)
 ```
 
-`timepix_response` / `eaglexo_response` depend only on `crystallography`.
-Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
+`timepix_response` / `eaglexo_response` depend only on `crystallography` and
+the shared `_si_sensor` leaf. Packaged data resolves via `cxr_mc.DATA_DIR`, so
+imports work from any cwd.
 
 ## Entry points
 
 - **`cxr` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
-  dispatching the `scan`, `export` and `slim` subcommands.
+  dispatching the `scan`, `export`, `slim`, `archive`, `restore` and `archives`
+  subcommands.
 - **`cxr scan <material>`** → `scan:main` → `run.run_sweep` → writes
   `checkpoints/<material>.pkl`. Root shim: `scan.py`.
-- **`cxr slim <checkpoint>`** → `slim:slim_checkpoint` → `results.slim_results`:
-  shrink a checkpoint pickle for transfer (drop wide-brem / float32 / filter configs).
+- **`cxr slim <checkpoint> [--grid]`** → `slim:slim_checkpoint` →
+  `results.slim_results`: shrink a checkpoint pickle for transfer (drop
+  wide-brem / float32 / filter configs; `--grid` keeps only the material's
+  current-grid configs).
+- **`cxr archive`/`restore`/`archives`** → `archive:*`: the local checkpoint
+  shelf — copy the active slot `checkpoints/<stem>.pkl` to/from the long-term
+  `checkpoints/archive/<label>.pkl`.
 - **Notebooks**: `notebooks/scan.ipynb` (sweep) → `notebooks/analysis.ipynb` (viz); both read the
   per-material grids in `config.py`.
 - **Sweep worker**: `montecarlo.run_case` (module-level so it pickles into the
@@ -94,14 +101,15 @@ Turns a `Sweep` definition into the Cartesian product of `run_case` dicts.
   thickness, orientation), `build_cases`, `crystal_params`,
   `substrate_composition`, `stack_layers`, `film_on_substrate_layers`,
   `layer_radiator`, `substrate_radiator`, `geometry_table`,
-  `fmt_thickness`; the `MATERIAL_LABELS` registry.
+  `fmt_thickness`, `pm` (±hkl expansion); the `MATERIAL_LABELS` registry.
 - Deps: `crystallography`.
 
 ### `config.py`
 Per-material grids and the default settings/sweep builders shared by the CLI and
 both notebooks.
 - Public: `default_settings`, `material_grid`, `material_sweep`,
-  `trajectory_sweep`; the `_MATERIAL_GRIDS` / `MATERIALS` registries.
+  `trajectory_sweep`, `MaterialGrid` (TypedDict); the `_MATERIAL_GRIDS` /
+  `MATERIALS` registries.
 - Deps: `results` (`Settings`), `sweep` (`Sweep`).
 
 ### `run.py`
@@ -117,13 +125,22 @@ Headless sweep entry: parse args → build cases → `run_sweep` → checkpoint.
 
 ## Results & plotting
 
-### `results.py`
-Result records, derived line metrics, and ranking/selection.
-- Public: `Settings` (dataclass), `store_result`, `records`, `filter_results`,
-  `select_results`, `slim_results`, `sweep_values`, `results_dataframe`,
-  `line_metrics`, `line_index`,
-  `line_quality`, `selection_score`, `top_geometries`, `summary_table`,
-  `show_summary`, `show_top`, `best_azimuth`, `detected_background`.
+### `results/` (package)
+Result records, derived line metrics, and ranking/selection. Split from a
+single module into submodules; **every public and internal name is re-exported
+from the package**, so `from cxr_mc.results import X` is unchanged
+(`tests/test_results_exports.py` freezes the export set).
+- `store` — `Settings` (dataclass), `store_result`, `detected_background`,
+  `PER_NA`. Deps: `montecarlo`.
+- `selection` — `records`, `records_for_cases`, `filter_results`,
+  `select_results`, `sweep_values`, `slim_results` (transfer-size trimmer),
+  `best_azimuth` (the azimuth-max reduction). Pure NumPy; no sibling deps.
+- `metrics` — per-record line-finding scalars: `line_metrics`, `line_index`,
+  `line_quality`. Deps: none (scipy peak finding).
+- `scoring` — `selection_score`, `top_geometries`, `show_top`; the
+  `SELECTION_MODES` registry. Deps: `metrics`, `selection`.
+- `tables` — `results_dataframe`, `summary_table`, `show_summary`. Deps:
+  `montecarlo`, `sweep`, `metrics`, `store`.
 - Deps: `montecarlo`, `sweep`.
 
 ### `plots/` (package)
@@ -159,16 +176,36 @@ freezes the export set). Submodule DAG (leaf → driver):
 - `interactive` — `browse`, `browse_plotly`, `stream_chunk`, `plot_chunk`
   (the slider/streaming drivers that dispatch to the `spectra`/`detectors`
   drawers). Top of the DAG. Deps: `_style`, `_common`, `spectra`, `detectors`.
-- `altair_spectra` — Altair/Vega-Lite renderer for the intrinsic spectra
-  (`spectrum_chart`, `spectrum_frame`): a fast, interactive alternative to the
-  matplotlib `spectra` figures, sharing `_common._line_brem` so the physics is
-  identical. Intentionally **NOT** re-exported from the package (would break the
-  frozen export guard) — import via `cxr_mc.plots.altair_spectra`. First slice of
-  the matplotlib → altair migration (`tests/test_altair_plots.py`). Deps:
-  `_common`, `results`, `altair`, `pandas`.
+- `altair_*` — Altair/Vega-Lite renderers: fast, interactive alternatives to
+  the matplotlib figures, reusing the exact same data prep so the physics is
+  identical. Intentionally **NOT** re-exported from the package (would break
+  the frozen export guard) — import via `cxr_mc.plots.altair_<name>`.
+  - `altair_spectra` — intrinsic spectra (`spectrum_chart`, `spectrum_frame`);
+    shares `_common._line_brem` (`tests/test_altair_plots.py`). Deps:
+    `_common`, `results`.
+  - `altair_sweeps` — parametric-sweep figures (`metric_vs_chart`,
+    `heatmap_chart`, `scan_charts`); renders from `_frames`' tidy DataFrames
+    and reuses `sweeps`' axis/metric registries
+    (`tests/test_altair_sweeps.py`). Deps: `_frames`, `sweeps`, `results`.
+  - `altair_detectors` — detector-view spectra (`timepix_detected_chart`/
+    `_frame`, `eaglexo_detected_chart`/`_frame`, `eaglexo_charge_chart`/
+    `_frame`); reuses `detectors`' per-record prep
+    (`tests/test_altair_detectors.py`). Deps: `_common`, `altair_spectra`,
+    `detectors`, `eaglexo_response`.
+  - `altair_trajectories` — electron-penetration views
+    (`penetration_survival_chart`, `trajectory_chart`, the `*_frame` builders);
+    reuses `trajectories`' transport prep; the dense datashader raster stays
+    on matplotlib (`tests/test_altair_trajectories.py`). Deps: `sweeps`,
+    `trajectories`.
 - Deps: `montecarlo`, `results`, `timepix_response`, `eaglexo_response`.
 
 ## Detector forward models
+
+### `_si_sensor.py`
+Internal shared silicon-sensor plumbing for both detector forward models: the
+fixed Si material constants, the (grid → cached-response) keying pattern, the
+Poisson acquisition core, and the `.apply()` input-shape guard. Leaf; no
+sibling deps.
 
 ### `timepix_response.py`
 Timepix3 charge-sensitive forward model (diffusion, absorption, energy
@@ -176,7 +213,7 @@ resolution, Poisson counts).
 - Public: `TimepixResponse`, `build_response`, `get_response`,
   `absorption_efficiency`, `energy_fwhm_eV`, `sigma_diffusion_um`,
   `poisson_counts`.
-- Deps: `crystallography`.
+- Deps: `crystallography`, `_si_sensor`.
 
 ### `eaglexo_response.py`
 Eagle XO detector forward model (geometry/solid angle, QE table, energy
@@ -184,14 +221,14 @@ resolution, Poisson counts).
 - Public: `EagleResponse`, `geometry`, `sweep_geometry`, `get_response`, `qe`,
   `qe_absorption_model`, `load_qe_table`, `solid_angle_sr`, `energy_fwhm_eV`,
   `poisson_counts`.
-- Deps: `crystallography`.
+- Deps: `crystallography`, `_si_sensor`.
 
 ## CLI & packaging
 
 ### `cli.py`
 The `cxr` console-script dispatcher.
 - Public: `main`.
-- Deps: `scan`, `export`, `slim`, `__version__`.
+- Deps: `scan`, `export`, `slim`, `archive`, `__version__`.
 
 ### `export.py`
 `cxr export` subcommand — render figures / PDFs from a checkpoint.
@@ -199,9 +236,18 @@ The `cxr` console-script dispatcher.
 
 ### `slim.py`
 `cxr slim` subcommand — shrink a checkpoint pickle for transfer (drop the
-full-range brem arrays, downcast spectra to float32, filter configs).
+full-range brem arrays, downcast spectra to float32, filter configs; `--grid`
+keeps only the material's current-grid configs).
 - Public: `slim_checkpoint`, `add_subparser`, `main`.
-- Deps: `results` (`slim_results`).
+- Deps: `results` (`slim_results`, `_grid_names`).
+
+### `archive.py`
+`cxr archive`/`restore`/`archives` subcommands — the durable local checkpoint
+shelf. Copy the active slot `checkpoints/<stem>.pkl` to/from the long-term
+`checkpoints/archive/<label>.pkl` (atomic temp+replace, `--force` overwrite
+guards, label↔stem date-stamp inference).
+- Public: `archive_checkpoint`, `restore_checkpoint`, `list_archives`,
+  `add_subparser`, `main`.
 
 ### `__init__.py`
 Package root: exposes `DATA_DIR` (packaged-data resolver) and `__version__`.

@@ -42,17 +42,14 @@ on `main` once the branch exists.
    (now on `main`). Two items intentionally out of scope, tracked only in
    [`docs/dedup-inventory.md`](docs/dedup-inventory.md): M4 (wide-brem overlay
    physics x4) and the M7 `line_fwhm_eV`/escape-helper sub-items.
-5. **Checkpoint lifecycle.** -> `feature/checkpoint-lifecycle`. Slim/archive/restore +
-   grid-filtered pull + remote clear landed; remaining: on-box `clear` re-verify,
-   `pull --grid` as default.
-6. **Material filters.** Model calibration filters (e.g. sheets of Al foil) between the
+5. **Material filters.** Model calibration filters (e.g. sheets of Al foil) between the
    x-ray beam and detector, for detector calibration against filtered spectra.
-7. **Finite electron beam size.** Confirm the input beam is finite, then model it as a
+6. **Finite electron beam size.** Confirm the input beam is finite, then model it as a
    ~1 mm diameter Gaussian beam incident on the crystal.
-8. **Sweep cache standardization.** Round parametric angular sweeps to the nearest
+7. **Sweep cache standardization.** Round parametric angular sweeps to the nearest
    degree; standardize energy-grid sizes/spacings so thickness/angle/etc. sweeps share
    one cached-data store that is always checked before running.
-9. **Checkpoint compression.** Compress pickle objects (or use an alternative storage
+8. **Checkpoint compression.** Compress pickle objects (or use an alternative storage
    format) locally and on the remote for space efficiency and faster transfer.
 
 ## P3 - lower / exploratory
