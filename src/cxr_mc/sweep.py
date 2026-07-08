@@ -49,6 +49,7 @@ MATERIAL_LABELS = {
     "ptse2": "PtSe2",
     "hfse2": "HfSe2",
     "zrse2": "ZrSe2",
+    "hbn": "h-BN",
     "hopg": "HOPG",
     "diamond": "diamond",
     "silicon": "silicon",
@@ -247,6 +248,13 @@ _CRYSTAL_PARAMS: dict[str, CrystalParamsGrid] = {
     "ptse2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 1), "E_grid": np.arange(350.0, 3500.0, 3.0)},
     "hfse2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 1), "E_grid": np.arange(350.0, 3500.0, 3.0)},
     "zrse2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 1), "E_grid": np.arange(350.0, 3500.0, 3.0)},
+    # Layered h-BN: c-axis normal, so start with the basal 00l family like HOPG.
+    "hbn": {
+        "B_ang2": 0.6,
+        "beam_uvw": (0, 0, 1),
+        "E_grid": np.arange(100.0, 5000.0, 3.0),
+        "hkl_list": pm((0, 0, 2), (0, 0, 4)),
+    },
     "diamond": {"B_ang2": 0.21, "beam_uvw": (4, 0, 0), "E_grid": np.arange(100.0, 5000.0, 2.0)},
     "silicon": {"B_ang2": 0.46, "beam_uvw": (4, 4, 0), "E_grid": np.arange(100.0, 5000.0, 3.0)},
     # c-cut sapphire: c-axis normal to the film.
@@ -379,9 +387,9 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     :func:`geometry_table`."""
     cp = crystal_params(sweep.material, sweep.n_families)
     # line grid: fine + narrow (per-material default, E_grid_line, or the
-    # deprecated e_grid_eV alias). brem grid: coarse + wide -- default spans the
-    # line start up to the highest beam energy at 50 eV (brem cuts off at the
-    # beam energy, so that's the full physical range); override via E_grid_brem.
+    # deprecated e_grid_eV alias). brem grid: coarse + wide -- each case spans
+    # up to that case's beam energy because brem cuts off at the particle energy.
+    # E_grid_brem overrides the start/spacing, not the per-energy upper limit.
     line_src = sweep.E_grid_line if sweep.E_grid_line is not None else sweep.e_grid_eV
     line_grid = cp["E_grid"] if line_src is None else np.asarray(line_src, float)
     energies = _seq(sweep.energy_keV)
@@ -420,7 +428,9 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
         step = float(g[1] - g[0])
         return (float(g[0]), float(g[-1]) + step, step)
 
-    line_triple, brem_triple = _triple(line_grid), _triple(brem_grid)
+    line_triple = _triple(line_grid)
+    brem_start = float(brem_grid[0])
+    brem_step = float(brem_grid[1] - brem_grid[0])
 
     # normalize the substrate sugar onto the general stack (mutually exclusive)
     stack = sweep.stack
@@ -461,7 +471,7 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
                     thickness_ang=float(thickness),
                     E_grid=line_triple,  # legacy key (== line grid)
                     E_grid_line=line_triple,
-                    E_grid_brem=brem_triple,
+                    E_grid_brem=(brem_start, float(E0) * 1e3 + brem_step, brem_step),
                     theta_obs_rad=np.deg2rad(sweep.theta_obs_deg),
                     tilt_deg=float(tilt),
                     tilt_azim_deg=float(azim),

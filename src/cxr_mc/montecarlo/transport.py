@@ -25,7 +25,9 @@ A0_SQ_CM2 = 2.8002852e-17  # Bohr radius squared [cm^2] (NIST SRD 64 unit)
 # ---- element data for transport ---------------------------------------------
 # A [g/mol], J = mean ionization potential [keV] (Berger-Seltzer values)
 TRANSPORT_ELEMENTS = {
+    "B": {"Z": 5, "A": 10.81, "J_keV": 0.076},
     "C": {"Z": 6, "A": 12.011, "J_keV": 0.078},
+    "N": {"Z": 7, "A": 14.007, "J_keV": 0.082},
     "Si": {"Z": 14, "A": 28.085, "J_keV": 0.173},
     "Ge": {"Z": 32, "A": 72.630, "J_keV": 0.350},
     "Se": {"Z": 34, "A": 78.971, "J_keV": 0.348},
@@ -247,6 +249,8 @@ def simulate_trajectories(
       "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
       "t_ang" (M,), "elec_id" (M,), "layer" (M,) [emitting layer index]
     and diagnostics: "n_backscattered", "n_transmitted", "n_stopped", "n_layers".
+
+    Validation: electron-transport
     """
     # Build the layer stack: explicit `layers` (film-on-substrate) overrides;
     # else a single layer spanning the slab (bit-for-bit the old transport).

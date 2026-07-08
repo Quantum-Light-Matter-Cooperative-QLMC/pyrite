@@ -15,6 +15,7 @@ from cxr_mc.montecarlo import (
     mc_spectrum,
     simulate_trajectories,
 )
+from cxr_mc.sweep import crystal_params
 
 
 def test_normalize_requires_material():
@@ -47,3 +48,19 @@ def test_tellurium_in_transport_table():
     assert TRANSPORT_ELEMENTS["Te"]["Z"] == 52
 
     assert TRANSPORT_ELEMENTS["Te"]["A"] == pytest.approx(127.6, abs=0.1)
+
+
+def test_hbn_composition_runs_transport():
+    cp = crystal_params("hbn")
+
+    segs = simulate_trajectories(
+        30.0,
+        4,
+        100.0,
+        composition=cp["composition"],
+        seed=123,
+        max_steps=5,
+    )
+
+    assert segs["Ne"] == 4
+    assert len(segs["E_keV"]) > 0

@@ -17,7 +17,7 @@ def _():
     except Exception:
         alt.data_transformers.disable_max_rows()
 
-    from cxr_mc.config import default_settings, trajectory_sweep
+    from cxr_mc.config import PENETRATION_TILT_DEG, default_settings, trajectory_sweep
     from cxr_mc.plots import (
         plot_best_spectra,
         plot_eaglexo_charge_map,
@@ -43,6 +43,7 @@ def _():
 
     return (
         MATERIAL_LABELS,
+        PENETRATION_TILT_DEG,
         build_cases,
         cases_from_results,
         default_settings,
@@ -85,16 +86,16 @@ def _(mo):
     material_ui = mo.ui.dropdown(
         [
             "hopg",
+            "hbn",
             "diamond",
             "silicon",
-            "sapphire",
-            "mos2",
             "mose2",
-            "ws2",
             "wse2",
             "ptse2",
             "hfse2",
             "zrse2",
+            "ws2",
+            "mos2",
         ],
         value="hopg",
         label="Material (match the scan you ran)",
@@ -160,17 +161,11 @@ def _(xmax_ui, xmin_ui):
 
 
 @app.cell
-def _(mo):
-    # Polar-angle selector for the Penetration tab (trajectories + survival vs
-    # depth) -- 15 deg spacing so the grid lands exactly on a low, nonzero
-    # default (grazing-free but still off-normal, where the electron cascade's
-    # asymmetry actually shows). Options mirror trajectory_sweep(tilt_span=75,
-    # n_tilts=11) below: -75..75 in steps of 15.
-    _tilts = list(range(-75, 76, 15))
+def _(PENETRATION_TILT_DEG, mo):
+    _angle_opts = {f"{t:g} deg": t for t in PENETRATION_TILT_DEG}
     penetration_angle_ui = mo.ui.dropdown(
-        {f"{t:g} deg": float(t) for t in _tilts}, value="15 deg", label="polar tilt (penetration)"
+        _angle_opts, value="-15 deg", label="polar tilt (penetration)"
     )
-    penetration_angle_ui
     return (penetration_angle_ui,)
 
 
@@ -346,17 +341,17 @@ def _(
         return mo.accordion({"Eagle XO": _eaglexo_inner, "Timepix3": _timepix_inner}, lazy=True)
 
     def _penetration_tab():
+        _angle = penetration_angle_ui.value
         _md = mo.md(
             "Surviving-electron fraction vs depth (one curve per beam energy) and "
             "an interactive low-Ne track cross-section, at the polar tilt selected "
-            "above (default 15°, a low nonzero angle -- avoids both the fully-"
+            "in this tab (default -15 deg, a low nonzero angle -- avoids both the fully-"
             "normal and grazing-incidence edge cases). These run the cheap CPU-only "
             "transport directly — no checkpoint needed. For a stacked/multilayer "
             "material (e.g. mos2 on sapphire) the cascade is transported through "
             "the FULL stack, not just the top film. Dense grid loads on expand."
         )
-        _angle = penetration_angle_ui.value
-        _sweep = trajectory_sweep(MATERIAL, n_tilts=11, tilt_span=75.0, energies=(30, 60))
+        _sweep = trajectory_sweep(MATERIAL, energies=(30, 60))
         _traj = build_cases(_sweep, settings.n_electrons, settings.n_electrons_brem)
         if not _traj:
             return mo.vstack([_md, mo.md("*No trajectory cases.*")])
@@ -364,7 +359,7 @@ def _(
         # Pick the lowest energy at the selected tilt for the single-track view.
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
         _track = trajectory_chart(_nc, Ne=40)
-        _parts = [_md, *(p for p in (_survival, _track) if p is not None)]
+        _parts = [_md, penetration_angle_ui, *(p for p in (_survival, _track) if p is not None)]
         _parts.append(
             mo.accordion(
                 {
