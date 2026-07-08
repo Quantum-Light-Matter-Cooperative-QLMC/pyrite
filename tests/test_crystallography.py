@@ -17,6 +17,7 @@ EXPECTED = {
     "silicon",
     "lif",
     "hopg",
+    "hbn",
     "mose2",
     "wse2",
     "mote2",
@@ -63,6 +64,30 @@ def test_debye_waller_in_unit_interval(g):
     w = debye_waller(g, 0.5)
 
     assert 0.0 < w <= 1.0
+
+
+def test_hbn_structure_sane():
+    # Bulk h-BN a=2.504 A, c=6.661 A: V = (sqrt(3)/2) a^2 c ~= 36.2 A^3.
+    # The conventional P6_3/mmc cell has 2 BN formula units.
+    info = CRYSTALS["hbn"]
+
+    assert info["lattice"]["a"] == pytest.approx(2.504, abs=1e-3)
+    assert info["lattice"]["c"] == pytest.approx(6.661, abs=1e-3)
+    assert info["V_cell"] == pytest.approx(36.2, abs=0.1)
+    assert len(info["basis"]) == 4
+    assert sum(1 for el, _ in info["basis"] if el == "B") == 2
+    assert sum(1 for el, _ in info["basis"] if el == "N") == 2
+
+    # AA' ("eclipsed") stacking: every atom has the OPPOSITE species directly
+    # above/below it in the adjacent layer (same x,y; z shifted by 1/2). This is
+    # what distinguishes bulk h-BN from graphite-like AB and pins the basis
+    # z-registry, not just the atom counts. See docs/validation/hbn-structure.md.
+    site = {
+        (round(p[0] % 1, 4), round(p[1] % 1, 4), round(p[2] % 1, 4)): el for el, p in info["basis"]
+    }
+    for el, p in info["basis"]:
+        partner = (round(p[0] % 1, 4), round(p[1] % 1, 4), round((p[2] + 0.5) % 1, 4))
+        assert site[partner] != el, f"h-BN registry broken: {el} eclipses {el} across layers"
 
 
 def test_dominant_reflections_nonempty_triples():

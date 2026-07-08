@@ -7,7 +7,7 @@ The single source of truth for **what physics `cxr-mc` claims and whether it has
 
 **Status:** `unverified` → `filtered` (units+limits+signs) → `rederived` (independent derivation matches) → `anchored` (regression test green) → `signed-off` (human-certified). `discrepancy` = a check failed.
 
-Progress: **0 / 20 signed-off** · 1 filtered · 1 blocked.
+Progress: **0 / 20 signed-off** · 1 rederived · 1 filtered · 1 blocked.
 
 ## Core coherent physics (highest risk — verify first)
 
@@ -30,6 +30,7 @@ Progress: **0 / 20 signed-off** · 1 filtered · 1 blocked.
 | `mote2-bulk-structure` | 2H-MoTe2 bulk lattice + basis (a=3.517 Å, c=13.96 Å) | `data/crystal_structures.toml::mote2` | literature / Materials Project | unverified | cell volume + stoichiometry check | `tests/test_crystallography.py::test_mote2_structure_sane` | bulk material, used in bare MoTe2 scans |
 | `mote2-product-structure` | 2H-MoTe2 product-page lattice + basis used for few-layer MoTe2-on-sapphire scans | `data/crystal_structures.toml::mote2_product` | 2D Semiconductors product page | unverified | unit conversion nm→Å + cell-volume check | `tests/test_crystallography.py::test_mote2_product_structure_sane` | product-page lattice (a=3.50 Å, c=13.41 Å) differs from bulk for thin films |
 | `sapphire-corundum-structure` | α-Al2O3/sapphire corundum lattice + explicit conventional-cell basis, B_ang2=0.25 | `data/crystal_structures.toml::sapphire` | Newnham & de Haan 1962; B_ang2 literature ~0.25 | unverified | cell volume + stoichiometry check | `tests/test_crystallography.py::test_sapphire_structure_sane` | expanded from R-3c Wyckoff sites because the loader does not apply symmetry; Debye-Waller B_ang2 updated from 0.5 Ų to 0.25 Ų (literature range 0.20–0.30) |
+| `hbn-structure` | h-BN P6_3/mmc layered/eclipsed lattice + explicit four-atom conventional-cell basis | `data/crystal_structures.toml::hbn` | Pease, Acta Cryst 5, 356 (1952) | rederived | V=36.17 Å³ ✓; 2B+2N ✓; basis ≡ Pease Wyckoff under shift (2/3,1/3,3/4) ✓; AA′ registry ✓ (anchor green) | `tests/test_crystallography.py::test_hbn_structure_sane` | a=2.504 A, c=6.661 A; B/N sites swap across the half-cell so B lies above N; write-up `docs/validation/hbn-structure.md` |
 | `absorption-length` | X-ray absorption length / μ | `crystallography.py::absorption_length_ang` | Henke f2 / Beer–Lambert | unverified | — | — | |
 | `self-absorption` | per-segment Beer–Lambert path-to-surface, cross-stack | `montecarlo/spectrum.py::mc_spectrum` | Beer–Lambert | unverified | — | — | reduces across multilayer |
 
