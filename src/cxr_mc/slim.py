@@ -4,7 +4,8 @@ The GPU box writes one pickle per material holding the full union of every swept
 config at full resolution (``results.store_result``); pulling it to the viz
 laptop is gigabyte-scale and mostly stale for any single plot. This command
 writes a smaller pickle -- dropping the full-range bremsstrahlung arrays and/or
-downcasting the spectra to float32 -- that still loads and plots exactly like the
+downcasting the spectra to float32, and gzip-compressing the output (TODO P2 #8,
+see ``cxr_mc._checkpoint_io``) -- that still loads and plots exactly like the
 full one via ``run.load_checkpoint``.
 
     cxr slim checkpoints/hopg.pkl --drop-wide-brem --downcast
@@ -16,8 +17,8 @@ programmatically via ``results.slim_results(..., tilt_deg=..., E0_keV=...)``.
 
 import argparse
 import os
-import pickle
 
+from . import _checkpoint_io
 from .results import slim_results
 
 
@@ -64,8 +65,7 @@ def slim_checkpoint(
     # validate the stem before loading: the load is the expensive step, and a bad
     # --grid stem should fail in milliseconds, not after a gigabyte unpickle
     material = _material_from_stem(in_path) if grid else None
-    with open(in_path, "rb") as f:
-        results = pickle.load(f)
+    results = _checkpoint_io.load(in_path)
     slim = slim_results(
         results, grid=material, drop_wide_brem=drop_wide_brem, downcast=downcast, **constraints
     )
@@ -73,8 +73,7 @@ def slim_checkpoint(
         root, ext = os.path.splitext(in_path)
         out_path = f"{root}.slim{ext or '.pkl'}"
     tmp = out_path + ".tmp"
-    with open(tmp, "wb") as f:
-        pickle.dump(slim, f)
+    _checkpoint_io.dump(slim, tmp)
     os.replace(tmp, out_path)  # atomic: never leave a half-written pickle
     before, after = os.path.getsize(in_path), os.path.getsize(out_path)
     n_in = sum(len(v) for v in results.values())

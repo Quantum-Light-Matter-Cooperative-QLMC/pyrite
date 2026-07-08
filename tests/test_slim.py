@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 import pytest
 
+from cxr_mc import _checkpoint_io
 from cxr_mc.config import default_settings, material_sweep
 from cxr_mc.results import slim_results
 from cxr_mc.slim import slim_checkpoint
@@ -85,8 +86,7 @@ def test_slim_checkpoint_roundtrip_is_smaller(tmp_path):
     out = tmp_path / "hopg.slim.pkl"
     slim_checkpoint(str(src), str(out), drop_wide_brem=True, downcast=True)
     assert out.exists() and out.stat().st_size < src.stat().st_size
-    with open(out, "rb") as f:
-        reloaded = pickle.load(f)
+    reloaded = _checkpoint_io.load(str(out))
     assert set(reloaded) == set(res)
     assert "brem_wide" not in reloaded["t0.0"][25.0]
     assert reloaded["t0.0"][25.0]["spec"].dtype == np.float32
@@ -157,8 +157,7 @@ def test_slim_checkpoint_grid_roundtrips(tmp_path):
         pickle.dump(res, f)
     out = tmp_path / "hopg.grid.pkl"
     slim_checkpoint(str(src), str(out), grid=True)
-    with open(out, "rb") as f:
-        reloaded = pickle.load(f)
+    reloaded = _checkpoint_io.load(str(out))
     assert set(reloaded) == keep
 
 

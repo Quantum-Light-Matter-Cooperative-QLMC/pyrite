@@ -23,10 +23,11 @@ time, typically the grid-filtered view.
 import argparse
 import datetime
 import os
-import pickle
 import re
 import shutil
 from pathlib import Path
+
+from . import _checkpoint_io
 
 # Anchored to the repo root (src/cxr_mc/archive.py -> parents[2] = repo root), the
 # same dir run.load_checkpoint reads, so `cxr archive` works from any cwd. Computed
@@ -96,10 +97,12 @@ def restore_checkpoint(label, stem=None, *, force=False, root=DEFAULT_ROOT):
 
 def _record_count(path):
     """Total records in an archived checkpoint (``sum(len(by_E) ...)``), or None
-    if it can't be read as a results store."""
+    if it can't be read as a results store. Reads via ``_checkpoint_io.load``
+    (TODO P2 #8), which transparently handles both gzip-compressed and legacy
+    plain-pickle archives -- the shelf can hold either, since ``archive``/
+    ``restore`` just copy whatever bytes the active slot already has."""
     try:
-        with open(path, "rb") as f:
-            results = pickle.load(f)
+        results = _checkpoint_io.load(path)
         return sum(len(v) for v in results.values())
     except Exception:
         return None
