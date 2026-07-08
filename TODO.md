@@ -33,29 +33,28 @@ on `main` once the branch exists.
    implements optional `Dans_Diffraction` validation-oracle checks. Next: review/merge
    those branches, then decide whether the original `crystals` package still offers
    unique value.
-2. **Polars investigation.** Evaluate Polars for packaging large parameter-sweep metadata.
-3. **pyelsepa / ELSEPA transport.** -> `feature/elsepa-port` Adapter landed + **validated** (C 2.19%,
+2. **pyelsepa / ELSEPA transport.** -> `feature/elsepa-port` Adapter landed + **validated** (C 2.19%,
    Si 4.42% max rel vs NIST); image now builds tarball-free from
    `github.com/eScatter/elsepa`. Remaining gate: the image/venv live outside the repo
-   (`C:/dev/pyelsepa`), so the driver stays gated in CI. Tied to P2 #2.
-4. **Codebase de-duplication follow-through.** `refactor/dedup-followthrough` — merged
+   (`C:/dev/pyelsepa`), so the driver stays gated in CI.
+3. **Codebase de-duplication follow-through.** `refactor/dedup-followthrough` — merged
    (now on `main`). Two items intentionally out of scope, tracked only in
    [`docs/dedup-inventory.md`](docs/dedup-inventory.md): M4 (wide-brem overlay
    physics x4) and the M7 `line_fwhm_eV`/escape-helper sub-items.
-5. **Material filters.** Model calibration filters (e.g. sheets of Al foil) between the
+4. **Material filters.** Model calibration filters (e.g. sheets of Al foil) between the
    x-ray beam and detector, for detector calibration against filtered spectra.
-6. **Finite electron beam size.** Confirm the input beam is finite, then model it as a
+5. **Finite electron beam size.** Confirm the input beam is finite, then model it as a
    ~1 mm diameter Gaussian beam incident on the crystal.
-7. **Sweep cache standardization.** Round parametric angular sweeps to the nearest
+6. **Sweep cache standardization.** Round parametric angular sweeps to the nearest
    degree; standardize energy-grid sizes/spacings so thickness/angle/etc. sweeps share
    one cached-data store that is always checked before running.
-8. **`analysis_app.py` parameter-sweep views.** Support parameter sweeps (e.g. the
+7. **`analysis_app.py` parameter-sweep views.** Support parameter sweeps (e.g. the
    crystal-thickness sweeps in the current h-BN work); today the app silently shows only
    the thinnest crystal.
-9. **Checkpoint union tooling.** Union a live material checkpoint with an archived one
+8. **Checkpoint union tooling.** Union a live material checkpoint with an archived one
    for the same material; archive the current pickle first by default, leave the source
    archive intact — both overridable (skip archive / delete old archive).
-10. **`remote.py stop` ergonomics.** Make `stop <material>` stop the sole running job
+9. **`remote.py stop` ergonomics.** Make `stop <material>` stop the sole running job
     with no arg (one job at a time); add `stop -a/--all` to clear the queue and
     `stop <mat...>` to drop specific queued materials.
 
