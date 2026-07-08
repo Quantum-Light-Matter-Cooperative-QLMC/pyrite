@@ -39,20 +39,45 @@ on `main` once the branch exists.
    `github.com/eScatter/elsepa`. Remaining gate: the image/venv live outside the repo
    (`C:/dev/pyelsepa`), so the driver stays gated in CI. Tied to P2 #2.
 4. **Codebase de-duplication follow-through.** `refactor/dedup-followthrough` — merged
-   (now on `main`). All mechanical hoists landed: title/metrics hoists into
-   `plots/_common.py`, shared `_si_sensor.py`, `plot_heatmaps` value= mode + Eagle
-   charge-map delegation, `sweep.crystal_params` registry collapse, the `results.py` ->
-   `results/` package split, and renderer-neutral plot frame builders
-   (`plots/_frames.py`) shared by matplotlib/Altair. Two items intentionally out of
-   scope, tracked only in [`docs/dedup-inventory.md`](docs/dedup-inventory.md): M4
-   (wide-brem overlay physics x4) and the M7 `line_fwhm_eV`/escape-helper sub-items.
+   (now on `main`). Two items intentionally out of scope, tracked only in
+   [`docs/dedup-inventory.md`](docs/dedup-inventory.md): M4 (wide-brem overlay
+   physics x4) and the M7 `line_fwhm_eV`/escape-helper sub-items.
+5. **Checkpoint lifecycle.** -> `feature/checkpoint-lifecycle`. Slim/archive/restore +
+   grid-filtered pull + remote clear landed; remaining: on-box `clear` re-verify,
+   `pull --grid` as default, mos2 checkpoint-size anomaly.
+6. **Material filters.** Model calibration filters (e.g. sheets of Al foil) between the
+   x-ray beam and detector, for detector calibration against filtered spectra.
+7. **Finite electron beam size.** Confirm the input beam is finite, then model it as a
+   ~1 mm diameter Gaussian beam incident on the crystal.
+8. **Sweep cache standardization.** Round parametric angular sweeps to the nearest
+   degree; standardize energy-grid sizes/spacings so thickness/angle/etc. sweeps share
+   one cached-data store that is always checked before running.
+9. **Checkpoint compression.** Compress pickle objects (or use an alternative storage
+   format) locally and on the remote for space efficiency and faster transfer.
 
 ## P3 - lower / exploratory
 
 1. **Marimo/Altair follow-ups.** Core migration landed from `feature/marimo-transfer`;
-   `marimo` notebook/plot cleanup & fixes remain.
+   remaining notebook/plot fixes:
+   - Enforce fixed plot size for heatmaps (they expand with axis sizes).
+   - Enforce few-decimal-point axis tick labels (heatmaps worst offenders).
+   - Angle selector for penetration plots (trajectories + mean population vs depth);
+     default to a low nonzero polar angle (~15 deg).
+   - Intrinsic-spectra plot of CXR emission without the incoherent brem background;
+     user-adjustable x-axis limits on both spectral plots; lin/log y switch.
+   - Fix blank detector-tab plots.
+   - Fix penetration plots for multilayer/stacked materials: show trajectories and
+     population-vs-depth through the full stack, not just the top layers (mos2).
+   - Finalize transition to `scan_app.py` (can't select a material, among other issues).
 2. **Grazing-incidence soft X-ray diffraction grating.** -> `feature/grazing-grating`.
    Dispersion scaffold implemented; next is grating reflectivity + detected-image model.
+3. **CLI/remote output noise.** Silence the import-time "No GPU found, or cupy not
+   installed!" banner on every `cxr` invocation and the repeated "no Mott transport
+   table for 'X'" warnings spammed by `dev/remote.py` runs.
+4. **`remote.py start --follow` hang.** Launches the task but hangs afterward and never
+   attaches the tqdm progress bar.
+5. **Git history cleanup.** Squash minor upkeep/doc commits; evaluate other repo
+   structure/history improvements.
 
 ## Long term features
 
