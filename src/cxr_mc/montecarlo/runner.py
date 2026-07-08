@@ -47,6 +47,51 @@ def _env_chunk(name, default):
 _SPEC_CHUNK = _env_chunk("CXR_MC_SPEC_CHUNK", 40000)  # segments per line-spectrum GPU matmul
 _BREM_CHUNK = _env_chunk("CXR_MC_BREM_CHUNK", 20000)  # segments per brem-spectrum GPU matmul
 
+# A2 (docs/acceleration-technique-evaluation.md): stretch the CuPy memory-pool
+# free cadence. free_all_blocks() forces a device sync + full realloc, so paying
+# it once per case is the conservative default; the spike frees less often and
+# leans on a reserved-pool watermark to stay bounded. Read once at import; the
+# GPU free path is driver-process only (workers run transport), so no locking.
+_FREE_EVERY = _env_chunk("CXR_MC_FREE_EVERY", 1)  # free the pool every N GPU cases (1 = per-case)
+_FREE_WATERMARK_MB = _env_chunk(
+    "CXR_MC_FREE_WATERMARK_MB", 0
+)  # ...or when reserved pool exceeds this; 0 = off
+_cases_since_free = 0  # GPU cases since the last free (module-global: single driver process)
+_pool_peak_bytes = 0  # high-water reserved pool size, for the A2 operational watermark check
+
+
+def _should_free(cases_since, every, reserved_bytes, watermark_mb):
+    """A2 free-cadence predicate (pure, no CuPy so it unit-tests without a GPU).
+
+    Free the pool when ``every`` cases have elapsed since the last free, OR when
+    the reserved pool has crossed the watermark (``watermark_mb == 0`` -> the
+    watermark is off). The default (every=1, watermark off) fires every case."""
+    over_watermark = watermark_mb > 0 and reserved_bytes > watermark_mb * (1 << 20)
+    return cases_since >= every or over_watermark
+
+
+def _maybe_free_pool():
+    """Return this case's GPU scratch to the device on the A2 cadence.
+
+    ``free_all_blocks()`` releases the CuPy pool's free blocks back to the card so
+    a long sweep can't let the reserved pool grow/fragment until it fills VRAM --
+    but it forces a device sync + full realloc, so A2 stretches how often it runs
+    (see :func:`_should_free`). The trigger reads ``total_bytes()`` (reserved), NOT
+    ``used_bytes()``: by the time control reaches this inter-case point the case's
+    CuPy temporaries are already dereferenced, so ``used_bytes()`` is ~0 and would
+    never trip -- ``total_bytes()`` is the footprint that actually grows. Default
+    (1 / off) reproduces the original per-case free exactly. Driver-process only,
+    so the module counter needs no lock."""
+    global _cases_since_free, _pool_peak_bytes
+    pool = cp.get_default_memory_pool()
+    reserved = pool.total_bytes()
+    if reserved > _pool_peak_bytes:
+        _pool_peak_bytes = reserved
+    _cases_since_free += 1
+    if _should_free(_cases_since_free, _FREE_EVERY, reserved, _FREE_WATERMARK_MB):
+        pool.free_all_blocks()
+        _cases_since_free = 0
+
 
 class _TimingAgg:
     """Main-process accumulator for CXR_MC_TIMING phase profiling.
@@ -136,6 +181,13 @@ def _report_timing(agg, mode, nw):
         lines.append(f"  Gate-0 verdict             : {verdict}")
     else:
         lines.append("  (CPU-only mode: no GPU phase. Split sizes the Branch B / mode-2 payoff.)")
+    if _GPU and _pool_peak_bytes:
+        cadence = f"every {_FREE_EVERY} cases" if _FREE_EVERY > 1 else "per case"
+        wm = f", watermark {_FREE_WATERMARK_MB} MB" if _FREE_WATERMARK_MB > 0 else ""
+        lines.append(
+            f"  CuPy pool peak (reserved)  : {_pool_peak_bytes / (1 << 20):8.1f} MB"
+            f"   (free {cadence}{wm})"  # A2 operational watermark: must stay bounded
+        )
     lines.append("")
     print("\n".join(lines), file=sys.stderr, flush=True)
 
@@ -362,10 +414,10 @@ def _spectrum_case(case, tp):
     # SAME path (via _brem_for_case) and can't drift back to single-slab brem.
     brem_wide = _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers)
     brem = np.interp(E_grid, E_brem, brem_wide)  # brem under the lines (line grid)
-    # Hand this case's GPU scratch back to the OS so the CuPy memory pool can't
-    # accumulate (and fragment) across a long sweep until it fills the card.
+    # Return this case's GPU scratch on the A2 cadence so the CuPy memory pool
+    # can't accumulate (and fragment) across a long sweep until it fills the card.
     if _GPU:
-        cp.get_default_memory_pool().free_all_blocks()
+        _maybe_free_pool()
     out = dict(
         E_grid=E_grid,
         spec=spec,
