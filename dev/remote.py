@@ -13,7 +13,8 @@ One-shot (foreground, holds the ssh session open until the sweep finishes):
     python dev/remote.py scan mose2               # sync code up, run sweep, pull checkpoint
     python dev/remote.py scan mose2 --quick       # tiny grid smoke test
     python dev/remote.py scan mose2 --no-sync     # skip the code upload (code unchanged)
-    python dev/remote.py pull mose2 wse2          # fetch one or more existing checkpoints
+    python dev/remote.py pull mose2 wse2          # fetch existing checkpoints (grid-filtered)
+    python dev/remote.py pull mose2 --full        # fetch the full, un-filtered checkpoint
     python dev/remote.py sync                     # only push the current code
 
 Detached QUEUE (survives ssh disconnect -- launch, walk away, reconnect later):
@@ -26,7 +27,7 @@ Detached QUEUE (survives ssh disconnect -- launch, walk away, reconnect later):
     python dev/remote.py status [JOBID]           # one job: meta + state + log tail (default: latest)
     python dev/remote.py logs [JOBID] --follow    # tail the remote log (live)
     python dev/remote.py stop JOBID               # SIGTERM a running job's process group
-    python dev/remote.py pull mose2 wse2 mos2     # fetch the finished checkpoints
+    python dev/remote.py pull mose2 wse2 mos2     # fetch the finished checkpoints (grid-filtered)
 
 `start` returns immediately: it ships the code, writes a small runner under
 <remote>/jobs/<jobid>/ and launches it with `nohup setsid` so it keeps running
@@ -600,14 +601,19 @@ def main(argv=None):
     p = sub.add_parser("pull", help="fetch one or more existing checkpoints from the box")
     p.add_argument("material", nargs="+", help="checkpoint stem(s), e.g. mose2 mose2_quick")
     p.add_argument(
-        "--grid",
+        "-f",
+        "--full",
         action="store_true",
-        help="filter each checkpoint to its CURRENT grid on the box before the transfer",
+        help="pull the full, un-filtered checkpoint instead of the default grid-filtered pull",
     )
-    p.add_argument("--drop-wide-brem", action="store_true", help="with --grid: drop wide-brem too")
-    p.add_argument("--downcast", action="store_true", help="with --grid: downcast to float32 too")
     p.add_argument(
-        "--no-sync", action="store_true", help="with --grid: skip the pre-pull code sync"
+        "--drop-wide-brem", action="store_true", help="with grid pull: drop wide-brem too"
+    )
+    p.add_argument(
+        "--downcast", action="store_true", help="with grid pull: downcast to float32 too"
+    )
+    p.add_argument(
+        "--no-sync", action="store_true", help="with grid pull: skip the pre-pull code sync"
     )
 
     c = sub.add_parser("clear", help="delete a material's accumulated checkpoints on the box")
@@ -625,7 +631,7 @@ def main(argv=None):
         case "pull":
             pull(
                 args.material,
-                grid=args.grid,
+                grid=not args.full,
                 drop_wide_brem=args.drop_wide_brem,
                 downcast=args.downcast,
                 no_sync=args.no_sync,

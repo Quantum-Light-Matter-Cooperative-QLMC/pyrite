@@ -160,3 +160,25 @@ def test_scan_rejects_quick_plus_grid_before_any_work(monkeypatch):
     )
     with pytest.raises(SystemExit, match="grid"):
         remote.main(["scan", "hopg", "--quick", "--grid"])
+
+
+# ---- pull defaults to --grid; -f/--full opts into the plain whole-file pull -----
+def test_pull_defaults_to_grid(monkeypatch):
+    calls = []
+    monkeypatch.setattr(remote, "pull", lambda *a, **kw: calls.append(kw))
+    remote.main(["pull", "hopg"])
+    assert calls[0]["grid"] is True
+
+
+def test_pull_full_flag_disables_grid(monkeypatch):
+    calls = []
+    monkeypatch.setattr(remote, "pull", lambda *a, **kw: calls.append(kw))
+    remote.main(["pull", "hopg", "--full"])
+    assert calls[0]["grid"] is False
+
+
+def test_pull_short_full_flag(monkeypatch):
+    calls = []
+    monkeypatch.setattr(remote, "pull", lambda *a, **kw: calls.append(kw))
+    remote.main(["pull", "hopg", "-f"])
+    assert calls[0]["grid"] is False
