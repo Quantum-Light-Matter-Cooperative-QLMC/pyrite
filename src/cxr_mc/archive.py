@@ -26,8 +26,13 @@ import os
 import pickle
 import re
 import shutil
+from pathlib import Path
 
-DEFAULT_ROOT = "checkpoints"
+# Anchored to the repo root (src/cxr_mc/archive.py -> parents[2] = repo root), the
+# same dir run.load_checkpoint reads, so `cxr archive` works from any cwd. Computed
+# here rather than imported from run to keep the montecarlo import chain (and its
+# GPU-detection banner) out of a plain archive command.
+DEFAULT_ROOT = str(Path(__file__).resolve().parents[2] / "checkpoints")
 ARCHIVE_SUBDIR = "archive"
 _DATE_SUFFIX_RE = re.compile(r"-\d{8}$")  # a trailing -YYYYMMDD default-label stamp
 
@@ -68,7 +73,7 @@ def archive_checkpoint(stem, label=None, *, force=False, root=DEFAULT_ROOT):
     if os.path.exists(dst) and not force:
         raise SystemExit(f"archive already exists: {dst} (pass --force to overwrite)")
     _atomic_copy(src, dst)
-    print(f"archived checkpoints/{stem}.pkl -> {os.path.join(ARCHIVE_SUBDIR, label)}.pkl")
+    print(f"archived checkpoints/{stem}.pkl -> {ARCHIVE_SUBDIR}/{label}.pkl")
     return dst
 
 
@@ -85,7 +90,7 @@ def restore_checkpoint(label, stem=None, *, force=False, root=DEFAULT_ROOT):
     if os.path.exists(dst) and not force:
         raise SystemExit(f"active checkpoint already exists: {dst} (pass --force to overwrite)")
     _atomic_copy(src, dst)
-    print(f"restored {os.path.join(ARCHIVE_SUBDIR, label)}.pkl -> checkpoints/{stem}.pkl")
+    print(f"restored {ARCHIVE_SUBDIR}/{label}.pkl -> checkpoints/{stem}.pkl")
     return dst
 
 

@@ -94,6 +94,29 @@ def test_archives_empty_shelf(tmp_path, capsys):
     assert "(no archives)" in capsys.readouterr().out
 
 
+def test_archive_and_restore_prints_use_forward_slashes(tmp_path, capsys):
+    """The confirmation lines mix 'checkpoints/<stem>.pkl' with an os.path.join'd
+    archive path, which prints 'archive\\label.pkl' on Windows -- keep both sides
+    forward-slashed."""
+    _write(tmp_path / "hopg.pkl", _store())
+    archive.archive_checkpoint("hopg", "snap", root=str(tmp_path))
+    archive.restore_checkpoint("snap", "hopg", force=True, root=str(tmp_path))
+    out = capsys.readouterr().out
+    assert "\\" not in out
+    assert "archive/snap.pkl" in out
+
+
+def test_default_root_is_repo_anchored():
+    """cxr archive must hit the same checkpoints/ dir no matter the cwd, and it
+    must be the exact dir run.load_checkpoint reads from (repo-root anchored)."""
+    import os
+
+    from cxr_mc import run
+
+    assert os.path.isabs(archive.DEFAULT_ROOT)
+    assert archive.DEFAULT_ROOT == run._DEFAULT_CHECKPOINT_DIR
+
+
 def test_stem_from_label_strips_only_date_suffix():
     assert archive._stem_from_label("hopg-20260704") == "hopg"
     assert archive._stem_from_label("good-thickness") == "good-thickness"

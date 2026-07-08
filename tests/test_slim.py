@@ -168,3 +168,23 @@ def test_slim_checkpoint_grid_rejects_quick_stem(tmp_path):
         pickle.dump(_results(), f)
     with pytest.raises(SystemExit, match="quick"):
         slim_checkpoint(str(src), grid=True)
+
+
+def test_pct_smaller_never_reports_negative_zero():
+    """A slim that lands a hair LARGER (tiny checkpoint + float32 pickling
+    overhead) must report '0% smaller', not the '-0%' float-format artifact."""
+    from cxr_mc.slim import _pct_smaller
+
+    assert str(_pct_smaller(100_004, 100_008)) == "0"  # -0.004% -> 0, not -0
+    assert _pct_smaller(100, 37) == 63
+    assert _pct_smaller(0, 0) == 0
+
+
+def test_slim_checkpoint_grid_rejects_unknown_material_before_load(tmp_path):
+    """An unknown stem with --grid must exit with a clean one-line message naming
+    the stem, not a raw ValueError traceback -- and must do so BEFORE loading the
+    (potentially gigabyte-scale) pickle, which the junk bytes pin down."""
+    src = tmp_path / "notamaterial.pkl"
+    src.write_bytes(b"not a pickle")  # unpickling this would raise, so a load = fail
+    with pytest.raises(SystemExit, match="notamaterial"):
+        slim_checkpoint(str(src), grid=True)

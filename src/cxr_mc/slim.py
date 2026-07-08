@@ -33,7 +33,23 @@ def _material_from_stem(in_path):
             "--quick checkpoint, whose grid isn't reproducible from "
             "material_sweep(material). Drop --grid for this stem."
         )
+    # deferred import: config imports results at module load, so importing it at
+    # slim.py's top would re-enter that cycle (same pattern as results/selection)
+    from .config import material_grid
+
+    try:
+        material_grid(stem)
+    except (KeyError, ValueError) as e:
+        raise SystemExit(f"--grid: {e}") from None
     return stem
+
+
+def _pct_smaller(before, after):
+    """Integer percent saved by the slim. int(round(...)) rather than an f-string
+    ':.0f', which renders a tiny negative pct (slim output a hair larger than the
+    input) as the '-0%' artifact."""
+    pct = 100.0 * (1.0 - after / before) if before else 0.0
+    return int(round(pct))
 
 
 def slim_checkpoint(
@@ -45,9 +61,11 @@ def slim_checkpoint(
     configs, inferring the material from the checkpoint stem (rejecting a
     ``_quick`` stem). Extra keyword args are case-field constraints passed straight
     to ``slim_results``. Returns the slim results dict."""
+    # validate the stem before loading: the load is the expensive step, and a bad
+    # --grid stem should fail in milliseconds, not after a gigabyte unpickle
+    material = _material_from_stem(in_path) if grid else None
     with open(in_path, "rb") as f:
         results = pickle.load(f)
-    material = _material_from_stem(in_path) if grid else None
     slim = slim_results(
         results, grid=material, drop_wide_brem=drop_wide_brem, downcast=downcast, **constraints
     )
@@ -61,10 +79,10 @@ def slim_checkpoint(
     before, after = os.path.getsize(in_path), os.path.getsize(out_path)
     n_in = sum(len(v) for v in results.values())
     n_out = sum(len(v) for v in slim.values())
-    pct = 100.0 * (1.0 - after / before) if before else 0.0
     print(
         f"slimmed {in_path} ({before / 1e6:.1f} MB, {n_in} records) -> "
-        f"{out_path} ({after / 1e6:.1f} MB, {n_out} records); {pct:.0f}% smaller"
+        f"{out_path} ({after / 1e6:.1f} MB, {n_out} records); "
+        f"{_pct_smaller(before, after)}% smaller"
     )
     return slim
 

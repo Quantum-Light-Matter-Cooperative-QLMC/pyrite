@@ -341,10 +341,12 @@ def clear_remote(material, yes=False):
             f"checkpoints, and clearing it would race a running sweep.\n{detail}\n"
             "stop it (python dev/remote.py stop <jobid>) first, or wait for it to finish."
         )
-    # which of the two stems actually exist on the box
+    # which of the two stems actually exist on the box; the `|| true` keeps a
+    # missing last stem's failed `[ -f ]` from becoming the loop's -- and hence
+    # ssh's -- exit status, which would make _ssh_capture abort the whole clear
     listing = (
         f"cd {REMOTE_DIR}/checkpoints 2>/dev/null || exit 0; "
-        f'for f in {material}.pkl {material}_quick.pkl; do [ -f "$f" ] && echo "$f"; done'
+        f'for f in {material}.pkl {material}_quick.pkl; do [ -f "$f" ] && echo "$f" || true; done'
     )
     existing = _ssh_capture(listing).split()
     if not existing:
@@ -631,6 +633,12 @@ def main(argv=None):
         case "clear":
             clear_remote(args.material, args.yes)
         case "scan":
+            if args.quick and args.grid:
+                raise SystemExit(
+                    "scan --quick --grid: quick checkpoints aren't grid-filterable "
+                    "(their grid isn't reproducible from material_sweep), so the "
+                    "trailing pull would fail after the whole sweep ran. Drop --grid."
+                )
             # same checkpoint-collision guard as `start`: a foreground scan and a
             # detached job writing the same <stem>.pkl would race on its .tmp.
             _refuse_if_busy([args.material], args.quick)
