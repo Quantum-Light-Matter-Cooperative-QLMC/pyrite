@@ -25,16 +25,16 @@ attack*; this file carries the *full findings with line numbers and rationale*.
 
 | Item | What | Commit |
 |------|------|--------|
-| H1   | `repair_brem_wide` multilayer drift (correctness) routed through the multilayer runner path | `e6edc50` |
-| LOW nits | dead-expr / dead-statement / redundant-import one-liners | `e6edc50` |
-| M1   | best-azimuth collapse idiom → `_best_azimuth`/`_peak_line` in `plots/_common.py` (~11 sites) | `6f51ced` |
-| M7 (prologue) | `cases→names` prologue → `results.records_for_cases` (9 sites) | `6f51ced` |
-| M7 (remainder) | `_case_title`/`_metrics_map` hoisted into `plots/_common.py` (8 + 5 sites) | `f6f0dd2` |
-| M2   | Si constants + `grid_key`/`prep_spectrum`/`poisson_core` hoisted into `_si_sensor.py` | `28e20ec` |
-| M3   | `plot_eaglexo_charge_map` rewritten as a wrapper around `plot_heatmaps`' new `value=` mode | `28e20ec` |
-| M5   | `sweep.crystal_params` if-chain → `_CRYSTAL_PARAMS` registry; radiator-dict constructions unified into `_radiator()` | `546fd5c` |
-| —    | `results.py` package split (`store`/`selection`/`metrics`/`scoring`/`tables` + `test_results_exports.py`) | `279e709` |
-| M6   | `heatmap_frame`/`metric_vs_frame`/`_effective_x`/`_ndistinct`/`scan_mode`/`pick_hue` hoisted into `plots/_frames.py`; `sweeps.py` renders from them | `83e16b9` |
+| H1   | `repair_brem_wide` multilayer drift (correctness) routed through the multilayer runner path | `05e151c` |
+| LOW nits | dead-expr / dead-statement / redundant-import one-liners | `05e151c` |
+| M1   | best-azimuth collapse idiom → `_best_azimuth`/`_peak_line` in `plots/_common.py` (~11 sites) | `3bde9c6` |
+| M7 (prologue) | `cases→names` prologue → `results.records_for_cases` (9 sites) | `3bde9c6` |
+| M7 (remainder) | `_case_title`/`_metrics_map` hoisted into `plots/_common.py` (8 + 5 sites) | `b104a41` |
+| M2   | Si constants + `grid_key`/`prep_spectrum`/`poisson_core` hoisted into `_si_sensor.py` | `f668a14` |
+| M3   | `plot_eaglexo_charge_map` rewritten as a wrapper around `plot_heatmaps`' new `value=` mode | `f668a14` |
+| M5   | `sweep.crystal_params` if-chain → `_CRYSTAL_PARAMS` registry; radiator-dict constructions unified into `_radiator()` | `fcc2412` |
+| —    | `results.py` package split (`store`/`selection`/`metrics`/`scoring`/`tables` + `test_results_exports.py`) | `a958789` |
+| M6   | `heatmap_frame`/`metric_vs_frame`/`_effective_x`/`_ndistinct`/`scan_mode`/`pick_hue` hoisted into `plots/_frames.py`; `sweeps.py` renders from them | `ea5dc03` |
 
 **Remaining:** nothing queued in `TODO.md`'s numbered backlog. **Two items that fell out of
 the TODO summary and must not be lost: M4, and the M7 `line_fwhm_eV`
@@ -44,7 +44,7 @@ the TODO summary and must not be lost: M4, and the M7 `line_fwhm_eV`
 
 ## Findings inventory
 
-### HIGH — H1: `run.repair_brem_wide` multilayer drift  *(DONE — `e6edc50`)*
+### HIGH — H1: `run.repair_brem_wide` multilayer drift  *(DONE — `05e151c`)*
 
 `run.py:275-284` re-implemented the runner's brem phase by hand instead of reusing
 `runner._transport_case`/`_spectrum_case`, and had drifted: it called
@@ -56,13 +56,13 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
 
 ### MEDIUM — duplication clusters
 
-- **M1 — collapse idiom ×10-11.**  *(DONE — `6f51ced`)*
+- **M1 — collapse idiom ×10-11.**  *(DONE — `3bde9c6`)*
   `max(grp, key=lambda r: float(np.max(r["spec"])))` + group-by-energy loop across
   `spectra.py` ×3, `detectors.py` ×4, `interactive.py` ×2, `altair_spectra.py`,
   `altair_detectors.py`. Hoisted `_peak_line(r)` and `_best_azimuth(grp, collapse_azimuth)`
   into `plots/_common.py` (added `import numpy as np`). Internal helpers, not re-exported.
 
-- **M2 — timepix vs eaglexo response share verbatim blocks.**  *(DONE — `28e20ec`.)*
+- **M2 — timepix vs eaglexo response share verbatim blocks.**  *(DONE — `f668a14`.)*
   `timepix_response.py` and `eaglexo_response.py` duplicated: the Si constants
   (`W_EHP_EV`, `FANO_SI`, `SI_DENSITY_G_CM3`, `SI_A`, `SI_N_PER_ANG3`), the
   `_RESPONSE_CACHE` + `get_response` grid-key caching pattern, the `poisson_counts` core,
@@ -74,7 +74,7 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   to preserve (both ledger rows were already `unverified`/`blocked` pre-refactor), confirmed
   against `docs/physics-validation-ledger.md` before assuming so.
 
-- **M3 — `plot_eaglexo_charge_map` re-implements `plot_heatmaps`.**  *(DONE — `28e20ec`.)*
+- **M3 — `plot_eaglexo_charge_map` re-implements `plot_heatmaps`.**  *(DONE — `f668a14`.)*
   `plots/detectors.py:562-677` duplicated ~90 lines of `sweeps.py` best-per-cell /
   `_cell_edges` / shared vmin-vmax / colorbar machinery, plus the thin-axis→line fallback. Gave
   `plot_heatmaps` a `value=callable(record)` mode (factored into a new `sweeps._value_heatmap`
@@ -91,7 +91,7 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   and `eaglexo_charge_frame`. Extract `_eag_wide_brem(r, coating)` / `_eag_wide_charge(r, coating)`
   next to `_eag_detected`.
 
-- **M5 — `sweep.crystal_params` 110-line if-chain.**  *(DONE — `546fd5c`.)*
+- **M5 — `sweep.crystal_params` 110-line if-chain.**  *(DONE — `fcc2412`.)*
   Every branch returned `{crystal, composition, hkl_list, beam_uvw, B_ang2, E_grid}`. Collapsed
   to `_CRYSTAL_PARAMS`, a data registry mirroring `config._MATERIAL_GRIDS` (a `CrystalParamsGrid`
   `TypedDict` table keyed by material, holding just `B_ang2`/`beam_uvw`/`E_grid` plus an optional
@@ -111,7 +111,7 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   `sweep.py` went 550 → 520 lines net (the registry table + its `TypedDict`/comments add lines
   back against the if-chain's removal). 198 tests / 0 ruff / 0 pyright unchanged.
 
-- **`results.py` package split.**  *(DONE — `279e709`.)* 663 lines split
+- **`results.py` package split.**  *(DONE — `a958789`.)* 663 lines split
   verbatim (no logic changes) into a `results/` package following the `montecarlo`/`plots`
   precedent: `store.py` (`Settings`, `store_result`, `detected_background`), `selection.py`
   (`records`/`records_for_cases`/`filter_results`/`sweep_values`/`select_results`/
@@ -126,7 +126,7 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   comparison artifact, not a content change) plus the full 201-test suite / 0 ruff / 0 pyright.
 
 - **M6 — matplotlib `sweeps` vs `altair_sweeps` duplicate the reduction, not just rendering.**
-  *(DONE -- `83e16b9`.)* Moved `heatmap_frame`/`metric_vs_frame`/
+  *(DONE -- `ea5dc03`.)* Moved `heatmap_frame`/`metric_vs_frame`/
   `_effective_x`/`_ndistinct`/`scan_mode`/`pick_hue` into a new renderer-neutral
   `plots/_frames.py`. `sweeps.py`'s `plot_heatmaps`/`plot_metric_vs`/`plot_scan`
   now render from the same tidy-data frames `altair_sweeps.py`'s
@@ -138,16 +138,16 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
   the full suite.
 
 - **M7 — smaller mechanical hoists.**
-  - `records_for_cases(results, cases)` — the `cases→names` prologue ×9. *(DONE — `6f51ced`.)*
+  - `records_for_cases(results, cases)` — the `cases→names` prologue ×9. *(DONE — `3bde9c6`.)*
   - `_case_title` — extract from `altair_detectors._title(...)`; title recipe reimplemented
     inline ~12× across `spectra.py`, `detectors.py`, `sweeps.py`, `altair_sweeps.py`,
     `interactive.py`. Target: `plots/_common.py` next to `_best_azimuth`/`_peak_line`.
-    *(DONE — `f6f0dd2`; 8 call sites swapped. `sweeps.py` had no case-title
+    *(DONE — `b104a41`; 8 call sites swapped. `sweeps.py` had no case-title
     code, so only the other 4 files needed edits. Left alone: `interactive.py`'s plotly
     slider title and `spectra.py`'s mosaic title — genuine format divergences, not the same
     recipe.)*
   - `_metrics_map` — extract from `altair_sweeps._metrics_map(...)`; reimplemented ×5. Same
-    target module. *(DONE — `f6f0dd2`; 5 call sites swapped across
+    target module. *(DONE — `b104a41`; 5 call sites swapped across
     `altair_sweeps.py`, `spectra.py`, `sweeps.py`.)*
   - `line_fwhm_eV(case, E_pk, mosaic_rad)` — `store_result` (`results.py:64-80`) and
     `plot_mosaic_comparison` (`spectra.py:254-275`) duplicate the EDS² + aperture² +
@@ -156,7 +156,7 @@ substrate backscatter/brem/cross-stack absorption) and wrote it back. Also ignor
     `mc_brem_spectrum` (`spectrum.py:144-148` & `267-273` vs `487-491` & `513`). *(TODO — NOT
     in the TODO summary; `montecarlo/` → ledger obligations apply, verbatim moves only.)*
 
-### LOW — nits  *(DONE — `e6edc50`)*
+### LOW — nits  *(DONE — `05e151c`)*
 
 - Dead expr `self.E[1] - self.E[0]` @ `eaglexo_response.py:315` (was the pyright warning).
 - Dead statement `float(Eb[0])` @ `plots/spectra.py:155`.
