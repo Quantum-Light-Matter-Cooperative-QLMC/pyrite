@@ -271,6 +271,18 @@ echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
 """
 
 
+def _launch_queue_command(jobid):
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    # Detach only the runner process. Without the subshell, `cmd1 && cmd2 &&
+    # nohup ... & echo launched` backgrounds the whole AND-list, leaving a shell
+    # associated with the SSH channel even after "launched" is printed.
+    return (
+        f"cd '{REMOTE_DIR}' && : > '{jobdir}/log' && "
+        f"(nohup setsid bash '{jobdir}/run.sh' >/dev/null 2>&1 </dev/null &) && "
+        f"echo 'launched {jobid}'"
+    )
+
+
 def _live_jobs():
     """[(jobid, quick, [materials])] for every job on the box whose runner
     process is still alive (pid file present and `kill -0` succeeds). Reads the
@@ -373,14 +385,10 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
     jobid = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     script = _queue_script(jobid, materials, quick, workers)
-    # detach: redirect all three std streams off the ssh channel and setsid into
+    # Redirect all three runner streams off the ssh channel and setsid into
     # a new session, so the ssh command returns immediately and the job keeps
     # running after you disconnect.
-    launch = (
-        f"cd '{REMOTE_DIR}' && : > '{jobdir}/log' && "
-        f"nohup setsid bash '{jobdir}/run.sh' >/dev/null 2>&1 </dev/null & "
-        f"echo 'launched {jobid}'"
-    )
+    launch = _launch_queue_command(jobid)
 
     if dry_run:
         print(f"# job {jobid}: {' '.join(materials)}{' (quick)' if quick else ''}")
@@ -463,7 +471,9 @@ def tail_logs(jobid=None, follow=False):
     )
     if follow:
         try:
-            subprocess.run(["ssh", HOST, remote])  # inherit stdio -> live stream
+            # Close stdin so Windows OpenSSH cannot hang on console forwarding,
+            # while stdout/stderr still inherit for live streaming and Ctrl-C.
+            subprocess.run(["ssh", "-n", HOST, remote])
         except KeyboardInterrupt:
             print("\n(stopped following; the job is unaffected)")
     else:
@@ -494,10 +504,11 @@ def attach(jobid=None):
     if not jobid:
         raise SystemExit("no jobs to attach to (start one: remote.py start <materials>)")
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
-    # tail the log live, but self-terminate once the job process exits, so a
+    # Tail the log live, but self-terminate once the job process exits, so a
     # finished job doesn't leave you stuck in tail -f. The tail is NOT nohup'd, so
     # a local Ctrl-C / dropped ssh tears it (and the wait loop) down while the
-    # setsid'd job keeps going.
+    # setsid'd job keeps going. SSH stdin is closed with -n below; stdout/stderr
+    # still inherit, which is enough for live output and Ctrl-C.
     remote = (
         f'D="{jobdir}"; '
         f'[ -d "$D" ] || {{ echo "no such job: {jobid}"; exit 1; }}; '
@@ -519,7 +530,7 @@ def attach(jobid=None):
     )
     print(f"attached to job {jobid} on {HOST} -- Ctrl-C to disconnect (the job keeps running).\n")
     try:
-        subprocess.run(["ssh", HOST, remote])
+        subprocess.run(["ssh", "-n", HOST, remote])
     except KeyboardInterrupt:
         _disconnect_hint(jobid)
 

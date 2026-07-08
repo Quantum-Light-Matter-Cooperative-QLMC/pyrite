@@ -35,6 +35,36 @@ def test_queue_script_no_flags_when_unset():
     assert "--quick" not in s and "--workers" not in s
 
 
+def test_launch_queue_command_backgrounds_only_runner():
+    launch = remote._launch_queue_command("20260101-000000")
+
+    assert "&& (nohup setsid bash" in launch
+    assert "</dev/null &) && echo 'launched 20260101-000000'" in launch
+    assert "</dev/null & echo" not in launch
+
+
+def test_attach_uses_stdin_closed_ssh_for_live_view(monkeypatch):
+    runs = []
+    monkeypatch.setattr(remote.subprocess, "run", lambda cmd: runs.append(cmd))
+
+    remote.attach("20260101-000000")
+
+    assert len(runs) == 1
+    assert runs[0][:3] == ["ssh", "-n", remote.HOST]
+    assert len(runs[0]) == 4
+
+
+def test_follow_logs_use_stdin_closed_ssh(monkeypatch):
+    runs = []
+    monkeypatch.setattr(remote.subprocess, "run", lambda cmd: runs.append(cmd))
+
+    remote.tail_logs("20260101-000000", follow=True)
+
+    assert len(runs) == 1
+    assert runs[0][:3] == ["ssh", "-n", remote.HOST]
+    assert len(runs[0]) == 4
+
+
 def test_stems_quick_suffix():
     assert remote._stems(["mose2", "wse2"], True) == ["mose2_quick", "wse2_quick"]
     assert remote._stems(["mose2"], False) == ["mose2"]
