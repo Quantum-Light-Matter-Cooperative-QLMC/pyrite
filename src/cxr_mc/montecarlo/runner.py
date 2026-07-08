@@ -9,6 +9,8 @@ workers.
 """
 
 import os
+import sys
+from time import perf_counter
 from typing import Any
 
 import numpy as np
@@ -17,6 +19,125 @@ from ._backend import _GPU, cp
 from .geometry import tilted_geometry
 from .spectrum import _segments_in_layer, mc_brem_spectrum, mc_spectrum
 from .transport import simulate_trajectories
+
+# Opt-in Gate-0 phase profiling for the sweep-acceleration work (TODO P?/#numba;
+# see docs/acceleration-technique-evaluation.md). With CXR_MC_TIMING set (to
+# anything but "" / "0"), each phase records its own wall time onto the dict it
+# returns under a private "_t_*" key, and run_cases accumulates those (plus the
+# GPU-idle wait) and prints a per-phase summary + the pipeline verdict. The keys
+# are STRIPPED by _TimingAgg.collect before any result is stored/checkpointed, so
+# timing never leaks into the pickle. The flag is read at import so it applies in
+# every spawned transport worker too (env is inherited on spawn/forkserver).
+_TIMING = os.environ.get("CXR_MC_TIMING", "") not in ("", "0")
+
+
+def _env_chunk(name, default):
+    """Chunk-size default, overridable via env for the A1 sweep-acceleration spike
+    (docs/acceleration-technique-evaluation.md, A1: sweep spec/brem chunk on the lab
+    box and read the GPU spectrum-phase time). Read once at import so it applies in
+    the main GPU process; an explicit per-case ``spec_chunk``/``brem_chunk`` still
+    wins. Unset / blank / non-positive / non-integer -> the memory-safe default."""
+    try:
+        v = int(os.environ.get(name, ""))
+    except (TypeError, ValueError):
+        return default
+    return v if v > 0 else default
+
+
+_SPEC_CHUNK = _env_chunk("CXR_MC_SPEC_CHUNK", 40000)  # segments per line-spectrum GPU matmul
+_BREM_CHUNK = _env_chunk("CXR_MC_BREM_CHUNK", 20000)  # segments per brem-spectrum GPU matmul
+
+
+class _TimingAgg:
+    """Main-process accumulator for CXR_MC_TIMING phase profiling.
+
+    Lives only in the driver process (never pickled). Per-case transport and
+    spectrum deltas ride back on the phase dicts (workers -> main for transport);
+    the GPU-idle wait is measured directly in run_cases' pipeline loop. ``collect``
+    both records and strips the private keys so stored results stay clean.
+    """
+
+    def __init__(self):
+        self.transport: list[float] = []  # worker compute time for _transport_case
+        self.spectrum: list[float] = []  # _spectrum_case body (GPU work in main proc)
+        self.wait: list[float] = []  # driver blocked on the transport future (GPU idle)
+
+    def collect(self, out):
+        """Pop the private _t_* deltas a phase dict rode back on and record them."""
+        t = out.pop("_t_transport", None)
+        if t is not None:
+            self.transport.append(t)
+        s = out.pop("_t_spectrum", None)
+        if s is not None:
+            self.spectrum.append(s)
+
+    def report(self, mode, nw):
+        """Print the phase split, GPU-idle fraction, and pipeline verdict to stderr."""
+        _report_timing(self, mode, nw)
+
+
+def _fmt_ms(xs):
+    """(mean, median, n) formatted in ms, or '(none)' for an empty series."""
+    a = np.asarray(xs, dtype=float)
+    if a.size == 0:
+        return "        (none)        "
+    return f"mean {a.mean() * 1e3:8.2f} ms  median {np.median(a) * 1e3:8.2f} ms  (n={a.size})"
+
+
+def _report_timing(agg, mode, nw):
+    tr = np.asarray(agg.transport, dtype=float)
+    sp = np.asarray(agg.spectrum, dtype=float)
+    wt = np.asarray(agg.wait, dtype=float)
+    lines = [
+        "",
+        f"[cxr-timing] mode={mode}  cases={max(tr.size, sp.size)}  workers={nw}",
+        f"  transport (worker compute) : {_fmt_ms(tr)}",
+        f"  spectrum  (GPU/main proc)  : {_fmt_ms(sp)}",
+    ]
+    if wt.size:
+        lines.append(f"  driver wait on transport   : {_fmt_ms(wt)}")
+        # GPU-idle fraction: of the driver's serial timeline (spectrum work +
+        # blocking on the transport future), the share spent waiting. This is the
+        # Gate-0 decision metric -- transport hidden behind spectrum => low.
+        denom = wt.sum() + sp.sum()
+        idle = wt.sum() / denom if denom else float("nan")
+        # Warmup (pool fill + first-touch CUDA alloc/JIT) inflates the first ~nw
+        # waits; report steady state too for the real production picture.
+        drop = min(nw, max(0, wt.size - 1))
+        wt_ss, sp_ss = wt[drop:], sp[drop:]
+        denom_ss = wt_ss.sum() + sp_ss.sum()
+        idle_ss = wt_ss.sum() / denom_ss if denom_ss else float("nan")
+        lines.append(
+            f"  GPU-idle fraction          : {idle:6.1%}  (all cases)"
+            f"   |   {idle_ss:6.1%}  (steady state, first {drop} dropped)"
+        )
+        if sp.size and tr.size:
+            feed = np.median(tr) / nw  # per-case transport throughput of the pool
+            bound = "SPECTRUM-bound" if np.median(sp) > feed else "TRANSPORT-bound"
+            lines.append(
+                f"  pipeline balance           : {bound}  "
+                f"(median spectrum {np.median(sp) * 1e3:.1f} ms vs "
+                f"transport/nw {feed * 1e3:.1f} ms)"
+            )
+        # Gate-0 verdict per docs/acceleration-technique-evaluation.md decision rule.
+        ref_idle = idle_ss if np.isfinite(idle_ss) else idle
+        if ref_idle < 0.20:
+            verdict = (
+                "Branch A (accelerate the spectrum phase) is the production path; "
+                "transport speedups (Branch B) are capped near the idle fraction."
+            )
+        elif ref_idle >= 0.25:
+            verdict = (
+                "transport pool cannot feed the card -- Branch B (faster transport) "
+                "helps production too; do it alongside Branch A."
+            )
+        else:
+            verdict = "20-25% idle: borderline -- Branch A first, re-measure before Branch B."
+        lines.append(f"  Gate-0 verdict             : {verdict}")
+    else:
+        lines.append("  (CPU-only mode: no GPU phase. Split sizes the Branch B / mode-2 payoff.)")
+    lines.append("")
+    print("\n".join(lines), file=sys.stderr, flush=True)
 
 
 def run_case(case):
@@ -37,7 +158,10 @@ def run_case(case):
         optional: tilt_deg (0), tilt_azim_deg (0), beam_uvw (None),
                 azimuth_rad (0), E_cut_lines_keV (5), E_cut_brem_keV (1),
                 spec_chunk (40000) / brem_chunk (20000): segments per GPU matmul
-                -- lower these to cap peak GPU memory on a busy/shared device,
+                -- lower these to cap peak GPU memory on a busy/shared device;
+                the per-case default is overridable via the CXR_MC_SPEC_CHUNK /
+                CXR_MC_BREM_CHUNK env vars (A1 sweep-accel spike, an explicit
+                per-case value still wins),
                 sinc_cutoff (None = exact lineshapes; windowing buys nothing
                 for bulk targets, where scattering Doppler-spreads the lines
                 across the whole grid),
@@ -57,6 +181,7 @@ def _transport_case(case):
     numpy, never touches the GPU). Returns the segments + geometry + grids the
     spectrum phase consumes. run_cases farms this out to a worker pool so the
     transport of upcoming cases overlaps the GPU work on the current one."""
+    t0 = perf_counter() if _TIMING else 0.0
     if "E_grid_line" in case:
         E_grid = np.arange(*case["E_grid_line"])
         E_brem = np.arange(*case["E_grid_brem"])
@@ -92,7 +217,10 @@ def _transport_case(case):
         beam_dir=beam,
         layers=layers,
     )
-    return dict(E_grid=E_grid, E_brem=E_brem, n_hat=n_hat, segs=segs, segs_b=segs_b)
+    tp: dict[str, Any] = dict(E_grid=E_grid, E_brem=E_brem, n_hat=n_hat, segs=segs, segs_b=segs_b)
+    if _TIMING:
+        tp["_t_transport"] = perf_counter() - t0
+    return tp
 
 
 def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers):
@@ -104,7 +232,7 @@ def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers):
     ``brem_chunk`` (segments per GPU matmul). Pure move of _spectrum_case's brem
     block; shared with :func:`_brem_for_case` so a brem-only repair regenerates
     the SAME multilayer background as a live sweep."""
-    brem_chunk = case.get("brem_chunk") or 20000
+    brem_chunk = case.get("brem_chunk") or _BREM_CHUNK
     n_lay = int(segs_b.get("n_layers", 1))
     if n_lay == 1:
         return mc_brem_spectrum(
@@ -165,6 +293,7 @@ def _spectrum_case(case, tp):
     """GPU phase of run_case: line spectrum + brem from the already-transported
     segments ``tp`` (from _transport_case). Runs in the main process, so only one
     CUDA context ever touches the device."""
+    t0 = perf_counter() if _TIMING else 0.0
     E_grid, E_brem, n_hat = tp["E_grid"], tp["E_brem"], tp["n_hat"]
     segs, segs_b = tp["segs"], tp["segs_b"]
     # optional film-on-substrate stack (None -> single slab, unchanged)
@@ -183,7 +312,7 @@ def _spectrum_case(case, tp):
         mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),  # None -> perfect crystal
         mosaic_nodes=case.get("mosaic_mc_nodes", 1),
     )
-    spec_chunk = case.get("spec_chunk") or 40000
+    spec_chunk = case.get("spec_chunk") or _SPEC_CHUNK
     if radiators is None:
         spec = mc_spectrum(
             segs,
@@ -237,7 +366,7 @@ def _spectrum_case(case, tp):
     # accumulate (and fragment) across a long sweep until it fills the card.
     if _GPU:
         cp.get_default_memory_pool().free_all_blocks()
-    return dict(
+    out = dict(
         E_grid=E_grid,
         spec=spec,
         brem=brem,
@@ -248,6 +377,15 @@ def _spectrum_case(case, tp):
         crystal=case["crystal"],
         E0_keV=case["E0_keV"],
     )
+    if _TIMING:
+        # Ride the phase deltas back to the driver on the result dict; run_cases'
+        # _TimingAgg.collect strips both keys before the result is stored. Carry
+        # _t_transport through so the CPU-pool path (where transport time only
+        # exists inside this worker) can report the split too.
+        out["_t_spectrum"] = perf_counter() - t0
+        if "_t_transport" in tp:
+            out["_t_transport"] = tp["_t_transport"]
+    return out
 
 
 def _worker_init():
@@ -322,12 +460,18 @@ def run_cases(cases, max_workers=None, progress=True, callback=None):
     if n == 0:
         return results
 
+    timing = _TimingAgg() if _TIMING else None
+
     def _serial():
         for i in _maybe_bar(range(n)):
             out = run_case(cases[i])
+            if timing is not None:
+                timing.collect(out)
             results[i] = out
             if callback is not None:
                 callback(i, cases[i], out)
+        if timing is not None:
+            timing.report("serial", nw=1)
         return results
 
     def _single_thread_blas():
@@ -357,14 +501,21 @@ def run_cases(cases, max_workers=None, progress=True, callback=None):
         with ProcessPoolExecutor(max_workers=nw, initializer=_worker_init) as ex:
             inflight = {i: ex.submit(_transport_case, cases[i]) for i in range(min(prefetch, n))}
             for i in _maybe_bar(range(n)):
+                tw0 = perf_counter() if timing is not None else 0.0
                 tp = inflight.pop(i).result()  # transport (already overlapped)
+                if timing is not None:
+                    timing.wait.append(perf_counter() - tw0)  # GPU idle: draining the pool
                 j = i + prefetch
                 if j < n:
                     inflight[j] = ex.submit(_transport_case, cases[j])
                 out = _spectrum_case(cases[i], tp)  # GPU, THIS process only
+                if timing is not None:
+                    timing.collect(out)
                 results[i] = out
                 if callback is not None:
                     callback(i, cases[i], out)
+        if timing is not None:
+            timing.report("GPU-pipeline", nw=nw)
         return results
 
     # ---- no GPU: serial in-process, or a full-case worker pool ---------------
@@ -381,7 +532,11 @@ def run_cases(cases, max_workers=None, progress=True, callback=None):
         for fut in _maybe_bar(as_completed(futures)):
             i = futures[fut]
             out = fut.result()
+            if timing is not None:
+                timing.collect(out)
             results[i] = out
             if callback is not None:
                 callback(i, cases[i], out)
+    if timing is not None:
+        timing.report("CPU-pool", nw=max_workers)
     return results

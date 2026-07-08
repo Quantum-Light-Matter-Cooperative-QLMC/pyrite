@@ -1,0 +1,80 @@
+"""A1 chunk-size invariance gate (docs/acceleration-technique-evaluation.md, A1).
+
+The ``spec_chunk`` / ``brem_chunk`` knobs only bound how many trajectory segments
+go into each GPU matmul -- they must not change the physics. The only thing that
+moves when the chunk size changes is the float-summation reduction ORDER across
+the chunk loop, so the spectra agree to a float tolerance rather than bit-for-bit
+(the docstring's rtol~=1e-10). This gate is what lets the A1 spike retune the
+chunk size for throughput without silently perturbing results.
+
+CPU-only and fast (the suite forces the NumPy backend), so the reorder is at the
+float64 level (~1e-13 relative); the loose rtol leaves generous headroom.
+"""
+
+import numpy as np
+import pytest
+
+from cxr_mc.crystallography import CRYSTALS
+from cxr_mc.montecarlo import mc_brem_spectrum, mc_spectrum, simulate_trajectories
+from cxr_mc.montecarlo.runner import _env_chunk
+
+THETA = np.deg2rad(119.0)
+E0_KEV = 25.0
+B_002 = 0.8
+HKL = ((0, 0, 2), (0, 0, -2))
+E_LINE = np.arange(700.0, 1200.0, 1.0)
+E_BREM = np.arange(700.0, 20000.0, 50.0)
+NE = 120
+TINY_CHUNK = 8  # << segment count, so the chunk loop runs many iterations
+BIG_CHUNK = 10**9  # one shot: the whole segment set in a single matmul
+
+_info = CRYSTALS["hopg"]
+_n_atoms = len(_info["basis"]) / _info["V_cell"]
+
+
+@pytest.fixture(scope="module")
+def segments():
+    """A single small transported case shared by the chunk-invariance checks."""
+    segs = simulate_trajectories(
+        E0_KEV, NE, 1e7, element="C", n_atoms_per_ang3=_n_atoms, E_cut_keV=1.0, seed=7
+    )
+    # The gate is meaningless unless the tiny chunk actually splits the segments.
+    assert segs["L_ang"].size > TINY_CHUNK
+    return segs
+
+
+def _assert_chunk_invariant(one_shot, chunked):
+    peak = float(np.max(np.abs(one_shot)))
+    assert peak > 0.0  # a degenerate all-zero spectrum would pass vacuously
+    np.testing.assert_allclose(chunked, one_shot, rtol=1e-10, atol=1e-12 * peak)
+
+
+def test_line_spectrum_chunk_invariant(segments):
+    kw = dict(crystal="hopg", hkl_list=HKL, theta_obs_rad=THETA, B_ang2=B_002)
+    one_shot = mc_spectrum(segments, E_LINE, chunk=BIG_CHUNK, **kw)
+    chunked = mc_spectrum(segments, E_LINE, chunk=TINY_CHUNK, **kw)
+    _assert_chunk_invariant(one_shot, chunked)
+
+
+def test_brem_spectrum_chunk_invariant(segments):
+    kw = dict(element="C", n_atoms_per_ang3=_n_atoms, theta_obs_rad=THETA)
+    one_shot = mc_brem_spectrum(segments, E_BREM, chunk=BIG_CHUNK, **kw)
+    chunked = mc_brem_spectrum(segments, E_BREM, chunk=TINY_CHUNK, **kw)
+    _assert_chunk_invariant(one_shot, chunked)
+
+
+# ---- the env-var override that drives the A1 spike ---------------------------
+def test_env_chunk_parses_positive_override(monkeypatch):
+    monkeypatch.setenv("CXR_MC_SPEC_CHUNK", "250000")
+    assert _env_chunk("CXR_MC_SPEC_CHUNK", 40000) == 250000
+
+
+@pytest.mark.parametrize("bad", ["", "0", "-5", "12.5", "lots", "  "])
+def test_env_chunk_falls_back_on_bad_values(monkeypatch, bad):
+    monkeypatch.setenv("CXR_MC_SPEC_CHUNK", bad)
+    assert _env_chunk("CXR_MC_SPEC_CHUNK", 40000) == 40000
+
+
+def test_env_chunk_falls_back_when_unset(monkeypatch):
+    monkeypatch.delenv("CXR_MC_SPEC_CHUNK", raising=False)
+    assert _env_chunk("CXR_MC_SPEC_CHUNK", 40000) == 40000
