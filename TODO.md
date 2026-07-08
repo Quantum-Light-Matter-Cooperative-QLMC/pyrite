@@ -83,3 +83,11 @@ on `main` once the branch exists.
 ## Long term features
 
 1. `Geant4` or similar integration to support high-energy electron beams
+
+   * Specifically, RAGAE@DESY
+     * Energy 3-5 MeV
+     * 50 fs duration
+     * 100 fC charge
+     * 200-300 um diameter on target
+
+   JungFrau Detector is about 4.5 m away from IP but could be as short as ~50 cm (in vacuum)
