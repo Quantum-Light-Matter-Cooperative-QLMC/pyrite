@@ -49,6 +49,15 @@ on `main` once the branch exists.
 7. **Sweep cache standardization.** Round parametric angular sweeps to the nearest
    degree; standardize energy-grid sizes/spacings so thickness/angle/etc. sweeps share
    one cached-data store that is always checked before running.
+8. **`analysis_app.py` parameter-sweep views.** Support parameter sweeps (e.g. the
+   crystal-thickness sweeps in the current h-BN work); today the app silently shows only
+   the thinnest crystal.
+9. **Checkpoint union tooling.** Union a live material checkpoint with an archived one
+   for the same material; archive the current pickle first by default, leave the source
+   archive intact — both overridable (skip archive / delete old archive).
+10. **`remote.py stop` ergonomics.** Make `stop <material>` stop the sole running job
+    with no arg (one job at a time); add `stop -a/--all` to clear the queue and
+    `stop <mat...>` to drop specific queued materials.
 
 ## P3 - lower / exploratory
 
@@ -60,14 +69,17 @@ on `main` once the branch exists.
      detected-vs-incident charts do).
    - The dense penetration-grid accordion (matplotlib, Penetration tab) is still
      fixed at `energy=30` regardless of the angle selector above it.
+   - The x/y plot-limit entry boxes should move into the Spectra tab they belong to.
 2. **Grazing-incidence soft X-ray diffraction grating.** -> `feature/grazing-grating`.
    Dispersion scaffold implemented; next is grating reflectivity + detected-image model.
-3. **`remote.py start --follow` hang.** Launches the task but hangs afterward and never
+3. **`remote.py start` and `remote.py start --follow` hang.** Launches the task but hangs afterward and `--follow` never
    attaches the tqdm progress bar.
 4. **Git history cleanup.** Squash minor upkeep/doc commits; evaluate other repo
    structure/history improvements.
+5. **Dynamic GPU chunk sizing.** Evaluate config-driven chunk-size selection for
+   `dev/remote.py` GPU runs (probe a few test cases against the config's array sizes),
+   including a write-up of what chunking is and how config values drive it.
 
 ## Long term features
 
 1. `Geant4` or similar integration to support high-energy electron beams
-2. Add support for `Numba with CUDA` to significantly speed up calcs
