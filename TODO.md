@@ -1,22 +1,50 @@
-# TODO / Backlog
+# TODO (branch: feature/marimo-altair-followups)
 
-Items live on `feature/...` / `bugfix/...` / `docs/...` branches, not `main`, until finished.
-Full detail for an in-progress item lives on its branch (or its design doc);
-`main` keeps only a one-line summary + pointer, enforced by /docs:todo-sync.
-Priorities weigh value-to-goal (line-flux / enhancement predictions + the publication's validation story)
-against effort and risk.
+Scope: `main`'s P3 #1 "Marimo/Altair follow-ups" -- the remaining notebook/plot
+fixes after the core `feature/marimo-transfer` migration landed.
 
-Item generation:
-----------------
+## Done on this branch
 
-1. Create and move to branch of relevant type
-2. Overwrite branch TODO.md with concise, 2-3 sentence problem summary + implementation path, scoped only to the relevant item, then publish to `origin`
-3. Move to `main`, create 1 sentence summary of new item, then triage into existing TODO.md items and push tightly scoped `docs(todo)` commit to main
+- **Fix blank detector-tab plots.** Root cause: `analysis_app.py`'s Detectors tab
+  nested `mo.ui.tabs(...)` (Eagle XO / Timepix3) inside the outer `mo.ui.tabs`
+  (lazy=True) -- a known marimo bug where charts inside nested tabs render blank
+  (marimo-team/marimo#6919). Fixed by rendering the Eagle XO / Timepix3 split as
+  a `mo.accordion` instead (same lazy-defer behavior, no nesting problem).
+- **Fix penetration plots for multilayer/stacked materials (mos2).** Two bugs:
+  (1) `config.trajectory_sweep()` never propagated a material's `substrate`/
+  `stack` into the `Sweep` it built, so the Penetration tab's cases always had
+  `abs_layers=None` even for mos2 (substrate="sapphire") -- fixed by carrying
+  `substrate`/`stack` through. (2) `plots/trajectories._trajectory_data` (the
+  single choke point for both the matplotlib and Altair trajectory/survival
+  renderers) called `simulate_trajectories` with only the film's
+  `composition`/`thickness_ang`, ignoring `case["abs_layers"]` -- fixed to pass
+  `layers=case.get("abs_layers")` and use the full stack's total thickness for
+  the depth axis. Internal layer-boundary lines now drawn on both renderers.
+- **Angle selector for penetration plots.** Added a polar-tilt dropdown
+  (`penetration_angle_ui`) driving both the survival-vs-depth chart and the
+  single-track view; the geometry sweep now uses 15 deg spacing
+  (`tilt_span=75, n_tilts=11`) so the default (15 deg) lands exactly on the grid.
+- **Intrinsic spectra without brem + adjustable x-limits + lin/log y.**
+  `altair_spectra.spectrum_chart` already supported `include_brem=False`; added
+  `x_domain=`/`y_type=` params and wired a brem-toggle checkbox, x-min/x-max
+  number inputs, and a log-y switch in the Intrinsic-spectra tab. The same
+  `x_domain` also threads through to `timepix_detected_chart` /
+  `eaglexo_detected_chart` (the other two spectral, energy-vs-intensity views).
+- **Finalize transition to `scan_app.py` (material selection).** Was hardcoded
+  `MATERIAL = "hopg"`; replaced with a `mo.ui.dropdown` over `config.MATERIALS`.
+  Also dropped the leftover `IPython.display` import/call (marimo renders a
+  cell's bare last expression directly).
+- **Fixed heatmap plot size + few-decimal tick labels.** `altair_sweeps.heatmap_chart`
+  sized each panel as `cell * n_distinct_values`, so a dense sweep (e.g. a
+  25/40-tilt grid) grew the chart rather than shrinking the cells -- switched to
+  a fixed `width`/`height` per panel (Vega-Lite auto-divides the ordinal range).
+  Added `axis=alt.Axis(format=".3~g")` to the heatmap x/y and `metric_vs_chart`
+  axes so float sweep values (e.g. `-33.300000000000004`) render as short
+  tick labels.
 
-**NOTE:** If the user has written a detailed item summary directly into `TODO.md` on
-main, fold it into a branch (steps 1-2 above), then slim it back to a one-line summary
-on `main` once the branch exists.
+## Deferred / follow-ups spotted but out of scope
 
+<<<<<<< HEAD
 ## P1 - high value (physics accuracy + publication validation)
 
 1. **Crystal mosaicity - measured-data validation.** MC route implemented; validate
@@ -53,17 +81,13 @@ on `main` once the branch exists.
 ## P3 - lower / exploratory
 
 1. **Marimo/Altair follow-ups.** Core migration landed from `feature/marimo-transfer`;
-   remaining notebook/plot fixes:
-   - Enforce fixed plot size for heatmaps (they expand with axis sizes).
-   - Enforce few-decimal-point axis tick labels (heatmaps worst offenders).
-   - Angle selector for penetration plots (trajectories + mean population vs depth);
-     default to a low nonzero polar angle (~15 deg).
-   - Intrinsic-spectra plot of CXR emission without the incoherent brem background;
-     user-adjustable x-axis limits on both spectral plots; lin/log y switch.
-   - Fix blank detector-tab plots.
-   - Fix penetration plots for multilayer/stacked materials: show trajectories and
-     population-vs-depth through the full stack, not just the top layers (mos2).
-   - Finalize transition to `scan_app.py` (can't select a material, among other issues).
+   `feature/marimo-altair-followups` closed out the remaining fixes (blank detector
+   tabs, mos2 multilayer penetration, angle selector, intrinsic-spectra controls,
+   heatmap sizing/ticks, `scan_app.py` material dropdown). Two small deferred items:
+   - `eaglexo_charge_chart` doesn't yet take `x_domain=` (only the two
+     detected-vs-incident charts do).
+   - The dense penetration-grid accordion (matplotlib, Penetration tab) is still
+     fixed at `energy=30` regardless of the angle selector above it.
 2. **Grazing-incidence soft X-ray diffraction grating.** -> `feature/grazing-grating`.
    Dispersion scaffold implemented; next is grating reflectivity + detected-image model.
 3. **`remote.py start --follow` hang.** Launches the task but hangs afterward and never
@@ -75,3 +99,9 @@ on `main` once the branch exists.
 
 1. `Geant4` or similar integration to support high-energy electron beams
 2. Add support for `Numba with CUDA` to significantly speed up calcs
+=======
+- `eaglexo_charge_chart` doesn't yet take `x_domain=` (only the two
+  detected-vs-incident charts do).
+- The dense penetration-grid accordion (matplotlib, in the Penetration tab) is
+  still fixed at `energy=30` regardless of the angle selector above it.
+>>>>>>> feature/marimo-altair-followups

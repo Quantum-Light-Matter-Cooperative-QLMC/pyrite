@@ -7,18 +7,17 @@ app = marimo.App()
 @app.cell
 def _():
     import marimo as mo
-    from IPython.display import display
 
-    from cxr_mc.config import COLLAPSE_AZIMUTH, default_settings, material_sweep
+    from cxr_mc.config import COLLAPSE_AZIMUTH, MATERIALS, default_settings, material_sweep
     from cxr_mc.plots import stream_chunk
     from cxr_mc.run import run_sweep
     from cxr_mc.sweep import build_cases, geometry_table
 
     return (
         COLLAPSE_AZIMUTH,
+        MATERIALS,
         build_cases,
         default_settings,
-        display,
         geometry_table,
         material_sweep,
         mo,
@@ -37,26 +36,36 @@ def _(mo):
     notebook loads that checkpoint and draws every figure — keeping the long scan
     and the (re-runnable) plotting in separate kernels.
 
-    Set `MATERIAL` below, then run top to bottom. Every material's sweep grid lives
-    in `src/cxr_mc/config.py`, shared with the analysis notebook so the two never
-    drift.
+    Pick a material below, then run top to bottom. Every material's sweep grid
+    lives in `src/cxr_mc/config.py`, shared with the analysis notebook so the two
+    never drift.
     """)
     return
 
 
 @app.cell
-def _(build_cases, default_settings, display, geometry_table, material_sweep):
-    # Material: "hopg" | "diamond" | "silicon" | "mose2" | "wse2" | "ptse2"
-    #         | "hfse2" | "zrse2" | "ws2" | "mos2"
-    MATERIAL = "hopg"
+def _(MATERIALS, mo):
+    material_ui = mo.ui.dropdown(list(MATERIALS), value="hopg", label="Material to scan")
+    material_ui
+    return (material_ui,)
+
+
+@app.cell
+def _(build_cases, default_settings, geometry_table, material_sweep, material_ui):
+    MATERIAL = material_ui.value
 
     settings = default_settings()
     sweep = material_sweep(MATERIAL)  # full parametric grid (src/cxr_mc/config.py)
 
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
     print(f"{len(cases)} cases across {len({c['name'] for c in cases})} configs")
-    display(geometry_table(cases))
     return MATERIAL, cases, settings
+
+
+@app.cell
+def _(cases, geometry_table):
+    geometry_table(cases)
+    return
 
 
 @app.cell

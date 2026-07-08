@@ -3,6 +3,8 @@
 Electron-trajectory and penetration/survival figures.
 """
 
+from typing import Any
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -67,29 +69,41 @@ def _beam_detector_basis(beam, n_hat):
     return e1, perp / np.linalg.norm(perp)
 
 
-def _trajectory_data(case, Ne, seed):
+def _trajectory_data(case, Ne, seed) -> dict[str, Any]:
     """Simulate one case and project the cascade into the beam-detector plane.
     Returns 2D segment endpoints (M,2,2) in display units, per-segment energy/age/
     depth, the slab + detector unit vectors in that plane, and the back/through
-    fractions."""
+    fractions.
+
+    Multilayer/stacked materials (``case["abs_layers"]`` set -- film-on-substrate,
+    e.g. mos2-on-sapphire) are transported through the FULL stack via
+    ``layers=abs_layers``, matching the spectrum runner (`montecarlo.runner`);
+    without this the electron cascade (and hence the trajectory/penetration
+    plots) only ever saw the top film layer, silently dropping the substrate's
+    backscatter contribution and reporting only the film's thickness."""
     beam, n_hat = tilted_geometry(
         case["theta_obs_rad"],
         np.deg2rad(case.get("tilt_deg", 0.0)),
         np.deg2rad(case.get("tilt_azim_deg", 0.0)),
     )
+    abs_layers = case.get("abs_layers")
+    total_thickness_ang = (
+        float(abs_layers[-1][1]) if abs_layers is not None else case["thickness_ang"]
+    )
     segs = simulate_trajectories(
         case["E0_keV"],
         Ne,
-        case["thickness_ang"],
+        total_thickness_ang,
         composition=case["composition"],
         E_cut_keV=case.get("E_cut_lines_keV", 5.0),
         seed=seed,
         beam_dir=beam,
+        layers=abs_layers,
     )
     e1, e2 = _beam_detector_basis(beam, n_hat)
     L, v, r = segs["L_ang"], segs["v_hat"], segs["r_mid"]
     start = r - 0.5 * L[:, None] * v
-    u, ulab = (1e4, r"$\mu$m") if case["thickness_ang"] >= 1e4 else (10.0, "nm")
+    u, ulab = (1e4, r"$\mu$m") if total_thickness_ang >= 1e4 else (10.0, "nm")
 
     # Continuous per-electron tracks (not a loose segment cloud): order segments by
     # (electron, age) so each electron's segment START points form a polyline --
@@ -126,7 +140,14 @@ def _trajectory_data(case, Ne, seed):
         nslab=nslab,
         u=u,
         ulab=ulab,
-        thick=case["thickness_ang"] / u,
+        thick=total_thickness_ang / u,
+        # internal layer boundaries (display units), excluding the final z_bot
+        # (== thick, already the slab's back face) -- empty for a single slab.
+        layer_bounds=(
+            [float(z_bot) / u for (_, z_bot, _) in abs_layers[:-1]]
+            if abs_layers is not None
+            else []
+        ),
         eta=100.0 * segs["n_backscattered"] / segs["Ne"],
         thru=100.0 * segs["n_transmitted"] / segs["Ne"],
         Ne=segs["Ne"],
@@ -206,6 +227,19 @@ def _draw_trajectory_panel(
     W = 6.0 * max(xhi - xlo, yhi - ylo)
     slab = np.array([-W * tang, W * tang, W * tang + thick * nslab, -W * tang + thick * nslab])
     ax.fill(slab[:, 0], slab[:, 1], facecolor="0.80", edgecolor="0.55", lw=1.0, zorder=1)
+    # internal layer boundaries (film-on-substrate stacks, e.g. mos2 on sapphire):
+    # a thin line at each interior interface so the substrate is visually distinct
+    # from the film, without a second fill colour per layer.
+    for zb in data.get("layer_bounds", ()):
+        c = zb * nslab
+        ax.plot(
+            [-W * tang[0] + c[0], W * tang[0] + c[0]],
+            [-W * tang[1] + c[1], W * tang[1] + c[1]],
+            color="0.45",
+            lw=0.8,
+            ls="--",
+            zorder=1,
+        )
 
     # continuous NaN-separated per-electron tracks -> datashader raster, colour =
     # electron energy (ds.max keeps it crisp under the line-width antialiasing)

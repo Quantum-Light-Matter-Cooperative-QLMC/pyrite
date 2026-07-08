@@ -138,9 +138,46 @@ def _(mo, records, res):
 
 
 @app.cell
+def _(mo):
+    # Spectral-plot controls: CXR-only (no brem background) toggle, adjustable
+    # x-axis (photon energy) limits, and a lin/log y switch -- shared by the
+    # intrinsic-spectra chart and the Timepix3 detected-vs-incident chart (the
+    # two line-per-energy spectral views). Leave x-limits at 0 for autoscale.
+    brem_ui = mo.ui.checkbox(value=True, label="show brem background")
+    xmin_ui = mo.ui.number(value=0.0, label="x-min (eV, 0 = auto)")
+    xmax_ui = mo.ui.number(value=0.0, label="x-max (eV, 0 = auto)")
+    ylog_ui = mo.ui.switch(value=False, label="log y")
+    mo.hstack([brem_ui, xmin_ui, xmax_ui, ylog_ui])
+    return brem_ui, xmax_ui, xmin_ui, ylog_ui
+
+
+@app.cell
+def _(xmax_ui, xmin_ui):
+    # (0, 0) -> None (autoscale); otherwise an explicit (lo, hi) domain.
+    x_domain = (xmin_ui.value, xmax_ui.value) if (xmin_ui.value or xmax_ui.value) else None
+    return (x_domain,)
+
+
+@app.cell
+def _(mo):
+    # Polar-angle selector for the Penetration tab (trajectories + survival vs
+    # depth) -- 15 deg spacing so the grid lands exactly on a low, nonzero
+    # default (grazing-free but still off-normal, where the electron cascade's
+    # asymmetry actually shows). Options mirror trajectory_sweep(tilt_span=75,
+    # n_tilts=11) below: -75..75 in steps of 15.
+    _tilts = list(range(-75, 76, 15))
+    penetration_angle_ui = mo.ui.dropdown(
+        {f"{t:g} deg": float(t) for t in _tilts}, value="15 deg", label="polar tilt (penetration)"
+    )
+    penetration_angle_ui
+    return (penetration_angle_ui,)
+
+
+@app.cell
 def _(
     MATERIAL,
     MATERIAL_LABELS,
+    brem_ui,
     build_cases,
     cases,
     eaglexo_charge_chart,
@@ -148,6 +185,7 @@ def _(
     load_checkpoint,
     metric_vs_chart,
     mo,
+    penetration_angle_ui,
     penetration_survival_chart,
     plot_best_spectra,
     plot_eaglexo_charge_map,
@@ -165,6 +203,8 @@ def _(
     top_geometries,
     trajectory_chart,
     trajectory_sweep,
+    x_domain,
+    ylog_ui,
 ):
     # All figures live in one lazy, tabbed layout. Each tab value is a zero-arg
     # builder closure (not a pre-built object), so `lazy=True` defers the *compute*
@@ -197,10 +237,19 @@ def _(
 
     def _spectra_tab():
         _md = mo.md(
-            "The coherent line spectrum at the selected polar tilt, one line per "
-            "beam energy (brem as a faint dashed underlay). Pan/zoom in the chart."
+            "The INTRINSIC coherent CXR line spectrum at the selected polar tilt, "
+            "one line per beam energy; toggle the brem background off above for "
+            "the CXR-only view. Pan/zoom in the chart, or set explicit x-limits "
+            "and switch to log y with the controls above."
         )
-        _chart = spectrum_chart(res, settings, tilt_deg=_tilt)
+        _chart = spectrum_chart(
+            res,
+            settings,
+            tilt_deg=_tilt,
+            include_brem=brem_ui.value,
+            x_domain=x_domain,
+            y_type="log" if ylog_ui.value else "linear",
+        )
         return mo.vstack(
             [_md, _chart if _chart is not None else mo.md("*No spectra — run the scan first.*")]
         )
@@ -240,17 +289,21 @@ def _(
         )
 
     def _detectors_tab():
-        # Eagle XO and Timepix3 are nested sub-tabs (lazy=True) rather than a
-        # dropdown: a mo.ui.dropdown created inside a lazy builder isn't in
-        # marimo's reactive DAG, so it can't drive re-renders. Nested tabs manage
-        # their own state and defer each detector's compute until selected.
+        # Eagle XO and Timepix3 render into a nested mo.accordion (lazy=True)
+        # rather than a dropdown or nested mo.ui.tabs: a mo.ui.dropdown created
+        # inside a lazy builder isn't in marimo's reactive DAG, so it can't drive
+        # re-renders, and nested mo.ui.tabs-in-tabs is a known marimo rendering
+        # bug (charts inside the inner tab silently render blank -- this is what
+        # produced the "blank detector-tab plots" bug: marimo-team/marimo#6919).
+        # An accordion lazily defers each section's compute exactly like the
+        # inner tabs did, without the nesting problem.
         def _eaglexo_inner():
             _md = mo.md(
                 "Raptor Eagle XO direct-detection CCD (`solid_angle x QE(E)`): soft PXR "
                 "lines pass at ~90% QE, hard brem is crushed by the thin sensor. "
                 "Photon density (detected vs incident), then recorded-charge density."
             )
-            _detected = eaglexo_detected_chart(res, settings, tilt_deg=_tilt)
+            _detected = eaglexo_detected_chart(res, settings, tilt_deg=_tilt, x_domain=x_domain)
             _charge = eaglexo_charge_chart(res, settings, tilt_deg=_tilt)
             _parts = [_md, *(c for c in (_detected, _charge) if c is not None)]
             _parts.append(
@@ -275,7 +328,7 @@ def _(
                 "Si quad forward model: photoabsorption → charge sharing → per-pixel "
                 "threshold counting. Detected vs incident at the selected tilt."
             )
-            _detected = timepix_detected_chart(res, settings, tilt_deg=_tilt)
+            _detected = timepix_detected_chart(res, settings, tilt_deg=_tilt, x_domain=x_domain)
             _parts = [_md, *([_detected] if _detected is not None else [])]
             _parts.append(
                 mo.accordion(
@@ -289,22 +342,26 @@ def _(
             )
             return mo.vstack(_parts)
 
-        return mo.ui.tabs({"Eagle XO": _eaglexo_inner, "Timepix3": _timepix_inner}, lazy=True)
+        return mo.accordion({"Eagle XO": _eaglexo_inner, "Timepix3": _timepix_inner}, lazy=True)
 
     def _penetration_tab():
         _md = mo.md(
             "Surviving-electron fraction vs depth (one curve per beam energy) and "
-            "an interactive low-Ne track cross-section. These run the cheap CPU-only "
-            "transport directly — no checkpoint needed. Dense grid loads on expand."
+            "an interactive low-Ne track cross-section, at the polar tilt selected "
+            "above (default 15°, a low nonzero angle -- avoids both the fully-"
+            "normal and grazing-incidence edge cases). These run the cheap CPU-only "
+            "transport directly — no checkpoint needed. For a stacked/multilayer "
+            "material (e.g. mos2 on sapphire) the cascade is transported through "
+            "the FULL stack, not just the top film. Dense grid loads on expand."
         )
-        _sweep = trajectory_sweep(MATERIAL, n_tilts=9, energies=(30, 60))
+        _angle = penetration_angle_ui.value
+        _sweep = trajectory_sweep(MATERIAL, n_tilts=11, tilt_span=75.0, energies=(30, 60))
         _traj = build_cases(_sweep, settings.n_electrons, settings.n_electrons_brem)
         if not _traj:
             return mo.vstack([_md, mo.md("*No trajectory cases.*")])
-        _survival = penetration_survival_chart(_traj, Ne=500)
-        # Pick closest to normal incidence at the lowest energy: grazing cases
-        # produce near-invisible horizontal tracks in the beam-detector frame.
-        _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"]), c["E0_keV"]))
+        _survival = penetration_survival_chart(_traj, Ne=500, tilt=_angle)
+        # Pick the lowest energy at the selected tilt for the single-track view.
+        _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
         _track = trajectory_chart(_nc, Ne=40)
         _parts = [_md, *(p for p in (_survival, _track) if p is not None)]
         _parts.append(

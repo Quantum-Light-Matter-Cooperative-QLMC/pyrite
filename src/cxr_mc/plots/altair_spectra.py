@@ -100,15 +100,21 @@ def spectrum_chart(
     tilt_deg=None,
     include_brem=True,
     collapse_azimuth=True,
+    x_domain=None,
+    y_type="linear",
     width=720,
     height=360,
 ):
     """Interactive Altair line chart of the INTRINSIC spectra at ONE polar tilt,
-    one line per beam energy (brem drawn as a faint dashed underlay). The Altair
-    counterpart of :func:`cxr_mc.plots.plot_by_energy` / ``browse(kind="by_energy")``
-    -- same data prep, Vega-Lite renderer with pan/zoom. Pass ``tilt_deg`` to pick a
-    tilt (default: the lowest present). Returns an :class:`altair.Chart`, or
-    ``None`` when there are no records."""
+    one line per beam energy (brem drawn as a faint dashed underlay, omitted
+    entirely when ``include_brem=False`` -- the CXR-only view with no
+    incoherent bremsstrahlung background). The Altair counterpart of
+    :func:`cxr_mc.plots.plot_by_energy` / ``browse(kind="by_energy")`` -- same
+    data prep, Vega-Lite renderer with pan/zoom. Pass ``tilt_deg`` to pick a
+    tilt (default: the lowest present); ``x_domain=(lo, hi)`` fixes the photon
+    -energy axis limits (default: autoscale to the data); ``y_type`` is
+    ``"linear"`` or ``"log"``. Returns an :class:`altair.Chart`, or ``None``
+    when there are no records."""
     recs = _tilt_records(results, tilt_deg)
     if not recs:
         return None
@@ -119,10 +125,12 @@ def spectrum_chart(
         return None
 
     title = _case_title(recs[0]["case"], "intrinsic", latex=False)
+    x_scale = alt.Scale(domain=list(x_domain)) if x_domain is not None else alt.Undefined
+    y_scale = alt.Scale(type=y_type)  # type: ignore[arg-type]
 
     base = alt.Chart(df).encode(
-        x=alt.X("energy_eV:Q", title="Photon energy (eV)"),
-        y=alt.Y("intensity:Q", title="Intensity (Phs/eV/s/nA)"),
+        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
+        y=alt.Y("intensity:Q", title="Intensity (Phs/eV/s/nA)", scale=y_scale),
         color=alt.Color("E0_keV:N", title="beam energy (keV)"),
         tooltip=["E0_keV:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )

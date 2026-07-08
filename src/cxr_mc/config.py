@@ -238,10 +238,21 @@ def trajectory_sweep(material: str, *, n_tilts=9, energies=(30, 60), tilt_span=8
     material's thickness array if it is a sweep (e.g. HOPG), or the scalar
     itself. This avoids inheriting a 40-element thickness loop that would (a)
     make penetration_survival_chart silently pick the thinnest slab and (b)
-    make trajectory_chart plot nearly-invisible grazing tracks."""
+    make trajectory_chart plot nearly-invisible grazing tracks.
+
+    Carries the material's ``substrate``/``stack`` through (when present) so a
+    film-on-substrate material (e.g. mos2 on sapphire) gets its ``abs_layers``
+    stack here too -- without this the penetration figures silently transported
+    electrons through the free-standing film only, never reaching the
+    substrate, even though the spectrum runner always sees the full stack."""
     p = material_grid(material)
     thick_arr = np.atleast_1d(np.asarray(p["thickness_ang"], dtype=float))
     thick = float(thick_arr[len(thick_arr) // 2])
+    stack_kwargs = {}
+    if "stack" in p:
+        stack_kwargs["stack"] = p["stack"]
+    elif "substrate" in p:
+        stack_kwargs["substrate"] = p["substrate"]
     return Sweep(
         material=_STACK_FILMS.get(material, material),  # named stacks: the film
         thickness_ang=thick,
@@ -251,4 +262,5 @@ def trajectory_sweep(material: str, *, n_tilts=9, energies=(30, 60), tilt_span=8
         theta_obs_deg=90.0,
         E_grid_line=p["E_grid_line"],
         E_grid_brem=p["E_grid_brem"],
+        **stack_kwargs,
     )
