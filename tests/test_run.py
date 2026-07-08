@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 
+from cxr_mc import _checkpoint_io
 from cxr_mc.run import (
     _checkpoint_save,
     cases_from_results,
@@ -100,8 +101,14 @@ def test_checkpoint_save_roundtrips(tmp_path):
     rec = {"cfg_a": {30.0: {"case": {"crystal": "hopg"}, "spec": np.array([1.0])}}}
     ckpt = tmp_path / "hopg.pkl"
     _checkpoint_save(str(ckpt), rec)
-    with open(ckpt, "rb") as f:
-        assert set(pickle.load(f)) == {"cfg_a"}
+    assert set(_checkpoint_io.load(str(ckpt))) == {"cfg_a"}
+
+
+def test_checkpoint_save_is_gzip_compressed(tmp_path):
+    """TODO P2 #8: checkpoints are written gzip-compressed, not as plain pickles."""
+    ckpt = tmp_path / "hopg.pkl"
+    _checkpoint_save(str(ckpt), {"cfg_a": {30.0: {"case": {}, "spec": np.ones(1000)}}})
+    assert ckpt.read_bytes()[:2] == b"\x1f\x8b"
 
 
 def test_checkpoint_save_is_atomic(tmp_path):
@@ -110,8 +117,7 @@ def test_checkpoint_save_is_atomic(tmp_path):
     _checkpoint_save(str(ckpt), {"old": 1})
     _checkpoint_save(str(ckpt), {"new": 2})
     assert not (tmp_path / "hopg.pkl.tmp").exists()
-    with open(ckpt, "rb") as f:
-        assert pickle.load(f) == {"new": 2}
+    assert _checkpoint_io.load(str(ckpt)) == {"new": 2}
 
 
 # ---------------------------------------------------------------------------
@@ -176,8 +182,7 @@ def test_run_sweep_writes_checkpoint(tmp_path, monkeypatch):
     run_sweep([_fake_case("cfg_a", 30.0)], {}, checkpoint_dir=str(tmp_path), progress=False)
     ckpt = tmp_path / "hopg.pkl"
     assert ckpt.exists()
-    with open(ckpt, "rb") as f:
-        saved = pickle.load(f)
+    saved = _checkpoint_io.load(str(ckpt))
     assert "cfg_a" in saved
 
 

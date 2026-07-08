@@ -23,12 +23,12 @@ context); see montecarlo.run_cases.
 """
 
 import os
-import pickle
 import time
 from collections import defaultdict
 from functools import partial
 from pathlib import Path
 
+from . import _checkpoint_io
 from .montecarlo import run_cases
 from .results import store_result
 
@@ -43,10 +43,11 @@ def checkpoint_path_for(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
 
 
 def _checkpoint_save(checkpoint_path, results):
-    """Atomically pickle ``results`` to ``checkpoint_path``: write a sibling
-    ``.<pid>.tmp`` then ``os.replace`` it into place. The replace is atomic on a
-    single filesystem, so a crash/OOM mid-write never leaves a half-written
-    ``.pkl`` -- the old checkpoint survives intact and the run stays resumable.
+    """Atomically gzip-pickle ``results`` to ``checkpoint_path`` (see
+    :mod:`cxr_mc._checkpoint_io`, TODO P2 #8): write a sibling ``.<pid>.tmp``
+    then ``os.replace`` it into place. The replace is atomic on a single
+    filesystem, so a crash/OOM mid-write never leaves a half-written ``.pkl``
+    -- the old checkpoint survives intact and the run stays resumable.
 
     The pid in the temp name keeps two processes writing the *same* checkpoint
     from sharing one ``.tmp``: with a fixed name they clobber each other's temp
@@ -56,8 +57,7 @@ def _checkpoint_save(checkpoint_path, results):
     Shared by :func:`run_sweep` (per-config crash-safe saves) and
     :func:`repair_checkpoint`."""
     tmp = f"{checkpoint_path}.{os.getpid()}.tmp"
-    with open(tmp, "wb") as f:
-        pickle.dump(results, f)
+    _checkpoint_io.dump(results, tmp)
     os.replace(tmp, checkpoint_path)
 
 
@@ -75,8 +75,7 @@ def load_checkpoint(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
     if not os.path.exists(path):
         print(f"no checkpoint at {path} -- run notebooks/scan.ipynb for {material!r} first")
         return {}
-    with open(path, "rb") as f:
-        results = pickle.load(f)
+    results = _checkpoint_io.load(path)
     n = sum(len(v) for v in results.values())
     print(f"loaded {n} {material} records from {path}")
     return results
@@ -149,8 +148,7 @@ def run_sweep(
         _checkpoint_save(checkpoint_path, subset)
 
     if resume and os.path.exists(checkpoint_path):
-        with open(checkpoint_path, "rb") as f:
-            loaded = pickle.load(f)
+        loaded = _checkpoint_io.load(checkpoint_path)
         results.update(loaded)
         print(
             f"resumed {sum(len(v) for v in loaded.values())} {material} cases from {checkpoint_path}"
@@ -293,8 +291,7 @@ def repair_checkpoint(checkpoint_path, save_every=100, **kw):
     if not os.path.exists(checkpoint_path):
         print(f"no such checkpoint: {checkpoint_path}")
         return {}
-    with open(checkpoint_path, "rb") as f:
-        results = pickle.load(f)
+    results = _checkpoint_io.load(checkpoint_path)
 
     save_cb = partial(_checkpoint_save, checkpoint_path)  # atomic; resumable on crash
     n = repair_brem_wide(results, save_every=save_every, save_cb=save_cb, **kw)
