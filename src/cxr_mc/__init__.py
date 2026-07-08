@@ -9,6 +9,8 @@ explicitly, e.g. ``from cxr_mc import crystallography`` or
 See the README for the scientific overview and CLAUDE.md for working conventions.
 """
 
+import logging
+import os
 from pathlib import Path
 
 __version__ = "0.1.0"
@@ -17,5 +19,20 @@ __version__ = "0.1.0"
 # eaglexo_qe.csv, legacy atomic_scattering_factors/). Resolved relative to this
 # file so it works installed (wheel) or from a source checkout.
 DATA_DIR = Path(__file__).parent / "data"
+
+# Package logger. Library convention: attach a NullHandler so a plain `import
+# cxr_mc` (and every `cxr` CLI invocation, incl. each ProcessPoolExecutor
+# worker in montecarlo.runner) stays silent -- submodules log routine
+# noise (GPU/CPU backend probe, per-element Mott-table fallback) at DEBUG,
+# which propagates nowhere by default. Set CXR_MC_DEBUG=1 to see it: this
+# attaches our own StreamHandler at DEBUG on just the "cxr_mc" logger,
+# without touching the caller's root logging config.
+logger = logging.getLogger("cxr_mc")
+logger.addHandler(logging.NullHandler())
+if os.environ.get("CXR_MC_DEBUG"):
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(name)s: %(message)s"))
+    logger.addHandler(_handler)
+    logger.setLevel(logging.DEBUG)
 
 __all__ = ["DATA_DIR", "__version__"]

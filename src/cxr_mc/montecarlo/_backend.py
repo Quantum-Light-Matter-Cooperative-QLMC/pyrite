@@ -3,15 +3,21 @@ montecarlo._backend
 
 Array backend selection (GPU via CuPy, else CPU NumPy) shared by every
 montecarlo submodule. Importing this module performs the one-time device
-probe and prints the GPU/CPU banner; ``xp`` is the active array module
-(``cupy`` or ``numpy``), ``cp`` is CuPy or ``None`` on a CPU box, ``REAL`` is
-the on-device spectrum precision, and ``_to_cpu`` moves arrays back to NumPy.
+probe and logs the GPU/CPU banner at DEBUG (silent by default -- see
+``cxr_mc.__init__`` / set ``CXR_MC_DEBUG=1`` to see it, incl. once per
+``ProcessPoolExecutor`` worker in ``montecarlo.runner``); ``xp`` is the
+active array module (``cupy`` or ``numpy``), ``cp`` is CuPy or ``None`` on a
+CPU box, ``REAL`` is the on-device spectrum precision, and ``_to_cpu`` moves
+arrays back to NumPy.
 """
 
+import logging
 import os
 import warnings
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 try:
     # cupy-cuda* imports cleanly even with no usable CUDA runtime (e.g. on the
@@ -30,12 +36,12 @@ try:
         raise RuntimeError("no CUDA device")
     _GPU = True
     xp = cp
-    print("Using GPU")
+    logger.debug("Using GPU")
 except Exception:
     _GPU = False
     cp = None  # so submodules can `from ._backend import cp` on a CPU box
     xp = np
-    print("No GPU found, or cupy not installed!\nFalling back to CPU execution.")
+    logger.debug("No GPU found, or cupy not installed! Falling back to CPU execution.")
 
 # On-GPU spectrum precision. Consumer GPUs run fp64 at 1/32-1/64 of their fp32
 # rate, so the big sinc/brem matmuls dominate -- single precision ~halves their

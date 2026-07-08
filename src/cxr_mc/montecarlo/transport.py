@@ -8,6 +8,7 @@ vectorized event-driven trajectory simulator. Pure NumPy -- never touches the
 GPU; the spectrum phase consumes the segment arrays it returns.
 """
 
+import logging
 import os
 from functools import cache
 
@@ -15,6 +16,8 @@ import numpy as np
 
 from .. import DATA_DIR
 from .materials import _normalize_composition
+
+logger = logging.getLogger(__name__)
 
 MOTT_DIR = str(DATA_DIR / "mott_transport_cross_sections")
 A0_SQ_CM2 = 2.8002852e-17  # Bohr radius squared [cm^2] (NIST SRD 64 unit)
@@ -131,15 +134,19 @@ def _sample_cos_theta(Z, E_keV, rng, elastic_model, element):
     NIST Mott transport table exists for `element` (e.g. W), fall back to the
     analytic screened-Rutherford screening for that element. The miss is cached
     in _NO_MOTT so we don't re-stat the filesystem every transport step
-    (lru_cache doesn't cache the FileNotFoundError); warned once."""
+    (lru_cache doesn't cache the FileNotFoundError); logged once per element
+    per process at DEBUG (silent by default -- set CXR_MC_DEBUG=1 to see it;
+    a ProcessPoolExecutor worker pool re-logs once per worker, since each
+    worker gets its own _NO_MOTT cache)."""
     if elastic_model == "mott" and element not in _NO_MOTT:
         try:
             logE, logA = _mott_alpha_table(element, Z)
             alpha = 10.0 ** np.interp(np.log10(E_keV * 1e3), logE, logA)
         except FileNotFoundError:
-            print(
-                f"transport: no Mott transport table for {element!r}; using "
-                f"the analytic screened-Rutherford screening for it instead."
+            logger.debug(
+                "transport: no Mott transport table for %r; using "
+                "the analytic screened-Rutherford screening for it instead.",
+                element,
             )
             _NO_MOTT.add(element)
             alpha = _alpha_sr_joy(Z, E_keV)

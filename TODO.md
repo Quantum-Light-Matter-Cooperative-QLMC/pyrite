@@ -66,12 +66,9 @@ on `main` once the branch exists.
    - Finalize transition to `scan_app.py` (can't select a material, among other issues).
 2. **Grazing-incidence soft X-ray diffraction grating.** -> `feature/grazing-grating`.
    Dispersion scaffold implemented; next is grating reflectivity + detected-image model.
-3. **CLI/remote output noise.** Silence the import-time "No GPU found, or cupy not
-   installed!" banner on every `cxr` invocation and the repeated "no Mott transport
-   table for 'X'" warnings spammed by `dev/remote.py` runs.
-4. **`remote.py start --follow` hang.** Launches the task but hangs afterward and never
+3. **`remote.py start --follow` hang.** Launches the task but hangs afterward and never
    attaches the tqdm progress bar.
-5. **Git history cleanup.** Squash minor upkeep/doc commits; evaluate other repo
+4. **Git history cleanup.** Squash minor upkeep/doc commits; evaluate other repo
    structure/history improvements.
 
 ## Long term features

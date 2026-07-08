@@ -124,9 +124,10 @@ your PATH will **not** have the dependencies — always use `uv run python …`.
 the `cxr` console script is on the venv PATH (`uv run cxr --help`).
 
 **GPU is optional.** `cupy-cuda13x` (CUDA 13) is a dependency, but it imports
-cleanly even with no usable GPU and the code **falls back to CPU automatically**
-(you'll see `No GPU found … Falling back to CPU execution`). On a CUDA machine
-you'll see `Using GPU`. Set `CXR_FP64=1` to force double precision for
+cleanly even with no usable GPU and the code **falls back to CPU automatically**.
+The backend probe logs its result (`No GPU found … Falling back to CPU
+execution` or `Using GPU`) at DEBUG level, so it's silent by default; set
+`CXR_MC_DEBUG=1` to see it. Set `CXR_FP64=1` to force double precision for
 reference/validation runs (the GPU path defaults to fp32).
 
 Launch the notebooks with:
