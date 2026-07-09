@@ -16,6 +16,8 @@ __pycache__/
 *.pdf
 *.html
 
+worktrees/
+
 # Distribution / packaging
 .Python
 build/
