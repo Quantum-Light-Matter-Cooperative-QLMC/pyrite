@@ -176,6 +176,13 @@ def union_checkpoint(
     step's overwrite guard. The source archive is left intact by default; pass
     ``delete_archive=True`` to remove it once the union has landed. Returns the
     active-slot path.
+
+    If the pre-archive step's default label (``<stem>-<today>``) would collide
+    with the archive being unioned in, refuses outright -- even with ``force``
+    -- rather than letting the pre-union backup silently overwrite the very
+    archive the union is reading from (that archive is meant to be left intact
+    by default). Pass ``pre_archive=False`` to union same-day round-trips like
+    this, or archive the live checkpoint under an explicit label first.
     """
     live_path = os.path.join(root, f"{stem}.pkl")
     if not os.path.isfile(live_path):
@@ -183,6 +190,17 @@ def union_checkpoint(
     archive_path = os.path.join(_archive_dir(root), f"{label}.pkl")
     if not os.path.isfile(archive_path):
         raise SystemExit(f"no such archive: {archive_path}")
+
+    if pre_archive:
+        pre_archive_dst = os.path.join(_archive_dir(root), f"{_default_label(stem)}.pkl")
+        if os.path.abspath(pre_archive_dst) == os.path.abspath(archive_path):
+            raise SystemExit(
+                f"refusing to union: the pre-union backup would write to "
+                f"{ARCHIVE_SUBDIR}/{label}.pkl, which is the same archive being "
+                f"unioned in -- this would destroy it even with --force. Pass "
+                f"--no-archive to skip the pre-union backup, or archive the live "
+                f"checkpoint under a different label first"
+            )
 
     live = _checkpoint_io.load(live_path)
     archived = _checkpoint_io.load(archive_path)

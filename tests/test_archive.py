@@ -206,3 +206,32 @@ def test_union_missing_active_slot_errors(tmp_path):
     _write(tmp_path / "archive" / "snap.pkl", _material_store("hopg", ["cfgA"]))
     with pytest.raises(SystemExit, match="no such active checkpoint"):
         archive.union_checkpoint("hopg", "snap", root=str(tmp_path))
+
+
+def test_union_refuses_pre_archive_collision_with_source_even_with_force(tmp_path):
+    """If the union source archive happens to sit at the pre-archive step's
+    default label (e.g. a same-day round trip: archive this morning, union that
+    label back in this afternoon), the pre-archive step must not be allowed to
+    overwrite it -- not even with --force -- since that would silently destroy
+    the very archive the union is reading from while claiming (by leaving
+    delete_archive=False) to keep it intact."""
+    predate_label = archive._default_label("hopg")
+    _write(tmp_path / "hopg.pkl", _material_store("hopg", ["cfgA"]))
+    _write(tmp_path / "archive" / f"{predate_label}.pkl", _material_store("hopg", ["cfgB"]))
+
+    with pytest.raises(SystemExit, match="refusing to union"):
+        archive.union_checkpoint("hopg", predate_label, root=str(tmp_path))
+    with pytest.raises(SystemExit, match="refusing to union"):
+        archive.union_checkpoint("hopg", predate_label, force=True, root=str(tmp_path))
+
+    # refused before any mutation: both the active slot and the source archive
+    # are byte-for-byte untouched
+    live = _checkpoint_io.load(str(tmp_path / "hopg.pkl"))
+    assert set(live) == {"cfgA"}
+    archived = _checkpoint_io.load(str(tmp_path / "archive" / f"{predate_label}.pkl"))
+    assert set(archived) == {"cfgB"}
+
+    # --no-archive still lets the same union go through
+    archive.union_checkpoint("hopg", predate_label, pre_archive=False, root=str(tmp_path))
+    merged = _checkpoint_io.load(str(tmp_path / "hopg.pkl"))
+    assert set(merged) == {"cfgA", "cfgB"}
