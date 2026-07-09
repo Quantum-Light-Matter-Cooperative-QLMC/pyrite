@@ -13,10 +13,11 @@ EDS line width that dominates the soft-X-ray band today.
 
 ## Status
 
-`src/cxr_mc/grating.py` implements the **dispersion geometry** and the
-**grazing-incidence Fresnel reflectivity** of the grating's coating (the
-concrete, testable physics) as a standalone forward model — nothing in the
-sweep/plot pipeline imports it yet. Cross-checked in `tests/test_grating.py`.
+`src/cxr_mc/grating.py` implements the **dispersion geometry**, the
+**grazing-incidence Fresnel reflectivity** of the grating's coating, and now a
+**simple CCD pixel grid** (geometry-only rebinning, no QE/charge-sharing yet)
+as a standalone forward model — nothing in the sweep/plot pipeline imports it
+yet. Cross-checked in `tests/test_grating.py`.
 
 | provided | meaning |
 | --- | --- |
@@ -29,6 +30,8 @@ sweep/plot pipeline imports it yet. Cross-checked in `tests/test_grating.py`.
 | `Grating.throughput(E)` | `reflectivity(E) × groove_efficiency` (the latter a placeholder scalar, not a real groove-profile model) |
 | `disperse_spectrum(E, spec, grating, distance_mm, weight_by_throughput=False)` | **flux-conserving** map of a spectrum to detector position (`∫I dx = ∫spec dE`); optionally throughput-weighted |
 | `resolving_power(E, grating, distance_mm, pixel_mm)` | pixel-limited `λ/Δλ` |
+| `ALEXS_SENSORS` / `SimpleCCD.from_alexs(variant)` | greateyes ALEX-s `1k256`/`2k512` pixel-format registry + a fixed pixel grid built from it |
+| `bin_to_pixels(position_mm, intensity_per_mm, ccd, center_mm=None)` | rebin a dispersed profile onto `ccd`'s fixed pixels (each pixel integrates the polar-angle/position span it subtends); light outside the sensor is dropped |
 
 ## Physics and conventions
 
@@ -95,14 +98,19 @@ Real instrument, not a hypothetical, for the reflectivity/CCD phases below:
 
 ## What is NOT modelled yet (and why)
 
-Dispersion geometry and coating reflectivity are modelled; deliberately still
-out of scope:
+Dispersion geometry, coating reflectivity, and simple pixel binning are
+modelled; deliberately still out of scope:
 
 - **Groove-profile diffraction efficiency** vs energy and angle — the coating's
   Fresnel reflectivity is modelled (`Grating.reflectivity`), but the
   groove-profile efficiency factor is a placeholder scalar
   (`Grating.groove_efficiency`, default 1.0), not a real model. That needs a
   scalar or rigorous-coupled-wave (RCWA) treatment of the ruled profile.
+- **CCD detector physics** (QE(E), charge sharing, energy resolution, Poisson
+  acquisition noise) — `SimpleCCD`/`bin_to_pixels` only rebin the already-
+  computed flux onto a fixed pixel grid; every photon that lands within the
+  sensor's physical extent is "detected" with unit efficiency. See step 5
+  below for the planned upgrade path.
 - **Aberrations / focusing** (spherical or VLS gratings, Rowland circle) — the
   flat-detector `x = L tan(β − β_ref)` map ignores defocus and coma.
 - **Source size / beam divergence** — a real line image is the convolution of the
@@ -119,11 +127,11 @@ out of scope:
    `weight_by_throughput=True`. The groove-profile efficiency itself (vs.
    McPherson 251MX grating: 120/300/1200/2400 g/mm) is still a placeholder — see
    "What is NOT modelled yet".
-3. A **simple** CCD forward model: bin detected photons by the polar angle each
-   pixel subtends (no QE/charge-sharing structure yet), sized to the ALEX-s
-   1k256/2k512 pixel formats above. This is deliberately crude — it exists to get
-   the full grating→image pipeline working end-to-end before adding detector
-   physics.
+3. **(done)** A **simple** CCD forward model: bin detected photons by the polar
+   angle each pixel subtends (no QE/charge-sharing structure yet), sized to the
+   ALEX-s 1k256/2k512 pixel formats above (`ALEXS_SENSORS`, `SimpleCCD`,
+   `bin_to_pixels`). This is deliberately crude — it exists to get the full
+   grating→image pipeline working end-to-end before adding detector physics.
 4. A forward-model entry that takes the model's `mc_spectrum` output + a
    `Grating` + the simple CCD from step 3 and returns the **dispersed, detected
    image** (counts vs pixel), so it slots in beside the Timepix / Eagle XO models.
@@ -160,7 +168,9 @@ out of scope:
    panel; validate against a measured grating-spectrometer dataset when available
    (data-dependent, like P1's other gated items).
 
-Coating reflectivity (step 2) is done; groove-profile efficiency remains a
-placeholder scalar, so the throughput-weighted dispersed profile is closer to
-real flux than the purely geometric one but still not final until a
-groove-efficiency model lands (step 3+).
+Coating reflectivity (step 2) and simple pixel binning (step 3) are done;
+groove-profile efficiency remains a placeholder scalar, so the throughput-
+weighted dispersed profile is closer to real flux than the purely geometric
+one but still not final until a groove-efficiency model lands. Step 4 (a
+single forward-model entry combining `mc_spectrum` + `Grating` + `SimpleCCD`)
+is next.

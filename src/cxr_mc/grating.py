@@ -22,6 +22,10 @@ incidence Fresnel reflectivity of the coating is modelled (`Grating.reflectivity
 groove-profile diffraction efficiency is NOT -- `Grating.groove_efficiency` is a
 placeholder scalar (a rigorous scalar/RCWA treatment is future work, see
 docs/grazing-grating.md).
+
+`SimpleCCD` + `bin_to_pixels` (phased-plan step 3) rebin a dispersed profile
+onto a fixed pixel grid sized to the greateyes ALEX-s 1k256/2k512 formats --
+geometry only (no QE, charge-sharing, or energy resolution yet).
 """
 
 from dataclasses import dataclass
@@ -214,6 +218,90 @@ def disperse_spectrum(
     inten = np.where(np.abs(dxdE) > 0, spec / np.abs(dxdE), 0.0)
     inten[~np.isfinite(inten)] = 0.0
     return x, inten
+
+
+# ---- simple CCD: pixel binning of the dispersed profile (phased-plan step 3) --
+# greateyes ALEX-s, two interchangeable formats (docs/grazing-grating.md
+# "Hardware targets"). n_pix / pixel_um are along the DISPERSION axis (the
+# sensor's long axis); active_mm is (dispersion, cross-dispersion) extent,
+# included for reference only (this simple model is 1-D, along dispersion).
+ALEXS_SENSORS = {
+    "1k256": dict(n_pix=1024, pixel_um=26.0, active_mm=(26.6, 6.7)),
+    "2k512": dict(n_pix=2048, pixel_um=13.5, active_mm=(27.6, 6.9)),
+}
+
+
+@dataclass(frozen=True)
+class SimpleCCD:
+    """A geometry-only CCD pixel grid along the grating's dispersion axis.
+
+    n_pix : number of pixels along the dispersion direction.
+    pixel_mm : pixel pitch along the dispersion direction [mm].
+
+    Deliberately crude (phased-plan step 3, docs/grazing-grating.md): a fixed
+    array of equal-width bins with no QE, charge-sharing, or energy-resolution
+    structure -- that comes later (step 5). Use `bin_to_pixels` to rebin a
+    `disperse_spectrum` profile onto this grid.
+    """
+
+    n_pix: int
+    pixel_mm: float
+
+    @classmethod
+    def from_alexs(cls, variant):
+        """Build from a named greateyes ALEX-s format ("1k256" or "2k512")."""
+        if variant not in ALEXS_SENSORS:
+            raise KeyError(f"unknown ALEX-s variant {variant!r} (have {list(ALEXS_SENSORS)})")
+        s = ALEXS_SENSORS[variant]
+        return cls(n_pix=s["n_pix"], pixel_mm=s["pixel_um"] * 1.0e-3)
+
+    @property
+    def width_mm(self) -> float:
+        return self.n_pix * self.pixel_mm
+
+    def pixel_edges_mm(self, center_mm=0.0):
+        """The `n_pix + 1` pixel boundary positions [mm], centered on ``center_mm``."""
+        half = 0.5 * self.width_mm
+        return float(center_mm) + np.linspace(-half, half, self.n_pix + 1)
+
+    def pixel_centers_mm(self, center_mm=0.0):
+        edges = self.pixel_edges_mm(center_mm)
+        return 0.5 * (edges[:-1] + edges[1:])
+
+
+def bin_to_pixels(position_mm, intensity_per_mm, ccd, center_mm=None):
+    """Rebin a dispersed ``(position_mm, intensity_per_mm)`` profile (e.g. from
+    `disperse_spectrum`) onto ``ccd``'s fixed pixel grid.
+
+    Each pixel's value is the integral of ``intensity_per_mm`` across the
+    physical span (equivalently the polar-angle span, via the grating's flat-
+    detector map) that pixel subtends -- no QE or charge-sharing yet (that is
+    step 5; see docs/grazing-grating.md "What is NOT modelled yet"). The
+    integral is done on the cumulative-trapezoid of the (sorted) input curve,
+    interpolated at the pixel edges, so it is exact for a piecewise-linear
+    input and needs no assumption that ``position_mm`` already lies on a
+    uniform grid. Light landing outside the sensor's physical extent is
+    dropped, like any real finite detector -- so
+    ``sum(flux_per_pixel) <= trapz(intensity_per_mm, position_mm)``, with
+    equality when the whole dispersed profile fits within the sensor.
+
+    ``center_mm`` (default: the flux-weighted centroid of the input profile)
+    positions the fixed pixel grid relative to the dispersed light.
+
+    Returns ``(pixel_centers_mm, flux_per_pixel)``, both length ``ccd.n_pix``.
+    """
+    x = np.asarray(position_mm, dtype=float)
+    inten = np.asarray(intensity_per_mm, dtype=float)
+    order = np.argsort(x)
+    x, inten = x[order], inten[order]
+    if center_mm is None:
+        total = np.trapezoid(inten, x)
+        center_mm = float(np.trapezoid(inten * x, x) / total) if total > 0 else 0.0
+    edges = ccd.pixel_edges_mm(center_mm)
+    cum = np.concatenate([[0.0], np.cumsum(0.5 * (inten[1:] + inten[:-1]) * np.diff(x))])
+    cum_at_edges = np.interp(edges, x, cum, left=cum[0], right=cum[-1])
+    flux_per_pixel = np.diff(cum_at_edges)
+    return ccd.pixel_centers_mm(center_mm), flux_per_pixel
 
 
 def resolving_power(E_eV, grating, distance_mm, pixel_mm, beta_ref_rad=None):

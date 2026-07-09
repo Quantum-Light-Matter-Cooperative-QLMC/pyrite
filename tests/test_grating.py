@@ -5,7 +5,10 @@ import pytest
 
 from cxr_mc.crystallography import HC_EV_ANG, optical_constants
 from cxr_mc.grating import (
+    ALEXS_SENSORS,
     Grating,
+    SimpleCCD,
+    bin_to_pixels,
     coating_number_density_per_ang3,
     detector_position_mm,
     disperse_spectrum,
@@ -141,3 +144,70 @@ def test_throughput_wiring_reduces_flux_vs_raw_geometry():
     # spot check against a direct hand computation of the weighted integral
     expected_flux = np.trapezoid(spec * g.throughput(E), E)
     assert flux_thr == pytest.approx(expected_flux, rel=0.02)
+
+
+# ---- simple CCD pixel binning (docs/grazing-grating.md phased-plan step 3) ---
+
+
+def test_alexs_sensor_formats_match_datasheet_geometry():
+    # greateyes ALEX-s 1k256 / 2k512 (docs/grazing-grating.md "Hardware targets")
+    assert ALEXS_SENSORS["1k256"]["n_pix"] == 1024
+    assert ALEXS_SENSORS["1k256"]["pixel_um"] == pytest.approx(26.0)
+    assert ALEXS_SENSORS["2k512"]["n_pix"] == 2048
+    assert ALEXS_SENSORS["2k512"]["pixel_um"] == pytest.approx(13.5)
+
+
+def test_simple_ccd_from_alexs_geometry():
+    ccd = SimpleCCD.from_alexs("1k256")
+    assert ccd.n_pix == 1024
+    assert ccd.pixel_mm == pytest.approx(0.026)
+    assert ccd.width_mm == pytest.approx(1024 * 0.026)
+    edges = ccd.pixel_edges_mm(center_mm=0.0)
+    centers = ccd.pixel_centers_mm(center_mm=0.0)
+    assert edges.shape == (1025,)
+    assert centers.shape == (1024,)
+    assert edges[0] == pytest.approx(-ccd.width_mm / 2.0)
+    assert edges[-1] == pytest.approx(ccd.width_mm / 2.0)
+    assert centers[0] == pytest.approx(edges[0] + ccd.pixel_mm / 2.0)
+
+    with pytest.raises(KeyError):
+        SimpleCCD.from_alexs("not-a-real-variant")
+
+
+def test_bin_to_pixels_conserves_flux_when_fully_contained():
+    g = Grating(groove_density_per_mm=1200.0, alpha_rad=np.deg2rad(86.0), order=1)
+    E = np.arange(500.0, 1200.0, 1.0)
+    spec = np.exp(-0.5 * ((E - 850.0) / 6.0) ** 2)  # a line at 850 eV
+    x, inten = disperse_spectrum(E, spec, g, distance_mm=200.0)
+    # a CCD much wider than the dispersed band -> nothing falls off the edge
+    ccd = SimpleCCD(n_pix=2000, pixel_mm=0.05)
+    centers, flux = bin_to_pixels(x, inten, ccd)
+    order = np.argsort(x)
+    flux_expected = np.trapezoid(inten[order], x[order])
+    assert flux.sum() == pytest.approx(flux_expected, rel=0.02)
+    assert centers.shape == (2000,)
+    assert np.all(np.diff(centers) > 0)  # centers strictly increasing
+
+
+def test_bin_to_pixels_clips_light_outside_sensor():
+    g = Grating(groove_density_per_mm=1200.0, alpha_rad=np.deg2rad(86.0), order=1)
+    E = np.arange(500.0, 1200.0, 1.0)
+    spec = np.exp(-0.5 * ((E - 850.0) / 6.0) ** 2)
+    x, inten = disperse_spectrum(E, spec, g, distance_mm=200.0)
+    flux_full = np.trapezoid(inten[np.argsort(x)], x[np.argsort(x)])
+    # a CCD much narrower than the dispersed band -> most flux falls off the edge
+    ccd = SimpleCCD(n_pix=10, pixel_mm=0.001)
+    _, flux = bin_to_pixels(x, inten, ccd)
+    assert 0.0 < flux.sum() < flux_full
+
+
+def test_bin_to_pixels_localizes_narrow_line_to_few_pixels():
+    ccd = SimpleCCD.from_alexs("2k512")
+    # a narrow synthetic peak, already in position/intensity space
+    x = np.linspace(-1.0, 1.0, 2001)
+    inten = np.exp(-0.5 * (x / 0.01) ** 2)
+    _, flux = bin_to_pixels(x, inten, ccd)
+    assert flux.sum() > 0
+    # essentially all flux lands within a handful of pixels around the centroid
+    frac_in_top10 = np.sort(flux)[-10:].sum() / flux.sum()
+    assert frac_in_top10 > 0.99

@@ -21,6 +21,11 @@ reflectivity of the coating (`Grating.reflectivity`, `Grating.throughput`,
 diffraction efficiency (`Grating.groove_efficiency`) is still a placeholder
 scalar, not a real model.
 
+`src/cxr_mc/grating.py` also now implements a simple CCD pixel grid
+(`ALEXS_SENSORS`, `SimpleCCD`, `bin_to_pixels`) sized to the greateyes ALEX-s
+1k256/2k512 formats: geometry-only rebinning of a dispersed profile onto fixed
+pixels, no QE/charge-sharing/energy-resolution yet.
+
 **Remaining — real CCD + grating + geometry buildout (promoted to P1):**
 
 1. **(done)** Grating reflectivity `R(E,α)` (`crystallography.optical_constants`:
@@ -30,10 +35,11 @@ scalar, not a real model.
    251MX grating: 120/300/1200/2400 g/mm, ~87° incidence / <3° grazing,
    ~25 mm flat-field length) is still a placeholder scalar
    (`Grating.groove_efficiency`) pending a scalar/RCWA treatment.
-2. A **simple** CCD forward model first: bin detected photons by the polar angle
-   each pixel subtends (no QE/charge-sharing structure yet). Ground it in the
-   greateyes ALEX-s 1k256 (1024×255 px, 26 µm px, 26.6×6.7 mm) and ALEX-s 2k512
-   (2048×515 px, 13.5 µm px, 27.6×6.9 mm) formats.
+2. **(done)** A **simple** CCD forward model: bin detected photons by the polar
+   angle each pixel subtends (no QE/charge-sharing structure yet). Ground it in
+   the greateyes ALEX-s 1k256 (1024×255 px, 26 µm px, 26.6×6.7 mm) and ALEX-s
+   2k512 (2048×515 px, 13.5 µm px, 27.6×6.9 mm) formats
+   (`ALEXS_SENSORS`/`SimpleCCD`/`bin_to_pixels`).
 3. Once that end-to-end path works, replace the simple binning with a more
    physical CCD model (QE(E), charge sharing, energy resolution) beside the
    existing Timepix / Eagle XO detector forward models.
