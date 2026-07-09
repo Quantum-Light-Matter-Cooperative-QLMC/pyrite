@@ -26,6 +26,11 @@ scalar, not a real model.
 1k256/2k512 formats: geometry-only rebinning of a dispersed profile onto fixed
 pixels, no QE/charge-sharing/energy-resolution yet.
 
+`src/cxr_mc/grating.py` also now implements the combined forward-model entry
+`detected_image` (`mc_spectrum` output + `Grating` + `SimpleCCD` → dispersed,
+detected image, counts vs pixel) — pure composition of the reflectivity and
+pixel-binning pieces above, no new physics.
+
 **Remaining — real CCD + grating + geometry buildout (promoted to P1):**
 
 1. **(done)** Grating reflectivity `R(E,α)` (`crystallography.optical_constants`:
@@ -40,17 +45,20 @@ pixels, no QE/charge-sharing/energy-resolution yet.
    the greateyes ALEX-s 1k256 (1024×255 px, 26 µm px, 26.6×6.7 mm) and ALEX-s
    2k512 (2048×515 px, 13.5 µm px, 27.6×6.9 mm) formats
    (`ALEXS_SENSORS`/`SimpleCCD`/`bin_to_pixels`).
-3. Once that end-to-end path works, replace the simple binning with a more
-   physical CCD model (QE(E), charge sharing, energy resolution) beside the
+3. **(done)** A combined forward-model entry (`detected_image`) chaining the
+   grating reflectivity + simple CCD binning above, so an `mc_spectrum` output
+   can be turned into a detected image in one call, slotting in beside the
    existing Timepix / Eagle XO detector forward models.
-4. **(preliminary survey done)** other CCD/grating options in the broader
+4. Now that end-to-end path works, replace the simple binning with a more
+   physical CCD model (QE(E), charge sharing, energy resolution).
+5. **(preliminary survey done)** other CCD/grating options in the broader
    ~10 eV-4 keV band (the McPherson 251MX tops out near 1.24 keV at 2400 g/mm),
    preferring broadband coverage — see `docs/grazing-grating.md` phased-plan
    step 6 for findings (Horiba PGM200, Bestec custom builds, a published
    multilayer-coated grating reaching 3.3 keV; Andor "SO"-series and Princeton
    Instruments PIXIS-XO/PI-MTE as ALEX-s-class detector alternatives). Not yet
    turned into code/a hardware choice.
-5. Validate vs measured data when available (data-dependent, like P1's other
+6. Validate vs measured data when available (data-dependent, like P1's other
    gated items).
 
 Design + phased plan: [`docs/grazing-grating.md`](docs/grazing-grating.md).

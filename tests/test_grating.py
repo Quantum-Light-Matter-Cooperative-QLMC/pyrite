@@ -10,6 +10,7 @@ from cxr_mc.grating import (
     SimpleCCD,
     bin_to_pixels,
     coating_number_density_per_ang3,
+    detected_image,
     detector_position_mm,
     disperse_spectrum,
     groove_spacing_angstrom,
@@ -211,3 +212,47 @@ def test_bin_to_pixels_localizes_narrow_line_to_few_pixels():
     # essentially all flux lands within a handful of pixels around the centroid
     frac_in_top10 = np.sort(flux)[-10:].sum() / flux.sum()
     assert frac_in_top10 > 0.99
+
+
+# ---- combined forward-model entry (docs/grazing-grating.md phased-plan step 4) --
+
+
+def test_detected_image_matches_manual_disperse_then_bin():
+    g = Grating(groove_density_per_mm=1200.0, alpha_rad=np.deg2rad(86.0), order=1, coating="Au")
+    ccd = SimpleCCD.from_alexs("2k512")
+    E = np.arange(500.0, 1200.0, 1.0)
+    spec = np.exp(-0.5 * ((E - 850.0) / 6.0) ** 2)  # a line at 850 eV
+    centers, counts = detected_image(E, spec, g, ccd, distance_mm=200.0)
+    # same contract as bin_to_pixels: fixed pixel grid, one value per pixel
+    assert centers.shape == (ccd.n_pix,)
+    assert counts.shape == (ccd.n_pix,)
+    assert counts.sum() > 0
+    # matches manually chaining disperse_spectrum (throughput-weighted, since
+    # detected_image defaults weight_by_throughput=True) then bin_to_pixels
+    x, inten = disperse_spectrum(E, spec, g, distance_mm=200.0, weight_by_throughput=True)
+    centers_manual, counts_manual = bin_to_pixels(x, inten, ccd)
+    assert np.allclose(centers, centers_manual)
+    assert np.allclose(counts, counts_manual)
+
+
+def test_detected_image_throughput_weighting_reduces_counts_vs_geometry_only():
+    g = Grating(groove_density_per_mm=1200.0, alpha_rad=np.deg2rad(86.0), order=1, coating="Au")
+    ccd = SimpleCCD(n_pix=2000, pixel_mm=0.05)  # wide enough to contain the line
+    E = np.arange(500.0, 1200.0, 1.0)
+    spec = np.exp(-0.5 * ((E - 850.0) / 6.0) ** 2)
+    _, counts_default = detected_image(E, spec, g, ccd, distance_mm=200.0)
+    _, counts_geom = detected_image(E, spec, g, ccd, distance_mm=200.0, weight_by_throughput=False)
+    # default (throughput-weighted) total is strictly less than geometry-only,
+    # since R <= 1 everywhere (mirrors test_throughput_wiring_reduces_flux_vs_raw_geometry)
+    assert 0.0 < counts_default.sum() < counts_geom.sum()
+
+
+def test_detected_image_matches_geometry_only_when_throughput_disabled():
+    g = Grating(groove_density_per_mm=1200.0, alpha_rad=np.deg2rad(86.0), order=1)
+    ccd = SimpleCCD(n_pix=2000, pixel_mm=0.05)
+    E = np.arange(500.0, 1200.0, 1.0)
+    spec = np.exp(-0.5 * ((E - 850.0) / 6.0) ** 2)
+    _, counts = detected_image(E, spec, g, ccd, distance_mm=200.0, weight_by_throughput=False)
+    x, inten = disperse_spectrum(E, spec, g, distance_mm=200.0, weight_by_throughput=False)
+    _, counts_manual = bin_to_pixels(x, inten, ccd)
+    assert np.allclose(counts, counts_manual)

@@ -14,8 +14,10 @@ EDS line width that dominates the soft-X-ray band today.
 ## Status
 
 `src/cxr_mc/grating.py` implements the **dispersion geometry**, the
-**grazing-incidence Fresnel reflectivity** of the grating's coating, and now a
-**simple CCD pixel grid** (geometry-only rebinning, no QE/charge-sharing yet)
+**grazing-incidence Fresnel reflectivity** of the grating's coating, a
+**simple CCD pixel grid** (geometry-only rebinning, no QE/charge-sharing yet),
+and now a **combined forward-model entry** (`detected_image`, chaining the two
+above) that turns an `mc_spectrum` output directly into a detected image — all
 as a standalone forward model — nothing in the sweep/plot pipeline imports it
 yet. Cross-checked in `tests/test_grating.py`.
 
@@ -32,6 +34,7 @@ yet. Cross-checked in `tests/test_grating.py`.
 | `resolving_power(E, grating, distance_mm, pixel_mm)` | pixel-limited `λ/Δλ` |
 | `ALEXS_SENSORS` / `SimpleCCD.from_alexs(variant)` | greateyes ALEX-s `1k256`/`2k512` pixel-format registry + a fixed pixel grid built from it |
 | `bin_to_pixels(position_mm, intensity_per_mm, ccd, center_mm=None)` | rebin a dispersed profile onto `ccd`'s fixed pixels (each pixel integrates the polar-angle/position span it subtends); light outside the sensor is dropped |
+| `detected_image(E_grid_eV, spec, grating, ccd, distance_mm, weight_by_throughput=True, ...)` | combined forward-model entry: `mc_spectrum` output → dispersed, detected image (counts vs pixel), chaining `disperse_spectrum` + `bin_to_pixels` |
 
 ## Physics and conventions
 
@@ -132,9 +135,12 @@ modelled; deliberately still out of scope:
    ALEX-s 1k256/2k512 pixel formats above (`ALEXS_SENSORS`, `SimpleCCD`,
    `bin_to_pixels`). This is deliberately crude — it exists to get the full
    grating→image pipeline working end-to-end before adding detector physics.
-4. A forward-model entry that takes the model's `mc_spectrum` output + a
-   `Grating` + the simple CCD from step 3 and returns the **dispersed, detected
-   image** (counts vs pixel), so it slots in beside the Timepix / Eagle XO models.
+4. **(done)** A forward-model entry (`detected_image`) that takes the model's
+   `mc_spectrum` output + a `Grating` + the simple CCD from step 3 and returns
+   the **dispersed, detected image** (counts vs pixel), so it slots in beside
+   the Timepix / Eagle XO models. Pure composition of steps 2 and 3 (chains
+   `disperse_spectrum` then `bin_to_pixels`) — no new physics, so no new ledger
+   row.
 5. Replace the simple CCD with a more physical model (QE(E), charge sharing,
    energy resolution) once step 4's pipeline is validated structurally — same
    upgrade path `eaglexo_response.py` took from geometry-only to a digitized QE
@@ -168,9 +174,9 @@ modelled; deliberately still out of scope:
    panel; validate against a measured grating-spectrometer dataset when available
    (data-dependent, like P1's other gated items).
 
-Coating reflectivity (step 2) and simple pixel binning (step 3) are done;
-groove-profile efficiency remains a placeholder scalar, so the throughput-
-weighted dispersed profile is closer to real flux than the purely geometric
-one but still not final until a groove-efficiency model lands. Step 4 (a
-single forward-model entry combining `mc_spectrum` + `Grating` + `SimpleCCD`)
-is next.
+Coating reflectivity (step 2), simple pixel binning (step 3), and the combined
+`mc_spectrum` → `Grating` → `SimpleCCD` forward-model entry `detected_image`
+(step 4) are done; groove-profile efficiency remains a placeholder scalar, so
+the throughput-weighted dispersed image is closer to real flux than the purely
+geometric one but still not final until a groove-efficiency model lands. Step
+5 (replacing the simple CCD with real detector physics) is next.

@@ -26,6 +26,11 @@ docs/grazing-grating.md).
 `SimpleCCD` + `bin_to_pixels` (phased-plan step 3) rebin a dispersed profile
 onto a fixed pixel grid sized to the greateyes ALEX-s 1k256/2k512 formats --
 geometry only (no QE, charge-sharing, or energy resolution yet).
+
+`detected_image` (phased-plan step 4) is the single combined forward-model
+entry: `mc_spectrum` output + a `Grating` + a `SimpleCCD` -> the dispersed,
+detected image (counts vs pixel), chaining `disperse_spectrum` and
+`bin_to_pixels` so it slots in beside the Timepix / Eagle XO detector models.
 """
 
 from dataclasses import dataclass
@@ -302,6 +307,51 @@ def bin_to_pixels(position_mm, intensity_per_mm, ccd, center_mm=None):
     cum_at_edges = np.interp(edges, x, cum, left=cum[0], right=cum[-1])
     flux_per_pixel = np.diff(cum_at_edges)
     return ccd.pixel_centers_mm(center_mm), flux_per_pixel
+
+
+def detected_image(
+    E_grid_eV,
+    spec,
+    grating,
+    ccd,
+    distance_mm,
+    *,
+    weight_by_throughput=True,
+    beta_ref_rad=None,
+    center_mm=None,
+):
+    """Combined forward-model entry (phased-plan step 4): the model's `mc_spectrum`
+    (or `mc_spectrum_solid_angle`) output on ``E_grid_eV`` + a ``grating`` + a
+    ``ccd`` (`SimpleCCD`) -> the dispersed, DETECTED image (counts vs pixel), by
+    chaining `disperse_spectrum` then `bin_to_pixels`. So it slots in beside the
+    Timepix / Eagle XO detector forward models.
+
+    Pure composition of the two already-validated pieces above -- no new physics
+    equation and so no new ledger row/validator pass, same precedent as
+    `SimpleCCD`/`bin_to_pixels` themselves being pure geometry (see
+    docs/grazing-grating.md phased-plan step 3's note on this).
+
+    ``weight_by_throughput`` defaults to True HERE (unlike `disperse_spectrum`'s
+    own default of False, kept for backward compatibility there): this function
+    IS the detected-image entry point, so a real CCD frame should reflect the
+    grating's Fresnel throughput (`Grating.throughput`), not the purely
+    geometric dispersion. Pass False to get the geometry-only image instead.
+
+    ``beta_ref_rad``/``center_mm`` forward to `disperse_spectrum`/`bin_to_pixels`
+    respectively (both default to auto-centering on the dispersed light).
+
+    Returns ``(pixel_centers_mm, counts_per_pixel)``, both length ``ccd.n_pix`` --
+    same contract as `bin_to_pixels`.
+    """
+    x, inten = disperse_spectrum(
+        E_grid_eV,
+        spec,
+        grating,
+        distance_mm,
+        beta_ref_rad=beta_ref_rad,
+        weight_by_throughput=weight_by_throughput,
+    )
+    return bin_to_pixels(x, inten, ccd, center_mm=center_mm)
 
 
 def resolving_power(E_eV, grating, distance_mm, pixel_mm, beta_ref_rad=None):
