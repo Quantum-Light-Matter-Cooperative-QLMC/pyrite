@@ -7,7 +7,7 @@ The single source of truth for **what physics `cxr-mc` claims and whether it has
 
 **Status:** `unverified` → `filtered` (units+limits+signs) → `rederived` (independent derivation matches) → `anchored` (regression test green) → `signed-off` (human-certified). `discrepancy` = a check failed.
 
-Progress: **0 / 20 signed-off** · 1 rederived · 1 filtered · 1 blocked.
+Progress: **0 / 22 signed-off** · 3 rederived · 1 filtered · 1 blocked.
 
 ## Core coherent physics (highest risk — verify first)
 
@@ -32,6 +32,7 @@ Progress: **0 / 20 signed-off** · 1 rederived · 1 filtered · 1 blocked.
 | `sapphire-corundum-structure` | α-Al2O3/sapphire corundum lattice + explicit conventional-cell basis, B_ang2=0.25 | `data/crystal_structures.toml::sapphire` | Newnham & de Haan 1962; B_ang2 literature ~0.25 | unverified | cell volume + stoichiometry check | `tests/test_crystallography.py::test_sapphire_structure_sane` | expanded from R-3c Wyckoff sites because the loader does not apply symmetry; Debye-Waller B_ang2 updated from 0.5 Ų to 0.25 Ų (literature range 0.20–0.30) |
 | `hbn-structure` | h-BN P6_3/mmc layered/eclipsed lattice + explicit four-atom conventional-cell basis | `data/crystal_structures.toml::hbn` | Pease, Acta Cryst 5, 356 (1952) | rederived | V=36.17 Å³ ✓; 2B+2N ✓; basis ≡ Pease Wyckoff under shift (2/3,1/3,3/4) ✓; AA′ registry ✓ (anchor green) | `tests/test_crystallography.py::test_hbn_structure_sane` | a=2.504 A, c=6.661 A; B/N sites swap across the half-cell so B lies above N; write-up `docs/validation/hbn-structure.md` |
 | `absorption-length` | X-ray absorption length / μ | `crystallography.py::absorption_length_ang` | Henke f2 / Beer–Lambert | unverified | — | — | |
+| `grazing-optical-constants` | complex refractive index `n = 1 − δ − iβ` (δ, β from f1=Z+f′, f2) | `crystallography.py::optical_constants` | Als-Nielsen & McMorrow *Elements of Modern X-ray Physics* 2nd ed. Ch. 3; equiv. Attwood & Sakdinawat Ch. 3 | rederived | units (δ,β dimensionless); sign δ,β>0 off-edge; independent θ_c=√(2δ) spot-check at Cu Kα matches textbook Si (0.223° vs ≈0.22°) and Au (0.554° vs ≈0.55°) to 4 sig figs | `tests/test_crystallography.py::test_optical_constants_beta_matches_absorption_length`, `::test_optical_constants_delta_positive_off_edge` | feeds `grating.py::Grating.reflectivity`; write-up `docs/validation/grazing-reflectivity.md`; note the β↔`absorption_length_ang` test is a construction tautology (same formula reused), not independent corroboration — see write-up |
 | `self-absorption` | per-segment Beer–Lambert path-to-surface, cross-stack | `montecarlo/spectrum.py::mc_spectrum` | Beer–Lambert | unverified | — | — | reduces across multilayer |
 
 ## Transport & background
@@ -55,3 +56,9 @@ Progress: **0 / 20 signed-off** · 1 rederived · 1 filtered · 1 blocked.
 |----|-------|------|--------|--------|--------|--------|-------|
 | `detector-eaglexo` | `solid_angle(Ω) × QE(E)` CCD operator | `eaglexo_response.py::EagleResponse` | `eaglexo_qe.csv` | unverified | — | — | |
 | `detector-timepix` | Si charge model, diffusion, ~1.9 keV counting threshold | `timepix_response.py::TimepixResponse` | Henke f2 (Si) | blocked | — | — | **hardware params are placeholders** — can't sign off until real quad values land |
+
+## Grazing-incidence grating spectrometer
+
+| id | claim | code | source | status | checks | anchor | notes |
+|----|-------|------|--------|--------|--------|--------|-------|
+| `grazing-reflectivity` | small-angle Fresnel reflectivity `R(θ) = \|r(θ)\|²`, `r(θ) = (θ − √(θ²−2δ−2iβ)) / (θ + √(θ²−2δ−2iβ))`, polarization-independent (grazing-incidence approximation) | `grating.py::Grating.reflectivity` | Als-Nielsen & McMorrow *Elements of Modern X-ray Physics* 2nd ed. Ch. 3; equiv. Attwood & Sakdinawat Ch. 3 | rederived | bounded in [0,1]; θ≪θc → R→1 (total external reflection); θ≫θc → R→(θc/2θ)⁴·(1+(β/δ)²) independently re-derived (Taylor expansion), test's 60° choice confirmed necessary (Au β/δ≈0.25 at 1500 eV, needs θ≳20° for <10% convergence to the β→0 idealization); monotonic decrease with grazing angle; independent Maxwell/Snell re-derivation matches code term-for-term | `tests/test_grating.py::test_reflectivity_total_external_reflection_below_critical_angle`, `::test_reflectivity_asymptotic_falloff_above_critical_angle`, `::test_reflectivity_bounded_and_decreases_away_from_critical_angle` | coating element/density confirmed gold for McPherson 251MX, density/molar-mass values not independently re-verified here (`Grating.coating`); depends on `grazing-optical-constants`; write-up `docs/validation/grazing-reflectivity.md` — the 60°-grazing test checks the formula's own asymptotic self-consistency, not physical accuracy outside θ≪1 (real operation stays at few-degree grazing) |

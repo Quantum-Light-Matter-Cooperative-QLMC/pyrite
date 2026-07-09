@@ -22,12 +22,13 @@ on `main` once the branch exists.
 ### Active
 
 1. **Grazing-incidence soft X-ray diffraction grating - CCD + geometry buildout.**
-   -> `feature/grazing-grating`. Promoted from P3: dispersion geometry landed; next
-   is grating reflectivity/groove efficiency, then a real detected-image forward
-   model (start with a simple CCD that bins photons by per-pixel polar angle,
-   then a more physical CCD model), sized to real hardware — McPherson 251MX
-   gratings (120/300/1200/2400 g/mm, ~6 eV-1.24 keV) and greateyes ALEX-s
-   1k256/2k512 CCDs — before surveying broader ~10 eV-4 keV CCD/grating options.
+   `feature/grazing-grating` merged: dispersion geometry, grating reflectivity
+   (`Grating.reflectivity`/`throughput`), a simple geometry-only CCD (`SimpleCCD`,
+   sized to greateyes ALEX-s 1k256/2k512), and the combined `detected_image`
+   forward-model entry (`mc_spectrum` -> `Grating` -> `SimpleCCD`, counts vs
+   pixel) are all landed in `src/cxr_mc/grating.py`. Next: replace `SimpleCCD`
+   with a real CCD detector-physics model (QE(E), charge sharing, energy
+   resolution), then the broader ~10 eV-4 keV CCD/grating hardware survey.
    Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
 
 ### Gated

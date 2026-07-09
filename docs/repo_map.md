@@ -223,6 +223,15 @@ resolution, Poisson counts).
   `poisson_counts`.
 - Deps: `crystallography`, `_si_sensor`.
 
+### `grating.py`
+**Exploratory** grazing-incidence soft-X-ray grating spectrometer forward model
+(dispersion geometry, coating reflectivity, and a simple CCD pixel grid; not
+wired into the pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
+- Public: `Grating`, `wavelength_angstrom`, `groove_spacing_angstrom`,
+  `coating_number_density_per_ang3`, `detector_position_mm`, `disperse_spectrum`,
+  `resolving_power`, `ALEXS_SENSORS`, `SimpleCCD`, `bin_to_pixels`.
+- Deps: `crystallography` (`HC_EV_ANG`, `optical_constants`).
+
 ## CLI & packaging
 
 ### `cli.py`

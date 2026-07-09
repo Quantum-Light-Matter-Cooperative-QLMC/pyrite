@@ -287,6 +287,48 @@ def absorption_length_ang(element, photon_E_eV, number_density_per_ang3):
         return 1.0 / mu
 
 
+# ---- complex refractive index (grazing-incidence optics) --------------------
+def optical_constants(element, photon_E_eV, number_density_per_ang3):
+    """
+    Complex refractive index n = 1 - delta - i*beta of a material, from the
+    element's Henke/Chantler anomalous scattering factors f'(E), f''(E)
+    (`atomic_form_factors.henke_dispersion`), the Henke convention
+    f1 = Z + f' (forward-scattering factor):
+
+        delta(E) = (r_e lambda^2 / 2 pi) * n_atomic * f1(E),   f1 = Z + f'(E)
+        beta(E)  = (r_e lambda^2 / 2 pi) * n_atomic * f2(E)
+
+    Standard result, e.g. Als-Nielsen & McMorrow, "Elements of Modern X-ray
+    Physics" 2nd ed., Ch. 3 (index of refraction from the atomic scattering
+    factor); equivalently Attwood & Sakdinawat, "X-Rays and Extreme Ultraviolet
+    Radiation" 2nd ed., Ch. 3. Same r_e, lambda, 2*pi normalization as this
+    module's `absorption_length_ang`, whose `beta_idx` IS this beta -- that
+    function's mu = 2 k beta is the textbook absorption coefficient, so
+    beta computed here reproduces it exactly (limiting-case cross-check).
+
+    element : str element symbol.
+    photon_E_eV : float or array, photon energy [eV].
+    number_density_per_ang3 : float, atomic number density [1/Angstrom^3].
+
+    Returns (delta, beta), each shaped like photon_E_eV. Out-of-range energies
+    (see henke_dispersion) return NaN, consistent with the rest of the module.
+
+    Limiting case: f2 -> 0 (far from any edge, fully non-absorbing idealization)
+    gives beta -> 0, the lossless dielectric limit used by `Grating.reflectivity`'s
+    total-external-reflection / power-law-falloff checks.
+
+    Validation: grazing-optical-constants
+    """
+    fp, f2 = henke_dispersion(element, photon_E_eV)
+    f1 = Z_TABLE[element] + fp
+    with np.errstate(divide="ignore", invalid="ignore"):
+        lam = HC_EV_ANG / np.asarray(photon_E_eV, float)  # wavelength [Angstrom]
+        pref = R_E_ANG * lam**2 / (2.0 * np.pi) * number_density_per_ang3
+        delta = pref * f1
+        beta = pref * f2
+    return delta, beta
+
+
 # ---- crystal orientation ----------------------------------------------------
 def _rotation_between(u_hat, t_hat):
     """Minimal rotation matrix R such that R @ u_hat = t_hat (unit vectors)."""
