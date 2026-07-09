@@ -24,9 +24,9 @@ plots   ◄── montecarlo, results, timepix_response, eaglexo_response
 cli     ◄── scan, export          (the `cxr` console script)
 ```
 
-`timepix_response` / `eaglexo_response` depend only on `crystallography` and
-the shared `_si_sensor` leaf. Packaged data resolves via `cxr_mc.DATA_DIR`, so
-imports work from any cwd.
+`timepix_response` / `eaglexo_response` depend only on `crystallography` plus
+the shared `_si_sensor` plumbing (Si constants, response caching, Poisson core).
+Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
 
 ## Entry points
 
@@ -35,6 +35,11 @@ imports work from any cwd.
   subcommands.
 - **`cxr scan <material>`** → `scan:main` → `run.run_sweep` → writes
   `checkpoints/<material>.pkl`. Root shim: `scan.py`.
+- **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint) →
+  `notebooks/analysis_app.py` (all figures, Altair + matplotlib, lazy tabbed
+  layout); both read the per-material grids in `config.py`.
+- **`cxr export [stem]`** → `export:main`: `marimo export html` of the analysis
+  app → `results/<stem>.html`.
 - **`cxr slim <checkpoint> [--grid]`** → `slim:slim_checkpoint` →
   `results.slim_results`: shrink a checkpoint pickle for transfer (drop
   wide-brem / float32 / filter configs; `--grid` keeps only the material's
@@ -42,8 +47,6 @@ imports work from any cwd.
 - **`cxr archive`/`restore`/`archives`** → `archive:*`: the local checkpoint
   shelf — copy the active slot `checkpoints/<stem>.pkl` to/from the long-term
   `checkpoints/archive/<label>.pkl`.
-- **Notebooks**: `notebooks/scan.ipynb` (sweep) → `notebooks/analysis.ipynb` (viz); both read the
-  per-material grids in `config.py`.
 - **Sweep worker**: `montecarlo.run_case` (module-level so it pickles into the
   `run_cases` process pool).
 
@@ -126,21 +129,21 @@ Headless sweep entry: parse args → build cases → `run_sweep` → checkpoint.
 ## Results & plotting
 
 ### `results/` (package)
-Result records, derived line metrics, and ranking/selection. Split from a
-single module into submodules; **every public and internal name is re-exported
-from the package**, so `from cxr_mc.results import X` is unchanged
+Result records, derived line metrics, and ranking/selection. Split from a single
+module into submodules; **every public and internal name is re-exported from the
+package**, so `from cxr_mc.results import X` is unchanged
 (`tests/test_results_exports.py` freezes the export set).
-- `store` — `Settings` (dataclass), `store_result`, `detected_background`,
-  `PER_NA`. Deps: `montecarlo`.
-- `selection` — `records`, `records_for_cases`, `filter_results`,
-  `select_results`, `sweep_values`, `slim_results` (transfer-size trimmer),
-  `best_azimuth` (the azimuth-max reduction). Pure NumPy; no sibling deps.
-- `metrics` — per-record line-finding scalars: `line_metrics`, `line_index`,
-  `line_quality`. Deps: none (scipy peak finding).
-- `scoring` — `selection_score`, `top_geometries`, `show_top`; the
-  `SELECTION_MODES` registry. Deps: `metrics`, `selection`.
-- `tables` — `results_dataframe`, `summary_table`, `show_summary`. Deps:
-  `montecarlo`, `sweep`, `metrics`, `store`.
+- `store` — the `{config_name: {E0_keV: record}}` store: `Settings` (dataclass),
+  `store_result`, `detected_background`, `PER_NA`.
+- `selection` — subsetting/reducing a store: `records`, `records_for_cases`,
+  `filter_results`, `select_results`, `sweep_values`, `slim_results`,
+  `best_azimuth`.
+- `metrics` — per-record scalars for the heatmaps: `line_index`, `line_quality`,
+  `line_metrics`.
+- `scoring` — geometry ranking: `SELECTION_MODES`, `selection_score`,
+  `top_geometries`, `show_top`.
+- `tables` — DataFrame views: `results_dataframe`, `summary_table`,
+  `show_summary`.
 - Deps: `montecarlo`, `sweep`.
 
 ### `plots/` (package)
@@ -176,27 +179,26 @@ freezes the export set). Submodule DAG (leaf → driver):
 - `interactive` — `browse`, `browse_plotly`, `stream_chunk`, `plot_chunk`
   (the slider/streaming drivers that dispatch to the `spectra`/`detectors`
   drawers). Top of the DAG. Deps: `_style`, `_common`, `spectra`, `detectors`.
-- `altair_*` — Altair/Vega-Lite renderers: fast, interactive alternatives to
-  the matplotlib figures, reusing the exact same data prep so the physics is
-  identical. Intentionally **NOT** re-exported from the package (would break
-  the frozen export guard) — import via `cxr_mc.plots.altair_<name>`.
-  - `altair_spectra` — intrinsic spectra (`spectrum_chart`, `spectrum_frame`);
-    shares `_common._line_brem` (`tests/test_altair_plots.py`). Deps:
-    `_common`, `results`.
-  - `altair_sweeps` — parametric-sweep figures (`metric_vs_chart`,
-    `heatmap_chart`, `scan_charts`); renders from `_frames`' tidy DataFrames
-    and reuses `sweeps`' axis/metric registries
-    (`tests/test_altair_sweeps.py`). Deps: `_frames`, `sweeps`, `results`.
-  - `altair_detectors` — detector-view spectra (`timepix_detected_chart`/
-    `_frame`, `eaglexo_detected_chart`/`_frame`, `eaglexo_charge_chart`/
-    `_frame`); reuses `detectors`' per-record prep
-    (`tests/test_altair_detectors.py`). Deps: `_common`, `altair_spectra`,
+- `altair_*` — Altair/Vega-Lite renderers, the interactive counterparts of the
+  matplotlib figures (the marimo `analysis_app.py` uses these first). They share
+  the exact data prep with the matplotlib path (`_common._line_brem`, the
+  `_frames` builders, the `detectors`/`trajectories` internals), so the physics
+  is identical — only the renderer differs. Intentionally **NOT** re-exported
+  from the package (frozen export guard) — import from the submodule. Per-module
+  guard tests: `tests/test_altair_*.py`.
+  - `altair_spectra` — intrinsic spectra: `spectrum_chart`, `spectrum_frame`.
+    Deps: `_common`, `results`.
+  - `altair_sweeps` — metric scans + parametric heatmaps: `metric_vs_chart`,
+    `heatmap_chart`, `scan_charts` (auto heatmap-vs-lines, one shared metrics
+    map across quantities). Deps: `_common`, `_frames`, `sweeps`, `results`.
+  - `altair_detectors` — Timepix3/Eagle XO spectral views:
+    `timepix_detected_chart`, `eaglexo_detected_chart`, `eaglexo_charge_chart`
+    (+ their `*_frame` builders). Deps: `_common`, `altair_spectra`,
     `detectors`, `eaglexo_response`.
-  - `altair_trajectories` — electron-penetration views
-    (`penetration_survival_chart`, `trajectory_chart`, the `*_frame` builders);
-    reuses `trajectories`' transport prep; the dense datashader raster stays
-    on matplotlib (`tests/test_altair_trajectories.py`). Deps: `sweeps`,
-    `trajectories`.
+  - `altair_trajectories` — penetration views: `penetration_survival_chart`,
+    `trajectory_chart` (+ `survival_frame`, `tracks_frame`,
+    `track_segments_frame`); the dense datashader raster stays on matplotlib.
+    Deps: `sweeps`, `trajectories`.
 - Deps: `montecarlo`, `results`, `timepix_response`, `eaglexo_response`.
 
 ## Detector forward models
@@ -231,7 +233,8 @@ The `cxr` console-script dispatcher.
 - Deps: `scan`, `export`, `slim`, `archive`, `__version__`.
 
 ### `export.py`
-`cxr export` subcommand — render figures / PDFs from a checkpoint.
+`cxr export` subcommand — `marimo export html` of `notebooks/analysis_app.py`
+→ `results/<stem>.html` (replaces the retired nbconvert-PDF path).
 - Public: `add_subparser`, `main`.
 
 ### `slim.py`

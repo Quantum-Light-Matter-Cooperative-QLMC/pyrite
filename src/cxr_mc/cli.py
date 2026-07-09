@@ -4,7 +4,7 @@ A single console script with subcommands, wired in pyproject.toml as
 ``cxr = "cxr_mc.cli:main"``:
 
     cxr scan <material> [--quick] [--workers N]   # run a sweep -> checkpoint
-    cxr export [stem]                             # analysis.ipynb -> results/<stem>.pdf
+    cxr export [stem]                             # analysis app -> results/<stem>.html
     cxr slim <checkpoint> [--grid] [--drop-wide-brem] [--downcast]  # shrink a pkl for transfer
     cxr archive <stem> [label]                    # copy active checkpoint to the shelf
     cxr restore <label> [--as <stem>]             # copy a shelved checkpoint back

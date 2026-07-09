@@ -104,18 +104,23 @@ def metric_vs_frame(
     cases=None,
     rel_prominence=0.03,
     line_metric="sharpness",
+    metrics=None,
 ):
     """Tidy long-form table for a 1-D metric scan: one row per (hue value, x value),
     ``metric`` reduced over every OTHER swept dimension to its best geometry
     (``results.selection_score`` ``select``). Mirrors the data behind
     :func:`cxr_mc.plots.plot_metric_vs`, including the single-valued-x fallback.
     ``x`` is in DISPLAY units (e.g. thickness in microns). Columns:
-    ``x, metric, hue`` (``hue`` is the ``"30 keV"``-style value label)."""
+    ``x, metric, hue`` (``hue`` is the ``"30 keV"``-style value label).
+    ``metrics`` is a precomputed ``_common._metrics_map`` for THESE records
+    (computed here when omitted) -- multi-quantity drivers pass one shared map
+    instead of re-deriving it per quantity."""
     recs = records_for_cases(results, cases)
     if not recs:
         return pd.DataFrame(columns=["x", "metric", "hue"])
     x = _effective_x(recs, x, hue)
-    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
+    if metrics is None:
+        metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
     div_x = _AXIS_SPECS.get(x, (None, 1.0))[1]
     rows = []
     for hv in sorted({r["case"][hue] for r in recs}):
@@ -147,17 +152,22 @@ def heatmap_frame(
     line_metric="sharpness",
     min_flux_frac=0.02,
     min_line_quality=0.2,
+    metrics=None,
 ):
     """Tidy long-form table for one heatmap quantity over ``x`` x ``y``, one block
     per ``panel`` value. Each (x, y) cell is reduced to its best record
     (``selection_score`` ``select``); flux-gated quantities blank out cells with
     near-zero emission or an ill-defined line (dropped rows -> gaps), mirroring
     :func:`cxr_mc.plots.plot_heatmaps`. ``x`` / ``y`` are in DISPLAY units.
-    Columns: ``x, y, panel, value``."""
+    Columns: ``x, y, panel, value``. ``metrics`` is a precomputed
+    ``_common._metrics_map`` for THESE records (computed here when omitted) --
+    multi-quantity drivers pass one shared map instead of re-deriving it per
+    quantity."""
     recs = records_for_cases(results, cases)
     if not recs:
         return pd.DataFrame(columns=["x", "y", "panel", "value"])
-    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
+    if metrics is None:
+        metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
     gated = quantity in _FLUX_GATED
     rows = []
     for pv in sorted({r["case"][panel] for r in recs}):

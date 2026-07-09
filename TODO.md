@@ -73,7 +73,10 @@ on `main` once the branch exists.
 1. **Marimo/Altair follow-ups.** Core migration landed from `feature/marimo-transfer`;
    `feature/marimo-altair-followups` closed out the remaining fixes (blank detector
    tabs, mos2 multilayer penetration, angle selector, intrinsic-spectra controls,
-   heatmap sizing/ticks, `scan_app.py` material dropdown). Two small deferred items:
+   heatmap sizing/ticks, `scan_app.py` material dropdown). `cxr export` now renders
+   `notebooks/analysis_app.py` via `marimo export html` (replacing the retired
+   nbconvert-PDF path), and sweep-chart drivers share one precomputed metrics map
+   across quantities instead of recomputing per-quantity. Two small deferred items:
 
    - `eaglexo_charge_chart` doesn't yet take `x_domain=` (only the two
      detected-vs-incident charts do).
