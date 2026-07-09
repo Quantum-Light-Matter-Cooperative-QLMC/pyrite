@@ -31,6 +31,14 @@ pixels, no QE/charge-sharing/energy-resolution yet.
 detected image, counts vs pixel) — pure composition of the reflectivity and
 pixel-binning pieces above, no new physics.
 
+`src/cxr_mc/grating.py` also now implements a physically-motivated CCD
+response (`qe_absorption`, `charge_cloud_sigma_um`, `energy_fwhm_eV`,
+`detected_image_physical`): Beer-Lambert absorption QE, Einstein-relation
+drift-diffusion charge-cloud sharing, and Fano+read-noise energy resolution.
+Device-specific constants (`ACTIVE_SI_UM`, `DEPLETION_VOLTAGE_V`,
+`OPERATING_TEMP_C`, `READ_NOISE_E`) are `### FILL IN` placeholders — no public
+greateyes ALEX-s datasheet was found.
+
 **Remaining — real CCD + grating + geometry buildout (promoted to P1):**
 
 1. **(done)** Grating reflectivity `R(E,α)` (`crystallography.optical_constants`:
@@ -49,8 +57,12 @@ pixel-binning pieces above, no new physics.
    grating reflectivity + simple CCD binning above, so an `mc_spectrum` output
    can be turned into a detected image in one call, slotting in beside the
    existing Timepix / Eagle XO detector forward models.
-4. Now that end-to-end path works, replace the simple binning with a more
-   physical CCD model (QE(E), charge sharing, energy resolution).
+4. **(done)** Replace the simple binning with a more physical CCD model:
+   Beer-Lambert absorption QE, Einstein-relation drift-diffusion charge
+   sharing, Fano+read-noise energy resolution
+   (`qe_absorption`/`charge_cloud_sigma_um`/`energy_fwhm_eV`/
+   `detected_image_physical`). Device constants are `### FILL IN` placeholders
+   pending a real greateyes ALEX-s datasheet.
 5. **(preliminary survey done)** other CCD/grating options in the broader
    ~10 eV-4 keV band (the McPherson 251MX tops out near 1.24 keV at 2400 g/mm),
    preferring broadband coverage — see `docs/grazing-grating.md` phased-plan
