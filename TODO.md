@@ -76,15 +76,15 @@ on `main` once the branch exists.
    heatmap sizing/ticks, `scan_app.py` material dropdown). `cxr export` now renders
    `notebooks/analysis_app.py` via `marimo export html` (replacing the retired
    nbconvert-PDF path), and sweep-chart drivers share one precomputed metrics map
-   across quantities instead of recomputing per-quantity. Two small deferred items:
+   across quantities instead of recomputing per-quantity. `eaglexo_charge_chart`
+   now takes `x_domain=` like the other detector charts, and the default first
+   tab is "Intrinsic spectra" instead of "Top geometries". Remaining deferred
+   items:
 
-   - `eaglexo_charge_chart` doesn't yet take `x_domain=` (only the two
-     detected-vs-incident charts do).
    - The dense penetration-grid accordion (matplotlib, Penetration tab) is still
      fixed at `energy=30` regardless of the angle selector above it.
    - The x/y plot-limit entry boxes should move into the Spectra tab they belong to.
    - Add capability to click on individual heatmap pixels to select that parameter set for spectral plotting
-   - Change default first tab to "intrinsic spectra" instead of "top geometries"
 2. **Git history cleanup.** Squash minor upkeep/doc commits; evaluate other repo
    structure/history improvements.
 3. **Dynamic GPU chunk sizing.** Evaluate config-driven chunk-size selection for
