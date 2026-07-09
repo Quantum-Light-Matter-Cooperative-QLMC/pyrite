@@ -1,12 +1,12 @@
 """Tests for the local checkpoint shelf (checkpoint lifecycle, component 2):
-cxr archive / restore / archives. Pure local file ops on a temp checkpoints/
-tree -- no ssh, CPU-only, fast."""
+cxr archive / restore / archives / union. Pure local file ops on a temp
+checkpoints/ tree -- no ssh, CPU-only, fast."""
 
 import pickle
 
 import pytest
 
-from cxr_mc import archive
+from cxr_mc import _checkpoint_io, archive
 
 
 def _write(path, payload):
@@ -18,6 +18,16 @@ def _write(path, payload):
 def _store(n_configs=2, n_energies=2):
     return {
         f"cfg{i}": {30.0 + j: {"case": {}} for j in range(n_energies)} for i in range(n_configs)
+    }
+
+
+def _material_store(material, config_names, n_energies=2):
+    """A results store like ``_store`` but with a real ``case["crystal"]`` (union
+    needs it for the material-match check) and caller-chosen config names, so
+    tests can control which (name, E0) points overlap between two stores."""
+    return {
+        name: {30.0 + j: {"case": {"crystal": material}} for j in range(n_energies)}
+        for name in config_names
     }
 
 
@@ -121,3 +131,78 @@ def test_stem_from_label_strips_only_date_suffix():
     assert archive._stem_from_label("hopg-20260704") == "hopg"
     assert archive._stem_from_label("good-thickness") == "good-thickness"
     assert archive._stem_from_label("mose2_quick-20260101") == "mose2_quick"
+
+
+# ---- union --------------------------------------------------------------------
+
+
+def test_union_happy_path_merges_and_pre_archives(tmp_path):
+    live = _material_store("hopg", ["cfgA", "cfgB"])
+    incoming = _material_store("hopg", ["cfgB", "cfgC"])
+    _write(tmp_path / "hopg.pkl", live)
+    _write(tmp_path / "archive" / "snap.pkl", incoming)
+
+    archive.union_checkpoint("hopg", "snap", root=str(tmp_path))
+
+    merged = _checkpoint_io.load(str(tmp_path / "hopg.pkl"))
+    assert set(merged) == {"cfgA", "cfgB", "cfgC"}
+    # default: undoable -- the pre-union live checkpoint was archived first
+    predate_label = archive._default_label("hopg")
+    assert (tmp_path / "archive" / f"{predate_label}.pkl").is_file()
+    # default: the source archive is left intact
+    assert (tmp_path / "archive" / "snap.pkl").is_file()
+
+
+def test_union_refuses_material_mismatch(tmp_path):
+    _write(tmp_path / "hopg.pkl", _material_store("hopg", ["cfgA"]))
+    _write(tmp_path / "archive" / "snap.pkl", _material_store("mos2", ["cfgB"]))
+    with pytest.raises(SystemExit, match="material mismatch"):
+        archive.union_checkpoint("hopg", "snap", root=str(tmp_path))
+    # refused before any mutation: the active slot is untouched
+    live = _checkpoint_io.load(str(tmp_path / "hopg.pkl"))
+    assert set(live) == {"cfgA"}
+
+
+def test_union_live_wins_on_collision(tmp_path):
+    live = {"cfgA": {30.0: {"case": {"crystal": "hopg"}, "tag": "live"}}}
+    incoming = {"cfgA": {30.0: {"case": {"crystal": "hopg"}, "tag": "archived"}}}
+    _write(tmp_path / "hopg.pkl", live)
+    _write(tmp_path / "archive" / "snap.pkl", incoming)
+
+    archive.union_checkpoint("hopg", "snap", root=str(tmp_path))
+
+    merged = _checkpoint_io.load(str(tmp_path / "hopg.pkl"))
+    assert merged["cfgA"][30.0]["tag"] == "live"  # live wins the (name, E0) collision
+
+
+def test_union_no_archive_skips_pre_archive(tmp_path):
+    _write(tmp_path / "hopg.pkl", _material_store("hopg", ["cfgA"]))
+    _write(tmp_path / "archive" / "snap.pkl", _material_store("hopg", ["cfgB"]))
+
+    archive.union_checkpoint("hopg", "snap", pre_archive=False, root=str(tmp_path))
+
+    predate_label = archive._default_label("hopg")
+    assert not (tmp_path / "archive" / f"{predate_label}.pkl").exists()
+    merged = _checkpoint_io.load(str(tmp_path / "hopg.pkl"))
+    assert set(merged) == {"cfgA", "cfgB"}
+
+
+def test_union_delete_archive_removes_source(tmp_path):
+    _write(tmp_path / "hopg.pkl", _material_store("hopg", ["cfgA"]))
+    _write(tmp_path / "archive" / "snap.pkl", _material_store("hopg", ["cfgB"]))
+
+    archive.union_checkpoint("hopg", "snap", delete_archive=True, root=str(tmp_path))
+
+    assert not (tmp_path / "archive" / "snap.pkl").exists()
+
+
+def test_union_missing_archive_errors(tmp_path):
+    _write(tmp_path / "hopg.pkl", _material_store("hopg", ["cfgA"]))
+    with pytest.raises(SystemExit, match="no such archive"):
+        archive.union_checkpoint("hopg", "ghost", root=str(tmp_path))
+
+
+def test_union_missing_active_slot_errors(tmp_path):
+    _write(tmp_path / "archive" / "snap.pkl", _material_store("hopg", ["cfgA"]))
+    with pytest.raises(SystemExit, match="no such active checkpoint"):
+        archive.union_checkpoint("hopg", "snap", root=str(tmp_path))

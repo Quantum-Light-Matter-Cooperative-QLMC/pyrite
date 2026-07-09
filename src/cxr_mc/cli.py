@@ -9,6 +9,7 @@ A single console script with subcommands, wired in pyproject.toml as
     cxr archive <stem> [label]                    # copy active checkpoint to the shelf
     cxr restore <label> [--as <stem>]             # copy a shelved checkpoint back
     cxr archives                                  # list the shelf
+    cxr union <stem> <label>                      # merge a shelved checkpoint into active
 """
 
 import argparse

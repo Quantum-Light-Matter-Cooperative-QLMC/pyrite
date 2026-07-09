@@ -1,5 +1,5 @@
-"""``cxr archive`` / ``restore`` / ``archives`` -- a durable local shelf for
-checkpoints (checkpoint lifecycle, component 2).
+"""``cxr archive`` / ``restore`` / ``archives`` / ``union`` -- a durable local
+shelf for checkpoints (checkpoint lifecycle, component 2).
 
 The GPU box is scratch compute; the laptop is the durable store. A grid-filtered
 pull lands in the ACTIVE slot ``checkpoints/<stem>.pkl`` (exactly what
@@ -13,6 +13,8 @@ pull lands in the ACTIVE slot ``checkpoints/<stem>.pkl`` (exactly what
     cxr restore hopg-20260704         # -> checkpoints/hopg.pkl (stem inferred)
     cxr restore good-thickness --as hopg
     cxr archives                      # list the shelf
+    cxr union hopg good-thickness     # merge archive/good-thickness.pkl into
+                                       # checkpoints/hopg.pkl (TODO P2 #8)
 
 All operations are pure local file copies (atomic temp+replace), so this lives on
 the ``cxr`` console script next to ``slim`` -- library-side and unit-testable --
@@ -128,6 +130,94 @@ def list_archives(root=DEFAULT_ROOT):
     return labels
 
 
+def _material_of(results):
+    """The crystal/material shared by every record in a results store, read off
+    the first record's ``case["crystal"]`` (same field ``run._crystal_of`` keys
+    the per-material checkpoint split on). ``None`` for an empty store -- nothing
+    to check the caller's material claim against."""
+    for recs in results.values():
+        for r in recs.values():
+            return r["case"]["crystal"]
+    return None
+
+
+def _union_results(live, archived):
+    """Merge ``archived`` into ``live`` at (config name, E0) granularity, LIVE
+    winning on any (name, E0) collision.
+
+    Records carry no run-id/timestamp (see
+    ``docs/superpowers/specs/2026-07-04-checkpoint-lifecycle-design.md``, "Out of
+    scope"), so there is no principled way to prefer one side over the other on
+    overlap by recency -- the live checkpoint is what's currently in front of you
+    (and, by default, the one just re-derived from the box), so it wins ties.
+    Returns a NEW dict; does not mutate either input."""
+    merged = {name: dict(recs) for name, recs in live.items()}
+    for name, recs in archived.items():
+        merged.setdefault(name, {})
+        for E0, rec in recs.items():
+            merged[name].setdefault(E0, rec)  # no-op if E0 already came from live
+    return merged
+
+
+def union_checkpoint(
+    stem, label, *, pre_archive=True, delete_archive=False, force=False, root=DEFAULT_ROOT
+):
+    """Merge the archived checkpoint ``<root>/archive/<label>.pkl`` into the
+    active slot ``<root>/<stem>.pkl``, in place. Live wins on any overlapping
+    (config name, E0) point (see :func:`_union_results`).
+
+    Refuses to union checkpoints for different materials (compared by each
+    store's ``case["crystal"]``, see :func:`_material_of`) -- unioning e.g. hopg
+    into mos2 would silently pollute a checkpoint with another crystal's records.
+
+    By default archives the live checkpoint FIRST (via :func:`archive_checkpoint`,
+    same default label), so the union is undoable via ``cxr restore``; pass
+    ``pre_archive=False`` to skip it. ``force`` is forwarded to that pre-archive
+    step's overwrite guard. The source archive is left intact by default; pass
+    ``delete_archive=True`` to remove it once the union has landed. Returns the
+    active-slot path.
+    """
+    live_path = os.path.join(root, f"{stem}.pkl")
+    if not os.path.isfile(live_path):
+        raise SystemExit(f"no such active checkpoint: {live_path}")
+    archive_path = os.path.join(_archive_dir(root), f"{label}.pkl")
+    if not os.path.isfile(archive_path):
+        raise SystemExit(f"no such archive: {archive_path}")
+
+    live = _checkpoint_io.load(live_path)
+    archived = _checkpoint_io.load(archive_path)
+    live_material = _material_of(live)
+    archived_material = _material_of(archived)
+    if (
+        live_material is not None
+        and archived_material is not None
+        and live_material != archived_material
+    ):
+        raise SystemExit(
+            f"material mismatch: checkpoints/{stem}.pkl is {live_material!r}, "
+            f"{ARCHIVE_SUBDIR}/{label}.pkl is {archived_material!r} -- refusing to union"
+        )
+
+    if pre_archive:
+        archive_checkpoint(stem, force=force, root=root)
+
+    merged = _union_results(live, archived)
+    tmp = live_path + ".tmp"
+    _checkpoint_io.dump(merged, tmp)
+    os.replace(tmp, live_path)
+
+    if delete_archive:
+        os.remove(archive_path)
+
+    n_before = sum(len(v) for v in live.values())
+    n_after = sum(len(v) for v in merged.values())
+    print(
+        f"unioned {ARCHIVE_SUBDIR}/{label}.pkl into checkpoints/{stem}.pkl "
+        f"({n_before} -> {n_after} records)"
+    )
+    return live_path
+
+
 def _cli_archive(args):
     archive_checkpoint(args.stem, args.label, force=args.force)
 
@@ -140,9 +230,19 @@ def _cli_archives(args):
     list_archives()
 
 
+def _cli_union(args):
+    union_checkpoint(
+        args.stem,
+        args.label,
+        pre_archive=not args.no_archive,
+        delete_archive=args.delete_archive,
+        force=args.force,
+    )
+
+
 def add_subparser(sub):
-    """Register the ``archive`` / ``restore`` / ``archives`` subcommands on an
-    argparse subparsers object."""
+    """Register the ``archive`` / ``restore`` / ``archives`` / ``union`` subcommands
+    on an argparse subparsers object."""
     ap = sub.add_parser("archive", help="copy an active checkpoint to the long-term shelf")
     ap.add_argument("stem", help="active checkpoint stem, e.g. hopg")
     ap.add_argument("label", nargs="?", default=None, help="archive label (default: <stem>-<date>)")
@@ -157,6 +257,24 @@ def add_subparser(sub):
 
     lp = sub.add_parser("archives", help="list the long-term shelf")
     lp.set_defaults(func=_cli_archives)
+
+    up = sub.add_parser("union", help="merge an archived checkpoint into the active slot")
+    up.add_argument("stem", help="active checkpoint stem, e.g. hopg")
+    up.add_argument("label", help="archive label to union in")
+    up.add_argument(
+        "--no-archive",
+        action="store_true",
+        help="skip archiving the live checkpoint before mutating it (default: archive first)",
+    )
+    up.add_argument(
+        "--delete-archive",
+        action="store_true",
+        help="delete the source archive after a successful union (default: leave it intact)",
+    )
+    up.add_argument(
+        "--force", action="store_true", help="overwrite an existing pre-union archive label"
+    )
+    up.set_defaults(func=_cli_union)
 
 
 def main(argv=None):
