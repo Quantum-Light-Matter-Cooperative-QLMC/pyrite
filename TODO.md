@@ -45,11 +45,18 @@ on `main` once the branch exists.
 
 ## P2 - medium (experiment match + usability)
 
-1. **External crystallography library adapters.** `codex/diffpy-structure-importer`
-   implements `diffpy.structure` CIF/import support; `codex/dans-diffraction-research`
-   implements optional `Dans_Diffraction` validation-oracle checks. Next: review/merge
-   those branches, then decide whether the original `crystals` package still offers
-   unique value.
+1. **External crystallography library adapters.** `feature/diffpy` (`67f27e0`) implements
+   `diffpy.structure` CIF/import support; `feature/dans-diffraction` (`d4dbeff`) implements
+   optional `Dans_Diffraction` validation-oracle checks. Both reviewed (read-only,
+   unmerged): verdict **MERGE-AFTER-FIXES** for each. Neither duplicates production
+   physics. Blockers: `feature/diffpy` adds a *hard* `diffpy-structure` dependency, 2 of
+   its 3 new tests cannot collect without it, and its ledger row already claims `anchored`
+   before any real test run. `feature/dans-diffraction` is correctly guarded and optional;
+   it needs only a rebase + a dangling doc reference dropped. Merge decisions are the
+   user's. Whether `crystals` remains useful hinges on one empirical check — does
+   `diffpy.structure`'s CIF parser expand space-group + Wyckoff CIFs to a full P1 basis?
+   If yes, `crystals` is redundant here.
+   Review: [`docs/crystallography-adapters-review.md`](docs/crystallography-adapters-review.md).
 2. **pyelsepa / ELSEPA transport.** -> `feature/elsepa-port` Adapter landed + **validated** (C 2.19%,
    Si 4.42% max rel vs NIST); image now builds tarball-free from
    `github.com/eScatter/elsepa`. Remaining gate: the image/venv live outside the repo
