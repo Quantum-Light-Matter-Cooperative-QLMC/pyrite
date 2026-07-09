@@ -21,6 +21,7 @@ is rarely an issue here).
 import altair as alt
 
 from ..results import records_for_cases
+from ._common import _metrics_map
 from ._frames import (
     _effective_x,
     heatmap_frame,
@@ -81,11 +82,14 @@ def metric_vs_chart(
     logy=False,
     width=720,
     height=420,
+    metrics=None,
 ):
     """Interactive 1-D parameter scan: ``metric`` vs swept ``x``, one line per
     ``hue`` value (best geometry per point). The Altair counterpart of
-    :func:`cxr_mc.plots.plot_metric_vs`. Returns an :class:`altair.Chart`, or
-    ``None`` when there are no records."""
+    :func:`cxr_mc.plots.plot_metric_vs`. ``metrics`` is a precomputed
+    ``_common._metrics_map`` (computed in the frame builder when omitted);
+    :func:`scan_charts` passes one shared map across its quantities. Returns an
+    :class:`altair.Chart`, or ``None`` when there are no records."""
     recs = records_for_cases(results, cases)
     if not recs:
         return None
@@ -100,6 +104,7 @@ def metric_vs_chart(
         cases=cases,
         rel_prominence=rel_prominence,
         line_metric=line_metric,
+        metrics=metrics,
     )
     if df.empty:
         return None
@@ -134,6 +139,7 @@ def heatmap_chart(
     min_line_quality=0.2,
     width=_HEATMAP_WIDTH,
     height=_HEATMAP_HEIGHT,
+    metrics=None,
 ):
     """Interactive parametric heatmap of one quantity over ``x`` x ``y``, faceted
     into one panel per ``panel`` value, best record per cell. The Altair
@@ -142,6 +148,9 @@ def heatmap_chart(
     are the FIXED per-panel footprint (independent of how many x/y values are
     swept -- Vega-Lite auto-divides the ordinal scale's fixed range into equal
     bands, so a dense sweep gets thinner cells rather than a wider chart).
+    ``metrics`` is a precomputed ``_common._metrics_map`` (computed in the frame
+    builder when omitted); :func:`scan_charts` passes one shared map across its
+    quantities.
     Returns an :class:`altair.Chart`, or ``None`` when there are no records."""
     key, label, cmap = _resolve_quantity(quantity)
     df = heatmap_frame(
@@ -157,6 +166,7 @@ def heatmap_chart(
         line_metric=line_metric,
         min_flux_frac=min_flux_frac,
         min_line_quality=min_line_quality,
+        metrics=metrics,
     )
     if df.empty:
         return None
@@ -209,6 +219,8 @@ def scan_charts(
     quantities = [_resolve_quantity(q) for q in (quantities or _HEATMAP_QUANTITIES)]
 
     mode = scan_mode(recs, x, y, heatmap_min, force)
+    # one metrics map shared across every quantity's chart (quantity-independent)
+    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
 
     if mode == "heatmap":
         charts = [
@@ -225,6 +237,7 @@ def scan_charts(
                 line_metric=line_metric,
                 min_flux_frac=min_flux_frac,
                 min_line_quality=min_line_quality,
+                metrics=metrics,
             )
             for key, label, cmap in quantities
         ]
@@ -245,6 +258,7 @@ def scan_charts(
             line_metric=line_metric,
             logx=logx,
             logy=logy,
+            metrics=metrics,
         )
         for key, _, _ in quantities
     ]

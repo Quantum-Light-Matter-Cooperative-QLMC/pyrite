@@ -300,7 +300,7 @@ def _(
                 "Photon density (detected vs incident), then recorded-charge density."
             )
             _detected = eaglexo_detected_chart(res, settings, tilt_deg=_tilt, x_domain=x_domain)
-            _charge = eaglexo_charge_chart(res, settings, tilt_deg=_tilt)
+            _charge = eaglexo_charge_chart(res, settings, tilt_deg=_tilt, x_domain=x_domain)
             _parts = [_md, *(c for c in (_detected, _charge) if c is not None)]
             _parts.append(
                 mo.accordion(
@@ -392,8 +392,8 @@ def _(
 
     mo.ui.tabs(
         {
-            "Top geometries": _rankings_tab,
             "Intrinsic spectra": _spectra_tab,
+            "Top geometries": _rankings_tab,
             "Geometry & scans": _scans_tab,
             "Detectors": _detectors_tab,
             "Penetration": _penetration_tab,

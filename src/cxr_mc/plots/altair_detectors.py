@@ -347,6 +347,7 @@ def eaglexo_charge_chart(
     tilt_deg=None,
     coating="BN",
     collapse_azimuth=True,
+    x_domain=None,
     width=720,
     height=360,
 ):
@@ -355,7 +356,9 @@ def eaglexo_charge_chart(
     marked. A CCD integrates charge rather than counting photons, so this shows
     where the recorded signal actually comes from. The Altair counterpart of
     :func:`cxr_mc.plots.plot_eaglexo_charge` / ``browse(kind="eaglexo_charge")``.
-    Returns an :class:`altair.Chart`, or ``None`` when there are no records."""
+    ``x_domain=(lo, hi)`` fixes the photon-energy axis limits (default:
+    autoscale). Returns an :class:`altair.Chart`, or ``None`` when there are no
+    records."""
     recs = _tilt_records(results, tilt_deg)
     if not recs:
         return None
@@ -363,7 +366,7 @@ def eaglexo_charge_chart(
     if df.empty:
         return None
     base = alt.Chart(df).encode(
-        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=_logx()),
+        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=_logx(x_domain)),
         y=alt.Y(
             "charge_density:Q",
             title="charge density (e-/eV/s)",

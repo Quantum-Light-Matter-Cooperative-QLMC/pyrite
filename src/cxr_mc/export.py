@@ -1,78 +1,57 @@
-"""Export analysis.ipynb to results/<material>_cxr_<date>.pdf via webpdf.
+"""Export the marimo analysis app to results/<stem>.html via ``marimo export``.
 
-The output is named after the ACTIVE Sweep's material in the notebook's
-parameters cell (commented-out example sweeps are skipped) plus today's date, so
-successive exports are self-describing instead of all landing on analysis.pdf.
-Pass an explicit stem to override:  ``cxr export my_custom_name``.
+The Jupyter ``analysis.ipynb`` this used to render (via nbconvert webpdf) was
+replaced by the marimo app ``notebooks/analysis_app.py``; ``marimo export html``
+executes the app headlessly and writes a static HTML snapshot -- the shareable
+artifact that replaces the old PDF. The default output name carries today's
+date so successive exports are self-describing; pass an explicit stem to
+override: ``cxr export my_custom_name``.
 
-Run from the repo root (it reads ``analysis.ipynb`` and writes into ``results/``).
+Run from the repo root (it reads ``notebooks/analysis_app.py`` and writes into
+``results/``). The app's material dropdown defaults to hopg; the export renders
+whatever the app computes headlessly.
 """
 
-import asyncio
 import datetime
-import json
-import re
+import subprocess
 import sys
 
-NOTEBOOK = "analysis.ipynb"
-
-
-def _material(nb_path):
-    """Swept material from the notebook's ACTIVE ``Sweep(...)`` in the parameters
-    cell (commented example sweeps are skipped). 'cxr' if it can't be found."""
-    try:
-        with open(nb_path, encoding="utf-8") as f:
-            nb = json.load(f)
-    except OSError:
-        return "cxr"
-    pat = re.compile(r"material\s*=\s*['\"]([A-Za-z0-9_]+)['\"]", re.IGNORECASE)
-    for cell in nb.get("cells", []):
-        if cell.get("cell_type") != "code":
-            continue
-        for line in "".join(cell.get("source", [])).splitlines():
-            if line.lstrip().startswith("#"):  # skip commented-out example sweeps
-                continue
-            m = pat.search(line)
-            if m:
-                return m.group(1).lower()
-    return "cxr"
+NOTEBOOK = "notebooks/analysis_app.py"
 
 
 def _default_stem():
-    return f"{_material(NOTEBOOK)}_cxr_{datetime.date.today():%Y-%m-%d}"
+    return f"cxr_analysis_{datetime.date.today():%Y-%m-%d}"
+
+
+def _command(stem):
+    """The ``marimo export html`` argv for one output stem (module-run through
+    the current interpreter so the venv's marimo is the one that runs)."""
+    return [
+        sys.executable,
+        "-m",
+        "marimo",
+        "export",
+        "html",
+        NOTEBOOK,
+        "-o",
+        f"results/{stem}.html",
+    ]
 
 
 def _export(stem=None):
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
-        asyncio.set_event_loop_policy = lambda *a, **k: None  # block jupyter reverting it
-
     stem = stem or _default_stem()
-    print(f"exporting {NOTEBOOK} -> results/{stem}.pdf")
-
-    from nbconvert.nbconvertapp import main as nbmain
-
-    sys.argv = [
-        "jupyter-nbconvert",
-        "--to",
-        "webpdf",
-        "--output-dir",
-        "results",
-        "--output",
-        stem,
-        NOTEBOOK,
-    ]
-    nbmain()
+    print(f"exporting {NOTEBOOK} -> results/{stem}.html")
+    subprocess.run(_command(stem), check=True)
 
 
 def add_subparser(sub):
     """Register the ``export`` subcommand on an argparse subparsers object."""
-    ap = sub.add_parser("export", help="render analysis.ipynb -> results/<stem>.pdf")
+    ap = sub.add_parser("export", help=f"render {NOTEBOOK} -> results/<stem>.html")
     ap.add_argument(
         "stem",
         nargs="?",
         default=None,
-        help="output filename stem (default: <material>_cxr_<date>)",
+        help="output filename stem (default: cxr_analysis_<date>)",
     )
     ap.set_defaults(func=lambda args: _export(args.stem))
     return ap

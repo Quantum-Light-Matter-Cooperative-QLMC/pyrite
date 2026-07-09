@@ -1,7 +1,9 @@
-"""analysis.ipynb -> results/<material>_cxr_<date>.pdf -- thin shim to cxr_mc.export.
+"""notebooks/analysis_app.py -> results/<stem>.html -- thin shim to cxr_mc.export.
 
 Kept in scripts/ for muscle-memory ``python scripts/export_pdf.py [stem]``; prefer
-the installed CLI ``cxr export [stem]``. The real logic lives in cxr_mc/export.py.
+the installed CLI ``cxr export [stem]``. The real logic lives in cxr_mc/export.py
+(now a ``marimo export html`` of the analysis app -- the old nbconvert-PDF path
+died with analysis.ipynb in the marimo migration).
 """
 
 import os

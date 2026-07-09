@@ -127,3 +127,10 @@ def test_eaglexo_charge_chart_builds_valid_spec():
 
 def test_eaglexo_charge_chart_none_on_empty():
     assert eaglexo_charge_chart({}, _settings()) is None
+
+
+def test_eaglexo_charge_chart_x_domain_fixes_scale():
+    chart = eaglexo_charge_chart(_store(wide_brem=True), _settings(), x_domain=(500.0, 7000.0))
+    spec = chart.to_dict()
+    x_scale = spec["layer"][0]["encoding"]["x"]["scale"]
+    assert x_scale["domain"] == [500.0, 7000.0]

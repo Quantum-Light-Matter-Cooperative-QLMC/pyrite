@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ..results import records_for_cases
+from ._common import _metrics_map
 from ._frames import (
     _AXIS_SPECS,
     _FLUX_GATED,  # noqa: F401  -- re-exported via plots.__init__ (frozen export set)
@@ -180,6 +181,7 @@ def plot_heatmaps(
     value_cmap="viridis",
     auto_lines=False,
     title=None,
+    metrics=None,
 ):
     """Parametric heatmaps over ANY two swept parameters ``x`` x ``y``, one panel
     per value of ``panel``, one figure per quantity.
@@ -217,6 +219,10 @@ def plot_heatmaps(
     sweep's configs -- otherwise a checkpoint accumulating several sweeps yields a
     sparse UNION of grids. Returns the list of figs.
 
+    ``metrics`` is a precomputed ``_common._metrics_map`` for this sweep's
+    records (computed once here when omitted and shared across every quantity's
+    figure); :func:`plot_scan` passes its own map through.
+
     ``value`` bypasses ``quantities``/line_metrics/``select`` entirely: pass a
     ``callable(record) -> float`` and each cell shows the MAX of ``value`` over
     its records (there is no separate quality score -- the record achieving that
@@ -237,6 +243,8 @@ def plot_heatmaps(
 
     quantities = quantities or _HEATMAP_QUANTITIES
     panel_vals = sorted({r["case"][panel] for r in recs})
+    if metrics is None:  # one shared map across every quantity's figure
+        metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
 
     figs = []
     for key, label, cmap in quantities:
@@ -253,6 +261,7 @@ def plot_heatmaps(
             line_metric=line_metric,
             min_flux_frac=min_flux_frac,
             min_line_quality=min_line_quality,
+            metrics=metrics,
         )
         panels = []  # (panel_value, Z, x_edges, y_edges)
         for pv in panel_vals:
@@ -406,6 +415,7 @@ def plot_metric_vs(
     line_metric="sharpness",
     logx=False,
     logy=False,
+    metrics=None,
 ):
     """1-D parameter scan: ``metric`` vs the swept parameter ``x``, one line per
     ``hue`` value, reducing every OTHER swept dimension to its best geometry
@@ -416,7 +426,9 @@ def plot_metric_vs(
         plot_metric_vs(res, s, x="E0_keV", metric="peak_flux", hue="tilt_deg")
 
     ``metric`` is any line_metrics key. Generalizes plot_peak_vs_tilt
-    (x="tilt_deg", metric="peak_flux", hue="E0_keV")."""
+    (x="tilt_deg", metric="peak_flux", hue="E0_keV"). ``metrics`` is a
+    precomputed ``_common._metrics_map`` (computed in the frame builder when
+    omitted); :func:`plot_scan` passes one shared map across its quantities."""
     recs = records_for_cases(results, cases)
     if not recs:
         print("no results yet")
@@ -449,6 +461,7 @@ def plot_metric_vs(
         cases=cases,
         rel_prominence=rel_prominence,
         line_metric=line_metric,
+        metrics=metrics,
     )
     fig, ax = plt.subplots(figsize=(8, 5))
     hue_vals = sorted({r["case"][hue] for r in recs})
@@ -526,6 +539,8 @@ def plot_scan(
     quantities = [_resolve_quantity(q) for q in quantities]
 
     mode = scan_mode(recs, x, y, heatmap_min, force)
+    # one metrics map shared across every quantity's figure (quantity-independent)
+    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
 
     if mode == "heatmap":
         print(f"plot_scan: heatmap mode ({x} x {y}, panel per {panel})")
@@ -542,6 +557,7 @@ def plot_scan(
             line_metric=line_metric,
             min_flux_frac=min_flux_frac,
             min_line_quality=min_line_quality,
+            metrics=metrics,
         )
 
     # line mode: denser axis -> x, sparser -> hue (unless hue is given)
@@ -560,6 +576,7 @@ def plot_scan(
             line_metric=line_metric,
             logx=logx,
             logy=logy,
+            metrics=metrics,
         )
         for key, _, _ in quantities
     ]
