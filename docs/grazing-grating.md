@@ -15,11 +15,14 @@ EDS line width that dominates the soft-X-ray band today.
 
 `src/cxr_mc/grating.py` implements the **dispersion geometry**, the
 **grazing-incidence Fresnel reflectivity** of the grating's coating, a
-**simple CCD pixel grid** (geometry-only rebinning, no QE/charge-sharing yet),
-and now a **combined forward-model entry** (`detected_image`, chaining the two
-above) that turns an `mc_spectrum` output directly into a detected image — all
-as a standalone forward model — nothing in the sweep/plot pipeline imports it
-yet. Cross-checked in `tests/test_grating.py`.
+**simple CCD pixel grid** (geometry-only rebinning), a **combined
+forward-model entry** (`detected_image`, chaining the two above) that turns an
+`mc_spectrum` output directly into a detected image, and now a **physical CCD
+response** (`qe_absorption`, `charge_cloud_sigma_um`, `energy_fwhm_eV`,
+`detected_image_physical`) with real (if device-constant-placeholder) QE,
+charge-sharing, and energy-resolution physics — all as a standalone forward
+model — nothing in the sweep/plot pipeline imports it yet. Cross-checked in
+`tests/test_grating.py`.
 
 | provided | meaning |
 | --- | --- |
@@ -35,6 +38,10 @@ yet. Cross-checked in `tests/test_grating.py`.
 | `ALEXS_SENSORS` / `SimpleCCD.from_alexs(variant)` | greateyes ALEX-s `1k256`/`2k512` pixel-format registry + a fixed pixel grid built from it |
 | `bin_to_pixels(position_mm, intensity_per_mm, ccd, center_mm=None)` | rebin a dispersed profile onto `ccd`'s fixed pixels (each pixel integrates the polar-angle/position span it subtends); light outside the sensor is dropped |
 | `detected_image(E_grid_eV, spec, grating, ccd, distance_mm, weight_by_throughput=True, ...)` | combined forward-model entry: `mc_spectrum` output → dispersed, detected image (counts vs pixel), chaining `disperse_spectrum` + `bin_to_pixels` |
+| `qe_absorption(E, active_um=ACTIVE_SI_UM, peak=ENTRANCE_QE_PEAK)` | Beer-Lambert absorption-efficiency QE of the active silicon |
+| `charge_cloud_sigma_um(E, active_um=..., v_dep=DEPLETION_VOLTAGE_V, temp_c=OPERATING_TEMP_C)` | lateral charge-cloud RMS spread [um] from drift-diffusion |
+| `energy_fwhm_eV(E, n_pix=4, read_noise_e=READ_NOISE_E)` | Fano + read-noise single-photon energy resolution (photon-counting mode; not applied by default) |
+| `detected_image_physical(E_grid_eV, spec, grating, ccd, distance_mm, ...)` | like `detected_image`, but weights by `qe_absorption` before binning and applies the `charge_cloud_sigma_um` Gaussian blur (at the detected spectrum's flux-weighted mean energy) after binning |
 
 ## Physics and conventions
 
@@ -101,7 +108,8 @@ Real instrument, not a hypothetical, for the reflectivity/CCD phases below:
 
 ## What is NOT modelled yet (and why)
 
-Dispersion geometry, coating reflectivity, and simple pixel binning are
+Dispersion geometry, coating reflectivity, simple pixel binning, and now a
+closed-form physical CCD response (QE, charge sharing, energy resolution) are
 modelled; deliberately still out of scope:
 
 - **Groove-profile diffraction efficiency** vs energy and angle — the coating's
@@ -109,11 +117,18 @@ modelled; deliberately still out of scope:
   groove-profile efficiency factor is a placeholder scalar
   (`Grating.groove_efficiency`, default 1.0), not a real model. That needs a
   scalar or rigorous-coupled-wave (RCWA) treatment of the ruled profile.
-- **CCD detector physics** (QE(E), charge sharing, energy resolution, Poisson
-  acquisition noise) — `SimpleCCD`/`bin_to_pixels` only rebin the already-
-  computed flux onto a fixed pixel grid; every photon that lands within the
-  sensor's physical extent is "detected" with unit efficiency. See step 5
-  below for the planned upgrade path.
+- **Measured ALEX-s QE/noise curves** — `qe_absorption`/`charge_cloud_sigma_um`/
+  `energy_fwhm_eV` (step 5) are real closed-form physics (Beer-Lambert
+  absorption, Einstein-relation drift-diffusion, Fano + read noise), but their
+  device constants (`ACTIVE_SI_UM`, `DEPLETION_VOLTAGE_V`, `OPERATING_TEMP_C`,
+  `READ_NOISE_E`, `ENTRANCE_QE_PEAK`) are placeholders — no public greateyes
+  ALEX-s datasheet was found (unlike the Eagle XO's digitized
+  `eaglexo_qe.csv`). `detected_image_physical`'s charge-cloud blur also uses a
+  single characteristic sigma at the frame's flux-weighted mean energy, not a
+  per-photon energy-dependent blur, and `energy_fwhm_eV` is exposed but not
+  applied anywhere (this module models the ALEX-s as an imaging, not
+  photon-counting, detector). No Poisson acquisition-noise draw yet either
+  (cf. `eaglexo_response.poisson_counts`).
 - **Aberrations / focusing** (spherical or VLS gratings, Rowland circle) — the
   flat-detector `x = L tan(β − β_ref)` map ignores defocus and coma.
 - **Source size / beam divergence** — a real line image is the convolution of the
@@ -141,10 +156,15 @@ modelled; deliberately still out of scope:
    the Timepix / Eagle XO models. Pure composition of steps 2 and 3 (chains
    `disperse_spectrum` then `bin_to_pixels`) — no new physics, so no new ledger
    row.
-5. Replace the simple CCD with a more physical model (QE(E), charge sharing,
-   energy resolution) once step 4's pipeline is validated structurally — same
-   upgrade path `eaglexo_response.py` took from geometry-only to a digitized QE
-   curve.
+5. **(done)** Replace the simple CCD with a more physical model: Beer-Lambert
+   absorption QE (`qe_absorption`), Einstein-relation drift-diffusion charge
+   sharing (`charge_cloud_sigma_um`), and Fano+read-noise energy resolution
+   (`energy_fwhm_eV`), composed into `detected_image_physical` — same upgrade
+   path `eaglexo_response.py` took, except no digitized greateyes ALEX-s
+   datasheet exists (unlike the Eagle XO's `eaglexo_qe.csv`), so this is
+   closed-form physics with `### FILL IN` device constants rather than a
+   measured curve — see "What is NOT modelled yet" and the
+   `alexs-qe-absorption`/`alexs-charge-diffusion` ledger rows.
 6. **(preliminary survey done, no code yet)** Survey CCD/grating options beyond
    the McPherson 251MX + ALEX-s pairing for the broader ~10 eV-4 keV band (the
    251MX's 2400 g/mm grating tops out near 1.24 keV), preferring broadband
@@ -174,9 +194,13 @@ modelled; deliberately still out of scope:
    panel; validate against a measured grating-spectrometer dataset when available
    (data-dependent, like P1's other gated items).
 
-Coating reflectivity (step 2), simple pixel binning (step 3), and the combined
+Coating reflectivity (step 2), simple pixel binning (step 3), the combined
 `mc_spectrum` → `Grating` → `SimpleCCD` forward-model entry `detected_image`
-(step 4) are done; groove-profile efficiency remains a placeholder scalar, so
-the throughput-weighted dispersed image is closer to real flux than the purely
-geometric one but still not final until a groove-efficiency model lands. Step
-5 (replacing the simple CCD with real detector physics) is next.
+(step 4), and a closed-form physical CCD response (`detected_image_physical`,
+step 5) are done; groove-profile efficiency remains a placeholder scalar, and
+the physical CCD's device constants (active thickness, depletion voltage,
+temperature, read noise) are `### FILL IN` placeholders pending a real
+greateyes datasheet, so the throughput- and QE-weighted, charge-cloud-blurred
+image is closer to real flux/PSF than the purely geometric one but still not
+final until a groove-efficiency model and real ALEX-s hardware numbers land.
+Step 6 (the broadband hardware survey) is next to turn into code/a choice.

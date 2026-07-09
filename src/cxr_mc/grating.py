@@ -31,13 +31,28 @@ geometry only (no QE, charge-sharing, or energy resolution yet).
 entry: `mc_spectrum` output + a `Grating` + a `SimpleCCD` -> the dispersed,
 detected image (counts vs pixel), chaining `disperse_spectrum` and
 `bin_to_pixels` so it slots in beside the Timepix / Eagle XO detector models.
+
+`qe_absorption`, `charge_cloud_sigma_um`, `energy_fwhm_eV`, and
+`detected_image_physical` (phased-plan step 5) upgrade the geometry-only
+`SimpleCCD`/`bin_to_pixels` with closed-form detector physics -- Beer-Lambert
+absorption QE, Einstein-relation drift-diffusion charge sharing, Fano +
+read-noise energy resolution -- the same ladder `eaglexo_response.py` climbed
+for the Eagle XO. No public greateyes ALEX-s datasheet QE/noise curve exists
+(unlike the Eagle XO's digitized `eaglexo_qe.csv`), so these are physics
+formulas with device-specific constants (active thickness, depletion voltage,
+temperature, read noise) flagged '### FILL IN' pending a real datasheet.
 """
 
 from dataclasses import dataclass
 
 import numpy as np
 
-from .crystallography import HC_EV_ANG, optical_constants  # h*c [eV*Angstrom]
+from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
+from .crystallography import (
+    HC_EV_ANG,
+    absorption_length_ang,
+    optical_constants,
+)  # h*c [eV*Angstrom]
 
 # ---- coating optical constants (grazing-incidence reflectivity) --------------
 # Atomic number density n = rho/A * N_A, converted cm^-3 -> Ang^-3 (the unit
@@ -366,3 +381,199 @@ def resolving_power(E_eV, grating, distance_mm, pixel_mm, beta_ref_rad=None):
     dlam = pixel_mm / dx_dlam  # Angstrom per pixel
     lam = wavelength_angstrom(E_eV)
     return lam / dlam
+
+
+# ---- physical CCD: QE, charge sharing, energy resolution (phased-plan step 5) --
+# Upgrades SimpleCCD's geometry-only pixel binning with real detector physics,
+# the same "geometry -> QE(E) -> charge diffusion" ladder eaglexo_response.py
+# climbed for the Eagle XO. No digitized greateyes ALEX-s datasheet QE/noise
+# curve is publicly available (unlike the Eagle XO's eaglexo_qe.csv), so QE and
+# charge diffusion below are both closed-form physics models (Beer-Lambert
+# absorption efficiency; Einstein-relation drift-diffusion) with the
+# DEVICE-SPECIFIC numeric constants (active thickness, depletion voltage,
+# temperature, read noise) flagged '### FILL IN' pending a real greateyes
+# datasheet/measurement -- same pattern as eaglexo_response.py's
+# DEFAULT_DISTANCE_M / ACTIVE_SI_UM.
+ACTIVE_SI_UM = 30.0  ### FILL IN -- active (depleted) Si thickness [um] of the
+#   greateyes ALEX-s sensor; no public datasheet value found. Deep-depletion
+#   back-illuminated CCDs built for SXR/EUV typically run ~30-50 um; this is a
+#   mid-range placeholder, NOT a measured/confirmed ALEX-s number.
+DEPLETION_VOLTAGE_V = 40.0  ### FILL IN -- full-depletion bias [V]; a typical
+#   deep-depletion scientific-CCD range (~20-50 V), not ALEX-s-confirmed.
+OPERATING_TEMP_C = -60.0  ### FILL IN -- greateyes markets ALEX-s as
+#   "deep-cooled"; -60 C is a representative TE-cooled operating point for
+#   that product family, not a confirmed ALEX-s spec.
+READ_NOISE_E = 3.0  ### FILL IN -- read noise [e- RMS] at slow readout; no
+#   public ALEX-s figure found, set close to the Eagle XO's 2.3 e-
+#   (eaglexo_response.READ_NOISE_E) as a representative deep-cooled-CCD value.
+ENTRANCE_QE_PEAK = 0.9  ### FILL IN -- entrance-surface / dead-layer loss
+#   factor capping the Beer-Lambert QE below 1; representative back-
+#   illuminated-CCD value (cf. eaglexo_response.qe_absorption_model's
+#   peak=0.93 default), not measured for ALEX-s.
+
+_K_B_EV_PER_K = 8.617333262e-5  # Boltzmann constant [eV/K] (== [V/K], 1 eV/e- = 1 V)
+
+
+def qe_absorption(E_eV, active_um=None, peak=None):
+    """CCD quantum efficiency from pure Beer-Lambert absorption in the active
+    silicon:
+
+        QE(E) = peak * (1 - exp(-t / L_abs(E)))
+
+    t = ``active_um`` (default `ACTIVE_SI_UM`), L_abs from Henke f2
+    (`crystallography.absorption_length_ang`, the same absorption length used
+    throughout this repo -- see the `absorption-length` ledger entry).
+
+    Derivation: a photon normally incident on a slab of thickness t is
+    absorbed within it with probability ``1 - exp(-t/L_abs)`` (Beer-Lambert).
+    ``peak`` < 1 folds in the fixed entrance-surface / dead-layer loss a real
+    back-illuminated CCD has on top of bulk absorption (not modelled here from
+    first principles -- see `ENTRANCE_QE_PEAK`). This is the SAME functional
+    form as `eaglexo_response.qe_absorption_model` (a cross-check there, since
+    a measured datasheet curve is primary for the Eagle XO); here it IS
+    primary, since no greateyes ALEX-s QE datasheet is publicly available --
+    see the module docstring and `ACTIVE_SI_UM`.
+
+    Limiting cases:
+      - t << L_abs(E) (hard photon / thin sensor): QE -> peak * t/L_abs(E),
+        the optically-thin linear regime.
+      - t >> L_abs(E) (soft photon / thick sensor): QE -> peak, full capture.
+
+    Validation: alexs-qe-absorption
+    """
+    t_um = ACTIVE_SI_UM if active_um is None else active_um
+    p = ENTRANCE_QE_PEAK if peak is None else peak
+    E = np.asarray(E_eV, dtype=float)
+    L_ang = absorption_length_ang("Si", np.clip(E, 1e-3, None), SI_N_PER_ANG3)
+    out = p * (1.0 - np.exp(-(t_um * 1.0e4) / L_ang))  # um -> Angstrom
+    return np.nan_to_num(out, nan=0.0, posinf=0.0, neginf=0.0)
+
+
+def charge_cloud_sigma_um(E_eV, active_um=None, v_dep=None, temp_c=None):
+    """Lateral charge-cloud RMS spread [um] from diffusion during drift to the
+    front-side electrodes, for a photon absorbed at depth z(E) in a back-
+    illuminated, fully-depleted sensor of active thickness t under bias
+    ``v_dep`` (uniform field ``E_field = v_dep/t``) at temperature ``temp_c``.
+
+    Derivation: the drifting charge cloud diffuses while it drifts a distance
+    ``d = t - z`` to the front (collecting) surface. With the Einstein
+    relation ``D = mu*kT/q`` and drift velocity ``v_d = mu*E_field``, the
+    drift time is ``t_drift = d/v_d``, so:
+
+        sigma^2 = 2 D t_drift = 2 (kT/q) d / E_field = 2 (kT/q) t d / v_dep
+
+    -- mobility mu cancels, leaving only the thermal voltage kT/q, the
+    geometry (t, d), and the bias v_dep. ``z(E)`` is approximated by the
+    characteristic absorption depth ``min(L_abs(E), t)`` (exact only in the
+    ``L_abs << t`` limit for the true exponential absorption profile; a
+    reasonable single-number stand-in otherwise -- a full depth-resolved
+    treatment is future work). Source: Einstein relation + drift-diffusion,
+    the standard semiconductor-detector treatment of charge-cloud spreading in
+    back-illuminated CCDs (e.g. Janesick, "Scientific Charge-Coupled Devices",
+    SPIE 2001, Ch. 4).
+
+    Limiting cases:
+      - Soft photon (L_abs -> 0): absorbed right at the back (entrance)
+        surface, drifts the FULL thickness t -> sigma -> t*sqrt(2 kT/(q*v_dep)),
+        the maximum blur -- matches the well-known result that back-
+        illuminated CCDs blur soft X-rays MORE than hard ones.
+      - Hard photon (L_abs >= t): absorbed at the front (z=t) -> zero drift
+        distance -> sigma -> 0 (though QE is also falling here, see
+        `qe_absorption`).
+
+    Validation: alexs-charge-diffusion
+    """
+    t_um = ACTIVE_SI_UM if active_um is None else active_um
+    v = DEPLETION_VOLTAGE_V if v_dep is None else v_dep
+    T_c = OPERATING_TEMP_C if temp_c is None else temp_c
+    kT_over_q = _K_B_EV_PER_K * (T_c + 273.15)  # thermal voltage [V] (1 eV/e- == 1 V)
+    E = np.asarray(E_eV, dtype=float)
+    L_ang = absorption_length_ang("Si", np.clip(E, 1e-3, None), SI_N_PER_ANG3)
+    L_um = L_ang * 1.0e-4
+    z_um = np.minimum(L_um, t_um)
+    drift_um = t_um - z_um
+    sigma_um = np.sqrt(2.0 * kT_over_q * t_um * drift_um / v)
+    return np.nan_to_num(sigma_um, nan=0.0, posinf=0.0, neginf=0.0)
+
+
+def energy_fwhm_eV(E_eV, n_pix=4, read_noise_e=None):
+    """Single-photon energy-measurement FWHM [eV] in photon-counting mode:
+    Fano statistics on the e-h pair count plus read noise over ``n_pix``
+    pixels the charge cloud covers, in quadrature on the variance -- the
+    SAME formula (and role) as `eaglexo_response.energy_fwhm_eV`, restated
+    here for the ALEX-s's own W_Si/Fano/read-noise constants:
+
+        sigma_N^2 = F (E / W_Si) + n_pix sigma_read^2   [electrons^2]
+        FWHM = 2.3548 * W_Si * sigma_N
+
+    Not applied by default anywhere in this module (the ALEX-s is used here as
+    an imaging, not photon-counting, detector) -- exposed for parity with
+    `eaglexo_response` and future photon-counting-mode use. No new physics
+    equation vs. that existing formula, so no separate ledger row.
+    """
+    rn = READ_NOISE_E if read_noise_e is None else read_noise_e
+    E = np.asarray(E_eV, dtype=float)
+    var_e = FANO_SI * (E / W_EHP_EV) + n_pix * rn**2  # [e-^2]
+    return 2.3548 * W_EHP_EV * np.sqrt(var_e)  # [eV]
+
+
+def detected_image_physical(
+    E_grid_eV,
+    spec,
+    grating,
+    ccd,
+    distance_mm,
+    *,
+    weight_by_throughput=True,
+    beta_ref_rad=None,
+    center_mm=None,
+    active_um=None,
+    v_dep=None,
+    temp_c=None,
+    peak_qe=None,
+):
+    """Physical-CCD combined forward-model entry (phased-plan step 5): like
+    `detected_image`, but folds in the ALEX-s QE(E) (`qe_absorption`) before
+    binning and the charge-cloud diffusion blur (`charge_cloud_sigma_um`)
+    after binning, instead of `SimpleCCD`'s unit-efficiency, no-blur geometry.
+
+    Pipeline: ``spec * grating.throughput(E)`` (optional, via
+    ``weight_by_throughput``) ``* qe_absorption(E)`` -> `disperse_spectrum`'s
+    flux-conserving Jacobian remap -> `bin_to_pixels` -> a Gaussian blur in
+    pixel space with sigma set by `charge_cloud_sigma_um` evaluated at the
+    FLUX-WEIGHTED MEAN energy of the (QE- and throughput-weighted) input
+    spectrum. That is a single characteristic width for the whole frame, not a
+    per-photon energy-dependent blur (the latter would need per-photon
+    tracking this module doesn't do) -- a reasonable simplification when one
+    line/band dominates the frame, less so for a broad multi-line spectrum
+    spanning a wide charge-cloud-sigma range. The blur is applied with
+    zero-padded (not periodic) edges, so it is flux-conserving except for
+    charge diffusing past the sensor's physical edge pixels -- the same
+    "real finite detector" behavior `bin_to_pixels` already has for light
+    landing outside the sensor outright.
+
+    Returns ``(pixel_centers_mm, counts_per_pixel)``, same contract as
+    `detected_image`.
+    """
+    E = np.asarray(E_grid_eV, dtype=float)
+    spec = np.asarray(spec, dtype=float) * qe_absorption(E, active_um=active_um, peak=peak_qe)
+    x, inten = disperse_spectrum(
+        E,
+        spec,
+        grating,
+        distance_mm,
+        beta_ref_rad=beta_ref_rad,
+        weight_by_throughput=weight_by_throughput,
+    )
+    centers, counts = bin_to_pixels(x, inten, ccd, center_mm=center_mm)
+
+    weighted_spec = spec * grating.throughput(E) if weight_by_throughput else spec
+    total = np.trapezoid(weighted_spec, E)
+    E_mean = float(np.trapezoid(weighted_spec * E, E) / total) if total > 0 else float(np.mean(E))
+    sigma_um = float(charge_cloud_sigma_um(E_mean, active_um=active_um, v_dep=v_dep, temp_c=temp_c))
+    sigma_px = (sigma_um * 1.0e-3) / ccd.pixel_mm  # um -> mm -> pixels
+    if sigma_px > 0:
+        from scipy.ndimage import gaussian_filter1d
+
+        counts = gaussian_filter1d(counts, sigma_px, mode="constant", cval=0.0)
+    return centers, counts

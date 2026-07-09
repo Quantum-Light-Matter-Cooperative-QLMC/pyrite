@@ -3,17 +3,22 @@
 import numpy as np
 import pytest
 
-from cxr_mc.crystallography import HC_EV_ANG, optical_constants
+from cxr_mc._si_sensor import SI_N_PER_ANG3
+from cxr_mc.crystallography import HC_EV_ANG, absorption_length_ang, optical_constants
 from cxr_mc.grating import (
     ALEXS_SENSORS,
     Grating,
     SimpleCCD,
     bin_to_pixels,
+    charge_cloud_sigma_um,
     coating_number_density_per_ang3,
     detected_image,
+    detected_image_physical,
     detector_position_mm,
     disperse_spectrum,
+    energy_fwhm_eV,
     groove_spacing_angstrom,
+    qe_absorption,
     resolving_power,
     wavelength_angstrom,
 )
@@ -256,3 +261,142 @@ def test_detected_image_matches_geometry_only_when_throughput_disabled():
     x, inten = disperse_spectrum(E, spec, g, distance_mm=200.0, weight_by_throughput=False)
     _, counts_manual = bin_to_pixels(x, inten, ccd)
     assert np.allclose(counts, counts_manual)
+
+
+# ---- physical CCD: QE, charge sharing, energy resolution (phased-plan step 5) --
+
+
+def test_qe_absorption_bounded_and_thickness_limits():
+    E = np.array([200.0, 900.0, 4000.0])
+    # t/L_abs ~ 1e-5 - 1e-7 here (see absorption lengths of ~0.04-9.7 um over
+    # this band) -- deep enough into the optically-thin regime that the
+    # leading-order linear approximation holds to << 1e-3 relative.
+    t_thin_um = 1.0e-4
+    qe_thin = qe_absorption(E, active_um=t_thin_um, peak=1.0)  # t << L_abs everywhere
+    qe_thick = qe_absorption(E, active_um=1.0e4, peak=1.0)  # t >> L_abs everywhere
+    assert np.all(qe_thin >= 0.0) and np.all(qe_thin <= 1.0)
+    assert np.all(qe_thick >= 0.0) and np.all(qe_thick <= 1.0)
+    # optically-thin limit: QE -> t/L_abs (linear regime)
+    L_ang = absorption_length_ang("Si", E, SI_N_PER_ANG3)
+    expected_thin = (t_thin_um * 1.0e4) / L_ang
+    assert qe_thin == pytest.approx(expected_thin, rel=1e-3)
+    # optically-thick limit: QE -> peak (full capture)
+    assert qe_thick == pytest.approx(1.0, abs=1e-6)
+    # peak scales the whole curve
+    assert qe_absorption(900.0, active_um=1.0e4, peak=0.5) == pytest.approx(0.5, abs=1e-6)
+
+
+def test_qe_absorption_increases_with_thickness():
+    E = 900.0
+    thin = float(qe_absorption(E, active_um=1.0, peak=1.0))
+    thick = float(qe_absorption(E, active_um=100.0, peak=1.0))
+    assert 0.0 < thin < thick <= 1.0
+
+
+def test_charge_cloud_sigma_soft_photon_is_maximum_blur():
+    # L_abs(10 eV, Si) ~ 0.04 um: with a (deliberately oversized, for this
+    # limit test) t=1000 um active layer, L_abs/t ~ 4e-5 -- deep enough into
+    # the "absorbed right at the back surface" regime that drift ~ t almost
+    # exactly, so sigma -> t*sqrt(2 kT/(q v_dep)) (see derivation) to << 1e-3.
+    t_um, v_dep, temp_c = 1000.0, 40.0, -60.0
+    sigma_soft = float(charge_cloud_sigma_um(10.0, active_um=t_um, v_dep=v_dep, temp_c=temp_c))
+    k_b_ev_per_k = 8.617333262e-5
+    kT_over_q = k_b_ev_per_k * (temp_c + 273.15)
+    expected_max = t_um * np.sqrt(2.0 * kT_over_q / v_dep)
+    assert sigma_soft == pytest.approx(expected_max, rel=1e-3)
+
+
+def test_charge_cloud_sigma_zero_when_absorbed_at_front():
+    # L_abs(E) >= t: absorbed right at the front electrodes -> zero drift -> sigma -> 0.
+    t_um = 1e-6  # vanishingly thin sensor: L_abs(E) >= t for any real E
+    sigma = float(charge_cloud_sigma_um(900.0, active_um=t_um, v_dep=40.0, temp_c=-60.0))
+    assert sigma == pytest.approx(0.0, abs=1e-9)
+
+
+def test_charge_cloud_sigma_positive_and_bounded_by_soft_limit():
+    t_um, v_dep, temp_c = 30.0, 40.0, -60.0
+    k_b_ev_per_k = 8.617333262e-5
+    kT_over_q = k_b_ev_per_k * (temp_c + 273.15)
+    max_sigma = t_um * np.sqrt(2.0 * kT_over_q / v_dep)
+    for E in [50.0, 300.0, 900.0, 2000.0, 4000.0]:
+        sigma = float(charge_cloud_sigma_um(E, active_um=t_um, v_dep=v_dep, temp_c=temp_c))
+        assert 0.0 <= sigma <= max_sigma + 1e-9
+
+
+def test_energy_fwhm_ev_positive_and_grows_with_energy():
+    fwhm_low = float(energy_fwhm_eV(200.0))
+    fwhm_high = float(energy_fwhm_eV(2000.0))
+    assert fwhm_low > 0.0 and fwhm_high > fwhm_low
+
+
+def test_detected_image_physical_matches_manual_qe_dispersion_bin():
+    g = Grating(groove_density_per_mm=1200.0, alpha_rad=np.deg2rad(86.0), order=1, coating="Au")
+    ccd = SimpleCCD.from_alexs("2k512")
+    E = np.arange(500.0, 1200.0, 1.0)
+    spec = np.exp(-0.5 * ((E - 850.0) / 6.0) ** 2)  # a line at 850 eV
+    centers, counts = detected_image_physical(E, spec, g, ccd, distance_mm=200.0)
+    assert centers.shape == (ccd.n_pix,)
+    assert counts.shape == (ccd.n_pix,)
+    assert counts.sum() > 0
+    # manual QE weighting before the existing (already-tested) dispersion+binning chain
+    spec_qe = spec * qe_absorption(E)
+    x, inten = disperse_spectrum(E, spec_qe, g, distance_mm=200.0, weight_by_throughput=True)
+    centers_manual, counts_manual_unblurred = bin_to_pixels(x, inten, ccd)
+    assert np.allclose(centers, centers_manual)
+    # the charge-cloud blur conserves total flux (up to edge losses,
+    # negligible for a line well inside the sensor). Under these DEFAULT
+    # device constants (deep-depletion, cold, high-field -- by design a small
+    # charge cloud) the blur sigma is sub-pixel at 850 eV, so the blurred and
+    # unblurred images can legitimately coincide; see
+    # test_detected_image_physical_blur_redistributes_flux_across_pixels for a
+    # case with parameters chosen to make the blur pixel-visible.
+    assert counts.sum() == pytest.approx(counts_manual_unblurred.sum(), rel=1e-3)
+
+
+def test_detected_image_physical_reduces_counts_vs_geometry_only():
+    g = Grating(groove_density_per_mm=1200.0, alpha_rad=np.deg2rad(86.0), order=1, coating="Au")
+    ccd = SimpleCCD(n_pix=2000, pixel_mm=0.05)
+    E = np.arange(500.0, 1200.0, 1.0)
+    spec = np.exp(-0.5 * ((E - 850.0) / 6.0) ** 2)
+    _, counts_physical = detected_image_physical(E, spec, g, ccd, distance_mm=200.0)
+    _, counts_geom = detected_image(E, spec, g, ccd, distance_mm=200.0, weight_by_throughput=False)
+    # QE <= 1 and throughput <= 1 both reduce flux relative to raw geometry
+    assert 0.0 < counts_physical.sum() < counts_geom.sum()
+
+
+def test_charge_cloud_sigma_decreases_with_energy_over_Si_absorption_band():
+    # sigma(E) tracks drift = t - min(L_abs(E), t): softer photons absorb
+    # closer to the entrance surface (small L_abs) and so drift further, all
+    # else equal -- the well-known "back-illuminated CCDs blur soft X-rays
+    # more" result. 200 eV -> 4 keV both have L_abs << t=30 um (drift ~ t,
+    # near the max-blur plateau); 8 keV has L_abs=68.7 um > t, so drift -> 0.
+    t_um, v_dep, temp_c = 30.0, 40.0, -60.0
+    sigma_200 = float(charge_cloud_sigma_um(200.0, active_um=t_um, v_dep=v_dep, temp_c=temp_c))
+    sigma_4000 = float(charge_cloud_sigma_um(4000.0, active_um=t_um, v_dep=v_dep, temp_c=temp_c))
+    sigma_8000 = float(charge_cloud_sigma_um(8000.0, active_um=t_um, v_dep=v_dep, temp_c=temp_c))
+    assert sigma_200 > sigma_4000 > sigma_8000 == pytest.approx(0.0, abs=1e-9)
+
+
+def test_detected_image_physical_blur_redistributes_flux_across_pixels():
+    # Deliberately EXAGGERATED (non-physical) v_dep/active_um -- just to make
+    # the charge-cloud sigma several pixels wide so the convolution mechanism
+    # itself is pixel-visible; the default device constants give a sub-pixel
+    # cloud by design (see test_detected_image_physical_matches_manual_qe_dispersion_bin).
+    g = Grating(groove_density_per_mm=1200.0, alpha_rad=np.deg2rad(86.0), order=1, coating="Au")
+    ccd = SimpleCCD(n_pix=4000, pixel_mm=0.01)
+    E = np.arange(500.0, 1200.0, 1.0)
+    spec = np.exp(-0.5 * ((E - 850.0) / 0.5) ** 2)  # a very narrow input line
+    kwargs = dict(active_um=100.0, v_dep=0.5, temp_c=20.0)
+    centers, counts = detected_image_physical(E, spec, g, ccd, distance_mm=200.0, **kwargs)
+    x, inten = disperse_spectrum(
+        E, spec * qe_absorption(E, active_um=100.0), g, distance_mm=200.0, weight_by_throughput=True
+    )
+    _, counts_unblurred = bin_to_pixels(x, inten, ccd)
+    assert counts.sum() > 0
+    # total flux conserved (this line sits well inside the wide sensor, so no
+    # edge losses either from binning or from the blur's zero-padded edges)
+    assert counts.sum() == pytest.approx(counts_unblurred.sum(), rel=1e-2)
+    # the blur visibly redistributes flux: pixels that were exactly zero
+    # before blurring now carry some counts near the peak
+    zero_before = counts_unblurred == 0.0
+    assert np.any(counts[zero_before] > 0.0)
