@@ -5,9 +5,12 @@ import pytest
 
 from cxr_mc.crystallography import (
     CRYSTALS,
+    HC_EV_ANG,
+    absorption_length_ang,
     chi_g,
     debye_waller,
     dominant_reflections,
+    optical_constants,
     reciprocal_g_vector,
     structure_factor,
 )
@@ -131,3 +134,26 @@ def test_sapphire_structure_sane():
     assert len(info["basis"]) == 30
     assert sum(1 for el, _ in info["basis"] if el == "Al") == 12
     assert sum(1 for el, _ in info["basis"] if el == "O") == 18
+
+
+def test_optical_constants_beta_matches_absorption_length():
+    # beta computed by optical_constants IS absorption_length_ang's beta_idx by
+    # construction (same r_e, lambda, 2pi normalization) -- cross-check that
+    # mu = 2 k beta reproduces 1/absorption_length_ang exactly (limiting-case
+    # consistency check, not an independent derivation).
+    E = 1500.0
+    n_per_ang3 = 0.05  # arbitrary number density; only the beta<->mu relation is checked
+    _, beta = optical_constants("Si", E, n_per_ang3)
+    lam = HC_EV_ANG / E
+    k = 2.0 * np.pi / lam
+    mu = 2.0 * k * beta
+    L_abs = absorption_length_ang("Si", E, n_per_ang3)
+    assert (1.0 / mu) == pytest.approx(L_abs, rel=1e-9)
+
+
+def test_optical_constants_delta_positive_off_edge():
+    # Off any absorption edge, delta > 0 (n = 1 - delta < 1, the usual X-ray
+    # regime) and beta > 0 (absorptive).
+    delta, beta = optical_constants("Au", 1500.0, 0.059)
+    assert delta > 0.0
+    assert beta > 0.0

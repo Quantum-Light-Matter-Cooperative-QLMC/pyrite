@@ -17,15 +17,47 @@ theta_g = 90 deg - alpha of a few degrees) for usable reflectivity; that is a
 property of `alpha`, not a different equation.
 
 This module is standalone (nothing in the sweep/plot pipeline imports it yet);
-see docs/grazing-grating.md for the modality and the phased plan. Reflectivity /
-groove efficiency are NOT modelled here -- this is dispersion geometry only.
+see docs/grazing-grating.md for the modality and the phased plan. Grazing-
+incidence Fresnel reflectivity of the coating is modelled (`Grating.reflectivity`);
+groove-profile diffraction efficiency is NOT -- `Grating.groove_efficiency` is a
+placeholder scalar (a rigorous scalar/RCWA treatment is future work, see
+docs/grazing-grating.md).
 """
 
 from dataclasses import dataclass
 
 import numpy as np
 
-from .crystallography import HC_EV_ANG  # h*c [eV*Angstrom]
+from .crystallography import HC_EV_ANG, optical_constants  # h*c [eV*Angstrom]
+
+# ---- coating optical constants (grazing-incidence reflectivity) --------------
+# Atomic number density n = rho/A * N_A, converted cm^-3 -> Ang^-3 (the unit
+# crystallography.optical_constants wants) -- same pattern as
+# _si_sensor.SI_N_PER_ANG3 (0.602214076 = N_A * 1e-24). Densities and molar
+# masses are standard elemental values (CRC Handbook of Chemistry and Physics /
+# IUPAC standard atomic weights) for the coatings common on SXR grazing-
+# incidence gratings and mirrors.
+_COATING_DENSITY_G_CM3 = {
+    "Au": 19.30,  # gold: most common SXR grazing-incidence grating/mirror coating
+    "Pt": 21.45,  # platinum: common alternative, higher-Z
+    "Ni": 8.908,  # nickel: common alternative, cheaper
+}
+_COATING_MOLAR_MASS_G_MOL = {
+    "Au": 196.96657,
+    "Pt": 195.084,
+    "Ni": 58.6934,
+}
+
+
+def coating_number_density_per_ang3(element):
+    """Atomic number density [1/Angstrom^3] of a coating element (rho/A * N_A,
+    cm^-3 -> Ang^-3), for the elements in `_COATING_DENSITY_G_CM3`."""
+    if element not in _COATING_DENSITY_G_CM3:
+        raise KeyError(
+            f"No coating density/molar-mass data for '{element}'. "
+            f"Known coatings: {sorted(_COATING_DENSITY_G_CM3)}."
+        )
+    return _COATING_DENSITY_G_CM3[element] / _COATING_MOLAR_MASS_G_MOL[element] * 0.602214076
 
 
 def wavelength_angstrom(E_eV):
@@ -45,11 +77,26 @@ class Grating:
     groove_density_per_mm : ruling density (e.g. 1200 lines/mm).
     alpha_rad : incidence angle from the grating NORMAL (grazing => near pi/2).
     order : diffraction order m (1 typical; 0 is specular).
+    coating : reflective coating element symbol, one of `_COATING_DENSITY_G_CM3`
+        (default "Au"). Confirmed for the McPherson 251MX's four gratings
+        (120/300/1200/2400 g/mm all gold-coated per McPherson's own product
+        materials, see docs/grazing-grating.md "Hardware targets"); the exact
+        groove *profile* (laminar vs blazed) feeding a future groove-efficiency
+        model is still McPherson-family-typical, not 251MX-confirmed.
+    groove_efficiency : placeholder scalar diffraction efficiency in [0, 1],
+        NOT a real groove-profile efficiency model (that needs a scalar or
+        rigorous-coupled-wave (RCWA) treatment, out of scope here -- see
+        docs/grazing-grating.md "What is NOT modelled yet"). Default 1.0
+        (i.e. no groove-efficiency penalty applied) is itself the placeholder.
+        ### FILL IN once a groove-profile model or measured efficiency curve
+        lands.
     """
 
     groove_density_per_mm: float
     alpha_rad: float
     order: int = 1
+    coating: str = "Au"
+    groove_efficiency: float = 1.0
 
     @property
     def d_angstrom(self) -> float:
@@ -75,6 +122,55 @@ class Grating:
         beta = self.diffraction_angle_rad(E_eV)
         return self.order / (self.d_angstrom * np.cos(beta))
 
+    def reflectivity(self, E_eV):
+        """Grazing-incidence Fresnel reflectivity R(E) of the coating (bare-film;
+        groove-profile diffraction efficiency is NOT included, see `throughput`).
+
+        Complex refractive index n = 1 - delta - i*beta of `coating`
+        (`crystallography.optical_constants`, Henke/Chantler f1 = Z+f', f2). At
+        the incidence grazing angle theta = `grazing_angle_rad` (measured from
+        the surface; theta, delta, beta all << 1), the vacuum/medium Fresnel
+        amplitude reflectivity r = (k_z1 - k_z2)/(k_z1 + k_z2), with
+        k_z1 = k0 sin(theta) ~ k0 theta and
+        k_z2 = k0 sqrt(n^2 - cos^2 theta) ~ k0 sqrt(theta^2 - 2 delta - 2i beta)
+        (using n^2 - 1 ~ -2 delta - 2i beta and cos^2 theta ~ 1 - theta^2 for
+        theta << 1 rad), reduces to the standard small-angle form:
+
+            r(theta) = (theta - sqrt(theta^2 - 2 delta - 2i beta))
+                       / (theta + sqrt(theta^2 - 2 delta - 2i beta))
+            R(theta) = |r(theta)|^2
+
+        Source: Als-Nielsen & McMorrow, "Elements of Modern X-ray Physics" 2nd
+        ed., Ch. 3 (refraction and reflection at an interface); equivalently
+        Attwood & Sakdinawat, "X-Rays and Extreme Ultraviolet Radiation" 2nd
+        ed., Ch. 3. ASSUMES grazing incidence, where the s- and p-polarization
+        reflectivities coincide to good approximation (the polarization factor
+        -> cos(2 theta) -> 1 as theta -> 0), so R is treated here as
+        polarization-independent -- standard practice for grazing-incidence
+        SXR optics, stated explicitly since it is an approximation.
+
+        Limiting cases (beta -> 0 idealization, theta_c = sqrt(2 delta)):
+          - theta << theta_c: the sqrt argument is negative, so r is a pure
+            phase, |r| = 1 -> total external reflection, R -> 1.
+          - theta >> theta_c: R -> (theta_c / (2 theta))^4 (Als-Nielsen &
+            McMorrow's steep power-law falloff above the critical angle).
+
+        Validation: grazing-reflectivity
+        """
+        n_per_ang3 = coating_number_density_per_ang3(self.coating)
+        delta, beta = optical_constants(self.coating, E_eV, n_per_ang3)
+        theta = self.grazing_angle_rad
+        inside = theta**2 - 2.0 * delta - 2.0j * beta
+        root = np.sqrt(inside)
+        r = (theta - root) / (theta + root)
+        return np.abs(r) ** 2
+
+    def throughput(self, E_eV):
+        """Combined grating throughput: Fresnel `reflectivity(E)` times the
+        placeholder `groove_efficiency` scalar (NOT a real groove-profile
+        efficiency model -- see that field's docstring)."""
+        return self.reflectivity(E_eV) * self.groove_efficiency
+
 
 def detector_position_mm(beta_rad, beta_ref_rad, distance_mm):
     """Where a ray diffracted at beta lands on a flat detector a distance
@@ -83,7 +179,9 @@ def detector_position_mm(beta_rad, beta_ref_rad, distance_mm):
     return distance_mm * np.tan(np.asarray(beta_rad, float) - beta_ref_rad)
 
 
-def disperse_spectrum(E_grid_eV, spec, grating, distance_mm, *, beta_ref_rad=None):
+def disperse_spectrum(
+    E_grid_eV, spec, grating, distance_mm, *, beta_ref_rad=None, weight_by_throughput=False
+):
     """Map an energy spectrum onto detector positions through ``grating``.
 
     Returns ``(position_mm, intensity_per_mm)`` for the input energies whose order
@@ -91,9 +189,19 @@ def disperse_spectrum(E_grid_eV, spec, grating, distance_mm, *, beta_ref_rad=Non
     is reweighted by the Jacobian ``|dE/dx|`` so that integral(I dx) == integral(spec dE).
     ``beta_ref_rad`` (the detector-normal direction) defaults to the mean
     diffraction angle, centring the dispersed band on the detector.
+
+    ``weight_by_throughput`` (default False -- preserves the existing purely-
+    geometric behavior): when True, ``spec`` is first multiplied by
+    ``grating.throughput(E)`` (Fresnel reflectivity x groove_efficiency, see
+    ``Grating.throughput``) before the Jacobian remap below, so the returned
+    intensity is a throughput-weighted (still flux-conserving, now w.r.t. the
+    *weighted* input) profile rather than a purely geometric one. This only
+    rescales the input spectrum; the Jacobian math itself is untouched.
     """
     E = np.asarray(E_grid_eV, float)
     spec = np.asarray(spec, float)
+    if weight_by_throughput:
+        spec = spec * grating.throughput(E)
     beta = grating.diffraction_angle_rad(E)
     if beta_ref_rad is None:
         beta_ref_rad = float(np.nanmean(beta))

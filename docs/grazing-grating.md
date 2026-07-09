@@ -13,17 +13,21 @@ EDS line width that dominates the soft-X-ray band today.
 
 ## Status
 
-`src/cxr_mc/grating.py` implements the **dispersion geometry** (the concrete,
-testable physics) as a standalone forward model — nothing in the sweep/plot
-pipeline imports it yet. Cross-checked in `tests/test_grating.py`.
+`src/cxr_mc/grating.py` implements the **dispersion geometry** and the
+**grazing-incidence Fresnel reflectivity** of the grating's coating (the
+concrete, testable physics) as a standalone forward model — nothing in the
+sweep/plot pipeline imports it yet. Cross-checked in `tests/test_grating.py`.
 
 | provided | meaning |
 | --- | --- |
 | `wavelength_angstrom(E)` / `groove_spacing_angstrom(ρ)` | unit conversions |
-| `Grating(groove_density_per_mm, alpha_rad, order)` | a grating in a fixed mount |
+| `coating_number_density_per_ang3(element)` | atomic number density for a coating (Au/Pt/Ni) |
+| `Grating(groove_density_per_mm, alpha_rad, order, coating, groove_efficiency)` | a grating in a fixed mount |
 | `Grating.diffraction_angle_rad(E)` | the grating equation `sinβ = mλ/d − sinα` (NaN if no propagating order) |
 | `Grating.angular_dispersion_rad_per_angstrom(E)` | `dβ/dλ = m/(d cosβ)` |
-| `disperse_spectrum(E, spec, grating, distance_mm)` | **flux-conserving** map of a spectrum to detector position (`∫I dx = ∫spec dE`) |
+| `Grating.reflectivity(E)` | small-angle Fresnel reflectivity `R(E)` of the coating (grazing angle, polarization-independent approximation) |
+| `Grating.throughput(E)` | `reflectivity(E) × groove_efficiency` (the latter a placeholder scalar, not a real groove-profile model) |
+| `disperse_spectrum(E, spec, grating, distance_mm, weight_by_throughput=False)` | **flux-conserving** map of a spectrum to detector position (`∫I dx = ∫spec dE`); optionally throughput-weighted |
 | `resolving_power(E, grating, distance_mm, pixel_mm)` | pixel-limited `λ/Δλ` |
 
 ## Physics and conventions
@@ -43,6 +47,23 @@ d (sin α + sin β) = m λ          →     sin β = m λ / d − sin α
   rulings; see the test).
 - `λ = hc / E` with `hc = 12398.42 eV·Å` (`crystallography.HC_EV_ANG`).
 
+Grazing-incidence Fresnel reflectivity of the coating, small-angle form:
+
+```
+n = 1 − δ − iβ                              (complex refractive index)
+r(θ) = (θ − √(θ² − 2δ − 2iβ)) / (θ + √(θ² − 2δ − 2iβ))
+R(θ) = |r(θ)|²
+```
+
+with `θ` the grazing angle (`Grating.grazing_angle_rad`) and `δ, β` from
+`crystallography.optical_constants` (Henke/Chantler `f1 = Z+f'`, `f2`). Treated
+as polarization-independent, the standard grazing-incidence approximation
+(source, assumptions, and limiting cases are in `Grating.reflectivity`'s
+docstring). `Grating.throughput(E) = reflectivity(E) × groove_efficiency`
+combines this with the placeholder groove-efficiency scalar; pass
+`weight_by_throughput=True` to `disperse_spectrum` to get a throughput-weighted
+dispersed profile instead of a purely geometric one.
+
 ## Hardware targets
 
 Real instrument, not a hypothetical, for the reflectivity/CCD phases below:
@@ -51,8 +72,20 @@ Real instrument, not a hypothetical, for the reflectivity/CCD phases below:
   gratings — 120, 300, 1200, 2400 g/mm — covering roughly 6 eV-1.24 keV in total
   (each grating's own band is narrower); fixed ~87° incidence from normal (< 3°
   grazing), ~25 mm flat focal-plane length. This caps out well below the ~4 keV
-  target range, so it is the *first* grating, not the only one — step 4 below
+  target range, so it is the *first* grating, not the only one — step 6 below
   surveys broadband options to extend upward.
+  **Coating: gold**, confirmed for all four groove densities from McPherson's own
+  product materials (press release + product page), matching `Grating`'s default
+  `coating="Au"` — no longer just a placeholder guess ([McPherson 251MX product
+  page](https://www.mcphersoninc.com/spectrometers/xuhvvuvuv/model251mx.html);
+  [flat-field grating press release](https://mcphersoninc.com/pressreleases/flatFieldGrating120.html)).
+  A related McPherson product line describes **laminar (square-wave, not blazed)
+  groove profiles** and a steeper ~1.5° grazing option for higher-energy reach —
+  useful groundwork for a future groove-efficiency model (step in "What is NOT
+  modelled yet"), but **not confirmed** to be the exact 251MX groove profile, so
+  treat as McPherson-family-typical rather than hardware-verified. No quantitative
+  efficiency curve for the 251MX was found publicly — absolute throughput numbers
+  remain unconfirmed pending a datasheet/measurement.
 - **Detector: greateyes ALEX-s** deep-cooled CCD, two formats:
   - `1k256`: 1024×255 px, 26 µm pixels, 26.6×6.7 mm active area.
   - `2k512`: 2048×515 px, 13.5 µm pixels, 27.6×6.9 mm active area.
@@ -62,12 +95,14 @@ Real instrument, not a hypothetical, for the reflectivity/CCD phases below:
 
 ## What is NOT modelled yet (and why)
 
-This is *dispersion geometry only*. Deliberately out of scope for the scaffold:
+Dispersion geometry and coating reflectivity are modelled; deliberately still
+out of scope:
 
-- **Grating reflectivity / groove efficiency** vs energy and angle — needs the
-  coating optical constants and a groove-profile efficiency model (e.g. a scalar
-  or rigorous-coupled-wave treatment). This sets the absolute throughput and the
-  usable band, so it is the first thing to add before any flux comparison.
+- **Groove-profile diffraction efficiency** vs energy and angle — the coating's
+  Fresnel reflectivity is modelled (`Grating.reflectivity`), but the
+  groove-profile efficiency factor is a placeholder scalar
+  (`Grating.groove_efficiency`, default 1.0), not a real model. That needs a
+  scalar or rigorous-coupled-wave (RCWA) treatment of the ruled profile.
 - **Aberrations / focusing** (spherical or VLS gratings, Rowland circle) — the
   flat-detector `x = L tan(β − β_ref)` map ignores defocus and coma.
 - **Source size / beam divergence** — a real line image is the convolution of the
@@ -77,10 +112,13 @@ This is *dispersion geometry only*. Deliberately out of scope for the scaffold:
 ## Phased plan to a real modality
 
 1. **(done)** Dispersion geometry + resolving power, tested.
-2. Reflectivity/efficiency `R(E, α)` from coating optical constants (xraydb can
-   supply `f', f''` → δ, β → Fresnel reflectivity at grazing angle) × a groove
-   efficiency factor, parameterized per McPherson 251MX grating (120/300/1200/2400
-   g/mm); multiply into `disperse_spectrum`.
+2. **(done)** Coating Fresnel reflectivity `R(E)` from optical constants
+   (`crystallography.optical_constants`: `f', f''` → δ, β → Fresnel reflectivity
+   at grazing angle, `Grating.reflectivity`), combined with a placeholder groove-
+   efficiency scalar into `Grating.throughput`, wired into `disperse_spectrum` via
+   `weight_by_throughput=True`. The groove-profile efficiency itself (vs.
+   McPherson 251MX grating: 120/300/1200/2400 g/mm) is still a placeholder — see
+   "What is NOT modelled yet".
 3. A **simple** CCD forward model: bin detected photons by the polar angle each
    pixel subtends (no QE/charge-sharing structure yet), sized to the ALEX-s
    1k256/2k512 pixel formats above. This is deliberately crude — it exists to get
@@ -93,13 +131,36 @@ This is *dispersion geometry only*. Deliberately out of scope for the scaffold:
    energy resolution) once step 4's pipeline is validated structurally — same
    upgrade path `eaglexo_response.py` took from geometry-only to a digitized QE
    curve.
-6. Survey CCD/grating options beyond the McPherson 251MX + ALEX-s pairing for the
-   broader ~10 eV-4 keV band (the 251MX's 2400 g/mm grating tops out near
-   1.24 keV), preferring broadband coverage. Independent lookups/implementation
-   here parallelize well across agents.
+6. **(preliminary survey done, no code yet)** Survey CCD/grating options beyond
+   the McPherson 251MX + ALEX-s pairing for the broader ~10 eV-4 keV band (the
+   251MX's 2400 g/mm grating tops out near 1.24 keV), preferring broadband
+   coverage. Findings so far (web/literature search, not yet cross-checked
+   against primary datasheets in all cases — flagged where uncertain):
+   - **Grating spectrometers**: Horiba/Jobin-Yvon PGM200 (grazing-incidence
+     flat-field, interchangeable 1800/450 g/mm gratings, "varied groove depth"
+     technology for a broadened single-grating band — exact range unconfirmed);
+     Bestec GmbH custom plane-/spherical-grating monochromators (soft-to-hard
+     X-ray, beamline-grade, custom builds not a catalog product); a published
+     research instrument (Imazono et al., *Appl. Opt.* 57(27):7770, 2018,
+     [PubMed](https://pubmed.ncbi.nlm.nih.gov/30462040/)) reaches 0.9-3.3 keV
+     using an **aperiodic Ni/C multilayer** grating coating rather than a simple
+     metal film — direct evidence that a multilayer coating (not gold) plus a
+     shallower grazing angle is likely required to push toward the 4 keV goal.
+   - **Detectors**: Andor iKon-M/L/XL "SO" series and Newton "SO" series
+     (windowless, open-front, direct-detection CCDs, 13-26 µm pixels, up to
+     4.2 MP, peak QE ~95%, CF152 UHV flange) and Princeton Instruments
+     PIXIS-XO / PI-MTE (back-illuminated, no AR coating, 10 eV-30 keV quoted,
+     rotatable ConFlat flange, up to 2048×2048) are catalog alternatives to the
+     greateyes ALEX-s family in the same windowless direct-detection class. Note
+     the visually-similar Andor Newton **BEX2-DD** variant has a fused-silica
+     *window* and is NOT usable here — only the "SO" line is windowless.
+   - Not yet actionable as code; this is groundwork for a future hardware-survey
+     writeup, not a `Grating`/CCD implementation choice.
 7. Optionally expose grating parameters as `Sweep` knobs and add a `plots.py`
    panel; validate against a measured grating-spectrometer dataset when available
    (data-dependent, like P1's other gated items).
 
-Reflectivity (step 2) is the next high-value piece — until then the dispersed
-profile is a *relative* spectrum, correct in position but not in throughput.
+Coating reflectivity (step 2) is done; groove-profile efficiency remains a
+placeholder scalar, so the throughput-weighted dispersed profile is closer to
+real flux than the purely geometric one but still not final until a
+groove-efficiency model lands (step 3+).
