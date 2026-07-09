@@ -68,9 +68,13 @@ on `main` once the branch exists.
 7. **`analysis_app.py` parameter-sweep views.** Support parameter sweeps (e.g. the
    crystal-thickness sweeps in the current h-BN work); today the app silently shows only
    the thinnest crystal.
-8. **Checkpoint union tooling.** Union a live material checkpoint with an archived one
-   for the same material; archive the current pickle first by default, leave the source
-   archive intact — both overridable (skip archive / delete old archive).
+8. **Checkpoint union tooling.** `feature/checkpoint-union` — merged (now on `main`).
+   `cxr union <stem> <label>` merges an archived checkpoint into the active slot at
+   (config name, E0) granularity; live wins on collision (records carry no provenance
+   stamp to break ties by recency). Refuses a material mismatch, pre-archives the live
+   pickle by default (`--no-archive` skips), leaves the source archive intact by default
+   (`--delete-archive` removes it), and refuses outright — even with `--force` — when the
+   pre-union backup label would collide with the archive being unioned in.
 
 ## P3 - lower / exploratory
 

@@ -31,8 +31,8 @@ Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
 ## Entry points
 
 - **`cxr` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
-  dispatching the `scan`, `export`, `slim`, `archive`, `restore` and `archives`
-  subcommands.
+  dispatching the `scan`, `export`, `slim`, `archive`, `restore`, `archives` and
+  `union` subcommands.
 - **`cxr scan <material>`** → `scan:main` → `run.run_sweep` → writes
   `checkpoints/<material>.pkl`. Root shim: `scan.py`.
 - **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint) →
@@ -44,9 +44,10 @@ Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
   `results.slim_results`: shrink a checkpoint pickle for transfer (drop
   wide-brem / float32 / filter configs; `--grid` keeps only the material's
   current-grid configs).
-- **`cxr archive`/`restore`/`archives`** → `archive:*`: the local checkpoint
-  shelf — copy the active slot `checkpoints/<stem>.pkl` to/from the long-term
-  `checkpoints/archive/<label>.pkl`.
+- **`cxr archive`/`restore`/`archives`/`union`** → `archive:*`: the local
+  checkpoint shelf — copy the active slot `checkpoints/<stem>.pkl` to/from the
+  long-term `checkpoints/archive/<label>.pkl`; `union` merges a shelved
+  checkpoint back into the active slot for the same material.
 - **Sweep worker**: `montecarlo.run_case` (module-level so it pickles into the
   `run_cases` process pool).
 
@@ -254,12 +255,17 @@ keeps only the material's current-grid configs).
 - Deps: `results` (`slim_results`, `_grid_names`).
 
 ### `archive.py`
-`cxr archive`/`restore`/`archives` subcommands — the durable local checkpoint
-shelf. Copy the active slot `checkpoints/<stem>.pkl` to/from the long-term
-`checkpoints/archive/<label>.pkl` (atomic temp+replace, `--force` overwrite
-guards, label↔stem date-stamp inference).
+`cxr archive`/`restore`/`archives`/`union` subcommands — the durable local
+checkpoint shelf. Copy the active slot `checkpoints/<stem>.pkl` to/from the
+long-term `checkpoints/archive/<label>.pkl` (atomic temp+replace, `--force`
+overwrite guards, label↔stem date-stamp inference). `union` merges an archived
+checkpoint into the active slot for the SAME material (compared via each
+store's `case["crystal"]`), live winning on any overlapping (config name, E0)
+point; archives the live checkpoint first by default (`--no-archive` to skip)
+and leaves the source archive intact by default (`--delete-archive` to remove
+it).
 - Public: `archive_checkpoint`, `restore_checkpoint`, `list_archives`,
-  `add_subparser`, `main`.
+  `union_checkpoint`, `add_subparser`, `main`.
 
 ### `__init__.py`
 Package root: exposes `DATA_DIR` (packaged-data resolver) and `__version__`.
