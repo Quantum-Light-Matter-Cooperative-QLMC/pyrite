@@ -19,6 +19,19 @@ on `main` once the branch exists.
 
 ## P1 - high value (physics accuracy + publication validation)
 
+### Active
+
+1. **Grazing-incidence soft X-ray diffraction grating - CCD + geometry buildout.**
+   -> `feature/grazing-grating`. Promoted from P3: dispersion geometry landed; next
+   is grating reflectivity/groove efficiency, then a real detected-image forward
+   model (start with a simple CCD that bins photons by per-pixel polar angle,
+   then a more physical CCD model), sized to real hardware — McPherson 251MX
+   gratings (120/300/1200/2400 g/mm, ~6 eV-1.24 keV) and greateyes ALEX-s
+   1k256/2k512 CCDs — before surveying broader ~10 eV-4 keV CCD/grating options.
+   Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+
+### Gated
+
 1. **Crystal mosaicity - measured-data validation.** MC route implemented; validate
    broadened line widths vs. a measured HOPG rocking-curve / EDS dataset
    (data-dependent). Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
@@ -54,9 +67,6 @@ on `main` once the branch exists.
 8. **Checkpoint union tooling.** Union a live material checkpoint with an archived one
    for the same material; archive the current pickle first by default, leave the source
    archive intact — both overridable (skip archive / delete old archive).
-9. **`remote.py stop` ergonomics.** Make `stop <material>` stop the sole running job
-    with no arg (one job at a time); add `stop -a/--all` to clear the queue and
-    `stop <mat...>` to drop specific queued materials.
 
 ## P3 - lower / exploratory
 
@@ -64,18 +74,17 @@ on `main` once the branch exists.
    `feature/marimo-altair-followups` closed out the remaining fixes (blank detector
    tabs, mos2 multilayer penetration, angle selector, intrinsic-spectra controls,
    heatmap sizing/ticks, `scan_app.py` material dropdown). Two small deferred items:
+
    - `eaglexo_charge_chart` doesn't yet take `x_domain=` (only the two
      detected-vs-incident charts do).
    - The dense penetration-grid accordion (matplotlib, Penetration tab) is still
      fixed at `energy=30` regardless of the angle selector above it.
    - The x/y plot-limit entry boxes should move into the Spectra tab they belong to.
-2. **Grazing-incidence soft X-ray diffraction grating.** -> `feature/grazing-grating`.
-   Dispersion scaffold implemented; next is grating reflectivity + detected-image model.
-3. **`remote.py start` and `remote.py start --follow` hang.** Launches the task but hangs afterward and `--follow` never
-   attaches the tqdm progress bar.
-4. **Git history cleanup.** Squash minor upkeep/doc commits; evaluate other repo
+   - Add capability to click on individual heatmap pixels to select that parameter set for spectral plotting
+   - Change default first tab to "intrinsic spectra" instead of "top geometries"
+2. **Git history cleanup.** Squash minor upkeep/doc commits; evaluate other repo
    structure/history improvements.
-5. **Dynamic GPU chunk sizing.** Evaluate config-driven chunk-size selection for
+3. **Dynamic GPU chunk sizing.** Evaluate config-driven chunk-size selection for
    `dev/remote.py` GPU runs (probe a few test cases against the config's array sizes),
    including a write-up of what chunking is and how config values drive it.
 
