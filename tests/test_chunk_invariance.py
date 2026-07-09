@@ -3,12 +3,16 @@
 The ``spec_chunk`` / ``brem_chunk`` knobs only bound how many trajectory segments
 go into each GPU matmul -- they must not change the physics. The only thing that
 moves when the chunk size changes is the float-summation reduction ORDER across
-the chunk loop, so the spectra agree to a float tolerance rather than bit-for-bit
-(the docstring's rtol~=1e-10). This gate is what lets the A1 spike retune the
-chunk size for throughput without silently perturbing results.
+the chunk loop, so the spectra agree to a float tolerance rather than bit-for-bit.
+This gate is what lets the A1 spike retune the chunk size for throughput without
+silently perturbing results.
 
-CPU-only and fast (the suite forces the NumPy backend), so the reorder is at the
-float64 level (~1e-13 relative); the loose rtol leaves generous headroom.
+The tolerance must track the backend's accumulation precision, which
+``montecarlo._backend.REAL`` selects at import: float64 on a CPU box (or under
+``CXR_FP64=1``), float32 on a GPU. Reordering an N-term sum perturbs it by
+roughly ``sqrt(N)*eps`` relative, so a fixed float64 rtol spuriously fails on
+any GPU machine -- the historical bug this parametrization fixes. Set
+``CUDA_VISIBLE_DEVICES=""`` to exercise the strict float64 path anywhere.
 """
 
 import numpy as np
@@ -16,6 +20,7 @@ import pytest
 
 from cxr_mc.crystallography import CRYSTALS
 from cxr_mc.montecarlo import mc_brem_spectrum, mc_spectrum, simulate_trajectories
+from cxr_mc.montecarlo._backend import REAL
 from cxr_mc.montecarlo.runner import _env_chunk
 
 THETA = np.deg2rad(119.0)
@@ -30,6 +35,13 @@ BIG_CHUNK = 10**9  # one shot: the whole segment set in a single matmul
 
 _info = CRYSTALS["hopg"]
 _n_atoms = len(_info["basis"]) / _info["V_cell"]
+
+# Reordering an N-term float sum moves it by ~sqrt(N)*eps relative. The chunk
+# loop here reduces over ~1e4 segments, so allow a few hundred eps of the
+# backend's working precision: 1e-10 under float64 (far above the ~1e-13 the
+# reorder actually costs), ~2e-5 under the GPU's float32.
+_EPS = float(np.finfo(REAL).eps)
+RTOL = max(1e-10, 200.0 * _EPS)
 
 
 @pytest.fixture(scope="module")
@@ -46,7 +58,7 @@ def segments():
 def _assert_chunk_invariant(one_shot, chunked):
     peak = float(np.max(np.abs(one_shot)))
     assert peak > 0.0  # a degenerate all-zero spectrum would pass vacuously
-    np.testing.assert_allclose(chunked, one_shot, rtol=1e-10, atol=1e-12 * peak)
+    np.testing.assert_allclose(chunked, one_shot, rtol=RTOL, atol=RTOL * 1e-2 * peak)
 
 
 def test_line_spectrum_chunk_invariant(segments):

@@ -44,6 +44,7 @@ temperature, read noise) flagged '### FILL IN' pending a real datasheet.
 """
 
 from dataclasses import dataclass
+from typing import TypedDict
 
 import numpy as np
 
@@ -245,9 +246,20 @@ def disperse_spectrum(
 # "Hardware targets"). n_pix / pixel_um are along the DISPERSION axis (the
 # sensor's long axis); active_mm is (dispersion, cross-dispersion) extent,
 # included for reference only (this simple model is 1-D, along dispersion).
-ALEXS_SENSORS = {
-    "1k256": dict(n_pix=1024, pixel_um=26.0, active_mm=(26.6, 6.7)),
-    "2k512": dict(n_pix=2048, pixel_um=13.5, active_mm=(27.6, 6.9)),
+class AlexsSensor(TypedDict):
+    """One greateyes ALEX-s sensor format. Typing the registry with this (rather
+    than ``dict[str, Any]``) lets pyright keep ``n_pix`` an ``int`` and
+    ``pixel_um`` a ``float`` through the ``SimpleCCD.from_alexs`` spread, the
+    same way :class:`config.MaterialGrid` types ``_MATERIAL_GRIDS``."""
+
+    n_pix: int
+    pixel_um: float
+    active_mm: tuple[float, float]
+
+
+ALEXS_SENSORS: dict[str, AlexsSensor] = {
+    "1k256": AlexsSensor(n_pix=1024, pixel_um=26.0, active_mm=(26.6, 6.7)),
+    "2k512": AlexsSensor(n_pix=2048, pixel_um=13.5, active_mm=(27.6, 6.9)),
 }
 
 
