@@ -34,7 +34,8 @@ import pandas as pd
 from .. import eaglexo_response as eag
 from .. import timepix_response as tpx
 from ._common import _best_azimuth, _case_title
-from .altair_spectra import _tilt_records
+from .altair_spectra import _scale as _axis_scale
+from .altair_spectra import _tilt_records, _validate_band, _windowed_frame
 from .detectors import (
     SI_K_EDGE_EV,
     _eag_detected,
@@ -62,6 +63,34 @@ def _title(recs, tail):
     return _case_title(recs[0]["case"], tail, latex=False)
 
 
+def _y_scale(df, y_field, y_type, x_domain=None, y_domain=None, floor_frac=1e-5):
+    if y_type not in {"linear", "log"}:
+        raise ValueError(f"scale type must be 'linear' or 'log', got {y_type!r}")
+    if y_domain is not None:
+        return _axis_scale(y_type, y_domain)
+    if y_type == "linear":
+        if x_domain is None:
+            return _axis_scale("linear")
+        windowed = _windowed_frame(df.rename(columns={y_field: "intensity"}), x_domain)
+        hi = float(windowed["intensity"].max()) if not windowed.empty else 0.0
+        if hi <= 0:
+            return _axis_scale("linear")
+        return alt.Scale(domainMin=0.0, domainMax=hi * 1.05)
+
+    windowed = _windowed_frame(df.rename(columns={y_field: "intensity"}), x_domain)
+    positive = windowed.loc[windowed["intensity"] > 0, "intensity"]
+    if positive.empty:
+        return _axis_scale("log")
+    floor = max(float(positive.min()), float(positive.max()) * floor_frac)
+    return alt.Scale(type="log", domainMin=floor, clamp=True)
+
+
+def _detector_x_scale(x_type, x_domain):
+    if x_type == "log" and x_domain is None:
+        return _logx()
+    return _axis_scale(x_type, x_domain)
+
+
 # ---- Timepix3 detected vs incident -------------------------------------------
 def timepix_detected_frame(
     recs,
@@ -72,6 +101,7 @@ def timepix_detected_frame(
     n_mc=80000,
     seed=0,
     collapse_azimuth=True,
+    band="broad",
 ):
     """Tidy long-form incident-vs-Timepix3-detected table for ``recs`` (already
     restricted to one polar tilt): one row per (beam energy, grid point, kind),
@@ -80,6 +110,7 @@ def timepix_detected_frame(
     ``"line"`` (fine line grid) or ``"brem"`` (the wide brem-grid tail, present
     only when the sweep stored ``brem_wide``). Columns:
     ``energy_eV, intensity, E0_keV, azimuth_deg, kind, band``."""
+    _validate_band(band)
     frames = []
     for E0, grp in _collapsed(recs, collapse_azimuth=collapse_azimuth):
         for r in grp:
@@ -99,7 +130,7 @@ def timepix_detected_frame(
                         }
                     )
                 )
-            if r.get("brem_wide") is not None:
+            if band == "broad" and r.get("brem_wide") is not None:
                 Eb = np.asarray(r["E_grid_brem"], dtype=float)
                 tail = Eb > float(np.nanmax(E))
                 if np.any(tail):
@@ -131,14 +162,21 @@ def timepix_detected_frame(
     return pd.concat(frames, ignore_index=True)
 
 
-def _detected_layers(df):
+def _detected_layers(
+    df,
+    *,
+    x_scale=alt.Undefined,
+    y_scale=alt.Undefined,
+    color_field="E0_keV",
+    color_title="beam energy (keV)",
+):
     """The shared incident (dashed)/detected (solid) line layers for a
     detected-vs-incident frame. ``detail`` splits the line/brem bands so the two
     grids never join across their gap."""
     base = alt.Chart(df).encode(
-        x=alt.X("energy_eV:Q", title="Photon energy (eV)"),
-        y=alt.Y("intensity:Q", title="Phs/eV/s/nA", scale=alt.Scale(type="log")),
-        color=alt.Color("E0_keV:N", title="beam energy (keV)"),
+        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
+        y=alt.Y("intensity:Q", title="Phs/eV/s/nA", scale=y_scale),
+        color=alt.Color(f"{color_field}:N", title=color_title),
         detail="band:N",
         tooltip=["E0_keV:N", "energy_eV:Q", "intensity:Q", "kind:N", "band:N"],
     )
@@ -160,6 +198,10 @@ def timepix_detected_chart(
     seed=0,
     collapse_azimuth=True,
     x_domain=None,
+    y_domain=None,
+    x_type="linear",
+    y_type="log",
+    band="broad",
     width=720,
     height=360,
 ):
@@ -181,18 +223,15 @@ def timepix_detected_chart(
         n_mc=n_mc,
         seed=seed,
         collapse_azimuth=collapse_azimuth,
+        band=band,
     )
     if df.empty:
         return None
-    incident, detected = _detected_layers(df)
-    if x_domain is not None:
-        x_scale = alt.Scale(domain=list(x_domain))
-        incident = incident.encode(
-            x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale)
-        )
-        detected = detected.encode(
-            x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale)
-        )
+    incident, detected = _detected_layers(
+        df,
+        x_scale=_detector_x_scale(x_type, x_domain),
+        y_scale=_y_scale(df, "intensity", y_type, x_domain, y_domain),
+    )
     thr = (
         alt.Chart(pd.DataFrame({"E": [_thr_keV() * 1e3]}))
         .mark_rule(color="gray", strokeDash=[4, 4])
@@ -214,6 +253,7 @@ def eaglexo_detected_frame(
     coating="BN",
     resolve_energy=False,
     collapse_azimuth=True,
+    band="broad",
 ):
     """Tidy long-form incident-vs-Eagle-XO-detected table for ``recs`` (one polar
     tilt): one row per (beam energy, grid point, kind, band). ``kind`` in
@@ -222,6 +262,7 @@ def eaglexo_detected_frame(
     ``brem_wide``). Mirrors :func:`cxr_mc.plots.detectors._draw_eaglexo_detected`,
     including the thin-sensor QE roll-off on the wide brem. Columns:
     ``energy_eV, intensity, E0_keV, azimuth_deg, kind, band``."""
+    _validate_band(band)
     frames = []
     for E0, grp in _collapsed(recs, collapse_azimuth=collapse_azimuth):
         for r in grp:
@@ -229,7 +270,7 @@ def eaglexo_detected_frame(
             inc, det = _eag_detected(r, settings, coating, resolve_energy)
             az = float(r["case"]["tilt_azim_deg"])
             rows = [("line", E, inc, det)]
-            if r.get("brem_wide") is not None:
+            if band == "broad" and r.get("brem_wide") is not None:
                 Eb = np.asarray(r["E_grid_brem"], dtype=float)
                 inc_b = np.asarray(r["brem_wide"], dtype=float) * r["scale"]
                 det_b = inc_b * eag.qe(Eb, coating)
@@ -263,6 +304,10 @@ def eaglexo_detected_chart(
     collapse_azimuth=True,
     show_qe=True,
     x_domain=None,
+    y_domain=None,
+    x_type="log",
+    y_type="log",
+    band="broad",
     width=720,
     height=360,
 ):
@@ -284,13 +329,13 @@ def eaglexo_detected_chart(
         coating=coating,
         resolve_energy=resolve_energy,
         collapse_azimuth=collapse_azimuth,
+        band=band,
     )
     if df.empty:
         return None
-    incident, detected = _detected_layers(df)
-    xsc = _logx(x_domain)
-    incident = incident.encode(x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=xsc))
-    detected = detected.encode(x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=xsc))
+    xsc = _detector_x_scale(x_type, x_domain)
+    ysc = _y_scale(df, "intensity", y_type, x_domain, y_domain)
+    incident, detected = _detected_layers(df, x_scale=xsc, y_scale=ysc)
     layers = [
         incident,
         detected,
@@ -322,7 +367,7 @@ def eaglexo_detected_chart(
 
 
 # ---- Eagle XO recorded-charge density ----------------------------------------
-def eaglexo_charge_frame(recs, settings, *, coating="BN", collapse_azimuth=True):
+def eaglexo_charge_frame(recs, settings, *, coating="BN", collapse_azimuth=True, band="broad"):
     """Tidy long-form Eagle XO recorded-charge density [e-/eV/s] for ``recs`` (one
     polar tilt): one row per (beam energy, grid point, band). ``band`` is
     ``"line"`` (fine grid, lines + line-grid brem) or ``"brem"`` (the wide brem
@@ -330,6 +375,7 @@ def eaglexo_charge_frame(recs, settings, *, coating="BN", collapse_azimuth=True)
     charge than its photon count. Mirrors
     :func:`cxr_mc.plots.detectors._draw_eaglexo_charge`. Columns:
     ``energy_eV, charge_density, E0_keV, azimuth_deg, band``."""
+    _validate_band(band)
     cur = settings.beam_current_na
     frames = []
     for E0, grp in _collapsed(recs, collapse_azimuth=collapse_azimuth):
@@ -349,7 +395,7 @@ def eaglexo_charge_frame(recs, settings, *, coating="BN", collapse_azimuth=True)
                     }
                 )
             )
-            if r.get("brem_wide") is not None:
+            if band == "broad" and r.get("brem_wide") is not None:
                 Eb = np.asarray(r["E_grid_brem"], dtype=float)
                 inc_b = np.nan_to_num(np.asarray(r["brem_wide"], dtype=float) * r["scale"])
                 cd_b = inc_b * eag.qe(Eb, coating) * (Eb / eag.W_EHP_EV) * cur
@@ -377,6 +423,10 @@ def eaglexo_charge_chart(
     coating="BN",
     collapse_azimuth=True,
     x_domain=None,
+    y_domain=None,
+    x_type="log",
+    y_type="log",
+    band="broad",
     width=720,
     height=360,
 ):
@@ -391,15 +441,21 @@ def eaglexo_charge_chart(
     recs = _tilt_records(results, tilt_deg)
     if not recs:
         return None
-    df = eaglexo_charge_frame(recs, settings, coating=coating, collapse_azimuth=collapse_azimuth)
+    df = eaglexo_charge_frame(
+        recs, settings, coating=coating, collapse_azimuth=collapse_azimuth, band=band
+    )
     if df.empty:
         return None
     base = alt.Chart(df).encode(
-        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=_logx(x_domain)),
+        x=alt.X(
+            "energy_eV:Q",
+            title="Photon energy (eV)",
+            scale=_detector_x_scale(x_type, x_domain),
+        ),
         y=alt.Y(
             "charge_density:Q",
             title="charge density (e-/eV/s)",
-            scale=alt.Scale(type="log"),
+            scale=_y_scale(df, "charge_density", y_type, x_domain, y_domain),
         ),
         color=alt.Color("E0_keV:N", title="beam energy (keV)"),
         tooltip=["E0_keV:N", "energy_eV:Q", "charge_density:Q", "band:N"],

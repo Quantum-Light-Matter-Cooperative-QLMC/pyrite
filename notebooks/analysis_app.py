@@ -199,39 +199,90 @@ def _(res, scan_thickness_ui, select_results):
 @app.cell
 def _(mo, records, res, sweep_values):
     # Detector tab selectors.
-    _tilts = sorted({r["case"]["tilt_deg"] for r in records(res)})
+    _sv = sweep_values(res) if records(res) else {}
+    _tilts = _sv.get("tilt_deg", [])
+    _azim = _sv.get("tilt_azim_deg", [])
+    _thk = _sv.get("thickness_ang", [])
     _tilt_opts = {f"{t:g} deg": t for t in _tilts} or {"— no data —": None}
     detector_tilt_ui = mo.ui.dropdown(_tilt_opts, value=next(iter(_tilt_opts)), label="polar tilt")
 
-    _thk = sweep_values(res).get("thickness_ang", []) if records(res) else []
+    _azim_opts = {f"{a:g} deg": a for a in _azim} or {"â€” no data â€”": None}
+    detector_azim_ui = mo.ui.dropdown(_azim_opts, value=next(iter(_azim_opts)), label="azimuth")
+
     _thk_opts = {f"{t:g} Å ({t / 1e4:g} µm)": t for t in _thk} or {"— no data —": None}
     detector_thickness_ui = mo.ui.dropdown(
         _thk_opts, value=list(_thk_opts)[-1], label="crystal thickness"
     )
 
-    detector_xmin_ui = mo.ui.number(value=0.0, label="x-min (eV, 0 = auto)")
-    detector_xmax_ui = mo.ui.number(value=0.0, label="x-max (eV, 0 = auto)")
-    return detector_thickness_ui, detector_tilt_ui, detector_xmax_ui, detector_xmin_ui
+    detector_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV, 0 = auto)")
+    detector_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV, 0 = auto)")
+    detector_ymin_ui = mo.ui.number(value=0.0, label="narrow y-min (0 = auto)")
+    detector_ymax_ui = mo.ui.number(value=0.0, label="narrow y-max (0 = auto)")
+    detector_xlog_ui = mo.ui.switch(value=False, label="narrow log x")
+    detector_ylog_ui = mo.ui.switch(value=True, label="narrow log y")
+
+    detector_broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV, 0 = auto)")
+    detector_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV, 0 = auto)")
+    detector_broad_ymin_ui = mo.ui.number(value=0.0, label="broad y-min (0 = auto)")
+    detector_broad_ymax_ui = mo.ui.number(value=0.0, label="broad y-max (0 = auto)")
+    detector_broad_xlog_ui = mo.ui.switch(value=True, label="broad log x")
+    detector_broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
+    return (
+        detector_azim_ui,
+        detector_broad_xlog_ui,
+        detector_broad_xmax_ui,
+        detector_broad_xmin_ui,
+        detector_broad_ylog_ui,
+        detector_broad_ymax_ui,
+        detector_broad_ymin_ui,
+        detector_thickness_ui,
+        detector_tilt_ui,
+        detector_xlog_ui,
+        detector_xmax_ui,
+        detector_xmin_ui,
+        detector_ylog_ui,
+        detector_ymax_ui,
+        detector_ymin_ui,
+    )
 
 
 @app.cell
-def _(detector_thickness_ui, res, select_results):
-    detector_res_view = (
-        select_results(res, thickness_ang=detector_thickness_ui.value)
-        if detector_thickness_ui.value is not None
-        else res
-    )
+def _(detector_azim_ui, detector_thickness_ui, res, select_results):
+    _constraints = {}
+    if detector_thickness_ui.value is not None:
+        _constraints["thickness_ang"] = detector_thickness_ui.value
+    if detector_azim_ui.value is not None:
+        _constraints["tilt_azim_deg"] = detector_azim_ui.value
+    detector_res_view = select_results(res, **_constraints) if _constraints else res
     return (detector_res_view,)
 
 
 @app.cell
-def _(detector_xmax_ui, detector_xmin_ui):
-    detector_x_domain = (
-        (detector_xmin_ui.value or None, detector_xmax_ui.value or None)
-        if (detector_xmin_ui.value or detector_xmax_ui.value)
-        else None
+def _(
+    detector_broad_xmax_ui,
+    detector_broad_xmin_ui,
+    detector_broad_ymax_ui,
+    detector_broad_ymin_ui,
+    detector_xmax_ui,
+    detector_xmin_ui,
+    detector_ymax_ui,
+    detector_ymin_ui,
+):
+    def _domain(xmin, xmax):
+        if not xmin and not xmax:
+            return None
+        return (xmin if xmin else None, xmax if xmax else None)
+
+    detector_x_domain = _domain(detector_xmin_ui.value, detector_xmax_ui.value)
+    detector_y_domain = _domain(detector_ymin_ui.value, detector_ymax_ui.value)
+    detector_broad_x_domain = _domain(detector_broad_xmin_ui.value, detector_broad_xmax_ui.value)
+    detector_broad_y_domain = _domain(detector_broad_ymin_ui.value, detector_broad_ymax_ui.value)
+    return (
+        detector_broad_x_domain,
+        detector_broad_y_domain,
+        detector_x_domain,
+        detector_y_domain,
     )
-    return (detector_x_domain,)
 
 
 @app.cell
@@ -1053,12 +1104,26 @@ def _(
 @app.cell
 def _(
     cases,
+    detector_azim_ui,
+    detector_broad_x_domain,
+    detector_broad_xlog_ui,
+    detector_broad_xmax_ui,
+    detector_broad_xmin_ui,
+    detector_broad_y_domain,
+    detector_broad_ylog_ui,
+    detector_broad_ymax_ui,
+    detector_broad_ymin_ui,
     detector_res_view,
     detector_thickness_ui,
     detector_tilt_ui,
     detector_x_domain,
+    detector_xlog_ui,
     detector_xmax_ui,
     detector_xmin_ui,
+    detector_y_domain,
+    detector_ylog_ui,
+    detector_ymax_ui,
+    detector_ymin_ui,
     eaglexo_charge_chart,
     eaglexo_detected_chart,
     mo,
@@ -1090,10 +1155,38 @@ def _(
                 else ""
             )
         )
+        _azim_widget = (
+            detector_azim_ui
+            if len(_sv.get("tilt_azim_deg", [])) > 1
+            else mo.md(
+                f"azimuth: {detector_azim_ui.value:g} deg"
+                if detector_azim_ui.value is not None
+                else ""
+            )
+        )
         _controls = mo.vstack(
             [
-                mo.hstack([detector_tilt_ui, _thk_widget]),
-                mo.hstack([detector_xmin_ui, detector_xmax_ui]),
+                mo.hstack([detector_tilt_ui, _azim_widget, _thk_widget]),
+                mo.hstack(
+                    [
+                        detector_xmin_ui,
+                        detector_xmax_ui,
+                        detector_ymin_ui,
+                        detector_ymax_ui,
+                        detector_xlog_ui,
+                        detector_ylog_ui,
+                    ]
+                ),
+                mo.hstack(
+                    [
+                        detector_broad_xmin_ui,
+                        detector_broad_xmax_ui,
+                        detector_broad_ymin_ui,
+                        detector_broad_ymax_ui,
+                        detector_broad_xlog_ui,
+                        detector_broad_ylog_ui,
+                    ]
+                ),
             ]
         )
 

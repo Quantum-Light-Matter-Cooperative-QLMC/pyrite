@@ -61,6 +61,13 @@ def _store(wide_brem=False):
     }
 
 
+def _dataset(spec):
+    name = spec.get("data", {}).get("name")
+    if name is None:
+        name = spec["layer"][0]["data"]["name"]
+    return spec["datasets"][name]
+
+
 # ---- Timepix3 ----------------------------------------------------------------
 def test_timepix_frame_has_incident_and_detected():
     df = timepix_detected_frame([_record(30.0, -20.0, 0.0)], _settings(), **_TPX_KW)
@@ -89,6 +96,21 @@ def test_timepix_chart_builds_valid_spec():
     spec = chart.to_dict()  # raises if malformed / over the row cap
     # incident + detected + threshold rule
     assert len(spec["layer"]) == 3
+
+
+def test_timepix_chart_broadband_log_y_floors_domain_away_from_zero():
+    rec = _record(30.0, -20.0, 0.0, wide_brem=True)
+    rec["brem_wide"] = np.linspace(1.0, 0.0, rec["E_grid_brem"].size)
+    store = {"HOPG bulk": {30.0: rec}}
+
+    chart = timepix_detected_chart(store, _settings(), **_TPX_KW, y_type="log")
+
+    spec = chart.to_dict()
+    scale = spec["layer"][0]["encoding"]["y"]["scale"]
+    assert scale["type"] == "log"
+    assert scale.get("domainMin", 0) > 0
+    assert scale.get("clamp") is True
+    assert any(row["intensity"] == 0.0 for row in _dataset(spec))
 
 
 def test_timepix_chart_none_on_empty():
@@ -121,6 +143,21 @@ def test_eaglexo_detected_chart_without_qe():
     assert len(spec["layer"]) == 3  # no QE layer
 
 
+def test_eaglexo_detected_chart_broadband_log_y_floors_domain_away_from_zero():
+    rec = _record(30.0, -20.0, 0.0, wide_brem=True)
+    rec["brem_wide"] = np.linspace(1.0, 0.0, rec["E_grid_brem"].size)
+    store = {"HOPG bulk": {30.0: rec}}
+
+    chart = eaglexo_detected_chart(store, _settings(), show_qe=False, y_type="log")
+
+    spec = chart.to_dict()
+    scale = spec["layer"][0]["encoding"]["y"]["scale"]
+    assert scale["type"] == "log"
+    assert scale.get("domainMin", 0) > 0
+    assert scale.get("clamp") is True
+    assert any(row["intensity"] == 0.0 for row in _dataset(spec))
+
+
 def test_eaglexo_detected_chart_none_on_empty():
     assert eaglexo_detected_chart({}, _settings()) is None
 
@@ -148,3 +185,18 @@ def test_eaglexo_charge_chart_x_domain_fixes_scale():
     spec = chart.to_dict()
     x_scale = spec["layer"][0]["encoding"]["x"]["scale"]
     assert x_scale["domain"] == [500.0, 7000.0]
+
+
+def test_eaglexo_charge_chart_broadband_log_y_floors_domain_away_from_zero():
+    rec = _record(30.0, -20.0, 0.0, wide_brem=True)
+    rec["brem_wide"] = np.linspace(1.0, 0.0, rec["E_grid_brem"].size)
+    store = {"HOPG bulk": {30.0: rec}}
+
+    chart = eaglexo_charge_chart(store, _settings(), y_type="log")
+
+    spec = chart.to_dict()
+    scale = spec["layer"][0]["encoding"]["y"]["scale"]
+    assert scale["type"] == "log"
+    assert scale.get("domainMin", 0) > 0
+    assert scale.get("clamp") is True
+    assert any(row["charge_density"] == 0.0 for row in _dataset(spec))
