@@ -34,12 +34,20 @@ file structure or (at current checkpoint sizes) data volume — Vega-Lite/vegafu
 handles the 200 KB-2.9 MB payloads seen here.
 
 **Recommended implementation path (ranked by confidence):**
-1. **Cache `line_metrics`** (or `_metrics_map`) with marimo's native `@mo.cache` /
-   `mo.lru_cache` (available in this marimo version, `0.23.11`) so repeated calls with the
-   same records/settings skip the scipy peak-finding pass. Confirmed by direct measurement
-   to remove the two actual slow paths (`heatmap_select_chart`, `scan_charts`). This is the
-   "marimo_csv"-shaped idea the task named, done with marimo's own cache primitive instead
-   of literal CSVs.
+1. **DONE — cache `line_metrics` results across calls.** `mo.cache`/`mo.lru_cache` turned
+   out to be unusable outside a running `@app.cell` (raises `OSError: could not get source
+   code` when the decorated function lives in a library module, since it depends on
+   marimo's AST/cell-graph machinery). Implemented instead as a plain module-level dict
+   cache in `src/cxr_mc/plots/_common.py` (`_LINE_METRICS_CACHE`, mirroring the existing
+   `_EFF_CACHE` pattern), keyed on `(case["name"], case["E0_keV"], settings.beam_current_na,
+   rel_prominence, line_metric)` — content-based, not `id()`-based, since CPython reuses
+   freed objects' addresses and an identity key would be unsafe for a process-lifetime
+   cache. Verified on `checkpoints/mose2.pkl` (3720 records): `heatmap_select_chart`
+   warm-call time dropped from 1.06s to 0.07s (~15x); `cache_len` after warm-up equals
+   `n_records` as expected. Full test suite (`uv run pytest`), `ruff check`, `ruff format`,
+   and `pyright` all pass on the changed files (`src/cxr_mc/plots/_common.py`,
+   `tests/test_sweep_metrics_reuse.py` — the latter's `line_metrics_calls` fixture now
+   clears `_LINE_METRICS_CACHE` first so cross-test cache hits don't undercount calls).
 2. **Decouple the mega-cell into one `@app.cell` per tab** (same file), each closing over
    only the widgets that tab actually reads, plus a final small cell that just calls
    `mo.ui.tabs({...}, lazy=True)` over the 8 tab values. Cheap, low-risk, improves DAG
