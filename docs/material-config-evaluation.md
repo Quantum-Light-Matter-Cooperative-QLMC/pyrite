@@ -11,9 +11,15 @@ follow-up.** Do not change any of `n_families`'s default,
 physics change, not a config-exposure change, and would require a fresh
 validation pass.
 
-## What the codebase does today
+**Status on `feature/material-config-rework`:** steps 1-3 are implemented.
+`src/cxr_mc/materials.py` now owns the combined per-material rows, while
+`config.py` and `sweep.py` consume typed projections from that registry. This
+remains a config relocation/surfacing change only; no reflection defaults,
+`g_max_invang`, or ranking metrics were changed.
 
-Per-material configuration is split across three places by import layer
+## What the codebase did before this staged change
+
+Per-material configuration was split across three places by import layer
 (leaf → driver, see `docs/repo_map.md`):
 
 ```
@@ -30,10 +36,10 @@ config.py  _MATERIAL_GRIDS  scan geometry/energy grids: thickness,
                             tilt/azimuth sweeps, energy_keV, E_grid_line/brem
 ```
 
-`config.py` already does `from .sweep import Layer, ScalarOrSeq, Sweep`, so
-`_CRYSTAL_PARAMS` cannot simply move into `config.py` — `sweep.crystal_params`
-would then need to import back from `config.py`, a cycle. The split is a
-structural consequence of the DAG, not an oversight.
+The split could not be fixed by simply moving `_CRYSTAL_PARAMS` into
+`config.py`: `sweep.crystal_params` would then need to import back from
+`config.py`, a cycle. The implemented `materials.py` module avoids that by
+sitting below both `config.py` and `sweep.py`.
 
 ### Orientation is *partially* exposed already
 
@@ -103,9 +109,8 @@ independently.
    with run-scan knobs would drag physics data under scan-config churn and
    blur what the validation ledger is tracking.
 
-**Recommendation: option 2**, done as a follow-up after the plumbing pass
-below lands (smaller, reviewable diff first; the registry merge can reuse
-whatever field shapes the CLI/persistence work settles on).
+**Implemented: option 2**, after the plumbing pass below settled the CLI and
+surfacing field shapes.
 
 ## What's cheap vs. what carries a validation cost
 
@@ -129,11 +134,10 @@ whatever field shapes the CLI/persistence work settles on).
    `geometry_table` to show more than a bare reflection count when someone
    wants to eyeball a checkpoint's orientation without writing a one-off
    script.
-3. **Registry unification (`materials.py`)** — after 1-2 land and settle the
-   field shapes, migrate `_MATERIAL_GRIDS`/`_CRYSTAL_PARAMS` into one
-   per-material row each, including a visible reason string for materials
-   that hand-pin `hkl_list` (HOPG, h-BN) so the auto-vs-pinned distinction
-   stops being implicit.
+3. **Registry unification (`materials.py`)** — `_MATERIAL_GRIDS` /
+   `_CRYSTAL_PARAMS` now project from one per-material row each, including a
+   visible reason string for materials that hand-pin `hkl_list` (HOPG, h-BN)
+   so the auto-vs-pinned distinction stops being implicit.
 4. **Not in scope here** — no change to `n_families`'s default, `g_max_invang`,
    or the ranking metric. If someone wants that later, it's a physics-review
    task, not a config-exposure task.

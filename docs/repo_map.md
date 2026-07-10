@@ -113,6 +113,16 @@ re-exported from the package**, so `from cxr_mc.montecarlo import X` is unchange
 
 ## Sweep, config & drivers
 
+### `materials.py`
+Single source of truth for per-material scan grids and crystallographic scan
+defaults. Exposes typed projections so `config.py` and `sweep.py` share one
+registry without importing each other.
+- Public: `MATERIAL_CONFIGS`, `MATERIAL_GRIDS`, `CRYSTAL_PARAMS`,
+  `MATERIAL_LABELS`, `MATERIALS`, `MaterialConfig`, `MaterialGrid`,
+  `CrystalParamsGrid`, `Layer`, `ScalarOrSeq`, `material_scan_grid`,
+  `material_crystal_key`, `crystal_config`, `pm`.
+- Deps: none (NumPy literals only).
+
 ### `sweep.py`
 Turns a `Sweep` definition into the Cartesian product of `run_case` dicts.
 - Public: `Sweep` (dataclass of all knobs), `Layer` (one stack layer: material,
@@ -120,15 +130,15 @@ Turns a `Sweep` definition into the Cartesian product of `run_case` dicts.
   `substrate_composition`, `stack_layers`, `film_on_substrate_layers`,
   `layer_radiator`, `substrate_radiator`, `geometry_table`,
   `fmt_thickness`, `pm` (±hkl expansion); the `MATERIAL_LABELS` registry.
-- Deps: `crystallography`.
+- Deps: `crystallography`, `materials`.
 
 ### `config.py`
-Per-material grids and the default settings/sweep builders shared by the CLI and
-both notebooks.
+Default settings/sweep builders shared by the CLI and both notebooks; per-material
+scan grids are projections from `materials.py`.
 - Public: `default_settings`, `material_grid`, `material_sweep`,
   `trajectory_sweep`, `MaterialGrid` (TypedDict); the `_MATERIAL_GRIDS` /
   `MATERIALS` registries.
-- Deps: `results` (`Settings`), `sweep` (`Sweep`).
+- Deps: `materials`, `results` (`Settings`), `sweep` (`Sweep`).
 
 ### `run.py`
 Checkpointed, resumable sweep driver and checkpoint loaders/repair.

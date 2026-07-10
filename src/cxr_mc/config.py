@@ -7,8 +7,8 @@ scan-runner (``scan.ipynb``) and the visualization driver
 (``analysis.ipynb``) can never drift apart: they build the SAME
 :class:`results.Settings` and the SAME per-material :class:`sweep.Sweep`,
 so the viz notebook is guaranteed to be looking at the checkpoint the runner
-wrote. Edit a material's grid (or the detector/analysis knobs) here ONCE and both
-notebooks pick it up.
+wrote. Edit a material's grid in :mod:`cxr_mc.materials` and both notebooks pick
+it up; detector/analysis knobs still live here.
 
   * :func:`default_settings` -- beam current, electron counts, detector flags.
   * :func:`material_sweep`   -- the full parametric scan for a material (thickness,
@@ -19,51 +19,21 @@ notebooks pick it up.
 """
 
 from dataclasses import replace
-from typing import NotRequired, TypedDict
 
 import numpy as np
 
+from . import materials as _materials
+from .materials import MaterialGrid, material_crystal_key
 from .results import Settings
-from .sweep import Layer, ScalarOrSeq, Sweep
+from .sweep import Sweep
 
-
-class MaterialGrid(TypedDict):
-    """The per-material scan grid: the geometry + energy fields that vary per
-    material and are spread into :class:`sweep.Sweep`. Typing the grids with this
-    (rather than ``dict[str, Any]``) lets pyright validate the literals in
-    :data:`_MATERIAL_GRIDS` and the ``**grid`` spread in :func:`material_sweep`.
-
-    A registry key can also name a full STACK (film + substrate-side layers):
-    ``stack`` holds the :class:`sweep.Layer` list under the film, and
-    :data:`_STACK_FILMS` maps the registry key (the CLI/checkpoint name, e.g.
-    ``cxr scan mos2-on-sio2-si``) to the film crystal key."""
-
-    thickness_ang: ScalarOrSeq
-    energy_keV: ScalarOrSeq
-    tilt_deg: ScalarOrSeq
-    tilt_azim_deg: ScalarOrSeq
-    E_grid_line: np.ndarray
-    E_grid_brem: np.ndarray
-    substrate: NotRequired[str]
-    stack: NotRequired[tuple[Layer, ...]]
-
-
-# named-stack registry keys -> the FILM crystal key (a CRYSTALS material). Keys
-# absent here are their own film (the single-material default).
-_STACK_FILMS = {
-    "mos2-on-sio2-si": "mos2",
-}
+_MATERIAL_GRIDS = _materials.MATERIAL_GRIDS
+MATERIALS = _materials.MATERIALS
 
 
 # When the azimuth is swept, collapse it: for each (polar tilt, energy) keep only
 # the azimuth with the highest spectral peak. False -> show every azimuth.
 COLLAPSE_AZIMUTH = True
-
-# Product target: few-layer 2H-MoTe2 with c = 13.41 A (two layers per cell).
-_MOTE2_PRODUCT_LAYER_PITCH_ANG = 13.41 / 2.0
-
-# Few-layer 2H-MoS2: c = 12.294 A (crystal_structures.toml), two layers per cell.
-_MOS2_LAYER_PITCH_ANG = 12.294 / 2.0
 
 # Penetration-plot transport angles. Keep this intentionally sparse because each
 # value triggers direct CPU trajectory MC in the analysis app.
@@ -87,147 +57,6 @@ def default_settings():
     )
 
 
-# ---- per-material parametric scan grids --------------------------------------
-# Each entry is the geometry + energy grids for one material's full sweep. Keep
-# the line grid fine + narrow (the expensive coherent lines top out at a few keV)
-# and the brem grid coarse + WIDE (out to the beam energy) -- see sweep.
-_MATERIAL_GRIDS: dict[str, MaterialGrid] = {
-    # Thickness study: total flux + CXR/brem ratio vs thickness at a few key
-    # tilts (negative = entrance-toward-detector = high flux). Single azimuth
-    # (pitch plane) and single energy so plot_metric_vs(x="thickness_ang",
-    # hue="tilt_deg") has nothing to silently collapse -- one clean curve per tilt.
-    # For an energy comparison instead, add 40 to energy_keV and use hue="E0_keV".
-    "hopg": {
-        "thickness_ang": 1e4,
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 10, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "hbn": {
-        "thickness_ang": np.concat([np.logspace(2, 5, 6), np.logspace(5, 6, 2, endpoint=False)]),
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-89, -80, 10, endpoint=True),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "E_grid_line": np.arange(5.0, 1000.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "diamond": {
-        "thickness_ang": 10e4,
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "silicon": {
-        "thickness_ang": 10e4,
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 3.0),  # (was a stray 1-tuple in the nb)
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "mose2": {
-        "thickness_ang": 10e4,
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "wse2": {
-        "thickness_ang": 10e4,
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "mote2": {
-        "thickness_ang": 10e4,
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "mote2_product": {
-        "thickness_ang": _MOTE2_PRODUCT_LAYER_PITCH_ANG * np.arange(3, 7),
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "substrate": "sapphire",
-        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "ptse2": {
-        "thickness_ang": 10e4,
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "hfse2": {
-        "thickness_ang": 10e4,
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "zrse2": {
-        "thickness_ang": 10e4,
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "ws2": {
-        "thickness_ang": 10e4,
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "E_grid_line": np.arange(50.0, 3500.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "mos2": {
-        "thickness_ang": _MOS2_LAYER_PITCH_ANG * 3,
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "substrate": "sapphire",
-        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    # Named device stack: few-layer 2H-MoS2 on a thin thermal a-SiO2 (285 nm,
-    # the common device oxide -- adjust to the actual wafer) over thick
-    # crystalline Si. Run as `cxr scan mos2-on-sio2-si`.
-    "mos2-on-sio2-si": {
-        "thickness_ang": _MOS2_LAYER_PITCH_ANG * np.arange(3, 7),
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "stack": (Layer("sio2", 2850.0), Layer("silicon", 5e6)),
-        "E_grid_line": np.arange(50.0, 4000.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-    "sapphire": {
-        "thickness_ang": 5e6,
-        "energy_keV": [25, 30, 35],
-        "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4000.0, 3.0),
-        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
-    },
-}
-
-MATERIALS = tuple(_MATERIAL_GRIDS)
-
-
 def material_grid(material) -> MaterialGrid:
     """The raw per-material grid dict (thickness, energies, tilt sweeps, grids)."""
     if material not in _MATERIAL_GRIDS:
@@ -239,9 +68,9 @@ def material_sweep(material: str, *, theta_obs_deg=90.0, **overrides):
     """The full parametric :class:`sweep.Sweep` for ``material`` (the geometry
     the runner scans and the viz notebook reduces). ``overrides`` replace any grid
     field, e.g. ``material_sweep("ptse2", thickness_ang=2e4)``. For a named-stack
-    key (:data:`_STACK_FILMS`) the Sweep's material is the film crystal; the
-    registry key stays the CLI/checkpoint name."""
-    film = _STACK_FILMS.get(material, material)
+    key the Sweep's material is the film crystal; the registry key stays the
+    CLI/checkpoint name."""
+    film = material_crystal_key(material)
     sweep = Sweep(material=film, theta_obs_deg=theta_obs_deg, **material_grid(material))
     return replace(sweep, **overrides) if overrides else sweep
 
@@ -291,7 +120,7 @@ def trajectory_sweep(
     else:
         tilt_values = tuple(float(t) for t in tilts)
     return Sweep(
-        material=_STACK_FILMS.get(material, material),  # named stacks: the film
+        material=material_crystal_key(material),  # named stacks: the film
         thickness_ang=thick,
         energy_keV=list(energies),
         tilt_deg=tilt_values,
