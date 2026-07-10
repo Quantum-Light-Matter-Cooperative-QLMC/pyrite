@@ -253,3 +253,7 @@ jobs/
 
 # cxr analyze persisted default material
 .cxr-analyze-default
+
+# Ephemeral tool / assistant scratch output
+/.playwright-mcp/
+/claudedocs/
