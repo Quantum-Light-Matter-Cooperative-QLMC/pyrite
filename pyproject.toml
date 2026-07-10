@@ -8,6 +8,7 @@ dependencies = [
     "altair>=6.2.2",
     "cupy-cuda13x[ctk]>=14.1.1",
     "datashader>=0.19.1",
+    "diffpy-structure>=3.4.0",
     "ipykernel>=7.3.0",
     "ipympl>=0.10.0",
     "jupyter-core>=5.9.1",

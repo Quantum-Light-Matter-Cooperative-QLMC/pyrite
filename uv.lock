@@ -712,6 +712,7 @@ dependencies = [
     { name = "altair" },
     { name = "cupy-cuda13x", extra = ["ctk"] },
     { name = "datashader" },
+    { name = "diffpy-structure" },
     { name = "ipykernel" },
     { name = "ipympl" },
     { name = "jupyter-core" },
@@ -753,6 +754,7 @@ requires-dist = [
     { name = "altair", specifier = ">=6.2.2" },
     { name = "cupy-cuda13x", extras = ["ctk"], specifier = ">=14.1.1" },
     { name = "datashader", specifier = ">=0.19.1" },
+    { name = "diffpy-structure", specifier = ">=3.4.0" },
     { name = "ipykernel", specifier = ">=7.3.0" },
     { name = "ipympl", specifier = ">=0.10.0" },
     { name = "jupyter-core", specifier = ">=5.9.1" },
@@ -852,6 +854,34 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/0f/d5/c66da9b79e5bdb124974bfe172b4daf3c984ebd9c2a06e2b8a4dc7331c72/defusedxml-0.7.1.tar.gz", hash = "sha256:1bb3032db185915b62d7c6209c5a8792be6a32ab2fedacc84e01b52c51aa3e69", size = 75520, upload-time = "2021-03-08T10:59:26.269Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/07/6c/aa3f2f849e01cb6a001cd8554a88d4c77c5c1a31c95bdf1cf9301e6d9ef4/defusedxml-0.7.1-py2.py3-none-any.whl", hash = "sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61", size = 25604, upload-time = "2021-03-08T10:59:24.45Z" },
+]
+
+[[package]]
+name = "diffpy-structure"
+version = "3.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "diffpy-utils" },
+    { name = "numpy" },
+    { name = "pycifrw" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/26/86/eb2809ddadf4e31af5ad9971b460bbc26d1f5e10dc478d0c91fa65c35edc/diffpy_structure-3.4.0.tar.gz", hash = "sha256:4678915d002b34e2b8965bc786f7a9ef9bd1c569cf59273370c484e12b25c7c8", size = 155589, upload-time = "2026-03-29T16:02:17.1Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b4/5e/bf11645aebb9af7d8d35927c40d3855816a0855c799e8156eeca8d632c90/diffpy_structure-3.4.0-py3-none-any.whl", hash = "sha256:bd0f06a96635d80316f51ebc0a08003bdeb2cb48c9bb18cbed1455ac60645e48", size = 132431, upload-time = "2026-03-29T16:02:15.639Z" },
+]
+
+[[package]]
+name = "diffpy-utils"
+version = "3.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy" },
+    { name = "xraydb" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/76/ae/c4ff7f1e5a8f3c801a00f2391b0d05fe38780fd1b63356081c24383712d1/diffpy_utils-3.7.2.tar.gz", hash = "sha256:463486a100ba981299b3b16c40ab39b0e84312d63498870e5d15e0608614ab2c", size = 113726, upload-time = "2026-03-17T14:47:27.463Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/61/2b/e260d50e64690d2a9e405d52ccd18a63c286c5088937dd0107cb23eb3195/diffpy_utils-3.7.2-py3-none-any.whl", hash = "sha256:6100600736791a8e4638e3dd476704f4dabe3cab75bcb5c60c83c16a2032519a", size = 38460, upload-time = "2026-03-17T14:47:26.372Z" },
 ]
 
 [[package]]
@@ -2936,6 +2966,18 @@ wheels = [
 ]
 
 [[package]]
+name = "prettytable"
+version = "3.18.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "wcwidth" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/81/74/ba08d81e668ccfe8658d7520a307e63c19862c08eb4ccb26f356c5239a7a/prettytable-3.18.0.tar.gz", hash = "sha256:439217116152244369caf3d9f1caf2f9fe29b03bd79e88d2928c8e718c95d680", size = 76373, upload-time = "2026-06-22T16:07:50.174Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fe/be/2e6798ace5cc036f5d05d36b7b2fd85346f1a708c87060890b070d0ec607/prettytable-3.18.0-py3-none-any.whl", hash = "sha256:b3346e0e6f79180833aebaac088ae926340586cf6d7d991b9eb125b65f72313a", size = 37357, upload-time = "2026-06-22T16:07:48.595Z" },
+]
+
+[[package]]
 name = "prometheus-client"
 version = "0.25.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3113,6 +3155,24 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/b0/49/942c3b79878ba928324d1e17c274ed84581db8c0a749b24bcf4cbdf15bd3/pyarrow-24.0.0-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:d8ddd2768da81d3ee08cfea9b597f4abb4e8e1dc8ae7e204b608d23a0d3ab699", size = 49471890, upload-time = "2026-04-21T10:51:02.439Z" },
     { url = "https://files.pythonhosted.org/packages/76/97/ff71431000a75d84135a1ace5ca4ba11726a231a8007bbb320a4c54075d5/pyarrow-24.0.0-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:61a3d7eaa97a14768b542f3d284dc6400dd2470d9f080708b13cd46b6ae18136", size = 51932250, upload-time = "2026-04-21T10:51:10.576Z" },
     { url = "https://files.pythonhosted.org/packages/51/be/6f79d55816d5c22557cf27533543d5d70dfe692adfbee4b99f2760674f38/pyarrow-24.0.0-cp314-cp314t-win_amd64.whl", hash = "sha256:c91d00057f23b8d353039520dc3a6c09d8608164c692e9f59a175a42b2ae0c19", size = 28131282, upload-time = "2026-04-21T10:51:16.815Z" },
+]
+
+[[package]]
+name = "pycifrw"
+version = "5.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "ply" },
+    { name = "prettytable" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/58/e0/f1871f520c359e4e3a2eb7437c9e7e792bb6c356414e8617937561167caf/pycifrw-5.0.1.tar.gz", hash = "sha256:e636b80be6a2be15b215e69ecec0c0a784ebcbfed8b1e3bac4bcc6e6ba9a75e0", size = 896861, upload-time = "2025-03-24T05:34:42.247Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/0d/6af0bb9a45c771ffccd5c4c035c57ac9005e711b1191ddad1dd954187cfe/pycifrw-5.0.1-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:1d01c83295a9e5f91e1cd5df03a24387a79388992b60c9e043f2c24a65b6607d", size = 184049, upload-time = "2025-03-24T05:34:35.867Z" },
+    { url = "https://files.pythonhosted.org/packages/83/81/bdd4bfabe70b7c9a8c0716a722ced4ebd27311afd1f4800cd405d3229c1b/pycifrw-5.0.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:e9ad2fdb4fca6398ed5ae50c19908bf6238434893b68d0125bda79a54a03d708", size = 184027, upload-time = "2025-03-24T05:34:37.043Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/a5/a8c7562ec39f2647245b52ea4aeb13b5b125b3f48c0c152e9ebce7047a0a/pycifrw-5.0.1-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:65a90ee34e46e6be20834493382585277d12daaa8d1a145cb158c163b3d9fc1c", size = 205819, upload-time = "2025-03-24T05:34:38.623Z" },
+    { url = "https://files.pythonhosted.org/packages/66/4a/a59dbf6f3ceccf277b2969dd0bc7b9b162f8284b032a47a59ed26c77313d/pycifrw-5.0.1-cp313-cp313-win32.whl", hash = "sha256:6fdb4cfd28cb70eea64c3520e0c29559e38cf82f819bae818a4b94ffa210aae9", size = 183574, upload-time = "2025-03-24T05:34:39.736Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/9b/50835e8fd86073fa7aa921df61b4cebc1f0ff400e4338541675cb72b5507/pycifrw-5.0.1-cp313-cp313-win_amd64.whl", hash = "sha256:8632df76b99932408ab432e09b30aa9a6c390df884a5f34f1e1f76201e625156", size = 184711, upload-time = "2025-03-24T05:34:40.918Z" },
 ]
 
 [[package]]

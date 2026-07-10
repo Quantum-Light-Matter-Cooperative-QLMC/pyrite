@@ -157,3 +157,107 @@ def test_optical_constants_delta_positive_off_edge():
     delta, beta = optical_constants("Au", 1500.0, 0.059)
     assert delta > 0.0
     assert beta > 0.0
+
+
+def test_diffpy_structure_adapter_preserves_lattice_basis_and_volume():
+    from cxr_mc.crystallography import diffpy_structure_to_crystal_info
+
+    class FakeLattice:
+        a = 3.0
+        b = 4.0
+        c = 5.0
+        alpha = 90.0
+        beta = 90.0
+        gamma = 90.0
+
+    class FakeAtom:
+        def __init__(self, element, xyz):
+            self.element = element
+            self.xyz = np.array(xyz, dtype=float)
+
+    class FakeStructure:
+        lattice = FakeLattice()
+
+        def __iter__(self):
+            return iter(
+                [
+                    FakeAtom("Na", [0.0, 0.0, 0.0]),
+                    FakeAtom("Cl", [0.5, 0.5, 0.5]),
+                ]
+            )
+
+    info = diffpy_structure_to_crystal_info(FakeStructure(), mosaic_fwhm_deg=0.2)
+
+    assert info["lattice"] == {
+        "system": "general",
+        "a": 3.0,
+        "b": 4.0,
+        "c": 5.0,
+        "alpha": 90.0,
+        "beta": 90.0,
+        "gamma": 90.0,
+    }
+    assert info["V_cell"] == pytest.approx(60.0)
+    assert info["mosaic_fwhm_deg"] == pytest.approx(0.2)
+    assert [(element, pos.tolist()) for element, pos in info["basis"]] == [
+        ("Na", [0.0, 0.0, 0.0]),
+        ("Cl", [0.5, 0.5, 0.5]),
+    ]
+
+
+def test_diffpy_structure_adapter_accepts_installed_diffpy_structure():
+    from diffpy.structure import Atom, Lattice, Structure
+
+    from cxr_mc.crystallography import diffpy_structure_to_crystal_info
+
+    structure = Structure(
+        [Atom("Na", [0.0, 0.0, 0.0]), Atom("Cl", [0.5, 0.5, 0.5])],
+        lattice=Lattice(a=3.0, b=4.0, c=5.0, alpha=90.0, beta=90.0, gamma=90.0),
+    )
+
+    info = diffpy_structure_to_crystal_info(structure)
+
+    assert info["lattice"]["system"] == "general"
+    assert info["V_cell"] == pytest.approx(60.0)
+    assert [(element, pos.tolist()) for element, pos in info["basis"]] == [
+        ("Na", [0.0, 0.0, 0.0]),
+        ("Cl", [0.5, 0.5, 0.5]),
+    ]
+
+
+@pytest.mark.filterwarnings("ignore:.*diffpy.structure.*:DeprecationWarning:diffpy.structure")
+def test_load_crystal_from_cif_uses_diffpy_structure(tmp_path):
+    from cxr_mc.crystallography import load_crystal_from_cif
+
+    cif = tmp_path / "nacl.cif"
+    cif.write_text(
+        """
+data_nacl
+_symmetry_space_group_name_H-M 'P 1'
+_cell_length_a 3.0
+_cell_length_b 4.0
+_cell_length_c 5.0
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 90.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Na1 Na 0.0 0.0 0.0
+Cl1 Cl 0.5 0.5 0.5
+""".strip(),
+        encoding="utf-8",
+    )
+
+    info = load_crystal_from_cif(cif, mosaic_fwhm_deg=0.1)
+
+    assert info["lattice"]["a"] == pytest.approx(3.0)
+    assert info["V_cell"] == pytest.approx(60.0)
+    assert info["mosaic_fwhm_deg"] == pytest.approx(0.1)
+    assert [(element, pos.tolist()) for element, pos in info["basis"]] == [
+        ("Na", [0.0, 0.0, 0.0]),
+        ("Cl", [0.5, 0.5, 0.5]),
+    ]

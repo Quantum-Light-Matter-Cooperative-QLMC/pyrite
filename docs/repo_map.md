@@ -11,6 +11,7 @@ see [`TODO.md`](../TODO.md). Regenerate with the `docs:update-repo-map` command.
 atomic_form_factors            (xraydb-backed atomic data; no sibling deps)
         │
 crystallography                (crystal DB, structure factor, χ_g/U_g, μ)
+        ├── validation_oracles (optional external comparators; checks only)
         │
 montecarlo                     (transport + radiation + detector helpers)
         │
@@ -58,10 +59,23 @@ Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
 ### `crystallography.py`
 Crystal database, structure factors, and X-ray optical constants — the physics
 data layer under the Monte Carlo.
-- Public: `load_crystals`, `reciprocal_g_vector`, `g_mag`, `debye_waller`,
-  `structure_factor`, `chi_g`, `U_g`, `absorption_length_ang`,
-  `dominant_reflections`, `beta_from_Ee`; the `CRYSTALS` registry.
+- Public: `load_crystals`, `load_crystal_from_cif`,
+  `diffpy_structure_to_crystal_info`, `reciprocal_g_vector`, `g_mag`,
+  `debye_waller`, `structure_factor`, `chi_g`, `U_g`,
+  `absorption_length_ang`, `dominant_reflections`, `beta_from_Ee`; the
+  `CRYSTALS` registry.
 - Deps: `atomic_form_factors`, `DATA_DIR`.
+
+### `validation_oracles.py`
+Optional validation-only adapters for external crystallography/scattering
+comparators. The first backend builds or loads `Dans_Diffraction` crystals and
+compares lattice parameters, reciprocal-vector magnitudes, and `|F_hkl|²` while
+leaving production physics in `crystallography.py`.
+- Public: `build_dans_crystal_from_cxr`, `load_dans_crystal_from_cif`,
+  `compare_lattice`, `compare_reflection_geometry`,
+  `compare_structure_factor_magnitudes`; the comparison dataclasses.
+- Deps: `crystallography`; imports `Dans_Diffraction` lazily only when a check
+  asks for it.
 
 ### `atomic_form_factors.py`
 Atomic scattering factors (Z, f0, f′, f″) from **xraydb** for any element — no
