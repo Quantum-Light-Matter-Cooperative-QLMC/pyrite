@@ -225,6 +225,9 @@ tempCodeRunnerFile.py
 # Ruff stuff:
 .ruff_cache/
 
+# uv workspace-local cache; see uv.toml.
+.uv-cache/
+
 # PyPI configuration file
 .pypirc
 

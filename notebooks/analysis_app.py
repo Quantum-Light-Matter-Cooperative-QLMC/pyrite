@@ -536,7 +536,6 @@ def _(
             "The INTRINSIC coherent CXR line spectrum at the selected polar tilt, "
             "one line per beam energy."
         )
-        _tilt = tilt_ui.value
         _sv = sweep_values(res) if records(res) else {}
         _thk_widget = (
             thickness_ui
@@ -559,7 +558,7 @@ def _(
             _chart = spectrum_chart(
                 res_view,
                 settings,
-                tilt_deg=_tilt,
+                tilt_deg=tilt_ui.value,
                 include_brem=brem_ui.value,
                 x_domain=x_domain,
                 x_type="log" if narrow_xlog_ui.value else "linear",
@@ -576,7 +575,7 @@ def _(
             _chart = spectrum_chart(
                 res_view,
                 settings,
-                tilt_deg=_tilt,
+                tilt_deg=tilt_ui.value,
                 include_brem=brem_ui.value,
                 x_domain=broad_x_domain,
                 x_type="log" if broad_xlog_ui.value else "linear",
@@ -955,7 +954,6 @@ def _(
         # produced the "blank detector-tab plots" bug: marimo-team/marimo#6919).
         # The accordion lazily defers each section's compute exactly like the
         # inner tabs did, without the nesting problem.
-        _tilt = detector_tilt_ui.value
         _sv = sweep_values(res) if records(res) else {}
         _thk_widget = (
             detector_thickness_ui
@@ -980,10 +978,16 @@ def _(
                 "Photon density (detected vs incident), then recorded-charge density."
             )
             _detected = eaglexo_detected_chart(
-                detector_res_view, settings, tilt_deg=_tilt, x_domain=detector_x_domain
+                detector_res_view,
+                settings,
+                tilt_deg=detector_tilt_ui.value,
+                x_domain=detector_x_domain,
             )
             _charge = eaglexo_charge_chart(
-                detector_res_view, settings, tilt_deg=_tilt, x_domain=detector_x_domain
+                detector_res_view,
+                settings,
+                tilt_deg=detector_tilt_ui.value,
+                x_domain=detector_x_domain,
             )
             _parts = [_md, *(c for c in (_detected, _charge) if c is not None)]
             _parts.append(
@@ -1009,7 +1013,10 @@ def _(
                 "threshold counting. Detected vs incident at the selected tilt."
             )
             _detected = timepix_detected_chart(
-                detector_res_view, settings, tilt_deg=_tilt, x_domain=detector_x_domain
+                detector_res_view,
+                settings,
+                tilt_deg=detector_tilt_ui.value,
+                x_domain=detector_x_domain,
             )
             _parts = [_md, *([_detected] if _detected is not None else [])]
             _parts.append(
@@ -1071,19 +1078,24 @@ def _(
         # Pick the lowest energy at the selected tilt for the single-track view.
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
         _track = trajectory_chart(_nc, Ne=40)
-        _grid_energy = penetration_energy_ui.value
         _parts = [
             _md,
             mo.hstack([penetration_angle_ui, penetration_thickness_ui, penetration_energy_ui]),
             *(p for p in (_survival, _track) if p is not None),
         ]
+
+        def _dense_grid():
+            _dense_sweep = trajectory_sweep(
+                MATERIAL,
+                energies=(30, 60),
+                thickness_ang=penetration_thickness_ui.value,
+            )
+            _dense_traj = build_cases(_dense_sweep, settings.n_electrons, settings.n_electrons_brem)
+            return plot_trajectory_grid(_dense_traj, energy=penetration_energy_ui.value, Ne=120)
+
         _parts.append(
             mo.accordion(
-                {
-                    "Dense penetration grid (datashader, matplotlib)": lambda: plot_trajectory_grid(
-                        _traj, energy=_grid_energy, Ne=120
-                    )
-                },
+                {"Dense penetration grid (datashader, matplotlib)": _dense_grid},
                 lazy=True,
             )
         )

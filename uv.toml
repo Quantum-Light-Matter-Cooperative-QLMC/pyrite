@@ -1,0 +1,4 @@
+# Keep tool caches inside the workspace so sandboxed agents do not need
+# user-home AppData access for routine `uv run ...` commands.
+cache-dir = ".uv-cache"
+link-mode = "copy"
