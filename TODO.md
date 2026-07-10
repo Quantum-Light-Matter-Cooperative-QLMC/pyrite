@@ -1,83 +1,37 @@
-# TODO / Backlog
+# TODO — feature/elsepa-port
 
-Items live on `feature/...` / `bugfix/...` / `docs/...` branches, not `main`, until finished.
-Full detail for an in-progress item lives on its branch (or its design doc);
-`main` keeps only a one-line summary + pointer, enforced by /docs:todo-sync.
-Priorities weigh value-to-goal (line-flux / enhancement predictions + the publication's validation story)
-against effort and risk.
+This branch carries one backlog item; the full triaged backlog lives on `main`.
+(Supersedes the older `feature/elsepa-transport`, which predates the
+`cxr_model`→`cxr_mc` rename + the `montecarlo` package split.)
 
-Item generation:
-----------------
+## pyelsepa / ELSEPA transport (P2)
 
-1. Create and move to branch of relevant type
-2. Overwrite branch TODO.md with concise, 2-3 sentence problem summary + implementation path, scoped only to the relevant item, then publish to `origin`
-3. Move to `main`, create 1 sentence summary of new item, then triage into existing TODO.md items and push tightly scoped `docs(todo)` commit to main
+*EVALUATED; adapter landed, image now buildable, validation reproduced.*
 
-**NOTE:** If the user has written a detailed item summary directly into `TODO.md` on
-main, fold it into a branch (steps 1-2 above), then slim it back to a one-line summary
-on `main` once the branch exists.
+Evaluate replacing the hardcoded NIST Mott transport tables in
+`src/cxr_mc/data/mott_transport_cross_sections/` with on-demand ELSEPA
+([github.com/eScatter/pyelsepa](https://github.com/eScatter/pyelsepa), checked out at
+`C:\dev\pyelsepa`). NB: *electron*-scattering data — separate from the xraydb (photon)
+migration; xraydb cannot supply it.
 
-## P1 - high value (physics accuracy + publication validation)
+**Done:**
+- `dev/elsepa_tables.py` — drop-in adapter (writer/reader/compare are pure +
+  unit-tested against the real `_load_mott_transport`; a gated
+  `elsepa_transport_cross_section` driver runs ELSEPA via pyelsepa).
+- Build is now **tarball-free**: `pyelsepa/docker/Dockerfile.modern` clones
+  `github.com/eScatter/elsepa` (Apache-2.0) instead of the paywalled
+  `adus_v1_0.tar.gz`; isolated venv at `C:/dev/pyelsepa/elsepa-venv` built + patched.
+- **Validation reproduced** vs NIST: C (Z=6) 2.19% max rel, Si (Z=14) 4.42% max rel.
+  Full recipe + results in [`docs/elsepa-transport.md`](docs/elsepa-transport.md).
 
-### Active
+**Remaining (why this branch stays open):**
+- The `elsepa` image/venv live outside the repo (`C:/dev/pyelsepa`) and can't be
+  reproduced in CI — the driver stays gated behind an actionable error; the NIST
+  tables + analytic screened-Rutherford fallback remain in force at runtime.
+- Extend table regeneration to elements with no NIST table (e.g. W, currently on the
+  SR fallback).
+- Decide whether to wire the adapter in at all, vs. keep it as offline tooling.
 
-1. **Physics validation ledger — 19 of 26 claims unverified, 0 signed off.** Re-derive each
-   claim in fresh context, then add the 17 missing in-code `Validation: <id>` markers.
-   Ledger: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md);
-   method: [`docs/validation/README.md`](docs/validation/README.md).
-2. **Grazing grating — groove efficiency.** `Grating.groove_efficiency` is a placeholder
-   scalar, not a groove-profile model. -> `feature/grating-groove-efficiency`.
-   Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-3. **Grazing grating — ALEX-s constants + hardware survey.** The ALEX-s device constants in
-   `grating.py` are `### FILL IN` placeholders pending a real datasheet; the ~10 eV-4 keV
-   CCD/grating survey is unwritten. -> `docs/soft-xray-hardware-survey`.
-   Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-
-### Gated
-
-1. **Crystal mosaicity - measured-data validation.** MC route implemented; validate
-   broadened line widths vs. a measured HOPG rocking-curve / EDS dataset
-   (data-dependent). Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
-2. **Multilayer film-on-substrate - measured-data validation.** Model implemented;
-   validate vs. a measured film-on-substrate dataset (data-dependent). Design:
-   [`docs/multilayer-materials.md`](docs/multilayer-materials.md).
-
-## P2 - medium (experiment match + usability)
-
-1. **Crystallography — `crystals`-package redundancy question.** `diffpy`/`dans-diffraction`
-   adapters landed; whether `crystals` still adds unique value (symmetry/Wyckoff expansion) is
-   unresolved, pending a ~1-hour spike. Review:
-   [`docs/crystallography-adapters-review.md`](docs/crystallography-adapters-review.md).
-2. **pyelsepa / ELSEPA transport.** Adapter landed + validated (C 2.19%, Si 4.42% max rel vs
-   NIST); gated in CI because the image/venv live outside the repo. -> `feature/elsepa-port`.
-3. **Sweep cache standardization.** Checkpoint records key on `(name, E0)` only, so the energy
-   grid is not part of the cache key and stores silently mix grid resolutions.
-   -> `feature/sweep-cache-standardization`.
-4. **Material filters.** Model calibration filters (e.g. sheets of Al foil) between the
-   x-ray beam and detector, for detector calibration against filtered spectra.
-   -> `feature/material-filters`.
-5. **Finite electron beam size.** Confirm the input beam is finite, then model it as a
-   ~1 mm diameter Gaussian beam incident on the crystal.
-6. **De-duplication follow-through — M4 + M7.** The two clusters parked out of scope by the
-   merged `refactor/dedup-followthrough`. -> `refactor/dedup-m4-m7`.
-   Inventory: [`docs/dedup-inventory.md`](docs/dedup-inventory.md).
-
-## P3 - lower / exploratory
-
-1. **Git history cleanup.** Squash minor upkeep/doc commits; evaluate other repo
-   structure/history improvements.
-2. **Dynamic GPU chunk sizing.** Evaluate config-driven chunk-size selection for
-   `cxr remote` GPU runs (probe a few test cases against the config's array sizes),
-   including a write-up of what chunking is and how config values drive it.
-
-## Long term features
-
-1. `Geant4` or similar integration to support high-energy electron beams
-
-   * Specifically, RAGAE@DESY
-     * Energy 3-5 MeV
-     * 50 fs duration
-     * 100 fC charge
-     * 200-300 um diameter on target
-
-   JungFrau Detector is about 4.5 m away from IP but could be as short as ~50 cm (in vacuum)
+NB: pyelsepa depends on **Pint**, worth weighing if a units library is ever evaluated for
+`cxr_mc`. (The old `claude_WIP.txt` scratchpad bullet is dropped — the file is not tracked on
+this branch, so there is nothing to strip before merge.)
