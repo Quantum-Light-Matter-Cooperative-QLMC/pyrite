@@ -1,4 +1,63 @@
-# TODO / Backlog
+# TODO — `perf/notebook-render-eval`
+
+**Task:** evaluate whether splitting `notebooks/analysis_app.py` (1070 lines, 8-tab
+marimo+Altair dashboard) into multiple sub-notebook files, plus downsampling /
+"marimo_csv"-style caching, would speed up plot rendering — and plan it if worthwhile.
+
+**Findings (measured on `checkpoints/mose2.pkl`, the densest checkpoint: 3720 records,
+40 tilts x 31 azimuths x 3 energies):**
+- Checkpoint load is fast (0.36 s) — not the bottleneck.
+- `spectrum_chart` (one tilt, one band): ~0.15 s build+serialize, ~650 KB payload — fine.
+- `heatmap_select_chart`: **0.94 s build**, only 200 KB payload — compute-bound, not data-volume.
+- `scan_charts` (8 charts): **1.11 s build**, 2.9 MB total payload — also compute-bound.
+- Root cause of both slow ones: `results.metrics.line_metrics` runs per-record scipy
+  peak-finding (`find_peaks`/prominence/widths) for every record; `plots._common._metrics_map`
+  memoizes it *within* one call (dict keyed by `id(record)`) but there is **no cache across
+  calls** — every re-render redoes the full O(N) peak-finding pass from scratch.
+- The whole tabbed dashboard is built inside **one ~600-line `@app.cell`**
+  (`notebooks/analysis_app.py:460-1053`) closing over ~40 top-level widgets spanning all 8
+  tabs — any single widget's change reruns the entire cell body. Whether this actually
+  forces the *currently open* tab to recompute (vs. marimo preserving already-loaded lazy
+  content across the rerun) could not be confirmed live — the Chrome browser-automation
+  extension was not connected in this session, so the decisive interaction test (open a
+  heavy tab, change an unrelated widget on another tab, switch back, check for a reload)
+  is still open. Marimo's `IDProvider` resets its counter each cell execution, so the
+  mega-cell's UI elements get *stable* ids across reruns — this weakens, but doesn't
+  disprove, the "wasted remount" theory.
+
+**Verdict: splitting into separate notebook FILES is not the fix.** Marimo apps are
+independent reactive graphs; 6 of 8 tabs share `res`/`res_view`/the thickness pin/the
+heatmap-click-to-spectrum wiring, so file-splitting would duplicate checkpoint loading and
+break that cross-widget wiring for little payoff (only "Penetration" and "Cross-material"
+are genuinely standalone). The measured bottleneck is uncached per-record peak-finding, not
+file structure or (at current checkpoint sizes) data volume — Vega-Lite/vegafusion already
+handles the 200 KB-2.9 MB payloads seen here.
+
+**Recommended implementation path (ranked by confidence):**
+1. **Cache `line_metrics`** (or `_metrics_map`) with marimo's native `@mo.cache` /
+   `mo.lru_cache` (available in this marimo version, `0.23.11`) so repeated calls with the
+   same records/settings skip the scipy peak-finding pass. Confirmed by direct measurement
+   to remove the two actual slow paths (`heatmap_select_chart`, `scan_charts`). This is the
+   "marimo_csv"-shaped idea the task named, done with marimo's own cache primitive instead
+   of literal CSVs.
+2. **Decouple the mega-cell into one `@app.cell` per tab** (same file), each closing over
+   only the widgets that tab actually reads, plus a final small cell that just calls
+   `mo.ui.tabs({...}, lazy=True)` over the 8 tab values. Cheap, low-risk, improves DAG
+   legibility regardless of whether the live recompute test above confirms real wasted work.
+3. **Downsampling raw spectra**: lower priority — current payloads are within
+   Vega-Lite/vegafusion's already-provisioned-for range; only revisit if 1-2 don't fully
+   fix perceived lag.
+4. File-splitting: not recommended now; revisit only if the file's line count itself (not
+   render speed) becomes the actual maintenance pain point, and only for the two standalone
+   tabs (Penetration, Cross-material).
+
+**Before implementing:** re-run the live cross-tab-recompute test (needs the Chrome
+extension connected) to confirm/rule out item 2's actual runtime payoff, since it's the one
+claim in this plan not backed by a direct measurement.
+
+---
+
+# TODO / Backlog (inherited from main, for reference only — do not edit here)
 
 Items live on `feature/...` / `bugfix/...` / `docs/...` branches, not `main`, until finished.
 Full detail for an in-progress item lives on its branch (or its design doc);
