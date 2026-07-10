@@ -61,10 +61,55 @@ def _case_title(case, tail="", *, latex=True, e0_keV=None, tilt_fmt="0.1f"):
     return f"{head} -- {tail}" if tail else head
 
 
+# Cross-call cache for the (expensive, per-record scipy peak-finding)
+# `line_metrics` result -- `_metrics_map` already dedupes within one call via
+# `id(rec)`, but every fresh call (e.g. a marimo tab re-rendering because an
+# unrelated widget elsewhere changed) redid the whole O(records) pass from
+# scratch. Measured on the densest checkpoint (mose2, 3720 records): this pass
+# is why `heatmap_select_chart`/`scan_charts` cost ~0.9-1.1s per call.
+#
+# Keyed on CONTENT (the record's (name, E0_keV) pair), not `id(r)`/`id(settings)`:
+# an identity key would be unsafe for a process-lifetime cache, since CPython
+# reuses a freed object's address for the next allocation -- two unrelated
+# records built at different times could collide on `id()` alone and silently
+# return each other's metrics. `(case["name"], case["E0_keV"])` is already the
+# results store's own primary key (`results[name][E0] = record`, see
+# `results.store.store_result`), so it's guaranteed unique per record and --
+# unlike the rest of `case` (which can carry unhashable `composition`/
+# `hkl_list`/`abs_layers` entries) is always a plain hashable (str, float)
+# pair. `settings.beam_current_na` is the only settings field `line_metrics`
+# reads today -- extend this key if it grows to read more.
+_LINE_METRICS_CACHE = {}
+_LINE_METRICS_CACHE_MAX = 100_000
+
+
+def _cached_line_metrics(r, settings, rel_prominence, line_metric):
+    case = r["case"]
+    key = (
+        case["name"],
+        case["E0_keV"],
+        settings.beam_current_na,
+        rel_prominence,
+        line_metric,
+    )
+    cached = _LINE_METRICS_CACHE.get(key)
+    if cached is not None:
+        return cached
+    value = line_metrics(r, settings, rel_prominence, metric=line_metric)
+    if len(_LINE_METRICS_CACHE) >= _LINE_METRICS_CACHE_MAX:
+        _LINE_METRICS_CACHE.clear()
+    _LINE_METRICS_CACHE[key] = value
+    return value
+
+
 def _metrics_map(recs, settings, rel_prominence, line_metric):
     """``id(rec) -> line_metrics(rec)`` for every record -- the same per-record
-    metric dict every sweep draw (matplotlib and altair) builds, computed once."""
-    return {id(r): line_metrics(r, settings, rel_prominence, metric=line_metric) for r in recs}
+    metric dict every sweep draw (matplotlib and altair) builds. Computed once
+    per record and cached ACROSS calls (see ``_cached_line_metrics``), so
+    re-rendering after a change that doesn't touch these records (e.g. a
+    marimo tab re-rendering because an unrelated widget changed) reuses the
+    prior peak-finding results instead of redoing them."""
+    return {id(r): _cached_line_metrics(r, settings, rel_prominence, line_metric) for r in recs}
 
 
 def _line_brem(r, settings, convolve=None):

@@ -473,88 +473,12 @@ def _(mo):
 @app.cell
 def _(
     MATERIAL,
-    MATERIAL_LABELS,
-    azim_E0_ui,
-    azim_azims_ui,
-    azim_brem_ui,
-    azim_thk_ui,
-    azim_tilt_ui,
-    azim_x_domain,
-    azim_xlog_ui,
-    azim_xmax_ui,
-    azim_xmin_ui,
-    azim_ylog_ui,
-    brem_ui,
-    broad_x_domain,
-    broad_xlog_ui,
-    broad_xmax_ui,
-    broad_xmin_ui,
-    broad_ylog_ui,
-    build_cases,
-    cases,
-    compare_spectrum_chart,
-    detector_res_view,
-    detector_thickness_ui,
-    detector_tilt_ui,
-    detector_x_domain,
-    detector_xmax_ui,
-    detector_xmin_ui,
-    eaglexo_charge_chart,
-    eaglexo_detected_chart,
-    heatmap_E0_ui,
-    heatmap_select,
-    load_checkpoint,
-    metric_vs_chart,
     mo,
-    narrow_xlog_ui,
-    narrow_xmax_ui,
-    narrow_xmin_ui,
-    penetration_angle_ui,
-    penetration_energy_ui,
-    penetration_thickness_ui,
-    penetration_survival_chart,
-    plot_best_spectra,
-    plot_eaglexo_charge_map,
-    plot_eaglexo_efficiency,
-    plot_material_comparison,
-    plot_timepix_efficiency,
-    plot_trajectory_grid,
-    polar_E0_ui,
-    polar_azim_ui,
-    polar_brem_ui,
-    polar_thk_ui,
-    polar_tilts_ui,
-    polar_x_domain,
-    polar_xlog_ui,
-    polar_xmax_ui,
-    polar_xmin_ui,
-    polar_ylog_ui,
-    records,
     res,
-    res_view,
-    scan_charts,
-    scan_res_view,
-    scan_thickness_ui,
-    select_results,
     settings,
-    spectrum_chart,
-    sweep_values,
-    thickness_ui,
-    tilt_ui,
-    timepix_detected_chart,
     top_geometries,
-    trajectory_chart,
-    trajectory_sweep,
-    x_domain,
-    ylog_ui,
 ):
-    # All figures live in one lazy, tabbed layout. Each tab value is a zero-arg
-    # builder closure (not a pre-built object), so `lazy=True` defers the compute
-    # to the open tab. Expensive chart bodies are nested in `mo.lazy`/lazy
-    # accordions so each tab can paint controls and placeholders before the slow
-    # plot data is prepared.
-
-    def _rankings_tab():
+    def rankings_tab():
         # Rank across ALL thicknesses (raw `res`, not the pinned `res_view`): the
         # thickness column disambiguates rows, so a thickness sweep shows every
         # thickness competing head-to-head rather than being collapsed to the pin.
@@ -578,7 +502,36 @@ def _(
             ]
         )
 
-    def _spectra_tab():
+    return (rankings_tab,)
+
+
+@app.cell
+def _(
+    brem_ui,
+    broad_x_domain,
+    broad_xlog_ui,
+    broad_xmax_ui,
+    broad_xmin_ui,
+    broad_ylog_ui,
+    heatmap_E0_ui,
+    heatmap_select,
+    mo,
+    narrow_xlog_ui,
+    narrow_xmax_ui,
+    narrow_xmin_ui,
+    records,
+    res,
+    res_view,
+    select_results,
+    settings,
+    spectrum_chart,
+    sweep_values,
+    thickness_ui,
+    tilt_ui,
+    x_domain,
+    ylog_ui,
+):
+    def spectra_tab():
         _md = mo.md(
             "The INTRINSIC coherent CXR line spectrum at the selected polar tilt, "
             "one line per beam energy."
@@ -699,7 +652,30 @@ def _(
             ]
         )
 
-    def _polar_compare_tab():
+    return (spectra_tab,)
+
+
+@app.cell
+def _(
+    compare_spectrum_chart,
+    mo,
+    polar_E0_ui,
+    polar_azim_ui,
+    polar_brem_ui,
+    polar_thk_ui,
+    polar_tilts_ui,
+    polar_x_domain,
+    polar_xlog_ui,
+    polar_xmax_ui,
+    polar_xmin_ui,
+    polar_ylog_ui,
+    records,
+    res,
+    select_results,
+    settings,
+    sweep_values,
+):
+    def polar_compare_tab():
         # Overlays one spectrum line per POLAR TILT (the polar_tilts_ui
         # multiselect), at a PINNED beam energy / azimuth / thickness -- the
         # complement of _spectra_tab, which fixes tilt and varies energy. Uses
@@ -781,7 +757,30 @@ def _(
         _parts.append(mo.lazy(_chart_item, show_loading_indicator=True))
         return mo.vstack(_parts)
 
-    def _azim_compare_tab():
+    return (polar_compare_tab,)
+
+
+@app.cell
+def _(
+    azim_E0_ui,
+    azim_azims_ui,
+    azim_brem_ui,
+    azim_thk_ui,
+    azim_tilt_ui,
+    azim_x_domain,
+    azim_xlog_ui,
+    azim_xmax_ui,
+    azim_xmin_ui,
+    azim_ylog_ui,
+    compare_spectrum_chart,
+    mo,
+    records,
+    res,
+    select_results,
+    settings,
+    sweep_values,
+):
+    def azim_compare_tab():
         # Overlays one spectrum line per AZIMUTH (the azim_azims_ui
         # multiselect), at a pinned beam energy / polar tilt / thickness --
         # mirrors _polar_compare_tab with the swept dimension swapped. Also
@@ -860,7 +859,24 @@ def _(
         _parts.append(mo.lazy(_chart_item, show_loading_indicator=True))
         return mo.vstack(_parts)
 
-    def _scans_tab():
+    return (azim_compare_tab,)
+
+
+@app.cell
+def _(
+    cases,
+    metric_vs_chart,
+    mo,
+    plot_best_spectra,
+    records,
+    res,
+    scan_charts,
+    scan_res_view,
+    scan_thickness_ui,
+    settings,
+    sweep_values,
+):
+    def scans_tab():
         def _scan_charts_item():
             charts = scan_charts(scan_res_view, settings, cases=cases, line_metric="prominence")
             return mo.vstack(charts) if charts else mo.md("*No scan results.*")
@@ -906,7 +922,31 @@ def _(
             ]
         )
 
-    def _detectors_tab():
+    return (scans_tab,)
+
+
+@app.cell
+def _(
+    cases,
+    detector_res_view,
+    detector_thickness_ui,
+    detector_tilt_ui,
+    detector_x_domain,
+    detector_xmax_ui,
+    detector_xmin_ui,
+    eaglexo_charge_chart,
+    eaglexo_detected_chart,
+    mo,
+    plot_eaglexo_charge_map,
+    plot_eaglexo_efficiency,
+    plot_timepix_efficiency,
+    records,
+    res,
+    settings,
+    sweep_values,
+    timepix_detected_chart,
+):
+    def detectors_tab():
         # Eagle XO and Timepix3 render into a nested mo.accordion
         # rather than a dropdown or nested mo.ui.tabs: keeping the controls in
         # top-level cells makes their reactivity explicit, and nested
@@ -991,7 +1031,24 @@ def _(
             ]
         )
 
-    def _penetration_tab():
+    return (detectors_tab,)
+
+
+@app.cell
+def _(
+    MATERIAL,
+    build_cases,
+    mo,
+    penetration_angle_ui,
+    penetration_energy_ui,
+    penetration_thickness_ui,
+    penetration_survival_chart,
+    plot_trajectory_grid,
+    settings,
+    trajectory_chart,
+    trajectory_sweep,
+):
+    def penetration_tab():
         _angle = penetration_angle_ui.value
         _md = mo.md(
             "Surviving-electron fraction vs depth (one curve per beam energy) and "
@@ -1032,7 +1089,18 @@ def _(
         )
         return mo.vstack(_parts)
 
-    def _cross_material_tab():
+    return (penetration_tab,)
+
+
+@app.cell
+def _(
+    MATERIAL_LABELS,
+    load_checkpoint,
+    mo,
+    plot_material_comparison,
+    settings,
+):
+    def cross_material_tab():
         _md = mo.md(
             "For every material whose checkpoint exists, the single best geometry's "
             "dominant line: energy vs flux, coloured by line quality."
@@ -1050,16 +1118,34 @@ def _(
             [_md, mo.md("*Run `scan_app.py` for more materials to populate this comparison.*")]
         )
 
+    return (cross_material_tab,)
+
+
+@app.cell
+def _(
+    azim_compare_tab,
+    cross_material_tab,
+    detectors_tab,
+    mo,
+    penetration_tab,
+    polar_compare_tab,
+    rankings_tab,
+    scans_tab,
+    spectra_tab,
+):
+    # Each tab value is a zero-arg builder closure from its own cell, so
+    # `lazy=True` still defers chart work while each builder closes over
+    # only the widgets and data it actually reads.
     mo.ui.tabs(
         {
-            "Energy comparison": _spectra_tab,
-            "Polar-angle comparison": _polar_compare_tab,
-            "Azimuthal comparison": _azim_compare_tab,
-            "Top geometries": _rankings_tab,
-            "Geometry & scans": _scans_tab,
-            "Detectors": _detectors_tab,
-            "Penetration": _penetration_tab,
-            "Cross-material": _cross_material_tab,
+            "Energy comparison": spectra_tab,
+            "Polar-angle comparison": polar_compare_tab,
+            "Azimuthal comparison": azim_compare_tab,
+            "Top geometries": rankings_tab,
+            "Geometry & scans": scans_tab,
+            "Detectors": detectors_tab,
+            "Penetration": penetration_tab,
+            "Cross-material": cross_material_tab,
         },
         lazy=True,
     )
