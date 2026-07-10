@@ -212,12 +212,15 @@ def heatmap_select_chart(
     renders exactly one ``panel`` -- ``panel_value`` (a raw ``panel`` value,
     e.g. an E0 in keV) selects which, defaulting to the first present. An Altair
     ``selection_point`` on the (x, y) encodings is attached via ``add_params``
-    and the clicked cell is highlighted (unselected cells dimmed), so a marimo
-    ``mo.ui.altair_chart(chart, chart_selection=False)`` wrapper exposes the
-    clicked row -- carrying ``name`` / ``panel_raw`` from :func:`heatmap_frame`
-    -- through ``chart.value``. ``quantity`` is a bare key or ``(key, label,
-    cmap)`` triple. Returns an :class:`altair.Chart`, or ``None`` when the
-    (filtered) frame is empty."""
+    so a marimo ``mo.ui.altair_chart(chart, chart_selection=False)`` wrapper
+    exposes the clicked row -- carrying ``name`` / ``panel_raw`` from
+    :func:`heatmap_frame` -- through ``chart.value``. A second, purely visual
+    hover selection dims cells other than the one under the pointer (full color
+    at rest, and again once the pointer leaves the chart); the click selection
+    itself carries no opacity/dimming so it doesn't wash out the whole grid
+    between clicks. The clicked cell instead gets a stroke outline. ``quantity``
+    is a bare key or ``(key, label, cmap)`` triple. Returns an
+    :class:`altair.Chart`, or ``None`` when the (filtered) frame is empty."""
     key, label, cmap = _resolve_quantity(quantity)
     df = heatmap_frame(
         results,
@@ -242,6 +245,18 @@ def heatmap_select_chart(
     if df.empty:
         return None
     sel = alt.selection_point(on="click", encodings=["x", "y"], empty=False)
+    # Name matches marimo's "bin_coloring" convention (frontend/src/plugins/impl/vega/params.ts):
+    # params so-named are excluded from the signal listeners that feed `mo.ui.altair_chart(...).value`,
+    # so this purely-visual hover selection can never perturb the click selection read downstream.
+    # Leave nearest=False/omitted: nearest selects from rect anchor points, offsetting
+    # the hover hitbox by half a heatmap cell instead of using the rect under the pointer.
+    hover = alt.selection_point(
+        name="bin_coloring",
+        on="pointerover",
+        empty=True,
+        clear="mouseout",
+        encodings=["x", "y"],
+    )
     panel_label = str(df["panel"].to_numpy()[0])
     chart = (
         alt.Chart(df)
@@ -250,10 +265,12 @@ def heatmap_select_chart(
             x=alt.X("x:O", title=_axis_label(x), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
             y=alt.Y("y:O", title=_axis_label(y), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
             color=alt.Color("value:Q", title=label, scale=alt.Scale(scheme=_scheme(cmap))),  # type: ignore[arg-type]
-            opacity=alt.condition(sel, alt.value(1.0), alt.value(0.35)),
+            opacity=alt.condition(hover, alt.value(1.0), alt.value(0.35)),
+            stroke=alt.condition(sel, alt.value("black"), alt.value(None)),
+            strokeWidth=alt.condition(sel, alt.value(2.0), alt.value(0.0)),
             tooltip=["panel:N", "x:O", "y:O", "value:Q", "name:N"],
         )
-        .add_params(sel)
+        .add_params(sel, hover)
         .properties(
             width=width,
             height=height,

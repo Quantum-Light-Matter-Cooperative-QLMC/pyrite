@@ -127,6 +127,31 @@ def test_heatmap_select_chart_single_panel_no_facet():
     assert spec.get("params"), "expected a selection param for click-select"
 
 
+def test_heatmap_select_chart_opacity_only_dims_on_hover():
+    # The grid must render at full color at rest -- only the "bin_coloring"-named
+    # hover param (which marimo's frontend excludes from backend signal listeners,
+    # see frontend/src/plugins/impl/vega/params.ts) may drive the opacity dimming.
+    # The click selection param must drive a stroke outline instead, so it can't
+    # wash out the whole grid between clicks.
+    chart = heatmap_select_chart(_store(), _settings(), quantity="peak_flux", panel_value=30.0)
+    spec = chart.to_dict()
+    params_by_name = {p["name"]: p for p in spec["params"]}
+    assert "bin_coloring" in params_by_name
+    hover_select = params_by_name["bin_coloring"]["select"]
+    assert hover_select["on"] == "pointerover"
+    assert hover_select["clear"] == "mouseout"
+    assert "nearest" not in hover_select
+
+    opacity = spec["encoding"]["opacity"]["condition"]
+    assert opacity["param"] == "bin_coloring"
+    assert opacity["empty"] is True  # full color for all cells when nothing is hovered
+
+    stroke = spec["encoding"]["stroke"]["condition"]
+    assert stroke["param"] != "bin_coloring"
+    click_select = params_by_name[stroke["param"]]["select"]
+    assert click_select["on"] == "click"
+
+
 def test_heatmap_select_chart_defaults_to_first_panel():
     # panel_value omitted -> first panel (30 keV) present, still a valid spec
     chart = heatmap_select_chart(_store(), _settings(), quantity="peak_flux")
