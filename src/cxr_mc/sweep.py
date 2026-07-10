@@ -516,6 +516,7 @@ def geometry_table(cases):
         rows.append(
             {
                 "config": c["name"],
+                "beam_uvw": c["beam_uvw"],
                 "refl": len(c["hkl_list"]),
                 "t [um]": c["thickness_ang"] / 1e4,
                 "polar [deg]": round(c["tilt_deg"], 2),
