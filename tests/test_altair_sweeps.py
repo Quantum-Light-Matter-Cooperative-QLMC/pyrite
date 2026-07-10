@@ -14,6 +14,7 @@ import numpy as np
 from cxr_mc.plots._frames import heatmap_frame, metric_vs_frame
 from cxr_mc.plots.altair_sweeps import (
     heatmap_chart,
+    heatmap_select_chart,
     metric_vs_chart,
     scan_charts,
 )
@@ -86,10 +87,18 @@ def test_heatmap_frame_shape():
     df = heatmap_frame(
         _store(), _settings(), quantity="peak_flux", x="tilt_azim_deg", y="tilt_deg", panel="E0_keV"
     )
-    assert list(df.columns) == ["x", "y", "panel", "value"]
+    assert list(df.columns) == ["x", "y", "panel", "value", "name", "panel_raw"]
     # 2 panels x (2 azimuths x 2 tilts) = 8 cells (peak_flux is never gated)
     assert len(df) == 8
     assert set(df["panel"]) == {"30 keV", "60 keV"}
+    # name/panel_raw carry per-cell identity for click-to-select back-mapping
+    assert set(df["name"]) == {
+        "HOPG t-20.0 a0.0",
+        "HOPG t-20.0 a30.0",
+        "HOPG t-10.0 a0.0",
+        "HOPG t-10.0 a30.0",
+    }
+    assert set(df["panel_raw"]) == {30.0, 60.0}
 
 
 def test_heatmap_chart_builds_valid_spec():
@@ -106,6 +115,27 @@ def test_heatmap_chart_accepts_quantity_triple():
 
 def test_heatmap_chart_none_on_empty():
     assert heatmap_chart({}, _settings()) is None
+
+
+# ---- click-selectable single-panel heatmap -----------------------------------
+def test_heatmap_select_chart_single_panel_no_facet():
+    # one panel only (no facet), and a point-selection param is attached so a
+    # marimo wrapper can read the clicked cell.
+    chart = heatmap_select_chart(_store(), _settings(), quantity="peak_flux", panel_value=30.0)
+    spec = chart.to_dict()  # raises if malformed
+    assert "facet" not in spec
+    assert spec.get("params"), "expected a selection param for click-select"
+
+
+def test_heatmap_select_chart_defaults_to_first_panel():
+    # panel_value omitted -> first panel (30 keV) present, still a valid spec
+    chart = heatmap_select_chart(_store(), _settings(), quantity="peak_flux")
+    assert isinstance(chart, alt.Chart)
+    chart.to_dict()
+
+
+def test_heatmap_select_chart_none_on_empty():
+    assert heatmap_select_chart({}, _settings()) is None
 
 
 # ---- scan (auto-pick) --------------------------------------------------------

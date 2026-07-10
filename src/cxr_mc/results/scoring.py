@@ -60,10 +60,11 @@ def top_geometries(
     """A compact, ranked table of the BEST geometries across a results store --
     the readable alternative to dumping every (tilt, azimuth, energy) row. Ranks
     by results.selection_score(``select``) and returns the top ``top_n`` as a
-    best-first DataFrame: polar/azimuth tilt, beam energy, dominant line
-    energy, line-definition quality, peak spectral flux, integrated coherent flux,
-    and the dominant line's share of the total. ``names`` restricts to those
-    configs (e.g. one material)."""
+    best-first DataFrame: polar/azimuth tilt, crystal thickness, beam energy,
+    dominant line energy, line-definition quality, peak spectral flux, integrated
+    coherent flux, and the dominant line's share of the total. Ranks across all
+    thicknesses in the store, so the thickness column disambiguates otherwise
+    identical geometries. ``names`` restricts to those configs (e.g. one material)."""
     recs = records(results, names)
     if not recs:
         return pd.DataFrame()
@@ -80,6 +81,7 @@ def top_geometries(
                 "rank": rank,
                 "polar": round(c["tilt_deg"], 1),
                 "azim": round(c["tilt_azim_deg"], 1),
+                "thick [Å]": round(c["thickness_ang"]),
                 "E [keV]": c["E0_keV"],
                 "line [eV]": round(m["line_eV"]),
                 "quality": round(m["line_quality"], 2),

@@ -186,6 +186,83 @@ def heatmap_chart(
     return chart
 
 
+# ---- click-selectable single-panel heatmap ----------------------------------
+def heatmap_select_chart(
+    results,
+    settings,
+    *,
+    quantity: "str | tuple" = "peak_flux",
+    x="tilt_azim_deg",
+    y="tilt_deg",
+    panel="E0_keV",
+    panel_value=None,
+    select="quality_peak",
+    cases=None,
+    rel_prominence=0.03,
+    line_metric="sharpness",
+    min_flux_frac=0.02,
+    min_line_quality=0.2,
+    width=_HEATMAP_WIDTH,
+    height=_HEATMAP_HEIGHT,
+    metrics=None,
+):
+    """A SINGLE-panel, click-selectable variant of :func:`heatmap_chart`, for
+    picking one cell interactively. Unlike ``heatmap_chart`` this does NOT facet
+    (faceted charts don't compose with a marimo point selection); instead it
+    renders exactly one ``panel`` -- ``panel_value`` (a raw ``panel`` value,
+    e.g. an E0 in keV) selects which, defaulting to the first present. An Altair
+    ``selection_point`` on the (x, y) encodings is attached via ``add_params``
+    and the clicked cell is highlighted (unselected cells dimmed), so a marimo
+    ``mo.ui.altair_chart(chart, chart_selection=False)`` wrapper exposes the
+    clicked row -- carrying ``name`` / ``panel_raw`` from :func:`heatmap_frame`
+    -- through ``chart.value``. ``quantity`` is a bare key or ``(key, label,
+    cmap)`` triple. Returns an :class:`altair.Chart`, or ``None`` when the
+    (filtered) frame is empty."""
+    key, label, cmap = _resolve_quantity(quantity)
+    df = heatmap_frame(
+        results,
+        settings,
+        quantity=key,
+        x=x,
+        y=y,
+        panel=panel,
+        select=select,
+        cases=cases,
+        rel_prominence=rel_prominence,
+        line_metric=line_metric,
+        min_flux_frac=min_flux_frac,
+        min_line_quality=min_line_quality,
+        metrics=metrics,
+    )
+    if df.empty:
+        return None
+    # Reduce to a single panel so one grid <-> one (x, y) cell (no facet).
+    keep = panel_value if panel_value is not None else sorted(df["panel_raw"].unique())[0]
+    df = df.loc[df["panel_raw"] == keep]
+    if df.empty:
+        return None
+    sel = alt.selection_point(on="click", encodings=["x", "y"], empty=False)
+    panel_label = str(df["panel"].to_numpy()[0])
+    chart = (
+        alt.Chart(df)
+        .mark_rect()
+        .encode(
+            x=alt.X("x:O", title=_axis_label(x), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
+            y=alt.Y("y:O", title=_axis_label(y), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
+            color=alt.Color("value:Q", title=label, scale=alt.Scale(scheme=_scheme(cmap))),  # type: ignore[arg-type]
+            opacity=alt.condition(sel, alt.value(1.0), alt.value(0.35)),
+            tooltip=["panel:N", "x:O", "y:O", "value:Q", "name:N"],
+        )
+        .add_params(sel)
+        .properties(
+            width=width,
+            height=height,
+            title=f"{label}  @ {panel_label}    (click a cell)",
+        )
+    )
+    return chart
+
+
 # ---- auto-picking scan (heatmap vs lines) ------------------------------------
 def scan_charts(
     results,

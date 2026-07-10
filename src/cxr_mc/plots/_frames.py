@@ -159,13 +159,18 @@ def heatmap_frame(
     (``selection_score`` ``select``); flux-gated quantities blank out cells with
     near-zero emission or an ill-defined line (dropped rows -> gaps), mirroring
     :func:`cxr_mc.plots.plot_heatmaps`. ``x`` / ``y`` are in DISPLAY units.
-    Columns: ``x, y, panel, value``. ``metrics`` is a precomputed
+    Columns: ``x, y, panel, value, name, panel_raw``. ``name`` is the config
+    name of the cell's best record and ``panel_raw`` its raw ``panel`` value --
+    both carried so an interactive click on a cell (see
+    :func:`cxr_mc.plots.altair_sweeps.heatmap_select_chart`) maps back to an
+    exact geometry / parameter set. ``metrics`` is a precomputed
     ``_common._metrics_map`` for THESE records (computed here when omitted) --
     multi-quantity drivers pass one shared map instead of re-deriving it per
     quantity."""
+    cols = ["x", "y", "panel", "value", "name", "panel_raw"]
     recs = records_for_cases(results, cases)
     if not recs:
-        return pd.DataFrame(columns=["x", "y", "panel", "value"])
+        return pd.DataFrame(columns=cols)
     if metrics is None:
         metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
     gated = quantity in _FLUX_GATED
@@ -190,6 +195,8 @@ def heatmap_frame(
                     "y": _axis_disp(y, [yv])[0],
                     "panel": _value_label(panel, pv),
                     "value": float(m[quantity]),
+                    "name": r["case"]["name"],
+                    "panel_raw": float(pv),
                 }
             )
-    return pd.DataFrame(rows, columns=["x", "y", "panel", "value"])
+    return pd.DataFrame(rows, columns=cols)
