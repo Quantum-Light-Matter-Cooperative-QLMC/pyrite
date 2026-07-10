@@ -69,7 +69,7 @@ _AXIS_SPECS = {
     "tilt_deg": ("polar tilt", 1.0, "deg", "{:g}"),
     "tilt_azim_deg": ("azimuthal tilt", 1.0, "deg", "{:g}"),
     "E0_keV": ("beam energy", 1.0, "keV", "{:g}"),
-    "thickness_ang": ("thickness", 1e4, r"$\mu$m", "{:g}"),
+    "thickness_ang": ("thickness", 1e4, r"μm", "{:g}"),
     "B_ang2": ("B-factor", 1.0, r"$\AA^2$", "{:g}"),
 }
 

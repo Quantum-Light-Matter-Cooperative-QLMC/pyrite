@@ -163,6 +163,38 @@ def test_heatmap_select_chart_none_on_empty():
     assert heatmap_select_chart({}, _settings()) is None
 
 
+def test_heatmap_select_chart_click_selection_needs_non_vegafusion_transformer():
+    # notebooks/analysis_app.py enables vegafusion GLOBALLY (to lift Vega-Lite's
+    # 5000-row cap for the dense spectra charts) but must build THIS chart's
+    # `mo.ui.altair_chart` wrapper under a locally-restored default transformer
+    # -- vegafusion serializes an already-compiled Vega spec (`signals`, no
+    # top-level `params`), and marimo's frontend needs that `params` array to
+    # know which named selection to listen for and report back as `.value`.
+    # Under vegafusion the click still highlights visually (baked into the
+    # compiled signal graph) but the selection can never reach the kernel.
+    # This guards the exact mechanism notebooks/analysis_app.py works around.
+    import marimo as mo
+
+    chart = heatmap_select_chart(_store(), _settings(), quantity="peak_flux", panel_value=30.0)
+    assert chart is not None
+
+    prior = alt.data_transformers.active
+    try:
+        alt.data_transformers.enable("vegafusion")
+
+        broken = mo.ui.altair_chart(chart, chart_selection=False, legend_selection=False)
+        assert "params" not in broken._spec
+
+        with alt.data_transformers.enable("default"):
+            fixed = mo.ui.altair_chart(chart, chart_selection=False, legend_selection=False)
+        assert "params" in fixed._spec
+        # the `with` block must not leak -- other charts on the page still
+        # need vegafusion active afterward.
+        assert alt.data_transformers.active.startswith("vegafusion")
+    finally:
+        alt.data_transformers.enable(prior)
+
+
 # ---- scan (auto-pick) --------------------------------------------------------
 def test_scan_charts_force_lines_one_per_quantity():
     charts = scan_charts(_store(), _settings(), force="lines")

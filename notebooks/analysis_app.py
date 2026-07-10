@@ -265,14 +265,27 @@ def _(heatmap_E0_ui, heatmap_select_chart, mo, res_view, settings):
     # carries its own point-selection param (see heatmap_select_chart), so let that
     # drive rather than marimo's default interval brush. None when the pinned view
     # has no heatmap to draw.
+    #
+    # mo.ui.altair_chart's click round-trip depends on the serialized spec's
+    # top-level Vega-Lite `params` array to know which named selection to
+    # listen for and report back as `.value`. The notebook enables vegafusion
+    # globally (to lift Vega-Lite's 5000-row cap for the dense spectra charts),
+    # but vegafusion serializes an already-COMPILED Vega spec (`signals`, no
+    # `params`) -- the click still highlights visually (that's baked into the
+    # compiled signal graph) but the selection can never reach the kernel. This
+    # heatmap grid is tiny, so build it under the default transformer instead.
+    import altair as _alt
+
     _chart = heatmap_select_chart(
         res_view, settings, panel_value=heatmap_E0_ui.value, line_metric="prominence"
     )
-    heatmap_select = (
-        mo.ui.altair_chart(_chart, chart_selection=False, legend_selection=False)
-        if _chart is not None
-        else None
-    )
+    if _chart is None:
+        heatmap_select = None
+    else:
+        with _alt.data_transformers.enable("default"):
+            heatmap_select = mo.ui.altair_chart(
+                _chart, chart_selection=False, legend_selection=False
+            )
     return (heatmap_select,)
 
 

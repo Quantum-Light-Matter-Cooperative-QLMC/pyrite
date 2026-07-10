@@ -62,6 +62,75 @@ def _validate_band(band):
         raise ValueError(f"band must be 'narrow' or 'broad', got {band!r}")
 
 
+def _windowed_frame(df, x_domain):
+    """Sub-frame of ``df`` whose ``energy_eV`` falls inside ``x_domain`` -- used
+    ONLY to size a y-scale's domain, never to restrict what's drawn. Vega-Lite
+    always computes a scale's domain from that encoding's whole dataset,
+    regardless of another encoding's domain, so narrowing the x-window (e.g.
+    broad x-max) wouldn't otherwise shrink the y-axis to the data actually
+    visible in that window. Falls back to the full frame when the window
+    excludes everything, so an out-of-range ``x_domain`` can't blank the axis.
+    """
+    if x_domain is None:
+        return df
+    lo, hi = x_domain
+    mask = pd.Series(True, index=df.index)
+    if lo is not None:
+        mask &= df["energy_eV"] >= lo
+    if hi is not None:
+        mask &= df["energy_eV"] <= hi
+    windowed = df.loc[mask]
+    return windowed if not windowed.empty else df
+
+
+def _log_y_scale(df, floor_frac=1e-5):
+    """Log-scale ``y`` with an explicit positive ``domainMin``, clamped.
+
+    Vega-Lite auto-computes the y domain from the data's raw (min, max) when
+    no domain is given, and a log scale whose domain touches 0 collapses
+    every point onto one pixel position instead of raising. The wide
+    bremsstrahlung tail (``band="broad"``) tapers to exactly 0 at its
+    radiative endpoint (photon energy == beam energy), so that 0 always
+    reaches the auto domain unless excluded here. Mirrors the matplotlib
+    renderer's ``ax.set_ylim(floor, ...)`` guard in ``plots/spectra.py``.
+
+    That endpoint value still sits below ``domainMin`` once excluded, and
+    Vega-Lite does not clamp out-of-domain values by default: it extrapolates
+    ``log(0) == -Infinity`` to an invalid pixel position, which renders as a
+    spurious spike pinned to the axis extreme instead of just disappearing
+    below the floor (matplotlib clips silently at the axis limits; Vega-Lite
+    needs ``clamp`` told explicitly to do the same).
+
+    ``df`` is whatever frame the caller wants the domain fit to -- pass a
+    window from :func:`_windowed_frame` to size the domain to a visible x-range
+    instead of the full dataset.
+    """
+    positive = df.loc[df["intensity"] > 0, "intensity"]
+    if positive.empty:
+        return _scale("log")
+    floor = max(float(positive.min()), float(positive.max()) * floor_frac)
+    return alt.Scale(type="log", domainMin=floor, clamp=True)
+
+
+def _linear_y_scale(df, x_domain):
+    """Explicit zero-anchored linear y-domain sized to the visible x-window.
+
+    Mirrors :func:`_log_y_scale`'s reason for existing: Vega-Lite computes a
+    scale's domain from the encoding's whole dataset, so restricting
+    ``x_domain`` (e.g. broad x-max) wouldn't otherwise autoscale y to the data
+    actually visible in that window. Falls back to Vega-Lite's own auto
+    domain (``_scale("linear")``, unbounded) when no ``x_domain`` is set --
+    the common case -- to leave that default behavior unchanged.
+    """
+    if x_domain is None:
+        return _scale("linear")
+    windowed = _windowed_frame(df, x_domain)
+    hi = float(windowed["intensity"].max()) if not windowed.empty else 0.0
+    if hi <= 0:
+        return _scale("linear")
+    return alt.Scale(domainMin=0.0, domainMax=hi * 1.05)
+
+
 def _scale(scale_type, domain=None):
     if scale_type not in {"linear", "log"}:
         raise ValueError(f"scale type must be 'linear' or 'log', got {scale_type!r}")
@@ -247,7 +316,11 @@ def spectrum_chart(
 
     title = _case_title(recs[0]["case"], "intrinsic", latex=False)
     x_scale = _scale(x_type, x_domain)
-    y_scale = _scale(y_type)
+    y_scale = (
+        _log_y_scale(_windowed_frame(df, x_domain))
+        if y_type == "log"
+        else _linear_y_scale(df, x_domain)
+    )
 
     base = alt.Chart(df).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
@@ -336,7 +409,11 @@ def compare_spectrum_chart(
 
     title = _case_title(recs[0]["case"], "comparison", latex=False)
     x_scale = _scale(x_type, x_domain)
-    y_scale = _scale(y_type)
+    y_scale = (
+        _log_y_scale(_windowed_frame(df, x_domain))
+        if y_type == "log"
+        else _linear_y_scale(df, x_domain)
+    )
     hue_title = _COMPARE_HUE_FIELDS[hue]
 
     base = alt.Chart(df).encode(
