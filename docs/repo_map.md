@@ -186,8 +186,10 @@ freezes the export set). Submodule DAG (leaf → driver):
   is identical — only the renderer differs. Intentionally **NOT** re-exported
   from the package (frozen export guard) — import from the submodule. Per-module
   guard tests: `tests/test_altair_*.py`.
-  - `altair_spectra` — intrinsic spectra: `spectrum_chart`, `spectrum_frame`.
-    Deps: `_common`, `results`.
+  - `altair_spectra` — intrinsic spectra: `spectrum_chart`, `spectrum_frame`,
+    `compare_spectrum_chart` (overlay one line per E0/tilt/azimuth, for the
+    Energy/Polar-angle/Azimuthal comparison notebook tabs). Deps: `_common`,
+    `results`.
   - `altair_sweeps` — metric scans + parametric heatmaps: `metric_vs_chart`,
     `heatmap_chart`, `scan_charts` (auto heatmap-vs-lines, one shared metrics
     map across quantities). Deps: `_common`, `_frames`, `sweeps`, `results`.
