@@ -44,6 +44,21 @@ def _build_parser(ap):
         action="store_true",
         help="tiny grid (5 polar tilts x 2 azimuths x 2 energies) for a smoke test",
     )
+    ap.add_argument(
+        "--n-families",
+        type=int,
+        default=None,
+        help="override the number of dominant reflection families "
+        "(crystallography.dominant_reflections; default is the material's Sweep default)",
+    )
+    ap.add_argument(
+        "--beam-uvw",
+        type=int,
+        nargs=3,
+        metavar=("H", "K", "L"),
+        default=None,
+        help="override the beam zone axis [uvw] (default: the material's crystal_params default)",
+    )
     ap.add_argument("--checkpoint-dir", default="checkpoints")
     ap.set_defaults(func=run)
     return ap
@@ -56,20 +71,30 @@ def add_subparser(sub):
 
 def run(args):
     settings = default_settings()
+    overrides = {}
     if args.quick:
-        sweep = material_sweep(
-            args.material,
+        overrides.update(
             tilt_deg=np.linspace(-45.0, 45.0, 5),
             tilt_azim_deg=np.array([-30.0, -10.0]),
             energy_keV=[30, 60],
         )
-    else:
-        sweep = material_sweep(args.material)
+    if args.n_families is not None:
+        overrides["n_families"] = args.n_families
+    if args.beam_uvw is not None:
+        overrides["beam_uvw"] = tuple(args.beam_uvw)
+    sweep = material_sweep(args.material, **overrides)
 
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
     print(
         f"{args.material}: {len(cases)} cases across "
         f"{len({c['name'] for c in cases})} configs" + (" (quick grid)" if args.quick else "")
+    )
+    # read the RESOLVED orientation off the first case, not the Sweep request:
+    # HOPG/h-BN hand-pin hkl_list and bypass dominant_reflections entirely, so
+    # echoing sweep.n_families would claim a knob that's actually inert for them.
+    print(
+        f"crystal orientation: beam_uvw={cases[0]['beam_uvw']} "
+        f"hkl_list ({len(cases[0]['hkl_list'])} reflections)={cases[0]['hkl_list']}"
     )
 
     # Always pass an explicit path named for the REGISTRY key: run_sweep's

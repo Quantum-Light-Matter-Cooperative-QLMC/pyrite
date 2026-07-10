@@ -179,8 +179,46 @@ def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
 
     monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
     args = argparse.Namespace(
-        material="mos2-on-sio2-si", workers=0, quick=False, checkpoint_dir=str(tmp_path)
+        material="mos2-on-sio2-si",
+        workers=0,
+        quick=False,
+        n_families=None,
+        beam_uvw=None,
+        checkpoint_dir=str(tmp_path),
     )
     scan.run(args)
     assert seen["path"] is not None
     assert seen["path"].endswith("mos2-on-sio2-si.pkl")
+
+
+def test_scan_forwards_n_families_and_beam_uvw_overrides(monkeypatch, tmp_path):
+    # mose2 auto-selects hkl_list via dominant_reflections (unlike HOPG/h-BN,
+    # which hand-pin it), so n_families=6 must change the resolved reflection
+    # count and beam_uvw=(1, 0, 0) must override the material's (0, 0, 2) default.
+    import argparse
+
+    from cxr_mc import scan
+
+    default_hkl = crystal_params("mose2", n_families=4)["hkl_list"]
+    override_hkl = crystal_params("mose2", n_families=6)["hkl_list"]
+    assert len(override_hkl) != len(default_hkl)
+
+    seen = {}
+
+    def fake_run_sweep(cases, results, checkpoint_dir=None, checkpoint_path=None, **kw):
+        seen["cases"] = cases
+
+    monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
+    args = argparse.Namespace(
+        material="mose2",
+        workers=0,
+        quick=True,
+        n_families=6,
+        beam_uvw=[1, 0, 0],
+        checkpoint_dir=str(tmp_path),
+    )
+    scan.run(args)
+
+    case = seen["cases"][0]
+    assert case["beam_uvw"] == (1, 0, 0)
+    assert len(case["hkl_list"]) == len(override_hkl)

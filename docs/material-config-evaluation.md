@@ -3,9 +3,10 @@
 Should the per-material config be reworked, and how should crystal plane
 orientation (`beam_uvw`) and the dominant-reflection count (`n_families`) be
 exposed instead of living as source-level defaults? **Recommendation: split
-into a cheap, physics-risk-free plumbing pass (CLI flags + checkpoint
-persistence) now, and a moderate-churn registry unification (still no physics
-change) as a follow-up.** Do not change any of `n_families`'s default,
+into a cheap, physics-risk-free plumbing pass (CLI flags + surfacing the
+orientation that's already persisted per-checkpoint but never printed) now,
+and a moderate-churn registry unification (still no physics change) as a
+follow-up.** Do not change any of `n_families`'s default,
 `g_max_invang`, or the reflection-ranking metric as part of this — that's a
 physics change, not a config-exposure change, and would require a fresh
 validation pass.
@@ -59,22 +60,32 @@ independently.
    specific plane set without editing source. "Which planes" and "how many
    planes" currently live in two different mechanisms (a hardcoded bypass vs.
    a `Sweep` field) that don't compose.
-2. **Nothing is recorded.** `cxr scan` (`scan.py`) has no `--n-families` /
-   `--beam-uvw` flags — reaching either knob requires calling
-   `material_sweep()` from Python. More importantly, grepping `results.py`,
-   `_checkpoint_io.py`, and `run.py` for `hkl_list` / `beam_uvw` / `n_families`
-   returns **zero matches**: none of the orientation actually used to produce
-   a checkpoint is persisted with it. If the per-material defaults ever change,
-   an old checkpoint's spectrum can no longer be traced back to which
-   reflections generated it. This is the literal "done silently" the config
-   is being reworked to fix, and it's independent of whether the knobs become
-   CLI-settable.
+2. **Persisted, but not surfaced.** Correction to an earlier pass of this
+   evaluation: grepping `results.py`/`_checkpoint_io.py`/`run.py` for the
+   literal names `hkl_list`/`beam_uvw`/`n_families` returns no hits, but that
+   grep was the wrong test — `build_cases` already puts the resolved
+   `hkl_list`/`beam_uvw` into every case dict (`sweep.py:466-478`), and
+   `store_result` stores the whole case verbatim as `record["case"]`
+   (`results/store.py:80`). That survives the checkpoint round-trip: `run.py`
+   reads `r["case"]["crystal"]` off *loaded* checkpoints, and
+   `results/selection.py`'s `slim_results` explicitly keeps `"case"` as one of
+   its retained keys. So the actual planes summed and the zone axis used
+   **are** recoverable from any checkpoint today — the real gap is that
+   nothing surfaces them without manually indexing into
+   `record["case"]["hkl_list"]`: `cxr scan` prints no orientation summary, and
+   `sweep.geometry_table` shows only a reflection *count* (`len(c["hkl_list"])`),
+   not which planes or the zone axis. `n_families` itself (the request, as
+   opposed to the `hkl_list` it resolved to) is not stored as its own field —
+   but the resolved `hkl_list` is the more useful artifact of the two, and for
+   HOPG/h-BN, echoing `n_families` would be misleading anyway (next point).
+   This is the literal "done silently" the config is being reworked to fix,
+   and it's a *surfacing* problem, not a persistence problem.
 
 ## Options for where a unified per-material config lives
 
-1. **Leave the split, add flags + persistence only.** Zero churn to the
-   registries themselves. Fixes the CLI-visibility and reproducibility gaps
-   but leaves "editing one material means touching two files" unresolved.
+1. **Leave the split, add flags + surfacing only.** Zero churn to the
+   registries themselves. Fixes the CLI-visibility and surfacing gaps but
+   leaves "editing one material means touching two files" unresolved.
 2. **New leaf module (`materials.py`) between `crystallography.py` and
    `sweep.py`/`config.py`.** Both `sweep.py` and `config.py` import from it;
    no cycle. Holds one row per material with orientation fields (`beam_uvw`,
@@ -101,7 +112,7 @@ whatever field shapes the CLI/persistence work settles on).
 | Change | Risk |
 | --- | --- |
 | `--n-families` / `--beam-uvw` flags on `cxr scan`, forwarded to existing `Sweep` overrides | None — same code path, just argparse wiring |
-| Persist `hkl_list` / `beam_uvw` / `n_families` into checkpoint/run metadata | None — recording, not computing |
+| Print the resolved `hkl_list`/`beam_uvw` from `cxr scan` (already persisted in `record["case"]`; just not echoed anywhere) | None — reads existing data, computes nothing new |
 | Unify `_MATERIAL_GRIDS` + `_CRYSTAL_PARAMS` into one per-material registry | None — same values, relocated |
 | Changing the `n_families` **default** (currently 4 for every non-pinned material), `g_max_invang`, or the `\|S(g)\| e^{-W}/g^2` ranking metric | **Physics change** — alters the summed reflection set for every current material's spectra; needs a fresh-context re-derivation + anchor-figure re-check per `docs/physics-validation-ledger.md` before it could be adopted |
 
@@ -111,11 +122,13 @@ whatever field shapes the CLI/persistence work settles on).
    `scan.py:_build_parser`, threaded into the existing `material_sweep(...,
    n_families=..., beam_uvw=...)` override mechanism. No new plumbing needed
    beyond argparse.
-2. **Persistence** — stamp the `cp["hkl_list"]` / `cp["beam_uvw"]` /
-   `sweep.n_families` actually used into whatever metadata already rides
-   along with a checkpoint (check `results.Settings` / the run-case dict in
-   `run.py`), so a saved checkpoint is traceable to the reflections that
-   produced it.
+2. **Surfacing** — the orientation is already persisted in `record["case"]`
+   (see above); print the resolved `beam_uvw`/`hkl_list` at the end of
+   `cxr scan` (reading `cases[0]`, not `sweep`, since HOPG/h-BN resolve
+   `hkl_list` independent of any `n_families` request), and extend
+   `geometry_table` to show more than a bare reflection count when someone
+   wants to eyeball a checkpoint's orientation without writing a one-off
+   script.
 3. **Registry unification (`materials.py`)** — after 1-2 land and settle the
    field shapes, migrate `_MATERIAL_GRIDS`/`_CRYSTAL_PARAMS` into one
    per-material row each, including a visible reason string for materials
