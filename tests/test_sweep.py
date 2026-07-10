@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from cxr_mc import materials as material_registry
 from cxr_mc.config import (
     MATERIALS,
     PENETRATION_TILT_DEG,
@@ -10,7 +11,13 @@ from cxr_mc.config import (
     material_sweep,
     trajectory_sweep,
 )
-from cxr_mc.sweep import MATERIAL_LABELS, Sweep, build_cases, crystal_params
+from cxr_mc.materials import (
+    CRYSTAL_PARAMS,
+    MATERIAL_CONFIGS,
+    MATERIAL_GRIDS,
+    material_crystal_key,
+)
+from cxr_mc.sweep import MATERIAL_LABELS, Layer, Sweep, build_cases, crystal_params
 
 ALL = [
     "mose2",
@@ -100,6 +107,25 @@ def test_mote2_registered():
     assert MATERIAL_LABELS["mote2"] == "MoTe2"
 
     assert "mote2" in MATERIALS
+
+
+def test_material_registry_projects_scan_and_crystal_views():
+    assert set(MATERIAL_GRIDS) <= set(MATERIAL_CONFIGS)
+    assert set(CRYSTAL_PARAMS) <= set(MATERIAL_CONFIGS)
+    assert Layer is material_registry.Layer
+
+    assert material_crystal_key("mos2-on-sio2-si") == "mos2"
+    assert MATERIAL_GRIDS["mos2-on-sio2-si"]["stack"][0].material == "sio2"
+    assert CRYSTAL_PARAMS["mos2"]["beam_uvw"] == (0, 0, 2)
+
+
+@pytest.mark.parametrize("material", ["hopg", "hbn"])
+def test_pinned_hkl_materials_carry_reason(material):
+    row = MATERIAL_CONFIGS[material]
+
+    assert row["hkl_list_reason"]
+    assert row["hkl_list"] == CRYSTAL_PARAMS[material]["hkl_list"]
+    assert crystal_params(material, n_families=999)["hkl_list"] == row["hkl_list"]
 
 
 def test_mote2_material_grid_is_bulk():

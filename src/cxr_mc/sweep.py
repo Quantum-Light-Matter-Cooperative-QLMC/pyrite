@@ -16,18 +16,24 @@ are both valid and need no other code changes.
 
 Crystallography (composition, dominant reflections, zone axis, B-factor, default
 energy grid) is looked up per material; the detector geometry defaults to the
-2x2 Timepix3 quad. Only ``crystallography`` is imported here (no GPU), so
-this module is cheap to import and test.
+2x2 Timepix3 quad. Only ``crystallography`` and the lightweight material
+registry are imported here (no GPU), so this module is cheap to import and test.
 """
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 from itertools import product
-from typing import Any, NotRequired, TypedDict
+from typing import Any
 
 import numpy as np
 
+from . import materials as _materials
 from .crystallography import CRYSTALS, dominant_reflections
+from .materials import Layer, ScalarOrSeq
+
+_CRYSTAL_PARAMS = _materials.CRYSTAL_PARAMS
+MATERIAL_LABELS = _materials.MATERIAL_LABELS
+pm = _materials.pm
 
 # ---- Timepix3 quad geometry (fixed hardware) --------------------------------
 TIMEPIX3_PIXEL_PITCH_M = 55e-6
@@ -37,26 +43,6 @@ TIMEPIX3_DTHETA_OBS_DEG = float(
     np.degrees(2 * np.arctan((TIMEPIX3_CHIP_WIDTH_M / 2) / TIMEPIX3_DISTANCE_M))
 )
 TIMEPIX3_DOMEGA_SR = float(TIMEPIX3_CHIP_WIDTH_M**2 / TIMEPIX3_DISTANCE_M**2)
-
-# pretty labels for the material column / config names
-MATERIAL_LABELS = {
-    "mose2": "MoSe2",
-    "wse2": "WSe2",
-    "mote2": "MoTe2",
-    "mote2_product": "MoTe2 (product)",
-    "mos2": "MoS2",
-    "ws2": "WS2",
-    "ptse2": "PtSe2",
-    "hfse2": "HfSe2",
-    "zrse2": "ZrSe2",
-    "hbn": "h-BN",
-    "hopg": "HOPG",
-    "diamond": "diamond",
-    "silicon": "silicon",
-    "sapphire": "sapphire",
-}
-
-ScalarOrSeq = float | Sequence[float] | np.ndarray
 
 
 def fmt_thickness(t_ang):
@@ -68,14 +54,6 @@ def fmt_thickness(t_ang):
     if t_ang < 1e7:
         return f"{t_ang / 1e4:g}um"
     return f"{t_ang / 1e7:g}mm"
-
-
-def pm(*hkls):
-    """A list of reflections together with their negatives."""
-    out = []
-    for h in hkls:
-        out += [tuple(h), tuple(-x for x in h)]
-    return out
 
 
 # amorphous substrate number densities [1/Ang^3], from bulk mass density:
@@ -101,27 +79,6 @@ def substrate_composition(substrate):
         f"unknown substrate {substrate!r}; use one of {list(_SUBSTRATE_COMP)} "
         f"or a crystal key in {list(CRYSTALS)}"
     )
-
-
-@dataclass(frozen=True)
-class Layer:
-    """One substrate-side layer of a stack (the film is NOT a Layer -- it is the
-    Sweep's material/thickness, which sweeps; stack layers are fixed per run).
-
-    material : a crystal key in CRYSTALS (the layer radiates its own PXR/CBS)
-        or an amorphous preset key ('sio2': absorption + brem only).
-    beam_uvw : direct-lattice direction along the surface normal (+z). None ->
-        the per-material default from crystal_params (e.g. sapphire stays c-cut,
-        matching the commercial c-cut substrates). Ignored for amorphous layers.
-    azimuth_deg : in-plane rotation of THIS layer's lattice about the surface
-        normal, relative to the film's azimuth -- i.e. which in-plane g of the
-        layer lines up with the film's. Ignored for amorphous layers.
-    """
-
-    material: str
-    thickness_ang: float
-    beam_uvw: tuple | None = None
-    azimuth_deg: float = 0.0
 
 
 def stack_layers(film_composition, film_thickness_ang, stack):
@@ -205,81 +162,12 @@ def layer_radiator(layer: "Layer", n_families: int = 4):
     return rad
 
 
-class CrystalParamsGrid(TypedDict):
-    """Fixed per-material crystallography that :func:`crystal_params` spreads into
-    its returned dict, mirroring :data:`config._MATERIAL_GRIDS`/``MaterialGrid``.
-    ``hkl_list`` is present only for materials where the automatic
-    :func:`~cxr_mc.crystallography.dominant_reflections` family search isn't right
-    (fiber-textured HOPG); everyone else gets it derived from ``B_ang2``."""
-
-    B_ang2: float
-    beam_uvw: tuple[int, int, int]
-    E_grid: np.ndarray
-    hkl_list: NotRequired[list[tuple[int, ...]]]
-
-
-# per-material crystallography registry: B-factor, beam zone axis, default
-# photon-energy grid. ``crystal`` (== the registry key) and ``composition``
-# (derived from the crystal's basis, like substrate_composition already does
-# for substrates) are NOT stored here -- they follow mechanically from the key.
-_CRYSTAL_PARAMS: dict[str, CrystalParamsGrid] = {
-    "mose2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 2), "E_grid": np.arange(350.0, 1750.0, 3.0)},
-    # isostructural with MoSe2; W has no NIST Mott table so transport falls back to
-    # analytic screened-Rutherford screening for W (see montecarlo).
-    "wse2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 2), "E_grid": np.arange(350.0, 2500.0, 3.0)},
-    # 2H-MoTe2 (alpha) bulk, isostructural with MoSe2. Te has no NIST Mott table ->
-    # transport falls back to analytic screened-Rutherford screening for Te (see
-    # montecarlo), as for W/S/Pt/Hf/Zr.
-    "mote2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 2), "E_grid": np.arange(350.0, 2500.0, 3.0)},
-    # 2H-MoTe2 product-page variant (few-layer, on sapphire substrate). Same
-    # phonon/crystal params as bulk; only the lattice differs (crystal_structures.toml).
-    "mote2_product": {
-        "B_ang2": 0.6,
-        "beam_uvw": (0, 0, 2),
-        "E_grid": np.arange(350.0, 2500.0, 3.0),
-    },
-    # 2H disulfides, isostructural with WSe2/MoSe2 (small in-plane a -> bright). S has
-    # no NIST Mott table -> analytic SR screening fallback.
-    "ws2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 2), "E_grid": np.arange(350.0, 2500.0, 3.0)},
-    "mos2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 2), "E_grid": np.arange(350.0, 2500.0, 3.0)},
-    # 1T (CdI2-type): heavy metal at the ORIGIN -> every (00l) stays strong, so the
-    # bright basal series marches up in energy with the tight c. These metals
-    # (Pt/Hf/Zr) have no NIST Mott table -> analytic SR screening.
-    "ptse2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 1), "E_grid": np.arange(350.0, 3500.0, 3.0)},
-    "hfse2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 1), "E_grid": np.arange(350.0, 3500.0, 3.0)},
-    "zrse2": {"B_ang2": 0.6, "beam_uvw": (0, 0, 1), "E_grid": np.arange(350.0, 3500.0, 3.0)},
-    # Layered h-BN: c-axis normal, so start with the basal 00l family like HOPG.
-    "hbn": {
-        "B_ang2": 0.6,
-        "beam_uvw": (0, 0, 1),
-        "E_grid": np.arange(100.0, 5000.0, 3.0),
-        "hkl_list": pm((0, 0, 2), (0, 0, 4)),
-    },
-    "diamond": {"B_ang2": 0.21, "beam_uvw": (4, 0, 0), "E_grid": np.arange(100.0, 5000.0, 2.0)},
-    "silicon": {"B_ang2": 0.46, "beam_uvw": (4, 4, 0), "E_grid": np.arange(100.0, 5000.0, 3.0)},
-    # c-cut sapphire: c-axis normal to the film.
-    "sapphire": {
-        "B_ang2": 0.25,
-        "beam_uvw": (0, 0, 1),
-        "E_grid": np.arange(100.0, 5000.0, 3.0),
-    },
-    # HOPG is fiber-textured: only the (00l) c-axis reflections are coherent, so the
-    # automatic dominant_reflections family search is skipped via hkl_list.
-    "hopg": {
-        "B_ang2": 0.8,
-        "beam_uvw": (0, 0, 1),
-        "E_grid": np.arange(100.0, 5000.0, 3.0),
-        "hkl_list": pm((0, 0, 2), (0, 0, 4)),
-    },
-}
-
-
 def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
     """Fixed crystallography for a material: composition, the dominant
     reflections, the beam zone axis [uvw], the (isotropic) B-factor, and a
     sensible default photon-energy grid. Override the grid via Sweep.e_grid_eV."""
     if material not in _CRYSTAL_PARAMS:
-        raise ValueError(f"unknown material {material!r} (have {list(MATERIAL_LABELS)})")
+        raise ValueError(f"unknown material {material!r} (have {list(_CRYSTAL_PARAMS)})")
     grid = _CRYSTAL_PARAMS[material]
     B_ang2 = grid["B_ang2"]
     hkl_list = grid.get("hkl_list")
