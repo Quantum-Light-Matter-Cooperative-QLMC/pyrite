@@ -5,6 +5,7 @@ A single console script with subcommands, wired in pyproject.toml as
 
     cxr scan <material> [--quick] [--workers N]   # run a sweep -> checkpoint
     cxr export [stem]                             # analysis app -> results/<stem>.html
+    cxr analyze [-d/--default] [<material>] [--watch] [--edit]  # launch the analysis app
     cxr slim <checkpoint> [--grid] [--drop-wide-brem] [--downcast]  # shrink a pkl for transfer
     cxr archive <stem> [label]                    # copy active checkpoint to the shelf
     cxr restore <label> [--as <stem>]             # copy a shelved checkpoint back
@@ -13,7 +14,7 @@ A single console script with subcommands, wired in pyproject.toml as
 
 import argparse
 
-from . import __version__, archive, export, scan, slim
+from . import __version__, analyze, archive, export, scan, slim
 
 
 def main(argv=None):
@@ -25,6 +26,7 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="command", required=True)
     scan.add_subparser(sub)
     export.add_subparser(sub)
+    analyze.add_subparser(sub)
     slim.add_subparser(sub)
     archive.add_subparser(sub)
 

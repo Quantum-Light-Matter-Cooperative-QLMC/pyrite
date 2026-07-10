@@ -250,3 +250,6 @@ jobs/
 # Local session logs (full conversation transcripts written by the /compress skill)
 /CC-Session-Logs/*
 !/CC-Session-Logs/.gitkeep
+
+# cxr analyze persisted default material
+.cxr-analyze-default
