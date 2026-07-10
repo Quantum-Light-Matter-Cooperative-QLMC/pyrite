@@ -369,42 +369,78 @@ def _(mo, records, res, sweep_values):
 def _(mo):
     # Polar-angle comparison spectral controls.
     polar_brem_ui = mo.ui.checkbox(value=True, label="show brem background")
-    polar_xmin_ui = mo.ui.number(value=0.0, label="x-min (eV, 0 = auto)")
-    polar_xmax_ui = mo.ui.number(value=0.0, label="x-max (eV, 0 = auto)")
-    polar_xlog_ui = mo.ui.switch(value=False, label="log x")
-    polar_ylog_ui = mo.ui.switch(value=False, label="log y")
-    return polar_brem_ui, polar_xlog_ui, polar_xmax_ui, polar_xmin_ui, polar_ylog_ui
+    polar_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV, 0 = auto)")
+    polar_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV, 0 = auto)")
+    polar_xlog_ui = mo.ui.switch(value=False, label="narrow log x")
+    polar_ylog_ui = mo.ui.switch(value=False, label="narrow log y")
+
+    polar_broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV, 0 = auto)")
+    polar_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV, 0 = auto)")
+    polar_broad_xlog_ui = mo.ui.switch(value=False, label="broad log x")
+    polar_broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
+
+    return (
+        polar_brem_ui,
+        polar_broad_xlog_ui,
+        polar_broad_xmax_ui,
+        polar_broad_xmin_ui,
+        polar_broad_ylog_ui,
+        polar_xlog_ui,
+        polar_xmax_ui,
+        polar_xmin_ui,
+        polar_ylog_ui,
+    )
 
 
 @app.cell
-def _(polar_xmax_ui, polar_xmin_ui):
-    polar_x_domain = (
-        (polar_xmin_ui.value or None, polar_xmax_ui.value or None)
-        if (polar_xmin_ui.value or polar_xmax_ui.value)
-        else None
-    )
-    return (polar_x_domain,)
+def _(polar_broad_xmax_ui, polar_broad_xmin_ui, polar_xmax_ui, polar_xmin_ui):
+    def _domain(xmin, xmax):
+        if not xmin and not xmax:
+            return None
+        return (xmin if xmin else None, xmax if xmax else None)
+
+    polar_x_domain = _domain(polar_xmin_ui.value, polar_xmax_ui.value)
+    polar_broad_x_domain = _domain(polar_broad_xmin_ui.value, polar_broad_xmax_ui.value)
+    return polar_broad_x_domain, polar_x_domain
 
 
 @app.cell
 def _(mo):
     # Azimuthal comparison spectral controls.
     azim_brem_ui = mo.ui.checkbox(value=True, label="show brem background")
-    azim_xmin_ui = mo.ui.number(value=0.0, label="x-min (eV, 0 = auto)")
-    azim_xmax_ui = mo.ui.number(value=0.0, label="x-max (eV, 0 = auto)")
-    azim_xlog_ui = mo.ui.switch(value=False, label="log x")
-    azim_ylog_ui = mo.ui.switch(value=False, label="log y")
-    return azim_brem_ui, azim_xlog_ui, azim_xmax_ui, azim_xmin_ui, azim_ylog_ui
+    azim_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV, 0 = auto)")
+    azim_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV, 0 = auto)")
+    azim_xlog_ui = mo.ui.switch(value=False, label="narrow log x")
+    azim_ylog_ui = mo.ui.switch(value=False, label="narrow log y")
+
+    azim_broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV, 0 = auto)")
+    azim_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV, 0 = auto)")
+    azim_broad_xlog_ui = mo.ui.switch(value=False, label="broad log x")
+    azim_broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
+
+    return (
+        azim_brem_ui,
+        azim_broad_xlog_ui,
+        azim_broad_xmax_ui,
+        azim_broad_xmin_ui,
+        azim_broad_ylog_ui,
+        azim_xlog_ui,
+        azim_xmax_ui,
+        azim_xmin_ui,
+        azim_ylog_ui,
+    )
 
 
 @app.cell
-def _(azim_xmax_ui, azim_xmin_ui):
-    azim_x_domain = (
-        (azim_xmin_ui.value or None, azim_xmax_ui.value or None)
-        if (azim_xmin_ui.value or azim_xmax_ui.value)
-        else None
-    )
-    return (azim_x_domain,)
+def _(azim_broad_xmax_ui, azim_broad_xmin_ui, azim_xmax_ui, azim_xmin_ui):
+    def _domain(xmin, xmax):
+        if not xmin and not xmax:
+            return None
+        return (xmin if xmin else None, xmax if xmax else None)
+
+    azim_x_domain = _domain(azim_xmin_ui.value, azim_xmax_ui.value)
+    azim_broad_x_domain = _domain(azim_broad_xmin_ui.value, azim_broad_xmax_ui.value)
+    return azim_broad_x_domain, azim_x_domain
 
 
 @app.cell
@@ -661,6 +697,11 @@ def _(
     polar_E0_ui,
     polar_azim_ui,
     polar_brem_ui,
+    polar_broad_x_domain,
+    polar_broad_xlog_ui,
+    polar_broad_xmax_ui,
+    polar_broad_xmin_ui,
+    polar_broad_ylog_ui,
     polar_thk_ui,
     polar_tilts_ui,
     polar_x_domain,
@@ -687,8 +728,19 @@ def _(
             "a pinned beam energy / azimuth / thickness. Pick a few tilts below to "
             "compare."
         )
-        _spectral_controls = mo.hstack(
-            [polar_brem_ui, polar_xmin_ui, polar_xmax_ui, polar_xlog_ui, polar_ylog_ui]
+        _spectral_controls = mo.vstack(
+            [
+                polar_brem_ui,
+                mo.hstack([polar_xmin_ui, polar_xmax_ui, polar_xlog_ui, polar_ylog_ui]),
+                mo.hstack(
+                    [
+                        polar_broad_xmin_ui,
+                        polar_broad_xmax_ui,
+                        polar_broad_xlog_ui,
+                        polar_broad_ylog_ui,
+                    ]
+                ),
+            ]
         )
         _sv = sweep_values(res) if records(res) else {}
         _e0_widget = (
@@ -730,7 +782,7 @@ def _(
                 ]
             )
 
-        def _chart_item():
+        def _narrow_chart_item():
             _constraints = {"tilt_deg": list(polar_tilts_ui.value)}
             if polar_E0_ui.value is not None:
                 _constraints["E0_keV"] = polar_E0_ui.value
@@ -738,22 +790,51 @@ def _(
                 _constraints["tilt_azim_deg"] = polar_azim_ui.value
             if polar_thk_ui.value is not None:
                 _constraints["thickness_ang"] = polar_thk_ui.value
-            _sub = select_results(res, **_constraints)
             _chart = compare_spectrum_chart(
-                _sub,
+                select_results(res, **_constraints),
                 settings,
                 hue="tilt_deg",
                 include_brem=polar_brem_ui.value,
                 x_domain=polar_x_domain,
                 x_type="log" if polar_xlog_ui.value else "linear",
                 y_type="log" if polar_ylog_ui.value else "linear",
+                band="narrow",
             )
-            return _chart if _chart is not None else mo.md("*No spectra for this slice.*")
+            return (
+                _chart if _chart is not None else mo.md("*No narrowband spectra for this slice.*")
+            )
+
+        def _broad_chart_item():
+            _constraints = {"tilt_deg": list(polar_tilts_ui.value)}
+            if polar_E0_ui.value is not None:
+                _constraints["E0_keV"] = polar_E0_ui.value
+            if polar_azim_ui.value is not None:
+                _constraints["tilt_azim_deg"] = polar_azim_ui.value
+            if polar_thk_ui.value is not None:
+                _constraints["thickness_ang"] = polar_thk_ui.value
+            _chart = compare_spectrum_chart(
+                select_results(res, **_constraints),
+                settings,
+                hue="tilt_deg",
+                include_brem=polar_brem_ui.value,
+                x_domain=polar_broad_x_domain,
+                x_type="log" if polar_broad_xlog_ui.value else "linear",
+                y_type="log" if polar_broad_ylog_ui.value else "linear",
+                band="broad",
+            )
+            return _chart if _chart is not None else mo.md("*No broadband spectra for this slice.*")
 
         _parts = [_md, _e0_widget, _azim_widget, _thk_widget, _spectral_controls, polar_tilts_ui]
         if _note is not None:
             _parts.append(_note)
-        _parts.append(mo.lazy(_chart_item, show_loading_indicator=True))
+        _parts.extend(
+            [
+                mo.md("**Narrowband**"),
+                mo.lazy(_narrow_chart_item, show_loading_indicator=True),
+                mo.md("**Broadband**"),
+                mo.lazy(_broad_chart_item, show_loading_indicator=True),
+            ]
+        )
         return mo.vstack(_parts)
 
     return (polar_compare_tab,)
@@ -764,6 +845,11 @@ def _(
     azim_E0_ui,
     azim_azims_ui,
     azim_brem_ui,
+    azim_broad_x_domain,
+    azim_broad_xlog_ui,
+    azim_broad_xmax_ui,
+    azim_broad_xmin_ui,
+    azim_broad_ylog_ui,
     azim_thk_ui,
     azim_tilt_ui,
     azim_x_domain,
@@ -789,8 +875,19 @@ def _(
             "a pinned beam energy / polar tilt / thickness. Pick a few azimuths "
             "below to compare."
         )
-        _spectral_controls = mo.hstack(
-            [azim_brem_ui, azim_xmin_ui, azim_xmax_ui, azim_xlog_ui, azim_ylog_ui]
+        _spectral_controls = mo.vstack(
+            [
+                azim_brem_ui,
+                mo.hstack([azim_xmin_ui, azim_xmax_ui, azim_xlog_ui, azim_ylog_ui]),
+                mo.hstack(
+                    [
+                        azim_broad_xmin_ui,
+                        azim_broad_xmax_ui,
+                        azim_broad_xlog_ui,
+                        azim_broad_ylog_ui,
+                    ]
+                ),
+            ]
         )
         _sv = sweep_values(res) if records(res) else {}
         _e0_widget = (
@@ -832,7 +929,7 @@ def _(
                 ]
             )
 
-        def _chart_item():
+        def _narrow_chart_item():
             _constraints = {"tilt_azim_deg": list(azim_azims_ui.value)}
             if azim_E0_ui.value is not None:
                 _constraints["E0_keV"] = azim_E0_ui.value
@@ -840,22 +937,51 @@ def _(
                 _constraints["tilt_deg"] = azim_tilt_ui.value
             if azim_thk_ui.value is not None:
                 _constraints["thickness_ang"] = azim_thk_ui.value
-            _sub = select_results(res, **_constraints)
             _chart = compare_spectrum_chart(
-                _sub,
+                select_results(res, **_constraints),
                 settings,
                 hue="tilt_azim_deg",
                 include_brem=azim_brem_ui.value,
                 x_domain=azim_x_domain,
                 x_type="log" if azim_xlog_ui.value else "linear",
                 y_type="log" if azim_ylog_ui.value else "linear",
+                band="narrow",
             )
-            return _chart if _chart is not None else mo.md("*No spectra for this slice.*")
+            return (
+                _chart if _chart is not None else mo.md("*No narrowband spectra for this slice.*")
+            )
+
+        def _broad_chart_item():
+            _constraints = {"tilt_azim_deg": list(azim_azims_ui.value)}
+            if azim_E0_ui.value is not None:
+                _constraints["E0_keV"] = azim_E0_ui.value
+            if azim_tilt_ui.value is not None:
+                _constraints["tilt_deg"] = azim_tilt_ui.value
+            if azim_thk_ui.value is not None:
+                _constraints["thickness_ang"] = azim_thk_ui.value
+            _chart = compare_spectrum_chart(
+                select_results(res, **_constraints),
+                settings,
+                hue="tilt_azim_deg",
+                include_brem=azim_brem_ui.value,
+                x_domain=azim_broad_x_domain,
+                x_type="log" if azim_broad_xlog_ui.value else "linear",
+                y_type="log" if azim_broad_ylog_ui.value else "linear",
+                band="broad",
+            )
+            return _chart if _chart is not None else mo.md("*No broadband spectra for this slice.*")
 
         _parts = [_md, _e0_widget, _tilt_widget, _thk_widget, _spectral_controls, azim_azims_ui]
         if _note is not None:
             _parts.append(_note)
-        _parts.append(mo.lazy(_chart_item, show_loading_indicator=True))
+        _parts.extend(
+            [
+                mo.md("**Narrowband**"),
+                mo.lazy(_narrow_chart_item, show_loading_indicator=True),
+                mo.md("**Broadband**"),
+                mo.lazy(_broad_chart_item, show_loading_indicator=True),
+            ]
+        )
         return mo.vstack(_parts)
 
     return (azim_compare_tab,)

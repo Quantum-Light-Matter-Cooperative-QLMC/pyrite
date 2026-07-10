@@ -33,11 +33,11 @@ def _settings():
     )
 
 
-def _record(E0_keV, tilt_deg, azim_deg, peak_center=2500.0, n=200):
+def _record(E0_keV, tilt_deg, azim_deg, peak_center=2500.0, n=200, wide_brem=False):
     E = np.linspace(1000.0, 5000.0, n)  # eV
     peak = np.exp(-(((E - peak_center) / 50.0) ** 2))  # a single sharp line
     brem = np.linspace(1.0, 0.2, n)  # a smooth falling continuum
-    return {
+    rec = {
         "E_grid": E,
         "spec": peak,
         "brem": brem,
@@ -51,6 +51,11 @@ def _record(E0_keV, tilt_deg, azim_deg, peak_center=2500.0, n=200):
             "thickness_ang": 5.0e4,
         },
     }
+    if wide_brem:
+        Eb = np.linspace(0.0, E0_keV * 1000.0, 120)
+        rec["E_grid_brem"] = Eb
+        rec["brem_wide"] = np.linspace(1.2, 0.0, Eb.size)
+    return rec
 
 
 def _store_single_tilt():
@@ -64,26 +69,26 @@ def _store_single_tilt():
     }
 
 
-def _store_multi_tilt():
+def _store_multi_tilt(wide_brem=False):
     # One beam energy, three polar tilts (single azimuth each) -- the shape a
     # "Polar-angle comparison" tab slice looks like.
     return {
         "HOPG bulk": {
-            30.0: _record(30.0, -40.0, 0.0),
-            30.1: _record(30.0, -20.0, 0.0),
-            30.2: _record(30.0, 0.0, 0.0),
+            30.0: _record(30.0, -40.0, 0.0, wide_brem=wide_brem),
+            30.1: _record(30.0, -20.0, 0.0, wide_brem=wide_brem),
+            30.2: _record(30.0, 0.0, 0.0, wide_brem=wide_brem),
         }
     }
 
 
-def _store_multi_azim():
+def _store_multi_azim(wide_brem=False):
     # One beam energy, one polar tilt, three azimuths -- the "Azimuthal
     # comparison" tab slice shape.
     return {
         "HOPG bulk": {
-            30.0: _record(30.0, -20.0, 0.0),
-            30.1: _record(30.0, -20.0, 45.0),
-            30.2: _record(30.0, -20.0, 90.0),
+            30.0: _record(30.0, -20.0, 0.0, wide_brem=wide_brem),
+            30.1: _record(30.0, -20.0, 45.0, wide_brem=wide_brem),
+            30.2: _record(30.0, -20.0, 90.0, wide_brem=wide_brem),
         }
     }
 
@@ -116,6 +121,38 @@ def test_compare_chart_hue_column_present_for_every_field():
     row = df[0]
     for col in ("energy_eV", "intensity", "E0_keV", "tilt_deg", "tilt_azim_deg", "component"):
         assert col in row
+
+
+def test_compare_chart_broadband_uses_wide_brem_tail_for_tilts():
+    chart = compare_spectrum_chart(
+        _store_multi_tilt(wide_brem=True),
+        _settings(),
+        hue="tilt_deg",
+        band="broad",
+    )
+    spec = chart.to_dict()
+    df = _dataset(spec)
+    tail = [row for row in df if row["component"] == "total" and row["energy_eV"] > 5000.0]
+
+    assert tail
+    assert max(row["energy_eV"] for row in df) == 30000.0
+    assert {row["tilt_deg"] for row in tail} == {-40.0, -20.0, 0.0}
+
+
+def test_compare_chart_broadband_uses_wide_brem_tail_for_azimuths():
+    chart = compare_spectrum_chart(
+        _store_multi_azim(wide_brem=True),
+        _settings(),
+        hue="tilt_azim_deg",
+        band="broad",
+    )
+    spec = chart.to_dict()
+    df = _dataset(spec)
+    tail = [row for row in df if row["component"] == "total" and row["energy_eV"] > 5000.0]
+
+    assert tail
+    assert max(row["energy_eV"] for row in df) == 30000.0
+    assert {row["tilt_azim_deg"] for row in tail} == {0.0, 45.0, 90.0}
 
 
 def test_compare_chart_none_on_empty():
