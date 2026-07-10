@@ -14,6 +14,7 @@ import numpy as np
 from cxr_mc.plots._frames import heatmap_frame, metric_vs_frame
 from cxr_mc.plots.altair_sweeps import (
     heatmap_chart,
+    heatmap_select_chart,
     metric_vs_chart,
     scan_charts,
 )
@@ -86,10 +87,18 @@ def test_heatmap_frame_shape():
     df = heatmap_frame(
         _store(), _settings(), quantity="peak_flux", x="tilt_azim_deg", y="tilt_deg", panel="E0_keV"
     )
-    assert list(df.columns) == ["x", "y", "panel", "value"]
+    assert list(df.columns) == ["x", "y", "panel", "value", "name", "panel_raw"]
     # 2 panels x (2 azimuths x 2 tilts) = 8 cells (peak_flux is never gated)
     assert len(df) == 8
     assert set(df["panel"]) == {"30 keV", "60 keV"}
+    # name/panel_raw carry per-cell identity for click-to-select back-mapping
+    assert set(df["name"]) == {
+        "HOPG t-20.0 a0.0",
+        "HOPG t-20.0 a30.0",
+        "HOPG t-10.0 a0.0",
+        "HOPG t-10.0 a30.0",
+    }
+    assert set(df["panel_raw"]) == {30.0, 60.0}
 
 
 def test_heatmap_chart_builds_valid_spec():
@@ -106,6 +115,52 @@ def test_heatmap_chart_accepts_quantity_triple():
 
 def test_heatmap_chart_none_on_empty():
     assert heatmap_chart({}, _settings()) is None
+
+
+# ---- click-selectable single-panel heatmap -----------------------------------
+def test_heatmap_select_chart_single_panel_no_facet():
+    # one panel only (no facet), and a point-selection param is attached so a
+    # marimo wrapper can read the clicked cell.
+    chart = heatmap_select_chart(_store(), _settings(), quantity="peak_flux", panel_value=30.0)
+    spec = chart.to_dict()  # raises if malformed
+    assert "facet" not in spec
+    assert spec.get("params"), "expected a selection param for click-select"
+
+
+def test_heatmap_select_chart_opacity_only_dims_on_hover():
+    # The grid must render at full color at rest -- only the "bin_coloring"-named
+    # hover param (which marimo's frontend excludes from backend signal listeners,
+    # see frontend/src/plugins/impl/vega/params.ts) may drive the opacity dimming.
+    # The click selection param must drive a stroke outline instead, so it can't
+    # wash out the whole grid between clicks.
+    chart = heatmap_select_chart(_store(), _settings(), quantity="peak_flux", panel_value=30.0)
+    spec = chart.to_dict()
+    params_by_name = {p["name"]: p for p in spec["params"]}
+    assert "bin_coloring" in params_by_name
+    hover_select = params_by_name["bin_coloring"]["select"]
+    assert hover_select["on"] == "pointerover"
+    assert hover_select["clear"] == "mouseout"
+    assert "nearest" not in hover_select
+
+    opacity = spec["encoding"]["opacity"]["condition"]
+    assert opacity["param"] == "bin_coloring"
+    assert opacity["empty"] is True  # full color for all cells when nothing is hovered
+
+    stroke = spec["encoding"]["stroke"]["condition"]
+    assert stroke["param"] != "bin_coloring"
+    click_select = params_by_name[stroke["param"]]["select"]
+    assert click_select["on"] == "click"
+
+
+def test_heatmap_select_chart_defaults_to_first_panel():
+    # panel_value omitted -> first panel (30 keV) present, still a valid spec
+    chart = heatmap_select_chart(_store(), _settings(), quantity="peak_flux")
+    assert isinstance(chart, alt.Chart)
+    chart.to_dict()
+
+
+def test_heatmap_select_chart_none_on_empty():
+    assert heatmap_select_chart({}, _settings()) is None
 
 
 # ---- scan (auto-pick) --------------------------------------------------------

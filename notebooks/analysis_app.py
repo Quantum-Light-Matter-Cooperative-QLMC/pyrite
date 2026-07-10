@@ -31,13 +31,23 @@ def _():
         eaglexo_detected_chart,
         timepix_detected_chart,
     )
-    from cxr_mc.plots.altair_spectra import spectrum_chart
-    from cxr_mc.plots.altair_sweeps import metric_vs_chart, scan_charts
+    from cxr_mc.plots.altair_spectra import compare_spectrum_chart, spectrum_chart
+    from cxr_mc.plots.altair_sweeps import (
+        heatmap_select_chart,
+        metric_vs_chart,
+        scan_charts,
+    )
     from cxr_mc.plots.altair_trajectories import (
         penetration_survival_chart,
         trajectory_chart,
     )
-    from cxr_mc.results import filter_results, records, sweep_values, top_geometries
+    from cxr_mc.results import (
+        filter_results,
+        records,
+        select_results,
+        sweep_values,
+        top_geometries,
+    )
     from cxr_mc.run import cases_from_results, load_checkpoint
     from cxr_mc.sweep import MATERIAL_LABELS, build_cases
 
@@ -46,10 +56,12 @@ def _():
         PENETRATION_TILT_DEG,
         build_cases,
         cases_from_results,
+        compare_spectrum_chart,
         default_settings,
         eaglexo_charge_chart,
         eaglexo_detected_chart,
         filter_results,
+        heatmap_select_chart,
         load_checkpoint,
         metric_vs_chart,
         mo,
@@ -62,6 +74,7 @@ def _():
         plot_trajectory_grid,
         records,
         scan_charts,
+        select_results,
         spectrum_chart,
         sweep_values,
         timepix_detected_chart,
@@ -83,6 +96,14 @@ def _(mo):
 
 @app.cell
 def _(mo):
+    from cxr_mc.analyze import get_default_material, initial_material
+
+    initial_material_value = initial_material(mo.cli_args(), get_default_material())
+    return (initial_material_value,)
+
+
+@app.cell
+def _(initial_material_value, mo):
     material_ui = mo.ui.dropdown(
         [
             "hopg",
@@ -97,7 +118,7 @@ def _(mo):
             "ws2",
             "mos2",
         ],
-        value="hopg",
+        value=initial_material_value,
         label="Material (match the scan you ran)",
     )
     material_ui
@@ -140,6 +161,142 @@ def _(mo, records, res):
 
 
 @app.cell
+def _(mo, records, res, sweep_values):
+    # Thickness selector -- a crystal-thickness sweep is otherwise silently collapsed:
+    # best_azimuth keeps, per beam energy, only the record with the strongest peak
+    # line across ALL thicknesses, so every other thickness vanishes from the spectra,
+    # detector, scan and ranking views without a trace. Pin ONE thickness here (like
+    # the polar-tilt selector) so those views show it honestly; step through the
+    # dropdown to compare thicknesses. Shown only when >1 thickness was swept; a
+    # single-thickness checkpoint leaves the slice a no-op.
+    _thk = sweep_values(res).get("thickness_ang", []) if records(res) else []
+    _opts = {f"{t:g} Å ({t / 1e4:g} µm)": t for t in _thk} or {"— no data —": None}
+    thickness_ui = mo.ui.dropdown(_opts, value=list(_opts)[-1], label="crystal thickness")
+    thickness_ui if len(_thk) > 1 else mo.md("")
+    return (thickness_ui,)
+
+
+@app.cell
+def _(res, select_results, thickness_ui):
+    # The pinned-thickness view of the checkpoint. Every per-geometry chart below
+    # draws from this instead of the raw `res`, so a thickness sweep no longer
+    # collapses to one hidden record. None (no data / single option) -> pass through.
+    res_view = (
+        select_results(res, thickness_ang=thickness_ui.value)
+        if thickness_ui.value is not None
+        else res
+    )
+    return (res_view,)
+
+
+@app.cell
+def _(mo, records, res, sweep_values):
+    # Beam energy shown in the click-to-select heatmap below. That heatmap can't
+    # facet by energy -- a faceted Altair chart doesn't compose with a marimo point
+    # selection -- so we pick ONE energy here and render a single panel instead.
+    _e0 = sweep_values(res).get("E0_keV", []) if records(res) else []
+    _opts = {f"{e:g} keV": e for e in _e0} or {"— no data —": None}
+    heatmap_E0_ui = mo.ui.dropdown(_opts, value=next(iter(_opts)), label="heatmap beam energy")
+    return (heatmap_E0_ui,)
+
+
+@app.cell
+def _(heatmap_E0_ui, heatmap_select_chart, mo, res_view, settings):
+    # The interactive pixel-select heatmap: click a (azimuth, polar-tilt) cell to
+    # drive the spectrum in the Intrinsic-spectra tab. Built here as a TOP-LEVEL
+    # reactive element (a ui made inside a lazy tab builder wouldn't be in the DAG,
+    # so its clicks couldn't trigger re-renders). chart_selection=False: the chart
+    # carries its own point-selection param (see heatmap_select_chart), so let that
+    # drive rather than marimo's default interval brush. None when the pinned view
+    # has no heatmap to draw.
+    _chart = heatmap_select_chart(
+        res_view, settings, panel_value=heatmap_E0_ui.value, line_metric="prominence"
+    )
+    heatmap_select = (
+        mo.ui.altair_chart(_chart, chart_selection=False, legend_selection=False)
+        if _chart is not None
+        else None
+    )
+    return (heatmap_select,)
+
+
+@app.cell
+def _(mo, records, res, sweep_values):
+    # Selectors for the "Polar-angle comparison" tab -- overlays one spectrum
+    # line per POLAR TILT, so the OTHER swept knobs (beam energy, azimuth,
+    # thickness) must each be pinned to a single value here. Built as TOP-LEVEL
+    # reactive elements for the same reason as heatmap_E0_ui above: a mo.ui
+    # element created INSIDE a lazy tab builder isn't in marimo's reactive DAG,
+    # so changing it wouldn't re-render the tab. A dim with only one swept value
+    # still gets its dropdown here (so `.value` exists for the tab to read) --
+    # the tab body shows a static label instead of the widget for that dim.
+    _sv = sweep_values(res) if records(res) else {}
+    _e0 = _sv.get("E0_keV", [])
+    _azim = _sv.get("tilt_azim_deg", [])
+    _thk = _sv.get("thickness_ang", [])
+    _tilts = _sv.get("tilt_deg", [])
+
+    _e0_opts = {f"{e:g} keV": e for e in _e0} or {"— no data —": None}
+    polar_E0_ui = mo.ui.dropdown(_e0_opts, value=next(iter(_e0_opts)), label="beam energy")
+
+    _azim_opts = {f"{a:g} deg": a for a in _azim} or {"— no data —": None}
+    polar_azim_ui = mo.ui.dropdown(_azim_opts, value=next(iter(_azim_opts)), label="azimuth")
+
+    _thk_opts = {f"{t:g} Å ({t / 1e4:g} µm)": t for t in _thk} or {"— no data —": None}
+    polar_thk_ui = mo.ui.dropdown(_thk_opts, value=list(_thk_opts)[-1], label="thickness")
+
+    # Default multiselect picks up to ~4 tilts spread across the available
+    # range (first, last, and evenly-spaced in between) -- a useful comparison
+    # out of the box without forcing the user to hand-pick values first.
+    if len(_tilts) <= 4:
+        _default_tilts = list(_tilts)
+    else:
+        _n = len(_tilts) - 1
+        _idx = sorted({round(_n * k / 3) for k in range(4)})
+        _default_tilts = [_tilts[i] for i in _idx]
+    polar_tilts_ui = mo.ui.multiselect(
+        {f"{t:g} deg": t for t in _tilts},
+        value=[f"{t:g} deg" for t in _default_tilts],
+        label="polar tilts to compare",
+    )
+    return polar_E0_ui, polar_azim_ui, polar_thk_ui, polar_tilts_ui
+
+
+@app.cell
+def _(mo, records, res, sweep_values):
+    # Selectors for the "Azimuthal comparison" tab -- overlays one spectrum
+    # line per AZIMUTH, pinning beam energy / polar tilt / thickness. Same
+    # top-level-DAG requirement as the polar-tab selectors above.
+    _sv = sweep_values(res) if records(res) else {}
+    _e0 = _sv.get("E0_keV", [])
+    _tilts = _sv.get("tilt_deg", [])
+    _thk = _sv.get("thickness_ang", [])
+    _azim = _sv.get("tilt_azim_deg", [])
+
+    _e0_opts = {f"{e:g} keV": e for e in _e0} or {"— no data —": None}
+    azim_E0_ui = mo.ui.dropdown(_e0_opts, value=next(iter(_e0_opts)), label="beam energy")
+
+    _tilt_opts = {f"{t:g} deg": t for t in _tilts} or {"— no data —": None}
+    azim_tilt_ui = mo.ui.dropdown(_tilt_opts, value=next(iter(_tilt_opts)), label="polar tilt")
+
+    _thk_opts = {f"{t:g} Å ({t / 1e4:g} µm)": t for t in _thk} or {"— no data —": None}
+    azim_thk_ui = mo.ui.dropdown(_thk_opts, value=list(_thk_opts)[-1], label="thickness")
+
+    if len(_azim) <= 4:
+        _default_azims = list(_azim)
+    else:
+        _n = len(_azim) - 1
+        _idx = sorted({round(_n * k / 3) for k in range(4)})
+        _default_azims = [_azim[i] for i in _idx]
+    azim_azims_ui = mo.ui.multiselect(
+        {f"{a:g} deg": a for a in _azim},
+        value=[f"{a:g} deg" for a in _default_azims],
+        label="azimuths to compare",
+    )
+    return azim_E0_ui, azim_azims_ui, azim_thk_ui, azim_tilt_ui
+
+
+@app.cell
 def _(mo):
     # Spectral-plot controls: CXR-only (no brem background) toggle, adjustable
     # x-axis (photon energy) limits, and a lin/log y switch -- shared by the
@@ -173,11 +330,18 @@ def _(PENETRATION_TILT_DEG, mo):
 def _(
     MATERIAL,
     MATERIAL_LABELS,
+    azim_E0_ui,
+    azim_azims_ui,
+    azim_thk_ui,
+    azim_tilt_ui,
     brem_ui,
     build_cases,
     cases,
+    compare_spectrum_chart,
     eaglexo_charge_chart,
     eaglexo_detected_chart,
+    heatmap_E0_ui,
+    heatmap_select,
     load_checkpoint,
     metric_vs_chart,
     mo,
@@ -189,11 +353,18 @@ def _(
     plot_material_comparison,
     plot_timepix_efficiency,
     plot_trajectory_grid,
+    polar_E0_ui,
+    polar_azim_ui,
+    polar_thk_ui,
+    polar_tilts_ui,
     records,
     res,
+    res_view,
     scan_charts,
+    select_results,
     settings,
     spectrum_chart,
+    sweep_values,
     tilt_ui,
     timepix_detected_chart,
     top_geometries,
@@ -211,6 +382,9 @@ def _(
     _tilt = tilt_ui.value
 
     def _rankings_tab():
+        # Rank across ALL thicknesses (raw `res`, not the pinned `res_view`): the
+        # thickness column disambiguates rows, so a thickness sweep shows every
+        # thickness competing head-to-head rather than being collapsed to the pin.
         df = top_geometries(res, settings, top_n=20, select="quality_peak")
         if df.empty:
             return mo.md(f"**No checkpoint for `{MATERIAL}`** — run `scan_app.py` first.")
@@ -239,28 +413,218 @@ def _(
             "and switch to log y with the controls above."
         )
         _chart = spectrum_chart(
-            res,
+            res_view,
             settings,
             tilt_deg=_tilt,
             include_brem=brem_ui.value,
             x_domain=x_domain,
             y_type="log" if ylog_ui.value else "linear",
         )
-        return mo.vstack(
-            [_md, _chart if _chart is not None else mo.md("*No spectra — run the scan first.*")]
+
+        # Pixel-select: click a heatmap cell -> spectrum for THAT (azimuth, tilt)
+        # geometry at the heatmap's beam energy, on the pinned-thickness view.
+        # `x`/`y` are the encoded (tilt_azim_deg, tilt_deg) of the clicked cell.
+        def _pixel_spectrum():
+            if heatmap_select is None:
+                return mo.md("*No heatmap for this view — needs an azimuth × polar-tilt sweep.*")
+            _sel = heatmap_select.value
+            if _sel is None or len(_sel) == 0:
+                return mo.md("*Click a heatmap cell above to plot its spectrum here.*")
+            _row = _sel.iloc[0]
+            _sub = select_results(
+                res_view,
+                tilt_azim_deg=float(_row["x"]),
+                tilt_deg=float(_row["y"]),
+                E0_keV=heatmap_E0_ui.value,
+            )
+            _sp = spectrum_chart(
+                _sub,
+                settings,
+                tilt_deg=float(_row["y"]),
+                include_brem=brem_ui.value,
+                x_domain=x_domain,
+                y_type="log" if ylog_ui.value else "linear",
+            )
+            return _sp if _sp is not None else mo.md("*No spectrum for that cell.*")
+
+        _hm = (
+            heatmap_select
+            if heatmap_select is not None
+            else mo.md("*No 2-D heatmap for this checkpoint / thickness.*")
         )
+        return mo.vstack(
+            [
+                _md,
+                _chart if _chart is not None else mo.md("*No spectra — run the scan first.*"),
+                mo.md("---"),
+                mo.md(
+                    "**Pixel-select** — pick a beam energy, then click a heatmap cell to "
+                    "plot that geometry's spectrum below."
+                ),
+                heatmap_E0_ui,
+                _hm,
+                _pixel_spectrum(),
+            ]
+        )
+
+    def _polar_compare_tab():
+        # Overlays one spectrum line per POLAR TILT (the polar_tilts_ui
+        # multiselect), at a PINNED beam energy / azimuth / thickness -- the
+        # complement of _spectra_tab, which fixes tilt and varies energy. Uses
+        # the RAW `res` (not the pinned `res_view`): thickness is pinned by
+        # THIS tab's own polar_thk_ui dropdown instead, so starting from
+        # res_view would apply the (unrelated) top-of-notebook thickness pin
+        # underneath it.
+        _md = mo.md(
+            "The INTRINSIC coherent CXR line spectrum, one line per POLAR TILT, at "
+            "a pinned beam energy / azimuth / thickness. Pick a few tilts below to "
+            "compare; the brem/x-limit/log-y controls above still apply."
+        )
+        _sv = sweep_values(res) if records(res) else {}
+        _e0_widget = (
+            polar_E0_ui
+            if len(_sv.get("E0_keV", [])) > 1
+            else mo.md(
+                f"beam energy: {polar_E0_ui.value:g} keV" if polar_E0_ui.value is not None else ""
+            )
+        )
+        _azim_widget = (
+            polar_azim_ui
+            if len(_sv.get("tilt_azim_deg", [])) > 1
+            else mo.md(
+                f"azimuth: {polar_azim_ui.value:g} deg" if polar_azim_ui.value is not None else ""
+            )
+        )
+        _thk_widget = (
+            polar_thk_ui
+            if len(_sv.get("thickness_ang", [])) > 1
+            else mo.md(
+                f"thickness: {polar_thk_ui.value:g} Å" if polar_thk_ui.value is not None else ""
+            )
+        )
+        _note = (
+            mo.md("*Only one polar tilt in this checkpoint — nothing to compare.*")
+            if len(_sv.get("tilt_deg", [])) <= 1
+            else None
+        )
+        if not polar_tilts_ui.value:
+            return mo.vstack(
+                [
+                    _md,
+                    _e0_widget,
+                    _azim_widget,
+                    _thk_widget,
+                    polar_tilts_ui,
+                    mo.md("*Select at least one polar tilt above to plot.*"),
+                ]
+            )
+        _constraints = {"tilt_deg": list(polar_tilts_ui.value)}
+        if polar_E0_ui.value is not None:
+            _constraints["E0_keV"] = polar_E0_ui.value
+        if polar_azim_ui.value is not None:
+            _constraints["tilt_azim_deg"] = polar_azim_ui.value
+        if polar_thk_ui.value is not None:
+            _constraints["thickness_ang"] = polar_thk_ui.value
+        _sub = select_results(res, **_constraints)
+        _chart = compare_spectrum_chart(
+            _sub,
+            settings,
+            hue="tilt_deg",
+            include_brem=brem_ui.value,
+            x_domain=x_domain,
+            y_type="log" if ylog_ui.value else "linear",
+        )
+        _parts = [_md, _e0_widget, _azim_widget, _thk_widget, polar_tilts_ui]
+        if _note is not None:
+            _parts.append(_note)
+        _parts.append(_chart if _chart is not None else mo.md("*No spectra for this slice.*"))
+        return mo.vstack(_parts)
+
+    def _azim_compare_tab():
+        # Overlays one spectrum line per AZIMUTH (the azim_azims_ui
+        # multiselect), at a pinned beam energy / polar tilt / thickness --
+        # mirrors _polar_compare_tab with the swept dimension swapped. Also
+        # uses the raw `res`; thickness is pinned by azim_thk_ui here.
+        _md = mo.md(
+            "The INTRINSIC coherent CXR line spectrum, one line per AZIMUTH, at "
+            "a pinned beam energy / polar tilt / thickness. Pick a few azimuths "
+            "below to compare; the brem/x-limit/log-y controls above still apply."
+        )
+        _sv = sweep_values(res) if records(res) else {}
+        _e0_widget = (
+            azim_E0_ui
+            if len(_sv.get("E0_keV", [])) > 1
+            else mo.md(
+                f"beam energy: {azim_E0_ui.value:g} keV" if azim_E0_ui.value is not None else ""
+            )
+        )
+        _tilt_widget = (
+            azim_tilt_ui
+            if len(_sv.get("tilt_deg", [])) > 1
+            else mo.md(
+                f"polar tilt: {azim_tilt_ui.value:g} deg" if azim_tilt_ui.value is not None else ""
+            )
+        )
+        _thk_widget = (
+            azim_thk_ui
+            if len(_sv.get("thickness_ang", [])) > 1
+            else mo.md(
+                f"thickness: {azim_thk_ui.value:g} Å" if azim_thk_ui.value is not None else ""
+            )
+        )
+        _note = (
+            mo.md("*Only one azimuth in this checkpoint — nothing to compare.*")
+            if len(_sv.get("tilt_azim_deg", [])) <= 1
+            else None
+        )
+        if not azim_azims_ui.value:
+            return mo.vstack(
+                [
+                    _md,
+                    _e0_widget,
+                    _tilt_widget,
+                    _thk_widget,
+                    azim_azims_ui,
+                    mo.md("*Select at least one azimuth above to plot.*"),
+                ]
+            )
+        _constraints = {"tilt_azim_deg": list(azim_azims_ui.value)}
+        if azim_E0_ui.value is not None:
+            _constraints["E0_keV"] = azim_E0_ui.value
+        if azim_tilt_ui.value is not None:
+            _constraints["tilt_deg"] = azim_tilt_ui.value
+        if azim_thk_ui.value is not None:
+            _constraints["thickness_ang"] = azim_thk_ui.value
+        _sub = select_results(res, **_constraints)
+        _chart = compare_spectrum_chart(
+            _sub,
+            settings,
+            hue="tilt_azim_deg",
+            include_brem=brem_ui.value,
+            x_domain=x_domain,
+            y_type="log" if ylog_ui.value else "linear",
+        )
+        _parts = [_md, _e0_widget, _tilt_widget, _thk_widget, azim_azims_ui]
+        if _note is not None:
+            _parts.append(_note)
+        _parts.append(_chart if _chart is not None else mo.md("*No spectra for this slice.*"))
+        return mo.vstack(_parts)
 
     def _scans_tab():
         # Each plot is a separate mo.lazy(fn) so the tab returns instantly with
         # placeholders; scans, metric lines, and the best-spectra accordion each
         # compute and render independently as they become visible.
         def _scan_charts_item():
-            charts = scan_charts(res, settings, cases=cases, line_metric="prominence")
+            charts = scan_charts(res_view, settings, cases=cases, line_metric="prominence")
             return mo.vstack(charts) if charts else mo.md("*No scan results.*")
 
         def _metric_lines_item():
-            line = metric_vs_chart(res, settings, x="tilt_deg", metric="line_flux", hue="E0_keV")
-            peak = metric_vs_chart(res, settings, x="tilt_deg", metric="peak_flux", hue="E0_keV")
+            line = metric_vs_chart(
+                res_view, settings, x="tilt_deg", metric="line_flux", hue="E0_keV"
+            )
+            peak = metric_vs_chart(
+                res_view, settings, x="tilt_deg", metric="peak_flux", hue="E0_keV"
+            )
             parts = [c for c in (line, peak) if c is not None]
             return mo.vstack(parts) if parts else mo.md("*No metric results.*")
 
@@ -276,7 +640,7 @@ def _(
                 mo.accordion(
                     {
                         "Best spectra (matplotlib)": lambda: plot_best_spectra(
-                            res, settings, top_n=12, select="quality_peak"
+                            res_view, settings, top_n=12, select="quality_peak"
                         )
                     },
                     lazy=True,
@@ -299,8 +663,10 @@ def _(
                 "lines pass at ~90% QE, hard brem is crushed by the thin sensor. "
                 "Photon density (detected vs incident), then recorded-charge density."
             )
-            _detected = eaglexo_detected_chart(res, settings, tilt_deg=_tilt, x_domain=x_domain)
-            _charge = eaglexo_charge_chart(res, settings, tilt_deg=_tilt, x_domain=x_domain)
+            _detected = eaglexo_detected_chart(
+                res_view, settings, tilt_deg=_tilt, x_domain=x_domain
+            )
+            _charge = eaglexo_charge_chart(res_view, settings, tilt_deg=_tilt, x_domain=x_domain)
             _parts = [_md, *(c for c in (_detected, _charge) if c is not None)]
             _parts.append(
                 mo.accordion(
@@ -309,8 +675,8 @@ def _(
                             plot_eaglexo_efficiency(sensor="4240")
                         ),
                         "Charge geometry map (matplotlib)": lambda: (
-                            plot_eaglexo_charge_map(res, settings, cases=cases)
-                            if records(res)
+                            plot_eaglexo_charge_map(res_view, settings, cases=cases)
+                            if records(res_view)
                             else mo.md("*No results.*")
                         ),
                     },
@@ -324,7 +690,9 @@ def _(
                 "Si quad forward model: photoabsorption → charge sharing → per-pixel "
                 "threshold counting. Detected vs incident at the selected tilt."
             )
-            _detected = timepix_detected_chart(res, settings, tilt_deg=_tilt, x_domain=x_domain)
+            _detected = timepix_detected_chart(
+                res_view, settings, tilt_deg=_tilt, x_domain=x_domain
+            )
             _parts = [_md, *([_detected] if _detected is not None else [])]
             _parts.append(
                 mo.accordion(
@@ -392,7 +760,9 @@ def _(
 
     mo.ui.tabs(
         {
-            "Intrinsic spectra": _spectra_tab,
+            "Energy comparison": _spectra_tab,
+            "Polar-angle comparison": _polar_compare_tab,
+            "Azimuthal comparison": _azim_compare_tab,
             "Top geometries": _rankings_tab,
             "Geometry & scans": _scans_tab,
             "Detectors": _detectors_tab,
