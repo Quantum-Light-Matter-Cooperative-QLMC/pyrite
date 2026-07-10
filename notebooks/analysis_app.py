@@ -170,6 +170,18 @@ def _(PENETRATION_TILT_DEG, mo):
 
 
 @app.cell
+def _(mo):
+    # The dense grid draws ONE beam energy at a time (a panel per tilt); the
+    # survival/track views above it already show both energies from
+    # trajectory_sweep's default (30, 60), so this only needs to pick between
+    # those two.
+    penetration_energy_ui = mo.ui.dropdown(
+        {"30 keV": 30.0, "60 keV": 60.0}, value="30 keV", label="beam energy (dense grid)"
+    )
+    return (penetration_energy_ui,)
+
+
+@app.cell
 def _(
     MATERIAL,
     MATERIAL_LABELS,
@@ -182,6 +194,7 @@ def _(
     metric_vs_chart,
     mo,
     penetration_angle_ui,
+    penetration_energy_ui,
     penetration_survival_chart,
     plot_best_spectra,
     plot_eaglexo_charge_map,
@@ -359,12 +372,14 @@ def _(
         # Pick the lowest energy at the selected tilt for the single-track view.
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
         _track = trajectory_chart(_nc, Ne=40)
+        _grid_energy = penetration_energy_ui.value
         _parts = [_md, penetration_angle_ui, *(p for p in (_survival, _track) if p is not None)]
+        _parts.append(penetration_energy_ui)
         _parts.append(
             mo.accordion(
                 {
                     "Dense penetration grid (datashader, matplotlib)": lambda: plot_trajectory_grid(
-                        _traj, energy=30, Ne=120
+                        _traj, energy=_grid_energy, Ne=120
                     )
                 },
                 lazy=True,
