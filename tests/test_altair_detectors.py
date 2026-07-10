@@ -69,6 +69,20 @@ def test_timepix_frame_has_incident_and_detected():
     assert set(df["band"]) == {"line"}
 
 
+def test_timepix_frame_includes_wide_brem_tail():
+    df = timepix_detected_frame(
+        [_record(30.0, -20.0, 0.0, wide_brem=True)],
+        _settings(),
+        **_TPX_KW,
+    )
+
+    assert set(df["band"]) == {"line", "brem"}
+    assert df["energy_eV"].max() == 30000.0
+    tail = df[df["energy_eV"] > 6000.0]
+    assert set(tail["kind"]) == {"incident", "detected"}
+    assert set(tail["band"]) == {"brem"}
+
+
 def test_timepix_chart_builds_valid_spec():
     chart = timepix_detected_chart(_store(), _settings(), **_TPX_KW)
     assert isinstance(chart, alt.LayerChart)

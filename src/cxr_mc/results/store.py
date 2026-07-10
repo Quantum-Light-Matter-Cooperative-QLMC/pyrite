@@ -98,3 +98,31 @@ def detected_background(r, settings, convolve=None):
     if do_conv:
         b = convolve_detector(E, b, r["fwhm"])
     return b * r["scale"]
+
+
+def _detected_background_wide(r, settings, convolve=None):
+    """Bremsstrahlung background in detected units on the widest available grid.
+
+    Returns ``(E, brem)`` where ``brem`` is already scaled to Phs/eV/s/nA.
+    Slimmed checkpoints without ``E_grid_brem``/``brem_wide`` fall back to the
+    line grid used by :func:`detected_background`.
+    """
+    E_wide = r.get("E_grid_brem")
+    brem_wide = r.get("brem_wide")
+    if E_wide is None or brem_wide is None:
+        E = np.asarray(r["E_grid"], dtype=float)
+        return E, detected_background(r, settings, convolve=convolve)
+
+    do_conv = getattr(settings, "convolve_with_det", False) if convolve is None else convolve
+    E = np.asarray(E_wide, dtype=float)
+    if settings.brem_source == "none":
+        return E, np.zeros_like(E)
+    if settings.brem_source == "external":
+        path = r["case"].get("brem_file")
+        b = load_external_brem(path, E) if path else np.zeros_like(E)
+    else:
+        qe = detector_efficiency(E) if settings.apply_detector_qe else 1.0
+        b = np.asarray(brem_wide, dtype=float) * qe
+    if do_conv:
+        b = convolve_detector(E, b, r["fwhm"])
+    return E, b * r["scale"]

@@ -156,6 +156,14 @@ def test_trajectory_sweep_uses_penetration_angle_set():
     assert len(cases) == len(PENETRATION_TILT_DEG) * 2
 
 
+def test_trajectory_sweep_accepts_explicit_penetration_thickness():
+    sweep = trajectory_sweep("hbn", thickness_ang=100000.0)
+    cases = build_cases(sweep, 10, 5)
+
+    assert sweep.thickness_ang == 100000.0
+    assert {c["thickness_ang"] for c in cases} == {100000.0}
+
+
 def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
     # the checkpoint must be named for the REGISTRY key, not the film crystal --
     # otherwise `cxr scan mos2-on-sio2-si` would clobber/resume plain mos2.pkl
