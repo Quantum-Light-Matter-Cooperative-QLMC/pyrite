@@ -87,6 +87,7 @@ on `main` once the branch exists.
 
    - The dense penetration-grid accordion (matplotlib, Penetration tab) is still
      fixed at `energy=30` regardless of the angle selector above it.
+     It also doesn't seem to plot anything when the tab is opened.
    - The x/y plot-limit entry boxes should move into the Spectra tab they belong to.
    - Add capability to click on individual heatmap pixels to select that parameter set for spectral plotting
 2. **Git history cleanup.** Squash minor upkeep/doc commits; evaluate other repo
