@@ -1,4 +1,5 @@
-"""remote.py: material-name validation and the detached-queue runner generation.
+"""cxr_mc.remote (``cxr remote``): material-name validation and the
+detached-queue runner generation.
 
 These are pure-string/logic checks (no ssh), so they run anywhere. The one
 exception is the clear-listing regression test, which executes the box-side
@@ -8,7 +9,8 @@ import shutil
 import subprocess
 
 import pytest
-import remote
+
+from cxr_mc import remote
 
 
 def test_check_materials_accepts_crystal_keys():

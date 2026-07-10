@@ -187,11 +187,11 @@ See [`docs/running-on-a-cluster.md`](docs/running-on-a-cluster.md) for a SLURM
 `sbatch` template (including a job-array sweep over several materials). Pull the
 checkpoints back and do all the matplotlib/PDF work locally.
 
-> The author's own loop uses a small personal helper,
-> [`dev/remote.py`](dev/remote.py), to push the working tree to one GPU box (ssh
-> host `qlmc`, overridable via `CXR_REMOTE_{HOST,DIR,UV}`) and pull the checkpoint
-> back. It is **not** part of the installed package and is specific to that setup;
-> the cluster recipe above is the portable path.
+> The author's own loop uses a small personal helper, `cxr remote` (see
+> [`src/cxr_mc/remote.py`](src/cxr_mc/remote.py)), to push the working tree to
+> one GPU box (ssh host `qlmc`, overridable via `CXR_REMOTE_{HOST,DIR,UV}`) and
+> pull the checkpoint back. It is optional and specific to that setup; the
+> cluster recipe above is the portable path.
 
 ---
 

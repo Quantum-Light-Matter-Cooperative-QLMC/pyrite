@@ -59,10 +59,9 @@ docs = [
 
 [tool.pytest.ini_options]
 # Put src/ on the path so `import cxr_mc` resolves without requiring an install
-# (an editable install via `uv sync` also works); dev/ lets test_remote.py import
-# the demoted remote.py helper. Tests stay CPU-only/fast -- the heavy MC physics
-# validation lives in checks/, not here.
-pythonpath = ["src", "dev"]
+# (an editable install via `uv sync` also works). Tests stay CPU-only/fast -- the
+# heavy MC physics validation lives in checks/, not here.
+pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
 

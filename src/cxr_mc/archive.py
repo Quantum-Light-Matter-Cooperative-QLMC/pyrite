@@ -18,7 +18,7 @@ pull lands in the ACTIVE slot ``checkpoints/<stem>.pkl`` (exactly what
 
 All operations are pure local file copies (atomic temp+replace), so this lives on
 the ``cxr`` console script next to ``slim`` -- library-side and unit-testable --
-not in ``dev/remote.py``. The shelf stores whatever the active slot holds at the
+not in ``cxr_mc.remote``. The shelf stores whatever the active slot holds at the
 time, typically the grid-filtered view.
 """
 

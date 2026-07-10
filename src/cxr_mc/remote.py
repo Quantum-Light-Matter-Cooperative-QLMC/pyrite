@@ -1,34 +1,38 @@
-"""
-remote.py -- run the heavy CXR scan on the GPU box, keep the data-vis local.
+"""``cxr remote`` -- run the heavy CXR scan on the GPU box, keep the data-vis local.
 
 The split this enables: the laptop holds the project and does ALL the data-vis +
 PDF export (where matplotlib and the xelatex/webpdf toolchain are set up), while
 the lab box (an RTX 5080, ssh host 'qlmc') only does the GPU-heavy Monte-Carlo
-sweep. This script ships the current code up, runs scan.py there, and pulls the
-resulting checkpoint back into ./checkpoints -- so you never hand-ssh in or copy
-files, and you never need a PDF toolchain on the lab box.
+sweep. This command ships the current code up, runs scan.py there (see
+:mod:`cxr_mc.scan`), and pulls the resulting checkpoint back into ./checkpoints
+-- so you never hand-ssh in or copy files, and you never need a PDF toolchain on
+the lab box.
+
+Optional, dev-only tool: it is only useful if you have an ssh host configured
+(default 'qlmc', override via CXR_REMOTE_HOST) to run sweeps on. Every other
+``cxr`` command works without it.
 
 One-shot (foreground, holds the ssh session open until the sweep finishes):
 
-    python dev/remote.py scan mose2               # sync code up, run sweep, pull checkpoint
-    python dev/remote.py scan mose2 --quick       # tiny grid smoke test
-    python dev/remote.py scan mose2 --no-sync     # skip the code upload (code unchanged)
-    python dev/remote.py pull mose2 wse2          # fetch existing checkpoints (grid-filtered)
-    python dev/remote.py pull mose2 --full        # fetch the full, un-filtered checkpoint
-    python dev/remote.py sync                     # only push the current code
+    cxr remote scan mose2               # sync code up, run sweep, pull checkpoint
+    cxr remote scan mose2 --quick       # tiny grid smoke test
+    cxr remote scan mose2 --no-sync     # skip the code upload (code unchanged)
+    cxr remote pull mose2 wse2          # fetch existing checkpoints (grid-filtered)
+    cxr remote pull mose2 --full        # fetch the full, un-filtered checkpoint
+    cxr remote sync                     # only push the current code
 
 Detached QUEUE (survives ssh disconnect -- launch, walk away, reconnect later):
 
-    python dev/remote.py start mose2 wse2 mos2    # queue several materials, run detached
-    python dev/remote.py start mose2 --follow     # launch, then track it live
-    python dev/remote.py start mose2 --quick      # detached quick smoke test
-    python dev/remote.py attach [JOBID]           # (re)connect + track live (default: latest)
-    python dev/remote.py jobs                     # list jobs on the box + their state
-    python dev/remote.py status [JOBID]           # one job: meta + state + log tail (default: latest)
-    python dev/remote.py logs [JOBID] --follow    # tail the remote log (live)
-    python dev/remote.py stop mose2 wse2          # SIGTERM live job(s) by material
-    python dev/remote.py stop --all               # SIGTERM every live job
-    python dev/remote.py pull mose2 wse2 mos2     # fetch the finished checkpoints (grid-filtered)
+    cxr remote start mose2 wse2 mos2    # queue several materials, run detached
+    cxr remote start mose2 --follow     # launch, then track it live
+    cxr remote start mose2 --quick      # detached quick smoke test
+    cxr remote attach [JOBID]           # (re)connect + track live (default: latest)
+    cxr remote jobs                     # list jobs on the box + their state
+    cxr remote status [JOBID]           # one job: meta + state + log tail (default: latest)
+    cxr remote logs [JOBID] --follow    # tail the remote log (live)
+    cxr remote stop mose2 wse2          # SIGTERM live job(s) by material
+    cxr remote stop --all               # SIGTERM every live job
+    cxr remote pull mose2 wse2 mos2     # fetch the finished checkpoints (grid-filtered)
 
 `start` returns immediately: it ships the code, writes a small runner under
 <remote>/jobs/<jobid>/ and launches it with `nohup setsid` so it keeps running
@@ -62,10 +66,10 @@ from pathlib import Path
 HOST = os.environ.get("CXR_REMOTE_HOST", "qlmc")
 REMOTE_DIR = os.environ.get("CXR_REMOTE_DIR", "/home/aamador/dev/cxr-mc")
 REMOTE_UV = os.environ.get("CXR_REMOTE_UV", "/home/aamador/.local/bin/uv")
-# repo root = two levels up from dev/remote.py. remote.py orchestrates the
-# *checkout* (it tars the working tree up to the box), so it resolves paths
-# against the repo root, not its own dev/ dir.
-LOCAL_ROOT = Path(__file__).resolve().parents[1]
+# repo root = three levels up from src/cxr_mc/remote.py. remote.py orchestrates
+# the *checkout* (it tars the working tree up to the box), so it resolves paths
+# against the repo root, not its own package dir.
+LOCAL_ROOT = Path(__file__).resolve().parents[2]
 
 # detached-job bookkeeping lives under <REMOTE_DIR>/jobs/<jobid>/ on the box
 # (gitignored there): run.sh, meta, pid, state, log. One subdir per `start`.
@@ -327,8 +331,8 @@ def _refuse_if_busy(materials, quick):
             "refusing to start: a live job is already producing the same "
             "checkpoint(s), and two runs writing one <stem>.pkl race on its "
             f".tmp and crash.\n{detail}\n"
-            "attach to it (python dev/remote.py attach <jobid>) or stop it "
-            "(python dev/remote.py stop <material>) first, or run different materials."
+            "attach to it (cxr remote attach <jobid>) or stop it "
+            "(cxr remote stop <material>) first, or run different materials."
         )
 
 
@@ -353,7 +357,7 @@ def clear_remote(material, yes=False):
         raise SystemExit(
             "refusing to clear: a live job is still producing one of these "
             f"checkpoints, and clearing it would race a running sweep.\n{detail}\n"
-            "stop it (python dev/remote.py stop <material>) first, or wait for it to finish."
+            "stop it (cxr remote stop <material>) first, or wait for it to finish."
         )
     # which of the two stems actually exist on the box; the `|| true` keeps a
     # missing last stem's failed `[ -f ]` from becoming the loop's -- and hence
@@ -414,9 +418,9 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
     print(
         f"\nstarted job {jobid} on {HOST}: {' '.join(materials)}"
         f"{' (quick)' if quick else ''}\n"
-        f"  watch:  python dev/remote.py status {jobid}\n"
-        f"  logs:   python dev/remote.py logs {jobid} --follow\n"
-        f"  pull:   python dev/remote.py pull {' '.join(stems)}   (when state is 'done')"
+        f"  watch:  cxr remote status {jobid}\n"
+        f"  logs:   cxr remote logs {jobid} --follow\n"
+        f"  pull:   cxr remote pull {' '.join(stems)}   (when state is 'done')"
     )
     return jobid
 
@@ -490,9 +494,9 @@ def _latest_jobid():
 def _disconnect_hint(jobid):
     print(
         f"\n\ndisconnected from job {jobid} -- it keeps running on {HOST}.\n"
-        f"  reconnect: python dev/remote.py attach {jobid}\n"
-        f"  status:    python dev/remote.py status {jobid}\n"
-        "  stop:      python dev/remote.py stop <material>"
+        f"  reconnect: cxr remote attach {jobid}\n"
+        f"  status:    cxr remote status {jobid}\n"
+        "  stop:      cxr remote stop <material>"
     )
 
 
@@ -503,7 +507,7 @@ def attach(jobid=None):
     and runs to completion regardless. Defaults to the most recent job."""
     jobid = jobid or _latest_jobid()
     if not jobid:
-        raise SystemExit("no jobs to attach to (start one: remote.py start <materials>)")
+        raise SystemExit("no jobs to attach to (start one: cxr remote start <materials>)")
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     # Tail the log live, but self-terminate once the job process exits, so a
     # finished job doesn't leave you stuck in tail -f. The tail is NOT nohup'd, so
@@ -587,19 +591,115 @@ def stop_jobs(materials=None, all_jobs=False):
         _stop_jobid(jobid)
 
 
-def main(argv=None):
-    # The box's output is UTF-8 (job logs embed tqdm block-glyph progress bars
-    # like `████▌`). On Windows stdout defaults to cp1252 -- and when it is,
-    # printing that text raises UnicodeEncodeError, so `status`/`jobs`/`logs`
-    # would crash on the glyphs. Force UTF-8 with replacement so they never do.
+def _ensure_utf8_stdio():
+    """The box's output is UTF-8 (job logs embed tqdm block-glyph progress bars
+    like `████▌`). On Windows stdout defaults to cp1252 -- and when it is,
+    printing that text raises UnicodeEncodeError, so `status`/`jobs`/`logs`/
+    `attach` would crash on the glyphs. Force UTF-8 with replacement so they
+    never do. Scoped to remote subcommands (called from their CLI wrappers, not
+    at import time) so it doesn't change stdio encoding for unrelated ``cxr``
+    commands."""
     for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
         try:
-            stream.reconfigure(encoding="utf-8", errors="replace")
-        except (AttributeError, ValueError):
+            reconfigure(encoding="utf-8", errors="replace")
+        except ValueError:
             pass
 
-    ap = argparse.ArgumentParser(prog="remote.py", description=__doc__.splitlines()[1])
-    sub = ap.add_subparsers(dest="cmd", required=True)
+
+# ---- CLI wiring ----------------------------------------------------------------
+def _dispatch(handler):
+    def _run_cli(args):
+        _ensure_utf8_stdio()
+        return handler(args)
+
+    return _run_cli
+
+
+def _cli_scan(args):
+    if args.quick and args.grid:
+        raise SystemExit(
+            "scan --quick --grid: quick checkpoints aren't grid-filterable "
+            "(their grid isn't reproducible from material_sweep), so the "
+            "trailing pull would fail after the whole sweep ran. Drop --grid."
+        )
+    # same checkpoint-collision guard as `start`: a foreground scan and a
+    # detached job writing the same <stem>.pkl would race on its .tmp.
+    _refuse_if_busy([args.material], args.quick)
+    if not args.no_sync:
+        sync_code()
+    remote_scan(args.material, args.quick, args.workers)
+    stem = f"{args.material}_quick" if args.quick else args.material
+    # code is already synced above, so the trailing grid-pull skips its own sync
+    # (no_sync=True); forward the same grid/trim flags.
+    pull(
+        [stem],
+        grid=args.grid,
+        drop_wide_brem=args.drop_wide_brem,
+        downcast=args.downcast,
+        no_sync=True,
+    )
+    print(
+        f"\ndone. checkpoints/{stem}.pkl is local; open notebooks/analysis.ipynb "
+        f"with MATERIAL='{stem}' (or run scripts/export_pdf.py) -- all viz/PDF "
+        "stays local."
+    )
+
+
+def _cli_pull(args):
+    pull(
+        args.material,
+        grid=not args.full,
+        drop_wide_brem=args.drop_wide_brem,
+        downcast=args.downcast,
+        no_sync=args.no_sync,
+    )
+
+
+def _cli_start(args):
+    jobid = start_queue(args.materials, args.quick, args.workers, args.no_sync, args.dry_run)
+    if args.follow and not args.dry_run:
+        attach(jobid)
+
+
+def _cli_attach(args):
+    attach(args.jobid)
+
+
+def _cli_jobs(args):
+    list_jobs()
+
+
+def _cli_status(args):
+    job_status(args.jobid)
+
+
+def _cli_logs(args):
+    tail_logs(args.jobid, args.follow)
+
+
+def _cli_stop(args):
+    stop_jobs(args.materials, args.all)
+
+
+def _cli_clear(args):
+    clear_remote(args.material, args.yes)
+
+
+def _cli_sync(args):
+    sync_code()
+
+
+def _build_remote_parser(ap):
+    """Add every ``remote`` subcommand (scan/pull/start/attach/jobs/status/logs/
+    stop/clear/sync) to ``ap``'s own subparsers. Nested one level under a
+    ``remote`` group -- rather than flat alongside ``cxr scan`` etc -- because
+    several of these names (``scan`` in particular) collide with top-level cxr
+    subcommands that mean something different (a local sweep vs this
+    sync+run-on-the-box+pull)."""
+    sub = ap.add_subparsers(dest="remote_command", required=True)
 
     s = sub.add_parser("scan", help="sync code, run ONE sweep in the foreground, pull checkpoint")
     s.add_argument("material")
@@ -611,6 +711,7 @@ def main(argv=None):
     )
     s.add_argument("--drop-wide-brem", action="store_true", help="with --grid: drop wide-brem too")
     s.add_argument("--downcast", action="store_true", help="with --grid: downcast to float32 too")
+    s.set_defaults(func=_dispatch(_cli_scan))
 
     st = sub.add_parser(
         "start",
@@ -627,25 +728,31 @@ def main(argv=None):
         action="store_true",
         help="track the job live after launching (Ctrl-C disconnects; job keeps running)",
     )
+    st.set_defaults(func=_dispatch(_cli_start))
 
     at = sub.add_parser(
         "attach",
         help="live-track a job until it finishes (Ctrl-C disconnects; default: latest)",
     )
     at.add_argument("jobid", nargs="?", default=None)
+    at.set_defaults(func=_dispatch(_cli_attach))
 
-    sub.add_parser("jobs", help="list jobs on the box and their state")
+    jb = sub.add_parser("jobs", help="list jobs on the box and their state")
+    jb.set_defaults(func=_dispatch(_cli_jobs))
 
     js = sub.add_parser("status", help="show one job (default: latest)")
     js.add_argument("jobid", nargs="?", default=None)
+    js.set_defaults(func=_dispatch(_cli_status))
 
     lg = sub.add_parser("logs", help="tail a job's log (default: latest)")
     lg.add_argument("jobid", nargs="?", default=None)
     lg.add_argument("--follow", "-f", action="store_true", help="stream live")
+    lg.set_defaults(func=_dispatch(_cli_logs))
 
     sp = sub.add_parser("stop", help="SIGTERM live job(s) by material, or every live job")
     sp.add_argument("materials", nargs="*", help="material name(s) owned by live jobs")
     sp.add_argument("-a", "--all", action="store_true", help="stop every live job")
+    sp.set_defaults(func=_dispatch(_cli_stop))
 
     p = sub.add_parser("pull", help="fetch one or more existing checkpoints from the box")
     p.add_argument("material", nargs="+", help="checkpoint stem(s), e.g. mose2 mose2_quick")
@@ -664,73 +771,40 @@ def main(argv=None):
     p.add_argument(
         "--no-sync", action="store_true", help="with grid pull: skip the pre-pull code sync"
     )
+    p.set_defaults(func=_dispatch(_cli_pull))
 
     c = sub.add_parser("clear", help="delete a material's accumulated checkpoints on the box")
     c.add_argument(
         "material", help="crystal key; clears both <material>.pkl and <material>_quick.pkl"
     )
     c.add_argument("--yes", action="store_true", help="actually delete (default: dry preview only)")
+    c.set_defaults(func=_dispatch(_cli_clear))
 
-    sub.add_parser("sync", help="push the current code to the box only")
+    sy = sub.add_parser("sync", help="push the current code to the box only")
+    sy.set_defaults(func=_dispatch(_cli_sync))
 
+    return ap
+
+
+def add_subparser(sub):
+    """Register the ``remote`` subcommand group on an argparse subparsers
+    object. Everything under it (``cxr remote scan|pull|start|attach|jobs|
+    status|logs|stop|clear|sync``) is optional -- it only works with an ssh host
+    configured to run sweeps on (default 'qlmc', see CXR_REMOTE_HOST)."""
+    ap = sub.add_parser(
+        "remote", help="[dev] push code + run/manage MC sweeps on a remote GPU box over ssh"
+    )
+    return _build_remote_parser(ap)
+
+
+def main(argv=None):
+    ap = _build_remote_parser(
+        argparse.ArgumentParser(
+            prog="cxr-remote", description="push code + run/manage MC sweeps on a remote GPU box"
+        )
+    )
     args = ap.parse_args(argv)
-    match args.cmd:
-        case "sync":
-            sync_code()
-        case "pull":
-            pull(
-                args.material,
-                grid=not args.full,
-                drop_wide_brem=args.drop_wide_brem,
-                downcast=args.downcast,
-                no_sync=args.no_sync,
-            )
-        case "clear":
-            clear_remote(args.material, args.yes)
-        case "scan":
-            if args.quick and args.grid:
-                raise SystemExit(
-                    "scan --quick --grid: quick checkpoints aren't grid-filterable "
-                    "(their grid isn't reproducible from material_sweep), so the "
-                    "trailing pull would fail after the whole sweep ran. Drop --grid."
-                )
-            # same checkpoint-collision guard as `start`: a foreground scan and a
-            # detached job writing the same <stem>.pkl would race on its .tmp.
-            _refuse_if_busy([args.material], args.quick)
-            if not args.no_sync:
-                sync_code()
-            remote_scan(args.material, args.quick, args.workers)
-            stem = f"{args.material}_quick" if args.quick else args.material
-            # code is already synced above, so the trailing grid-pull skips its
-            # own sync (no_sync=True); forward the same grid/trim flags.
-            pull(
-                [stem],
-                grid=args.grid,
-                drop_wide_brem=args.drop_wide_brem,
-                downcast=args.downcast,
-                no_sync=True,
-            )
-            print(
-                f"\ndone. checkpoints/{stem}.pkl is local; open notebooks/analysis.ipynb "
-                f"with MATERIAL='{stem}' (or run scripts/export_pdf.py) -- all viz/PDF "
-                "stays local."
-            )
-        case "start":
-            jobid = start_queue(
-                args.materials, args.quick, args.workers, args.no_sync, args.dry_run
-            )
-            if args.follow and not args.dry_run:
-                attach(jobid)
-        case "attach":
-            attach(args.jobid)
-        case "jobs":
-            list_jobs()
-        case "status":
-            job_status(args.jobid)
-        case "logs":
-            tail_logs(args.jobid, args.follow)
-        case "stop":
-            stop_jobs(args.materials, args.all)
+    return args.func(args)
 
 
 if __name__ == "__main__":

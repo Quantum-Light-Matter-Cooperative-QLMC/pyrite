@@ -11,11 +11,12 @@ A single console script with subcommands, wired in pyproject.toml as
     cxr restore <label> [--as <stem>]             # copy a shelved checkpoint back
     cxr archives                                  # list the shelf
     cxr union <stem> <label>                      # merge a shelved checkpoint into active
+    cxr remote <subcommand> ...                   # [dev, optional] run sweeps on a remote GPU box
 """
 
 import argparse
 
-from . import __version__, analyze, archive, export, scan, slim
+from . import __version__, analyze, archive, export, remote, scan, slim
 
 
 def main(argv=None):
@@ -30,6 +31,7 @@ def main(argv=None):
     analyze.add_subparser(sub)
     slim.add_subparser(sub)
     archive.add_subparser(sub)
+    remote.add_subparser(sub)
 
     args = ap.parse_args(argv)
     return args.func(args)

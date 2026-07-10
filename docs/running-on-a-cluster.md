@@ -95,6 +95,6 @@ lives.
 - **fp64:** set `CXR_FP64=1` for double-precision reference runs (the GPU path
   defaults to fp32).
 
-The author's personal single-box helper (`dev/remote.py`) does the same push / run
-/ pull loop over plain ssh for a non-scheduler GPU box; it is not needed on a
-cluster and is not part of the installed package.
+The author's personal single-box helper (`cxr remote`, see `cxr_mc/remote.py`)
+does the same push / run / pull loop over plain ssh for a non-scheduler GPU box;
+it is not needed on a cluster.

@@ -5,7 +5,7 @@ once a sweep has filled in every config -- slow to write on the GPU box, slow
 to ``scp`` back to the laptop, and slow to load in the viz notebook. gzip
 (stdlib, no new dependency) typically halves or better the on-disk size of
 these float-array-heavy pickles at a modest CPU cost, which is a straight win
-for both disk footprint and (especially) `dev/remote.py` transfer time.
+for both disk footprint and (especially) `cxr remote` transfer time.
 
 Backward compatibility is the load-side contract: every checkpoint written
 before this change is a plain (uncompressed) pickle, both on the laptop
