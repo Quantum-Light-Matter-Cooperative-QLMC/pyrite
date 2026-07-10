@@ -32,6 +32,7 @@ import numpy as np
 import pandas as pd
 
 from .. import eaglexo_response as eag
+from .. import timepix_response as tpx
 from ._common import _best_azimuth, _case_title
 from .altair_spectra import _tilt_records
 from .detectors import (
@@ -75,8 +76,9 @@ def timepix_detected_frame(
     """Tidy long-form incident-vs-Timepix3-detected table for ``recs`` (already
     restricted to one polar tilt): one row per (beam energy, grid point, kind),
     ``kind`` in ``{"incident", "detected"}``, both already scaled to Phs/eV/s/nA.
-    Mirrors :func:`cxr_mc.plots.detectors._draw_timepix_detected`. The ``band``
-    column is always ``"line"`` here (Timepix uses the line grid only). Columns:
+    Mirrors :func:`cxr_mc.plots.detectors._draw_timepix_detected`. ``band`` is
+    ``"line"`` (fine line grid) or ``"brem"`` (the wide brem-grid tail, present
+    only when the sweep stored ``brem_wide``). Columns:
     ``energy_eV, intensity, E0_keV, azimuth_deg, kind, band``."""
     frames = []
     for E0, grp in _collapsed(recs, collapse_azimuth=collapse_azimuth):
@@ -97,6 +99,33 @@ def timepix_detected_frame(
                         }
                     )
                 )
+            if r.get("brem_wide") is not None:
+                Eb = np.asarray(r["E_grid_brem"], dtype=float)
+                tail = Eb > float(np.nanmax(E))
+                if np.any(tail):
+                    Eb_tail = Eb[tail]
+                    inc_b = np.asarray(r["brem_wide"], dtype=float)[tail] * r["scale"]
+                    resp = tpx.get_response(
+                        Eb_tail,
+                        n_mc=n_mc,
+                        seed=seed,
+                        thickness_um=thickness_um,
+                        bias_v=bias_v,
+                    )
+                    det_b = resp.apply(inc_b)
+                    for kind, y in (("incident", inc_b), ("detected", det_b)):
+                        frames.append(
+                            pd.DataFrame(
+                                {
+                                    "energy_eV": Eb_tail,
+                                    "intensity": np.asarray(y, dtype=float),
+                                    "E0_keV": float(E0),
+                                    "azimuth_deg": az,
+                                    "kind": kind,
+                                    "band": "brem",
+                                }
+                            )
+                        )
     if not frames:
         return pd.DataFrame(columns=_DET_COLUMNS)
     return pd.concat(frames, ignore_index=True)

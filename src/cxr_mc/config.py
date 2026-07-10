@@ -102,105 +102,105 @@ _MATERIAL_GRIDS: dict[str, MaterialGrid] = {
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
         "tilt_azim_deg": np.linspace(-85, 0, 10, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 2.0),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "hbn": {
-        "thickness_ang": np.logspace(2, 5, 6),
+        "thickness_ang": np.concat([np.logspace(2, 5, 6), np.logspace(5, 6, 2, endpoint=False)]),
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-89, -80, 10, endpoint=True),
-        "tilt_azim_deg": np.linspace(-85, 0, 10, endpoint=True),
-        "E_grid_line": np.arange(5.0, 1000.0, 2.0),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
+        "E_grid_line": np.arange(5.0, 1000.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "diamond": {
         "thickness_ang": 10e4,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 30, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 2.0),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "silicon": {
         "thickness_ang": 10e4,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 15, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 2.0),  # (was a stray 1-tuple in the nb)
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),  # (was a stray 1-tuple in the nb)
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "mose2": {
         "thickness_ang": 10e4,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 15, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 2.0),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "wse2": {
         "thickness_ang": 10e4,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 15, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 2.0),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "mote2": {
         "thickness_ang": 10e4,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 15, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 2.0),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "mote2_product": {
         "thickness_ang": _MOTE2_PRODUCT_LAYER_PITCH_ANG * np.arange(3, 7),
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 15, endpoint=True),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
         "substrate": "sapphire",
-        "E_grid_line": np.arange(50.0, 4500.0, 2.0),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "ptse2": {
         "thickness_ang": 10e4,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 15, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 2.0),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "hfse2": {
         "thickness_ang": 10e4,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 15, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 2.0),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "zrse2": {
         "thickness_ang": 10e4,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 15, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4500.0, 2.0),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "ws2": {
         "thickness_ang": 10e4,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 15, endpoint=True),
-        "E_grid_line": np.arange(50.0, 3500.0, 2.0),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 3500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "mos2": {
         "thickness_ang": _MOS2_LAYER_PITCH_ANG * 3,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 10, endpoint=True),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
         "substrate": "sapphire",
-        "E_grid_line": np.arange(50.0, 4500.0, 2.0),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     # Named device stack: few-layer 2H-MoS2 on a thin thermal a-SiO2 (285 nm,
@@ -210,17 +210,17 @@ _MATERIAL_GRIDS: dict[str, MaterialGrid] = {
         "thickness_ang": _MOS2_LAYER_PITCH_ANG * np.arange(3, 7),
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 15, endpoint=True),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
         "stack": (Layer("sio2", 2850.0), Layer("silicon", 5e6)),
-        "E_grid_line": np.arange(50.0, 4000.0, 2.0),
+        "E_grid_line": np.arange(50.0, 4000.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
     "sapphire": {
         "thickness_ang": 5e6,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(-85, 0, 20, endpoint=False),
-        "tilt_azim_deg": np.linspace(-85, 0, 15, endpoint=True),
-        "E_grid_line": np.arange(50.0, 4000.0, 2.0),
+        "tilt_azim_deg": np.linspace(-80, 0, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4000.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
 }
@@ -251,6 +251,7 @@ def trajectory_sweep(
     *,
     tilts=PENETRATION_TILT_DEG,
     energies=(30, 60),
+    thickness_ang: float | None = None,
     n_tilts: int | None = None,
     tilt_span: float | None = None,
 ):
@@ -260,11 +261,12 @@ def trajectory_sweep(
     span from ``-tilt_span`` to normal incidence when supplied; otherwise the
     sparse default :data:`PENETRATION_TILT_DEG` set is used.
 
-    Always uses ONE representative thickness: the geometric midpoint of the
-    material's thickness array if it is a sweep (e.g. HOPG), or the scalar
-    itself. This avoids inheriting a 40-element thickness loop that would (a)
-    make penetration_survival_chart silently pick the thinnest slab and (b)
-    make trajectory_chart plot nearly-invisible grazing tracks.
+    Always uses ONE thickness: ``thickness_ang`` when explicitly supplied,
+    otherwise the geometric midpoint of the material's thickness array if it is a
+    sweep (e.g. HOPG), or the scalar itself. This avoids inheriting a 40-element
+    thickness loop that would (a) make penetration_survival_chart silently pick
+    the thinnest slab and (b) make trajectory_chart plot nearly-invisible
+    grazing tracks.
 
     Carries the material's ``substrate``/``stack`` through (when present) so a
     film-on-substrate material (e.g. mos2 on sapphire) gets its ``abs_layers``
@@ -272,8 +274,11 @@ def trajectory_sweep(
     electrons through the free-standing film only, never reaching the
     substrate, even though the spectrum runner always sees the full stack."""
     p = material_grid(material)
-    thick_arr = np.atleast_1d(np.asarray(p["thickness_ang"], dtype=float))
-    thick = float(thick_arr[len(thick_arr) // 2])
+    if thickness_ang is None:
+        thick_arr = np.atleast_1d(np.asarray(p["thickness_ang"], dtype=float))
+        thick = float(thick_arr[len(thick_arr) // 2])
+    else:
+        thick = float(thickness_ang)
     stack_kwargs = {}
     if "stack" in p:
         stack_kwargs["stack"] = p["stack"]

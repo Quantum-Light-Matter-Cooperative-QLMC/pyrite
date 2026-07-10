@@ -25,11 +25,11 @@ def _settings():
     )
 
 
-def _record(E0_keV, tilt_deg, azim_deg, n=200):
+def _record(E0_keV, tilt_deg, azim_deg, n=200, wide_brem=False):
     E = np.linspace(1000.0, 5000.0, n)  # eV
     peak = np.exp(-(((E - 2500.0) / 50.0) ** 2))  # a single sharp line
     brem = np.linspace(1.0, 0.2, n)  # a smooth falling continuum
-    return {
+    rec = {
         "E_grid": E,
         "spec": peak,
         "brem": brem,
@@ -43,6 +43,11 @@ def _record(E0_keV, tilt_deg, azim_deg, n=200):
             "thickness_ang": 5.0e4,
         },
     }
+    if wide_brem:
+        Eb = np.linspace(0.0, E0_keV * 1000.0, 120)
+        rec["E_grid_brem"] = Eb
+        rec["brem_wide"] = np.linspace(1.2, 0.02, Eb.size)
+    return rec
 
 
 def _store():
@@ -53,6 +58,10 @@ def _store():
             60.0: _record(60.0, -20.0, 0.0),
         }
     }
+
+
+def _dataset(spec):
+    return spec["datasets"][spec["data"]["name"]]
 
 
 def test_spectrum_frame_shapes_and_components():
@@ -67,6 +76,42 @@ def test_spectrum_frame_shapes_and_components():
         df[df.component == "total"]["intensity"].to_numpy()
         >= df[df.component == "brem"]["intensity"].to_numpy() - 1e-9
     ).all()
+
+
+def test_spectrum_frame_broadband_uses_wide_brem_tail():
+    df = spectrum_frame([_record(30.0, -20.0, 0.0, wide_brem=True)], _settings(), band="broad")
+
+    assert df["energy_eV"].max() == 30000.0
+    tail = df[(df.component == "total") & (df.energy_eV > 5000.0)]
+    brem_tail = df[(df.component == "brem") & (df.energy_eV > 5000.0)]
+    assert not tail.empty
+    assert np.allclose(tail["intensity"].to_numpy(), brem_tail["intensity"].to_numpy())
+
+
+def test_spectrum_frame_broadband_clips_tail_to_beam_energy():
+    rec = _record(30.0, -20.0, 0.0, wide_brem=True)
+    rec["E_grid_brem"] = np.array([0.0, 5000.0, 30000.0, 30500.0])
+    rec["brem_wide"] = np.array([1.0, 0.5, 0.2, 99.0])
+
+    df = spectrum_frame([rec], _settings(), band="broad")
+
+    assert df["energy_eV"].max() == 30000.0
+    assert 30500.0 not in set(df["energy_eV"])
+
+
+def test_spectrum_frame_narrow_ignores_wide_brem_tail():
+    df = spectrum_frame([_record(30.0, -20.0, 0.0, wide_brem=True)], _settings())
+
+    assert df["energy_eV"].max() == 5000.0
+
+
+def test_spectrum_frame_peak_preserving_decimation_keeps_line_peak():
+    rec = _record(30.0, -20.0, 0.0, n=1000)
+    df = spectrum_frame([rec], _settings(), include_brem=False, max_points=40)
+
+    total = df[df.component == "total"]
+    assert len(total) <= 40
+    assert np.isclose(total["intensity"].max(), rec["spec"].max() * rec["scale"])
 
 
 def test_spectrum_frame_excludes_brem_when_disabled():
@@ -84,6 +129,24 @@ def test_spectrum_chart_builds_valid_spec():
     assert enc["color"]["field"] == "E0_keV"
     # total + brem layers
     assert len(spec["layer"]) == 2
+
+
+def test_spectrum_chart_accepts_log_x_scale_and_broadband():
+    store = {"HOPG bulk": {30.0: _record(30.0, -20.0, 0.0, wide_brem=True)}}
+    chart = spectrum_chart(
+        store,
+        _settings(),
+        band="broad",
+        x_domain=(50.0, 30000.0),
+        x_type="log",
+        y_type="log",
+    )
+
+    spec = chart.to_dict()
+    enc = spec["layer"][0]["encoding"]
+    assert enc["x"]["scale"] == {"domain": [50.0, 30000.0], "type": "log"}
+    assert enc["y"]["scale"] == {"type": "log"}
+    assert max(row["energy_eV"] for row in _dataset(spec)) == 30000.0
 
 
 def test_spectrum_chart_single_layer_without_brem():
