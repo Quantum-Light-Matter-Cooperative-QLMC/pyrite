@@ -48,10 +48,13 @@ handles the 200 KB-2.9 MB payloads seen here.
    and `pyright` all pass on the changed files (`src/cxr_mc/plots/_common.py`,
    `tests/test_sweep_metrics_reuse.py` — the latter's `line_metrics_calls` fixture now
    clears `_LINE_METRICS_CACHE` first so cross-test cache hits don't undercount calls).
-2. **Decouple the mega-cell into one `@app.cell` per tab** (same file), each closing over
-   only the widgets that tab actually reads, plus a final small cell that just calls
-   `mo.ui.tabs({...}, lazy=True)` over the 8 tab values. Cheap, low-risk, improves DAG
-   legibility regardless of whether the live recompute test above confirms real wasted work.
+2. **DONE - decouple the mega-cell into one `@app.cell` per tab.** `notebooks/analysis_app.py`
+   now returns one zero-arg builder closure per tab, each from its own cell with only the
+   widgets/data that tab reads, plus a final small cell that calls
+   `mo.ui.tabs({...}, lazy=True)` over the 8 tab builders. The tab bodies and chart arguments
+   were otherwise left unchanged. Verified with syntax compilation, direct Ruff and Marimo
+   checks on `notebooks/analysis_app.py`, and the focused `tests/test_export.py` /
+   `tests/test_analyze.py` launcher/export tests.
 3. **Downsampling raw spectra**: lower priority — current payloads are within
    Vega-Lite/vegafusion's already-provisioned-for range; only revisit if 1-2 don't fully
    fix perceived lag.
@@ -59,9 +62,9 @@ handles the 200 KB-2.9 MB payloads seen here.
    render speed) becomes the actual maintenance pain point, and only for the two standalone
    tabs (Penetration, Cross-material).
 
-**Before implementing:** re-run the live cross-tab-recompute test (needs the Chrome
-extension connected) to confirm/rule out item 2's actual runtime payoff, since it's the one
-claim in this plan not backed by a direct measurement.
+**Remaining measurement:** the live cross-tab-recompute test still needs a connected browser
+session if we want to quantify item 2's runtime payoff. The structural split is landed, so that
+test is now evidence-gathering rather than an implementation gate.
 
 ---
 
