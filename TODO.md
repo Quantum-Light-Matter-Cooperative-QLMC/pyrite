@@ -21,17 +21,16 @@ on `main` once the branch exists.
 
 ### Active
 
-1. **Grazing-incidence soft X-ray diffraction grating - CCD + geometry buildout.**
-   `feature/grazing-grating` merged through step 5: dispersion geometry, grating
-   reflectivity (`Grating.reflectivity`/`throughput`), the geometry-only
-   `SimpleCCD` (sized to greateyes ALEX-s 1k256/2k512), the combined
-   `detected_image` forward-model entry, and a physical CCD response
-   (`qe_absorption`, `charge_cloud_sigma_um`, `energy_fwhm_eV`,
-   `detected_image_physical`) are all landed in `src/cxr_mc/grating.py`.
-   Remaining: (a) the ALEX-s device constants are `### FILL IN` placeholders
-   pending a real datasheet; (b) `Grating.groove_efficiency` is still a
-   placeholder scalar, not a groove-profile model; (c) the broader ~10 eV-4 keV
-   CCD/grating hardware survey.
+1. **Physics validation ledger — 19 of 26 claims unverified, 0 signed off.** Re-derive each
+   claim in fresh context, then add the 17 missing in-code `Validation: <id>` markers.
+   Ledger: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md);
+   method: [`docs/validation/README.md`](docs/validation/README.md).
+2. **Grazing grating — groove efficiency.** `Grating.groove_efficiency` is a placeholder
+   scalar, not a groove-profile model. -> `feature/grating-groove-efficiency`.
+   Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+3. **Grazing grating — ALEX-s constants + hardware survey.** The ALEX-s device constants in
+   `grating.py` are `### FILL IN` placeholders pending a real datasheet; the ~10 eV-4 keV
+   CCD/grating survey is unwritten. -> `docs/soft-xray-hardware-survey`.
    Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
 
 ### Gated
@@ -45,62 +44,30 @@ on `main` once the branch exists.
 
 ## P2 - medium (experiment match + usability)
 
-1. **External crystallography library adapters.** `feature/diffpy` (`67f27e0`) implements
-   `diffpy.structure` CIF/import support; `feature/dans-diffraction` (`d4dbeff`) implements
-   optional `Dans_Diffraction` validation-oracle checks. Both reviewed (read-only,
-   unmerged): verdict **MERGE-AFTER-FIXES** for each. Neither duplicates production
-   physics. Blockers: `feature/diffpy` adds a *hard* `diffpy-structure` dependency, 2 of
-   its 3 new tests cannot collect without it, and its ledger row already claims `anchored`
-   before any real test run. `feature/dans-diffraction` is correctly guarded and optional;
-   it needs only a rebase + a dangling doc reference dropped. Merge decisions are the
-   user's. Whether `crystals` remains useful hinges on one empirical check — does
-   `diffpy.structure`'s CIF parser expand space-group + Wyckoff CIFs to a full P1 basis?
-   If yes, `crystals` is redundant here.
-   Review: [`docs/crystallography-adapters-review.md`](docs/crystallography-adapters-review.md).
-2. **pyelsepa / ELSEPA transport.** -> `feature/elsepa-port` Adapter landed + **validated** (C 2.19%,
-   Si 4.42% max rel vs NIST); image now builds tarball-free from
-   `github.com/eScatter/elsepa`. Remaining gate: the image/venv live outside the repo
-   (`C:/dev/pyelsepa`), so the driver stays gated in CI.
-3. **Codebase de-duplication follow-through.** `refactor/dedup-followthrough` — merged
-   (now on `main`). Two items intentionally out of scope, tracked only in
-   [`docs/dedup-inventory.md`](docs/dedup-inventory.md): M4 (wide-brem overlay
-   physics x4) and the M7 `line_fwhm_eV`/escape-helper sub-items.
+1. **External crystallography library adapters — merge decision pending.** `feature/diffpy`
+   (`67f27e0`) and `feature/dans-diffraction` (`d4dbeff`) are both reviewed, unmerged, verdict
+   **MERGE-AFTER-FIXES**; the merge call and the open `crystals`-redundancy question are the
+   user's. Review: [`docs/crystallography-adapters-review.md`](docs/crystallography-adapters-review.md).
+2. **pyelsepa / ELSEPA transport.** Adapter landed + validated (C 2.19%, Si 4.42% max rel vs
+   NIST); gated in CI because the image/venv live outside the repo. -> `feature/elsepa-port`.
+3. **Sweep cache standardization.** Checkpoint records key on `(name, E0)` only, so the energy
+   grid is not part of the cache key and stores silently mix grid resolutions.
+   -> `feature/sweep-cache-standardization`.
 4. **Material filters.** Model calibration filters (e.g. sheets of Al foil) between the
    x-ray beam and detector, for detector calibration against filtered spectra.
+   -> `feature/material-filters`.
 5. **Finite electron beam size.** Confirm the input beam is finite, then model it as a
    ~1 mm diameter Gaussian beam incident on the crystal.
-6. **Sweep cache standardization.** Round parametric angular sweeps to the nearest
-   degree; standardize energy-grid sizes/spacings so thickness/angle/etc. sweeps share
-   one cached-data store that is always checked before running.
-7. **`analysis_app.py` parameter-sweep views.** Support parameter sweeps (e.g. the
-   crystal-thickness sweeps in the current h-BN work); today the app silently shows only
-   the thinnest crystal.
-8. **Checkpoint union tooling.** `feature/checkpoint-union` — merged (now on `main`).
-   `cxr union <stem> <label>` merges an archived checkpoint into the active slot at
-   (config name, E0) granularity; live wins on collision (records carry no provenance
-   stamp to break ties by recency). Refuses a material mismatch, pre-archives the live
-   pickle by default (`--no-archive` skips), leaves the source archive intact by default
-   (`--delete-archive` removes it), and refuses outright — even with `--force` — when the
-   pre-union backup label would collide with the archive being unioned in.
+6. **De-duplication follow-through — M4 + M7.** The two clusters parked out of scope by the
+   merged `refactor/dedup-followthrough`. -> `refactor/dedup-m4-m7`.
+   Inventory: [`docs/dedup-inventory.md`](docs/dedup-inventory.md).
 
 ## P3 - lower / exploratory
 
-1. **Marimo/Altair follow-ups.** Core migration landed from `feature/marimo-transfer`;
-   `feature/marimo-altair-followups` closed out the remaining fixes (blank detector
-   tabs, mos2 multilayer penetration, angle selector, intrinsic-spectra controls,
-   heatmap sizing/ticks, `scan_app.py` material dropdown). `cxr export` now renders
-   `notebooks/analysis_app.py` via `marimo export html` (replacing the retired
-   nbconvert-PDF path), and sweep-chart drivers share one precomputed metrics map
-   across quantities instead of recomputing per-quantity. `eaglexo_charge_chart`
-   now takes `x_domain=` like the other detector charts, and the default first
-   tab is "Intrinsic spectra" instead of "Top geometries". Remaining deferred
-   items:
-
-   - The dense penetration-grid accordion (matplotlib, Penetration tab) is still
-     fixed at `energy=30` regardless of the angle selector above it.
-     It also doesn't seem to plot anything when the tab is opened.
-   - The x/y plot-limit entry boxes should move into the Spectra tab they belong to.
-   - Add capability to click on individual heatmap pixels to select that parameter set for spectral plotting
+1. **Marimo/Altair follow-up — penetration grid.** The dense penetration-grid accordion
+   (matplotlib, Penetration tab) is still hard-wired to `energy=30` and ignores the tab's
+   polar-tilt selector; it also may not plot anything when expanded.
+   -> `feature/marimo-sweep-views`.
 2. **Git history cleanup.** Squash minor upkeep/doc commits; evaluate other repo
    structure/history improvements.
 3. **Dynamic GPU chunk sizing.** Evaluate config-driven chunk-size selection for
