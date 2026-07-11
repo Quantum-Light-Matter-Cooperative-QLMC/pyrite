@@ -429,9 +429,10 @@ def _(mo):
     These are separate from the Fig. 1c anchor: each run contains coherent
     PXR+CBS emission, convolved with the same Zhai EDS-plus-aperture detector
     response and normalized to **Phs/eV/s/nA**. WSe₂ and MoSe₂ each render four
-    polar-tilt panels at a selected reported thickness; h-BN overlays its four
-    requested tilts at 921 nm. Every study uses a 200 keV beam and the reported
-    energy window.
+    reported polar-tilt panels at 200 keV. Their TEM azimuth is not reported, so
+    it must be selected explicitly below and is labeled exploratory. The 921 nm
+    h-BN comparison uses its reported 17° polar / 130° azimuth orientation and
+    overlays the reported 17.5, 20, 22.5, and 25 keV SEM spectra.
     """)
     return
 
@@ -462,25 +463,37 @@ def _(af, mo, supplementary_study_ui):
 
 
 @app.cell
-def _(mo, supplementary_study_ui, supplementary_thickness_ui):
+def _(af, mo, supplementary_study_ui, supplementary_thickness_ui):
+    _study = af.supplementary_study(supplementary_study_ui.value)
     supplementary_ne_ui = mo.ui.number(
         start=10,
         stop=5_000,
         step=10,
         value=200,
-        label="Electrons per polar-tilt spectrum",
+        label="Electrons per spectrum",
+    )
+    supplementary_azimuth_ui = mo.ui.number(
+        start=0,
+        stop=180,
+        step=5,
+        value=0,
+        label="Exploratory TMD azimuth (deg; unreported)",
     )
     run_supplementary_ui = mo.ui.run_button(label="Run supplementary study")
     refresh_supplementary_ui = mo.ui.checkbox(value=False, label="Recompute (ignore cache)")
     mo.vstack(
         [
             mo.hstack([supplementary_study_ui, supplementary_thickness_ui]),
+            supplementary_azimuth_ui
+            if any(condition.azimuth_deg is None for condition in _study.conditions)
+            else mo.md("**Reported orientation:** polar 17°, azimuth 130°"),
             mo.hstack([supplementary_ne_ui, refresh_supplementary_ui, run_supplementary_ui]),
         ]
     )
     return (
         refresh_supplementary_ui,
         run_supplementary_ui,
+        supplementary_azimuth_ui,
         supplementary_ne_ui,
     )
 
@@ -491,6 +504,7 @@ def _(
     mo,
     refresh_supplementary_ui,
     run_supplementary_ui,
+    supplementary_azimuth_ui,
     supplementary_ne_ui,
     supplementary_study_ui,
     supplementary_thickness_ui,
@@ -501,14 +515,20 @@ def _(
     )
     study = af.supplementary_study(supplementary_study_ui.value)
     thickness_nm = float(supplementary_thickness_ui.value)
+    exploratory_azimuth_deg = (
+        float(supplementary_azimuth_ui.value)
+        if any(condition.azimuth_deg is None for condition in study.conditions)
+        else None
+    )
     with mo.status.spinner(
         title="Running detector-convolved supplementary spectra",
-        subtitle="Four transport and PXR+CBS spectra are computed or loaded from cache.",
+        subtitle="Four reported-condition spectra are computed or loaded from cache.",
     ):
         spectra, cache_hit, cache_path = af.cached_coherent_spectra(
             study,
             thickness_nm,
             ne=int(supplementary_ne_ui.value),
+            exploratory_azimuth_deg=exploratory_azimuth_deg,
             refresh=refresh_supplementary_ui.value,
         )
     figure = (
@@ -520,7 +540,13 @@ def _(
         [
             mo.callout(
                 f"{'Loaded cached' if cache_hit else 'Computed and cached'} result at "
-                f"`{cache_path.relative_to(cache_path.parents[1])}`.",
+                f"`{cache_path.relative_to(cache_path.parents[1])}`."
+                + (
+                    f" Exploratory TMD azimuth: {exploratory_azimuth_deg:g}° "
+                    "(not reported by Zhai et al.)."
+                    if exploratory_azimuth_deg is not None
+                    else " Reported h-BN orientation: polar 17°, azimuth 130°."
+                ),
                 kind="success",
             ),
             mo.center(figure),

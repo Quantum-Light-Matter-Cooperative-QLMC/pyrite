@@ -75,17 +75,27 @@ from cxr_mc.montecarlo.geometry import tilted_geometry  # noqa: E402
 from cxr_mc.sweep import crystal_params  # noqa: E402
 
 GRAPHITE_B_002 = 0.8  # graphite c-axis Debye-Waller B-factor [Ang^2], approx (Zhai SI)
-_ZHAI_CACHE_SCHEMA = 1
+_ZHAI_CACHE_SCHEMA = 2  # v2: per-condition azimuths; v1 caches assumed azimuth = 0
+
+
+@dataclass(frozen=True)
+class SupplementaryCondition:
+    """One spectrum condition reported in Zhai et al. Supplementary Fig. 5."""
+
+    energy_keV: float
+    polar_tilt_deg: float
+    azimuth_deg: float | None
 
 
 @dataclass(frozen=True)
 class SupplementaryCoherentStudy:
     """A Zhai supplementary-information coherent-emission comparison.
 
-    The study holds the reported beam energy, thicknesses, polar tilts, and
-    photon-energy window.  Its cached spectra contain intrinsic coherent
-    emission only; the figure builders apply the Fig. 1c detector response
-    when converting them to the displayed observable.
+    The study holds the reported thicknesses, photon-energy window, and four
+    per-spectrum conditions (beam energy, polar tilt, and azimuth — ``None``
+    when Zhai does not report it).  Its cached spectra contain intrinsic
+    coherent emission only; the figure builders apply the Fig. 1c detector
+    response when converting them to the displayed observable.
     """
 
     crystal: str
@@ -93,8 +103,7 @@ class SupplementaryCoherentStudy:
     thicknesses_nm: tuple[float, ...]
     e_min_eV: float
     e_max_eV: float
-    polar_tilts_deg: tuple[float, ...] = (10.0, 15.0, 17.5, 20.0)
-    energy_keV: float = 200.0
+    conditions: tuple[SupplementaryCondition, ...]
     theta_obs_rad: float = float(np.deg2rad(119.0))
 
     @property
@@ -110,6 +119,10 @@ ZHAI_SUPPLEMENTARY_STUDIES = {
         thicknesses_nm=(42.0, 55.0, 75.0),
         e_min_eV=800.0,
         e_max_eV=1200.0,
+        conditions=tuple(
+            SupplementaryCondition(200.0, polar_tilt_deg, None)
+            for polar_tilt_deg in (10.0, 15.0, 17.5, 20.0)
+        ),
     ),
     "mose2": SupplementaryCoherentStudy(
         crystal="mose2",
@@ -117,6 +130,10 @@ ZHAI_SUPPLEMENTARY_STUDIES = {
         thicknesses_nm=(47.0, 112.0, 147.0),
         e_min_eV=800.0,
         e_max_eV=1200.0,
+        conditions=tuple(
+            SupplementaryCondition(200.0, polar_tilt_deg, None)
+            for polar_tilt_deg in (10.0, 15.0, 17.5, 20.0)
+        ),
     ),
     "hbn": SupplementaryCoherentStudy(
         crystal="hbn",
@@ -124,6 +141,10 @@ ZHAI_SUPPLEMENTARY_STUDIES = {
         thicknesses_nm=(921.0,),
         e_min_eV=600.0,
         e_max_eV=1200.0,
+        conditions=tuple(
+            SupplementaryCondition(energy_keV, 17.0, 130.0)
+            for energy_keV in (17.5, 20.0, 22.5, 25.0)
+        ),
     ),
 }
 
@@ -424,15 +445,24 @@ def supplementary_study(crystal: str) -> SupplementaryCoherentStudy:
 
 
 def model_coherent_spectra(
-    study: SupplementaryCoherentStudy, thickness_nm: float, ne: int = 500
-) -> dict[float, np.ndarray]:
+    study: SupplementaryCoherentStudy,
+    thickness_nm: float,
+    ne: int = 500,
+    *,
+    exploratory_azimuth_deg: float | None = None,
+) -> dict[SupplementaryCondition, np.ndarray]:
     """Simulate intrinsic coherent PXR+CBS spectra for one requested thickness.
 
     Electron transport uses the material's compound composition and the sample
-    geometry at each reported polar tilt.  The returned spectra are
-    ``d²N / (dE dOmega electron)``: no bremsstrahlung, detector response, or
-    experimental solid-angle scaling is added.  The figure builders preserve
-    this cache format, then apply the Fig. 1c detector response for display.
+    geometry at each reported condition (beam energy, polar tilt, azimuth).
+    Conditions whose azimuth Zhai does not report (the TEM-based TMD studies)
+    are only modeled when ``exploratory_azimuth_deg`` is supplied explicitly;
+    otherwise a ``ValueError`` is raised so an unreported angle is never
+    silently presented as zero.  The returned spectra are keyed by condition
+    and are ``d²N / (dE dOmega electron)``: no bremsstrahlung, detector
+    response, or experimental solid-angle scaling is added.  The figure
+    builders preserve this cache format, then apply the Fig. 1c detector
+    response for display.
     """
     if thickness_nm not in study.thicknesses_nm:
         raise ValueError(
@@ -444,16 +474,25 @@ def model_coherent_spectra(
 
     params = crystal_params(study.crystal)
     thickness_ang = float(thickness_nm) * 10.0
-    spectra: dict[float, np.ndarray] = {}
-    for tilt_deg in study.polar_tilts_deg:
+    spectra: dict[SupplementaryCondition, np.ndarray] = {}
+    for index, condition in enumerate(study.conditions):
+        azimuth_deg = condition.azimuth_deg
+        if azimuth_deg is None:
+            azimuth_deg = exploratory_azimuth_deg
+        if azimuth_deg is None:
+            raise ValueError(
+                f"{study.crystal}'s TEM azimuth is unreported by Zhai et al.; "
+                "pass exploratory_azimuth_deg explicitly to model this study"
+            )
         beam_dir, n_hat = tilted_geometry(
             study.theta_obs_rad,
-            float(np.deg2rad(tilt_deg)),
+            float(np.deg2rad(condition.polar_tilt_deg)),
+            float(np.deg2rad(azimuth_deg)),
         )
         # Each panel receives a reproducible, distinct transport realization.
-        seed = int(thickness_nm * 100 + (tilt_deg + 30.0) * 10)
+        seed = int(thickness_nm * 100) + index
         segments = simulate_trajectories(
-            study.energy_keV,
+            condition.energy_keV,
             ne,
             thickness_ang,
             composition=params["composition"],
@@ -461,7 +500,7 @@ def model_coherent_spectra(
             E_cut_keV=5.0,
             seed=seed,
         )
-        spectra[tilt_deg] = mc_spectrum(
+        spectra[condition] = mc_spectrum(
             segments,
             study.E_grid,
             crystal=study.crystal,
@@ -475,7 +514,10 @@ def model_coherent_spectra(
 
 
 def _supplementary_cache_key(
-    study: SupplementaryCoherentStudy, thickness_nm: float, ne: int
+    study: SupplementaryCoherentStudy,
+    thickness_nm: float,
+    ne: int,
+    exploratory_azimuth_deg: float | None,
 ) -> str:
     """Fingerprint a supplementary coherent-only calculation and its inputs."""
     digest = hashlib.sha256()
@@ -484,6 +526,7 @@ def _supplementary_cache_key(
         "study": asdict(study),
         "thickness_nm": thickness_nm,
         "ne": ne,
+        "exploratory_azimuth_deg": exploratory_azimuth_deg,
     }
     digest.update(json.dumps(inputs, sort_keys=True).encode())
     digest.update(inspect.getsource(model_coherent_spectra).encode())
@@ -498,10 +541,11 @@ def cached_coherent_spectra(
     thickness_nm: float,
     ne: int = 500,
     *,
+    exploratory_azimuth_deg: float | None = None,
     cache_dir: str | Path | None = None,
     refresh: bool = False,
-) -> tuple[dict[float, np.ndarray], bool, Path]:
-    """Load or atomically cache one supplementary coherent-only tilt set."""
+) -> tuple[dict[SupplementaryCondition, np.ndarray], bool, Path]:
+    """Load or atomically cache one supplementary coherent-only condition set."""
     from cxr_mc import _checkpoint_io
 
     root = (
@@ -509,11 +553,14 @@ def cached_coherent_spectra(
         if cache_dir is not None
         else _HERE.parent / "checkpoints" / "zhai_reproduction"
     )
-    path = root / f"zhai-supplement-{_supplementary_cache_key(study, thickness_nm, ne)}.pkl"
+    key = _supplementary_cache_key(study, thickness_nm, ne, exploratory_azimuth_deg)
+    path = root / f"zhai-supplement-{key}.pkl"
     if path.exists() and not refresh:
         return _checkpoint_io.load(str(path)), True, path
 
-    spectra = model_coherent_spectra(study, thickness_nm, ne=ne)
+    spectra = model_coherent_spectra(
+        study, thickness_nm, ne=ne, exploratory_azimuth_deg=exploratory_azimuth_deg
+    )
     root.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
@@ -529,12 +576,17 @@ def reproduce_all(
     ne_brem: int = 200,
     ne_supp: int = 200,
     *,
+    tmd_exploratory_azimuth_deg: float = 0.0,
     cache_dir: str | Path | None = None,
     refresh: bool = False,
 ) -> list[tuple[str, Path, bool]]:
     """Force-populate every Zhai cache the validation app can hit, at the
     app's own default sample counts so a pulled cache is a guaranteed hit
     locally.
+
+    Zhai does not report the TMD (WSe2/MoSe2) TEM azimuth, so those caches are
+    computed at ``tmd_exploratory_azimuth_deg`` — the default matches the app's
+    exploratory-azimuth control default; the value is part of the cache key.
 
     No figures -- this only leaves correct, hash-addressed .pkl files on disk
     under ``cache_dir`` (default checkpoints/zhai_reproduction/). This is the
@@ -550,9 +602,19 @@ def reproduce_all(
     )
     results.append(("zhai-fig1c", path, hit))
     for crystal, study in ZHAI_SUPPLEMENTARY_STUDIES.items():
+        azimuth_deg = (
+            tmd_exploratory_azimuth_deg
+            if any(condition.azimuth_deg is None for condition in study.conditions)
+            else None
+        )
         for thickness_nm in study.thicknesses_nm:
             _, hit, path = cached_coherent_spectra(
-                study, thickness_nm, ne=ne_supp, cache_dir=cache_dir, refresh=refresh
+                study,
+                thickness_nm,
+                ne=ne_supp,
+                exploratory_azimuth_deg=azimuth_deg,
+                cache_dir=cache_dir,
+                refresh=refresh,
             )
             results.append((f"{crystal}-{thickness_nm:g}nm", path, hit))
     return results
@@ -750,13 +812,15 @@ def figure_enhancement(anchor: ZhaiAnchor, model: dict):
 
 
 def _supplementary_detected_spectrum(
-    study: SupplementaryCoherentStudy, spectrum: np.ndarray
+    study: SupplementaryCoherentStudy,
+    condition: SupplementaryCondition,
+    spectrum: np.ndarray,
 ) -> np.ndarray:
     """Return one supplementary spectrum in Fig. 1c detected flux units.
 
     Applies the same quadrature EDS-plus-aperture FWHM as ``model_spectra``:
     Zhai SI Eqs. (14) and (16), at the spectrum's intrinsic peak and the
-    study's 200 keV observation geometry.  It assumes the Fig. 1c collection
+    condition's reported beam energy.  It assumes the Fig. 1c collection
     aperture (0.066 sr) and 1 nA electron rate.  In the zero-FWHM limit the
     returned spectrum is the intrinsic density scaled by those two factors.
     """
@@ -767,7 +831,7 @@ def _supplementary_detected_spectrum(
             eds_fwhm_eV(peak_eV),
             aperture_fwhm_eV(
                 peak_eV,
-                beta_from_keV(study.energy_keV),
+                beta_from_keV(condition.energy_keV),
                 study.theta_obs_rad,
                 anchor.dtheta_obs_rad,
             ),
@@ -777,24 +841,26 @@ def _supplementary_detected_spectrum(
 
 
 def figure_supplementary_tmd(
-    study: SupplementaryCoherentStudy, thickness_nm: float, spectra: dict[float, np.ndarray]
+    study: SupplementaryCoherentStudy,
+    thickness_nm: float,
+    spectra: dict[SupplementaryCondition, np.ndarray],
 ):
     """Return the four requested TMD coherent-only polar-tilt panels."""
     import matplotlib.pyplot as plt
 
     if study.crystal not in {"wse2", "mose2"}:
         raise ValueError("figure_supplementary_tmd is only for the WSe2 and MoSe2 studies")
-    if set(spectra) != set(study.polar_tilts_deg):
-        raise ValueError("spectra must contain exactly the study's four polar tilts")
+    if set(spectra) != set(study.conditions):
+        raise ValueError("spectra must contain exactly the study's four conditions")
 
     fig, axes = plt.subplots(2, 2, figsize=(8, 7), sharex=True)
-    for ax, tilt_deg in zip(axes.flat, study.polar_tilts_deg, strict=True):
+    for ax, condition in zip(axes.flat, study.conditions, strict=True):
         ax.plot(
             study.E_grid,
-            _supplementary_detected_spectrum(study, spectra[tilt_deg]),
+            _supplementary_detected_spectrum(study, condition, spectra[condition]),
             color="C0",
         )
-        ax.set_title(f"Polar tilt {tilt_deg:g}°")
+        ax.set_title(f"Polar tilt {condition.polar_tilt_deg:g}° (azimuth unreported)")
         ax.set_xlabel("Photon energy (eV)")
         ax.set_ylabel("Intensity (Phs/eV/s/nA)")
         ax.set_xlim(study.e_min_eV, study.e_max_eV)
@@ -802,7 +868,7 @@ def figure_supplementary_tmd(
         ax.tick_params(axis="x", labelbottom=True)
         ax.grid(alpha=0.3)
     fig.suptitle(
-        f"{study.label}, {study.energy_keV:g} keV, {thickness_nm:g} nm: "
+        f"{study.label}, {study.conditions[0].energy_keV:g} keV, {thickness_nm:g} nm: "
         "Zhai-detector-convolved PXR+CBS"
     )
     # Matplotlib 3.10 can assign NaN axes bounds when tight_layout() measures
@@ -812,33 +878,36 @@ def figure_supplementary_tmd(
 
 
 def figure_supplementary_hbn(
-    study: SupplementaryCoherentStudy, thickness_nm: float, spectra: dict[float, np.ndarray]
+    study: SupplementaryCoherentStudy,
+    thickness_nm: float,
+    spectra: dict[SupplementaryCondition, np.ndarray],
 ):
-    """Return the requested h-BN four-tilt coherent-only comparison."""
+    """Return the requested h-BN four-beam-energy coherent-only comparison."""
     import matplotlib.pyplot as plt
 
     if study.crystal != "hbn":
         raise ValueError("figure_supplementary_hbn is only for the h-BN study")
-    if set(spectra) != set(study.polar_tilts_deg):
-        raise ValueError("spectra must contain exactly the study's four polar tilts")
+    if set(spectra) != set(study.conditions):
+        raise ValueError("spectra must contain exactly the study's four conditions")
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    for i, tilt_deg in enumerate(study.polar_tilts_deg):
+    for i, condition in enumerate(study.conditions):
         ax.plot(
             study.E_grid,
-            _supplementary_detected_spectrum(study, spectra[tilt_deg]),
+            _supplementary_detected_spectrum(study, condition, spectra[condition]),
             color=f"C{i}",
-            label=f"{tilt_deg:g}°",
+            label=f"{condition.energy_keV:g} keV",
         )
     ax.set_xlabel("Photon energy (eV)")
     ax.set_ylabel("Intensity (Phs/eV/s/nA)")
     ax.set_xlim(study.e_min_eV, study.e_max_eV)
     ax.set_ylim(bottom=0.0)
     ax.set_title(
-        f"h-BN, {study.energy_keV:g} keV, {thickness_nm:g} nm: Zhai-detector-convolved PXR+CBS"
+        f"h-BN, {thickness_nm:g} nm, polar {study.conditions[0].polar_tilt_deg:g}°, "
+        f"azimuth {study.conditions[0].azimuth_deg:g}°: Zhai-detector-convolved PXR+CBS"
     )
     ax.grid(alpha=0.3)
-    ax.legend(title="Polar tilt")
+    ax.legend(title="Beam energy")
     fig.tight_layout()
     return fig
 
@@ -859,16 +928,16 @@ def figure_supplementary_overview(spectra: dict[str, np.ndarray]):
     for ax, crystal in zip(axes, ("wse2", "mose2", "hbn"), strict=True):
         study = supplementary_study(crystal)
         thickness_nm = study.thicknesses_nm[0]
-        tilt_deg = study.polar_tilts_deg[-1]  # steepest requested tilt
+        condition = study.conditions[-1]  # steepest tilt (TMD) / highest energy (h-BN)
         ax.plot(study.E_grid, spectra[crystal], color="C0")
-        ax.set_title(f"{study.label}\n{thickness_nm:g} nm, tilt {tilt_deg:g}\N{DEGREE SIGN}")
+        ax.set_title(
+            f"{study.label}\n{thickness_nm:g} nm, {condition.energy_keV:g} keV, "
+            f"tilt {condition.polar_tilt_deg:g}\N{DEGREE SIGN}"
+        )
         ax.set_xlabel("Photon energy (eV)")
         ax.grid(alpha=0.3)
     axes[0].set_ylabel(r"Coherent emission $d^2N/(dE\,d\Omega\,e^-)$")
-    fig.suptitle(
-        f"Zhai supplementary studies overview, "
-        f"{ZHAI_SUPPLEMENTARY_STUDIES['wse2'].energy_keV:g} keV"
-    )
+    fig.suptitle("Zhai supplementary studies overview")
     fig.tight_layout()
     return fig
 
@@ -879,6 +948,7 @@ def export_all_figures(
     ne_brem: int = 200,
     ne_supp: int = 200,
     *,
+    tmd_exploratory_azimuth_deg: float = 0.0,
     cache_dir: str | Path | None = None,
 ) -> list[Path]:
     """Render the complete publication figure set from whatever is already
@@ -913,9 +983,18 @@ def export_all_figures(
 
     overview_spectra: dict[str, np.ndarray] = {}
     for crystal, study in ZHAI_SUPPLEMENTARY_STUDIES.items():
+        azimuth_deg = (
+            tmd_exploratory_azimuth_deg
+            if any(condition.azimuth_deg is None for condition in study.conditions)
+            else None
+        )
         for thickness_nm in study.thicknesses_nm:
             spectra, _hit, _path = cached_coherent_spectra(
-                study, thickness_nm, ne=ne_supp, cache_dir=cache_dir
+                study,
+                thickness_nm,
+                ne=ne_supp,
+                exploratory_azimuth_deg=azimuth_deg,
+                cache_dir=cache_dir,
             )
             fig = (
                 figure_supplementary_hbn(study, thickness_nm, spectra)
@@ -924,7 +1003,7 @@ def export_all_figures(
             )
             _save(f"zhai_supplementary_{crystal}_{thickness_nm:g}nm", fig)
             if thickness_nm == study.thicknesses_nm[0]:
-                overview_spectra[crystal] = spectra[study.polar_tilts_deg[-1]]
+                overview_spectra[crystal] = spectra[study.conditions[-1]]
 
     _save("zhai_supplementary_overview", figure_supplementary_overview(overview_spectra))
     return written

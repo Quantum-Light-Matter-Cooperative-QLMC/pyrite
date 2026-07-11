@@ -201,16 +201,24 @@ def test_figure_enhancement_smoke(anchor):
 
 
 def _synthetic_supplementary_spectra(study):
-    """One distinct narrow coherent line per requested polar tilt."""
+    """One narrow coherent line per requested condition."""
     return {
-        tilt: np.exp(-0.5 * ((study.E_grid - (900.0 + 2.0 * tilt)) / 8.0) ** 2)
-        for tilt in study.polar_tilts_deg
+        condition: np.exp(
+            -0.5
+            * (
+                (study.E_grid - (860.0 + 2.0 * condition.polar_tilt_deg + condition.energy_keV))
+                / 8.0
+            )
+            ** 2
+        )
+        for condition in study.conditions
     }
 
 
 def test_supplementary_detected_spectrum_matches_fig1c_detector_scaling():
     study = af.supplementary_study("wse2")
-    spectrum = _synthetic_supplementary_spectra(study)[10.0]
+    condition = study.conditions[0]
+    spectrum = _synthetic_supplementary_spectra(study)[condition]
     peak_eV = float(study.E_grid[np.argmax(spectrum)])
     anchor = af.ZhaiAnchor()
     fwhm_eV = float(
@@ -218,7 +226,7 @@ def test_supplementary_detected_spectrum_matches_fig1c_detector_scaling():
             af.eds_fwhm_eV(peak_eV),
             af.aperture_fwhm_eV(
                 peak_eV,
-                af.beta_from_keV(study.energy_keV),
+                af.beta_from_keV(condition.energy_keV),
                 study.theta_obs_rad,
                 anchor.dtheta_obs_rad,
             ),
@@ -227,7 +235,7 @@ def test_supplementary_detected_spectrum_matches_fig1c_detector_scaling():
     expected = af.convolve_detector(study.E_grid, spectrum, fwhm_eV)
     expected *= anchor.domega_sr * anchor.per_nA
 
-    assert np.allclose(af._supplementary_detected_spectrum(study, spectrum), expected)
+    assert np.allclose(af._supplementary_detected_spectrum(study, condition, spectrum), expected)
 
 
 @pytest.mark.parametrize("crystal", ["wse2", "hbn"])
@@ -240,7 +248,9 @@ def test_supplementary_figures_use_detected_units_and_hard_bounds(crystal):
         else af.figure_supplementary_tmd(study, study.thicknesses_nm[0], spectra)
     )
 
-    expected = af._supplementary_detected_spectrum(study, spectra[study.polar_tilts_deg[0]])
+    expected = af._supplementary_detected_spectrum(
+        study, study.conditions[0], spectra[study.conditions[0]]
+    )
     assert np.allclose(fig.axes[0].lines[0].get_ydata(), expected)
     assert all(ax.get_ylabel() == "Intensity (Phs/eV/s/nA)" for ax in fig.axes)
     assert all(ax.get_ylim()[0] == 0.0 for ax in fig.axes)
@@ -254,15 +264,73 @@ def test_supplementary_studies_match_requested_windows_and_thicknesses():
     mose2 = af.supplementary_study("mose2")
     hbn = af.supplementary_study("hbn")
 
-    assert wse2.energy_keV == mose2.energy_keV == hbn.energy_keV == 200.0
     assert wse2.thicknesses_nm == (42.0, 55.0, 75.0)
     assert mose2.thicknesses_nm == (47.0, 112.0, 147.0)
     assert hbn.thicknesses_nm == (921.0,)
     assert (wse2.E_grid[0], wse2.E_grid[-1]) == (800.0, 1199.0)
     assert (hbn.E_grid[0], hbn.E_grid[-1]) == (600.0, 1199.0)
-    assert wse2.polar_tilts_deg == (10.0, 15.0, 17.5, 20.0)
+    assert tuple(
+        (condition.energy_keV, condition.polar_tilt_deg, condition.azimuth_deg)
+        for condition in wse2.conditions
+    ) == (
+        (200.0, 10.0, None),
+        (200.0, 15.0, None),
+        (200.0, 17.5, None),
+        (200.0, 20.0, None),
+    )
+    assert mose2.conditions == wse2.conditions
+    assert tuple(
+        (condition.energy_keV, condition.polar_tilt_deg, condition.azimuth_deg)
+        for condition in hbn.conditions
+    ) == (
+        (17.5, 17.0, 130.0),
+        (20.0, 17.0, 130.0),
+        (22.5, 17.0, 130.0),
+        (25.0, 17.0, 130.0),
+    )
     with pytest.raises(ValueError, match="unknown Zhai supplementary crystal"):
         af.supplementary_study("hopg")
+
+
+def test_supplementary_model_uses_reported_hbn_azimuth(monkeypatch):
+    geometry_calls = []
+
+    def fake_geometry(theta_obs_rad, polar_rad, azimuth_rad):
+        geometry_calls.append((theta_obs_rad, polar_rad, azimuth_rad))
+        return np.array([0.0, 0.0, 1.0]), np.array([1.0, 0.0, 0.0])
+
+    monkeypatch.setattr(af, "tilted_geometry", fake_geometry)
+    monkeypatch.setattr(af, "simulate_trajectories", lambda *args, **kwargs: np.zeros((1, 2)))
+    monkeypatch.setattr(af, "mc_spectrum", lambda *args, **kwargs: np.zeros(600))
+
+    study = af.supplementary_study("hbn")
+    spectra = af.model_coherent_spectra(study, 921.0, ne=1)
+
+    assert set(spectra) == set(study.conditions)
+    assert len(geometry_calls) == 4
+    assert all(call[1] == pytest.approx(np.deg2rad(17.0)) for call in geometry_calls)
+    assert all(call[2] == pytest.approx(np.deg2rad(130.0)) for call in geometry_calls)
+
+
+def test_supplementary_model_requires_explicit_unreported_azimuth(monkeypatch):
+    study = af.supplementary_study("wse2")
+    with pytest.raises(ValueError, match="azimuth is unreported"):
+        af.model_coherent_spectra(study, 42.0, ne=1)
+
+    geometry_azimuths = []
+
+    def fake_geometry(theta_obs_rad, polar_rad, azimuth_rad):
+        geometry_azimuths.append(azimuth_rad)
+        return np.array([0.0, 0.0, 1.0]), np.array([1.0, 0.0, 0.0])
+
+    monkeypatch.setattr(af, "tilted_geometry", fake_geometry)
+    monkeypatch.setattr(af, "simulate_trajectories", lambda *args, **kwargs: np.zeros((1, 2)))
+    monkeypatch.setattr(af, "mc_spectrum", lambda *args, **kwargs: np.zeros(400))
+
+    af.model_coherent_spectra(study, 42.0, ne=1, exploratory_azimuth_deg=35.0)
+
+    assert geometry_azimuths == pytest.approx([np.deg2rad(35.0)] * 4)
+    assert all(condition.azimuth_deg is None for condition in study.conditions)
 
 
 def test_supplementary_tmd_figure_smoke():
@@ -282,8 +350,8 @@ def test_supplementary_tmd_panels_autoscale_and_show_upper_x_tick_labels():
     study = af.supplementary_study("wse2")
     unit_spectra = _synthetic_supplementary_spectra(study)
     spectra = {
-        tilt: scale * unit_spectra[tilt]
-        for tilt, scale in zip(study.polar_tilts_deg, (1.0, 2.0, 4.0, 8.0), strict=True)
+        condition: scale * unit_spectra[condition]
+        for condition, scale in zip(study.conditions, (1.0, 2.0, 4.0, 8.0), strict=True)
     }
 
     fig = af.figure_supplementary_tmd(study, study.thicknesses_nm[0], spectra)
@@ -299,8 +367,8 @@ def test_supplementary_tmd_panels_autoscale_and_show_upper_x_tick_labels():
 def test_supplementary_tmd_figure_renders_at_physical_intensity_scale():
     study = af.supplementary_study("wse2")
     spectra = {
-        tilt: 1e-9 * np.exp(-0.5 * ((study.E_grid - (900.0 + 2.0 * tilt)) / 8.0) ** 2)
-        for tilt in study.polar_tilts_deg
+        condition: 1e-9 * spectrum
+        for condition, spectrum in _synthetic_supplementary_spectra(study).items()
     }
 
     fig = af.figure_supplementary_tmd(study, study.thicknesses_nm[0], spectra)
@@ -326,7 +394,9 @@ def test_supplementary_overview_figure_smoke():
     from matplotlib.figure import Figure
 
     spectra = {
-        crystal: _synthetic_supplementary_spectra(af.supplementary_study(crystal))[20.0]
+        crystal: _synthetic_supplementary_spectra(af.supplementary_study(crystal))[
+            af.supplementary_study(crystal).conditions[-1]
+        ]
         for crystal in ("wse2", "mose2", "hbn")
     }
 
@@ -346,7 +416,9 @@ def test_supplementary_overview_rejects_missing_material():
 
 def test_supplementary_overview_rejects_unknown_key():
     spectra = {
-        crystal: _synthetic_supplementary_spectra(af.supplementary_study(crystal))[20.0]
+        crystal: _synthetic_supplementary_spectra(af.supplementary_study(crystal))[
+            af.supplementary_study(crystal).conditions[-1]
+        ]
         for crystal in ("wse2", "mose2", "hbn")
     }
     spectra["hopg"] = spectra.pop("hbn")
@@ -361,9 +433,9 @@ def test_reproduce_all_populates_every_cache_and_reuses_it(tmp_path, monkeypatch
         calls.append(("fig1c", ne, ne_brem))
         return {"peak": True}
 
-    def fake_coherent(study, thickness_nm, ne):
-        calls.append((study.crystal, thickness_nm, ne))
-        return {tilt: np.zeros(4) for tilt in study.polar_tilts_deg}
+    def fake_coherent(study, thickness_nm, ne, exploratory_azimuth_deg=None):
+        calls.append((study.crystal, thickness_nm, ne, exploratory_azimuth_deg))
+        return {condition: np.zeros(4) for condition in study.conditions}
 
     monkeypatch.setattr(af, "model_spectra", fake_model_spectra)
     monkeypatch.setattr(af, "model_coherent_spectra", fake_coherent)
@@ -393,7 +465,7 @@ def test_export_all_figures_writes_expected_files(tmp_path, monkeypatch):
     def fake_model_spectra(received_anchor, ne, ne_brem):
         return _synthetic_model(anchor)
 
-    def fake_coherent(study, thickness_nm, ne):
+    def fake_coherent(study, thickness_nm, ne, exploratory_azimuth_deg=None):
         return _synthetic_supplementary_spectra(study)
 
     monkeypatch.setattr(af, "model_spectra", fake_model_spectra)
@@ -427,11 +499,11 @@ def test_supplementary_tmd_figure_rejects_hbn_crystal():
         )
 
 
-def test_supplementary_tmd_figure_rejects_incomplete_tilt_set():
+def test_supplementary_tmd_figure_rejects_incomplete_condition_set():
     study = af.supplementary_study("wse2")
     spectra = _synthetic_supplementary_spectra(study)
-    del spectra[study.polar_tilts_deg[0]]
-    with pytest.raises(ValueError, match="exactly the study's four polar tilts"):
+    del spectra[study.conditions[0]]
+    with pytest.raises(ValueError, match="exactly the study's four conditions"):
         af.figure_supplementary_tmd(study, study.thicknesses_nm[0], spectra)
 
 
@@ -443,11 +515,11 @@ def test_supplementary_hbn_figure_rejects_non_hbn_crystal():
         )
 
 
-def test_supplementary_hbn_figure_rejects_incomplete_tilt_set():
+def test_supplementary_hbn_figure_rejects_incomplete_condition_set():
     study = af.supplementary_study("hbn")
     spectra = _synthetic_supplementary_spectra(study)
-    del spectra[study.polar_tilts_deg[0]]
-    with pytest.raises(ValueError, match="exactly the study's four polar tilts"):
+    del spectra[study.conditions[0]]
+    with pytest.raises(ValueError, match="exactly the study's four conditions"):
         af.figure_supplementary_hbn(study, study.thicknesses_nm[0], spectra)
 
 

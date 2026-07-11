@@ -1,86 +1,76 @@
 # Validation status: Zhai supplementary coherent-emission studies
 
-**Scope.** `checks/anchor_figures.py::ZHAI_SUPPLEMENTARY_STUDIES` — the
-WSe₂/MoSe₂/h-BN coherent-only reproductions (`figure_supplementary_tmd`,
-`figure_supplementary_hbn`), driven by `model_coherent_spectra` and rendered
-by the validation app's "Zhai supplementary" section and `cxr check --export`.
+**Scope.** `checks/anchor_figures.py::ZHAI_SUPPLEMENTARY_STUDIES` - the
+WSe2/MoSe2/h-BN reproductions rendered by the validation app's "Zhai
+supplementary" section and `cxr check --export`.
 
-This is a **provenance and open-question record, not a physics
-re-derivation write-up** (contrast `docs/validation/hbn-structure.md`) — none
-of these study *inputs* carry a ledger `id` of their own; they parameterize
-existing ledgered claims (`line-energy-dispersion`, `coherent-line-spectrum`,
-`electron-transport`). Promoting anything here past this record requires a
-fresh-context re-derivation per `docs/validation/README.md`, and only a human
-signs off.
+This is a provenance record, not a physics re-derivation. The inputs
+parameterize existing ledgered claims (`line-energy-dispersion`,
+`coherent-line-spectrum`, and `electron-transport`); their ledger states are
+unchanged, and only a human marks a claim `signed-off`.
 
-## What's encoded, and where it came from
+## Supplementary Fig. 5 inputs
 
-| material | thicknesses (nm) | energy window (eV) | polar tilts (deg) | beam energy |
-|----------|-------------------|---------------------|--------------------|-------------|
-| WSe₂ | 42, 55, 75 | 800–1200 | +10, +15, +17.5, +20 | 200 keV |
-| MoSe₂ | 47, 112, 147 | 800–1200 | +10, +15, +17.5, +20 | 200 keV |
-| h-BN | 921 | 600–1200 | +10, +15, +17.5, +20 | 200 keV |
+| material | thicknesses (nm) | beam energy (keV) | polar tilt theta_til (deg) | azimuth phi_til (deg) |
+|----------|------------------|-------------------|----------------------------|------------------------|
+| WSe2 | 42, 55, 75 | 200 | 10, 15, 17.5, 20 | not reported |
+| MoSe2 | 47, 112, 147 | 200 | 10, 15, 17.5, 20 | not reported |
+| h-BN | 921 | 17.5, 20, 22.5, 25 | 17 | 130 |
 
-(Tilts flipped from negative to positive 2026-07-11 — see
-[Open question: azimuthal angle](#open-question-azimuthal-angle-resolved)
-below and `docs/tilt-convention.md`. The table above reflects the corrected,
-canonical-convention grid; the transcribed `TODO.md` note below predates the
-flip and is left as-is for provenance.)
+The TMD values come from Section S7 and Supplementary Fig. 5: the beam was
+aligned to the `[001]` zone axis using Kikuchi lines and then tilted with a
+double-tilt TEM holder. The paper reports the four polar tilts but does not
+report the corresponding holder azimuth. Consequently, the study metadata
+stores `azimuth_deg=None`. Modeling requires an explicitly supplied
+`exploratory_azimuth_deg`, which is labeled unreported in the app and included
+in the cache key.
 
-These match the values transcribed into `TODO.md`'s original user-added note
-("Zhai supplementary coherent-emission figures ... all 200 keV, at polar
-tilts −10/−15/−17.5/−20 deg") — the code and that note agree, which is as far
-as a provenance check without the source SI in-repo can go. Confirming these
-numbers directly against the published SI figures/tables is unclaimed here.
+The 921 nm h-BN values come from Supplementary Table 4. Its Fig. 5 panel is an
+SEM beam-energy series at one fitted sample orientation; it is not a four-tilt,
+200 keV series.
 
-## Open question: azimuthal angle (resolved)
+## Supplementary Table 4 orientation transcription
 
-`model_coherent_spectra` (`checks/anchor_figures.py`) builds each tilt's
-geometry via:
+The paper explains that surface roughness, holder unevenness, and bending make
+the SEM sample angles nonzero. It obtains each pair by minimizing the residual
+sum of squares between measured and predicted spectra.
 
-```python
-beam_dir, n_hat = tilted_geometry(study.theta_obs_rad, float(np.deg2rad(tilt_deg)))
-```
+| sample | thickness | theta_til (deg) | phi_til (deg) |
+|--------|-----------|-----------------|---------------|
+| graphite film | 29 +/- 6 nm | 9.5 | 120 |
+| graphite film | 76 +/- 5 nm | 13.0 | 120 |
+| graphite film | 150 +/- 13 nm | 6.5 | 180 |
+| bulk graphite (HOPG) | ~17 um | 11.0 | 60 |
+| bulk graphite (HOPG) | ~500 um | 11.5 | 40 |
+| bulk graphite (HOPG) | ~1 mm | 9.5 | 40 |
+| h-BN film | 42 +/- 3 nm | 13.5 | 115 |
+| h-BN film | 219 +/- 17 nm | 11.5 | 65 |
+| h-BN film | 109 +/- 5 nm | 13.5 | 130 |
+| h-BN film | 219 +/- 17 nm | 17.0 | 130 |
+| h-BN film | ~659 nm | 14.5 | 105 |
+| h-BN film | ~921 nm | 17.0 | 130 |
+| bulk h-BN | ~170 um | 20.0 | 65 |
 
-`tilted_geometry` (`src/cxr_mc/montecarlo/geometry.py`) takes only a polar
-tilt — there is no azimuthal parameter in this call at all, so every
-supplementary panel is implicitly computed at **azimuth = 0**, i.e. `φ = 0`
-in the canonical convention (`docs/tilt-convention.md`): the tilt lies in the
-scattering `x–z` plane. This part of the original open question is settled —
-azimuth = 0 is correct, it is the SI's own reference plane, not an
-unconfirmed guess.
+## Correction to the former azimuth assumption
 
-What *was* wrong was the sign of `tilt_deg` itself. `tilted_geometry`'s
-`normal = [sinθ·cosφ, sinθ·sinφ, cosθ]` already matches Zhai's positive-θ =
-"reciprocal vector toward detector" convention (`docs/tilt-convention.md`),
-but the series above were generated with **negative** `tilt_deg`
-(`checks/anchor_figures.py`'s old `polar_tilts_deg = (−10, −15, −17.5, −20)`)
-— the mirror configuration, reciprocal vector tilted **away** from the
-detector. Confirmed empirically (WSe₂, 55 nm, `θ_obs = 119°`, same transport
-seed): flipping `+10°` vs `−10°` leaves the line energy **unchanged** (981.5
-eV both ways — the line-energy denominator `1 − v0·n̂` is even in θ at
-`φ = 0`), but changes peak **intensity** by 2× (ratio 0.505) and integrated
-flux by ~40%.
+The previous implementation called `tilted_geometry` without its azimuth
+argument, implicitly evaluating every supplementary spectrum at `phi=0`. The
+former provenance note then described zero as the SI's established reference
+plane. That conclusion was unsupported: Table 4 explicitly reports nonzero
+azimuths for graphite and h-BN, while Section S7 leaves the TMD azimuth
+unreported.
 
-**Resolution:** the grids in the table above are now generated at positive
-`tilt_deg`. The underlying lineshape physics was never wrong (as anticipated
-in the original open-question note), and the reported *line energies* in any
-prior figure/comparison are unaffected by the flip. Reported *intensities*
-(peak heights, integrated flux, any bulk-vs-film enhancement ratio computed
-from these studies) were computed at the mirror configuration and need
-re-generation + re-comparison against the published SI before being trusted.
+The corrected implementation passes the reported 130 degree azimuth for the
+921 nm h-BN study. For MoSe2 and WSe2 it retains `None` in published metadata
+and accepts only a separate, explicit exploratory value. Cache schema 2
+prevents reuse of spectra generated under the old implicit-zero assumption.
 
 ## Status
 
-Provenance: internally consistent (code ≡ transcribed note, modulo the sign
-correction above). Azimuth assumption: **resolved** — `φ = 0` is the correct,
-canonical reference plane. Polar sign: **corrected** 2026-07-11 (positive =
-Zhai's toward-detector convention); line energies unaffected, intensities
-require fresh regeneration.
+Provenance: transcribed from Zhai et al. Supplementary Table 4, Section S7, and
+Supplementary Fig. 5. Reported h-BN orientation: encoded. TMD azimuth:
+unreported and exposed only as an exploratory input.
 
-**Not signed off.** This write-up documents what changed and why; it is not
-an independent re-derivation. Per `docs/validation/README.md`, any
-intensity/enhancement claim exercised through these studies needs a
-fresh-context re-verification against the regenerated (positive-tilt)
-checkpoints before advancing past its current ledger status — see
-`docs/physics-validation-ledger.md`.
+**Not signed off.** Regenerated spectra and intensity comparisons still require
+fresh-context verification against the published curves before any validation
+claim advances.
