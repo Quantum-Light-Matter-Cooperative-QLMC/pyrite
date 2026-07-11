@@ -250,6 +250,38 @@ def test_supplementary_hbn_figure_smoke():
     fig.canvas.draw()
 
 
+def test_supplementary_overview_figure_smoke():
+    from matplotlib.figure import Figure
+
+    spectra = {
+        crystal: _synthetic_supplementary_spectra(af.supplementary_study(crystal))[-20.0]
+        for crystal in ("wse2", "mose2", "hbn")
+    }
+
+    fig = af.figure_supplementary_overview(spectra)
+
+    assert isinstance(fig, Figure)
+    assert len(fig.axes) == 3
+    titles = " ".join(ax.get_title() for ax in fig.axes)
+    assert "WSe_2" in titles and "MoSe_2" in titles and "h-BN" in titles
+    fig.canvas.draw()
+
+
+def test_supplementary_overview_rejects_missing_material():
+    with pytest.raises(ValueError, match="wse2"):
+        af.figure_supplementary_overview({"wse2": np.zeros(4), "mose2": np.zeros(4)})
+
+
+def test_supplementary_overview_rejects_unknown_key():
+    spectra = {
+        crystal: _synthetic_supplementary_spectra(af.supplementary_study(crystal))[-20.0]
+        for crystal in ("wse2", "mose2", "hbn")
+    }
+    spectra["hopg"] = spectra.pop("hbn")
+    with pytest.raises(ValueError, match="hbn"):
+        af.figure_supplementary_overview(spectra)
+
+
 def test_reproduce_all_populates_every_cache_and_reuses_it(tmp_path, monkeypatch):
     calls = []
 

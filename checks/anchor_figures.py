@@ -797,6 +797,36 @@ def figure_supplementary_hbn(
     return fig
 
 
+def figure_supplementary_overview(spectra: dict[str, np.ndarray]):
+    """One row of three panels -- WSe2, MoSe2, h-BN side by side -- each
+    showing that material's steepest requested polar tilt at its thinnest
+    listed thickness: a single representative slice per material, for the
+    paper's validation appendix. The full tilt x thickness grid is the
+    per-material figure_supplementary_tmd/hbn panels above."""
+    import matplotlib.pyplot as plt
+
+    expected = {"wse2", "mose2", "hbn"}
+    if set(spectra) != expected:
+        raise ValueError(f"spectra must contain exactly {sorted(expected)}, got {sorted(spectra)}")
+
+    fig, axes = plt.subplots(1, 3, figsize=(13, 4))
+    for ax, crystal in zip(axes, ("wse2", "mose2", "hbn"), strict=True):
+        study = supplementary_study(crystal)
+        thickness_nm = study.thicknesses_nm[0]
+        tilt_deg = study.polar_tilts_deg[-1]  # steepest requested tilt
+        ax.plot(study.E_grid, spectra[crystal], color="C0")
+        ax.set_title(f"{study.label}\n{thickness_nm:g} nm, tilt {tilt_deg:g}Â°")
+        ax.set_xlabel("Photon energy (eV)")
+        ax.grid(alpha=0.3)
+    axes[0].set_ylabel(r"Coherent emission $d^2N/(dE\,d\Omega\,e^-)$")
+    fig.suptitle(
+        f"Zhai supplementary studies overview, "
+        f"{ZHAI_SUPPLEMENTARY_STUDIES['wse2'].energy_keV:g} keV"
+    )
+    fig.tight_layout()
+    return fig
+
+
 # ---- validation table + CLI --------------------------------------------------
 
 
