@@ -197,3 +197,54 @@ def test_figure_enhancement_smoke(anchor):
 
     fig = af.figure_enhancement(anchor, _synthetic_model(anchor))
     assert isinstance(fig, Figure)
+
+
+def _synthetic_supplementary_spectra(study):
+    """One distinct narrow coherent line per requested polar tilt."""
+    return {
+        tilt: np.exp(-0.5 * ((study.E_grid - (900.0 + 2.0 * tilt)) / 8.0) ** 2)
+        for tilt in study.polar_tilts_deg
+    }
+
+
+def test_supplementary_studies_match_requested_windows_and_thicknesses():
+    wse2 = af.supplementary_study("wse2")
+    mose2 = af.supplementary_study("mose2")
+    hbn = af.supplementary_study("hbn")
+
+    assert wse2.energy_keV == mose2.energy_keV == hbn.energy_keV == 200.0
+    assert wse2.thicknesses_nm == (42.0, 55.0, 75.0)
+    assert mose2.thicknesses_nm == (47.0, 112.0, 147.0)
+    assert hbn.thicknesses_nm == (921.0,)
+    assert (wse2.E_grid[0], wse2.E_grid[-1]) == (800.0, 1199.0)
+    assert (hbn.E_grid[0], hbn.E_grid[-1]) == (600.0, 1199.0)
+    assert wse2.polar_tilts_deg == (-10.0, -15.0, -17.5, -20.0)
+    with pytest.raises(ValueError, match="unknown Zhai supplementary crystal"):
+        af.supplementary_study("hopg")
+
+
+def test_supplementary_tmd_figure_smoke():
+    from matplotlib.figure import Figure
+
+    study = af.supplementary_study("wse2")
+    fig = af.figure_supplementary_tmd(
+        study, study.thicknesses_nm[0], _synthetic_supplementary_spectra(study)
+    )
+    assert isinstance(fig, Figure)
+    assert len(fig.axes) == 4
+    assert all(ax.get_xlabel() == "Photon energy (eV)" for ax in fig.axes)
+    fig.canvas.draw()
+
+
+def test_supplementary_hbn_figure_smoke():
+    from matplotlib.figure import Figure
+
+    study = af.supplementary_study("hbn")
+    fig = af.figure_supplementary_hbn(
+        study, study.thicknesses_nm[0], _synthetic_supplementary_spectra(study)
+    )
+    assert isinstance(fig, Figure)
+    assert len(fig.axes) == 1
+    assert len(fig.axes[0].lines) == 4
+    assert fig.axes[0].get_xlabel() == "Photon energy (eV)"
+    fig.canvas.draw()

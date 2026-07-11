@@ -413,5 +413,104 @@ def _(af, anchor, mo, zhai_cache_hit, zhai_cache_path, zhai_model, zhai_referenc
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Zhai supplementary coherent-emission studies
+
+    These are separate from the Fig. 1c anchor: each run contains **only
+    intrinsic coherent PXR+CBS emission**, with no incoherent bremsstrahlung or
+    detector convolution. WSe₂ and MoSe₂ each render four polar-tilt panels at
+    a selected reported thickness; h-BN overlays its four requested tilts at
+    921 nm. Every study uses a 200 keV beam and the reported energy window.
+    """)
+    return
+
+
+@app.cell
+def _(af, mo):
+    supplementary_study_ui = mo.ui.dropdown(
+        {
+            "WSe₂ (800–1200 eV)": "wse2",
+            "MoSe₂ (800–1200 eV)": "mose2",
+            "h-BN (600–1200 eV)": "hbn",
+        },
+        value="wse2",
+        label="Supplementary material",
+    )
+    supplementary_study = af.supplementary_study(supplementary_study_ui.value)
+    supplementary_thickness_ui = mo.ui.dropdown(
+        {f"{thickness:g} nm": thickness for thickness in supplementary_study.thicknesses_nm},
+        value=supplementary_study.thicknesses_nm[0],
+        label="Crystal thickness",
+    )
+    supplementary_ne_ui = mo.ui.number(
+        start=10,
+        stop=5_000,
+        step=10,
+        value=200,
+        label="Electrons per polar-tilt spectrum",
+    )
+    run_supplementary_ui = mo.ui.run_button(label="Run supplementary study")
+    refresh_supplementary_ui = mo.ui.checkbox(value=False, label="Recompute (ignore cache)")
+    mo.vstack(
+        [
+            mo.hstack([supplementary_study_ui, supplementary_thickness_ui]),
+            mo.hstack([supplementary_ne_ui, refresh_supplementary_ui, run_supplementary_ui]),
+        ]
+    )
+    return (
+        refresh_supplementary_ui,
+        run_supplementary_ui,
+        supplementary_ne_ui,
+        supplementary_study_ui,
+        supplementary_thickness_ui,
+    )
+
+
+@app.cell
+def _(
+    af,
+    mo,
+    refresh_supplementary_ui,
+    run_supplementary_ui,
+    supplementary_ne_ui,
+    supplementary_study_ui,
+    supplementary_thickness_ui,
+):
+    mo.stop(
+        not run_supplementary_ui.value,
+        mo.callout("Choose a material and thickness, then run the study.", kind="info"),
+    )
+    study = af.supplementary_study(supplementary_study_ui.value)
+    thickness_nm = float(supplementary_thickness_ui.value)
+    with mo.status.spinner(
+        title="Running coherent-only supplementary spectra",
+        subtitle="Four transport and PXR+CBS spectra are computed or loaded from cache.",
+    ):
+        spectra, cache_hit, cache_path = af.cached_coherent_spectra(
+            study,
+            thickness_nm,
+            ne=int(supplementary_ne_ui.value),
+            refresh=refresh_supplementary_ui.value,
+        )
+    figure = (
+        af.figure_supplementary_hbn(study, thickness_nm, spectra)
+        if study.crystal == "hbn"
+        else af.figure_supplementary_tmd(study, thickness_nm, spectra)
+    )
+    mo.vstack(
+        [
+            mo.callout(
+                f"{'Loaded cached' if cache_hit else 'Computed and cached'} result at "
+                f"`{cache_path.relative_to(cache_path.parents[1])}`.",
+                kind="success",
+            ),
+            figure,
+        ]
+    )
+    return
+
+
 if __name__ == "__main__":
     app.run()
