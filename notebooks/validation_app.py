@@ -13,6 +13,8 @@ def _():
 
     import marimo as mo
 
+    from cxr_mc import check as check_support
+
     repo_dir = Path(__file__).resolve().parent.parent
     checks_dir = repo_dir / "checks"
     if str(checks_dir) not in sys.path:
@@ -60,7 +62,7 @@ def _():
             )
         return reports
 
-    return af, mo, run_checks
+    return af, check_support, mo, run_checks
 
 
 @app.cell(hide_code=True)
@@ -75,7 +77,8 @@ def _(mo):
     than treated as tests).
 
     Expensive work is never started automatically. Choose a section's controls
-    and press its run button. Standalone checks remain the reusable/headless
+    and press its run button, or use the remote-first cache preparation control
+    near the supplementary studies. Standalone checks remain the reusable/headless
     source of truth; this notebook is a thin reactive driver over them.
     """)
     return
@@ -463,7 +466,7 @@ def _(af, mo, supplementary_study_ui):
 
 
 @app.cell
-def _(af, mo, supplementary_study_ui, supplementary_thickness_ui):
+def _(af, check_support, mo, supplementary_study_ui, supplementary_thickness_ui):
     _study = af.supplementary_study(supplementary_study_ui.value)
     supplementary_ne_ui = mo.ui.number(
         start=10,
@@ -476,15 +479,16 @@ def _(af, mo, supplementary_study_ui, supplementary_thickness_ui):
         start=0,
         stop=180,
         step=5,
-        value=0,
+        value=check_support.load_default_azimuth(),
         label="Exploratory TMD azimuth (deg; unreported)",
     )
+    save_supplementary_azimuth_ui = mo.ui.run_button(label="Save as repository default")
     run_supplementary_ui = mo.ui.run_button(label="Run supplementary study")
     refresh_supplementary_ui = mo.ui.checkbox(value=False, label="Recompute (ignore cache)")
     mo.vstack(
         [
             mo.hstack([supplementary_study_ui, supplementary_thickness_ui]),
-            supplementary_azimuth_ui
+            mo.hstack([supplementary_azimuth_ui, save_supplementary_azimuth_ui])
             if any(condition.azimuth_deg is None for condition in _study.conditions)
             else mo.md("**Reported orientation:** polar 17°, azimuth 130°"),
             mo.hstack([supplementary_ne_ui, refresh_supplementary_ui, run_supplementary_ui]),
@@ -493,9 +497,122 @@ def _(af, mo, supplementary_study_ui, supplementary_thickness_ui):
     return (
         refresh_supplementary_ui,
         run_supplementary_ui,
+        save_supplementary_azimuth_ui,
         supplementary_azimuth_ui,
         supplementary_ne_ui,
     )
+
+
+@app.cell
+def _(check_support, mo, save_supplementary_azimuth_ui, supplementary_azimuth_ui):
+    mo.stop(not save_supplementary_azimuth_ui.value)
+    check_support.save_default_azimuth(float(supplementary_azimuth_ui.value))
+    mo.callout(
+        f"Saved {float(supplementary_azimuth_ui.value):g}° as the repository default. "
+        "It will be selected on the next app startup.",
+        kind="success",
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Remote-first cache preparation
+
+    This optional launcher prepares all expensive Zhai caches using the values
+    currently selected above. It first probes the configured SSH GPU host. When
+    available, it starts a detached job that continues after this app closes;
+    status is polled below and completed caches are pulled automatically. If the
+    SSH tools or host are unavailable before launch, the same batch runs locally.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    prepare_zhai_caches_ui = mo.ui.run_button(label="Prepare expensive caches (remote first)")
+    remote_status_refresh_ui = mo.ui.refresh(
+        options=[5, 15, 30], default_interval=15, label="Remote status refresh"
+    )
+    mo.hstack([prepare_zhai_caches_ui, remote_status_refresh_ui])
+    return prepare_zhai_caches_ui, remote_status_refresh_ui
+
+
+@app.cell
+def _(mo):
+    get_remote_zhai_job, set_remote_zhai_job = mo.state(None)
+    get_remote_zhai_message, set_remote_zhai_message = mo.state(
+        "No background cache-preparation job has been started."
+    )
+    return (
+        get_remote_zhai_job,
+        get_remote_zhai_message,
+        set_remote_zhai_job,
+        set_remote_zhai_message,
+    )
+
+
+@app.cell
+def _(
+    af,
+    check_support,
+    get_remote_zhai_job,
+    get_remote_zhai_message,
+    mo,
+    ne_brem_ui,
+    ne_ui,
+    prepare_zhai_caches_ui,
+    refresh_zhai_ui,
+    refresh_supplementary_ui,
+    remote_status_refresh_ui,
+    set_remote_zhai_job,
+    set_remote_zhai_message,
+    supplementary_azimuth_ui,
+    supplementary_ne_ui,
+):
+    _ = remote_status_refresh_ui.value
+    _jobid = get_remote_zhai_job()
+    if prepare_zhai_caches_ui.value and _jobid is None:
+        _available, _reason = check_support.probe_remote_zhai()
+        if _available:
+            _jobid = check_support.start_remote_zhai(
+                ne=int(ne_ui.value),
+                ne_brem=int(ne_brem_ui.value),
+                ne_supp=int(supplementary_ne_ui.value),
+                tmd_azimuth=float(supplementary_azimuth_ui.value),
+                refresh=refresh_zhai_ui.value or refresh_supplementary_ui.value,
+            )
+            set_remote_zhai_job(_jobid)
+            set_remote_zhai_message(
+                f"Remote job `{_jobid}` launched; it is running in the background."
+            )
+        else:
+            set_remote_zhai_message(f"{_reason} Falling back to a local batch run.")
+            with mo.status.spinner(title="Remote unavailable; preparing caches locally"):
+                af.reproduce_all(
+                    ne=int(ne_ui.value),
+                    ne_brem=int(ne_brem_ui.value),
+                    ne_supp=int(supplementary_ne_ui.value),
+                    tmd_exploratory_azimuth_deg=float(supplementary_azimuth_ui.value),
+                    refresh=refresh_zhai_ui.value or refresh_supplementary_ui.value,
+                )
+            set_remote_zhai_message("Remote unavailable; the local fallback completed.")
+    elif _jobid is not None:
+        _state, _report = check_support.remote_zhai_status(_jobid)
+        if _state == "done":
+            _pull_report = check_support.pull_remote_zhai()
+            set_remote_zhai_job(None)
+            set_remote_zhai_message(
+                f"Remote job `{_jobid}` completed and its caches were pulled.\n\n{_pull_report}"
+            )
+        elif _state in {"failed", "error"}:
+            set_remote_zhai_job(None)
+            set_remote_zhai_message(f"Remote job `{_jobid}` {_state}.\n\n{_report}")
+        else:
+            set_remote_zhai_message(f"Remote job `{_jobid}`: {_state}.\n\n{_report}")
+    mo.callout(get_remote_zhai_message(), kind="info")
+    return
 
 
 @app.cell

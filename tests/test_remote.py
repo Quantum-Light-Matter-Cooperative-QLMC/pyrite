@@ -279,15 +279,23 @@ def test_pull_short_full_flag(monkeypatch):
 
 # ---- cxr remote check (Zhai GPU reproduction) ------------------------------
 def test_zhai_queue_script_has_ne_flags_and_meta():
-    s = remote._zhai_queue_script("20260101-000000", ne=11, ne_brem=3, ne_supp=5, refresh=True)
+    s = remote._zhai_queue_script(
+        "20260101-000000",
+        ne=11,
+        ne_brem=3,
+        ne_supp=5,
+        tmd_azimuth=35.0,
+        refresh=True,
+    )
     assert "reproduce_zhai.py" in s
     assert "--ne 11" in s and "--ne-brem 3" in s and "--ne-supp 5" in s and "--refresh" in s
+    assert "--tmd-azimuth 35.0" in s
     assert "materials: zhai" in s and "quick: False" in s
     assert "20260101-000000" in s
 
 
 def test_zhai_queue_script_no_refresh_flag_when_unset():
-    s = remote._zhai_queue_script("j", ne=1, ne_brem=1, ne_supp=1, refresh=False)
+    s = remote._zhai_queue_script("j", ne=1, ne_brem=1, ne_supp=1, tmd_azimuth=0.0, refresh=False)
     assert "--refresh" not in s
 
 
@@ -324,7 +332,7 @@ def test_remote_check_syncs_runs_and_pulls(monkeypatch):
     monkeypatch.setattr(remote, "_run", lambda cmd, **kw: calls.append(("run", cmd)))
     monkeypatch.setattr(remote, "pull_zhai_cache", lambda: calls.append("pull"))
 
-    remote.remote_check(ne=11, ne_brem=3, ne_supp=5, refresh=True)
+    remote.remote_check(ne=11, ne_brem=3, ne_supp=5, tmd_azimuth=35.0, refresh=True)
 
     assert calls[0] == "sync"
     assert calls[1][0] == "run"
@@ -332,6 +340,7 @@ def test_remote_check_syncs_runs_and_pulls(monkeypatch):
     assert ssh_cmd[:3] == ["ssh", "-n", remote.HOST]
     assert "reproduce_zhai.py" in ssh_cmd[3]
     assert "--ne 11" in ssh_cmd[3] and "--refresh" in ssh_cmd[3]
+    assert "--tmd-azimuth 35.0" in ssh_cmd[3]
     assert calls[2] == "pull"
 
 
@@ -417,7 +426,16 @@ def test_check_cli_foreground_calls_remote_check(monkeypatch):
 
     remote.main(["check", "--ne", "11", "--refresh"])
 
-    assert calls == [{"ne": 11, "ne_brem": 200, "ne_supp": 200, "refresh": True, "no_sync": False}]
+    assert calls == [
+        {
+            "ne": 11,
+            "ne_brem": 200,
+            "ne_supp": 200,
+            "tmd_azimuth": 0.0,
+            "refresh": True,
+            "no_sync": False,
+        }
+    ]
 
 
 def test_check_cli_rejects_follow_without_detached(monkeypatch, capsys):

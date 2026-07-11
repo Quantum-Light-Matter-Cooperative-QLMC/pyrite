@@ -23,6 +23,7 @@ def test_cli_defaults_match_app_defaults(monkeypatch):
             "ne": 20_000,
             "ne_brem": 200,
             "ne_supp": 200,
+            "tmd_exploratory_azimuth_deg": 0.0,
             "cache_dir": None,
             "refresh": False,
         }
@@ -46,12 +47,23 @@ def test_cli_forwards_overrides(monkeypatch, capsys):
             "3",
             "--ne-supp",
             "5",
+            "--tmd-azimuth",
+            "35",
             "--refresh",
             "--cache-dir",
             "/tmp/x",
         ]
     )
 
-    assert calls == [{"ne": 11, "ne_brem": 3, "ne_supp": 5, "cache_dir": "/tmp/x", "refresh": True}]
+    assert calls == [
+        {
+            "ne": 11,
+            "ne_brem": 3,
+            "ne_supp": 5,
+            "tmd_exploratory_azimuth_deg": 35.0,
+            "cache_dir": "/tmp/x",
+            "refresh": True,
+        }
+    ]
     out = capsys.readouterr().out
     assert "zhai-fig1c" in out and "cached" in out

@@ -46,6 +46,12 @@ def main(argv=None):
         help="supplementary electrons per polar-tilt spectrum",
     )
     ap.add_argument(
+        "--tmd-azimuth",
+        type=float,
+        default=0.0,
+        help="exploratory azimuth in degrees for TMD studies whose azimuth is unreported",
+    )
+    ap.add_argument(
         "--refresh",
         action="store_true",
         help="recompute even if a matching cache already exists",
@@ -57,6 +63,7 @@ def main(argv=None):
         ne=args.ne,
         ne_brem=args.ne_brem,
         ne_supp=args.ne_supp,
+        tmd_exploratory_azimuth_deg=args.tmd_azimuth,
         cache_dir=args.cache_dir,
         refresh=args.refresh,
     )

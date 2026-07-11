@@ -205,7 +205,14 @@ def remote_scan(material, quick=False, workers=None):
     _run(["ssh", "-n", HOST, cmd])
 
 
-def remote_check(ne=20_000, ne_brem=200, ne_supp=200, refresh=False, no_sync=False):
+def remote_check(
+    ne=20_000,
+    ne_brem=200,
+    ne_supp=200,
+    tmd_azimuth=0.0,
+    refresh=False,
+    no_sync=False,
+):
     """Sync code, run reproduce_zhai.py on the box (populating
     checkpoints/zhai_reproduction/ there), then pull every cache file back.
     Foreground: holds the ssh session open until the run finishes."""
@@ -214,7 +221,7 @@ def remote_check(ne=20_000, ne_brem=200, ne_supp=200, refresh=False, no_sync=Fal
         sync_code()
     cmd = (
         f"cd {REMOTE_DIR} && {REMOTE_UV} run --no-sync python reproduce_zhai.py"
-        f"{_zhai_flags(ne, ne_brem, ne_supp, refresh)}"
+        f"{_zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh)}"
     )
     _run(["ssh", "-n", HOST, cmd])
     pull_zhai_cache()
@@ -331,21 +338,21 @@ echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
 """
 
 
-def _zhai_flags(ne, ne_brem, ne_supp, refresh):
-    flags = f" --ne {ne} --ne-brem {ne_brem} --ne-supp {ne_supp}"
+def _zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
+    flags = f" --ne {ne} --ne-brem {ne_brem} --ne-supp {ne_supp} --tmd-azimuth {tmd_azimuth}"
     if refresh:
         flags += " --refresh"
     return flags
 
 
-def _zhai_queue_script(jobid, ne, ne_brem, ne_supp, refresh):
+def _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     """The bash runner for a detached Zhai-reproduction job: same
     pid/meta/state bookkeeping as _queue_script, but runs reproduce_zhai.py
     once instead of looping scan.py over materials. The meta's `materials:
     zhai` / `quick: False` lines are what let _live_jobs/_refuse_if_busy/
     stop_jobs treat this job like any material-keyed one, keyed on ZHAI_STEM."""
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
-    flags = _zhai_flags(ne, ne_brem, ne_supp, refresh)
+    flags = _zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh)
     return f"""#!/usr/bin/env bash
 set -u
 JOBDIR="{jobdir}"
@@ -515,7 +522,13 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
 
 
 def start_zhai_queue(
-    ne=20_000, ne_brem=200, ne_supp=200, refresh=False, no_sync=False, dry_run=False
+    ne=20_000,
+    ne_brem=200,
+    ne_supp=200,
+    tmd_azimuth=0.0,
+    refresh=False,
+    no_sync=False,
+    dry_run=False,
 ):
     """Launch a detached Zhai-reproduction job on the box (mirrors
     start_queue): sync code, write the runner, nohup setsid it. Returns the
@@ -524,7 +537,7 @@ def start_zhai_queue(
         _refuse_if_busy([ZHAI_STEM], False)
     jobid = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
-    script = _zhai_queue_script(jobid, ne, ne_brem, ne_supp, refresh)
+    script = _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh)
     launch = _launch_queue_command(jobid)
 
     if dry_run:
@@ -830,6 +843,7 @@ def _cli_check(args):
             ne=args.ne,
             ne_brem=args.ne_brem,
             ne_supp=args.ne_supp,
+            tmd_azimuth=args.tmd_azimuth,
             refresh=args.refresh,
             no_sync=args.no_sync,
         )
@@ -840,6 +854,7 @@ def _cli_check(args):
         ne=args.ne,
         ne_brem=args.ne_brem,
         ne_supp=args.ne_supp,
+        tmd_azimuth=args.tmd_azimuth,
         refresh=args.refresh,
         no_sync=args.no_sync,
     )
@@ -948,6 +963,12 @@ def _build_remote_parser(ap):
     )
     ck.add_argument(
         "--ne-supp", type=int, default=200, help="supplementary electrons per polar-tilt spectrum"
+    )
+    ck.add_argument(
+        "--tmd-azimuth",
+        type=float,
+        default=0.0,
+        help="exploratory azimuth for TMD studies whose azimuth is unreported",
     )
     ck.add_argument(
         "--refresh", action="store_true", help="recompute even if a matching cache exists"
