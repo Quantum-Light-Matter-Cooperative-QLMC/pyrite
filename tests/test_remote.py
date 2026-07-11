@@ -275,3 +275,149 @@ def test_pull_short_full_flag(monkeypatch):
     monkeypatch.setattr(remote, "pull", lambda *a, **kw: calls.append(kw))
     remote.main(["pull", "hopg", "-f"])
     assert calls[0]["grid"] is False
+
+
+# ---- cxr remote check (Zhai GPU reproduction) ------------------------------
+def test_zhai_queue_script_has_ne_flags_and_meta():
+    s = remote._zhai_queue_script("20260101-000000", ne=11, ne_brem=3, ne_supp=5, refresh=True)
+    assert "reproduce_zhai.py" in s
+    assert "--ne 11" in s and "--ne-brem 3" in s and "--ne-supp 5" in s and "--refresh" in s
+    assert "materials: zhai" in s and "quick: False" in s
+    assert "20260101-000000" in s
+
+
+def test_zhai_queue_script_no_refresh_flag_when_unset():
+    s = remote._zhai_queue_script("j", ne=1, ne_brem=1, ne_supp=1, refresh=False)
+    assert "--refresh" not in s
+
+
+def test_zhai_start_refuses_when_a_zhai_job_is_already_live(monkeypatch):
+    monkeypatch.setattr(remote, "_live_jobs", lambda: [("job1", False, ["zhai"])])
+    with pytest.raises(SystemExit, match="refusing to start"):
+        remote.start_zhai_queue()
+
+
+def test_zhai_start_dry_run_prints_without_ssh_or_sync(monkeypatch, capsys):
+    monkeypatch.setattr(remote, "_live_jobs", lambda: pytest.fail("dry-run must not check busy"))
+    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("dry-run must not sync"))
+    monkeypatch.setattr(
+        remote.subprocess, "run", lambda *a, **kw: pytest.fail("dry-run must not ssh")
+    )
+
+    jobid = remote.start_zhai_queue(dry_run=True)
+
+    out = capsys.readouterr().out
+    assert jobid in out and "reproduce_zhai.py" in out
+
+
+def test_remote_check_refuses_when_a_zhai_job_is_already_live(monkeypatch):
+    monkeypatch.setattr(remote, "_live_jobs", lambda: [("job1", False, ["zhai"])])
+    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("must refuse before syncing"))
+    with pytest.raises(SystemExit, match="refusing to start"):
+        remote.remote_check()
+
+
+def test_remote_check_syncs_runs_and_pulls(monkeypatch):
+    calls = []
+    monkeypatch.setattr(remote, "_live_jobs", lambda: [])
+    monkeypatch.setattr(remote, "sync_code", lambda: calls.append("sync"))
+    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: calls.append(("run", cmd)))
+    monkeypatch.setattr(remote, "pull_zhai_cache", lambda: calls.append("pull"))
+
+    remote.remote_check(ne=11, ne_brem=3, ne_supp=5, refresh=True)
+
+    assert calls[0] == "sync"
+    assert calls[1][0] == "run"
+    ssh_cmd = calls[1][1]
+    assert ssh_cmd[:3] == ["ssh", "-n", remote.HOST]
+    assert "reproduce_zhai.py" in ssh_cmd[3]
+    assert "--ne 11" in ssh_cmd[3] and "--refresh" in ssh_cmd[3]
+    assert calls[2] == "pull"
+
+
+def test_remote_check_no_sync_skips_sync(monkeypatch):
+    calls = []
+    monkeypatch.setattr(remote, "_live_jobs", lambda: [])
+    monkeypatch.setattr(remote, "sync_code", lambda: calls.append("sync"))
+    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: calls.append("run"))
+    monkeypatch.setattr(remote, "pull_zhai_cache", lambda: calls.append("pull"))
+
+    remote.remote_check(no_sync=True)
+
+    assert calls == ["run", "pull"]
+
+
+def test_pull_zhai_cache_fetches_every_listed_file(monkeypatch, tmp_path):
+    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda *a: (
+            "/r/checkpoints/zhai_reproduction/zhai-a.pkl\n"
+            "/r/checkpoints/zhai_reproduction/zhai-b.pkl\n"
+        ),
+    )
+    runs = []
+    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: runs.append(cmd))
+
+    remote.pull_zhai_cache()
+
+    assert len(runs) == 2
+    assert runs[0][0] == "scp" and runs[0][1].endswith("zhai-a.pkl")
+    assert (tmp_path / "checkpoints" / "zhai_reproduction").is_dir()
+
+
+def test_pull_zhai_cache_reports_when_empty(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(remote, "_ssh_capture", lambda *a: "")
+    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: pytest.fail("nothing to pull"))
+
+    remote.pull_zhai_cache()
+
+    assert "no zhai cache files" in capsys.readouterr().out
+
+
+def test_check_cli_pull_flag_skips_run(monkeypatch):
+    calls = []
+    monkeypatch.setattr(remote, "pull_zhai_cache", lambda: calls.append("pull"))
+    monkeypatch.setattr(
+        remote, "remote_check", lambda **kw: pytest.fail("--pull must not run the reproduction")
+    )
+
+    remote.main(["check", "--pull"])
+
+    assert calls == ["pull"]
+
+
+def test_check_cli_detached_starts_queue(monkeypatch):
+    calls = []
+    monkeypatch.setattr(remote, "start_zhai_queue", lambda **kw: calls.append(kw) or "jid")
+    monkeypatch.setattr(remote, "attach", lambda jobid: pytest.fail("no --follow: must not attach"))
+
+    remote.main(["check", "--detached", "--ne", "11"])
+
+    assert calls[0]["ne"] == 11
+
+
+def test_check_cli_detached_follow_attaches(monkeypatch):
+    monkeypatch.setattr(remote, "start_zhai_queue", lambda **kw: "jid")
+    attached = []
+    monkeypatch.setattr(remote, "attach", attached.append)
+
+    remote.main(["check", "--detached", "--follow"])
+
+    assert attached == ["jid"]
+
+
+def test_check_cli_foreground_calls_remote_check(monkeypatch):
+    calls = []
+    monkeypatch.setattr(remote, "remote_check", lambda **kw: calls.append(kw))
+
+    remote.main(["check", "--ne", "11", "--refresh"])
+
+    assert calls == [{"ne": 11, "ne_brem": 200, "ne_supp": 200, "refresh": True, "no_sync": False}]
+
+
+def test_sync_paths_ship_checks_and_zhai_shim():
+    assert "checks" in remote.SYNC_PATHS
+    assert "reproduce_zhai.py" in remote.SYNC_PATHS

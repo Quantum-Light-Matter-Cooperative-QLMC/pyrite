@@ -20,6 +20,10 @@ One-shot (foreground, holds the ssh session open until the sweep finishes):
     cxr remote pull mose2 wse2          # fetch existing checkpoints (grid-filtered)
     cxr remote pull mose2 --full        # fetch the full, un-filtered checkpoint
     cxr remote sync                     # only push the current code
+    cxr remote check [--ne N] [--ne-brem N] [--ne-supp N] [--refresh]
+                     [--detached [--follow]] [--pull]
+                                    # run the Zhai + supplementary MC on the
+                                    # box, or pull its cache back
 
 Detached QUEUE (survives ssh disconnect -- launch, walk away, reconnect later):
 
@@ -75,6 +79,11 @@ LOCAL_ROOT = Path(__file__).resolve().parents[2]
 # (gitignored there): run.sh, meta, pid, state, log. One subdir per `start`.
 JOBS_SUBDIR = "jobs"
 
+# The Zhai reproduction job has no crystal key of its own, but reusing the
+# existing material-stem bookkeeping (_refuse_if_busy / _live_jobs /
+# stop_jobs) needs one to key off of -- this is that synthetic token.
+ZHAI_STEM = "zhai"
+
 # material keys are embedded into a remote shell command, so constrain them to
 # the crystal-key alphabet -- this both rejects typos early and blocks shell
 # injection through the material argument.
@@ -83,7 +92,15 @@ _MATERIAL_RE = re.compile(r"^[A-Za-z0-9_]+$")
 # what `sync` ships up: the code that changes (the src/ package now also carries
 # data/, so it travels too), plus the root scan.py shim the box invokes and
 # pyproject.toml. Not checkpoints/ (the output we pull back the other way).
-SYNC_PATHS = ["src", "scan.py", "pyproject.toml", "uv.lock", "README.md"]
+SYNC_PATHS = [
+    "src",
+    "scan.py",
+    "reproduce_zhai.py",
+    "checks",
+    "pyproject.toml",
+    "uv.lock",
+    "README.md",
+]
 
 # text extensions whose CRLF is normalized to LF before tarring (see _add_to_tar):
 # the laptop is Windows so its working files are CRLF, and shipping those over the
@@ -188,6 +205,21 @@ def remote_scan(material, quick=False, workers=None):
     _run(["ssh", "-n", HOST, cmd])
 
 
+def remote_check(ne=20_000, ne_brem=200, ne_supp=200, refresh=False, no_sync=False):
+    """Sync code, run reproduce_zhai.py on the box (populating
+    checkpoints/zhai_reproduction/ there), then pull every cache file back.
+    Foreground: holds the ssh session open until the run finishes."""
+    _refuse_if_busy([ZHAI_STEM], False)
+    if not no_sync:
+        sync_code()
+    cmd = (
+        f"cd {REMOTE_DIR} && {REMOTE_UV} run --no-sync python reproduce_zhai.py"
+        f"{_zhai_flags(ne, ne_brem, ne_supp, refresh)}"
+    )
+    _run(["ssh", "-n", HOST, cmd])
+    pull_zhai_cache()
+
+
 def pull(stems, grid=False, drop_wide_brem=False, downcast=False, no_sync=False):
     """Fetch checkpoints/<stem>.pkl back from the box for each stem (stem =
     material, or material_quick for a --quick run).
@@ -229,6 +261,26 @@ def pull(stems, grid=False, drop_wide_brem=False, downcast=False, no_sync=False)
         else:
             _run(["scp", f"{HOST}:{REMOTE_DIR}/checkpoints/{stem}.pkl", str(local)])
             print(f"pulled -> checkpoints/{stem}.pkl")
+
+
+def pull_zhai_cache():
+    """Fetch every cache file under checkpoints/zhai_reproduction/ from the
+    box.
+
+    Lists remote filenames first (like clear_remote's listing step) rather
+    than `scp -r`, which double-nests the directory when the local destination
+    already exists -- listing + per-file scp is unambiguous either way."""
+    remote_dir = f"{REMOTE_DIR}/checkpoints/zhai_reproduction"
+    listing = f'[ -d "{remote_dir}" ] || exit 0; ls -1 "{remote_dir}"/*.pkl 2>/dev/null'
+    names = [Path(p).name for p in _ssh_capture(listing).split()]
+    if not names:
+        print("(no zhai cache files on the box -- run `cxr remote check` first)")
+        return
+    dest = LOCAL_ROOT / "checkpoints" / "zhai_reproduction"
+    dest.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        _run(["scp", f"{HOST}:{remote_dir}/{name}", str(dest / name)])
+    print(f"pulled -> checkpoints/zhai_reproduction/ ({len(names)} cache files)")
 
 
 # ---- detached job queue -------------------------------------------------------
@@ -273,6 +325,40 @@ for m in "${{mats[@]}}"; do
   fi
 done
 echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
+"""
+
+
+def _zhai_flags(ne, ne_brem, ne_supp, refresh):
+    flags = f" --ne {ne} --ne-brem {ne_brem} --ne-supp {ne_supp}"
+    if refresh:
+        flags += " --refresh"
+    return flags
+
+
+def _zhai_queue_script(jobid, ne, ne_brem, ne_supp, refresh):
+    """The bash runner for a detached Zhai-reproduction job: same
+    pid/meta/state bookkeeping as _queue_script, but runs reproduce_zhai.py
+    once instead of looping scan.py over materials. The meta's `materials:
+    zhai` / `quick: False` lines are what let _live_jobs/_refuse_if_busy/
+    stop_jobs treat this job like any material-keyed one, keyed on ZHAI_STEM."""
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    flags = _zhai_flags(ne, ne_brem, ne_supp, refresh)
+    return f"""#!/usr/bin/env bash
+set -u
+JOBDIR="{jobdir}"
+cd "{REMOTE_DIR}" || exit 1
+echo $$ > "$JOBDIR/pid"
+{{ echo "job: {jobid}"; echo "materials: {ZHAI_STEM}"; echo "quick: False"; \\
+echo "ne: {ne}"; echo "ne_brem: {ne_brem}"; echo "ne_supp: {ne_supp}"; \\
+echo "started: $(date -Is)"; echo "pid: $$"; }} > "$JOBDIR/meta"
+{REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+echo "running zhai reproduction since $(date -Is)" > "$JOBDIR/state"
+if ! {REMOTE_UV} run --no-sync python reproduce_zhai.py{flags} >> "$JOBDIR/log" 2>&1
+then
+  echo "FAILED $(date -Is)" > "$JOBDIR/state"
+  exit 1
+fi
+echo "done $(date -Is)" > "$JOBDIR/state"
 """
 
 
@@ -421,6 +507,44 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
         f"  watch:  cxr remote status {jobid}\n"
         f"  logs:   cxr remote logs {jobid} --follow\n"
         f"  pull:   cxr remote pull {' '.join(stems)}   (when state is 'done')"
+    )
+    return jobid
+
+
+def start_zhai_queue(
+    ne=20_000, ne_brem=200, ne_supp=200, refresh=False, no_sync=False, dry_run=False
+):
+    """Launch a detached Zhai-reproduction job on the box (mirrors
+    start_queue): sync code, write the runner, nohup setsid it. Returns the
+    job id; pull results with `cxr remote check --pull` once state is 'done'."""
+    if not dry_run:
+        _refuse_if_busy([ZHAI_STEM], False)
+    jobid = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    script = _zhai_queue_script(jobid, ne, ne_brem, ne_supp, refresh)
+    launch = _launch_queue_command(jobid)
+
+    if dry_run:
+        print(f"# zhai job {jobid}: ne={ne} ne_brem={ne_brem} ne_supp={ne_supp}")
+        print(f"# --- ssh {HOST}: mkdir -p {jobdir} && cat > {jobdir}/run.sh <<\n")
+        print(script)
+        print(f"# --- ssh {HOST}: {launch}")
+        return jobid
+
+    if not no_sync:
+        sync_code()
+    subprocess.run(
+        ["ssh", HOST, f"mkdir -p '{jobdir}' && cat > '{jobdir}/run.sh'"],
+        input=script.replace("\r\n", "\n").encode(),
+        check=True,
+    )
+    _run(["ssh", "-n", HOST, launch])
+
+    print(
+        f"\nstarted zhai job {jobid} on {HOST}\n"
+        f"  watch:  cxr remote status {jobid}\n"
+        f"  logs:   cxr remote logs {jobid} --follow\n"
+        f"  pull:   cxr remote check --pull   (when state is 'done')"
     )
     return jobid
 
@@ -692,6 +816,30 @@ def _cli_sync(args):
     sync_code()
 
 
+def _cli_check(args):
+    if args.pull:
+        pull_zhai_cache()
+        return
+    if args.detached:
+        jobid = start_zhai_queue(
+            ne=args.ne,
+            ne_brem=args.ne_brem,
+            ne_supp=args.ne_supp,
+            refresh=args.refresh,
+            no_sync=args.no_sync,
+        )
+        if args.follow:
+            attach(jobid)
+        return
+    remote_check(
+        ne=args.ne,
+        ne_brem=args.ne_brem,
+        ne_supp=args.ne_supp,
+        refresh=args.refresh,
+        no_sync=args.no_sync,
+    )
+
+
 def _build_remote_parser(ap):
     """Add every ``remote`` subcommand (scan/pull/start/attach/jobs/status/logs/
     stop/clear/sync) to ``ap``'s own subparsers. Nested one level under a
@@ -782,6 +930,40 @@ def _build_remote_parser(ap):
 
     sy = sub.add_parser("sync", help="push the current code to the box only")
     sy.set_defaults(func=_dispatch(_cli_sync))
+
+    ck = sub.add_parser(
+        "check",
+        help="run the Zhai reproduction + supplementary MC on the box, pull caches back",
+    )
+    ck.add_argument(
+        "--ne", type=int, default=20_000, help="Fig.1c anchor line electrons per energy"
+    )
+    ck.add_argument(
+        "--ne-brem", default=200, type=int, help="Fig.1c anchor bremsstrahlung electrons per energy"
+    )
+    ck.add_argument(
+        "--ne-supp", type=int, default=200, help="supplementary electrons per polar-tilt spectrum"
+    )
+    ck.add_argument(
+        "--refresh", action="store_true", help="recompute even if a matching cache exists"
+    )
+    ck.add_argument("--no-sync", action="store_true", help="skip the code upload")
+    ck.add_argument(
+        "--detached",
+        "-d",
+        action="store_true",
+        help="launch as a DETACHED job (survives disconnect)",
+    )
+    ck.add_argument(
+        "--follow",
+        "-f",
+        action="store_true",
+        help="with --detached: track the job live after launching",
+    )
+    ck.add_argument(
+        "--pull", action="store_true", help="skip the run; just fetch existing zhai cache files"
+    )
+    ck.set_defaults(func=_dispatch(_cli_check))
 
     return ap
 
