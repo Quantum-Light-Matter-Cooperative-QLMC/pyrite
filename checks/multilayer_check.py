@@ -125,13 +125,14 @@ def main():
 def check_backscatter():
     """Full-pipeline slice-2 check (run_case): a substrate behind a thin film
     BACKSCATTERS electrons into the film (boosting the coherent line yield) and
-    adds its own bremsstrahlung, at the high-flux negative-tilt geometry where
-    cross-stack ABSORPTION of the film lines is negligible (front exit)."""
+    adds its own bremsstrahlung, at the high-flux positive-tilt (toward-
+    detector, Zhai convention) geometry where cross-stack ABSORPTION of the
+    film lines is negligible (front exit)."""
 
     def _run(substrate):
         sw = Sweep(
             material="mose2",
-            tilt_deg=-30.0,
+            tilt_deg=30.0,
             energy_keV=30.0,
             thickness_ang=500.0,
             substrate=substrate,
@@ -142,7 +143,7 @@ def check_backscatter():
     free, sub = _run(None), _run("sio2")
     l_ratio = sub["spec"].sum() / max(free["spec"].sum(), 1e-300)
     b_ratio = sub["brem_wide"].sum() / max(free["brem_wide"].sum(), 1e-300)
-    print("\ntransport backscatter (50 nm MoSe2, neg tilt, full run_case):")
+    print("\ntransport backscatter (50 nm MoSe2, +tilt, full run_case):")
     print(f"  eta (backscatter):  free={free['eta']:.4f}  on sio2={sub['eta']:.4f}")
     print(f"  film line yield  sub/free = {l_ratio:.3f}  (>1: substrate backscatter boost)")
     print(f"  brem yield       sub/free = {b_ratio:.3f}  (>1: substrate bremsstrahlung)")

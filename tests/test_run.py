@@ -208,8 +208,8 @@ def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
 def test_run_sweep_on_chunk_fires_per_group(tmp_path, monkeypatch):
     monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
     # same (crystal, thickness, tilt) -> one group; different tilt -> another
-    c1 = _fake_case("cfg_a", 30.0, tilt_deg=-30.0)
-    c2 = _fake_case("cfg_b", 30.0, tilt_deg=-30.0)
+    c1 = _fake_case("cfg_a", 30.0, tilt_deg=30.0)
+    c2 = _fake_case("cfg_b", 30.0, tilt_deg=30.0)
     c3 = _fake_case("cfg_c", 30.0, tilt_deg=0.0)
     chunks = []
     run_sweep(

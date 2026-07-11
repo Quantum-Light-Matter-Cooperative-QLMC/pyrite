@@ -63,8 +63,8 @@ def _store_single_tilt():
     # test_altair_plots._store()).
     return {
         "HOPG bulk": {
-            30.0: _record(30.0, -20.0, 0.0),
-            60.0: _record(60.0, -20.0, 0.0),
+            30.0: _record(30.0, 20.0, 0.0),
+            60.0: _record(60.0, 20.0, 0.0),
         }
     }
 
@@ -74,8 +74,8 @@ def _store_multi_tilt(wide_brem=False):
     # "Polar-angle comparison" tab slice looks like.
     return {
         "HOPG bulk": {
-            30.0: _record(30.0, -40.0, 0.0, wide_brem=wide_brem),
-            30.1: _record(30.0, -20.0, 0.0, wide_brem=wide_brem),
+            30.0: _record(30.0, 40.0, 0.0, wide_brem=wide_brem),
+            30.1: _record(30.0, 20.0, 0.0, wide_brem=wide_brem),
             30.2: _record(30.0, 0.0, 0.0, wide_brem=wide_brem),
         }
     }
@@ -86,9 +86,9 @@ def _store_multi_azim(wide_brem=False):
     # comparison" tab slice shape.
     return {
         "HOPG bulk": {
-            30.0: _record(30.0, -20.0, 0.0, wide_brem=wide_brem),
-            30.1: _record(30.0, -20.0, 45.0, wide_brem=wide_brem),
-            30.2: _record(30.0, -20.0, 90.0, wide_brem=wide_brem),
+            30.0: _record(30.0, 20.0, 0.0, wide_brem=wide_brem),
+            30.1: _record(30.0, 20.0, 45.0, wide_brem=wide_brem),
+            30.2: _record(30.0, 20.0, 90.0, wide_brem=wide_brem),
         }
     }
 
@@ -99,7 +99,7 @@ def test_compare_chart_one_line_per_hue_value_tilt():
     spec = chart.to_dict()
     df = _dataset(spec)
     tilts = {row["tilt_deg"] for row in df}
-    assert tilts == {-40.0, -20.0, 0.0}
+    assert tilts == {40.0, 20.0, 0.0}
     enc = spec["layer"][0]["encoding"]
     assert enc["color"]["field"] == "tilt_deg"
 
@@ -136,7 +136,7 @@ def test_compare_chart_broadband_uses_wide_brem_tail_for_tilts():
 
     assert tail
     assert max(row["energy_eV"] for row in df) == 30000.0
-    assert {row["tilt_deg"] for row in tail} == {-40.0, -20.0, 0.0}
+    assert {row["tilt_deg"] for row in tail} == {40.0, 20.0, 0.0}
 
 
 def test_compare_chart_broadband_uses_wide_brem_tail_for_azimuths():
@@ -163,7 +163,7 @@ def test_compare_chart_single_hue_value_still_renders_one_line():
     chart = compare_spectrum_chart(_store_single_tilt(), _settings(), hue="tilt_deg")
     spec = chart.to_dict()
     df = _dataset(spec)
-    assert {row["tilt_deg"] for row in df} == {-20.0}
+    assert {row["tilt_deg"] for row in df} == {20.0}
 
 
 def test_compare_chart_rejects_unknown_hue():
@@ -174,12 +174,12 @@ def test_compare_chart_rejects_unknown_hue():
 
 
 def test_compare_chart_duplicate_hue_values_collapse_to_max_peak():
-    # Two records sharing tilt_deg=-20 (different azimuths) -- the stronger-peak
+    # Two records sharing tilt_deg=20 (different azimuths) -- the stronger-peak
     # one should win, giving exactly ONE line for that hue value.
     store = {
         "HOPG bulk": {
-            30.0: _record(30.0, -20.0, 0.0, peak_center=2500.0),
-            30.1: _record(30.0, -20.0, 45.0, peak_center=2500.0),
+            30.0: _record(30.0, 20.0, 0.0, peak_center=2500.0),
+            30.1: _record(30.0, 20.0, 45.0, peak_center=2500.0),
         }
     }
     # Boost the second record's peak so the selection is unambiguous.
@@ -188,7 +188,7 @@ def test_compare_chart_duplicate_hue_values_collapse_to_max_peak():
     spec = chart.to_dict()
     df = _dataset(spec)
     tilts = {row["tilt_deg"] for row in df}
-    assert tilts == {-20.0}
+    assert tilts == {20.0}
     azims = {row["tilt_azim_deg"] for row in df}
     assert azims == {45.0}  # the boosted (stronger-peak) record's azimuth won
 

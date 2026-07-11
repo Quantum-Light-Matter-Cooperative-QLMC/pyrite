@@ -208,7 +208,10 @@ def run_case(case):
                 latter to the beam energy for the full measured spectrum, without
                 paying the line cost up there -- the lines top out at a few keV).
         optional: tilt_deg (0), tilt_azim_deg (0), beam_uvw (None),
-                azimuth_rad (0), E_cut_lines_keV (5), E_cut_brem_keV (1),
+                azimuth_rad (0), recip_miscut_rad (None; (polar_rad, azim_rad)
+                crystal miscut of g relative to n -- None is a strict no-op,
+                see montecarlo.geometry._orientation_R), E_cut_lines_keV (5),
+                E_cut_brem_keV (1),
                 spec_chunk (40000) / brem_chunk (20000): segments per GPU matmul
                 -- lower these to cap peak GPU memory on a busy/shared device;
                 the per-case default is overridable via the CXR_MC_SPEC_CHUNK /
@@ -376,6 +379,7 @@ def _spectrum_case(case, tp):
             composition=case["composition"],
             beam_uvw=case.get("beam_uvw"),
             azimuth_rad=case.get("azimuth_rad", 0.0),
+            recip_miscut_rad=case.get("recip_miscut_rad"),
             sinc_cutoff=case.get("sinc_cutoff"),
             chunk=spec_chunk,
             layers=abs_layers,
@@ -401,6 +405,7 @@ def _spectrum_case(case, tp):
                 # per-layer in-plane orientation (Layer.azimuth_deg); radiators
                 # from pre-stack checkpoints lack the key -> case-level fallback
                 azimuth_rad=rad.get("azimuth_rad", case.get("azimuth_rad", 0.0)),
+                recip_miscut_rad=rad.get("recip_miscut_rad", case.get("recip_miscut_rad")),
                 sinc_cutoff=case.get("sinc_cutoff"),
                 chunk=spec_chunk,
                 layers=abs_layers,

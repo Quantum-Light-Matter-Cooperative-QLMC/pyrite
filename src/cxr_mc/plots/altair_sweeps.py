@@ -38,8 +38,8 @@ from .sweeps import (
 )
 
 # Tick-label format for numeric axes (d3-format): 3 significant digits, no
-# trailing zeros -- keeps a 25-tilt sweep (e.g. np.linspace(-85, -0.1, 25),
-# which produces values like -33.300000000000004) from spamming full-precision
+# trailing zeros -- keeps a 25-tilt sweep (e.g. np.linspace(0.1, 85, 25),
+# which produces values like 33.300000000000004) from spamming full-precision
 # floats down the heatmap axes.
 _TICK_FMT = ".3~g"
 

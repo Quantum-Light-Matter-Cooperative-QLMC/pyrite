@@ -26,7 +26,7 @@ def _sweep(material, **kw):
         material=material,
         thickness_ang=1e4,
         energy_keV=30,
-        tilt_deg=-30.0,
+        tilt_deg=30.0,
         E_grid_line=LINE_GRID,
         E_grid_brem=BREM_GRID,
         **kw,

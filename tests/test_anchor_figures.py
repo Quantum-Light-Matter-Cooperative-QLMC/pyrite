@@ -210,7 +210,7 @@ def _synthetic_supplementary_spectra(study):
 
 def test_supplementary_detected_spectrum_matches_fig1c_detector_scaling():
     study = af.supplementary_study("wse2")
-    spectrum = _synthetic_supplementary_spectra(study)[-10.0]
+    spectrum = _synthetic_supplementary_spectra(study)[10.0]
     peak_eV = float(study.E_grid[np.argmax(spectrum)])
     anchor = af.ZhaiAnchor()
     fwhm_eV = float(
@@ -260,7 +260,7 @@ def test_supplementary_studies_match_requested_windows_and_thicknesses():
     assert hbn.thicknesses_nm == (921.0,)
     assert (wse2.E_grid[0], wse2.E_grid[-1]) == (800.0, 1199.0)
     assert (hbn.E_grid[0], hbn.E_grid[-1]) == (600.0, 1199.0)
-    assert wse2.polar_tilts_deg == (-10.0, -15.0, -17.5, -20.0)
+    assert wse2.polar_tilts_deg == (10.0, 15.0, 17.5, 20.0)
     with pytest.raises(ValueError, match="unknown Zhai supplementary crystal"):
         af.supplementary_study("hopg")
 
@@ -326,7 +326,7 @@ def test_supplementary_overview_figure_smoke():
     from matplotlib.figure import Figure
 
     spectra = {
-        crystal: _synthetic_supplementary_spectra(af.supplementary_study(crystal))[-20.0]
+        crystal: _synthetic_supplementary_spectra(af.supplementary_study(crystal))[20.0]
         for crystal in ("wse2", "mose2", "hbn")
     }
 
@@ -346,7 +346,7 @@ def test_supplementary_overview_rejects_missing_material():
 
 def test_supplementary_overview_rejects_unknown_key():
     spectra = {
-        crystal: _synthetic_supplementary_spectra(af.supplementary_study(crystal))[-20.0]
+        crystal: _synthetic_supplementary_spectra(af.supplementary_study(crystal))[20.0]
         for crystal in ("wse2", "mose2", "hbn")
     }
     spectra["hopg"] = spectra.pop("hbn")

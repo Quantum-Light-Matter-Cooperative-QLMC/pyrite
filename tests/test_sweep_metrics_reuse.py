@@ -55,7 +55,7 @@ def _record(name, E0, tilt, azim, amp, n=80):
 
 def _store():
     store = {}
-    for tilt in (-20.0, -10.0):
+    for tilt in (20.0, 10.0):
         for azim in (0.0, 30.0):
             name = f"HOPG t{tilt} a{azim}"
             store[name] = {

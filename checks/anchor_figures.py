@@ -93,7 +93,7 @@ class SupplementaryCoherentStudy:
     thicknesses_nm: tuple[float, ...]
     e_min_eV: float
     e_max_eV: float
-    polar_tilts_deg: tuple[float, ...] = (-10.0, -15.0, -17.5, -20.0)
+    polar_tilts_deg: tuple[float, ...] = (10.0, 15.0, 17.5, 20.0)
     energy_keV: float = 200.0
     theta_obs_rad: float = float(np.deg2rad(119.0))
 

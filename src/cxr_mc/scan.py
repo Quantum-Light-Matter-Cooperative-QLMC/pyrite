@@ -74,8 +74,8 @@ def run(args):
     overrides = {}
     if args.quick:
         overrides.update(
-            tilt_deg=np.linspace(-45.0, 45.0, 5),
-            tilt_azim_deg=np.array([-30.0, -10.0]),
+            tilt_deg=np.linspace(0.0, 85.0, 5),
+            tilt_azim_deg=np.array([10.0, 30.0]),
             energy_keV=[30, 60],
         )
     if args.n_families is not None:

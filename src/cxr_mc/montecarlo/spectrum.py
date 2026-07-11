@@ -67,6 +67,7 @@ def mc_spectrum(
     composition=None,
     beam_uvw=None,
     azimuth_rad=0.0,
+    recip_miscut_rad: tuple[float, float] | None = None,
     sinc_cutoff=None,
     components=False,
     layers=None,
@@ -106,6 +107,14 @@ def mc_spectrum(
     azimuth_rad about +z (the in-plane setting of the crystal relative to
     the detector azimuth -- it matters for individual family members).
 
+    recip_miscut_rad: optional (polar_rad, azim_rad) crystal miscut -- an
+    EXTRA tilt applied only to the reciprocal vectors g, leaving the
+    transported slab normal/beam_dir (set by tilted_geometry() upstream,
+    outside this function) untouched. None (default) is a strict no-op: g
+    stays aligned with the slab normal, today's behavior bit-for-bit. See
+    :func:`geometry._orientation_R`. Not wired into any grid/study yet; the
+    escape hatch for a future asymmetric reflection (g not parallel to n).
+
     sinc_cutoff: None (default) evaluates every segment's lineshape over the
     FULL grid (exact). A number C truncates each lineshape at |P t_L| > C,
     i.e. |E - E_res| > C/a_width -- segments are processed in resonance-
@@ -137,7 +146,7 @@ def mc_spectrum(
     abs_comp = _normalize_composition(absorber_element, n_atoms, composition)
 
     # crystal orientation: rotation applied to all reciprocal vectors
-    R_orient = _orientation_R(info["lattice"], beam_uvw, azimuth_rad)
+    R_orient = _orientation_R(info["lattice"], beam_uvw, azimuth_rad, recip_miscut_rad)
     thickness = segments["thickness_ang"]
     Ne = segments["Ne"]
 

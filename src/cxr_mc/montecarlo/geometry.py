@@ -5,6 +5,14 @@ Lab/sample-frame geometry shared by transport, spectrum and detector: the
 tilted-sample beam/detector directions, the finite-detector-face direction
 grid, the crystal-orientation and small-tilt rotations, and the Gauss-Hermite
 mosaic-orientation quadrature.
+
+Tilt convention (matches Zhai SI): the sample tilt is a spherical (theta, phi)
+pair. Positive polar tilt (``tilt_polar_rad`` / ``tilt_deg``) tilts the slab
+normal -- and, by construction, the reciprocal vector g (g || n by default,
+see :func:`_orientation_R`) -- TOWARD the detector. Positive azimuth
+(``tilt_azim_rad`` / ``tilt_azim_deg``) is a CCW roll about the beam +z axis,
+reported in [0 deg, 180 deg]; azimuth 0 places the tilt in the scattering x-z
+plane (zero y-component).
 """
 
 import numpy as np
@@ -21,8 +29,18 @@ def tilted_geometry(theta_obs_rad, tilt_polar_rad, tilt_azim_rad=0.0):
     is fixed along +z_lab and the detector sits at polar angle theta_obs_rad,
     azimuth 0. Tilting the sample so its normal points along
     (sin tp cos ta, sin tp sin ta, cos tp) in the lab (tp = tilt_polar_rad,
-    ta = tilt_azim_rad, cf. Zhai SI Fig. 1) is equivalent to rotating the
-    beam and detector into the sample frame.
+    ta = tilt_azim_rad) is equivalent to rotating the beam and detector into
+    the sample frame.
+
+    Convention (matches Zhai SI): POSITIVE tp tilts the slab normal -- and
+    therefore the reciprocal vector g (g || n by default) -- TOWARD the
+    detector. Verified: at ta = 0, +tp and -tp give the SAME line energy
+    (the 1 - v0.n_hat denominator is even in tp) but +tp gives ~2x the peak
+    coherent-emission intensity of -tp (theta_obs = 119 deg) -- +tp is the
+    physically-correct, higher-flux orientation Zhai reports. POSITIVE ta is
+    a CCW roll about the beam +z axis, reported over [0 deg, 180 deg]; ta = 0
+    places the tilt in the scattering x-z plane, i.e. the normal has zero
+    y-component.
 
     Returns (beam_dir, n_hat) to pass to simulate_trajectories(beam_dir=...)
     and mc_spectrum(n_hat=...). For ta = 0 the detector's sample-frame polar
@@ -58,7 +76,11 @@ def detector_directions(
 
     The central cell sits at polar angle ``theta_obs_rad`` (azimuth 0) in the lab
     and is mapped into the sample frame through the SAME tilt rotation as
-    tilted_geometry(), so n_side=1 returns exactly that single direction. The chip
+    tilted_geometry() -- same convention: positive ``tilt_polar_rad`` tilts the
+    slab normal (and g, by default) toward the detector; positive
+    ``tilt_azim_rad`` is a CCW roll about the beam +z axis over [0, pi], with
+    0 in the scattering x-z plane -- so n_side=1 returns exactly that single
+    direction. The chip
     in-plane axes are chosen so one grid axis spreads in the scattering plane (the
     polar / Delta-theta direction) and the other out of plane (azimuth). The
     per-cell weight is the inverse-square + obliquity solid angle
@@ -104,12 +126,29 @@ def detector_directions(
     return n_hats, weights
 
 
-def _orientation_R(lattice, beam_uvw, azimuth_rad):
+def _orientation_R(
+    lattice, beam_uvw, azimuth_rad, recip_miscut_rad: tuple[float, float] | None = None
+):
     """Rotation applied to EVERY reciprocal vector: the minimal rotation taking the
     crystal direct-lattice direction `beam_uvw` onto +z (the slab normal), then a
     roll of `azimuth_rad` about +z. Returns None for the construction-frame default
     (beam_uvw is None and azimuth_rad == 0). Shared by mc_spectrum and mosaic_psi_rad
-    so the orientation convention lives in one place."""
+    so the orientation convention lives in one place.
+
+    recip_miscut_rad: optional (polar_rad, azim_rad) EXTRA tilt of the
+    reciprocal vector g away from the slab normal n -- a crystal miscut, where
+    g no longer points along the physical normal (n stays whatever
+    tilted_geometry() sets via tilt_polar_rad/tilt_azim_rad; ONLY g moves
+    here). None (default) is a strict no-op: g stays aligned with n, today's
+    behavior bit-for-bit. When given, uses the SAME spherical parametrization
+    as tilted_geometry (Zhai convention: positive polar rotates g further from
+    +z in the construction frame, azim CCW about +z), composed on top of the
+    beam_uvw/azimuth rotation so it acts purely on g -- n_hat/beam_dir (set by
+    tilted_geometry separately) are never touched. (0.0, anything) or
+    (anything, 0.0-equivalent axis) collapses to the identity, so a caller
+    that always passes recip_miscut_rad=(0.0, 0.0) gets the None behavior
+    exactly. Not yet wired into any grid/study -- plumbed for a future
+    asymmetric-reflection (g not || n) study."""
     R = None
     if beam_uvw is not None:
         u, v, w = np.asarray(beam_uvw, dtype=float)
@@ -120,6 +159,13 @@ def _orientation_R(lattice, beam_uvw, azimuth_rad):
         ca, sa = np.cos(azimuth_rad), np.sin(azimuth_rad)
         Rz = np.array([[ca, -sa, 0.0], [sa, ca, 0.0], [0.0, 0.0, 1.0]])
         R = Rz if R is None else Rz @ R
+    if recip_miscut_rad is not None:
+        mp, ma = recip_miscut_rad
+        if mp:
+            st, ct = np.sin(mp), np.cos(mp)
+            miscut_dir = np.array([st * np.cos(ma), st * np.sin(ma), ct])
+            R_miscut = _rotation_between(np.array([0.0, 0.0, 1.0]), miscut_dir)
+            R = R_miscut if R is None else R_miscut @ R
     return R
 
 

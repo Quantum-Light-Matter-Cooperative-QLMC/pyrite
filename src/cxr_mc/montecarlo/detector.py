@@ -102,7 +102,12 @@ def mosaic_psi_rad(case, E_pk_eV):
         np.deg2rad(case.get("tilt_azim_deg", 0.0)),
     )
     beta = beta_from_keV(case["E0_keV"])
-    R = _orientation_R(info["lattice"], case.get("beam_uvw"), case.get("azimuth_rad", 0.0))
+    R = _orientation_R(
+        info["lattice"],
+        case.get("beam_uvw"),
+        case.get("azimuth_rad", 0.0),
+        case.get("recip_miscut_rad"),
+    )
     denom = 1.0 - beta * float(beam_dir @ n_hat)  # g-independent (Doppler denominator)
     if denom <= 0.0:
         return None

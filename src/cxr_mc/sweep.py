@@ -9,8 +9,8 @@ The driver notebook sets ONE :class:`Sweep`. Every physical parameter accepts
 **either a single value (fixed) or a sequence/array (swept)**; :func:`build_cases`
 takes the Cartesian product over whatever is swept. So
 
-    Sweep(tilt_deg=-30.0,              tilt_azim_deg=0.0)          # one case geometry
-    Sweep(tilt_deg=np.linspace(-36,-1,14), tilt_azim_deg=[-9,0,9])  # 14*3 geometries
+    Sweep(tilt_deg=30.0,               tilt_azim_deg=0.0)          # one case geometry
+    Sweep(tilt_deg=np.linspace(1,36,14), tilt_azim_deg=[0,9,18])   # 14*3 geometries
 
 are both valid and need no other code changes.
 
@@ -87,9 +87,10 @@ def stack_layers(film_composition, film_thickness_ang, stack):
     boundaries accumulating downward. Attach as a case's ``abs_layers`` so
     emitted lines/brem are attenuated by the WHOLE stack (each crystalline
     layer still RADIATES via its own layer_radiator). Beam enters the film
-    side; with negative tilt (front exit) the lower layers sit BEHIND the
-    emission and do not attenuate -- they bite the back-exit / transmission
-    geometry. See docs/multilayer-materials.md."""
+    side; with positive tilt (toward-detector, Zhai convention; front exit)
+    the lower layers sit BEHIND the emission and do not attenuate -- they
+    bite the back-exit / transmission geometry. See
+    docs/multilayer-materials.md."""
     t_f = float(film_thickness_ang)
     layers = [(0.0, t_f, [(el, float(n)) for el, n in film_composition])]
     z = t_f
@@ -198,7 +199,7 @@ class Sweep:
     material: str  # required: no default, so a Sweep can't silently load MoSe2
     thickness_ang: ScalarOrSeq = 2e4
     energy_keV: ScalarOrSeq = (30.0, 45.0, 60.0)
-    tilt_deg: ScalarOrSeq = -30.0
+    tilt_deg: ScalarOrSeq = 30.0
     tilt_azim_deg: ScalarOrSeq = 0.0
     # fixed setup (single values) ------------------------------------------
     theta_obs_deg: float = 90.0

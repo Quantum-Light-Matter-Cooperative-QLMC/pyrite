@@ -47,7 +47,7 @@ def _record(name, E0, tilt, azim, amp, n=80):
 def _store():
     # 2 tilts x 2 azimuths (distinct configs) x 2 beam energies = 8 records.
     store = {}
-    for tilt in (-20.0, -10.0):
+    for tilt in (20.0, 10.0):
         for azim in (0.0, 30.0):
             name = f"HOPG t{tilt} a{azim}"
             store[name] = {
@@ -93,10 +93,10 @@ def test_heatmap_frame_shape():
     assert set(df["panel"]) == {"30 keV", "60 keV"}
     # name/panel_raw carry per-cell identity for click-to-select back-mapping
     assert set(df["name"]) == {
-        "HOPG t-20.0 a0.0",
-        "HOPG t-20.0 a30.0",
-        "HOPG t-10.0 a0.0",
-        "HOPG t-10.0 a30.0",
+        "HOPG t20.0 a0.0",
+        "HOPG t20.0 a30.0",
+        "HOPG t10.0 a0.0",
+        "HOPG t10.0 a30.0",
     }
     assert set(df["panel_raw"]) == {30.0, 60.0}
 

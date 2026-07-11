@@ -37,7 +37,7 @@ COLLAPSE_AZIMUTH = True
 
 # Penetration-plot transport angles. Keep this intentionally sparse because each
 # value triggers direct CPU trajectory MC in the analysis app.
-PENETRATION_TILT_DEG = (0.0, -15.0, -45.0, -75.0)
+PENETRATION_TILT_DEG = (0.0, 15.0, 45.0, 75.0)
 
 
 def default_settings():
@@ -87,7 +87,7 @@ def trajectory_sweep(
     """A small dedicated geometry sweep for the electron-penetration figures: a
     handful of polar tilts at normal azimuth, two beam energies (transport only,
     so the energy grids are irrelevant -- kept for build_cases). ``n_tilts`` panels
-    span from ``-tilt_span`` to normal incidence when supplied; otherwise the
+    span from normal incidence to ``tilt_span`` when supplied; otherwise the
     sparse default :data:`PENETRATION_TILT_DEG` set is used.
 
     Always uses ONE thickness: ``thickness_ang`` when explicitly supplied,
@@ -116,7 +116,7 @@ def trajectory_sweep(
     if n_tilts is not None or tilt_span is not None:
         count = 9 if n_tilts is None else int(n_tilts)
         span = 80.0 if tilt_span is None else float(tilt_span)
-        tilt_values = np.linspace(-span, 0.0, count, endpoint=True)
+        tilt_values = np.linspace(0.0, span, count, endpoint=True)
     else:
         tilt_values = tuple(float(t) for t in tilts)
     return Sweep(
