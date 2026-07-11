@@ -524,6 +524,40 @@ def cached_coherent_spectra(
     return spectra, False, path
 
 
+def reproduce_all(
+    ne: int = 20_000,
+    ne_brem: int = 200,
+    ne_supp: int = 200,
+    *,
+    cache_dir: str | Path | None = None,
+    refresh: bool = False,
+) -> list[tuple[str, Path, bool]]:
+    """Force-populate every Zhai cache the validation app can hit, at the
+    app's own default sample counts so a pulled cache is a guaranteed hit
+    locally.
+
+    No figures -- this only leaves correct, hash-addressed .pkl files on disk
+    under ``cache_dir`` (default checkpoints/zhai_reproduction/). This is the
+    GPU-box-runnable unit behind ``reproduce_zhai.py`` / ``cxr remote check``.
+
+    Returns [(label, path, cache_hit)] for the Fig.1c anchor plus every
+    supplementary (study, thickness) pair -- 8 entries total.
+    """
+    results: list[tuple[str, Path, bool]] = []
+    anchor = ZhaiAnchor()
+    _, hit, path = cached_model_spectra(
+        anchor, ne=ne, ne_brem=ne_brem, cache_dir=cache_dir, refresh=refresh
+    )
+    results.append(("zhai-fig1c", path, hit))
+    for crystal, study in ZHAI_SUPPLEMENTARY_STUDIES.items():
+        for thickness_nm in study.thicknesses_nm:
+            _, hit, path = cached_coherent_spectra(
+                study, thickness_nm, ne=ne_supp, cache_dir=cache_dir, refresh=refresh
+            )
+            results.append((f"{crystal}-{thickness_nm:g}nm", path, hit))
+    return results
+
+
 # ---- optional digitized reference (model-vs-measured hook) -------------------
 
 

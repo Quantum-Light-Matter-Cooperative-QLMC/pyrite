@@ -248,3 +248,35 @@ def test_supplementary_hbn_figure_smoke():
     assert len(fig.axes[0].lines) == 4
     assert fig.axes[0].get_xlabel() == "Photon energy (eV)"
     fig.canvas.draw()
+
+
+def test_reproduce_all_populates_every_cache_and_reuses_it(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_model_spectra(received_anchor, ne, ne_brem):
+        calls.append(("fig1c", ne, ne_brem))
+        return {"peak": True}
+
+    def fake_coherent(study, thickness_nm, ne):
+        calls.append((study.crystal, thickness_nm, ne))
+        return {tilt: np.zeros(4) for tilt in study.polar_tilts_deg}
+
+    monkeypatch.setattr(af, "model_spectra", fake_model_spectra)
+    monkeypatch.setattr(af, "model_coherent_spectra", fake_coherent)
+
+    results = af.reproduce_all(ne=11, ne_brem=3, ne_supp=5, cache_dir=tmp_path)
+
+    assert len(results) == 8
+    labels = [label for label, _path, _hit in results]
+    assert labels[0] == "zhai-fig1c"
+    assert "wse2-42nm" in labels and "mose2-147nm" in labels and "hbn-921nm" in labels
+    assert all(path.exists() for _label, path, _hit in results)
+    assert all(hit is False for _label, _path, hit in results)  # first run: no cache hits
+    assert len(calls) == 8
+
+    calls.clear()
+    results2 = af.reproduce_all(ne=11, ne_brem=3, ne_supp=5, cache_dir=tmp_path)
+
+    assert calls == []  # fully cache-hit; no MC re-run
+    assert [label for label, _p, _h in results2] == labels
+    assert all(hit for _label, _path, hit in results2)
