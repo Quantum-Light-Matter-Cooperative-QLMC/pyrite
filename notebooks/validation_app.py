@@ -426,11 +426,12 @@ def _(mo):
     mo.md(r"""
     ## Zhai supplementary coherent-emission studies
 
-    These are separate from the Fig. 1c anchor: each run contains **only
-    intrinsic coherent PXR+CBS emission**, with no incoherent bremsstrahlung or
-    detector convolution. WSe₂ and MoSe₂ each render four polar-tilt panels at
-    a selected reported thickness; h-BN overlays its four requested tilts at
-    921 nm. Every study uses a 200 keV beam and the reported energy window.
+    These are separate from the Fig. 1c anchor: each run contains coherent
+    PXR+CBS emission, convolved with the same Zhai EDS-plus-aperture detector
+    response and normalized to **Phs/eV/s/nA**. WSe₂ and MoSe₂ each render four
+    polar-tilt panels at a selected reported thickness; h-BN overlays its four
+    requested tilts at 921 nm. Every study uses a 200 keV beam and the reported
+    energy window.
     """)
     return
 
@@ -501,7 +502,7 @@ def _(
     study = af.supplementary_study(supplementary_study_ui.value)
     thickness_nm = float(supplementary_thickness_ui.value)
     with mo.status.spinner(
-        title="Running coherent-only supplementary spectra",
+        title="Running detector-convolved supplementary spectra",
         subtitle="Four transport and PXR+CBS spectra are computed or loaded from cache.",
     ):
         spectra, cache_hit, cache_path = af.cached_coherent_spectra(
