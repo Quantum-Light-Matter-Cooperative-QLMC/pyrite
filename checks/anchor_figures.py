@@ -827,6 +827,63 @@ def figure_supplementary_overview(spectra: dict[str, np.ndarray]):
     return fig
 
 
+def export_all_figures(
+    outdir: str | Path = "figures",
+    ne: int = 20_000,
+    ne_brem: int = 200,
+    ne_supp: int = 200,
+    *,
+    cache_dir: str | Path | None = None,
+) -> list[Path]:
+    """Render the complete publication figure set from whatever is already
+    cached under checkpoints/zhai_reproduction/ (a cache miss recomputes
+    locally rather than failing) -- the Fig.1c trio, every supplementary
+    panel, and the cross-material overview -- to `outdir`. One command turns
+    a `cxr remote check` pull into the full figure set with no per-study
+    clicking in the app. Returns the list of PNG paths written (a PDF is
+    written alongside each)."""
+    import matplotlib
+
+    try:
+        matplotlib.use("Agg")
+    except Exception:
+        pass
+
+    outpath = Path(outdir)
+    outpath.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+
+    def _save(name, fig):
+        for ext in ("png", "pdf"):
+            fig.savefig(outpath / f"{name}.{ext}", dpi=150, bbox_inches="tight")
+        written.append(outpath / f"{name}.png")
+
+    anchor = ZhaiAnchor()
+    model, _hit, _path = cached_model_spectra(anchor, ne=ne, ne_brem=ne_brem, cache_dir=cache_dir)
+    reference = reference_curve(anchor)
+    _save("zhai_fig1c_spectra_vs_theory", figure_spectra(anchor, model, reference))
+    _save("zhai_flux_anchor", figure_flux_anchor(anchor, model))
+    _save("zhai_bulk_vs_film_enhancement", figure_enhancement(anchor, model))
+
+    overview_spectra: dict[str, np.ndarray] = {}
+    for crystal, study in ZHAI_SUPPLEMENTARY_STUDIES.items():
+        for thickness_nm in study.thicknesses_nm:
+            spectra, _hit, _path = cached_coherent_spectra(
+                study, thickness_nm, ne=ne_supp, cache_dir=cache_dir
+            )
+            fig = (
+                figure_supplementary_hbn(study, thickness_nm, spectra)
+                if crystal == "hbn"
+                else figure_supplementary_tmd(study, thickness_nm, spectra)
+            )
+            _save(f"zhai_supplementary_{crystal}_{thickness_nm:g}nm", fig)
+            if thickness_nm == study.thicknesses_nm[0]:
+                overview_spectra[crystal] = spectra[study.polar_tilts_deg[-1]]
+
+    _save("zhai_supplementary_overview", figure_supplementary_overview(overview_spectra))
+    return written
+
+
 # ---- validation table + CLI --------------------------------------------------
 
 

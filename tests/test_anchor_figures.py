@@ -312,3 +312,36 @@ def test_reproduce_all_populates_every_cache_and_reuses_it(tmp_path, monkeypatch
     assert calls == []  # fully cache-hit; no MC re-run
     assert [label for label, _p, _h in results2] == labels
     assert all(hit for _label, _path, hit in results2)
+
+
+def test_export_all_figures_writes_expected_files(tmp_path, monkeypatch):
+    anchor = af.ZhaiAnchor()
+    backend_calls = []
+
+    def fake_model_spectra(received_anchor, ne, ne_brem):
+        return _synthetic_model(anchor)
+
+    def fake_coherent(study, thickness_nm, ne):
+        return _synthetic_supplementary_spectra(study)
+
+    monkeypatch.setattr(af, "model_spectra", fake_model_spectra)
+    monkeypatch.setattr(af, "model_coherent_spectra", fake_coherent)
+    monkeypatch.setattr(matplotlib, "use", lambda backend: backend_calls.append(backend))
+
+    outdir = tmp_path / "figures"
+    written = af.export_all_figures(
+        outdir=outdir, ne=11, ne_brem=3, ne_supp=5, cache_dir=tmp_path / "cache"
+    )
+
+    names = {p.name for p in written}
+    assert "zhai_fig1c_spectra_vs_theory.png" in names
+    assert "zhai_flux_anchor.png" in names
+    assert "zhai_bulk_vs_film_enhancement.png" in names
+    assert "zhai_supplementary_wse2_42nm.png" in names
+    assert "zhai_supplementary_mose2_147nm.png" in names
+    assert "zhai_supplementary_hbn_921nm.png" in names
+    assert "zhai_supplementary_overview.png" in names
+    for path in written:
+        assert path.exists()
+        assert path.with_suffix(".pdf").exists()
+    assert backend_calls == ["Agg"]
