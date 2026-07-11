@@ -27,8 +27,8 @@ automatically -- so the same figure/notebook becomes a true model-vs-measured
 plot the moment real data lands, with no code change.
 
 Backend module: the functions return plain data + matplotlib Figures; main()
-runs the (slow) MC, writes figures/, and prints the validation tables. The
-companion notebook checks/zhai_fig1c_validation.ipynb is a thin viz wrapper.
+runs the (slow) MC, writes figures/, and prints the validation tables. The Zhai
+section of notebooks/validation_app.py is the thin interactive wrapper.
 
 Run (CPU-force on a box with the cupy wheel but no CUDA device):
   uv run python -c "import sys;sys.modules['cupy']=None;sys.path.insert(0,'checks');import runpy;runpy.run_path('checks/anchor_figures.py',run_name='__main__')"
@@ -36,8 +36,12 @@ Run (CPU-force on a box with the cupy wheel but no CUDA device):
 
 from __future__ import annotations
 
+import hashlib
+import inspect
+import json
+import os
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
@@ -69,6 +73,7 @@ from cxr_mc.montecarlo import (  # noqa: E402
 )
 
 GRAPHITE_B_002 = 0.8  # graphite c-axis Debye-Waller B-factor [Ang^2], approx (Zhai SI)
+_ZHAI_CACHE_SCHEMA = 1
 
 
 @dataclass(frozen=True)
@@ -294,6 +299,59 @@ def model_spectra(anchor: ZhaiAnchor, ne: int = 500, ne_brem: int = 200) -> dict
     return out
 
 
+def _zhai_cache_key(anchor: ZhaiAnchor, ne: int, ne_brem: int) -> str:
+    """Fingerprint inputs and implementation files that affect the reproduction."""
+    digest = hashlib.sha256()
+    inputs = {
+        "schema": _ZHAI_CACHE_SCHEMA,
+        "anchor": asdict(anchor),
+        "ne": ne,
+        "ne_brem": ne_brem,
+    }
+    digest.update(json.dumps(inputs, sort_keys=True).encode())
+    digest.update(inspect.getsource(model_spectra).encode())
+    implementation_files = _HERE.parent.glob("src/cxr_mc/**/*.py")
+    for path in sorted(implementation_files):
+        digest.update(path.relative_to(_HERE.parent).as_posix().encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()[:20]
+
+
+def cached_model_spectra(
+    anchor: ZhaiAnchor,
+    ne: int = 500,
+    ne_brem: int = 200,
+    *,
+    cache_dir: str | Path | None = None,
+    refresh: bool = False,
+) -> tuple[dict, bool, Path]:
+    """Load or atomically cache a Zhai reproduction keyed by inputs and code.
+
+    Returns ``(model, cache_hit, path)``. Cache files are local generated
+    artifacts under ``checkpoints/zhai_reproduction`` by default.
+    """
+    from cxr_mc import _checkpoint_io
+
+    root = (
+        Path(cache_dir)
+        if cache_dir is not None
+        else _HERE.parent / "checkpoints" / "zhai_reproduction"
+    )
+    path = root / f"zhai-{_zhai_cache_key(anchor, ne, ne_brem)}.pkl"
+    if path.exists() and not refresh:
+        return _checkpoint_io.load(str(path)), True, path
+
+    model = model_spectra(anchor, ne=ne, ne_brem=ne_brem)
+    root.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        _checkpoint_io.dump(model, str(tmp))
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
+    return model, False, path
+
+
 # ---- optional digitized reference (model-vs-measured hook) -------------------
 
 
@@ -346,36 +404,46 @@ def _match_series(reference: dict, E0_keV: float) -> str | None:
 
 
 def figure_spectra(anchor: ZhaiAnchor, model: dict, reference: dict | None = None):
-    """Fig 1c analog vs theory: model spectra (intrinsic + detector-convolved
-    with bremsstrahlung) with the Eq.(10) dispersion-relation line energies as
-    vertical markers, the 29 nm film overlay, and -- if provided -- the
-    digitized measured curve scaled to the model peak per beam energy."""
+    """Fig 1c analog vs theory in three vertically stacked stages.
+
+    The stages are intrinsic PXR+CBS, detector-convolved PXR+CBS without the
+    incoherent bremsstrahlung background, and the detector-convolved total.
+    Eq.(10) line energies are vertical markers; the 29 nm film is overlaid on
+    both detector views, and digitized measurements (when present) on the total.
+    """
     import matplotlib.pyplot as plt
 
     scale = anchor.domega_sr * anchor.per_nA  # per e/sr/eV -> Phs/eV/s/nA
     lines = theory_line_energies(anchor)
-    fig, (ax_i, ax_d) = plt.subplots(1, 2, figsize=(13, 5))
+    fig, (ax_i, ax_line, ax_total) = plt.subplots(3, 1, figsize=(9, 13), sharex=True)
     for i, E0 in enumerate(anchor.energies_keV):
         m = model[E0]
         c = f"C{i}"
         ax_i.plot(anchor.E_grid, m["spec"] * scale, color=c, label=f"{E0:g} keV")
-        ax_d.plot(
+        ax_line.plot(
+            anchor.E_grid,
+            m["spec_det"] * scale,
+            color=c,
+            label=f"{E0:g} keV (bulk)",
+        )
+        ax_total.plot(
             anchor.E_grid,
             (m["spec_det"] + m["brem_det"]) * scale,
             color=c,
             label=f"{E0:g} keV (bulk)",
         )
-        ax_d.plot(anchor.E_grid, m["brem_det"] * scale, color=c, ls="--", lw=0.9)
-        for ax in (ax_i, ax_d):
+        ax_total.plot(anchor.E_grid, m["brem_det"] * scale, color=c, ls="--", lw=0.9)
+        for ax in (ax_i, ax_line, ax_total):
             ax.axvline(lines[E0], color=c, ls=":", lw=1.2, alpha=0.7)
     if "film" in model:
-        ax_d.plot(
-            anchor.E_grid,
-            model["film"]["spec_det"] * scale,
-            "k-",
-            lw=1.0,
-            label=f"{model['film']['E0_keV']:g} keV, 29 nm film",
-        )
+        for ax in (ax_line, ax_total):
+            ax.plot(
+                anchor.E_grid,
+                model["film"]["spec_det"] * scale,
+                "k-",
+                lw=1.0,
+                label=f"{model['film']['E0_keV']:g} keV, 29 nm film",
+            )
     if reference:
         for i, E0 in enumerate(anchor.energies_keV):
             key = _match_series(reference, E0)
@@ -384,7 +452,7 @@ def figure_spectra(anchor: ZhaiAnchor, model: dict, reference: dict | None = Non
             e, inten = reference[key]
             peak = float((model[E0]["spec_det"] + model[E0]["brem_det"]).max() * scale)
             y = inten / np.nanmax(inten) * peak  # scale measured shape to model peak
-            ax_d.scatter(
+            ax_total.scatter(
                 e,
                 y,
                 s=14,
@@ -394,10 +462,12 @@ def figure_spectra(anchor: ZhaiAnchor, model: dict, reference: dict | None = Non
                 label=f"{E0:g} keV (measured)",
             )
     ax_i.set_title("Intrinsic PXR+CBS (1 mm HOPG)\ndotted = Eq.(10) line energy")
-    ax_d.set_title("EDS-convolved: peaks + brem (dashed)\ndotted = Eq.(10) line energy")
-    for ax in (ax_i, ax_d):
+    ax_line.set_title("EDS-convolved PXR+CBS only (no incoherent brem)")
+    ax_total.set_title("EDS-convolved total: PXR+CBS + brem (dashed)")
+    for ax in (ax_i, ax_line, ax_total):
         ax.set_xlabel("Photon energy (eV)")
         ax.set_ylabel("Intensity (Phs/eV/s/nA)")
+        ax.tick_params(axis="x", labelbottom=True)
         ax.grid(alpha=0.3)
         ax.legend(fontsize=8)
     fig.suptitle(r"Model vs theory: PXR+CBS from HOPG, $\theta_{obs}$=119$\degree$, 0.066 sr")

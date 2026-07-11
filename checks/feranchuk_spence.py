@@ -893,7 +893,8 @@ def photons_per_electron(
 
     agree exactly with the integrated finite-segment lineshape used in
 
-    montecarlo.mc_spectrum (validated to <1% in zhai_fig1c_check.py).
+    montecarlo.mc_spectrum (validated to <1% by
+    anchor_figures.single_segment_anchor).
 
     Up to ~1.7x at relativistic-ish beta and forward angles.
 

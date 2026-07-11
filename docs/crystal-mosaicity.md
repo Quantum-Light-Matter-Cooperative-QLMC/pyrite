@@ -63,9 +63,9 @@ FWHM, so a record computed with `mosaic=False` can be re-broadened at plot time.
 
 ## (2) Monte-Carlo mosaic average — IMPLEMENTED (the exact route)
 
-### Scoping (do this before reaching for the exact route)
+### Scoping result (completed before implementing the exact route)
 
-`checks/mosaic_scoping_check.py` measures the intrinsic multiple-scattering Doppler
+The retired scoping study measured the intrinsic multiple-scattering Doppler
 width vs the analytic mosaic broadening for HOPG, thin → bulk. The finding: for the
 real HOPG grades the line is genuinely **mosaic-broad** — ZYH (3.5°) gives 25–72 eV vs
 a ~5–30 eV Doppler width (1–15× across thin→bulk), and ZYB (0.8°) is comparable
@@ -132,8 +132,9 @@ lineshape.
 - `sweep.Sweep(mosaic=True, mosaic_route="mc", mosaic_nodes=…)` → `build_cases` sets the
   `mosaic_mc_*` case keys **and turns the analytic `store_result` term off** — the two
   routes are mutually exclusive (applying both double-counts the broadening).
-- Validation: `checks/mosaic_mc_check.py`; scoping: `checks/mosaic_scoping_check.py`;
-  synthetic unit tests (quadrature + wiring): `tests/test_mosaic_mc.py`.
+- Validation: `checks/mosaic_mc_check.py`; synthetic unit tests (quadrature +
+  wiring): `tests/test_mosaic_mc.py`. The completed scoping study was retired after
+  its decision was implemented; its conclusion is preserved above.
 
 ```python
 material_sweep("hopg", mosaic=True, mosaic_route="mc")                       # default nodes (moments)

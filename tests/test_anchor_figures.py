@@ -124,12 +124,64 @@ def _synthetic_model(anchor):
     return model
 
 
+def test_cached_model_spectra_round_trip(anchor, tmp_path, monkeypatch):
+    expected = _synthetic_model(anchor)
+    calls = []
+
+    def fake_model_spectra(received_anchor, ne, ne_brem):
+        calls.append((received_anchor, ne, ne_brem))
+        return expected
+
+    monkeypatch.setattr(af, "model_spectra", fake_model_spectra)
+
+    first, first_hit, path = af.cached_model_spectra(anchor, ne=12, ne_brem=7, cache_dir=tmp_path)
+    second, second_hit, second_path = af.cached_model_spectra(
+        anchor, ne=12, ne_brem=7, cache_dir=tmp_path
+    )
+
+    assert not first_hit
+    assert second_hit
+    assert path == second_path
+    assert path.exists()
+    assert calls == [(anchor, 12, 7)]
+    assert first.keys() == second.keys()
+
+
+def test_cached_model_spectra_refreshes(anchor, tmp_path, monkeypatch):
+    calls = []
+
+    def fake_model_spectra(received_anchor, ne, ne_brem):
+        calls.append((received_anchor, ne, ne_brem))
+        return {"generation": len(calls)}
+
+    monkeypatch.setattr(af, "model_spectra", fake_model_spectra)
+    af.cached_model_spectra(anchor, ne=12, ne_brem=7, cache_dir=tmp_path)
+    refreshed, cache_hit, _ = af.cached_model_spectra(
+        anchor, ne=12, ne_brem=7, cache_dir=tmp_path, refresh=True
+    )
+
+    assert not cache_hit
+    assert refreshed == {"generation": 2}
+    assert len(calls) == 2
+
+
 def test_figure_spectra_smoke(anchor):
     from matplotlib.figure import Figure
 
-    fig = af.figure_spectra(anchor, _synthetic_model(anchor))
+    model = _synthetic_model(anchor)
+    fig = af.figure_spectra(anchor, model)
     assert isinstance(fig, Figure)
-    assert len(fig.axes) == 2
+    assert len(fig.axes) == 3
+    fig.canvas.draw()
+    assert all(any(label.get_visible() for label in ax.get_xticklabels()) for ax in fig.axes)
+    assert all(ax.get_xlabel() == "Photon energy (eV)" for ax in fig.axes)
+    scale = anchor.domega_sr * anchor.per_nA
+    first_energy = anchor.energies_keV[0]
+    assert np.allclose(fig.axes[1].lines[0].get_ydata(), model[first_energy]["spec_det"] * scale)
+    assert np.allclose(
+        fig.axes[2].lines[0].get_ydata(),
+        (model[first_energy]["spec_det"] + model[first_energy]["brem_det"]) * scale,
+    )
 
 
 def test_figure_spectra_with_reference_overlay(anchor):
@@ -137,7 +189,7 @@ def test_figure_spectra_with_reference_overlay(anchor):
     ref = af.reference_curve(path=_CHECKS / "reference_data" / "zhai_fig1c.example.csv")
     fig = af.figure_spectra(anchor, model, reference=ref)
     # detector panel gains scatter collections from the overlay
-    assert len(fig.axes[1].collections) >= 1
+    assert len(fig.axes[2].collections) >= 1
 
 
 def test_figure_enhancement_smoke(anchor):

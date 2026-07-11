@@ -70,9 +70,10 @@ def main():
     )
     spec_single = OMEGA * mc_spectrum(segs, E_GRID, "hopg", HKL, theta_obs_rad=THETA, B_ang2=B_002)
     rel = float(np.max(np.abs(spec_int1 - spec_single)) / np.max(np.abs(spec_single)))
+    ok = rel < 1e-9
     print(
         f"[1] regression n_side=1 vs single-angle x Omega: max rel = {rel:.2e}  "
-        f"({'PASS' if rel < 1e-9 else 'FAIL'})"
+        f"({'PASS' if ok else 'FAIL'})"
     )
 
     # --- 2. wide detector: asymmetric, shifted integrated line -----------------
@@ -121,6 +122,8 @@ def main():
     )
     shift = abs(_centroid(E_GRID, spec_tp) - _centroid(E_GRID, spec_tp0))
     print(f"    centroid shift n_side={SMALL_NSIDE} vs 1: {shift:.3f} eV (negligible, as expected)")
+    if not ok:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
