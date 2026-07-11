@@ -208,6 +208,47 @@ def _synthetic_supplementary_spectra(study):
     }
 
 
+def test_supplementary_detected_spectrum_matches_fig1c_detector_scaling():
+    study = af.supplementary_study("wse2")
+    spectrum = _synthetic_supplementary_spectra(study)[-10.0]
+    peak_eV = float(study.E_grid[np.argmax(spectrum)])
+    anchor = af.ZhaiAnchor()
+    fwhm_eV = float(
+        np.hypot(
+            af.eds_fwhm_eV(peak_eV),
+            af.aperture_fwhm_eV(
+                peak_eV,
+                af.beta_from_keV(study.energy_keV),
+                study.theta_obs_rad,
+                anchor.dtheta_obs_rad,
+            ),
+        )
+    )
+    expected = af.convolve_detector(study.E_grid, spectrum, fwhm_eV)
+    expected *= anchor.domega_sr * anchor.per_nA
+
+    assert np.allclose(af._supplementary_detected_spectrum(study, spectrum), expected)
+
+
+@pytest.mark.parametrize("crystal", ["wse2", "hbn"])
+def test_supplementary_figures_use_detected_units_and_hard_bounds(crystal):
+    study = af.supplementary_study(crystal)
+    spectra = _synthetic_supplementary_spectra(study)
+    fig = (
+        af.figure_supplementary_hbn(study, study.thicknesses_nm[0], spectra)
+        if crystal == "hbn"
+        else af.figure_supplementary_tmd(study, study.thicknesses_nm[0], spectra)
+    )
+
+    expected = af._supplementary_detected_spectrum(study, spectra[study.polar_tilts_deg[0]])
+    assert np.allclose(fig.axes[0].lines[0].get_ydata(), expected)
+    assert all(ax.get_ylabel() == "Intensity (Phs/eV/s/nA)" for ax in fig.axes)
+    assert all(ax.get_ylim()[0] == 0.0 for ax in fig.axes)
+    assert all(ax.get_xlim() == (study.e_min_eV, study.e_max_eV) for ax in fig.axes)
+    if crystal == "wse2":
+        assert tuple(fig.get_size_inches()) == (8.0, 7.0)
+
+
 def test_supplementary_studies_match_requested_windows_and_thicknesses():
     wse2 = af.supplementary_study("wse2")
     mose2 = af.supplementary_study("mose2")

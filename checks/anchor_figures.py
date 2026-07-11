@@ -83,9 +83,9 @@ class SupplementaryCoherentStudy:
     """A Zhai supplementary-information coherent-emission comparison.
 
     The study holds the reported beam energy, thicknesses, polar tilts, and
-    photon-energy window.  Its spectra deliberately exclude both incoherent
-    bremsstrahlung and detector convolution, matching the supplementary
-    ``coherent emission only`` presentation.
+    photon-energy window.  Its cached spectra contain intrinsic coherent
+    emission only; the figure builders apply the Fig. 1c detector response
+    when converting them to the displayed observable.
     """
 
     crystal: str
@@ -431,8 +431,8 @@ def model_coherent_spectra(
     Electron transport uses the material's compound composition and the sample
     geometry at each reported polar tilt.  The returned spectra are
     ``d²N / (dE dOmega electron)``: no bremsstrahlung, detector response, or
-    experimental solid-angle scaling is added.  This is intentionally the same
-    intrinsic quantity labelled "coherent emission only" in the supplement.
+    experimental solid-angle scaling is added.  The figure builders preserve
+    this cache format, then apply the Fig. 1c detector response for display.
     """
     if thickness_nm not in study.thicknesses_nm:
         raise ValueError(
@@ -749,6 +749,33 @@ def figure_enhancement(anchor: ZhaiAnchor, model: dict):
     return fig
 
 
+def _supplementary_detected_spectrum(
+    study: SupplementaryCoherentStudy, spectrum: np.ndarray
+) -> np.ndarray:
+    """Return one supplementary spectrum in Fig. 1c detected flux units.
+
+    Applies the same quadrature EDS-plus-aperture FWHM as ``model_spectra``:
+    Zhai SI Eqs. (14) and (16), at the spectrum's intrinsic peak and the
+    study's 200 keV observation geometry.  It assumes the Fig. 1c collection
+    aperture (0.066 sr) and 1 nA electron rate.  In the zero-FWHM limit the
+    returned spectrum is the intrinsic density scaled by those two factors.
+    """
+    anchor = ZhaiAnchor()
+    peak_eV = float(study.E_grid[np.argmax(spectrum)])
+    fwhm_eV = float(
+        np.hypot(
+            eds_fwhm_eV(peak_eV),
+            aperture_fwhm_eV(
+                peak_eV,
+                beta_from_keV(study.energy_keV),
+                study.theta_obs_rad,
+                anchor.dtheta_obs_rad,
+            ),
+        )
+    )
+    return convolve_detector(study.E_grid, spectrum, fwhm_eV) * (anchor.domega_sr * anchor.per_nA)
+
+
 def figure_supplementary_tmd(
     study: SupplementaryCoherentStudy, thickness_nm: float, spectra: dict[float, np.ndarray]
 ):
@@ -760,15 +787,22 @@ def figure_supplementary_tmd(
     if set(spectra) != set(study.polar_tilts_deg):
         raise ValueError("spectra must contain exactly the study's four polar tilts")
 
-    fig, axes = plt.subplots(2, 2, figsize=(10, 7), sharex=True, sharey=True)
+    fig, axes = plt.subplots(2, 2, figsize=(8, 7), sharex=True, sharey=True)
     for ax, tilt_deg in zip(axes.flat, study.polar_tilts_deg, strict=True):
-        ax.plot(study.E_grid, spectra[tilt_deg], color="C0")
+        ax.plot(
+            study.E_grid,
+            _supplementary_detected_spectrum(study, spectra[tilt_deg]),
+            color="C0",
+        )
         ax.set_title(f"Polar tilt {tilt_deg:g}°")
         ax.set_xlabel("Photon energy (eV)")
-        ax.set_ylabel(r"Coherent emission $d^2N/(dE\,d\Omega\,e^-)$")
+        ax.set_ylabel("Intensity (Phs/eV/s/nA)")
+        ax.set_xlim(study.e_min_eV, study.e_max_eV)
+        ax.set_ylim(bottom=0.0)
         ax.grid(alpha=0.3)
     fig.suptitle(
-        f"{study.label}, {study.energy_keV:g} keV, {thickness_nm:g} nm: intrinsic PXR+CBS only"
+        f"{study.label}, {study.energy_keV:g} keV, {thickness_nm:g} nm: "
+        "Zhai-detector-convolved PXR+CBS"
     )
     # Matplotlib 3.10 can assign NaN axes bounds when tight_layout() measures
     # this shared 2×2 layout at the physical (~1e-9) intensity scale.
@@ -789,10 +823,19 @@ def figure_supplementary_hbn(
 
     fig, ax = plt.subplots(figsize=(8, 5))
     for i, tilt_deg in enumerate(study.polar_tilts_deg):
-        ax.plot(study.E_grid, spectra[tilt_deg], color=f"C{i}", label=f"{tilt_deg:g}°")
+        ax.plot(
+            study.E_grid,
+            _supplementary_detected_spectrum(study, spectra[tilt_deg]),
+            color=f"C{i}",
+            label=f"{tilt_deg:g}°",
+        )
     ax.set_xlabel("Photon energy (eV)")
-    ax.set_ylabel(r"Coherent emission $d^2N/(dE\,d\Omega\,e^-)$")
-    ax.set_title(f"h-BN, {study.energy_keV:g} keV, {thickness_nm:g} nm: intrinsic PXR+CBS only")
+    ax.set_ylabel("Intensity (Phs/eV/s/nA)")
+    ax.set_xlim(study.e_min_eV, study.e_max_eV)
+    ax.set_ylim(bottom=0.0)
+    ax.set_title(
+        f"h-BN, {study.energy_keV:g} keV, {thickness_nm:g} nm: Zhai-detector-convolved PXR+CBS"
+    )
     ax.grid(alpha=0.3)
     ax.legend(title="Polar tilt")
     fig.tight_layout()
