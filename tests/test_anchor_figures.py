@@ -7,6 +7,7 @@ return Figures on synthetic data -- so the suite stays CPU-only and fast.
 """
 
 import sys
+from io import BytesIO
 from pathlib import Path
 
 import matplotlib
@@ -234,6 +235,18 @@ def test_supplementary_tmd_figure_smoke():
     assert len(fig.axes) == 4
     assert all(ax.get_xlabel() == "Photon energy (eV)" for ax in fig.axes)
     fig.canvas.draw()
+
+
+def test_supplementary_tmd_figure_renders_at_physical_intensity_scale():
+    study = af.supplementary_study("wse2")
+    spectra = {
+        tilt: 1e-9 * np.exp(-0.5 * ((study.E_grid - (900.0 + 2.0 * tilt)) / 8.0) ** 2)
+        for tilt in study.polar_tilts_deg
+    }
+
+    fig = af.figure_supplementary_tmd(study, study.thicknesses_nm[0], spectra)
+
+    fig.savefig(BytesIO(), format="png", bbox_inches="tight")
 
 
 def test_supplementary_hbn_figure_smoke():

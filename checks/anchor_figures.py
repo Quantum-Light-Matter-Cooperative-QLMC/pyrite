@@ -770,7 +770,9 @@ def figure_supplementary_tmd(
     fig.suptitle(
         f"{study.label}, {study.energy_keV:g} keV, {thickness_nm:g} nm: intrinsic PXR+CBS only"
     )
-    fig.tight_layout()
+    # Matplotlib 3.10 can assign NaN axes bounds when tight_layout() measures
+    # this shared 2×2 layout at the physical (~1e-9) intensity scale.
+    fig.subplots_adjust(left=0.11, right=0.97, bottom=0.09, top=0.88, wspace=0.28, hspace=0.38)
     return fig
 
 
