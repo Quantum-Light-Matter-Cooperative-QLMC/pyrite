@@ -19,17 +19,10 @@ on `main` once the branch exists.
 
 # USER ADDED:
 
-- Zhai supplementary coherent-emission figures (WSe₂ 42/55/75 nm, MoSe₂
-  47/112/147 nm, h-BN 921 nm, all 200 keV, at polar tilts -10/-15/-17.5/-20 deg)
-  are implemented in `checks/anchor_figures.py` + the validation app. This
-  branch (`feature/zhai-gpu-reproduction`) adds: a `cxr remote check` command
-  to run the Zhai + supplementary Monte Carlos on the GPU lab box (`ne=20_000`
-  Fig.1c anchor, `ne=200` per supplementary tilt) and pull the caches back; a
-  `cxr check --export` command to render the complete figure set from cache
-  in one shot; a cross-material overview figure; and a provenance write-up
-  covering the still-open azimuth = 0 assumption. Design:
-  [`docs/superpowers/specs/2026-07-10-zhai-gpu-and-figure-coverage-design.md`](docs/superpowers/specs/2026-07-10-zhai-gpu-and-figure-coverage-design.md).
-  Provenance + the azimuth = 0 status: [`docs/validation/zhai-supplementary.md`](docs/validation/zhai-supplementary.md).
+- Zhai supplementary coherent-emission figures (WSe₂/MoSe₂/h-BN, `checks/anchor_figures.py`
+  + the validation app) now have GPU lab-box reproduction (`cxr remote check`), a
+  one-command local figure export (`cxr check --export`), and a provenance write-up
+  covering the open azimuth = 0 question: [`docs/validation/zhai-supplementary.md`](docs/validation/zhai-supplementary.md).
 - Implement automated ACP server startups for interaction with marimo notebooks:
   ------------------------------------------------------------------------------
 
