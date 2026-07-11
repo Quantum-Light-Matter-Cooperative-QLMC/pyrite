@@ -60,7 +60,7 @@ def _():
             )
         return reports
 
-    return af, checks_dir, mo, run_checks
+    return af, mo, run_checks
 
 
 @app.cell(hide_code=True)
@@ -296,7 +296,7 @@ def _(mo):
     Reproduces the HOPG spectra and bulk-versus-film comparison from Zhai et al.,
     *Nature Communications* **16**, 11218 (2025). If
     `checks/reference_data/zhai_fig1c.csv` is present, its digitized curves are
-    overlaid automatically. Use 500 line electrons and 200 bremsstrahlung
+    overlaid automatically. Use 20,000 line electrons and 200 bremsstrahlung
     electrons for publication-quality output. Results are cached locally by
     sample counts, experimental inputs, and implementation version.
     """)
@@ -307,16 +307,16 @@ def _(mo):
 def _(mo):
     ne_ui = mo.ui.number(
         start=10,
-        stop=5_000,
+        stop=50_000,
         step=10,
-        value=200,
+        value=20_000,
         label="Line-spectrum electrons per energy",
     )
     ne_brem_ui = mo.ui.number(
         start=10,
-        stop=5_000,
+        stop=1_000,
         step=10,
-        value=100,
+        value=200,
         label="Bremsstrahlung electrons per energy",
     )
     run_zhai_ui = mo.ui.run_button(label="Run Zhai reproduction")
@@ -361,7 +361,15 @@ def _(af, anchor, mo, ne_brem_ui, ne_ui, refresh_zhai_ui, run_zhai_ui):
 
 
 @app.cell
-def _(af, anchor, mo, zhai_cache_hit, zhai_cache_path, zhai_model, zhai_reference):
+def _(
+    af,
+    anchor,
+    mo,
+    zhai_cache_hit,
+    zhai_cache_path,
+    zhai_model,
+    zhai_reference,
+):
     rows = af.validation_table(anchor, zhai_model)
     headers = [
         "E0 (keV)",
