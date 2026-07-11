@@ -815,7 +815,7 @@ def figure_supplementary_overview(spectra: dict[str, np.ndarray]):
         thickness_nm = study.thicknesses_nm[0]
         tilt_deg = study.polar_tilts_deg[-1]  # steepest requested tilt
         ax.plot(study.E_grid, spectra[crystal], color="C0")
-        ax.set_title(f"{study.label}\n{thickness_nm:g} nm, tilt {tilt_deg:g}Â°")
+        ax.set_title(f"{study.label}\n{thickness_nm:g} nm, tilt {tilt_deg:g}\N{DEGREE SIGN}")
         ax.set_xlabel("Photon energy (eV)")
         ax.grid(alpha=0.3)
     axes[0].set_ylabel(r"Coherent emission $d^2N/(dE\,d\Omega\,e^-)$")
