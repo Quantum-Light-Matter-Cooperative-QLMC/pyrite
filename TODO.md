@@ -17,19 +17,6 @@ Item generation:
 fold it into a branch (steps 1-2 above), then slim it back to a one-line summary
 on `main` once the branch exists.
 
-# USER ADDED:
-
-- Zhai supplementary coherent-emission figures (WSe₂/MoSe₂/h-BN, `checks/anchor_figures.py`
-  + the validation app) now have GPU lab-box reproduction (`cxr remote check`), a
-  one-command local figure export (`cxr check --export`), and a provenance write-up
-  covering the open azimuth = 0 question: [`docs/validation/zhai-supplementary.md`](docs/validation/zhai-supplementary.md).
-- Implement automated ACP server startups for interaction with marimo notebooks:
-  ------------------------------------------------------------------------------
-
-
-  - npx stdio-to-ws "cmd /c npx @zed-industries/claude-code-acp" --port 3017
-  - npx stdio-to-ws "cmd /c npx @zed-industries/codex-acp" --port 3021
-
 ## P1 - high value (physics accuracy + publication validation)
 
 ### Active
@@ -82,6 +69,13 @@ on `main` once the branch exists.
    registry (`materials.py`, no cycle). No physics change. ->
    `feature/material-config-rework`. Evaluation:
    [`docs/material-config-evaluation.md`](docs/material-config-evaluation.md).
+8. **Zhai supplementary — missing HOPG + h-BN plots.** `ZHAI_SUPPLEMENTARY_STUDIES` has no
+   `hopg` entry and only one h-BN thickness (921 nm); Table 4 already has the missing
+   thicknesses' tilts transcribed. -> `feature/zhai-supplementary-coverage-gaps`.
+9. **Parameter-space sampling review.** Too many independent parameters (tilt, azimuth,
+   energy, detector placement, thickness, misalignment) to scan by eye; needs a
+   sampling/prioritization strategy before the user can evaluate combinations feasibly.
+   -> `docs/parameter-space-sampling-review`.
 
 ## P3 - lower / exploratory
 
@@ -90,6 +84,9 @@ on `main` once the branch exists.
 2. **Dynamic GPU chunk sizing.** Evaluate config-driven chunk-size selection for
    `cxr remote` GPU runs (probe a few test cases against the config's array sizes),
    including a write-up of what chunking is and how config values drive it.
+3. **Automated ACP server startups for marimo notebooks.** Wrap the two
+   `stdio-to-ws`/`npx` bridge commands into one script instead of running them by hand.
+   -> `feature/acp-server-autostart`.
 
 ## Long term features
 
