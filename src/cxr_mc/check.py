@@ -41,7 +41,12 @@ def _command(*, edit=False, watch=False):
 def _launch(*, edit=False, watch=False):
     cmd = _command(edit=edit, watch=watch)
     env = {**os.environ}
-    subprocess.run(cmd, check=True, env=env)
+    try:
+        subprocess.run(cmd, check=True, env=env)
+    except KeyboardInterrupt:
+        # Ctrl+C is delivered to the marimo child and this parent on Windows.
+        # Once marimo has handled its interactive exit, avoid a second traceback.
+        return
 
 
 def _export(outdir="figures", ne=20_000, ne_brem=200, ne_supp=200):

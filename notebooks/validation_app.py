@@ -436,22 +436,32 @@ def _(mo):
 
 
 @app.cell
-def _(af, mo):
+def _(mo):
     supplementary_study_ui = mo.ui.dropdown(
         {
             "WSe₂ (800–1200 eV)": "wse2",
             "MoSe₂ (800–1200 eV)": "mose2",
             "h-BN (600–1200 eV)": "hbn",
         },
-        value="wse2",
+        value="WSe₂ (800–1200 eV)",
         label="Supplementary material",
     )
+    return (supplementary_study_ui,)
+
+
+@app.cell
+def _(af, mo, supplementary_study_ui):
     supplementary_study = af.supplementary_study(supplementary_study_ui.value)
     supplementary_thickness_ui = mo.ui.dropdown(
         {f"{thickness:g} nm": thickness for thickness in supplementary_study.thicknesses_nm},
-        value=supplementary_study.thicknesses_nm[0],
+        value=f"{supplementary_study.thicknesses_nm[0]:g} nm",
         label="Crystal thickness",
     )
+    return (supplementary_thickness_ui,)
+
+
+@app.cell
+def _(mo, supplementary_study_ui, supplementary_thickness_ui):
     supplementary_ne_ui = mo.ui.number(
         start=10,
         stop=5_000,
@@ -471,8 +481,6 @@ def _(af, mo):
         refresh_supplementary_ui,
         run_supplementary_ui,
         supplementary_ne_ui,
-        supplementary_study_ui,
-        supplementary_thickness_ui,
     )
 
 

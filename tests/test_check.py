@@ -1,5 +1,6 @@
 """Tests for cxr_mc.check: marimo launch args + the --export figure batch."""
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -47,3 +48,37 @@ def test_default_cli_launches_marimo_not_export(monkeypatch):
     check.main(["check"])
 
     assert calls == [{"edit": False, "watch": False}]
+
+
+def test_launch_treats_keyboard_interrupt_as_normal_marimo_exit():
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from cxr_mc import check; "
+                "check.subprocess.run = lambda *args, **kwargs: "
+                "(_ for _ in ()).throw(KeyboardInterrupt()); "
+                "check._launch()"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_validation_app_initializes_its_default_supplementary_study():
+    repo_dir = Path(__file__).resolve().parents[1]
+
+    completed = subprocess.run(
+        [sys.executable, check.NOTEBOOK],
+        cwd=repo_dir,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
