@@ -29,6 +29,7 @@ on `main` once the branch exists.
   in one shot; a cross-material overview figure; and a provenance write-up
   covering the still-open azimuth = 0 assumption. Design:
   [`docs/superpowers/specs/2026-07-10-zhai-gpu-and-figure-coverage-design.md`](docs/superpowers/specs/2026-07-10-zhai-gpu-and-figure-coverage-design.md).
+  Provenance + the azimuth = 0 status: [`docs/validation/zhai-supplementary.md`](docs/validation/zhai-supplementary.md).
 - Implement automated ACP server startups for interaction with marimo notebooks:
   ------------------------------------------------------------------------------
 
