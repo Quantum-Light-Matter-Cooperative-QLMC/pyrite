@@ -13,16 +13,25 @@ Item generation:
 2. Overwrite branch TODO.md with concise, 2-3 sentence problem summary + implementation path, scoped only to the relevant item, then publish to `origin`
 3. Move to `main`, create 1 sentence summary of new item, then triage into existing TODO.md items and push tightly scoped `docs(todo)` commit to main
 
-**NOTE:** If the user has written a detailed item summary directly into `TODO.md` on
-main, fold it into a branch (steps 1-2 above), then slim it back to a one-line summary
+**NOTE:** If the user has written a detailed item summary directly into `TODO.md`,
+fold it into a branch (steps 1-2 above), then slim it back to a one-line summary
 on `main` once the branch exists.
 
 # USER ADDED:
 
 - I want to add to the zhai verification section of the notebook more of the figures they have from the supplementary info:
+
   - WSe2 at 200 keV, four separate small plots of the COHERENT EMISSION ONLY, plotted from 800 eV to 1200 eV, at polar tilt angles of -10 deg, -15 deg, -17.5 deg, -20 deg. There are sets of 4 small plots for thicknesses of 42 nm, 55 nm, and 75 nm.
   - MoSe2 also at 200 keV, same plots as above, except for thicknesses of 47 nm, 112 nm and 147 nm
   - h-BN plots with four traces plotted together from 600 eV to 1200 eV, coherent emission only, 921 nm
+  - I have added a 'cxr check' command which runs the validation notebook. Please implement some additional commands/options to use the lab box w/ GPU for the calculation of these various monte-carlos, since my laptop doesn't cut it very well
+  - presumably, all these plots assume azimuthal angle == 0, but unsure what they do in paper
+- Implement automated ACP server startups for interaction with marimo notebooks:
+  ------------------------------------------------------------------------------
+
+
+  - npx stdio-to-ws "cmd /c npx @zed-industries/claude-code-acp" --port 3017
+  - npx stdio-to-ws "cmd /c npx @zed-industries/codex-acp" --port 3021
 
 ## P1 - high value (physics accuracy + publication validation)
 
