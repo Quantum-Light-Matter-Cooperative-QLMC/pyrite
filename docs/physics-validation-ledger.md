@@ -7,7 +7,7 @@ The single source of truth for **what physics `cxr-mc` claims and whether it has
 
 **Status:** `unverified` → `filtered` (units+limits+signs) → `rederived` (independent derivation matches) → `anchored` (regression test green) → `signed-off` (human-certified). `discrepancy` = a check failed.
 
-Progress: **0 / 28 signed-off** · 5 rederived · 1 anchored · 1 filtered · 1 blocked.
+Progress: **0 / 30 signed-off** · 6 rederived · 1 anchored · 1 filtered · 1 blocked · 1 discrepancy.
 
 ## Core coherent physics (highest risk — verify first)
 
@@ -20,6 +20,7 @@ Progress: **0 / 28 signed-off** · 5 rederived · 1 anchored · 1 filtered · 1 
 | `line-energy-dispersion` | `ω = v·g / (1 − v·n̂)` tunable line energy | `montecarlo/geometry.py::tilted_geometry` / `checks/anchor_figures.py::line_energy_eV` | Zhai 2025 Eq.(10) | unverified | — | `checks/anchor_figures.py::theory_line_energies` | **2026-07-11**: tilt convention flipped to Zhai's positive θ (`docs/tilt-convention.md`) — `1 − v·n̂` is even in θ at φ=0, so line energies computed under the old negative-θ grids are unaffected by the flip (verified 981.5 eV both signs, WSe₂ 55 nm case); this row's status is unchanged by the flip |
 | `closed-form-flux` | Eq.(12) closed-form line flux (single-segment reference) | `checks/anchor_figures.py::feranchuk_line_flux` | Feranchuk 2000 Eq.(12) | unverified | — | `checks/anchor_figures.py::single_segment_anchor` (ratio≈1) | reference, not pipeline |
 | `enhancement-bulk-film` | bulk-vs-film line enhancement | `checks/anchor_figures.py::figure_enhancement` | Zhai 2025 | unverified | — | `checks/anchor_figures.py::figure_enhancement` | **2026-07-11**: tilt convention flipped to Zhai's positive θ (`docs/tilt-convention.md`) — enhancement is an intensity ratio, so any prior number here was computed at the old negative-θ (mirror) grids at ~half peak intensity; needs regeneration + fresh-context re-verification, not signed-off |
+| `zhai-hbn-921-detected` | end-to-end detected-spectrum anchor vs Zhai SI Fig. S5b (h-BN 921 nm, 17.5–25 keV, tilt 17°/130°) | `checks/anchor_figures.py::_supplementary_detected_spectrum` (+ `model_coherent_spectra`) | Zhai 2025 SI Fig. S5b | discrepancy | — | — | **2026-07-11 UNEXPLAINED GAP** — after fixing the aperture-FWHM transcription error and applying window QE, simulation remains 1.35–1.76× above the paper, growing with beam energy (sim 1.15/1.20/1.24/1.23 vs paper ≈0.85/0.80/0.75/0.70 Phs/eV/s/nA at 17.5/20/22.5/25 keV). Transport elastic-model choice ruled out (<10%). Open candidates: intrinsic `mc_spectrum` prefactor vs SI Eq. (2), h-BN Debye-Waller B, thickness uncertainty, whether Zhai efficiency-corrects experiment. Do not trust absolute supplementary-panel normalization until resolved. |
 
 ## Crystallography & atomic data
 
@@ -58,6 +59,7 @@ Progress: **0 / 28 signed-off** · 5 rederived · 1 anchored · 1 filtered · 1 
 |----|-------|------|--------|--------|--------|--------|-------|
 | `detector-eaglexo` | `solid_angle(Ω) × QE(E)` CCD operator | `eaglexo_response.py::EagleResponse` | `eaglexo_qe.csv` | unverified | — | — | |
 | `detector-timepix` | Si charge model, diffusion, ~1.9 keV counting threshold | `timepix_response.py::TimepixResponse` | Henke f2 (Si) | blocked | — | — | **hardware params are placeholders** — can't sign off until real quad values land |
+| `detector-line-broadening` | EDS polar-aperture line broadening `FWHM = (2√(2ln2)/3)·(∂Ep/∂θobs)·Δθobs` | `montecarlo/detector.py::aperture_fwhm_eV` | Zhai et al. 2025 SI Eq. (14) | rederived | units (eV); limiting case FWHM→0 as Δθobs→0 or β→0; prefactor pinned against an independent `2*sqrt(2*log(2))/3` computation; fresh-context re-derivation: Eq. (14) azimuthal reduction for v∥z confirmed term-for-term (rtol 1e-14 spot check), Zhai's 0.785 prefactor reproduced exactly by the span=3σ Gaussian-equivalence reading | `tests/test_detector_response.py` | **2026-07-11 fix**: prefactor was `2·sqrt(2ln2/3)` (√3× too large, misplaced parenthesis) prior to this fix; corrected to `2·sqrt(2ln2)/3` per Eq. (14); the 0.785 factor is Zhai's own convention (~15% wider than a uniform-span variance match, ≈0.68) — we follow the paper; write-up `docs/validation/detector-line-broadening.md` |
 
 ## Grazing-incidence grating spectrometer
 

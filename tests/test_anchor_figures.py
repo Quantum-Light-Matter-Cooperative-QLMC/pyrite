@@ -232,7 +232,8 @@ def test_supplementary_detected_spectrum_matches_fig1c_detector_scaling():
             ),
         )
     )
-    expected = af.convolve_detector(study.E_grid, spectrum, fwhm_eV)
+    spectrum_eff = spectrum * af.detector_efficiency(study.E_grid)
+    expected = af.convolve_detector(study.E_grid, spectrum_eff, fwhm_eV)
     expected *= anchor.domega_sr * anchor.per_nA
 
     assert np.allclose(af._supplementary_detected_spectrum(study, condition, spectrum), expected)
