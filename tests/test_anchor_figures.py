@@ -278,6 +278,24 @@ def test_supplementary_tmd_figure_smoke():
     fig.canvas.draw()
 
 
+def test_supplementary_tmd_panels_autoscale_and_show_upper_x_tick_labels():
+    study = af.supplementary_study("wse2")
+    unit_spectra = _synthetic_supplementary_spectra(study)
+    spectra = {
+        tilt: scale * unit_spectra[tilt]
+        for tilt, scale in zip(study.polar_tilts_deg, (1.0, 2.0, 4.0, 8.0), strict=True)
+    }
+
+    fig = af.figure_supplementary_tmd(study, study.thicknesses_nm[0], spectra)
+    fig.canvas.draw()
+
+    upper_limits = [ax.get_ylim()[1] for ax in fig.axes]
+    assert len(set(upper_limits)) == len(fig.axes)
+    assert all(ax.get_ylim()[1] > np.max(ax.lines[0].get_ydata()) for ax in fig.axes)
+    assert all(any(label.get_visible() for label in ax.get_xticklabels()) for ax in fig.axes[:2])
+    assert fig.subplotpars.left == pytest.approx(1.0 - fig.subplotpars.right)
+
+
 def test_supplementary_tmd_figure_renders_at_physical_intensity_scale():
     study = af.supplementary_study("wse2")
     spectra = {

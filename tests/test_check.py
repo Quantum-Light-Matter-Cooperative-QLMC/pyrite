@@ -82,3 +82,10 @@ def test_validation_app_initializes_its_default_supplementary_study():
     )
 
     assert completed.returncode == 0, completed.stderr
+
+
+def test_validation_app_centers_the_supplementary_figure():
+    repo_dir = Path(__file__).resolve().parents[1]
+    source = (repo_dir / check.NOTEBOOK).read_text(encoding="utf-8")
+
+    assert "mo.center(figure)" in source

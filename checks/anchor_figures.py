@@ -787,7 +787,7 @@ def figure_supplementary_tmd(
     if set(spectra) != set(study.polar_tilts_deg):
         raise ValueError("spectra must contain exactly the study's four polar tilts")
 
-    fig, axes = plt.subplots(2, 2, figsize=(8, 7), sharex=True, sharey=True)
+    fig, axes = plt.subplots(2, 2, figsize=(8, 7), sharex=True)
     for ax, tilt_deg in zip(axes.flat, study.polar_tilts_deg, strict=True):
         ax.plot(
             study.E_grid,
@@ -799,6 +799,7 @@ def figure_supplementary_tmd(
         ax.set_ylabel("Intensity (Phs/eV/s/nA)")
         ax.set_xlim(study.e_min_eV, study.e_max_eV)
         ax.set_ylim(bottom=0.0)
+        ax.tick_params(axis="x", labelbottom=True)
         ax.grid(alpha=0.3)
     fig.suptitle(
         f"{study.label}, {study.energy_keV:g} keV, {thickness_nm:g} nm: "
@@ -806,7 +807,7 @@ def figure_supplementary_tmd(
     )
     # Matplotlib 3.10 can assign NaN axes bounds when tight_layout() measures
     # this shared 2×2 layout at the physical (~1e-9) intensity scale.
-    fig.subplots_adjust(left=0.11, right=0.97, bottom=0.09, top=0.88, wspace=0.28, hspace=0.38)
+    fig.subplots_adjust(left=0.11, right=0.89, bottom=0.09, top=0.88, wspace=0.28, hspace=0.38)
     return fig
 
 

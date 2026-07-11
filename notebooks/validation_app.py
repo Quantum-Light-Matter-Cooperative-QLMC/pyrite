@@ -523,7 +523,7 @@ def _(
                 f"`{cache_path.relative_to(cache_path.parents[1])}`.",
                 kind="success",
             ),
-            figure,
+            mo.center(figure),
         ]
     )
     return
