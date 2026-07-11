@@ -91,6 +91,38 @@ def _detector_x_scale(x_type, x_domain):
     return _axis_scale(x_type, x_domain)
 
 
+def _broad_incident(r):
+    """One uniform broadband incident spectrum for a detector response.
+
+    The coherent spectrum lives on the fine line grid while bremsstrahlung is
+    stored on a coarser grid out to the beam energy.  Timepix3 redistributes
+    photon energy, so it must see their sum on one grid: applying it to the two
+    pieces independently discards events that cross the line-grid boundary and
+    produces a visible step at that boundary.
+
+    The wide brem grid is already uniform and matches Timepix3's
+    recorded-energy bin scale, so interpolate only the coherent contribution onto it.
+    Outside the line grid the coherent term is zero by construction.
+    """
+    E_line = np.asarray(r["E_grid"], dtype=float)
+    E_brem = r.get("E_grid_brem")
+    brem_wide = r.get("brem_wide")
+    if E_brem is None or brem_wide is None:
+        incident = np.asarray(r["spec"], dtype=float) + np.asarray(r["brem"], dtype=float)
+        return E_line, incident * r["scale"]
+
+    E = np.asarray(E_brem, dtype=float)
+    brem = np.asarray(brem_wide, dtype=float)
+    # The 0-eV brem bin cannot contribute to a photon-energy spectrum and is
+    # below the line grid's modeled band.  Starting at the line-grid floor also
+    # keeps the response grid physically meaningful.
+    mask = E >= float(np.nanmin(E_line))
+    E = E[mask]
+    brem = brem[mask]
+    coherent = np.interp(E, E_line, np.asarray(r["spec"], dtype=float), left=0.0, right=0.0)
+    return E, (coherent + brem) * r["scale"]
+
+
 # ---- Timepix3 detected vs incident -------------------------------------------
 def timepix_detected_frame(
     recs,
@@ -107,56 +139,45 @@ def timepix_detected_frame(
     restricted to one polar tilt): one row per (beam energy, grid point, kind),
     ``kind`` in ``{"incident", "detected"}``, both already scaled to Phs/eV/s/nA.
     Mirrors :func:`cxr_mc.plots.detectors._draw_timepix_detected`. ``band`` is
-    ``"line"`` (fine line grid) or ``"brem"`` (the wide brem-grid tail, present
-    only when the sweep stored ``brem_wide``). Columns:
+    ``"line"`` (fine line grid) or ``"broad"`` (the wide brem grid with the
+    coherent contribution interpolated onto it).  The broad view applies one
+    Timepix response to the entire incident spectrum. Columns:
     ``energy_eV, intensity, E0_keV, azimuth_deg, kind, band``."""
     _validate_band(band)
     frames = []
     for E0, grp in _collapsed(recs, collapse_azimuth=collapse_azimuth):
         for r in grp:
-            E = np.asarray(r["E_grid"], dtype=float)
-            inc, det = _tpx_detected(r, settings, thickness_um, bias_v, n_mc, seed)
             az = float(r["case"]["tilt_azim_deg"])
-            for kind, y in (("incident", inc), ("detected", det)):
-                frames.append(
-                    pd.DataFrame(
-                        {
-                            "energy_eV": E,
-                            "intensity": np.asarray(y, dtype=float),
-                            "E0_keV": float(E0),
-                            "azimuth_deg": az,
-                            "kind": kind,
-                            "band": "line",
-                        }
-                    )
-                )
             if band == "broad" and r.get("brem_wide") is not None:
-                Eb = np.asarray(r["E_grid_brem"], dtype=float)
-                tail = Eb > float(np.nanmax(E))
-                if np.any(tail):
-                    Eb_tail = Eb[tail]
-                    inc_b = np.asarray(r["brem_wide"], dtype=float)[tail] * r["scale"]
-                    resp = tpx.get_response(
-                        Eb_tail,
-                        n_mc=n_mc,
-                        seed=seed,
-                        thickness_um=thickness_um,
-                        bias_v=bias_v,
-                    )
-                    det_b = resp.apply(inc_b)
-                    for kind, y in (("incident", inc_b), ("detected", det_b)):
-                        frames.append(
-                            pd.DataFrame(
-                                {
-                                    "energy_eV": Eb_tail,
-                                    "intensity": np.asarray(y, dtype=float),
-                                    "E0_keV": float(E0),
-                                    "azimuth_deg": az,
-                                    "kind": kind,
-                                    "band": "brem",
-                                }
-                            )
+                E, inc = _broad_incident(r)
+                resp = tpx.get_response(
+                    E,
+                    n_mc=n_mc,
+                    seed=seed,
+                    thickness_um=thickness_um,
+                    bias_v=bias_v,
+                )
+                det = resp.apply(inc)
+                rows = [("broad", E, inc, det)]
+            else:
+                E = np.asarray(r["E_grid"], dtype=float)
+                inc, det = _tpx_detected(r, settings, thickness_um, bias_v, n_mc, seed)
+                rows = [("line", E, inc, det)]
+
+            for band_name, Ex, yi, yd in rows:
+                for kind, y in (("incident", yi), ("detected", yd)):
+                    frames.append(
+                        pd.DataFrame(
+                            {
+                                "energy_eV": Ex,
+                                "intensity": np.asarray(y, dtype=float),
+                                "E0_keV": float(E0),
+                                "azimuth_deg": az,
+                                "kind": kind,
+                                "band": band_name,
+                            }
                         )
+                    )
     if not frames:
         return pd.DataFrame(columns=_DET_COLUMNS)
     return pd.concat(frames, ignore_index=True)

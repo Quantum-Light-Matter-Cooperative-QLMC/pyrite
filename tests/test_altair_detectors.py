@@ -12,6 +12,7 @@ from types import SimpleNamespace
 import altair as alt
 import numpy as np
 
+from cxr_mc.plots import altair_detectors
 from cxr_mc.plots.altair_detectors import (
     eaglexo_charge_chart,
     eaglexo_charge_frame,
@@ -76,18 +77,34 @@ def test_timepix_frame_has_incident_and_detected():
     assert set(df["band"]) == {"line"}
 
 
-def test_timepix_frame_includes_wide_brem_tail():
-    df = timepix_detected_frame(
-        [_record(30.0, -20.0, 0.0, wide_brem=True)],
-        _settings(),
-        **_TPX_KW,
-    )
+def test_timepix_frame_uses_one_response_across_line_grid_boundary(monkeypatch):
+    rec = _record(30.0, -20.0, 0.0, wide_brem=True)
+    rec["spec"] = np.zeros_like(rec["spec"])
+    rec["brem_wide"] = np.ones_like(rec["brem_wide"])
 
-    assert set(df["band"]) == {"line", "brem"}
+    calls = []
+
+    class _IdentityResponse:
+        def apply(self, spec):
+            return np.asarray(spec, dtype=float)
+
+    def _response(E, **_kwargs):
+        calls.append(np.asarray(E, dtype=float))
+        return _IdentityResponse()
+
+    monkeypatch.setattr(altair_detectors.tpx, "get_response", _response)
+    df = timepix_detected_frame([rec], _settings(), **_TPX_KW)
+
+    # Broadband Timepix detection must use one response over the summed
+    # spectrum.  Splitting it at the line-grid endpoint loses redistributed
+    # photons and makes the detected trace jump there.
+    assert set(df["band"]) == {"broad"}
     assert df["energy_eV"].max() == 30000.0
-    tail = df[df["energy_eV"] > 6000.0]
-    assert set(tail["kind"]) == {"incident", "detected"}
-    assert set(tail["band"]) == {"brem"}
+    incident = df.loc[df["kind"] == "incident"]
+    assert incident["energy_eV"].is_monotonic_increasing
+    np.testing.assert_allclose(incident["intensity"], 2.0)
+    assert len(calls) == 1
+    np.testing.assert_allclose(calls[0], incident["energy_eV"])
 
 
 def test_timepix_chart_builds_valid_spec():
