@@ -1,0 +1,57 @@
+"""Tests for the reproduce_zhai.py root shim (the box-invokable entry point
+for cxr remote check) -- argument parsing and CLI wiring only; the actual MC
+work is reproduce_all, tested in tests/test_anchor_figures.py."""
+
+import sys
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+import reproduce_zhai  # noqa: E402
+
+
+def test_cli_defaults_match_app_defaults(monkeypatch):
+    calls = []
+    monkeypatch.setattr(reproduce_zhai, "reproduce_all", lambda **kw: calls.append(kw) or [])
+
+    reproduce_zhai.main([])
+
+    assert calls == [
+        {
+            "ne": 20_000,
+            "ne_brem": 200,
+            "ne_supp": 200,
+            "cache_dir": None,
+            "refresh": False,
+        }
+    ]
+
+
+def test_cli_forwards_overrides(monkeypatch, capsys):
+    calls = []
+
+    def fake_reproduce_all(**kw):
+        calls.append(kw)
+        return [("zhai-fig1c", Path("checkpoints/zhai_reproduction/zhai-abc.pkl"), True)]
+
+    monkeypatch.setattr(reproduce_zhai, "reproduce_all", fake_reproduce_all)
+
+    reproduce_zhai.main(
+        [
+            "--ne",
+            "11",
+            "--ne-brem",
+            "3",
+            "--ne-supp",
+            "5",
+            "--refresh",
+            "--cache-dir",
+            "/tmp/x",
+        ]
+    )
+
+    assert calls == [{"ne": 11, "ne_brem": 3, "ne_supp": 5, "cache_dir": "/tmp/x", "refresh": True}]
+    out = capsys.readouterr().out
+    assert "zhai-fig1c" in out and "cached" in out
