@@ -1,106 +1,28 @@
-# TODO / Backlog
+# TODO — feature/zhai-supplementary-coverage-gaps
 
-Items live on `feature/...` / `bugfix/...` / `docs/...` branches, not `main`, until finished.
-Full detail for an in-progress item lives on its branch (or its design doc);
-`main` keeps only a one-line summary + pointer, enforced by /docs:todo-sync.
-Priorities weigh value-to-goal (line-flux / enhancement predictions + the publication's validation story)
-against effort and risk.
+This branch carries one backlog item; the full triaged backlog lives on `main`.
 
-Item generation:
-----------------
+## Zhai supplementary — missing HOPG + h-BN plots (P2)
 
-1. Create and move to branch of relevant type
-2. Overwrite branch TODO.md with concise, 2-3 sentence problem summary + implementation path, scoped only to the relevant item, then publish to `origin`
-3. Move to `main`, create 1 sentence summary of new item, then triage into existing TODO.md items and push tightly scoped `docs(todo)` commit to main
+`checks/anchor_figures.py::ZHAI_SUPPLEMENTARY_STUDIES` only defines `wse2`, `mose2`, and
+`hbn` (921 nm only). The user flagged that the supplementary-info recreation is missing:
 
-**NOTE:** If the user has written a detailed item summary directly into `TODO.md`,
-fold it into a branch (steps 1-2 above), then slim it back to a one-line summary
-on `main` once the branch exists.
+- **HOPG**, at thicknesses 29 nm, 76 nm, 150 nm, 17 um, 500 um, and 1 mm — no `hopg` entry
+  exists in `ZHAI_SUPPLEMENTARY_STUDIES` at all. Polar/azimuthal tilts are already
+  transcribed in [`docs/validation/zhai-supplementary.md`](docs/validation/zhai-supplementary.md)
+  (Supplementary Table 4), and plotting should otherwise match the h-BN treatment.
+- **h-BN**, additional thicknesses 42 nm, 109 nm, 219 nm (two tilt conditions reported at
+  this thickness), 659 nm, and 170 um — only 921 nm is currently modeled. Tilts for these
+  are likewise already transcribed in the same Table 4 rows.
 
-## P1 - high value (physics accuracy + publication validation)
+**Implementation path.** Add a `hopg` `SupplementaryCoherentStudy` entry and extend the
+`hbn` entry's `thicknesses_nm`, using the tilt (`theta_til`/`phi_til`) values already in
+`docs/validation/zhai-supplementary.md`'s Table 4 transcription. Each condition's polar
+tilt/azimuth pair is per-thickness (not shared across thicknesses like the current
+`hbn`/TMD entries), so check whether `SupplementaryCoherentStudy`/`SupplementaryCondition`
+need reshaping to key tilt by thickness rather than assuming one tilt set applies to every
+listed thickness. Wire the new entries through the validation app + `cxr check --export`
+figure builders alongside the existing WSe2/MoSe2/h-BN panels.
 
-### Active
-
-1. **Physics validation ledger — 19 of 26 claims unverified, 0 signed off.** Re-derive each
-   claim in fresh context, then add the 17 missing in-code `Validation: <id>` markers.
-   Ledger: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md);
-   method: [`docs/validation/README.md`](docs/validation/README.md).
-2. **Grazing grating — groove efficiency.** `Grating.groove_efficiency` is a placeholder
-   scalar, not a groove-profile model. -> `feature/grating-groove-efficiency`.
-   Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-3. **Grazing grating — ALEX-s constants + hardware survey.** The ALEX-s device constants in
-   `grating.py` are `### FILL IN` placeholders pending a real datasheet; the ~10 eV-4 keV
-   CCD/grating survey is unwritten. -> `docs/soft-xray-hardware-survey`.
-   Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-
-### Gated
-
-1. **Crystal mosaicity - measured-data validation.** MC route implemented; validate
-   broadened line widths vs. a measured HOPG rocking-curve / EDS dataset
-   (data-dependent). Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
-2. **Multilayer film-on-substrate - measured-data validation.** Model implemented;
-   validate vs. a measured film-on-substrate dataset (data-dependent). Design:
-   [`docs/multilayer-materials.md`](docs/multilayer-materials.md).
-
-## P2 - medium (experiment match + usability)
-
-1. **Crystallography — `crystals`-package redundancy question.** `diffpy`/`dans-diffraction`
-   adapters landed; whether `crystals` still adds unique value (symmetry/Wyckoff expansion) is
-   unresolved, pending a ~1-hour spike. Review:
-   [`docs/crystallography-adapters-review.md`](docs/crystallography-adapters-review.md).
-2. **pyelsepa / ELSEPA transport.** Adapter landed + validated (C 2.19%, Si 4.42% max rel vs
-   NIST); gated in CI because the image/venv live outside the repo. -> `feature/elsepa-port`.
-3. **Sweep cache standardization.** Checkpoint records key on `(name, E0)` only, so the energy
-   grid is not part of the cache key and stores silently mix grid resolutions.
-   -> `feature/sweep-cache-standardization`.
-4. **Material filters.** Model calibration filters (e.g. sheets of Al foil) between the
-   x-ray beam and detector, for detector calibration against filtered spectra.
-   -> `feature/material-filters`.
-5. **Finite electron beam size.** DONE on `feature/finite-electron-beam-size`. Confirmed
-   the prior beam was a delta-function point source (`pos = np.zeros((Ne, 3))` in
-   `simulate_trajectories`); added an opt-in `beam_fwhm_mm` parameter (Gaussian spot,
-   standard FWHM convention) that offsets each electron's entry point, wired through
-   `run_case`/`repair_brem_wide` via the case dict. Proved (and regression-tested) that
-   under the current model this is a pure rigid (x, y) translation with **zero effect**
-   on the emitted spectrum: `mc_spectrum` only ever reads the segment depth `z`, since
-   the crystal is modeled as laterally infinite and the detector direction is a fixed
-   far-field unit vector (`docs/detector-solid-angle.md`). Ledger row: `finite-beam-size`
-   (`rederived`). Not yet wired into `Sweep`/CLI/checkpoint schema, and not yet plotted
-   in `plots/trajectories.py` -- future work if/when a near-field detector or
-   finite-crystal-footprint model is added (the point where beam size would start to
-   matter physically).
-6. **Material config rework — expose crystal orientation + dominant-plane count.**
-   `beam_uvw`/`n_families` are overridable via `Sweep` but not from the CLI, `hkl_list`
-   has no override path, and none of it is persisted with a checkpoint (unreproducible
-   after a registry default changes). Staged plan: CLI flags -> checkpoint persistence
-   -> unify `config._MATERIAL_GRIDS`/`sweep._CRYSTAL_PARAMS` into one per-material
-   registry (`materials.py`, no cycle). No physics change. ->
-   `feature/material-config-rework`. Evaluation:
-   [`docs/material-config-evaluation.md`](docs/material-config-evaluation.md).
-7. **Zhai supplementary — missing HOPG + h-BN plots.** `ZHAI_SUPPLEMENTARY_STUDIES` has no
-   `hopg` entry and only one h-BN thickness (921 nm); Table 4 already has the missing
-   thicknesses' tilts transcribed. -> `feature/zhai-supplementary-coverage-gaps`.
-8. **Parameter-space sampling review.** Too many independent parameters (tilt, azimuth,
-   energy, detector placement, thickness, misalignment) to scan by eye; needs a
-   sampling/prioritization strategy before the user can evaluate combinations feasibly.
-   -> `docs/parameter-space-sampling-review`.
-
-## P3 - lower / exploratory
-
-1. **Git history cleanup.** Squash minor upkeep/doc commits; evaluate other repo
-   structure/history improvements.
-2. **Dynamic GPU chunk sizing.** Evaluate config-driven chunk-size selection for
-   `cxr remote` GPU runs (probe a few test cases against the config's array sizes),
-   including a write-up of what chunking is and how config values drive it.
-
-## Long term features
-
-1. `Geant4` or similar integration to support high-energy electron beams
-
-   * Specifically, RAGAE@DESY
-     * Energy 3-5 MeV
-     * 50 fs duration
-     * 100 fC charge
-     * 200-300 um diameter on target
-
-   JungFrau Detector is about 4.5 m away from IP but could be as short as ~50 cm (in vacuum)
+No new physics — this reuses the already-ledgered `line-energy-dispersion`,
+`coherent-line-spectrum`, and `electron-transport` claims with different geometry inputs.
