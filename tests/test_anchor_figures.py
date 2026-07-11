@@ -345,3 +345,51 @@ def test_export_all_figures_writes_expected_files(tmp_path, monkeypatch):
         assert path.exists()
         assert path.with_suffix(".pdf").exists()
     assert backend_calls == ["Agg"]
+
+
+def test_supplementary_tmd_figure_rejects_hbn_crystal():
+    study = af.supplementary_study("hbn")
+    with pytest.raises(ValueError, match="only for the WSe2 and MoSe2"):
+        af.figure_supplementary_tmd(
+            study, study.thicknesses_nm[0], _synthetic_supplementary_spectra(study)
+        )
+
+
+def test_supplementary_tmd_figure_rejects_incomplete_tilt_set():
+    study = af.supplementary_study("wse2")
+    spectra = _synthetic_supplementary_spectra(study)
+    del spectra[study.polar_tilts_deg[0]]
+    with pytest.raises(ValueError, match="exactly the study's four polar tilts"):
+        af.figure_supplementary_tmd(study, study.thicknesses_nm[0], spectra)
+
+
+def test_supplementary_hbn_figure_rejects_non_hbn_crystal():
+    study = af.supplementary_study("wse2")
+    with pytest.raises(ValueError, match="only for the h-BN study"):
+        af.figure_supplementary_hbn(
+            study, study.thicknesses_nm[0], _synthetic_supplementary_spectra(study)
+        )
+
+
+def test_supplementary_hbn_figure_rejects_incomplete_tilt_set():
+    study = af.supplementary_study("hbn")
+    spectra = _synthetic_supplementary_spectra(study)
+    del spectra[study.polar_tilts_deg[0]]
+    with pytest.raises(ValueError, match="exactly the study's four polar tilts"):
+        af.figure_supplementary_hbn(study, study.thicknesses_nm[0], spectra)
+
+
+def test_physics_source_tree_is_lf_only():
+    """The Zhai cache key hashes raw bytes of every src/cxr_mc/**/*.py file
+    (_zhai_cache_key / _supplementary_cache_key); cxr remote check relies on
+    the box and the laptop hashing identical bytes for a pulled cache to be a
+    hit. The repo's .gitattributes pins `* text=auto eol=lf`, so a CRLF file
+    slipping into src/ would silently produce a different hash per platform
+    and break that invariant with no visible error -- catch it here instead."""
+    repo_root = _CHECKS.parent
+    offenders = [
+        str(path.relative_to(repo_root))
+        for path in sorted((repo_root / "src" / "cxr_mc").glob("**/*.py"))
+        if b"\r\n" in path.read_bytes()
+    ]
+    assert offenders == [], f"CRLF line endings found (breaks box<->laptop cache hash): {offenders}"
