@@ -271,7 +271,10 @@ def pull_zhai_cache():
     than `scp -r`, which double-nests the directory when the local destination
     already exists -- listing + per-file scp is unambiguous either way."""
     remote_dir = f"{REMOTE_DIR}/checkpoints/zhai_reproduction"
-    listing = f'[ -d "{remote_dir}" ] || exit 0; ls -1 "{remote_dir}"/*.pkl 2>/dev/null'
+    listing = (
+        f'[ -d "{remote_dir}" ] || exit 0; '
+        f'find "{remote_dir}" -maxdepth 1 -type f -name "*.pkl" -printf "%f\\n"'
+    )
     names = [Path(p).name for p in _ssh_capture(listing).split()]
     if not names:
         print("(no zhai cache files on the box -- run `cxr remote check` first)")
@@ -817,6 +820,8 @@ def _cli_sync(args):
 
 
 def _cli_check(args):
+    if args.follow and not args.detached:
+        args._check_parser.error("--follow requires --detached")
     if args.pull:
         pull_zhai_cache()
         return
@@ -948,7 +953,8 @@ def _build_remote_parser(ap):
         "--refresh", action="store_true", help="recompute even if a matching cache exists"
     )
     ck.add_argument("--no-sync", action="store_true", help="skip the code upload")
-    ck.add_argument(
+    mode = ck.add_mutually_exclusive_group()
+    mode.add_argument(
         "--detached",
         "-d",
         action="store_true",
@@ -960,10 +966,10 @@ def _build_remote_parser(ap):
         action="store_true",
         help="with --detached: track the job live after launching",
     )
-    ck.add_argument(
+    mode.add_argument(
         "--pull", action="store_true", help="skip the run; just fetch existing zhai cache files"
     )
-    ck.set_defaults(func=_dispatch(_cli_check))
+    ck.set_defaults(func=_dispatch(_cli_check), _check_parser=ck)
 
     return ap
 

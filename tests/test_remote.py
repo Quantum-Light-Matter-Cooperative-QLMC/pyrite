@@ -369,12 +369,14 @@ def test_pull_zhai_cache_fetches_every_listed_file(monkeypatch, tmp_path):
 
 def test_pull_zhai_cache_reports_when_empty(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
-    monkeypatch.setattr(remote, "_ssh_capture", lambda *a: "")
+    commands = []
+    monkeypatch.setattr(remote, "_ssh_capture", lambda command: commands.append(command) or "")
     monkeypatch.setattr(remote, "_run", lambda cmd, **kw: pytest.fail("nothing to pull"))
 
     remote.pull_zhai_cache()
 
     assert "no zhai cache files" in capsys.readouterr().out
+    assert "find" in commands[0]
 
 
 def test_check_cli_pull_flag_skips_run(monkeypatch):
@@ -416,6 +418,31 @@ def test_check_cli_foreground_calls_remote_check(monkeypatch):
     remote.main(["check", "--ne", "11", "--refresh"])
 
     assert calls == [{"ne": 11, "ne_brem": 200, "ne_supp": 200, "refresh": True, "no_sync": False}]
+
+
+def test_check_cli_rejects_follow_without_detached(monkeypatch, capsys):
+    monkeypatch.setattr(
+        remote, "remote_check", lambda **kw: pytest.fail("must reject before running")
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        remote.main(["check", "--follow"])
+
+    assert excinfo.value.code == 2
+    assert "--follow requires --detached" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("args", [["--pull", "--detached"], ["--pull", "--detached", "--follow"]])
+def test_check_cli_rejects_pull_with_detached(monkeypatch, capsys, args):
+    monkeypatch.setattr(
+        remote, "pull_zhai_cache", lambda: pytest.fail("must reject before pulling")
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        remote.main(["check", *args])
+
+    assert excinfo.value.code == 2
+    assert "not allowed with argument --pull" in capsys.readouterr().err
 
 
 def test_sync_paths_ship_checks_and_zhai_shim():
