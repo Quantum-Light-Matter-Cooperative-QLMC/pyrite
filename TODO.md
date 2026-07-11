@@ -17,6 +17,13 @@ Item generation:
 main, fold it into a branch (steps 1-2 above), then slim it back to a one-line summary
 on `main` once the branch exists.
 
+# USER ADDED:
+
+- I want to add to the zhai verification section of the notebook more of the figures they have from the supplementary info:
+  - WSe2 at 200 keV, four separate small plots of the COHERENT EMISSION ONLY, plotted from 800 eV to 1200 eV, at polar tilt angles of -10 deg, -15 deg, -17.5 deg, -20 deg. There are sets of 4 small plots for thicknesses of 42 nm, 55 nm, and 75 nm.
+  - MoSe2 also at 200 keV, same plots as above, except for thicknesses of 47 nm, 112 nm and 147 nm
+  - h-BN plots with four traces plotted together from 600 eV to 1200 eV, coherent emission only, 921 nm
+
 ## P1 - high value (physics accuracy + publication validation)
 
 ### Active
