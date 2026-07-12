@@ -1,5 +1,5 @@
 """
-grating.py
+detectors/grating.py
 
 EXPLORATORY forward model for a grazing-incidence soft X-ray diffraction grating
 spectrometer (TODO P3 #8): disperse the model's PXR+CBS line spectrum across a
@@ -48,12 +48,12 @@ from typing import TypedDict
 
 import numpy as np
 
-from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
-from .materials.crystal import (
+from ..materials.crystal import (
     HC_EV_ANG,
     absorption_length_ang,
     optical_constants,
 )  # h*c [eV*Angstrom]
+from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
 
 # ---- coating optical constants (grazing-incidence reflectivity) --------------
 # Atomic number density n = rho/A * N_A, converted cm^-3 -> Ang^-3 (the unit

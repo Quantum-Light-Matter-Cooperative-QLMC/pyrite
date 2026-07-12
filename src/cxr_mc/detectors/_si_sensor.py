@@ -1,5 +1,5 @@
 """
-_si_sensor.py
+detectors/_si_sensor.py
 =============
 
 Shared silicon-sensor plumbing for the two detector forward models

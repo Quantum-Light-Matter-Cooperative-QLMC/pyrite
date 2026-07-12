@@ -6,8 +6,8 @@ Timepix3 and Eagle XO detector-view figures (efficiency, detected, charge).
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .. import eaglexo_response as eag
-from .. import timepix_response as tpx
+from ..detectors import eaglexo_response as eag
+from ..detectors import timepix_response as tpx
 from ..results import (
     PER_NA,
     records,

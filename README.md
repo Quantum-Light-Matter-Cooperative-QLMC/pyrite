@@ -101,8 +101,8 @@ directory and the data travels with an installed wheel. `*.pkl` checkpoints and
 | `run.py`                 | `run_sweep(...)`: checkpointed, crash-safe, resumable driver around `run_cases`; `load_checkpoint`/`cases_from_results` for the viz side.                                                                                                                                                       |
 | `results.py`             | `Settings` dataclass, per-record metrics (`peak_flux`, `coherent_flux`, `line_flux`, `line_quality`, …), and ranking helpers (`selection_score`, `top_geometries`).                                                                                                                            |
 | `plots.py`               | All plotting:`browse`, `plot_heatmaps`, `plot_metric_vs`, `plot_best_spectra`, `plot_material_comparison`, and the electron-penetration figures.                                                                                                                                                |
-| `timepix_response.py`    | Per-photon forward model of the Timepix3 (Si sensor): photoabsorption, e–h pairs, charge sharing, and the**~1.9 keV counting threshold** (the headline effect — it eats sub-2 keV line flux).                                                                                                 |
-| `eaglexo_response.py`    | Raptor Eagle XO CCD: a clean`solid_angle × QE(E)` operator (windowless direct-detection CCD).                                                                                                                                                                                                  |
+| `detectors/timepix_response.py`    | Per-photon forward model of the Timepix3 (Si sensor): photoabsorption, e–h pairs, charge sharing, and the**~1.9 keV counting threshold** (the headline effect — it eats sub-2 keV line flux).                                                                                                 |
+| `detectors/eaglexo_response.py`    | Raptor Eagle XO CCD: a clean`solid_angle × QE(E)` operator (windowless direct-detection CCD).                                                                                                                                                                                                  |
 
 ---
 
@@ -326,7 +326,7 @@ numbers:
   re-validated against the Feranchuk/Zhai anchors —
   [`docs/atomic-data-sources.md`](docs/atomic-data-sources.md).
 - **Timepix3 hardware** parameters (`SENSOR_THICKNESS_UM`, `BIAS_VOLTAGE_V`,
-  `TEMPERATURE_K` in `timepix_response.py`) are **placeholders** pending the real quad
+  `TEMPERATURE_K` in `detectors/timepix_response.py`) are **placeholders** pending the real quad
   values; the detected-spectrum figures inherit that uncertainty.
 
 ---

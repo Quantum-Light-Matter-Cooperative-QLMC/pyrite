@@ -31,8 +31,8 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-from .. import eaglexo_response as eag
-from .. import timepix_response as tpx
+from ..detectors import eaglexo_response as eag
+from ..detectors import timepix_response as tpx
 from ._common import _best_azimuth, _case_title
 from .altair_spectra import _scale as _axis_scale
 from .altair_spectra import _tilt_records, _validate_band, _windowed_frame

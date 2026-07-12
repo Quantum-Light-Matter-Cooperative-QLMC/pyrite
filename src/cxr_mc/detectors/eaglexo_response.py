@@ -1,5 +1,5 @@
 """
-eaglexo_response.py
+detectors/eaglexo_response.py
 ===================
 
 Forward model of a Raptor Photonics **Eagle XO** camera *recording* an incident
@@ -85,9 +85,10 @@ is W_Si = 3.65 eV/pair (each absorbed photon of energy E makes E/W_Si electrons)
 
 import numpy as np
 
-from . import DATA_DIR, _si_sensor
+from .. import DATA_DIR
+from ..materials.crystal import absorption_length_ang
+from . import _si_sensor
 from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
-from .materials.crystal import absorption_length_ang
 
 # ---- sensor variants (fixed, from the Eagle XO datasheet) --------------------
 # Active area and pixel pitch for the two CCD options; the active area (with the
@@ -296,7 +297,7 @@ class EagleResponse:
         spec = _si_sensor.prep_spectrum(spec, self.E, "eaglexo_response")
         det = spec * self.qe
         if self.resolve_energy:
-            from .montecarlo import convolve_detector
+            from ..montecarlo import convolve_detector
 
             fwhm = float(np.median(energy_fwhm_eV(self.E, self.n_pix)))
             det = convolve_detector(self.E, det, fwhm)  # ~const, sqrt(E)-weak
