@@ -58,4 +58,8 @@ Agents should always prefer these commands.
 - Do not duplicate README or TODO content here.
 - When asked to locate something, use `scripts/dev.py repo-map` first.
 - Keep changes surgical and verify with the smallest useful command.
+- **Git commits:** the shared `pre-commit` hook may point at a stale worktree
+  virtualenv. Run `uv run pre-commit run --all-files`, then in PowerShell prepend
+  the current worktree's `.venv\Scripts` to `PATH` before `git commit` so the
+  hook can find `pre-commit`.
 - New/edited physics needs a derivation docstring (source eq, assumptions, a limiting case) + a `Validation: <id>` marker + a row in the validation ledger. Verify physics with a fresh context, never the one that wrote it; only a human marks a claim `signed-off`.
