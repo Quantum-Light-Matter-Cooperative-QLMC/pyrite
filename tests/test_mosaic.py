@@ -6,7 +6,7 @@ All synthetic (a Gaussian line, no Monte-Carlo transport) so it stays fast."""
 import numpy as np
 import pytest
 
-from cxr_mc.crystallography import CRYSTALS
+from cxr_mc.materials.crystal import CRYSTALS
 from cxr_mc.montecarlo import (
     aperture_fwhm_eV,
     beta_from_keV,

@@ -1,5 +1,5 @@
 """
-materials.py
+materials.registry
 ============
 
 Single source of truth for material scan grids and crystallographic scan

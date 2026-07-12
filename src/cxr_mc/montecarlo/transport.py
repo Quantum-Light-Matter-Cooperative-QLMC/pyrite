@@ -15,7 +15,7 @@ from functools import cache
 import numpy as np
 
 from .. import DATA_DIR
-from .materials import _normalize_composition
+from ..materials.attenuation import _normalize_composition
 
 logger = logging.getLogger(__name__)
 

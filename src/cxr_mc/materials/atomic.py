@@ -1,5 +1,5 @@
 """
-atomic_form_factors.py
+materials.atomic
 
 Atomic form factor F(g, E) = f0(g) + f'(E) + i f''(E), sourced from xraydb
 (https://github.com/xraypy/XrayDB, MIT code / CC0 data) -- no hard-coded tables.
@@ -12,7 +12,7 @@ Atomic form factor F(g, E) = f0(g) + f'(E) + i f''(E), sourced from xraydb
 
 The public surface is unchanged from the previous Henke/CXRO + Cromer-Mann
 implementation -- cromer_mann_f0, henke_dispersion, atomic_form_factor, Z_TABLE,
-load_henke -- so callers (crystallography.py, montecarlo.py, the checks/) are
+load_henke -- so callers (materials.crystal, montecarlo, the checks/) are
 untouched. The names cromer_mann_f0 / henke_dispersion are kept for compatibility
 even though the underlying data is now Waasmaier-Kirfel / Chantler.
 

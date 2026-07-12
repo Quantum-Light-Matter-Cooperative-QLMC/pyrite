@@ -41,7 +41,7 @@ This module was split from a single montecarlo.py into a package; every public
 and internal name remains importable as ``from cxr_mc.montecarlo import X`` for
 backward compatibility. The submodules are:
   _backend  -- GPU/CPU array backend (xp, cp, REAL, _to_cpu, _GPU)
-  materials -- composition normalization + X-ray self-absorption
+  cxr_mc.materials.attenuation -- composition normalization + X-ray self-absorption
   transport -- electron transport, scattering, stopping power
   geometry  -- tilted-sample / detector / orientation rotations
   spectrum  -- CXR line spectrum, solid-angle integral, bremsstrahlung
@@ -49,6 +49,12 @@ backward compatibility. The submodules are:
   runner    -- per-case driver and the pipelined run_cases sweep
 """
 
+from ..materials.attenuation import (
+    _layer_dz,
+    _mu_total_inv_ang,
+    _normalize_composition,
+    _stack_tau,
+)
 from ._backend import _GPU, REAL, _to_cpu, cp, xp
 from .detector import (
     aperture_fwhm_eV,
@@ -64,12 +70,6 @@ from .geometry import (
     _small_tilt_R,
     detector_directions,
     tilted_geometry,
-)
-from .materials import (
-    _layer_dz,
-    _mu_total_inv_ang,
-    _normalize_composition,
-    _stack_tau,
 )
 from .runner import (
     _brem_for_case,

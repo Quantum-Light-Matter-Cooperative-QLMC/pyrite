@@ -206,7 +206,7 @@ the 2-layer sugar. To register a NAMED stack runnable as `cxr scan <key>`:
 1. `data/crystal_structures.toml` — add any crystalline substrate not present (Si and
    sapphire exist; fused-silica SiO₂ is amorphous → no entry, just a `composition`).
    **No atomic-data edits** — xraydb covers O/Al.
-2. `src/cxr_mc/materials.py` — a `MATERIAL_CONFIGS` row keyed by the stack name
+2. `src/cxr_mc/materials/registry.py` — a `MATERIAL_CONFIGS` row keyed by the stack name
    with `"crystal": "<film-key>"` and `"stack": (Layer(...), ...)`. The registry
    key is the CLI + checkpoint name (e.g. `mos2-on-sio2-si` →
    `checkpoints/mos2-on-sio2-si.pkl`); the film key drives the crystallography

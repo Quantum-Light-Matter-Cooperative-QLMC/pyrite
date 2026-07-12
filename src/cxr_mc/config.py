@@ -7,7 +7,7 @@ scan-runner (``scan.ipynb``) and the visualization driver
 (``analysis.ipynb``) can never drift apart: they build the SAME
 :class:`results.Settings` and the SAME per-material :class:`sweep.Sweep`,
 so the viz notebook is guaranteed to be looking at the checkpoint the runner
-wrote. Edit a material's grid in :mod:`cxr_mc.materials` and both notebooks pick
+wrote. Edit a material's grid in :mod:`cxr_mc.materials.registry` and both notebooks pick
 it up; detector/analysis knobs still live here.
 
   * :func:`default_settings` -- beam current, electron counts, detector flags.

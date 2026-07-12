@@ -79,7 +79,7 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 
-from cxr_mc.crystallography import (
+from cxr_mc.materials.crystal import (
     CRYSTALS,
     HBARC_EV_ANG,
     M_E_EV,

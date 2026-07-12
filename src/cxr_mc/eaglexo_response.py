@@ -87,7 +87,7 @@ import numpy as np
 
 from . import DATA_DIR, _si_sensor
 from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
-from .crystallography import absorption_length_ang
+from .materials.crystal import absorption_length_ang
 
 # ---- sensor variants (fixed, from the Eagle XO datasheet) --------------------
 # Active area and pixel pitch for the two CCD options; the active area (with the

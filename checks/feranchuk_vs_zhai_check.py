@@ -60,7 +60,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from feranchuk_spence import photons_per_electron
 
-from cxr_mc.crystallography import (
+from cxr_mc.materials.crystal import (
     CRYSTALS,
     HBARC_EV_ANG,
     absorption_length_ang,

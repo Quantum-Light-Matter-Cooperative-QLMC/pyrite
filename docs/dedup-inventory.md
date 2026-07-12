@@ -12,7 +12,7 @@ attack*; this file carries the *full findings with line numbers and rationale*.
   assert `set(pkg.__all__) == FROZEN_EXPORTS`. Adding names is fine; removing or
   failing-to-re-export a frozen name breaks the test. `altair_*` modules are intentionally
   **not** re-exported — don't add them.
-- **Physics-validation ledger.** Anything touching `montecarlo/` or `crystallography.py`
+- **Physics-validation ledger.** Anything touching `montecarlo/` or `materials/crystal.py`
   triggers the ledger workflow (derivation docstring + `Validation:` marker + ledger row +
   fresh-context verification per `docs/validation/README.md`). Prefer **verbatim moves over
   rewrites** there.

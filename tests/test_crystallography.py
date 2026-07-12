@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from cxr_mc.crystallography import (
+from cxr_mc.materials.crystal import (
     CRYSTALS,
     HC_EV_ANG,
     absorption_length_ang,
@@ -160,7 +160,7 @@ def test_optical_constants_delta_positive_off_edge():
 
 
 def test_diffpy_structure_adapter_preserves_lattice_basis_and_volume():
-    from cxr_mc.crystallography import diffpy_structure_to_crystal_info
+    from cxr_mc.materials.crystal import diffpy_structure_to_crystal_info
 
     class FakeLattice:
         a = 3.0
@@ -208,7 +208,7 @@ def test_diffpy_structure_adapter_preserves_lattice_basis_and_volume():
 def test_diffpy_structure_adapter_accepts_installed_diffpy_structure():
     from diffpy.structure import Atom, Lattice, Structure
 
-    from cxr_mc.crystallography import diffpy_structure_to_crystal_info
+    from cxr_mc.materials.crystal import diffpy_structure_to_crystal_info
 
     structure = Structure(
         [Atom("Na", [0.0, 0.0, 0.0]), Atom("Cl", [0.5, 0.5, 0.5])],
@@ -227,7 +227,7 @@ def test_diffpy_structure_adapter_accepts_installed_diffpy_structure():
 
 @pytest.mark.filterwarnings("ignore:.*diffpy.structure.*:DeprecationWarning:diffpy.structure")
 def test_load_crystal_from_cif_uses_diffpy_structure(tmp_path):
-    from cxr_mc.crystallography import load_crystal_from_cif
+    from cxr_mc.materials.crystal import load_crystal_from_cif
 
     cif = tmp_path / "nacl.cif"
     cif.write_text(

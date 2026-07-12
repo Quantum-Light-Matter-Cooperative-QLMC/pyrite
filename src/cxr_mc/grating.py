@@ -49,7 +49,7 @@ from typing import TypedDict
 import numpy as np
 
 from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
-from .crystallography import (
+from .materials.crystal import (
     HC_EV_ANG,
     absorption_length_ang,
     optical_constants,

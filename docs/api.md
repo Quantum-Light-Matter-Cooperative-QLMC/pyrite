@@ -8,9 +8,12 @@ functions and classes, with `[source]` links into the code.
    :toctree: _autosummary
    :recursive:
 
-   cxr_mc.atomic_form_factors
+   cxr_mc.materials
+   cxr_mc.materials.atomic
+   cxr_mc.materials.crystal
+   cxr_mc.materials.registry
+   cxr_mc.materials.attenuation
    cxr_mc.config
-   cxr_mc.crystallography
    cxr_mc.eaglexo_response
    cxr_mc.montecarlo
    cxr_mc.plots
