@@ -31,7 +31,7 @@ def anchor():
 
 def test_line_energy_matches_dispersion(anchor):
     """line_energy_eV reproduces E = hbar c beta g / (1 - beta cos theta)."""
-    from cxr_mc.crystallography import (
+    from cxr_mc.materials.crystal import (
         CRYSTALS,
         HBARC_EV_ANG,
         reciprocal_g_vector,

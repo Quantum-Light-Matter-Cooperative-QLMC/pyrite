@@ -56,7 +56,7 @@ for _p in (str(_HERE), str(_HERE.parent / "src")):
 
 from feranchuk_spence import photons_per_electron  # noqa: E402
 
-from cxr_mc.crystallography import (  # noqa: E402
+from cxr_mc.materials.crystal import (  # noqa: E402
     CRYSTALS,
     HBARC_EV_ANG,
     absorption_length_ang,

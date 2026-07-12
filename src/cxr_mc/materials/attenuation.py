@@ -1,5 +1,5 @@
 """
-montecarlo.materials
+materials.attenuation
 
 Composition handling and X-ray self-absorption shared across transport,
 spectrum and detector: normalize a single-element / compound material spec,
@@ -9,8 +9,8 @@ the total linear attenuation summed over elements, and the layered
 
 import numpy as np
 
-from ..crystallography import absorption_length_ang
-from ._backend import _GPU, REAL, _to_cpu, cp
+from ..montecarlo._backend import _GPU, REAL, _to_cpu, cp
+from .crystal import absorption_length_ang
 
 
 def _normalize_composition(element, n_atoms_per_ang3, composition):

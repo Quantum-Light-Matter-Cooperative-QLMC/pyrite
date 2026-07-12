@@ -28,12 +28,13 @@ from typing import Any
 import numpy as np
 
 from . import materials as _materials
-from .crystallography import CRYSTALS, dominant_reflections
 from .materials import Layer, ScalarOrSeq
+from .materials.crystal import CRYSTALS, dominant_reflections
+from .materials.registry import pm as _pm
 
 _CRYSTAL_PARAMS = _materials.CRYSTAL_PARAMS
 MATERIAL_LABELS = _materials.MATERIAL_LABELS
-pm = _materials.pm
+pm = _pm
 
 # ---- Timepix3 quad geometry (fixed hardware) --------------------------------
 TIMEPIX3_PIXEL_PITCH_M = 55e-6

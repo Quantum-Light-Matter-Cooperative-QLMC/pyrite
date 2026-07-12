@@ -18,7 +18,7 @@ any GPU machine -- the historical bug this parametrization fixes. Set
 import numpy as np
 import pytest
 
-from cxr_mc.crystallography import CRYSTALS
+from cxr_mc.materials.crystal import CRYSTALS
 from cxr_mc.montecarlo import mc_brem_spectrum, mc_spectrum, simulate_trajectories
 from cxr_mc.montecarlo._backend import REAL
 from cxr_mc.montecarlo.runner import _env_chunk

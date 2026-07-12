@@ -8,9 +8,9 @@ angle, and the Gaussian detector convolution.
 
 import numpy as np
 
-from ..crystallography import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
+from ..materials.attenuation import _mu_total_inv_ang
+from ..materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
 from .geometry import _orientation_R, tilted_geometry
-from .materials import _mu_total_inv_ang
 from .transport import beta_from_keV
 
 

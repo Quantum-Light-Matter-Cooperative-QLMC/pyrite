@@ -68,9 +68,9 @@ azimuth: replace the `−…0` span with `np.linspace(0, 180, n, endpoint=True)`
 (same point count, full Zhai range; note the azimuthal step roughly doubles —
 acceptable, flagged).
 
-- `src/cxr_mc/materials.py`: every `tilt_deg` grid (`−85…0`, and hbn `−89…−80`
+- `src/cxr_mc/materials/registry.py`: every `tilt_deg` grid (`−85…0`, and hbn `−89…−80`
   → `80…89`) and every `tilt_azim_deg` grid (`−80…0`, hopg `−85…0`) → positive /
-  `0…180`. Fix the stale comment (`materials.py:~113`,
+  `0…180`. Fix the stale comment (`materials/registry.py:~113`,
   "negative = entrance-toward-detector") to state the Zhai convention.
 - `src/cxr_mc/config.py` `default_sweep` (`~line 119`):
   `np.linspace(-span, 0.0, count)` → `np.linspace(0.0, span, count)`.

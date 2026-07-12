@@ -87,7 +87,7 @@ from scipy.special import erf
 
 from . import _si_sensor
 from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
-from .crystallography import absorption_length_ang
+from .materials.crystal import absorption_length_ang
 
 K_OVER_Q_V_PER_K = 8.617333e-5  # Boltzmann constant / elementary charge [V/K]
 

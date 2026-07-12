@@ -16,7 +16,7 @@ above. This is fixed on this branch's `TODO.md`.
 Both branches were cut from `511a067`, which is an ancestor of `5f94424` — i.e. cut from a
 point on `main`'s history before the `feature/grazing-grating` and `worktree-marimo` merges.
 `main` has since moved `docs/physics-validation-ledger.md`, `docs/repo_map.md`, and
-`src/cxr_mc/crystallography.py` (the `optical_constants` addition). `pyproject.toml` was
+`src/cxr_mc/materials/crystal.py` (the `optical_constants` addition). `pyproject.toml` was
 *not* touched on `main` in that range (`git diff 511a067 5f94424 -- pyproject.toml` is
 empty), so it needs no reconciliation.
 Drift/conflict detail is in each branch's section below.
@@ -25,7 +25,7 @@ Drift/conflict detail is in each branch's section below.
 
 ## `feature/diffpy` — `diffpy.structure` CIF/structure importer
 
-**What it adds.** Two pure-addition functions in `src/cxr_mc/crystallography.py`:
+**What it adds.** Two pure-addition functions in `src/cxr_mc/materials/crystal.py`:
 
 - `diffpy_structure_to_crystal_info(structure, mosaic_fwhm_deg=None)` — converts a
   `diffpy.structure.Structure`-like object (matched via a local `Protocol`, not an isinstance
@@ -40,7 +40,7 @@ module scope — the `from diffpy.structure import Structure` import is local to
 `load_crystal_from_cif` only.
 
 **What it changes in existing code paths.** Nothing. `git diff main...origin/feature/diffpy --
-src/cxr_mc/crystallography.py` is a pure insertion after `_reciprocal_basis`; no existing
+src/cxr_mc/materials/crystal.py` is a pure insertion after `_reciprocal_basis`; no existing
 function body, signature, or behavior changes. `reciprocal_g_vector` and everything after it in
 the file is untouched (the earlier `diff main diffpy` I ran without `...` initially showed
 `optical_constants` as "removed" — that is an artifact of diffing against current `main`
@@ -51,7 +51,7 @@ diff against the correct merge-base confirms pure addition.)
 **Hard or optional dependency?** **Hard.** `diffpy-structure>=3.4.0` is added to
 `[project].dependencies` in `pyproject.toml` (not an `optional-dependencies` extra), and
 `uv.lock` resolves it + its `diffpy-utils` transitive dependency. The *import* is lazy
-(function-local, so `import cxr_mc.crystallography` never touches `diffpy` unless
+(function-local, so `import cxr_mc.materials.crystal` never touches `diffpy` unless
 `load_crystal_from_cif` is called), but the *package* is not optional at the packaging level —
 `uv sync` always installs it once this merges. That's a legitimate design choice (a CIF importer
 arguably deserves to be a real dependency, not gated), but it means merging this branch requires
@@ -102,7 +102,7 @@ anchor" conflicts, not logical conflicts:
   keeping both new rows.
 - `tests/test_crystallography.py` — both sides append new test functions at end of file;
   trivially resolved by keeping both blocks.
-`src/cxr_mc/crystallography.py`, `docs/repo_map.md`, and `pyproject.toml` all merge cleanly
+`src/cxr_mc/materials/crystal.py`, `docs/repo_map.md`, and `pyproject.toml` all merge cleanly
 (`git merge-tree` reports them as auto-mergeable, not conflicted). `main` moved in the first
 two since the branch point; `pyproject.toml` it did not touch at all.
 
@@ -116,7 +116,7 @@ two since the branch point; `pyproject.toml` it did not touch at all.
    was "optional CIF import," this needs to move to an `optional-dependencies` extra with a
    guarded import and `importorskip`-style tests instead.
 
-No code-quality objection: I extracted `crystallography.py` and `test_crystallography.py` from
+No code-quality objection: I extracted `materials/crystal.py` and `test_crystallography.py` from
 this branch and ran the repo's own `ruff check` config against them standalone — clean, no
 findings. Style, docstring density, and typing idiom (Protocol-based structural typing, not
 `isinstance`) match the surrounding module closely.
@@ -126,9 +126,9 @@ findings. Style, docstring density, and typing idiom (Protocol-based structural 
 ## `feature/dans-diffraction` — optional `Dans_Diffraction` validation oracle
 
 Built on top of `feature/diffpy` (`d4dbeff` → `0fc98a5` → `67f27e0`), so this section only
-describes what it adds *beyond* that branch; `crystallography.py` and
+describes what it adds *beyond* that branch; `materials/crystal.py` and
 `tests/test_crystallography.py` have zero further changes on this branch
-(`git diff origin/feature/diffpy...origin/feature/dans-diffraction -- src/cxr_mc/crystallography.py tests/test_crystallography.py`
+(`git diff origin/feature/diffpy...origin/feature/dans-diffraction -- src/cxr_mc/materials/crystal.py tests/test_crystallography.py`
 is empty).
 
 **What it adds.**
@@ -156,7 +156,7 @@ is empty).
 
 **What it changes in existing code paths.** Nothing beyond the `diffpy` branch's own additions
 (which this branch inherits, unmodified). `validation_oracles.py` only *reads* from
-`cxr_mc.crystallography` (`CRYSTALS`, `reciprocal_g_vector`, `structure_factor`) — it imports
+`cxr_mc.materials.crystal` (`CRYSTALS`, `reciprocal_g_vector`, `structure_factor`) — it imports
 no `montecarlo`/`sweep`/`results` modules and nothing imports it back, so it's a pure leaf
 hanging off `crystallography`, matching how the branch's own `docs/repo_map.md` edit describes
 it (`crystallography ├── validation_oracles`).
@@ -174,7 +174,7 @@ and it is *deliberate and correctly scoped*, not a mistake. The module docstring
 that `Dans_Diffraction` uses the opposite structure-factor phase-sign convention from cxr_mc, so
 the comparisons are restricted to phase-insensitive quantities (`|g|`, `|F_hkl|²`, lattice/cell
 parameters) and complex-phase comparison is explicitly called out as a separate, unimplemented
-concern. `structure_factor`/`chi_g`/`U_g`/`debye_waller` in `crystallography.py` remain the only
+concern. `structure_factor`/`chi_g`/`U_g`/`debye_waller` in `materials/crystal.py` remain the only
 code path anything in `montecarlo`/`results`/`plots` ever calls; `Dans_Diffraction`'s own
 scattering computation only feeds the *comparison* dataclasses in `validation_oracles.py`, which
 nothing in production imports. If this had instead been wired so that production code could

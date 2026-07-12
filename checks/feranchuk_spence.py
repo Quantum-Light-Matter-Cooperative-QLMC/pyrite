@@ -12,7 +12,7 @@ core, kept as a validation reference (the results pipeline is the Monte-Carlo in
 
 src/montecarlo.py). It builds on the general crystallography primitives in
 
-src/crystallography.py (constants, CRYSTALS, structure factors, chi_g/U_g); run
+src/cxr_mc/materials/crystal.py (constants, CRYSTALS, structure factors, chi_g/U_g); run
 
 the checks/ scripts with src/ on sys.path so that import resolves.
 
@@ -72,8 +72,8 @@ CAVEATS:
 
 import numpy as np
 
-from cxr_mc.atomic_form_factors import Z_TABLE, atomic_form_factor, cromer_mann_f0
-from cxr_mc.crystallography import (
+from cxr_mc.materials.atomic import Z_TABLE, atomic_form_factor, cromer_mann_f0
+from cxr_mc.materials.crystal import (
     _EDGE_PRONE,
     ALPHA_FS,
     CRYSTALS,

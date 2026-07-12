@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- **Verbatim conversion only** — no physics/logic changes. The three `checks/` notebooks call already-validated library functions (`feranchuk_spence`, `cxr_mc.crystallography`, `cxr_mc.montecarlo`, `checks/anchor_figures.py`); converting their container format must not change a single computed value.
+- **Verbatim conversion only** — no physics/logic changes. The three `checks/` notebooks call already-validated library functions (`feranchuk_spence`, `cxr_mc.materials.crystal`, `cxr_mc.montecarlo`, `checks/anchor_figures.py`); converting their container format must not change a single computed value.
 - `docs/physics-validation-ledger.md` does not reference any of the three `checks/` notebooks by name (only `checks/anchor_figures.py` is named, in the `closed-form-flux` row) — confirmed via `grep -in "feranchuk\|zhai_fig1c\|cxr_analysis" docs/physics-validation-ledger.md`. No ledger edits are needed by this plan.
 - `notebooks/*.ipynb`, `checks/*.ipynb`, and their jupytext `.md` pairs are IN SYNC at the current commit (verified: `git log -1` on each `.ipynb`/`.md` pair returns the same commit hash, and `git status` is clean for both directories) — safe to read the `.md` files as the accurate source of notebook content instead of parsing the JSON `.ipynb` directly.
 - Verify every step with `uv run pytest`, `uv run ruff check .`, `uv run pyright` (repo baseline: 201 tests / 0 ruff / 0 pyright, or whatever the M6 plan left it at if run first).
@@ -42,7 +42,7 @@
 - Delete: `checks/zhai_fig1c_check.ipynb`, `checks/zhai_fig1c_check.md`
 
 **Interfaces:**
-- Consumes: `cxr_mc.crystallography` (`HBARC_EV_ANG`, `ALPHA_FS`, `CRYSTALS`, `reciprocal_g_vector`), `feranchuk_spence` (`amplitudes_PXR_CBS_both`, `bremsstrahlung_background`), `cxr_mc.montecarlo` (`simulate_trajectories`, `mc_spectrum`, `mc_brem_spectrum`, `beta_from_keV`, `eds_fwhm_eV`, `aperture_fwhm_eV`, `convolve_detector`) — all pre-existing, unchanged.
+- Consumes: `cxr_mc.materials.crystal` (`HBARC_EV_ANG`, `ALPHA_FS`, `CRYSTALS`, `reciprocal_g_vector`), `feranchuk_spence` (`amplitudes_PXR_CBS_both`, `bremsstrahlung_background`), `cxr_mc.montecarlo` (`simulate_trajectories`, `mc_spectrum`, `mc_brem_spectrum`, `beta_from_keV`, `eds_fwhm_eV`, `aperture_fwhm_eV`, `convolve_detector`) — all pre-existing, unchanged.
 - Produces: a standalone script; running it prints the validation lines this notebook already prints and writes `zhai_fig1c_analog.png` to the current working directory (repo root, matching how the sibling `checks/*.py` scripts and this notebook's OWN docstring assume `python checks/zhai_fig1c_check.py` is run from repo root).
 
 - [ ] **Step 1: Write `checks/zhai_fig1c_check.py`**
@@ -78,7 +78,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from cxr_mc.crystallography import (
+from cxr_mc.materials.crystal import (
     HBARC_EV_ANG,
     ALPHA_FS,
     CRYSTALS,
@@ -206,7 +206,7 @@ EOF
 - Delete: `checks/cxr_analysis_feranchuk.ipynb`, `checks/cxr_analysis_feranchuk.md`
 
 **Interfaces:**
-- Consumes: `cxr_mc.crystallography` (`CRYSTALS`, `reciprocal_g_vector`, `beta_from_Ee`, `absorption_length_ang`, `Z_TABLE`, `ALPHA_FS`, `HC_EV_ANG`), `cxr_mc.atomic_form_factors.atomic_form_factor`, `feranchuk_spence` (`omega_n`, `amplitudes_PXR_CBS_sweep`, `delta_g`, `cxr_to_bremsstrahlung`, `cxr_lines_fixed`) — all pre-existing, unchanged.
+- Consumes: `cxr_mc.materials.crystal` (`CRYSTALS`, `reciprocal_g_vector`, `beta_from_Ee`, `absorption_length_ang`, `ALPHA_FS`, `HC_EV_ANG`), `cxr_mc.materials.atomic.Z_TABLE`, `cxr_mc.materials.atomic.atomic_form_factor`, `feranchuk_spence` (`omega_n`, `amplitudes_PXR_CBS_sweep`, `delta_g`, `cxr_to_bremsstrahlung`, `cxr_lines_fixed`) — all pre-existing, unchanged.
 - Produces: `docs/pxr-cbr-derivation.md` is a documentation-only artifact (no code executes from it); `checks/feranchuk_figures_check.py` is a standalone script writing PNGs under `figures/`.
 
 - [ ] **Step 1: Write `docs/pxr-cbr-derivation.md`**

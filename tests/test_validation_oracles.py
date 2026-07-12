@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from cxr_mc import validation_oracles as vo
-from cxr_mc.crystallography import CRYSTALS, reciprocal_g_vector, structure_factor
+from cxr_mc.materials.crystal import CRYSTALS, reciprocal_g_vector, structure_factor
 
 
 class FakeCell:
