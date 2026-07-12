@@ -45,28 +45,34 @@ class Settings:
     n_electrons_brem: int = 100  # transport electrons for the background
 
 
+def line_fwhm_eV(case: dict, E_pk: float, mosaic_rad: float | None) -> float:
+    """Combined EDS, aperture, and optional capped-mosaic line FWHM [eV]."""
+    fwhm_sq = (
+        eds_fwhm_eV(E_pk) ** 2
+        + aperture_fwhm_eV(
+            E_pk, beta_from_keV(case["E0_keV"]), case["theta_obs_rad"], case["dtheta_obs_rad"]
+        )
+        ** 2
+    )
+    if mosaic_rad:
+        psi = mosaic_psi_rad(case, E_pk)
+        if psi is not None:
+            fwhm_sq += min(mosaic_fwhm_eV(E_pk, psi, mosaic_rad), E_pk) ** 2
+    return float(np.sqrt(fwhm_sq))
+
+
 # ---- results store -----------------------------------------------------------
 def store_result(results, case, out):
     """Post-process one finished case into ``results[name][E0]`` (in place)."""
     name, E0 = case["name"], case["E0_keV"]
     E_grid = out["E_grid"]
     E_pk = E_grid[np.argmax(out["spec"])]
-    fwhm_sq = (
-        eds_fwhm_eV(E_pk) ** 2
-        + aperture_fwhm_eV(E_pk, beta_from_keV(E0), case["theta_obs_rad"], case["dtheta_obs_rad"])
-        ** 2
-    )
     # crystal mosaicity (analytic): add the mosaic broadening in quadrature when the
     # run enabled it (case["mosaic_fwhm_rad"] from build_cases; None/absent -> skip,
     # an exact no-op so old checkpoints and mosaic=False runs are unchanged). The
     # linearization diverges as psi -> 90 deg, so cap the term at E_pk -- beyond
     # FWHM ~ E the line is washed out and the model is meaningless anyway.
-    mosaic_rad = case.get("mosaic_fwhm_rad")
-    if mosaic_rad:
-        psi = mosaic_psi_rad(case, E_pk)
-        if psi is not None:
-            fwhm_sq += min(mosaic_fwhm_eV(E_pk, psi, mosaic_rad), E_pk) ** 2
-    fwhm = np.sqrt(fwhm_sq)
+    fwhm = line_fwhm_eV(case, E_pk, case.get("mosaic_fwhm_rad"))
     results.setdefault(name, {})[E0] = dict(
         E_grid=E_grid,
         spec=out["spec"],

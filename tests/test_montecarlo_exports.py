@@ -52,6 +52,8 @@ FROZEN_EXPORTS = frozenset(
         "_SEG_ARRAYS",
         "_segments_in_layer",
         "_polarization_pair",
+        "_observation_direction",
+        "_escape_length",
         "mc_spectrum",
         "mc_spectrum_solid_angle",
         "R_E_CM2",

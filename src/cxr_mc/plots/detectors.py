@@ -324,6 +324,20 @@ def _eag_detected(r, settings, coating="BN", resolve_energy=False):
     return incident, resp.apply(incident)
 
 
+def _eag_wide_brem(r, coating="BN"):
+    """Wide-grid Eagle XO incident and detected brem [Phs/eV/s/nA]."""
+    E = np.asarray(r["E_grid_brem"], dtype=float)
+    incident = np.asarray(r["brem_wide"], dtype=float) * r["scale"]
+    return E, incident, incident * eag.qe(E, coating)
+
+
+def _eag_wide_charge(r, coating="BN", beam_current_na=1.0):
+    """Wide-grid Eagle XO charge density [e-/eV/s] from brem."""
+    E = np.asarray(r["E_grid_brem"], dtype=float)
+    incident = np.nan_to_num(np.asarray(r["brem_wide"], dtype=float) * r["scale"])
+    return E, incident * eag.qe(E, coating) * (E / eag.W_EHP_EV) * beam_current_na
+
+
 def _draw_eaglexo_detected(
     fig,
     trecs,
@@ -368,9 +382,7 @@ def _draw_eaglexo_detected(
                 label=rf"{E0:g} keV ($\phi$={az:.1f}$\degree$)",
             )
             if r.get("brem_wide") is not None:  # full range -> the brem roll-off
-                Eb = np.asarray(r["E_grid_brem"], dtype=float)
-                inc_b = r["brem_wide"] * r["scale"]
-                det_b = inc_b * eag.qe(Eb, coating)
+                Eb, inc_b, det_b = _eag_wide_brem(r, coating)
                 xhi = max(xhi, float(Eb[-1]))
                 if inc_b.size:  # keep the broad brem in the y-range, not clipped
                     ymax = max(ymax, float(np.nanmax(inc_b)))
@@ -452,9 +464,7 @@ def _eag_charge_rate(r, coating="BN"):
     resp = eag.get_response(r["E_grid"], coating=coating)
     q = resp.integrated_charge(r["spec"] * r["scale"])  # coherent lines [e-/s/nA]
     if r.get("brem_wide") is not None:
-        Eb = np.asarray(r["E_grid_brem"], dtype=float)
-        inc_b = np.nan_to_num(np.asarray(r["brem_wide"], dtype=float) * r["scale"])
-        cd_b = inc_b * eag.qe(Eb, coating) * (Eb / eag.W_EHP_EV)
+        Eb, cd_b = _eag_wide_charge(r, coating)
         q += float(np.trapezoid(cd_b, Eb))
     else:
         q += resp.integrated_charge(r["brem"] * r["scale"])
@@ -498,9 +508,7 @@ def _draw_eaglexo_charge(
                 label=rf"{E0:g} keV ($\phi$={az:.1f}$\degree$, {rate:.2g} e$^-$/s)",
             )
             if r.get("brem_wide") is not None:
-                Eb = np.asarray(r["E_grid_brem"], dtype=float)
-                inc_b = np.nan_to_num(np.asarray(r["brem_wide"], dtype=float) * r["scale"])
-                cd_b = inc_b * eag.qe(Eb, coating) * (Eb / eag.W_EHP_EV) * cur
+                Eb, cd_b = _eag_wide_charge(r, coating, cur)
                 xhi = max(xhi, float(Eb[-1]))
                 fb = cd_b[np.isfinite(cd_b)]
                 if fb.size:

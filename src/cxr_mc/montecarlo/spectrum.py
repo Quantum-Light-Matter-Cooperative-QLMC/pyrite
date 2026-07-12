@@ -53,6 +53,17 @@ def _polarization_pair(k_hat, g_vec):
     return e_s, e_p / np.linalg.norm(e_p)
 
 
+def _observation_direction(theta_obs_rad, n_hat):
+    if n_hat is None:
+        return np.array([np.sin(theta_obs_rad), 0.0, np.cos(theta_obs_rad)])
+    n_hat = np.asarray(n_hat, dtype=float)
+    return n_hat / np.linalg.norm(n_hat)
+
+
+def _escape_length(z_mid, thickness, n_z):
+    return z_mid / -n_z if n_z < 0 else (thickness - z_mid) / n_z
+
+
 def mc_spectrum(
     segments,
     E_grid_eV,
@@ -150,11 +161,7 @@ def mc_spectrum(
     thickness = segments["thickness_ang"]
     Ne = segments["Ne"]
 
-    if n_hat is None:
-        n_hat = np.array([np.sin(theta_obs_rad), 0.0, np.cos(theta_obs_rad)])
-    else:
-        n_hat = np.asarray(n_hat, dtype=float)
-        n_hat = n_hat / np.linalg.norm(n_hat)
+    n_hat = _observation_direction(theta_obs_rad, n_hat)
     E_grid = xp.asarray(E_grid_eV, dtype=REAL)
     spec = xp.zeros(E_grid.size, dtype=REAL)
     spec_pxr = xp.zeros(E_grid.size, dtype=REAL)
@@ -493,11 +500,7 @@ def mc_brem_spectrum(
     thickness = segments["thickness_ang"]
     Ne = segments["Ne"]
 
-    if n_hat is None:
-        n_hat = np.array([np.sin(theta_obs_rad), 0.0, np.cos(theta_obs_rad)])
-    else:
-        n_hat = np.asarray(n_hat, dtype=float)
-        n_hat = n_hat / np.linalg.norm(n_hat)
+    n_hat = _observation_direction(theta_obs_rad, n_hat)
 
     E_grid = xp.asarray(E_grid_eV, dtype=REAL)
     mu = _mu_total_inv_ang(comp, E_grid)  # (NE,) [1/Ang], single-slab fallback
@@ -519,7 +522,7 @@ def mc_brem_spectrum(
     seg_L = xp.asarray(segments["L_ang"], dtype=REAL)
     seg_E = xp.asarray(segments["E_keV"], dtype=REAL)
     z_mid = seg_r[:, 2]
-    L_esc = z_mid / -n_hat[2] if n_hat[2] < 0 else (thickness - z_mid) / n_hat[2]
+    L_esc = _escape_length(z_mid, thickness, n_hat[2])
 
     spec = xp.zeros(E_grid.size, dtype=REAL)
     M = seg_E.size

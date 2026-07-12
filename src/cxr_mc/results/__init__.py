@@ -55,6 +55,7 @@ from .store import (
     PER_NA,
     Settings,
     detected_background,
+    line_fwhm_eV,
     store_result,
 )
 from .tables import (
@@ -69,6 +70,7 @@ __all__ = [
     # store
     "PER_NA",
     "Settings",
+    "line_fwhm_eV",
     "store_result",
     "detected_background",
     # selection

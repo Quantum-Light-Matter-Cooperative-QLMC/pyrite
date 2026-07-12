@@ -7,16 +7,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from ..montecarlo import (
-    aperture_fwhm_eV,
-    beta_from_keV,
     convolve_detector,
     detector_efficiency,
-    eds_fwhm_eV,
-    mosaic_fwhm_eV,
     mosaic_psi_rad,
 )
 from ..results import (
     best_azimuth,
+    line_fwhm_eV,
     records,
     records_for_cases,
     selection_score,
@@ -244,28 +241,15 @@ def plot_mosaic_comparison(r, settings, grades_deg=(None, 0.4, 0.8, 3.5), ax=Non
     E, E_pk = r["E_grid"], r["E_pk"]
     qe = detector_efficiency(E) if settings.apply_detector_qe else 1.0
     line_in = r["spec"] * qe
-    base_sq = (
-        eds_fwhm_eV(E_pk) ** 2
-        + aperture_fwhm_eV(
-            E_pk,
-            beta_from_keV(case["E0_keV"]),
-            case["theta_obs_rad"],
-            case["dtheta_obs_rad"],
-        )
-        ** 2
-    )
     psi = mosaic_psi_rad(case, E_pk)
 
     curves = []  # (label, fwhm, detected)
     for grade in grades_deg:
         if grade is None:
-            fwhm = float(np.sqrt(base_sq))
+            fwhm = line_fwhm_eV(case, E_pk, None)
             lbl = "perfect"
         else:
-            extra = (
-                min(mosaic_fwhm_eV(E_pk, psi, np.deg2rad(grade)), E_pk) if psi is not None else 0.0
-            )
-            fwhm = float(np.sqrt(base_sq + extra**2))
+            fwhm = line_fwhm_eV(case, E_pk, np.deg2rad(grade))
             lbl = rf"mosaic {grade:g}$\degree$"
         det = convolve_detector(E, line_in, fwhm) * r["scale"]
         curves.append((lbl, fwhm, det))
