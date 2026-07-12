@@ -18,6 +18,7 @@ FROZEN_EXPORTS = frozenset(
         # store
         "PER_NA",
         "Settings",
+        "line_fwhm_eV",
         "store_result",
         "detected_background",
         # selection

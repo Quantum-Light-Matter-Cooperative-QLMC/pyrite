@@ -58,10 +58,7 @@ on `main` once the branch exists.
    -> `feature/material-filters`.
 5. **Finite electron beam size.** Confirm the input beam is finite, then model it as a
    ~1 mm diameter Gaussian beam incident on the crystal.
-6. **De-duplication follow-through — M4 + M7.** The two clusters parked out of scope by the
-   merged `refactor/dedup-followthrough`. -> `refactor/dedup-m4-m7`.
-   Inventory: [`docs/dedup-inventory.md`](docs/dedup-inventory.md).
-7. **Material config rework — expose crystal orientation + dominant-plane count.**
+6. **Material config rework — expose crystal orientation + dominant-plane count.**
    `beam_uvw`/`n_families` are overridable via `Sweep` but not from the CLI, `hkl_list`
    has no override path, and none of it is persisted with a checkpoint (unreproducible
    after a registry default changes). Staged plan: CLI flags -> checkpoint persistence
@@ -69,10 +66,10 @@ on `main` once the branch exists.
    registry (`materials.py`, no cycle). No physics change. ->
    `feature/material-config-rework`. Evaluation:
    [`docs/material-config-evaluation.md`](docs/material-config-evaluation.md).
-8. **Zhai supplementary — missing HOPG + h-BN plots.** `ZHAI_SUPPLEMENTARY_STUDIES` has no
+7. **Zhai supplementary — missing HOPG + h-BN plots.** `ZHAI_SUPPLEMENTARY_STUDIES` has no
    `hopg` entry and only one h-BN thickness (921 nm); Table 4 already has the missing
    thicknesses' tilts transcribed. -> `feature/zhai-supplementary-coverage-gaps`.
-9. **Parameter-space sampling review.** Too many independent parameters (tilt, azimuth,
+8. **Parameter-space sampling review.** Too many independent parameters (tilt, azimuth,
    energy, detector placement, thickness, misalignment) to scan by eye; needs a
    sampling/prioritization strategy before the user can evaluate combinations feasibly.
    -> `docs/parameter-space-sampling-review`.

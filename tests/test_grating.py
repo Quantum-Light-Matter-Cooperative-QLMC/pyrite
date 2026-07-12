@@ -3,8 +3,8 @@
 import numpy as np
 import pytest
 
-from cxr_mc._si_sensor import SI_N_PER_ANG3
-from cxr_mc.grating import (
+from cxr_mc.detectors._si_sensor import SI_N_PER_ANG3
+from cxr_mc.detectors.grating import (
     ALEXS_SENSORS,
     Grating,
     SimpleCCD,

@@ -11,7 +11,7 @@ reflectivity `r(θ) = (θ − √(θ² − 2δ − 2iβ)) / (θ + √(θ² − 2
 polarization-independent.
 
 **Code.** `src/cxr_mc/materials/crystal.py::optical_constants`,
-`src/cxr_mc/grating.py::Grating.reflectivity` (+ `Grating.throughput`,
+`src/cxr_mc/detectors/grating.py::Grating.reflectivity` (+ `Grating.throughput`,
 `disperse_spectrum(..., weight_by_throughput=)`).
 **Anchor.** `tests/test_crystallography.py::test_optical_constants_beta_matches_absorption_length`,
 `::test_optical_constants_delta_positive_off_edge`;

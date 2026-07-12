@@ -25,11 +25,11 @@ results ◄── montecarlo, sweep
 config  ◄── results, sweep
 run     ◄── montecarlo, results
 scan    ◄── config, run, sweep
-plots   ◄── montecarlo, results, timepix_response, eaglexo_response
+plots   ◄── montecarlo, results, detectors.timepix_response, detectors.eaglexo_response
 cli     ◄── scan, export          (the `cxr` console script)
 ```
 
-`timepix_response` / `eaglexo_response` depend only on `materials.crystal` plus
+`detectors.timepix_response` / `detectors.eaglexo_response` depend only on `materials.crystal` plus
 the shared `_si_sensor` plumbing (Si constants, response caching, Poisson core).
 Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
 
@@ -208,7 +208,7 @@ freezes the export set). Submodule DAG (leaf → driver):
   re-deriving the best-record reduction inline. Deps: `_style`, `_frames`, `results`.
 - `detectors` — `plot_timepix_efficiency` / `_detected` / `_poisson`,
   `plot_eaglexo_efficiency` / `_detected` / `_charge` / `_charge_map`. Deps:
-  `_style`, `_common`, `sweeps`, `results`, `timepix_response`, `eaglexo_response`.
+  `_style`, `_common`, `sweeps`, `results`, `detectors.timepix_response`, `detectors.eaglexo_response`.
 - `trajectories` — `plot_electron_trajectories`, `plot_trajectory_grid`,
   `plot_penetration_survival`. Deps: `_style`, `montecarlo`, `results`.
 - `interactive` — `browse`, `browse_plotly`, `stream_chunk`, `plot_chunk`
@@ -231,45 +231,49 @@ freezes the export set). Submodule DAG (leaf → driver):
   - `altair_detectors` — Timepix3/Eagle XO spectral views:
     `timepix_detected_chart`, `eaglexo_detected_chart`, `eaglexo_charge_chart`
     (+ their `*_frame` builders). Deps: `_common`, `altair_spectra`,
-    `detectors`, `eaglexo_response`.
+    `detectors`, `detectors.eaglexo_response`.
   - `altair_trajectories` — penetration views: `penetration_survival_chart`,
     `trajectory_chart` (+ `survival_frame`, `tracks_frame`,
     `track_segments_frame`); the dense datashader raster stays on matplotlib.
     Deps: `sweeps`, `trajectories`.
-- Deps: `montecarlo`, `results`, `timepix_response`, `eaglexo_response`.
+- Deps: `montecarlo`, `results`, `detectors.timepix_response`, `detectors.eaglexo_response`.
 
 ## Detector forward models
 
-### `_si_sensor.py`
+### `detectors/`
+Detector and detector-adjacent forward models. Deps: `materials.crystal`,
+`DATA_DIR`.
+
+#### `_si_sensor.py`
 Internal shared silicon-sensor plumbing for both detector forward models: the
 fixed Si material constants, the (grid → cached-response) keying pattern, the
 Poisson acquisition core, and the `.apply()` input-shape guard. Leaf; no
 sibling deps.
 
-### `timepix_response.py`
+#### `timepix_response.py`
 Timepix3 charge-sensitive forward model (diffusion, absorption, energy
 resolution, Poisson counts).
 - Public: `TimepixResponse`, `build_response`, `get_response`,
   `absorption_efficiency`, `energy_fwhm_eV`, `sigma_diffusion_um`,
   `poisson_counts`.
-- Deps: `crystallography`, `_si_sensor`.
+- Deps: `materials.crystal`, `_si_sensor`.
 
-### `eaglexo_response.py`
+#### `eaglexo_response.py`
 Eagle XO detector forward model (geometry/solid angle, QE table, energy
 resolution, Poisson counts).
 - Public: `EagleResponse`, `geometry`, `sweep_geometry`, `get_response`, `qe`,
   `qe_absorption_model`, `load_qe_table`, `solid_angle_sr`, `energy_fwhm_eV`,
   `poisson_counts`.
-- Deps: `crystallography`, `_si_sensor`.
+- Deps: `materials.crystal`, `_si_sensor`.
 
-### `grating.py`
+#### `grating.py`
 **Exploratory** grazing-incidence soft-X-ray grating spectrometer forward model
 (dispersion geometry, coating reflectivity, and a simple CCD pixel grid; not
 wired into the pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
 - Public: `Grating`, `wavelength_angstrom`, `groove_spacing_angstrom`,
   `coating_number_density_per_ang3`, `detector_position_mm`, `disperse_spectrum`,
   `resolving_power`, `ALEXS_SENSORS`, `SimpleCCD`, `bin_to_pixels`.
-- Deps: `crystallography` (`HC_EV_ANG`, `optical_constants`).
+- Deps: `materials.crystal` (`HC_EV_ANG`, `optical_constants`).
 
 ## CLI & packaging
 

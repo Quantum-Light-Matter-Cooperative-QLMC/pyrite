@@ -31,14 +31,16 @@ import altair as alt
 import numpy as np
 import pandas as pd
 
-from .. import eaglexo_response as eag
-from .. import timepix_response as tpx
+from ..detectors import eaglexo_response as eag
+from ..detectors import timepix_response as tpx
 from ._common import _best_azimuth, _case_title
 from .altair_spectra import _scale as _axis_scale
 from .altair_spectra import _tilt_records, _validate_band, _windowed_frame
 from .detectors import (
     SI_K_EDGE_EV,
     _eag_detected,
+    _eag_wide_brem,
+    _eag_wide_charge,
     _thr_keV,
     _tpx_detected,
 )
@@ -292,9 +294,7 @@ def eaglexo_detected_frame(
             az = float(r["case"]["tilt_azim_deg"])
             rows = [("line", E, inc, det)]
             if band == "broad" and r.get("brem_wide") is not None:
-                Eb = np.asarray(r["E_grid_brem"], dtype=float)
-                inc_b = np.asarray(r["brem_wide"], dtype=float) * r["scale"]
-                det_b = inc_b * eag.qe(Eb, coating)
+                Eb, inc_b, det_b = _eag_wide_brem(r, coating)
                 rows.append(("brem", Eb, inc_b, det_b))
             for band, Ex, yi, yd in rows:
                 for kind, y in (("incident", yi), ("detected", yd)):
@@ -417,9 +417,7 @@ def eaglexo_charge_frame(recs, settings, *, coating="BN", collapse_azimuth=True,
                 )
             )
             if band == "broad" and r.get("brem_wide") is not None:
-                Eb = np.asarray(r["E_grid_brem"], dtype=float)
-                inc_b = np.nan_to_num(np.asarray(r["brem_wide"], dtype=float) * r["scale"])
-                cd_b = inc_b * eag.qe(Eb, coating) * (Eb / eag.W_EHP_EV) * cur
+                Eb, cd_b = _eag_wide_charge(r, coating, cur)
                 frames.append(
                     pd.DataFrame(
                         {
