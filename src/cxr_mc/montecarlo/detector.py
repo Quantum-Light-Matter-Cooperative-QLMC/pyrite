@@ -8,9 +8,9 @@ angle, and the Gaussian detector convolution.
 
 import numpy as np
 
-from ..crystallography import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
+from ..materials.attenuation import _mu_total_inv_ang
+from ..materials.crystal import CRYSTALS, HBARC_EV_ANG, reciprocal_g_vector
 from .geometry import _orientation_R, tilted_geometry
-from .materials import _mu_total_inv_ang
 from .transport import beta_from_keV
 
 
@@ -57,9 +57,29 @@ def eds_fwhm_eV(E_eV):
 
 
 def aperture_fwhm_eV(E_eV, beta, theta_obs_rad, dtheta_obs_rad):
-    """Line broadening from the detector polar-angle span, SI Eq. (14)."""
+    """Line broadening from the detector polar-angle span, Zhai et al. 2025 SI Eq. (14):
+
+        FWHM_dtheta_obs = (2*sqrt(2*ln2) / 3) * (dEp/dtheta_obs) * dtheta_obs
+
+    dtheta_obs_rad is the FULL polar span (Delta theta_obs = 16.6 deg for the EDS
+    aperture used here), and the Gaussian-equivalent width is Zhai's chosen
+    stand-in for the (non-Gaussian) uniform angular span. dEp/dtheta_obs (SI Eq.
+    (14), second line) reduces, for this beam-axis geometry, to
+    E*beta*sin(theta_obs)/(1 - beta*cos(theta_obs)) -- the `dE_dth` term below.
+    The prefactor 2*sqrt(2*ln2)/3 ~= 0.785 is adopted as reported by Zhai; a
+    naive variance match to a uniform span of full width dtheta_obs would instead
+    give sqrt(2*ln2/3) ~= 0.68, so we follow the paper's own convention rather
+    than rederive it. Limiting case: FWHM -> 0 as dtheta_obs_rad -> 0 or beta -> 0
+    (stationary source / no aperture -> no polar-angle broadening).
+
+    NB: prior to 2026-07-11 this function returned sqrt(3) times the Eq. (14)
+    value (the /3 was mistakenly pulled inside the sqrt), broadening every
+    detector-convolved line by that factor.
+
+    Validation: detector-line-broadening
+    """
     dE_dth = E_eV * beta * np.sin(theta_obs_rad) / (1.0 - beta * np.cos(theta_obs_rad))
-    return 2.0 * np.sqrt(2.0 * np.log(2.0) / 3.0) * dE_dth * dtheta_obs_rad
+    return 2.0 * np.sqrt(2.0 * np.log(2.0)) / 3.0 * dE_dth * dtheta_obs_rad
 
 
 def mosaic_fwhm_eV(E_eV, psi_rad, mosaic_fwhm_rad):

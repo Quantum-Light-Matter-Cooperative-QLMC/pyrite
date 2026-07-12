@@ -10,7 +10,8 @@ available.
 
 import numpy as np
 
-from ..crystallography import (
+from ..materials.attenuation import _layer_dz, _mu_total_inv_ang, _normalize_composition, _stack_tau
+from ..materials.crystal import (
     ALPHA_FS,
     CRYSTALS,
     HBARC_EV_ANG,
@@ -21,7 +22,6 @@ from ..crystallography import (
 )
 from ._backend import REAL, _to_cpu, xp
 from .geometry import _mosaic_quadrature, _orientation_R
-from .materials import _layer_dz, _mu_total_inv_ang, _normalize_composition, _stack_tau
 from .transport import TRANSPORT_ELEMENTS, beta_from_keV
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
@@ -176,7 +176,7 @@ def mc_spectrum(
     # the basis elements' native Henke energies, which densely sample the edges --
     # a plain uniform mesh mis-resolves the edge jumps (tens of % at e.g. the
     # C K-edge). Window matches the keep mask below.
-    from ..atomic_form_factors import load_henke
+    from ..materials.atomic import load_henke
 
     _pad = 0.2 * (float(E_grid_eV[-1]) - float(E_grid_eV[0]))
     _lo, _hi = float(E_grid_eV[0]) - _pad, float(E_grid_eV[-1]) + _pad

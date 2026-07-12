@@ -31,7 +31,7 @@ def anchor():
 
 def test_line_energy_matches_dispersion(anchor):
     """line_energy_eV reproduces E = hbar c beta g / (1 - beta cos theta)."""
-    from cxr_mc.crystallography import (
+    from cxr_mc.materials.crystal import (
         CRYSTALS,
         HBARC_EV_ANG,
         reciprocal_g_vector,
@@ -232,7 +232,8 @@ def test_supplementary_detected_spectrum_matches_fig1c_detector_scaling():
             ),
         )
     )
-    expected = af.convolve_detector(study.E_grid, spectrum, fwhm_eV)
+    spectrum_eff = spectrum * af.detector_efficiency(study.E_grid)
+    expected = af.convolve_detector(study.E_grid, spectrum_eff, fwhm_eV)
     expected *= anchor.domega_sr * anchor.per_nA
 
     assert np.allclose(af._supplementary_detected_spectrum(study, condition, spectrum), expected)

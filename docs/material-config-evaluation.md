@@ -12,7 +12,7 @@ physics change, not a config-exposure change, and would require a fresh
 validation pass.
 
 **Status on `feature/material-config-rework`:** steps 1-3 are implemented.
-`src/cxr_mc/materials.py` now owns the combined per-material rows, while
+`src/cxr_mc/materials/registry.py` now owns the combined per-material rows, while
 `config.py` and `sweep.py` consume typed projections from that registry. This
 remains a config relocation/surfacing change only; no reflection defaults,
 `g_max_invang`, or ranking metrics were changed.
@@ -24,7 +24,7 @@ Per-material configuration was split across three places by import layer
 
 ```
 crystal_structures.toml   physics data: lattice, basis, mosaic_fwhm_deg
-        │                 (crystallography.py loads it; has its own
+        │                 (materials/crystal.py loads it; has its own
         │                  Validation: <id> entries in the ledger)
         ▼
 sweep.py  _CRYSTAL_PARAMS  crystal orientation: beam_uvw (zone axis),
@@ -38,7 +38,7 @@ config.py  _MATERIAL_GRIDS  scan geometry/energy grids: thickness,
 
 The split could not be fixed by simply moving `_CRYSTAL_PARAMS` into
 `config.py`: `sweep.crystal_params` would then need to import back from
-`config.py`, a cycle. The implemented `materials.py` module avoids that by
+`config.py`, a cycle. The implemented `materials/registry.py` module avoids that by
 sitting below both `config.py` and `sweep.py`.
 
 ### Orientation is *partially* exposed already
@@ -92,7 +92,7 @@ independently.
 1. **Leave the split, add flags + surfacing only.** Zero churn to the
    registries themselves. Fixes the CLI-visibility and surfacing gaps but
    leaves "editing one material means touching two files" unresolved.
-2. **New leaf module (`materials.py`) between `crystallography.py` and
+2. **New leaf module (`materials/registry.py`) between `materials/crystal.py` and
    `sweep.py`/`config.py`.** Both `sweep.py` and `config.py` import from it;
    no cycle. Holds one row per material with orientation fields (`beam_uvw`,
    optional `hkl_list` pin + a required reason string when pinned, so the
@@ -134,7 +134,7 @@ surfacing field shapes.
    `geometry_table` to show more than a bare reflection count when someone
    wants to eyeball a checkpoint's orientation without writing a one-off
    script.
-3. **Registry unification (`materials.py`)** — `_MATERIAL_GRIDS` /
+3. **Registry unification (`materials/registry.py`)** — `_MATERIAL_GRIDS` /
    `_CRYSTAL_PARAMS` now project from one per-material row each, including a
    visible reason string for materials that hand-pin `hkl_list` (HOPG, h-BN)
    so the auto-vs-pinned distinction stops being implicit.

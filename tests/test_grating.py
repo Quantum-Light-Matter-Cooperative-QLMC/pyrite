@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from cxr_mc._si_sensor import SI_N_PER_ANG3
-from cxr_mc.crystallography import HC_EV_ANG, absorption_length_ang, optical_constants
 from cxr_mc.grating import (
     ALEXS_SENSORS,
     Grating,
@@ -22,6 +21,7 @@ from cxr_mc.grating import (
     resolving_power,
     wavelength_angstrom,
 )
+from cxr_mc.materials.crystal import HC_EV_ANG, absorption_length_ang, optical_constants
 
 
 def test_wavelength_and_spacing():

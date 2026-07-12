@@ -56,7 +56,7 @@ for _p in (str(_HERE), str(_HERE.parent / "src")):
 
 from feranchuk_spence import photons_per_electron  # noqa: E402
 
-from cxr_mc.crystallography import (  # noqa: E402
+from cxr_mc.materials.crystal import (  # noqa: E402
     CRYSTALS,
     HBARC_EV_ANG,
     absorption_length_ang,
@@ -66,6 +66,7 @@ from cxr_mc.montecarlo import (  # noqa: E402
     aperture_fwhm_eV,
     beta_from_keV,
     convolve_detector,
+    detector_efficiency,
     eds_fwhm_eV,
     mc_brem_spectrum,
     mc_spectrum,
@@ -818,11 +819,22 @@ def _supplementary_detected_spectrum(
 ) -> np.ndarray:
     """Return one supplementary spectrum in Fig. 1c detected flux units.
 
-    Applies the same quadrature EDS-plus-aperture FWHM as ``model_spectra``:
-    Zhai SI Eqs. (14) and (16), at the spectrum's intrinsic peak and the
-    condition's reported beam energy.  It assumes the Fig. 1c collection
-    aperture (0.066 sr) and 1 nA electron rate.  In the zero-FWHM limit the
-    returned spectrum is the intrinsic density scaled by those two factors.
+    Applies the soft-X-ray window efficiency ``detector_efficiency`` to the
+    intrinsic spectrum first, then convolves with the same quadrature
+    EDS-plus-aperture FWHM as ``model_spectra``: Zhai SI Eqs. (14) and (16),
+    at the spectrum's intrinsic peak and the condition's reported beam
+    energy (photons are lost in the detector window before the sensor
+    electronics blur the surviving counts in energy).  It assumes the
+    Fig. 1c collection aperture (0.066 sr) and 1 nA electron rate.  In the
+    zero-FWHM, unit-efficiency limit the returned spectrum is the intrinsic
+    density scaled by those two factors.
+
+    Caveat: Zhai's SI (S3/S4) never states whether their experimental
+    spectra are efficiency-corrected or their theory includes window
+    transmission; applying our nominal Moxtek AP3.3-class QE model here is
+    a modeling choice, and the residual normalization gap vs Zhai SI
+    Fig. S5b is tracked in docs/physics-validation-ledger.md (id
+    `zhai-hbn-921-detected`).
     """
     anchor = ZhaiAnchor()
     peak_eV = float(study.E_grid[np.argmax(spectrum)])
@@ -837,7 +849,10 @@ def _supplementary_detected_spectrum(
             ),
         )
     )
-    return convolve_detector(study.E_grid, spectrum, fwhm_eV) * (anchor.domega_sr * anchor.per_nA)
+    spectrum_eff = spectrum * detector_efficiency(study.E_grid)
+    return convolve_detector(study.E_grid, spectrum_eff, fwhm_eV) * (
+        anchor.domega_sr * anchor.per_nA
+    )
 
 
 def figure_supplementary_tmd(

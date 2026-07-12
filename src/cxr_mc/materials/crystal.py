@@ -1,11 +1,11 @@
 """
-crystallography.py
+materials.crystal
 
 General-purpose X-ray crystallography / diffraction primitives, shared by the
 Monte-Carlo pipeline (montecarlo, sweep, the detector forward models) and the
 Feranchuk-Spence analytic checks (checks/feranchuk_spence.py). Nothing here is
 specific to the Feranchuk amplitude framework -- it is the reusable layer above
-atomic_form_factors.py:
+materials.atomic:
 
   * physical constants (hc, hbar c, alpha, m_e, r_e),
   * lattice geometry: direct/reciprocal vectors, |g| for any crystal system,
@@ -19,7 +19,7 @@ atomic_form_factors.py:
 Units: energies eV, lengths Angstrom, angles radians.
 
 Crystal structures are loaded from crystal_structures.toml (data/) into the
-CRYSTALS dict; see that file for the format. Depends on atomic_form_factors.py
+CRYSTALS dict; see that file for the format. Depends on materials.atomic.
 (cromer_mann_f0, atomic_form_factor, henke_dispersion, Z_TABLE).
 """
 
@@ -30,8 +30,8 @@ from typing import Protocol, cast
 
 import numpy as np
 
-from . import DATA_DIR
-from .atomic_form_factors import (
+from .. import DATA_DIR
+from .atomic import (
     Z_TABLE,
     atomic_form_factor,
     cromer_mann_f0,

@@ -29,7 +29,7 @@ from typing import Any, Protocol
 
 import numpy as np
 
-from cxr_mc.crystallography import CRYSTALS, reciprocal_g_vector, structure_factor
+from cxr_mc.materials.crystal import CRYSTALS, reciprocal_g_vector, structure_factor
 
 _Lattice6 = tuple[float, float, float, float, float, float]
 

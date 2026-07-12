@@ -10,8 +10,8 @@ S(g) = sum_j f_j(g) * exp(i g . r_j) * exp(-W_j),   W = B (sin θ / λ)^2 = B (g
 with the crystallographic B-factor `B = 8π² <u_x²>` (`<u_x²>` = mean-square
 displacement along the scattering vector).
 
-**Code.** `src/cxr_mc/crystallography.py::structure_factor`,
-`src/cxr_mc/crystallography.py::debye_waller`
+**Code.** `src/cxr_mc/materials/crystal.py::structure_factor`,
+`src/cxr_mc/materials/crystal.py::debye_waller`
 **Source (as handed).** Standard kinematical structure factor
 `F(g) = Σ_j f_j exp(i g·r_j) exp(−B g²/16π²)`. The flagged trap is the
 Debye–Waller exponent convention: `B` vs `<u²>`, and the factor `16π²` vs `4`.
@@ -215,7 +215,7 @@ implemented correctly, so the phase convention is verified. `S(000) ≈ 114` mat
 ## 5. Finding: missing in-code `Validation:` marker
 
 Per `docs/validation/README.md`, every ledgered physics function must carry a
-one-line `Validation: <id>` marker in its docstring. `crystallography.py` contains
+one-line `Validation: <id>` marker in its docstring. `materials/crystal.py` contains
 that marker only on `optical_constants` (`Validation: grazing-optical-constants`).
 `structure_factor` and `debye_waller` — the code for this claim — carry **no**
 `Validation: structure-factor` marker (nor do the sibling ledgered functions

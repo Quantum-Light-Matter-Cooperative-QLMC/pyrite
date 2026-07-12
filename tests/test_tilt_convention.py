@@ -10,7 +10,7 @@ convention-design.md):
   the physical slab normal n (a crystal miscut). None is a strict no-op.
 
 This module covers the convention itself (tilted_geometry) and the hook
-(_orientation_R / mc_spectrum); the grid-value flips in materials.py /
+(_orientation_R / mc_spectrum); the grid-value flips in materials/registry.py /
 config.py / sweep.py / scan.py / checks/anchor_figures.py are covered by
 their existing consumer tests (already updated to the positive convention).
 """
@@ -18,7 +18,7 @@ their existing consumer tests (already updated to the positive convention).
 import numpy as np
 import pytest
 
-from cxr_mc.crystallography import CRYSTALS
+from cxr_mc.materials.crystal import CRYSTALS
 from cxr_mc.montecarlo import mc_spectrum, simulate_trajectories, tilted_geometry
 from cxr_mc.montecarlo.geometry import _orientation_R
 

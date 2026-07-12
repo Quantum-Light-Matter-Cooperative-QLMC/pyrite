@@ -17,7 +17,7 @@ plane (zero y-component).
 
 import numpy as np
 
-from ..crystallography import _direct_lattice_vectors, _rotation_between
+from ..materials.crystal import _direct_lattice_vectors, _rotation_between
 
 
 def tilted_geometry(theta_obs_rad, tilt_polar_rad, tilt_azim_rad=0.0):

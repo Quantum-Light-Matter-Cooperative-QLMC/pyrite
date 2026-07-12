@@ -3,15 +3,19 @@
 Navigation aid for `src/cxr_mc/` — the importable package. Read this before
 exploring source. For *why* (physics, validation, provenance) see
 [`README.md`](../README.md) and the design notes in [`docs/`](.); for the backlog
-see [`TODO.md`](../TODO.md). Regenerate with the `docs:update-repo-map` command.
+see [`TODO.md`](../TODO.md). Regenerate the directory inventory with
+`uv run python scripts/dev.py repo-map`.
 
 ## Dependency layers (leaf → driver)
 
 ```
-atomic_form_factors            (xraydb-backed atomic data; no sibling deps)
+materials.atomic               (xraydb-backed atomic data; no sibling deps)
         │
-crystallography                (crystal DB, structure factor, χ_g/U_g, μ)
+materials.crystal              (crystal DB, structure factor, χ_g/U_g, μ)
         ├── validation_oracles (optional external comparators; checks only)
+materials.registry             (material scan configurations; no physics deps)
+        │
+materials.attenuation          (composition and Beer–Lambert helpers)
         │
 montecarlo                     (transport + radiation + detector helpers)
         │
@@ -25,7 +29,7 @@ plots   ◄── montecarlo, results, timepix_response, eaglexo_response
 cli     ◄── scan, export          (the `cxr` console script)
 ```
 
-`timepix_response` / `eaglexo_response` depend only on `crystallography` plus
+`timepix_response` / `eaglexo_response` depend only on `materials.crystal` plus
 the shared `_si_sensor` plumbing (Si constants, response caching, Poisson core).
 Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
 
@@ -56,7 +60,13 @@ Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
 
 ## Core physics
 
-### `crystallography.py`
+### `materials/` (package)
+The material domain package. Its narrow top-level API re-exports only crystal
+and registry conveniences (`CRYSTALS`, material registries, `Layer`, and
+configuration helpers); implementation APIs remain in the submodules below.
+
+
+### `materials/crystal.py`
 Crystal database, structure factors, and X-ray optical constants — the physics
 data layer under the Monte Carlo.
 - Public: `load_crystals`, `load_crystal_from_cif`,
@@ -64,20 +74,20 @@ data layer under the Monte Carlo.
   `debye_waller`, `structure_factor`, `chi_g`, `U_g`,
   `absorption_length_ang`, `dominant_reflections`, `beta_from_Ee`; the
   `CRYSTALS` registry.
-- Deps: `atomic_form_factors`, `DATA_DIR`.
+- Deps: `materials.atomic`, `DATA_DIR`.
 
 ### `validation_oracles.py`
 Optional validation-only adapters for external crystallography/scattering
 comparators. The first backend builds or loads `Dans_Diffraction` crystals and
 compares lattice parameters, reciprocal-vector magnitudes, and `|F_hkl|²` while
-leaving production physics in `crystallography.py`.
+leaving production physics in `materials/crystal.py`.
 - Public: `build_dans_crystal_from_cxr`, `load_dans_crystal_from_cif`,
   `compare_lattice`, `compare_reflection_geometry`,
   `compare_structure_factor_magnitudes`; the comparison dataclasses.
-- Deps: `crystallography`; imports `Dans_Diffraction` lazily only when a check
+- Deps: `materials.crystal`; imports `Dans_Diffraction` lazily only when a check
   asks for it.
 
-### `atomic_form_factors.py`
+### `materials/atomic.py`
 Atomic scattering factors (Z, f0, f′, f″) from **xraydb** for any element — no
 hand-maintained table.
 - Public: `cromer_mann_f0`, `henke_dispersion`, `atomic_form_factor`,
@@ -92,35 +102,35 @@ re-exported from the package**, so `from cxr_mc.montecarlo import X` is unchange
 (`tests/test_montecarlo_exports.py` freezes the export set).
 - `_backend` — GPU/CPU array backend probe + banner: `xp`, `cp`, `REAL`,
   `_to_cpu`, `_GPU`.
-- `materials` — `_normalize_composition`, `_mu_total_inv_ang`, `_layer_dz`,
+- `materials.attenuation` — `_normalize_composition`, `_mu_total_inv_ang`, `_layer_dz`,
   `_stack_tau` (composition + cross-stack self-absorption). Deps: `_backend`,
-  `crystallography`.
+  `materials.crystal`.
 - `transport` — `simulate_trajectories` (multilayer-stack aware via `layers=`),
   `beta_from_keV`, scattering/stopping helpers; the `TRANSPORT_ELEMENTS`
-  registry. Pure NumPy. Deps: `materials`, `DATA_DIR`.
+  registry. Pure NumPy. Deps: `materials.attenuation`, `DATA_DIR`.
 - `geometry` — `tilted_geometry`, `detector_directions`, `_orientation_R`,
-  `_small_tilt_R`, `_mosaic_quadrature`. Deps: `crystallography`.
+  `_small_tilt_R`, `_mosaic_quadrature`. Deps: `materials.crystal`.
 - `spectrum` — `mc_spectrum` (PXR+CBS, cross-stack self-absorption, exact mosaic
   average), `mc_spectrum_solid_angle`, `mc_brem_spectrum`, `load_external_brem`.
-  Deps: `_backend`, `materials`, `transport`, `geometry`, `crystallography`.
+  Deps: `_backend`, `materials.attenuation`, `transport`, `geometry`, `materials.crystal`.
 - `detector` — `detector_efficiency`, `eds_fwhm_eV`, `aperture_fwhm_eV`,
-  `mosaic_fwhm_eV`, `mosaic_psi_rad`, `convolve_detector`. Deps: `materials`,
-  `geometry`, `transport`, `crystallography`.
+  `mosaic_fwhm_eV`, `mosaic_psi_rad`, `convolve_detector`. Deps: `materials.attenuation`,
+  `geometry`, `transport`, `materials.crystal`.
 - `runner` — `run_case`, `run_cases` (GPU-serial / CPU-pooled), `_transport_case`,
   `_spectrum_case`, `_worker_init`. Deps: `_backend`, `transport`, `geometry`,
   `spectrum`.
-- Deps: `crystallography`, `DATA_DIR`.
+- Deps: `materials.crystal`, `materials.attenuation`, `DATA_DIR`.
 
 ## Sweep, config & drivers
 
-### `materials.py`
+### `materials/registry.py`
 Single source of truth for per-material scan grids and crystallographic scan
 defaults. Exposes typed projections so `config.py` and `sweep.py` share one
 registry without importing each other.
 - Public: `MATERIAL_CONFIGS`, `MATERIAL_GRIDS`, `CRYSTAL_PARAMS`,
   `MATERIAL_LABELS`, `MATERIALS`, `MaterialConfig`, `MaterialGrid`,
   `CrystalParamsGrid`, `Layer`, `ScalarOrSeq`, `material_scan_grid`,
-  `material_crystal_key`, `crystal_config`, `pm`.
+  `material_crystal_key`, `crystal_config`.
 - Deps: none (NumPy literals only).
 
 ### `sweep.py`
@@ -130,15 +140,15 @@ Turns a `Sweep` definition into the Cartesian product of `run_case` dicts.
   `substrate_composition`, `stack_layers`, `film_on_substrate_layers`,
   `layer_radiator`, `substrate_radiator`, `geometry_table`,
   `fmt_thickness`, `pm` (±hkl expansion); the `MATERIAL_LABELS` registry.
-- Deps: `crystallography`, `materials`.
+- Deps: `materials.crystal`, `materials.registry`.
 
 ### `config.py`
 Default settings/sweep builders shared by the CLI and both notebooks; per-material
-scan grids are projections from `materials.py`.
+scan grids are projections from `materials/registry.py`.
 - Public: `default_settings`, `material_grid`, `material_sweep`,
   `trajectory_sweep`, `MaterialGrid` (TypedDict); the `_MATERIAL_GRIDS` /
   `MATERIALS` registries.
-- Deps: `materials`, `results` (`Settings`), `sweep` (`Sweep`).
+- Deps: `materials.registry`, `results` (`Settings`), `sweep` (`Sweep`).
 
 ### `run.py`
 Checkpointed, resumable sweep driver and checkpoint loaders/repair.
