@@ -220,6 +220,10 @@ def run_case(case):
                 sinc_cutoff (None = exact lineshapes; windowing buys nothing
                 for bulk targets, where scattering Doppler-spreads the lines
                 across the whole grid),
+                beam_fwhm_mm (None): transverse electron-beam spot size (Gaussian
+                FWHM, mm) -- None is a strict no-op, the point-source beam
+                (montecarlo.transport.simulate_trajectories, BIT-FOR-BIT
+                unchanged spectrum; see that docstring for why),
                 mosaic_mc_fwhm_rad (None) / mosaic_mc_nodes (1): the exact
                 Monte-Carlo crystal-mosaicity average (mc_spectrum); None/1 ->
                 perfect crystal,
@@ -252,6 +256,7 @@ def _transport_case(case):
     # film-on-substrate stack drives multilayer transport too (substrate
     # backscatter / substrate brem); None -> single-material slab (unchanged).
     layers = case.get("abs_layers")
+    beam_fwhm_mm = case.get("beam_fwhm_mm")
     segs = simulate_trajectories(
         case["E0_keV"],
         case["Ne"],
@@ -261,6 +266,7 @@ def _transport_case(case):
         seed=case["seed"],
         beam_dir=beam,
         layers=layers,
+        beam_fwhm_mm=beam_fwhm_mm,
     )
     segs_b = simulate_trajectories(
         case["E0_keV"],
@@ -271,6 +277,7 @@ def _transport_case(case):
         seed=case["seed"] + 1,
         beam_dir=beam,
         layers=layers,
+        beam_fwhm_mm=beam_fwhm_mm,
     )
     tp: dict[str, Any] = dict(E_grid=E_grid, E_brem=E_brem, n_hat=n_hat, segs=segs, segs_b=segs_b)
     if _TIMING:
@@ -340,6 +347,7 @@ def _brem_for_case(case, E_brem):
         seed=case["seed"] + 1,
         beam_dir=beam,
         layers=abs_layers,
+        beam_fwhm_mm=case.get("beam_fwhm_mm"),
     )
     return _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers)
 

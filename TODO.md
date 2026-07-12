@@ -56,8 +56,19 @@ on `main` once the branch exists.
 4. **Material filters.** Model calibration filters (e.g. sheets of Al foil) between the
    x-ray beam and detector, for detector calibration against filtered spectra.
    -> `feature/material-filters`.
-5. **Finite electron beam size.** Confirm the input beam is finite, then model it as a
-   ~1 mm diameter Gaussian beam incident on the crystal.
+5. **Finite electron beam size.** DONE on `feature/finite-electron-beam-size`. Confirmed
+   the prior beam was a delta-function point source (`pos = np.zeros((Ne, 3))` in
+   `simulate_trajectories`); added an opt-in `beam_fwhm_mm` parameter (Gaussian spot,
+   standard FWHM convention) that offsets each electron's entry point, wired through
+   `run_case`/`repair_brem_wide` via the case dict. Proved (and regression-tested) that
+   under the current model this is a pure rigid (x, y) translation with **zero effect**
+   on the emitted spectrum: `mc_spectrum` only ever reads the segment depth `z`, since
+   the crystal is modeled as laterally infinite and the detector direction is a fixed
+   far-field unit vector (`docs/detector-solid-angle.md`). Ledger row: `finite-beam-size`
+   (`rederived`). Not yet wired into `Sweep`/CLI/checkpoint schema, and not yet plotted
+   in `plots/trajectories.py` -- future work if/when a near-field detector or
+   finite-crystal-footprint model is added (the point where beam size would start to
+   matter physically).
 6. **Material config rework — expose crystal orientation + dominant-plane count.**
    `beam_uvw`/`n_families` are overridable via `Sweep` but not from the CLI, `hkl_list`
    has no override path, and none of it is persisted with a checkpoint (unreproducible

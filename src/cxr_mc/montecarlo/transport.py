@@ -211,6 +211,7 @@ def simulate_trajectories(
     beam_dir=None,
     composition=None,
     layers=None,
+    beam_fwhm_mm=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -245,12 +246,39 @@ def simulate_trajectories(
     transport, BIT-FOR-BIT). When given, thickness_ang is superseded by the
     stack's total thickness.
 
+    beam_fwhm_mm: transverse size of the incident electron beam -- an
+    azimuthally-symmetric Gaussian spot of the given FULL WIDTH AT HALF MAXIMUM
+    [mm] (same FWHM convention as mosaic_fwhm_rad / eds_fwhm_eV / aperture_fwhm_eV
+    elsewhere in this package). Each electron's entry point is drawn independently
+    as x0, y0 ~ Normal(0, sigma), sigma = beam_fwhm_mm / (2 sqrt(2 ln 2)), and
+    added as a per-electron (x0, y0, 0) offset to every segment position (the
+    whole trajectory is rigidly translated, since only the entry point is
+    finite -- beam_dir, common to the whole beam, is unaffected). None (default)
+    is a strict no-op -- the old point-source (delta-function) beam entering at
+    the origin, BIT-FOR-BIT. Limiting case: beam_fwhm_mm -> 0 recovers the point
+    source exactly (sigma -> 0 -> x0 = y0 = 0).
+
+    The offset is drawn from an RNG stream independent of `seed`'s main stream
+    (a numpy SeedSequence child), so enabling this NEVER perturbs the free-path /
+    scattering-angle draws: every other returned array (E_keV, v_hat, L_ang,
+    t_ang, elec_id, layer, n_backscattered, n_transmitted, n_stopped) is
+    identical to the beam_fwhm_mm=None run; r_mid changes only by the constant
+    per-electron transverse offset. This is because no downstream physics --
+    elastic scattering, stopping power, layer-boundary crossing, or the
+    self-absorption path in mc_spectrum -- ever reads pos[:, :2]: the crystal is
+    modeled as laterally infinite and the detector direction n_hat is a fixed
+    far-field unit vector (docs/detector-solid-angle.md). A finite beam spot is
+    therefore presently a pure geometry/visualization refinement with zero
+    effect on the emitted spectrum; it lays the groundwork for a future
+    near-field-detector or finite-crystal-footprint model, where the transverse
+    entry point would start to matter.
+
     Returns dict of per-segment arrays:
       "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
       "t_ang" (M,), "elec_id" (M,), "layer" (M,) [emitting layer index]
     and diagnostics: "n_backscattered", "n_transmitted", "n_stopped", "n_layers".
 
-    Validation: electron-transport
+    Validation: electron-transport, finite-beam-size
     """
     # Build the layer stack: explicit `layers` (film-on-substrate) overrides;
     # else a single layer spanning the slab (bit-for-bit the old transport).
@@ -296,6 +324,15 @@ def simulate_trajectories(
 
     rng = np.random.default_rng(seed)
     pos = np.zeros((Ne, 3))
+    if beam_fwhm_mm:
+        # independent child stream: does not consume from `rng`, so the main
+        # transport draws (free path, scattering angle) are untouched -- see
+        # the beam_fwhm_mm docstring paragraph above for the invariance this
+        # buys.
+        MM_TO_ANG = 1.0e7
+        sigma_ang = float(beam_fwhm_mm) * MM_TO_ANG / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+        beam_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(2)[1])
+        pos[:, :2] = beam_rng.normal(0.0, sigma_ang, size=(Ne, 2))
     if beam_dir is None:
         beam_dir = np.array([0.0, 0.0, 1.0])
     beam_dir = np.asarray(beam_dir, dtype=float)

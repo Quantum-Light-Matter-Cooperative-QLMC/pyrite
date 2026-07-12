@@ -7,7 +7,7 @@ The single source of truth for **what physics `cxr-mc` claims and whether it has
 
 **Status:** `unverified` → `filtered` (units+limits+signs) → `rederived` (independent derivation matches) → `anchored` (regression test green) → `signed-off` (human-certified). `discrepancy` = a check failed.
 
-Progress: **0 / 30 signed-off** · 6 rederived · 1 anchored · 1 filtered · 1 blocked · 1 discrepancy.
+Progress: **0 / 31 signed-off** · 7 rederived · 1 anchored · 1 filtered · 1 blocked · 1 discrepancy.
 
 ## Core coherent physics (highest risk — verify first)
 
@@ -44,6 +44,7 @@ Progress: **0 / 30 signed-off** · 6 rederived · 1 anchored · 1 filtered · 1 
 |----|-------|------|--------|--------|--------|--------|-------|
 | `electron-transport` | Joy–Luo slowing-down + Mott/screened-Rutherford elastic scattering → radiating segments | `montecarlo/transport.py::simulate_trajectories` | Joy–Luo; NIST SRD 64 Mott; Browning free paths | unverified | — | — | CASINO-style single-scattering MC; upstream of all spectra |
 | `brem-spectrum` | bremsstrahlung background, Born + Elwert | `montecarlo/spectrum.py::mc_brem_spectrum` | Born + Elwert | unverified | — | — | benign 0-eV divide-by-zero clamped |
+| `finite-beam-size` | transverse electron-beam entry point sampled from an isotropic Gaussian (`beam_fwhm_mm`, standard Gaussian-beam-spot FWHM convention) | `montecarlo/transport.py::simulate_trajectories` (`beam_fwhm_mm=`) | standard Gaussian beam-spot parametrization | rederived | units (mm→Å, 1 mm = 1e7 Å) and FWHM→σ conversion independently recomputed and confirmed; limiting case `beam_fwhm_mm→0`/`None` reproduces the point source bit-for-bit; sampled `std(x0,y0)` matches `σ = FWHM/(2√(2 ln 2))` to <0.5% at N=100000 (independent draw, different seed/FWHM than the repo test); RNG-independence of the spawned child stream confirmed with an independent numeric probe (100000-draw perturbation of the beam stream leaves the main transport rng's next draws untouched); central claim (no physics function reads transverse x,y) confirmed by exhaustive grep of `r_mid`/`seg_r` across `src/cxr_mc` — fresh-context re-derivation, write-up `docs/validation/finite-beam-size.md` | `tests/test_montecarlo.py::test_beam_fwhm_mm_zero_and_none_are_equivalent`, `::test_beam_fwhm_mm_offsets_transverse_position_only`, `::test_beam_fwhm_mm_matches_gaussian_sigma`, `::test_beam_fwhm_mm_seed_reproducible` | TODO P2 #5; no downstream physics (`mc_spectrum`) reads the transverse position today — crystal modeled as laterally infinite, detector direction `n_hat` a fixed far-field unit vector (`docs/detector-solid-angle.md`) — so this is presently a geometry/visualization refinement with zero effect on the emitted spectrum; not yet wired into `Sweep`/CLI beyond the `run_case`/`repair_brem_wide` case dict; not a physics law with a citable source equation (geometric convention), so verification is internal-consistency-based rather than agreement with an external derivation; write-up `docs/validation/finite-beam-size.md` |
 
 ## Mosaicity & multilayer (code-cross-checked; need sign-off + measured data)
 
