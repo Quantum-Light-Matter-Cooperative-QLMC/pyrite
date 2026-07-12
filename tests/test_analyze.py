@@ -117,6 +117,21 @@ def test_no_args_uses_persisted_default(tmp_path, monkeypatch):
     assert launched == {"material": "hbn", "edit": False, "watch": False}
 
 
+def test_acp_flag_starts_analysis_with_bridge_lifecycle(tmp_path, monkeypatch):
+    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
+    launched = {}
+    monkeypatch.setattr(
+        analyze,
+        "_launch",
+        lambda material, **kw: launched.update(material=material, **kw),
+    )
+
+    args = _parse(["analyze", "--acp"])
+    args.func(args)
+
+    assert launched == {"material": "hopg", "edit": False, "watch": False, "acp": True}
+
+
 def test_material_arg_is_transient_does_not_persist(tmp_path, monkeypatch):
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
     monkeypatch.setattr(analyze, "_launch", lambda material, **kw: None)

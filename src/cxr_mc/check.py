@@ -23,6 +23,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from ._acp import running_acp
 from .remote import HOST as REMOTE_HOST
 
 NOTEBOOK = "notebooks/validation_app.py"
@@ -173,11 +174,15 @@ def _command(*, edit=False, watch=False):
     ]
 
 
-def _launch(*, edit=False, watch=False):
+def _launch(*, edit=False, watch=False, acp=False):
     cmd = _command(edit=edit, watch=watch)
     env = {**os.environ}
     try:
-        subprocess.run(cmd, check=True, env=env)
+        if acp:
+            with running_acp():
+                subprocess.run(cmd, check=True, env=env)
+        else:
+            subprocess.run(cmd, check=True, env=env)
     except KeyboardInterrupt:
         # Ctrl+C is delivered to the marimo child and this parent on Windows.
         # Once marimo has handled its interactive exit, avoid a second traceback.
@@ -199,7 +204,10 @@ def _cli(args):
     if args.export:
         _export(args.outdir, ne=args.ne, ne_brem=args.ne_brem, ne_supp=args.ne_supp)
         return
-    _launch(edit=args.edit, watch=args.watch)
+    launch_args = {"edit": args.edit, "watch": args.watch}
+    if args.acp:
+        launch_args["acp"] = True
+    _launch(**launch_args)
 
 
 def add_subparser(sub):
@@ -209,6 +217,7 @@ def add_subparser(sub):
     )
     ap.add_argument("--watch", action="store_true", help="pass marimo's --watch")
     ap.add_argument("--edit", action="store_true", help="use `marimo edit` instead of `marimo run`")
+    ap.add_argument("--acp", action="store_true", help="start local Claude and Codex ACP bridges")
     ap.add_argument(
         "--export",
         action="store_true",

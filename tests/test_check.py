@@ -128,6 +128,15 @@ def test_default_cli_launches_marimo_not_export(monkeypatch):
     assert calls == [{"edit": False, "watch": False}]
 
 
+def test_acp_flag_starts_validation_with_bridge_lifecycle(monkeypatch):
+    calls = []
+    monkeypatch.setattr(check, "_launch", lambda **kw: calls.append(kw))
+
+    check.main(["check", "--acp"])
+
+    assert calls == [{"edit": False, "watch": False, "acp": True}]
+
+
 def test_launch_treats_keyboard_interrupt_as_normal_marimo_exit():
     completed = subprocess.run(
         [

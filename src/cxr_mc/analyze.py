@@ -31,6 +31,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from ._acp import running_acp
 from .config import MATERIALS
 
 NOTEBOOK = "notebooks/analysis_app.py"
@@ -91,11 +92,15 @@ def _command(material, *, edit=False, watch=False):
     ]
 
 
-def _launch(material, *, edit=False, watch=False):
+def _launch(material, *, edit=False, watch=False, acp=False):
     cmd = _command(material, edit=edit, watch=watch)
     print(f"launching {NOTEBOOK} ({'edit' if edit else 'run'}) with material={material}")
     env = {**os.environ, "CXR_ANALYZE_INITIAL": material}
-    subprocess.run(cmd, check=True, env=env)
+    if acp:
+        with running_acp():
+            subprocess.run(cmd, check=True, env=env)
+    else:
+        subprocess.run(cmd, check=True, env=env)
 
 
 def _cli(args):
@@ -109,7 +114,10 @@ def _cli(args):
         set_default_material(args.material)
 
     material = args.material or get_default_material() or "hopg"
-    _launch(material, edit=args.edit, watch=args.watch)
+    launch_args = {"edit": args.edit, "watch": args.watch}
+    if args.acp:
+        launch_args["acp"] = True
+    _launch(material, **launch_args)
 
 
 def add_subparser(sub):
@@ -129,6 +137,7 @@ def add_subparser(sub):
     )
     ap.add_argument("--watch", action="store_true", help="pass marimo's --watch")
     ap.add_argument("--edit", action="store_true", help="use `marimo edit` instead of `marimo run`")
+    ap.add_argument("--acp", action="store_true", help="start local Claude and Codex ACP bridges")
     ap.set_defaults(func=_cli)
     return ap
 

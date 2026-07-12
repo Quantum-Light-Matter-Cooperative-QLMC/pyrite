@@ -7,6 +7,8 @@ Run via:
     uv run python scripts/dev.py <command>
 
 Commands:
+    acp-up     start the Claude and Codex ACP WebSocket bridges
+    acp-down   stop bridges started by acp-up
     repo-map   print a compact repo tree and the canonical commands
     lint       run Ruff over source, tests, dev helpers, and checks
     format     run Ruff formatter
@@ -21,7 +23,10 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+import time
 from pathlib import Path
+
+from cxr_mc._acp import ACP_SERVERS, start_acp_servers, stop_acp_servers
 
 ROOT = Path(__file__).resolve().parents[1]
 NOTEBOOK_SKIP_PARTS = {
@@ -36,6 +41,25 @@ NOTEBOOK_SKIP_PARTS = {
 
 def run(*args: str, cwd: Path = ROOT) -> None:
     subprocess.run([sys.executable, *args], cwd=cwd, check=True)
+
+
+def cmd_acp_up(_: argparse.Namespace) -> None:
+    processes = start_acp_servers()
+    print("ACP bridges running:")
+    for name, (_, port) in ACP_SERVERS.items():
+        print(f"  {name}: ws://localhost:{port}")
+    print("Press Ctrl-C to stop both bridges, or run acp-down from another terminal.")
+    try:
+        while all(process.poll() is None for process in processes):
+            time.sleep(0.2)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        stop_acp_servers()
+
+
+def cmd_acp_down(_: argparse.Namespace) -> None:
+    stop_acp_servers()
 
 
 def iter_notebooks() -> list[Path]:
@@ -82,6 +106,8 @@ def cmd_repo_map(_: argparse.Namespace) -> None:
             print(rel)
     print("Canonical commands:")
     for line in [
+        "uv run python scripts/dev.py acp-up",
+        "uv run python scripts/dev.py acp-down",
         "uv run python scripts/dev.py lint",
         "uv run python scripts/dev.py format",
         "uv run python scripts/dev.py test",
@@ -130,6 +156,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="command", required=True)
 
     for name, fn in [
+        ("acp-up", cmd_acp_up),
+        ("acp-down", cmd_acp_down),
         ("repo-map", cmd_repo_map),
         ("lint", cmd_lint),
         ("format", cmd_format),
