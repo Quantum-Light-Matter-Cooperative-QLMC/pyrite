@@ -50,11 +50,13 @@ The production values will be:
 | `nbs2` | 3.320 | 11.970 | 0.113 |
 | `nbse2` | 3.4459 | 12.5607 | 0.116 |
 
-The NbS2 structure follows the experimental 2H parameters used in the
-published 2H/3R electronic-structure comparison and the P6_3/mmc 2b/4f AFLOW
-prototype. The NbSe2 lattice follows a room-temperature bulk refinement; its
-4f coordinate is the origin-equivalent form of the reported approximately
-0.616 coordinate.
+For NbS2, the experimental lattice parameters `(a, c) = (3.320 A, 11.970 A)`
+come from the supplement to El Youbi et al.; that supplement separately
+adopts `z = 0.113` from Heil, Schlipf, and Giustino. For NbSe2, the
+room-temperature lattice parameters `(a, c) = (3.4459 A, 12.5607 A)` come
+from Wang et al., while `z = 0.116` is the lower endpoint of the experimental
+`0.116-0.118` range summarized by Johannes, Mazin, and Howells. The
+P6_3/mmc 2b/4f basis is cross-checked against the AFLOW prototype.
 
 Each TOML entry will carry a derivation comment, `Validation:` marker, source,
 stoichiometry, positive-volume, finite-coupling, and 2H-a stacking limiting
@@ -131,13 +133,19 @@ composition alone.
 
 - Leroux et al., *Polytypism and superconductivity in the NbS2 system*,
   Dalton Transactions (2021), https://doi.org/10.1039/D0DT03636F
-- Heil et al., supplemental crystallographic parameters for 2H/3R NbS2,
+- El Youbi et al., experimental NbS2 lattice parameters in the supplement,
   Physical Review B 103, 155105 (2021),
   https://doi.org/10.1103/PhysRevB.103.155105
+- Heil, Schlipf, and Giustino, adopted NbS2 chalcogen coordinate,
+  Physical Review B 98, 075120 (2018),
+  https://doi.org/10.1103/PhysRevB.98.075120
 - AFLOW prototype `AB2_hP6_194_b_f-002` (NbS2/NbSe2 2b/4f basis),
   https://aflow.org/p/Z5TL/
-- Yan et al., bulk 2H-NbSe2 lattice refinement,
+- Wang et al., room-temperature bulk 2H-NbSe2 lattice refinement,
   https://doi.org/10.1063/5.0172460
+- Johannes, Mazin, and Howells, experimental NbSe2 chalcogen-coordinate range,
+  Physical Review B 73, 205102 (2006),
+  https://doi.org/10.1103/PhysRevB.73.205102
 - Popovic et al., *Controlled Crystal Growth of Indium Selenide, In2Se3, and
   the Crystal Structures of alpha-In2Se3*, Inorganic Chemistry (2018),
   https://doi.org/10.1021/acs.inorgchem.8b01950

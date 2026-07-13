@@ -9,6 +9,7 @@ full sweep is run (that lives in checks/)."""
 import numpy as np
 import pytest
 
+import cxr_mc.montecarlo.transport as transport
 from cxr_mc.montecarlo import (
     TRANSPORT_ELEMENTS,
     _normalize_composition,
@@ -50,20 +51,41 @@ def test_tellurium_in_transport_table():
     assert TRANSPORT_ELEMENTS["Te"]["A"] == pytest.approx(127.6, abs=0.1)
 
 
-def test_niobium_transport_parameters_and_fallback():
+def test_niobium_transport_parameters_and_fallback(monkeypatch):
     params = TRANSPORT_ELEMENTS["Nb"]
     assert params == {"Z": 41, "A": pytest.approx(92.906, abs=0.001), "J_keV": 0.417}
 
-    segs = simulate_trajectories(
-        30.0,
-        4,
-        100.0,
-        composition=[("Nb", 0.05)],
-        seed=123,
-        max_steps=2,
-    )
-    assert segs["Ne"] == 4
-    assert len(segs["E_keV"]) > 0
+    mott_calls = []
+    alpha_calls = []
+    original_alpha_sr_joy = transport._alpha_sr_joy
+
+    def missing_mott_table(element, Z):
+        mott_calls.append((element, Z))
+        raise FileNotFoundError
+
+    def spy_alpha_sr_joy(Z, E_keV):
+        alpha_calls.append((Z, E_keV.copy()))
+        return original_alpha_sr_joy(Z, E_keV)
+
+    monkeypatch.setattr(transport, "_mott_alpha_table", missing_mott_table)
+    monkeypatch.setattr(transport, "_alpha_sr_joy", spy_alpha_sr_joy)
+
+    previous_no_mott = set(transport._NO_MOTT)
+    transport._NO_MOTT.discard("Nb")
+    energies = np.array([30.0, 25.0])
+    try:
+        transport._sample_cos_theta(41, energies, np.random.default_rng(1), "mott", "Nb")
+        transport._sample_cos_theta(41, energies, np.random.default_rng(2), "mott", "Nb")
+
+        assert mott_calls == [("Nb", 41)]
+        assert len(alpha_calls) == 2
+        for Z, called_energies in alpha_calls:
+            assert Z == 41
+            np.testing.assert_array_equal(called_energies, energies)
+        assert "Nb" in transport._NO_MOTT
+    finally:
+        transport._NO_MOTT.clear()
+        transport._NO_MOTT.update(previous_no_mott)
 
 
 def test_hbn_composition_runs_transport():

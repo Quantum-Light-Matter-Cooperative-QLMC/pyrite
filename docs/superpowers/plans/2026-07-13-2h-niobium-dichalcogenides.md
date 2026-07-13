@@ -210,9 +210,9 @@ Append these entries after the existing 2H disulfides in `src/cxr_mc/data/crysta
 
 ```toml
 # Metallic 2H-a NbS2, P6_3/mmc: Nb occupies aligned 2b columns and S occupies
-# 4f with z=0.113. Source: Heil et al., Phys. Rev. B 103, 155105 (2021),
-# supplemental crystallographic parameters; 2b/4f expansion cross-checked
-# against AFLOW AB2_hP6_194_b_f-002. Assumes a stoichiometric, unmodulated bulk
+# 4f with z=0.113. Lattice: El Youbi et al., Phys. Rev. B 103, 155105 (2021),
+# supplement; z: Heil et al., Phys. Rev. B 98, 075120 (2018). The 2b/4f
+# expansion is cross-checked against AFLOW AB2_hP6_194_b_f-002. Assumes a stoichiometric, unmodulated bulk
 # cell. Limiting checks: two Nb + four S, V=(sqrt(3)/2)a^2c, and Nb(x,y) remains
 # aligned across z=1/4 and 3/4. Validation: nbs2-2ha-structure
 [nbs2]
@@ -229,9 +229,10 @@ basis = [
 ]
 
 # Metallic 2H-a NbSe2, P6_3/mmc: Nb occupies aligned 2b columns and Se occupies
-# 4f with z=0.116 (origin-equivalent to the reported ~0.616 representative).
-# Lattice: Yan et al., J. Appl. Phys. 134 (2023), doi:10.1063/5.0172460;
-# basis prototype: AFLOW AB2_hP6_194_b_f-002. Assumes the room-temperature,
+# 4f with z=0.116, the lower endpoint of the experimental 0.116-0.118 range
+# summarized by Johannes, Mazin, and Howells, Phys. Rev. B 73, 205102 (2006).
+# Lattice: Wang et al., Appl. Phys. Lett. 123, 153505 (2023),
+# doi:10.1063/5.0172460; basis prototype: AFLOW AB2_hP6_194_b_f-002. Assumes the room-temperature,
 # unmodulated bulk cell (not the low-temperature CDW supercell). Limiting checks:
 # two Nb + four Se, V=(sqrt(3)/2)a^2c, and aligned Nb columns.
 # Validation: nbse2-2ha-structure
@@ -272,11 +273,14 @@ Create `docs/validation/2ha-niobium-dichalcogenides.md` with:
 
 The production `nbs2` and `nbse2` entries use the metallic 2H-a
 P6_3/mmc conventional cell. Nb occupies Wyckoff 2b and the chalcogen occupies
-4f. NbS2 uses `(a, c, z) = (3.320 A, 11.970 A, 0.113)` from Heil et al.,
-Phys. Rev. B 103, 155105 (2021), supplemental material. NbSe2 uses
-`(a, c, z) = (3.4459 A, 12.5607 A, 0.116)` from the room-temperature lattice
-refinement of Yan et al., J. Appl. Phys. 134 (2023), with the 2b/4f basis
-cross-checked against AFLOW prototype `AB2_hP6_194_b_f-002`.
+4f. For NbS2, `(a, c) = (3.320 A, 11.970 A)` come from the supplement to El
+Youbi et al., Phys. Rev. B 103, 155105 (2021), while `z = 0.113` was adopted
+there from Heil, Schlipf, and Giustino, Phys. Rev. B 98, 075120 (2018). For
+NbSe2, `(a, c) = (3.4459 A, 12.5607 A)` come from Wang et al., Appl. Phys.
+Lett. 123, 153505 (2023), while `z = 0.116` is the lower endpoint of the
+experimental `0.116-0.118` range summarized by Johannes, Mazin, and Howells,
+Phys. Rev. B 73, 205102 (2006). The 2b/4f basis is cross-checked against AFLOW
+prototype `AB2_hP6_194_b_f-002`.
 
 ## Explicit basis derivation
 
@@ -305,8 +309,8 @@ human review; this document does not sign off either claim.
 Add after the existing structure rows in `docs/physics-validation-ledger.md`:
 
 ```markdown
-| `nbs2-2ha-structure` | 2H-a NbS2 P6_3/mmc lattice + explicit 2b/4f conventional-cell basis | `data/crystal_structures.toml::nbs2` | Heil et al., PRB 103, 155105 (2021) supplement; AFLOW `AB2_hP6_194_b_f-002` | unverified | cell volume; 2Nb+4S; aligned Nb columns; finite `F_g`, `chi_g`, `U_g` | `tests/test_crystallography.py::test_2ha_niobium_dichalcogenide_structure`, `::test_2ha_niobium_dichalcogenide_couplings_are_finite` | [validation write-up](validation/2ha-niobium-dichalcogenides.md) |
-| `nbse2-2ha-structure` | 2H-a NbSe2 P6_3/mmc lattice + explicit 2b/4f conventional-cell basis | `data/crystal_structures.toml::nbse2` | Yan et al., J. Appl. Phys. 134 (2023); AFLOW `AB2_hP6_194_b_f-002` | unverified | cell volume; 2Nb+4Se; aligned Nb columns; finite `F_g`, `chi_g`, `U_g` | `tests/test_crystallography.py::test_2ha_niobium_dichalcogenide_structure`, `::test_2ha_niobium_dichalcogenide_couplings_are_finite` | room-temperature unmodulated cell; [validation write-up](validation/2ha-niobium-dichalcogenides.md) |
+| `nbs2-2ha-structure` | 2H-a NbS2 P6_3/mmc lattice + explicit 2b/4f conventional-cell basis | `data/crystal_structures.toml::nbs2` | El Youbi et al., PRB 103, 155105 (2021) supplement for `a,c`; Heil et al., PRB 98, 075120 (2018) for `z`; AFLOW `AB2_hP6_194_b_f-002` | unverified | cell volume; 2Nb+4S; aligned Nb columns; finite `F_g`, `chi_g`, `U_g` | `tests/test_crystallography.py::test_2ha_niobium_dichalcogenide_structure`, `::test_2ha_niobium_dichalcogenide_couplings_are_finite` | [validation write-up](validation/2ha-niobium-dichalcogenides.md) |
+| `nbse2-2ha-structure` | 2H-a NbSe2 P6_3/mmc lattice + explicit 2b/4f conventional-cell basis | `data/crystal_structures.toml::nbse2` | Wang et al., APL 123, 153505 (2023) for `a,c`; Johannes et al., PRB 73, 205102 (2006) for experimental `z` range; AFLOW `AB2_hP6_194_b_f-002` | unverified | cell volume; 2Nb+4Se; aligned Nb columns; finite `F_g`, `chi_g`, `U_g` | `tests/test_crystallography.py::test_2ha_niobium_dichalcogenide_structure`, `::test_2ha_niobium_dichalcogenide_couplings_are_finite` | room-temperature unmodulated cell; [validation write-up](validation/2ha-niobium-dichalcogenides.md) |
 ```
 
 - [ ] **Step 7: Check validation markers and formatting**
