@@ -285,8 +285,9 @@ basis = [
 ]
 
 # Metallic 2H-a NbS2, P6_3/mmc: Nb occupies aligned 2b columns and S occupies
-# 4f with z=0.113. Source: Heil et al., Phys. Rev. B 103, 155105 (2021),
-# supplemental crystallographic parameters; 2b/4f expansion cross-checked
+# 4f with z=0.113. El Youbi et al., Phys. Rev. B 103, 155105 (2021), supplement,
+# report supplier a=3.32, c=11.97 and adopt z=0.113 from Heil, Schlipf, and
+# Giustino, Phys. Rev. B 98, 075120 (2018). The 2b/4f expansion is cross-checked
 # against AFLOW AB2_hP6_194_b_f-002. Assumes a stoichiometric, unmodulated bulk
 # cell. Limiting checks: two Nb + four S, V=(sqrt(3)/2)a^2c, and Nb(x,y) remains
 # aligned across z=1/4 and 3/4. Validation: nbs2-2ha-structure
@@ -304,9 +305,12 @@ basis = [
 ]
 
 # Metallic 2H-a NbSe2, P6_3/mmc: Nb occupies aligned 2b columns and Se occupies
-# 4f with z=0.116 (origin-equivalent to the reported ~0.616 representative).
-# Lattice: Yan et al., J. Appl. Phys. 134 (2023), doi:10.1063/5.0172460;
-# basis prototype: AFLOW AB2_hP6_194_b_f-002. Assumes the room-temperature,
+# 4f with z=0.116. Lattice: Wang et al., Appl. Phys. Lett. 123, 153505 (2023),
+# doi:10.1063/5.0172460. The z value is the lower end of the experimental
+# 0.116-0.118 range summarized by Johannes, Mazin, and Howells, Phys. Rev. B 73,
+# 205102 (2006), from primary crystallographic reports including Brown and
+# Beerntsen, Acta Cryst. 18, 31 (1965), doi:10.1107/S0365110X65000063. Basis
+# prototype: AFLOW AB2_hP6_194_b_f-002. Assumes the room-temperature,
 # unmodulated bulk cell (not the low-temperature CDW supercell). Limiting checks:
 # two Nb + four Se, V=(sqrt(3)/2)a^2c, and aligned Nb columns.
 # Validation: nbse2-2ha-structure

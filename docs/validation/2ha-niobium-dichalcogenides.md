@@ -6,11 +6,26 @@
 
 The production `nbs2` and `nbse2` entries use the metallic 2H-a
 P6_3/mmc conventional cell. Nb occupies Wyckoff 2b and the chalcogen occupies
-4f. NbS2 uses `(a, c, z) = (3.320 A, 11.970 A, 0.113)` from Heil et al.,
-Phys. Rev. B 103, 155105 (2021), supplemental material. NbSe2 uses
-`(a, c, z) = (3.4459 A, 12.5607 A, 0.116)` from the room-temperature lattice
-refinement of Yan et al., J. Appl. Phys. 134 (2023), with the 2b/4f basis
-cross-checked against AFLOW prototype `AB2_hP6_194_b_f-002`.
+4f.
+
+For NbS2, `(a, c) = (3.320 A, 11.970 A)` are the experimental lattice
+parameters supplied with the crystals and reported in the supplement to El
+Youbi et al., Phys. Rev. B 103, 155105 (2021),
+doi:10.1103/PhysRevB.103.155105. That supplement separately states that
+`z = 0.113` was adopted from Heil, Schlipf, and Giustino, Phys. Rev. B 98,
+075120 (2018), doi:10.1103/PhysRevB.98.075120; it is not a crystallographic
+refinement by El Youbi et al.
+
+For NbSe2, `(a, c) = (3.4459 A, 12.5607 A)` are the refined room-temperature
+lattice constants reported by Wang et al., Appl. Phys. Lett. 123, 153505
+(2023), doi:10.1063/5.0172460. The adopted `z = 0.116` is the lower endpoint
+of the experimental `0.116-0.118` range summarized by Johannes, Mazin, and
+Howells, Phys. Rev. B 73, 205102 (2006),
+doi:10.1103/PhysRevB.73.205102, from primary crystallographic reports including
+Brown and Beerntsen, Acta Cryst. 18, 31-36 (1965),
+doi:10.1107/S0365110X65000063, and Marezio et al., J. Solid State Chem. 4,
+425-429 (1972), doi:10.1016/0022-4596(72)90158-2. The 2b/4f basis for both
+materials is cross-checked against AFLOW prototype `AB2_hP6_194_b_f-002`.
 
 ## Explicit basis derivation
 
