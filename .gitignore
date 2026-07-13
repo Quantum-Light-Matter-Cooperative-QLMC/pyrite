@@ -17,6 +17,7 @@ __pycache__/
 *.html
 
 worktrees/
+.worktrees/
 
 # Distribution / packaging
 .Python
