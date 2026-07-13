@@ -356,11 +356,12 @@ def absorption_length_ang(element, photon_E_eV, number_density_per_ang3):
     inverse lengths add through ``sum_i n_i f2_i``. As ``n`` or ``f2`` tends
     to zero, ``mu`` tends to zero and the returned length diverges.
 
-    The wide brem grid starts at 0 eV (config E_grid_brem = np.arange(0.0, ...)),
-    so this is called with E=0; there lam->inf, mu->0, L_abs->inf, which the brem
-    path already swallows via nan_to_num. The errstate guard just suppresses the
-    benign "divide by zero" / "invalid value" RuntimeWarnings from that E=0 bin --
-    the returned values (and so all numerics) are unchanged.
+    Outside the Chantler table range, including at the wide bremsstrahlung
+    grid's 0 eV bin, ``henke_dispersion`` returns NaN and this function
+    therefore returns NaN. Downstream ``nan_to_num`` policy handles those
+    out-of-domain bins. The ``errstate`` guard only suppresses the associated
+    divide-by-zero and invalid-value warnings; the derivation above applies to
+    positive energies inside the tabulated range.
 
     Validation: absorption-length
     """

@@ -297,12 +297,11 @@ def line_energy_eV(anchor: ZhaiAnchor, E0_keV: float) -> float:
 
         E = hbar c beta g_z / (1 - beta cos theta_obs),
 
-    for beam parallel to the HOPG c-axis and ``g_z = |g|``. This positive-
-    numerator convention implicitly labels the resonant spatial harmonic by
-    the reciprocal member opposite to an ``exp(+i g.r)`` reconstruction; that
-    mapping is not explicit in the production coupling and remains the
-    documented sign discrepancy. In the nonrelativistic limit ``beta -> 0``,
-    the line energy tends to zero.
+    for beam parallel to the HOPG c-axis and ``g_z = |g|``. Under an
+    ``exp(+i g.r)`` reconstruction, this positive numerator would correspond
+    to the opposite reciprocal harmonic. Production does not document that
+    mapping, so the sign discrepancy remains. In the nonrelativistic limit
+    ``beta -> 0``, the line energy tends to zero.
 
     Validation: line-energy-dispersion
     """

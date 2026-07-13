@@ -103,9 +103,10 @@ def mc_spectrum(
     centered segment duration ``t_L``, giving
     ``t_L**2 sinc(P t_L / pi)**2`` under NumPy's normalized-sinc convention,
     with ``P = (1 - beta v_hat.n)(omega - omega_res) / 2``. It assumes a
-    constant segment velocity and amplitude. As ``t_L -> infinity``, the
-    normalized lineshape converges distributionally to a delta function at
-    ``omega_res``; at zero detuning its value is ``t_L**2``.
+    constant segment velocity and amplitude. Writing this factor as
+    ``|Q(P, t_L)|**2``, its exact normalized long-duration limit is
+    ``|Q|**2 / (pi t_L) -> delta(P)`` distributionally. At zero detuning the
+    unnormalized factor has value ``t_L**2``.
 
     Validation: finite-time-lineshape
 
