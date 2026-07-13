@@ -540,7 +540,7 @@ def _(broad_xmax_ui, broad_xmin_ui, narrow_xmax_ui, narrow_xmin_ui):
 def _(PENETRATION_TILT_DEG, mo):
     _angle_opts = {f"{t:g} deg": t for t in PENETRATION_TILT_DEG}
     penetration_angle_ui = mo.ui.dropdown(
-        _angle_opts, value="-15 deg", label="polar tilt (penetration)"
+        _angle_opts, value="15 deg", label="polar tilt (penetration)"
     )
     return (penetration_angle_ui,)
 
@@ -1279,7 +1279,7 @@ def _(
         _md = mo.md(
             "Surviving-electron fraction vs depth (one curve per beam energy) and "
             "an interactive low-Ne track cross-section, at the polar tilt selected "
-            "in this tab (default -15 deg, a low nonzero angle -- avoids both the fully-"
+            "in this tab (default 15 deg, a low nonzero angle -- avoids both the fully-"
             "normal and grazing-incidence edge cases). These run the cheap CPU-only "
             "transport directly — no checkpoint needed. For a stacked/multilayer "
             "material (e.g. mos2 on sapphire) the cascade is transported through "
