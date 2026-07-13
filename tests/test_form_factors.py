@@ -5,6 +5,7 @@ load_henke must still return a finite, physical (E, f1, f2) table per element.""
 import numpy as np
 import pytest
 
+import cxr_mc.materials.crystal as crystal_module
 from cxr_mc.materials.atomic import (
     Z_TABLE,
     atomic_form_factor,
@@ -14,7 +15,7 @@ from cxr_mc.materials.atomic import (
 )
 
 # the structure-factor elements the project models (light + edge-prone + heavy)
-ELEMENTS = ["C", "Li", "F", "Si", "Ge", "S", "Mo", "Se", "Zr", "Te", "Hf", "W", "Pt"]
+ELEMENTS = ["C", "Li", "F", "Si", "Ge", "S", "Mo", "Nb", "Se", "Zr", "Te", "Hf", "W", "Pt"]
 
 
 @pytest.mark.parametrize("element", ELEMENTS)
@@ -31,6 +32,14 @@ def test_f0_decreases_with_g():
 def test_tellurium_registered():
     assert Z_TABLE["Te"] == 52
     assert "Te" in Z_TABLE
+
+
+def test_niobium_registered_and_edge_prone():
+    assert Z_TABLE["Nb"] == 41
+    assert "Nb" in crystal_module._EDGE_PRONE
+
+    E, f1, f2 = load_henke("Nb")
+    assert E.size > 0 and np.all(np.isfinite(f1)) and np.all(f2 >= 0)
 
 
 def test_unknown_element_raises():

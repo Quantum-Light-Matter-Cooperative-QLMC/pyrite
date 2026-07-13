@@ -50,6 +50,22 @@ def test_tellurium_in_transport_table():
     assert TRANSPORT_ELEMENTS["Te"]["A"] == pytest.approx(127.6, abs=0.1)
 
 
+def test_niobium_transport_parameters_and_fallback():
+    params = TRANSPORT_ELEMENTS["Nb"]
+    assert params == {"Z": 41, "A": pytest.approx(92.906, abs=0.001), "J_keV": 0.417}
+
+    segs = simulate_trajectories(
+        30.0,
+        4,
+        100.0,
+        composition=[("Nb", 0.05)],
+        seed=123,
+        max_steps=2,
+    )
+    assert segs["Ne"] == 4
+    assert len(segs["E_keV"]) > 0
+
+
 def test_hbn_composition_runs_transport():
     cp = crystal_params("hbn")
 
