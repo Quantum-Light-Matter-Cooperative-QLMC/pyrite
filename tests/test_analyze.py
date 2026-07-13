@@ -148,6 +148,7 @@ def test_command_run_default():
     assert cmd[0] == sys.executable
     assert cmd[1:4] == ["-m", "marimo", "run"]
     assert "--watch" not in cmd
+    assert "--port" not in cmd
     assert cmd[-4:] == [analyze.NOTEBOOK, "--", "--material", "hopg"]
 
 

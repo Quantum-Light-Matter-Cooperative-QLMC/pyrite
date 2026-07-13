@@ -92,6 +92,7 @@ def test_command_uses_run_by_default():
     assert cmd[1:4] == ["-m", "marimo", "run"]
     assert check.NOTEBOOK in cmd
     assert "--watch" not in cmd
+    assert "--port" not in cmd
 
 
 def test_command_edit_and_watch_flags():
