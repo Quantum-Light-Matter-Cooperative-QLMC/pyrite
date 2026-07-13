@@ -7,6 +7,7 @@ import cxr_mc.materials.crystal as crystal_module
 from cxr_mc.materials.crystal import (
     CRYSTALS,
     HC_EV_ANG,
+    U_g,
     absorption_length_ang,
     chi_g,
     debye_waller,
@@ -32,6 +33,8 @@ EXPECTED = {
     "hfs2",
     "hfse2",
     "zrse2",
+    "nbs2",
+    "nbse2",
 }
 
 
@@ -123,6 +126,57 @@ def test_mote2_product_structure_sane():
     assert info["V_cell"] == pytest.approx(142.27, abs=0.1)
     assert len(info["basis"]) == 6
     assert sum(1 for el, _ in info["basis"] if el == "Te") == 4
+
+
+@pytest.mark.parametrize(
+    ("name", "chalcogen", "a", "c", "z"),
+    [
+        ("nbs2", "S", 3.320, 11.970, 0.113),
+        ("nbse2", "Se", 3.4459, 12.5607, 0.116),
+    ],
+)
+def test_2ha_niobium_dichalcogenide_structure(name, chalcogen, a, c, z):
+    info = CRYSTALS[name]
+    basis = info["basis"]
+
+    assert info["lattice"]["a"] == pytest.approx(a)
+    assert info["lattice"]["c"] == pytest.approx(c)
+    assert info["V_cell"] == pytest.approx(np.sqrt(3.0) * a**2 * c / 2.0)
+    assert len(basis) == 6
+    assert sum(element == "Nb" for element, _ in basis) == 2
+    assert sum(element == chalcogen for element, _ in basis) == 4
+
+    nb_positions = sorted(tuple(position) for element, position in basis if element == "Nb")
+    assert nb_positions == [(0.0, 0.0, 0.25), (0.0, 0.0, 0.75)]
+
+    expected_chalcogen = {
+        tuple(round(value, 6) for value in position)
+        for position in (
+            (1 / 3, 2 / 3, z),
+            (1 / 3, 2 / 3, 0.5 - z),
+            (2 / 3, 1 / 3, 0.5 + z),
+            (2 / 3, 1 / 3, 1.0 - z),
+        )
+    }
+    actual_chalcogen = {
+        tuple(round(float(value), 6) for value in position)
+        for element, position in basis
+        if element == chalcogen
+    }
+    assert actual_chalcogen == expected_chalcogen
+
+
+@pytest.mark.parametrize("name", ["nbs2", "nbse2"])
+def test_2ha_niobium_dichalcogenide_couplings_are_finite(name):
+    hkl = (1, 0, 0)
+    structure, g = structure_factor(name, hkl, 1500.0, B_ang2=0.6)
+    susceptibility = chi_g(name, hkl, 1500.0, B_ang2=0.6)
+    potential = U_g(name, hkl, 1500.0, B_ang2=0.6)
+
+    assert g > 0.0
+    assert np.isfinite(abs(structure)) and abs(structure) > 0.0
+    assert np.isfinite(abs(susceptibility)) and abs(susceptibility) > 0.0
+    assert np.isfinite(abs(potential)) and abs(potential) > 0.0
 
 
 def test_hfs2_structure_sane():
