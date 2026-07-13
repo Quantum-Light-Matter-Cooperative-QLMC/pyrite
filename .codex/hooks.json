@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .codex/scripts/sync-session-logs.ps1",
+            "command": "bash .codex/scripts/sync-session-logs.sh",
             "timeout": 30
           }
         ]

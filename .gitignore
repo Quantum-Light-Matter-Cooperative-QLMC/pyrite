@@ -9,7 +9,7 @@ __pycache__/
 .codex/*
 !.codex/hooks.json
 !.codex/scripts/
-!.codex/scripts/sync-session-logs.ps1
+!.codex/scripts/*.sh
 .superpowers/
 
 *.png
