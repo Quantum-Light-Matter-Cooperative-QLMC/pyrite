@@ -108,9 +108,9 @@ That is
 \qquad E_{\rm code}=\hbar c\,\omega_{\rm code}.
 \]
 
-The denominator, \(\hbar c\) conversion, and dimensions match exactly. The
-numerator sign does not match the independently derived expression for the
-named \(+i\mathbf g\cdot\mathbf r\) harmonic.
+The denominator, \(\hbar c\) conversion, and dimensions match exactly. Under
+the independent derivation's \(+i\mathbf g\cdot\mathbf r\) spatial-harmonic
+convention, the numerator sign is opposite to production.
 
 The implementation does not document the mapping needed to remove this
 difference. `reciprocal_g_vector(hkl, ...)` returns the vector with the sign of
@@ -166,9 +166,11 @@ Doppler denominator's opposite-tilt invariance.
 
 **discrepancy**
 
-For the repository's explicitly named
-\(\exp(+i\mathbf g\cdot\mathbf r)\) harmonic, the independent phase matching
-has \(-\mathbf v\cdot\mathbf g\) while production has
-\(+\mathbf v\cdot\mathbf g\). The repository does not explicitly map the
-production vector to the opposite/conjugate Fourier harmonic, so the two
-expressions cannot presently be certified as equivalent.
+The repository explicitly uses \(\exp(+i\mathbf g\cdot\mathbf R_j)\) for its
+structure-factor phase, but it does not document the corresponding spatial
+Fourier reconstruction or how that coefficient maps to `g_vec` in the
+resonance. Under the independent derivation's
+\(\exp(+i\mathbf g\cdot\mathbf r)\) harmonic convention, phase matching has
+\(-\mathbf v\cdot\mathbf g\) while production has
+\(+\mathbf v\cdot\mathbf g\). Without an explicit opposite/conjugate-harmonic
+mapping, equivalence cannot presently be certified.

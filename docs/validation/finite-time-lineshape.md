@@ -109,11 +109,55 @@ S = xp.sinc(x) ** 2
 ```
 
 Since \(E-E_{\rm res}=\hbar c(\omega-\omega_{\rm res})\), `x` is exactly
-\(PT/\pi\). The leading `t_L**2` is carried once in `pref`; no extra factor of
-two, \(\pi\), or \(\hbar c\) is missing. The prefactor's division by
-`HBARC_EV_ANG` converts the spectrum from per wavenumber to per eV. Both the
-full-grid and cutoff paths use the same normalized-sinc argument; truncation
-only intentionally removes tails outside the requested cutoff.
+\(PT/\pi\). To carry the normalization into the energy coordinate, define
+
+\[
+D=1-\mathbf v\cdot\hat{\mathbf n},
+\qquad
+P=\frac{D(E-E_{\rm res})}{2\hbar c}.
+\]
+
+Writing \(dP\) for the positive integration measure, the Jacobian is
+
+\[
+dP=\frac{|D|}{2\hbar c}\,dE,
+\qquad
+dE=\frac{2\hbar c}{|D|}\,dP.
+\]
+
+(For a subluminal segment, \(D>0\), so the absolute values may be omitted.)
+The independently derived \(P\)-area therefore becomes
+
+\[
+\int_{-\infty}^{\infty}|Q(P(E),T)|^2\,dE
+=\frac{2\hbar c}{|D|}\int_{-\infty}^{\infty}|Q(P,T)|^2\,dP
+=\frac{2\pi T\hbar c}{|D|}.
+\]
+
+Thus the energy-domain unit-area density and its delta limit are
+
+\[
+L_T^{(E)}(E)
+=\frac{|D|}{2\pi T\hbar c}|Q(P(E),T)|^2
+\xrightarrow[T\to\infty]{\mathcal D}\delta(E-E_{\rm res}),
+\]
+
+or, equivalently,
+
+\[
+\frac{|Q(P(E),T)|^2}{T}
+\xrightarrow[T\to\infty]{\mathcal D}
+\frac{2\pi\hbar c}{|D|}\delta(E-E_{\rm res}).
+\]
+
+The leading `t_L**2` is carried once in `pref`. The sinc argument contains the
+required \(1/(2\hbar c)\), while the separate `1/HBARC_EV_ANG` in `pref`
+converts the physical differential spectrum from per wavenumber to per eV.
+On energy integration, that prefactor cancels the \(\hbar c\) in the
+lineshape's energy-domain area above and leaves the expected Jacobian
+\(2\pi T/|D|\). No factor of two, \(\pi\), \(D\), or \(\hbar c\) is missing.
+Both the full-grid and cutoff paths use the same normalized-sinc argument;
+truncation only intentionally removes tails outside the requested cutoff.
 
 This comparison concerns the finite-time lineshape. It does not resolve the
 separate `line-energy-dispersion` sign adjudication used to define the center
@@ -139,7 +183,9 @@ integration-window error.
 
 The implementation's factor is exactly
 \(T^2\operatorname{sinc}^2(PT/\pi)\) with
-\(P=(1-\mathbf v\cdot\hat{\mathbf n})(\omega-\omega_{\rm res})/2\) and
-\(T=t_L\). Signs, the phase's factor of two, NumPy's \(\pi\)-normalized sinc,
-the \(\hbar c\) energy conversion, dimensions, normalization, and limiting
-behavior all agree.
+\(P=D(\omega-\omega_{\rm res})/2=D(E-E_{\rm res})/(2\hbar c)\),
+\(D=1-\mathbf v\cdot\hat{\mathbf n}\), and \(T=t_L\). Its energy-domain
+area is \(2\pi T\hbar c/|D|\), and multiplication by the implementation's
+per-energy prefactor `1/HBARC_EV_ANG` leaves \(2\pi T/|D|\). Signs, the phase's
+factor of two, NumPy's \(\pi\)-normalized sinc, the energy-coordinate
+Jacobian, dimensions, normalization, and limiting behavior all agree.
