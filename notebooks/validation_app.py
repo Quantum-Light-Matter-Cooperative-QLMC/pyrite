@@ -470,6 +470,21 @@ def _(af, mo, supplementary_study_ui):
 @app.cell
 def _(af, check_support, mo, supplementary_study_ui, supplementary_thickness_ui):
     _study = af.supplementary_study(supplementary_study_ui.value)
+    _orientation_options = af.supplementary_orientations(
+        _study, float(supplementary_thickness_ui.value)
+    )
+    supplementary_orientation_ui = (
+        mo.ui.dropdown(
+            {
+                f"Polar {polar:g}°, azimuth {azimuth:g}°": (polar, azimuth)
+                for polar, azimuth in _orientation_options
+            },
+            value=f"Polar {_orientation_options[0][0]:g}°, azimuth {_orientation_options[0][1]:g}°",
+            label="Reported angle combination",
+        )
+        if _study.crystal in {"hbn", "hopg"}
+        else None
+    )
     supplementary_ne_ui = mo.ui.number(
         start=10,
         stop=5_000,
@@ -489,7 +504,13 @@ def _(af, check_support, mo, supplementary_study_ui, supplementary_thickness_ui)
     refresh_supplementary_ui = mo.ui.checkbox(value=False, label="Recompute (ignore cache)")
     mo.vstack(
         [
-            mo.hstack([supplementary_study_ui, supplementary_thickness_ui]),
+            mo.hstack(
+                [
+                    supplementary_study_ui,
+                    supplementary_thickness_ui,
+                    *([supplementary_orientation_ui] if supplementary_orientation_ui else []),
+                ]
+            ),
             mo.hstack([supplementary_azimuth_ui, save_supplementary_azimuth_ui])
             if _study.has_unreported_azimuth
             else mo.md(
@@ -504,6 +525,7 @@ def _(af, check_support, mo, supplementary_study_ui, supplementary_thickness_ui)
         save_supplementary_azimuth_ui,
         supplementary_azimuth_ui,
         supplementary_ne_ui,
+        supplementary_orientation_ui,
     )
 
 
@@ -627,6 +649,7 @@ def _(
     run_supplementary_ui,
     supplementary_azimuth_ui,
     supplementary_ne_ui,
+    supplementary_orientation_ui,
     supplementary_study_ui,
     supplementary_thickness_ui,
 ):
@@ -651,7 +674,12 @@ def _(
             refresh=refresh_supplementary_ui.value,
         )
     figure = (
-        af.figure_supplementary_sem(study, thickness_nm, spectra)
+        af.figure_supplementary_sem(
+            study,
+            thickness_nm,
+            spectra,
+            orientation=tuple(supplementary_orientation_ui.value),
+        )
         if study.crystal in {"hbn", "hopg"}
         else af.figure_supplementary_tmd(study, thickness_nm, spectra)
     )

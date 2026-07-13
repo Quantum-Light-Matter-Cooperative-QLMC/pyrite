@@ -8,7 +8,7 @@
     "docs/_build",
     "docs/_autosummary",
     "**/node_modules",
-    "**/.*",
+    "**/.*"
   ],
   "venvPath": ".",
   "venv": ".venv",

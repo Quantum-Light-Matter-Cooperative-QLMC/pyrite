@@ -549,6 +549,18 @@ def supplementary_study(crystal: str) -> SupplementaryCoherentStudy:
         ) from exc
 
 
+def supplementary_orientations(
+    study: SupplementaryCoherentStudy, thickness_nm: float
+) -> tuple[tuple[float, float], ...]:
+    """Return the distinct reported SEM orientation pairs in Table 4 order."""
+    orientations = tuple(
+        (condition.polar_tilt_deg, condition.azimuth_deg)
+        for condition in study.conditions_for(thickness_nm)
+        if condition.azimuth_deg is not None
+    )
+    return tuple(dict.fromkeys(orientations))
+
+
 def model_coherent_spectra(
     study: SupplementaryCoherentStudy,
     thickness_nm: float,
@@ -993,8 +1005,15 @@ def figure_supplementary_sem(
     study: SupplementaryCoherentStudy,
     thickness_nm: float,
     spectra: dict[SupplementaryCondition, np.ndarray],
+    *,
+    orientation: tuple[float, float] | None = None,
 ):
-    """Return one reported h-BN or HOPG SEM beam-energy comparison."""
+    """Return one reported h-BN or HOPG SEM beam-energy comparison.
+
+    When a sample has more than one reported orientation, the first Table 4
+    pair is selected by default. Each figure therefore compares beam energy at
+    one fixed polar/azimuthal orientation.
+    """
     import matplotlib.pyplot as plt
 
     if study.crystal not in {"hbn", "hopg"}:
@@ -1004,32 +1023,33 @@ def figure_supplementary_sem(
         raise ValueError("spectra must contain exactly the requested conditions")
 
     fig, ax = plt.subplots(figsize=(8, 5))
-    multi_orientation = (
-        len({(condition.polar_tilt_deg, condition.azimuth_deg) for condition in conditions}) > 1
+    orientations = supplementary_orientations(study, thickness_nm)
+    if not orientations:
+        raise ValueError("SEM conditions must include reported azimuths")
+    selected_orientation = orientations[0] if orientation is None else tuple(orientation)
+    if selected_orientation not in orientations:
+        raise ValueError(
+            f"orientation {selected_orientation} is not reported for {thickness_nm:g} nm"
+        )
+    selected_conditions = tuple(
+        condition
+        for condition in conditions
+        if (condition.polar_tilt_deg, condition.azimuth_deg) == selected_orientation
     )
-    for i, condition in enumerate(conditions):
+    for i, condition in enumerate(selected_conditions):
         ax.plot(
             study.E_grid,
             _supplementary_detected_spectrum(study, condition, spectra[condition]),
             color=f"C{i}",
-            label=(
-                f"{condition.energy_keV:g} keV, {condition.polar_tilt_deg:g}°/"
-                f"{condition.azimuth_deg:g}°"
-                if multi_orientation
-                else f"{condition.energy_keV:g} keV"
-            ),
+            label=f"{condition.energy_keV:g} keV",
         )
     ax.set_xlabel("Photon energy (eV)")
     ax.set_ylabel("Intensity (Phs/eV/s/nA)")
     ax.set_xlim(study.e_min_eV, study.e_max_eV)
     ax.set_ylim(bottom=0.0)
     ax.set_title(
-        f"{study.label}, {thickness_nm:g} nm: Zhai-detector-convolved PXR+CBS"
-        if multi_orientation
-        else (
-            f"{study.label}, {thickness_nm:g} nm, polar {conditions[0].polar_tilt_deg:g}°, "
-            f"azimuth {conditions[0].azimuth_deg:g}°: Zhai-detector-convolved PXR+CBS"
-        )
+        f"{study.label}, {thickness_nm:g} nm, polar {selected_orientation[0]:g}°, "
+        f"azimuth {selected_orientation[1]:g}°: Zhai-detector-convolved PXR+CBS"
     )
     ax.grid(alpha=0.3)
     ax.legend(title="Beam energy")

@@ -422,6 +422,46 @@ def test_supplementary_hbn_figure_smoke():
     fig.canvas.draw()
 
 
+def test_supplementary_sem_figure_limits_to_selected_orientation():
+    study = af.supplementary_study("hbn")
+    thickness_nm = 219.0
+    spectra = {
+        condition: np.exp(-0.5 * ((study.E_grid - 900.0) / 8.0) ** 2)
+        for condition in study.conditions_for(thickness_nm)
+    }
+    fig = af.figure_supplementary_sem(
+        study,
+        thickness_nm,
+        spectra,
+        orientation=(11.5, 65.0),
+    )
+
+    assert len(fig.axes[0].lines) == 4
+    assert [line.get_label() for line in fig.axes[0].lines] == [
+        "17.5 keV",
+        "20 keV",
+        "22.5 keV",
+        "25 keV",
+    ]
+    assert "polar 11.5°" in fig.axes[0].get_title()
+    assert "azimuth 65°" in fig.axes[0].get_title()
+
+
+def test_supplementary_sem_figure_defaults_to_first_reported_orientation():
+    study = af.supplementary_study("hbn")
+    thickness_nm = 219.0
+    spectra = {
+        condition: np.exp(-0.5 * ((study.E_grid - 900.0) / 8.0) ** 2)
+        for condition in study.conditions_for(thickness_nm)
+    }
+
+    fig = af.figure_supplementary_sem(study, thickness_nm, spectra)
+
+    assert len(fig.axes[0].lines) == 4
+    assert "polar 11.5°" in fig.axes[0].get_title()
+    assert "azimuth 65°" in fig.axes[0].get_title()
+
+
 def test_supplementary_overview_figure_smoke():
     from matplotlib.figure import Figure
 
