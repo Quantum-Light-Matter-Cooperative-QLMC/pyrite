@@ -264,10 +264,12 @@ def test_supplementary_studies_match_requested_windows_and_thicknesses():
     wse2 = af.supplementary_study("wse2")
     mose2 = af.supplementary_study("mose2")
     hbn = af.supplementary_study("hbn")
+    hopg = af.supplementary_study("hopg")
 
     assert wse2.thicknesses_nm == (42.0, 55.0, 75.0)
     assert mose2.thicknesses_nm == (47.0, 112.0, 147.0)
-    assert hbn.thicknesses_nm == (921.0,)
+    assert hbn.thicknesses_nm == (42.0, 109.0, 219.0, 659.0, 921.0, 170_000.0)
+    assert hopg.thicknesses_nm == (29.0, 76.0, 150.0, 17_000.0, 500_000.0, 1_000_000.0)
     assert (wse2.E_grid[0], wse2.E_grid[-1]) == (800.0, 1199.0)
     assert (hbn.E_grid[0], hbn.E_grid[-1]) == (600.0, 1199.0)
     assert tuple(
@@ -282,7 +284,7 @@ def test_supplementary_studies_match_requested_windows_and_thicknesses():
     assert mose2.conditions == wse2.conditions
     assert tuple(
         (condition.energy_keV, condition.polar_tilt_deg, condition.azimuth_deg)
-        for condition in hbn.conditions
+        for condition in hbn.conditions_for(921.0)
     ) == (
         (17.5, 17.0, 130.0),
         (20.0, 17.0, 130.0),
@@ -290,7 +292,36 @@ def test_supplementary_studies_match_requested_windows_and_thicknesses():
         (25.0, 17.0, 130.0),
     )
     with pytest.raises(ValueError, match="unknown Zhai supplementary crystal"):
-        af.supplementary_study("hopg")
+        af.supplementary_study("graphite")
+
+
+def test_supplementary_table4_conditions_are_bound_to_each_thickness():
+    """Table 4 angles must not leak between distinct HOPG/h-BN samples."""
+    hopg = af.supplementary_study("hopg")
+    hbn = af.supplementary_study("hbn")
+
+    assert hopg.thicknesses_nm == (29.0, 76.0, 150.0, 17_000.0, 500_000.0, 1_000_000.0)
+    assert {
+        (condition.polar_tilt_deg, condition.azimuth_deg) for condition in hopg.conditions_for(76.0)
+    } == {(13.0, 120.0)}
+    assert {
+        (condition.polar_tilt_deg, condition.azimuth_deg)
+        for condition in hopg.conditions_for(17_000.0)
+    } == {(11.0, 60.0)}
+    assert hbn.thicknesses_nm == (42.0, 109.0, 219.0, 659.0, 921.0, 170_000.0)
+    assert {
+        (condition.polar_tilt_deg, condition.azimuth_deg) for condition in hbn.conditions_for(219.0)
+    } == {(11.5, 65.0), (17.0, 130.0)}
+    assert len(hbn.conditions_for(219.0)) == 8
+
+
+def test_zhai_thermal_beam_uses_the_reported_gaussian_99_9_percent_diameter():
+    beam = af.ZhaiThermalBeam()
+
+    assert beam.energy_keV == 300.0
+    assert beam.diameter_mm == 1.0
+    assert beam.enclosed_fraction == 0.999
+    assert beam.fwhm_mm == pytest.approx(np.sqrt(np.log(2.0) / np.log(1000.0)))
 
 
 def test_supplementary_model_uses_reported_hbn_azimuth(monkeypatch):
@@ -307,7 +338,7 @@ def test_supplementary_model_uses_reported_hbn_azimuth(monkeypatch):
     study = af.supplementary_study("hbn")
     spectra = af.model_coherent_spectra(study, 921.0, ne=1)
 
-    assert set(spectra) == set(study.conditions)
+    assert set(spectra) == set(study.conditions_for(921.0))
     assert len(geometry_calls) == 4
     assert all(call[1] == pytest.approx(np.deg2rad(17.0)) for call in geometry_calls)
     assert all(call[2] == pytest.approx(np.deg2rad(130.0)) for call in geometry_calls)
@@ -394,19 +425,22 @@ def test_supplementary_hbn_figure_smoke():
 def test_supplementary_overview_figure_smoke():
     from matplotlib.figure import Figure
 
-    spectra = {
-        crystal: _synthetic_supplementary_spectra(af.supplementary_study(crystal))[
-            af.supplementary_study(crystal).conditions[-1]
-        ]
-        for crystal in ("wse2", "mose2", "hbn")
-    }
+    spectra = {}
+    for crystal in ("wse2", "mose2", "hbn", "hopg"):
+        study = af.supplementary_study(crystal)
+        thickness_nm = study.thicknesses_nm[0]
+        synthetic = {
+            condition: np.exp(-0.5 * ((study.E_grid - (860.0 + condition.energy_keV)) / 8.0) ** 2)
+            for condition in study.conditions_for(thickness_nm)
+        }
+        spectra[crystal] = synthetic[study.conditions_for(thickness_nm)[-1]]
 
     fig = af.figure_supplementary_overview(spectra)
 
     assert isinstance(fig, Figure)
-    assert len(fig.axes) == 3
+    assert len(fig.axes) == 4
     titles = " ".join(ax.get_title() for ax in fig.axes)
-    assert "WSe_2" in titles and "MoSe_2" in titles and "h-BN" in titles
+    assert "WSe_2" in titles and "MoSe_2" in titles and "h-BN" in titles and "HOPG" in titles
     fig.canvas.draw()
 
 
@@ -416,13 +450,8 @@ def test_supplementary_overview_rejects_missing_material():
 
 
 def test_supplementary_overview_rejects_unknown_key():
-    spectra = {
-        crystal: _synthetic_supplementary_spectra(af.supplementary_study(crystal))[
-            af.supplementary_study(crystal).conditions[-1]
-        ]
-        for crystal in ("wse2", "mose2", "hbn")
-    }
-    spectra["hopg"] = spectra.pop("hbn")
+    spectra = {crystal: np.zeros(4) for crystal in ("wse2", "mose2", "hbn", "hopg")}
+    spectra["graphite"] = spectra.pop("hopg")
     with pytest.raises(ValueError, match="hbn"):
         af.figure_supplementary_overview(spectra)
 
@@ -436,20 +465,25 @@ def test_reproduce_all_populates_every_cache_and_reuses_it(tmp_path, monkeypatch
 
     def fake_coherent(study, thickness_nm, ne, exploratory_azimuth_deg=None):
         calls.append((study.crystal, thickness_nm, ne, exploratory_azimuth_deg))
-        return {condition: np.zeros(4) for condition in study.conditions}
+        return {condition: np.zeros(4) for condition in study.conditions_for(thickness_nm)}
 
     monkeypatch.setattr(af, "model_spectra", fake_model_spectra)
     monkeypatch.setattr(af, "model_coherent_spectra", fake_coherent)
 
     results = af.reproduce_all(ne=11, ne_brem=3, ne_supp=5, cache_dir=tmp_path)
 
-    assert len(results) == 8
+    assert len(results) == 19
     labels = [label for label, _path, _hit in results]
     assert labels[0] == "zhai-fig1c"
-    assert "wse2-42nm" in labels and "mose2-147nm" in labels and "hbn-921nm" in labels
+    assert (
+        "wse2-42nm" in labels
+        and "mose2-147nm" in labels
+        and "hbn-170000nm" in labels
+        and "hopg-1000000nm" in labels
+    )
     assert all(path.exists() for _label, path, _hit in results)
     assert all(hit is False for _label, _path, hit in results)  # first run: no cache hits
-    assert len(calls) == 8
+    assert len(calls) == 19
 
     calls.clear()
     results2 = af.reproduce_all(ne=11, ne_brem=3, ne_supp=5, cache_dir=tmp_path)
@@ -467,7 +501,10 @@ def test_export_all_figures_writes_expected_files(tmp_path, monkeypatch):
         return _synthetic_model(anchor)
 
     def fake_coherent(study, thickness_nm, ne, exploratory_azimuth_deg=None):
-        return _synthetic_supplementary_spectra(study)
+        return {
+            condition: np.exp(-0.5 * ((study.E_grid - 900.0) / 8.0) ** 2)
+            for condition in study.conditions_for(thickness_nm)
+        }
 
     monkeypatch.setattr(af, "model_spectra", fake_model_spectra)
     monkeypatch.setattr(af, "model_coherent_spectra", fake_coherent)
@@ -485,6 +522,7 @@ def test_export_all_figures_writes_expected_files(tmp_path, monkeypatch):
     assert "zhai_supplementary_wse2_42nm.png" in names
     assert "zhai_supplementary_mose2_147nm.png" in names
     assert "zhai_supplementary_hbn_921nm.png" in names
+    assert "zhai_supplementary_hopg_1000000nm.png" in names
     assert "zhai_supplementary_overview.png" in names
     for path in written:
         assert path.exists()
@@ -520,7 +558,7 @@ def test_supplementary_hbn_figure_rejects_incomplete_condition_set():
     study = af.supplementary_study("hbn")
     spectra = _synthetic_supplementary_spectra(study)
     del spectra[study.conditions[0]]
-    with pytest.raises(ValueError, match="exactly the study's four conditions"):
+    with pytest.raises(ValueError, match="exactly the requested conditions"):
         af.figure_supplementary_hbn(study, study.thicknesses_nm[0], spectra)
 
 

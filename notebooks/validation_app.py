@@ -434,8 +434,9 @@ def _(mo):
     response and normalized to **Phs/eV/s/nA**. WSe₂ and MoSe₂ each render four
     reported polar-tilt panels at 200 keV. Their TEM azimuth is not reported, so
     it must be selected explicitly below and is labeled exploratory. The 921 nm
-    h-BN comparison uses its reported 17° polar / 130° azimuth orientation and
-    overlays the reported 17.5, 20, 22.5, and 25 keV SEM spectra.
+    h-BN and HOPG use the thickness-specific polar/azimuth orientations reported
+    in Supplementary Table 4 and overlay the 17.5, 20, 22.5, and 25 keV SEM
+    spectra (the 219 nm h-BN sample has two reported orientations).
     """)
     return
 
@@ -447,6 +448,7 @@ def _(mo):
             "WSe₂ (800–1200 eV)": "wse2",
             "MoSe₂ (800–1200 eV)": "mose2",
             "h-BN (600–1200 eV)": "hbn",
+            "HOPG (500–1250 eV)": "hopg",
         },
         value="WSe₂ (800–1200 eV)",
         label="Supplementary material",
@@ -489,8 +491,10 @@ def _(af, check_support, mo, supplementary_study_ui, supplementary_thickness_ui)
         [
             mo.hstack([supplementary_study_ui, supplementary_thickness_ui]),
             mo.hstack([supplementary_azimuth_ui, save_supplementary_azimuth_ui])
-            if any(condition.azimuth_deg is None for condition in _study.conditions)
-            else mo.md("**Reported orientation:** polar 17°, azimuth 130°"),
+            if _study.has_unreported_azimuth
+            else mo.md(
+                "**Reported orientation(s):** encoded per thickness from Supplementary Table 4."
+            ),
             mo.hstack([supplementary_ne_ui, refresh_supplementary_ui, run_supplementary_ui]),
         ]
     )
@@ -633,13 +637,11 @@ def _(
     study = af.supplementary_study(supplementary_study_ui.value)
     thickness_nm = float(supplementary_thickness_ui.value)
     exploratory_azimuth_deg = (
-        float(supplementary_azimuth_ui.value)
-        if any(condition.azimuth_deg is None for condition in study.conditions)
-        else None
+        float(supplementary_azimuth_ui.value) if study.has_unreported_azimuth else None
     )
     with mo.status.spinner(
         title="Running detector-convolved supplementary spectra",
-        subtitle="Four reported-condition spectra are computed or loaded from cache.",
+        subtitle="Reported-condition spectra are computed or loaded from cache.",
     ):
         spectra, cache_hit, cache_path = af.cached_coherent_spectra(
             study,
@@ -649,8 +651,8 @@ def _(
             refresh=refresh_supplementary_ui.value,
         )
     figure = (
-        af.figure_supplementary_hbn(study, thickness_nm, spectra)
-        if study.crystal == "hbn"
+        af.figure_supplementary_sem(study, thickness_nm, spectra)
+        if study.crystal in {"hbn", "hopg"}
         else af.figure_supplementary_tmd(study, thickness_nm, spectra)
     )
     mo.vstack(
@@ -662,7 +664,7 @@ def _(
                     f" Exploratory TMD azimuth: {exploratory_azimuth_deg:g}° "
                     "(not reported by Zhai et al.)."
                     if exploratory_azimuth_deg is not None
-                    else " Reported h-BN orientation: polar 17°, azimuth 130°."
+                    else " Reported Table 4 orientation(s) selected for this thickness."
                 ),
                 kind="success",
             ),

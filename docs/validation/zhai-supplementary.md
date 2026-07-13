@@ -1,7 +1,7 @@
 # Validation status: Zhai supplementary coherent-emission studies
 
 **Scope.** `checks/anchor_figures.py::ZHAI_SUPPLEMENTARY_STUDIES` - the
-WSe2/MoSe2/h-BN reproductions rendered by the validation app's "Zhai
+WSe2/MoSe2/h-BN/HOPG reproductions rendered by the validation app's "Zhai
 supplementary" section and `cxr check --export`.
 
 This is a provenance record, not a physics re-derivation. The inputs
@@ -50,6 +50,25 @@ sum of squares between measured and predicted spectra.
 | h-BN film | ~659 nm | 14.5 | 105 |
 | h-BN film | ~921 nm | 17.0 | 130 |
 | bulk h-BN | ~170 um | 20.0 | 65 |
+
+The validation registry binds each Table 4 orientation to its own sample
+thickness. Every h-BN and HOPG orientation produces the reported 17.5, 20,
+22.5, and 25 keV SEM series; the two 219 nm h-BN rows therefore produce eight
+spectra rather than silently sharing either row's angles with another sample.
+
+## Electron-beam profile (thermal analysis only)
+
+SI Section S2 states that initial electron landing positions follow a Gaussian
+distribution and defines the beam-spot diameter as enclosing 99.9% of that
+distribution. SI Section S11 models the XY current density as a 2-D Gaussian
+and uses a 1 mm diameter for its **300 keV thermal analysis**. The validation
+check records the equivalent standard Gaussian FWHM as
+`1 mm * sqrt(ln(2) / ln(1000)) = 0.3168 mm`.
+
+This size is not applied to the Fig. 1c or Table 4 spectral reproductions: the
+paper does not state that their lower-energy spectral measurements used the
+S11 thermal-analysis spot size. The present spectral model is laterally
+infinite, so its transverse beam offsets do not change emitted spectra.
 
 ## Correction to the former azimuth assumption
 
