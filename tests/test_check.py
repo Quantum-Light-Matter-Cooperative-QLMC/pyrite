@@ -100,6 +100,20 @@ def test_command_edit_and_watch_flags():
     assert "--watch" in cmd
 
 
+def test_command_tunnel_uses_fixed_marimo_port():
+    command = check._command(tunnel=True)
+    assert command[3:7] == ["run", "--port", "2718", check.NOTEBOOK]
+
+
+def test_tunnel_flag_forwards_to_validation_launch(monkeypatch):
+    calls = []
+    monkeypatch.setattr(check, "_launch", lambda **kw: calls.append(kw))
+
+    check.main(["check", "--tunnel"])
+
+    assert calls == [{"edit": False, "watch": False, "tunnel": True}]
+
+
 def test_export_cli_calls_export_all_figures_and_skips_marimo(monkeypatch, tmp_path):
     calls = []
 
