@@ -151,6 +151,20 @@ def test_command_run_default():
     assert cmd[-4:] == [analyze.NOTEBOOK, "--", "--material", "hopg"]
 
 
+def test_command_tunnel_uses_fixed_marimo_port():
+    command = analyze._command("hopg", tunnel=True)
+    assert command[3:7] == ["run", "--port", "2718", analyze.NOTEBOOK]
+
+
+def test_tunnel_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
+    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
+    launched = {}
+    monkeypatch.setattr(analyze, "_launch", lambda material, **kw: launched.update(material=material, **kw))
+    args = _parse(["analyze", "--tunnel"])
+    args.func(args)
+    assert launched == {"material": "hopg", "edit": False, "watch": False, "tunnel": True}
+
+
 def test_command_edit():
     cmd = analyze._command("wse2", edit=True)
     assert cmd[3] == "edit"

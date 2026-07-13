@@ -35,6 +35,7 @@ from ._acp import running_acp
 from .config import MATERIALS
 
 NOTEBOOK = "notebooks/analysis_app.py"
+TUNNEL_PORT = 2718
 
 # Anchored to the repo root (src/cxr_mc/analyze.py -> parents[2] = repo root),
 # the same convention run.py uses for _DEFAULT_CHECKPOINT_DIR, so the persisted
@@ -75,7 +76,7 @@ def initial_material(cli_args, persisted_default):
     return "hopg"
 
 
-def _command(material, *, edit=False, watch=False):
+def _command(material, *, edit=False, watch=False, tunnel=False):
     """The marimo argv for one launch (module-run through the current
     interpreter so the venv's marimo is the one that runs). Marimo's own flags
     go before the notebook path; app args go after ``--``."""
@@ -85,6 +86,7 @@ def _command(material, *, edit=False, watch=False):
         "marimo",
         "edit" if edit else "run",
         *(["--watch"] if watch else []),
+        *(["--port", str(TUNNEL_PORT)] if tunnel else []),
         NOTEBOOK,
         "--",
         "--material",
@@ -92,9 +94,12 @@ def _command(material, *, edit=False, watch=False):
     ]
 
 
-def _launch(material, *, edit=False, watch=False, acp=False):
-    cmd = _command(material, edit=edit, watch=watch)
+def _launch(material, *, edit=False, watch=False, acp=False, tunnel=False):
+    cmd = _command(material, edit=edit, watch=watch, tunnel=tunnel)
     print(f"launching {NOTEBOOK} ({'edit' if edit else 'run'}) with material={material}")
+    if tunnel:
+        print(f"ssh -L {TUNNEL_PORT}:127.0.0.1:{TUNNEL_PORT} <your-pi-ssh-host>")
+        print(f"http://127.0.0.1:{TUNNEL_PORT}")
     env = {**os.environ, "CXR_ANALYZE_INITIAL": material}
     if acp:
         with running_acp():
@@ -117,6 +122,8 @@ def _cli(args):
     launch_args = {"edit": args.edit, "watch": args.watch}
     if args.acp:
         launch_args["acp"] = True
+    if args.tunnel:
+        launch_args["tunnel"] = True
     _launch(material, **launch_args)
 
 
@@ -138,6 +145,7 @@ def add_subparser(sub):
     ap.add_argument("--watch", action="store_true", help="pass marimo's --watch")
     ap.add_argument("--edit", action="store_true", help="use `marimo edit` instead of `marimo run`")
     ap.add_argument("--acp", action="store_true", help="start local Claude and Codex ACP bridges")
+    ap.add_argument("--tunnel", action="store_true", help="use a fixed port for SSH tunneling")
     ap.set_defaults(func=_cli)
     return ap
 
