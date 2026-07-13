@@ -1,6 +1,6 @@
 ---
 name: monte-carlo
-description: Work on stochastic kernels, RNG-dependent sampling, or Monte Carlo transport algorithms in cxr_mc. Use when adding or modifying stochastic processes, seeded tests, CPU/GPU kernel parity, or transport benchmarks.
+description: Use when adding or modifying stochastic kernels, RNG-dependent sampling, seeded tests, CPU/GPU parity, Monte Carlo transport, or transport benchmarks in cxr-mc.
 ---
 
 # Monte Carlo

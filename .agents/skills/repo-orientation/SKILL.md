@@ -1,6 +1,6 @@
 ---
 name: repo-orientation
-description: Find the right file, command, or module in cxr_mc before editing. Use when locating code, choosing an owning module, assessing repository structure, or making a surgical change.
+description: Use when locating code, choosing an owning module, assessing cxr-mc repository structure, updating the repository map, or planning a surgical change.
 ---
 
 # Repo Orientation
@@ -10,7 +10,10 @@ description: Find the right file, command, or module in cxr_mc before editing. U
 - Prefer `src/cxr_mc/` for implementation changes.
 - Use `tests/` for fast CPU checks.
 - Use `checks/` for heavier physics validation anchors.
-- Treat `scan.ipynb` as the sweep runner and `analysis.ipynb` as the viz notebook.
+- Treat `notebooks/scan_app.py`, `notebooks/analysis_app.py`, and
+  `notebooks/validation_app.py` as the three marimo application entry points.
+- Treat `checks/cxr_analysis_feranchuk.ipynb` as the remaining legacy validation
+  notebook, not an application owner.
 - Do not rewrite `README.md`, `TODO.md`, or `docs/` unless the task is about those files.
 
 ## Canonical Commands
@@ -27,3 +30,6 @@ description: Find the right file, command, or module in cxr_mc before editing. U
 2. Check whether a helper already exists in `src/cxr_mc/`.
 3. Prefer a focused test over a broad refactor.
 4. Keep notebook edits limited to presentation or analysis flow.
+
+Regenerate the inventory with `uv run python scripts/dev.py repo-map` after
+entry points, packages, or agent-tooling top-levels change.

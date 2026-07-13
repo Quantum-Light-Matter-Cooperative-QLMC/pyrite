@@ -40,9 +40,10 @@ Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
   `union` subcommands.
 - **`cxr scan <material>`** → `scan:main` → `run.run_sweep` → writes
   `checkpoints/<material>.pkl`. Root shim: `scan.py`.
-- **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint) →
+- **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
   `notebooks/analysis_app.py` (all figures, Altair + matplotlib, lazy tabbed
-  layout); both read the per-material grids in `config.py`.
+  layout), and `notebooks/validation_app.py` (validation-study interface). The
+  scan and analysis apps read the per-material grids in `config.py`.
 - **`cxr export [stem]`** → `export:main`: `marimo export html` of the analysis
   app → `results/<stem>.html`.
 - **`cxr slim <checkpoint> [--grid]`** → `slim:slim_checkpoint` →

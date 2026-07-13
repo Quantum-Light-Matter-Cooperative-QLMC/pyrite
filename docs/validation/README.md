@@ -48,6 +48,48 @@ unverified → filtered → rederived → anchored → signed-off
 
 **Pin it or lose it:** every `signed-off`/`anchored` claim has a regression test so a future edit can't silently break certified physics.
 
+## Independent-verifier contract
+
+The verifier receives a validation `id`, `file::symbol`, and/or diff. Use the
+ledger to resolve any missing identifiers. Independence is mandatory: the
+verifier must be a fresh context that did not write the implementation.
+
+Follow this order:
+
+1. Read only the ledger row and derivation docstring. Record the cited source
+   and equation, intended quantity, signature, units, assumptions, and stated
+   limiting case. Do not read the implementation body yet.
+2. Apply cheap filters: dimensional consistency, limiting cases, and
+   sign/symmetry/convention checks. A failure is immediately a `discrepancy`.
+3. Starting from the source and signature, derive the expression independently
+   in `docs/validation/<id>.md`. The derivation must precede inspection of the
+   implementation body so the code cannot anchor the result.
+4. Read the implementation and compare it symbolically and dimensionally;
+   compare at one or more numeric points when feasible. Use independent
+   reference data or `checks/` anchors rather than implementation helpers.
+5. Report the verdict and a suggested ledger edit. Never apply `signed-off`;
+   that transition belongs to a human.
+
+The verifier may write only `docs/validation/<id>.md`. It must not modify the
+code under review. Missing `Validation:` markers or ledger rows are findings,
+not invitations to repair the implementation in the verification context.
+
+## Verifier output
+
+Return this concise structure:
+
+```markdown
+- **Claim**: `<id>` — `<file::symbol>` — `<source + equation>`
+- **Filters**: units `<pass/failure>`; limits `<pass/failure>`; signs/conventions `<pass/failure>`
+- **Re-derivation**: `matches` | `differs` — `<exact divergent term or convention>`
+- **Verdict**: `filtered` | `rederived` | `discrepancy`
+- **Write-up**: `docs/validation/<id>.md`
+- **Suggested ledger change**: `<proposed row edit or none; human applies it>`
+```
+
+For a discrepancy, identify the first exact factor, sign, exponent, unit, or
+convention that diverges. Do not substitute a general narrative for that diff.
+
 ## Rules for contributors (human or agent)
 
 - Every physics function carries a derivation docstring: **source (paper + eq #), assumptions, ≥1 limiting case, and a `Validation: <id>` marker.** No "trust me" formulas.

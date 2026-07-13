@@ -1,12 +1,13 @@
-# Monte Carlo rules for stochastic kernels in cxr_mc
+---
+name: monte-carlo
+description: Use when adding or modifying stochastic kernels, RNG-dependent sampling, seeded tests, CPU/GPU parity, Monte Carlo transport, or transport benchmarks in cxr-mc.
+---
 
-# Use this skill when
+# Monte Carlo
 
-Use this skill when adding or modifying any stochastic kernel, RNG-dependent sampling, or transport algorithm.
+## Rules
 
-# Rules
-
-- Preserve RNG reproducibility — fix seeds in tests; document seed conventions.
+- Preserve RNG reproducibility: fix seeds in tests and document seed conventions.
 - New stochastic processes require regression tests with deterministic seeds.
-- Always benchmark new kernels against the CPU baseline.
+- Benchmark new kernels against the CPU baseline.
 - Keep CPU and GPU implementations numerically consistent.

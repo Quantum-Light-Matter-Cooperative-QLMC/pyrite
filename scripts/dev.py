@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Small cross-platform developer command runner for cxr_mc.
 
-This keeps Claude and humans out of shell one-liner hell on Windows.
+This keeps agents and humans out of shell one-liner hell on Windows.
 Run via:
 
     uv run python scripts/dev.py <command>
@@ -10,17 +10,24 @@ Commands:
     acp-up     start the Claude and Codex ACP WebSocket bridges
     acp-down   stop bridges started by acp-up
     repo-map   print a compact repo tree and the canonical commands
-    lint       run Ruff over source, tests, dev helpers, and checks
+    lint       run Ruff over the repository
     format     run Ruff formatter
+    typecheck  run Pyright
+    precommit  run all pre-commit hooks
     nbqa       lint notebooks with nbQA + Ruff
     nbstrip    strip notebook outputs in-place
-    test       run the fast test suite
-    verify     lint + test
+    test       run pytest, forwarding selectors and arguments
+    smoke      exercise checkpoint loading and plotting
+    sync-skills mirror .agents/skills into .claude/skills
+    check-skills validate the canonical skills and exact mirror
+    verify     check skills, lint, type check, and test
 """
 
 from __future__ import annotations
 
 import argparse
+import re
+import shutil
 import subprocess
 import sys
 import time
@@ -29,14 +36,14 @@ from pathlib import Path
 from cxr_mc._acp import ACP_SERVERS, start_acp_servers, stop_acp_servers
 
 ROOT = Path(__file__).resolve().parents[1]
-NOTEBOOK_SKIP_PARTS = {
-    ".venv",
-    ".git",
-    "checkpoints",
-    "results",
-    "docs/_build",
-    "docs/_autosummary",
-}
+AGENT_SKILLS_DIR = ROOT / ".agents" / "skills"
+CLAUDE_SKILLS_DIR = ROOT / ".claude" / "skills"
+LEGACY_NOTEBOOK = ROOT / "checks" / "cxr_analysis_feranchuk.ipynb"
+SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+class AgentToolingError(RuntimeError):
+    """Raised when the portable skill tree is malformed or out of sync."""
 
 
 def run(*args: str, cwd: Path = ROOT) -> None:
@@ -63,13 +70,7 @@ def cmd_acp_down(_: argparse.Namespace) -> None:
 
 
 def iter_notebooks() -> list[Path]:
-    notebooks: list[Path] = []
-    for path in ROOT.rglob("*.ipynb"):
-        rel = path.relative_to(ROOT).as_posix()
-        if any(skip in rel for skip in NOTEBOOK_SKIP_PARTS):
-            continue
-        notebooks.append(path)
-    return sorted(notebooks)
+    return [LEGACY_NOTEBOOK] if LEGACY_NOTEBOOK.is_file() else []
 
 
 def cmd_repo_map(_: argparse.Namespace) -> None:
@@ -79,7 +80,6 @@ def cmd_repo_map(_: argparse.Namespace) -> None:
         "checks",
         "docs",
         "dev",
-        ".claude",
         "scripts",
     ]
     print("cxr_mc repo map")
@@ -104,13 +104,23 @@ def cmd_repo_map(_: argparse.Namespace) -> None:
             print()
         else:
             print(rel)
+    print("Agent tooling:")
+    for rel in [".agents", ".claude", ".codex"]:
+        if (ROOT / rel).exists():
+            print(f"  {rel}/")
+    print()
     print("Canonical commands:")
     for line in [
         "uv run python scripts/dev.py acp-up",
         "uv run python scripts/dev.py acp-down",
         "uv run python scripts/dev.py lint",
         "uv run python scripts/dev.py format",
+        "uv run python scripts/dev.py typecheck",
+        "uv run python scripts/dev.py precommit",
         "uv run python scripts/dev.py test",
+        "uv run python scripts/dev.py smoke --material hopg --output-dir /tmp/cxr-mc-smoke",
+        "uv run python scripts/dev.py sync-skills",
+        "uv run python scripts/dev.py check-skills",
         "uv run python scripts/dev.py verify",
         "uv run python scripts/dev.py nbqa",
         "uv run python scripts/dev.py nbstrip",
@@ -119,11 +129,19 @@ def cmd_repo_map(_: argparse.Namespace) -> None:
 
 
 def cmd_lint(_: argparse.Namespace) -> None:
-    run("-m", "ruff", "check", "src", "tests", "dev", "checks")
+    run("-m", "ruff", "check", ".")
 
 
 def cmd_format(_: argparse.Namespace) -> None:
-    run("-m", "ruff", "format", "src", "tests", "dev", "checks")
+    run("-m", "ruff", "format", ".")
+
+
+def cmd_typecheck(_: argparse.Namespace) -> None:
+    run("-m", "pyright")
+
+
+def cmd_precommit(_: argparse.Namespace) -> None:
+    run("-m", "pre_commit", "run", "--all-files")
 
 
 def cmd_nbqa(_: argparse.Namespace) -> None:
@@ -142,13 +160,158 @@ def cmd_nbstrip(_: argparse.Namespace) -> None:
     run("-m", "nbstripout", *[str(p) for p in notebooks])
 
 
-def cmd_test(_: argparse.Namespace) -> None:
-    run("-m", "pytest", "-q")
+def cmd_test(args: argparse.Namespace) -> None:
+    run("-m", "pytest", *getattr(args, "pytest_args", []))
 
 
-def cmd_verify(_: argparse.Namespace) -> None:
-    cmd_lint(argparse.Namespace())
-    cmd_test(argparse.Namespace())
+def cmd_smoke(args: argparse.Namespace) -> None:
+    run(
+        str(ROOT / "scripts" / "smoke.py"),
+        "--material",
+        args.material,
+        "--output-dir",
+        args.output_dir,
+    )
+
+
+def _frontmatter_fields(path: Path) -> dict[str, str]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as exc:
+        raise AgentToolingError(f"{path}: cannot read UTF-8 text: {exc}") from exc
+    if not lines or lines[0] != "---":
+        raise AgentToolingError(f"{path}: missing YAML frontmatter")
+    try:
+        end = lines.index("---", 1)
+    except ValueError as exc:
+        raise AgentToolingError(f"{path}: unterminated YAML frontmatter") from exc
+
+    fields: dict[str, str] = {}
+    for line in lines[1:end]:
+        key, separator, value = line.partition(":")
+        key = key.strip()
+        value = value.strip().strip("'\"")
+        if not separator or not key or not value:
+            raise AgentToolingError(f"{path}: malformed YAML frontmatter line {line!r}")
+        if key in fields:
+            raise AgentToolingError(f"{path}: duplicate frontmatter field {key!r}")
+        fields[key] = value
+    return fields
+
+
+def validate_skill_file(path: Path) -> None:
+    """Validate the required portable frontmatter for one skill."""
+    fields = _frontmatter_fields(path)
+    for field in ("name", "description"):
+        if field not in fields:
+            raise AgentToolingError(f"{path}: missing {field} in YAML frontmatter")
+    name = fields["name"]
+    if not SKILL_NAME_PATTERN.fullmatch(name):
+        raise AgentToolingError(f"{path}: invalid skill name {name!r}")
+    if name != path.parent.name:
+        raise AgentToolingError(
+            f"{path}: skill name {name!r} must match directory {path.parent.name!r}"
+        )
+    if not fields["description"].startswith("Use when"):
+        raise AgentToolingError(f"{path}: description must start with 'Use when'")
+
+
+def _relative_files(root: Path) -> dict[Path, Path]:
+    if not root.is_dir():
+        raise AgentToolingError(f"missing skill directory: {root}")
+    return {path.relative_to(root): path for path in sorted(root.rglob("*")) if path.is_file()}
+
+
+def _validated_canonical_files(root: Path) -> dict[Path, Path]:
+    files = _relative_files(root)
+    skill_dirs = sorted(path for path in root.iterdir() if path.is_dir())
+    if not skill_dirs:
+        raise AgentToolingError(f"no skill directories found under {root}")
+    for skill_dir in skill_dirs:
+        skill_file = skill_dir / "SKILL.md"
+        if not skill_file.is_file():
+            raise AgentToolingError(f"{skill_dir}: missing SKILL.md")
+        validate_skill_file(skill_file)
+    return files
+
+
+def _remove_path(path: Path) -> None:
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.exists():
+        shutil.rmtree(path)
+
+
+def check_skill_trees(canonical: Path = AGENT_SKILLS_DIR, mirror: Path = CLAUDE_SKILLS_DIR) -> None:
+    """Validate canonical skills and require an exact byte-for-byte mirror."""
+    canonical_files = _validated_canonical_files(canonical)
+    mirror_files = _relative_files(mirror)
+
+    canonical_names = set(canonical_files)
+    mirror_names = set(mirror_files)
+    missing = sorted(canonical_names - mirror_names)
+    extra = sorted(mirror_names - canonical_names)
+    different = sorted(
+        rel
+        for rel in canonical_names & mirror_names
+        if canonical_files[rel].read_bytes() != mirror_files[rel].read_bytes()
+        or mirror_files[rel].is_symlink()
+    )
+    errors = []
+    if missing:
+        errors.append("missing from mirror: " + ", ".join(map(str, missing)))
+    if extra:
+        errors.append("unexpected mirror files: " + ", ".join(map(str, extra)))
+    if different:
+        errors.append("byte-different mirror files: " + ", ".join(map(str, different)))
+    if errors:
+        raise AgentToolingError("; ".join(errors))
+
+
+def sync_skill_trees(canonical: Path = AGENT_SKILLS_DIR, mirror: Path = CLAUDE_SKILLS_DIR) -> None:
+    """Replace the generated mirror with ordinary copies of canonical files."""
+    _validated_canonical_files(canonical)
+    staged = mirror.with_name(f".{mirror.name}.tmp")
+    backup = mirror.with_name(f".{mirror.name}.backup")
+
+    for path in (staged, backup):
+        _remove_path(path)
+
+    shutil.copytree(canonical, staged, symlinks=False)
+    check_skill_trees(canonical, staged)
+
+    had_mirror = mirror.exists() or mirror.is_symlink()
+    if had_mirror:
+        mirror.replace(backup)
+    try:
+        staged.replace(mirror)
+    except OSError:
+        if had_mirror and not mirror.exists():
+            backup.replace(mirror)
+        raise
+    finally:
+        _remove_path(staged)
+    _remove_path(backup)
+
+
+def cmd_sync_skills(_: argparse.Namespace) -> None:
+    sync_skill_trees()
+    check_skill_trees()
+    print(
+        f"Synchronized {AGENT_SKILLS_DIR.relative_to(ROOT)} -> {CLAUDE_SKILLS_DIR.relative_to(ROOT)}"
+    )
+
+
+def cmd_check_skills(_: argparse.Namespace) -> None:
+    check_skill_trees()
+    print("Skill mirror is valid and synchronized.")
+
+
+def cmd_verify(args: argparse.Namespace) -> None:
+    cmd_check_skills(args)
+    cmd_lint(args)
+    cmd_typecheck(args)
+    cmd_test(args)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -161,18 +324,36 @@ def build_parser() -> argparse.ArgumentParser:
         ("repo-map", cmd_repo_map),
         ("lint", cmd_lint),
         ("format", cmd_format),
+        ("typecheck", cmd_typecheck),
+        ("precommit", cmd_precommit),
         ("nbqa", cmd_nbqa),
         ("nbstrip", cmd_nbstrip),
-        ("test", cmd_test),
-        ("verify", cmd_verify),
+        ("sync-skills", cmd_sync_skills),
+        ("check-skills", cmd_check_skills),
     ]:
         sp = sub.add_parser(name)
         sp.set_defaults(func=fn)
+    test = sub.add_parser("test")
+    test.add_argument("pytest_args", nargs=argparse.REMAINDER)
+    test.set_defaults(func=cmd_test)
+    smoke = sub.add_parser("smoke")
+    smoke.add_argument("--material", default="hopg")
+    smoke.add_argument("--output-dir", default="smoke_out")
+    smoke.set_defaults(func=cmd_smoke)
+    verify = sub.add_parser("verify")
+    verify.add_argument("pytest_args", nargs=argparse.REMAINDER)
+    verify.set_defaults(func=cmd_verify)
     return ap
 
 
 def main(argv: list[str] | None = None) -> None:
-    args = build_parser().parse_args(argv)
+    raw_args = list(sys.argv[1:] if argv is None else argv)
+    if raw_args and raw_args[0] in {"test", "verify"}:
+        command = raw_args[0]
+        func = cmd_test if command == "test" else cmd_verify
+        func(argparse.Namespace(command=command, pytest_args=raw_args[1:]))
+        return
+    args = build_parser().parse_args(raw_args)
     args.func(args)
 
 

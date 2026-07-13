@@ -1,6 +1,6 @@
 ---
 name: scientific-library
-description: Apply cxr_mc scientific-library coding conventions. Use when writing or reviewing code in src/cxr_mc/, especially simulation kernels, public APIs, vectorization, constants, and type/docstring consistency.
+description: Use when writing or reviewing cxr-mc library code, especially simulation kernels, public APIs, vectorization, constants, typing, and scientific docstrings.
 ---
 
 # Scientific Library

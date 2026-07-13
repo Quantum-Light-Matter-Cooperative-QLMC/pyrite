@@ -19,11 +19,5 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Lint
-        run: uv run ruff check .
-
-      - name: Type check
-        run: uv run pyright src/
-
-      - name: Test
-        run: uv run pytest
+      - name: Verify
+        run: uv run python scripts/dev.py verify

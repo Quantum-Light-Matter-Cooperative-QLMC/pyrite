@@ -1,6 +1,6 @@
 ---
 name: physics-review
-description: Review physics changes in cxr_mc. Use when modifying or adding physics equations, scattering models, transport algorithms, derivation docstrings, validation markers, or physics-validation ledger entries.
+description: Use when reviewing modified or new physics equations, scattering models, transport algorithms, derivation docstrings, validation markers, or ledger entries in cxr-mc.
 ---
 
 # Physics Review
