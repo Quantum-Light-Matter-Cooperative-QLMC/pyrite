@@ -156,6 +156,20 @@ def test_command_tunnel_uses_fixed_marimo_port():
     assert command[3:7] == ["run", "--port", "2718", analyze.NOTEBOOK]
 
 
+def test_tunnel_launch_prints_forwarding_instructions_without_running_marimo(monkeypatch, capsys):
+    launched = []
+    monkeypatch.setattr(
+        analyze.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
+    )
+
+    analyze._launch("hopg", tunnel=True)
+
+    output = capsys.readouterr().out
+    assert "ssh -L 2718:127.0.0.1:2718 <your-pi-ssh-host>" in output
+    assert "http://127.0.0.1:2718" in output
+    assert len(launched) == 1
+
+
 def test_tunnel_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
     launched = {}

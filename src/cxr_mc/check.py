@@ -178,8 +178,8 @@ def _command(*, edit=False, watch=False, tunnel=False):
 
 def _launch(*, edit=False, watch=False, acp=False, tunnel=False):
     cmd = _command(edit=edit, watch=watch, tunnel=tunnel)
-    print(f"launching {NOTEBOOK} ({'edit' if edit else 'run'})")
     if tunnel:
+        print(f"launching {NOTEBOOK} ({'edit' if edit else 'run'})")
         print(f"ssh -L {TUNNEL_PORT}:127.0.0.1:{TUNNEL_PORT} <your-pi-ssh-host>")
         print(f"http://127.0.0.1:{TUNNEL_PORT}")
     env = {**os.environ}

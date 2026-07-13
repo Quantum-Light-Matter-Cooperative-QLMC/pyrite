@@ -105,6 +105,28 @@ def test_command_tunnel_uses_fixed_marimo_port():
     assert command[3:7] == ["run", "--port", "2718", check.NOTEBOOK]
 
 
+def test_tunnel_launch_prints_forwarding_instructions_without_running_marimo(monkeypatch, capsys):
+    launched = []
+    monkeypatch.setattr(
+        check.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
+    )
+
+    check._launch(tunnel=True)
+
+    output = capsys.readouterr().out
+    assert "ssh -L 2718:127.0.0.1:2718 <your-pi-ssh-host>" in output
+    assert "http://127.0.0.1:2718" in output
+    assert len(launched) == 1
+
+
+def test_default_launch_keeps_stdout_unchanged(monkeypatch, capsys):
+    monkeypatch.setattr(check.subprocess, "run", lambda *args, **kwargs: None)
+
+    check._launch()
+
+    assert capsys.readouterr().out == ""
+
+
 def test_tunnel_flag_forwards_to_validation_launch(monkeypatch):
     calls = []
     monkeypatch.setattr(check, "_launch", lambda **kw: calls.append(kw))
@@ -129,6 +151,25 @@ def test_export_cli_calls_export_all_figures_and_skips_marimo(monkeypatch, tmp_p
     )
 
     check.main(["check", "--export", "--outdir", str(tmp_path), "--ne", "11"])
+
+    assert calls == [(str(tmp_path), 11, 200, 200)]
+
+
+def test_export_tunnel_cli_calls_export_all_figures_and_skips_marimo(monkeypatch, tmp_path):
+    calls = []
+
+    class _FakeAF:
+        @staticmethod
+        def export_all_figures(outdir, ne, ne_brem, ne_supp):
+            calls.append((outdir, ne, ne_brem, ne_supp))
+            return []
+
+    monkeypatch.setitem(sys.modules, "anchor_figures", _FakeAF())
+    monkeypatch.setattr(
+        check, "_launch", lambda **kw: pytest.fail("--export --tunnel must not launch marimo")
+    )
+
+    check.main(["check", "--export", "--tunnel", "--outdir", str(tmp_path), "--ne", "11"])
 
     assert calls == [(str(tmp_path), 11, 200, 200)]
 
