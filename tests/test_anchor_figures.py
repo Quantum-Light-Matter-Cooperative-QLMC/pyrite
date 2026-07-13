@@ -87,11 +87,12 @@ def test_match_series_tolerant():
     assert af._match_series(ref, 99.0) is None
 
 
-# NB: single_segment_anchor() and model_spectra() call mc_spectrum, which runs on
-# the GPU array module (xp=cupy on a CUDA box). Per repo convention the fast suite
-# stays CPU-only, so the lineshape-normalization anchor (the single-segment MC vs
-# Eq.(12) ratio) is exercised by the CPU-forced check run -- it is a column in
-# validation_table() printed by anchor_figures.main() -- not here.
+def test_single_segment_lineshape_converges_to_closed_form(anchor):
+    short_ratio = af.single_segment_anchor(anchor, 25.0, L_seg_ang=100.0)[2]
+    long_ratio = af.single_segment_anchor(anchor, 25.0, L_seg_ang=3000.0)[2]
+
+    assert abs(long_ratio - 1.0) < abs(short_ratio - 1.0)
+    assert long_ratio == pytest.approx(1.0, abs=5e-4)
 
 
 def _synthetic_model(anchor):

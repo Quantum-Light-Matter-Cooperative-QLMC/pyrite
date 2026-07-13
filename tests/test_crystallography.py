@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+import cxr_mc.materials.crystal as crystal_module
 from cxr_mc.materials.crystal import (
     CRYSTALS,
     HC_EV_ANG,
@@ -149,6 +150,24 @@ def test_optical_constants_beta_matches_absorption_length():
     mu = 2.0 * k * beta
     L_abs = absorption_length_ang("Si", E, n_per_ang3)
     assert (1.0 / mu) == pytest.approx(L_abs, rel=1e-9)
+
+
+def test_absorption_length_matches_henke_f2_coefficient(monkeypatch):
+    energy_eV = np.array([1000.0, 2500.0])
+    number_density_per_ang3 = 0.05
+    f2 = np.array([2.5, 1.25])
+
+    monkeypatch.setattr(
+        crystal_module,
+        "henke_dispersion",
+        lambda _element, _energy: (np.zeros_like(energy_eV), f2),
+    )
+
+    wavelength_ang = crystal_module.HC_EV_ANG / energy_eV
+    expected = 1.0 / (2.0 * crystal_module.R_E_ANG * wavelength_ang * number_density_per_ang3 * f2)
+    actual = crystal_module.absorption_length_ang("Si", energy_eV, number_density_per_ang3)
+
+    np.testing.assert_allclose(actual, expected, rtol=1e-14)
 
 
 def test_optical_constants_delta_positive_off_edge():

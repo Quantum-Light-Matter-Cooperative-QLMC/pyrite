@@ -291,11 +291,20 @@ class ZhaiAnchor:
 
 
 def line_energy_eV(anchor: ZhaiAnchor, E0_keV: float) -> float:
-    """Zero-scattering resonance energy, Feranchuk-Spence Eq. (10):
+    """Zero-scattering resonance energy in the production sign convention.
+
+    Starting from Feranchuk-Spence Eq. (10), the executable anchor uses
 
         E = hbar c beta g_z / (1 - beta cos theta_obs),
 
-    for beam || g (HOPG c-axis), so g_z = |g|. The MC peak must land here.
+    for beam parallel to the HOPG c-axis and ``g_z = |g|``. This positive-
+    numerator convention implicitly labels the resonant spatial harmonic by
+    the reciprocal member opposite to an ``exp(+i g.r)`` reconstruction; that
+    mapping is not explicit in the production coupling and remains the
+    documented sign discrepancy. In the nonrelativistic limit ``beta -> 0``,
+    the line energy tends to zero.
+
+    Validation: line-energy-dispersion
     """
     info = CRYSTALS[anchor.crystal]
     beta = beta_from_keV(E0_keV)

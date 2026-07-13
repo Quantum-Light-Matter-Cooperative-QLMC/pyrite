@@ -99,6 +99,16 @@ def mc_spectrum(
     at omega_res with the segment's velocity vector), t_L = L_seg/beta, and
     T_abs the Beer-Lambert escape factor from the segment midpoint.
 
+    The finite-time factor follows from integrating ``exp(i 2 P t)`` over a
+    centered segment duration ``t_L``, giving
+    ``t_L**2 sinc(P t_L / pi)**2`` under NumPy's normalized-sinc convention,
+    with ``P = (1 - beta v_hat.n)(omega - omega_res) / 2``. It assumes a
+    constant segment velocity and amplitude. As ``t_L -> infinity``, the
+    normalized lineshape converges distributionally to a delta function at
+    ``omega_res``; at zero detuning its value is ``t_L**2``.
+
+    Validation: finite-time-lineshape
+
     n_hat: detector direction in the SAMPLE frame; overrides theta_obs_rad
     when given (use tilted_geometry() for a tilted sample).
     composition: [(element, n_per_Ang3), ...] for compound self-absorption;

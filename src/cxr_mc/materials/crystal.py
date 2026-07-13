@@ -345,15 +345,24 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
 # ---- absorption length ------------------------------------------------------
 def absorption_length_ang(element, photon_E_eV, number_density_per_ang3):
     """
-    L_abs [Angstrom] from Henke f2:  mu = 2 (omega/c) * (n_atoms r_e lambda^2 f2 / ... )
-    Practical form: 1/L_abs = 2 k beta_index, beta_index = (r_e lambda^2 / 2pi) n f2.
-    Returns L_abs in Angstrom. (For compounds, sum n_i f2_i.)
+    Return the Beer-Lambert intensity attenuation length in Angstrom.
+
+    Starting from ``I(z) = I(0) exp(-mu z)`` and the Henke imaginary
+    refractive-index coefficient
+    ``beta = r_e lambda**2 n f2 / (2 pi)``, this uses
+    ``mu = 2 k beta = 2 r_e lambda n f2`` with ``k = 2 pi / lambda``.
+    The assumptions are a homogeneous elemental medium, passive attenuation,
+    and positive photon energy in the tabulated Henke range. For compounds,
+    inverse lengths add through ``sum_i n_i f2_i``. As ``n`` or ``f2`` tends
+    to zero, ``mu`` tends to zero and the returned length diverges.
 
     The wide brem grid starts at 0 eV (config E_grid_brem = np.arange(0.0, ...)),
     so this is called with E=0; there lam->inf, mu->0, L_abs->inf, which the brem
     path already swallows via nan_to_num. The errstate guard just suppresses the
     benign "divide by zero" / "invalid value" RuntimeWarnings from that E=0 bin --
     the returned values (and so all numerics) are unchanged.
+
+    Validation: absorption-length
     """
     _, f2 = henke_dispersion(element, photon_E_eV)
     with np.errstate(divide="ignore", invalid="ignore"):
