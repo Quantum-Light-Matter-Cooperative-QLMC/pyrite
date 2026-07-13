@@ -30,6 +30,7 @@ exceed it; enable ``altair.data_transformers.enable("vegafusion")`` or
 import altair as alt
 import numpy as np
 import pandas as pd
+from altair.utils.schemapi import UndefinedType
 
 from ..detectors import eaglexo_response as eag
 from ..detectors import timepix_response as tpx
@@ -188,8 +189,8 @@ def timepix_detected_frame(
 def _detected_layers(
     df,
     *,
-    x_scale=alt.Undefined,
-    y_scale=alt.Undefined,
+    x_scale: alt.Scale | UndefinedType = alt.Undefined,
+    y_scale: alt.Scale | UndefinedType = alt.Undefined,
     color_field="E0_keV",
     color_title="beam energy (keV)",
 ):

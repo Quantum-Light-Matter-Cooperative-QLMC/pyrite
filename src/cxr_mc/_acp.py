@@ -29,13 +29,17 @@ def acp_bridge_command(adapter: str, port: int) -> list[str]:
     ]
 
 
-def _popen_kwargs() -> dict[str, object]:
+def _start_bridge(adapter: str, port: int) -> subprocess.Popen[bytes]:
+    """Start one ACP bridge with platform-specific process-group handling."""
+    command = acp_bridge_command(adapter, port)
     if os.name == "nt":
-        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
-    return {"start_new_session": True}
+        return subprocess.Popen(
+            command, cwd=ROOT, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP
+        )
+    return subprocess.Popen(command, cwd=ROOT, start_new_session=True)
 
 
-def _write_state(processes: dict[str, subprocess.Popen[object]]) -> None:
+def _write_state(processes: dict[str, subprocess.Popen[bytes]]) -> None:
     ACP_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     state = {
         name: {"pid": process.pid, "port": ACP_SERVERS[name][1]}
@@ -52,17 +56,15 @@ def terminate_process_tree(pid: int) -> None:
         os.killpg(pid, 15)
 
 
-def start_acp_servers() -> list[subprocess.Popen[object]]:
+def start_acp_servers() -> list[subprocess.Popen[bytes]]:
     """Start both ACP bridges and save their process IDs for ``acp-down``."""
     if ACP_STATE_PATH.exists():
         raise RuntimeError(f"ACP state already exists at {ACP_STATE_PATH}; run acp-down first.")
 
-    processes: dict[str, subprocess.Popen[object]] = {}
+    processes: dict[str, subprocess.Popen[bytes]] = {}
     try:
         for name, (adapter, port) in ACP_SERVERS.items():
-            processes[name] = subprocess.Popen(
-                acp_bridge_command(adapter, port), cwd=ROOT, **_popen_kwargs()
-            )
+            processes[name] = _start_bridge(adapter, port)
         _write_state(processes)
     except BaseException:
         for process in processes.values():
