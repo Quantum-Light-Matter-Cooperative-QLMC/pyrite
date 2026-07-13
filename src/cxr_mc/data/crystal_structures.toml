@@ -216,6 +216,24 @@ basis = [
     { element = "Se", pos = [0.6666666666666667, 0.3333333333333333, 0.745] },
 ]
 
+# 1T-HfS2 (CdI2-type, P-3m1 #164): one HfS2 formula unit per primitive
+# hexagonal cell, with Hf on 1a and S on 2d. The product crystal reports
+# a=b=3.62 A and c=5.80 A; Neal et al., npj 2D Mater. Appl. 5, 45 (2021)
+# independently identify the vendor-grown bulk crystal as 1T P-3m1. The
+# idealized octahedral coordinate z=0.25 gives an Hf-S bond of 2.54 A,
+# consistent with the reported ~2.53 A. In the limiting basal case, one layer
+# per cell means (001) is allowed (unlike the cancelled odd 00l of 2H TMDs).
+# Validation: hfs2-structure
+[hfs2]
+system = "hexagonal"
+a = 3.62
+c = 5.80
+basis = [
+    { element = "Hf", pos = [0.0, 0.0, 0.0] },
+    { element = "S",  pos = [0.3333333333333333, 0.6666666666666667, 0.25] },
+    { element = "S",  pos = [0.6666666666666667, 0.3333333333333333, 0.75] },
+]
+
 [hfse2]
 system = "hexagonal"
 a = 3.748

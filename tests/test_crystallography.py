@@ -29,6 +29,7 @@ EXPECTED = {
     "mos2",
     "ws2",
     "ptse2",
+    "hfs2",
     "hfse2",
     "zrse2",
 }
@@ -122,6 +123,23 @@ def test_mote2_product_structure_sane():
     assert info["V_cell"] == pytest.approx(142.27, abs=0.1)
     assert len(info["basis"]) == 6
     assert sum(1 for el, _ in info["basis"] if el == "Te") == 4
+
+
+def test_hfs2_structure_sane():
+    # Bulk 1T-HfS2, P-3m1: a=3.62 A, c=5.80 A, one HfS2 formula unit.
+    # V = (sqrt(3)/2) a^2 c ~= 65.82 A^3. The 1T basis has one layer per
+    # cell, so the odd basal (001) reflection is allowed rather than cancelled.
+    info = CRYSTALS["hfs2"]
+
+    assert info["lattice"]["a"] == pytest.approx(3.62, abs=1e-3)
+    assert info["lattice"]["c"] == pytest.approx(5.80, abs=1e-2)
+    assert info["V_cell"] == pytest.approx(65.82, abs=0.1)
+    assert len(info["basis"]) == 3
+    assert sum(1 for el, _ in info["basis"] if el == "Hf") == 1
+    assert sum(1 for el, _ in info["basis"] if el == "S") == 2
+
+    structure_001, _ = structure_factor("hfs2", (0, 0, 1), 1000.0, B_ang2=0.6)
+    assert abs(structure_001) > 1.0
 
 
 def test_sapphire_structure_sane():

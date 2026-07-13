@@ -26,6 +26,7 @@ ALL = [
     "mos2",
     "ws2",
     "ptse2",
+    "hfs2",
     "hfse2",
     "zrse2",
     "diamond",

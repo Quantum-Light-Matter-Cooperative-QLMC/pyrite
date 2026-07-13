@@ -208,7 +208,7 @@ Crystals are defined in [`src/cxr_mc/data/crystal_structures.toml`](src/cxr_mc/d
 | `hopg`                    | highly-oriented pyrolytic graphite | hexagonal (fiber-textured) |
 | `mose2`, `wse2`, `mote2`  | 2H-MoSe₂, 2H-WSe₂, 2H-MoTe₂     | hexagonal (2H TMD)         |
 | `mos2`, `ws2`             | 2H-MoS₂, 2H-WS₂                  | hexagonal (2H TMD)         |
-| `ptse2`, `hfse2`, `zrse2` | PtSe₂, HfSe₂, ZrSe₂             | hexagonal (1T TMD)         |
+| `ptse2`, `hfs2`, `hfse2`, `zrse2` | PtSe₂, HfS₂, HfSe₂, ZrSe₂ | hexagonal (1T TMD)         |
 
 > **Note:** graphite is keyed `hopg` — there is no `graphite` key. HOPG is
 > fiber-textured, so **only (00l) reflections are coherent** (random in-plane
