@@ -43,20 +43,27 @@ Those grids simulated the mirror configuration — reciprocal vector tilted
 **away** from the detector — at reduced intensity. The rotation math in
 `tilted_geometry` did not change; only the angles fed into it did.
 
-## Line energy is invariant to the polar sign; intensity is not
+## Default zero-scattering scalars are invariant to the polar sign
 
-For `φ = 0`, the lab-frame quantity `1 − v0·n̂` (the line-energy denominator,
-`ω = v·g / (1 − v·n̂)`) is **even in θ** — flipping `θ → −θ` leaves the line
-energy unchanged. `v0·g`, and therefore the **intensity**, is not even: it
-picks up a `cos(tilt)`-type dependence that differs between toward- and
-away-facing configurations.
+For the default beam-aligned, `g ∥ normal`, `φ = 0` geometry, both scalar
+products in the production dispersion relation
+`ω = v·g / (1 − v·n̂)` are **even in θ**. The denominator is invariant under
+`θ → −θ`, while `v0·g = β|g| cos(θ)` has the same value at equal and opposite
+tilts. Flipping the polar sign therefore leaves the zero-scattering line
+energy unchanged, and default `v0·g` cannot explain an intensity asymmetry.
+
+The full simulated intensity can nevertheless differ between opposite tilts
+through downstream direction-sensitive transport, escape geometry,
+polarization/amplitude effects, or a reciprocal vector that is not aligned
+with the sample normal.
 
 Empirical check (WSe₂, 55 nm, `θ_obs = 119°`, identical transport seed,
 `+10°` vs `−10°`):
 
 - **Line energy: unchanged** — 981.5 eV both ways.
 - **Peak intensity: differs 2×** (ratio 0.505 at `+10°`/`−10°`); integrated
-  flux differs ~40%.
+  flux differs ~40%. This is a full-model observation, not a consequence of
+  the default zero-scattering `v0·g` scalar.
 
 Practical consequence: line-energy validations computed under the old
 (negative-tilt) grids remain valid — the line positions did not move.

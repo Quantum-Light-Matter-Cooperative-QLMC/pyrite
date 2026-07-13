@@ -34,19 +34,28 @@ def tilted_geometry(theta_obs_rad, tilt_polar_rad, tilt_azim_rad=0.0):
 
     Convention (matches Zhai SI): POSITIVE tp tilts the slab normal -- and
     therefore the reciprocal vector g (g || n by default) -- TOWARD the
-    detector. Verified: at ta = 0, +tp and -tp give the SAME line energy
-    (the 1 - v0.n_hat denominator is even in tp) but +tp gives ~2x the peak
-    coherent-emission intensity of -tp (theta_obs = 119 deg) -- +tp is the
-    physically-correct, higher-flux orientation Zhai reports. POSITIVE ta is
-    a CCW roll about the beam +z axis, reported over [0 deg, 180 deg]; ta = 0
-    places the tilt in the scattering x-z plane, i.e. the normal has zero
-    y-component.
+    detector. POSITIVE ta is a CCW roll about the beam +z axis, reported over
+    [0 deg, 180 deg]; ta = 0 places the tilt in the scattering x-z plane, i.e.
+    the normal has zero y-component.
+
+    The starting production dispersion relation is
+    ``omega = v0.g / (1 - v0.n_hat)`` (Zhai SI Eq. 10). For the beam-aligned,
+    ``g || normal``, ``ta = 0`` default, both ``v0.n_hat`` and
+    ``v0.g = beta |g| cos(tp)`` are even under ``tp -> -tp``. Thus neither
+    zero-scattering scalar causes the observed full-model opposite-tilt
+    intensity asymmetry; that can arise from direction-sensitive transport,
+    escape, polarization/amplitude, or non-aligned reciprocal-vector effects.
+    The reciprocal-harmonic sign mapping in the production numerator remains
+    unresolved; this statement does not adjudicate it.
 
     Returns (beam_dir, n_hat) to pass to simulate_trajectories(beam_dir=...)
     and mc_spectrum(n_hat=...). For ta = 0 the detector's sample-frame polar
     angle is simply theta_obs - tilt_polar; the lab-frame quantity
     1 - v0.n_hat (hence the zero-scattering line energy denominator) is
-    tilt-invariant, while v0.g picks up cos(tilt).
+    tilt-invariant. In the limiting case ``tilt_polar_rad = 0``, the untilted
+    beam and detector directions are recovered.
+
+    Validation: line-energy-dispersion
     """
     st, ct = np.sin(tilt_polar_rad), np.cos(tilt_polar_rad)
     normal_lab = np.array([st * np.cos(tilt_azim_rad), st * np.sin(tilt_azim_rad), ct])
