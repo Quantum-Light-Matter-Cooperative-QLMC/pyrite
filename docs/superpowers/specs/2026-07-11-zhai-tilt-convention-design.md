@@ -48,13 +48,17 @@ transport seed, `+10°` vs `−10°`):
 
 - **Line energy: unchanged** (peak at 981.5 eV both ways — the line-energy
   denominator `1 − v0·n̂` is even in θ at φ=0).
-- **Intensity: differs 2×** (peak ratio 0.505; integrated flux ~40%).
+- **Intensity: differs 2× at peak**: the ratio orientation is
+  `I(+10°)/I(−10°) ≈ 0.505`; integrated flux has
+  `F(+10°)/F(−10°) ≈ 0.65`.
 
 So cxr's existing negative-tilt outputs simulated the **mirror** (reciprocal away
-from detector) at ~half the peak intensity. Adopting Zhai's convention changes
-simulated **intensities** (not line energies), so intensity/enhancement
-validations must be redone; line-energy validations are unaffected. This resolves
-the open azimuth question in `docs/validation/zhai-supplementary.md`.
+from detector), which had roughly twice the positive-tilt peak in this WSe₂
+spot check. Adopting Zhai's convention changes simulated **intensities** (not
+line energies), but does not imply a universal increase or decrease with tilt
+sign. Intensity/enhancement validations must therefore be redone; line-energy
+validations are unaffected. This resolves the open azimuth question in
+`docs/validation/zhai-supplementary.md`.
 
 ## Scope: canonical, repo-wide
 

@@ -40,8 +40,11 @@ convention; what changed (2026-07-11) is that the per-material scan grids
 `checks/anchor_figures.py`) previously populated only the **negative** half
 of the polar range (`−85…0`, etc.) and a negative azimuth span (`−80…0`).
 Those grids simulated the mirror configuration — reciprocal vector tilted
-**away** from the detector — at reduced intensity. The rotation math in
-`tilted_geometry` did not change; only the angles fed into it did.
+**away** from the detector — at a different intensity. In the reproduced
+WSe₂ spot check below, the old negative mirror has the higher peak. This is
+not a universal claim that either tilt sign always increases or decreases the
+full-model intensity. The rotation math in `tilted_geometry` did not change;
+only the angles fed into it did.
 
 ## Default zero-scattering scalars are invariant to the polar sign
 
@@ -61,9 +64,13 @@ Empirical check (WSe₂, 55 nm, `θ_obs = 119°`, identical transport seed,
 `+10°` vs `−10°`):
 
 - **Line energy: unchanged** — 981.5 eV both ways.
-- **Peak intensity: differs 2×** (ratio 0.505 at `+10°`/`−10°`); integrated
-  flux differs ~40%. This is a full-model observation, not a consequence of
-  the default zero-scattering `v0·g` scalar.
+- **Peak intensity: differs 2×** —
+  `I(+10°)/I(−10°) ≈ 0.505`, so the positive-tilt peak is roughly half the
+  negative-tilt peak in this spot check.
+- **Integrated-flux ratio:** `F(+10°)/F(−10°) ≈ 0.65`.
+
+These are full-model observations for this configuration, not consequences of
+the default zero-scattering `v0·g` scalar or a universal monotonic tilt rule.
 
 Practical consequence: line-energy validations computed under the old
 (negative-tilt) grids remain valid — the line positions did not move.
