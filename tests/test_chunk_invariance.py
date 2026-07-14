@@ -61,6 +61,24 @@ def _assert_chunk_invariant(one_shot, chunked):
     np.testing.assert_allclose(chunked, one_shot, rtol=RTOL, atol=RTOL * 1e-2 * peak)
 
 
+@pytest.fixture(scope="module")
+def finite_side_segments():
+    """Finite-footprint segments whose far-field photons leave through +x."""
+    return {
+        "r_mid": np.array([[4.0, 0.0, 5.0], [3.0, 0.0, 5.0], [2.0, 0.0, 5.0]]),
+        "v_hat": np.tile([0.0, 0.0, 1.0], (3, 1)),
+        "L_ang": np.full(3, 10.0),
+        "E_keV": np.full(3, 30.0),
+        "t_ang": np.zeros(3),
+        "elec_id": np.arange(3),
+        "layer": np.zeros(3, dtype=int),
+        "Ne": 3,
+        "thickness_ang": 10.0,
+        "crystal_width_ang": 10.0,
+        "crystal_height_ang": 10.0,
+    }
+
+
 def test_line_spectrum_chunk_invariant(segments):
     kw = dict(crystal="hopg", hkl_list=HKL, theta_obs_rad=THETA, B_ang2=B_002)
     one_shot = mc_spectrum(segments, E_LINE, chunk=BIG_CHUNK, **kw)
@@ -72,6 +90,25 @@ def test_brem_spectrum_chunk_invariant(segments):
     kw = dict(element="C", n_atoms_per_ang3=_n_atoms, theta_obs_rad=THETA)
     one_shot = mc_brem_spectrum(segments, E_BREM, chunk=BIG_CHUNK, **kw)
     chunked = mc_brem_spectrum(segments, E_BREM, chunk=TINY_CHUNK, **kw)
+    _assert_chunk_invariant(one_shot, chunked)
+
+
+def test_finite_line_spectrum_chunk_invariant(finite_side_segments):
+    kw = dict(
+        crystal="hopg",
+        hkl_list=((0, 0, 2),),
+        B_ang2=B_002,
+        n_hat=np.array([1.0, 0.0, 0.01]),
+    )
+    one_shot = mc_spectrum(finite_side_segments, E_LINE, chunk=BIG_CHUNK, **kw)
+    chunked = mc_spectrum(finite_side_segments, E_LINE, chunk=1, **kw)
+    _assert_chunk_invariant(one_shot, chunked)
+
+
+def test_finite_brem_spectrum_chunk_invariant(finite_side_segments):
+    kw = dict(composition=[("C", 0.176)], n_hat=np.array([1.0, 0.0, 0.01]))
+    one_shot = mc_brem_spectrum(finite_side_segments, E_BREM, chunk=BIG_CHUNK, **kw)
+    chunked = mc_brem_spectrum(finite_side_segments, E_BREM, chunk=1, **kw)
     _assert_chunk_invariant(one_shot, chunked)
 
 

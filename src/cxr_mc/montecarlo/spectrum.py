@@ -10,7 +10,13 @@ available.
 
 import numpy as np
 
-from ..materials.attenuation import _layer_dz, _mu_total_inv_ang, _normalize_composition, _stack_tau
+from ..materials.attenuation import (
+    _layer_dz,
+    _layer_path_length,
+    _mu_total_inv_ang,
+    _normalize_composition,
+    _stack_tau,
+)
 from ..materials.crystal import (
     ALPHA_FS,
     CRYSTALS,
@@ -21,7 +27,7 @@ from ..materials.crystal import (
     reciprocal_g_vector,
 )
 from ._backend import REAL, _to_cpu, xp
-from .geometry import _mosaic_quadrature, _orientation_R
+from .geometry import _mosaic_quadrature, _orientation_R, first_prism_exit
 from .transport import TRANSPORT_ELEMENTS, beta_from_keV
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
@@ -62,6 +68,30 @@ def _observation_direction(theta_obs_rad, n_hat):
 
 def _escape_length(z_mid, thickness, n_z):
     return z_mid / -n_z if n_z < 0 else (thickness - z_mid) / n_z
+
+
+def _segment_escape_distance(segments, n_hat, *, xp):
+    """Photon distance from segment midpoints to their first crystal face.
+
+    Omitting both transverse dimensions recovers the original z-only slab
+    escape path.  A finite rectangular footprint instead chooses the nearest
+    of all six prism faces along the fixed far-field observation direction.
+    """
+    r = xp.asarray(segments["r_mid"], dtype=REAL)
+    width = segments.get("crystal_width_ang")
+    height = segments.get("crystal_height_ang")
+    if width is None or height is None:
+        return _escape_length(r[:, 2], segments["thickness_ang"], n_hat[2])
+    distance, _ = first_prism_exit(
+        r,
+        xp.asarray(n_hat, dtype=REAL),
+        z_min_ang=0.0,
+        z_max_ang=segments["thickness_ang"],
+        width_ang=width,
+        height_ang=height,
+        xp=xp,
+    )
+    return distance
 
 
 def mc_spectrum(
@@ -120,6 +150,13 @@ def mc_spectrum(
     escape attenuation is the piecewise mu_i*dz_i sum across the whole stack
     rather than the single slab; the RADIATION still comes from crystal/hkl_list
     (the film). None -> single slab (bit-for-bit unchanged).
+
+    Finite transverse dimensions stored on ``segments`` attenuate each photon to
+    the first of the rectangular prism's six faces along the fixed far-field
+    ``n_hat``. When both dimensions are omitted, the original z-only slab
+    attenuation branch is retained unchanged.
+
+    Validation: finite-transverse-crystal
 
     beam_uvw: CRYSTAL AXIS along the slab normal (+z). Default None keeps the
     construction-frame convention, i.e. [001] (the c-axis for hexagonal
@@ -292,14 +329,25 @@ def mc_spectrum(
         # geometric path is mosaic-independent; the optical depth uses E_r (the
         # orientation-shifted line energy), so it is recomputed per orientation.
         z_mid = seg_r[idx, 2]
-        if layers is None:
-            if n_hat[2] < 0:
-                L_esc = z_mid / (-n_hat[2])  # out the entrance face
+        finite_footprint = (
+            segments.get("crystal_width_ang") is not None
+            and segments.get("crystal_height_ang") is not None
+        )
+        if finite_footprint:
+            L_esc = _segment_escape_distance(segments, n_hat, xp=xp)[idx]
+            if layers is None:
+                tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)
             else:
-                L_esc = (thickness - z_mid) / n_hat[2]  # out the back face
-            tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)
+                tau = _stack_tau(layers, z_mid, n_hat[2], E_r, exit_distance_ang=L_esc)
         else:
-            tau = _stack_tau(layers, z_mid, n_hat[2], E_r)
+            if layers is None:
+                if n_hat[2] < 0:
+                    L_esc = z_mid / (-n_hat[2])  # out the entrance face
+                else:
+                    L_esc = (thickness - z_mid) / n_hat[2]  # out the back face
+                tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)
+            else:
+                tau = _stack_tau(layers, z_mid, n_hat[2], E_r)
         T_abs = xp.exp(-tau)
 
         # -- 7. accumulate the finite-segment lineshape ---------------------------
@@ -506,6 +554,13 @@ def mc_brem_spectrum(
     composition: [(element, n_per_Ang3), ...] for compounds; the emission is
     additive over elements (each weighted by its own Z^2 cross section), and
     the self-absorption uses the summed attenuation.
+
+    Finite transverse dimensions stored on ``segments`` attenuate each photon
+    to the first of the rectangular prism's six faces along the fixed far-field
+    observation direction. With both dimensions omitted, the original z-only
+    slab escape branches are retained unchanged.
+
+    Validation: finite-transverse-crystal
     """
     comp = _normalize_composition(element, n_atoms_per_ang3, composition)
     thickness = segments["thickness_ang"]
@@ -534,6 +589,12 @@ def mc_brem_spectrum(
     seg_E = xp.asarray(segments["E_keV"], dtype=REAL)
     z_mid = seg_r[:, 2]
     L_esc = _escape_length(z_mid, thickness, n_hat[2])
+    finite_footprint = (
+        segments.get("crystal_width_ang") is not None
+        and segments.get("crystal_height_ang") is not None
+    )
+    if finite_footprint:
+        L_esc = _segment_escape_distance(segments, n_hat, xp=xp)
 
     spec = xp.zeros(E_grid.size, dtype=REAL)
     M = seg_E.size
@@ -541,6 +602,14 @@ def mc_brem_spectrum(
         sl = slice(j0, min(j0 + chunk, M))
         if layers is None:
             T_abs = xp.exp(-L_esc[sl][:, None] * mu[None, :])
+        elif finite_footprint:
+            tau = 0.0
+            for (z_top, z_bot, _), mu_i in zip(layers, layer_mu, strict=False):
+                path = _layer_path_length(
+                    z_mid[sl], n_hat[2], L_esc[sl], float(z_top), float(z_bot)
+                )
+                tau = tau + path[:, None] * mu_i[None, :]
+            T_abs = xp.exp(-tau)
         else:
             tau = 0.0
             for (z_top, z_bot, _), mu_i in zip(layers, layer_mu, strict=False):
