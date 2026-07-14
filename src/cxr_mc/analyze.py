@@ -30,9 +30,11 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 from ._acp import running_acp
 from .config import MATERIALS
+from .materials import MATERIAL_LABELS
 
 NOTEBOOK = "notebooks/analysis_app.py"
 TUNNEL_PORT = 2718
@@ -41,6 +43,39 @@ TUNNEL_PORT = 2718
 # the same convention run.py uses for _DEFAULT_CHECKPOINT_DIR, so the persisted
 # default is found regardless of the caller's cwd.
 _DEFAULT_FILE = Path(__file__).resolve().parents[2] / ".cxr-analyze-default"
+
+
+class MaterialMenuRow(TypedDict):
+    """One configured material and whether its analysis checkpoint exists."""
+
+    value: str
+    label: str
+    disabled: bool
+
+
+def material_menu(
+    checkpoint_dir: Path | str,
+    materials: tuple[str, ...] = MATERIALS,
+    labels: dict[str, str] = MATERIAL_LABELS,
+) -> tuple[MaterialMenuRow, ...]:
+    """Return configured analysis materials, disabling ones without a checkpoint.
+
+    Only direct ``<material>.pkl`` children of ``checkpoint_dir`` count. This
+    deliberately excludes archived/reproduction caches and unknown pickle stems.
+    """
+    available = {path.stem for path in Path(checkpoint_dir).glob("*.pkl") if path.stem in materials}
+    return tuple(
+        {"value": material, "label": labels.get(material, material), "disabled": material not in available}
+        for material in materials
+    )
+
+
+def select_initial_material(
+    requested: str | None, menu: tuple[MaterialMenuRow, ...]
+) -> str | None:
+    """Keep an available requested material, otherwise use the first available one."""
+    selectable = [row["value"] for row in menu if not row["disabled"]]
+    return requested if requested in selectable else next(iter(selectable), None)
 
 
 def get_default_material():

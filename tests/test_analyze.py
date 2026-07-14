@@ -35,6 +35,39 @@ def test_hopg_fallback_when_neither_given():
     assert analyze.initial_material({}, None) == "hopg"
 
 
+def test_material_menu_marks_only_configured_checkpoint_stems_available(tmp_path):
+    checkpoints = tmp_path / "checkpoints"
+    checkpoints.mkdir()
+    for stem in ("silicon", "quick_only_quick", "unknown"):
+        (checkpoints / f"{stem}.pkl").touch()
+
+    menu = analyze.material_menu(
+        checkpoints,
+        materials=("hopg", "silicon", "quick_only"),
+        labels={"hopg": "HOPG", "silicon": "Silicon", "quick_only": "Quick"},
+    )
+
+    assert menu == (
+        {"value": "hopg", "label": "HOPG", "disabled": True},
+        {"value": "silicon", "label": "Silicon", "disabled": False},
+        {"value": "quick_only", "label": "Quick", "disabled": True},
+    )
+
+
+def test_select_initial_material_falls_back_to_first_available():
+    menu = (
+        {"value": "hopg", "label": "HOPG", "disabled": True},
+        {"value": "silicon", "label": "Silicon", "disabled": False},
+    )
+
+    assert analyze.select_initial_material("hopg", menu) == "silicon"
+    assert analyze.select_initial_material("silicon", menu) == "silicon"
+    assert analyze.select_initial_material(None, menu) == "silicon"
+    assert analyze.select_initial_material(
+        None, ({"value": "hopg", "label": "HOPG", "disabled": True},)
+    ) is None
+
+
 def test_env_var_fallback_used_between_cli_and_persisted(monkeypatch):
     monkeypatch.setenv("CXR_ANALYZE_INITIAL", "diamond")
     assert analyze.initial_material({}, "hopg") == "diamond"  # env beats persisted
