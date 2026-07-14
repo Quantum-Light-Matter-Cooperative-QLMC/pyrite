@@ -25,6 +25,7 @@ FROZEN_EXPORTS = frozenset(
         "_normalize_composition",
         "_mu_total_inv_ang",
         "_layer_dz",
+        "_layer_path_length",
         "_stack_tau",
         # transport
         "TRANSPORT_ELEMENTS",

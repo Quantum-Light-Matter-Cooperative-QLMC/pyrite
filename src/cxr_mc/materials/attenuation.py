@@ -60,7 +60,27 @@ def _layer_dz(z_mid, n_z, z_top, z_bot):
     return np.maximum(z_bot - np.maximum(z_mid, z_top), 0.0)  # spans [z_mid, z_total]
 
 
-def _stack_tau(layers, z_mid, n_z, E):
+def _layer_path_length(z_mid, n_z, exit_distance_ang, z_top, z_bot):
+    """Length within ``[z_top, z_bot]`` of a ray capped at ``exit_distance_ang``.
+
+    For nonzero ``n_z``, intersect the forward ray interval
+    ``[0, exit_distance_ang]`` with this layer's two z-face parameters.  A
+    lateral ray remains entirely in its containing half-open z layer, avoiding
+    double counting at shared layer boundaries.  NumPy ufunc dispatch preserves
+    the NumPy/CuPy backend of array arguments.
+    """
+    if n_z == 0.0:
+        in_layer = (z_mid >= z_top) & (z_mid < z_bot)
+        return np.where(in_layer, exit_distance_ang, 0.0)
+
+    t_top = (z_top - z_mid) / n_z
+    t_bot = (z_bot - z_mid) / n_z
+    path_start = np.maximum(np.minimum(t_top, t_bot), 0.0)
+    path_end = np.minimum(np.maximum(t_top, t_bot), exit_distance_ang)
+    return np.maximum(path_end - path_start, 0.0)
+
+
+def _stack_tau(layers, z_mid, n_z, E, *, exit_distance_ang=None):
     """Beer-Lambert optical depth for a photon leaving each segment midpoint
     (depth z_mid) along n_hat through a LAYERED absorber stack:
         tau = (1/|n_z|) * sum_i mu_i(E) * dz_i
@@ -68,7 +88,15 @@ def _stack_tau(layers, z_mid, n_z, E):
     the deepest z_bot being the total stack thickness. z_mid and E are per-segment
     arrays (E the resonance energy); the result matches their device. A single
     layer over [0, total_thickness] reproduces the single-slab escape exactly,
-    so passing layers=None elsewhere stays bit-for-bit identical."""
+    so passing layers=None elsewhere stays bit-for-bit identical.  Supplying an
+    exit distance caps paths at the selected prism face."""
+    if exit_distance_ang is not None:
+        tau = 0.0
+        for z_top, z_bot, comp in layers:
+            path = _layer_path_length(z_mid, n_z, exit_distance_ang, float(z_top), float(z_bot))
+            tau = tau + _mu_total_inv_ang(comp, E) * path
+        return tau
+
     inv = 1.0 / max(abs(float(n_z)), 1e-12)
     tau = 0.0
     for z_top, z_bot, comp in layers:

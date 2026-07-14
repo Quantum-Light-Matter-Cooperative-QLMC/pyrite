@@ -51,6 +51,7 @@ backward compatibility. The submodules are:
 
 from ..materials.attenuation import (
     _layer_dz,
+    _layer_path_length,
     _mu_total_inv_ang,
     _normalize_composition,
     _stack_tau,
@@ -129,6 +130,7 @@ __all__ = [
     "_normalize_composition",
     "_mu_total_inv_ang",
     "_layer_dz",
+    "_layer_path_length",
     "_stack_tau",
     # transport
     "TRANSPORT_ELEMENTS",

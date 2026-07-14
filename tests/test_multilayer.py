@@ -12,6 +12,7 @@ import pytest
 
 from cxr_mc.montecarlo import (
     _layer_dz,
+    _layer_path_length,
     _mu_total_inv_ang,
     _stack_tau,
     simulate_trajectories,
@@ -41,6 +42,19 @@ def test_layer_dz_front_exit():
     assert np.allclose(_layer_dz(z, -1.0, 0.0, 500.0), [100.0, 500.0, 500.0])  # film
     # the substrate is crossed only by a segment that sits INSIDE it (z=900)
     assert np.allclose(_layer_dz(z, -1.0, 500.0, 1000.0), [0.0, 0.0, 400.0])
+
+
+def test_layer_path_length_keeps_lateral_ray_in_current_layer():
+    path = _layer_path_length(np.array([250.0, 750.0]), 0.0, np.array([7.0, 7.0]), 0.0, 500.0)
+    np.testing.assert_allclose(path, [7.0, 0.0])
+
+
+def test_stack_tau_with_side_exit_stops_before_substrate():
+    film, sub = [("C", 0.176)], [("W", 0.0632)]
+    layers = [(0.0, 500.0, film), (500.0, 1000.0, sub)]
+    z, energy = np.array([250.0]), np.array([1500.0])
+    tau = _stack_tau(layers, z, 0.0, energy, exit_distance_ang=np.array([10.0]))
+    np.testing.assert_allclose(tau, 10.0 * _mu_total_inv_ang(film, energy))
 
 
 def test_substrate_transparent_to_film_segments_on_front_exit():
