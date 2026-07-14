@@ -18,7 +18,7 @@ from .selection import records
 # Modes for ranking a record by its line_metrics, shared by every "pick the best
 # case" path (the heatmap cell reduction, plot_metric_vs, the top-N browser), so
 # they all agree on what "best" means.
-SELECTION_MODES = ("peak", "line_flux", "coherent_flux", "quality_peak", "quality_line")
+SELECTION_MODES = ("peak", "line_flux", "coherent_flux", "line_brem_ratio", "quality_peak", "quality_line")
 
 
 def selection_score(m, mode="quality_peak"):
@@ -28,6 +28,7 @@ def selection_score(m, mode="quality_peak"):
                         favours the tallest spike, spurious lines included).
       "line_flux"     : integrated flux under the dominant found line.
       "coherent_flux" : integrated flux of ALL coherent lines (no peak finding).
+      "line_brem_ratio": dominant-line flux relative to brem in its local peak window.
       "quality_peak"  : peak_flux * line_quality (DEFAULT) -- favours geometries
                         that are both bright AND have a well-defined line, so a
                         tall-but-messy spike loses to a clean line.
@@ -35,13 +36,16 @@ def selection_score(m, mode="quality_peak"):
 
     ``m`` is the dict from line_metrics. Non-finite scores sort to the bottom."""
     q = m.get("line_quality", 1.0)
-    val = {
-        "peak": m["peak_flux"],
-        "line_flux": m["line_flux"],
-        "coherent_flux": m["coherent_flux"],
-        "quality_peak": m["peak_flux"] * q,
-        "quality_line": m["line_flux"] * q,
-    }.get(mode)
+    if mode == "line_brem_ratio":
+        val = m["line_brem_ratio"]
+    else:
+        val = {
+            "peak": m["peak_flux"],
+            "line_flux": m["line_flux"],
+            "coherent_flux": m["coherent_flux"],
+            "quality_peak": m["peak_flux"] * q,
+            "quality_line": m["line_flux"] * q,
+        }.get(mode)
     if val is None:
         raise ValueError(f"unknown select mode {mode!r}; have {list(SELECTION_MODES)}")
     return val if np.isfinite(val) else -np.inf
