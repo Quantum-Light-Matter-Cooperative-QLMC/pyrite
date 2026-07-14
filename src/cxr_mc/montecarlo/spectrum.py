@@ -588,13 +588,14 @@ def mc_brem_spectrum(
     seg_L = xp.asarray(segments["L_ang"], dtype=REAL)
     seg_E = xp.asarray(segments["E_keV"], dtype=REAL)
     z_mid = seg_r[:, 2]
-    L_esc = _escape_length(z_mid, thickness, n_hat[2])
     finite_footprint = (
         segments.get("crystal_width_ang") is not None
         and segments.get("crystal_height_ang") is not None
     )
     if finite_footprint:
         L_esc = _segment_escape_distance(segments, n_hat, xp=xp)
+    else:
+        L_esc = _escape_length(z_mid, thickness, n_hat[2])
 
     spec = xp.zeros(E_grid.size, dtype=REAL)
     M = seg_E.size

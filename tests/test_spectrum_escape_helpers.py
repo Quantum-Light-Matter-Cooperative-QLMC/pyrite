@@ -1,6 +1,7 @@
 """Unit coverage for the shared observation-direction and escape-path helpers."""
 
 import numpy as np
+import pytest
 
 from cxr_mc.montecarlo.spectrum import (
     _escape_length,
@@ -78,6 +79,19 @@ def test_finite_side_exit_shortens_coherent_and_brem_self_absorption():
     short_brem = mc_brem_spectrum(short, np.arange(700.0, 5000.0, 50.0), **brem_kw)
     wide_brem = mc_brem_spectrum(wide, np.arange(700.0, 5000.0, 50.0), **brem_kw)
     assert np.sum(short_brem) > np.sum(wide_brem)
+
+
+@pytest.mark.filterwarnings("error")
+def test_finite_brem_pure_lateral_escape_has_no_divide_by_zero_warning():
+    spectrum = mc_brem_spectrum(
+        _finite_segment(10.0),
+        np.arange(700.0, 5000.0, 50.0),
+        composition=[("C", 0.176)],
+        n_hat=np.array([1.0, 0.0, 0.0]),
+    )
+
+    assert np.all(np.isfinite(spectrum))
+    assert np.sum(spectrum) > 0.0
 
 
 def test_finite_side_exit_layered_absorption_stays_in_emission_layer():
