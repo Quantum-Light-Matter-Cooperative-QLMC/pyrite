@@ -103,8 +103,9 @@ stack = [
   layer (cross-stack `T_abs`), sum; `mc_brem_spectrum` summed per layer likewise.
 - `results.store_result` / `plots` → label by stack name; the per-record metrics are
   unchanged (they consume `spec`/`brem`, which stay one array per case).
-- **Checkpoints**: the case dict gains `layers`; old single-material checkpoints still load
-  (absence of `layers` ⇒ one-layer stack). No format break.
+- **Checkpoints**: stacked case dictionaries gain `abs_layers` and aligned
+  `layer_radiators`; old single-material checkpoints still load when those fields
+  are absent. No format break.
 
 ---
 
@@ -245,9 +246,11 @@ remains.
   R_KO and the maximum penetration `z_max ≈ R_KO`, following K-O's `E^1.67` energy scaling
   (carbon, 20→30 keV) and its `A/(Z^0.889 ρ)` material scaling (C vs Al), each to ~2 %.
   `checks/multilayer_validation_check.py` (B).
-- **Geometry sign — DONE:** negative tilt (entrance face toward the detector) gives the
-  high-flux branch and leaves the film lines unattenuated by the substrate; positive tilt
-  (back exit) attenuates them — and more as the exit path lengthens.
+- **Geometry sign — DONE:** positive tilt points the entrance-face normal toward
+  the detector (front exit) and leaves film lines unattenuated by the substrate;
+  negative tilt is the back-exit geometry and attenuates them more as the exit
+  path lengthens. This geometric sign statement does not claim a universally
+  higher full-model intensity for either branch.
   `checks/multilayer_check.py`.
 - **Measured-data — REMAINING:** quantitative comparison of the predicted broadened /
   substrate-attenuated line ratios against a real film-on-substrate spectrum (EDS / Timepix /

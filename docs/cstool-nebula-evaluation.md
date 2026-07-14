@@ -105,8 +105,8 @@ FWHM ≈ 4ξ. Mapping an energy spread to a PXR line shift via `ω ∝ β` (so
 | 0.3 µm | 0.38 keV | ~154 eV | ~7 eV |
 | 1.0 µm | 1.28 keV | ~512 eV | ~23 eV |
 
-The high-flux radiation is born shallow (negative tilt, entrance face toward the
-detector — README "Tilt sign"), so the relevant rows are the top two:
+The coherent radiation relevant to this estimate is born shallow, so the
+relevant rows are the top two:
 **straggling adds ≲10 eV to the line, well under the ~130 eV detector resolution
 and the mosaic broadening.** This is an order-of-magnitude bound (single element,
 Landau approximation, `ω ∝ β`), **not** a validated number — but it is ~20×

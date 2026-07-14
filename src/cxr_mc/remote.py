@@ -49,7 +49,7 @@ when the job finishes; to DISCONNECT, just Ctrl-C (or close the terminal / drop
 the link) -- that tears down the viewer only, and the job runs to completion.
 Reconnect any time with `attach`/`status`/`logs`, then `pull` once state is `done`.
 
-Then locally: open analysis.ipynb (same MATERIAL) or run scripts/export_pdf.py.
+Then locally: run ``cxr analyze <material>`` or ``scripts/export_pdf.py``.
 
 Transport is ssh/scp only (uses the 'qlmc' host in ~/.ssh/config, cloudflared
 ProxyCommand and all) -- no rsync dependency, so it works from Windows Git Bash.
@@ -828,8 +828,8 @@ def _cli_scan(args):
             no_sync=True,
         )
         print(
-            f"\ndone. checkpoints/{stem}.pkl is local; open notebooks/analysis.ipynb "
-            f"with MATERIAL='{stem}' (or run scripts/export_pdf.py) -- all viz/PDF "
+            f"\ndone. checkpoints/{stem}.pkl is local; run `cxr analyze {stem}` "
+            f"(or run scripts/export_pdf.py) -- all viz/PDF "
             "stays local."
         )
 

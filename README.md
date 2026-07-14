@@ -38,7 +38,7 @@ emission channels result, plus an incoherent background:
         ▼
   ┌──────────────────────┐   CASINO-style single-scattering Monte Carlo:
   │ electron transport   │   Joy–Luo slowing-down + Mott/screened-Rutherford
-  │ (montecarlo.py)      │   elastic scattering → straight radiating segments
+  │ (montecarlo/)        │   elastic scattering → straight radiating segments
   └──────────┬───────────┘
              │ segments (position, direction, energy, length)
         ┌────┴───────────────────────────┐
@@ -71,10 +71,10 @@ delta-function of the closed-form theory.
 ## Repository layout
 
 ```
-notebooks/scan.ipynb      RUNNER:  pick MATERIAL → Sweep → run_sweep → checkpoints/<material>.pkl
-notebooks/analysis.ipynb  VIZ:     load that checkpoint → all figures (no sweeps here)
+notebooks/scan_app.py     RUNNER:  pick material → Sweep → run_sweep → checkpoints/<material>.pkl
+notebooks/analysis_app.py VIZ:     load that checkpoint → all figures (no sweeps here)
 scan.py            root shim → cxr_mc.scan (guarded; python scan.py, or cxr scan)
-scripts/export_pdf.py  shim → cxr_mc.export (notebooks/analysis.ipynb → PDF, or cxr export)
+scripts/export_pdf.py  shim → cxr_mc.export (checkpoint → PDF, or cxr export)
 src/cxr_mc/     importable package: physics modules + the cxr CLI entry point
 src/cxr_mc/data/  materials.toml, cifs/, atomic_scattering_factors/, mott_transport_cross_sections/, *_qe.csv
 checks/            validation scripts + notebooks (Feranchuk anchor, Zhai Fig 1c, kinematic audit)
@@ -95,12 +95,12 @@ directory and the data travels with an installed wheel. `*.pkl` checkpoints and
 | Module                   | Responsibility                                                                                                                                                                                                                                                                                  |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `materials/`             | Material domain: `catalog.py` validates the immutable CIF-backed declarative catalog; `_cif.py` parses CIF structures; `crystal.py` owns reciprocal vectors, structure factors / `chi_g` (PXR) / `U_g` (CBS), Debye–Waller, absorption length, and physical constants; `atomic.py` supplies atomic responses; `attenuation.py` owns layered self-absorption. |
-| `montecarlo.py`          | The transport + radiation pipeline:`simulate_trajectories` (MC electron transport), `mc_spectrum` (coherent lines), `mc_brem_spectrum` (Born+Elwert brem), detector helpers, `tilted_geometry`, and the case drivers `run_case`/`run_cases`. **Optional CuPy GPU** with automatic CPU fallback. |
+| `montecarlo/`          | The transport + radiation pipeline: `simulate_trajectories` (MC electron transport), `mc_spectrum` (coherent lines), `mc_brem_spectrum` (Born+Elwert brem), detector helpers, `tilted_geometry`, and the case drivers `run_case`/`run_cases`. **Optional CuPy GPU** with automatic CPU fallback. |
 | `sweep.py`               | `Sweep` dataclass + `build_cases`. Every physical knob is a scalar (fixed) or a sequence (swept); cases = the Cartesian product.                                                                                                                                                                |
-| `config.py`              | Shared builders imported by both notebooks: `default_settings()`, `material_sweep(mat)`, and `trajectory_sweep(mat)`. Per-material grids come from `data/materials.toml`; detector/analysis knobs remain here.                                                        |
+| `config.py`              | Shared builders imported by both marimo apps: `default_settings()`, `material_sweep(mat)`, and `trajectory_sweep(mat)`. Per-material grids come from `data/materials.toml`; detector/analysis knobs remain here.                                                        |
 | `run.py`                 | `run_sweep(...)`: checkpointed, crash-safe, resumable driver around `run_cases`; `load_checkpoint`/`cases_from_results` for the viz side.                                                                                                                                                       |
-| `results.py`             | `Settings` dataclass, per-record metrics (`peak_flux`, `coherent_flux`, `line_flux`, `line_quality`, …), and ranking helpers (`selection_score`, `top_geometries`).                                                                                                                            |
-| `plots.py`               | All plotting:`browse`, `plot_heatmaps`, `plot_metric_vs`, `plot_best_spectra`, `plot_material_comparison`, and the electron-penetration figures.                                                                                                                                                |
+| `results/`             | `Settings` dataclass, per-record metrics (`peak_flux`, `coherent_flux`, `line_flux`, `line_quality`, …), and ranking helpers (`selection_score`, `top_geometries`).                                                                                                                            |
+| `plots/`               | Matplotlib and Altair spectrum, sweep, detector, comparison, and electron-penetration figures.                                                                                                                                                |
 | `detectors/timepix_response.py`    | Per-photon forward model of the Timepix3 (Si sensor): photoabsorption, e–h pairs, charge sharing, and the**~1.9 keV counting threshold** (the headline effect — it eats sub-2 keV line flux).                                                                                                 |
 | `detectors/eaglexo_response.py`    | Raptor Eagle XO CCD: a clean`solid_angle × QE(E)` operator (windowless direct-detection CCD).                                                                                                                                                                                                  |
 
@@ -159,14 +159,14 @@ structured so a GPU build is a base-image swap (see its header comment).
 
 ## Quickstart
 
-The workflow is **two notebooks that share the immutable material catalog** — edit a
+The workflow is **two marimo apps that share the immutable material catalog** — edit a
 material's thickness / energies / tilts / energy grids in
-`src/cxr_mc/data/materials.toml` once and both notebooks pick it up.
+`src/cxr_mc/data/materials.toml` once and both apps pick it up.
 
-1. **`notebooks/scan.ipynb`** (the runner): set `MATERIAL`, then
+1. **`notebooks/scan_app.py`** (the runner): choose a material, then
    `material_sweep(MATERIAL)` → `build_cases` → `run_sweep`, which writes
    `checkpoints/<material>.pkl` and streams the per-tilt statistics tables live.
-2. **`notebooks/analysis.ipynb`** (the viz): set the same `MATERIAL`, `load_checkpoint`,
+2. **`notebooks/analysis_app.py`** (the viz): choose the same material, `load_checkpoint`,
    `cases_from_results`, then `browse` / heatmaps / Eagle XO / Timepix /
    penetration figures. No sweeps run here.
 
@@ -326,10 +326,11 @@ soft lines.
 
 - **Frame:** incident beam along **+z**; detector at azimuth φ = 0 in the x–z
   plane at polar angle θ_obs. At θ_obs = 90° the detector is along +x.
-- **Tilt sign (critical):** `tilt_deg` is the sample-normal polar tilt.
-  **Negative tilt = entrance face toward the detector = HIGH flux** (radiation is
-  born near the entrance and escapes a short path); positive tilt points the PXR
-  lobe away and is ~10× weaker.
+- **Tilt sign (critical):** `tilt_deg` is the sample-normal polar tilt in Zhai's
+  convention. Positive tilt points the normal toward the detector (front-exit
+  geometry); current catalog grids are nonnegative. Opposite signs can have
+  different full-model intensities, but neither sign is universally the
+  high-flux branch; see `docs/tilt-convention.md`.
 - **At θ_obs = 90°, the tilt must be nonzero** — an untilted slab self-absorbs
   photons travelling along its faces (yaw alone gives identically zero).
 - **Coherence:** the measured line is `|A_PXR + A_CBS|²` — never separable.

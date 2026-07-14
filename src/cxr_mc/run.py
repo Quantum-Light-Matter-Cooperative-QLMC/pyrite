@@ -65,16 +65,16 @@ def _checkpoint_save(checkpoint_path, results):
 def load_checkpoint(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
     """Load a per-material results checkpoint (``checkpoints/<material>.pkl``)
     written by :func:`run_sweep`, WITHOUT re-running anything -- this is how the
-    visualization notebook (notebooks/analysis.ipynb) gets its ``results`` after the
-    scan-runner notebook (notebooks/scan.ipynb) has produced them. Returns the
+    visualization app (``notebooks/analysis_app.py``) gets its ``results`` after the
+    scan-runner app (``notebooks/scan_app.py``) has produced them. Returns the
     ``{name: {E0: record}}`` store (empty dict if the checkpoint is missing).
 
     Reconstruct the sweep's case list straight from it with
     ``cases = [r["case"] for r in results.records(results)]`` -- the records
-    carry their own cases, so the viz notebook needs no Sweep to filter/plot."""
+    carry their own cases, so the visualization app needs no Sweep to filter/plot."""
     path = checkpoint_path_for(material, checkpoint_dir)
     if not os.path.exists(path):
-        print(f"no checkpoint at {path} -- run notebooks/scan.ipynb for {material!r} first")
+        print(f"no checkpoint at {path} -- run `cxr scan {material}` first")
         return {}
     results = _checkpoint_io.load(path)
     n = sum(len(v) for v in results.values())

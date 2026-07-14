@@ -16,10 +16,11 @@ hundreds of keV range. The selection criteria are:
 No detector threshold is imposed. Sub-keV and soft-X-ray lines are therefore
 fully in scope.
 
-The current registry already contains diamond, silicon, LiF, sapphire, HOPG,
-h-BN, MoSe2, WSe2, MoTe2, PtSe2, HfS2, HfSe2, ZrSe2, WS2, MoS2, NbS2, and
-NbSe2. The principal omissions identified here are V2O5, TiS2, selected
-intercalated niobium dichalcogenides, MoO3, GaS, ZrS2, SnS2, and TiSe2.
+The current crystal catalog already contains diamond, silicon, LiF, sapphire,
+V2O5, HOPG, h-BN, MoSe2, WSe2, MoTe2, TiS2, PtSe2, HfS2, HfSe2, HfTe2,
+ZrSe2, WS2, MoS2, NbS2, and NbSe2. The principal omissions identified here
+are selected intercalated niobium dichalcogenides, MoO3, GaS, ZrS2, SnS2,
+and TiSe2.
 
 This is a research survey, not a validation-ledger sign-off. Numerical results
 from the literature must be reproduced in the cxr-mc geometry before they are

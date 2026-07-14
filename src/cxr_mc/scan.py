@@ -1,4 +1,4 @@
-"""Headless CXR scan runner (the library twin of scan.ipynb).
+"""Headless CXR scan runner (the library twin of ``notebooks/scan_app.py``).
 
 Runs the Monte-Carlo CXR parameter sweep for one material and writes the
 per-material checkpoint (checkpoints/<material>.pkl). Use this to run sweeps

@@ -2,11 +2,11 @@
 config.py
 =============
 
-Shared run configuration for the CXR pipeline, imported by BOTH notebooks so the
-scan-runner (``scan.ipynb``) and the visualization driver
-(``analysis.ipynb``) can never drift apart: they build the SAME
+Shared run configuration for the CXR pipeline, imported by BOTH marimo apps so the
+scan runner (``notebooks/scan_app.py``) and visualization driver
+(``notebooks/analysis_app.py``) can never drift apart: they build the SAME
 :class:`results.Settings` and the SAME per-material :class:`sweep.Sweep`,
-so the viz notebook is guaranteed to be looking at the checkpoint the runner
+so the visualization app is guaranteed to be looking at the checkpoint the runner
 wrote. Material identities and grids come from :data:`cxr_mc.materials.CATALOG`;
 detector/analysis knobs still live here.
 

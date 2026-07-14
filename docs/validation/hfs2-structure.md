@@ -95,7 +95,7 @@ to every other reflection.
 
 ## Diff against the implementation
 
-The TOML entry implements exactly the independently derived cell:
+The bundled CIF and catalog row implement exactly the independently derived cell:
 
 | quantity | independently derived / sourced | implemented | result |
 |---|---:|---:|---|

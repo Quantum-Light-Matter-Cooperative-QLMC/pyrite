@@ -190,7 +190,7 @@ modelled; deliberately still out of scope:
      *window* and is NOT usable here — only the "SO" line is windowless.
    - Not yet actionable as code; this is groundwork for a future hardware-survey
      writeup, not a `Grating`/CCD implementation choice.
-7. Optionally expose grating parameters as `Sweep` knobs and add a `plots.py`
+7. Optionally expose grating parameters as `Sweep` knobs and add a `plots/`
    panel; validate against a measured grating-spectrometer dataset when available
    (data-dependent, like P1's other gated items).
 

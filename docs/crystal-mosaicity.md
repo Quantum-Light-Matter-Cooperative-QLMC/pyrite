@@ -12,7 +12,8 @@ treatment (Darwin mosaic-block model; in PXR specifically: Nasonov; Feranchuk–
 and the 2026 *Rad. Phys. Chem.* paper "The Effect of Crystalline Mosaicity on the
 Spectral-Angular Distribution of Parametric X-ray Radiation").
 
-Two implementations are possible. **(1)** is shipped; **(2)** is designed here.
+Two implementations are shipped: **(1)** analytic detector broadening and **(2)**
+an explicit Monte-Carlo mosaic average.
 
 ---
 
