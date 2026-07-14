@@ -72,7 +72,8 @@ unknown elements.
 Tests will assert:
 
 - catalog membership, lattice values, cell volume, and basis stoichiometry;
-- nonzero finite structure factors, `chi_g`, and `U_g` for `(010)` and `(003)`;
+- nonzero finite structure factors, `chi_g`, and `U_g` for historical V2O5
+  `(010)` / standard-Pmmn `(001)`, and TiS2 `(003)`;
 - V/Ti transport availability;
 - the resolved `beam_uvw` and exact pinned reflection lists in the material
   registry/case builder.
