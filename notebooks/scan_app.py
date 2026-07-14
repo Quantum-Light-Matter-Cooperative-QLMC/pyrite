@@ -40,12 +40,12 @@ def _(mo):
 
     Runs the Monte-Carlo CXR parameter sweep for one material and writes the
     per-material checkpoint (`checkpoints/<material>.pkl`). The companion analysis
-    notebook loads that checkpoint and draws every figure — keeping the long scan
+    app loads that checkpoint and draws every figure — keeping the long scan
     and the (re-runnable) plotting in separate kernels.
 
     Pick a material below, then run top to bottom. Every material's sweep grid
-    lives in `src/cxr_mc/config.py`, shared with the analysis notebook so the two
-    never drift.
+    lives in `src/cxr_mc/data/materials.toml`, shared through the catalog so the
+    scan and analysis apps never drift.
     """)
     return
 
@@ -67,7 +67,7 @@ def _(build_cases, default_settings, geometry_table, material_sweep, material_ui
     MATERIAL = material_ui.value
 
     settings = default_settings()
-    sweep = material_sweep(MATERIAL)  # full parametric grid (src/cxr_mc/config.py)
+    sweep = material_sweep(MATERIAL)  # full parametric grid (data/materials.toml)
 
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
     print(f"{len(cases)} cases across {len({c['name'] for c in cases})} configs")
@@ -83,7 +83,7 @@ def _(cases, geometry_table):
 @app.cell
 def _(COLLAPSE_AZIMUTH, MATERIAL, cases, run_sweep, settings, stream_chunk):
     # Run (resumes from the checkpoint, skipping cached cases). The per-tilt
-    # photon-counting tables stream live; all the figures are in the analysis notebook.
+    # photon-counting tables stream live; all the figures are in the analysis app.
     results = {}
     try:
         run_sweep(
@@ -97,7 +97,7 @@ def _(COLLAPSE_AZIMUTH, MATERIAL, cases, run_sweep, settings, stream_chunk):
         print("EOF Error -- the script has already processed all data")
 
     print(f"\nDone -> checkpoints/{MATERIAL}.pkl")
-    print("Open the analysis notebook with the same MATERIAL to visualize.")
+    print("Open the analysis app with the same MATERIAL to visualize.")
     return
 
 

@@ -12,7 +12,12 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
 
-from cxr_mc.scan import main
+from cxr_mc.materials import MaterialConfigError
+
+try:
+    from cxr_mc.scan import main
+except MaterialConfigError as exc:
+    raise SystemExit(str(exc)) from None
 
 if __name__ == "__main__":
     main()

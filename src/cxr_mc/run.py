@@ -30,6 +30,7 @@ from functools import partial
 from pathlib import Path
 
 from . import _checkpoint_io
+from ._energy_grid import decode_energy_grid
 from .montecarlo import run_cases
 from .results import store_result
 
@@ -271,8 +272,8 @@ def repair_brem_wide(results, only_nonfinite=True, progress=True, save_every=0, 
     t0 = time.perf_counter()
     for k, r in enumerate(todo, 1):
         c = r["case"]
-        if "E_grid_brem" in c:  # (start, stop, step) tuple
-            E_brem = np.arange(*c["E_grid_brem"])
+        if "E_grid_brem" in c:
+            E_brem = decode_energy_grid(c["E_grid_brem"])
         elif r.get("E_grid_brem") is not None and np.asarray(r["E_grid_brem"]).size:
             E_brem = np.asarray(r["E_grid_brem"], float)
         else:  # legacy single-grid record

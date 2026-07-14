@@ -352,3 +352,31 @@ def test_repair_brem_wide_delegates_stacked_case_to_runner(monkeypatch):
     assert n == 1
     assert seen["abs_layers"] == case["abs_layers"]  # full stack reached the runner
     assert np.allclose(record["brem_wide"], 0.002)  # repaired in place
+
+
+def test_repair_brem_wide_preserves_exact_nonuniform_case_grid(monkeypatch):
+    case = _fake_case("cfg_a", 30.0)
+    case["E_grid_brem"] = np.array([10.0, 100.0, 1000.0])
+    record = dict(
+        E_grid=np.arange(*case["E_grid"]),
+        spec=np.ones(10),
+        brem=np.ones(10) * 0.01,
+        E_grid_brem=np.array([10.0, 100.0, 1000.0]),
+        brem_wide=np.full(3, np.nan),
+        eta=0.05,
+        scale=1.0,
+        case=case,
+    )
+    seen: dict[str, np.ndarray] = {}
+
+    def _spy(_case, E_brem):
+        seen["E_brem"] = np.asarray(E_brem, float)
+        return np.ones(3)
+
+    monkeypatch.setattr("cxr_mc.montecarlo._brem_for_case", _spy)
+
+    assert repair_brem_wide(
+        {"cfg_a": {30.0: record}}, only_nonfinite=True, progress=False
+    ) == 1
+    np.testing.assert_array_equal(seen["E_brem"], [10.0, 100.0, 1000.0])
+    np.testing.assert_array_equal(record["E_grid_brem"], [10.0, 100.0, 1000.0])

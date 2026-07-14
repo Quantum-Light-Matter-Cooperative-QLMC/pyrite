@@ -15,6 +15,7 @@ from typing import Any
 
 import numpy as np
 
+from .._energy_grid import decode_energy_grid
 from ._backend import _GPU, cp
 from .geometry import tilted_geometry
 from .spectrum import _segments_in_layer, mc_brem_spectrum, mc_spectrum
@@ -202,11 +203,11 @@ def run_case(case):
         required: crystal, composition, hkl_list, B_ang2, E0_keV, thickness_ang,
                 theta_obs_rad, Ne, Ne_brem, seed, and EITHER a single
                 E_grid = (start_eV, stop_eV, step_eV) OR the decoupled pair
-                E_grid_line / E_grid_brem (each a (start, stop, step) tuple):
+                E_grid_line / E_grid_brem (legacy uniform triples or exact arrays):
                 the lines are evaluated on the fine NARROW E_grid_line, the
-                smooth bremsstrahlung on the coarse WIDE E_grid_brem (extend the
-                latter to the beam energy for the full measured spectrum, without
-                paying the line cost up there -- the lines top out at a few keV).
+                smooth bremsstrahlung on the coarse WIDE E_grid_brem. Sweep-built
+                uniform brem triples extend to the beam energy; scalar/nonuniform
+                exact arrays retain their specified samples.
         optional: tilt_deg (0), tilt_azim_deg (0), beam_uvw (None),
                 azimuth_rad (0), recip_miscut_rad (None; (polar_rad, azim_rad)
                 crystal miscut of g relative to n -- None is a strict no-op,
@@ -247,10 +248,10 @@ def _transport_case(case):
     transport of upcoming cases overlaps the GPU work on the current one."""
     t0 = perf_counter() if _TIMING else 0.0
     if "E_grid_line" in case:
-        E_grid = np.arange(*case["E_grid_line"])
-        E_brem = np.arange(*case["E_grid_brem"])
+        E_grid = decode_energy_grid(case["E_grid_line"])
+        E_brem = decode_energy_grid(case["E_grid_brem"])
     else:
-        E_grid = np.arange(*case["E_grid"])
+        E_grid = decode_energy_grid(case["E_grid"])
         step_b = case.get("brem_step_eV", 10.0)
         E_brem = np.arange(E_grid[0], E_grid[-1] + step_b, step_b)
     beam, n_hat = tilted_geometry(

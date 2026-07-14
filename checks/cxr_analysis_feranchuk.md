@@ -351,7 +351,7 @@ sys.path.insert(0, "src")
 
 ```{code-cell} ipython3
 # Reflections to study. Structure data (lattice, basis -> d-spacing, elements)
-# comes from crystal_structures.toml via CRYSTALS; only the reflection choice
+# comes from the bundled CIF catalog via CRYSTALS; only the reflection choice
 # and the plot label live here.
 import numpy as np
 import time

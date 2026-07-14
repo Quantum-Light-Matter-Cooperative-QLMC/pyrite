@@ -27,6 +27,7 @@ from typing import Any
 
 import numpy as np
 
+from ._energy_grid import decode_energy_grid, encode_energy_grid
 from .materials import CATALOG, LayerSpec
 from .materials.crystal import dominant_reflections
 
@@ -282,7 +283,8 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     # line grid: fine + narrow (per-material default, E_grid_line, or the
     # deprecated e_grid_eV alias). brem grid: coarse + wide -- each case spans
     # up to that case's beam energy because brem cuts off at the particle energy.
-    # E_grid_brem overrides the start/spacing, not the per-energy upper limit.
+    # A uniform E_grid_brem keeps the legacy start/spacing behavior and extends
+    # to each beam energy. Scalar/nonuniform grids are explicit and stay exact.
     line_src = sweep.E_grid_line if sweep.E_grid_line is not None else sweep.e_grid_eV
     line_grid = cp["E_grid"] if line_src is None else np.asarray(line_src, float)
     energies = _seq(sweep.energy_keV)
@@ -330,14 +332,8 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     mosaic_analytic_rad = None if mosaic_mc else mosaic_fwhm_rad
     mosaic_mc_rad = mosaic_fwhm_rad if mosaic_mc else None
 
-    def _triple(g):
-        """(start, stop, step) so np.arange(*triple) reproduces grid g."""
-        step = float(g[1] - g[0])
-        return (float(g[0]), float(g[-1]) + step, step)
-
-    line_triple = _triple(line_grid)
-    brem_start = float(brem_grid[0])
-    brem_step = float(brem_grid[1] - brem_grid[0])
+    line_case_grid = encode_energy_grid(line_grid)
+    brem_case_grid = encode_energy_grid(brem_grid)
 
     # normalize the substrate sugar onto the general stack (mutually exclusive)
     stack = sweep.stack
@@ -385,9 +381,13 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
                     thickness_ang=float(thickness),
                     crystal_width_mm=None if width is None else float(width),
                     crystal_height_mm=None if height is None else float(height),
-                    E_grid=line_triple,  # legacy key (== line grid)
-                    E_grid_line=line_triple,
-                    E_grid_brem=(brem_start, float(E0) * 1e3 + brem_step, brem_step),
+                    E_grid=line_case_grid,  # legacy key (== line grid)
+                    E_grid_line=line_case_grid,
+                    E_grid_brem=(
+                        (brem_case_grid[0], float(E0) * 1e3 + brem_case_grid[2], brem_case_grid[2])
+                        if isinstance(brem_case_grid, tuple)
+                        else brem_case_grid
+                    ),
                     theta_obs_rad=np.deg2rad(sweep.theta_obs_deg),
                     tilt_deg=float(tilt),
                     tilt_azim_deg=float(azim),
@@ -416,12 +416,19 @@ def geometry_table(cases):
     for a quick sanity check before running."""
     import pandas as pd
 
-    def _grid(triple):
-        """'0.05-4 keV @ 3 eV' label from a (start, stop, step) grid triple."""
-        if triple is None:
+    def _grid(encoded):
+        """Compact label for a legacy uniform triple or an exact grid array."""
+        if encoded is None:
             return "-"
-        s0, s1, ds = triple
-        return f"{s0 / 1e3:g}-{(s1 - ds) / 1e3:g} keV @ {ds:g} eV"
+        values = decode_energy_grid(encoded)
+        if isinstance(encoded, tuple):
+            return (
+                f"{values[0] / 1e3:g}-{values[-1] / 1e3:g} keV"
+                f" @ {encoded[2]:g} eV"
+            )
+        if values.size == 1:
+            return f"{values[0] / 1e3:g} keV (1 value)"
+        return f"{values[0] / 1e3:g}-{values[-1] / 1e3:g} keV ({values.size} values)"
 
     rows, seen = [], set()
     for c in cases:

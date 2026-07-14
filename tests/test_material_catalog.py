@@ -221,6 +221,42 @@ stack = [{ material = "sio2", thickness_ang = 2850.0, azimuth_deg = 12.0 }]
     assert catalog.material("sample").stack[0].azimuth_deg == 12.0
 
 
+def test_catalog_scalar_and_logspace_energy_grids_reach_runner_exactly(tmp_path, monkeypatch):
+    from cxr_mc import config
+    from cxr_mc import sweep as sweep_module
+    from cxr_mc.materials import load_material_catalog
+    from cxr_mc.montecarlo import runner
+
+    text = _minimal_catalog(
+        material_rows="""
+[materials.sample]
+label = "sample"
+profile = "base"
+crystal = "mos2"
+""",
+    )
+    text = text.replace(
+        "E_grid_line = { arange = { start = 50.0, stop = 60.0, step = 2.0 } }",
+        "E_grid_line = 75.0",
+    ).replace(
+        "E_grid_brem = 0.0",
+        "E_grid_brem = { logspace = { start = 1.0, stop = 3.0, num = 3 } }",
+    )
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
+    monkeypatch.setattr(config, "CATALOG", catalog)
+    monkeypatch.setattr(sweep_module, "CATALOG", catalog)
+
+    case = sweep_module.build_cases(
+        config.material_sweep("sample"), n_electrons=1, n_electrons_brem=1
+    )[0]
+    monkeypatch.setattr(runner, "simulate_trajectories", lambda *args, **kwargs: {})
+
+    transport = runner._transport_case(case)
+
+    np.testing.assert_array_equal(transport["E_grid"], [75.0])
+    np.testing.assert_array_equal(transport["E_brem"], [10.0, 100.0, 1000.0])
+
+
 def test_pinned_hkls_add_negatives_and_require_positive_representatives(tmp_path):
     from cxr_mc.materials import MaterialConfigError, load_material_catalog
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -22,6 +23,38 @@ def import_without_crystals(name, *args, **kwargs):
 builtins.__import__ = import_without_crystals
 from cxr_mc import cli
 cli.main(["analyze"])
+"""
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "required dependency 'crystals' is not installed" in result.stderr
+    assert "uv sync" in result.stderr
+    assert result.stderr.count("required dependency 'crystals'") == 1
+    assert "materials." not in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_root_scan_shim_reports_missing_crystals_without_traceback() -> None:
+    root_scan = Path(__file__).parents[1] / "scan.py"
+    script = rf"""
+import builtins
+import runpy
+
+real_import = builtins.__import__
+
+def import_without_crystals(name, *args, **kwargs):
+    if name == "crystals":
+        raise ModuleNotFoundError("No module named 'crystals'", name="crystals")
+    return real_import(name, *args, **kwargs)
+
+builtins.__import__ = import_without_crystals
+runpy.run_path({str(root_scan)!r}, run_name="__main__")
 """
 
     result = subprocess.run(

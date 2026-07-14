@@ -15,6 +15,7 @@ from cxr_mc.materials import (
     CATALOG,
     LayerSpec,
 )
+from cxr_mc.montecarlo import runner
 from cxr_mc.sweep import (
     MATERIAL_LABELS,
     Sweep,
@@ -92,6 +93,79 @@ def test_build_cases_is_cartesian_product():
     }
 
     assert required <= set(cases[0])
+
+
+@pytest.mark.parametrize(
+    ("line_grid", "brem_grid"),
+    [
+        (np.array([75.0]), np.array([10.0, 100.0, 1000.0])),
+        (np.array([10.0, 100.0, 1000.0]), np.array([75.0])),
+    ],
+)
+def test_build_cases_and_runner_preserve_exact_nonuniform_and_scalar_energy_grids(
+    monkeypatch, line_grid, brem_grid
+):
+    case = build_cases(
+        Sweep(
+            material="mose2",
+            thickness_ang=100.0,
+            energy_keV=30.0,
+            tilt_deg=0.0,
+            E_grid_line=line_grid,
+            E_grid_brem=brem_grid,
+        ),
+        n_electrons=1,
+        n_electrons_brem=1,
+    )[0]
+
+    assert isinstance(case["E_grid_line"], np.ndarray)
+    assert isinstance(case["E_grid_brem"], np.ndarray)
+    monkeypatch.setattr(runner, "simulate_trajectories", lambda *args, **kwargs: {})
+
+    transport = runner._transport_case(case)
+
+    np.testing.assert_array_equal(transport["E_grid"], line_grid)
+    np.testing.assert_array_equal(transport["E_brem"], brem_grid)
+
+
+def test_build_cases_keeps_legacy_triples_for_uniform_energy_grids():
+    case = build_cases(
+        Sweep(
+            material="mose2",
+            thickness_ang=100.0,
+            energy_keV=30.0,
+            tilt_deg=0.0,
+            E_grid_line=np.arange(50.0, 100.0, 5.0),
+            E_grid_brem=np.arange(0.0, 1000.0, 100.0),
+        )
+    )[0]
+
+    assert case["E_grid_line"] == (50.0, 100.0, 5.0)
+    assert case["E_grid"] == (50.0, 100.0, 5.0)
+    assert case["E_grid_brem"] == (0.0, 30100.0, 100.0)
+
+
+def test_uniform_linspace_endpoint_grid_roundtrips_through_legacy_triple(monkeypatch):
+    line_grid = np.linspace(0.0, 1.0, 10, endpoint=True)
+    case = build_cases(
+        Sweep(
+            material="mose2",
+            thickness_ang=100.0,
+            energy_keV=30.0,
+            tilt_deg=0.0,
+            E_grid_line=line_grid,
+            E_grid_brem=75.0,
+        ),
+        n_electrons=1,
+        n_electrons_brem=1,
+    )[0]
+
+    assert isinstance(case["E_grid_line"], tuple)
+    monkeypatch.setattr(runner, "simulate_trajectories", lambda *args, **kwargs: {})
+
+    transport = runner._transport_case(case)
+
+    np.testing.assert_array_equal(transport["E_grid"], line_grid)
 
 
 def test_build_cases_sweeps_rectangular_footprints_and_labels_them():
