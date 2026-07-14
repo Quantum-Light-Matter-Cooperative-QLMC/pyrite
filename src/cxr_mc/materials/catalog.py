@@ -191,9 +191,10 @@ class _Errors:
 
 
 def _readonly(values: object) -> np.ndarray:
-    out = np.asarray(values, dtype=float).reshape(-1).copy()
-    out.flags.writeable = False
-    return out
+    contiguous = np.asarray(values, dtype=np.float64).reshape(-1)
+    # ``bytes`` owns immutable storage, unlike ``flags.writeable = False`` on
+    # an owning ndarray, whose caller can simply re-enable writes.
+    return np.frombuffer(contiguous.tobytes(), dtype=np.float64)
 
 
 def _negative(hkl: tuple[int, int, int]) -> tuple[int, int, int]:
@@ -205,6 +206,27 @@ def _number(value: object) -> float | None:
         return None
     out = float(value)
     return out if math.isfinite(out) else None
+
+
+def _descriptor_number(payload: Mapping[str, object], key: str) -> float:
+    value = _number(payload.get(key))
+    if value is None:
+        raise ValueError(f"{key} must be a finite number (not bool)")
+    return value
+
+
+def _descriptor_num(payload: Mapping[str, object]) -> int:
+    value = payload.get("num")
+    if type(value) is not int or value <= 0:
+        raise ValueError("num must be a positive integer")
+    return value
+
+
+def _descriptor_endpoint(payload: Mapping[str, object]) -> bool:
+    value = payload.get("endpoint", True)
+    if type(value) is not bool:
+        raise ValueError("endpoint must be a boolean")
+    return value
 
 
 def _direction(value: object, path: str, errors: _Errors) -> tuple[int, int, int] | None:
@@ -240,7 +262,10 @@ def _grid(value: object, path: str, errors: _Errors) -> np.ndarray | None:
             if kind == "values":
                 if not isinstance(payload, list):
                     raise ValueError("values must be an array")
-                out = _readonly(payload)
+                numeric = [_number(item) for item in payload]
+                if any(item is None for item in numeric):
+                    raise ValueError("values entries must be finite numbers (not bool)")
+                out = _readonly(numeric)
             else:
                 if not isinstance(payload, Mapping):
                     raise ValueError(f"{kind} must be a table")
@@ -255,23 +280,27 @@ def _grid(value: object, path: str, errors: _Errors) -> np.ndarray | None:
                 if kind == "arange":
                     if set(payload) != {"start", "stop", "step"}:
                         raise ValueError("arange requires start, stop, and step")
-                    out = _readonly(np.arange(payload["start"], payload["stop"], payload["step"]))
+                    start = _descriptor_number(payload, "start")
+                    stop = _descriptor_number(payload, "stop")
+                    step = _descriptor_number(payload, "step")
+                    if step == 0:
+                        raise ValueError("step must be nonzero")
+                    out = _readonly(np.arange(start, stop, step))
                 else:
                     required = {"start", "stop", "num"}
                     if not required <= set(payload):
                         raise ValueError(f"{kind} requires start, stop, and num")
-                    kwargs = {"endpoint": payload.get("endpoint", True)}
+                    start = _descriptor_number(payload, "start")
+                    stop = _descriptor_number(payload, "stop")
+                    num = _descriptor_num(payload)
+                    endpoint = _descriptor_endpoint(payload)
                     if kind == "logspace":
-                        kwargs["base"] = payload.get("base", 10.0)
-                        generated = np.logspace(
-                            payload["start"], payload["stop"], int(payload["num"]), **kwargs
-                        )
+                        base = _descriptor_number(payload, "base") if "base" in payload else 10.0
+                        generated = np.logspace(start, stop, num, endpoint=endpoint, base=base)
                     else:
-                        generated = np.linspace(
-                            payload["start"], payload["stop"], int(payload["num"]), **kwargs
-                        )
+                        generated = np.linspace(start, stop, num, endpoint=endpoint)
                     out = _readonly(generated)
-        except (TypeError, ValueError, ZeroDivisionError) as exc:
+        except (FloatingPointError, OverflowError, TypeError, ValueError, ZeroDivisionError) as exc:
             errors.add(path, f"invalid {kind} descriptor ({exc})")
             return None
     else:
@@ -453,6 +482,16 @@ def _parse_media(raw: object, errors: _Errors) -> dict[str, MediumSpec]:
     return out
 
 
+def _validate_angle_grid(name: str, grid: np.ndarray, path: str, errors: _Errors) -> bool:
+    if name == "tilt_deg" and (np.any(grid < 0) or np.any(grid >= 90)):
+        errors.add(path, "values must satisfy 0 <= tilt_deg < 90")
+        return False
+    if name == "tilt_azim_deg" and (np.any(grid < 0) or np.any(grid > 360)):
+        errors.add(path, "values must satisfy 0 <= tilt_azim_deg <= 360")
+        return False
+    return True
+
+
 def _scan(
     values: Mapping[str, object],
     path: str,
@@ -501,6 +540,10 @@ def _scan(
     if brem is not None and np.any(brem < 0):
         errors.add(f"{path}.E_grid_brem", "values must be nonnegative")
         grids["E_grid_brem"] = None
+    for key in ("tilt_deg", "tilt_azim_deg"):
+        grid = grids.get(key)
+        if grid is not None and not _validate_angle_grid(key, grid, f"{path}.{key}", errors):
+            grids[key] = None
     if thickness is None or any(grids.get(key) is None for key in _SCAN_KEYS[2:]):
         return None
     return ScanSpec(
@@ -536,7 +579,9 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 errors.add(f"{path}.{name}", "missing required key")
         for name in _SCAN_KEYS:
             if name in row:
-                _grid(row[name], f"{path}.{name}", errors)
+                grid = _grid(row[name], f"{path}.{name}", errors)
+                if grid is not None:
+                    _validate_angle_grid(name, grid, f"{path}.{name}", errors)
         out[key] = row
     return out
 
@@ -684,7 +729,7 @@ def load_material_catalog(path: Path | None = None) -> MaterialCatalog:
         raise MaterialConfigError((f"{source}: root must be a table",))
     errors.keys(raw, "catalog", {"schema_version", "profiles", "crystals", "media", "materials"})
     version = raw.get("schema_version")
-    if version != 1:
+    if type(version) is not int or version != 1:
         errors.add("schema_version", "must equal 1")
     for key in ("profiles", "crystals", "media", "materials"):
         if key not in raw:

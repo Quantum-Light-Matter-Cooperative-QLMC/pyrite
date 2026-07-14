@@ -1,5 +1,7 @@
 """Focused tests for the immutable TOML material catalog."""
 
+import hashlib
+import json
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -61,6 +63,113 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
         CATALOG.material("hbn").scan.thickness_ang,
         np.concatenate([np.logspace(2, 5, 6), np.logspace(5, 6, 2, endpoint=False)]),
     )
+
+
+def test_exposed_arrays_cannot_have_writes_reenabled():
+    from cxr_mc.materials import CATALOG
+
+    arrays = []
+    for crystal in CATALOG.crystals.values():
+        if crystal.E_grid is not None:
+            arrays.append(crystal.E_grid)
+        arrays.extend(position for _, position in crystal.basis)
+    for material in CATALOG.materials.values():
+        arrays.extend(
+            (
+                material.scan.thickness_ang,
+                material.scan.energy_keV,
+                material.scan.tilt_deg,
+                material.scan.tilt_azim_deg,
+                material.scan.E_grid_line,
+                material.scan.E_grid_brem,
+            )
+        )
+        if material.scan.thickness_layers is not None:
+            arrays.append(material.scan.thickness_layers)
+
+    for values in arrays:
+        try:
+            with pytest.raises(ValueError):
+                values.flags.writeable = True
+        finally:
+            values.flags.writeable = False
+        with pytest.raises(ValueError):
+            values[0] = -1.0
+
+
+@pytest.mark.parametrize("version", ["true", "1.0"])
+def test_schema_version_requires_integer_one(tmp_path, version):
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    text = _minimal_catalog().replace("schema_version = 1", f"schema_version = {version}")
+    with pytest.raises(MaterialConfigError, match="schema_version"):
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+
+@pytest.mark.parametrize(
+    ("valid", "invalid"),
+    [
+        ("energy_keV = { values = [25.0, 30.0] }", "energy_keV = { values = [true] }"),
+        (
+            "energy_keV = { values = [25.0, 30.0] }",
+            'energy_keV = { values = ["twenty-five"] }',
+        ),
+        (
+            "E_grid_line = { arange = { start = 50.0, stop = 60.0, step = 2.0 } }",
+            "E_grid_line = { arange = { start = true, stop = 60.0, step = 2.0 } }",
+        ),
+        (
+            "E_grid_line = { arange = { start = 50.0, stop = 60.0, step = 2.0 } }",
+            "E_grid_line = { arange = { start = 50.0, stop = 60.0, step = false } }",
+        ),
+        (
+            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 3, endpoint = false } }",
+            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 2.5, endpoint = false } }",
+        ),
+        (
+            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 3, endpoint = false } }",
+            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = inf, endpoint = false } }",
+        ),
+        (
+            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 3, endpoint = false } }",
+            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 3, endpoint = 1 } }",
+        ),
+        (
+            "tilt_azim_deg = 0.0",
+            "tilt_azim_deg = { logspace = { start = 0.0, stop = 2.0, num = 3, base = false } }",
+        ),
+    ],
+)
+def test_grid_descriptor_types_are_strict_and_errors_are_wrapped(tmp_path, valid, invalid):
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    text = _minimal_catalog().replace(valid, invalid)
+    with pytest.raises(MaterialConfigError, match="profiles.base"):
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("tilt_deg", "-0.1"),
+        ("tilt_deg", "90.0"),
+        ("tilt_azim_deg", "-0.1"),
+        ("tilt_azim_deg", "360.1"),
+    ],
+)
+def test_scan_angles_stay_in_physical_domains(tmp_path, field, value):
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    material_rows = f"""
+[materials.mos2]
+label = "MoS2"
+profile = "base"
+{field} = {value}
+"""
+    with pytest.raises(MaterialConfigError, match=rf"materials\.mos2\.scan\.{field}"):
+        load_material_catalog(
+            _write_catalog(tmp_path, _minimal_catalog(material_rows=material_rows))
+        )
 
 
 def test_grid_descriptors_profile_overrides_and_layer_count_conversion(tmp_path):
@@ -202,105 +311,128 @@ profile = "base"
     assert "no Mott transport table for W" in caplog.text
 
 
+def _array_fingerprint(values):
+    array = np.asarray(values, dtype="<f8")
+    return {
+        "shape": list(array.shape),
+        "sha256": hashlib.sha256(array.tobytes()).hexdigest(),
+    }
+
+
 @pytest.fixture(scope="module")
-def legacy_catalog_golden():
-    from cxr_mc.materials import CRYSTALS
-    from cxr_mc.materials.registry import CRYSTAL_PARAMS, MATERIAL_CONFIGS
-
-    return CRYSTALS, CRYSTAL_PARAMS, MATERIAL_CONFIGS
+def serialized_catalog_golden():
+    path = Path(__file__).parent / "data" / "material_catalog_golden.json"
+    return json.loads(path.read_text())
 
 
-def _sorted_basis(basis):
-    return sorted(((element, tuple(position)) for element, position in basis), key=lambda x: x)
-
-
-def test_packaged_catalog_matches_all_legacy_crystal_and_scan_values(legacy_catalog_golden):
+def test_packaged_catalog_matches_independent_serialized_golden(serialized_catalog_golden):
     from cxr_mc.materials import CATALOG
 
-    legacy_crystals, legacy_crystal_params, legacy_materials = legacy_catalog_golden
-    assert tuple(CATALOG.crystals) == tuple(legacy_crystals)
-    assert CATALOG.material_keys == tuple(legacy_materials)
+    golden = serialized_catalog_golden
+    assert tuple(CATALOG.crystals) == tuple(golden["crystal_keys"])
+    assert tuple(key for key, spec in CATALOG.crystals.items() if spec.E_grid is not None) == tuple(
+        golden["configured_crystal_keys"]
+    )
+    assert CATALOG.material_keys == tuple(golden["material_keys"])
 
-    for key, legacy in legacy_crystals.items():
+    for key, expected in golden["crystals"].items():
         actual = CATALOG.crystal(key)
-        old_lattice = legacy["lattice"]
-        if old_lattice["system"] == "cubic":
-            expected = (old_lattice["a"],) * 3 + (90.0, 90.0, 90.0)
-        elif old_lattice["system"] == "hexagonal":
-            expected = (old_lattice["a"], old_lattice["a"], old_lattice["c"], 90.0, 90.0, 120.0)
-        elif old_lattice["system"] == "orthorhombic":
-            expected = (
-                old_lattice["a"], old_lattice["b"], old_lattice["c"], 90.0, 90.0, 90.0
-            )
-        else:
-            expected = tuple(old_lattice[name] for name in ("a", "b", "c", "alpha", "beta", "gamma"))
-        np.testing.assert_allclose(
-            tuple(actual.lattice[name] for name in ("a", "b", "c", "alpha", "beta", "gamma")),
-            expected,
-            rtol=0.0,
-            atol=1e-8,
-        )
-        assert actual.V_cell == pytest.approx(legacy["V_cell"], rel=2e-15)
-        for (actual_el, actual_pos), (old_el, old_pos) in zip(
-            _sorted_basis(actual.basis), _sorted_basis(legacy["basis"]), strict=True
-        ):
-            assert actual_el == old_el
-            np.testing.assert_allclose(actual_pos, old_pos, rtol=0.0, atol=1e-8)
-        assert actual.mosaic_fwhm_deg == legacy["mosaic_fwhm_deg"]
-        expected_counts = {}
-        for element, _ in legacy["basis"]:
-            expected_counts[element] = expected_counts.get(element, 0) + 1
-        assert dict(actual.composition) == pytest.approx(
-            {element: count / legacy["V_cell"] for element, count in expected_counts.items()}
-        )
-
-    assert set(legacy_crystal_params) == set(CATALOG.crystals) - {"lif"}
-    for key, legacy in legacy_crystal_params.items():
-        actual = CATALOG.crystal(key)
-        assert actual.B_ang2 == legacy["B_ang2"]
-        assert actual.beam_uvw == legacy["beam_uvw"]
-        np.testing.assert_array_equal(actual.E_grid, legacy["E_grid"])
-        assert list(actual.hkl_list) == legacy.get("hkl_list", [])
-        assert actual.hkl_reason == legacy.get("hkl_list_reason")
-
-    for key, legacy in legacy_materials.items():
-        actual = CATALOG.material(key)
-        assert actual.label == legacy["label"]
-        assert actual.crystal_key == legacy.get("crystal", key)
-        for grid_key in (
-            "thickness_ang", "energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_line", "E_grid_brem"
-        ):
-            np.testing.assert_array_equal(getattr(actual.scan, grid_key), np.atleast_1d(legacy[grid_key]))
-        assert actual.substrate == legacy.get("substrate")
-        assert [(layer.material, layer.thickness_ang, layer.beam_uvw, layer.azimuth_deg) for layer in actual.stack] == [
-            (layer.material, layer.thickness_ang, layer.beam_uvw, layer.azimuth_deg)
-            for layer in legacy.get("stack", ())
+        assert dict(actual.lattice) == expected["lattice"]
+        assert actual.V_cell == pytest.approx(expected["V_cell"], rel=2e-15)
+        assert actual.mosaic_fwhm_deg == expected["mosaic_fwhm_deg"]
+        assert [element for element, _ in actual.composition] == [
+            item[0] for item in expected["composition"]
         ]
+        np.testing.assert_allclose(
+            [density for _, density in actual.composition],
+            [item[1] for item in expected["composition"]],
+            rtol=2e-15,
+        )
+        assert [element for element, _ in actual.basis] == [site[0] for site in expected["basis"]]
+        np.testing.assert_allclose(
+            np.asarray([position for _, position in actual.basis]),
+            np.asarray([site[1] for site in expected["basis"]]),
+            rtol=0.0,
+            atol=1e-12,
+        )
+        config = expected["config"]
+        assert actual.B_ang2 == config["B_ang2"]
+        assert list(actual.beam_uvw) == config["beam_uvw"]
+        assert list(map(list, actual.hkl_list)) == config["hkl_list"]
+        assert actual.hkl_reason == config["hkl_reason"]
+        assert actual.layers_per_cell == config["layers_per_cell"]
+        if config["E_grid"] is None:
+            assert actual.E_grid is None
+        else:
+            assert _array_fingerprint(actual.E_grid) == config["E_grid"]
+
+    assert [element for element, _ in CATALOG.media["sio2"].composition] == [
+        item[0] for item in golden["media"]["sio2"]
+    ]
+    np.testing.assert_allclose(
+        [density for _, density in CATALOG.media["sio2"].composition],
+        [item[1] for item in golden["media"]["sio2"]],
+        rtol=0.0,
+        atol=0.0,
+    )
+    for key, expected in golden["materials"].items():
+        actual = CATALOG.material(key)
+        assert actual.label == expected["label"]
+        assert actual.profile == expected["profile"]
+        assert actual.crystal_key == expected["crystal_key"]
+        assert actual.substrate == expected["substrate"]
+        assert [
+            {
+                "material": layer.material,
+                "thickness_ang": layer.thickness_ang,
+                "beam_uvw": list(layer.beam_uvw) if layer.beam_uvw else None,
+                "azimuth_deg": layer.azimuth_deg,
+            }
+            for layer in actual.stack
+        ] == expected["stack"]
+        for grid_name, fingerprint in expected["scan"].items():
+            assert _array_fingerprint(getattr(actual.scan, grid_name)) == fingerprint
+
+    special = golden["special_grids"]
+    np.testing.assert_array_equal(CATALOG.material("hbn").scan.thickness_ang, special["hbn_thickness_ang"])
+    np.testing.assert_array_equal(CATALOG.material("hbn").scan.tilt_deg, special["hbn_tilt_deg"])
+    mote2_grid = special["mote2_E_grid_descriptor"]
+    np.testing.assert_array_equal(
+        CATALOG.crystal("mote2").E_grid,
+        np.arange(mote2_grid["start"], mote2_grid["stop"], mote2_grid["step"]),
+    )
+    np.testing.assert_array_equal(CATALOG.material("mote2").scan.tilt_deg, special["mote2_tilt_deg"])
+    np.testing.assert_array_equal(
+        CATALOG.material("mote2").scan.tilt_azim_deg, special["mote2_tilt_azim_deg"]
+    )
 
 
-def test_catalog_cif_data_preserves_representative_crystal_physics(monkeypatch):
+def test_catalog_matches_serialized_physics_for_every_crystal(serialized_catalog_golden):
     from cxr_mc.materials import CATALOG
     from cxr_mc.materials import crystal as crystal_module
 
-    for key, hkl in (("diamond", (1, 1, 1)), ("hbn", (0, 0, 2)), ("mose2", (1, 0, 0))):
-        expected_S, expected_g = crystal_module.structure_factor(key, hkl, 1000.0, B_ang2=0.6)
+    for key, expected in serialized_catalog_golden["crystals"].items():
         spec = CATALOG.crystal(key)
-        monkeypatch.setitem(
-            crystal_module.CRYSTALS,
-            key,
-            {"lattice": spec.lattice, "basis": spec.basis, "V_cell": spec.V_cell},
-        )
-        actual_S, actual_g = crystal_module.structure_factor(key, hkl, 1000.0, B_ang2=0.6)
-        assert actual_g == pytest.approx(expected_g, rel=2e-8)
-        assert actual_S == pytest.approx(expected_S, rel=2e-7, abs=2e-7)
-
-    for key in ("diamond", "mose2"):
-        monkeypatch.undo()
-        expected = crystal_module.dominant_reflections(key, n_families=2, B_ang2=0.6)
-        spec = CATALOG.crystal(key)
-        monkeypatch.setitem(
-            crystal_module.CRYSTALS,
-            key,
-            {"lattice": spec.lattice, "basis": spec.basis, "V_cell": spec.V_cell},
-        )
-        assert crystal_module.dominant_reflections(key, n_families=2, B_ang2=0.6) == expected
+        old = crystal_module.CRYSTALS[key]
+        crystal_module.CRYSTALS[key] = {
+            "lattice": spec.lattice,
+            "basis": spec.basis,
+            "V_cell": spec.V_cell,
+        }
+        try:
+            physics = expected["physics"]
+            hkl = tuple(physics["hkl"])
+            structure, g_mag = crystal_module.structure_factor(
+                key, hkl, 1000.0, B_ang2=spec.B_ang2
+            )
+            assert g_mag == pytest.approx(physics["g_mag"], rel=2e-12)
+            assert structure.real == pytest.approx(physics["structure_factor"][0], rel=2e-12, abs=2e-12)
+            assert structure.imag == pytest.approx(physics["structure_factor"][1], rel=2e-12, abs=2e-12)
+            assert [
+                list(hkl)
+                for hkl in crystal_module.dominant_reflections(
+                    key, n_families=2, B_ang2=spec.B_ang2
+                )
+            ] == physics["dominant_reflections"]
+        finally:
+            crystal_module.CRYSTALS[key] = old
