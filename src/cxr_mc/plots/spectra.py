@@ -361,6 +361,7 @@ def plot_material_comparison(
     select="quality_peak",
     rel_prominence=0.03,
     line_metric="sharpness",
+    min_line_eV=None,
 ):
     """Cross-material headline: for each material's results store, find the single
     BEST geometry/energy (results.selection_score ``select``) and plot its
@@ -377,7 +378,14 @@ def plot_material_comparison(
         if not recs:
             continue
         metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
-        best = max(recs, key=lambda r: selection_score(metrics[id(r)], select))
+        candidates = [
+            r
+            for r in recs
+            if min_line_eV is None or metrics[id(r)]["line_eV"] >= min_line_eV
+        ]
+        if not candidates:
+            continue
+        best = max(candidates, key=lambda r: selection_score(metrics[id(r)], select))
         m = metrics[id(best)]
         pts.append((label, m["line_eV"], m["line_flux"], m["line_quality"], best["case"]))
     if not pts:
@@ -405,7 +413,10 @@ def plot_material_comparison(
     ax.set_yscale("log")
     ax.set_xlabel("dominant coherent line energy (keV)")
     ax.set_ylabel("integrated line flux at best geometry (Phs/s)")
-    ax.set_title(f"Best coherent line per material  (select: {select})", fontsize=12)
+    energy_floor = "" if min_line_eV is None else f", line >= {min_line_eV:g} eV"
+    ax.set_title(
+        f"Best coherent line per material  (select: {select}{energy_floor})", fontsize=12
+    )
     ax.grid(alpha=0.3, which="both")
     ax.margins(x=0.12)
     cb = fig.colorbar(sc, ax=ax)
