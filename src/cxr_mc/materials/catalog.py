@@ -176,6 +176,66 @@ class MaterialCatalog:
         except KeyError:
             raise KeyError(f"unknown material {key!r}; have {list(self.materials)}") from None
 
+    def resolve_stack(
+        self, key: str, film_thickness_ang: float
+    ) -> tuple[Mapping[str, object], ...]:
+        """Resolve a film and its explicit stack into ordered physical layers.
+
+        Boundaries are cumulative from the beam-entrance face. Composition is
+        resolved from the catalog's CIF-derived crystal density or named
+        medium number density. A crystalline layer inherits its configured
+        zone axis unless the layer overrides it; amorphous media have no
+        default orientation.
+        """
+        thickness = _number(film_thickness_ang)
+        if thickness is None or thickness <= 0:
+            raise ValueError("film_thickness_ang must be finite and positive")
+        material = self.material(key)
+        film = self.crystal(material.crystal_key)
+        physical: list[Mapping[str, object]] = []
+        z_top = 0.0
+
+        def append_layer(
+            layer_key: str,
+            layer_thickness: float,
+            composition: tuple[tuple[str, float], ...],
+            beam_uvw: tuple[int, int, int] | None,
+            azimuth_deg: float,
+        ) -> None:
+            nonlocal z_top
+            z_bottom = z_top + layer_thickness
+            physical.append(
+                MappingProxyType(
+                    {
+                        "key": layer_key,
+                        "z_top_ang": z_top,
+                        "z_bottom_ang": z_bottom,
+                        "composition": composition,
+                        "beam_uvw": beam_uvw,
+                        "azimuth_deg": azimuth_deg,
+                    }
+                )
+            )
+            z_top = z_bottom
+
+        append_layer(film.key, thickness, film.composition, film.beam_uvw, 0.0)
+        for layer in material.stack:
+            crystal = self.crystals.get(layer.material)
+            if crystal is not None:
+                composition = crystal.composition
+                beam_uvw = layer.beam_uvw or crystal.beam_uvw
+            else:
+                composition = self.media[layer.material].composition
+                beam_uvw = layer.beam_uvw
+            append_layer(
+                layer.material,
+                layer.thickness_ang,
+                composition,
+                beam_uvw,
+                layer.azimuth_deg,
+            )
+        return tuple(physical)
+
 
 class _Errors:
     def __init__(self) -> None:

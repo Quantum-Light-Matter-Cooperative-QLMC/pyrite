@@ -1,6 +1,6 @@
 {
   "provenance": {
-    "source_commit": "52ea6a5790508c5e863d1c10837e6712cf9e6767",
+    "source_commit": "df1478945a1bf52b8870a3c411a35edd55ec7d65",
     "description": "Independent serialized snapshot of the migrated CIF and registry values"
   },
   "crystal_keys": [
@@ -4421,6 +4421,68 @@
       },
       "substrate": null,
       "stack": []
+    }
+  },
+  "resolved_stacks": {
+    "mos2-on-sio2-si": {
+      "film_thickness_ang": 18.441000000000003,
+      "layers": [
+        {
+          "key": "mos2",
+          "z_top_ang": 0.0,
+          "z_bottom_ang": 18.441000000000003,
+          "composition": [
+            [
+              "Mo",
+              0.018811870912549915
+            ],
+            [
+              "S",
+              0.03762374182509983
+            ]
+          ],
+          "beam_uvw": [
+            0,
+            0,
+            2
+          ],
+          "azimuth_deg": 0.0
+        },
+        {
+          "key": "sio2",
+          "z_top_ang": 18.441000000000003,
+          "z_bottom_ang": 2868.441,
+          "composition": [
+            [
+              "Si",
+              0.02205
+            ],
+            [
+              "O",
+              0.0441
+            ]
+          ],
+          "beam_uvw": null,
+          "azimuth_deg": 0.0
+        },
+        {
+          "key": "silicon",
+          "z_top_ang": 2868.441,
+          "z_bottom_ang": 5002868.441,
+          "composition": [
+            [
+              "Si",
+              0.049942993373787194
+            ]
+          ],
+          "beam_uvw": [
+            4,
+            4,
+            0
+          ],
+          "azimuth_deg": 0.0
+        }
+      ]
     }
   },
   "special_grids": {

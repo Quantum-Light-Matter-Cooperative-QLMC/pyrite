@@ -407,6 +407,29 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
     )
 
 
+def test_catalog_resolves_stack_layers_to_serialized_physical_data(serialized_catalog_golden):
+    from cxr_mc.materials import CATALOG
+
+    expected_stacks = serialized_catalog_golden["resolved_stacks"]
+    assert tuple(expected_stacks) == tuple(
+        key for key, material in CATALOG.materials.items() if material.stack
+    )
+    for material_key, expected in expected_stacks.items():
+        layers = CATALOG.resolve_stack(material_key, expected["film_thickness_ang"])
+        actual = [
+            {
+                "key": layer["key"],
+                "z_top_ang": layer["z_top_ang"],
+                "z_bottom_ang": layer["z_bottom_ang"],
+                "composition": [list(item) for item in layer["composition"]],
+                "beam_uvw": list(layer["beam_uvw"]) if layer["beam_uvw"] else None,
+                "azimuth_deg": layer["azimuth_deg"],
+            }
+            for layer in layers
+        ]
+        assert actual == expected["layers"]
+
+
 def test_catalog_matches_serialized_physics_for_every_crystal(serialized_catalog_golden):
     from cxr_mc.materials import CATALOG
     from cxr_mc.materials import crystal as crystal_module
