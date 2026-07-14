@@ -134,10 +134,11 @@ execution` or `Using GPU`) at DEBUG level, so it's silent by default; set
 `CXR_MC_DEBUG=1` to see it. Set `CXR_FP64=1` to force double precision for
 reference/validation runs (the GPU path defaults to fp32).
 
-Launch the notebooks with:
+Launch the marimo apps with:
 
 ```bash
-uv run jupyter lab
+uv run marimo run notebooks/scan_app.py
+cxr analyze hopg
 ```
 
 ### Docker (CPU)

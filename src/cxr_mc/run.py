@@ -85,7 +85,7 @@ def load_checkpoint(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
 def cases_from_results(results):
     """The flat case list backing a loaded ``results`` store (each record carries
     its own ``case``) -- pass to filter_results / plot_heatmaps / the trajectory
-    grid so the viz notebook never has to rebuild the Sweep."""
+    grid so the visualization app never has to rebuild the Sweep."""
     return [rec["case"] for recs in results.values() for rec in recs.values()]
 
 
