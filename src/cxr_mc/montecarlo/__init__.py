@@ -65,11 +65,19 @@ from .detector import (
     mosaic_psi_rad,
 )
 from .geometry import (
+    X_MAX,
+    X_MIN,
+    Y_MAX,
+    Y_MIN,
+    Z_MAX,
+    Z_MIN,
     _mosaic_quadrature,
     _orientation_R,
     _small_tilt_R,
     detector_directions,
+    first_prism_exit,
     tilted_geometry,
+    validate_transverse_dimensions,
 )
 from .runner import (
     _brem_for_case,
@@ -139,6 +147,14 @@ __all__ = [
     "_rotate_directions",
     "simulate_trajectories",
     # geometry
+    "X_MIN",
+    "X_MAX",
+    "Y_MIN",
+    "Y_MAX",
+    "Z_MIN",
+    "Z_MAX",
+    "validate_transverse_dimensions",
+    "first_prism_exit",
     "tilted_geometry",
     "detector_directions",
     "_orientation_R",

@@ -19,6 +19,83 @@ import numpy as np
 
 from ..materials.crystal import _direct_lattice_vectors, _rotation_between
 
+X_MIN = 0
+X_MAX = 1
+Y_MIN = 2
+Y_MAX = 3
+Z_MIN = 4
+Z_MAX = 5
+
+
+def validate_transverse_dimensions(width, height, *, unit) -> tuple[float | None, float | None]:
+    """Validate a matched pair of full transverse crystal dimensions.
+
+    Dimensions are either both omitted, preserving the laterally infinite slab,
+    or both finite and strictly positive. ``unit`` labels validation failures so
+    callers can use this shared check for public mm inputs and internal Angstrom
+    geometry without changing their units.
+    """
+    if width is None and height is None:
+        return None, None
+    if width is None or height is None:
+        raise ValueError(f"width and height must both be specified in {unit}")
+
+    width, height = float(width), float(height)
+    if not np.isfinite(width) or not np.isfinite(height) or width <= 0.0 or height <= 0.0:
+        raise ValueError(f"width and height must be finite and strictly positive in {unit}")
+    return width, height
+
+
+def first_prism_exit(
+    r,
+    d,
+    *,
+    z_min_ang,
+    z_max_ang,
+    width_ang=None,
+    height_ang=None,
+    xp=np,
+):
+    """Return each inside-origin ray's first forward rectangular-prism face exit.
+
+    The sample-frame prism is ``[-width/2, width/2] x [-height/2, height/2] x
+    [z_min_ang, z_max_ang]``. Origins must be inside that prism, and rays with
+    a zero component never nominate the corresponding parallel faces. When both
+    transverse dimensions are ``None``, the limiting geometry is the original
+    z-only slab. Face ties resolve to the lowest face constant.
+
+    Validation: finite-transverse-crystal
+    """
+    width_ang, height_ang = validate_transverse_dimensions(width_ang, height_ang, unit="Ang")
+    r, d = xp.asarray(r), xp.asarray(d)
+    if width_ang is None:
+        numerators = (z_min_ang - r[..., 2], z_max_ang - r[..., 2])
+        components = (d[..., 2], d[..., 2])
+        faces = xp.asarray([Z_MIN, Z_MAX])
+    else:
+        assert height_ang is not None
+        hx, hy = width_ang / 2.0, height_ang / 2.0
+        numerators = (
+            -hx - r[..., 0],
+            hx - r[..., 0],
+            -hy - r[..., 1],
+            hy - r[..., 1],
+            z_min_ang - r[..., 2],
+            z_max_ang - r[..., 2],
+        )
+        components = (d[..., 0], d[..., 0], d[..., 1], d[..., 1], d[..., 2], d[..., 2])
+        faces = xp.asarray([X_MIN, X_MAX, Y_MIN, Y_MAX, Z_MIN, Z_MAX])
+    candidates = xp.stack(
+        [
+            xp.where(c != 0.0, n / xp.where(c != 0.0, c, 1.0), xp.inf)
+            for n, c in zip(numerators, components, strict=True)
+        ],
+        axis=-1,
+    )
+    candidates = xp.where(candidates > 0.0, candidates, xp.inf)
+    choice = xp.argmin(candidates, axis=-1)
+    return xp.take_along_axis(candidates, choice[..., None], axis=-1)[..., 0], faces[choice]
+
 
 def tilted_geometry(theta_obs_rad, tilt_polar_rad, tilt_azim_rad=0.0):
     """
