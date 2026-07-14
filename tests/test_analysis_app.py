@@ -27,3 +27,12 @@ def test_penetration_dropdown_default_is_one_of_configured_angles() -> None:
 
     configured_options = {f"{tilt:g} deg" for tilt in PENETRATION_TILT_DEG}
     assert ast.literal_eval(default) in configured_options
+
+
+def test_material_menu_uses_checkpoint_helper_and_custom_select() -> None:
+    source = APP.read_text()
+
+    assert "material_menu" in source
+    assert "select_initial_material" in source
+    assert "mo.ui.anywidget" in source
+    assert "MaterialSelect" in source

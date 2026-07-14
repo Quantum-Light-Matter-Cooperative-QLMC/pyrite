@@ -8,6 +8,38 @@ app = marimo.App(width="medium")
 def _():
     import altair as alt
     import marimo as mo
+    import traitlets
+    from anywidget import AnyWidget
+
+    class MaterialSelect(AnyWidget):
+        _esm = r"""
+        function render({ model, el }) {
+          const label = document.createElement("label");
+          label.textContent = model.get("label");
+          const select = document.createElement("select");
+          select.setAttribute("aria-label", model.get("label"));
+          for (const row of model.get("options")) {
+            const option = document.createElement("option");
+            option.value = row.value;
+            option.textContent = row.label;
+            option.disabled = row.disabled;
+            select.appendChild(option);
+          }
+          select.value = model.get("value") ?? "";
+          select.disabled = model.get("disabled");
+          select.addEventListener("change", () => {
+            model.set("value", select.value);
+            model.save_changes();
+          });
+          label.appendChild(select);
+          el.replaceChildren(label);
+        }
+        export default { render };
+        """
+        options = traitlets.List().tag(sync=True)
+        value = traitlets.Unicode(allow_none=True, default_value=None).tag(sync=True)
+        label = traitlets.Unicode().tag(sync=True)
+        disabled = traitlets.Bool().tag(sync=True)
 
     # A dense spectrum (fine grid x several beam energies) can exceed Vega-Lite's
     # default 5000-row cap; vegafusion (shipped with marimo[recommended]) lifts it,
@@ -48,12 +80,14 @@ def _():
         sweep_values,
         top_geometries,
     )
-    from cxr_mc.run import cases_from_results, load_checkpoint
+    from cxr_mc.run import _DEFAULT_CHECKPOINT_DIR, cases_from_results, load_checkpoint
     from cxr_mc.sweep import MATERIAL_LABELS, build_cases
 
     return (
         MATERIAL_LABELS,
+        MaterialSelect,
         PENETRATION_TILT_DEG,
+        _DEFAULT_CHECKPOINT_DIR,
         build_cases,
         cases_from_results,
         compare_spectrum_chart,
@@ -95,32 +129,25 @@ def _(mo):
 
 
 @app.cell
-def _(mo):
-    from cxr_mc.analyze import get_default_material, initial_material
+def _(MATERIAL_LABELS, MaterialSelect, _DEFAULT_CHECKPOINT_DIR, mo):
+    from cxr_mc.analyze import (
+        get_default_material,
+        initial_material,
+        material_menu,
+        select_initial_material,
+    )
+    from cxr_mc.config import MATERIALS
 
-    initial_material_value = initial_material(mo.cli_args(), get_default_material())
-    return (initial_material_value,)
-
-
-@app.cell
-def _(initial_material_value, mo):
-    material_ui = mo.ui.dropdown(
-        [
-            "hopg",
-            "hbn",
-            "diamond",
-            "silicon",
-            "sapphire",
-            "mose2",
-            "wse2",
-            "ptse2",
-            "hfse2",
-            "zrse2",
-            "ws2",
-            "mos2",
-        ],
-        value=initial_material_value,
-        label="Material (match the scan you ran)",
+    requested_material = initial_material(mo.cli_args(), get_default_material())
+    material_options = material_menu(_DEFAULT_CHECKPOINT_DIR, MATERIALS, MATERIAL_LABELS)
+    initial_selection = select_initial_material(requested_material, material_options)
+    material_ui = mo.ui.anywidget(
+        MaterialSelect(
+            options=list(material_options),
+            value=initial_selection,
+            label="Material (match the scan you ran)",
+            disabled=initial_selection is None,
+        )
     )
     material_ui
     return (material_ui,)
@@ -128,9 +155,9 @@ def _(initial_material_value, mo):
 
 @app.cell
 def _(cases_from_results, default_settings, filter_results, load_checkpoint, material_ui):
-    MATERIAL = material_ui.value
+    MATERIAL = material_ui.value["value"]
     settings = default_settings()
-    _results = load_checkpoint(MATERIAL)  # {name: {E0: record}}
+    _results = load_checkpoint(MATERIAL) if MATERIAL is not None else {}
     cases = cases_from_results(_results)  # rebuild the case list from the records
     res = filter_results(_results, cases)  # all loaded cases for this material
     return MATERIAL, cases, res, settings
