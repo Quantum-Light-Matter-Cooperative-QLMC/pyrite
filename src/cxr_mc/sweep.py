@@ -191,10 +191,12 @@ def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
 class Sweep:
     """One parameter sweep.
 
-    Each of ``thickness_ang``, ``energy_keV``, ``tilt_deg`` and
-    ``tilt_azim_deg`` is either a single number (fixed) or a sequence/array
-    (swept); build_cases() takes the product. The remaining fields are fixed
-    setup that rarely changes per run.
+    Each of ``thickness_ang``, ``energy_keV``, ``tilt_deg``,
+    ``tilt_azim_deg``, ``crystal_width_mm``, and ``crystal_height_mm`` is either
+    a single number (fixed) or a sequence/array (swept); build_cases() takes the
+    product. The transverse dimensions must be both ``None`` (the legacy
+    infinite slab) or both strictly positive full dimensions in mm. The
+    remaining fields are fixed setup that rarely changes per run.
     """
 
     material: str  # required: no default, so a Sweep can't silently load MoSe2
@@ -202,6 +204,8 @@ class Sweep:
     energy_keV: ScalarOrSeq = (30.0, 45.0, 60.0)
     tilt_deg: ScalarOrSeq = 30.0
     tilt_azim_deg: ScalarOrSeq = 0.0
+    crystal_width_mm: ScalarOrSeq | None = None
+    crystal_height_mm: ScalarOrSeq | None = None
     # fixed setup (single values) ------------------------------------------
     theta_obs_deg: float = 90.0
     n_families: int = 4
@@ -272,8 +276,10 @@ def _seq(x):
 
 def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     """Expand a :class:`Sweep` into a list of run_case dicts (the Cartesian
-    product over the swept thickness / tilt / azimuth, each crossed with every
-    beam energy). Returns the ``cases`` list; preview it with
+    product over the swept thickness / tilt / azimuth / optional footprint, each
+    crossed with every beam energy). ``crystal_width_mm`` and
+    ``crystal_height_mm`` are full dimensions: both are ``None`` for the legacy
+    infinite slab, otherwise both must be positive. Returns the ``cases`` list; preview it with
     :func:`geometry_table`."""
     cp = crystal_params(sweep.material, sweep.n_families)
     # line grid: fine + narrow (per-material default, E_grid_line, or the
@@ -292,6 +298,19 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     domega = TIMEPIX3_DOMEGA_SR if sweep.domega_sr is None else sweep.domega_sr
     beam_uvw = cp["beam_uvw"] if sweep.beam_uvw is None else sweep.beam_uvw
     label = MATERIAL_LABELS.get(sweep.material, sweep.material)
+    width_src, height_src = sweep.crystal_width_mm, sweep.crystal_height_mm
+    if width_src is None and height_src is None:
+        footprints = [(None, None)]
+    elif width_src is None or height_src is None:
+        raise ValueError("crystal_width_mm and crystal_height_mm must be supplied together")
+    else:
+        widths, heights = _seq(width_src), _seq(height_src)
+        if not (
+            np.all(np.isfinite(widths) & (widths > 0.0))
+            and np.all(np.isfinite(heights) & (heights > 0.0))
+        ):
+            raise ValueError("crystal_width_mm and crystal_height_mm must be finite and positive")
+        footprints = list(product(widths, heights))
 
     # crystal mosaicity (analytic, optional): None unless the run enables it AND the
     # crystal has a mosaic_fwhm_deg (or the Sweep overrides it). None -> perfect
@@ -330,8 +349,13 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
         stack = (Layer(sweep.substrate, sweep.substrate_thickness_ang),)
 
     cases = []
-    for i_c, (thickness, tilt, azim) in enumerate(
-        product(_seq(sweep.thickness_ang), _seq(sweep.tilt_deg), _seq(sweep.tilt_azim_deg))
+    for i_c, (thickness, tilt, azim, (width, height)) in enumerate(
+        product(
+            _seq(sweep.thickness_ang),
+            _seq(sweep.tilt_deg),
+            _seq(sweep.tilt_azim_deg),
+            footprints,
+        )
     ):
         name = f"{label} {fmt_thickness(thickness)} pol={tilt:g} az={azim:g}"
         abs_layers = None
@@ -349,6 +373,8 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
                 _radiator(cp, beam_uvw=beam_uvw, azimuth_rad=0.0),
                 *(layer_radiator(lay, sweep.n_families) for lay in stack),
             ]
+        if width is not None:
+            name = f"{name} footprint={width:g}x{height:g}mm"
         for i_e, E0 in enumerate(energies):
             cases.append(
                 dict(
@@ -359,6 +385,8 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
                     B_ang2=cp["B_ang2"],
                     E0_keV=float(E0),
                     thickness_ang=float(thickness),
+                    crystal_width_mm=None if width is None else float(width),
+                    crystal_height_mm=None if height is None else float(height),
                     E_grid=line_triple,  # legacy key (== line grid)
                     E_grid_line=line_triple,
                     E_grid_brem=(brem_start, float(E0) * 1e3 + brem_step, brem_step),
@@ -409,6 +437,8 @@ def geometry_table(cases):
                 "beam_uvw": c["beam_uvw"],
                 "refl": len(c["hkl_list"]),
                 "t [um]": c["thickness_ang"] / 1e4,
+                "width [mm]": c.get("crystal_width_mm"),
+                "height [mm]": c.get("crystal_height_mm"),
                 "polar [deg]": round(c["tilt_deg"], 2),
                 "azim [deg]": round(c["tilt_azim_deg"], 2),
                 "energies [keV]": [k["E0_keV"] for k in same],

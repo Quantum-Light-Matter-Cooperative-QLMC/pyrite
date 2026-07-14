@@ -8,8 +8,10 @@ import pickle
 from typing import Any
 
 import numpy as np
+import pytest
 
 from cxr_mc import _checkpoint_io
+from cxr_mc.montecarlo import runner
 from cxr_mc.run import (
     _checkpoint_save,
     cases_from_results,
@@ -79,6 +81,43 @@ def _stub_run_cases(cases, max_workers=None, progress=False, callback=None):
     for i, case in enumerate(cases):
         if callback is not None:
             callback(i, case, _fake_out(case))
+
+
+def test_transport_case_forwards_finite_footprint_to_both_trajectories(monkeypatch):
+    case = _fake_case("finite", 30.0)
+    case.update(crystal_width_mm=0.1, crystal_height_mm=0.2)
+    captured = []
+
+    def _transport(*args, **kwargs):
+        captured.append(kwargs)
+        return {"transport": len(captured)}
+
+    monkeypatch.setattr(runner, "simulate_trajectories", _transport)
+
+    runner._transport_case(case)
+
+    assert len(captured) == 2
+    assert all(call["crystal_width_mm"] == 0.1 for call in captured)
+    assert all(call["crystal_height_mm"] == 0.2 for call in captured)
+
+
+def test_brem_for_case_forwards_finite_footprint(monkeypatch):
+    case = _fake_case("finite", 30.0)
+    case.update(crystal_width_mm=0.1, crystal_height_mm=0.2)
+    captured = []
+
+    def _transport(*args, **kwargs):
+        captured.append(kwargs)
+        return {"transport": True}
+
+    monkeypatch.setattr(runner, "simulate_trajectories", _transport)
+    monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *args: np.array([0.0]))
+
+    runner._brem_for_case(case, np.array([100.0]))
+
+    assert len(captured) == 1
+    assert captured[0]["crystal_width_mm"] == pytest.approx(0.1)
+    assert captured[0]["crystal_height_mm"] == pytest.approx(0.2)
 
 
 # ---------------------------------------------------------------------------

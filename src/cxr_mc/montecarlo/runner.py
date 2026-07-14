@@ -224,6 +224,11 @@ def run_case(case):
                 FWHM, mm) -- None is a strict no-op, the point-source beam
                 (montecarlo.transport.simulate_trajectories, BIT-FOR-BIT
                 unchanged spectrum; see that docstring for why),
+                crystal_width_mm / crystal_height_mm (both None): optional full
+                rectangular crystal footprint dimensions in mm. They must be
+                supplied together and strictly positive to enable finite lateral
+                transport and six-face self-absorption; both None retains the
+                laterally infinite slab,
                 mosaic_mc_fwhm_rad (None) / mosaic_mc_nodes (1): the exact
                 Monte-Carlo crystal-mosaicity average (mc_spectrum); None/1 ->
                 perfect crystal,
@@ -267,6 +272,8 @@ def _transport_case(case):
         beam_dir=beam,
         layers=layers,
         beam_fwhm_mm=beam_fwhm_mm,
+        crystal_width_mm=case.get("crystal_width_mm"),
+        crystal_height_mm=case.get("crystal_height_mm"),
     )
     segs_b = simulate_trajectories(
         case["E0_keV"],
@@ -278,6 +285,8 @@ def _transport_case(case):
         beam_dir=beam,
         layers=layers,
         beam_fwhm_mm=beam_fwhm_mm,
+        crystal_width_mm=case.get("crystal_width_mm"),
+        crystal_height_mm=case.get("crystal_height_mm"),
     )
     tp: dict[str, Any] = dict(E_grid=E_grid, E_brem=E_brem, n_hat=n_hat, segs=segs, segs_b=segs_b)
     if _TIMING:
@@ -348,6 +357,8 @@ def _brem_for_case(case, E_brem):
         beam_dir=beam,
         layers=abs_layers,
         beam_fwhm_mm=case.get("beam_fwhm_mm"),
+        crystal_width_mm=case.get("crystal_width_mm"),
+        crystal_height_mm=case.get("crystal_height_mm"),
     )
     return _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers)
 

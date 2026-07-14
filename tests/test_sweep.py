@@ -17,7 +17,14 @@ from cxr_mc.materials import (
     MATERIAL_GRIDS,
     material_crystal_key,
 )
-from cxr_mc.sweep import MATERIAL_LABELS, Layer, Sweep, build_cases, crystal_params
+from cxr_mc.sweep import (
+    MATERIAL_LABELS,
+    Layer,
+    Sweep,
+    build_cases,
+    crystal_params,
+    geometry_table,
+)
 
 ALL = [
     "mose2",
@@ -87,6 +94,61 @@ def test_build_cases_is_cartesian_product():
     }
 
     assert required <= set(cases[0])
+
+
+def test_build_cases_sweeps_rectangular_footprints_and_labels_them():
+    cases = build_cases(
+        Sweep(
+            material="mose2",
+            thickness_ang=100.0,
+            energy_keV=30.0,
+            tilt_deg=0.0,
+            crystal_width_mm=[0.1, 0.2],
+            crystal_height_mm=[0.3, 0.4],
+        )
+    )
+
+    assert {(c["crystal_width_mm"], c["crystal_height_mm"]) for c in cases} == {
+        (0.1, 0.3),
+        (0.1, 0.4),
+        (0.2, 0.3),
+        (0.2, 0.4),
+    }
+    assert all(
+        c["name"].endswith(f"footprint={c['crystal_width_mm']:g}x{c['crystal_height_mm']:g}mm")
+        for c in cases
+    )
+
+    table = geometry_table(cases)
+    assert {"width [mm]", "height [mm]"} <= set(table.columns)
+    assert set(table["width [mm]"]) == {0.1, 0.2}
+    assert set(table["height [mm]"]) == {0.3, 0.4}
+
+
+@pytest.mark.parametrize(
+    ("width", "height"),
+    [
+        (0.1, None),
+        (None, 0.1),
+        (0.0, 0.1),
+        (0.1, -0.1),
+        (float("inf"), 0.1),
+        (0.1, float("inf")),
+    ],
+)
+def test_build_cases_rejects_invalid_footprint(width, height):
+    with pytest.raises(ValueError):
+        build_cases(Sweep(material="mose2", crystal_width_mm=width, crystal_height_mm=height))
+
+
+def test_build_cases_preserves_legacy_name_for_omitted_footprint():
+    case = build_cases(Sweep(material="mose2", thickness_ang=100.0, energy_keV=30.0, tilt_deg=0.0))[
+        0
+    ]
+
+    assert case["name"] == "MoSe2 10nm pol=0 az=0"
+    assert case["crystal_width_mm"] is None
+    assert case["crystal_height_mm"] is None
 
 
 def test_brem_grid_upper_limit_tracks_case_beam_energy():
