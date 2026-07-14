@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import matplotlib
 import numpy as np
 
@@ -35,3 +37,9 @@ def test_material_comparison_applies_minimum_line_energy():
         min_line_eV=100.0,
     )
     assert fig.axes[0].texts[0].get_text() == "  Test (60 keV)"
+
+
+def test_cross_material_tab_requests_new_comparisons():
+    source = Path("notebooks/analysis_app.py").read_text()
+    assert 'select="peak", min_line_eV=100.0' in source
+    assert 'select="line_brem_ratio", min_line_eV=100.0' in source
