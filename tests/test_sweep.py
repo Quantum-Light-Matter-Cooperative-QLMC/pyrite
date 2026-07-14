@@ -168,6 +168,42 @@ def test_uniform_linspace_endpoint_grid_roundtrips_through_legacy_triple(monkeyp
     np.testing.assert_array_equal(transport["E_grid"], line_grid)
 
 
+@pytest.mark.parametrize(
+    "line_grid",
+    [
+        75.0,
+        np.array([75.0, 75.0]),
+        np.array([50.0, 51.0, 52.0 + 1e-13]),
+    ],
+)
+def test_scalar_constant_and_near_uniform_energy_grids_stay_exact(monkeypatch, line_grid):
+    expected = np.atleast_1d(np.asarray(line_grid, dtype=float))
+    case = build_cases(
+        Sweep(
+            material="mose2",
+            thickness_ang=100.0,
+            energy_keV=[30.0, 40.0],
+            tilt_deg=0.0,
+            E_grid_line=line_grid,
+            E_grid_brem=75.0,
+        ),
+        n_electrons=1,
+        n_electrons_brem=1,
+    )[0]
+
+    assert isinstance(case["E_grid_line"], np.ndarray)
+    assert case["E_grid_line"].shape == expected.shape
+    assert not case["E_grid_line"].flags.writeable
+    assert not case["E_grid_brem"].flags.writeable
+    with pytest.raises(ValueError):
+        case["E_grid_line"][0] = -1.0
+
+    monkeypatch.setattr(runner, "simulate_trajectories", lambda *args, **kwargs: {})
+    transport = runner._transport_case(case)
+    np.testing.assert_array_equal(transport["E_grid"], expected)
+    np.testing.assert_array_equal(transport["E_brem"], [75.0])
+
+
 def test_build_cases_sweeps_rectangular_footprints_and_labels_them():
     cases = build_cases(
         Sweep(

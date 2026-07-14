@@ -7,25 +7,23 @@ type EnergyGridEncoding = tuple[float, float, float] | np.ndarray
 
 def encode_energy_grid(grid: object) -> EnergyGridEncoding:
     """Keep legacy triples for uniform grids and exact arrays otherwise."""
-    values = np.asarray(grid, dtype=float)
+    values = np.atleast_1d(np.asarray(grid, dtype=float))
     if values.size >= 2:
-        differences = np.diff(values)
-        step = float(differences[0])
-        tolerance = 1e-12 * max(1.0, abs(step))
-        if np.allclose(differences, step, rtol=1e-12, atol=tolerance):
+        step = float(values[1] - values[0])
+        if step != 0.0:
             start = float(values[0])
-            stop = float(values[-1]) + step
-            reconstructed = np.arange(start, stop, step, dtype=float)
-            if reconstructed.shape != values.shape or not np.allclose(
-                reconstructed, values, rtol=1e-12, atol=tolerance
-            ):
-                # ``last + step`` can admit one extra point for endpoint-inclusive
-                # linspace grids. A midpoint between the last value and its
-                # successor remains an exclusive arange stop without changing
-                # existing arange-derived legacy triples.
-                stop = float(values[-1]) + 0.5 * step
-            return (start, stop, step)
-    return values.copy()
+            # Prefer the historical stop for arange-derived grids. A midpoint
+            # stop avoids admitting an extra sample for some endpoint-inclusive
+            # linspace grids. Only encode either candidate when np.arange
+            # reproduces every declared float exactly; near-uniform grids must
+            # remain explicit rather than being silently rounded.
+            for stop in (float(values[-1]) + step, float(values[-1]) + 0.5 * step):
+                reconstructed = np.arange(start, stop, step, dtype=float)
+                if np.array_equal(reconstructed, values):
+                    return (start, stop, step)
+    exact = values.copy()
+    exact.setflags(write=False)
+    return exact
 
 
 def decode_energy_grid(encoded: object) -> np.ndarray:
