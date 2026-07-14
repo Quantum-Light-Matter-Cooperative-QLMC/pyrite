@@ -17,27 +17,36 @@ A single console script with subcommands, wired in pyproject.toml as
 """
 
 import argparse
+import sys
 
-from . import __version__, analyze, archive, check, check_config, export, remote, scan, slim
+from . import __version__
 
 
 def main(argv=None):
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
     ap = argparse.ArgumentParser(
         prog="cxr",
         description="Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.",
     )
     ap.add_argument("--version", action="version", version=f"cxr-mc {__version__}")
     sub = ap.add_subparsers(dest="command", required=True)
-    scan.add_subparser(sub)
-    export.add_subparser(sub)
-    analyze.add_subparser(sub)
-    slim.add_subparser(sub)
-    archive.add_subparser(sub)
-    remote.add_subparser(sub)
-    check.add_subparser(sub)
-    check_config.add_subparser(sub)
+    if raw_argv[:1] == ["check-config"]:
+        from . import check_config
 
-    args = ap.parse_args(argv)
+        check_config.add_subparser(sub)
+    else:
+        from . import analyze, archive, check, check_config, export, remote, scan, slim
+
+        scan.add_subparser(sub)
+        export.add_subparser(sub)
+        analyze.add_subparser(sub)
+        slim.add_subparser(sub)
+        archive.add_subparser(sub)
+        remote.add_subparser(sub)
+        check.add_subparser(sub)
+        check_config.add_subparser(sub)
+
+    args = ap.parse_args(raw_argv)
     return args.func(args)
 
 

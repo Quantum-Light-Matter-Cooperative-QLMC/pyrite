@@ -1,5 +1,7 @@
 """CLI checks for validating the bundled or an explicit material catalog."""
 
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -34,3 +36,37 @@ def test_check_config_reports_custom_catalog_errors_as_clean_cli_errors(
         cli.main(["check-config", str(invalid)])
 
     assert "Traceback" not in capsys.readouterr().err
+
+
+def test_check_config_reports_malformed_bundled_catalog_without_import_traceback(
+    tmp_path: Path,
+) -> None:
+    invalid = tmp_path / "broken-bundled.toml"
+    invalid.write_text('materials = ["hopg"]\n')
+    script = r"""
+import sys
+from pathlib import Path
+
+invalid = Path(sys.argv[1])
+real_open = Path.open
+
+def redirected_open(path, *args, **kwargs):
+    if path.name == "materials.toml":
+        return real_open(invalid, *args, **kwargs)
+    return real_open(path, *args, **kwargs)
+
+Path.open = redirected_open
+from cxr_mc import cli
+cli.main(["check-config"])
+"""
+
+    result = subprocess.run(
+        [sys.executable, "-c", script, str(invalid)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "invalid material catalog" in result.stderr
+    assert "Traceback" not in result.stderr

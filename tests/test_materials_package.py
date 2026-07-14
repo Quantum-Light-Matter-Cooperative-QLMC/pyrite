@@ -1,5 +1,8 @@
 """Contract tests for the material-physics package boundary."""
 
+import subprocess
+import sys
+
 import numpy as np
 
 
@@ -31,6 +34,40 @@ def test_materials_package_exports_only_registry_conveniences():
         "Layer",
     ):
         assert not hasattr(materials, legacy)
+
+
+def test_catalog_package_export_is_a_singleton():
+    import cxr_mc.materials as materials
+    from cxr_mc.materials import CATALOG
+
+    assert materials.CATALOG is CATALOG
+
+
+def test_importing_catalog_module_does_not_load_bundled_manifest():
+    script = r"""
+from pathlib import Path
+
+real_open = Path.open
+
+def guarded_open(path, *args, **kwargs):
+    if path.name == "materials.toml":
+        raise AssertionError("bundled catalog was loaded eagerly")
+    return real_open(path, *args, **kwargs)
+
+Path.open = guarded_open
+import cxr_mc.materials.catalog
+print("catalog module imported lazily")
+"""
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "catalog module imported lazily" in result.stdout
 
 
 def test_legacy_registry_and_crystal_toml_are_removed():

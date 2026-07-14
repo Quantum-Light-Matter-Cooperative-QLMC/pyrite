@@ -144,9 +144,9 @@ def reciprocal_g_vector(hkl, lattice):
 def load_crystals(catalog=None):
     """Project CIF-backed catalog crystals into mapping-style physics entries."""
     if catalog is None:
-        from .catalog import CATALOG
+        from .catalog import _get_default_catalog
 
-        catalog = CATALOG
+        catalog = _get_default_catalog()
     return {
         key: {
             "lattice": spec.lattice,

@@ -9,7 +9,6 @@ the total linear attenuation summed over elements, and the layered
 
 import numpy as np
 
-from ..montecarlo._backend import _GPU, REAL, _to_cpu, cp
 from .crystal import absorption_length_ang
 
 
@@ -40,6 +39,8 @@ def _mu_total_inv_ang(comp, E_eV):
     output is multiplied into the host-side spectra in the notebook). Keying off
     the input device -- not the global _GPU flag -- keeps the CPU post-processing
     path numpy even when a GPU is present."""
+    from ..montecarlo._backend import _GPU, REAL, _to_cpu, cp
+
     E_cpu = _to_cpu(E_eV)
     mu = 0.0
     for el, n_i in comp:

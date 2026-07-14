@@ -13,6 +13,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 from types import MappingProxyType
 from typing import cast
 
@@ -811,10 +812,20 @@ def load_material_catalog(path: Path | None = None) -> MaterialCatalog:
     )
 
 
-CATALOG = load_material_catalog()
+_DEFAULT_CATALOG: MaterialCatalog | None = None
+_DEFAULT_CATALOG_LOCK = Lock()
+
+
+def _get_default_catalog() -> MaterialCatalog:
+    """Load the bundled catalog once, on first package-level access."""
+    global _DEFAULT_CATALOG
+    if _DEFAULT_CATALOG is None:
+        with _DEFAULT_CATALOG_LOCK:
+            if _DEFAULT_CATALOG is None:
+                _DEFAULT_CATALOG = load_material_catalog()
+    return _DEFAULT_CATALOG
 
 __all__ = [
-    "CATALOG",
     "CrystalInfo",
     "CrystalSpec",
     "LayerSpec",

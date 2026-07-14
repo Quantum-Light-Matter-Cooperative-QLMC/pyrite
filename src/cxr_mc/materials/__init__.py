@@ -5,7 +5,6 @@ Import atomic, crystal, or attenuation details from their owning submodules.
 """
 
 from .catalog import (
-    CATALOG,
     CrystalInfo,
     CrystalSpec,
     LayerSpec,
@@ -16,10 +15,30 @@ from .catalog import (
     ScanSpec,
     load_material_catalog,
 )
-from .crystal import CRYSTALS
 
-MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
-MATERIALS = CATALOG.material_keys
+CATALOG: MaterialCatalog
+CRYSTALS: dict[str, dict[str, object]]
+MATERIAL_LABELS: dict[str, str]
+MATERIALS: tuple[str, ...]
+
+
+def __getattr__(name: str):
+    """Lazily construct catalog-backed package conveniences."""
+    if name == "CATALOG":
+        from .catalog import _get_default_catalog
+
+        value = _get_default_catalog()
+    elif name == "CRYSTALS":
+        from .crystal import CRYSTALS as value
+    elif name == "MATERIAL_LABELS":
+        catalog = __getattr__("CATALOG")
+        value = {key: material.label for key, material in catalog.materials.items()}
+    elif name == "MATERIALS":
+        value = __getattr__("CATALOG").material_keys
+    else:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    globals()[name] = value
+    return value
 
 __all__ = [
     "CRYSTALS",
