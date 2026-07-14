@@ -160,7 +160,7 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
     assert material in MATERIALS
 
     grid = material_grid(material)
-    assert grid["thickness_ang"] == 1e4
+    assert grid["thickness_ang"] == 10e4
     assert "substrate" not in grid
 
     params = crystal_params(material, n_families=999)

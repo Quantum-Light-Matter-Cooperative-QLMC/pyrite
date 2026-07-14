@@ -322,7 +322,7 @@ MATERIAL_CONFIGS: dict[str, MaterialConfig] = {
             "layered cut, so the reciprocal vector remains parallel to the "
             "slab normal; standard-Pmmn (010) is a different extinct direction."
         ),
-        "thickness_ang": 1e4,
+        "thickness_ang": 10e4,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(0, 85, 20, endpoint=False),
         "tilt_azim_deg": np.linspace(0, 180, 9, endpoint=True),
@@ -341,7 +341,7 @@ MATERIAL_CONFIGS: dict[str, MaterialConfig] = {
             "Pin the requested 1T-TiS2(003) symmetric-cut reflection so the "
             "reciprocal vector remains parallel to the basal slab normal."
         ),
-        "thickness_ang": 1e4,
+        "thickness_ang": 10e4,
         "energy_keV": [25, 30, 35],
         "tilt_deg": np.linspace(0, 85, 20, endpoint=False),
         "tilt_azim_deg": np.linspace(0, 180, 9, endpoint=True),
