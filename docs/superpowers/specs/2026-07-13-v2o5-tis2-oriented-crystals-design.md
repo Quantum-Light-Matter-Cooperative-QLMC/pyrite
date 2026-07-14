@@ -18,7 +18,8 @@ asymmetric-reflection or reciprocal-miscut model.
 Add `v2o5` to `crystal_structures.toml` as the ambient alpha phase:
 
 - orthorhombic Pmmn, with a complete two-formula-unit conventional basis;
-- lattice constants `a = 3.564`, `b = 11.512`, and `c = 4.368` Angstrom;
+- standard-Pmmn lattice constants `a = 11.512`, `b = 3.564`, and `c = 4.368`
+  Angstrom;
 - the explicitly expanded V and three inequivalent O sites use the cited
   crystallographic fractional coordinates.
 
@@ -45,16 +46,17 @@ and the standard positive tilt/azimuth grids.
 
 | Material | Slab-normal direct axis | Pinned radiation family | Reason |
 | --- | --- | --- | --- |
-| `v2o5` | `[010]` | `+-(020)` | Represents the requested V2O5(010) single-crystal cut with its first symmetry-allowed normal reflection, so `g || n`. |
+| `v2o5` | `[001]` | `+-(001)` | Represents the V2O5 layered cut conventionally reported as `(010)` in the historical Pmnm setting; in standard Pmmn it is `(001)`, so `g || n`. |
 | `tis2` | `[001]` | `+-(003)` | Represents the requested 1T-TiS2(003) basal cut with `g || n`. |
 
 The requested reflections are pinned rather than selected by
-`dominant_reflections`. The Pmmn V2O5 basis makes `(010)` systematically
-extinct; `(020)` is its first symmetry-allowed reflection parallel to the
-requested `(010)` slab normal. Automatic selection might choose an asymmetric
-plane; that would require the separate `n`/`g` split model and is out of scope.
-The V2O5 line grid will cover its lower-energy `(020)` line and the TiS2 grid
-will extend sufficiently high for `(003)`.
+`dominant_reflections`. V2O5 uses two axis conventions in the literature:
+the historical Pmnm `(010)` layered cut maps to standard-Pmmn `(001)`. Although
+standard-Pmmn `(010)` is extinct, it is a different physical direction and is
+not the requested layered reflection. Automatic selection might choose an
+asymmetric plane; that would require the separate `n`/`g` split model and is
+out of scope. The V2O5 line grid will cover its lower-energy `(001)` line and
+the TiS2 grid will extend sufficiently high for `(003)`.
 
 ## Transport and validation
 
