@@ -308,6 +308,46 @@ MATERIAL_CONFIGS: dict[str, MaterialConfig] = {
         "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
+    # Alpha-V2O5's layered cut is conventionally called (010) in historical
+    # Pmnm indexing; it is (001) in standard Pmmn. Pin the normal reflection so
+    # g remains parallel to the slab normal; do not auto-select an asymmetric plane.
+    "v2o5": {
+        "label": "V2O5 (010)",
+        "B_ang2": 0.6,
+        "beam_uvw": (0, 0, 1),
+        "E_grid": np.arange(50.0, 4000.0, 3.0),
+        "hkl_list": pm((0, 0, 1)),
+        "hkl_list_reason": (
+            "Use standard-Pmmn (001), equivalent to the historical V2O5(010) "
+            "layered cut, so the reciprocal vector remains parallel to the "
+            "slab normal; standard-Pmmn (010) is a different extinct direction."
+        ),
+        "thickness_ang": 1e4,
+        "energy_keV": [25, 30, 35],
+        "tilt_deg": np.linspace(0, 85, 20, endpoint=False),
+        "tilt_azim_deg": np.linspace(0, 180, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4000.0, 3.0),
+        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
+    },
+    # 1T-TiS2 single crystal on the (003) basal reflection. One layer per 1T
+    # cell makes this odd 00l order allowed; pin it to preserve g || slab normal.
+    "tis2": {
+        "label": "1T-TiS2 (003)",
+        "B_ang2": 0.6,
+        "beam_uvw": (0, 0, 1),
+        "E_grid": np.arange(350.0, 8000.0, 3.0),
+        "hkl_list": pm((0, 0, 3)),
+        "hkl_list_reason": (
+            "Pin the requested 1T-TiS2(003) symmetric-cut reflection so the "
+            "reciprocal vector remains parallel to the basal slab normal."
+        ),
+        "thickness_ang": 1e4,
+        "energy_keV": [25, 30, 35],
+        "tilt_deg": np.linspace(0, 85, 20, endpoint=False),
+        "tilt_azim_deg": np.linspace(0, 180, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 9000.0, 3.0),
+        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
+    },
     # 2H disulfides, isostructural with WSe2/MoSe2 (small in-plane a -> bright). S has
     # no NIST Mott table -> analytic SR screening fallback.
     "ws2": {

@@ -35,6 +35,8 @@ ALL = [
     "silicon",
     "hopg",
     "hbn",
+    "v2o5",
+    "tis2",
 ]
 
 
@@ -142,6 +144,46 @@ def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcog
     case = build_cases(sweep, n_electrons=2, n_electrons_brem=1)[0]
     assert case["crystal"] == material
     assert case["composition"] == params["composition"]
+
+
+@pytest.mark.parametrize(
+    ("material", "label", "beam_uvw", "hkl_list", "ratio"),
+    [
+        ("v2o5", "V2O5 (010)", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"V": 1, "O": 2.5}),
+        ("tis2", "1T-TiS2 (003)", (0, 0, 1), [(0, 0, 3), (0, 0, -3)], {"Ti": 1, "S": 2}),
+    ],
+)
+def test_oriented_materials_are_registered_as_symmetric_cuts(
+    material, label, beam_uvw, hkl_list, ratio
+):
+    assert MATERIAL_LABELS[material] == label
+    assert material in MATERIALS
+
+    grid = material_grid(material)
+    assert grid["thickness_ang"] == 1e4
+    assert "substrate" not in grid
+
+    params = crystal_params(material, n_families=999)
+    composition = dict(params["composition"])
+    assert params["beam_uvw"] == beam_uvw
+    assert params["hkl_list"] == hkl_list
+    assert MATERIAL_CONFIGS[material]["hkl_list_reason"]
+    for element, count in ratio.items():
+        assert composition[element] / min(composition.values()) == pytest.approx(count)
+
+    sweep = Sweep(
+        material=material,
+        thickness_ang=100.0,
+        energy_keV=30.0,
+        tilt_deg=30.0,
+        tilt_azim_deg=0.0,
+        E_grid_line=np.arange(500.0, 520.0, 5.0),
+        E_grid_brem=np.arange(0.0, 1000.0, 100.0),
+    )
+    case = build_cases(sweep, n_electrons=2, n_electrons_brem=1)[0]
+    assert case["crystal"] == material
+    assert case["beam_uvw"] == beam_uvw
+    assert case["hkl_list"] == hkl_list
 
 
 def test_material_registry_projects_scan_and_crystal_views():
