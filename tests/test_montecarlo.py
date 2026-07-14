@@ -59,6 +59,14 @@ def test_vanadium_transport_parameters():
     }
 
 
+def test_titanium_transport_parameters():
+    assert TRANSPORT_ELEMENTS["Ti"] == {
+        "Z": 22,
+        "A": pytest.approx(47.867, abs=0.001),
+        "J_keV": 0.233,
+    }
+
+
 def test_niobium_transport_parameters_and_fallback(monkeypatch):
     params = TRANSPORT_ELEMENTS["Nb"]
     assert params == {"Z": 41, "A": pytest.approx(92.906, abs=0.001), "J_keV": 0.417}

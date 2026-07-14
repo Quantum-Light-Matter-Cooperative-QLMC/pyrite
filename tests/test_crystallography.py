@@ -22,6 +22,7 @@ EXPECTED = {
     "silicon",
     "lif",
     "v2o5",
+    "tis2",
     "hopg",
     "hbn",
     "mose2",
@@ -116,6 +117,28 @@ def test_v2o5_010_structure_and_couplings_are_sane():
     structure, g = structure_factor("v2o5", (0, 0, 1), 1500.0, B_ang2=0.6)
     susceptibility = chi_g("v2o5", (0, 0, 1), 1500.0, B_ang2=0.6)
     potential = U_g("v2o5", (0, 0, 1), 1500.0, B_ang2=0.6)
+    assert g > 0.0
+    assert np.isfinite(abs(structure)) and abs(structure) > 0.0
+    assert np.isfinite(abs(susceptibility)) and abs(susceptibility) > 0.0
+    assert np.isfinite(abs(potential)) and abs(potential) > 0.0
+
+
+def test_tis2_003_structure_and_couplings_are_sane():
+    # 1T-TiS2 P-3m1: a=3.407, c=5.695 A; one TiS2 per cell.
+    info = CRYSTALS["tis2"]
+    basis = info["basis"]
+
+    assert info["lattice"]["system"] == "hexagonal"
+    assert info["lattice"]["a"] == pytest.approx(3.407)
+    assert info["lattice"]["c"] == pytest.approx(5.695)
+    assert info["V_cell"] == pytest.approx(np.sqrt(3.0) * 3.407**2 * 5.695 / 2.0, abs=0.1)
+    assert len(basis) == 3
+    assert sum(element == "Ti" for element, _ in basis) == 1
+    assert sum(element == "S" for element, _ in basis) == 2
+
+    structure, g = structure_factor("tis2", (0, 0, 3), 5000.0, B_ang2=0.6)
+    susceptibility = chi_g("tis2", (0, 0, 3), 5000.0, B_ang2=0.6)
+    potential = U_g("tis2", (0, 0, 3), 5000.0, B_ang2=0.6)
     assert g > 0.0
     assert np.isfinite(abs(structure)) and abs(structure) > 0.0
     assert np.isfinite(abs(susceptibility)) and abs(susceptibility) > 0.0
