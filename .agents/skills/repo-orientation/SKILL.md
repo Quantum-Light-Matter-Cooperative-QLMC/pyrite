@@ -18,11 +18,20 @@ description: Use when locating code, choosing an owning module, assessing cxr-mc
 
 ## Canonical Commands
 
+
 - `uv run python scripts/dev.py repo-map`
 - `uv run python scripts/dev.py lint`
 - `uv run python scripts/dev.py format`
 - `uv run python scripts/dev.py test`
 - `uv run python scripts/dev.py verify`
+
+## Optional semantic navigation (Serena)
+
+When Serena is available, prefer its `find_symbol`,
+`find_referencing_symbols`, and `get_symbols_overview` tools for code
+navigation; use `rename_symbol` for cross-file renames.
+
+Troubleshooting: `serena project health-check`
 
 ## Before Changing Code
 
