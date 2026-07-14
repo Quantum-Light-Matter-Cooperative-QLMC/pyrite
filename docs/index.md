@@ -25,6 +25,13 @@ atomic-data-sources
 ```
 
 ```{toctree}
+:caption: Research notes
+:maxdepth: 1
+
+nonrelativistic-pxr-cbs-material-survey
+```
+
+```{toctree}
 :caption: API reference
 :maxdepth: 2
 
