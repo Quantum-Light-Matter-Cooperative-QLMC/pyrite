@@ -8,6 +8,16 @@ def test_materials_package_exports_only_registry_conveniences():
 
     assert set(materials.__all__) == {
         "CRYSTALS",
+        "CATALOG",
+        "MaterialCatalog",
+        "CrystalInfo",
+        "CrystalSpec",
+        "MediumSpec",
+        "MaterialSpec",
+        "ScanSpec",
+        "LayerSpec",
+        "MaterialConfigError",
+        "load_material_catalog",
         "MATERIAL_CONFIGS",
         "MATERIAL_GRIDS",
         "CRYSTAL_PARAMS",

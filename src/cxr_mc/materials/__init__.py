@@ -4,6 +4,18 @@ The package-level surface intentionally contains only scan-selection convenience
 Import atomic, crystal, or attenuation details from their owning submodules.
 """
 
+from .catalog import (
+    CATALOG,
+    CrystalInfo,
+    CrystalSpec,
+    LayerSpec,
+    MaterialCatalog,
+    MaterialConfigError,
+    MaterialSpec,
+    MediumSpec,
+    ScanSpec,
+    load_material_catalog,
+)
 from .crystal import CRYSTALS
 from .registry import (
     CRYSTAL_PARAMS,
@@ -23,6 +35,16 @@ from .registry import (
 
 __all__ = [
     "CRYSTALS",
+    "CATALOG",
+    "MaterialCatalog",
+    "CrystalInfo",
+    "CrystalSpec",
+    "MediumSpec",
+    "MaterialSpec",
+    "ScanSpec",
+    "LayerSpec",
+    "MaterialConfigError",
+    "load_material_catalog",
     "MATERIAL_CONFIGS",
     "MATERIAL_GRIDS",
     "CRYSTAL_PARAMS",

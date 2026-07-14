@@ -15,6 +15,7 @@ from functools import cache
 import numpy as np
 
 from .. import DATA_DIR
+from ..materials._transport_data import TRANSPORT_ELEMENTS
 from ..materials.attenuation import _normalize_composition
 from .geometry import (
     X_MAX,
@@ -31,31 +32,6 @@ logger = logging.getLogger(__name__)
 
 MOTT_DIR = str(DATA_DIR / "mott_transport_cross_sections")
 A0_SQ_CM2 = 2.8002852e-17  # Bohr radius squared [cm^2] (NIST SRD 64 unit)
-
-# ---- element data for transport ---------------------------------------------
-# A [g/mol], J = mean ionization potential [keV] (Berger-Seltzer values)
-TRANSPORT_ELEMENTS = {
-    "B": {"Z": 5, "A": 10.81, "J_keV": 0.076},
-    "C": {"Z": 6, "A": 12.011, "J_keV": 0.078},
-    "N": {"Z": 7, "A": 14.007, "J_keV": 0.082},
-    "Si": {"Z": 14, "A": 28.085, "J_keV": 0.173},
-    "Ge": {"Z": 32, "A": 72.630, "J_keV": 0.350},
-    "Se": {"Z": 34, "A": 78.971, "J_keV": 0.348},
-    "Te": {"Z": 52, "A": 127.60, "J_keV": 0.485},
-    "S": {"Z": 16, "A": 32.06, "J_keV": 0.180},
-    "Ti": {"Z": 22, "A": 47.867, "J_keV": 0.233},
-    "V": {"Z": 23, "A": 50.9415, "J_keV": 0.245},
-    "Mo": {"Z": 42, "A": 95.95, "J_keV": 0.424},
-    "Nb": {"Z": 41, "A": 92.906, "J_keV": 0.417},
-    "W": {"Z": 74, "A": 183.84, "J_keV": 0.727},
-    "Zr": {"Z": 40, "A": 91.224, "J_keV": 0.393},
-    "Hf": {"Z": 72, "A": 178.49, "J_keV": 0.705},
-    "Pt": {"Z": 78, "A": 195.08, "J_keV": 0.790},
-    # substrate elements (SiO2 / Al2O3); J = ICRU 37 mean excitation energy
-    "O": {"Z": 8, "A": 15.999, "J_keV": 0.095},
-    "Al": {"Z": 13, "A": 26.982, "J_keV": 0.166},
-}
-
 
 def beta_from_keV(E_keV):
     g = 1.0 + E_keV / 510.99895
