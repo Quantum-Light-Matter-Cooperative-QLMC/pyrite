@@ -95,18 +95,19 @@ basis = [
     { element = "O",  pos = [0.63957333, 0.97290667, 0.41666667] },
 ]
 
-# Alpha-V2O5, ambient orthorhombic Pmmn (two formula units per cell).
-# a=3.564, b=11.512, c=4.368 A: McColl, Johnson & Cora, PCCP 20, 15002
+# Alpha-V2O5, ambient orthorhombic standard Pmmn (two formula units per cell).
+# a=11.512, b=3.564, c=4.368 A: McColl, Johnson & Cora, PCCP 20, 15002
 # (2018), doi:10.1039/C8CP02187B. Four unique-site coordinates are from
 # Sipr et al., Phys. Rev. B 60, 14115 (1999), doi:10.1103/PhysRevB.60.14115.
 # The loader has no space-group expansion, so 4f and 2a sites are explicit.
-# Assumes stoichiometric ambient alpha-V2O5. Limiting checks: V=a*b*c, 4V+10O,
-# and finite F/chi/U for the first allowed normal (020) reflection.
+# Assumes stoichiometric ambient alpha-V2O5. The historical Pmnm (010) layered
+# cut is standard-Pmmn (001). Limiting checks: V=a*b*c, 4V+10O, and finite
+# F/chi/U for that normal (001) reflection.
 # Validation: v2o5-010-structure
 [v2o5]
 system = "orthorhombic"
-a = 3.564
-b = 11.512
+a = 11.512
+b = 3.564
 c = 4.368
 basis = [
     { element = "V", pos = [0.10118, 0.25, 0.8917] },
