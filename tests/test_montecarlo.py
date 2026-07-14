@@ -142,7 +142,14 @@ def test_beam_fwhm_mm_offsets_transverse_position_only():
 
     for key in ("E_keV", "v_hat", "L_ang", "t_ang", "elec_id", "layer"):
         assert np.array_equal(point[key], finite[key]), key
-    for key in ("n_backscattered", "n_transmitted", "n_stopped", "Ne"):
+    for key in (
+        "n_backscattered",
+        "n_transmitted",
+        "n_stopped",
+        "n_side_exited",
+        "n_missed",
+        "Ne",
+    ):
         assert point[key] == finite[key]
 
     # depth (z) is identical; transverse (x, y) differs by a per-electron
@@ -189,3 +196,93 @@ def test_beam_fwhm_mm_seed_reproducible():
     a = simulate_trajectories(30.0, 50, 100.0, **kw)
     b = simulate_trajectories(30.0, 50, 100.0, **kw)
     assert np.array_equal(a["r_mid"], b["r_mid"])
+
+
+def test_finite_footprint_truncates_lateral_transport_and_counts_side_exit():
+    cp = crystal_params("hbn")
+    segs = simulate_trajectories(
+        30.0,
+        64,
+        1e8,
+        composition=cp["composition"],
+        seed=4,
+        elastic_model="sr",
+        beam_dir=[0.8, 0.0, 0.6],
+        max_steps=1,
+        crystal_width_mm=1e-6,
+        crystal_height_mm=1e-6,
+    )
+    assert segs["n_side_exited"] == 64
+    assert segs["n_transmitted"] == segs["n_backscattered"] == 0
+    assert np.all(np.abs(segs["r_mid"][:, 0]) < 5.0)
+
+
+def test_finite_footprint_counts_missed_gaussian_entries_without_changing_ne():
+    cp = crystal_params("hbn")
+    segs = simulate_trajectories(
+        30.0,
+        2_000,
+        100.0,
+        composition=cp["composition"],
+        seed=7,
+        elastic_model="sr",
+        max_steps=1,
+        beam_fwhm_mm=1.0,
+        crystal_width_mm=1e-6,
+        crystal_height_mm=1e-6,
+    )
+    assert segs["Ne"] == 2_000
+    assert segs["n_missed"] > 1_900
+    assert np.all(np.abs(segs["r_mid"][:, :2]) <= 5.0)
+
+
+def test_all_missed_entries_return_typed_empty_segment_arrays():
+    cp = crystal_params("hbn")
+    segs = simulate_trajectories(
+        30.0,
+        4,
+        100.0,
+        composition=cp["composition"],
+        seed=2,
+        elastic_model="sr",
+        beam_fwhm_mm=1e8,
+        crystal_width_mm=1e-6,
+        crystal_height_mm=1e-6,
+    )
+    assert segs["n_missed"] == segs["Ne"] == 4
+    assert segs["r_mid"].shape == segs["v_hat"].shape == (0, 3)
+    assert segs["L_ang"].shape == segs["E_keV"].shape == segs["t_ang"].shape == (0,)
+    assert segs["elec_id"].dtype == np.dtype("int64")
+    assert segs["layer"].dtype == np.dtype("int16")
+
+
+def test_omitted_footprint_is_bitwise_legacy_transport():
+    cp = crystal_params("hbn")
+    kw = dict(composition=cp["composition"], seed=19, elastic_model="sr", max_steps=5)
+    old = simulate_trajectories(30.0, 40, 100.0, **kw)
+    new = simulate_trajectories(
+        30.0,
+        40,
+        100.0,
+        crystal_width_mm=None,
+        crystal_height_mm=None,
+        **kw,
+    )
+    for key in ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "elec_id", "layer"):
+        assert np.array_equal(old[key], new[key]), key
+
+
+@pytest.mark.parametrize(
+    ("width_mm", "height_mm"), [(None, 1.0), (1.0, None), (0.0, 1.0), (-1.0, 1.0)]
+)
+def test_finite_footprint_rejects_invalid_dimension_pairs(width_mm, height_mm):
+    cp = crystal_params("hbn")
+    with pytest.raises(ValueError):
+        simulate_trajectories(
+            30.0,
+            4,
+            100.0,
+            composition=cp["composition"],
+            crystal_width_mm=width_mm,
+            crystal_height_mm=height_mm,
+        )

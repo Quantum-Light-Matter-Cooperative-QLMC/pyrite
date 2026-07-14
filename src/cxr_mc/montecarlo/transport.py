@@ -16,6 +16,16 @@ import numpy as np
 
 from .. import DATA_DIR
 from ..materials.attenuation import _normalize_composition
+from .geometry import (
+    X_MAX,
+    X_MIN,
+    Y_MAX,
+    Y_MIN,
+    Z_MAX,
+    Z_MIN,
+    first_prism_exit,
+    validate_transverse_dimensions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -215,6 +225,8 @@ def simulate_trajectories(
     composition=None,
     layers=None,
     beam_fwhm_mm=None,
+    crystal_width_mm=None,
+    crystal_height_mm=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -276,13 +288,35 @@ def simulate_trajectories(
     near-field-detector or finite-crystal-footprint model, where the transverse
     entry point would start to matter.
 
+    crystal_width_mm, crystal_height_mm: optional full transverse dimensions
+    [mm] of a rectangular prism centered at the beam origin. Both must be
+    supplied and strictly positive, or both omitted. Finite dimensions are
+    converted once to Angstrom and define the transport volume
+    ``[-width/2, width/2] x [-height/2, height/2] x [0, thickness]``. An
+    incident Gaussian entry point outside that footprint is counted in
+    ``n_missed`` and produces no segment, but remains in ``Ne`` so all yields
+    retain their per-incident-electron normalization. Side-face exits are
+    counted separately in ``n_side_exited``. The all-``None`` limiting case is
+    the original laterally infinite slab and follows its legacy free-flight
+    path without invoking the prism-exit helper. Each finite free flight is
+    capped at the smallest positive ray boundary solution ``p + s d`` on a
+    prism face; this assumes an axis-aligned rectangular footprint.
+
     Returns dict of per-segment arrays:
       "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
       "t_ang" (M,), "elec_id" (M,), "layer" (M,) [emitting layer index]
-    and diagnostics: "n_backscattered", "n_transmitted", "n_stopped", "n_layers".
+    and diagnostics: "n_backscattered", "n_transmitted", "n_side_exited",
+    "n_missed", "n_stopped", "n_layers".
 
-    Validation: electron-transport, finite-beam-size
+    Validation: electron-transport, finite-beam-size, finite-transverse-crystal
     """
+    width_mm, height_mm = validate_transverse_dimensions(
+        crystal_width_mm, crystal_height_mm, unit="mm"
+    )
+    width_ang = None if width_mm is None else width_mm * 1.0e7
+    height_ang = None if height_mm is None else height_mm * 1.0e7
+    finite_footprint = width_ang is not None
+
     # Build the layer stack: explicit `layers` (film-on-substrate) overrides;
     # else a single layer spanning the slab (bit-for-bit the old transport).
     if layers is None:
@@ -344,8 +378,14 @@ def simulate_trajectories(
         raise ValueError("beam_dir must point into the slab (z component > 0)")
     dirs = np.tile(beam_dir, (Ne, 1))
     E = np.full(Ne, float(E0_keV))
-    alive = np.ones(Ne, dtype=bool)
-    n_back = n_trans = 0
+    if finite_footprint:
+        assert height_ang is not None
+        alive = (np.abs(pos[:, 0]) <= width_ang / 2.0) & (np.abs(pos[:, 1]) <= height_ang / 2.0)
+        n_missed = int((~alive).sum())
+    else:
+        alive = np.ones(Ne, dtype=bool)
+        n_missed = 0
+    n_back = n_trans = n_side = 0
     # per-electron clock: cumulative flight "time" sum(L/beta) [Ang, c=1], the
     # same unit as the radiation interaction time t_L. Recorded at each segment's
     # START so a segment carries (depth, energy, age) -- consumed by the
@@ -401,22 +441,39 @@ def simulate_trajectories(
 
             d = dirs[grp]  # current unit direction of each electron
             p = pos[grp]  # current position [Ang]
-            dz = d[:, 2]
-            pz = p[:, 2]
-
             # -- 2. truncate at THIS layer's faces ------------------------------
             # The entrance face (z_top==0) and back face (z_bot==z_total) are
             # exits (vacuum -> no re-entry); an INTERNAL boundary instead hands
             # the electron to the neighbor layer with NO collision (it continues
             # straight and re-samples its free path in that layer next iteration).
-            cross_up = (dz < 0) & (pz + step * dz < z_top_L)
-            cross_dn = (dz > 0) & (pz + step * dz > z_bot_L)
-            s_up = np.where(dz < 0, (pz - z_top_L) / (-dz + 1e-300), np.inf)
-            s_dn = np.where(dz > 0, (z_bot_L - pz) / (dz + 1e-300), np.inf)
-            step = np.where(cross_up, s_up, step)
-            step = np.where(cross_dn, s_dn, step)
-            exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
-            exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
+            if finite_footprint:
+                exit_distance, exit_face = first_prism_exit(
+                    p,
+                    d,
+                    z_min_ang=z_top_L,
+                    z_max_ang=z_bot_L,
+                    width_ang=width_ang,
+                    height_ang=height_ang,
+                )
+                crossed_face = step > exit_distance
+                step = np.where(crossed_face, exit_distance, step)
+                cross_up = crossed_face & (exit_face == Z_MIN)
+                cross_dn = crossed_face & (exit_face == Z_MAX)
+                exit_side = crossed_face & np.isin(exit_face, (X_MIN, X_MAX, Y_MIN, Y_MAX))
+                exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
+                exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
+            else:
+                dz = d[:, 2]
+                pz = p[:, 2]
+                cross_up = (dz < 0) & (pz + step * dz < z_top_L)
+                cross_dn = (dz > 0) & (pz + step * dz > z_bot_L)
+                s_up = np.where(dz < 0, (pz - z_top_L) / (-dz + 1e-300), np.inf)
+                s_dn = np.where(dz > 0, (z_bot_L - pz) / (dz + 1e-300), np.inf)
+                step = np.where(cross_up, s_up, step)
+                step = np.where(cross_dn, s_dn, step)
+                exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
+                exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
+                exit_side = np.zeros(grp.size, dtype=bool)
 
             # -- 3. record the segment (the radiation source list) --------------
             # midpoint -> escape-absorption path; direction -> v.g, v.n in the
@@ -438,9 +495,10 @@ def simulate_trajectories(
             clock[grp] += step / beta_from_keV(Ea)
 
             # -- 5. kill exited / exhausted; pass internal crossers on ----------
-            died = exit_top | exit_bot | (E[grp] < E_cut_keV)
+            died = exit_top | exit_bot | exit_side | (E[grp] < E_cut_keV)
             n_back += int(exit_top.sum())  # exited the entrance face
             n_trans += int(exit_bot.sum())  # punched through the back face
+            n_side += int(exit_side.sum())  # exited a transverse prism face
             alive[grp[died]] = False
             crossed_internal = (cross_up | cross_dn) & ~died  # reached a layer seam
             if crossed_internal.any():
@@ -451,7 +509,7 @@ def simulate_trajectories(
             # (truncated flights did not collide). The scattering ELEMENT is
             # chosen with probability n_i sigma_i / sum; the polar angle from that
             # element's screened-Rutherford inversion; azimuth uniform; E unchanged.
-            full = ~(cross_up | cross_dn) & ~died
+            full = ~(cross_up | cross_dn | exit_side) & ~died
             srv = grp[full]
             if srv.size:
                 cos_t = np.empty(srv.size)
@@ -471,18 +529,39 @@ def simulate_trajectories(
                 phi = 2.0 * np.pi * rng.random(srv.size)
                 dirs[srv] = _rotate_directions(dirs[srv], cos_t, phi)
 
+    if finite_footprint and not seg_mid:
+        r_mid = np.empty((0, 3), dtype=float)
+        v_hat = np.empty((0, 3), dtype=float)
+        L_ang = np.empty(0, dtype=float)
+        E_keV = np.empty(0, dtype=float)
+        t_ang = np.empty(0, dtype=float)
+        elec_id = np.empty(0, dtype=np.int64)
+        layer = np.empty(0, dtype=np.int16)
+    else:
+        r_mid = np.concatenate(seg_mid)
+        v_hat = np.concatenate(seg_dir)
+        L_ang = np.concatenate(seg_len)
+        E_keV = np.concatenate(seg_E)
+        t_ang = np.concatenate(seg_t0)
+        elec_id = np.concatenate(seg_id)
+        layer = np.concatenate(seg_lay)
+
     return {
-        "r_mid": np.concatenate(seg_mid),
-        "v_hat": np.concatenate(seg_dir),
-        "L_ang": np.concatenate(seg_len),
-        "E_keV": np.concatenate(seg_E),
-        "t_ang": np.concatenate(seg_t0),  # segment-start age sum(L/beta) [Ang, c=1]
-        "elec_id": np.concatenate(seg_id),  # emitting electron index in [0, Ne)
-        "layer": np.concatenate(seg_lay),  # emitting layer index in [0, n_layers)
+        "r_mid": r_mid,
+        "v_hat": v_hat,
+        "L_ang": L_ang,
+        "E_keV": E_keV,
+        "t_ang": t_ang,  # segment-start age sum(L/beta) [Ang, c=1]
+        "elec_id": elec_id,  # emitting electron index in [0, Ne)
+        "layer": layer,  # emitting layer index in [0, n_layers)
         "n_backscattered": n_back,
         "n_transmitted": n_trans,
-        "n_stopped": int(Ne - n_back - n_trans),
+        "n_side_exited": n_side,
+        "n_missed": n_missed,
+        "n_stopped": int(Ne - n_back - n_trans - n_side - n_missed),
         "Ne": Ne,
         "thickness_ang": z_total,
+        "crystal_width_ang": width_ang,
+        "crystal_height_ang": height_ang,
         "n_layers": n_layers,
     }
