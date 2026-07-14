@@ -45,13 +45,15 @@ and the standard positive tilt/azimuth grids.
 
 | Material | Slab-normal direct axis | Pinned radiation family | Reason |
 | --- | --- | --- | --- |
-| `v2o5` | `[010]` | `+-(010)` | Represents the requested V2O5(010) single-crystal cut with `g || n`. |
+| `v2o5` | `[010]` | `+-(020)` | Represents the requested V2O5(010) single-crystal cut with its first symmetry-allowed normal reflection, so `g || n`. |
 | `tis2` | `[001]` | `+-(003)` | Represents the requested 1T-TiS2(003) basal cut with `g || n`. |
 
 The requested reflections are pinned rather than selected by
-`dominant_reflections`. Automatic selection might choose an asymmetric plane;
-that would require the separate `n`/`g` split model and is out of scope.
-The V2O5 line grid will cover its lower-energy `(010)` line and the TiS2 grid
+`dominant_reflections`. The Pmmn V2O5 basis makes `(010)` systematically
+extinct; `(020)` is its first symmetry-allowed reflection parallel to the
+requested `(010)` slab normal. Automatic selection might choose an asymmetric
+plane; that would require the separate `n`/`g` split model and is out of scope.
+The V2O5 line grid will cover its lower-energy `(020)` line and the TiS2 grid
 will extend sufficiently high for `(003)`.
 
 ## Transport and validation
