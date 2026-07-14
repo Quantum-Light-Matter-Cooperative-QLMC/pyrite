@@ -1366,7 +1366,9 @@ def _(
     def cross_material_tab():
         _md = mo.md(
             "For every material whose checkpoint exists, the single best geometry's "
-            "dominant line: energy vs flux, coloured by line quality."
+            "dominant line: energy vs flux. The three comparisons select by line "
+            "quality, peak flux, and local line-to-bremsstrahlung ratio; the two "
+            "diagnostic selections apply a 100 eV line-energy floor."
         )
         _by_material = {}
         for _m in MATERIAL_LABELS:
@@ -1375,7 +1377,16 @@ def _(
                 _by_material[MATERIAL_LABELS[_m]] = _r
         if len(_by_material) >= 2:
             return mo.vstack(
-                [_md, plot_material_comparison(_by_material, settings, select="quality_peak")]
+                [
+                    _md,
+                    plot_material_comparison(_by_material, settings, select="quality_peak"),
+                    plot_material_comparison(
+                        _by_material, settings, select="peak", min_line_eV=100.0
+                    ),
+                    plot_material_comparison(
+                        _by_material, settings, select="line_brem_ratio", min_line_eV=100.0
+                    ),
+                ]
             )
         return mo.vstack(
             [_md, mo.md("*Run `scan_app.py` for more materials to populate this comparison.*")]

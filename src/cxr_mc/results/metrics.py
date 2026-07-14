@@ -118,13 +118,19 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
       coherent_brem_ratio : trapz(spec) / trapz(brem) over the line grid -- ALL
                       coherent (CXR) flux relative to the incoherent brem beneath
                       it (a ratio, so scale/current cancel). NaN if there's no brem.
+      line_brem_ratio : trapz(spec) / trapz(brem) over ONLY the dominant line's
+                      local peak window. Unlike coherent_brem_ratio, this compares
+                      one line against its local brem, not all coherent flux over
+                      the full line grid. NaN if that window has no brem.
       line_quality  : [0, 1] definition score of the dominant line (line_quality);
                       the heatmaps gate the line-characterization maps on it.
 
-    All line characterization (line_eV, fwhm_eV, line_flux, line_frac) is from
-    the LINE spectrum r['spec']; brem only enters total_flux / the line_frac
-    denominator. peak_flux / coherent_flux / total_flux need no peak and stay
-    valid everywhere; the line_index-based ones are unreliable where
+    The coherent-line quantities (peak_flux, coherent_flux, line_eV, fwhm_eV,
+    and line_flux) are calculated from the LINE spectrum r['spec']. Brem enters
+    total_flux, the line_frac denominator, coherent_brem_ratio (over the full
+    line grid), and line_brem_ratio (over the dominant line's local window).
+    peak_flux / coherent_flux / total_flux need no peak and stay valid
+    everywhere; the line_index-based quantities are unreliable where
     line_quality is low (broad ramps, or many comparable peaks).
     """
     E = np.asarray(r["E_grid"], dtype=float)
@@ -147,6 +153,7 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
     half = max(round(n_fwhm * w_samp / 2.0), 1)
     lo, hi = max(idx - half, 0), min(idx + half + 1, spec.size)
     line_int = float(np.trapezoid(spec[lo:hi], E[lo:hi])) if hi > lo else 0.0
+    brem_line_int = float(np.trapezoid(brem[lo:hi], E[lo:hi])) if hi > lo else 0.0
     coh_int = float(np.trapezoid(spec, E)) if spec.size else 0.0
     brem_int = float(np.trapezoid(brem, E))
     total_int = coh_int + brem_int
@@ -159,5 +166,6 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
         "line_frac": (line_int / total_int) if total_int > 0 else float("nan"),
         "total_flux": total_int * sc * cur,
         "coherent_brem_ratio": (coh_int / brem_int) if brem_int > 0 else float("nan"),
+        "line_brem_ratio": (line_int / brem_line_int) if brem_line_int > 0 else float("nan"),
         "line_quality": line_quality(spec, rel_prominence),
     }

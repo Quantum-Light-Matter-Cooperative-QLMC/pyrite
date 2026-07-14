@@ -8,9 +8,10 @@ needs no Monte-Carlo run."""
 
 import numpy as np
 import pytest
+from scipy.signal import peak_widths
 
 from cxr_mc.config import default_settings
-from cxr_mc.results import line_metrics
+from cxr_mc.results import line_metrics, selection_score
 
 
 def _record(E, spec, brem):
@@ -45,3 +46,31 @@ def test_coherent_brem_ratio_nan_without_brem():
     m = line_metrics(_record(E, spec, np.zeros_like(E)), default_settings())
 
     assert np.isnan(m["coherent_brem_ratio"])
+
+
+def test_line_brem_ratio_uses_the_dominant_line_window():
+    E = np.arange(50.0, 151.0, 1.0)
+    spec = np.exp(-0.5 * ((E - 100.0) / 3.0) ** 2)
+    brem = 0.1 + 0.01 * E
+    m = line_metrics(_record(E, spec, brem), default_settings())
+    idx = int(np.argmax(spec))
+    width = float(peak_widths(spec, [idx], rel_height=0.5)[0][0])
+    half = max(round(3.0 * width / 2.0), 1)
+    lo, hi = max(idx - half, 0), min(idx + half + 1, spec.size)
+    expected = np.trapezoid(spec[lo:hi], E[lo:hi]) / np.trapezoid(brem[lo:hi], E[lo:hi])
+    assert m["line_brem_ratio"] == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("brem_level", [0.0, -0.1])
+def test_line_brem_ratio_is_nan_for_nonpositive_local_brem_integral(brem_level):
+    E = np.arange(50.0, 151.0, 1.0)
+    spec = np.exp(-0.5 * ((E - 100.0) / 3.0) ** 2)
+
+    m = line_metrics(_record(E, spec, np.full_like(E, brem_level)), default_settings())
+
+    assert np.isnan(m["line_brem_ratio"])
+
+
+def test_line_brem_ratio_is_a_selection_mode():
+    assert selection_score({"line_brem_ratio": 2.0}, "line_brem_ratio") == 2.0
+    assert selection_score({"line_brem_ratio": np.nan}, "line_brem_ratio") == -np.inf
