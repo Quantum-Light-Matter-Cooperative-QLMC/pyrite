@@ -3,11 +3,41 @@ import pytest
 
 from cxr_mc.montecarlo.geometry import (
     X_MAX,
+    X_MIN,
+    Y_MAX,
+    Y_MIN,
     Z_MAX,
     Z_MIN,
     first_prism_exit,
     validate_transverse_dimensions,
 )
+
+
+@pytest.mark.parametrize(
+    ("origin", "direction", "expected_distance", "expected_face"),
+    [
+        ((-4.0, 0.0, 5.0), (-1.0, 0.0, 0.0), 1.0, X_MIN),
+        ((4.0, 0.0, 5.0), (1.0, 0.0, 0.0), 1.0, X_MAX),
+        ((0.0, -4.0, 5.0), (0.0, -1.0, 0.0), 1.0, Y_MIN),
+        ((0.0, 4.0, 5.0), (0.0, 1.0, 0.0), 1.0, Y_MAX),
+        ((0.0, 0.0, 1.0), (0.0, 0.0, -1.0), 1.0, Z_MIN),
+        ((0.0, 0.0, 9.0), (0.0, 0.0, 1.0), 1.0, Z_MAX),
+    ],
+)
+def test_first_prism_exit_reaches_each_finite_prism_face(
+    origin, direction, expected_distance, expected_face
+):
+    distance, face = first_prism_exit(
+        np.array(origin),
+        np.array(direction),
+        z_min_ang=0.0,
+        z_max_ang=10.0,
+        width_ang=10.0,
+        height_ang=10.0,
+    )
+
+    assert distance == pytest.approx(expected_distance)
+    assert face == expected_face
 
 
 def test_first_prism_exit_selects_nearest_face_and_deterministic_corner():

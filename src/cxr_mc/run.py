@@ -11,7 +11,8 @@ case into ``results``, re-pickles that material's checkpoint at config
 granularity (crash-safe), and invokes ``on_chunk(group_config_names)`` once a
 whole **group**
 has finished. By default a group is everything that shares
-(material, thickness, polar tilt) -- i.e. the full azimuth sweep at one tilt --
+(material, thickness, polar tilt, finite footprint) -- i.e. the full azimuth
+sweep at one tilt and footprint --
 so the streamed plot/table waits until every azimuth is in and can collapse to
 the best azimuth per energy (see plots.stream_chunk).
 
@@ -89,8 +90,18 @@ def cases_from_results(results):
 
 
 def _default_group_key(case):
-    """Everything but the azimuth (and energy): the azimuth sweep at one tilt."""
-    return (case["crystal"], case["thickness_ang"], case["tilt_deg"])
+    """Everything but azimuth and energy: the sweep at one tilt and footprint.
+
+    Missing footprint fields represent the legacy laterally infinite slab, so
+    older case dictionaries continue to group together.
+    """
+    return (
+        case["crystal"],
+        case["thickness_ang"],
+        case["tilt_deg"],
+        case.get("crystal_width_mm"),
+        case.get("crystal_height_mm"),
+    )
 
 
 def run_sweep(
@@ -123,8 +134,9 @@ def run_sweep(
     progress : forwarded to run_cases (the per-case tqdm bar).
     group_key : case -> hashable. Configs sharing a key form one group;
         on_chunk fires once the WHOLE group has finished. Default groups by
-        (material, thickness, polar tilt), so the azimuth sweep at a tilt is one
-        group -- on_chunk gets every azimuth at once.
+        (material, thickness, polar tilt, finite footprint), so the azimuth
+        sweep at one tilt and footprint is one group -- on_chunk gets every
+        azimuth at once.
     on_chunk : optional callback(list_of_config_names) fired once per completed
         group, with all of that group's config names (cached + freshly run).
     """

@@ -246,7 +246,8 @@ def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
 
 def test_run_sweep_on_chunk_fires_per_group(tmp_path, monkeypatch):
     monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
-    # same (crystal, thickness, tilt) -> one group; different tilt -> another
+    # same (crystal, thickness, tilt, omitted footprint) -> one group;
+    # different tilt -> another
     c1 = _fake_case("cfg_a", 30.0, tilt_deg=30.0)
     c2 = _fake_case("cfg_b", 30.0, tilt_deg=30.0)
     c3 = _fake_case("cfg_c", 30.0, tilt_deg=0.0)
@@ -257,6 +258,22 @@ def test_run_sweep_on_chunk_fires_per_group(tmp_path, monkeypatch):
     assert len(chunks) == 2
     tilt_group = next(ch for ch in chunks if "cfg_a" in ch)
     assert set(tilt_group) == {"cfg_a", "cfg_b"}
+
+
+def test_run_sweep_separates_finite_footprint_chunk_groups(tmp_path, monkeypatch):
+    """Finite footprints need independent streaming groups at one tilt."""
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    narrow = _fake_case("narrow", 30.0, tilt_deg=30.0)
+    wide = _fake_case("wide", 30.0, tilt_deg=30.0)
+    narrow.update(crystal_width_mm=0.1, crystal_height_mm=0.2)
+    wide.update(crystal_width_mm=0.3, crystal_height_mm=0.2)
+
+    chunks = []
+    run_sweep(
+        [narrow, wide], {}, checkpoint_dir=str(tmp_path), on_chunk=chunks.append, progress=False
+    )
+
+    assert {frozenset(chunk) for chunk in chunks} == {frozenset({"narrow"}), frozenset({"wide"})}
 
 
 def test_run_sweep_resume_replays_cached_chunks(tmp_path, monkeypatch):
