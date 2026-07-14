@@ -1,0 +1,37 @@
+data_nbse2
+# Phase identity: cxr-mc crystal catalog entry [nbse2].
+# Deterministic full-basis P1 export of crystal_structures.toml.
+# Catalog provenance and assumptions:
+# Metallic 2H-a NbSe2, P6_3/mmc: Nb occupies aligned 2b columns and Se occupies
+# 4f with z=0.116. Lattice: Wang et al., Appl. Phys. Lett. 123, 153505 (2023),
+# doi:10.1063/5.0172460. The z value is the lower end of the experimental
+# 0.116-0.118 range summarized by Johannes, Mazin, and Howells, Phys. Rev. B 73,
+# 205102 (2006), from primary crystallographic reports including Brown and
+# Beerntsen, Acta Cryst. 18, 31 (1965), doi:10.1107/S0365110X65000063. Basis
+# prototype: AFLOW AB2_hP6_194_b_f-002. Assumes the room-temperature,
+# unmodulated bulk cell (not the low-temperature CDW supercell). Limiting checks:
+# two Nb + four Se, V=(sqrt(3)/2)a^2c, and aligned Nb columns.
+# Validation: nbse2-2ha-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 3.4459
+_cell_length_b 3.4459
+_cell_length_c 12.5607
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 120.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Nb1 Nb 0.0 0.0 0.25 1.0
+Se1 Se 0.3333333333333333 0.6666666666666667 0.116 1.0
+Se2 Se 0.3333333333333333 0.6666666666666667 0.384 1.0
+Nb2 Nb 0.0 0.0 0.75 1.0
+Se3 Se 0.6666666666666667 0.3333333333333333 0.616 1.0
+Se4 Se 0.6666666666666667 0.3333333333333333 0.884 1.0
+
+

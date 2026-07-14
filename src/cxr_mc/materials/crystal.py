@@ -26,7 +26,7 @@ CRYSTALS dict; see that file for the format. Depends on materials.atomic.
 import tomllib
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Protocol
 
 import numpy as np
 
@@ -132,56 +132,60 @@ def _reciprocal_basis(lattice):
     return B
 
 
-class _DiffpyLatticeLike(Protocol):
-    a: float
-    b: float
-    c: float
-    alpha: float
-    beta: float
-    gamma: float
-
-
-class _DiffpyAtomLike(Protocol):
+class _CrystalsAtomLike(Protocol):
     element: str
-    xyz: object
+    coords_fractional: object
+    occupancy: float
 
 
-class _DiffpyStructureLike(Protocol):
-    lattice: _DiffpyLatticeLike
+class _CrystalsCrystalLike(Protocol):
+    lattice_parameters: tuple[float, float, float, float, float, float]
+    volume: float
 
-    def __iter__(self) -> Iterator[_DiffpyAtomLike]: ...
+    def __iter__(self) -> Iterator[_CrystalsAtomLike]: ...
 
 
-def diffpy_structure_to_crystal_info(
-    structure: _DiffpyStructureLike, mosaic_fwhm_deg: float | None = None
+def crystals_crystal_to_crystal_info(
+    crystal: _CrystalsCrystalLike, mosaic_fwhm_deg: float | None = None
 ) -> dict[str, object]:
     """
-    Convert a ``diffpy.structure.Structure``-like object to a CRYSTALS entry.
+    Convert a ``crystals.Crystal``-like object to a CRYSTALS entry.
 
-    The adapter is intentionally structural only: it copies lattice lengths,
-    lattice angles, and fractional atom coordinates into the existing internal
-    representation so ``structure_factor``/``chi_g`` continue to use cxr_mc's
-    X-ray form-factor physics.
+    Source: ``Crystal.lattice_parameters``, ``Atom.coords_fractional``, and
+    ``Crystal.volume`` from crystals 1.7. The adapter is structural only, so
+    cxr-mc remains the source of X-ray scattering physics. It assumes each
+    expanded site is fully occupied and rejects partial occupancy instead of
+    silently treating it as a whole atom. In the P1 limiting case, sites are
+    copied one-for-one; for higher symmetry, ``Crystal.from_cif`` expands the
+    asymmetric unit before this deterministic conversion.
 
-    Validation: diffpy-structure-adapter
+    Validation: crystals-cif-adapter
     """
-    lattice_source = structure.lattice
+    a, b, c, alpha, beta, gamma = crystal.lattice_parameters
     lattice = {
         "system": "general",
-        "a": float(lattice_source.a),
-        "b": float(lattice_source.b),
-        "c": float(lattice_source.c),
-        "alpha": float(lattice_source.alpha),
-        "beta": float(lattice_source.beta),
-        "gamma": float(lattice_source.gamma),
+        "a": float(a),
+        "b": float(b),
+        "c": float(c),
+        "alpha": float(alpha),
+        "beta": float(beta),
+        "gamma": float(gamma),
     }
-    basis = [(str(atom.element), np.array(atom.xyz, dtype=float)) for atom in structure]
+    basis = []
+    for atom in crystal:
+        occupancy = float(getattr(atom, "occupancy", 1.0))
+        if not np.isclose(occupancy, 1.0, rtol=0.0, atol=1e-12):
+            raise ValueError(
+                f"cxr-mc CIF imports require full occupancy; found {occupancy:g} for {atom.element}"
+            )
+        coords = np.mod(np.asarray(atom.coords_fractional, dtype=float), 1.0)
+        basis.append((str(atom.element), coords))
+    basis.sort(key=lambda site: (site[0], *site[1].tolist()))
 
-    a1, a2, a3 = _direct_lattice_vectors(lattice)
     return {
         "lattice": lattice,
         "basis": basis,
-        "V_cell": float(np.dot(a1, np.cross(a2, a3))),
+        "V_cell": float(crystal.volume),
         "mosaic_fwhm_deg": mosaic_fwhm_deg,
     }
 
@@ -190,20 +194,18 @@ def load_crystal_from_cif(
     path: str | Path, mosaic_fwhm_deg: float | None = None
 ) -> dict[str, object]:
     """
-    Load a CIF file with ``diffpy.structure`` and return a CRYSTALS entry.
+    Load a CIF file with crystals 1.7 and return a CRYSTALS-compatible entry.
 
-    The TOML database remains the packaged fallback. This helper is the explicit
-    import path for external structures whose lattice and fractional basis are
-    supplied by CIF, while cxr_mc retains ownership of X-ray scattering physics.
+    ``Crystal.from_cif`` performs the CIF symmetry expansion. The canonical
+    adapter then retains the expanded fractional basis, cell parameters, and
+    volume while cxr-mc retains ownership of X-ray scattering physics.
 
-    Validation: diffpy-structure-adapter
+    Validation: crystals-cif-adapter
     """
-    from diffpy.structure import Structure
+    from crystals import Crystal
 
-    structure = Structure(filename=str(path), format="cif")
-    return diffpy_structure_to_crystal_info(
-        cast(_DiffpyStructureLike, structure), mosaic_fwhm_deg=mosaic_fwhm_deg
-    )
+    crystal = Crystal.from_cif(Path(path))
+    return crystals_crystal_to_crystal_info(crystal, mosaic_fwhm_deg=mosaic_fwhm_deg)
 
 
 def reciprocal_g_vector(hkl, lattice):

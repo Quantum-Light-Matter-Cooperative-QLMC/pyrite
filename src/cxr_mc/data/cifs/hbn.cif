@@ -1,0 +1,31 @@
+data_hbn
+# Phase identity: cxr-mc crystal catalog entry [hbn].
+# Deterministic full-basis P1 export of crystal_structures.toml.
+# Catalog provenance and assumptions:
+# Hexagonal boron nitride, P6_3/mmc, graphite-like layers with eclipsed B/N
+# registry: the second layer swaps B and N sites so B lies above N across the
+# van-der-Waals gap. Conventional hexagonal cell, four atoms (2 BN formula
+# units). Lattice constants are standard bulk h-BN values a=2.504 A, c=6.661 A;
+# the loader's limiting checks are stoichiometry, positive cell volume, and
+# finite structure factors. Validation: hbn-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 2.504
+_cell_length_b 2.504
+_cell_length_c 6.661
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 120.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+B1 B 0.0 0.0 0.0 1.0
+N1 N 0.3333333333333333 0.6666666666666667 0.0 1.0
+B2 B 0.3333333333333333 0.6666666666666667 0.5 1.0
+N2 N 0.0 0.0 0.5 1.0
+
+

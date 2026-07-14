@@ -1,0 +1,31 @@
+data_hfte2
+# Phase identity: cxr-mc crystal catalog entry [hfte2].
+# Deterministic full-basis P1 export of crystal_structures.toml.
+# Catalog provenance and assumptions:
+# 1T-HfTe2, CdI2-type P-3m1 (#164), from Materials Project mp-32887.
+# Hf occupies 1a at the origin; Te occupies 2d with z=0.228088. The Materials
+# Project relaxed primitive hexagonal cell has a=4.01826066 A and c=7.628794 A.
+# The loader does not apply space-group symmetry, so the symmetry mate at 1-z
+# is listed explicitly. Limiting checks: V=(sqrt(3)/2)a^2c, 1Hf+2Te, and finite
+# F/chi/U for the allowed basal (001) reflection.
+# Validation: hfte2-001-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 4.01826066
+_cell_length_b 4.01826066
+_cell_length_c 7.628794
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 120.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Hf1 Hf 0.0 0.0 0.0 1.0
+Te1 Te 0.33333333 0.66666667 0.228088 1.0
+Te2 Te 0.66666667 0.33333333 0.771912 1.0
+
+

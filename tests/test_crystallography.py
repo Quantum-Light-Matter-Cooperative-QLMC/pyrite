@@ -1,5 +1,7 @@
 """Crystallography primitives: DB load, reciprocal geometry, structure factor."""
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -320,74 +322,7 @@ def test_optical_constants_delta_positive_off_edge():
     assert beta > 0.0
 
 
-def test_diffpy_structure_adapter_preserves_lattice_basis_and_volume():
-    from cxr_mc.materials.crystal import diffpy_structure_to_crystal_info
-
-    class FakeLattice:
-        a = 3.0
-        b = 4.0
-        c = 5.0
-        alpha = 90.0
-        beta = 90.0
-        gamma = 90.0
-
-    class FakeAtom:
-        def __init__(self, element, xyz):
-            self.element = element
-            self.xyz = np.array(xyz, dtype=float)
-
-    class FakeStructure:
-        lattice = FakeLattice()
-
-        def __iter__(self):
-            return iter(
-                [
-                    FakeAtom("Na", [0.0, 0.0, 0.0]),
-                    FakeAtom("Cl", [0.5, 0.5, 0.5]),
-                ]
-            )
-
-    info = diffpy_structure_to_crystal_info(FakeStructure(), mosaic_fwhm_deg=0.2)
-
-    assert info["lattice"] == {
-        "system": "general",
-        "a": 3.0,
-        "b": 4.0,
-        "c": 5.0,
-        "alpha": 90.0,
-        "beta": 90.0,
-        "gamma": 90.0,
-    }
-    assert info["V_cell"] == pytest.approx(60.0)
-    assert info["mosaic_fwhm_deg"] == pytest.approx(0.2)
-    assert [(element, pos.tolist()) for element, pos in info["basis"]] == [
-        ("Na", [0.0, 0.0, 0.0]),
-        ("Cl", [0.5, 0.5, 0.5]),
-    ]
-
-
-def test_diffpy_structure_adapter_accepts_installed_diffpy_structure():
-    from diffpy.structure import Atom, Lattice, Structure
-
-    from cxr_mc.materials.crystal import diffpy_structure_to_crystal_info
-
-    structure = Structure(
-        [Atom("Na", [0.0, 0.0, 0.0]), Atom("Cl", [0.5, 0.5, 0.5])],
-        lattice=Lattice(a=3.0, b=4.0, c=5.0, alpha=90.0, beta=90.0, gamma=90.0),
-    )
-
-    info = diffpy_structure_to_crystal_info(structure)
-
-    assert info["lattice"]["system"] == "general"
-    assert info["V_cell"] == pytest.approx(60.0)
-    assert [(element, pos.tolist()) for element, pos in info["basis"]] == [
-        ("Na", [0.0, 0.0, 0.0]),
-        ("Cl", [0.5, 0.5, 0.5]),
-    ]
-
-
-@pytest.mark.filterwarnings("ignore:.*diffpy.structure.*:DeprecationWarning:diffpy.structure")
-def test_load_crystal_from_cif_uses_diffpy_structure(tmp_path):
+def test_load_crystal_from_cif_returns_compatible_deterministic_info(tmp_path):
     from cxr_mc.materials.crystal import load_crystal_from_cif
 
     cif = tmp_path / "nacl.cif"
@@ -419,6 +354,119 @@ Cl1 Cl 0.5 0.5 0.5
     assert info["V_cell"] == pytest.approx(60.0)
     assert info["mosaic_fwhm_deg"] == pytest.approx(0.1)
     assert [(element, pos.tolist()) for element, pos in info["basis"]] == [
-        ("Na", [0.0, 0.0, 0.0]),
         ("Cl", [0.5, 0.5, 0.5]),
+        ("Na", [0.0, 0.0, 0.0]),
     ]
+
+
+def test_load_crystal_from_cif_expands_non_p1_symmetry(tmp_path):
+    from cxr_mc.materials.crystal import load_crystal_from_cif
+
+    cif = tmp_path / "inversion.cif"
+    cif.write_text(
+        """
+data_inversion
+_symmetry_space_group_name_H-M 'P -1'
+_symmetry_Int_Tables_number 2
+_cell_length_a 4.0
+_cell_length_b 4.0
+_cell_length_c 4.0
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 90.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+C1 C 0.1 0.2 0.3
+""".strip(),
+        encoding="utf-8",
+    )
+
+    first = load_crystal_from_cif(cif)
+    second = load_crystal_from_cif(cif)
+
+    assert [(element, pos.tolist()) for element, pos in first["basis"]] == [
+        ("C", [0.1, 0.2, 0.3]),
+        ("C", [0.9, 0.8, 0.7]),
+    ]
+    assert [(element, pos.tolist()) for element, pos in second["basis"]] == [
+        (element, pos.tolist()) for element, pos in first["basis"]
+    ]
+
+
+def test_load_crystal_from_cif_rejects_partial_occupancy(tmp_path):
+    from cxr_mc.materials.crystal import load_crystal_from_cif
+
+    cif = tmp_path / "partial.cif"
+    cif.write_text(
+        """
+data_partial
+_symmetry_space_group_name_H-M 'P 1'
+_cell_length_a 3.0
+_cell_length_b 3.0
+_cell_length_c 3.0
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 90.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+C1 C 0.0 0.0 0.0 0.5
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="full occupancy"):
+        load_crystal_from_cif(cif)
+
+
+def test_packaged_p1_cifs_match_toml_catalog():
+    from cxr_mc.materials.crystal import load_crystal_from_cif
+
+    cif_dir = Path(crystal_module.DATA_DIR) / "cifs"
+    assert {path.stem for path in cif_dir.glob("*.cif")} == set(CRYSTALS)
+
+    for name, expected in CRYSTALS.items():
+        actual = load_crystal_from_cif(
+            cif_dir / f"{name}.cif", mosaic_fwhm_deg=expected["mosaic_fwhm_deg"]
+        )
+        expected_lattice = expected["lattice"]
+        expected_parameters = {
+            "a": expected_lattice["a"],
+            "b": expected_lattice.get("b", expected_lattice["a"]),
+            "c": expected_lattice.get("c", expected_lattice["a"]),
+            "alpha": expected_lattice.get("alpha", 90.0),
+            "beta": expected_lattice.get("beta", 90.0),
+            "gamma": 120.0
+            if expected_lattice["system"] == "hexagonal"
+            else expected_lattice.get("gamma", 90.0),
+        }
+        for parameter, value in expected_parameters.items():
+            assert actual["lattice"][parameter] == pytest.approx(value, abs=1e-12)
+        assert actual["V_cell"] == pytest.approx(expected["V_cell"], rel=1e-10)
+        assert actual["mosaic_fwhm_deg"] == expected["mosaic_fwhm_deg"]
+
+        expected_basis = sorted(
+            (element, tuple(float(value) for value in position))
+            for element, position in expected["basis"]
+        )
+        actual_basis = [
+            (element, tuple(float(value) for value in position))
+            for element, position in actual["basis"]
+        ]
+        assert [element for element, _ in actual_basis] == [
+            element for element, _ in expected_basis
+        ]
+        np.testing.assert_allclose(
+            [position for _, position in actual_basis],
+            [position for _, position in expected_basis],
+            rtol=0.0,
+            atol=1e-12,
+        )

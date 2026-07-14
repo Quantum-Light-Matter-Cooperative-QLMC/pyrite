@@ -1,0 +1,57 @@
+data_sapphire
+# Phase identity: cxr-mc crystal catalog entry [sapphire].
+# Deterministic full-basis P1 export of crystal_structures.toml.
+# Catalog provenance and assumptions:
+# Alpha-Al2O3 / sapphire, corundum R-3c in the conventional hexagonal cell
+# (30 atoms, Z=6). Lattice and internal parameters from Newnham & de Haan,
+# Z. Kristallogr. 117, 235 (1962): a=4.7589 A, c=12.991 A,
+# Al 12c z=0.35216, O 18e x=0.30624. R-centered Wyckoff sites are expanded
+# explicitly because the loader does not apply space-group symmetry.
+# Validation: sapphire-corundum-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 4.7589
+_cell_length_b 4.7589
+_cell_length_c 12.991
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 120.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Al1 Al 0.0 0.0 0.35216 1.0
+Al2 Al 0.0 0.0 0.64784 1.0
+Al3 Al 0.0 0.0 0.85216 1.0
+Al4 Al 0.0 0.0 0.14784 1.0
+Al5 Al 0.66666667 0.33333333 0.68549333 1.0
+Al6 Al 0.66666667 0.33333333 0.98117333 1.0
+Al7 Al 0.66666667 0.33333333 0.18549333 1.0
+Al8 Al 0.66666667 0.33333333 0.48117333 1.0
+Al9 Al 0.33333333 0.66666667 0.01882667 1.0
+Al10 Al 0.33333333 0.66666667 0.31450667 1.0
+Al11 Al 0.33333333 0.66666667 0.51882667 1.0
+Al12 Al 0.33333333 0.66666667 0.81450667 1.0
+O1 O 0.30624 0.0 0.25 1.0
+O2 O 0.0 0.30624 0.25 1.0
+O3 O 0.69376 0.69376 0.25 1.0
+O4 O 0.69376 0.0 0.75 1.0
+O5 O 0.0 0.69376 0.75 1.0
+O6 O 0.30624 0.30624 0.75 1.0
+O7 O 0.97290667 0.33333333 0.58333333 1.0
+O8 O 0.66666667 0.63957333 0.58333333 1.0
+O9 O 0.36042667 0.02709333 0.58333333 1.0
+O10 O 0.36042667 0.33333333 0.08333333 1.0
+O11 O 0.66666667 0.02709333 0.08333333 1.0
+O12 O 0.97290667 0.63957333 0.08333333 1.0
+O13 O 0.63957333 0.66666667 0.91666667 1.0
+O14 O 0.33333333 0.97290667 0.91666667 1.0
+O15 O 0.02709333 0.36042667 0.91666667 1.0
+O16 O 0.02709333 0.66666667 0.41666667 1.0
+O17 O 0.33333333 0.36042667 0.41666667 1.0
+O18 O 0.63957333 0.97290667 0.41666667 1.0
+
+

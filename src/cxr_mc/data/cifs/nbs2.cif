@@ -1,0 +1,34 @@
+data_nbs2
+# Phase identity: cxr-mc crystal catalog entry [nbs2].
+# Deterministic full-basis P1 export of crystal_structures.toml.
+# Catalog provenance and assumptions:
+# Metallic 2H-a NbS2, P6_3/mmc: Nb occupies aligned 2b columns and S occupies
+# 4f with z=0.113. El Youbi et al., Phys. Rev. B 103, 155105 (2021), supplement,
+# report supplier a=3.32, c=11.97 and adopt z=0.113 from Heil, Schlipf, and
+# Giustino, Phys. Rev. B 98, 075120 (2018). The 2b/4f expansion is cross-checked
+# against AFLOW AB2_hP6_194_b_f-002. Assumes a stoichiometric, unmodulated bulk
+# cell. Limiting checks: two Nb + four S, V=(sqrt(3)/2)a^2c, and Nb(x,y) remains
+# aligned across z=1/4 and 3/4. Validation: nbs2-2ha-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 3.32
+_cell_length_b 3.32
+_cell_length_c 11.97
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 120.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Nb1 Nb 0.0 0.0 0.25 1.0
+S1 S 0.3333333333333333 0.6666666666666667 0.113 1.0
+S2 S 0.3333333333333333 0.6666666666666667 0.387 1.0
+Nb2 Nb 0.0 0.0 0.75 1.0
+S3 S 0.6666666666666667 0.3333333333333333 0.613 1.0
+S4 S 0.6666666666666667 0.3333333333333333 0.887 1.0
+
+
