@@ -39,6 +39,24 @@ def test_material_comparison_applies_minimum_line_energy():
     assert fig.axes[0].texts[0].get_text() == "  Test (60 keV)"
 
 
+def test_material_comparison_omits_all_invalid_local_ratio_material():
+    invalid = _record("Invalid", 30.0, 150.0, peak=100.0)
+    invalid["brem"] = np.zeros_like(invalid["brem"])
+    valid = _record("Valid", 60.0, 200.0, peak=10.0)
+
+    fig = plot_material_comparison(
+        {
+            "Invalid": {"scan": {30.0: invalid}},
+            "Valid": {"scan": {60.0: valid}},
+        },
+        default_settings(),
+        select="line_brem_ratio",
+    )
+
+    assert [text.get_text() for text in fig.axes[0].texts] == ["  Valid (60 keV)"]
+    assert len(fig.axes[0].collections[0].get_offsets()) == 1
+
+
 def test_cross_material_tab_requests_new_comparisons():
     source = Path("notebooks/analysis_app.py").read_text()
     assert 'select="peak", min_line_eV=100.0' in source

@@ -125,10 +125,12 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
       line_quality  : [0, 1] definition score of the dominant line (line_quality);
                       the heatmaps gate the line-characterization maps on it.
 
-    All line characterization (line_eV, fwhm_eV, line_flux, line_frac) is from
-    the LINE spectrum r['spec']; brem only enters total_flux / the line_frac
-    denominator. peak_flux / coherent_flux / total_flux need no peak and stay
-    valid everywhere; the line_index-based ones are unreliable where
+    The coherent-line quantities (peak_flux, coherent_flux, line_eV, fwhm_eV,
+    and line_flux) are calculated from the LINE spectrum r['spec']. Brem enters
+    total_flux, the line_frac denominator, coherent_brem_ratio (over the full
+    line grid), and line_brem_ratio (over the dominant line's local window).
+    peak_flux / coherent_flux / total_flux need no peak and stay valid
+    everywhere; the line_index-based quantities are unreliable where
     line_quality is low (broad ramps, or many comparable peaks).
     """
     E = np.asarray(r["E_grid"], dtype=float)

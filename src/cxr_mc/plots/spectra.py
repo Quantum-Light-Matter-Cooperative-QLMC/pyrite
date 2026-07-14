@@ -383,6 +383,10 @@ def plot_material_comparison(
             for r in recs
             if min_line_eV is None or metrics[id(r)]["line_eV"] >= min_line_eV
         ]
+        if select == "line_brem_ratio":
+            candidates = [
+                r for r in candidates if np.isfinite(metrics[id(r)]["line_brem_ratio"])
+            ]
         if not candidates:
             continue
         best = max(candidates, key=lambda r: selection_score(metrics[id(r)], select))
