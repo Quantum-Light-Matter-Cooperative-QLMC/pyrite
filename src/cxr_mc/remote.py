@@ -67,6 +67,8 @@ import tarfile
 import tempfile
 from pathlib import Path
 
+from .scan import load_all_materials
+
 HOST = os.environ.get("CXR_REMOTE_HOST", "qlmc")
 REMOTE_DIR = os.environ.get("CXR_REMOTE_DIR", "/home/aamador/dev/cxr-mc")
 REMOTE_UV = os.environ.get("CXR_REMOTE_UV", "/home/aamador/.local/bin/uv")
@@ -74,6 +76,7 @@ REMOTE_UV = os.environ.get("CXR_REMOTE_UV", "/home/aamador/.local/bin/uv")
 # the *checkout* (it tars the working tree up to the box), so it resolves paths
 # against the repo root, not its own package dir.
 LOCAL_ROOT = Path(__file__).resolve().parents[2]
+MATS_FILE = LOCAL_ROOT / "mats_to_sim.toml"
 
 # detached-job bookkeeping lives under <REMOTE_DIR>/jobs/<jobid>/ on the box
 # (gitignored there): run.sh, meta, pid, state, log. One subdir per `start`.
@@ -100,6 +103,7 @@ SYNC_PATHS = [
     "pyproject.toml",
     "uv.lock",
     "README.md",
+    "mats_to_sim.toml",
 ]
 
 # text extensions whose CRLF is normalized to LF before tarring (see _add_to_tar):
@@ -241,33 +245,35 @@ def pull(stems, grid=False, drop_wide_brem=False, downcast=False, no_sync=False)
     dest.mkdir(exist_ok=True)
     if grid and not no_sync:
         sync_code()  # box must rebuild the grid from the same config.py
+    _check_materials(stems)
     for stem in stems:
         local = dest / f"{stem}.pkl"
-        if grid:
-            flags = " --grid"
-            if drop_wide_brem:
-                flags += " --drop-wide-brem"
-            if downcast:
-                flags += " --downcast"
-            remote_tmp = f"/tmp/{stem}.grid.pkl"
-            ckpt = f"{REMOTE_DIR}/checkpoints/{stem}.pkl"
-            # slim on the box; a missing checkpoint makes this exit nonzero (via
-            # _run's check=True), so the scp below is never reached for that stem.
-            _run(
-                [
-                    "ssh",
-                    "-n",
-                    HOST,
-                    f"cd {REMOTE_DIR} && {REMOTE_UV} run --no-sync cxr slim "
-                    f"{ckpt}{flags} -o {remote_tmp}",
-                ]
-            )
-            _run(["scp", f"{HOST}:{remote_tmp}", str(local)])
-            _run(["ssh", "-n", HOST, f"rm -f {remote_tmp}"])
-            print(f"pulled (grid) -> checkpoints/{stem}.pkl")
-        else:
-            _run(["scp", f"{HOST}:{REMOTE_DIR}/checkpoints/{stem}.pkl", str(local)])
-            print(f"pulled -> checkpoints/{stem}.pkl")
+        try:
+            if grid:
+                flags = " --grid"
+                if drop_wide_brem:
+                    flags += " --drop-wide-brem"
+                if downcast:
+                    flags += " --downcast"
+                remote_tmp = f"/tmp/{stem}.grid.pkl"
+                ckpt = f"{REMOTE_DIR}/checkpoints/{stem}.pkl"
+                _run(
+                    [
+                        "ssh",
+                        "-n",
+                        HOST,
+                        f"cd {REMOTE_DIR} && {REMOTE_UV} run --no-sync cxr slim "
+                        f"{ckpt}{flags} -o {remote_tmp}",
+                    ]
+                )
+                _run(["scp", f"{HOST}:{remote_tmp}", str(local)])
+                _run(["ssh", "-n", HOST, f"rm -f {remote_tmp}"])
+                print(f"pulled (grid) -> checkpoints/{stem}.pkl")
+            else:
+                _run(["scp", f"{HOST}:{REMOTE_DIR}/checkpoints/{stem}.pkl", str(local)])
+                print(f"pulled -> checkpoints/{stem}.pkl")
+        except subprocess.CalledProcessError:
+            print(f"warning: could not pull checkpoint {stem!r}; continuing")
 
 
 def pull_zhai_cache():
@@ -323,6 +329,7 @@ echo "workers: {workers}"; echo "started: $(date -Is)"; echo "pid: $$"; \
 mats=({mats})
 total=${{#mats[@]}}
 n=0
+failures=0
 for m in "${{mats[@]}}"; do
   n=$((n + 1))
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
@@ -330,11 +337,17 @@ for m in "${{mats[@]}}"; do
 >> "$JOBDIR/log"
   if ! {REMOTE_UV} run --no-sync python scan.py "$m"{flags} >> "$JOBDIR/log" 2>&1
   then
-    echo "FAILED at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
-    exit 1
+    failures=$((failures + 1))
+    echo "WARNING: scan failed for $m; continuing" >> "$JOBDIR/log"
+    echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
+    continue
   fi
 done
-echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
+if [ "$failures" -gt 0 ]; then
+  echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
+else
+  echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
+fi
 """
 
 
@@ -758,6 +771,18 @@ def _dispatch(handler):
     return _run_cli
 
 
+def _selected_materials(args, attribute):
+    """Resolve explicit material arguments or the shared ``--all`` manifest."""
+    explicit = getattr(args, attribute)
+    if args.all:
+        if explicit:
+            raise SystemExit(f"{args.remote_command} --all does not take material names")
+        return load_all_materials(MATS_FILE)
+    if explicit:
+        return explicit if isinstance(explicit, list) else [explicit]
+    raise SystemExit(f"{args.remote_command} needs material name(s), or use --all")
+
+
 def _cli_scan(args):
     if args.quick and args.grid:
         raise SystemExit(
@@ -765,32 +790,38 @@ def _cli_scan(args):
             "(their grid isn't reproducible from material_sweep), so the "
             "trailing pull would fail after the whole sweep ran. Drop --grid."
         )
+    materials = _selected_materials(args, "material")
     # same checkpoint-collision guard as `start`: a foreground scan and a
     # detached job writing the same <stem>.pkl would race on its .tmp.
-    _refuse_if_busy([args.material], args.quick)
+    _refuse_if_busy(materials, args.quick)
     if not args.no_sync:
         sync_code()
-    remote_scan(args.material, args.quick, args.workers)
-    stem = f"{args.material}_quick" if args.quick else args.material
-    # code is already synced above, so the trailing grid-pull skips its own sync
-    # (no_sync=True); forward the same grid/trim flags.
-    pull(
-        [stem],
-        grid=args.grid,
-        drop_wide_brem=args.drop_wide_brem,
-        downcast=args.downcast,
-        no_sync=True,
-    )
-    print(
-        f"\ndone. checkpoints/{stem}.pkl is local; open notebooks/analysis.ipynb "
-        f"with MATERIAL='{stem}' (or run scripts/export_pdf.py) -- all viz/PDF "
-        "stays local."
-    )
+    for material in materials:
+        try:
+            remote_scan(material, args.quick, args.workers)
+        except subprocess.CalledProcessError:
+            print(f"warning: remote scan failed for {material!r}; continuing")
+            continue
+        stem = f"{material}_quick" if args.quick else material
+        # code is already synced above, so the trailing grid-pull skips its own sync
+        # (no_sync=True); forward the same grid/trim flags.
+        pull(
+            [stem],
+            grid=args.grid,
+            drop_wide_brem=args.drop_wide_brem,
+            downcast=args.downcast,
+            no_sync=True,
+        )
+        print(
+            f"\ndone. checkpoints/{stem}.pkl is local; open notebooks/analysis.ipynb "
+            f"with MATERIAL='{stem}' (or run scripts/export_pdf.py) -- all viz/PDF "
+            "stays local."
+        )
 
 
 def _cli_pull(args):
     pull(
-        args.material,
+        _selected_materials(args, "material"),
         grid=not args.full,
         drop_wide_brem=args.drop_wide_brem,
         downcast=args.downcast,
@@ -799,7 +830,8 @@ def _cli_pull(args):
 
 
 def _cli_start(args):
-    jobid = start_queue(args.materials, args.quick, args.workers, args.no_sync, args.dry_run)
+    materials = _selected_materials(args, "materials")
+    jobid = start_queue(materials, args.quick, args.workers, args.no_sync, args.dry_run)
     if args.follow and not args.dry_run:
         attach(jobid)
 
@@ -869,8 +901,11 @@ def _build_remote_parser(ap):
     sync+run-on-the-box+pull)."""
     sub = ap.add_subparsers(dest="remote_command", required=True)
 
-    s = sub.add_parser("scan", help="sync code, run ONE sweep in the foreground, pull checkpoint")
-    s.add_argument("material")
+    s = sub.add_parser("scan", help="sync code, run sweep(s) in the foreground, pull checkpoints")
+    s.add_argument("material", nargs="?")
+    s.add_argument(
+        "-a", "--all", action="store_true", help="run every material in mats_to_sim.toml"
+    )
     s.add_argument("--quick", action="store_true")
     s.add_argument("--workers", type=int, default=None)
     s.add_argument("--no-sync", action="store_true", help="skip the code upload")
@@ -885,7 +920,10 @@ def _build_remote_parser(ap):
         "start",
         help="sync code, launch a DETACHED queue of materials (survives disconnect)",
     )
-    st.add_argument("materials", nargs="+", help="one or more crystal keys")
+    st.add_argument("materials", nargs="*", help="one or more crystal keys")
+    st.add_argument(
+        "-a", "--all", action="store_true", help="queue every material in mats_to_sim.toml"
+    )
     st.add_argument("--quick", action="store_true")
     st.add_argument("--workers", type=int, default=None)
     st.add_argument("--no-sync", action="store_true", help="skip the code upload")
@@ -923,7 +961,10 @@ def _build_remote_parser(ap):
     sp.set_defaults(func=_dispatch(_cli_stop))
 
     p = sub.add_parser("pull", help="fetch one or more existing checkpoints from the box")
-    p.add_argument("material", nargs="+", help="checkpoint stem(s), e.g. mose2 mose2_quick")
+    p.add_argument("material", nargs="*", help="checkpoint stem(s), e.g. mose2 mose2_quick")
+    p.add_argument(
+        "-a", "--all", action="store_true", help="pull every material in mats_to_sim.toml"
+    )
     p.add_argument(
         "-f",
         "--full",

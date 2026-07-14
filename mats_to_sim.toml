@@ -1,0 +1,2 @@
+# Materials selected by `cxr scan --all` and `cxr remote ... --all`.
+materials = ["hopg", "hbn", "hfse2"]

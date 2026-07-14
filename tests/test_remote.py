@@ -37,6 +37,14 @@ def test_queue_script_no_flags_when_unset():
     assert "--quick" not in s and "--workers" not in s
 
 
+def test_queue_script_warns_and_continues_after_a_material_fails():
+    script = remote._queue_script("j", ["hopg", "hbn"], quick=False, workers=None)
+
+    assert "WARNING: scan failed for $m; continuing" in script
+    assert "continue" in script
+    assert "done with $failures warning(s)" in script
+
+
 def test_launch_queue_command_backgrounds_only_runner():
     launch = remote._launch_queue_command("20260101-000000")
 
@@ -275,6 +283,39 @@ def test_pull_short_full_flag(monkeypatch):
     monkeypatch.setattr(remote, "pull", lambda *a, **kw: calls.append(kw))
     remote.main(["pull", "hopg", "-f"])
     assert calls[0]["grid"] is False
+
+
+def test_pull_warns_and_continues_when_one_checkpoint_is_missing(monkeypatch, capsys, tmp_path):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        if "missing.pkl" in " ".join(cmd):
+            raise subprocess.CalledProcessError(1, cmd)
+
+    monkeypatch.setattr(remote, "_run", fake_run)
+    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+
+    remote.pull(["hopg", "missing"], no_sync=True)
+
+    assert any("hopg.pkl" in " ".join(cmd) for cmd in calls)
+    assert "warning: could not pull checkpoint 'missing'" in capsys.readouterr().out
+
+
+def test_remote_start_all_uses_toml_manifest(monkeypatch, tmp_path):
+    manifest = tmp_path / "mats_to_sim.toml"
+    manifest.write_text('materials = ["hopg", "hbn"]\n')
+    monkeypatch.setattr(remote, "MATS_FILE", manifest)
+    calls = []
+    monkeypatch.setattr(remote, "start_queue", lambda materials, *args: calls.append(materials))
+
+    remote.main(["start", "--all", "--dry-run"])
+
+    assert calls == [["hopg", "hbn"]]
+
+
+def test_sync_paths_include_all_materials_manifest():
+    assert "mats_to_sim.toml" in remote.SYNC_PATHS
 
 
 # ---- cxr remote check (Zhai GPU reproduction) ------------------------------

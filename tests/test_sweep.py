@@ -387,3 +387,56 @@ def test_scan_forwards_n_families_and_beam_uvw_overrides(monkeypatch, tmp_path):
     case = seen["cases"][0]
     assert case["beam_uvw"] == (1, 0, 0)
     assert len(case["hkl_list"]) == len(override_hkl)
+
+
+def test_scan_all_runs_every_material_in_toml_manifest(monkeypatch, tmp_path):
+    """``cxr scan --all`` consumes the configured materials in file order."""
+    import argparse
+
+    from cxr_mc import scan
+
+    manifest = tmp_path / "mats_to_sim.toml"
+    manifest.write_text('materials = ["hopg", "hbn"]\n')
+    monkeypatch.setattr(scan, "MATS_FILE", manifest)
+    seen = []
+    monkeypatch.setattr(
+        scan, "run_sweep", lambda cases, results, **kw: seen.append(kw["checkpoint_path"])
+    )
+
+    scan.run(
+        argparse.Namespace(
+            material=None,
+            all=True,
+            workers=0,
+            quick=True,
+            n_families=None,
+            beam_uvw=None,
+            checkpoint_dir=str(tmp_path),
+        )
+    )
+
+    assert seen == [str(tmp_path / "hopg_quick.pkl"), str(tmp_path / "hbn_quick.pkl")]
+
+
+def test_scan_all_rejects_unknown_manifest_material_before_running(monkeypatch, tmp_path):
+    import argparse
+
+    from cxr_mc import scan
+
+    manifest = tmp_path / "mats_to_sim.toml"
+    manifest.write_text('materials = ["hopg", "missing"]\n')
+    monkeypatch.setattr(scan, "MATS_FILE", manifest)
+    monkeypatch.setattr(scan, "run_sweep", lambda *a, **kw: pytest.fail("must not run"))
+
+    with pytest.raises(SystemExit, match="unknown material"):
+        scan.run(
+            argparse.Namespace(
+                material=None,
+                all=True,
+                workers=0,
+                quick=False,
+                n_families=None,
+                beam_uvw=None,
+                checkpoint_dir=str(tmp_path),
+            )
+        )
