@@ -80,14 +80,13 @@ def _():
         sweep_values,
         top_geometries,
     )
-    from cxr_mc.run import _DEFAULT_CHECKPOINT_DIR, cases_from_results, load_checkpoint
+    from cxr_mc.run import cases_from_results, load_checkpoint
     from cxr_mc.sweep import MATERIAL_LABELS, build_cases
 
     return (
         MATERIAL_LABELS,
         MaterialSelect,
         PENETRATION_TILT_DEG,
-        _DEFAULT_CHECKPOINT_DIR,
         build_cases,
         cases_from_results,
         compare_spectrum_chart,
@@ -129,13 +128,14 @@ def _(mo):
 
 
 @app.cell
-def _(MATERIAL_LABELS, MaterialSelect, _DEFAULT_CHECKPOINT_DIR, mo):
+def _(MATERIAL_LABELS, MaterialSelect, mo):
     from cxr_mc.analyze import (
         get_default_material,
         initial_material,
         material_menu,
         select_initial_material,
     )
+    from cxr_mc.run import _DEFAULT_CHECKPOINT_DIR
     from cxr_mc.config import MATERIALS
 
     requested_material = initial_material(mo.cli_args(), get_default_material())

@@ -36,3 +36,22 @@ def test_material_menu_uses_checkpoint_helper_and_custom_select() -> None:
     assert "select_initial_material" in source
     assert "mo.ui.anywidget" in source
     assert "MaterialSelect" in source
+
+
+def test_material_menu_cell_owns_checkpoint_directory_dependency() -> None:
+    tree = ast.parse(APP.read_text())
+
+    menu_cell = next(
+        cell
+        for cell in tree.body
+        if isinstance(cell, ast.FunctionDef)
+        and any(arg.arg == "MaterialSelect" for arg in cell.args.args)
+    )
+
+    assert not any(arg.arg == "_DEFAULT_CHECKPOINT_DIR" for arg in menu_cell.args.args)
+    assert any(
+        isinstance(node, ast.ImportFrom)
+        and node.module == "cxr_mc.run"
+        and any(alias.name == "_DEFAULT_CHECKPOINT_DIR" for alias in node.names)
+        for node in menu_cell.body
+    )
