@@ -5,7 +5,8 @@ an azimuthally-symmetric 2D Gaussian spot of a given FULL WIDTH AT HALF
 MAXIMUM (`beam_fwhm_mm`, mm), applied as a rigid per-electron `(x0, y0)` offset
 to every segment that electron emits; `None`/`0` (falsy) is a strict no-op
 reproducing the old point-source beam bit-for-bit; the offset is drawn from an
-RNG stream independent of the main transport `rng`.
+RNG stream independent of the main transport `rng`. Its zero-spectrum-effect
+conclusion applies only when both finite-footprint dimensions are `None`.
 
 **Code.** `src/cxr_mc/montecarlo/transport.py::simulate_trajectories`
 (`beam_fwhm_mm=` parameter, branch at `if beam_fwhm_mm:` near
@@ -22,11 +23,17 @@ equation — this is a geometric convention, not a derived physical law).
   (transport is a rigid translation of the trajectory's starting point; the
   physics of free-path sampling, elastic scattering, and stopping power are
   all local/relative and don't care about an absolute lateral origin).
-- **Assumptions stated in the docstring:** the crystal is laterally infinite
-  and the detector direction `n_hat` is a fixed far-field unit vector, so no
-  downstream physics reads the transverse position — this makes the feature
-  presently a pure geometry/visualization refinement with (claimed) *zero*
-  effect on the emitted spectrum.
+- **All-`None` footprint scope:** when `crystal_width_mm` and
+  `crystal_height_mm` are both `None`, the crystal is laterally infinite and
+  the detector direction `n_hat` is a fixed far-field unit vector. In this
+  limiting model, no downstream physics reads transverse position, so changing
+  beam size has *zero* effect on the emitted spectrum.
+- **Finite-footprint exclusion:** when both transverse dimensions are finite,
+  sampled `(x0, y0)` determines whether an incident electron misses the
+  crystal, can affect lateral electron escape, and changes photon
+  self-absorption through the first of six faces. Those effects belong to the
+  separate, unverified `finite-transverse-crystal` ledger row; this write-up
+  does not validate them.
 - **Limiting case:** `beam_fwhm_mm → 0` or `None` recovers the point source
   exactly.
 
@@ -61,9 +68,14 @@ if beam_fwhm_mm:
   overwrites `pos[:, :2]` afterward outside the ordinary flight/collision
   update.
 
-## 2. Central claim: no physics path reads x, y (only z)
+## 2. Central claim, restricted to the all-`None` footprint
 
-Grepped `r_mid`/`seg_r`/`pos[:, 0|1|:2]` across all of `src/cxr_mc`:
+The following source inspection and grep were valid for the laterally
+infinite, all-`None` footprint branch. They must not be generalized to a
+finite rectangular crystal.
+
+For that branch, grepped `r_mid`/`seg_r`/`pos[:, 0|1|:2]` across all of
+`src/cxr_mc`:
 
 ```
 src/cxr_mc/montecarlo/spectrum.py:173:   seg_r = xp.asarray(segments["r_mid"], ...)
@@ -74,9 +86,9 @@ src/cxr_mc/montecarlo/transport.py: (definition + docstring only)
 src/cxr_mc/plots/trajectories.py:104: L, v, r = segs["L_ang"], segs["v_hat"], segs["r_mid"]
 ```
 
-- `spectrum.py::mc_spectrum` (coherent PXR/CBS line spectrum, ~line 173/283):
-  `seg_r` is sliced **only** at `[..., 2]` (`z_mid`), used solely to compute
-  the Beer–Lambert escape path length to the entrance/exit face
+- `spectrum.py::mc_spectrum` (coherent PXR/CBS line spectrum): in the
+  all-`None` branch, `seg_r` is sliced **only** at `[..., 2]` (`z_mid`), used
+  solely to compute the Beer–Lambert escape path length to the entrance/exit face
   (`L_esc = z_mid / (-n_hat[2])` or `(thickness - z_mid) / n_hat[2]`, and the
   layered-stack equivalent `_stack_tau`). The amplitude physics (`A_PXR`,
   `A_CBS`, resonance energy `E_res = ħc·(v·g)/(1 − v·n̂)`, sinc² lineshape)
@@ -86,26 +98,24 @@ src/cxr_mc/plots/trajectories.py:104: L, v, r = segs["L_ang"], segs["v_hat"], se
   vector fixed for the whole detector geometry (far-field approximation), so
   a lateral translation of the source point does not change the direction to
   the detector, hence doesn't change any dot product `v·n̂`, `v·g`, etc.
-- `spectrum.py::mc_brem_spectrum` (bremsstrahlung background, ~line 521/524):
-  same pattern — `z_mid = seg_r[:, 2]` feeds `_escape_length`/`_layer_dz` for
-  self-absorption; the bremsstrahlung cross-section (`_brem_dsigma_dk`)
-  depends only on `Z_i`, `seg_E`, `E_grid`. No x/y usage.
+- `spectrum.py::mc_brem_spectrum` (bremsstrahlung background): the all-`None`
+  branch likewise passes `z_mid = seg_r[:, 2]` to `_escape_length`/`_layer_dz`
+  for self-absorption; the bremsstrahlung cross-section (`_brem_dsigma_dk`)
+  depends only on `Z_i`, `seg_E`, `E_grid`.
 - `plots/trajectories.py` (the only other consumer of `r_mid`): uses the full
   3-vector `r` for plotting trajectory projections (`start @ e1`, `start @
   e2`) — visualization only, not physics.
 
-No other file in `src/cxr_mc` references `r_mid`, `seg_r`, or slices
-`pos[:, 0]`/`pos[:, 1]`/`pos[:, :2]`. I independently confirm the central
-claim: **under the current far-field-detector, laterally-infinite-crystal
-model, a nonzero `beam_fwhm_mm` cannot change a single bin of the emitted
-spectrum** — it only relabels which (x, y) each electron's z-trajectory sits
-at, which is invisible to every equation that consumes `segments`.
+I independently confirm the central claim only in that limit: **under the
+fixed-far-field, laterally-infinite all-`None` model, a nonzero
+`beam_fwhm_mm` cannot change a single bin of the emitted spectrum** — it only
+relabels which `(x, y)` each electron's z-trajectory sits at.
 
-This is a model-scope limitation, not a bug: the note in the ledger row and
-the docstring both flag this explicitly as "presently a pure geometry/
-visualization refinement," to be revisited if a near-field detector or
-finite-crystal-footprint model is added later. That's an honest and correctly
-labeled limitation, not an overclaim.
+This is now an explicit model boundary. A finite footprint consumes transverse
+position in `simulate_trajectories` (missed incidence and lateral exits) and
+in `mc_spectrum`/`mc_brem_spectrum` (the six-face escape distance). It can
+therefore change yields and spectra. Its ray-prism and attenuation physics is
+not adjudicated by this historic beam-size re-derivation.
 
 ## 3. Limiting case: `beam_fwhm_mm = None` vs `0.0`
 
@@ -236,26 +246,31 @@ names and the ledger notes claim.
   `Generator` object from a `SeedSequence.spawn` child) and an independent
   numeric test (100,000-draw perturbation of `beam_rng` does not change
   `rng`'s next 10 draws). ✓
-- **Central claim (no downstream physics reads x, y):** confirmed by
-  exhaustive grep of `r_mid`/`seg_r`/`pos[:, :2]` across `src/cxr_mc` — the
-  only two physics-consuming files (`spectrum.py::mc_spectrum`,
-  `::mc_brem_spectrum`) slice only index 2 (z); the only other consumer
-  (`plots/trajectories.py`) is visualization. ✓
+- **Central claim (all-`None` footprint only):** the fixed-far-field,
+  laterally-infinite branches do not consume `x,y`, so beam size is
+  spectrum-neutral there. A finite footprint is expressly excluded: it
+  consumes `x,y` for missed incidence, lateral exits, and six-face
+  self-absorption, under the separate unverified
+  `finite-transverse-crystal` claim. ✓
 
 ## Adjudication
 
-No discrepancy found. This is a well-scoped, correctly-labeled geometric
-addition: the unit/FWHM conversions are correct, the falsy-zero limiting case
-is intentional and verified bit-for-bit, the RNG-independence design is
-correctly implemented and independently confirmed (spawned `SeedSequence`
-child ⇒ genuinely uncorrelated, non-state-sharing `Generator`), and — the
-load-bearing claim — no physics function in the current codebase reads the
-transverse (x, y) segment position for anything other than plotting, so a
-nonzero `beam_fwhm_mm` is presently a no-op on the emitted spectrum by
-construction, exactly as documented. The existing regression tests
+No discrepancy was found for the beam-size claim in its corrected scope: the
+unit/FWHM conversions are correct, the falsy-zero limiting case is intentional
+and verified bit-for-bit, and the RNG-independence design is correctly
+implemented and independently confirmed (spawned `SeedSequence` child ⇒
+genuinely uncorrelated, non-state-sharing `Generator`). For an all-`None`
+footprint, a nonzero `beam_fwhm_mm` remains a no-op on the emitted spectrum by
+construction. The existing regression tests
 (`tests/test_montecarlo.py::test_beam_fwhm_mm_*`, 4/4 passing) genuinely
-exercise every one of these claims against the real code path, not a
+exercise these beam-size claims against the real code path, not a
 reimplementation.
+
+This adjudication does **not** extend to finite transverse dimensions. In that
+model, beam position changes missed incidence and lateral transport, while the
+spectra use the nearest of six escape faces; those claims remain
+`unverified` under `finite-transverse-crystal` pending an independent fresh
+context write-up.
 
 One point for the record (not a discrepancy, since it is explicitly and
 correctly caveated in both the docstring and the ledger row): "standard
