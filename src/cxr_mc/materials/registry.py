@@ -200,6 +200,33 @@ MATERIAL_CONFIGS: dict[str, MaterialConfig] = {
         "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
+    # Metallic 2H-a niobium dichalcogenides: Nb occupies aligned 2b columns,
+    # unlike the offset 2H-c Mo/W entries. Nb has no bundled NIST Mott table, so
+    # transport uses the analytic screened-Rutherford fallback.
+    "nbs2": {
+        "label": "NbS2",
+        "B_ang2": 0.6,
+        "beam_uvw": (0, 0, 2),
+        "E_grid": np.arange(350.0, 2500.0, 3.0),
+        "thickness_ang": 10e4,
+        "energy_keV": [25, 30, 35],
+        "tilt_deg": np.linspace(0, 85, 20, endpoint=False),
+        "tilt_azim_deg": np.linspace(0, 180, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
+        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
+    },
+    "nbse2": {
+        "label": "NbSe2",
+        "B_ang2": 0.6,
+        "beam_uvw": (0, 0, 2),
+        "E_grid": np.arange(350.0, 2500.0, 3.0),
+        "thickness_ang": 10e4,
+        "energy_keV": [25, 30, 35],
+        "tilt_deg": np.linspace(0, 85, 20, endpoint=False),
+        "tilt_azim_deg": np.linspace(0, 180, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
+        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
+    },
     # 2H-MoTe2 (alpha) bulk, isostructural with MoSe2. Te has no NIST Mott table ->
     # transport falls back to analytic screened-Rutherford screening for Te (see
     # montecarlo), as for W/S/Pt/Hf/Zr.

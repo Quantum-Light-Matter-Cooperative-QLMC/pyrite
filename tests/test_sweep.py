@@ -22,6 +22,8 @@ from cxr_mc.sweep import MATERIAL_LABELS, Layer, Sweep, build_cases, crystal_par
 ALL = [
     "mose2",
     "wse2",
+    "nbs2",
+    "nbse2",
     "mote2",
     "mos2",
     "ws2",
@@ -108,6 +110,38 @@ def test_mote2_registered():
     assert MATERIAL_LABELS["mote2"] == "MoTe2"
 
     assert "mote2" in MATERIALS
+
+
+@pytest.mark.parametrize(
+    ("material", "label", "chalcogen"),
+    [("nbs2", "NbS2", "S"), ("nbse2", "NbSe2", "Se")],
+)
+def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcogen):
+    assert MATERIAL_LABELS[material] == label
+    assert material in MATERIALS
+
+    grid = material_grid(material)
+    assert grid["thickness_ang"] == 10e4
+    assert "substrate" not in grid
+
+    params = crystal_params(material)
+    composition = dict(params["composition"])
+    assert params["beam_uvw"] == (0, 0, 2)
+    assert params["hkl_list"]
+    assert composition[chalcogen] == pytest.approx(2.0 * composition["Nb"])
+
+    sweep = Sweep(
+        material=material,
+        thickness_ang=100.0,
+        energy_keV=30.0,
+        tilt_deg=30.0,
+        tilt_azim_deg=0.0,
+        E_grid_line=np.arange(500.0, 520.0, 5.0),
+        E_grid_brem=np.arange(0.0, 1000.0, 100.0),
+    )
+    case = build_cases(sweep, n_electrons=2, n_electrons_brem=1)[0]
+    assert case["crystal"] == material
+    assert case["composition"] == params["composition"]
 
 
 def test_material_registry_projects_scan_and_crystal_views():
