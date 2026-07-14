@@ -20,6 +20,7 @@ import argparse
 import sys
 
 from . import __version__
+from .materials import MaterialConfigError
 
 
 def main(argv=None):
@@ -30,24 +31,27 @@ def main(argv=None):
     )
     ap.add_argument("--version", action="version", version=f"cxr-mc {__version__}")
     sub = ap.add_subparsers(dest="command", required=True)
-    if raw_argv[:1] == ["check-config"]:
-        from . import check_config
+    try:
+        if raw_argv[:1] == ["check-config"]:
+            from . import check_config
 
-        check_config.add_subparser(sub)
-    else:
-        from . import analyze, archive, check, check_config, export, remote, scan, slim
+            check_config.add_subparser(sub)
+        else:
+            from . import analyze, archive, check, check_config, export, remote, scan, slim
 
-        scan.add_subparser(sub)
-        export.add_subparser(sub)
-        analyze.add_subparser(sub)
-        slim.add_subparser(sub)
-        archive.add_subparser(sub)
-        remote.add_subparser(sub)
-        check.add_subparser(sub)
-        check_config.add_subparser(sub)
+            scan.add_subparser(sub)
+            export.add_subparser(sub)
+            analyze.add_subparser(sub)
+            slim.add_subparser(sub)
+            archive.add_subparser(sub)
+            remote.add_subparser(sub)
+            check.add_subparser(sub)
+            check_config.add_subparser(sub)
 
-    args = ap.parse_args(raw_argv)
-    return args.func(args)
+        args = ap.parse_args(raw_argv)
+        return args.func(args)
+    except MaterialConfigError as exc:
+        raise SystemExit(str(exc)) from None
 
 
 if __name__ == "__main__":

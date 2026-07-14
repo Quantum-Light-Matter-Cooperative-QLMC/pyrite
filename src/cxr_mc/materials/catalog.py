@@ -413,6 +413,15 @@ def _parse_info(
         counts = Counter(element for element, _ in basis)
         composition = tuple((element, count / volume) for element, count in counts.items())
         return CrystalInfo(lattice, basis, volume, composition, mosaic)
+    except ModuleNotFoundError as exc:
+        if exc.name == "crystals":
+            raise MaterialConfigError(
+                (
+                    "required dependency 'crystals' is not installed; "
+                    "install the project environment with `uv sync`",
+                )
+            ) from None
+        raise
     except Exception as exc:  # external CIF parser normalizes several exception types
         errors.add(path, f"could not load crystal {key!r} ({exc})")
         return None
