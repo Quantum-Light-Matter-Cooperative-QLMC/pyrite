@@ -1,6 +1,6 @@
 data_hfse2
 # Phase identity: cxr-mc crystal catalog entry [hfse2].
-# Deterministic full-basis P1 export of crystal_structures.toml.
+# Bundled full-basis P1 CIF used by the declarative material catalog.
 # Provenance: no additional source citation is recorded with this TOML entry.
 _symmetry_space_group_name_H-M 'P 1'
 _symmetry_Int_Tables_number 1
@@ -20,4 +20,3 @@ _atom_site_occupancy
 Hf1 Hf 0.0 0.0 0.0 1.0
 Se1 Se 0.3333333333333333 0.6666666666666667 0.255 1.0
 Se2 Se 0.6666666666666667 0.3333333333333333 0.745 1.0
-

@@ -1,12 +1,12 @@
 data_sapphire
 # Phase identity: cxr-mc crystal catalog entry [sapphire].
-# Deterministic full-basis P1 export of crystal_structures.toml.
+# Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # Alpha-Al2O3 / sapphire, corundum R-3c in the conventional hexagonal cell
 # (30 atoms, Z=6). Lattice and internal parameters from Newnham & de Haan,
 # Z. Kristallogr. 117, 235 (1962): a=4.7589 A, c=12.991 A,
 # Al 12c z=0.35216, O 18e x=0.30624. R-centered Wyckoff sites are expanded
-# explicitly because the loader does not apply space-group symmetry.
+# explicitly in this P1 representation.
 # Validation: sapphire-corundum-structure
 _symmetry_space_group_name_H-M 'P 1'
 _symmetry_Int_Tables_number 1
@@ -53,5 +53,4 @@ O15 O 0.02709333 0.36042667 0.91666667 1.0
 O16 O 0.02709333 0.66666667 0.41666667 1.0
 O17 O 0.33333333 0.36042667 0.41666667 1.0
 O18 O 0.63957333 0.97290667 0.41666667 1.0
-
 

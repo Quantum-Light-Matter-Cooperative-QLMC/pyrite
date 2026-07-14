@@ -1,143 +1,94 @@
-# Material config rework: exposing crystal orientation & dominant-plane count
+# Material configuration: declarative catalog evaluation
 
-Should the per-material config be reworked, and how should crystal plane
-orientation (`beam_uvw`) and the dominant-reflection count (`n_families`) be
-exposed instead of living as source-level defaults? **Recommendation: split
-into a cheap, physics-risk-free plumbing pass (CLI flags + surfacing the
-orientation that's already persisted per-checkpoint but never printed) now,
-and a moderate-churn registry unification (still no physics change) as a
-follow-up.** Do not change any of `n_families`'s default,
-`g_max_invang`, or the reflection-ranking metric as part of this — that's a
-physics change, not a config-exposure change, and would require a fresh
-validation pass.
+Per-material configuration now lives in the immutable, CIF-backed catalog at
+`src/cxr_mc/data/materials.toml`. This supersedes the former split across a
+structure table, per-material registries, source-level crystal defaults, and
+scan-grid tables. The consolidation changes configuration
+ownership, not the reflection-ranking physics.
 
-**Status on `feature/material-config-rework`:** steps 1-3 are implemented.
-`src/cxr_mc/materials/registry.py` now owns the combined per-material rows, while
-`config.py` and `sweep.py` consume typed projections from that registry. This
-remains a config relocation/surfacing change only; no reflection defaults,
-`g_max_invang`, or ranking metrics were changed.
+## Current ownership
 
-## What the codebase did before this staged change
-
-Per-material configuration was split across three places by import layer
-(leaf → driver, see `docs/repo_map.md`):
-
-```
-crystal_structures.toml   physics data: lattice, basis, mosaic_fwhm_deg
-        │                 (materials/crystal.py loads it; has its own
-        │                  Validation: <id> entries in the ledger)
-        ▼
-sweep.py  _CRYSTAL_PARAMS  crystal orientation: beam_uvw (zone axis),
-                            hkl_list (optional hand-pinned override),
-                            B_ang2, per-material E_grid default
-        │
-        ▼
-config.py  _MATERIAL_GRIDS  scan geometry/energy grids: thickness,
-                            tilt/azimuth sweeps, energy_keV, E_grid_line/brem
+```text
+data/cifs/<phase>.cif          lattice + symmetry-expanded fractional basis
+             │
+data/materials.toml           crystal metadata, profiles, media, materials, stacks
+             │
+materials.catalog.CATALOG     validated, ordered, deeply immutable typed records
+             ├── config.py    material scan/sweep projections
+             └── sweep.py     reflection resolution + Cartesian case construction
 ```
 
-The split could not be fixed by simply moving `_CRYSTAL_PARAMS` into
-`config.py`: `sweep.crystal_params` would then need to import back from
-`config.py`, a cycle. The implemented `materials/registry.py` module avoids that by
-sitting below both `config.py` and `sweep.py`.
+Production loading is offline-only. `crystals` 1.7 parses each bundled CIF and
+expands symmetry; cxr-mc remains responsible for form factors, structure
+factors, reflection selection, attenuation, transport, and radiation.
 
-### Orientation is *partially* exposed already
+The package boundary exposes `MaterialCatalog`, `CrystalInfo`, `CrystalSpec`,
+`MediumSpec`, `MaterialSpec`, `ScanSpec`, `LayerSpec`, and
+`load_material_catalog`. `CATALOG.material_keys` preserves `[materials]`
+declaration order. It is the complete runnable catalog; `mats_to_sim.toml` is
+only the smaller ordered user selection consumed by `cxr scan --all` and remote
+`--all` commands.
 
-`Sweep.beam_uvw` (`None` → per-material default) and `Sweep.n_families`
-(dataclass default `4`, applied uniformly) are real fields, and
-`material_sweep()`'s `**overrides` forwards straight into
-`dataclasses.replace`. So this already works, today, with no code change:
+## Scan values and precedence
 
-```python
-material_sweep("mose2", beam_uvw=(1, 0, 0), n_families=6)
-```
+Each profile is complete and profiles do not inherit from one another. A
+material selects one profile, then material-local scan fields replace the
+corresponding profile fields. A thickness override also replaces the profile's
+other thickness spelling, so the resolved scan has exactly one source:
 
-A per-stack `Layer` also carries its own `beam_uvw` / `azimuth_deg`
-(`sweep.py:107-124`), so a film-on-substrate run can already orient each layer
-independently.
+- `thickness_ang`: physical thickness in Å;
+- `thickness_layers`: positive integer layer count, converted with the
+  referenced crystal's CIF `c` and required `layers_per_cell` as
+  `layers * c / layers_per_cell`.
 
-### Two real gaps
+Every scalar is treated as a one-point grid. Descriptor semantics are exactly
+NumPy's:
 
-1. **`hkl_list` has no override path at all.** For HOPG and h-BN it is
-   hand-pinned in `_CRYSTAL_PARAMS` (`pm((0, 0, 2), (0, 0, 4))`), bypassing
-   `dominant_reflections` entirely — which means `n_families` is a **silent
-   no-op** for exactly those two materials (`sweep.py:266-273`). Every other
-   material auto-selects via `dominant_reflections`, with no way to pin a
-   specific plane set without editing source. "Which planes" and "how many
-   planes" currently live in two different mechanisms (a hardcoded bypass vs.
-   a `Sweep` field) that don't compose.
-2. **Persisted, but not surfaced.** Correction to an earlier pass of this
-   evaluation: grepping `results.py`/`_checkpoint_io.py`/`run.py` for the
-   literal names `hkl_list`/`beam_uvw`/`n_families` returns no hits, but that
-   grep was the wrong test — `build_cases` already puts the resolved
-   `hkl_list`/`beam_uvw` into every case dict (`sweep.py:466-478`), and
-   `store_result` stores the whole case verbatim as `record["case"]`
-   (`results/store.py:80`). That survives the checkpoint round-trip: `run.py`
-   reads `r["case"]["crystal"]` off *loaded* checkpoints, and
-   `results/selection.py`'s `slim_results` explicitly keeps `"case"` as one of
-   its retained keys. So the actual planes summed and the zone axis used
-   **are** recoverable from any checkpoint today — the real gap is that
-   nothing surfaces them without manually indexing into
-   `record["case"]["hkl_list"]`: `cxr scan` prints no orientation summary, and
-   `sweep.geometry_table` shows only a reflection *count* (`len(c["hkl_list"])`),
-   not which planes or the zone axis. `n_families` itself (the request, as
-   opposed to the `hkl_list` it resolved to) is not stored as its own field —
-   but the resolved `hkl_list` is the more useful artifact of the two, and for
-   HOPG/h-BN, echoing `n_families` would be misleading anyway (next point).
-   This is the literal "done silently" the config is being reworked to fix,
-   and it's a *surfacing* problem, not a persistence problem.
+- `values = [...]` preserves the explicit sequence;
+- `arange = { start, stop, step }` excludes `stop` exactly as `np.arange` does;
+- `linspace = { start, stop, num, endpoint }` includes `stop` by default;
+- `logspace = { start, stop, num, endpoint, base }` includes the exponent
+  endpoint by default and uses base 10 unless specified.
 
-## Options for where a unified per-material config lives
+For `linspace` and `logspace`, `endpoint = false` is explicit and honored.
 
-1. **Leave the split, add flags + surfacing only.** Zero churn to the
-   registries themselves. Fixes the CLI-visibility and surfacing gaps but
-   leaves "editing one material means touching two files" unresolved.
-2. **New leaf module (`materials/registry.py`) between `materials/crystal.py` and
-   `sweep.py`/`config.py`.** Both `sweep.py` and `config.py` import from it;
-   no cycle. Holds one row per material with orientation fields (`beam_uvw`,
-   optional `hkl_list` pin + a required reason string when pinned, so the
-   auto/pinned distinction is visible instead of implicit) sitting next to
-   (or cross-referenced with) the existing scan-grid fields. This is the
-   "one place per material" outcome implied by the request. Moderate churn:
-   touches `config.py`, `sweep.py`, all ~13 material entries, and any test
-   that imports `_MATERIAL_GRIDS`/`_CRYSTAL_PARAMS` directly
-   (`tests/test_sweep.py`, `tests/test_crystallography.py`).
-3. **Fold `crystal_structures.toml` in too.** Rejected: that file is
-   physics data with its own ledger entries (e.g. `Validation:
-   sapphire-corundum-structure`) reused independently by
-   `validation_oracles.py`/`checks/dans_diffraction_oracle.py`. Merging it
-   with run-scan knobs would drag physics data under scan-config churn and
-   blur what the validation ledger is tracking.
+## Orientation and reflection selection
 
-**Implemented: option 2**, after the plumbing pass below settled the CLI and
-surfacing field shapes.
+`beam_uvw` is required on every crystal. Most crystals leave reflection choice
+to `dominant_reflections`, using the existing `n_families` default and the
+unchanged `|S(g)| exp(-W) / g^2` ranking policy.
 
-## What's cheap vs. what carries a validation cost
+Special cuts use `hkl_families` in the crystal row. Each entry is the positive
+representative of a reciprocal family; the catalog deterministically expands
+it to both `+hkl` and `-hkl`. A nonempty `hkl_reason` is mandatory whenever a
+family is pinned, making the bypass of automatic ranking explicit. `cxr scan`
+prints the resolved `beam_uvw` and full `hkl_list`; checkpoints persist those
+resolved values in each case.
 
-| Change | Risk |
-| --- | --- |
-| `--n-families` / `--beam-uvw` flags on `cxr scan`, forwarded to existing `Sweep` overrides | None — same code path, just argparse wiring |
-| Print the resolved `hkl_list`/`beam_uvw` from `cxr scan` (already persisted in `record["case"]`; just not echoed anywhere) | None — reads existing data, computes nothing new |
-| Unify `_MATERIAL_GRIDS` + `_CRYSTAL_PARAMS` into one per-material registry | None — same values, relocated |
-| Changing the `n_families` **default** (currently 4 for every non-pinned material), `g_max_invang`, or the `\|S(g)\| e^{-W}/g^2` ranking metric | **Physics change** — alters the summed reflection set for every current material's spectra; needs a fresh-context re-derivation + anchor-figure re-check per `docs/physics-validation-ledger.md` before it could be adopted |
+The CLI still permits `--beam-uvw H K L` and `--n-families N`. The latter has no
+effect on a catalog-pinned reflection list, which is why the resolved list—not
+the requested family count—is the provenance stored and displayed.
 
-## Recommendation (staged)
+Changing the default family count, `g_max_invang`, or the ranking metric remains
+a physics change. It requires fresh-context review and validation-ledger work;
+the catalog consolidation did not change those values.
 
-1. **CLI flags** — add `--n-families INT` and `--beam-uvw H K L` to
-   `scan.py:_build_parser`, threaded into the existing `material_sweep(...,
-   n_families=..., beam_uvw=...)` override mechanism. No new plumbing needed
-   beyond argparse.
-2. **Surfacing** — the orientation is already persisted in `record["case"]`
-   (see above); print the resolved `beam_uvw`/`hkl_list` at the end of
-   `cxr scan` (reading `cases[0]`, not `sweep`, since HOPG/h-BN resolve
-   `hkl_list` independent of any `n_families` request), and extend
-   `geometry_table` to show more than a bare reflection count when someone
-   wants to eyeball a checkpoint's orientation without writing a one-off
-   script.
-3. **Registry unification (`materials/registry.py`)** — `_MATERIAL_GRIDS` /
-   `_CRYSTAL_PARAMS` now project from one per-material row each, including a
-   visible reason string for materials that hand-pin `hkl_list` (HOPG, h-BN)
-   so the auto-vs-pinned distinction stops being implicit.
-4. **Not in scope here** — no change to `n_families`'s default, `g_max_invang`,
-   or the ranking metric. If someone wants that later, it's a physics-review
-   task, not a config-exposure task.
+## Validation and failure policy
+
+Run `uv run cxr check-config` for the bundled catalog or
+`uv run cxr check-config path/to/materials.toml` for an explicit complete
+catalog. The loader accumulates path-qualified schema and semantic errors.
+
+Runnable compositions containing elements absent from cxr-mc's transport
+constants are rejected. A supported element without a packaged Mott transport
+CSV is nonfatal: loading logs a warning and electron transport uses the analytic
+screened-Rutherford fallback.
+
+Every crystal has a nonempty `validation_id`, and repository tests require each
+ID to appear as an exact row in `docs/physics-validation-ledger.md`. Structure
+provenance lives in the phase-specific CIF; run metadata such as B factor,
+orientation, scan defaults, and pin reasons lives in `materials.toml`.
+
+The locked `crystals` 1.7.0 dependency is GPLv3. A licensing review is required
+before distributing cxr-mc source, wheels, binaries, or containers that include
+it.

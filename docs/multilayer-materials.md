@@ -7,8 +7,8 @@ Real lab samples are not free-standing single crystals: they are a thin vdW **fi
 the model must represent that stack: each crystalline layer radiates its own lines, and
 every photon is attenuated by the **whole stack** on its way to the detector.
 
-Today the pipeline models exactly **one** single-crystal slab. This note specifies the
-upgrade to an ordered stack of layers.
+The pipeline models an ordered stack of layers; a single-crystal slab is the
+one-layer compatibility path.
 
 > **Implementation status. Slices 1–3 are implemented.** Slice 1 (cross-stack
 > self-absorption, §1) is opt-in — `substrate=None` is bit-for-bit the old single-material
@@ -40,21 +40,21 @@ upgrade to an ordered stack of layers.
 
 ---
 
-## What's already in place (the seams to generalize)
+## Implemented stack path
 
-The codebase is closer than it looks — the single-material path is a clean special case:
+The single-material path remains a clean special case of the stack-aware pipeline:
 
 
-| Concern | Today (single slab) | Code site |
+| Concern | Current representation | Code site |
 |---|---|---|
-| Sample def | `crystal` + `composition` + `hkl_list` + `B_ang2` + `thickness_ang` in the case dict | `sweep.crystal_params`, `sweep.build_cases` |
-| Transport | one `composition`, slab `0≤z≤thickness`, faces only at `z=0`/`z=thickness` | `montecarlo.simulate_trajectories` (boundary truncation L467–480) |
-| Line spectrum | one `crystal`/`hkl_list`/`B_ang2` | `montecarlo.mc_spectrum` |
-| **Self-absorption** | **single** straight path to one face × **one** material's µ | `mc_spectrum` `T_abs` (L753–760) |
-| Brem | one `composition`, same single-µ escape | `mc_brem_spectrum` |
+| Sample def | catalog material + optional ordered `stack`/`substrate`; resolved case keeps compatibility film fields plus `abs_layers`/`layer_radiators` | `materials.catalog`, `sweep.build_cases` |
+| Transport | composition-aware flights truncated at each internal boundary | `montecarlo.simulate_trajectories(layers=...)` |
+| Line spectrum | one radiator per crystalline layer, summed incoherently | `montecarlo.runner._spectrum_case`, `mc_spectrum` |
+| **Self-absorption** | piecewise optical depth through every crossed layer | `materials.attenuation._stack_tau` |
+| Brem | per-layer emitting segments with the same cross-stack escape depth | `mc_brem_spectrum` |
 | Geometry | whole slab shares one normal/tilt | `montecarlo.tilted_geometry` |
-| Compound µ | `composition=[(el,n),…]` already supported | `_normalize_composition`, `_mu_total_inv_ang` |
-| Crystalline Si/sapphire | `silicon` and `sapphire` are crystals | `data/crystal_structures.toml`, `crystal_params` |
+| Compound µ | `composition=[(el,n),…]` | `_normalize_composition`, `_mu_total_inv_ang` |
+| Crystalline Si/sapphire | bundled phase-specific CIFs + catalog crystal rows | `data/cifs/`, `data/materials.toml` |
 
 Two things the recent **xraydb migration** already unblocked: substrate elements (O, Al for
 SiO₂ / sapphire) need **no** hand-added atomic data — `henke_dispersion`/`load_henke` resolve
@@ -66,30 +66,37 @@ PXR/CBS radiator.
 
 ## Data model
 
-A **Stack** is an ordered list of **Layers**, top (beam-entrance) first:
+A **Stack** is an ordered list of **Layers**, top (beam-entrance) first. The
+film is the catalog material's crystal; `stack` lists the layers behind it:
 
-```python
-# conceptual; the case dict carries this instead of scalar crystal/thickness/…
-layers = [
-    Layer(thickness_ang=500.,  crystal="mose2",  composition=[("Mo",n),("Se",n)],
-          hkl_list=[...], B_ang2=0.6, beam_uvw=(0,0,2)),     # crystalline film
-    Layer(thickness_ang=5e6,   crystal=None,     composition=[("Si",n),("O",2n)]), # amorphous SiO2 substrate
+```toml
+[materials.mos2-on-sio2-si]
+label = "MoS2 on SiO2/Si"
+profile = "standard"
+crystal = "mos2"
+thickness_layers = { values = [3, 4, 5, 6] }
+stack = [
+  { material = "sio2", thickness_ang = 2850.0 },
+  { material = "silicon", thickness_ang = 5000000.0 },
 ]
 ```
 
-- `crystal=None` (or `hkl_list=[]`) ⇒ **amorphous**: absorbs + brems, no lines.
+- A layer referencing `[media.<key>]` is **amorphous**: it absorbs and produces
+  bremsstrahlung but has no coherent radiator.
+- A layer referencing `[crystals.<key>]` receives that crystal's composition,
+  default zone axis, and reflection policy; an inline `beam_uvw` overrides the
+  layer orientation.
 - A **single-layer** stack must reproduce today's result **bit-for-bit** (the regression
   anchor) — so the scalar `crystal`/`thickness_ang`/… path stays valid and is internally
   promoted to a one-layer stack.
 
-**Flow through the pipeline** (each bullet is the generalization of an existing function):
+**Flow through the pipeline:**
 
-- `sweep.crystal_params(material)` → also accept a **stack key** that returns
-  `layers=[…]`. New `stack_params(name)` registry (e.g. `"mose2_on_si"`,
-  `"mose2_on_sio2"`); single materials keep returning a one-layer stack.
-- `sweep.build_cases` → put `layers` (a list of plain dicts) in the case instead of the
-  scalar `crystal`/`composition`/`hkl_list`/`B_ang2`; `thickness_ang` becomes the **sum**
-  (kept for labels/back-compat) with per-layer thicknesses in `layers`.
+- `MaterialCatalog.resolve_stack` resolves catalog references to immutable,
+  ordered physical layers with cumulative boundaries and number densities.
+- `sweep.build_cases` keeps the film's scalar
+  `crystal`/`composition`/`hkl_list`/`B_ang2` fields for compatibility and adds
+  `abs_layers` plus aligned `layer_radiators` when a stack is present.
 - `montecarlo._transport_case` → pass the layer stack to a stack-aware
   `simulate_trajectories` (see transport options below).
 - `montecarlo._spectrum_case` → loop crystalline layers, accumulate `mc_spectrum` per
@@ -111,16 +118,17 @@ is unchanged) — vdW films are conformal/parallel to the substrate.
 
 ---
 
-## (1) Cross-stack self-absorption — the key generalization
+## (1) Cross-stack self-absorption — IMPLEMENTED
 
-Replace the single-material escape (`mc_spectrum` L753–760)
+The former single-material escape
 
 ```python
 L_esc = z_mid/(-n_hat[2])  if n_hat[2]<0  else (thickness - z_mid)/n_hat[2]
 T_abs = exp(-L_esc * mu(E))
 ```
 
-with a **piecewise optical depth** along the same straight ray `r(s)=r_mid + s·n̂`. The ray
+is generalized to a **piecewise optical depth** along the same straight ray
+`r(s)=r_mid + s·n̂`. The ray
 runs in `z` from `z_mid` to the exit face (`z=0` if `n̂_z<0`, else `z=z_N`); within each
 crossed layer *i* it travels `ℓ_i = Δz_i / |n̂_z|`, where `Δz_i` is the overlap of
 `[z_mid → z_exit]` with `[z_{i-1}, z_i]`. Then
@@ -191,42 +199,26 @@ old single-material transport. The three escalating options it chose among were:
   the most code. Needed for thick films and for the substrate's own line emission to be
   quantitatively right.
 
-**Recommendation:** ship (C), then (A). (B) is a stopgap only if a specific thick-film case
-needs it before (A) lands.
+The implementation selected (A). Options (B) and (C) are retained here only as
+the rejected intermediate designs that motivated the full boundary-aware path.
 
 ---
 
-## Registry / "adding a stack" checklist (implemented)
+## Catalog / "adding a stack" checklist
 
-N-layer stacks are live: `Sweep.stack` takes a tuple of `sweep.Layer(material,
-thickness_ang, beam_uvw=None, azimuth_deg=0.0)` — each crystalline layer radiates
-with its OWN zone axis + in-plane azimuth (relative to the film); `substrate=` remains
-the 2-layer sugar. To register a NAMED stack runnable as `cxr scan <key>`:
+N-layer stacks are live in `data/materials.toml`; `substrate = "key"` remains
+two-layer sugar. To add a named stack runnable as `cxr scan <key>`:
 
-1. `data/crystal_structures.toml` — add any crystalline substrate not present (Si and
-   sapphire exist; fused-silica SiO₂ is amorphous → no entry, just a `composition`).
-   **No atomic-data edits** — xraydb covers O/Al.
-2. `src/cxr_mc/materials/registry.py` — a `MATERIAL_CONFIGS` row keyed by the stack name
-   with `"crystal": "<film-key>"` and `"stack": (Layer(...), ...)`. The registry
-   key is the CLI + checkpoint name (e.g. `mos2-on-sio2-si` →
-   `checkpoints/mos2-on-sio2-si.pkl`); the film key drives the crystallography
-   and pretty label.
-3. Done — transport, per-layer radiation, cross-stack absorption, and the plots need
-   no per-stack edits.
+1. If a crystalline phase is absent, add its bundled CIF under `data/cifs/` and
+   a `[crystals.<key>]` row. Add amorphous number densities under `[media.<key>]`.
+2. Add one `[materials.<run-key>]` row with the film `crystal`, a profile or scan
+   overrides, and either `substrate` or an ordered inline `stack` (never both).
+3. Run `uv run cxr check-config`. Transport support errors are fatal; missing
+   Mott CSVs warn and use the analytic fallback.
 
----
-
-## Effort
-
-- **(1) cross-stack absorption + (C) transport + one validated `mose2_on_si` case:**
-  ≈ **2–3 engineer-days** (the `T_abs` path integral, the layer data model + back-compat
-  promotion, regression that single-layer == today bit-for-bit).
-- **(2) per-layer radiation (multi-crystalline / substrate emission):** ≈ **2–3 days**.
-- **(3A) full per-layer transport:** ≈ **3–4 days** (internal-boundary truncation + the
-  per-layer rate/stopping/scatter switch + a CASINO-style depth-dose cross-check).
-
-Total ≈ **7–10 engineer-days** for the full feature; the **first slice is ~2–3** and
-delivers the dominant substrate-attenuation physics on its own.
+The material run key is the CLI/checkpoint name; the film crystal key drives
+crystallography. No transport, radiation, absorption, or plotting registry edit
+is required.
 
 ---
 

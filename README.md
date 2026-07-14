@@ -76,7 +76,7 @@ notebooks/analysis.ipynb  VIZ:     load that checkpoint → all figures (no swee
 scan.py            root shim → cxr_mc.scan (guarded; python scan.py, or cxr scan)
 scripts/export_pdf.py  shim → cxr_mc.export (notebooks/analysis.ipynb → PDF, or cxr export)
 src/cxr_mc/     importable package: physics modules + the cxr CLI entry point
-src/cxr_mc/data/  crystal_structures.toml, atomic_scattering_factors/, mott_transport_cross_sections/, *_qe.csv
+src/cxr_mc/data/  materials.toml, cifs/, atomic_scattering_factors/, mott_transport_cross_sections/, *_qe.csv
 checks/            validation scripts + notebooks (Feranchuk anchor, Zhai Fig 1c, kinematic audit)
 dev/               author-only helpers (remote.py — run scan.py on a personal GPU box over ssh)
 docs/              design notes & decision records (deferred features, library choices)
@@ -94,10 +94,10 @@ directory and the data travels with an installed wheel. `*.pkl` checkpoints and
 
 | Module                   | Responsibility                                                                                                                                                                                                                                                                                  |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `materials/`             | Material-physics namespace: `crystal.py` loads the crystal DB (`CRYSTALS` from TOML) and supplies reciprocal vectors, structure factor / `chi_g` (PXR) / `U_g` (CBS), Debye–Waller, absorption length, and physical constants; `atomic.py` supplies atomic responses; `registry.py` owns scan configurations; `attenuation.py` owns layered self-absorption. |
+| `materials/`             | Material domain: `catalog.py` validates the immutable CIF-backed declarative catalog; `_cif.py` parses CIF structures; `crystal.py` owns reciprocal vectors, structure factors / `chi_g` (PXR) / `U_g` (CBS), Debye–Waller, absorption length, and physical constants; `atomic.py` supplies atomic responses; `attenuation.py` owns layered self-absorption. |
 | `montecarlo.py`          | The transport + radiation pipeline:`simulate_trajectories` (MC electron transport), `mc_spectrum` (coherent lines), `mc_brem_spectrum` (Born+Elwert brem), detector helpers, `tilted_geometry`, and the case drivers `run_case`/`run_cases`. **Optional CuPy GPU** with automatic CPU fallback. |
 | `sweep.py`               | `Sweep` dataclass + `build_cases`. Every physical knob is a scalar (fixed) or a sequence (swept); cases = the Cartesian product.                                                                                                                                                                |
-| `config.py`              | Shared run config imported by**both** notebooks so they can't drift: `default_settings()`, the per-material sweep grids, and the builders `material_sweep(mat)` / `trajectory_sweep(mat)`. **This is where you tune a material's grid.**                                                        |
+| `config.py`              | Shared builders imported by both notebooks: `default_settings()`, `material_sweep(mat)`, and `trajectory_sweep(mat)`. Per-material grids come from `data/materials.toml`; detector/analysis knobs remain here.                                                        |
 | `run.py`                 | `run_sweep(...)`: checkpointed, crash-safe, resumable driver around `run_cases`; `load_checkpoint`/`cases_from_results` for the viz side.                                                                                                                                                       |
 | `results.py`             | `Settings` dataclass, per-record metrics (`peak_flux`, `coherent_flux`, `line_flux`, `line_quality`, …), and ranking helpers (`selection_score`, `top_geometries`).                                                                                                                            |
 | `plots.py`               | All plotting:`browse`, `plot_heatmaps`, `plot_metric_vs`, `plot_best_spectra`, `plot_material_comparison`, and the electron-penetration figures.                                                                                                                                                |
@@ -121,6 +121,11 @@ Run anything with `uv run …` (or activate `.venv`). Note that a bare `python` 
 your PATH will **not** have the dependencies — always use `uv run python …`.
 `uv sync` installs the package, so `import cxr_mc` works with no path hacks and
 the `cxr` console script is on the venv PATH (`uv run cxr --help`).
+
+Run `uv sync` again after pulling or switching to a branch that changes
+`pyproject.toml` or `uv.lock`. The CIF catalog requires the locked `crystals`
+dependency; invoking `cxr` from a stale environment that predates that dependency
+cannot load the bundled catalog.
 
 **GPU is optional.** `cupy-cuda13x` (CUDA 13) is a dependency, but it imports
 cleanly even with no usable GPU and the code **falls back to CPU automatically**.
@@ -154,9 +159,9 @@ structured so a GPU build is a base-image swap (see its header comment).
 
 ## Quickstart
 
-The workflow is **two notebooks that share the grids in `config.py`** — edit a
-material's thickness / energies / tilts / energy-grids there once and both
-notebooks pick it up.
+The workflow is **two notebooks that share the immutable material catalog** — edit a
+material's thickness / energies / tilts / energy grids in
+`src/cxr_mc/data/materials.toml` once and both notebooks pick it up.
 
 1. **`notebooks/scan.ipynb`** (the runner): set `MATERIAL`, then
    `material_sweep(MATERIAL)` → `build_cases` → `run_sweep`, which writes
@@ -196,33 +201,75 @@ checkpoints back and do all the matplotlib/PDF work locally.
 
 ## Materials
 
-Crystals are defined in [`src/cxr_mc/data/crystal_structures.toml`](src/cxr_mc/data/crystal_structures.toml)
-(lattice + basis). Current catalog (TOML keys):
+[`src/cxr_mc/data/materials.toml`](src/cxr_mc/data/materials.toml) is the single
+declarative catalog for crystal metadata, scan profiles, amorphous media, runnable
+materials, and stacks. Each crystal points to a phase-specific bundled CIF under
+[`src/cxr_mc/data/cifs/`](src/cxr_mc/data/cifs/). Production loading is offline-only:
+it reads packaged files through `cxr_mc.DATA_DIR` and never fetches a structure at
+runtime.
 
+The `crystals` library parses CIF and expands crystallographic symmetry. That is the
+edge of its responsibility: cxr-mc owns atomic form factors, structure factors,
+reflection selection, attenuation, electron transport, and PXR/CBS radiation.
 
-| Key                               | Material                           | Structure                      |
-| --------------------------------- | ---------------------------------- | ------------------------------ |
-| `diamond`                         | diamond                            | cubic                          |
-| `silicon`                         | silicon                            | cubic                          |
-| `lif`                             | LiF                                | cubic (rock salt)              |
-| `hopg`                            | highly-oriented pyrolytic graphite | hexagonal (fiber-textured)     |
-| `mose2`, `wse2`, `mote2`          | 2H-MoSe₂, 2H-WSe₂, 2H-MoTe₂        | hexagonal (2H TMD)             |
-| `mos2`, `ws2`                     | 2H-MoS₂, 2H-WS₂                    | hexagonal (2H TMD)             |
-| `nbs2`, `nbse2`                   | 2H-a-NbS2, 2H-a-NbSe2              | hexagonal (metallic 2H-a TMD)  |
-| `ptse2`, `hfs2`, `hfte2`, `hfse2`, `zrse2` | PtSe₂, HfS₂, HfTe₂, HfSe₂, ZrSe₂ | hexagonal (1T TMD)             |
-| `v2o5`                            | alpha-V2O5                         | orthorhombic single crystal, (010) cut |
-| `tis2`                            | 1T-TiS2                            | hexagonal 1T single crystal, (003) cut |
+### Adding a material
+
+For a phase whose elements already have transport support, the workflow has two edits:
+
+1. Add a phase-specific CIF as `src/cxr_mc/data/cifs/<phase>.cif`.
+2. Add a short crystal row and runnable material row to `materials.toml`:
+
+```toml
+[crystals.example]
+cif = "cifs/example.cif"
+validation_id = "example-structure"
+B_ang2 = 0.6
+beam_uvw = [0, 0, 1]
+
+[materials.example]
+label = "Example phase"
+profile = "standard"
+```
+
+The `validation_id` must name a row in
+[`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md). Run
+`uv run cxr check-config` after editing; an explicit full catalog can be checked with
+`uv run cxr check-config path/to/materials.toml`.
+
+Profiles are complete scan templates and do not inherit from other profiles. A material
+selects exactly one profile, then fields written on that material replace the profile's
+field. Grid descriptors map directly to NumPy: `arange.stop` is always excluded;
+`linspace` and `logspace` include `stop` by default and honor an explicit
+`endpoint = false`. Use exactly one thickness representation: `thickness_ang` gives
+physical Å directly, while `thickness_layers` requires the crystal's positive integer
+`layers_per_cell` and resolves as `layers * CIF_c / layers_per_cell`.
+
+Pinned reflections use positive family representatives in `hkl_families`; the catalog
+adds both `+hkl` and `-hkl` deterministically. Every pin requires a nonempty
+`hkl_reason`. Without a pin, cxr-mc selects dominant reflections using its own structure
+factors and ranking policy.
+
+Catalog validation rejects runnable compositions containing elements absent from
+cxr-mc's transport model. Missing per-element Mott CSV data is different: it emits a
+warning and transport uses the analytic screened-Rutherford fallback, so catalog loading
+continues.
+
+The package API exposes the immutable `CATALOG: MaterialCatalog`, typed frozen records
+(`CrystalSpec`, `MediumSpec`, `MaterialSpec`, `ScanSpec`, and `LayerSpec`),
+`load_material_catalog`, and compatibility projections such as `CRYSTALS`, `MATERIALS`,
+and `MATERIAL_LABELS`. `CATALOG.material_keys` is an ordered tuple in the declaration
+order of `[materials]`; it drives catalog menus and default analysis iteration.
+[`mats_to_sim.toml`](mats_to_sim.toml) is only the smaller user-selected ordered list for
+`cxr scan --all` and `cxr remote ... --all`; it neither defines nor reorders the catalog.
+
+> **Distribution licensing:** the locked `crystals` 1.7.0 dependency is GPLv3. A
+> licensing review is required before distributing cxr-mc source, wheels, binaries, or
+> containers that include this dependency.
 
 > **Note:** graphite is keyed `hopg` — there is no `graphite` key. HOPG is
 > fiber-textured, so **only (00l) reflections are coherent** (random in-plane
 > grain azimuths); it is treated specially (beam along the c-axis, (00l) only),
 > not via `dominant_reflections`.
-
-Adding a new material (or element) touches several non-colocated registries
-(the TOML, `TRANSPORT_ELEMENTS`, an edge flag, the config grid, and the
-`sweep.py` wiring). Atomic scattering data comes from **xraydb** for any element,
-so there is no per-element table to edit. The full checklist lives in
-[`CLAUDE.md`](CLAUDE.md) under *"Adding a material"*.
 
 ### Crystal mosaicity (optional — off by default)
 
@@ -252,7 +299,7 @@ material_sweep("hopg", mosaic=True, mosaic_route="mc")    # exact per-orientatio
   [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
 
 `mosaic=False` is an exact no-op for both routes. The per-crystal η is an optional
-`mosaic_fwhm_deg` in `crystal_structures.toml` (only HOPG carries one today). Neither route
+`mosaic_fwhm_deg` in `materials.toml` (only HOPG carries one today). Neither route
 is **yet validated against measured line widths** (see *Validation*).
 
 ---
@@ -344,7 +391,8 @@ numbers:
   (`src/cxr_mc/data/mott_transport_cross_sections/`) calibrate the screened-Rutherford
   α(E) per element; free paths from the Browning fit. Elements without a NIST
   table fall back to the analytic screening with a one-time warning.
-- **Crystal structures:** `src/cxr_mc/data/crystal_structures.toml` (lattice + basis).
+- **Crystal structures:** phase-specific `src/cxr_mc/data/cifs/*.cif`, referenced by
+  `src/cxr_mc/data/materials.toml`; structures load offline through the `crystals` adapter.
 - **Detector QE:** `src/cxr_mc/data/eaglexo_qe.csv`; Timepix Si response computed from Henke `f2`.
 
 ---

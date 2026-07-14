@@ -9,11 +9,14 @@ see [`TODO.md`](../TODO.md). Regenerate the directory inventory with
 ## Dependency layers (leaf → driver)
 
 ```
+materials._transport_data      (transport-supported element constants; leaf)
+materials._cif                 (crystals-backed CIF parsing/symmetry expansion; leaf)
 materials.atomic               (xraydb-backed atomic data; no sibling deps)
         │
-materials.crystal              (crystal DB, structure factor, χ_g/U_g, μ)
+materials.catalog              (offline declarative catalog; CIF + transport validation)
+        │
+materials.crystal              (catalog projection, structure factor, χ_g/U_g, μ)
         ├── validation_oracles (optional external comparators; checks only)
-materials.registry             (material scan configurations; no physics deps)
         │
 materials.attenuation          (composition and Beer–Lambert helpers)
         │
@@ -36,8 +39,10 @@ Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
 ## Entry points
 
 - **`cxr` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
-  dispatching the `scan`, `export`, `slim`, `archive`, `restore`, `archives` and
-  `union` subcommands.
+  dispatching the `scan`, `check-config`, `export`, `slim`, `archive`, `restore`,
+  `archives` and `union` subcommands.
+- **`cxr check-config [catalog]`** → `check_config:_run`: validate the bundled
+  offline catalog or an explicit complete catalog without starting a simulation.
 - **`cxr scan <material>`** → `scan:main` → `run.run_sweep` → writes
   `checkpoints/<material>.pkl`. Root shim: `scan.py`.
 - **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
@@ -62,20 +67,37 @@ Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
 ## Core physics
 
 ### `materials/` (package)
-The material domain package. Its narrow top-level API re-exports only crystal
-and registry conveniences (`CRYSTALS`, material registries, `Layer`, and
-configuration helpers); implementation APIs remain in the submodules below.
+The material domain package. Its narrow top-level API exposes the immutable
+`CATALOG`, its frozen record types (`MaterialCatalog`, `CrystalInfo`,
+`CrystalSpec`, `MediumSpec`, `MaterialSpec`, `ScanSpec`, `LayerSpec`),
+`load_material_catalog`, and compatibility projections (`CRYSTALS`, `MATERIALS`,
+`MATERIAL_LABELS`). Implementation helpers remain in the submodules below.
 
+### `materials/catalog.py`
+Schema-version-1 loader for packaged `data/materials.toml`. It resolves only
+phase-specific CIFs below packaged `data/cifs`, validates scan descriptors,
+transport support, pinned-reflection policy, and stacks, then returns deeply
+immutable typed records. `material_keys` preserves TOML declaration order.
+- Public: `MaterialCatalog`, `MaterialConfigError`, `CrystalInfo`, `CrystalSpec`,
+  `MediumSpec`, `MaterialSpec`, `ScanSpec`, `LayerSpec`, `load_material_catalog`.
+- Deps: `materials._cif`, `materials._transport_data`, `DATA_DIR`.
+
+### `materials/_cif.py`
+Structural adapter around `crystals` 1.7: CIF parsing, symmetry expansion, cell
+parameters, fractional sites, and volume only. cxr-mc retains ownership of form
+factors, structure factors, reflection selection, attenuation, and transport.
+- Internal: `crystals_crystal_to_crystal_info`, `load_crystal_from_cif`.
+- Deps: external `crystals`, NumPy.
 
 ### `materials/crystal.py`
-Crystal database, structure factors, and X-ray optical constants — the physics
-data layer under the Monte Carlo.
+Catalog-backed crystal compatibility projection, structure factors, and X-ray
+optical constants — the physics data layer under the Monte Carlo.
 - Public: `load_crystals`, `load_crystal_from_cif`,
-  `diffpy_structure_to_crystal_info`, `reciprocal_g_vector`, `g_mag`,
+  `crystals_crystal_to_crystal_info`, `reciprocal_g_vector`, `g_mag`,
   `debye_waller`, `structure_factor`, `chi_g`, `U_g`,
   `absorption_length_ang`, `dominant_reflections`, `beta_from_Ee`; the
   `CRYSTALS` registry.
-- Deps: `materials.atomic`, `DATA_DIR`.
+- Deps: `materials.atomic`, `materials.catalog`, `materials._cif`.
 
 ### `validation_oracles.py`
 Optional validation-only adapters for external crystallography/scattering
@@ -124,32 +146,22 @@ re-exported from the package**, so `from cxr_mc.montecarlo import X` is unchange
 
 ## Sweep, config & drivers
 
-### `materials/registry.py`
-Single source of truth for per-material scan grids and crystallographic scan
-defaults. Exposes typed projections so `config.py` and `sweep.py` share one
-registry without importing each other.
-- Public: `MATERIAL_CONFIGS`, `MATERIAL_GRIDS`, `CRYSTAL_PARAMS`,
-  `MATERIAL_LABELS`, `MATERIALS`, `MaterialConfig`, `MaterialGrid`,
-  `CrystalParamsGrid`, `Layer`, `ScalarOrSeq`, `material_scan_grid`,
-  `material_crystal_key`, `crystal_config`.
-- Deps: none (NumPy literals only).
-
 ### `sweep.py`
 Turns a `Sweep` definition into the Cartesian product of `run_case` dicts.
-- Public: `Sweep` (dataclass of all knobs), `Layer` (one stack layer: material,
+- Public: `Sweep` (dataclass of all knobs), `LayerSpec` (one stack layer: material,
   thickness, orientation), `build_cases`, `crystal_params`,
   `substrate_composition`, `stack_layers`, `film_on_substrate_layers`,
   `layer_radiator`, `substrate_radiator`, `geometry_table`,
   `fmt_thickness`, `pm` (±hkl expansion); the `MATERIAL_LABELS` registry.
-- Deps: `materials.crystal`, `materials.registry`.
+- Deps: `materials` (`CATALOG`, `LayerSpec`), `materials.crystal`.
 
 ### `config.py`
 Default settings/sweep builders shared by the CLI and both notebooks; per-material
-scan grids are projections from `materials/registry.py`.
+scan grids are projections from the immutable `materials.CATALOG`.
 - Public: `default_settings`, `material_grid`, `material_sweep`,
-  `trajectory_sweep`, `MaterialGrid` (TypedDict); the `_MATERIAL_GRIDS` /
-  `MATERIALS` registries.
-- Deps: `materials.registry`, `results` (`Settings`), `sweep` (`Sweep`).
+  `trajectory_sweep`; the `MATERIALS` ordered tuple.
+- Deps: `materials` (`CATALOG`, `MaterialSpec`), `results` (`Settings`),
+  `sweep` (`Sweep`).
 
 ### `run.py`
 Checkpointed, resumable sweep driver and checkpoint loaders/repair.

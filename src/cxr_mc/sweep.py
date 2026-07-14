@@ -16,8 +16,8 @@ are both valid and need no other code changes.
 
 Crystallography (composition, dominant reflections, zone axis, B-factor, default
 energy grid) is looked up per material; the detector geometry defaults to the
-2x2 Timepix3 quad. Only ``crystallography`` and the lightweight material
-registry are imported here (no GPU), so this module is cheap to import and test.
+2x2 Timepix3 quad. Only ``materials.crystal`` and the immutable material catalog
+are imported here (no GPU), so this module is cheap to import and test.
 """
 
 from collections.abc import Sequence

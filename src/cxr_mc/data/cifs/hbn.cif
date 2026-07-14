@@ -1,6 +1,6 @@
 data_hbn
 # Phase identity: cxr-mc crystal catalog entry [hbn].
-# Deterministic full-basis P1 export of crystal_structures.toml.
+# Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # Hexagonal boron nitride, P6_3/mmc, graphite-like layers with eclipsed B/N
 # registry: the second layer swaps B and N sites so B lies above N across the
@@ -27,5 +27,4 @@ B1 B 0.0 0.0 0.0 1.0
 N1 N 0.3333333333333333 0.6666666666666667 0.0 1.0
 B2 B 0.3333333333333333 0.6666666666666667 0.5 1.0
 N2 N 0.0 0.0 0.5 1.0
-
 

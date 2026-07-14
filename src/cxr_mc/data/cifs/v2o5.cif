@@ -1,12 +1,12 @@
 data_v2o5
 # Phase identity: cxr-mc crystal catalog entry [v2o5].
-# Deterministic full-basis P1 export of crystal_structures.toml.
+# Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # Alpha-V2O5, ambient orthorhombic standard Pmmn (two formula units per cell).
 # a=11.512, b=3.564, c=4.368 A: McColl, Johnson & Cora, PCCP 20, 15002
 # (2018), doi:10.1039/C8CP02187B. Four unique-site coordinates are from
 # Sipr et al., Phys. Rev. B 60, 14115 (1999), doi:10.1103/PhysRevB.60.14115.
-# The loader has no space-group expansion, so 4f and 2a sites are explicit.
+# This P1 representation lists the 4f and 2a sites explicitly.
 # Assumes stoichiometric ambient alpha-V2O5. The historical Pmnm (010) layered
 # cut is standard-Pmmn (001). Limiting checks: V=a*b*c, 4V+10O, and finite
 # F/chi/U for that normal (001) reflection.
@@ -40,5 +40,4 @@ O7 O 0.0689 0.75 0.997 1.0
 O8 O 0.4311 0.75 0.997 1.0
 O9 O 0.25 0.25 0.001 1.0
 O10 O 0.75 0.75 0.999 1.0
-
 

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import tomllib
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -36,6 +37,26 @@ E_grid = {{ values = [100.0, 200.0] }}
 composition = {{ Si = 0.02205, O = 0.04410 }}
 {material_rows}
 """
+
+
+def test_bundled_crystal_validation_ids_are_ledgered():
+    from cxr_mc import DATA_DIR
+
+    with (DATA_DIR / "materials.toml").open("rb") as stream:
+        raw = tomllib.load(stream)
+    validation_ids = {
+        row["validation_id"].strip()
+        for row in raw["crystals"].values()
+        if isinstance(row.get("validation_id"), str) and row["validation_id"].strip()
+    }
+    ledger = (Path(__file__).parents[1] / "docs" / "physics-validation-ledger.md").read_text()
+
+    missing = sorted(
+        validation_id
+        for validation_id in validation_ids
+        if f"| `{validation_id}` |" not in ledger
+    )
+    assert not missing, f"catalog validation IDs missing from ledger: {missing}"
 
 
 def test_packaged_catalog_exposes_frozen_ordered_public_api():

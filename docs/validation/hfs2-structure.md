@@ -4,7 +4,8 @@
 three-atom primitive hexagonal cell with `a = 3.62 A`, `c = 5.80 A`, Hf on
 `1a`, and S on `2d` using the idealized octahedral coordinate `z = 0.25`.
 
-**Code.** `src/cxr_mc/data/crystal_structures.toml::[hfs2]`
+**Code.** `src/cxr_mc/data/cifs/hfs2.cif` and
+`src/cxr_mc/data/materials.toml::[crystals.hfs2]`
 
 **Anchor.** `tests/test_crystallography.py::test_hfs2_structure_sane`
 
@@ -16,7 +17,7 @@ doi:10.1143/JPSJ.51.2233.
 
 **Verifier context.** Independent session; did not author the implementation.
 The derivation below was completed from the cited claim and sources before
-inspection of the TOML body.
+inspection of the bundled CIF body.
 
 ## Source facts and assumptions
 

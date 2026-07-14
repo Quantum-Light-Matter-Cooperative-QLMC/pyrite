@@ -87,7 +87,7 @@ def material_sweep(material: str, *, theta_obs_deg=90.0, **overrides):
     """The full parametric :class:`sweep.Sweep` for ``material`` (the geometry
     the runner scans and the viz notebook reduces). ``overrides`` replace any grid
     field, e.g. ``material_sweep("ptse2", thickness_ang=2e4)``. For a named-stack
-    key the Sweep's material is the film crystal; the registry key stays the
+    key the Sweep's material is the film crystal; the catalog material key stays the
     CLI/checkpoint name."""
     spec = _material_spec(material)
     scan = spec.scan

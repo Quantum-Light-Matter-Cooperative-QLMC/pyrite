@@ -3,7 +3,7 @@
 ## Purpose and scope
 
 This note surveys crystalline materials that are missing from cxr-mc's current
-material registry and may be promising for parametric X-ray radiation (PXR) or
+material catalog and may be promising for parametric X-ray radiation (PXR) or
 coherent bremsstrahlung (CBS) driven by electron beams in the tens to low
 hundreds of keV range. The selection criteria are:
 

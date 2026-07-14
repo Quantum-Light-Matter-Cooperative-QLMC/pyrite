@@ -103,7 +103,7 @@ def _build_parser(ap):
         nargs=3,
         metavar=("H", "K", "L"),
         default=None,
-        help="override the beam zone axis [uvw] (default: the material's crystal_params default)",
+        help="override the beam zone axis [uvw] (default: the catalog crystal's beam_uvw)",
     )
     ap.add_argument("--checkpoint-dir", default="checkpoints")
     ap.set_defaults(func=run)
@@ -157,7 +157,7 @@ def _run_material(args, material):
         f"hkl_list ({len(cases[0]['hkl_list'])} reflections)={cases[0]['hkl_list']}"
     )
 
-    # Always pass an explicit path named for the REGISTRY key: run_sweep's
+    # Always pass an explicit path named for the catalog material key: run_sweep's
     # default derives the name from the film crystal, which would make a named
     # stack (e.g. mos2-on-sio2-si) clobber/resume the plain film's checkpoint.
     # A --quick smoke test writes to its OWN checkpoint (<material>_quick.pkl), so

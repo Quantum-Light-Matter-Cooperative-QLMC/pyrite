@@ -1,6 +1,6 @@
 data_hfs2
 # Phase identity: cxr-mc crystal catalog entry [hfs2].
-# Deterministic full-basis P1 export of crystal_structures.toml.
+# Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # 1T-HfS2 (CdI2-type, P-3m1 #164): one HfS2 formula unit per primitive
 # hexagonal cell, with Hf on 1a and S on 2d. The product crystal reports
@@ -28,5 +28,4 @@ _atom_site_occupancy
 Hf1 Hf 0.0 0.0 0.0 1.0
 S1 S 0.3333333333333333 0.6666666666666667 0.25 1.0
 S2 S 0.6666666666666667 0.3333333333333333 0.75 1.0
-
 

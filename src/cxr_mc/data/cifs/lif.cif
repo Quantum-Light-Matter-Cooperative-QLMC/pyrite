@@ -1,6 +1,6 @@
 data_lif
 # Phase identity: cxr-mc crystal catalog entry [lif].
-# Deterministic full-basis P1 export of crystal_structures.toml.
+# Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # Rock salt: 4 formula units per conventional cell.
 _symmetry_space_group_name_H-M 'P 1'
@@ -26,5 +26,4 @@ F1 F 0.5 0.5 0.5 1.0
 F2 F 0.5 0.0 0.0 1.0
 F3 F 0.0 0.5 0.0 1.0
 F4 F 0.0 0.0 0.5 1.0
-
 

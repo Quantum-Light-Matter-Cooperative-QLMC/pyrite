@@ -36,7 +36,7 @@ convention, it *is* Zhai's parametrization, evaluated at Zhai's angles.
 `tilt_deg` has always flowed into `tilted_geometry` with **no negation** at
 any call site. The spherical formula above was already Zhai's positive-θ
 convention; what changed (2026-07-11) is that the per-material scan grids
-(`materials/registry.py`, `config.py`, `sweep.py`, `scan.py`,
+(now in `data/materials.toml`, consumed through `config.py`, `sweep.py`, and `scan.py`, plus
 `checks/anchor_figures.py`) previously populated only the **negative** half
 of the polar range (`−85…0`, etc.) and a negative azimuth span (`−80…0`).
 Those grids simulated the mirror configuration — reciprocal vector tilted

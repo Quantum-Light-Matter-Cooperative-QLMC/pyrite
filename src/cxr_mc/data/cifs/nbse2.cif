@@ -1,6 +1,6 @@
 data_nbse2
 # Phase identity: cxr-mc crystal catalog entry [nbse2].
-# Deterministic full-basis P1 export of crystal_structures.toml.
+# Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # Metallic 2H-a NbSe2, P6_3/mmc: Nb occupies aligned 2b columns and Se occupies
 # 4f with z=0.116. Lattice: Wang et al., Appl. Phys. Lett. 123, 153505 (2023),
@@ -33,5 +33,4 @@ Se2 Se 0.3333333333333333 0.6666666666666667 0.384 1.0
 Nb2 Nb 0.0 0.0 0.75 1.0
 Se3 Se 0.6666666666666667 0.3333333333333333 0.616 1.0
 Se4 Se 0.6666666666666667 0.3333333333333333 0.884 1.0
-
 

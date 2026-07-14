@@ -40,7 +40,8 @@ FWHM, so a record computed with `mosaic=False` can be re-broadened at plot time.
   `montecarlo._orientation_R` (extracted from `mc_spectrum`).
 - `results.store_result` — adds the term in quadrature, gated on
   `case["mosaic_fwhm_rad"]`, capped at `E_pk`.
-- `crystal_structures.toml` — optional per-crystal `mosaic_fwhm_deg`; `crystallography.load_crystals` surfaces it.
+- `data/materials.toml` — optional per-crystal `mosaic_fwhm_deg`; the immutable
+  `materials.CATALOG` and `materials.crystal.load_crystals` surface it.
 - `sweep.Sweep(mosaic=…, mosaic_fwhm_deg=…)` → `build_cases` → `case["mosaic_fwhm_rad"]`.
 - `plots.plot_mosaic_comparison` — overlay grades from one record.
 - Tests: `tests/test_mosaic.py`.

@@ -1,6 +1,6 @@
 data_mote2_product
 # Phase identity: cxr-mc crystal catalog entry [mote2_product].
-# Deterministic full-basis P1 export of crystal_structures.toml.
+# Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
 # 2H-MoTe2 product-page variant: few-layer material with lattice a = 3.50, c = 13.41 A
 # from the referenced product page (reported as a=b=0.350 nm, c=1.341 nm). The Mo-Te bond
@@ -27,5 +27,4 @@ Te2 Te 0.6666666666666667 0.3333333333333333 0.121 1.0
 Mo2 Mo 0.6666666666666667 0.3333333333333333 0.75 1.0
 Te3 Te 0.3333333333333333 0.6666666666666667 0.879 1.0
 Te4 Te 0.3333333333333333 0.6666666666666667 0.621 1.0
-
 
