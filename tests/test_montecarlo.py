@@ -51,6 +51,14 @@ def test_tellurium_in_transport_table():
     assert TRANSPORT_ELEMENTS["Te"]["A"] == pytest.approx(127.6, abs=0.1)
 
 
+def test_vanadium_transport_parameters():
+    assert TRANSPORT_ELEMENTS["V"] == {
+        "Z": 23,
+        "A": pytest.approx(50.9415, abs=0.0001),
+        "J_keV": 0.245,
+    }
+
+
 def test_niobium_transport_parameters_and_fallback(monkeypatch):
     params = TRANSPORT_ELEMENTS["Nb"]
     assert params == {"Z": 41, "A": pytest.approx(92.906, abs=0.001), "J_keV": 0.417}

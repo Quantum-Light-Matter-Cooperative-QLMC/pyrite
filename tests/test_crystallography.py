@@ -21,6 +21,7 @@ EXPECTED = {
     "diamond",
     "silicon",
     "lif",
+    "v2o5",
     "hopg",
     "hbn",
     "mose2",
@@ -96,6 +97,29 @@ def test_hbn_structure_sane():
     for el, p in info["basis"]:
         partner = (round(p[0] % 1, 4), round(p[1] % 1, 4), round((p[2] + 0.5) % 1, 4))
         assert site[partner] != el, f"h-BN registry broken: {el} eclipses {el} across layers"
+
+
+def test_v2o5_010_structure_and_couplings_are_sane():
+    # alpha-V2O5 Pmmn: a=3.564, b=11.512, c=4.368 A; 2 V2O5 per cell.
+    info = CRYSTALS["v2o5"]
+    basis = info["basis"]
+
+    assert info["lattice"]["system"] == "orthorhombic"
+    assert info["lattice"]["a"] == pytest.approx(3.564)
+    assert info["lattice"]["b"] == pytest.approx(11.512)
+    assert info["lattice"]["c"] == pytest.approx(4.368)
+    assert info["V_cell"] == pytest.approx(3.564 * 11.512 * 4.368, abs=0.1)
+    assert len(basis) == 14
+    assert sum(element == "V" for element, _ in basis) == 4
+    assert sum(element == "O" for element, _ in basis) == 10
+
+    structure, g = structure_factor("v2o5", (0, 2, 0), 1500.0, B_ang2=0.6)
+    susceptibility = chi_g("v2o5", (0, 2, 0), 1500.0, B_ang2=0.6)
+    potential = U_g("v2o5", (0, 2, 0), 1500.0, B_ang2=0.6)
+    assert g > 0.0
+    assert np.isfinite(abs(structure)) and abs(structure) > 0.0
+    assert np.isfinite(abs(susceptibility)) and abs(susceptibility) > 0.0
+    assert np.isfinite(abs(potential)) and abs(potential) > 0.0
 
 
 def test_dominant_reflections_nonempty_triples():

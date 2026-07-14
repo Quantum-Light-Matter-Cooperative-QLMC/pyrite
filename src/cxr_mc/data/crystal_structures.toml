@@ -95,6 +95,36 @@ basis = [
     { element = "O",  pos = [0.63957333, 0.97290667, 0.41666667] },
 ]
 
+# Alpha-V2O5, ambient orthorhombic Pmmn (two formula units per cell).
+# a=3.564, b=11.512, c=4.368 A: McColl, Johnson & Cora, PCCP 20, 15002
+# (2018), doi:10.1039/C8CP02187B. Four unique-site coordinates are from
+# Sipr et al., Phys. Rev. B 60, 14115 (1999), doi:10.1103/PhysRevB.60.14115.
+# The loader has no space-group expansion, so 4f and 2a sites are explicit.
+# Assumes stoichiometric ambient alpha-V2O5. Limiting checks: V=a*b*c, 4V+10O,
+# and finite F/chi/U for the first allowed normal (020) reflection.
+# Validation: v2o5-010-structure
+[v2o5]
+system = "orthorhombic"
+a = 3.564
+b = 11.512
+c = 4.368
+basis = [
+    { element = "V", pos = [0.10118, 0.25, 0.8917] },
+    { element = "V", pos = [0.39882, 0.25, 0.8917] },
+    { element = "V", pos = [0.89882, 0.75, 0.1083] },
+    { element = "V", pos = [0.60118, 0.75, 0.1083] },
+    { element = "O", pos = [0.1043, 0.25, 0.531] },
+    { element = "O", pos = [0.3957, 0.25, 0.531] },
+    { element = "O", pos = [0.8957, 0.75, 0.469] },
+    { element = "O", pos = [0.6043, 0.75, 0.469] },
+    { element = "O", pos = [0.9311, 0.25, 0.003] },
+    { element = "O", pos = [0.5689, 0.25, 0.003] },
+    { element = "O", pos = [0.0689, 0.75, 0.997] },
+    { element = "O", pos = [0.4311, 0.75, 0.997] },
+    { element = "O", pos = [0.25, 0.25, 0.001] },
+    { element = "O", pos = [0.75, 0.75, 0.999] },
+]
+
 # AB-stacked (Bernal) highly-oriented pyrolytic graphite, 4 atoms per cell.
 # mosaic_fwhm_deg: c-axis (00l) rocking-curve FWHM of the mosaic-block spread.
 # 0.8 deg = ZYB research grade (ZYA 0.4 / ZYB 0.8 / ZYH 3.5). OPTIONAL per crystal:
