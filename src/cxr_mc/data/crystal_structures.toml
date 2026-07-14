@@ -373,3 +373,20 @@ basis = [
     { element = "Se", pos = [0.6666666666666667, 0.3333333333333333, 0.616] },
     { element = "Se", pos = [0.6666666666666667, 0.3333333333333333, 0.884] },
 ]
+
+# 1T-HfTe2, CdI2-type P-3m1 (#164), from Materials Project mp-32887.
+# Hf occupies 1a at the origin; Te occupies 2d with z=0.228088. The Materials
+# Project relaxed primitive hexagonal cell has a=4.01826066 A and c=7.628794 A.
+# The loader does not apply space-group symmetry, so the symmetry mate at 1-z
+# is listed explicitly. Limiting checks: V=(sqrt(3)/2)a^2c, 1Hf+2Te, and finite
+# F/chi/U for the allowed basal (001) reflection.
+# Validation: hfte2-001-structure
+[hfte2]
+system = "hexagonal"
+a = 4.01826066
+c = 7.62879400
+basis = [
+    { element = "Hf", pos = [0.00000000, 0.00000000, 0.00000000] },
+    { element = "Te", pos = [0.33333333, 0.66666667, 0.22808800] },
+    { element = "Te", pos = [0.66666667, 0.33333333, 0.77191200] },
+]

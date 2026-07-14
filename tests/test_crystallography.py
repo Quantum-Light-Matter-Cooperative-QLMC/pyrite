@@ -33,6 +33,7 @@ EXPECTED = {
     "ws2",
     "ptse2",
     "hfs2",
+    "hfte2",
     "hfse2",
     "zrse2",
     "nbs2",
@@ -241,6 +242,28 @@ def test_hfs2_structure_sane():
 
     structure_001, _ = structure_factor("hfs2", (0, 0, 1), 1000.0, B_ang2=0.6)
     assert abs(structure_001) > 1.0
+
+
+def test_hfte2_structure_and_001_couplings_are_sane():
+    # MP mp-32887: 1T-HfTe2 P-3m1, one HfTe2 formula unit per primitive
+    # hexagonal cell. The explicit 1a + 2d basis makes odd basal orders allowed.
+    info = CRYSTALS["hfte2"]
+
+    assert info["lattice"]["a"] == pytest.approx(4.01826066)
+    assert info["lattice"]["c"] == pytest.approx(7.62879400)
+    assert info["V_cell"] == pytest.approx(106.675, abs=0.01)
+    assert len(info["basis"]) == 3
+    assert sum(1 for el, _ in info["basis"] if el == "Hf") == 1
+    assert sum(1 for el, _ in info["basis"] if el == "Te") == 2
+
+    structure, g = structure_factor("hfte2", (0, 0, 1), 1000.0, B_ang2=0.6)
+    susceptibility = chi_g("hfte2", (0, 0, 1), 1000.0, B_ang2=0.6)
+    potential = U_g("hfte2", (0, 0, 1), 1000.0, B_ang2=0.6)
+
+    assert g > 0.0
+    assert np.isfinite(abs(structure)) and abs(structure) > 0.0
+    assert np.isfinite(abs(susceptibility)) and abs(susceptibility) > 0.0
+    assert np.isfinite(abs(potential)) and abs(potential) > 0.0
 
 
 def test_sapphire_structure_sane():

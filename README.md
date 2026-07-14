@@ -209,7 +209,7 @@ Crystals are defined in [`src/cxr_mc/data/crystal_structures.toml`](src/cxr_mc/d
 | `mose2`, `wse2`, `mote2`          | 2H-MoSe₂, 2H-WSe₂, 2H-MoTe₂        | hexagonal (2H TMD)             |
 | `mos2`, `ws2`                     | 2H-MoS₂, 2H-WS₂                    | hexagonal (2H TMD)             |
 | `nbs2`, `nbse2`                   | 2H-a-NbS2, 2H-a-NbSe2              | hexagonal (metallic 2H-a TMD)  |
-| `ptse2`, `hfs2`, `hfse2`, `zrse2` | PtSe₂, HfS₂, HfSe₂, ZrSe₂          | hexagonal (1T TMD)             |
+| `ptse2`, `hfs2`, `hfte2`, `hfse2`, `zrse2` | PtSe₂, HfS₂, HfTe₂, HfSe₂, ZrSe₂ | hexagonal (1T TMD)             |
 | `v2o5`                            | alpha-V2O5                         | orthorhombic single crystal, (010) cut |
 | `tis2`                            | 1T-TiS2                            | hexagonal 1T single crystal, (003) cut |
 

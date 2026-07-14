@@ -284,6 +284,26 @@ MATERIAL_CONFIGS: dict[str, MaterialConfig] = {
         "E_grid_line": np.arange(50.0, 4500.0, 3.0),
         "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
     },
+    # 1T-HfTe2 MP structure: use the cleavable basal (001) symmetric cut.
+    # Pinning keeps g parallel to the c-axis slab normal; the automatic search
+    # could otherwise choose an asymmetric in-plane reflection.
+    "hfte2": {
+        "label": "1T-HfTe2 (001)",
+        "B_ang2": 0.6,
+        "beam_uvw": (0, 0, 1),
+        "E_grid": np.arange(50.0, 4500.0, 3.0),
+        "hkl_list": pm((0, 0, 1)),
+        "hkl_list_reason": (
+            "Use the basal (001) symmetric cut of 1T-HfTe2 so the reciprocal "
+            "vector remains parallel to the cleavable c-axis slab normal."
+        ),
+        "thickness_ang": 10e4,
+        "energy_keV": [25, 30, 35],
+        "tilt_deg": np.linspace(0, 85, 20, endpoint=False),
+        "tilt_azim_deg": np.linspace(0, 180, 9, endpoint=True),
+        "E_grid_line": np.arange(50.0, 4500.0, 3.0),
+        "E_grid_brem": np.arange(0.0, 30000.0, 25.0),
+    },
     "hfse2": {
         "label": "HfSe2",
         "B_ang2": 0.6,
