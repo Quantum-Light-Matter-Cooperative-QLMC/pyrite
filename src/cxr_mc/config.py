@@ -7,8 +7,8 @@ scan-runner (``scan.ipynb``) and the visualization driver
 (``analysis.ipynb``) can never drift apart: they build the SAME
 :class:`results.Settings` and the SAME per-material :class:`sweep.Sweep`,
 so the viz notebook is guaranteed to be looking at the checkpoint the runner
-wrote. Edit a material's grid in :mod:`cxr_mc.materials.registry` and both notebooks pick
-it up; detector/analysis knobs still live here.
+wrote. Material identities and grids come from :data:`cxr_mc.materials.CATALOG`;
+detector/analysis knobs still live here.
 
   * :func:`default_settings` -- beam current, electron counts, detector flags.
   * :func:`material_sweep`   -- the full parametric scan for a material (thickness,
@@ -22,13 +22,11 @@ from dataclasses import replace
 
 import numpy as np
 
-from . import materials as _materials
-from .materials import MaterialGrid, material_crystal_key
+from .materials import CATALOG, MaterialSpec
 from .results import Settings
 from .sweep import Sweep
 
-_MATERIAL_GRIDS = _materials.MATERIAL_GRIDS
-MATERIALS = _materials.MATERIALS
+MATERIALS = CATALOG.material_keys
 
 
 # When the azimuth is swept, collapse it: for each (polar tilt, energy) keep only
@@ -57,11 +55,30 @@ def default_settings():
     )
 
 
-def material_grid(material) -> MaterialGrid:
-    """The raw per-material grid dict (thickness, energies, tilt sweeps, grids)."""
-    if material not in _MATERIAL_GRIDS:
-        raise ValueError(f"unknown material {material!r} (have {list(_MATERIAL_GRIDS)})")
-    return _MATERIAL_GRIDS[material]
+def _material_spec(material: str) -> MaterialSpec:
+    try:
+        return CATALOG.material(material)
+    except KeyError:
+        raise ValueError(f"unknown material {material!r} (have {list(MATERIALS)})") from None
+
+
+def material_grid(material: str) -> dict[str, object]:
+    """Return a mapping-style projection of a catalog material's scan grid."""
+    spec = _material_spec(material)
+    scan = spec.scan
+    grid: dict[str, object] = {
+        "thickness_ang": scan.thickness_ang,
+        "energy_keV": scan.energy_keV,
+        "tilt_deg": scan.tilt_deg,
+        "tilt_azim_deg": scan.tilt_azim_deg,
+        "E_grid_line": scan.E_grid_line,
+        "E_grid_brem": scan.E_grid_brem,
+    }
+    if spec.substrate is not None:
+        grid["substrate"] = spec.substrate
+    if spec.stack:
+        grid["stack"] = spec.stack
+    return grid
 
 
 def material_sweep(material: str, *, theta_obs_deg=90.0, **overrides):
@@ -70,8 +87,20 @@ def material_sweep(material: str, *, theta_obs_deg=90.0, **overrides):
     field, e.g. ``material_sweep("ptse2", thickness_ang=2e4)``. For a named-stack
     key the Sweep's material is the film crystal; the registry key stays the
     CLI/checkpoint name."""
-    film = material_crystal_key(material)
-    sweep = Sweep(material=film, theta_obs_deg=theta_obs_deg, **material_grid(material))
+    spec = _material_spec(material)
+    scan = spec.scan
+    sweep = Sweep(
+        material=spec.crystal_key,
+        theta_obs_deg=theta_obs_deg,
+        thickness_ang=scan.thickness_ang,
+        energy_keV=scan.energy_keV,
+        tilt_deg=scan.tilt_deg,
+        tilt_azim_deg=scan.tilt_azim_deg,
+        E_grid_line=scan.E_grid_line,
+        E_grid_brem=scan.E_grid_brem,
+        substrate=spec.substrate,
+        stack=spec.stack or None,
+    )
     return replace(sweep, **overrides) if overrides else sweep
 
 
@@ -102,17 +131,18 @@ def trajectory_sweep(
     stack here too -- without this the penetration figures silently transported
     electrons through the free-standing film only, never reaching the
     substrate, even though the spectrum runner always sees the full stack."""
-    p = material_grid(material)
+    spec = _material_spec(material)
+    scan = spec.scan
     if thickness_ang is None:
-        thick_arr = np.atleast_1d(np.asarray(p["thickness_ang"], dtype=float))
+        thick_arr = np.atleast_1d(np.asarray(scan.thickness_ang, dtype=float))
         thick = float(thick_arr[len(thick_arr) // 2])
     else:
         thick = float(thickness_ang)
     stack_kwargs = {}
-    if "stack" in p:
-        stack_kwargs["stack"] = p["stack"]
-    elif "substrate" in p:
-        stack_kwargs["substrate"] = p["substrate"]
+    if spec.stack:
+        stack_kwargs["stack"] = spec.stack
+    elif spec.substrate is not None:
+        stack_kwargs["substrate"] = spec.substrate
     if n_tilts is not None or tilt_span is not None:
         count = 9 if n_tilts is None else int(n_tilts)
         span = 80.0 if tilt_span is None else float(tilt_span)
@@ -120,13 +150,13 @@ def trajectory_sweep(
     else:
         tilt_values = tuple(float(t) for t in tilts)
     return Sweep(
-        material=material_crystal_key(material),  # named stacks: the film
+        material=spec.crystal_key,  # named stacks: the film
         thickness_ang=thick,
         energy_keV=list(energies),
         tilt_deg=tilt_values,
         tilt_azim_deg=0.0,
         theta_obs_deg=90.0,
-        E_grid_line=p["E_grid_line"],
-        E_grid_brem=p["E_grid_brem"],
+        E_grid_line=scan.E_grid_line,
+        E_grid_brem=scan.E_grid_brem,
         **stack_kwargs,
     )

@@ -18,7 +18,7 @@ from cxr_mc.montecarlo import (
     simulate_trajectories,
 )
 from cxr_mc.sweep import (
-    Layer,
+    LayerSpec,
     Sweep,
     build_cases,
     film_on_substrate_layers,
@@ -226,14 +226,14 @@ def test_build_cases_layer_radiators_match_stack():
 
 
 # ---------------------------------------------------------------------------
-# N-layer stacks (Sweep.stack / Layer): the film plus an arbitrary list of
+# N-layer stacks (Sweep.stack / LayerSpec): the film plus an arbitrary list of
 # substrate-side layers, each with its own thickness + crystal orientation.
 
 
 def test_stack_layers_three_layer_boundaries():
     # film (0..t_f) then each stack layer stacked below with cumulative z bounds
     film = [("Mo", 0.011), ("S", 0.023)]
-    layers = stack_layers(film, 100.0, [Layer("sio2", 900.0), Layer("silicon", 5e6)])
+    layers = stack_layers(film, 100.0, [LayerSpec("sio2", 900.0), LayerSpec("silicon", 5e6)])
     assert [(z0, z1) for z0, z1, _ in layers] == [
         (0.0, 100.0),
         (100.0, 1000.0),
@@ -246,15 +246,15 @@ def test_stack_layers_three_layer_boundaries():
 
 def test_layer_radiator_orientation_overrides():
     # amorphous layer -> no coherent radiator
-    assert layer_radiator(Layer("sio2", 900.0)) is None
+    assert layer_radiator(LayerSpec("sio2", 900.0)) is None
     # crystalline layer: beam_uvw + in-plane azimuth are per-layer specifiable
-    rad = layer_radiator(Layer("silicon", 5e6, beam_uvw=(1, 1, 1), azimuth_deg=30.0))
+    rad = layer_radiator(LayerSpec("silicon", 5e6, beam_uvw=(1, 1, 1), azimuth_deg=30.0))
     assert rad is not None
     assert rad["crystal"] == "silicon"
     assert rad["beam_uvw"] == (1, 1, 1)
     assert rad["azimuth_rad"] == pytest.approx(np.pi / 6)
     # sapphire keeps its hardcoded c-cut default when not overridden
-    sap = layer_radiator(Layer("sapphire", 5e6))
+    sap = layer_radiator(LayerSpec("sapphire", 5e6))
     assert sap is not None
     assert sap["beam_uvw"] == (0, 0, 1)
     assert sap["azimuth_rad"] == 0.0
@@ -266,7 +266,10 @@ def test_build_cases_stack_three_layers():
         thickness_ang=100.0,
         tilt_deg=30.0,
         energy_keV=30.0,
-        stack=(Layer("sio2", 900.0), Layer("silicon", 5e6, azimuth_deg=15.0)),
+        stack=(
+            LayerSpec("sio2", 900.0),
+            LayerSpec("silicon", 5e6, azimuth_deg=15.0),
+        ),
     )
     case = build_cases(sw)[0]
     assert len(case["abs_layers"]) == len(case["layer_radiators"]) == 3
@@ -282,7 +285,7 @@ def test_build_cases_stack_three_layers():
 def test_build_cases_substrate_sugar_matches_single_layer_stack():
     kw: dict[str, Any] = dict(material="mose2", tilt_deg=30.0, energy_keV=30.0)
     a = build_cases(Sweep(**kw, substrate="sapphire", substrate_thickness_ang=1e6))[0]
-    b = build_cases(Sweep(**kw, stack=(Layer("sapphire", 1e6),)))[0]
+    b = build_cases(Sweep(**kw, stack=(LayerSpec("sapphire", 1e6),)))[0]
     assert a["abs_layers"] == b["abs_layers"]
     assert a["layer_radiators"] == b["layer_radiators"]
     assert a["name"] == b["name"]
@@ -296,7 +299,7 @@ def test_build_cases_rejects_substrate_plus_stack():
                 tilt_deg=30.0,
                 energy_keV=30.0,
                 substrate="sio2",
-                stack=(Layer("silicon", 5e6),),
+                stack=(LayerSpec("silicon", 5e6),),
             )
         )
 

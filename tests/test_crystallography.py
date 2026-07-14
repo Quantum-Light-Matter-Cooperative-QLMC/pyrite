@@ -1,7 +1,5 @@
 """Crystallography primitives: DB load, reciprocal geometry, structure factor."""
 
-from pathlib import Path
-
 import numpy as np
 import pytest
 
@@ -108,7 +106,10 @@ def test_v2o5_010_structure_and_couplings_are_sane():
     info = CRYSTALS["v2o5"]
     basis = info["basis"]
 
-    assert info["lattice"]["system"] == "orthorhombic"
+    assert info["lattice"]["system"] == "general"
+    assert info["lattice"]["alpha"] == pytest.approx(90.0)
+    assert info["lattice"]["beta"] == pytest.approx(90.0)
+    assert info["lattice"]["gamma"] == pytest.approx(90.0)
     assert info["lattice"]["a"] == pytest.approx(11.512)
     assert info["lattice"]["b"] == pytest.approx(3.564)
     assert info["lattice"]["c"] == pytest.approx(4.368)
@@ -131,7 +132,10 @@ def test_tis2_003_structure_and_couplings_are_sane():
     info = CRYSTALS["tis2"]
     basis = info["basis"]
 
-    assert info["lattice"]["system"] == "hexagonal"
+    assert info["lattice"]["system"] == "general"
+    assert info["lattice"]["alpha"] == pytest.approx(90.0)
+    assert info["lattice"]["beta"] == pytest.approx(90.0)
+    assert info["lattice"]["gamma"] == pytest.approx(120.0)
     assert info["lattice"]["a"] == pytest.approx(3.407)
     assert info["lattice"]["c"] == pytest.approx(5.695)
     assert info["V_cell"] == pytest.approx(np.sqrt(3.0) * 3.407**2 * 5.695 / 2.0, abs=0.1)
@@ -427,26 +431,23 @@ C1 C 0.0 0.0 0.0 0.5
         load_crystal_from_cif(cif)
 
 
-def test_packaged_p1_cifs_match_toml_catalog():
+def test_packaged_p1_cifs_match_catalog_crystal_info():
+    from cxr_mc.materials import CATALOG
     from cxr_mc.materials.crystal import load_crystal_from_cif
 
-    cif_dir = Path(crystal_module.DATA_DIR) / "cifs"
-    assert {path.stem for path in cif_dir.glob("*.cif")} == set(CRYSTALS)
+    assert {spec.cif.stem for spec in CATALOG.crystals.values()} == set(CRYSTALS)
 
     for name, expected in CRYSTALS.items():
-        actual = load_crystal_from_cif(
-            cif_dir / f"{name}.cif", mosaic_fwhm_deg=expected["mosaic_fwhm_deg"]
-        )
+        spec = CATALOG.crystal(name)
+        actual = load_crystal_from_cif(spec.cif, mosaic_fwhm_deg=expected["mosaic_fwhm_deg"])
         expected_lattice = expected["lattice"]
         expected_parameters = {
             "a": expected_lattice["a"],
-            "b": expected_lattice.get("b", expected_lattice["a"]),
-            "c": expected_lattice.get("c", expected_lattice["a"]),
-            "alpha": expected_lattice.get("alpha", 90.0),
-            "beta": expected_lattice.get("beta", 90.0),
-            "gamma": 120.0
-            if expected_lattice["system"] == "hexagonal"
-            else expected_lattice.get("gamma", 90.0),
+            "b": expected_lattice["b"],
+            "c": expected_lattice["c"],
+            "alpha": expected_lattice["alpha"],
+            "beta": expected_lattice["beta"],
+            "gamma": expected_lattice["gamma"],
         }
         for parameter, value in expected_parameters.items():
             assert actual["lattice"][parameter] == pytest.approx(value, abs=1e-12)

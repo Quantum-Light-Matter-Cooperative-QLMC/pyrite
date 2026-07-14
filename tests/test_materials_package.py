@@ -18,20 +18,29 @@ def test_materials_package_exports_only_registry_conveniences():
         "LayerSpec",
         "MaterialConfigError",
         "load_material_catalog",
+        "MATERIAL_LABELS",
+        "MATERIALS",
+    }
+
+    for legacy in (
         "MATERIAL_CONFIGS",
         "MATERIAL_GRIDS",
         "CRYSTAL_PARAMS",
-        "MATERIAL_LABELS",
-        "MATERIALS",
-        "Layer",
-        "ScalarOrSeq",
-        "MaterialConfig",
         "MaterialGrid",
         "CrystalParamsGrid",
-        "material_crystal_key",
-        "material_scan_grid",
-        "crystal_config",
-    }
+        "Layer",
+    ):
+        assert not hasattr(materials, legacy)
+
+
+def test_legacy_registry_and_crystal_toml_are_removed():
+    from pathlib import Path
+
+    import cxr_mc
+
+    package = Path(cxr_mc.__file__).parent
+    assert not (package / "materials" / "registry.py").exists()
+    assert not (package / "data" / "crystal_structures.toml").exists()
 
 
 def test_materials_package_preserves_crystal_registry_and_attenuation_behavior():

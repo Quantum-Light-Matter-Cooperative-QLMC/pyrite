@@ -27,14 +27,17 @@ from typing import Any
 
 import numpy as np
 
-from . import materials as _materials
-from .materials import Layer, ScalarOrSeq
-from .materials.crystal import CRYSTALS, dominant_reflections
-from .materials.registry import pm as _pm
+from .materials import CATALOG, LayerSpec
+from .materials.crystal import dominant_reflections
 
-_CRYSTAL_PARAMS = _materials.CRYSTAL_PARAMS
-MATERIAL_LABELS = _materials.MATERIAL_LABELS
-pm = _pm
+ScalarOrSeq = float | Sequence[float] | np.ndarray
+MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
+
+
+def pm(*hkls: tuple[int, ...]) -> list[tuple[int, ...]]:
+    """Return reflections together with their negatives."""
+    return [item for hkl in hkls for item in (tuple(hkl), tuple(-x for x in hkl))]
+
 
 # ---- Timepix3 quad geometry (fixed hardware) --------------------------------
 TIMEPIX3_PIXEL_PITCH_M = 55e-6
@@ -57,34 +60,24 @@ def fmt_thickness(t_ang):
     return f"{t_ang / 1e7:g}mm"
 
 
-# amorphous substrate number densities [1/Ang^3], from bulk mass density:
-#   n_formula = rho[g/cc] * 0.602214 / M[g/mol], then * per-element stoichiometry
-_SUBSTRATE_COMP = {
-    "sio2": [("Si", 0.02205), ("O", 0.04410)],  # fused silica, rho=2.20, M=60.08
-}
-
-
 def substrate_composition(substrate):
     """Number-density composition [(element, n_per_Ang3), ...] for a substrate.
     Amorphous presets ('sio2') come from bulk density; a crystalline
     substrate already in CRYSTALS (e.g. 'silicon') uses its unit-cell density."""
-    if substrate.lower() in _SUBSTRATE_COMP:
-        return [(el, n) for el, n in _SUBSTRATE_COMP[substrate.lower()]]
-    if substrate in CRYSTALS:
-        from collections import Counter
-
-        info = CRYSTALS[substrate]
-        counts = Counter(el for el, _ in info["basis"])
-        return [(el, c / info["V_cell"]) for el, c in counts.items()]
+    key = substrate.lower()
+    if key in CATALOG.media:
+        return list(CATALOG.media[key].composition)
+    if substrate in CATALOG.crystals:
+        return list(CATALOG.crystal(substrate).composition)
     raise ValueError(
-        f"unknown substrate {substrate!r}; use one of {list(_SUBSTRATE_COMP)} "
-        f"or a crystal key in {list(CRYSTALS)}"
+        f"unknown substrate {substrate!r}; use one of {list(CATALOG.media)} "
+        f"or a crystal key in {list(CATALOG.crystals)}"
     )
 
 
 def stack_layers(film_composition, film_thickness_ang, stack):
     """Absorber stack [(z_top, z_bot, composition), ...] for a film at the
-    entrance face (z=0..t_film) followed by each :class:`Layer` in ``stack``,
+    entrance face (z=0..t_film) followed by each :class:`LayerSpec` in ``stack``,
     boundaries accumulating downward. Attach as a case's ``abs_layers`` so
     emitted lines/brem are attenuated by the WHOLE stack (each crystalline
     layer still RADIATES via its own layer_radiator). Beam enters the film
@@ -110,7 +103,7 @@ def film_on_substrate_layers(
     return stack_layers(
         film_composition,
         film_thickness_ang,
-        (Layer(substrate, substrate_thickness_ang),),
+        (LayerSpec(substrate, substrate_thickness_ang),),
     )
 
 
@@ -140,21 +133,21 @@ def substrate_radiator(substrate, n_families=4):
     absorbs + brems). This is the per-layer-radiation half of the multilayer
     feature -- the absorber stack (film_on_substrate_layers) is the other half.
     See docs/multilayer-materials.md."""
-    if substrate.lower() in _SUBSTRATE_COMP:
+    if substrate.lower() in CATALOG.media:
         return None  # amorphous: no coherent lines
-    if substrate in CRYSTALS:
+    if substrate in CATALOG.crystals:
         return _radiator(crystal_params(substrate, n_families))
     raise ValueError(
-        f"unknown substrate {substrate!r}; use one of {list(_SUBSTRATE_COMP)} "
-        f"or a crystal key in {list(CRYSTALS)}"
+        f"unknown substrate {substrate!r}; use one of {list(CATALOG.media)} "
+        f"or a crystal key in {list(CATALOG.crystals)}"
     )
 
 
-def layer_radiator(layer: "Layer", n_families: int = 4):
-    """Coherent radiator params for one stack :class:`Layer`, or None if the
+def layer_radiator(layer: LayerSpec, n_families: int = 4):
+    """Coherent radiator params for one stack :class:`LayerSpec`, or None if the
     layer is amorphous. Same dict as :func:`substrate_radiator` plus the
-    per-layer orientation: ``beam_uvw`` (overridden if the Layer sets one) and
-    ``azimuth_rad`` (the Layer's in-plane rotation, radians)."""
+    per-layer orientation: ``beam_uvw`` (overridden if the spec sets one) and
+    ``azimuth_rad`` (the spec's in-plane rotation, radians)."""
     rad = substrate_radiator(layer.material, n_families)
     if rad is None:
         return None
@@ -168,22 +161,26 @@ def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
     """Fixed crystallography for a material: composition, the dominant
     reflections, the beam zone axis [uvw], the (isotropic) B-factor, and a
     sensible default photon-energy grid. Override the grid via Sweep.e_grid_eV."""
-    if material not in _CRYSTAL_PARAMS:
-        raise ValueError(f"unknown material {material!r} (have {list(_CRYSTAL_PARAMS)})")
-    grid = _CRYSTAL_PARAMS[material]
-    B_ang2 = grid["B_ang2"]
-    hkl_list = grid.get("hkl_list")
-    if hkl_list is None:
-        hkl_list = dominant_reflections(material, n_families=n_families, B_ang2=B_ang2)
+    crystal_key = material
+    if material in CATALOG.materials:
+        crystal_key = CATALOG.material(material).crystal_key
+    if crystal_key not in CATALOG.crystals:
+        raise ValueError(f"unknown material {material!r} (have {list(CATALOG.crystals)})")
+    spec = CATALOG.crystal(crystal_key)
+    if spec.E_grid is None:
+        raise ValueError(f"crystal {crystal_key!r} has no configured photon-energy grid")
+    hkl_list: list[tuple[int, ...]]
+    if not spec.hkl_list:
+        hkl_list = dominant_reflections(crystal_key, n_families=n_families, B_ang2=spec.B_ang2)
     else:
-        hkl_list = list(hkl_list)  # fresh copy per call, like the derived path
+        hkl_list = list(spec.hkl_list)
     return dict(
-        crystal=material,
-        composition=substrate_composition(material),
+        crystal=crystal_key,
+        composition=list(spec.composition),
         hkl_list=hkl_list,
-        beam_uvw=grid["beam_uvw"],
-        B_ang2=B_ang2,
-        E_grid=grid["E_grid"],
+        beam_uvw=spec.beam_uvw,
+        B_ang2=spec.B_ang2,
+        E_grid=spec.E_grid,
     )
 
 
@@ -231,7 +228,7 @@ class Sweep:
     # crystal mosaicity (the INITIAL ANALYTIC broadening; switchable per run).
     #   mosaic=False (default) -> OFF: perfect crystal, an exact no-op.
     #   mosaic=True            -> apply the per-crystal mosaic_fwhm_deg from
-    #       crystal_structures.toml. Crystals without a value (diamond, silicon, the
+    #       the catalog. Crystals without a value (diamond, silicon, the
     #       TMDs) stay perfect even with mosaic=True, so this is the "optional,
     #       excluding crystals which lack such data" switch -- HOPG has a value (0.8
     #       deg) and so DOES broaden when mosaic=True.
@@ -262,11 +259,11 @@ class Sweep:
     substrate: str | None = None  # "sio2" | a crystal key e.g. "silicon"/"sapphire"
     substrate_thickness_ang: float = 5e6  # 0.5 mm default
     # general N-layer stack under the film (mutually exclusive with substrate=;
-    # substrate="x" is sugar for stack=(Layer("x", substrate_thickness_ang),)).
-    # Each Layer carries its own thickness + orientation (beam_uvw, azimuth_deg),
+    # substrate="x" is sugar for stack=(LayerSpec("x", substrate_thickness_ang),)).
+    # Each LayerSpec carries its own thickness + orientation (beam_uvw, azimuth_deg),
     # so e.g. a few-layer film / thin a-SiO2 / thick crystalline Si device stack
-    # is stack=(Layer("sio2", 2850), Layer("silicon", 5e6)).
-    stack: Sequence[Layer] | None = None
+    # is stack=(LayerSpec("sio2", 2850), LayerSpec("silicon", 5e6)).
+    stack: Sequence[LayerSpec] | None = None
 
 
 def _seq(x):
@@ -320,7 +317,7 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
         mosaic_deg = (
             sweep.mosaic_fwhm_deg
             if sweep.mosaic_fwhm_deg is not None
-            else CRYSTALS[cp["crystal"]].get("mosaic_fwhm_deg")
+            else CATALOG.crystal(cp["crystal"]).mosaic_fwhm_deg
         )
     mosaic_fwhm_rad = float(np.deg2rad(mosaic_deg)) if mosaic_deg else None
     if sweep.mosaic_route not in ("analytic", "mc"):
@@ -346,7 +343,7 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     if sweep.substrate is not None:
         if stack is not None:
             raise ValueError("give either substrate= or stack=, not both")
-        stack = (Layer(sweep.substrate, sweep.substrate_thickness_ang),)
+        stack = (LayerSpec(sweep.substrate, sweep.substrate_thickness_ang),)
 
     cases = []
     for i_c, (thickness, tilt, azim, (width, height)) in enumerate(

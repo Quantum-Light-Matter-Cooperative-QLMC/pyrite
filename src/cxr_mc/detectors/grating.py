@@ -250,7 +250,7 @@ class AlexsSensor(TypedDict):
     """One greateyes ALEX-s sensor format. Typing the registry with this (rather
     than ``dict[str, Any]``) lets pyright keep ``n_pix`` an ``int`` and
     ``pixel_um`` a ``float`` through the ``SimpleCCD.from_alexs`` spread, the
-    same way :class:`config.MaterialGrid` types ``_MATERIAL_GRIDS``."""
+    same way the catalog types material scan grids."""
 
     n_pix: int
     pixel_um: float

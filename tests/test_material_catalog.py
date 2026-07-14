@@ -216,9 +216,7 @@ profile = "base"
     catalog = load_material_catalog(_write_catalog(tmp_path, valid))
     assert catalog.crystal("mos2").hkl_list == ((0, 0, 2), (0, 0, -2))
 
-    invalid = valid.replace("[[0, 0, 2]]", "[[0, 0, -2]]").replace(
-        'hkl_reason = "basal cut"', ""
-    )
+    invalid = valid.replace("[[0, 0, 2]]", "[[0, 0, -2]]").replace('hkl_reason = "basal cut"', "")
     with pytest.raises(MaterialConfigError) as caught:
         load_material_catalog(_write_catalog(tmp_path, invalid))
     assert "crystals.mos2.hkl_families[0]" in str(caught.value)
@@ -394,14 +392,18 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
             assert _array_fingerprint(getattr(actual.scan, grid_name)) == fingerprint
 
     special = golden["special_grids"]
-    np.testing.assert_array_equal(CATALOG.material("hbn").scan.thickness_ang, special["hbn_thickness_ang"])
+    np.testing.assert_array_equal(
+        CATALOG.material("hbn").scan.thickness_ang, special["hbn_thickness_ang"]
+    )
     np.testing.assert_array_equal(CATALOG.material("hbn").scan.tilt_deg, special["hbn_tilt_deg"])
     mote2_grid = special["mote2_E_grid_descriptor"]
     np.testing.assert_array_equal(
         CATALOG.crystal("mote2").E_grid,
         np.arange(mote2_grid["start"], mote2_grid["stop"], mote2_grid["step"]),
     )
-    np.testing.assert_array_equal(CATALOG.material("mote2").scan.tilt_deg, special["mote2_tilt_deg"])
+    np.testing.assert_array_equal(
+        CATALOG.material("mote2").scan.tilt_deg, special["mote2_tilt_deg"]
+    )
     np.testing.assert_array_equal(
         CATALOG.material("mote2").scan.tilt_azim_deg, special["mote2_tilt_azim_deg"]
     )
@@ -436,26 +438,19 @@ def test_catalog_matches_serialized_physics_for_every_crystal(serialized_catalog
 
     for key, expected in serialized_catalog_golden["crystals"].items():
         spec = CATALOG.crystal(key)
-        old = crystal_module.CRYSTALS[key]
-        crystal_module.CRYSTALS[key] = {
-            "lattice": spec.lattice,
-            "basis": spec.basis,
-            "V_cell": spec.V_cell,
-        }
-        try:
-            physics = expected["physics"]
-            hkl = tuple(physics["hkl"])
-            structure, g_mag = crystal_module.structure_factor(
-                key, hkl, 1000.0, B_ang2=spec.B_ang2
-            )
-            assert g_mag == pytest.approx(physics["g_mag"], rel=2e-12)
-            assert structure.real == pytest.approx(physics["structure_factor"][0], rel=2e-12, abs=2e-12)
-            assert structure.imag == pytest.approx(physics["structure_factor"][1], rel=2e-12, abs=2e-12)
-            assert [
-                list(hkl)
-                for hkl in crystal_module.dominant_reflections(
-                    key, n_families=2, B_ang2=spec.B_ang2
-                )
-            ] == physics["dominant_reflections"]
-        finally:
-            crystal_module.CRYSTALS[key] = old
+        entry = crystal_module.CRYSTALS[key]
+        assert entry["lattice"] is spec.lattice
+        assert entry["basis"] is spec.basis
+        assert entry["V_cell"] == spec.V_cell
+        assert entry["mosaic_fwhm_deg"] == spec.mosaic_fwhm_deg
+
+        physics = expected["physics"]
+        hkl = tuple(physics["hkl"])
+        structure, g_mag = crystal_module.structure_factor(key, hkl, 1000.0, B_ang2=spec.B_ang2)
+        assert g_mag == pytest.approx(physics["g_mag"], rel=2e-12)
+        assert structure.real == pytest.approx(physics["structure_factor"][0], rel=2e-12, abs=2e-12)
+        assert structure.imag == pytest.approx(physics["structure_factor"][1], rel=2e-12, abs=2e-12)
+        assert [
+            list(hkl)
+            for hkl in crystal_module.dominant_reflections(key, n_families=2, B_ang2=spec.B_ang2)
+        ] == physics["dominant_reflections"]

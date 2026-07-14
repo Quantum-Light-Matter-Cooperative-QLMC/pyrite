@@ -9,7 +9,7 @@ materials.atomic:
 
   * physical constants (hc, hbar c, alpha, m_e, r_e),
   * lattice geometry: direct/reciprocal vectors, |g| for any crystal system,
-  * the crystal database (crystal_structures.toml -> CRYSTALS),
+  * the catalog-backed crystal database (CIF -> CATALOG -> CRYSTALS),
   * Debye-Waller, structure factor S(g), and the polarizability / crystal-
     potential Fourier components chi_g (PXR) and U_g (CBS),
   * photoabsorption length from Henke f2,
@@ -18,19 +18,17 @@ materials.atomic:
 
 Units: energies eV, lengths Angstrom, angles radians.
 
-Crystal structures are loaded from crystal_structures.toml (data/) into the
-CRYSTALS dict; see that file for the format. Depends on materials.atomic.
+Crystal structures are projected from the immutable material catalog into the
+mapping-style ``CRYSTALS`` compatibility registry. Depends on materials.atomic
 (cromer_mann_f0, atomic_form_factor, henke_dispersion, Z_TABLE).
 """
 
-import tomllib
-from collections.abc import Iterator
-from pathlib import Path
-from typing import Protocol
-
 import numpy as np
 
-from .. import DATA_DIR
+from ._cif import (
+    crystals_crystal_to_crystal_info as crystals_crystal_to_crystal_info,
+)
+from ._cif import load_crystal_from_cif as load_crystal_from_cif
 from .atomic import (
     Z_TABLE,
     atomic_form_factor,
@@ -132,82 +130,6 @@ def _reciprocal_basis(lattice):
     return B
 
 
-class _CrystalsAtomLike(Protocol):
-    element: str
-    coords_fractional: object
-    occupancy: float
-
-
-class _CrystalsCrystalLike(Protocol):
-    lattice_parameters: tuple[float, float, float, float, float, float]
-    volume: float
-
-    def __iter__(self) -> Iterator[_CrystalsAtomLike]: ...
-
-
-def crystals_crystal_to_crystal_info(
-    crystal: _CrystalsCrystalLike, mosaic_fwhm_deg: float | None = None
-) -> dict[str, object]:
-    """
-    Convert a ``crystals.Crystal``-like object to a CRYSTALS entry.
-
-    Source: ``Crystal.lattice_parameters``, ``Atom.coords_fractional``, and
-    ``Crystal.volume`` from crystals 1.7. The adapter is structural only, so
-    cxr-mc remains the source of X-ray scattering physics. It assumes each
-    expanded site is fully occupied and rejects partial occupancy instead of
-    silently treating it as a whole atom. In the P1 limiting case, sites are
-    copied one-for-one; for higher symmetry, ``Crystal.from_cif`` expands the
-    asymmetric unit before this deterministic conversion.
-
-    Validation: crystals-cif-adapter
-    """
-    a, b, c, alpha, beta, gamma = crystal.lattice_parameters
-    lattice = {
-        "system": "general",
-        "a": float(a),
-        "b": float(b),
-        "c": float(c),
-        "alpha": float(alpha),
-        "beta": float(beta),
-        "gamma": float(gamma),
-    }
-    basis = []
-    for atom in crystal:
-        occupancy = float(getattr(atom, "occupancy", 1.0))
-        if not np.isclose(occupancy, 1.0, rtol=0.0, atol=1e-12):
-            raise ValueError(
-                f"cxr-mc CIF imports require full occupancy; found {occupancy:g} for {atom.element}"
-            )
-        coords = np.mod(np.asarray(atom.coords_fractional, dtype=float), 1.0)
-        basis.append((str(atom.element), coords))
-    basis.sort(key=lambda site: (site[0], *site[1].tolist()))
-
-    return {
-        "lattice": lattice,
-        "basis": basis,
-        "V_cell": float(crystal.volume),
-        "mosaic_fwhm_deg": mosaic_fwhm_deg,
-    }
-
-
-def load_crystal_from_cif(
-    path: str | Path, mosaic_fwhm_deg: float | None = None
-) -> dict[str, object]:
-    """
-    Load a CIF file with crystals 1.7 and return a CRYSTALS-compatible entry.
-
-    ``Crystal.from_cif`` performs the CIF symmetry expansion. The canonical
-    adapter then retains the expanded fractional basis, cell parameters, and
-    volume while cxr-mc retains ownership of X-ray scattering physics.
-
-    Validation: crystals-cif-adapter
-    """
-    from crystals import Crystal
-
-    crystal = Crystal.from_cif(Path(path))
-    return crystals_crystal_to_crystal_info(crystal, mosaic_fwhm_deg=mosaic_fwhm_deg)
-
-
 def reciprocal_g_vector(hkl, lattice):
     """
     Reciprocal lattice vector g = h b1 + k b2 + l b3 for any crystal system.
@@ -218,34 +140,22 @@ def reciprocal_g_vector(hkl, lattice):
     return g_vec, np.linalg.norm(g_vec)
 
 
-# ---- crystal database (crystal_structures.toml) ------------------------------
-def load_crystals(
-    path=DATA_DIR / "crystal_structures.toml",
-):
-    """
-    Load the crystal database. Each entry becomes
-        {"lattice": {...}, "basis": [(element, frac_pos), ...], "V_cell": float}
-    with V_cell [Angstrom^3] computed from the lattice vectors.
-    """
-    with open(path, "rb") as f:
-        raw = tomllib.load(f)
-    crystals = {}
-    for name, spec in raw.items():
-        # mosaic_fwhm_deg is an OPTIONAL per-crystal property (the c-axis mosaic
-        # spread), not part of the lattice geometry -- carve it out before building
-        # the lattice dict so it can't leak into _direct_lattice_vectors / the
-        # reciprocal-basis cache key. Absent -> None (perfect crystal).
-        mosaic_fwhm_deg = spec.get("mosaic_fwhm_deg")
-        lattice = {key: val for key, val in spec.items() if key not in ("basis", "mosaic_fwhm_deg")}
-        basis = [(atom["element"], np.array(atom["pos"], dtype=float)) for atom in spec["basis"]]
-        a1, a2, a3 = _direct_lattice_vectors(lattice)
-        crystals[name] = {
-            "lattice": lattice,
-            "basis": basis,
-            "V_cell": float(np.dot(a1, np.cross(a2, a3))),
-            "mosaic_fwhm_deg": mosaic_fwhm_deg,
+# ---- catalog-backed crystal database ---------------------------------------
+def load_crystals(catalog=None):
+    """Project CIF-backed catalog crystals into mapping-style physics entries."""
+    if catalog is None:
+        from .catalog import CATALOG
+
+        catalog = CATALOG
+    return {
+        key: {
+            "lattice": spec.lattice,
+            "basis": spec.basis,
+            "V_cell": spec.V_cell,
+            "mosaic_fwhm_deg": spec.mosaic_fwhm_deg,
         }
-    return crystals
+        for key, spec in catalog.crystals.items()
+    }
 
 
 CRYSTALS = load_crystals()

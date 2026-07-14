@@ -1,8 +1,7 @@
 """Immutable material catalog loaded from the packaged TOML schema.
 
-The module owns configuration parsing only.  It deliberately sits below the
-scan and Monte Carlo drivers so those consumers can migrate independently of
-the legacy :mod:`cxr_mc.materials.registry` tables.
+The module owns configuration parsing only. It deliberately sits below the
+scan and Monte Carlo drivers.
 """
 
 from __future__ import annotations
@@ -20,8 +19,8 @@ from typing import cast
 import numpy as np
 
 from .. import DATA_DIR
+from ._cif import load_crystal_from_cif
 from ._transport_data import TRANSPORT_ELEMENTS
-from .crystal import load_crystal_from_cif
 
 logger = logging.getLogger(__name__)
 
@@ -683,7 +682,9 @@ def _material_elements(
     media: Mapping[str, MediumSpec],
 ) -> set[str]:
     elements = {element for element, _ in crystals[material.crystal_key].composition}
-    refs = ([material.substrate] if material.substrate else []) + [layer.material for layer in material.stack]
+    refs = ([material.substrate] if material.substrate else []) + [
+        layer.material for layer in material.stack
+    ]
     for ref in refs:
         if ref in crystals:
             elements.update(element for element, _ in crystals[ref].composition)
@@ -741,9 +742,7 @@ def _parse_materials(
                 errors.add(f"{path}.stack", "must be a nonempty array of layers")
             else:
                 for index, item in enumerate(stack_raw):
-                    layer = _parse_layer(
-                        item, f"{path}.stack[{index}]", crystals, media, errors
-                    )
+                    layer = _parse_layer(item, f"{path}.stack[{index}]", crystals, media, errors)
                     if layer is not None:
                         layers.append(layer)
         if substrate is not None and "stack" in row:
@@ -753,7 +752,9 @@ def _parse_materials(
                 key, label, profile, crystal_key, scan, substrate, tuple(layers)
             )
     for key, material in out.items():
-        unsupported = sorted(_material_elements(material, crystals, media) - set(TRANSPORT_ELEMENTS))
+        unsupported = sorted(
+            _material_elements(material, crystals, media) - set(TRANSPORT_ELEMENTS)
+        )
         if unsupported:
             errors.add(
                 f"materials.{key}",

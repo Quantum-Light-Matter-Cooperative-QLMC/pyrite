@@ -17,21 +17,9 @@ from .catalog import (
     load_material_catalog,
 )
 from .crystal import CRYSTALS
-from .registry import (
-    CRYSTAL_PARAMS,
-    MATERIAL_CONFIGS,
-    MATERIAL_GRIDS,
-    MATERIAL_LABELS,
-    MATERIALS,
-    CrystalParamsGrid,
-    Layer,
-    MaterialConfig,
-    MaterialGrid,
-    ScalarOrSeq,
-    crystal_config,
-    material_crystal_key,
-    material_scan_grid,
-)
+
+MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
+MATERIALS = CATALOG.material_keys
 
 __all__ = [
     "CRYSTALS",
@@ -45,17 +33,6 @@ __all__ = [
     "LayerSpec",
     "MaterialConfigError",
     "load_material_catalog",
-    "MATERIAL_CONFIGS",
-    "MATERIAL_GRIDS",
-    "CRYSTAL_PARAMS",
     "MATERIAL_LABELS",
     "MATERIALS",
-    "Layer",
-    "ScalarOrSeq",
-    "MaterialConfig",
-    "MaterialGrid",
-    "CrystalParamsGrid",
-    "material_crystal_key",
-    "material_scan_grid",
-    "crystal_config",
 ]

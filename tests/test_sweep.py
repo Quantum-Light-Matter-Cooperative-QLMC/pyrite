@@ -12,14 +12,11 @@ from cxr_mc.config import (
     trajectory_sweep,
 )
 from cxr_mc.materials import (
-    CRYSTAL_PARAMS,
-    MATERIAL_CONFIGS,
-    MATERIAL_GRIDS,
-    material_crystal_key,
+    CATALOG,
+    LayerSpec,
 )
 from cxr_mc.sweep import (
     MATERIAL_LABELS,
-    Layer,
     Sweep,
     build_cases,
     crystal_params,
@@ -231,7 +228,7 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
     composition = dict(params["composition"])
     assert params["beam_uvw"] == beam_uvw
     assert params["hkl_list"] == hkl_list
-    assert MATERIAL_CONFIGS[material]["hkl_list_reason"]
+    assert CATALOG.crystal(material).hkl_reason
     for element, count in ratio.items():
         assert composition[element] / min(composition.values()) == pytest.approx(count)
 
@@ -251,22 +248,28 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
 
 
 def test_material_registry_projects_scan_and_crystal_views():
-    assert set(MATERIAL_GRIDS) <= set(MATERIAL_CONFIGS)
-    assert set(CRYSTAL_PARAMS) <= set(MATERIAL_CONFIGS)
-    assert Layer is material_registry.Layer
-
-    assert material_crystal_key("mos2-on-sio2-si") == "mos2"
-    assert MATERIAL_GRIDS["mos2-on-sio2-si"]["stack"][0].material == "sio2"
-    assert CRYSTAL_PARAMS["mos2"]["beam_uvw"] == (0, 0, 2)
+    assert MATERIALS == CATALOG.material_keys
+    assert MATERIAL_LABELS == {key: material.label for key, material in CATALOG.materials.items()}
+    assert CATALOG.material("mos2-on-sio2-si").crystal_key == "mos2"
+    assert CATALOG.material("mos2-on-sio2-si").stack[0].material == "sio2"
+    assert CATALOG.crystal("mos2").beam_uvw == (0, 0, 2)
+    assert material_registry.LayerSpec is LayerSpec
 
 
 @pytest.mark.parametrize("material", ["hopg", "hbn"])
 def test_pinned_hkl_materials_carry_reason(material):
-    row = MATERIAL_CONFIGS[material]
+    spec = CATALOG.crystal(material)
 
-    assert row["hkl_list_reason"]
-    assert row["hkl_list"] == CRYSTAL_PARAMS[material]["hkl_list"]
-    assert crystal_params(material, n_families=999)["hkl_list"] == row["hkl_list"]
+    assert spec.hkl_reason
+    assert crystal_params(material, n_families=999)["hkl_list"] == list(spec.hkl_list)
+
+
+def test_layer_spec_is_the_frozen_stack_type():
+    from dataclasses import FrozenInstanceError
+
+    layer = LayerSpec("silicon", 5e6)
+    with pytest.raises(FrozenInstanceError):
+        layer.thickness_ang = 1.0  # type: ignore[misc]
 
 
 def test_mote2_material_grid_is_bulk():
