@@ -266,27 +266,29 @@ def simulate_trajectories(
     [mm] (same FWHM convention as mosaic_fwhm_rad / eds_fwhm_eV / aperture_fwhm_eV
     elsewhere in this package). Each electron's entry point is drawn independently
     as x0, y0 ~ Normal(0, sigma), sigma = beam_fwhm_mm / (2 sqrt(2 ln 2)), and
-    added as a per-electron (x0, y0, 0) offset to every segment position (the
-    whole trajectory is rigidly translated, since only the entry point is
-    finite -- beam_dir, common to the whole beam, is unaffected). None (default)
-    is a strict no-op -- the old point-source (delta-function) beam entering at
-    the origin, BIT-FOR-BIT. Limiting case: beam_fwhm_mm -> 0 recovers the point
-    source exactly (sigma -> 0 -> x0 = y0 = 0).
+    used as its initial transverse position. With a laterally infinite crystal,
+    this rigidly translates the whole trajectory; beam_dir, common to the whole
+    beam, is unaffected. None (default) is a strict no-op -- the old point-source
+    (delta-function) beam entering at the origin, BIT-FOR-BIT. Limiting case:
+    beam_fwhm_mm -> 0 recovers the point source exactly
+    (sigma -> 0 -> x0 = y0 = 0).
 
     The offset is drawn from an RNG stream independent of `seed`'s main stream
-    (a numpy SeedSequence child), so enabling this NEVER perturbs the free-path /
+    (a numpy SeedSequence child). When both crystal_width_mm and
+    crystal_height_mm are None, enabling it NEVER perturbs the free-path /
     scattering-angle draws: every other returned array (E_keV, v_hat, L_ang,
     t_ang, elec_id, layer, n_backscattered, n_transmitted, n_stopped) is
     identical to the beam_fwhm_mm=None run; r_mid changes only by the constant
-    per-electron transverse offset. This is because no downstream physics --
-    elastic scattering, stopping power, layer-boundary crossing, or the
-    self-absorption path in mc_spectrum -- ever reads pos[:, :2]: the crystal is
-    modeled as laterally infinite and the detector direction n_hat is a fixed
-    far-field unit vector (docs/detector-solid-angle.md). A finite beam spot is
-    therefore presently a pure geometry/visualization refinement with zero
-    effect on the emitted spectrum; it lays the groundwork for a future
-    near-field-detector or finite-crystal-footprint model, where the transverse
-    entry point would start to matter.
+    per-electron transverse offset. In this laterally infinite limit, no
+    downstream physics -- elastic scattering, stopping power, layer-boundary
+    crossing, or the self-absorption path in mc_spectrum -- reads pos[:, :2],
+    and a finite beam spot is a pure geometry/visualization refinement with zero
+    effect on the emitted spectrum.
+
+    With a finite crystal footprint, the sampled transverse positions classify
+    missed entries and can cause side-face exits. Segment positions also affect
+    the downstream six-face escape attenuation, so beam size can change the
+    emitted radiation spectrum.
 
     crystal_width_mm, crystal_height_mm: optional full transverse dimensions
     [mm] of a rectangular prism centered at the beam origin. Both must be
