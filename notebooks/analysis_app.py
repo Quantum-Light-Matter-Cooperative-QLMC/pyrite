@@ -55,6 +55,7 @@ def _():
         alt.data_transformers.disable_max_rows()
 
     from cxr_mc.config import PENETRATION_TILT_DEG, default_settings, trajectory_sweep
+    from cxr_mc.materials import CATALOG
     from cxr_mc.plots import (
         plot_best_spectra,
         plot_eaglexo_charge_map,
@@ -86,10 +87,10 @@ def _():
         top_geometries,
     )
     from cxr_mc.run import cases_from_results, load_checkpoint
-    from cxr_mc.sweep import MATERIAL_LABELS, build_cases
+    from cxr_mc.sweep import build_cases
 
     return (
-        MATERIAL_LABELS,
+        CATALOG,
         MaterialSelect,
         PENETRATION_TILT_DEG,
         build_cases,
@@ -133,7 +134,7 @@ def _(mo):
 
 
 @app.cell
-def _(MATERIAL_LABELS, MaterialSelect, mo):
+def _(MaterialSelect, mo):
     from cxr_mc.analyze import (
         get_default_material,
         initial_material,
@@ -141,10 +142,9 @@ def _(MATERIAL_LABELS, MaterialSelect, mo):
         select_initial_material,
     )
     from cxr_mc.run import _DEFAULT_CHECKPOINT_DIR
-    from cxr_mc.config import MATERIALS
 
     requested_material = initial_material(mo.cli_args(), get_default_material())
-    material_options = material_menu(_DEFAULT_CHECKPOINT_DIR, MATERIALS, MATERIAL_LABELS)
+    material_options = material_menu(_DEFAULT_CHECKPOINT_DIR)
     initial_selection = select_initial_material(requested_material, material_options)
     material_ui = mo.ui.anywidget(
         MaterialSelect(
@@ -1357,7 +1357,7 @@ def _(
 
 @app.cell
 def _(
-    MATERIAL_LABELS,
+    CATALOG,
     load_checkpoint,
     mo,
     plot_material_comparison,
@@ -1371,10 +1371,10 @@ def _(
             "diagnostic selections apply a 100 eV line-energy floor."
         )
         _by_material = {}
-        for _m in MATERIAL_LABELS:
-            _r = load_checkpoint(_m)
+        for _material_key in CATALOG.material_keys:
+            _r = load_checkpoint(_material_key)
             if _r:
-                _by_material[MATERIAL_LABELS[_m]] = _r
+                _by_material[CATALOG.material(_material_key).label] = _r
         if len(_by_material) >= 2:
             return mo.vstack(
                 [

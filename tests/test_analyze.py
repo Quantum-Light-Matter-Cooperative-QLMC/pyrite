@@ -9,6 +9,7 @@ import sys
 import pytest
 
 from cxr_mc import analyze
+from cxr_mc.materials import CATALOG
 
 
 @pytest.fixture(autouse=True)
@@ -54,6 +55,15 @@ def test_material_menu_marks_only_configured_checkpoint_stems_available(tmp_path
     )
 
 
+def test_material_menu_defaults_to_catalog_order_and_spec_labels(tmp_path):
+    menu = analyze.material_menu(tmp_path)
+
+    assert tuple(row["value"] for row in menu) == CATALOG.material_keys
+    assert tuple(row["label"] for row in menu) == tuple(
+        CATALOG.material(key).label for key in CATALOG.material_keys
+    )
+
+
 def test_select_initial_material_falls_back_to_first_available():
     menu = (
         {"value": "hopg", "label": "HOPG", "disabled": True},
@@ -63,9 +73,12 @@ def test_select_initial_material_falls_back_to_first_available():
     assert analyze.select_initial_material("hopg", menu) == "silicon"
     assert analyze.select_initial_material("silicon", menu) == "silicon"
     assert analyze.select_initial_material(None, menu) == "silicon"
-    assert analyze.select_initial_material(
-        None, ({"value": "hopg", "label": "HOPG", "disabled": True},)
-    ) is None
+    assert (
+        analyze.select_initial_material(
+            None, ({"value": "hopg", "label": "HOPG", "disabled": True},)
+        )
+        is None
+    )
 
 
 def test_env_var_fallback_used_between_cli_and_persisted(monkeypatch):

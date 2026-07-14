@@ -11,8 +11,9 @@ line metrics) and the photon-counting :func:`summary_table` /
 import numpy as np
 import pandas as pd
 
+from ..materials import CATALOG
 from ..montecarlo import convolve_detector, detector_efficiency
-from ..sweep import MATERIAL_LABELS, fmt_thickness
+from ..sweep import fmt_thickness
 from .metrics import line_metrics
 from .store import Settings, detected_background
 
@@ -101,7 +102,11 @@ def summary_table(recs, settings):
                 brem_cts = wide
         rows.append(
             {
-                "material": MATERIAL_LABELS.get(c["crystal"], c["crystal"]),
+                "material": (
+                    CATALOG.materials[c["crystal"]].label
+                    if c["crystal"] in CATALOG.materials
+                    else c["crystal"]
+                ),
                 "thickness": fmt_thickness(c["thickness_ang"]),
                 "polar [deg]": c["tilt_deg"],
                 "azimuth [deg]": c["tilt_azim_deg"],

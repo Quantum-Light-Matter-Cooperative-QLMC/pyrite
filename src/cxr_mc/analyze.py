@@ -29,12 +29,12 @@ import argparse
 import os
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TypedDict
 
 from ._acp import running_acp
-from .config import MATERIALS
-from .materials import MATERIAL_LABELS
+from .materials import CATALOG
 
 NOTEBOOK = "notebooks/analysis_app.py"
 TUNNEL_PORT = 2718
@@ -55,24 +55,32 @@ class MaterialMenuRow(TypedDict):
 
 def material_menu(
     checkpoint_dir: Path | str,
-    materials: tuple[str, ...] = MATERIALS,
-    labels: dict[str, str] = MATERIAL_LABELS,
+    materials: tuple[str, ...] | None = None,
+    labels: Mapping[str, str] | None = None,
 ) -> tuple[MaterialMenuRow, ...]:
     """Return configured analysis materials, disabling ones without a checkpoint.
 
     Only direct ``<material>.pkl`` children of ``checkpoint_dir`` count. This
     deliberately excludes archived/reproduction caches and unknown pickle stems.
     """
+    materials = CATALOG.material_keys if materials is None else materials
+    labels = (
+        {material: CATALOG.material(material).label for material in materials}
+        if labels is None
+        else labels
+    )
     available = {path.stem for path in Path(checkpoint_dir).glob("*.pkl") if path.stem in materials}
     return tuple(
-        {"value": material, "label": labels.get(material, material), "disabled": material not in available}
+        {
+            "value": material,
+            "label": labels.get(material, material),
+            "disabled": material not in available,
+        }
         for material in materials
     )
 
 
-def select_initial_material(
-    requested: str | None, menu: tuple[MaterialMenuRow, ...]
-) -> str | None:
+def select_initial_material(requested: str | None, menu: tuple[MaterialMenuRow, ...]) -> str | None:
     """Keep an available requested material, otherwise use the first available one."""
     selectable = [row["value"] for row in menu if not row["disabled"]]
     return requested if requested in selectable else next(iter(selectable), None)
@@ -146,8 +154,8 @@ def _launch(material, *, edit=False, watch=False, acp=False, tunnel=False):
 def _cli(args):
     if args.default and args.material is None:
         raise SystemExit("cxr analyze -d/--default: no material given to persist")
-    if args.material is not None and args.material not in MATERIALS:
-        valid = ", ".join(MATERIALS)
+    if args.material is not None and args.material not in CATALOG.materials:
+        valid = ", ".join(CATALOG.material_keys)
         raise SystemExit(f"cxr analyze: unknown material {args.material!r}; valid: {valid}")
 
     if args.default:

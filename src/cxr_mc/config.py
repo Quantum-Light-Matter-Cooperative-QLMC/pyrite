@@ -59,7 +59,9 @@ def _material_spec(material: str) -> MaterialSpec:
     try:
         return CATALOG.material(material)
     except KeyError:
-        raise ValueError(f"unknown material {material!r} (have {list(MATERIALS)})") from None
+        raise ValueError(
+            f"unknown material {material!r} (have {list(CATALOG.material_keys)})"
+        ) from None
 
 
 def material_grid(material: str) -> dict[str, object]:

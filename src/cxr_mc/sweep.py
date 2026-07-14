@@ -294,7 +294,8 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     dtheta = TIMEPIX3_DTHETA_OBS_DEG if sweep.dtheta_obs_deg is None else sweep.dtheta_obs_deg
     domega = TIMEPIX3_DOMEGA_SR if sweep.domega_sr is None else sweep.domega_sr
     beam_uvw = cp["beam_uvw"] if sweep.beam_uvw is None else sweep.beam_uvw
-    label = MATERIAL_LABELS.get(sweep.material, sweep.material)
+    material_spec = CATALOG.materials.get(sweep.material)
+    label = material_spec.label if material_spec is not None else sweep.material
     width_src, height_src = sweep.crystal_width_mm, sweep.crystal_height_mm
     if width_src is None and height_src is None:
         footprints = [(None, None)]

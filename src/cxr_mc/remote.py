@@ -67,6 +67,7 @@ import tarfile
 import tempfile
 from pathlib import Path
 
+from .materials import CATALOG
 from .scan import load_all_materials
 
 HOST = os.environ.get("CXR_REMOTE_HOST", "qlmc")
@@ -87,10 +88,10 @@ JOBS_SUBDIR = "jobs"
 # stop_jobs) needs one to key off of -- this is that synthetic token.
 ZHAI_STEM = "zhai"
 
-# material keys are embedded into a remote shell command, so constrain them to
-# the crystal-key alphabet -- this both rejects typos early and blocks shell
-# injection through the material argument.
-_MATERIAL_RE = re.compile(r"^[A-Za-z0-9_]+$")
+# Catalog material keys, checkpoint stems, and job ids are embedded into remote
+# shell commands. Hyphens are valid catalog-key characters, while whitespace
+# and shell metacharacters remain forbidden.
+_SHELL_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 # what `sync` ships up: the code that changes (the src/ package now also carries
 # data/, so it travels too), plus the root scan.py shim the box invokes and
@@ -138,12 +139,23 @@ def _ssh_capture(remote_cmd):
     return r.stdout
 
 
-def _check_materials(materials):
-    bad = [m for m in materials if not _MATERIAL_RE.match(m)]
+def _check_shell_tokens(tokens):
+    """Reject tokens that are unsafe to interpolate into remote shell commands."""
+    bad = [token for token in tokens if not _SHELL_TOKEN_RE.fullmatch(token)]
     if bad:
         raise SystemExit(
-            f"invalid material name(s) {bad}: expected crystal keys like "
-            f"mose2 / hopg / silicon (letters, digits, underscore only)."
+            f"invalid remote shell token(s) {bad}: expected only letters, digits, "
+            "underscore, or hyphen"
+        )
+
+
+def _check_materials(materials):
+    """Validate runnable material keys for remote scan/start operations."""
+    _check_shell_tokens(materials)
+    unknown = [material for material in materials if material not in CATALOG.materials]
+    if unknown:
+        raise SystemExit(
+            f"unknown material(s): {', '.join(unknown)}; valid: {', '.join(CATALOG.material_keys)}"
         )
 
 
@@ -201,6 +213,7 @@ def sync_code():
 
 
 def remote_scan(material, quick=False, workers=None):
+    _check_materials([material])
     cmd = f"cd {REMOTE_DIR} && {REMOTE_UV} run --no-sync python scan.py {material}"
     if quick:
         cmd += " --quick"
@@ -241,11 +254,11 @@ def pull(stems, grid=False, drop_wide_brem=False, downcast=False, no_sync=False)
     and delete the temp. ``sync_code()`` runs first (unless ``no_sync``) so the
     box rebuilds the grid from the same ``config.py`` the laptop has -- closing
     sync drift. Without ``grid`` this is the plain whole-file scp."""
+    _check_shell_tokens(stems)
     dest = LOCAL_ROOT / "checkpoints"
     dest.mkdir(exist_ok=True)
     if grid and not no_sync:
         sync_code()  # box must rebuild the grid from the same config.py
-    _check_materials(stems)
     for stem in stems:
         local = dest / f"{stem}.pkl"
         try:
@@ -315,7 +328,7 @@ def _queue_script(jobid, materials, quick, workers):
         flags += " --quick"
     if workers is not None:
         flags += f" --workers {workers}"
-    mats = " ".join(materials)  # safe: each token matched _MATERIAL_RE
+    mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     return f"""#!/usr/bin/env bash
 set -u
@@ -595,7 +608,7 @@ def list_jobs():
 def _job_assign(jobid):
     """Bash that sets JOB to the given id, or the latest job dir if none given."""
     if jobid:
-        _check_materials([jobid.replace("-", "")])  # reject odd chars in the id
+        _check_shell_tokens([jobid])
         return f'JOB="{jobid}"'
     return 'JOB=$(ls -1 "$JOBS" 2>/dev/null | tail -1)'
 
@@ -661,6 +674,7 @@ def attach(jobid=None):
     jobid = jobid or _latest_jobid()
     if not jobid:
         raise SystemExit("no jobs to attach to (start one: cxr remote start <materials>)")
+    _check_shell_tokens([jobid])
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     # Tail the log live, but self-terminate once the job process exits, so a
     # finished job doesn't leave you stuck in tail -f. The tail is NOT nohup'd, so
@@ -696,7 +710,7 @@ def attach(jobid=None):
 def _stop_jobid(jobid):
     """SIGTERM a running job's whole process group (the runner + scan.py + its
     transport worker pool), then mark the job stopped."""
-    _check_materials([jobid.replace("-", "")])
+    _check_shell_tokens([jobid])
     remote = (
         f'D="{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"; '
         'if [ ! -f "$D/pid" ]; then echo "no pid for job {0}"; exit 1; fi; '
@@ -726,7 +740,7 @@ def stop_jobs(materials=None, all_jobs=False):
     else:
         if not materials:
             raise SystemExit("stop needs material(s), or use --all")
-        _check_materials(materials)
+        _check_shell_tokens(materials)
         wanted = set(materials)
         live = _live_jobs()
         matches = [
@@ -791,6 +805,7 @@ def _cli_scan(args):
             "trailing pull would fail after the whole sweep ran. Drop --grid."
         )
     materials = _selected_materials(args, "material")
+    _check_materials(materials)
     # same checkpoint-collision guard as `start`: a foreground scan and a
     # detached job writing the same <stem>.pkl would race on its .tmp.
     _refuse_if_busy(materials, args.quick)

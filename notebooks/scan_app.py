@@ -14,14 +14,15 @@ app = marimo.App()
 def _():
     import marimo as mo
 
-    from cxr_mc.config import COLLAPSE_AZIMUTH, MATERIALS, default_settings, material_sweep
+    from cxr_mc.config import COLLAPSE_AZIMUTH, default_settings, material_sweep
+    from cxr_mc.materials import CATALOG
     from cxr_mc.plots import stream_chunk
     from cxr_mc.run import run_sweep
     from cxr_mc.sweep import build_cases, geometry_table
 
     return (
         COLLAPSE_AZIMUTH,
-        MATERIALS,
+        CATALOG,
         build_cases,
         default_settings,
         geometry_table,
@@ -50,8 +51,13 @@ def _(mo):
 
 
 @app.cell
-def _(MATERIALS, mo):
-    material_ui = mo.ui.dropdown(list(MATERIALS), value="hopg", label="Material to scan")
+def _(CATALOG, mo):
+    material_options = {CATALOG.material(key).label: key for key in CATALOG.material_keys}
+    material_ui = mo.ui.dropdown(
+        material_options,
+        value=CATALOG.material("hopg").label,
+        label="Material to scan",
+    )
     material_ui
     return (material_ui,)
 

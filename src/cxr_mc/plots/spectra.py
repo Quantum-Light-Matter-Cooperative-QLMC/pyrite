@@ -371,7 +371,8 @@ def plot_material_comparison(
     the paper's catalogue.
 
     ``results_by_material`` : ``{label: results_store}``, e.g. built in the
-    notebook with ``{m: load_checkpoint(m) for m in MATERIALS}`` (skip empties)."""
+    notebook with ``{m: load_checkpoint(m) for m in CATALOG.material_keys}``
+    (skip empties)."""
     pts = []  # (label, line_eV, line_flux, quality, case)
     for label, results in results_by_material.items():
         recs = records(results)

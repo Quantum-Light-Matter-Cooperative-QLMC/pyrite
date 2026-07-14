@@ -28,7 +28,8 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import MATERIALS, default_settings, material_sweep
+from .config import default_settings, material_sweep
+from .materials import CATALOG
 from .run import run_sweep
 from .sweep import build_cases
 
@@ -49,15 +50,28 @@ def load_all_materials(path: Path | None = None) -> list[str]:
     if (
         not isinstance(materials, list)
         or not materials
-        or not all(isinstance(material, str) for material in materials)
+        or not all(isinstance(material, str) and material.strip() for material in materials)
     ):
         raise SystemExit(
-            f"invalid material manifest {path}: expected a non-empty string list 'materials'"
+            f"invalid material manifest {path}: expected a list of non-empty strings 'materials'"
         )
-    unknown = [material for material in materials if material not in MATERIALS]
+    duplicates = list(
+        dict.fromkeys(material for material in materials if materials.count(material) > 1)
+    )
+    if duplicates:
+        raise SystemExit(f"duplicate material(s) in {path}: {', '.join(duplicates)}")
+    unknown = [material for material in materials if material not in CATALOG.materials]
     if unknown:
         raise SystemExit(f"unknown material(s) in {path}: {', '.join(unknown)}")
     return materials
+
+
+def validate_materials(materials: list[str]) -> None:
+    """Reject runnable selections that are absent from the material catalog."""
+    unknown = [material for material in materials if material not in CATALOG.materials]
+    if unknown:
+        valid = ", ".join(CATALOG.material_keys)
+        raise SystemExit(f"unknown material(s): {', '.join(unknown)}; valid: {valid}")
 
 
 def _build_parser(ap):
@@ -110,6 +124,7 @@ def run(args):
         materials = [args.material]
     else:
         raise SystemExit("scan needs a material name, or use --all")
+    validate_materials(materials)
     for material in materials:
         _run_material(args, material)
 

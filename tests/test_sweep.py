@@ -445,3 +445,59 @@ def test_scan_all_rejects_unknown_manifest_material_before_running(monkeypatch, 
                 checkpoint_dir=str(tmp_path),
             )
         )
+
+
+@pytest.mark.parametrize(
+    ("manifest_text", "message"),
+    [
+        ('materials = ["hopg", ""]\n', "non-empty strings"),
+        ('materials = ["hopg", "hopg"]\n', "duplicate material"),
+    ],
+)
+def test_scan_all_rejects_invalid_manifest_entries_before_running(
+    monkeypatch, tmp_path, manifest_text, message
+):
+    import argparse
+
+    from cxr_mc import scan
+
+    manifest = tmp_path / "mats_to_sim.toml"
+    manifest.write_text(manifest_text)
+    monkeypatch.setattr(scan, "MATS_FILE", manifest)
+    monkeypatch.setattr(scan, "run_sweep", lambda *a, **kw: pytest.fail("must not run"))
+
+    with pytest.raises(SystemExit, match=message):
+        scan.run(
+            argparse.Namespace(
+                material=None,
+                all=True,
+                workers=0,
+                quick=False,
+                n_families=None,
+                beam_uvw=None,
+                checkpoint_dir=str(tmp_path),
+            )
+        )
+
+
+def test_scan_rejects_explicit_unknown_material_before_building(monkeypatch, tmp_path):
+    import argparse
+
+    from cxr_mc import scan
+
+    monkeypatch.setattr(
+        scan, "material_sweep", lambda *a, **kw: pytest.fail("must validate before building")
+    )
+
+    with pytest.raises(SystemExit, match="unknown material"):
+        scan.run(
+            argparse.Namespace(
+                material="not-in-catalog",
+                all=False,
+                workers=0,
+                quick=False,
+                n_families=None,
+                beam_uvw=None,
+                checkpoint_dir=str(tmp_path),
+            )
+        )

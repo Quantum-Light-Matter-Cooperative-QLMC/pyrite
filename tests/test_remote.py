@@ -14,13 +14,22 @@ from cxr_mc import remote
 
 
 def test_check_materials_accepts_crystal_keys():
-    remote._check_materials(["mose2", "hopg", "mote2", "silicon"])  # no raise
+    remote._check_materials(["mose2", "hopg", "mos2-on-sio2-si", "silicon"])
+
+
+def test_check_materials_rejects_shell_safe_unknown_catalog_keys():
+    with pytest.raises(SystemExit, match="unknown material"):
+        remote._check_materials(["not_in_catalog"])
 
 
 @pytest.mark.parametrize("bad", ["rm -rf /", "a;b", "../etc", "a b", "", "m&n"])
 def test_check_materials_rejects_injection(bad):
     with pytest.raises(SystemExit):
         remote._check_materials([bad])
+
+
+def test_check_shell_tokens_preserves_checkpoint_and_synthetic_stems():
+    remote._check_shell_tokens(["mose2_quick", "zhai", "20260101-000000"])
 
 
 def test_queue_script_has_per_material_scan_calls():
@@ -312,6 +321,64 @@ def test_remote_start_all_uses_toml_manifest(monkeypatch, tmp_path):
     remote.main(["start", "--all", "--dry-run"])
 
     assert calls == [["hopg", "hbn"]]
+
+
+def test_remote_scan_accepts_hyphenated_catalog_material(monkeypatch):
+    calls = []
+    monkeypatch.setattr(remote, "_live_jobs", lambda: [])
+    monkeypatch.setattr(remote, "remote_scan", lambda material, *args: calls.append(material))
+    monkeypatch.setattr(remote, "pull", lambda *args, **kwargs: None)
+
+    remote.main(["scan", "mos2-on-sio2-si", "--no-sync"])
+
+    assert calls == ["mos2-on-sio2-si"]
+
+
+def test_remote_scan_rejects_unknown_before_busy_or_sync(monkeypatch):
+    monkeypatch.setattr(
+        remote, "_live_jobs", lambda: pytest.fail("must validate before checking busy jobs")
+    )
+    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("must validate before syncing"))
+
+    with pytest.raises(SystemExit, match="unknown material"):
+        remote.main(["scan", "not_in_catalog"])
+
+
+def test_remote_start_accepts_hyphenated_catalog_material(capsys):
+    remote.main(["start", "mos2-on-sio2-si", "--dry-run"])
+
+    assert "mos2-on-sio2-si" in capsys.readouterr().out
+
+
+def test_remote_start_rejects_unknown_before_busy_or_sync(monkeypatch):
+    monkeypatch.setattr(
+        remote, "_live_jobs", lambda: pytest.fail("must validate before checking busy jobs")
+    )
+    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("must validate before syncing"))
+
+    with pytest.raises(SystemExit, match="unknown material"):
+        remote.main(["start", "not_in_catalog"])
+
+
+def test_pull_validates_safe_stems_without_requiring_catalog_membership(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: calls.append(cmd))
+
+    remote.pull(["hopg_quick", "zhai"], no_sync=True)
+
+    assert any("hopg_quick.pkl" in " ".join(command) for command in calls)
+    assert any("zhai.pkl" in " ".join(command) for command in calls)
+
+
+def test_pull_rejects_unsafe_stem_before_sync_or_local_mutation(monkeypatch, tmp_path):
+    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("must validate before syncing"))
+
+    with pytest.raises(SystemExit, match="invalid remote shell token"):
+        remote.pull(["bad;stem"], grid=True)
+
+    assert not (tmp_path / "checkpoints").exists()
 
 
 def test_sync_paths_include_all_materials_manifest():

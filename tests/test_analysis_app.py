@@ -55,3 +55,11 @@ def test_material_menu_cell_owns_checkpoint_directory_dependency() -> None:
         and any(alias.name == "_DEFAULT_CHECKPOINT_DIR" for alias in node.names)
         for node in menu_cell.body
     )
+
+
+def test_analysis_app_discovers_materials_directly_from_catalog() -> None:
+    source = APP.read_text()
+
+    assert "from cxr_mc.materials import CATALOG" in source
+    assert "MATERIAL_LABELS" not in source
+    assert "from cxr_mc.config import MATERIALS" not in source
