@@ -79,6 +79,27 @@ def test_submit_command_uses_sbatch_parsable_and_records_scheduler_id():
     assert "nohup" not in command and "setsid" not in command
 
 
+def test_remote_dry_run_describes_sbatch_submission(monkeypatch, capsys):
+    monkeypatch.setattr(
+        remote,
+        "_refuse_if_busy",
+        lambda *_args: pytest.fail("dry-run must not check busy"),
+    )
+    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("dry-run must not sync"))
+    monkeypatch.setattr(
+        remote.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
+    )
+    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh"))
+    monkeypatch.setattr(remote, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh"))
+
+    remote.start_queue(["hopg"], dry_run=True)
+
+    out = capsys.readouterr().out
+    assert "#SBATCH --partition=gpu" in out
+    assert "sbatch --parsable" in out
+    assert "nohup" not in out and "setsid" not in out
+
+
 def test_start_writes_static_metadata_before_sbatch(monkeypatch):
     uploads = []
     submissions = []

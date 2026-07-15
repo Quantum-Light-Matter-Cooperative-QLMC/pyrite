@@ -96,6 +96,25 @@ lives.
 - **fp64:** set `CXR_FP64=1` for double-precision reference runs (the GPU path
   defaults to fp32).
 
-The author's personal single-box helper (`cxr remote`, see `cxr_mc/remote.py`)
-does the same push / run / pull loop over plain ssh for a non-scheduler GPU box;
-it is not needed on a cluster.
+## Lab-box remote helper
+
+`cxr remote` syncs the current working tree to the configured lab host and
+submits every CXR compute run through SLURM. Its fixed lab allocation requests
+the `gpu` partition, one node, one task, one GPU (`--gres=gpu:1`), and unlimited
+wall time. The generated batch job starts with `module purge`, then loads
+`cuda`, `openmpi`, and `hdf5`; it uses the synced project's configured `uv`
+environment, not the WarpX-specific `jrozells` Conda environment.
+
+Review the exact batch script and `sbatch --parsable` submission command without
+contacting the lab box:
+
+```bash
+cxr remote start hopg --dry-run
+```
+
+`cxr remote scan hopg` syncs, submits, follows the SLURM job, and pulls the
+checkpoint. `cxr remote start hopg wse2` syncs, submits, and returns immediately;
+use `cxr remote status`, `cxr remote logs --follow`, or `cxr remote attach` to
+monitor it. `cxr remote stop ...` cancels an active allocation with `scancel`.
+`cxr remote check` follows the same submit-and-wait workflow for its validation
+calculation; `cxr remote check --detached` returns after submission.

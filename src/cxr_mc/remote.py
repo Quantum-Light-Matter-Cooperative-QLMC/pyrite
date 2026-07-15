@@ -1,10 +1,11 @@
-"""``cxr remote`` -- run the heavy CXR scan on the GPU box, keep the data-vis local.
+"""``cxr remote`` -- schedule heavy CXR scans on the lab GPU box, keep data-vis local.
 
 The split this enables: the laptop holds the project and does ALL the data-vis +
 PDF export (where matplotlib and the xelatex/webpdf toolchain are set up), while
 the lab box (an RTX 5080, ssh host 'qlmc') only does the GPU-heavy Monte-Carlo
-sweep. This command ships the current code up, runs scan.py there (see
-:mod:`cxr_mc.scan`), and pulls the resulting checkpoint back into ./checkpoints
+sweep. Every compute-producing subcommand ships the current code up, submits a
+one-GPU SLURM batch script there (see :mod:`cxr_mc.scan`), and pulls results into
+./checkpoints
 -- so you never hand-ssh in or copy files, and you never need a PDF toolchain on
 the lab box.
 
@@ -25,7 +26,7 @@ One-shot (submit, wait for SLURM, then pull):
                                     # run the Zhai + supplementary MC on the
                                     # box, or pull its cache back
 
-Detached QUEUE (survives ssh disconnect -- launch, walk away, reconnect later):
+Asynchronous SLURM queue (survives ssh disconnect -- launch, walk away, reconnect later):
 
     cxr remote start mose2 wse2 mos2    # queue several materials, run detached
     cxr remote start mose2 --follow     # launch, then track it live
@@ -43,7 +44,7 @@ Detached QUEUE (survives ssh disconnect -- launch, walk away, reconnect later):
 materials sequentially (one `scan.py` per material), writing meta/state/log and
 its scheduler ID into the job dir.
 
-The job is detached on the box from the moment it starts, so the ssh connection
+The SLURM job is independent of the submission SSH connection, so the SSH link
 is only ever a VIEWER. `--follow` (or `attach`) streams the log live and exits
 when the job finishes; to DISCONNECT, just Ctrl-C (or close the terminal / drop
 the link) -- that tears down the viewer only, and the job runs to completion.
@@ -1056,7 +1057,11 @@ def _build_remote_parser(ap):
     st.add_argument("--quick", action="store_true")
     st.add_argument("--workers", type=int, default=None)
     st.add_argument("--no-sync", action="store_true", help="skip the code upload")
-    st.add_argument("--dry-run", action="store_true", help="print the runner + commands, don't ssh")
+    st.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the SLURM batch script + submission command, don't ssh",
+    )
     st.add_argument(
         "--follow",
         "-f",
