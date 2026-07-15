@@ -320,7 +320,7 @@ def _(
 def _(CATALOG, MATERIAL, mo):
     # The penetration figures run transport directly, so use the selected
     # material's configured scan grids instead of requiring a checkpoint.
-    _scan = CATALOG[MATERIAL].scan
+    _scan = CATALOG.material(MATERIAL).scan
     _energy_values = tuple(float(value) for value in _scan.energy_keV)
     _thickness_values = tuple(float(value) for value in _scan.thickness_ang)
     _tilt_values = tuple(float(value) for value in _scan.tilt_deg)

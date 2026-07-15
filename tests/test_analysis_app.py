@@ -12,7 +12,7 @@ def test_penetration_controls_read_the_active_material_scan() -> None:
     source = APP.read_text()
 
     assert "def _(CATALOG, MATERIAL, mo):" in source
-    assert "_scan = CATALOG[MATERIAL].scan" in source
+    assert "_scan = CATALOG.material(MATERIAL).scan" in source
 
 
 def test_penetration_controls_offer_material_presets_and_bounded_manual_values() -> None:
