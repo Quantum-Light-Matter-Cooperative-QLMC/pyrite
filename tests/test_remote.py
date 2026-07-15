@@ -166,6 +166,15 @@ def test_attach_uses_stdin_closed_ssh_for_live_view(monkeypatch):
     assert "/pid" not in runs[0][-1]
 
 
+def test_attach_retries_until_a_queued_job_creates_its_log(monkeypatch):
+    runs = []
+    monkeypatch.setattr(remote.subprocess, "run", lambda cmd: runs.append(cmd))
+
+    remote.attach("20260101-000000")
+
+    assert 'tail -n 50 -F --retry "$D/log"' in runs[0][-1]
+
+
 def test_stop_jobid_uses_scancel_not_kill(monkeypatch):
     commands = []
     monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "48291\n")

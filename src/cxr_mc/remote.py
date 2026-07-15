@@ -775,7 +775,7 @@ def attach(jobid=None):
     remote = (
         f'D="{jobdir}"; '
         f'[ -d "$D" ] || {{ echo "no such job: {jobid}"; exit 1; }}; '
-        'tail -n 50 -f "$D/log" 2>/dev/null & TP=$!; '
+        'tail -n 50 -F --retry "$D/log" 2>/dev/null & TP=$!; '
         # `start --follow` can attach immediately after submission; wait briefly
         # for the submit protocol to append its scheduler ID before polling.
         "SID=; for _ in $(seq 1 30); do "
