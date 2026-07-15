@@ -42,7 +42,17 @@ def test_queue_script_has_per_material_scan_calls():
     assert "mose2" in s and "wse2" in s
     assert "20260101-000000" in s  # job id is embedded
     assert "mats=(mose2 wse2)" in s  # bash array drives the loop
+    assert "parallel_materials=2" in s
     assert "/pid" not in s
+
+
+def test_queue_script_accepts_three_parallel_materials():
+    script = remote._queue_script(
+        "j", ["hopg", "hbn", "hfse2"], quick=False, workers=4, parallel_materials=3
+    )
+
+    assert "parallel_materials=3" in script
+    assert "wait -n" in script
 
 
 def test_queue_script_no_flags_when_unset():
@@ -54,7 +64,7 @@ def test_queue_script_warns_and_continues_after_a_material_fails():
     script = remote._queue_script("j", ["hopg", "hbn"], quick=False, workers=None)
 
     assert "WARNING: scan failed for $m; continuing" in script
-    assert "continue" in script
+    assert "wait -n" in script
     assert "done with $failures warning(s)" in script
 
 
@@ -157,6 +167,33 @@ def test_submit_failure_releases_its_checkpoint_reservations():
     assert '"$R/hopg/jobid"' in command
 
 
+def test_submit_command_with_reservations_is_valid_bash(monkeypatch, tmp_path):
+    """The owner-checked cleanup fragment must not break submission parsing."""
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    reservation = tmp_path / "jobs" / "reservations" / "hopg"
+    jobdir.mkdir(parents=True)
+    reservation.mkdir(parents=True)
+    (reservation / "jobid").write_text("j\n")
+    fake_sbatch = tmp_path / "sbatch"
+    fake_sbatch.write_text("#!/bin/sh\nprintf '48291\\n'\n")
+    fake_sbatch.chmod(0o755)
+    monkeypatch.setattr(remote, "REMOTE_DIR", str(tmp_path))
+    env = os.environ.copy()
+    env["PATH"] = f"{tmp_path}:{env['PATH']}"
+
+    result = subprocess.run(
+        [bash, "-c", remote._submit_slurm_command("j", ["hopg"])],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "48291"
+    assert "slurm_job_id: 48291" in (jobdir / "meta").read_text()
+
+
 def test_stop_waits_for_scheduler_cancellation_before_releasing_reservations(monkeypatch):
     commands = []
     monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "48291\n")
@@ -244,13 +281,16 @@ def test_start_writes_static_metadata_before_sbatch(monkeypatch):
         lambda command: submissions.append(["ssh", "-n", remote.HOST, command]) or "48291\n",
     )
 
-    remote.start_queue(["hopg"], quick=True, workers=3, no_sync=True)
+    remote.start_queue(
+        ["hopg"], quick=True, workers=3, parallel_materials=3, no_sync=True
+    )
 
     upload_command = uploads[0][0][0][-1]
     assert "job: " in upload_command
     assert "materials: hopg" in upload_command
     assert "quick: True" in upload_command
     assert "workers: 3" in upload_command
+    assert "parallel_materials: 3" in upload_command
     assert "started:" not in upload_command
     assert "started: $(date -Is)" in uploads[0][1]["input"].decode()
     assert "materials: hopg" not in uploads[0][1]["input"].decode()
@@ -395,6 +435,32 @@ def test_attach_retries_until_a_queued_job_creates_its_log(monkeypatch):
     remote.attach("20260101-000000")
 
     assert 'tail -n 50 -F --retry "$D/log"' in runs[0][-1]
+
+
+def test_implicit_job_selection_excludes_checkpoint_reservations(monkeypatch, tmp_path):
+    """Bare queue commands must not mistake jobs/reservations for a job."""
+    commands = []
+    monkeypatch.setattr(remote, "_ssh_capture", lambda command: commands.append(command) or "")
+
+    remote.list_jobs()
+    remote.job_status()
+    remote.tail_logs()
+    remote._latest_jobid()
+
+    jobs = tmp_path / "jobs"
+    job = jobs / "20260715-113910-b0240c4f"
+    job.mkdir(parents=True)
+    (job / "meta").write_text("slurm_job_id: 48291\n")
+    (job / "state").write_text("running\n")
+    (jobs / "reservations" / "hopg").mkdir(parents=True)
+    list_command = commands[0].replace(
+        f'JOBS="{remote.REMOTE_DIR}/{remote.JOBS_SUBDIR}"', f'JOBS="{jobs}"'
+    )
+    result = subprocess.run(["bash", "-c", list_command], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == "20260715-113910-b0240c4f  running\n"
+    assert all('[ -f "$d/meta" ] || continue' in command for command in commands)
 
 
 def test_attach_returns_false_when_the_viewer_is_interrupted(monkeypatch):
@@ -603,6 +669,75 @@ def _bash_or_skip(tmp_path):
     return bash
 
 
+def test_parallel_queue_script_preserves_partial_failure_results(monkeypatch, tmp_path):
+    """Run the generated payload: one failed child must not hide two successes."""
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.mkdir(parents=True)
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = sync ]; then exit 0; fi\n'
+        'case "$*" in *hbn*) exit 7 ;; esac\n'
+        "exit 0\n"
+    )
+    fake_uv.chmod(0o755)
+    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    script = remote._queue_script(
+        "j", ["hopg", "hbn", "hfse2"], quick=False, workers=4, parallel_materials=2
+    )
+
+    result = subprocess.run([bash, "-c", script], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    assert (jobdir / "state").read_text().startswith("done with 1 warning(s)")
+    log = (jobdir / "log").read_text()
+    assert "completed: hopg" in log
+    assert "completed: hfse2" in log
+    assert "WARNING: scan failed for hbn; continuing" in log
+
+
+@pytest.mark.parametrize("parallel_materials", [1, 2, 4])
+def test_parallel_queue_script_enforces_process_limit(
+    monkeypatch, tmp_path, parallel_materials
+):
+    """Measure the generated payload's peak simultaneous scan processes."""
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.mkdir(parents=True)
+    trace = tmp_path / "trace"
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = sync ]; then exit 0; fi\n'
+        f'echo "start $$" >> "{trace.as_posix()}"\n'
+        "sleep 0.05\n"
+        f'echo "end $$" >> "{trace.as_posix()}"\n'
+    )
+    fake_uv.chmod(0o755)
+    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    materials = ["hopg", "hbn", "hfse2", "v2o5"]
+    script = remote._queue_script(
+        "j",
+        materials,
+        quick=False,
+        workers=4,
+        parallel_materials=parallel_materials,
+    )
+
+    result = subprocess.run([bash, "-c", script], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    active = peak = 0
+    for event in trace.read_text().splitlines():
+        active += 1 if event.startswith("start ") else -1
+        peak = max(peak, active)
+    assert active == 0
+    assert peak == parallel_materials
+
+
 def test_clear_fails_closed_when_squeue_cannot_be_queried(monkeypatch, tmp_path):
     """A scheduler outage cannot be mistaken for an absent job before deletion."""
     bash = _bash_or_skip(tmp_path)
@@ -719,11 +854,68 @@ def test_remote_start_all_uses_toml_manifest(monkeypatch, tmp_path):
     manifest.write_text('materials = ["hopg", "hbn"]\n')
     monkeypatch.setattr(remote, "MATS_FILE", manifest)
     calls = []
-    monkeypatch.setattr(remote, "start_queue", lambda materials, *args: calls.append(materials))
+    monkeypatch.setattr(
+        remote, "start_queue", lambda materials, *args, **kwargs: calls.append(materials)
+    )
 
     remote.main(["start", "--all", "--dry-run"])
 
     assert calls == [["hopg", "hbn"]]
+
+
+def test_remote_start_defaults_to_two_parallel_materials(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        remote,
+        "start_queue",
+        lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
+    )
+
+    remote.main(["start", "hopg", "--dry-run"])
+
+    assert calls[0][1]["parallel_materials"] == 2
+
+
+def test_remote_start_accepts_parallel_materials_three_and_four(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        remote,
+        "start_queue",
+        lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
+    )
+
+    remote.main(["start", "hopg", "hbn", "--parallel-materials", "3", "--dry-run"])
+    remote.main(["start", "hopg", "hbn", "--parallel-materials", "4", "--dry-run"])
+
+    assert [kwargs["parallel_materials"] for _materials, kwargs in calls] == [3, 4]
+
+
+def test_remote_start_rejects_parallel_materials_above_four(monkeypatch):
+    monkeypatch.setattr(
+        remote, "start_queue", lambda *_args, **_kwargs: pytest.fail("must reject before start")
+    )
+
+    with pytest.raises(SystemExit):
+        remote.main(["start", "hopg", "--parallel-materials", "5", "--dry-run"])
+
+
+def test_start_queue_rejects_parallel_materials_above_four():
+    with pytest.raises(SystemExit, match="between 1 and 4"):
+        remote.start_queue(["hopg"], parallel_materials=5, dry_run=True)
+
+
+def test_remote_scan_forwards_parallel_materials(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        remote,
+        "start_queue",
+        lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
+    )
+    monkeypatch.setattr(remote, "attach", lambda _jobid: False)
+
+    remote.main(["scan", "hopg", "--parallel-materials", "3", "--no-sync"])
+
+    assert calls[0][1]["parallel_materials"] == 3
 
 
 def test_remote_scan_submits_then_attaches_and_pulls(monkeypatch):

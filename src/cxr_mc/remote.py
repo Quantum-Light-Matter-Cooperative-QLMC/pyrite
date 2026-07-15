@@ -41,8 +41,8 @@ Asynchronous SLURM queue (survives ssh disconnect -- launch, walk away, reconnec
 
 `start` returns immediately: it ships the code, writes a batch script under
 <remote>/jobs/<jobid>/, and submits it to SLURM. The batch job processes the
-materials sequentially (one `scan.py` per material), writing meta/state/log and
-its scheduler ID into the job dir.
+materials with bounded concurrency (two `scan.py` processes by default),
+writing meta/state/log and its scheduler ID into the job dir.
 
 The SLURM job is independent of the submission SSH connection, so the SSH link
 is only ever a VIEWER. `--follow` (or `attach`) streams the log live and exits
@@ -79,6 +79,8 @@ REMOTE_UV = os.environ.get("CXR_REMOTE_UV", "/home/aamador/.local/bin/uv")
 SLURM_PARTITION = "gpu"
 SLURM_GPUS = 1
 SLURM_TIME = "UNLIMITED"
+DEFAULT_PARALLEL_MATERIALS = 2
+MAX_PARALLEL_MATERIALS = 4
 # repo root = three levels up from src/cxr_mc/remote.py. remote.py orchestrates
 # the *checkout* (it tars the working tree up to the box), so it resolves paths
 # against the repo root, not its own package dir.
@@ -343,7 +345,7 @@ def _new_jobid() -> str:
 def _completed_materials(jobid, materials):
     """Return materials with a successful queue-log completion marker.
 
-    The sequential payload appends one marker only after ``scan.py`` exits
+    Each concurrent child appends one marker only after ``scan.py`` exits
     successfully. Reading those markers after ``attach`` keeps a
     warning-and-continue batch from being reported as though every requested
     checkpoint were available to pull.
@@ -358,8 +360,27 @@ def _completed_materials(jobid, materials):
     return [material for material in materials if material in completed]
 
 
-def _queue_script(jobid, materials, quick, workers):
-    """CXR payload for one sequential material queue inside a SLURM allocation."""
+def _validate_parallel_materials(parallel_materials):
+    """Return a supported in-allocation material-process limit."""
+    if (
+        not isinstance(parallel_materials, int)
+        or not 1 <= parallel_materials <= MAX_PARALLEL_MATERIALS
+    ):
+        raise SystemExit(
+            f"parallel materials must be between 1 and {MAX_PARALLEL_MATERIALS}"
+        )
+    return parallel_materials
+
+
+def _queue_script(
+    jobid,
+    materials,
+    quick,
+    workers,
+    parallel_materials=DEFAULT_PARALLEL_MATERIALS,
+):
+    """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
+    parallel_materials = _validate_parallel_materials(parallel_materials)
     flags = ""
     if quick:
         flags += " --quick"
@@ -373,21 +394,40 @@ echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 mats=({mats})
 total=${{#mats[@]}}
+parallel_materials={parallel_materials}
 n=0
 failures=0
-for m in "${{mats[@]}}"; do
-  n=$((n + 1))
-  echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
-  printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" \
+active=0
+run_material() {{
+  local i="$1"
+  local m="$2"
+  echo "running $m [$i/$total] since $(date -Is)" > "$JOBDIR/state"
+  printf '\\n===== [%s/%s] %s  %s =====\\n' "$i" "$total" "$m" "$(date -Is)" \
 >> "$JOBDIR/log"
   if ! {REMOTE_UV} run --no-sync python scan.py "$m"{flags} >> "$JOBDIR/log" 2>&1
   then
-    failures=$((failures + 1))
     echo "WARNING: scan failed for $m; continuing" >> "$JOBDIR/log"
-    echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
-    continue
+    echo "warning at $m [$i/$total] $(date -Is)" > "$JOBDIR/state"
+    return 1
   fi
   echo "completed: $m" >> "$JOBDIR/log"
+}}
+for m in "${{mats[@]}}"; do
+  n=$((n + 1))
+  run_material "$n" "$m" &
+  active=$((active + 1))
+  if [ "$active" -ge "$parallel_materials" ]; then
+    if ! wait -n; then
+      failures=$((failures + 1))
+    fi
+    active=$((active - 1))
+  fi
+done
+while [ "$active" -gt 0 ]; do
+  if ! wait -n; then
+    failures=$((failures + 1))
+  fi
+  active=$((active - 1))
 done
 if [ "$failures" -gt 0 ]; then
   echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
@@ -430,11 +470,12 @@ def _release_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
     """Return a remote command that releases only reservations owned by ``jobid``."""
     _check_shell_tokens([jobid, *stems])
     reservations = _reservation_root()
-    releases = " ".join(
-        f'if [ "$(cat \"$R/{stem}/jobid\" 2>/dev/null)" = "$J" ]; then rm -rf "$R/{stem}"; fi;'
+    releases = "; ".join(
+        f'if [ "$(cat \"$R/{stem}/jobid\" 2>/dev/null)" = "$J" ]; then rm -rf "$R/{stem}"; fi'
         for stem in stems
     )
-    return f'R="{reservations}"; J="{jobid}"; {releases}'
+    command = f'R="{reservations}"; J="{jobid}"'
+    return f"{command}; {releases}" if releases else command
 
 
 def _release_job_reservations_command(jobid: str) -> str:
@@ -545,10 +586,17 @@ case "$SID" in ''|*[!0-9]*) \
   echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; {release}; exit 1 ;; \
 esac; \
 printf 'slurm_job_id: %s\\n' "$SID" >> "$D/meta"; \
-printf '%s\\n' "$SID"""
+printf '%s\\n' "$SID"
+"""
 
 
-def _queue_metadata(jobid, materials, quick, workers):
+def _queue_metadata(
+    jobid,
+    materials,
+    quick,
+    workers,
+    parallel_materials=DEFAULT_PARALLEL_MATERIALS,
+):
     """Static metadata persisted before a queue becomes visible to SLURM."""
     return "\n".join(
         [
@@ -556,6 +604,7 @@ def _queue_metadata(jobid, materials, quick, workers):
             f"materials: {' '.join(materials)}",
             f"quick: {bool(quick)}",
             f"workers: {workers}",
+            f"parallel_materials: {parallel_materials}",
             "",
         ]
     )
@@ -843,20 +892,28 @@ def clear_remote(material, yes=False):
         return
 
 
-def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=False):
-    """Submit a sequential material queue to SLURM. Returns the local job id."""
+def start_queue(
+    materials,
+    quick=False,
+    workers=None,
+    no_sync=False,
+    dry_run=False,
+    parallel_materials=DEFAULT_PARALLEL_MATERIALS,
+):
+    """Submit a bounded-concurrency material queue to SLURM. Returns its job id."""
     _check_materials(materials)
+    parallel_materials = _validate_parallel_materials(parallel_materials)
     if not dry_run:
         _refuse_if_busy(materials, quick)
     jobid = _new_jobid()
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     stems = _stems(materials, quick)
-    payload = _queue_script(jobid, materials, quick, workers)
+    payload = _queue_script(jobid, materials, quick, workers, parallel_materials)
     script = _slurm_batch_script(
         jobid, payload, job_name=f"cxr-{jobid}", reservation_stems=stems
     )
     upload = _write_job_script_command(
-        jobdir, _queue_metadata(jobid, materials, quick, workers)
+        jobdir, _queue_metadata(jobid, materials, quick, workers, parallel_materials)
     )
     submit = _submit_slurm_command(jobid, stems)
 
@@ -878,6 +935,7 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
     print(
         f"\nsubmitted SLURM job {scheduler_id} as local job {jobid} on {HOST}: {' '.join(materials)}"
         f"{' (quick)' if quick else ''}\n"
+        f"  parallel materials: {parallel_materials}\n"
         f"  watch:  cxr remote status {jobid}\n"
         f"  logs:   cxr remote logs {jobid} --follow\n"
         f"  pull:   cxr remote pull {' '.join(stems)}   (when state is 'done')"
@@ -930,15 +988,28 @@ def start_zhai_queue(
     return jobid
 
 
+def _recorded_job_dirs_command() -> str:
+    """Shell fragment that emits only submitted job directories, in order.
+
+    ``jobs/reservations`` is bookkeeping for checkpoint ownership, not a job.
+    A submitted job has its metadata file written before ``sbatch`` runs, so
+    that marker also excludes incomplete or unrelated directories safely.
+    """
+    return (
+        'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
+        '[ -f "$d/meta" ] || continue; printf "%s\\n" "$(basename "$d")"; done'
+    )
+
+
 def list_jobs():
-    """Print every job dir on the box with its current state line, oldest first
-    (the dirs are timestamp-named, so this is chronological)."""
+    """Print every submitted job with its current state, oldest first."""
     remote = (
         f'JOBS="{REMOTE_DIR}/{JOBS_SUBDIR}"; '
         '[ -d "$JOBS" ] || { echo "(no jobs)"; exit 0; }; '
-        'found=; for d in "$JOBS"/*/; do [ -d "$d" ] || continue; found=1; '
+        'found=; for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
+        '[ -f "$d/meta" ] || continue; found=1; '
         'printf "%s  %s\\n" "$(basename "$d")" '
-        '"$(cat "$d/state" 2>/dev/null || echo "?")"; done; '
+        '"$(cat "$d/state" 2>/dev/null || echo \"?\")"; done; '
         '[ -n "$found" ] || echo "(no jobs)"'
     )
     print(_ssh_capture(remote), end="")
@@ -949,7 +1020,7 @@ def _job_assign(jobid):
     if jobid:
         _check_shell_tokens([jobid])
         return f'JOB="{jobid}"'
-    return 'JOB=$(ls -1 "$JOBS" 2>/dev/null | tail -1)'
+    return f'JOB=$({_recorded_job_dirs_command()} | tail -1)'
 
 
 def job_status(jobid=None):
@@ -995,7 +1066,9 @@ def tail_logs(jobid=None, follow=False):
 
 def _latest_jobid():
     """The most recent job id on the box (job dirs are timestamp-named), or None."""
-    out = _ssh_capture(f'ls -1 "{REMOTE_DIR}/{JOBS_SUBDIR}" 2>/dev/null | tail -1').strip()
+    out = _ssh_capture(
+        f'JOBS="{REMOTE_DIR}/{JOBS_SUBDIR}"; {_recorded_job_dirs_command()} | tail -1'
+    ).strip()
     return out or None
 
 
@@ -1159,11 +1232,12 @@ def _cli_scan(args):
         )
     materials = _selected_materials(args, "material")
     # `start_queue` validates material tokens, refuses checkpoint collisions,
-    # syncs once, and submits one sequential scheduler job for every material.
+    # syncs once, and submits one bounded-concurrency scheduler job for the materials.
     jobid = start_queue(
         materials,
         quick=args.quick,
         workers=args.workers,
+        parallel_materials=getattr(args, "parallel_materials", DEFAULT_PARALLEL_MATERIALS),
         no_sync=args.no_sync,
     )
     if not attach(jobid):
@@ -1203,7 +1277,14 @@ def _cli_pull(args):
 
 def _cli_start(args):
     materials = _selected_materials(args, "materials")
-    jobid = start_queue(materials, args.quick, args.workers, args.no_sync, args.dry_run)
+    jobid = start_queue(
+        materials,
+        quick=args.quick,
+        workers=args.workers,
+        parallel_materials=args.parallel_materials,
+        no_sync=args.no_sync,
+        dry_run=args.dry_run,
+    )
     if args.follow and not args.dry_run:
         attach(jobid)
 
@@ -1280,6 +1361,14 @@ def _build_remote_parser(ap):
     )
     s.add_argument("--quick", action="store_true")
     s.add_argument("--workers", type=int, default=None)
+    s.add_argument(
+        "--parallel-materials",
+        type=int,
+        choices=range(1, MAX_PARALLEL_MATERIALS + 1),
+        default=DEFAULT_PARALLEL_MATERIALS,
+        metavar="N",
+        help="simultaneous material scans in one GPU allocation (default: 2; max: 4)",
+    )
     s.add_argument("--no-sync", action="store_true", help="skip the code upload")
     s.add_argument(
         "--grid", action="store_true", help="grid-filter the checkpoint on the box before pulling"
@@ -1298,6 +1387,14 @@ def _build_remote_parser(ap):
     )
     st.add_argument("--quick", action="store_true")
     st.add_argument("--workers", type=int, default=None)
+    st.add_argument(
+        "--parallel-materials",
+        type=int,
+        choices=range(1, MAX_PARALLEL_MATERIALS + 1),
+        default=DEFAULT_PARALLEL_MATERIALS,
+        metavar="N",
+        help="simultaneous material scans in one GPU allocation (default: 2; max: 4)",
+    )
     st.add_argument("--no-sync", action="store_true", help="skip the code upload")
     st.add_argument(
         "--dry-run",

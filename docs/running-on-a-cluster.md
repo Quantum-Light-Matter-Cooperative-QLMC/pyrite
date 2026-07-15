@@ -113,8 +113,11 @@ cxr remote start hopg --dry-run
 ```
 
 `cxr remote scan hopg` syncs, submits, follows the SLURM job, and pulls the
-checkpoint. `cxr remote start hopg wse2` syncs, submits, and returns immediately;
-use `cxr remote status`, `cxr remote logs --follow`, or `cxr remote attach` to
-monitor it. `cxr remote stop ...` cancels an active allocation with `scancel`.
-`cxr remote check` follows the same submit-and-wait workflow for its validation
-calculation; `cxr remote check --detached` returns after submission.
+checkpoint. `cxr remote start hopg wse2` syncs, submits, and returns immediately.
+Multi-material runs start two material scans concurrently by default; use
+`--parallel-materials 3` for workloads measured to fit concurrently, `1` for
+serial execution, or at most `4`. Use `cxr remote status`, `cxr remote logs --follow`,
+or `cxr remote attach` to monitor the allocation. `cxr remote stop ...` cancels
+an active allocation with `scancel`. `cxr remote check` follows the same
+submit-and-wait workflow for its validation calculation;
+`cxr remote check --detached` returns after submission.
