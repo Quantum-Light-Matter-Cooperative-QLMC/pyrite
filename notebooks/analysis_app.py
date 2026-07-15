@@ -348,10 +348,10 @@ def _(CATALOG, MATERIAL, mo):
     )
     penetration_thickness_manual_ui = mo.ui.number(
         start=0.001,
-        stop=10.0,
+        stop=10000.0,
         step=0.001,
-        value=min(max(_thickness_values[0] / 1e7, 0.001), 10.0),
-        label="crystal thickness (mm)",
+        value=min(max(_thickness_values[0] / 1e4, 0.001), 10000.0),
+        label="crystal thickness (µm)",
     )
 
     penetration_tilt_source_ui = mo.ui.dropdown(
@@ -399,7 +399,7 @@ def _(
     penetration_thickness_ang = (
         penetration_thickness_grid_ui.value
         if penetration_thickness_source_ui.value == "grid"
-        else penetration_thickness_manual_ui.value * 1e7
+        else penetration_thickness_manual_ui.value * 1e4
     )
     penetration_tilt_deg = (
         penetration_tilt_grid_ui.value

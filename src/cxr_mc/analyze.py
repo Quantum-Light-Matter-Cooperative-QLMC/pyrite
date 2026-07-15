@@ -22,7 +22,6 @@ both.
     cxr analyze wse2               # transient: this run only, doesn't persist
     cxr analyze -d wse2            # persist wse2 as the new default, and launch it
     cxr analyze --watch            # add marimo's --watch (combinable with either)
-    cxr analyze --headless         # start without opening a browser
     cxr analyze --smoke            # execute the app once without a browser
     cxr analyze --edit             # `marimo edit` instead of `marimo run`
 """
@@ -122,7 +121,7 @@ def initial_material(cli_args, persisted_default):
     return "hopg"
 
 
-def _command(material, *, edit=False, watch=False, headless=False, tunnel=False):
+def _command(material, *, edit=False, watch=False, tunnel=False):
     """The marimo argv for one launch (module-run through the current
     interpreter so the venv's marimo is the one that runs). Marimo's own flags
     go before the notebook path; app args go after ``--``."""
@@ -132,7 +131,6 @@ def _command(material, *, edit=False, watch=False, headless=False, tunnel=False)
         "marimo",
         "edit" if edit else "run",
         *(["--watch"] if watch else []),
-        *(["--headless"] if headless else []),
         *(["--port", str(TUNNEL_PORT)] if tunnel else []),
         NOTEBOOK,
         "--",
@@ -159,8 +157,8 @@ def _smoke_command(material, output):
     ]
 
 
-def _launch(material, *, edit=False, watch=False, headless=False, smoke=False, acp=False, tunnel=False):
-    cmd = _command(material, edit=edit, watch=watch, headless=headless, tunnel=tunnel)
+def _launch(material, *, edit=False, watch=False, smoke=False, acp=False, tunnel=False):
+    cmd = _command(material, edit=edit, watch=watch, tunnel=tunnel)
     print(f"launching {NOTEBOOK} ({'edit' if edit else 'run'}) with material={material}")
     if tunnel:
         print(f"ssh -L {TUNNEL_PORT}:127.0.0.1:{TUNNEL_PORT} <your-pi-ssh-host>")
@@ -189,8 +187,6 @@ def _cli(args):
 
     material = args.material or get_default_material() or "hopg"
     launch_args = {"edit": args.edit, "watch": args.watch}
-    if args.headless:
-        launch_args["headless"] = True
     if args.smoke:
         launch_args["smoke"] = True
     if args.acp:
@@ -216,7 +212,6 @@ def add_subparser(sub):
         help="also persist <material> as the new default for future no-argument runs",
     )
     ap.add_argument("--watch", action="store_true", help="pass marimo's --watch")
-    ap.add_argument("--headless", action="store_true", help="start marimo without opening a browser")
     ap.add_argument("--smoke", action="store_true", help="execute the app once headlessly and exit")
     ap.add_argument("--edit", action="store_true", help="use `marimo edit` instead of `marimo run`")
     ap.add_argument("--acp", action="store_true", help="start local Claude and Codex ACP bridges")

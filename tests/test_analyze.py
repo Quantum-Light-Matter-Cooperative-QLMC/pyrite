@@ -198,10 +198,9 @@ def test_command_run_default():
     assert cmd[-4:] == [analyze.NOTEBOOK, "--", "--material", "hopg"]
 
 
-def test_command_headless_omits_browser_launch():
-    cmd = analyze._command("hopg", headless=True)
-
-    assert cmd[3:5] == ["run", "--headless"]
+def test_headless_flag_is_not_supported():
+    with pytest.raises(SystemExit):
+        _parse(["analyze", "--headless"])
 
 
 def test_smoke_command_executes_analysis_app_to_a_temporary_html_file(tmp_path):

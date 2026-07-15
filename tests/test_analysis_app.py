@@ -20,8 +20,10 @@ def test_penetration_controls_offer_material_presets_and_bounded_manual_values()
 
     for grid in ("scan.energy_keV", "scan.thickness_ang", "scan.tilt_deg"):
         assert grid in source
-    for bound in ("start=1.0", "stop=300.0", "start=0.001", "stop=10.0", "stop=89.9"):
+    for bound in ("start=1.0", "stop=300.0", "start=0.001", "stop=10000.0", "stop=89.9"):
         assert bound in source
+    assert 'label="crystal thickness (µm)"' in source
+    assert "penetration_thickness_manual_ui.value * 1e4" in source
     for name in (
         "penetration_energy_keV",
         "penetration_thickness_ang",
