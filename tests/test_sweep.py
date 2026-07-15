@@ -334,6 +334,8 @@ def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcog
             [(0, 2, 0), (0, -2, 0)],
             {"P": 1},
         ),
+        ("4h_sic", "4H-SiC (0004)", (0, 0, 1), [(0, 0, 4), (0, 0, -4)], {"Si": 1, "C": 1}),
+        ("6h_sic", "6H-SiC (0006)", (0, 0, 1), [(0, 0, 6), (0, 0, -6)], {"Si": 1, "C": 1}),
     ],
 )
 def test_oriented_materials_are_registered_as_symmetric_cuts(

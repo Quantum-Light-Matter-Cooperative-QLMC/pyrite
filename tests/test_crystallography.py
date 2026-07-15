@@ -42,6 +42,8 @@ EXPECTED = {
     "nbse2",
     "tise2",
     "black_phosphorus",
+    "4h_sic",
+    "6h_sic",
 }
 
 
@@ -195,6 +197,33 @@ def test_black_phosphorus_020_structure_and_couplings_are_sane():
     structure, g = structure_factor("black_phosphorus", (0, 2, 0), 1500.0, B_ang2=0.6)
     susceptibility = chi_g("black_phosphorus", (0, 2, 0), 1500.0, B_ang2=0.6)
     potential = U_g("black_phosphorus", (0, 2, 0), 1500.0, B_ang2=0.6)
+
+    assert g > 0.0
+    assert np.isfinite(abs(structure)) and abs(structure) > 0.0
+    assert np.isfinite(abs(susceptibility)) and abs(susceptibility) > 0.0
+    assert np.isfinite(abs(potential)) and abs(potential) > 0.0
+
+
+@pytest.mark.parametrize(
+    ("key", "a", "c", "n_formulae", "hkl"),
+    [
+        ("4h_sic", 3.07993, 10.08222, 4, (0, 0, 4)),
+        ("6h_sic", 3.0810, 15.1248, 6, (0, 0, 6)),
+    ],
+)
+def test_hexagonal_sic_basal_structures_and_couplings_are_sane(key, a, c, n_formulae, hkl):
+    info = CRYSTALS[key]
+    basis = info["basis"]
+
+    assert info["lattice"]["a"] == pytest.approx(a)
+    assert info["lattice"]["c"] == pytest.approx(c)
+    assert info["V_cell"] == pytest.approx(np.sqrt(3.0) * a * a * c / 2.0)
+    assert sum(element == "Si" for element, _ in basis) == n_formulae
+    assert sum(element == "C" for element, _ in basis) == n_formulae
+
+    structure, g = structure_factor(key, hkl, 1500.0, B_ang2=0.6)
+    susceptibility = chi_g(key, hkl, 1500.0, B_ang2=0.6)
+    potential = U_g(key, hkl, 1500.0, B_ang2=0.6)
 
     assert g > 0.0
     assert np.isfinite(abs(structure)) and abs(structure) > 0.0
