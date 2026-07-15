@@ -5,6 +5,7 @@ These are pure-string/logic checks (no ssh), so they run anywhere. The one
 exception is the clear-listing regression test, which executes the box-side
 shell snippet under a local bash (skipped when bash is unavailable)."""
 
+import argparse
 import shutil
 import subprocess
 
@@ -88,6 +89,11 @@ def test_start_writes_static_metadata_before_sbatch(monkeypatch):
         lambda *args, **kwargs: uploads.append((args, kwargs)),
     )
     monkeypatch.setattr(remote, "_run", lambda command, **_kwargs: submissions.append(command))
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda command: submissions.append(["ssh", "-n", remote.HOST, command]) or "48291\n",
+    )
 
     remote.start_queue(["hopg"], quick=True, workers=3, no_sync=True)
 
@@ -100,6 +106,17 @@ def test_start_writes_static_metadata_before_sbatch(monkeypatch):
     assert "started: $(date -Is)" in uploads[0][1]["input"].decode()
     assert "materials: hopg" not in uploads[0][1]["input"].decode()
     assert "sbatch --parsable" in submissions[0][-1]
+
+
+def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
+    monkeypatch.setattr(remote, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(remote.subprocess, "run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(remote, "_run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "48291\n")
+
+    remote.start_queue(["hopg"], no_sync=True)
+
+    assert "submitted SLURM job 48291" in capsys.readouterr().out
 
 
 def test_slurm_job_id_reads_recorded_scheduler_id(monkeypatch):
@@ -445,15 +462,56 @@ def test_remote_start_all_uses_toml_manifest(monkeypatch, tmp_path):
     assert calls == [["hopg", "hbn"]]
 
 
-def test_remote_scan_accepts_hyphenated_catalog_material(monkeypatch):
+def test_remote_scan_submits_then_attaches_and_pulls(monkeypatch):
+    events = []
+    monkeypatch.setattr(
+        remote,
+        "start_queue",
+        lambda materials, **_kw: events.append(("start", materials)) or "j",
+    )
+    monkeypatch.setattr(remote, "attach", lambda jobid: events.append(("attach", jobid)))
+    monkeypatch.setattr(remote, "_completed_materials", lambda _jobid, materials: materials)
+    monkeypatch.setattr(remote, "pull", lambda stems, **_kw: events.append(("pull", stems)))
+
+    remote._cli_scan(
+        argparse.Namespace(
+            material="hopg",
+            all=False,
+            quick=False,
+            workers=None,
+            no_sync=False,
+            grid=False,
+            drop_wide_brem=False,
+            downcast=False,
+            remote_command="scan",
+        )
+    )
+
+    assert events == [("start", ["hopg"]), ("attach", "j"), ("pull", ["hopg"])]
+
+
+def test_remote_scan_preserves_hyphenated_catalog_material(monkeypatch):
     calls = []
-    monkeypatch.setattr(remote, "_live_jobs", lambda: [])
-    monkeypatch.setattr(remote, "remote_scan", lambda material, *args: calls.append(material))
-    monkeypatch.setattr(remote, "pull", lambda *args, **kwargs: None)
+    monkeypatch.setattr(remote, "start_queue", lambda materials, **_kw: calls.append(materials) or "j")
+    monkeypatch.setattr(remote, "attach", lambda _jobid: None)
+    monkeypatch.setattr(remote, "_completed_materials", lambda _jobid, materials: materials)
+    monkeypatch.setattr(remote, "pull", lambda *_args, **_kwargs: None)
 
     remote.main(["scan", "mos2-on-sio2-si", "--no-sync"])
 
-    assert calls == ["mos2-on-sio2-si"]
+    assert calls == [["mos2-on-sio2-si"]]
+
+
+def test_completed_materials_reads_success_markers_from_the_queue_log(monkeypatch):
+    commands = []
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda command: commands.append(command) or "hopg\nhbn\n",
+    )
+
+    assert remote._completed_materials("j", ["hopg", "wse2", "hbn"]) == ["hopg", "hbn"]
+    assert 's/^completed: //p' in commands[0]
 
 
 def test_remote_scan_rejects_unknown_before_busy_or_sync(monkeypatch):
@@ -557,35 +615,37 @@ def test_remote_check_refuses_when_a_zhai_job_is_already_live(monkeypatch):
         remote.remote_check()
 
 
-def test_remote_check_syncs_runs_and_pulls(monkeypatch):
-    calls = []
-    monkeypatch.setattr(remote, "_live_jobs", lambda: [])
-    monkeypatch.setattr(remote, "sync_code", lambda: calls.append("sync"))
-    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: calls.append(("run", cmd)))
-    monkeypatch.setattr(remote, "pull_zhai_cache", lambda: calls.append("pull"))
+def test_foreground_check_submits_then_attaches_and_pulls(monkeypatch):
+    events = []
+    monkeypatch.setattr(remote, "start_zhai_queue", lambda **_kw: events.append("start") or "j")
+    monkeypatch.setattr(remote, "attach", lambda jobid: events.append(("attach", jobid)))
+    monkeypatch.setattr(remote, "pull_zhai_cache", lambda: events.append("pull"))
 
-    remote.remote_check(ne=11, ne_brem=3, ne_supp=5, tmd_azimuth=35.0, refresh=True)
+    remote.remote_check(no_sync=True)
 
-    assert calls[0] == "sync"
-    assert calls[1][0] == "run"
-    ssh_cmd = calls[1][1]
-    assert ssh_cmd[:3] == ["ssh", "-n", remote.HOST]
-    assert "reproduce_zhai.py" in ssh_cmd[3]
-    assert "--ne 11" in ssh_cmd[3] and "--refresh" in ssh_cmd[3]
-    assert "--tmd-azimuth 35.0" in ssh_cmd[3]
-    assert calls[2] == "pull"
+    assert events == ["start", ("attach", "j"), "pull"]
 
 
 def test_remote_check_no_sync_skips_sync(monkeypatch):
     calls = []
-    monkeypatch.setattr(remote, "_live_jobs", lambda: [])
-    monkeypatch.setattr(remote, "sync_code", lambda: calls.append("sync"))
-    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: calls.append("run"))
+    monkeypatch.setattr(remote, "start_zhai_queue", lambda **kw: calls.append(kw) or "j")
+    monkeypatch.setattr(remote, "attach", lambda _jobid: calls.append("attach"))
     monkeypatch.setattr(remote, "pull_zhai_cache", lambda: calls.append("pull"))
 
     remote.remote_check(no_sync=True)
 
-    assert calls == ["run", "pull"]
+    assert calls == [
+        {
+            "ne": 20_000,
+            "ne_brem": 200,
+            "ne_supp": 200,
+            "tmd_azimuth": 0.0,
+            "refresh": False,
+            "no_sync": True,
+        },
+        "attach",
+        "pull",
+    ]
 
 
 def test_pull_zhai_cache_fetches_every_listed_file(monkeypatch, tmp_path):

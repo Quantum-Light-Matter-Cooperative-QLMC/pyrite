@@ -12,9 +12,9 @@ Optional, dev-only tool: it is only useful if you have an ssh host configured
 (default 'qlmc', override via CXR_REMOTE_HOST) to run sweeps on. Every other
 ``cxr`` command works without it.
 
-One-shot (foreground, holds the ssh session open until the sweep finishes):
+One-shot (submit, wait for SLURM, then pull):
 
-    cxr remote scan mose2               # sync code up, run sweep, pull checkpoint
+    cxr remote scan mose2               # sync code up, submit sweep, pull checkpoint
     cxr remote scan mose2 --quick       # tiny grid smoke test
     cxr remote scan mose2 --no-sync     # skip the code upload (code unchanged)
     cxr remote pull mose2 wse2          # fetch existing checkpoints (grid-filtered)
@@ -217,13 +217,15 @@ def sync_code():
 
 
 def remote_scan(material, quick=False, workers=None):
+    """Submit one material through SLURM and follow it to completion.
+
+    This compatibility helper deliberately does not pull: callers that need a
+    checkpoint can apply their own grid/trim policy after it returns.
+    """
     _check_materials([material])
-    cmd = f"cd {REMOTE_DIR} && {REMOTE_UV} run --no-sync python scan.py {material}"
-    if quick:
-        cmd += " --quick"
-    if workers is not None:
-        cmd += f" --workers {workers}"
-    _run(["ssh", "-n", HOST, cmd])
+    jobid = start_queue([material], quick=quick, workers=workers)
+    attach(jobid)
+    return jobid
 
 
 def remote_check(
@@ -234,17 +236,16 @@ def remote_check(
     refresh=False,
     no_sync=False,
 ):
-    """Sync code, run reproduce_zhai.py on the box (populating
-    checkpoints/zhai_reproduction/ there), then pull every cache file back.
-    Foreground: holds the ssh session open until the run finishes."""
-    _refuse_if_busy([ZHAI_STEM], False)
-    if not no_sync:
-        sync_code()
-    cmd = (
-        f"cd {REMOTE_DIR} && {REMOTE_UV} run --no-sync python reproduce_zhai.py"
-        f"{_zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh)}"
+    """Submit the Zhai reproduction through SLURM, follow it, then pull cache."""
+    jobid = start_zhai_queue(
+        ne=ne,
+        ne_brem=ne_brem,
+        ne_supp=ne_supp,
+        tmd_azimuth=tmd_azimuth,
+        refresh=refresh,
+        no_sync=no_sync,
     )
-    _run(["ssh", "-n", HOST, cmd])
+    attach(jobid)
     pull_zhai_cache()
 
 
@@ -323,6 +324,24 @@ def _stems(materials, quick):
     return [f"{m}_quick" if quick else m for m in materials]
 
 
+def _completed_materials(jobid, materials):
+    """Return materials with a successful queue-log completion marker.
+
+    The sequential payload appends one marker only after ``scan.py`` exits
+    successfully. Reading those markers after ``attach`` keeps a
+    warning-and-continue batch from being reported as though every requested
+    checkpoint were available to pull.
+    """
+    _check_shell_tokens([jobid, *materials])
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    completed = set(
+        _ssh_capture(
+            f'D="{jobdir}"; sed -n "s/^completed: //p" "$D/log" 2>/dev/null'
+        ).split()
+    )
+    return [material for material in materials if material in completed]
+
+
 def _queue_script(jobid, materials, quick, workers):
     """CXR payload for one sequential material queue inside a SLURM allocation."""
     flags = ""
@@ -352,6 +371,7 @@ for m in "${{mats[@]}}"; do
     echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
     continue
   fi
+  echo "completed: $m" >> "$JOBDIR/log"
 done
 if [ "$failures" -gt 0 ]; then
   echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
@@ -623,11 +643,13 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
         input=script.replace("\r\n", "\n").encode(),
         check=True,
     )
-    _run(["ssh", "-n", HOST, submit])
+    scheduler_id = _ssh_capture(submit).strip()
+    if not scheduler_id.isdigit():
+        raise SystemExit(f"SLURM submission for job {jobid} returned no scheduler ID")
 
     stems = _stems(materials, quick)
     print(
-        f"\nstarted job {jobid} on {HOST}: {' '.join(materials)}"
+        f"\nsubmitted SLURM job {scheduler_id} as local job {jobid} on {HOST}: {' '.join(materials)}"
         f"{' (quick)' if quick else ''}\n"
         f"  watch:  cxr remote status {jobid}\n"
         f"  logs:   cxr remote logs {jobid} --follow\n"
@@ -671,10 +693,12 @@ def start_zhai_queue(
         input=script.replace("\r\n", "\n").encode(),
         check=True,
     )
-    _run(["ssh", "-n", HOST, submit])
+    scheduler_id = _ssh_capture(submit).strip()
+    if not scheduler_id.isdigit():
+        raise SystemExit(f"SLURM submission for job {jobid} returned no scheduler ID")
 
     print(
-        f"\nstarted zhai job {jobid} on {HOST}\n"
+        f"\nsubmitted SLURM job {scheduler_id} as local Zhai job {jobid} on {HOST}\n"
         f"  watch:  cxr remote status {jobid}\n"
         f"  logs:   cxr remote logs {jobid} --follow\n"
         f"  pull:   cxr remote check --pull   (when state is 'done')"
@@ -893,28 +917,30 @@ def _cli_scan(args):
             "trailing pull would fail after the whole sweep ran. Drop --grid."
         )
     materials = _selected_materials(args, "material")
-    _check_materials(materials)
-    # same checkpoint-collision guard as `start`: a foreground scan and a
-    # detached job writing the same <stem>.pkl would race on its .tmp.
-    _refuse_if_busy(materials, args.quick)
-    if not args.no_sync:
-        sync_code()
-    for material in materials:
-        try:
-            remote_scan(material, args.quick, args.workers)
-        except subprocess.CalledProcessError:
-            print(f"warning: remote scan failed for {material!r}; continuing")
-            continue
-        stem = f"{material}_quick" if args.quick else material
-        # code is already synced above, so the trailing grid-pull skips its own sync
-        # (no_sync=True); forward the same grid/trim flags.
-        pull(
-            [stem],
-            grid=args.grid,
-            drop_wide_brem=args.drop_wide_brem,
-            downcast=args.downcast,
-            no_sync=True,
-        )
+    # `start_queue` validates material tokens, refuses checkpoint collisions,
+    # syncs once, and submits one sequential scheduler job for every material.
+    jobid = start_queue(
+        materials,
+        quick=args.quick,
+        workers=args.workers,
+        no_sync=args.no_sync,
+    )
+    attach(jobid)
+    completed = _completed_materials(jobid, materials)
+    if not completed:
+        print("warning: the SLURM scan produced no successful checkpoints; nothing to pull")
+        return
+    stems = _stems(completed, args.quick)
+    # Code is already synced by the queue, so a grid pull skips its own sync;
+    # preserve the requested grid/trim policy.
+    pull(
+        stems,
+        grid=args.grid,
+        drop_wide_brem=args.drop_wide_brem,
+        downcast=args.downcast,
+        no_sync=True,
+    )
+    for stem in stems:
         print(
             f"\ndone. checkpoints/{stem}.pkl is local; run `cxr analyze {stem}` "
             f"(or run scripts/export_pdf.py) -- all viz/PDF "
@@ -1004,7 +1030,7 @@ def _build_remote_parser(ap):
     sync+run-on-the-box+pull)."""
     sub = ap.add_subparsers(dest="remote_command", required=True)
 
-    s = sub.add_parser("scan", help="sync code, run sweep(s) in the foreground, pull checkpoints")
+    s = sub.add_parser("scan", help="sync code, submit sweep(s), wait, and pull checkpoints")
     s.add_argument("material", nargs="?")
     s.add_argument(
         "-a", "--all", action="store_true", help="run every material in mats_to_sim.toml"
@@ -1021,7 +1047,7 @@ def _build_remote_parser(ap):
 
     st = sub.add_parser(
         "start",
-        help="sync code, launch a DETACHED queue of materials (survives disconnect)",
+        help="sync code and submit a SLURM queue of materials (survives disconnect)",
     )
     st.add_argument("materials", nargs="*", help="one or more crystal keys")
     st.add_argument(
