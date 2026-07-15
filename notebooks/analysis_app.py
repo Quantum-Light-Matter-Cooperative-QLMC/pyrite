@@ -54,7 +54,7 @@ def _():
     except Exception:
         alt.data_transformers.disable_max_rows()
 
-    from cxr_mc.config import PENETRATION_TILT_DEG, default_settings, trajectory_sweep
+    from cxr_mc.config import default_settings, trajectory_sweep
     from cxr_mc.materials import CATALOG
     from cxr_mc.plots import (
         plot_best_spectra,
@@ -92,7 +92,6 @@ def _():
     return (
         CATALOG,
         MaterialSelect,
-        PENETRATION_TILT_DEG,
         build_cases,
         cases_from_results,
         compare_spectrum_chart,
@@ -318,14 +317,84 @@ def _(
 
 
 @app.cell
-def _(mo, records, res, sweep_values):
-    # Penetration tab thickness selector.
-    _thk = sweep_values(res).get("thickness_ang", []) if records(res) else []
-    _opts = {f"{t:g} Å ({t / 1e4:g} µm)": t for t in _thk} or {"— no data —": None}
-    penetration_thickness_ui = mo.ui.dropdown(
-        _opts, value=list(_opts)[-1], label="crystal thickness"
+def _(CATALOG, MATERIAL, mo):
+    # The penetration figures run transport directly, so use the selected
+    # material's configured scan grids instead of requiring a checkpoint.
+    _scan = CATALOG[MATERIAL].scan
+    _energy_values = tuple(float(value) for value in _scan.energy_keV)
+    _thickness_values = tuple(float(value) for value in _scan.thickness_ang)
+    _tilt_values = tuple(float(value) for value in _scan.tilt_deg)
+
+    _source_options = {"material scan grid": "grid", "manual entry": "manual"}
+    penetration_energy_source_ui = mo.ui.dropdown(
+        _source_options, value="grid", label="beam energy source"
     )
-    return (penetration_thickness_ui,)
+    penetration_energy_grid_ui = mo.ui.dropdown(
+        {f"{value:g} keV": value for value in _energy_values},
+        value=f"{_energy_values[0]:g} keV",
+        label="beam energy",
+    )
+    penetration_energy_manual_ui = mo.ui.number(
+        start=1.0, stop=300.0, step=1.0, value=_energy_values[0], label="beam energy (keV)"
+    )
+
+    penetration_thickness_source_ui = mo.ui.dropdown(
+        _source_options, value="grid", label="crystal thickness source"
+    )
+    penetration_thickness_grid_ui = mo.ui.dropdown(
+        {f"{value:g} Å ({value / 1e4:g} µm)": value for value in _thickness_values},
+        value=f"{_thickness_values[0]:g} Å ({_thickness_values[0] / 1e4:g} µm)",
+        label="crystal thickness",
+    )
+    penetration_thickness_manual_ui = mo.ui.number(
+        start=0.001,
+        stop=10.0,
+        step=0.001,
+        value=min(max(_thickness_values[0] / 1e7, 0.001), 10.0),
+        label="crystal thickness (mm)",
+    )
+
+    penetration_tilt_source_ui = mo.ui.dropdown(
+        _source_options, value="grid", label="polar tilt source"
+    )
+    penetration_tilt_grid_ui = mo.ui.dropdown(
+        {f"{value:g} deg": value for value in _tilt_values},
+        value=f"{_tilt_values[0]:g} deg",
+        label="polar tilt",
+    )
+    penetration_tilt_manual_ui = mo.ui.number(
+        start=0.0, stop=89.9, step=0.1, value=_tilt_values[0], label="polar tilt (deg)"
+    )
+
+    penetration_energy_keV = (
+        penetration_energy_grid_ui.value
+        if penetration_energy_source_ui.value == "grid"
+        else penetration_energy_manual_ui.value
+    )
+    penetration_thickness_ang = (
+        penetration_thickness_grid_ui.value
+        if penetration_thickness_source_ui.value == "grid"
+        else penetration_thickness_manual_ui.value * 1e7
+    )
+    penetration_tilt_deg = (
+        penetration_tilt_grid_ui.value
+        if penetration_tilt_source_ui.value == "grid"
+        else penetration_tilt_manual_ui.value
+    )
+    return (
+        penetration_energy_grid_ui,
+        penetration_energy_keV,
+        penetration_energy_manual_ui,
+        penetration_energy_source_ui,
+        penetration_thickness_ang,
+        penetration_thickness_grid_ui,
+        penetration_thickness_manual_ui,
+        penetration_thickness_source_ui,
+        penetration_tilt_deg,
+        penetration_tilt_grid_ui,
+        penetration_tilt_manual_ui,
+        penetration_tilt_source_ui,
+    )
 
 
 @app.cell
@@ -566,27 +635,6 @@ def _(broad_xmax_ui, broad_xmin_ui, narrow_xmax_ui, narrow_xmin_ui):
     x_domain = _domain(narrow_xmin_ui.value, narrow_xmax_ui.value)
     broad_x_domain = _domain(broad_xmin_ui.value, broad_xmax_ui.value)
     return broad_x_domain, x_domain
-
-
-@app.cell
-def _(PENETRATION_TILT_DEG, mo):
-    _angle_opts = {f"{t:g} deg": t for t in PENETRATION_TILT_DEG}
-    penetration_angle_ui = mo.ui.dropdown(
-        _angle_opts, value="15 deg", label="polar tilt (penetration)"
-    )
-    return (penetration_angle_ui,)
-
-
-@app.cell
-def _(mo):
-    # The dense grid draws ONE beam energy at a time (a panel per tilt); the
-    # survival/track views above it already show both energies from
-    # trajectory_sweep's default (30, 60), so this only needs to pick between
-    # those two.
-    penetration_energy_ui = mo.ui.dropdown(
-        {"30 keV": 30.0, "60 keV": 60.0}, value="30 keV", label="beam energy (dense grid)"
-    )
-    return (penetration_energy_ui,)
 
 
 @app.cell
@@ -1297,9 +1345,18 @@ def _(
     MATERIAL,
     build_cases,
     mo,
-    penetration_angle_ui,
-    penetration_energy_ui,
-    penetration_thickness_ui,
+    penetration_energy_grid_ui,
+    penetration_energy_keV,
+    penetration_energy_manual_ui,
+    penetration_energy_source_ui,
+    penetration_thickness_ang,
+    penetration_thickness_grid_ui,
+    penetration_thickness_manual_ui,
+    penetration_thickness_source_ui,
+    penetration_tilt_deg,
+    penetration_tilt_grid_ui,
+    penetration_tilt_manual_ui,
+    penetration_tilt_source_ui,
     penetration_survival_chart,
     plot_trajectory_grid,
     settings,
@@ -1307,42 +1364,79 @@ def _(
     trajectory_sweep,
 ):
     def penetration_tab():
-        _angle = penetration_angle_ui.value
+        _angle = penetration_tilt_deg
         _md = mo.md(
             "Surviving-electron fraction vs depth (one curve per beam energy) and "
             "an interactive low-Ne track cross-section, at the polar tilt selected "
-            "in this tab (default 15 deg, a low nonzero angle -- avoids both the fully-"
-            "normal and grazing-incidence edge cases). These run the cheap CPU-only "
+            "in this tab. These run the cheap CPU-only "
             "transport directly — no checkpoint needed. For a stacked/multilayer "
             "material (e.g. mos2 on sapphire) the cascade is transported through "
-            "the FULL stack, not just the top film. Dense grid loads on expand."
+            "the FULL stack, not just the top film. Manual beam energies above 30 keV "
+            "are exploratory because the free-path fit is documented through 30 keV. "
+            "Dense grid loads on expand."
         )
         _sweep = trajectory_sweep(
             MATERIAL,
-            energies=(30, 60),
-            thickness_ang=penetration_thickness_ui.value,
+            energies=(penetration_energy_keV,),
+            tilts=(penetration_tilt_deg,),
+            thickness_ang=penetration_thickness_ang,
         )
         _traj = build_cases(_sweep, settings.n_electrons, settings.n_electrons_brem)
         if not _traj:
             return mo.vstack([_md, mo.md("*No trajectory cases.*")])
         _survival = penetration_survival_chart(_traj, Ne=500, tilt=_angle)
-        # Pick the lowest energy at the selected tilt for the single-track view.
+        # The sweep has one selected energy and tilt; keep the nearest-case guard
+        # in case a future sweep adds a surrounding grid.
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
         _track = trajectory_chart(_nc, Ne=40)
         _parts = [
             _md,
-            mo.hstack([penetration_angle_ui, penetration_thickness_ui, penetration_energy_ui]),
+            mo.vstack(
+                [
+                    mo.hstack(
+                        [
+                            penetration_energy_source_ui,
+                            (
+                                penetration_energy_grid_ui
+                                if penetration_energy_source_ui.value == "grid"
+                                else penetration_energy_manual_ui
+                            ),
+                        ]
+                    ),
+                    mo.hstack(
+                        [
+                            penetration_thickness_source_ui,
+                            (
+                                penetration_thickness_grid_ui
+                                if penetration_thickness_source_ui.value == "grid"
+                                else penetration_thickness_manual_ui
+                            ),
+                        ]
+                    ),
+                    mo.hstack(
+                        [
+                            penetration_tilt_source_ui,
+                            (
+                                penetration_tilt_grid_ui
+                                if penetration_tilt_source_ui.value == "grid"
+                                else penetration_tilt_manual_ui
+                            ),
+                        ]
+                    ),
+                ]
+            ),
             *(p for p in (_survival, _track) if p is not None),
         ]
 
         def _dense_grid():
             _dense_sweep = trajectory_sweep(
                 MATERIAL,
-                energies=(30, 60),
-                thickness_ang=penetration_thickness_ui.value,
+                energies=(penetration_energy_keV,),
+                tilts=(penetration_tilt_deg,),
+                thickness_ang=penetration_thickness_ang,
             )
             _dense_traj = build_cases(_dense_sweep, settings.n_electrons, settings.n_electrons_brem)
-            return plot_trajectory_grid(_dense_traj, energy=penetration_energy_ui.value, Ne=120)
+            return plot_trajectory_grid(_dense_traj, energy=penetration_energy_keV, Ne=120)
 
         _parts.append(
             mo.accordion(

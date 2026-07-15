@@ -5,28 +5,29 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from cxr_mc.config import PENETRATION_TILT_DEG
-
 APP = Path(__file__).parents[1] / "notebooks" / "analysis_app.py"
 
 
-def test_penetration_dropdown_default_is_one_of_configured_angles() -> None:
-    tree = ast.parse(APP.read_text())
+def test_penetration_controls_read_the_active_material_scan() -> None:
+    source = APP.read_text()
 
-    dropdown = next(
-        call
-        for cell in ast.walk(tree)
-        if isinstance(cell, ast.FunctionDef)
-        and any(arg.arg == "PENETRATION_TILT_DEG" for arg in cell.args.args)
-        for call in ast.walk(cell)
-        if isinstance(call, ast.Call)
-        and isinstance(call.func, ast.Attribute)
-        and call.func.attr == "dropdown"
-    )
-    default = next(keyword.value for keyword in dropdown.keywords if keyword.arg == "value")
+    assert "def _(CATALOG, MATERIAL, mo):" in source
+    assert "_scan = CATALOG[MATERIAL].scan" in source
 
-    configured_options = {f"{tilt:g} deg" for tilt in PENETRATION_TILT_DEG}
-    assert ast.literal_eval(default) in configured_options
+
+def test_penetration_controls_offer_material_presets_and_bounded_manual_values() -> None:
+    source = APP.read_text()
+
+    for grid in ("scan.energy_keV", "scan.thickness_ang", "scan.tilt_deg"):
+        assert grid in source
+    for bound in ("start=1.0", "stop=300.0", "start=0.001", "stop=10.0", "stop=89.9"):
+        assert bound in source
+    for name in (
+        "penetration_energy_keV",
+        "penetration_thickness_ang",
+        "penetration_tilt_deg",
+    ):
+        assert name in source
 
 
 def test_material_menu_uses_checkpoint_helper_and_custom_select() -> None:
