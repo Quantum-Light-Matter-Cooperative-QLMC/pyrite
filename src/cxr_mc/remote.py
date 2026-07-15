@@ -67,6 +67,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import uuid
 from pathlib import Path
 
 from .materials import CATALOG
@@ -333,6 +334,12 @@ def _stems(materials, quick):
     return [f"{m}_quick" if quick else m for m in materials]
 
 
+def _new_jobid() -> str:
+    """Return a collision-resistant, shell-safe local job directory name."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"{timestamp}-{uuid.uuid4().hex[:8]}"
+
+
 def _completed_materials(jobid, materials):
     """Return materials with a successful queue-log completion marker.
 
@@ -570,11 +577,66 @@ def _zhai_queue_metadata(jobid, ne, ne_brem, ne_supp):
 
 
 def _write_job_script_command(jobdir, metadata):
-    """Create a job directory, persist static metadata, and receive run.sh on stdin."""
+    """Exclusively create a job directory, then receive its script on stdin."""
     return (
-        f"mkdir -p '{jobdir}' && cat > '{jobdir}/run.sh' && "
+        f"mkdir '{jobdir}' && cat > '{jobdir}/run.sh' && "
         f"printf %s {shlex.quote(metadata)} > '{jobdir}/meta'"
     )
+
+
+def _stage_job_script(jobid: str, stems: list[str], upload: str, script: str) -> None:
+    """Reserve stems and upload a batch script, releasing on upload failure."""
+    _run(["ssh", "-n", HOST, _reserve_checkpoint_stems_command(jobid, stems)])
+    try:
+        subprocess.run(
+            ["ssh", HOST, upload],
+            input=script.replace("\r\n", "\n").encode(),
+            check=True,
+        )
+    except BaseException:
+        _run(["ssh", "-n", HOST, _release_checkpoint_stems_command(jobid, stems)])
+        raise
+
+
+def _submission_outcome(jobid: str) -> str:
+    """Classify a submission whose SSH response was lost, conservatively."""
+    _check_shell_tokens([jobid])
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    remote = (
+        f'D="{jobdir}"; '
+        '[ -d "$D" ] || { echo missing; exit 0; }; '
+        'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
+        'case "$SID" in *[!0-9]*|\'\') ;; *) echo submitted; exit 0 ;; esac; '
+        'STATE=$(cat "$D/state" 2>/dev/null || true); '
+        'case "$STATE" in '
+        '"FAILED (sbatch submission)"*) echo failed ;; '
+        'queued*|running*|cancelling*) echo pending ;; '
+        '*) echo unknown ;; esac'
+    )
+    return _ssh_capture(remote).strip()
+
+
+def _release_if_submission_definitely_failed(jobid: str, stems: list[str]) -> None:
+    """Release staging locks only after remote state proves ``sbatch`` failed."""
+    try:
+        definitely_failed = _submission_outcome(jobid) == "failed"
+    except BaseException:
+        return
+    if definitely_failed:
+        _run(["ssh", "-n", HOST, _release_checkpoint_stems_command(jobid, stems)])
+
+
+def _submit_staged_job(jobid: str, stems: list[str]) -> str:
+    """Submit an uploaded script without freeing locks after an ambiguous SSH loss."""
+    try:
+        scheduler_id = _ssh_capture(_submit_slurm_command(jobid, stems)).strip()
+    except BaseException:
+        _release_if_submission_definitely_failed(jobid, stems)
+        raise
+    if not scheduler_id.isdigit():
+        _release_if_submission_definitely_failed(jobid, stems)
+        raise SystemExit(f"SLURM submission for job {jobid} returned no scheduler ID")
+    return scheduler_id
 
 
 def _live_jobs():
@@ -708,7 +770,7 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
     _check_materials(materials)
     if not dry_run:
         _refuse_if_busy(materials, quick)
-    jobid = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    jobid = _new_jobid()
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     stems = _stems(materials, quick)
     payload = _queue_script(jobid, materials, quick, workers)
@@ -729,22 +791,11 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
 
     if not no_sync:
         sync_code()
-    _run(["ssh", "-n", HOST, _reserve_checkpoint_stems_command(jobid, stems)])
     # create the job dir and write run.sh (script piped over stdin).
     # Send as LF-only bytes: text=True on Windows translates \n->\r\n,
     # which produces a CRLF run.sh that bash silently refuses to execute.
-    try:
-        subprocess.run(
-            ["ssh", HOST, upload],
-            input=script.replace("\r\n", "\n").encode(),
-            check=True,
-        )
-    except subprocess.CalledProcessError:
-        _run(["ssh", "-n", HOST, _release_checkpoint_stems_command(jobid, stems)])
-        raise
-    scheduler_id = _ssh_capture(submit).strip()
-    if not scheduler_id.isdigit():
-        raise SystemExit(f"SLURM submission for job {jobid} returned no scheduler ID")
+    _stage_job_script(jobid, stems, upload, script)
+    scheduler_id = _submit_staged_job(jobid, stems)
 
     print(
         f"\nsubmitted SLURM job {scheduler_id} as local job {jobid} on {HOST}: {' '.join(materials)}"
@@ -768,7 +819,7 @@ def start_zhai_queue(
     """Submit a Zhai-reproduction batch job to SLURM. Returns the local job id."""
     if not dry_run:
         _refuse_if_busy([ZHAI_STEM], False)
-    jobid = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    jobid = _new_jobid()
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     stems = [ZHAI_STEM]
     payload = _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh)
@@ -789,19 +840,8 @@ def start_zhai_queue(
 
     if not no_sync:
         sync_code()
-    _run(["ssh", "-n", HOST, _reserve_checkpoint_stems_command(jobid, stems)])
-    try:
-        subprocess.run(
-            ["ssh", HOST, upload],
-            input=script.replace("\r\n", "\n").encode(),
-            check=True,
-        )
-    except subprocess.CalledProcessError:
-        _run(["ssh", "-n", HOST, _release_checkpoint_stems_command(jobid, stems)])
-        raise
-    scheduler_id = _ssh_capture(submit).strip()
-    if not scheduler_id.isdigit():
-        raise SystemExit(f"SLURM submission for job {jobid} returned no scheduler ID")
+    _stage_job_script(jobid, stems, upload, script)
+    scheduler_id = _submit_staged_job(jobid, stems)
 
     print(
         f"\nsubmitted SLURM job {scheduler_id} as local Zhai job {jobid} on {HOST}\n"
@@ -941,8 +981,12 @@ def _stop_jobid(jobid):
         f'D="{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"; '
         f'scancel {scheduler_id} || exit $?; '
         f'echo "cancelling [{scheduler_id}] $(date -Is)" > "$D/state"; '
-        f'while squeue -h -j {scheduler_id} -o \'%T\' | grep -q \'[^[:space:]]\'; '
-        'do sleep 1; done; '
+        'while :; do '
+        f'S=$(squeue -h -j {scheduler_id} -o \'%T\'); STATUS=$?; '
+        'if [ "$STATUS" -ne 0 ]; then '
+        'echo "could not confirm SLURM cancellation; keeping checkpoint reservations" >&2; '
+        'exit "$STATUS"; fi; '
+        '[ -n "$S" ] || break; sleep 1; done; '
         f'{release}; '
         f'echo "cancelled [{scheduler_id}] $(date -Is)" > "$D/state"; '
         f'echo "cancelled SLURM job {scheduler_id} for job {jobid}"'

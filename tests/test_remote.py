@@ -6,8 +6,10 @@ exception is the clear-listing regression test, which executes the box-side
 shell snippet under a local bash (skipped when bash is unavailable)."""
 
 import argparse
+import os
 import shutil
 import subprocess
+from types import SimpleNamespace
 
 import pytest
 
@@ -79,6 +81,44 @@ def test_submit_command_uses_sbatch_parsable_and_records_scheduler_id():
     assert "nohup" not in command and "setsid" not in command
 
 
+def test_same_second_starters_use_unique_exclusive_job_directories(monkeypatch):
+    """Two submitters must not overwrite a shared second-resolution job dir."""
+
+    real_datetime = remote.datetime.datetime
+
+    class FixedDatetime:
+        @classmethod
+        def now(cls):
+            return real_datetime(2026, 7, 15, 12, 0, 0)
+
+    suffixes = iter(["a" * 32, "b" * 32])
+    uploads = []
+    monkeypatch.setattr(remote.datetime, "datetime", FixedDatetime)
+    monkeypatch.setattr(
+        remote,
+        "uuid",
+        SimpleNamespace(uuid4=lambda: SimpleNamespace(hex=next(suffixes))),
+        raising=False,
+    )
+    monkeypatch.setattr(remote, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(remote, "_run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        remote.subprocess,
+        "run",
+        lambda command, **_kwargs: uploads.append(command) or SimpleNamespace(returncode=0),
+    )
+    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "48291\n")
+
+    first = remote.start_queue(["hopg"], no_sync=True)
+    second = remote.start_queue(["hbn"], no_sync=True)
+
+    assert first == "20260715-120000-aaaaaaaa"
+    assert second == "20260715-120000-bbbbbbbb"
+    assert first != second
+    assert all("mkdir -p" not in upload[-1] for upload in uploads)
+    assert all("mkdir '" in upload[-1] for upload in uploads)
+
+
 def test_checkpoint_reservation_rejects_a_second_stager_for_the_same_stem(monkeypatch, tmp_path):
     """The remote ``mkdir`` lock closes the gap between a busy check and sbatch."""
     monkeypatch.setattr(remote, "REMOTE_DIR", str(tmp_path))
@@ -127,8 +167,44 @@ def test_stop_waits_for_scheduler_cancellation_before_releasing_reservations(mon
 
     command = commands[0][-1]
     assert "scancel 48291" in command
-    assert "while squeue" in command
+    assert "S=$(squeue -h -j 48291 -o '%T')" in command
+    assert 'if [ "$STATUS" -ne 0 ]' in command
     assert 'cat "$d/jobid"' in command
+
+
+def test_stop_retains_reservations_if_squeue_cancellation_query_fails(monkeypatch, tmp_path):
+    """A failed scheduler query must not look like successful cancellation."""
+    jobdir = tmp_path / "jobs" / "j"
+    reservation = tmp_path / "jobs" / "reservations" / "hopg"
+    jobdir.mkdir(parents=True)
+    reservation.mkdir(parents=True)
+    (jobdir / "state").write_text("running\n")
+    (reservation / "jobid").write_text("j\n")
+    commands = tmp_path / "bin"
+    commands.mkdir()
+    (commands / "scancel").write_text("#!/bin/sh\nexit 0\n")
+    (commands / "squeue").write_text("#!/bin/sh\nexit 7\n")
+    (commands / "scancel").chmod(0o755)
+    (commands / "squeue").chmod(0o755)
+
+    monkeypatch.setattr(remote, "REMOTE_DIR", str(tmp_path))
+    monkeypatch.setattr(remote, "_slurm_job_id", lambda _jobid: "48291")
+    monkeypatch.setattr(remote, "_slurm_state", lambda _scheduler_id: "RUNNING")
+
+    def run_remote(command, **_kwargs):
+        subprocess.run(
+            ["bash", "-c", command[-1]],
+            check=True,
+            env={**os.environ, "PATH": f"{commands}:{os.environ['PATH']}"},
+        )
+
+    monkeypatch.setattr(remote, "_run", run_remote)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        remote._stop_jobid("j")
+
+    assert reservation.exists()
+    assert (jobdir / "state").read_text().startswith("cancelling")
 
 
 def test_remote_dry_run_describes_sbatch_submission(monkeypatch, capsys):
@@ -191,6 +267,49 @@ def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
     remote.start_queue(["hopg"], no_sync=True)
 
     assert "submitted SLURM job 48291" in capsys.readouterr().out
+
+
+def test_interrupted_job_upload_releases_its_checkpoint_reservations(monkeypatch):
+    commands = []
+    monkeypatch.setattr(remote, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(remote, "_run", lambda command, **_kwargs: commands.append(command))
+    monkeypatch.setattr(
+        remote.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(KeyboardInterrupt),
+    )
+    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: pytest.fail("must not submit"))
+
+    with pytest.raises(KeyboardInterrupt):
+        remote.start_queue(["hopg"], no_sync=True)
+
+    assert len(commands) == 2
+    assert 'J="' in commands[-1][-1]
+    assert 'if [ "$(cat "$R/hopg/jobid"' in commands[-1][-1]
+
+
+def test_ambiguous_submit_failure_inspects_queued_state_and_keeps_reservations(monkeypatch):
+    commands = []
+    captures = []
+    monkeypatch.setattr(remote, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(remote, "_run", lambda command, **_kwargs: commands.append(command))
+    monkeypatch.setattr(remote.subprocess, "run", lambda *_args, **_kwargs: None)
+
+    def capture(command):
+        captures.append(command)
+        if "sbatch --parsable" in command:
+            raise SystemExit("ssh command failed (exit 255)")
+        return "queued\n"
+
+    monkeypatch.setattr(remote, "_ssh_capture", capture)
+
+    with pytest.raises(SystemExit, match="ssh command failed"):
+        remote.start_queue(["hopg"], no_sync=True)
+
+    assert len(captures) == 2
+    assert "slurm_job_id" in captures[-1]
+    assert 'cat "$D/state"' in captures[-1]
+    assert len(commands) == 1  # reservation remains while queued submission is ambiguous
 
 
 def test_slurm_job_id_reads_recorded_scheduler_id(monkeypatch):
