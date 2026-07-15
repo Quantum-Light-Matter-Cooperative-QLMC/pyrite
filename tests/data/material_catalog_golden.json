@@ -18,6 +18,8 @@
     "tis2",
     "tise2",
     "black_phosphorus",
+    "4h_sic",
+    "6h_sic",
     "ptse2",
     "pts2",
     "pdse2",
@@ -44,6 +46,8 @@
     "tis2",
     "tise2",
     "black_phosphorus",
+    "4h_sic",
+    "6h_sic",
     "ptse2",
     "pts2",
     "pdse2",
@@ -78,6 +82,8 @@
     "tis2",
     "tise2",
     "black_phosphorus",
+    "4h_sic",
+    "6h_sic",
     "ws2",
     "mos2",
     "mos2-on-sio2-si",
@@ -2223,6 +2229,320 @@
             1,
             0,
             -1
+          ]
+        ]
+      }
+    },
+    "4h_sic": {
+      "lattice": {
+        "system": "general",
+        "a": 3.07993,
+        "b": 3.07993,
+        "c": 10.08222,
+        "alpha": 90.0,
+        "beta": 90.0,
+        "gamma": 119.99999999999999
+      },
+      "basis": [
+        [
+          "C",
+          [
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        [
+          "C",
+          [
+            0.0,
+            0.0,
+            0.5
+          ]
+        ],
+        [
+          "C",
+          [
+            0.3333333333333333,
+            0.6666666666666667,
+            0.25
+          ]
+        ],
+        [
+          "C",
+          [
+            0.6666666666666667,
+            0.3333333333333333,
+            0.75
+          ]
+        ],
+        [
+          "Si",
+          [
+            0.0,
+            0.0,
+            0.1875
+          ]
+        ],
+        [
+          "Si",
+          [
+            0.0,
+            0.0,
+            0.6875
+          ]
+        ],
+        [
+          "Si",
+          [
+            0.3333333333333333,
+            0.6666666666666667,
+            0.4375
+          ]
+        ],
+        [
+          "Si",
+          [
+            0.6666666666666667,
+            0.3333333333333333,
+            0.9375
+          ]
+        ]
+      ],
+      "V_cell": 82.82634434238643,
+      "mosaic_fwhm_deg": null,
+      "composition": [
+        [
+          "C",
+          0.04829381317935334
+        ],
+        [
+          "Si",
+          0.04829381317935334
+        ]
+      ],
+      "config": {
+        "B_ang2": 0.6,
+        "beam_uvw": [
+          0,
+          0,
+          1
+        ],
+        "E_grid": {
+          "shape": [
+            984
+          ],
+          "sha256": "71ac56940f146cd15acd2e2b285a6c678e8b5ce322fcece601e70e09a101a915"
+        },
+        "hkl_list": [
+          [
+            0,
+            0,
+            4
+          ],
+          [
+            0,
+            0,
+            -4
+          ]
+        ],
+        "hkl_reason": "Pin the basal 4H-SiC (0004) symmetric cut so the reciprocal vector remains parallel to the c-axis-normal slab.",
+        "layers_per_cell": null
+      },
+      "physics": {
+        "hkl": [
+          0,
+          0,
+          4
+        ],
+        "g_mag": 2.492778498060779,
+        "structure_factor": [
+          17.8083601607037,
+          -33.43717698434119
+        ],
+        "dominant_reflections": [
+          [
+            0,
+            0,
+            4
+          ],
+          [
+            0,
+            0,
+            -4
+          ]
+        ]
+      }
+    },
+    "6h_sic": {
+      "lattice": {
+        "system": "general",
+        "a": 3.0810000000000004,
+        "b": 3.081,
+        "c": 15.1248,
+        "alpha": 90.0,
+        "beta": 90.0,
+        "gamma": 119.99999999999999
+      },
+      "basis": [
+        [
+          "C",
+          [
+            0.0,
+            0.0,
+            0.3746
+          ]
+        ],
+        [
+          "C",
+          [
+            0.0,
+            0.0,
+            0.8746
+          ]
+        ],
+        [
+          "C",
+          [
+            0.3333333333333333,
+            0.6666666666666667,
+            0.0412
+          ]
+        ],
+        [
+          "C",
+          [
+            0.3333333333333333,
+            0.6666666666666667,
+            0.708
+          ]
+        ],
+        [
+          "C",
+          [
+            0.6666666666666667,
+            0.3333333333333333,
+            0.208
+          ]
+        ],
+        [
+          "C",
+          [
+            0.6666666666666667,
+            0.3333333333333333,
+            0.5412
+          ]
+        ],
+        [
+          "Si",
+          [
+            0.0,
+            0.0,
+            0.0
+          ]
+        ],
+        [
+          "Si",
+          [
+            0.0,
+            0.0,
+            0.5
+          ]
+        ],
+        [
+          "Si",
+          [
+            0.3333333333333333,
+            0.6666666666666667,
+            0.1664
+          ]
+        ],
+        [
+          "Si",
+          [
+            0.3333333333333333,
+            0.6666666666666667,
+            0.8329
+          ]
+        ],
+        [
+          "Si",
+          [
+            0.6666666666666667,
+            0.3333333333333333,
+            0.3329
+          ]
+        ],
+        [
+          "Si",
+          [
+            0.6666666666666667,
+            0.3333333333333333,
+            0.6664
+          ]
+        ]
+      ],
+      "V_cell": 124.33794030642834,
+      "mosaic_fwhm_deg": null,
+      "composition": [
+        [
+          "C",
+          0.048255584620535946
+        ],
+        [
+          "Si",
+          0.048255584620535946
+        ]
+      ],
+      "config": {
+        "B_ang2": 0.6,
+        "beam_uvw": [
+          0,
+          0,
+          1
+        ],
+        "E_grid": {
+          "shape": [
+            984
+          ],
+          "sha256": "71ac56940f146cd15acd2e2b285a6c678e8b5ce322fcece601e70e09a101a915"
+        },
+        "hkl_list": [
+          [
+            0,
+            0,
+            6
+          ],
+          [
+            0,
+            0,
+            -6
+          ]
+        ],
+        "hkl_reason": "Pin the basal 6H-SiC (0006) symmetric cut so the reciprocal vector remains parallel to the c-axis-normal slab.",
+        "layers_per_cell": null
+      },
+      "physics": {
+        "hkl": [
+          0,
+          0,
+          6
+        ],
+        "g_mag": 2.49253622150888,
+        "structure_factor": [
+          50.52185646826415,
+          26.270247833868616
+        ],
+        "dominant_reflections": [
+          [
+            0,
+            0,
+            6
+          ],
+          [
+            0,
+            0,
+            -6
           ]
         ]
       }
@@ -4623,6 +4943,96 @@
             2984
           ],
           "sha256": "bf1d50c08e6ab4634d145afffa14004c85b72f133498b4fcb29686724ff7df53"
+        },
+        "E_grid_brem": {
+          "shape": [
+            1200
+          ],
+          "sha256": "79f8f20c412aa260b3f00a9e0cb7c2e01c140a18067e9f5fe5e8c9aab64638d2"
+        }
+      },
+      "substrate": null,
+      "stack": []
+    },
+    "4h_sic": {
+      "label": "4H-SiC (0004)",
+      "profile": "standard",
+      "crystal_key": "4h_sic",
+      "scan": {
+        "thickness_ang": {
+          "shape": [
+            1
+          ],
+          "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+        },
+        "energy_keV": {
+          "shape": [
+            5
+          ],
+          "sha256": "6563222d2205af55db24ee0e9ffe4f62da7092d37ba7341079b78371cd735a11"
+        },
+        "tilt_deg": {
+          "shape": [
+            20
+          ],
+          "sha256": "9f7c9944f5f950c13e8efe53a8b8180f54a7b1699c5ff2feb5ac4fdb22886e2c"
+        },
+        "tilt_azim_deg": {
+          "shape": [
+            15
+          ],
+          "sha256": "7273802342839bc1553cca81a039811bdbbeac0b512ec632396caa5a92d35eea"
+        },
+        "E_grid_line": {
+          "shape": [
+            984
+          ],
+          "sha256": "71ac56940f146cd15acd2e2b285a6c678e8b5ce322fcece601e70e09a101a915"
+        },
+        "E_grid_brem": {
+          "shape": [
+            1200
+          ],
+          "sha256": "79f8f20c412aa260b3f00a9e0cb7c2e01c140a18067e9f5fe5e8c9aab64638d2"
+        }
+      },
+      "substrate": null,
+      "stack": []
+    },
+    "6h_sic": {
+      "label": "6H-SiC (0006)",
+      "profile": "standard",
+      "crystal_key": "6h_sic",
+      "scan": {
+        "thickness_ang": {
+          "shape": [
+            1
+          ],
+          "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+        },
+        "energy_keV": {
+          "shape": [
+            5
+          ],
+          "sha256": "6563222d2205af55db24ee0e9ffe4f62da7092d37ba7341079b78371cd735a11"
+        },
+        "tilt_deg": {
+          "shape": [
+            20
+          ],
+          "sha256": "9f7c9944f5f950c13e8efe53a8b8180f54a7b1699c5ff2feb5ac4fdb22886e2c"
+        },
+        "tilt_azim_deg": {
+          "shape": [
+            15
+          ],
+          "sha256": "7273802342839bc1553cca81a039811bdbbeac0b512ec632396caa5a92d35eea"
+        },
+        "E_grid_line": {
+          "shape": [
+            984
+          ],
+          "sha256": "71ac56940f146cd15acd2e2b285a6c678e8b5ce322fcece601e70e09a101a915"
         },
         "E_grid_brem": {
           "shape": [
