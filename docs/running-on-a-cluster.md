@@ -117,7 +117,8 @@ checkpoint. `cxr remote start hopg wse2` syncs, submits, and returns immediately
 Multi-material runs start two material scans concurrently by default; use
 `--parallel-materials 3` for workloads measured to fit concurrently, `1` for
 serial execution, or at most `4`. Use `cxr remote status`, `cxr remote logs --follow`,
-or `cxr remote attach` to monitor the allocation. `cxr remote stop ...` cancels
-an active allocation with `scancel`. `cxr remote check` follows the same
-submit-and-wait workflow for its validation calculation;
+or `cxr remote attach` to monitor the allocation. `attach` shows an independent
+case-progress bar for each material; `logs --follow` shows the raw shared job log.
+`cxr remote stop ...` cancels an active allocation with `scancel`. `cxr remote
+check` follows the same submit-and-wait workflow for its validation calculation;
 `cxr remote check --detached` returns after submission.

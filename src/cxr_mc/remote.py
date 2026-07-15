@@ -45,10 +45,11 @@ materials with bounded concurrency (two `scan.py` processes by default),
 writing meta/state/log and its scheduler ID into the job dir.
 
 The SLURM job is independent of the submission SSH connection, so the SSH link
-is only ever a VIEWER. `--follow` (or `attach`) streams the log live and exits
-when the job finishes; to DISCONNECT, just Ctrl-C (or close the terminal / drop
-the link) -- that tears down the viewer only, and the job runs to completion.
-Reconnect any time with `attach`/`status`/`logs`, then `pull` once state is `done`.
+is only ever a VIEWER. `attach` renders one local case-progress bar per material;
+`logs --follow` remains the raw shared diagnostic stream. Both exit when the job
+finishes. To DISCONNECT, just Ctrl-C (or close the terminal / drop the link) --
+that tears down the viewer only, and the job runs to completion. Reconnect any
+time with `attach`/`status`/`logs`, then `pull` once state is `done`.
 
 Then locally: run ``cxr analyze <material>`` or ``scripts/export_pdf.py``.
 
@@ -60,6 +61,7 @@ Override the box via env: CXR_REMOTE_HOST / CXR_REMOTE_DIR / CXR_REMOTE_UV.
 import argparse
 import datetime
 import io
+import json
 import os
 import re
 import shlex
@@ -67,8 +69,11 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 import uuid
 from pathlib import Path
+
+from tqdm import tqdm
 
 from .materials import CATALOG
 from .scan import load_all_materials
@@ -390,6 +395,7 @@ def _queue_script(
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     return f"""JOBDIR="{jobdir}"
 cd "{REMOTE_DIR}" || exit 1
+mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 mats=({mats})
@@ -404,7 +410,8 @@ run_material() {{
   echo "running $m [$i/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$i" "$total" "$m" "$(date -Is)" \
 >> "$JOBDIR/log"
-  if ! {REMOTE_UV} run --no-sync python scan.py "$m"{flags} >> "$JOBDIR/log" 2>&1
+  if ! {REMOTE_UV} run --no-sync python scan.py "$m"{flags} \
+    --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: scan failed for $m; continuing" >> "$JOBDIR/log"
     echo "warning at $m [$i/$total] $(date -Is)" > "$JOBDIR/state"
@@ -605,6 +612,7 @@ def _queue_metadata(
             f"quick: {bool(quick)}",
             f"workers: {workers}",
             f"parallel_materials: {parallel_materials}",
+            "progress_dashboard: True",
             "",
         ]
     )
@@ -789,6 +797,16 @@ def _job_state(jobid: str) -> str:
     _check_shell_tokens([jobid])
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     return _ssh_capture(f'cat "{jobdir}/state" 2>/dev/null').strip()
+
+
+def _job_metadata(jobid: str) -> str:
+    """Return the persisted queue metadata for attach-mode selection."""
+    _check_shell_tokens([jobid])
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    return _ssh_capture(
+        f'D="{jobdir}"; [ -d "$D" ] || {{ echo "no such job: {jobid}" >&2; exit 1; }}; '
+        'cat "$D/meta" 2>/dev/null'
+    )
 
 
 def _job_succeeded(jobid: str) -> bool:
@@ -1081,11 +1099,77 @@ def _disconnect_hint(jobid):
     )
 
 
-def attach(jobid=None):
-    """Live-track a job: stream its log until it finishes, then print the final
-    state. Disconnecting -- Ctrl-C, closing the terminal, or a dropped ssh --
-    tears down the VIEWER only; the SLURM job keeps running regardless. Defaults
-    to the most recent job."""
+def _metadata_value(metadata, key):
+    prefix = f"{key}: "
+    values = [line[len(prefix) :] for line in metadata.splitlines() if line.startswith(prefix)]
+    return values[-1] if values else None
+
+
+def _parse_progress_records(payload):
+    """Parse complete one-line JSON records, ignoring malformed snapshots."""
+    records = {}
+    for line in payload.splitlines():
+        try:
+            record = json.loads(line)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(record, dict):
+            continue
+        material = record.get("material")
+        total = record.get("total_cases")
+        cached = record.get("cached_cases")
+        completed = record.get("completed_new_cases")
+        state = record.get("state")
+        if not isinstance(material, str) or not _SHELL_TOKEN_RE.fullmatch(material):
+            continue
+        if not isinstance(total, int) or isinstance(total, bool):
+            continue
+        if not isinstance(cached, int) or isinstance(cached, bool):
+            continue
+        if not isinstance(completed, int) or isinstance(completed, bool):
+            continue
+        if total < 0 or cached < 0 or completed < 0 or cached + completed > total:
+            continue
+        if state not in {"running", "done", "failed"}:
+            continue
+        records[material] = record
+    return records
+
+
+def _read_progress_records(jobid):
+    """Read every complete per-material record in a job directory."""
+    _check_shell_tokens([jobid])
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    payload = _ssh_capture(
+        f'D="{jobdir}"; for f in "$D"/progress/*.json; do '
+        '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done'
+    )
+    return _parse_progress_records(payload)
+
+
+def _update_progress_bars(bars, records):
+    """Apply the latest independent material snapshots to local tqdm bars."""
+    for material, bar in bars.items():
+        record = records.get(material)
+        if record is None:
+            continue
+        bar.total = record["total_cases"]
+        bar.n = record["cached_cases"] + record["completed_new_cases"]
+        bar.set_description_str(f"{material}: {record['state']}", refresh=False)
+        bar.set_postfix(
+            cached=record["cached_cases"],
+            new=record["completed_new_cases"],
+            refresh=False,
+        )
+        bar.refresh()
+
+
+def _attach_log_stream(jobid=None):
+    """Use the original raw-log viewer for a job without progress records.
+
+    Disconnecting the viewer leaves the SLURM allocation running. Defaults to
+    the most recent job when called directly.
+    """
     jobid = jobid or _latest_jobid()
     if not jobid:
         raise SystemExit("no jobs to attach to (start one: cxr remote start <materials>)")
@@ -1122,6 +1206,58 @@ def attach(jobid=None):
         _disconnect_hint(jobid)
         return False
     return True
+
+
+def _attach_progress_dashboard(jobid, metadata):
+    """Poll one new-style job and render its material records locally."""
+    materials = (_metadata_value(metadata, "materials") or "").split()
+    scheduler_id = _metadata_value(metadata, "slurm_job_id") or ""
+    if not materials or not scheduler_id.isdigit():
+        raise SystemExit(f"job {jobid} has incomplete progress metadata")
+
+    bars = {
+        material: tqdm(
+            total=None,
+            desc=f"{material}: pending",
+            unit="case",
+            position=position,
+            leave=True,
+            dynamic_ncols=True,
+        )
+        for position, material in enumerate(materials)
+    }
+    print(f"attached to job {jobid} on {HOST} -- Ctrl-C to disconnect (the job keeps running).")
+    interrupted = False
+    try:
+        while True:
+            _update_progress_bars(bars, _read_progress_records(jobid))
+            if _slurm_state(scheduler_id) is None:
+                break
+            time.sleep(2)
+        _update_progress_bars(bars, _read_progress_records(jobid))
+    except KeyboardInterrupt:
+        interrupted = True
+    finally:
+        for bar in bars.values():
+            bar.close()
+    if interrupted:
+        _disconnect_hint(jobid)
+        return False
+    print("\n--- job finished ---")
+    print(_job_state(jobid))
+    return True
+
+
+def attach(jobid=None):
+    """Track a job with per-material progress or legacy raw-log streaming."""
+    jobid = jobid or _latest_jobid()
+    if not jobid:
+        raise SystemExit("no jobs to attach to (start one: cxr remote start <materials>)")
+    _check_shell_tokens([jobid])
+    metadata = _job_metadata(jobid)
+    if _metadata_value(metadata, "progress_dashboard") == "True":
+        return _attach_progress_dashboard(jobid, metadata)
+    return _attach_log_stream(jobid)
 
 
 def _stop_jobid(jobid):

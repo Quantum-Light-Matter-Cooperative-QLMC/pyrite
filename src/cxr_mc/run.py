@@ -116,6 +116,7 @@ def run_sweep(
     progress=True,
     group_key=None,
     on_chunk=None,
+    on_progress=None,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
@@ -140,6 +141,8 @@ def run_sweep(
         azimuth at once.
     on_chunk : optional callback(list_of_config_names) fired once per completed
         group, with all of that group's config names (cached + freshly run).
+    on_progress : optional callback(completed_new_cases, total_cases, cached_cases)
+        fired once after resume filtering and after every newly completed case.
     """
     if group_key is None:
         group_key = _default_group_key
@@ -168,7 +171,11 @@ def run_sweep(
         )
 
     todo = [c for c in cases if not (c["name"] in results and c["E0_keV"] in results[c["name"]])]
-    print(f"{len(todo)} of {len(cases)} cases to run ({len(cases) - len(todo)} cached)")
+    cached_cases = len(cases) - len(todo)
+    print(f"{len(todo)} of {len(cases)} cases to run ({cached_cases} cached)")
+    completed_new_cases = 0
+    if on_progress is not None:
+        on_progress(completed_new_cases, len(cases), cached_cases)
 
     # all config names in each group (cached + to-run), in first-seen order
     group_names = defaultdict(list)
@@ -190,6 +197,7 @@ def run_sweep(
     progress_state = {"done": 0}
 
     def _cb(i, case, out):
+        nonlocal completed_new_cases
         store_result(results, case, out)
         name = case["name"]
         energies_remaining[name] -= 1
@@ -208,6 +216,9 @@ def run_sweep(
                     f"-- {progress_state['done']}/{n_groups} tilt-groups ==="
                 )
                 on_chunk(group_names[g])
+        completed_new_cases += 1
+        if on_progress is not None:
+            on_progress(completed_new_cases, len(cases), cached_cases)
 
     # Fully-cached tilt-groups have no cases left to run, so the callback above
     # never fires for them. On resume, replay them through on_chunk first (in

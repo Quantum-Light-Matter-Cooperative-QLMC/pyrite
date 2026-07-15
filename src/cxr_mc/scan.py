@@ -22,6 +22,7 @@ a harmless no-op.
 """
 
 import argparse
+import json
 import os
 import tomllib
 from pathlib import Path
@@ -106,6 +107,8 @@ def _build_parser(ap):
         help="override the beam zone axis [uvw] (default: the catalog crystal's beam_uvw)",
     )
     ap.add_argument("--checkpoint-dir", default="checkpoints")
+    ap.add_argument("--progress-file", type=Path, help=argparse.SUPPRESS)
+    ap.add_argument("--no-progress", action="store_true", help=argparse.SUPPRESS)
     ap.set_defaults(func=run)
     return ap
 
@@ -165,15 +168,86 @@ def _run_material(args, material):
     stem = f"{material}_quick" if args.quick else material
     ckpt = os.path.join(args.checkpoint_dir, f"{stem}.pkl")
     results = {}
-    run_sweep(
-        cases,
-        results,
-        checkpoint_dir=args.checkpoint_dir,
-        checkpoint_path=ckpt,
-        max_workers=args.workers,
-    )
+    progress_file = getattr(args, "progress_file", None)
+    latest_progress = {
+        "total_cases": len(cases),
+        "cached_cases": 0,
+        "completed_new_cases": 0,
+    }
+
+    def _record_progress(completed_new_cases, total_cases, cached_cases):
+        latest_progress.update(
+            total_cases=total_cases,
+            cached_cases=cached_cases,
+            completed_new_cases=completed_new_cases,
+        )
+        if progress_file is not None:
+            _write_progress_record(
+                progress_file,
+                material=material,
+                state="running",
+                **latest_progress,
+            )
+
+    if progress_file is not None:
+        _write_progress_record(
+            progress_file,
+            material=material,
+            state="running",
+            **latest_progress,
+        )
+    try:
+        run_sweep(
+            cases,
+            results,
+            checkpoint_dir=args.checkpoint_dir,
+            checkpoint_path=ckpt,
+            max_workers=args.workers,
+            progress=not getattr(args, "no_progress", False),
+            on_progress=_record_progress if progress_file is not None else None,
+        )
+    except BaseException:
+        if progress_file is not None:
+            _write_progress_record(
+                progress_file,
+                material=material,
+                state="failed",
+                **latest_progress,
+            )
+        raise
+    if progress_file is not None:
+        _write_progress_record(
+            progress_file,
+            material=material,
+            state="done",
+            **latest_progress,
+        )
     n = sum(len(v) for v in results.values())
     print(f"done -> {args.checkpoint_dir}/{stem}.pkl ({n} records)")
+
+
+def _write_progress_record(
+    path,
+    *,
+    material,
+    total_cases,
+    cached_cases,
+    completed_new_cases,
+    state,
+):
+    """Atomically replace one scan's compact JSON progress record."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "material": material,
+        "total_cases": total_cases,
+        "cached_cases": cached_cases,
+        "completed_new_cases": completed_new_cases,
+        "state": state,
+    }
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp.write_text(json.dumps(record, separators=(",", ":")) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def main(argv=None):

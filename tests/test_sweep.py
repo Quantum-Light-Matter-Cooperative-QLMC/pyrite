@@ -1,5 +1,7 @@
 """Sweep / build_cases: the Cartesian expansion and the required-material guard."""
 
+import json
+
 import numpy as np
 import pytest
 
@@ -479,6 +481,97 @@ def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
     scan.run(args)
     assert seen["path"] is not None
     assert seen["path"].endswith("mos2-on-sio2-si.pkl")
+
+
+def test_scan_progress_record_is_atomically_replaced(tmp_path):
+    from cxr_mc.scan import _write_progress_record
+
+    path = tmp_path / "progress" / "hopg.json"
+    _write_progress_record(
+        path,
+        material="hopg",
+        total_cases=4,
+        cached_cases=1,
+        completed_new_cases=0,
+        state="running",
+    )
+    _write_progress_record(
+        path,
+        material="hopg",
+        total_cases=4,
+        cached_cases=1,
+        completed_new_cases=3,
+        state="done",
+    )
+
+    assert json.loads(path.read_text()) == {
+        "material": "hopg",
+        "total_cases": 4,
+        "cached_cases": 1,
+        "completed_new_cases": 3,
+        "state": "done",
+    }
+    assert list(path.parent.glob("*.tmp")) == []
+
+
+def test_scan_progress_record_tracks_running_and_done(monkeypatch, tmp_path):
+    import argparse
+
+    from cxr_mc import scan
+
+    path = tmp_path / "progress" / "hopg.json"
+    observed = []
+
+    def fake_run_sweep(_cases, _results, **kwargs):
+        callback = kwargs["on_progress"]
+        callback(0, 2, 1)
+        observed.append(json.loads(path.read_text()))
+        callback(1, 2, 1)
+
+    monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
+    args = argparse.Namespace(
+        workers=0,
+        quick=False,
+        n_families=None,
+        beam_uvw=None,
+        checkpoint_dir=str(tmp_path),
+        progress_file=str(path),
+        no_progress=True,
+    )
+
+    scan._run_material(args, "hopg")
+
+    assert observed[0]["state"] == "running"
+    assert observed[0]["cached_cases"] == 1
+    assert json.loads(path.read_text())["state"] == "done"
+
+
+def test_scan_progress_record_tracks_failure(monkeypatch, tmp_path):
+    import argparse
+
+    from cxr_mc import scan
+
+    path = tmp_path / "progress" / "hopg.json"
+
+    def fake_run_sweep(_cases, _results, **kwargs):
+        kwargs["on_progress"](0, 2, 0)
+        raise RuntimeError("scan failed")
+
+    monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
+    args = argparse.Namespace(
+        workers=0,
+        quick=False,
+        n_families=None,
+        beam_uvw=None,
+        checkpoint_dir=str(tmp_path),
+        progress_file=str(path),
+        no_progress=True,
+    )
+
+    with pytest.raises(RuntimeError, match="scan failed"):
+        scan._run_material(args, "hopg")
+
+    assert json.loads(path.read_text())["state"] == "failed"
 
 
 def test_scan_forwards_n_families_and_beam_uvw_overrides(monkeypatch, tmp_path):

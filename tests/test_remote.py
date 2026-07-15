@@ -6,6 +6,7 @@ exception is the clear-listing regression test, which executes the box-side
 shell snippet under a local bash (skipped when bash is unavailable)."""
 
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -43,6 +44,9 @@ def test_queue_script_has_per_material_scan_calls():
     assert "20260101-000000" in s  # job id is embedded
     assert "mats=(mose2 wse2)" in s  # bash array drives the loop
     assert "parallel_materials=2" in s
+    assert 'mkdir -p "$JOBDIR/progress"' in s
+    assert '--progress-file "$JOBDIR/progress/$m.json"' in s
+    assert "--no-progress" in s
     assert "/pid" not in s
 
 
@@ -291,6 +295,7 @@ def test_start_writes_static_metadata_before_sbatch(monkeypatch):
     assert "quick: True" in upload_command
     assert "workers: 3" in upload_command
     assert "parallel_materials: 3" in upload_command
+    assert "progress_dashboard: True" in upload_command
     assert "started:" not in upload_command
     assert "started: $(date -Is)" in uploads[0][1]["input"].decode()
     assert "materials: hopg" not in uploads[0][1]["input"].decode()
@@ -415,6 +420,7 @@ def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, ca
 
 def test_attach_uses_stdin_closed_ssh_for_live_view(monkeypatch):
     runs = []
+    monkeypatch.setattr(remote, "_job_metadata", lambda _jobid: "materials: hopg\n")
     monkeypatch.setattr(remote.subprocess, "run", lambda cmd: runs.append(cmd))
 
     remote.attach("20260101-000000")
@@ -430,6 +436,7 @@ def test_attach_uses_stdin_closed_ssh_for_live_view(monkeypatch):
 
 def test_attach_retries_until_a_queued_job_creates_its_log(monkeypatch):
     runs = []
+    monkeypatch.setattr(remote, "_job_metadata", lambda _jobid: "materials: hopg\n")
     monkeypatch.setattr(remote.subprocess, "run", lambda cmd: runs.append(cmd))
 
     remote.attach("20260101-000000")
@@ -464,6 +471,7 @@ def test_implicit_job_selection_excludes_checkpoint_reservations(monkeypatch, tm
 
 
 def test_attach_returns_false_when_the_viewer_is_interrupted(monkeypatch):
+    monkeypatch.setattr(remote, "_job_metadata", lambda _jobid: "materials: hopg\n")
     monkeypatch.setattr(
         remote.subprocess,
         "run",
@@ -471,6 +479,152 @@ def test_attach_returns_false_when_the_viewer_is_interrupted(monkeypatch):
     )
 
     assert remote.attach("20260101-000000") is False
+
+
+def test_parse_progress_records_ignores_malformed_snapshots():
+    valid = {
+        "material": "hopg",
+        "total_cases": 5,
+        "cached_cases": 1,
+        "completed_new_cases": 2,
+        "state": "running",
+    }
+    invalid_count = {**valid, "material": "hbn", "completed_new_cases": 9}
+    invalid_bool = {**valid, "material": "hbn", "total_cases": True}
+    payload = "\n".join(
+        [
+            json.dumps(valid),
+            "{partial",
+            json.dumps(invalid_count),
+            json.dumps(invalid_bool),
+            "[]",
+        ]
+    )
+
+    assert remote._parse_progress_records(payload) == {"hopg": valid}
+
+
+class _FakeProgressBar:
+    def __init__(self, **kwargs):
+        self.total = kwargs["total"]
+        self.n = 0
+        self.description = kwargs["desc"]
+        self.postfix = {}
+        self.refreshes = 0
+        self.closed = False
+
+    def set_description_str(self, description, refresh=False):
+        self.description = description
+
+    def set_postfix(self, **kwargs):
+        kwargs.pop("refresh", None)
+        self.postfix = kwargs
+
+    def refresh(self):
+        self.refreshes += 1
+
+    def close(self):
+        self.closed = True
+
+
+def test_progress_bars_update_materials_independently():
+    bars = {
+        "hopg": _FakeProgressBar(total=None, desc="hopg: pending"),
+        "hbn": _FakeProgressBar(total=None, desc="hbn: pending"),
+    }
+    records = remote._parse_progress_records(
+        json.dumps(
+            {
+                "material": "hopg",
+                "total_cases": 5,
+                "cached_cases": 1,
+                "completed_new_cases": 2,
+                "state": "running",
+            }
+        )
+    )
+
+    remote._update_progress_bars(bars, records)
+
+    assert bars["hopg"].n == 3
+    assert bars["hopg"].total == 5
+    assert bars["hopg"].postfix == {"cached": 1, "new": 2}
+    assert bars["hbn"].n == 0
+    assert bars["hbn"].description == "hbn: pending"
+
+
+def test_dashboard_attach_closes_bars_and_prints_final_state(monkeypatch, capsys):
+    metadata = (
+        "materials: hopg hbn\n"
+        "progress_dashboard: True\n"
+        "slurm_job_id: 48291\n"
+    )
+    payload = "\n".join(
+        [
+            json.dumps(
+                {
+                    "material": "hopg",
+                    "total_cases": 4,
+                    "cached_cases": 1,
+                    "completed_new_cases": 3,
+                    "state": "done",
+                }
+            ),
+            json.dumps(
+                {
+                    "material": "hbn",
+                    "total_cases": 2,
+                    "cached_cases": 0,
+                    "completed_new_cases": 1,
+                    "state": "failed",
+                }
+            ),
+        ]
+    )
+    bars = []
+    scheduler_states = iter(["RUNNING", None])
+    monkeypatch.setattr(remote, "_job_metadata", lambda _jobid: metadata)
+    monkeypatch.setattr(remote, "_read_progress_records", lambda _jobid: remote._parse_progress_records(payload))
+    monkeypatch.setattr(remote, "_slurm_state", lambda _sid: next(scheduler_states))
+    monkeypatch.setattr(remote, "_job_state", lambda _jobid: "done with 1 warning(s)")
+    monkeypatch.setattr(remote.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        remote,
+        "tqdm",
+        lambda **kwargs: bars.append(_FakeProgressBar(**kwargs)) or bars[-1],
+    )
+
+    assert remote.attach("j") is True
+
+    assert [bar.n for bar in bars] == [4, 1]
+    assert all(bar.closed for bar in bars)
+    output = capsys.readouterr().out
+    assert "--- job finished ---" in output
+    assert "done with 1 warning(s)" in output
+
+
+def test_dashboard_attach_ctrl_c_disconnects_viewer_only(monkeypatch):
+    bars = []
+    monkeypatch.setattr(
+        remote,
+        "_job_metadata",
+        lambda _jobid: (
+            "materials: hopg\nprogress_dashboard: True\nslurm_job_id: 48291\n"
+        ),
+    )
+    monkeypatch.setattr(
+        remote,
+        "_read_progress_records",
+        lambda _jobid: (_ for _ in ()).throw(KeyboardInterrupt),
+    )
+    monkeypatch.setattr(
+        remote,
+        "tqdm",
+        lambda **kwargs: bars.append(_FakeProgressBar(**kwargs)) or bars[-1],
+    )
+
+    assert remote.attach("j") is False
+    assert bars[0].closed is True
 
 
 def test_stop_jobid_uses_scancel_not_kill(monkeypatch):

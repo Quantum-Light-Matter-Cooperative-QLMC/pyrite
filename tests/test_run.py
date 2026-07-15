@@ -244,6 +244,49 @@ def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
     assert "cfg_a" in results and "cfg_b" in results
 
 
+def test_run_sweep_reports_initial_and_per_case_progress(tmp_path, monkeypatch):
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    cases = [
+        _fake_case("cfg_a", 30.0),
+        _fake_case("cfg_a", 45.0),
+        _fake_case("cfg_b", 30.0),
+    ]
+    progress = []
+
+    run_sweep(
+        cases,
+        {},
+        checkpoint_dir=str(tmp_path),
+        progress=False,
+        on_progress=lambda completed, total, cached: progress.append(
+            (completed, total, cached)
+        ),
+    )
+
+    assert progress == [(0, 3, 0), (1, 3, 0), (2, 3, 0), (3, 3, 0)]
+
+
+def test_run_sweep_progress_counts_cached_cases_on_resume(tmp_path, monkeypatch):
+    cached_case = _fake_case("cfg_a", 30.0)
+    existing = {"cfg_a": {30.0: {"case": cached_case, "spec": np.array([1.0])}}}
+    with open(tmp_path / "hopg.pkl", "wb") as f:
+        pickle.dump(existing, f)
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    progress = []
+
+    run_sweep(
+        [cached_case, _fake_case("cfg_b", 30.0)],
+        {},
+        checkpoint_dir=str(tmp_path),
+        progress=False,
+        on_progress=lambda completed, total, cached: progress.append(
+            (completed, total, cached)
+        ),
+    )
+
+    assert progress == [(0, 2, 1), (1, 2, 1)]
+
+
 def test_run_sweep_on_chunk_fires_per_group(tmp_path, monkeypatch):
     monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
     # same (crystal, thickness, tilt, omitted footprint) -> one group;
