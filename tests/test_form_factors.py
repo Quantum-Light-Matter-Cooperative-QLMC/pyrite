@@ -15,7 +15,7 @@ from cxr_mc.materials.atomic import (
 )
 
 # the structure-factor elements the project models (light + edge-prone + heavy)
-ELEMENTS = ["C", "Li", "F", "Si", "Ge", "S", "Mo", "Nb", "Se", "Zr", "Te", "Hf", "W", "Pt"]
+ELEMENTS = ["C", "Li", "F", "Si", "Ge", "S", "Mo", "Nb", "Pd", "Se", "Zr", "Te", "Hf", "W", "Pt"]
 
 
 @pytest.mark.parametrize("element", ELEMENTS)

@@ -1,0 +1,37 @@
+data_pdse2
+# Phase identity: cxr-mc crystal catalog entry [pdse2].
+# Bundled full-basis P1 CIF used by the declarative material catalog.
+# Catalog provenance and assumptions:
+# Ambient orthorhombic Pbca PdSe2 (Materials Project mp-2418; Gronvold &
+# Rost, Acta Cryst. 10, 329--332 (1957)): a=5.741, b=5.866, c=7.691 A.
+# The 4a Pd sites and 8c Se sites use the reported Se (x, y, z)=(0.112,
+# 0.117, 0.407), expanded explicitly from the Pbca prototype. The weakly
+# bonded layers stack along c, so the catalog uses a c-axis-normal slab.
+# Validation: pdse2-pbca-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 5.741
+_cell_length_b 5.866
+_cell_length_c 7.691
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 90.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Pd1 Pd 0.0 0.0 0.0 1.0
+Pd2 Pd 0.5 0.0 0.5 1.0
+Pd3 Pd 0.0 0.5 0.5 1.0
+Pd4 Pd 0.5 0.5 0.0 1.0
+Se1 Se 0.112 0.117 0.407 1.0
+Se2 Se 0.388 0.883 0.907 1.0
+Se3 Se 0.888 0.617 0.093 1.0
+Se4 Se 0.612 0.383 0.593 1.0
+Se5 Se 0.888 0.883 0.593 1.0
+Se6 Se 0.612 0.117 0.093 1.0
+Se7 Se 0.112 0.383 0.907 1.0
+Se8 Se 0.388 0.617 0.407 1.0

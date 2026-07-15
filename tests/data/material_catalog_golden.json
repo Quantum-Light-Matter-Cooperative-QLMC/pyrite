@@ -17,6 +17,8 @@
     "mote2_product",
     "tis2",
     "ptse2",
+    "pts2",
+    "pdse2",
     "hfs2",
     "hfse2",
     "zrse2",
@@ -39,6 +41,8 @@
     "mote2_product",
     "tis2",
     "ptse2",
+    "pts2",
+    "pdse2",
     "hfs2",
     "hfse2",
     "zrse2",
@@ -60,6 +64,8 @@
     "mote2",
     "mote2_product",
     "ptse2",
+    "pts2",
+    "pdse2",
     "hfs2",
     "hfte2",
     "hfse2",
@@ -2335,6 +2341,93 @@
         ]
       }
     },
+    "pts2": {
+      "lattice": {
+        "system": "general",
+        "a": 3.59,
+        "b": 3.59,
+        "c": 5.106,
+        "alpha": 90.0,
+        "beta": 90.0,
+        "gamma": 119.99999999999999
+      },
+      "basis": [
+        ["Pt", [0.0, 0.0, 0.0]],
+        ["S", [0.3333333333333333, 0.6666666666666667, 0.252]],
+        ["S", [0.6666666666666667, 0.3333333333333333, 0.748]]
+      ],
+      "V_cell": 56.99022076526163,
+      "mosaic_fwhm_deg": null,
+      "composition": [
+        ["Pt", 0.017546870087043944],
+        ["S", 0.03509374017408789]
+      ],
+      "config": {
+        "B_ang2": 0.6,
+        "beam_uvw": [0, 0, 1],
+        "E_grid": {
+          "shape": [1050],
+          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
+        },
+        "hkl_list": [],
+        "hkl_reason": null,
+        "layers_per_cell": null
+      },
+      "physics": {
+        "hkl": [0, 0, 1],
+        "g_mag": 1.2305494138620416,
+        "structure_factor": [73.48153985490922, 0.0],
+        "dominant_reflections": [[0, 0, -1], [0, 0, 1], [-1, 0, 1], [-1, 1, -1], [0, -1, -1], [0, 1, 1], [1, -1, 1], [1, 0, -1]]
+      }
+    },
+    "pdse2": {
+      "lattice": {
+        "system": "general",
+        "a": 5.741,
+        "b": 5.866,
+        "c": 7.691,
+        "alpha": 90.0,
+        "beta": 90.0,
+        "gamma": 90.0
+      },
+      "basis": [
+        ["Pd", [0.0, 0.0, 0.0]],
+        ["Pd", [0.0, 0.5, 0.5]],
+        ["Pd", [0.5, 0.0, 0.5]],
+        ["Pd", [0.5, 0.5, 0.0]],
+        ["Se", [0.112, 0.117, 0.407]],
+        ["Se", [0.112, 0.383, 0.907]],
+        ["Se", [0.388, 0.617, 0.407]],
+        ["Se", [0.388, 0.883, 0.907]],
+        ["Se", [0.612, 0.117, 0.093]],
+        ["Se", [0.612, 0.383, 0.593]],
+        ["Se", [0.888, 0.617, 0.093]],
+        ["Se", [0.888, 0.883, 0.593]]
+      ],
+      "V_cell": 259.00754584599997,
+      "mosaic_fwhm_deg": null,
+      "composition": [
+        ["Pd", 0.015443565502830213],
+        ["Se", 0.030887131005660425]
+      ],
+      "config": {
+        "B_ang2": 0.6,
+        "beam_uvw": [0, 0, 1],
+        "E_grid": {
+          "shape": [1050],
+          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
+        },
+        "hkl_list": [],
+        "hkl_reason": null,
+        "layers_per_cell": null
+      },
+      "physics": {
+        "hkl": [0, 0, 2],
+        "g_mag": 1.6339059438771515,
+        "structure_factor": [231.49006644910884, 12.405106428739877],
+        "dominant_reflections": [[0, 0, -2], [0, 0, 2], [-2, 0, 0], [2, 0, 0]]
+      }
+    },
     "hfs2": {
       "lattice": {
         "system": "general",
@@ -3943,6 +4036,36 @@
           ],
           "sha256": "79f8f20c412aa260b3f00a9e0cb7c2e01c140a18067e9f5fe5e8c9aab64638d2"
         }
+      },
+      "substrate": null,
+      "stack": []
+    },
+    "pts2": {
+      "label": "PtS2",
+      "profile": "standard",
+      "crystal_key": "pts2",
+      "scan": {
+        "thickness_ang": {"shape": [1], "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"},
+        "energy_keV": {"shape": [3], "sha256": "b2ea7f5490b31e059d7abf65cdc59aaae70b2c4c09f18b81a1e30ec6ea63d2ce"},
+        "tilt_deg": {"shape": [20], "sha256": "36649ae1de6066aa6130648f5a38fc67c92cd61e5a98487b64a9f3546ff951ec"},
+        "tilt_azim_deg": {"shape": [9], "sha256": "c7f4c5364436b08979fcef9fc02ebbfcc3eaf830100ef1ffcdd353caed6f2edf"},
+        "E_grid_line": {"shape": [1484], "sha256": "0665711635d7e55251fef26a248510024af5bade0033df4c32062a9ab98a3155"},
+        "E_grid_brem": {"shape": [1200], "sha256": "79f8f20c412aa260b3f00a9e0cb7c2e01c140a18067e9f5fe5e8c9aab64638d2"}
+      },
+      "substrate": null,
+      "stack": []
+    },
+    "pdse2": {
+      "label": "PdSe2",
+      "profile": "standard",
+      "crystal_key": "pdse2",
+      "scan": {
+        "thickness_ang": {"shape": [1], "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"},
+        "energy_keV": {"shape": [3], "sha256": "b2ea7f5490b31e059d7abf65cdc59aaae70b2c4c09f18b81a1e30ec6ea63d2ce"},
+        "tilt_deg": {"shape": [20], "sha256": "36649ae1de6066aa6130648f5a38fc67c92cd61e5a98487b64a9f3546ff951ec"},
+        "tilt_azim_deg": {"shape": [9], "sha256": "c7f4c5364436b08979fcef9fc02ebbfcc3eaf830100ef1ffcdd353caed6f2edf"},
+        "E_grid_line": {"shape": [1484], "sha256": "0665711635d7e55251fef26a248510024af5bade0033df4c32062a9ab98a3155"},
+        "E_grid_brem": {"shape": [1200], "sha256": "79f8f20c412aa260b3f00a9e0cb7c2e01c140a18067e9f5fe5e8c9aab64638d2"}
       },
       "substrate": null,
       "stack": []

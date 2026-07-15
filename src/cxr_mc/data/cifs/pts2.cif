@@ -1,0 +1,27 @@
+data_pts2
+# Phase identity: cxr-mc crystal catalog entry [pts2].
+# Bundled full-basis P1 CIF used by the declarative material catalog.
+# Catalog provenance and assumptions:
+# Layered 1T-PtS2 (P-3m1; Materials Project mp-762). The JARVIS optB88-vdW
+# relaxation gives a=b=3.590 A and c=5.106 A; the S 2d height z=0.252 is
+# reported for the P-3m1 phase. The weakly bonded layers stack along c, so the
+# catalog uses a c-axis-normal slab.
+# Validation: pts2-p3m1-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 3.59
+_cell_length_b 3.59
+_cell_length_c 5.106
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 120.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Pt1 Pt 0.0 0.0 0.0 1.0
+S1 S 0.3333333333333333 0.6666666666666667 0.252 1.0
+S2 S 0.6666666666666667 0.3333333333333333 0.748 1.0

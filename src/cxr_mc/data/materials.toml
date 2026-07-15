@@ -108,6 +108,20 @@ B_ang2 = 0.6
 beam_uvw = [0, 0, 1]
 E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 
+[crystals.pts2]
+cif = "cifs/pts2.cif"
+validation_id = "pts2-p3m1-structure"
+B_ang2 = 0.6
+beam_uvw = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+
+[crystals.pdse2]
+cif = "cifs/pdse2.cif"
+validation_id = "pdse2-pbca-structure"
+B_ang2 = 0.6
+beam_uvw = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+
 [crystals.hfs2]
 cif = "cifs/hfs2.cif"
 validation_id = "hfs2-structure"
@@ -221,6 +235,14 @@ substrate = "sapphire"
 
 [materials.ptse2]
 label = "PtSe2"
+profile = "standard"
+
+[materials.pts2]
+label = "PtS2"
+profile = "standard"
+
+[materials.pdse2]
+label = "PdSe2"
 profile = "standard"
 
 [materials.hfs2]

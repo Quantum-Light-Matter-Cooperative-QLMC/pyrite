@@ -32,9 +32,11 @@ EXPECTED = {
     "mos2",
     "ws2",
     "ptse2",
+    "pts2",
     "hfs2",
     "hfte2",
     "hfse2",
+    "pdse2",
     "zrse2",
     "nbs2",
     "nbse2",
@@ -265,6 +267,52 @@ def test_hfte2_structure_and_001_couplings_are_sane():
     structure, g = structure_factor("hfte2", (0, 0, 1), 1000.0, B_ang2=0.6)
     susceptibility = chi_g("hfte2", (0, 0, 1), 1000.0, B_ang2=0.6)
     potential = U_g("hfte2", (0, 0, 1), 1000.0, B_ang2=0.6)
+
+    assert g > 0.0
+    assert np.isfinite(abs(structure)) and abs(structure) > 0.0
+    assert np.isfinite(abs(susceptibility)) and abs(susceptibility) > 0.0
+    assert np.isfinite(abs(potential)) and abs(potential) > 0.0
+
+
+def test_pdse2_structure_and_basal_couplings_are_sane():
+    # Ambient PdSe2 is orthorhombic Pbca (mp-2418): a=5.741, b=5.866,
+    # c=7.691 A, with four PdSe2 formula units in the conventional cell.
+    # Its van der Waals layers stack along c, matching the c-axis-normal slab.
+    info = CRYSTALS["pdse2"]
+
+    assert info["lattice"]["a"] == pytest.approx(5.741)
+    assert info["lattice"]["b"] == pytest.approx(5.866)
+    assert info["lattice"]["c"] == pytest.approx(7.691)
+    assert info["V_cell"] == pytest.approx(5.741 * 5.866 * 7.691, abs=0.1)
+    assert len(info["basis"]) == 12
+    assert sum(element == "Pd" for element, _ in info["basis"]) == 4
+    assert sum(element == "Se" for element, _ in info["basis"]) == 8
+
+    structure, g = structure_factor("pdse2", (0, 0, 2), 1500.0, B_ang2=0.6)
+    susceptibility = chi_g("pdse2", (0, 0, 2), 1500.0, B_ang2=0.6)
+    potential = U_g("pdse2", (0, 0, 2), 1500.0, B_ang2=0.6)
+
+    assert g > 0.0
+    assert np.isfinite(abs(structure)) and abs(structure) > 0.0
+    assert np.isfinite(abs(susceptibility)) and abs(susceptibility) > 0.0
+    assert np.isfinite(abs(potential)) and abs(potential) > 0.0
+
+
+def test_pts2_structure_and_basal_couplings_are_sane():
+    # 1T PtS2 is trigonal P-3m1 (mp-762), with one PtS2 formula unit per
+    # primitive cell and van der Waals layers stacked along c.
+    info = CRYSTALS["pts2"]
+
+    assert info["lattice"]["a"] == pytest.approx(3.59)
+    assert info["lattice"]["c"] == pytest.approx(5.106)
+    assert info["V_cell"] == pytest.approx(np.sqrt(3.0) * 3.59**2 * 5.106 / 2.0, abs=0.1)
+    assert len(info["basis"]) == 3
+    assert sum(element == "Pt" for element, _ in info["basis"]) == 1
+    assert sum(element == "S" for element, _ in info["basis"]) == 2
+
+    structure, g = structure_factor("pts2", (0, 0, 1), 1500.0, B_ang2=0.6)
+    susceptibility = chi_g("pts2", (0, 0, 1), 1500.0, B_ang2=0.6)
+    potential = U_g("pts2", (0, 0, 1), 1500.0, B_ang2=0.6)
 
     assert g > 0.0
     assert np.isfinite(abs(structure)) and abs(structure) > 0.0
