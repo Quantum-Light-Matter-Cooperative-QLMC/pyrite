@@ -102,6 +102,55 @@ def test_start_writes_static_metadata_before_sbatch(monkeypatch):
     assert "sbatch --parsable" in submissions[0][-1]
 
 
+def test_slurm_job_id_reads_recorded_scheduler_id(monkeypatch):
+    commands = []
+    monkeypatch.setattr(
+        remote, "_ssh_capture", lambda command: commands.append(command) or "48291\n"
+    )
+
+    assert remote._slurm_job_id("j") == "48291"
+    assert "slurm_job_id" in commands[0]
+
+
+def test_slurm_state_queries_squeue(monkeypatch):
+    commands = []
+    monkeypatch.setattr(
+        remote, "_ssh_capture", lambda command: commands.append(command) or "RUNNING\n"
+    )
+
+    assert remote._slurm_state("48291") == "RUNNING"
+    assert "squeue -h -j 48291 -o '%T'" in commands[0]
+
+
+def test_live_jobs_queries_squeue_for_recorded_scheduler_ids(monkeypatch):
+    commands = []
+    monkeypatch.setattr(
+        remote, "_ssh_capture", lambda command: commands.append(command) or "j\tFalse\thopg\n"
+    )
+
+    assert remote._live_jobs() == [("j", False, ["hopg"])]
+    assert "squeue" in commands[0]
+    assert "slurm_job_id" in commands[0]
+    assert "kill -0" not in commands[0]
+    assert "/pid" not in commands[0]
+
+
+def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, capsys):
+    commands = []
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda command: commands.append(command) or "slurm: 48291 RUNNING\n",
+    )
+
+    remote.job_status("j")
+
+    assert "slurm: 48291 RUNNING" in capsys.readouterr().out
+    assert "squeue" in commands[0]
+    assert "kill -0" not in commands[0]
+    assert "/pid" not in commands[0]
+
+
 def test_attach_uses_stdin_closed_ssh_for_live_view(monkeypatch):
     runs = []
     monkeypatch.setattr(remote.subprocess, "run", lambda cmd: runs.append(cmd))
@@ -111,6 +160,30 @@ def test_attach_uses_stdin_closed_ssh_for_live_view(monkeypatch):
     assert len(runs) == 1
     assert runs[0][:3] == ["ssh", "-n", remote.HOST]
     assert len(runs[0]) == 4
+    assert "squeue" in runs[0][-1]
+    assert "slurm_job_id" in runs[0][-1]
+    assert "kill -0" not in runs[0][-1]
+    assert "/pid" not in runs[0][-1]
+
+
+def test_stop_jobid_uses_scancel_not_kill(monkeypatch):
+    commands = []
+    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "48291\n")
+    monkeypatch.setattr(remote, "_run", lambda command, **_kwargs: commands.append(command))
+
+    remote._stop_jobid("j")
+
+    assert "scancel 48291" in commands[0][-1]
+    assert "kill -TERM" not in commands[0][-1]
+    assert "scancel 48291 || exit" in commands[0][-1]
+
+
+def test_stop_jobid_rejects_legacy_job_without_scheduler_id(monkeypatch):
+    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "")
+    monkeypatch.setattr(remote, "_run", lambda *_args, **_kwargs: pytest.fail("must not scancel"))
+
+    with pytest.raises(SystemExit, match="not an active SLURM job"):
+        remote._stop_jobid("j")
 
 
 def test_follow_logs_use_stdin_closed_ssh(monkeypatch):

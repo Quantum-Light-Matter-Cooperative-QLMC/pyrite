@@ -34,14 +34,14 @@ Detached QUEUE (survives ssh disconnect -- launch, walk away, reconnect later):
     cxr remote jobs                     # list jobs on the box + their state
     cxr remote status [JOBID]           # one job: meta + state + log tail (default: latest)
     cxr remote logs [JOBID] --follow    # tail the remote log (live)
-    cxr remote stop mose2 wse2          # SIGTERM live job(s) by material
-    cxr remote stop --all               # SIGTERM every live job
+    cxr remote stop mose2 wse2          # cancel live SLURM job(s) by material
+    cxr remote stop --all               # cancel every live SLURM job
     cxr remote pull mose2 wse2 mos2     # fetch the finished checkpoints (grid-filtered)
 
-`start` returns immediately: it ships the code, writes a small runner under
-<remote>/jobs/<jobid>/ and launches it with `nohup setsid` so it keeps running
-after you disconnect. The runner processes the materials sequentially (one
-`scan.py` per material), writing meta/state/log/pid into the job dir.
+`start` returns immediately: it ships the code, writes a batch script under
+<remote>/jobs/<jobid>/, and submits it to SLURM. The batch job processes the
+materials sequentially (one `scan.py` per material), writing meta/state/log and
+its scheduler ID into the job dir.
 
 The job is detached on the box from the moment it starts, so the ssh connection
 is only ever a VIEWER. `--follow` (or `attach`) streams the log live and exits
@@ -479,14 +479,17 @@ def _write_job_script_command(jobdir, metadata):
 
 
 def _live_jobs():
-    """[(jobid, quick, [materials])] for every job on the box whose runner
-    process is still alive (pid file present and `kill -0` succeeds). Reads the
-    material list + quick flag straight from each job's meta."""
+    """[(jobid, quick, [materials])] for jobs still reported by SLURM.
+
+    Legacy job directories without a recorded scheduler ID are deliberately
+    non-live: PID liveness is not a safe fallback for scheduler-managed work.
+    """
     remote = (
         f'JOBS="{REMOTE_DIR}/{JOBS_SUBDIR}"; [ -d "$JOBS" ] || exit 0; '
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
-        'p=$(cat "$d/pid" 2>/dev/null) || continue; '
-        'kill -0 "$p" 2>/dev/null || continue; '
+        'SID=$(sed -n "s/^slurm_job_id: //p" "$d/meta" 2>/dev/null | tail -1); '
+        'case "$SID" in \'\'|*[!0-9]*) continue ;; esac; '
+        'squeue -h -j "$SID" -o \'%T\' | grep -q \'[^[:space:]]\' || continue; '
         'q=$(sed -n "s/^quick: //p" "$d/meta" 2>/dev/null); '
         'm=$(sed -n "s/^materials: //p" "$d/meta" 2>/dev/null); '
         'printf "%s\\t%s\\t%s\\n" "$(basename "$d")" "$q" "$m"; done'
@@ -499,6 +502,24 @@ def _live_jobs():
         jobid, q, mats = parts[0].strip(), parts[1].strip(), parts[2].split()
         jobs.append((jobid, q == "True", mats))
     return jobs
+
+
+def _slurm_job_id(jobid: str) -> str | None:
+    """Return a queue's recorded numeric scheduler ID, if it has one."""
+    _check_shell_tokens([jobid])
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    scheduler_id = _ssh_capture(
+        f'D="{jobdir}"; sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1'
+    ).strip()
+    return scheduler_id if scheduler_id.isdigit() else None
+
+
+def _slurm_state(slurm_job_id: str) -> str | None:
+    """Return the live SLURM state, or ``None`` after it leaves ``squeue``."""
+    if not slurm_job_id.isdigit():
+        return None
+    state = _ssh_capture(f"squeue -h -j {slurm_job_id} -o '%T'").strip()
+    return state.splitlines()[0] if state else None
 
 
 def _refuse_if_busy(materials, quick):
@@ -684,8 +705,7 @@ def _job_assign(jobid):
 
 
 def job_status(jobid=None):
-    """Print one job's meta, current state, whether its process is still alive,
-    and the tail of its log. Defaults to the most recent job."""
+    """Print one job's metadata, scheduler state, persisted state, and log tail."""
     remote = (
         f'JOBS="{REMOTE_DIR}/{JOBS_SUBDIR}"; {_job_assign(jobid)}; '
         'D="$JOBS/$JOB"; '
@@ -693,8 +713,11 @@ def job_status(jobid=None):
         "exit 1; fi; "
         'echo "== job $JOB =="; cat "$D/meta" 2>/dev/null; '
         'echo "-- state --"; cat "$D/state" 2>/dev/null || echo "(no state yet)"; '
-        'if [ -f "$D/pid" ] && kill -0 "$(cat "$D/pid")" 2>/dev/null; '
-        'then echo "process: ALIVE"; else echo "process: not running"; fi; '
+        'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
+        'case "$SID" in \'\'|*[!0-9]*) echo "slurm: (none) not queued" ;; '
+        '*) S=$(squeue -h -j "$SID" -o \'%T\'); '
+        'if [ -n "$S" ]; then echo "slurm: $SID $S"; '
+        'else echo "slurm: $SID not queued"; fi ;; esac; '
         'echo "-- log tail --"; tail -n 20 "$D/log" 2>/dev/null'
     )
     print(_ssh_capture(remote), end="")
@@ -739,34 +762,29 @@ def _disconnect_hint(jobid):
 def attach(jobid=None):
     """Live-track a job: stream its log until it finishes, then print the final
     state. Disconnecting -- Ctrl-C, closing the terminal, or a dropped ssh --
-    tears down the VIEWER only; the job is detached server-side (nohup setsid)
-    and runs to completion regardless. Defaults to the most recent job."""
+    tears down the VIEWER only; the SLURM job keeps running regardless. Defaults
+    to the most recent job."""
     jobid = jobid or _latest_jobid()
     if not jobid:
         raise SystemExit("no jobs to attach to (start one: cxr remote start <materials>)")
     _check_shell_tokens([jobid])
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
-    # Tail the log live, but self-terminate once the job process exits, so a
-    # finished job doesn't leave you stuck in tail -f. The tail is NOT nohup'd, so
-    # a local Ctrl-C / dropped ssh tears it (and the wait loop) down while the
-    # setsid'd job keeps going. SSH stdin is closed with -n below; stdout/stderr
-    # still inherit, which is enough for live output and Ctrl-C.
+    # Tail the log live, but self-terminate after SLURM no longer reports the
+    # job, so a finished job doesn't leave us stuck in tail -f. The tail is a
+    # viewer only: Ctrl-C or a dropped SSH connection leaves the job untouched.
     remote = (
         f'D="{jobdir}"; '
         f'[ -d "$D" ] || {{ echo "no such job: {jobid}"; exit 1; }}; '
         'tail -n 50 -f "$D/log" 2>/dev/null & TP=$!; '
-        # `start --follow` attaches the instant after launch, which can beat the
-        # detached runner writing its pid (the runner does it as its first act,
-        # but bash/setsid startup is not instantaneous). Poll for the pid instead
-        # of testing once -- otherwise we find it missing, skip the wait below,
-        # and tear the tail down right away, wrongly reporting "job finished".
-        "P=; for _ in $(seq 1 30); do "
-        'if [ -s "$D/pid" ]; then P=$(cat "$D/pid"); break; fi; sleep 1; done; '
-        # Then hold (keeping the tail live) until the runner process exits. A job
-        # that already finished still has its pid file, so kill -0 fails at once
-        # and we fall straight through to the teardown -- correct for that case.
-        'if [ -n "$P" ]; then '
-        'while kill -0 "$P" 2>/dev/null; do sleep 2; done; fi; '
+        # `start --follow` can attach immediately after submission; wait briefly
+        # for the submit protocol to append its scheduler ID before polling.
+        "SID=; for _ in $(seq 1 30); do "
+        'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
+        'case "$SID" in \'\'|*[!0-9]*) SID= ;; *) break ;; esac; sleep 1; done; '
+        'if [ -n "$SID" ]; then '
+        'while squeue -h -j "$SID" -o \'%T\' | grep -q \'[^[:space:]]\'; '
+        'do sleep 2; done; '
+        'else echo "no recorded SLURM job ID for {jobid}" >&2; fi; '
         'sleep 1; kill "$TP" 2>/dev/null; '
         'printf "\\n--- job finished ---\\n"; cat "$D/state" 2>/dev/null'
     )
@@ -778,17 +796,17 @@ def attach(jobid=None):
 
 
 def _stop_jobid(jobid):
-    """SIGTERM a running job's whole process group (the runner + scan.py + its
-    transport worker pool), then mark the job stopped."""
+    """Cancel one active scheduler job and record the terminal job state."""
     _check_shell_tokens([jobid])
+    scheduler_id = _slurm_job_id(jobid)
+    if scheduler_id is None or _slurm_state(scheduler_id) is None:
+        raise SystemExit(f"job {jobid} is not an active SLURM job")
     remote = (
         f'D="{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"; '
-        'if [ ! -f "$D/pid" ]; then echo "no pid for job {0}"; exit 1; fi; '
-        'P=$(cat "$D/pid"); '
-        'kill -TERM -"$P" 2>/dev/null || kill -TERM "$P" 2>/dev/null; '
-        'echo "stopped [{0}] $(date -Is)" > "$D/state"; '
-        'echo "sent SIGTERM to job {0} (pgid $P)"'
-    ).format(jobid)
+        f'scancel {scheduler_id} || exit $?; '
+        f'echo "cancelled [{scheduler_id}] $(date -Is)" > "$D/state"; '
+        f'echo "cancelled SLURM job {scheduler_id} for job {jobid}"'
+    )
     _run(["ssh", "-n", HOST, remote])
 
 
