@@ -78,6 +78,30 @@ def test_submit_command_uses_sbatch_parsable_and_records_scheduler_id():
     assert "nohup" not in command and "setsid" not in command
 
 
+def test_start_writes_static_metadata_before_sbatch(monkeypatch):
+    uploads = []
+    submissions = []
+    monkeypatch.setattr(remote, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(
+        remote.subprocess,
+        "run",
+        lambda *args, **kwargs: uploads.append((args, kwargs)),
+    )
+    monkeypatch.setattr(remote, "_run", lambda command, **_kwargs: submissions.append(command))
+
+    remote.start_queue(["hopg"], quick=True, workers=3, no_sync=True)
+
+    upload_command = uploads[0][0][0][-1]
+    assert "job: " in upload_command
+    assert "materials: hopg" in upload_command
+    assert "quick: True" in upload_command
+    assert "workers: 3" in upload_command
+    assert "started:" not in upload_command
+    assert "started: $(date -Is)" in uploads[0][1]["input"].decode()
+    assert "materials: hopg" not in uploads[0][1]["input"].decode()
+    assert "sbatch --parsable" in submissions[0][-1]
+
+
 def test_attach_uses_stdin_closed_ssh_for_live_view(monkeypatch):
     runs = []
     monkeypatch.setattr(remote.subprocess, "run", lambda cmd: runs.append(cmd))
@@ -414,8 +438,9 @@ def test_zhai_queue_script_has_ne_flags_and_meta():
     assert "reproduce_zhai.py" in s
     assert "--ne 11" in s and "--ne-brem 3" in s and "--ne-supp 5" in s and "--refresh" in s
     assert "--tmd-azimuth 35.0" in s
-    assert "materials: zhai" in s and "quick: False" in s
     assert "20260101-000000" in s
+    assert "materials: zhai" not in s and "quick: False" not in s
+    assert "started: $(date -Is)" in s
     assert "/pid" not in s
 
 

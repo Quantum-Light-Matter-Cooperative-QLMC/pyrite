@@ -61,6 +61,7 @@ import datetime
 import io
 import os
 import re
+import shlex
 import subprocess
 import sys
 import tarfile
@@ -333,9 +334,7 @@ def _queue_script(jobid, materials, quick, workers):
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     return f"""JOBDIR="{jobdir}"
 cd "{REMOTE_DIR}" || exit 1
-{{ echo "job: {jobid}"; echo "materials: {mats}"; echo "quick: {bool(quick)}"; \
-echo "workers: {workers}"; echo "started: $(date -Is)"; \
-}} >> "$JOBDIR/meta"
+echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 mats=({mats})
 total=${{#mats[@]}}
@@ -375,9 +374,7 @@ def _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     flags = _zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh)
     return f"""JOBDIR="{jobdir}"
 cd "{REMOTE_DIR}" || exit 1
-{{ echo "job: {jobid}"; echo "materials: {ZHAI_STEM}"; echo "quick: False"; \\
-echo "ne: {ne}"; echo "ne_brem: {ne_brem}"; echo "ne_supp: {ne_supp}"; \\
-echo "started: $(date -Is)"; }} >> "$JOBDIR/meta"
+echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 echo "running zhai reproduction since $(date -Is)" > "$JOBDIR/state"
 if ! {REMOTE_UV} run --no-sync python reproduce_zhai.py{flags} >> "$JOBDIR/log" 2>&1
@@ -443,6 +440,42 @@ case "$SID" in ''|*[!0-9]*) \
 esac; \
 printf 'slurm_job_id: %s\\n' "$SID" >> "$D/meta"; \
 printf '%s\\n' "$SID"""
+
+
+def _queue_metadata(jobid, materials, quick, workers):
+    """Static metadata persisted before a queue becomes visible to SLURM."""
+    return "\n".join(
+        [
+            f"job: {jobid}",
+            f"materials: {' '.join(materials)}",
+            f"quick: {bool(quick)}",
+            f"workers: {workers}",
+            "",
+        ]
+    )
+
+
+def _zhai_queue_metadata(jobid, ne, ne_brem, ne_supp):
+    """Static metadata persisted before the Zhai batch job is submitted."""
+    return "\n".join(
+        [
+            f"job: {jobid}",
+            f"materials: {ZHAI_STEM}",
+            "quick: False",
+            f"ne: {ne}",
+            f"ne_brem: {ne_brem}",
+            f"ne_supp: {ne_supp}",
+            "",
+        ]
+    )
+
+
+def _write_job_script_command(jobdir, metadata):
+    """Create a job directory, persist static metadata, and receive run.sh on stdin."""
+    return (
+        f"mkdir -p '{jobdir}' && cat > '{jobdir}/run.sh' && "
+        f"printf %s {shlex.quote(metadata)} > '{jobdir}/meta'"
+    )
 
 
 def _live_jobs():
@@ -547,11 +580,14 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     payload = _queue_script(jobid, materials, quick, workers)
     script = _slurm_batch_script(jobid, payload, job_name=f"cxr-{jobid}")
+    upload = _write_job_script_command(
+        jobdir, _queue_metadata(jobid, materials, quick, workers)
+    )
     submit = _submit_slurm_command(jobid)
 
     if dry_run:
         print(f"# job {jobid}: {' '.join(materials)}{' (quick)' if quick else ''}")
-        print(f"# --- ssh {HOST}: mkdir -p {jobdir} && cat > {jobdir}/run.sh <<\n")
+        print(f"# --- ssh {HOST}: {upload} <<\n")
         print(script)
         print(f"# --- ssh {HOST}: {submit}")
         return jobid
@@ -562,7 +598,7 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
     # Send as LF-only bytes: text=True on Windows translates \n->\r\n,
     # which produces a CRLF run.sh that bash silently refuses to execute.
     subprocess.run(
-        ["ssh", HOST, f"mkdir -p '{jobdir}' && cat > '{jobdir}/run.sh'"],
+        ["ssh", HOST, upload],
         input=script.replace("\r\n", "\n").encode(),
         check=True,
     )
@@ -595,11 +631,14 @@ def start_zhai_queue(
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     payload = _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh)
     script = _slurm_batch_script(jobid, payload, job_name=f"cxr-zhai-{jobid}")
+    upload = _write_job_script_command(
+        jobdir, _zhai_queue_metadata(jobid, ne, ne_brem, ne_supp)
+    )
     submit = _submit_slurm_command(jobid)
 
     if dry_run:
         print(f"# zhai job {jobid}: ne={ne} ne_brem={ne_brem} ne_supp={ne_supp}")
-        print(f"# --- ssh {HOST}: mkdir -p {jobdir} && cat > {jobdir}/run.sh <<\n")
+        print(f"# --- ssh {HOST}: {upload} <<\n")
         print(script)
         print(f"# --- ssh {HOST}: {submit}")
         return jobid
@@ -607,7 +646,7 @@ def start_zhai_queue(
     if not no_sync:
         sync_code()
     subprocess.run(
-        ["ssh", HOST, f"mkdir -p '{jobdir}' && cat > '{jobdir}/run.sh'"],
+        ["ssh", HOST, upload],
         input=script.replace("\r\n", "\n").encode(),
         check=True,
     )
