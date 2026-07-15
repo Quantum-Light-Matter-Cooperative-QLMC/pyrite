@@ -345,6 +345,18 @@ def test_live_jobs_queries_squeue_for_recorded_scheduler_ids(monkeypatch):
     assert "/pid" not in commands[0]
 
 
+def test_live_jobs_does_not_mask_a_scheduler_query_failure(monkeypatch):
+    commands = []
+    monkeypatch.setattr(
+        remote, "_ssh_capture", lambda command: commands.append(command) or "j\tFalse\thopg\n"
+    )
+
+    remote._live_jobs()
+
+    assert "STATE=$(squeue -h -j \"$SID\" -o '%T')" in commands[0]
+    assert "squeue -h -j \"$SID\" -o '%T' | grep" not in commands[0]
+
+
 def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, capsys):
     commands = []
     monkeypatch.setattr(
@@ -523,6 +535,15 @@ def test_clear_refuses_for_quick_stem_collision(monkeypatch):
         remote.clear_remote("hopg")
 
 
+def test_clear_refuses_when_an_ambiguous_submission_holds_a_reservation(monkeypatch):
+    """A retained pre-sbatch lock protects a possibly queued job without an ID."""
+    _no_live_jobs(monkeypatch)
+    monkeypatch.setattr(remote, "_ssh_capture", lambda *_args: "RESERVED\thopg\n")
+
+    with pytest.raises(SystemExit, match="reservation"):
+        remote.clear_remote("hopg", yes=True)
+
+
 def test_clear_dry_preview_lists_but_does_not_delete(monkeypatch, capsys):
     _no_live_jobs(monkeypatch)
     monkeypatch.setattr(remote, "_ssh_capture", lambda *a: "hopg.pkl\nhopg_quick.pkl\n")
@@ -536,13 +557,18 @@ def test_clear_dry_preview_lists_but_does_not_delete(monkeypatch, capsys):
 
 def test_clear_yes_deletes_existing_files(monkeypatch, capsys):
     _no_live_jobs(monkeypatch)
-    monkeypatch.setattr(remote, "_ssh_capture", lambda *a: "hopg.pkl hopg_quick.pkl")
+    commands = []
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda command: commands.append(command) or "CLEARED\thopg.pkl\nCLEARED\thopg_quick.pkl\n",
+    )
     runs = []
     monkeypatch.setattr(remote, "_run", lambda cmd, **kw: runs.append(cmd))
     remote.clear_remote("hopg", yes=True)
-    assert len(runs) == 1
-    deletion = " ".join(runs[0])
-    assert "rm -f" in deletion and "hopg.pkl" in deletion and "hopg_quick.pkl" in deletion
+    assert runs == []
+    assert "mkdir \"$R/$stem\"" in commands[0]
+    assert 'rm -f "$f"' in commands[0]
     assert "cleared on the box" in capsys.readouterr().out
 
 
@@ -575,6 +601,32 @@ def _bash_or_skip(tmp_path):
     if probe.returncode != 0:
         pytest.skip("bash cannot reach the pytest tmp dir")
     return bash
+
+
+def test_clear_fails_closed_when_squeue_cannot_be_queried(monkeypatch, tmp_path):
+    """A scheduler outage cannot be mistaken for an absent job before deletion."""
+    bash = _bash_or_skip(tmp_path)
+    job = tmp_path / "jobs" / "j"
+    job.mkdir(parents=True)
+    (job / "meta").write_text("slurm_job_id: 48291\nquick: False\nmaterials: hopg\n")
+    commands = tmp_path / "bin"
+    commands.mkdir()
+    (commands / "squeue").write_text("#!/bin/sh\nexit 7\n")
+    (commands / "squeue").chmod(0o755)
+    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
+
+    def local_bash_capture(remote_cmd):
+        env = {**os.environ, "PATH": f"{commands}:{os.environ.get('PATH', '')}"}
+        result = subprocess.run([bash, "-c", remote_cmd], capture_output=True, env=env)
+        if result.returncode != 0:
+            raise SystemExit(f"ssh command failed (exit {result.returncode})")
+        return result.stdout.decode()
+
+    monkeypatch.setattr(remote, "_ssh_capture", local_bash_capture)
+    monkeypatch.setattr(remote, "_run", lambda *_args, **_kw: pytest.fail("must not delete"))
+
+    with pytest.raises(SystemExit, match="ssh command failed"):
+        remote.clear_remote("hopg", yes=True)
 
 
 def test_clear_listing_snippet_exits_zero_when_quick_pkl_missing(monkeypatch, tmp_path, capsys):

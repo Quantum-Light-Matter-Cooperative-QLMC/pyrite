@@ -650,7 +650,9 @@ def _live_jobs():
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$d/meta" 2>/dev/null | tail -1); '
         'case "$SID" in \'\'|*[!0-9]*) continue ;; esac; '
-        'squeue -h -j "$SID" -o \'%T\' | grep -q \'[^[:space:]]\' || continue; '
+        'if ! STATE=$(squeue -h -j "$SID" -o \'%T\'); then '
+        'echo "could not query SLURM job $SID" >&2; exit 1; fi; '
+        '[ -n "$STATE" ] || continue; '
         'q=$(sed -n "s/^quick: //p" "$d/meta" 2>/dev/null); '
         'm=$(sed -n "s/^materials: //p" "$d/meta" 2>/dev/null); '
         'printf "%s\\t%s\\t%s\\n" "$(basename "$d")" "$q" "$m"; done'
@@ -663,6 +665,56 @@ def _live_jobs():
         jobid, q, mats = parts[0].strip(), parts[1].strip(), parts[2].split()
         jobs.append((jobid, q == "True", mats))
     return jobs
+
+
+def _reservation_holders(stems: list[str]) -> list[tuple[str, str]]:
+    """Return checkpoint reservations that must block destructive operations.
+
+    A reservation is acquired before ``sbatch``.  It is therefore authoritative
+    for avoiding checkpoint deletion even if submission was ambiguous and no
+    scheduler ID was ever recorded in the job metadata.
+    """
+    _check_shell_tokens(stems)
+    remote = (
+        f'R="{_reservation_root()}"; [ -d "$R" ] || exit 0; '
+        f'for stem in {" ".join(stems)}; do '
+        '[ -d "$R/$stem" ] || continue; '
+        'OWNER=$(cat "$R/$stem/jobid" 2>/dev/null) || OWNER="unknown"; '
+        'printf "%s\\t%s\\n" "$stem" "$OWNER"; done'
+    )
+    holders = []
+    for line in _ssh_capture(remote).splitlines():
+        stem, separator, owner = line.partition("\t")
+        if separator and stem in stems:
+            holders.append((stem, owner or "unknown"))
+    return holders
+
+
+def _clear_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
+    """Atomically reserve and delete checkpoint stems on the remote box.
+
+    The temporary reservation spans the delete itself, closing the interval
+    between a clear's liveness check and ``rm`` where a concurrent ``start``
+    could otherwise claim the same checkpoint.  The EXIT trap releases only
+    reservations owned by this clear, including after a failed deletion.
+    """
+    _check_shell_tokens([jobid, *stems])
+    reservations = _reservation_root()
+    stem_words = " ".join(stems)
+    releases = " ".join(
+        f'if [ "$(cat "$R/{stem}/jobid" 2>/dev/null)" = "$J" ]; then rm -rf "$R/{stem}"; fi;'
+        for stem in stems
+    )
+    return f'''R="{reservations}"; J="{jobid}"; C="{REMOTE_DIR}/checkpoints"; \
+mkdir -p "$R" || exit $?; \
+release() {{ {releases} }}; trap release EXIT; \
+for stem in {stem_words}; do \
+  if mkdir "$R/$stem" 2>/dev/null; then printf '%s\\n' "$J" > "$R/$stem/jobid"; \
+  else printf 'RESERVED\\t%s\\n' "$stem"; exit 0; fi; \
+done; \
+cd "$C" 2>/dev/null || exit 0; \
+for stem in {stem_words}; do f="$stem.pkl"; [ -f "$f" ] || continue; rm -f "$f" || exit $?; \
+  printf 'CLEARED\\t%s\\n' "$f"; done'''
 
 
 def _slurm_job_id(jobid: str) -> str | None:
@@ -724,11 +776,10 @@ def clear_remote(material, yes=False):
     """Delete a material's accumulated checkpoints on the box: both
     ``checkpoints/<material>.pkl`` and ``checkpoints/<material>_quick.pkl``.
 
-    Refuses (before touching anything) if a live job is producing either stem,
-    reusing the same ``_live_jobs`` guard as ``start``/``scan`` so a clear can't
-    yank a checkpoint out from under a running sweep. Without ``yes`` this is a
-    safe dry preview: it prints exactly which of the two files exist and would be
-    deleted, then stops. With ``yes`` it ``rm -f``s them and reports what went."""
+    Refuses (before touching anything) if a live job or a pre-submission
+    reservation protects either stem.  Without ``yes`` this is a safe dry
+    preview: it prints exactly which of the two files exist and would be deleted,
+    then stops. With ``yes`` it ``rm -f``s them and reports what went."""
     _check_materials([material])  # interpolated into a remote shell command
     wanted = {material, f"{material}_quick"}
     busy = [
@@ -742,6 +793,37 @@ def clear_remote(material, yes=False):
             "refusing to clear: a live job is still producing one of these "
             f"checkpoints, and clearing it would race a running sweep.\n{detail}\n"
             "stop it (cxr remote stop <material>) first, or wait for it to finish."
+        )
+    stems = [material, f"{material}_quick"]
+    if yes:
+        outcome = _ssh_capture(
+            _clear_checkpoint_stems_command(f"clear-{_new_jobid()}", stems)
+        ).splitlines()
+        reservations = [line.split("\t", 1)[1] for line in outcome if line.startswith("RESERVED\t")]
+        if reservations:
+            raise SystemExit(
+                "refusing to clear: a checkpoint reservation is still active for "
+                f"{', '.join(reservations)}. Wait for submission to resolve, or stop "
+                "the recorded job before clearing."
+            )
+        existing = [line.split("\t", 1)[1] for line in outcome if line.startswith("CLEARED\t")]
+        if not existing:
+            print(f"(nothing to clear for {material})")
+            return
+        print("cleared on the box:")
+        for f in existing:
+            print(f"  checkpoints/{f}")
+        return
+    reservations = _reservation_holders(stems)
+    if reservations:
+        detail = "\n".join(
+            f"  reservation {owner} protects -> {stem}" for stem, owner in reservations
+        )
+        raise SystemExit(
+            "refusing to clear: a checkpoint reservation is still active, which can "
+            "belong to a submission whose SLURM outcome is not yet known.\n"
+            f"{detail}\n"
+            "wait for submission to resolve, or stop the recorded job before clearing."
         )
     # which of the two stems actually exist on the box; the `|| true` keeps a
     # missing last stem's failed `[ -f ]` from becoming the loop's -- and hence
@@ -759,10 +841,6 @@ def clear_remote(material, yes=False):
         for f in existing:
             print(f"  checkpoints/{f}")
         return
-    _run(["ssh", "-n", HOST, f"cd {REMOTE_DIR}/checkpoints && rm -f {' '.join(existing)}"])
-    print("cleared on the box:")
-    for f in existing:
-        print(f"  checkpoints/{f}")
 
 
 def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=False):
@@ -885,7 +963,8 @@ def job_status(jobid=None):
         'echo "-- state --"; cat "$D/state" 2>/dev/null || echo "(no state yet)"; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
         'case "$SID" in \'\'|*[!0-9]*) echo "slurm: (none) not queued" ;; '
-        '*) S=$(squeue -h -j "$SID" -o \'%T\'); '
+        '*) if ! S=$(squeue -h -j "$SID" -o \'%T\'); then '
+        'echo "could not query SLURM job $SID" >&2; exit 1; fi; '
         'if [ -n "$S" ]; then echo "slurm: $SID $S"; '
         'else echo "slurm: $SID not queued"; fi ;; esac; '
         'echo "-- log tail --"; tail -n 20 "$D/log" 2>/dev/null'
@@ -952,8 +1031,10 @@ def attach(jobid=None):
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
         'case "$SID" in \'\'|*[!0-9]*) SID= ;; *) break ;; esac; sleep 1; done; '
         'if [ -n "$SID" ]; then '
-        'while squeue -h -j "$SID" -o \'%T\' | grep -q \'[^[:space:]]\'; '
-        'do sleep 2; done; '
+        'while :; do '
+        'if ! STATE=$(squeue -h -j "$SID" -o \'%T\'); then '
+        'echo "could not query SLURM job $SID" >&2; kill "$TP" 2>/dev/null; exit 1; fi; '
+        '[ -n "$STATE" ] || break; sleep 2; done; '
         'else echo "no recorded SLURM job ID for {jobid}" >&2; kill "$TP" 2>/dev/null; exit 1; fi; '
         'sleep 1; kill "$TP" 2>/dev/null; '
         'printf "\\n--- job finished ---\\n"; cat "$D/state" 2>/dev/null'
