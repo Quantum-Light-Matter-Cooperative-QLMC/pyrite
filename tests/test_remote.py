@@ -39,6 +39,7 @@ def test_queue_script_has_per_material_scan_calls():
     assert "mose2" in s and "wse2" in s
     assert "20260101-000000" in s  # job id is embedded
     assert "mats=(mose2 wse2)" in s  # bash array drives the loop
+    assert "/pid" not in s
 
 
 def test_queue_script_no_flags_when_unset():
@@ -54,12 +55,27 @@ def test_queue_script_warns_and_continues_after_a_material_fails():
     assert "done with $failures warning(s)" in script
 
 
-def test_launch_queue_command_backgrounds_only_runner():
-    launch = remote._launch_queue_command("20260101-000000")
+def test_slurm_batch_script_requests_the_lab_gpu_profile():
+    script = remote._slurm_batch_script("j", "echo payload", job_name="cxr-j")
 
-    assert "&& (nohup setsid bash" in launch
-    assert "</dev/null &) && echo 'launched 20260101-000000'" in launch
-    assert "</dev/null & echo" not in launch
+    assert "#SBATCH --job-name=cxr-j" in script
+    assert "#SBATCH --partition=gpu" in script
+    assert "#SBATCH --nodes=1" in script
+    assert "#SBATCH --ntasks-per-node=1" in script
+    assert "#SBATCH --gres=gpu:1" in script
+    assert "#SBATCH --time=UNLIMITED" in script
+    assert "module purge 2>/dev/null || true" in script
+    assert "module load cuda openmpi hdf5 2>/dev/null || true" in script
+    assert "echo payload" in script
+
+
+def test_submit_command_uses_sbatch_parsable_and_records_scheduler_id():
+    command = remote._submit_slurm_command("20260715-120000")
+
+    assert "sbatch --parsable" in command
+    assert "slurm_job_id" in command
+    assert "jobs/20260715-120000/run.sh" in command
+    assert "nohup" not in command and "setsid" not in command
 
 
 def test_attach_uses_stdin_closed_ssh_for_live_view(monkeypatch):
@@ -400,6 +416,7 @@ def test_zhai_queue_script_has_ne_flags_and_meta():
     assert "--tmd-azimuth 35.0" in s
     assert "materials: zhai" in s and "quick: False" in s
     assert "20260101-000000" in s
+    assert "/pid" not in s
 
 
 def test_zhai_queue_script_no_refresh_flag_when_unset():

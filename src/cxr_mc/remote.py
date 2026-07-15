@@ -73,6 +73,9 @@ from .scan import load_all_materials
 HOST = os.environ.get("CXR_REMOTE_HOST", "qlmc")
 REMOTE_DIR = os.environ.get("CXR_REMOTE_DIR", "/home/aamador/dev/cxr-mc")
 REMOTE_UV = os.environ.get("CXR_REMOTE_UV", "/home/aamador/.local/bin/uv")
+SLURM_PARTITION = "gpu"
+SLURM_GPUS = 1
+SLURM_TIME = "UNLIMITED"
 # repo root = three levels up from src/cxr_mc/remote.py. remote.py orchestrates
 # the *checkout* (it tars the working tree up to the box), so it resolves paths
 # against the repo root, not its own package dir.
@@ -80,7 +83,7 @@ LOCAL_ROOT = Path(__file__).resolve().parents[2]
 MATS_FILE = LOCAL_ROOT / "mats_to_sim.toml"
 
 # detached-job bookkeeping lives under <REMOTE_DIR>/jobs/<jobid>/ on the box
-# (gitignored there): run.sh, meta, pid, state, log. One subdir per `start`.
+# (gitignored there): run.sh, meta, state, log. One subdir per `start`.
 JOBS_SUBDIR = "jobs"
 
 # The Zhai reproduction job has no crystal key of its own, but reusing the
@@ -320,9 +323,7 @@ def _stems(materials, quick):
 
 
 def _queue_script(jobid, materials, quick, workers):
-    """The bash runner shipped to the box and launched detached. It records
-    pid/meta/state, then runs `scan.py` once per material in sequence, appending
-    all output to the job log and marking the state at each transition."""
+    """CXR payload for one sequential material queue inside a SLURM allocation."""
     flags = ""
     if quick:
         flags += " --quick"
@@ -330,14 +331,11 @@ def _queue_script(jobid, materials, quick, workers):
         flags += f" --workers {workers}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
-    return f"""#!/usr/bin/env bash
-set -u
-JOBDIR="{jobdir}"
+    return f"""JOBDIR="{jobdir}"
 cd "{REMOTE_DIR}" || exit 1
-echo $$ > "$JOBDIR/pid"
 {{ echo "job: {jobid}"; echo "materials: {mats}"; echo "quick: {bool(quick)}"; \
-echo "workers: {workers}"; echo "started: $(date -Is)"; echo "pid: $$"; \
-}} > "$JOBDIR/meta"
+echo "workers: {workers}"; echo "started: $(date -Is)"; \
+}} >> "$JOBDIR/meta"
 {REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 mats=({mats})
 total=${{#mats[@]}}
@@ -372,21 +370,14 @@ def _zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
 
 
 def _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh):
-    """The bash runner for a detached Zhai-reproduction job: same
-    pid/meta/state bookkeeping as _queue_script, but runs reproduce_zhai.py
-    once instead of looping scan.py over materials. The meta's `materials:
-    zhai` / `quick: False` lines are what let _live_jobs/_refuse_if_busy/
-    stop_jobs treat this job like any material-keyed one, keyed on ZHAI_STEM."""
+    """CXR payload for one Zhai reproduction inside a SLURM allocation."""
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     flags = _zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh)
-    return f"""#!/usr/bin/env bash
-set -u
-JOBDIR="{jobdir}"
+    return f"""JOBDIR="{jobdir}"
 cd "{REMOTE_DIR}" || exit 1
-echo $$ > "$JOBDIR/pid"
 {{ echo "job: {jobid}"; echo "materials: {ZHAI_STEM}"; echo "quick: False"; \\
 echo "ne: {ne}"; echo "ne_brem: {ne_brem}"; echo "ne_supp: {ne_supp}"; \\
-echo "started: $(date -Is)"; echo "pid: $$"; }} > "$JOBDIR/meta"
+echo "started: $(date -Is)"; }} >> "$JOBDIR/meta"
 {REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 echo "running zhai reproduction since $(date -Is)" > "$JOBDIR/state"
 if ! {REMOTE_UV} run --no-sync python reproduce_zhai.py{flags} >> "$JOBDIR/log" 2>&1
@@ -398,16 +389,60 @@ echo "done $(date -Is)" > "$JOBDIR/state"
 """
 
 
-def _launch_queue_command(jobid):
+def _slurm_batch_script(jobid: str, payload: str, *, job_name: str) -> str:
+    """Wrap a CXR queue payload in the lab box's one-GPU SLURM profile."""
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
-    # Detach only the runner process. Without the subshell, `cmd1 && cmd2 &&
-    # nohup ... & echo launched` backgrounds the whole AND-list, leaving a shell
-    # associated with the SSH channel even after "launched" is printed.
-    return (
-        f"cd '{REMOTE_DIR}' && : > '{jobdir}/log' && "
-        f"(nohup setsid bash '{jobdir}/run.sh' >/dev/null 2>&1 </dev/null &) && "
-        f"echo 'launched {jobid}'"
-    )
+    return f"""#!/usr/bin/env bash
+#SBATCH --job-name={job_name}
+#SBATCH --partition={SLURM_PARTITION}
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node={SLURM_GPUS}
+#SBATCH --gres=gpu:{SLURM_GPUS}
+#SBATCH --time={SLURM_TIME}
+#SBATCH --output={jobdir}/slurm-%j.out
+#SBATCH --error={jobdir}/slurm-%j.err
+
+set -u
+module purge 2>/dev/null || true
+module load cuda openmpi hdf5 2>/dev/null || true
+
+JOBDIR="{jobdir}"
+finish() {{
+  status=$?
+  current=$(cat "$JOBDIR/state" 2>/dev/null || true)
+  case "$current" in
+    done*|FAILED*|cancelled*) ;;
+    *) echo "FAILED (exit $status) $(date -Is)" > "$JOBDIR/state" ;;
+  esac
+}}
+trap finish EXIT
+echo "running $(date -Is)" > "$JOBDIR/state"
+{{
+  echo "===== SLURM job ${{SLURM_JOB_ID:-unknown}} ====="
+  echo "host: $(hostname)"
+  echo "gpus: {SLURM_GPUS}"
+  echo "partition: {SLURM_PARTITION}"
+  echo "started: $(date -Is)"
+}} >> "$JOBDIR/log"
+
+{payload}"""
+
+
+def _submit_slurm_command(jobid: str) -> str:
+    """Return the remote submission protocol for an already-written batch script."""
+    _check_shell_tokens([jobid])
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    return f"""D='{jobdir}'; \
+echo "queued $(date -Is)" > "$D/state"; \
+SID=$(sbatch --parsable '{jobdir}/run.sh') || {{ \
+  echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; exit 1; \
+}}; \
+SID=${{SID%%;*}}; \
+case "$SID" in ''|*[!0-9]*) \
+  echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; exit 1 ;; \
+esac; \
+printf 'slurm_job_id: %s\\n' "$SID" >> "$D/meta"; \
+printf '%s\\n' "$SID"""
 
 
 def _live_jobs():
@@ -504,24 +539,21 @@ def clear_remote(material, yes=False):
 
 
 def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=False):
-    """Launch a detached queue on the box: sync code, write the per-job runner,
-    and `nohup setsid` it so it survives ssh disconnect. Returns the job id."""
+    """Submit a sequential material queue to SLURM. Returns the local job id."""
     _check_materials(materials)
     if not dry_run:
         _refuse_if_busy(materials, quick)
     jobid = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
-    script = _queue_script(jobid, materials, quick, workers)
-    # Redirect all three runner streams off the ssh channel and setsid into
-    # a new session, so the ssh command returns immediately and the job keeps
-    # running after you disconnect.
-    launch = _launch_queue_command(jobid)
+    payload = _queue_script(jobid, materials, quick, workers)
+    script = _slurm_batch_script(jobid, payload, job_name=f"cxr-{jobid}")
+    submit = _submit_slurm_command(jobid)
 
     if dry_run:
         print(f"# job {jobid}: {' '.join(materials)}{' (quick)' if quick else ''}")
         print(f"# --- ssh {HOST}: mkdir -p {jobdir} && cat > {jobdir}/run.sh <<\n")
         print(script)
-        print(f"# --- ssh {HOST}: {launch}")
+        print(f"# --- ssh {HOST}: {submit}")
         return jobid
 
     if not no_sync:
@@ -534,7 +566,7 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
         input=script.replace("\r\n", "\n").encode(),
         check=True,
     )
-    _run(["ssh", "-n", HOST, launch])
+    _run(["ssh", "-n", HOST, submit])
 
     stems = _stems(materials, quick)
     print(
@@ -556,21 +588,20 @@ def start_zhai_queue(
     no_sync=False,
     dry_run=False,
 ):
-    """Launch a detached Zhai-reproduction job on the box (mirrors
-    start_queue): sync code, write the runner, nohup setsid it. Returns the
-    job id; pull results with `cxr remote check --pull` once state is 'done'."""
+    """Submit a Zhai-reproduction batch job to SLURM. Returns the local job id."""
     if not dry_run:
         _refuse_if_busy([ZHAI_STEM], False)
     jobid = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
-    script = _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh)
-    launch = _launch_queue_command(jobid)
+    payload = _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh)
+    script = _slurm_batch_script(jobid, payload, job_name=f"cxr-zhai-{jobid}")
+    submit = _submit_slurm_command(jobid)
 
     if dry_run:
         print(f"# zhai job {jobid}: ne={ne} ne_brem={ne_brem} ne_supp={ne_supp}")
         print(f"# --- ssh {HOST}: mkdir -p {jobdir} && cat > {jobdir}/run.sh <<\n")
         print(script)
-        print(f"# --- ssh {HOST}: {launch}")
+        print(f"# --- ssh {HOST}: {submit}")
         return jobid
 
     if not no_sync:
@@ -580,7 +611,7 @@ def start_zhai_queue(
         input=script.replace("\r\n", "\n").encode(),
         check=True,
     )
-    _run(["ssh", "-n", HOST, launch])
+    _run(["ssh", "-n", HOST, submit])
 
     print(
         f"\nstarted zhai job {jobid} on {HOST}\n"
