@@ -1462,8 +1462,37 @@ def _(
 
 
 @app.cell
+def _(CATALOG, load_checkpoint, mo, records):
+    # Cross-material controls are top-level so switching them reruns the lazy
+    # tab body.  The selector contains only energies present in loaded data.
+    _energies = set()
+    for _material_key in CATALOG.material_keys:
+        _results = load_checkpoint(_material_key)
+        if _results:
+            _energies.update(r["case"]["E0_keV"] for r in records(_results))
+    cross_material_energy_options = {
+        f"{energy:g} keV": energy for energy in sorted(_energies)
+    } or {"— no data —": None}
+    compare_all_beam_energies_ui = mo.ui.checkbox(value=True, label="Compare all beam energies")
+    return cross_material_energy_options, compare_all_beam_energies_ui
+
+
+@app.cell
+def _(compare_all_beam_energies_ui, cross_material_energy_options, mo):
+    cross_material_energy_ui = mo.ui.dropdown(
+        cross_material_energy_options,
+        value=next(iter(cross_material_energy_options)),
+        label="beam energy",
+        disabled=compare_all_beam_energies_ui.value,
+    )
+    return (cross_material_energy_ui,)
+
+
+@app.cell
 def _(
     CATALOG,
+    compare_all_beam_energies_ui,
+    cross_material_energy_ui,
     load_checkpoint,
     mo,
     plot_material_comparison,
@@ -1474,7 +1503,8 @@ def _(
             "For every material whose checkpoint exists, the single best geometry's "
             "dominant line: energy vs flux. The three comparisons select by line "
             "quality, peak flux, and local line-to-bremsstrahlung ratio; the two "
-            "diagnostic selections apply a 100 eV line-energy floor."
+            "diagnostic selections apply a 100 eV line-energy floor. Each label "
+            "also reports the selected geometry's θ and φ."
         )
         _by_material = {}
         for _material_key in CATALOG.material_keys:
@@ -1482,15 +1512,32 @@ def _(
             if _r:
                 _by_material[CATALOG.material(_material_key).label] = _r
         if len(_by_material) >= 2:
+            _beam_energy = (
+                None if compare_all_beam_energies_ui.value else cross_material_energy_ui.value
+            )
             return mo.vstack(
                 [
                     _md,
-                    plot_material_comparison(_by_material, settings, select="quality_peak"),
+                    mo.hstack([compare_all_beam_energies_ui, cross_material_energy_ui]),
                     plot_material_comparison(
-                        _by_material, settings, select="peak", min_line_eV=100.0
+                        _by_material,
+                        settings,
+                        select="quality_peak",
+                        beam_energy_keV=_beam_energy,
                     ),
                     plot_material_comparison(
-                        _by_material, settings, select="line_brem_ratio", min_line_eV=100.0
+                        _by_material,
+                        settings,
+                        select="peak",
+                        min_line_eV=100.0,
+                        beam_energy_keV=_beam_energy,
+                    ),
+                    plot_material_comparison(
+                        _by_material,
+                        settings,
+                        select="line_brem_ratio",
+                        min_line_eV=100.0,
+                        beam_energy_keV=_beam_energy,
                     ),
                 ]
             )

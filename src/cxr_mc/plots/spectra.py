@@ -362,6 +362,7 @@ def plot_material_comparison(
     rel_prominence=0.03,
     line_metric="sharpness",
     min_line_eV=None,
+    beam_energy_keV=None,
 ):
     """Cross-material headline: for each material's results store, find the single
     BEST geometry/energy (results.selection_score ``select``) and plot its
@@ -372,7 +373,8 @@ def plot_material_comparison(
 
     ``results_by_material`` : ``{label: results_store}``, e.g. built in the
     notebook with ``{m: load_checkpoint(m) for m in CATALOG.material_keys}``
-    (skip empties)."""
+    (skip empties).  ``beam_energy_keV`` optionally restricts each material to
+    that beam energy before selecting its best geometry."""
     pts = []  # (label, line_eV, line_flux, quality, case)
     for label, results in results_by_material.items():
         recs = records(results)
@@ -382,12 +384,11 @@ def plot_material_comparison(
         candidates = [
             r
             for r in recs
-            if min_line_eV is None or metrics[id(r)]["line_eV"] >= min_line_eV
+            if (beam_energy_keV is None or r["case"]["E0_keV"] == beam_energy_keV)
+            and (min_line_eV is None or metrics[id(r)]["line_eV"] >= min_line_eV)
         ]
         if select == "line_brem_ratio":
-            candidates = [
-                r for r in candidates if np.isfinite(metrics[id(r)]["line_brem_ratio"])
-            ]
+            candidates = [r for r in candidates if np.isfinite(metrics[id(r)]["line_brem_ratio"])]
         if not candidates:
             continue
         best = max(candidates, key=lambda r: selection_score(metrics[id(r)], select))
@@ -410,7 +411,10 @@ def plot_material_comparison(
     )
     for label, eV, flux, _q, case in pts:
         ax.annotate(
-            f"  {label} ({case['E0_keV']:g} keV)",
+            (
+                f"  {label} ({case['E0_keV']:g} keV, "
+                f"θ={case['tilt_deg']:g}°, φ={case['tilt_azim_deg']:g}°)"
+            ),
             (eV / 1e3, flux),
             fontsize=8,
             va="center",
@@ -419,9 +423,7 @@ def plot_material_comparison(
     ax.set_xlabel("dominant coherent line energy (keV)")
     ax.set_ylabel("integrated line flux at best geometry (Phs/s)")
     energy_floor = "" if min_line_eV is None else f", line >= {min_line_eV:g} eV"
-    ax.set_title(
-        f"Best coherent line per material  (select: {select}{energy_floor})", fontsize=12
-    )
+    ax.set_title(f"Best coherent line per material  (select: {select}{energy_floor})", fontsize=12)
     ax.grid(alpha=0.3, which="both")
     ax.margins(x=0.12)
     cb = fig.colorbar(sc, ax=ax)
