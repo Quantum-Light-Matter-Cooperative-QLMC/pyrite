@@ -355,13 +355,28 @@ def plot_best_spectra(
     return fig
 
 
+def _separate_annotation_boxes(fig, annotations):
+    """Offset labels vertically until their rendered bounding boxes do not overlap."""
+    placed_boxes = []
+    offsets = [0]
+    for distance in range(12, 12 * (len(annotations) + 1), 12):
+        offsets.extend((distance, -distance))
+    for annotation in annotations:
+        for offset in offsets:
+            annotation.set_position((6, offset))
+            fig.canvas.draw()
+            box = annotation.get_window_extent(fig.canvas.get_renderer())
+            if not any(box.overlaps(placed) for placed in placed_boxes):
+                placed_boxes.append(box)
+                break
+
+
 def plot_material_comparison(
     results_by_material,
     settings,
     select="quality_peak",
     rel_prominence=0.03,
     line_metric="sharpness",
-    min_line_eV=None,
     beam_energy_keV=None,
 ):
     """Cross-material headline: for each material's results store, find the single
@@ -374,7 +389,8 @@ def plot_material_comparison(
     ``results_by_material`` : ``{label: results_store}``, e.g. built in the
     notebook with ``{m: load_checkpoint(m) for m in CATALOG.material_keys}``
     (skip empties).  ``beam_energy_keV`` optionally restricts each material to
-    that beam energy before selecting its best geometry."""
+    that beam energy before selecting its best geometry. Labels are offset
+    automatically when their rendered bounding boxes would overlap."""
     pts = []  # (label, line_eV, line_flux, quality, case)
     for label, results in results_by_material.items():
         recs = records(results)
@@ -382,10 +398,7 @@ def plot_material_comparison(
             continue
         metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
         candidates = [
-            r
-            for r in recs
-            if (beam_energy_keV is None or r["case"]["E0_keV"] == beam_energy_keV)
-            and (min_line_eV is None or metrics[id(r)]["line_eV"] >= min_line_eV)
+            r for r in recs if (beam_energy_keV is None or r["case"]["E0_keV"] == beam_energy_keV)
         ]
         if select == "line_brem_ratio":
             candidates = [r for r in candidates if np.isfinite(metrics[id(r)]["line_brem_ratio"])]
@@ -409,24 +422,38 @@ def plot_material_comparison(
         edgecolor="k",
         zorder=3,
     )
+    annotations = []
     for label, eV, flux, _q, case in pts:
-        ax.annotate(
-            (
-                f"  {label} ({case['E0_keV']:g} keV, "
-                f"θ={case['tilt_deg']:g}°, φ={case['tilt_azim_deg']:g}°)"
-            ),
-            (eV / 1e3, flux),
-            fontsize=8,
-            va="center",
+        annotations.append(
+            ax.annotate(
+                (
+                    f"  {label} ({case['E0_keV']:g} keV, "
+                    f"θ={case['tilt_deg']:g}°, φ={case['tilt_azim_deg']:g}°)"
+                ),
+                (eV / 1e3, flux),
+                fontsize=8,
+                va="center",
+                xytext=(6, 0),
+                textcoords="offset points",
+            )
         )
     ax.set_yscale("log")
     ax.set_xlabel("dominant coherent line energy (keV)")
     ax.set_ylabel("integrated line flux at best geometry (Phs/s)")
-    energy_floor = "" if min_line_eV is None else f", line >= {min_line_eV:g} eV"
-    ax.set_title(f"Best coherent line per material  (select: {select}{energy_floor})", fontsize=12)
+    selection_titles = {
+        "quality_peak": "highest line-definition quality",
+        "peak": "highest peak flux",
+        "line_brem_ratio": "highest local line-to-bremsstrahlung ratio",
+    }
+    selection_title = selection_titles.get(select, select.replace("_", " "))
+    energy_scope = (
+        "all beam energies" if beam_energy_keV is None else f"{beam_energy_keV:g} keV beam energy"
+    )
+    ax.set_title(f"Cross-material comparison — {selection_title} ({energy_scope})", fontsize=12)
     ax.grid(alpha=0.3, which="both")
     ax.margins(x=0.12)
     cb = fig.colorbar(sc, ax=ax)
     cb.set_label("line-definition quality")
     fig.tight_layout()
+    _separate_annotation_boxes(fig, annotations)
     return fig

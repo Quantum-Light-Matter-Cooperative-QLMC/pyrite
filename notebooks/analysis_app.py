@@ -1502,9 +1502,8 @@ def _(
         _md = mo.md(
             "For every material whose checkpoint exists, the single best geometry's "
             "dominant line: energy vs flux. The three comparisons select by line "
-            "quality, peak flux, and local line-to-bremsstrahlung ratio; the two "
-            "diagnostic selections apply a 100 eV line-energy floor. Each label "
-            "also reports the selected geometry's θ and φ."
+            "quality, peak flux, and local line-to-bremsstrahlung ratio. Each "
+            "label reports the selected geometry's beam energy, θ, and φ."
         )
         _by_material = {}
         for _material_key in CATALOG.material_keys:
@@ -1529,14 +1528,12 @@ def _(
                         _by_material,
                         settings,
                         select="peak",
-                        min_line_eV=100.0,
                         beam_energy_keV=_beam_energy,
                     ),
                     plot_material_comparison(
                         _by_material,
                         settings,
                         select="line_brem_ratio",
-                        min_line_eV=100.0,
                         beam_energy_keV=_beam_energy,
                     ),
                 ]
