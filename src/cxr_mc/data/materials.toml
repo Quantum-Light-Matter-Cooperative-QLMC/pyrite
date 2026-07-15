@@ -119,6 +119,24 @@ E_grid = { arange = { start = 50.0, stop = 3500.0, step = 3.0 } }
 hkl_families = [[0, 2, 0]]
 hkl_reason = "Pin the allowed black-phosphorus (020) symmetric cut so the reciprocal vector remains parallel to the b-axis-normal layered slab."
 
+[crystals.4h_sic]
+cif = "cifs/4h_sic.cif"
+validation_id = "4h-sic-0004-structure"
+B_ang2 = 0.6
+beam_uvw = [0, 0, 1]
+E_grid = { arange = { start = 50.0, stop = 3000.0, step = 3.0 } }
+hkl_families = [[0, 0, 4]]
+hkl_reason = "Pin the basal 4H-SiC (0004) symmetric cut so the reciprocal vector remains parallel to the c-axis-normal slab."
+
+[crystals.6h_sic]
+cif = "cifs/6h_sic.cif"
+validation_id = "6h-sic-0006-structure"
+B_ang2 = 0.6
+beam_uvw = [0, 0, 1]
+E_grid = { arange = { start = 50.0, stop = 3000.0, step = 3.0 } }
+hkl_families = [[0, 0, 6]]
+hkl_reason = "Pin the basal 6H-SiC (0006) symmetric cut so the reciprocal vector remains parallel to the c-axis-normal slab."
+
 [crystals.ptse2]
 cif = "cifs/ptse2.cif"
 validation_id = "ptse2-cif-migration"
@@ -294,6 +312,14 @@ profile = "standard"
 
 [materials.black_phosphorus]
 label = "black phosphorus (020)"
+profile = "standard"
+
+[materials.4h_sic]
+label = "4H-SiC (0004)"
+profile = "standard"
+
+[materials.6h_sic]
+label = "6H-SiC (0006)"
 profile = "standard"
 
 [materials.ws2]
