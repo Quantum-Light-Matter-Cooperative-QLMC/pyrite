@@ -63,8 +63,8 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
     from cxr_mc.materials import CATALOG, MaterialCatalog
 
     assert isinstance(CATALOG, MaterialCatalog)
-    assert len(CATALOG.crystals) == 23
-    assert len(CATALOG.materials) == 23
+    assert len(CATALOG.crystals) == 25
+    assert len(CATALOG.materials) == 25
     assert CATALOG.material_keys == tuple(CATALOG.materials)
     assert CATALOG.crystal("hbn") is CATALOG.crystals["hbn"]
     assert CATALOG.material("mote2") is CATALOG.materials["mote2"]

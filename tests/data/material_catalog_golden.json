@@ -16,6 +16,8 @@
     "mote2",
     "mote2_product",
     "tis2",
+    "tise2",
+    "black_phosphorus",
     "ptse2",
     "pts2",
     "pdse2",
@@ -40,6 +42,8 @@
     "mote2",
     "mote2_product",
     "tis2",
+    "tise2",
+    "black_phosphorus",
     "ptse2",
     "pts2",
     "pdse2",
@@ -72,6 +76,8 @@
     "zrse2",
     "v2o5",
     "tis2",
+    "tise2",
+    "black_phosphorus",
     "ws2",
     "mos2",
     "mos2-on-sio2-si",
@@ -3524,6 +3530,294 @@
           ]
         ]
       }
+    },
+    "tise2": {
+      "lattice": {
+        "system": "general",
+        "a": 3.54,
+        "b": 3.54,
+        "c": 6.008,
+        "alpha": 90,
+        "beta": 90,
+        "gamma": 119.99999999999999
+      },
+      "basis": [
+        [
+          "Se",
+          [
+            0.3333333333333333,
+            0.6666666666666667,
+            0.25504
+          ]
+        ],
+        [
+          "Se",
+          [
+            0.6666666666666667,
+            0.3333333333333333,
+            0.74496
+          ]
+        ],
+        [
+          "Ti",
+          [
+            0,
+            0,
+            0
+          ]
+        ]
+      ],
+      "V_cell": 65.20292517199096,
+      "mosaic_fwhm_deg": null,
+      "composition": [
+        [
+          "Se",
+          0.030673470472750118
+        ],
+        [
+          "Ti",
+          0.015336735236375059
+        ]
+      ],
+      "config": {
+        "B_ang2": 0.6,
+        "beam_uvw": [
+          0,
+          0,
+          1
+        ],
+        "E_grid": {
+          "shape": [
+            1050
+          ],
+          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
+        },
+        "hkl_list": [
+          [
+            0,
+            0,
+            1
+          ],
+          [
+            0,
+            0,
+            -1
+          ]
+        ],
+        "hkl_reason": "Pin the basal 1T-TiSe2(001) symmetric cut so the reciprocal vector remains parallel to the c-axis-normal layered slab.",
+        "layers_per_cell": null
+      },
+      "physics": {
+        "hkl": [
+          0,
+          0,
+          1
+        ],
+        "g_mag": 1.0458031470005968,
+        "structure_factor": [
+          18.456475505934545,
+          -0.25239876029980124
+        ],
+        "dominant_reflections": [
+          [
+            0,
+            0,
+            -1
+          ],
+          [
+            0,
+            0,
+            1
+          ],
+          [
+            -1,
+            0,
+            1
+          ],
+          [
+            -1,
+            1,
+            -1
+          ],
+          [
+            0,
+            -1,
+            -1
+          ],
+          [
+            0,
+            1,
+            1
+          ],
+          [
+            1,
+            -1,
+            1
+          ],
+          [
+            1,
+            0,
+            -1
+          ]
+        ]
+      }
+    },
+    "black_phosphorus": {
+      "lattice": {
+        "system": "general",
+        "a": 3.3136000000000005,
+        "b": 10.478,
+        "c": 4.3763,
+        "alpha": 90,
+        "beta": 90,
+        "gamma": 90
+      },
+      "basis": [
+        [
+          "P",
+          [
+            0,
+            0.10168,
+            0.08056
+          ]
+        ],
+        [
+          "P",
+          [
+            0,
+            0.39832,
+            0.58056
+          ]
+        ],
+        [
+          "P",
+          [
+            0,
+            0.60168,
+            0.41944
+          ]
+        ],
+        [
+          "P",
+          [
+            0,
+            0.89832,
+            0.91944
+          ]
+        ],
+        [
+          "P",
+          [
+            0.5,
+            0.10168,
+            0.41944
+          ]
+        ],
+        [
+          "P",
+          [
+            0.5,
+            0.39832,
+            0.91944
+          ]
+        ],
+        [
+          "P",
+          [
+            0.5,
+            0.60168,
+            0.08056
+          ]
+        ],
+        [
+          "P",
+          [
+            0.5,
+            0.89832,
+            0.58056
+          ]
+        ]
+      ],
+      "V_cell": 151.94470187104,
+      "mosaic_fwhm_deg": null,
+      "composition": [
+        [
+          "P",
+          0.05265073346742843
+        ]
+      ],
+      "config": {
+        "B_ang2": 0.6,
+        "beam_uvw": [
+          0,
+          1,
+          0
+        ],
+        "E_grid": {
+          "shape": [
+            1050
+          ],
+          "sha256": "da5fda31ab68219fcd4abde8b93f510f74b5559c58dcf6e7b08612d3d77949d4"
+        },
+        "hkl_list": [
+          [
+            0,
+            2,
+            0
+          ],
+          [
+            0,
+            -2,
+            0
+          ]
+        ],
+        "hkl_reason": "Pin the allowed black-phosphorus (020) symmetric cut so the reciprocal vector remains parallel to the b-axis-normal layered slab.",
+        "layers_per_cell": null
+      },
+      "physics": {
+        "hkl": [
+          0,
+          2,
+          0
+        ],
+        "g_mag": 1.1993100414543973,
+        "structure_factor": [
+          28.498042421577154,
+          3.052893227207864
+        ],
+        "dominant_reflections": [
+          [
+            0,
+            -2,
+            0
+          ],
+          [
+            0,
+            2,
+            0
+          ],
+          [
+            0,
+            -2,
+            -1
+          ],
+          [
+            0,
+            -2,
+            1
+          ],
+          [
+            0,
+            2,
+            -1
+          ],
+          [
+            0,
+            2,
+            1
+          ]
+        ]
+      }
     }
   },
   "media": {
@@ -4534,6 +4828,96 @@
             1317
           ],
           "sha256": "90e255d43fdfdce913755db6e01c6aedaa89156f501e238578a6771d59f7cee9"
+        },
+        "E_grid_brem": {
+          "shape": [
+            1200
+          ],
+          "sha256": "79f8f20c412aa260b3f00a9e0cb7c2e01c140a18067e9f5fe5e8c9aab64638d2"
+        }
+      },
+      "substrate": null,
+      "stack": []
+    },
+    "tise2": {
+      "label": "1T-TiSe2 (001)",
+      "profile": "standard",
+      "crystal_key": "tise2",
+      "scan": {
+        "thickness_ang": {
+          "shape": [
+            1
+          ],
+          "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+        },
+        "energy_keV": {
+          "shape": [
+            3
+          ],
+          "sha256": "b2ea7f5490b31e059d7abf65cdc59aaae70b2c4c09f18b81a1e30ec6ea63d2ce"
+        },
+        "tilt_deg": {
+          "shape": [
+            20
+          ],
+          "sha256": "36649ae1de6066aa6130648f5a38fc67c92cd61e5a98487b64a9f3546ff951ec"
+        },
+        "tilt_azim_deg": {
+          "shape": [
+            9
+          ],
+          "sha256": "c7f4c5364436b08979fcef9fc02ebbfcc3eaf830100ef1ffcdd353caed6f2edf"
+        },
+        "E_grid_line": {
+          "shape": [
+            1484
+          ],
+          "sha256": "0665711635d7e55251fef26a248510024af5bade0033df4c32062a9ab98a3155"
+        },
+        "E_grid_brem": {
+          "shape": [
+            1200
+          ],
+          "sha256": "79f8f20c412aa260b3f00a9e0cb7c2e01c140a18067e9f5fe5e8c9aab64638d2"
+        }
+      },
+      "substrate": null,
+      "stack": []
+    },
+    "black_phosphorus": {
+      "label": "black phosphorus (020)",
+      "profile": "standard",
+      "crystal_key": "black_phosphorus",
+      "scan": {
+        "thickness_ang": {
+          "shape": [
+            1
+          ],
+          "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+        },
+        "energy_keV": {
+          "shape": [
+            3
+          ],
+          "sha256": "b2ea7f5490b31e059d7abf65cdc59aaae70b2c4c09f18b81a1e30ec6ea63d2ce"
+        },
+        "tilt_deg": {
+          "shape": [
+            20
+          ],
+          "sha256": "36649ae1de6066aa6130648f5a38fc67c92cd61e5a98487b64a9f3546ff951ec"
+        },
+        "tilt_azim_deg": {
+          "shape": [
+            9
+          ],
+          "sha256": "c7f4c5364436b08979fcef9fc02ebbfcc3eaf830100ef1ffcdd353caed6f2edf"
+        },
+        "E_grid_line": {
+          "shape": [
+            1484
+          ],
+          "sha256": "0665711635d7e55251fef26a248510024af5bade0033df4c32062a9ab98a3155"
         },
         "E_grid_brem": {
           "shape": [

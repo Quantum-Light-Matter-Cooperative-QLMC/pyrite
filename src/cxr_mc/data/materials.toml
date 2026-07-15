@@ -101,6 +101,24 @@ E_grid = { arange = { start = 350.0, stop = 8000.0, step = 3.0 } }
 hkl_families = [[0, 0, 3]]
 hkl_reason = "Pin the requested 1T-TiS2(003) symmetric-cut reflection so the reciprocal vector remains parallel to the basal slab normal."
 
+[crystals.tise2]
+cif = "cifs/tise2.cif"
+validation_id = "tise2-001-structure"
+B_ang2 = 0.6
+beam_uvw = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Pin the basal 1T-TiSe2(001) symmetric cut so the reciprocal vector remains parallel to the c-axis-normal layered slab."
+
+[crystals.black_phosphorus]
+cif = "cifs/black_phosphorus.cif"
+validation_id = "black-phosphorus-020-structure"
+B_ang2 = 0.6
+beam_uvw = [0, 1, 0]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 2, 0]]
+hkl_reason = "Pin the allowed black-phosphorus (020) symmetric cut so the reciprocal vector remains parallel to the b-axis-normal layered slab."
+
 [crystals.ptse2]
 cif = "cifs/ptse2.cif"
 validation_id = "ptse2-cif-migration"
@@ -270,6 +288,14 @@ E_grid_line = { arange = { start = 50.0, stop = 4000.0, step = 3.0 } }
 label = "1T-TiS2 (003)"
 profile = "standard"
 E_grid_line = { arange = { start = 50.0, stop = 9000.0, step = 3.0 } }
+
+[materials.tise2]
+label = "1T-TiSe2 (001)"
+profile = "standard"
+
+[materials.black_phosphorus]
+label = "black phosphorus (020)"
+profile = "standard"
 
 [materials.ws2]
 label = "WS2"

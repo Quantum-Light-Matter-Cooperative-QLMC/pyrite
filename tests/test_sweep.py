@@ -324,6 +324,14 @@ def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcog
         ("v2o5", "V2O5 (010)", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"V": 1, "O": 2.5}),
         ("tis2", "1T-TiS2 (003)", (0, 0, 1), [(0, 0, 3), (0, 0, -3)], {"Ti": 1, "S": 2}),
         ("hfte2", "1T-HfTe2 (001)", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"Hf": 1, "Te": 2}),
+        ("tise2", "1T-TiSe2 (001)", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"Ti": 1, "Se": 2}),
+        (
+            "black_phosphorus",
+            "black phosphorus (020)",
+            (0, 1, 0),
+            [(0, 2, 0), (0, -2, 0)],
+            {"P": 1},
+        ),
     ],
 )
 def test_oriented_materials_are_registered_as_symmetric_cuts(

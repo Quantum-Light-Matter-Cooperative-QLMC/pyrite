@@ -42,6 +42,14 @@ def test_niobium_registered_and_edge_prone():
     assert E.size > 0 and np.all(np.isfinite(f1)) and np.all(f2 >= 0)
 
 
+def test_phosphorus_registered_and_edge_prone():
+    assert Z_TABLE["P"] == 15
+    assert "P" in crystal_module._EDGE_PRONE
+
+    E, f1, f2 = load_henke("P")
+    assert E.size > 0 and np.all(np.isfinite(f1)) and np.all(f2 >= 0)
+
+
 def test_unknown_element_raises():
     assert "Xx" not in Z_TABLE
     with pytest.raises(KeyError):

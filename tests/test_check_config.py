@@ -14,7 +14,7 @@ def test_check_config_validates_bundled_catalog_without_running_simulation(capsy
 
     output = capsys.readouterr().out
     assert "valid material catalog" in output
-    assert "23 materials, 23 crystals" in output
+    assert "25 materials, 25 crystals" in output
 
 
 def test_check_config_accepts_an_explicit_full_catalog(capsys) -> None:

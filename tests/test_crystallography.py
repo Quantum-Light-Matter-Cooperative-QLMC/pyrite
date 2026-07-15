@@ -40,6 +40,8 @@ EXPECTED = {
     "zrse2",
     "nbs2",
     "nbse2",
+    "tise2",
+    "black_phosphorus",
 }
 
 
@@ -148,6 +150,52 @@ def test_tis2_003_structure_and_couplings_are_sane():
     structure, g = structure_factor("tis2", (0, 0, 3), 5000.0, B_ang2=0.6)
     susceptibility = chi_g("tis2", (0, 0, 3), 5000.0, B_ang2=0.6)
     potential = U_g("tis2", (0, 0, 3), 5000.0, B_ang2=0.6)
+    assert g > 0.0
+    assert np.isfinite(abs(structure)) and abs(structure) > 0.0
+    assert np.isfinite(abs(susceptibility)) and abs(susceptibility) > 0.0
+    assert np.isfinite(abs(potential)) and abs(potential) > 0.0
+
+
+def test_tise2_001_structure_and_couplings_are_sane():
+    # Ambient 1T-TiSe2 P-3m1: a=3.540 A, c=6.008 A, Se z=0.25504.
+    # Its van der Waals layers stack along c, matching the c-axis-normal slab.
+    info = CRYSTALS["tise2"]
+    basis = info["basis"]
+
+    assert info["lattice"]["a"] == pytest.approx(3.540)
+    assert info["lattice"]["c"] == pytest.approx(6.008)
+    assert info["V_cell"] == pytest.approx(np.sqrt(3.0) * 3.540**2 * 6.008 / 2.0, abs=0.1)
+    assert len(basis) == 3
+    assert sum(element == "Ti" for element, _ in basis) == 1
+    assert sum(element == "Se" for element, _ in basis) == 2
+
+    structure, g = structure_factor("tise2", (0, 0, 1), 1500.0, B_ang2=0.6)
+    susceptibility = chi_g("tise2", (0, 0, 1), 1500.0, B_ang2=0.6)
+    potential = U_g("tise2", (0, 0, 1), 1500.0, B_ang2=0.6)
+
+    assert g > 0.0
+    assert np.isfinite(abs(structure)) and abs(structure) > 0.0
+    assert np.isfinite(abs(susceptibility)) and abs(susceptibility) > 0.0
+    assert np.isfinite(abs(potential)) and abs(potential) > 0.0
+
+
+def test_black_phosphorus_020_structure_and_couplings_are_sane():
+    # Ambient black phosphorus is Cmce with eight P atoms in the conventional
+    # cell. Its puckered layers stack along b, matching the b-axis-normal slab.
+    info = CRYSTALS["black_phosphorus"]
+    basis = info["basis"]
+
+    assert info["lattice"]["a"] == pytest.approx(3.3136)
+    assert info["lattice"]["b"] == pytest.approx(10.478)
+    assert info["lattice"]["c"] == pytest.approx(4.3763)
+    assert info["V_cell"] == pytest.approx(3.3136 * 10.478 * 4.3763, abs=0.1)
+    assert len(basis) == 8
+    assert sum(element == "P" for element, _ in basis) == 8
+
+    structure, g = structure_factor("black_phosphorus", (0, 2, 0), 1500.0, B_ang2=0.6)
+    susceptibility = chi_g("black_phosphorus", (0, 2, 0), 1500.0, B_ang2=0.6)
+    potential = U_g("black_phosphorus", (0, 2, 0), 1500.0, B_ang2=0.6)
+
     assert g > 0.0
     assert np.isfinite(abs(structure)) and abs(structure) > 0.0
     assert np.isfinite(abs(susceptibility)) and abs(susceptibility) > 0.0
