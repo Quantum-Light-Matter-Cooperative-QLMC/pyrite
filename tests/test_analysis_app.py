@@ -30,6 +30,35 @@ def test_penetration_controls_offer_material_presets_and_bounded_manual_values()
         assert name in source
 
 
+def test_penetration_control_values_are_read_in_a_downstream_cell() -> None:
+    tree = ast.parse(APP.read_text())
+    controls_cell = next(
+        cell
+        for cell in tree.body
+        if isinstance(cell, ast.FunctionDef)
+        and any(arg.arg == "CATALOG" for arg in cell.args.args)
+    )
+
+    assert not any(
+        isinstance(node, ast.Attribute) and node.attr == "value"
+        for node in ast.walk(controls_cell)
+    )
+    assert any(
+        isinstance(cell, ast.FunctionDef)
+        and {arg.arg for arg in cell.args.args}
+        >= {
+            "penetration_energy_source_ui",
+            "penetration_thickness_source_ui",
+            "penetration_tilt_source_ui",
+        }
+        and any(
+            isinstance(node, ast.Attribute) and node.attr == "value"
+            for node in ast.walk(cell)
+        )
+        for cell in tree.body
+    )
+
+
 def test_material_menu_uses_checkpoint_helper_and_custom_select() -> None:
     source = APP.read_text()
 

@@ -22,6 +22,8 @@ both.
     cxr analyze wse2               # transient: this run only, doesn't persist
     cxr analyze -d wse2            # persist wse2 as the new default, and launch it
     cxr analyze --watch            # add marimo's --watch (combinable with either)
+    cxr analyze --headless         # start without opening a browser
+    cxr analyze --smoke            # execute the app once without a browser
     cxr analyze --edit             # `marimo edit` instead of `marimo run`
 """
 
@@ -29,6 +31,7 @@ import argparse
 import os
 import subprocess
 import sys
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TypedDict
@@ -119,7 +122,7 @@ def initial_material(cli_args, persisted_default):
     return "hopg"
 
 
-def _command(material, *, edit=False, watch=False, tunnel=False):
+def _command(material, *, edit=False, watch=False, headless=False, tunnel=False):
     """The marimo argv for one launch (module-run through the current
     interpreter so the venv's marimo is the one that runs). Marimo's own flags
     go before the notebook path; app args go after ``--``."""
@@ -129,6 +132,7 @@ def _command(material, *, edit=False, watch=False, tunnel=False):
         "marimo",
         "edit" if edit else "run",
         *(["--watch"] if watch else []),
+        *(["--headless"] if headless else []),
         *(["--port", str(TUNNEL_PORT)] if tunnel else []),
         NOTEBOOK,
         "--",
@@ -137,13 +141,35 @@ def _command(material, *, edit=False, watch=False, tunnel=False):
     ]
 
 
-def _launch(material, *, edit=False, watch=False, acp=False, tunnel=False):
-    cmd = _command(material, edit=edit, watch=watch, tunnel=tunnel)
+def _smoke_command(material, output):
+    """The one-shot, headless command used to execute the analysis app in CI-like checks."""
+    return [
+        sys.executable,
+        "-m",
+        "marimo",
+        "export",
+        "html",
+        NOTEBOOK,
+        "--output",
+        str(output),
+        "--force",
+        "--",
+        "--material",
+        material,
+    ]
+
+
+def _launch(material, *, edit=False, watch=False, headless=False, smoke=False, acp=False, tunnel=False):
+    cmd = _command(material, edit=edit, watch=watch, headless=headless, tunnel=tunnel)
     print(f"launching {NOTEBOOK} ({'edit' if edit else 'run'}) with material={material}")
     if tunnel:
         print(f"ssh -L {TUNNEL_PORT}:127.0.0.1:{TUNNEL_PORT} <your-pi-ssh-host>")
         print(f"http://127.0.0.1:{TUNNEL_PORT}")
     env = {**os.environ, "CXR_ANALYZE_INITIAL": material}
+    if smoke:
+        with tempfile.TemporaryDirectory(prefix="cxr-mc-analysis-") as tmpdir:
+            subprocess.run(_smoke_command(material, Path(tmpdir) / "analysis.html"), check=True, env=env)
+        return
     if acp:
         with running_acp():
             subprocess.run(cmd, check=True, env=env)
@@ -163,6 +189,10 @@ def _cli(args):
 
     material = args.material or get_default_material() or "hopg"
     launch_args = {"edit": args.edit, "watch": args.watch}
+    if args.headless:
+        launch_args["headless"] = True
+    if args.smoke:
+        launch_args["smoke"] = True
     if args.acp:
         launch_args["acp"] = True
     if args.tunnel:
@@ -186,6 +216,8 @@ def add_subparser(sub):
         help="also persist <material> as the new default for future no-argument runs",
     )
     ap.add_argument("--watch", action="store_true", help="pass marimo's --watch")
+    ap.add_argument("--headless", action="store_true", help="start marimo without opening a browser")
+    ap.add_argument("--smoke", action="store_true", help="execute the app once headlessly and exit")
     ap.add_argument("--edit", action="store_true", help="use `marimo edit` instead of `marimo run`")
     ap.add_argument("--acp", action="store_true", help="start local Claude and Codex ACP bridges")
     ap.add_argument("--tunnel", action="store_true", help="use a fixed port for SSH tunneling")

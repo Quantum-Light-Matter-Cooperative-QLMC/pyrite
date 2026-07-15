@@ -327,7 +327,7 @@ def _(CATALOG, MATERIAL, mo):
 
     _source_options = {"material scan grid": "grid", "manual entry": "manual"}
     penetration_energy_source_ui = mo.ui.dropdown(
-        _source_options, value="grid", label="beam energy source"
+        _source_options, value="material scan grid", label="beam energy source"
     )
     penetration_energy_grid_ui = mo.ui.dropdown(
         {f"{value:g} keV": value for value in _energy_values},
@@ -339,7 +339,7 @@ def _(CATALOG, MATERIAL, mo):
     )
 
     penetration_thickness_source_ui = mo.ui.dropdown(
-        _source_options, value="grid", label="crystal thickness source"
+        _source_options, value="material scan grid", label="crystal thickness source"
     )
     penetration_thickness_grid_ui = mo.ui.dropdown(
         {f"{value:g} Å ({value / 1e4:g} µm)": value for value in _thickness_values},
@@ -355,7 +355,7 @@ def _(CATALOG, MATERIAL, mo):
     )
 
     penetration_tilt_source_ui = mo.ui.dropdown(
-        _source_options, value="grid", label="polar tilt source"
+        _source_options, value="material scan grid", label="polar tilt source"
     )
     penetration_tilt_grid_ui = mo.ui.dropdown(
         {f"{value:g} deg": value for value in _tilt_values},
@@ -366,6 +366,31 @@ def _(CATALOG, MATERIAL, mo):
         start=0.0, stop=89.9, step=0.1, value=_tilt_values[0], label="polar tilt (deg)"
     )
 
+    return (
+        penetration_energy_grid_ui,
+        penetration_energy_manual_ui,
+        penetration_energy_source_ui,
+        penetration_thickness_grid_ui,
+        penetration_thickness_manual_ui,
+        penetration_thickness_source_ui,
+        penetration_tilt_grid_ui,
+        penetration_tilt_manual_ui,
+        penetration_tilt_source_ui,
+    )
+
+
+@app.cell
+def _(
+    penetration_energy_grid_ui,
+    penetration_energy_manual_ui,
+    penetration_energy_source_ui,
+    penetration_thickness_grid_ui,
+    penetration_thickness_manual_ui,
+    penetration_thickness_source_ui,
+    penetration_tilt_grid_ui,
+    penetration_tilt_manual_ui,
+    penetration_tilt_source_ui,
+):
     penetration_energy_keV = (
         penetration_energy_grid_ui.value
         if penetration_energy_source_ui.value == "grid"
@@ -381,20 +406,7 @@ def _(CATALOG, MATERIAL, mo):
         if penetration_tilt_source_ui.value == "grid"
         else penetration_tilt_manual_ui.value
     )
-    return (
-        penetration_energy_grid_ui,
-        penetration_energy_keV,
-        penetration_energy_manual_ui,
-        penetration_energy_source_ui,
-        penetration_thickness_ang,
-        penetration_thickness_grid_ui,
-        penetration_thickness_manual_ui,
-        penetration_thickness_source_ui,
-        penetration_tilt_deg,
-        penetration_tilt_grid_ui,
-        penetration_tilt_manual_ui,
-        penetration_tilt_source_ui,
-    )
+    return penetration_energy_keV, penetration_thickness_ang, penetration_tilt_deg
 
 
 @app.cell

@@ -198,6 +198,29 @@ def test_command_run_default():
     assert cmd[-4:] == [analyze.NOTEBOOK, "--", "--material", "hopg"]
 
 
+def test_command_headless_omits_browser_launch():
+    cmd = analyze._command("hopg", headless=True)
+
+    assert cmd[3:5] == ["run", "--headless"]
+
+
+def test_smoke_command_executes_analysis_app_to_a_temporary_html_file(tmp_path):
+    output = tmp_path / "analysis.html"
+
+    cmd = analyze._smoke_command("hopg", output)
+
+    assert cmd[:5] == [sys.executable, "-m", "marimo", "export", "html"]
+    assert cmd[5:] == [
+        analyze.NOTEBOOK,
+        "--output",
+        str(output),
+        "--force",
+        "--",
+        "--material",
+        "hopg",
+    ]
+
+
 def test_command_tunnel_uses_fixed_marimo_port():
     command = analyze._command("hopg", tunnel=True)
     assert command[3:7] == ["run", "--port", "2718", analyze.NOTEBOOK]
