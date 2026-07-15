@@ -1,2 +1,24 @@
 # Materials selected by `cxr scan --all` and `cxr remote ... --all`.
-materials = ["hopg", "hbn", "hfse2"]
+materials = [
+    # "diamond",
+    # "sapphire",
+    # "silicon",
+    "hopg",
+    "hbn",
+    "black_phosphorus",
+    "hfs2",
+    "hfse2",
+    "hfte2",
+    "mos2",
+    "mose2",
+    "mote2",
+    "pdse2",
+    "ptse2",
+    "tis2",
+    "tise2",
+    "v2o5",
+    "ws2",
+    "wse2",
+    # "wte2",
+    "zrse2",
+]

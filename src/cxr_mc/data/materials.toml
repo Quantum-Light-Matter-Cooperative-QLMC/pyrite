@@ -2,10 +2,10 @@ schema_version = 1
 
 [profiles.standard]
 thickness_ang = 100000.0
-energy_keV = { values = [25.0, 30.0, 35.0] }
-tilt_deg = { linspace = { start = 0.0, stop = 85.0, num = 20, endpoint = false } }
-tilt_azim_deg = { linspace = { start = 0.0, stop = 180.0, num = 9, endpoint = true } }
-E_grid_line = { arange = { start = 50.0, stop = 4500.0, step = 3.0 } }
+energy_keV = { values = [25.0, 50.0, 100.0, 150.0, 200.0] }
+tilt_deg = { linspace = { start = 1.0, stop = 89.0, num = 20, endpoint = false } }
+tilt_azim_deg = { linspace = { start = 91.0, stop = 180.0, num = 15, endpoint = true } }
+E_grid_line = { arange = { start = 50.0, stop = 3000.0, step = 3.0 } }
 E_grid_brem = { arange = { start = 0.0, stop = 30000.0, step = 25.0 } }
 
 [crystals.diamond]
@@ -13,7 +13,7 @@ cif = "cifs/diamond.cif"
 validation_id = "diamond-cif-migration"
 B_ang2 = 0.21
 beam_uvw = [4, 0, 0]
-E_grid = { arange = { start = 100.0, stop = 5000.0, step = 2.0 } }
+E_grid = { arange = { start = 100.0, stop = 5000.0, step = 3.0 } }
 
 [crystals.silicon]
 cif = "cifs/silicon.cif"
@@ -75,14 +75,14 @@ cif = "cifs/wse2.cif"
 validation_id = "wse2-cif-migration"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
-E_grid = { arange = { start = 350.0, stop = 2500.0, step = 3.0 } }
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 
 [crystals.mote2]
 cif = "cifs/mote2.cif"
 validation_id = "mote2-bulk-structure"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
-E_grid = { arange = { start = 350.0, stop = 2500.0, step = 2.0 } }
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 
 [crystals.mote2_product]
 cif = "cifs/mote2_product.cif"
@@ -90,7 +90,7 @@ validation_id = "mote2-product-structure"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
 layers_per_cell = 2
-E_grid = { arange = { start = 350.0, stop = 2500.0, step = 3.0 } }
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 
 [crystals.tis2]
 cif = "cifs/tis2.cif"
@@ -115,7 +115,7 @@ cif = "cifs/black_phosphorus.cif"
 validation_id = "black-phosphorus-020-structure"
 B_ang2 = 0.6
 beam_uvw = [0, 1, 0]
-E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+E_grid = { arange = { start = 50.0, stop = 3500.0, step = 3.0 } }
 hkl_families = [[0, 2, 0]]
 hkl_reason = "Pin the allowed black-phosphorus (020) symmetric cut so the reciprocal vector remains parallel to the b-axis-normal layered slab."
 
@@ -166,7 +166,7 @@ cif = "cifs/ws2.cif"
 validation_id = "ws2-cif-migration"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
-E_grid = { arange = { start = 350.0, stop = 2500.0, step = 3.0 } }
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 
 [crystals.mos2]
 cif = "cifs/mos2.cif"
@@ -174,28 +174,28 @@ validation_id = "mos2-cif-migration"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
 layers_per_cell = 2
-E_grid = { arange = { start = 350.0, stop = 2500.0, step = 3.0 } }
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 
 [crystals.nbs2]
 cif = "cifs/nbs2.cif"
 validation_id = "nbs2-2ha-structure"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
-E_grid = { arange = { start = 350.0, stop = 2500.0, step = 3.0 } }
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 
 [crystals.nbse2]
 cif = "cifs/nbse2.cif"
 validation_id = "nbse2-2ha-structure"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 2]
-E_grid = { arange = { start = 350.0, stop = 2500.0, step = 3.0 } }
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 
 [crystals.hfte2]
 cif = "cifs/hfte2.cif"
 validation_id = "hfte2-001-structure"
 B_ang2 = 0.6
 beam_uvw = [0, 0, 1]
-E_grid = { arange = { start = 50.0, stop = 4500.0, step = 3.0 } }
+E_grid = { arange = { start = 50.0, stop = 3500.0, step = 3.0 } }
 hkl_families = [[0, 0, 1]]
 hkl_reason = "Use the basal (001) symmetric cut of 1T-HfTe2 so the reciprocal vector remains parallel to the cleavable c-axis slab normal."
 
@@ -205,15 +205,16 @@ composition = { Si = 0.02205, O = 0.04410 }
 [materials.hopg]
 label = "HOPG"
 profile = "standard"
-thickness_ang = 10000.0
+thickness_ang = 1000e4
 tilt_azim_deg = { linspace = { start = 0.0, stop = 180.0, num = 10, endpoint = true } }
+E_grid_line = { arange = { start = 25.0, stop = 3500.0, step = 3.0 } }
 
 [materials.hbn]
 label = "h-BN"
 profile = "standard"
-thickness_ang = { values = [100.0, 398.1071705534973, 1584.893192461114, 6309.57344480193, 25118.864315095823, 100000.0, 100000.0, 316227.7660168379] }
-tilt_deg = { values = [0.0, 8.0, 16.0, 24.0, 32.0, 40.0, 48.0, 56.0, 64.0, 72.0, 80.0, 81.0, 82.0, 83.0, 84.0, 85.0, 86.0, 87.0, 88.0, 89.0] }
-E_grid_line = { arange = { start = 5.0, stop = 1000.0, step = 3.0 } }
+thickness_ang = 1000e4
+tilt_deg = { values = [0.0, 8.0, 16.0, 24.0, 32.0, 40.0, 48.0, 56.0, 64.0, 72.0, 80.0, 82.0, 84.0, 86.0, 88.0] }
+E_grid_line = { arange = { start = 25.0, stop = 3500.0, step = 3.0 } }
 
 [materials.diamond]
 label = "diamond"
@@ -242,8 +243,6 @@ profile = "standard"
 [materials.mote2]
 label = "MoTe2"
 profile = "standard"
-tilt_deg = { linspace = { start = 0.0, stop = 89.0, num = 30, endpoint = false } }
-tilt_azim_deg = { linspace = { start = 0.0, stop = 360.0, num = 30, endpoint = false } }
 
 [materials.mote2_product]
 label = "MoTe2 (product)"
