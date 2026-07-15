@@ -87,6 +87,7 @@ MATS_FILE = LOCAL_ROOT / "mats_to_sim.toml"
 # detached-job bookkeeping lives under <REMOTE_DIR>/jobs/<jobid>/ on the box
 # (gitignored there): run.sh, meta, state, log. One subdir per `start`.
 JOBS_SUBDIR = "jobs"
+RESERVATIONS_SUBDIR = "reservations"
 
 # The Zhai reproduction job has no crystal key of its own, but reusing the
 # existing material-stem bookkeeping (_refuse_if_busy / _live_jobs /
@@ -246,7 +247,14 @@ def remote_check(
         refresh=refresh,
         no_sync=no_sync,
     )
-    attach(jobid)
+    if not attach(jobid):
+        print("Zhai job is still running or its viewer disconnected; skipping automatic cache pull")
+        return
+    if not _job_succeeded(jobid):
+        state = _job_state(jobid) or "no terminal state recorded"
+        raise SystemExit(
+            f"Zhai SLURM job {jobid} did not complete successfully ({state}); cache not pulled"
+        )
     pull_zhai_cache()
 
 
@@ -407,9 +415,71 @@ echo "done $(date -Is)" > "$JOBDIR/state"
 """
 
 
-def _slurm_batch_script(jobid: str, payload: str, *, job_name: str) -> str:
+def _reservation_root() -> str:
+    return f"{REMOTE_DIR}/{JOBS_SUBDIR}/{RESERVATIONS_SUBDIR}"
+
+
+def _release_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
+    """Return a remote command that releases only reservations owned by ``jobid``."""
+    _check_shell_tokens([jobid, *stems])
+    reservations = _reservation_root()
+    releases = " ".join(
+        f'if [ "$(cat \"$R/{stem}/jobid\" 2>/dev/null)" = "$J" ]; then rm -rf "$R/{stem}"; fi;'
+        for stem in stems
+    )
+    return f'R="{reservations}"; J="{jobid}"; {releases}'
+
+
+def _release_job_reservations_command(jobid: str) -> str:
+    """Return a remote command that releases every reservation owned by a job."""
+    _check_shell_tokens([jobid])
+    return (
+        f'R="{_reservation_root()}"; J="{jobid}"; '
+        'for d in "$R"/*; do [ -d "$d" ] || continue; '
+        '[ "$(cat "$d/jobid" 2>/dev/null)" = "$J" ] && rm -rf "$d"; done'
+    )
+
+
+def _reserve_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
+    """Atomically reserve checkpoint stems while a job is being staged.
+
+    Each ``mkdir`` is the cross-client compare-and-set: a second submitter
+    cannot pass between the prior ``squeue`` snapshot and ``sbatch``.
+    """
+    _check_shell_tokens([jobid, *stems])
+    reservations = _reservation_root()
+    stem_words = " ".join(stems)
+    return f'''R="{reservations}"; J="{jobid}"; mkdir -p "$R"; claimed=""; \
+for stem in {stem_words}; do \
+  if mkdir "$R/$stem" 2>/dev/null; then \
+    printf '%s\\n' "$J" > "$R/$stem/jobid"; claimed="$claimed $stem"; \
+  else \
+    owner=$(cat "$R/$stem/jobid" 2>/dev/null || true); \
+    for held in $claimed; do \
+      [ "$(cat "$R/$held/jobid" 2>/dev/null)" = "$J" ] && rm -rf "$R/$held"; \
+    done; \
+    echo "refusing to stage job $J: checkpoint $stem is reserved by ${{owner:-another staging job}}" >&2; \
+    exit 17; \
+  fi; \
+done'''
+
+
+def _slurm_batch_script(
+    jobid: str,
+    payload: str,
+    *,
+    job_name: str,
+    reservation_stems: list[str] | None = None,
+) -> str:
     """Wrap a CXR queue payload in the lab box's one-GPU SLURM profile."""
+    reservation_stems = reservation_stems or []
+    _check_shell_tokens([jobid, *reservation_stems])
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    reservations = _reservation_root()
+    release_lines = "\n  ".join(
+        f'if [ "$(cat \"$RESERVATIONS/{stem}/jobid\" 2>/dev/null)" = "$JOBID" ]; then rm -rf "$RESERVATIONS/{stem}"; fi;'
+        for stem in reservation_stems
+    )
     return f"""#!/usr/bin/env bash
 #SBATCH --job-name={job_name}
 #SBATCH --partition={SLURM_PARTITION}
@@ -425,13 +495,19 @@ module purge 2>/dev/null || true
 module load cuda openmpi hdf5 2>/dev/null || true
 
 JOBDIR="{jobdir}"
+JOBID="{jobid}"
+RESERVATIONS="{reservations}"
+release_reservations() {{
+  {release_lines}
+}}
 finish() {{
   status=$?
   current=$(cat "$JOBDIR/state" 2>/dev/null || true)
   case "$current" in
-    done*|FAILED*|cancelled*) ;;
+    done*|FAILED*|cancelled*|cancelling*) ;;
     *) echo "FAILED (exit $status) $(date -Is)" > "$JOBDIR/state" ;;
   esac
+  release_reservations
 }}
 trap finish EXIT
 echo "running $(date -Is)" > "$JOBDIR/state"
@@ -446,18 +522,20 @@ echo "running $(date -Is)" > "$JOBDIR/state"
 {payload}"""
 
 
-def _submit_slurm_command(jobid: str) -> str:
+def _submit_slurm_command(jobid: str, reservation_stems: list[str] | None = None) -> str:
     """Return the remote submission protocol for an already-written batch script."""
-    _check_shell_tokens([jobid])
+    reservation_stems = reservation_stems or []
+    _check_shell_tokens([jobid, *reservation_stems])
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    release = _release_checkpoint_stems_command(jobid, reservation_stems)
     return f"""D='{jobdir}'; \
 echo "queued $(date -Is)" > "$D/state"; \
 SID=$(sbatch --parsable '{jobdir}/run.sh') || {{ \
-  echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; exit 1; \
+  echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; {release}; exit 1; \
 }}; \
 SID=${{SID%%;*}}; \
 case "$SID" in ''|*[!0-9]*) \
-  echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; exit 1 ;; \
+  echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; {release}; exit 1 ;; \
 esac; \
 printf 'slurm_job_id: %s\\n' "$SID" >> "$D/meta"; \
 printf '%s\\n' "$SID"""
@@ -543,6 +621,18 @@ def _slurm_state(slurm_job_id: str) -> str | None:
     return state.splitlines()[0] if state else None
 
 
+def _job_state(jobid: str) -> str:
+    """Return a job's persisted terminal/progress state without inferring liveness."""
+    _check_shell_tokens([jobid])
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    return _ssh_capture(f'cat "{jobdir}/state" 2>/dev/null').strip()
+
+
+def _job_succeeded(jobid: str) -> bool:
+    """Whether the batch script recorded a successful terminal state."""
+    return _job_state(jobid).startswith("done")
+
+
 def _refuse_if_busy(materials, quick):
     """Abort `start` if a live job is already producing any checkpoint this run
     would write. Two runs writing the same `<stem>.pkl` share one `<stem>.pkl.tmp`
@@ -620,12 +710,15 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
         _refuse_if_busy(materials, quick)
     jobid = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    stems = _stems(materials, quick)
     payload = _queue_script(jobid, materials, quick, workers)
-    script = _slurm_batch_script(jobid, payload, job_name=f"cxr-{jobid}")
+    script = _slurm_batch_script(
+        jobid, payload, job_name=f"cxr-{jobid}", reservation_stems=stems
+    )
     upload = _write_job_script_command(
         jobdir, _queue_metadata(jobid, materials, quick, workers)
     )
-    submit = _submit_slurm_command(jobid)
+    submit = _submit_slurm_command(jobid, stems)
 
     if dry_run:
         print(f"# job {jobid}: {' '.join(materials)}{' (quick)' if quick else ''}")
@@ -636,19 +729,23 @@ def start_queue(materials, quick=False, workers=None, no_sync=False, dry_run=Fal
 
     if not no_sync:
         sync_code()
+    _run(["ssh", "-n", HOST, _reserve_checkpoint_stems_command(jobid, stems)])
     # create the job dir and write run.sh (script piped over stdin).
     # Send as LF-only bytes: text=True on Windows translates \n->\r\n,
     # which produces a CRLF run.sh that bash silently refuses to execute.
-    subprocess.run(
-        ["ssh", HOST, upload],
-        input=script.replace("\r\n", "\n").encode(),
-        check=True,
-    )
+    try:
+        subprocess.run(
+            ["ssh", HOST, upload],
+            input=script.replace("\r\n", "\n").encode(),
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        _run(["ssh", "-n", HOST, _release_checkpoint_stems_command(jobid, stems)])
+        raise
     scheduler_id = _ssh_capture(submit).strip()
     if not scheduler_id.isdigit():
         raise SystemExit(f"SLURM submission for job {jobid} returned no scheduler ID")
 
-    stems = _stems(materials, quick)
     print(
         f"\nsubmitted SLURM job {scheduler_id} as local job {jobid} on {HOST}: {' '.join(materials)}"
         f"{' (quick)' if quick else ''}\n"
@@ -673,12 +770,15 @@ def start_zhai_queue(
         _refuse_if_busy([ZHAI_STEM], False)
     jobid = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    stems = [ZHAI_STEM]
     payload = _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh)
-    script = _slurm_batch_script(jobid, payload, job_name=f"cxr-zhai-{jobid}")
+    script = _slurm_batch_script(
+        jobid, payload, job_name=f"cxr-zhai-{jobid}", reservation_stems=stems
+    )
     upload = _write_job_script_command(
         jobdir, _zhai_queue_metadata(jobid, ne, ne_brem, ne_supp)
     )
-    submit = _submit_slurm_command(jobid)
+    submit = _submit_slurm_command(jobid, stems)
 
     if dry_run:
         print(f"# zhai job {jobid}: ne={ne} ne_brem={ne_brem} ne_supp={ne_supp}")
@@ -689,11 +789,16 @@ def start_zhai_queue(
 
     if not no_sync:
         sync_code()
-    subprocess.run(
-        ["ssh", HOST, upload],
-        input=script.replace("\r\n", "\n").encode(),
-        check=True,
-    )
+    _run(["ssh", "-n", HOST, _reserve_checkpoint_stems_command(jobid, stems)])
+    try:
+        subprocess.run(
+            ["ssh", HOST, upload],
+            input=script.replace("\r\n", "\n").encode(),
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        _run(["ssh", "-n", HOST, _release_checkpoint_stems_command(jobid, stems)])
+        raise
     scheduler_id = _ssh_capture(submit).strip()
     if not scheduler_id.isdigit():
         raise SystemExit(f"SLURM submission for job {jobid} returned no scheduler ID")
@@ -809,15 +914,20 @@ def attach(jobid=None):
         'if [ -n "$SID" ]; then '
         'while squeue -h -j "$SID" -o \'%T\' | grep -q \'[^[:space:]]\'; '
         'do sleep 2; done; '
-        'else echo "no recorded SLURM job ID for {jobid}" >&2; fi; '
+        'else echo "no recorded SLURM job ID for {jobid}" >&2; kill "$TP" 2>/dev/null; exit 1; fi; '
         'sleep 1; kill "$TP" 2>/dev/null; '
         'printf "\\n--- job finished ---\\n"; cat "$D/state" 2>/dev/null'
     )
     print(f"attached to job {jobid} on {HOST} -- Ctrl-C to disconnect (the job keeps running).\n")
     try:
-        subprocess.run(["ssh", "-n", HOST, remote])
+        result = subprocess.run(["ssh", "-n", HOST, remote])
     except KeyboardInterrupt:
         _disconnect_hint(jobid)
+        return False
+    if getattr(result, "returncode", 0) != 0:
+        _disconnect_hint(jobid)
+        return False
+    return True
 
 
 def _stop_jobid(jobid):
@@ -826,9 +936,14 @@ def _stop_jobid(jobid):
     scheduler_id = _slurm_job_id(jobid)
     if scheduler_id is None or _slurm_state(scheduler_id) is None:
         raise SystemExit(f"job {jobid} is not an active SLURM job")
+    release = _release_job_reservations_command(jobid)
     remote = (
         f'D="{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"; '
         f'scancel {scheduler_id} || exit $?; '
+        f'echo "cancelling [{scheduler_id}] $(date -Is)" > "$D/state"; '
+        f'while squeue -h -j {scheduler_id} -o \'%T\' | grep -q \'[^[:space:]]\'; '
+        'do sleep 1; done; '
+        f'{release}; '
         f'echo "cancelled [{scheduler_id}] $(date -Is)" > "$D/state"; '
         f'echo "cancelled SLURM job {scheduler_id} for job {jobid}"'
     )
@@ -926,7 +1041,9 @@ def _cli_scan(args):
         workers=args.workers,
         no_sync=args.no_sync,
     )
-    attach(jobid)
+    if not attach(jobid):
+        print("scan is still running or its viewer disconnected; skipping automatic pull")
+        return
     completed = _completed_materials(jobid, materials)
     if not completed:
         print("warning: the SLURM scan produced no successful checkpoints; nothing to pull")
@@ -1089,7 +1206,11 @@ def _build_remote_parser(ap):
     lg.add_argument("--follow", "-f", action="store_true", help="stream live")
     lg.set_defaults(func=_dispatch(_cli_logs))
 
-    sp = sub.add_parser("stop", help="SIGTERM live job(s) by material, or every live job")
+    sp = sub.add_parser(
+        "stop",
+        help="cancel active SLURM job(s) by material, or every live job",
+        description="cancel active SLURM job(s) by material, or every live job",
+    )
     sp.add_argument("materials", nargs="*", help="material name(s) owned by live jobs")
     sp.add_argument("-a", "--all", action="store_true", help="stop every live job")
     sp.set_defaults(func=_dispatch(_cli_stop))

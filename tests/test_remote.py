@@ -79,6 +79,58 @@ def test_submit_command_uses_sbatch_parsable_and_records_scheduler_id():
     assert "nohup" not in command and "setsid" not in command
 
 
+def test_checkpoint_reservation_rejects_a_second_stager_for_the_same_stem(monkeypatch, tmp_path):
+    """The remote ``mkdir`` lock closes the gap between a busy check and sbatch."""
+    monkeypatch.setattr(remote, "REMOTE_DIR", str(tmp_path))
+
+    first = subprocess.run(
+        ["bash", "-c", remote._reserve_checkpoint_stems_command("first", ["hopg"])],
+        capture_output=True,
+        text=True,
+    )
+    second = subprocess.run(
+        ["bash", "-c", remote._reserve_checkpoint_stems_command("second", ["hopg"])],
+        capture_output=True,
+        text=True,
+    )
+
+    assert first.returncode == 0
+    assert second.returncode != 0
+    assert "refusing to stage" in second.stderr
+    assert (tmp_path / "jobs" / "reservations" / "hopg" / "jobid").read_text().strip() == "first"
+
+
+def test_slurm_batch_script_releases_its_checkpoint_reservations():
+    script = remote._slurm_batch_script(
+        "j", "echo payload", job_name="cxr-j", reservation_stems=["hopg"]
+    )
+
+    assert "release_reservations" in script
+    assert '"$RESERVATIONS/hopg/jobid"' in script
+    assert '"$JOBID"' in script
+
+
+def test_submit_failure_releases_its_checkpoint_reservations():
+    command = remote._submit_slurm_command("j", ["hopg"])
+
+    assert "FAILED (sbatch submission)" in command
+    assert '"$R/hopg/jobid"' in command
+
+
+def test_stop_waits_for_scheduler_cancellation_before_releasing_reservations(monkeypatch):
+    commands = []
+    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "48291\n")
+    monkeypatch.setattr(remote, "_slurm_state", lambda _scheduler_id: "RUNNING")
+    monkeypatch.setattr(remote, "_run", lambda command, **_kwargs: commands.append(command))
+
+    remote._stop_jobid("j")
+
+    command = commands[0][-1]
+    assert "scancel 48291" in command
+    assert "while squeue" in command
+    assert 'cat "$d/jobid"' in command
+
+
 def test_remote_dry_run_describes_sbatch_submission(monkeypatch, capsys):
     monkeypatch.setattr(
         remote,
@@ -126,7 +178,8 @@ def test_start_writes_static_metadata_before_sbatch(monkeypatch):
     assert "started:" not in upload_command
     assert "started: $(date -Is)" in uploads[0][1]["input"].decode()
     assert "materials: hopg" not in uploads[0][1]["input"].decode()
-    assert "sbatch --parsable" in submissions[0][-1]
+    assert "mkdir \"$R/$stem\"" in submissions[0][-1]
+    assert "sbatch --parsable" in submissions[1][-1]
 
 
 def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
@@ -213,6 +266,16 @@ def test_attach_retries_until_a_queued_job_creates_its_log(monkeypatch):
     assert 'tail -n 50 -F --retry "$D/log"' in runs[0][-1]
 
 
+def test_attach_returns_false_when_the_viewer_is_interrupted(monkeypatch):
+    monkeypatch.setattr(
+        remote.subprocess,
+        "run",
+        lambda _cmd: (_ for _ in ()).throw(KeyboardInterrupt),
+    )
+
+    assert remote.attach("20260101-000000") is False
+
+
 def test_stop_jobid_uses_scancel_not_kill(monkeypatch):
     commands = []
     monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "48291\n")
@@ -231,6 +294,15 @@ def test_stop_jobid_rejects_legacy_job_without_scheduler_id(monkeypatch):
 
     with pytest.raises(SystemExit, match="not an active SLURM job"):
         remote._stop_jobid("j")
+
+
+def test_stop_help_describes_slurm_cancellation(capsys):
+    with pytest.raises(SystemExit):
+        remote.main(["stop", "--help"])
+
+    help_text = capsys.readouterr().out
+    assert "cancel active SLURM job" in help_text
+    assert "SIGTERM" not in help_text
 
 
 def test_follow_logs_use_stdin_closed_ssh(monkeypatch):
@@ -490,7 +562,7 @@ def test_remote_scan_submits_then_attaches_and_pulls(monkeypatch):
         "start_queue",
         lambda materials, **_kw: events.append(("start", materials)) or "j",
     )
-    monkeypatch.setattr(remote, "attach", lambda jobid: events.append(("attach", jobid)))
+    monkeypatch.setattr(remote, "attach", lambda jobid: events.append(("attach", jobid)) or True)
     monkeypatch.setattr(remote, "_completed_materials", lambda _jobid, materials: materials)
     monkeypatch.setattr(remote, "pull", lambda stems, **_kw: events.append(("pull", stems)))
 
@@ -509,6 +581,32 @@ def test_remote_scan_submits_then_attaches_and_pulls(monkeypatch):
     )
 
     assert events == [("start", ["hopg"]), ("attach", "j"), ("pull", ["hopg"])]
+
+
+def test_interrupted_remote_scan_does_not_pull(monkeypatch):
+    events = []
+    monkeypatch.setattr(remote, "start_queue", lambda *_args, **_kwargs: "j")
+    monkeypatch.setattr(remote, "attach", lambda _jobid: False)
+    monkeypatch.setattr(
+        remote, "_completed_materials", lambda *_args: pytest.fail("must not inspect completion")
+    )
+    monkeypatch.setattr(remote, "pull", lambda *_args, **_kwargs: events.append("pull"))
+
+    remote._cli_scan(
+        argparse.Namespace(
+            material="hopg",
+            all=False,
+            quick=False,
+            workers=None,
+            no_sync=False,
+            grid=False,
+            drop_wide_brem=False,
+            downcast=False,
+            remote_command="scan",
+        )
+    )
+
+    assert events == []
 
 
 def test_remote_scan_preserves_hyphenated_catalog_material(monkeypatch):
@@ -639,7 +737,8 @@ def test_remote_check_refuses_when_a_zhai_job_is_already_live(monkeypatch):
 def test_foreground_check_submits_then_attaches_and_pulls(monkeypatch):
     events = []
     monkeypatch.setattr(remote, "start_zhai_queue", lambda **_kw: events.append("start") or "j")
-    monkeypatch.setattr(remote, "attach", lambda jobid: events.append(("attach", jobid)))
+    monkeypatch.setattr(remote, "attach", lambda jobid: events.append(("attach", jobid)) or True)
+    monkeypatch.setattr(remote, "_job_succeeded", lambda _jobid: True, raising=False)
     monkeypatch.setattr(remote, "pull_zhai_cache", lambda: events.append("pull"))
 
     remote.remote_check(no_sync=True)
@@ -647,10 +746,35 @@ def test_foreground_check_submits_then_attaches_and_pulls(monkeypatch):
     assert events == ["start", ("attach", "j"), "pull"]
 
 
+def test_interrupted_foreground_check_does_not_pull(monkeypatch):
+    monkeypatch.setattr(remote, "start_zhai_queue", lambda **_kw: "j")
+    monkeypatch.setattr(remote, "attach", lambda _jobid: False)
+    monkeypatch.setattr(
+        remote, "pull_zhai_cache", lambda: pytest.fail("must not pull after interruption")
+    )
+
+    remote.remote_check(no_sync=True)
+
+
+@pytest.mark.parametrize("state", ["FAILED (exit 1)", "cancelled [48291]"])
+def test_failed_foreground_check_does_not_pull_stale_cache(monkeypatch, state):
+    monkeypatch.setattr(remote, "start_zhai_queue", lambda **_kw: "j")
+    monkeypatch.setattr(remote, "attach", lambda _jobid: True)
+    monkeypatch.setattr(remote, "_job_succeeded", lambda _jobid: False, raising=False)
+    monkeypatch.setattr(remote, "_job_state", lambda _jobid: state, raising=False)
+    monkeypatch.setattr(
+        remote, "pull_zhai_cache", lambda: pytest.fail("failed job must not pull stale cache")
+    )
+
+    with pytest.raises(SystemExit, match="did not complete successfully"):
+        remote.remote_check(no_sync=True)
+
+
 def test_remote_check_no_sync_skips_sync(monkeypatch):
     calls = []
     monkeypatch.setattr(remote, "start_zhai_queue", lambda **kw: calls.append(kw) or "j")
-    monkeypatch.setattr(remote, "attach", lambda _jobid: calls.append("attach"))
+    monkeypatch.setattr(remote, "attach", lambda _jobid: calls.append("attach") or True)
+    monkeypatch.setattr(remote, "_job_succeeded", lambda _jobid: True)
     monkeypatch.setattr(remote, "pull_zhai_cache", lambda: calls.append("pull"))
 
     remote.remote_check(no_sync=True)
