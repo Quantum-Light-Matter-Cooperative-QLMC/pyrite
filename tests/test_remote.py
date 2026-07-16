@@ -208,8 +208,9 @@ def test_stop_waits_for_scheduler_cancellation_before_releasing_reservations(mon
 
     command = commands[0][-1]
     assert "scancel 48291" in command
-    assert "S=$(squeue -h -j 48291 -o '%T')" in command
+    assert "STATE=$(squeue -h -j 48291 -o '%T' 2>&1)" in command
     assert 'if [ "$STATUS" -ne 0 ]' in command
+    assert '*"Invalid job id specified"*) break' in command
     assert 'cat "$d/jobid"' in command
 
 
@@ -377,6 +378,37 @@ def test_slurm_state_queries_squeue(monkeypatch):
     assert "squeue -h -j 48291 -o '%T'" in commands[0]
 
 
+def test_slurm_state_treats_retired_ids_as_not_queued_but_surfaces_other_failures(
+    monkeypatch, tmp_path
+):
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is required for generated remote-command regression")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    squeue = bin_dir / "squeue"
+
+    def run_remote(command):
+        result = subprocess.run(
+            [bash, "-c", command],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        )
+        if result.returncode != 0:
+            raise SystemExit(f"ssh command failed (exit {result.returncode})")
+        return result.stdout
+
+    monkeypatch.setattr(remote, "_ssh_capture", run_remote)
+    squeue.write_text("#!/bin/sh\necho 'slurm_load_jobs error: Invalid job id specified' >&2\nexit 1\n")
+    squeue.chmod(0o755)
+    assert remote._slurm_state("48291") is None
+
+    squeue.write_text("#!/bin/sh\necho 'controller unavailable' >&2\nexit 7\n")
+    with pytest.raises(SystemExit, match="ssh command failed"):
+        remote._slurm_state("48291")
+
+
 def test_live_jobs_queries_squeue_for_recorded_scheduler_ids(monkeypatch):
     commands = []
     monkeypatch.setattr(
@@ -390,7 +422,7 @@ def test_live_jobs_queries_squeue_for_recorded_scheduler_ids(monkeypatch):
     assert "/pid" not in commands[0]
 
 
-def test_live_jobs_does_not_mask_a_scheduler_query_failure(monkeypatch):
+def test_live_jobs_skips_retired_scheduler_ids_without_masking_other_query_failures(monkeypatch):
     commands = []
     monkeypatch.setattr(
         remote, "_ssh_capture", lambda command: commands.append(command) or "j\tFalse\thopg\n"
@@ -398,8 +430,9 @@ def test_live_jobs_does_not_mask_a_scheduler_query_failure(monkeypatch):
 
     remote._live_jobs()
 
-    assert "STATE=$(squeue -h -j \"$SID\" -o '%T')" in commands[0]
-    assert "squeue -h -j \"$SID\" -o '%T' | grep" not in commands[0]
+    assert "STATE=$(squeue -h -j $SID -o '%T' 2>&1)" in commands[0]
+    assert '*"Invalid job id specified"*) continue' in commands[0]
+    assert 'echo "could not query SLURM job $SID" >&2; exit "$STATUS"' in commands[0]
 
 
 def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, capsys):
@@ -551,6 +584,24 @@ def test_progress_bars_update_materials_independently():
     assert bars["hopg"].postfix == {"cached": 1, "new": 2}
     assert bars["hbn"].n == 0
     assert bars["hbn"].description == "hbn: pending"
+
+
+def test_attach_dashboard_allocates_every_material_row_without_dynamic_width(monkeypatch):
+    created = []
+
+    class Bar:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(remote, "tqdm", lambda **kwargs: created.append(kwargs) or Bar())
+    monkeypatch.setattr(remote, "_read_progress_records", lambda _jobid: {})
+    monkeypatch.setattr(remote, "_slurm_state", lambda _scheduler_id: None)
+    monkeypatch.setattr(remote, "_job_state", lambda _jobid: "done")
+
+    remote._attach_progress_dashboard("j", "materials: a b c\nslurm_job_id: 1\n")
+
+    assert [kwargs["nrows"] for kwargs in created] == [4, 4, 4]
+    assert all("dynamic_ncols" not in kwargs for kwargs in created)
 
 
 def test_dashboard_attach_closes_bars_and_prints_final_state(monkeypatch, capsys):
@@ -996,11 +1047,124 @@ def test_pull_warns_and_continues_when_one_checkpoint_is_missing(monkeypatch, ca
 
     monkeypatch.setattr(remote, "_run", fake_run)
     monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(remote, "_remote_sha256", lambda _path: "remote")
+    monkeypatch.setattr(remote, "_local_sha256", lambda _path: "local")
 
     remote.pull(["hopg", "missing"], no_sync=True)
 
     assert any("hopg.pkl" in " ".join(cmd) for cmd in calls)
     assert "warning: could not pull checkpoint 'missing'" in capsys.readouterr().out
+
+
+def test_pull_skips_scp_when_remote_artifact_matches_local(monkeypatch, tmp_path, capsys):
+    (tmp_path / "checkpoints").mkdir()
+    (tmp_path / "checkpoints" / "hopg.pkl").write_bytes(b"same")
+    calls = []
+    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(remote, "_remote_sha256", lambda _path: "digest")
+    monkeypatch.setattr(remote, "_local_sha256", lambda _path: "digest")
+    monkeypatch.setattr(remote, "_run", lambda command, **_kw: calls.append(command))
+
+    remote.pull(["hopg"], no_sync=True)
+
+    assert not any(command[0] == "scp" for command in calls)
+    assert "already current -> checkpoints/hopg.pkl" in capsys.readouterr().out
+
+
+def test_full_pull_warns_without_scp_when_remote_checksum_fails(monkeypatch, tmp_path, capsys):
+    """A failed remote hash must not fall through to an unchecked transfer."""
+    calls = []
+    commands = []
+    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda command: commands.append(command) or "sha256sum: missing file\\n",
+    )
+    monkeypatch.setattr(remote, "_run", lambda command, **_kw: calls.append(command))
+
+    remote.pull(["hopg"], no_sync=True)
+
+    assert len(commands) == 1
+    assert commands[0].startswith(
+        f"sha256sum {remote.REMOTE_DIR}/checkpoints/.hopg.pull."
+    )
+    assert not any(command[0] == "scp" for command in calls)
+    assert "warning: could not pull checkpoint 'hopg'" in capsys.readouterr().out
+
+
+def test_full_pull_transfers_stable_snapshot_once_when_artifacts_differ(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(remote, "_remote_sha256", lambda _path: "remote-digest")
+    monkeypatch.setattr(remote, "_local_sha256", lambda _path: "local-digest")
+    monkeypatch.setattr(remote, "_run", lambda command, **_kw: calls.append(command))
+
+    remote.pull(["hopg"], no_sync=True)
+
+    scp_calls = [command for command in calls if command[0] == "scp"]
+    link_calls = [
+        command
+        for command in calls
+        if command[:3] == ["ssh", "-n", remote.HOST]
+        and len(command) == 4
+        and command[3].startswith("ln ")
+    ]
+    assert len(scp_calls) == 1
+    assert len(link_calls) == 1
+    snapshot = link_calls[0][-1].split()[-1]
+    assert scp_calls[0][1] == f"{remote.HOST}:{snapshot}"
+    assert ["ssh", "-n", remote.HOST, f"rm -f {snapshot}"] in calls
+
+
+def test_grid_pull_skips_scp_and_removes_matching_temp_artifact(monkeypatch, tmp_path, capsys):
+    (tmp_path / "checkpoints").mkdir()
+    (tmp_path / "checkpoints" / "hopg.pkl").write_bytes(b"same")
+    calls = []
+    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(remote, "_remote_sha256", lambda _path: "digest")
+    monkeypatch.setattr(remote, "_local_sha256", lambda _path: "digest")
+    monkeypatch.setattr(remote, "_run", lambda command, **_kw: calls.append(command))
+
+    remote.pull(["hopg"], grid=True, no_sync=True)
+
+    assert any("cxr slim" in " ".join(command) for command in calls)
+    assert not any(command[0] == "scp" for command in calls)
+    assert ["ssh", "-n", remote.HOST, "rm -f /tmp/hopg.grid.pkl"] in calls
+    assert "already current -> checkpoints/hopg.pkl" in capsys.readouterr().out
+
+
+def test_grid_pull_removes_temp_when_checksum_fails(monkeypatch, tmp_path, capsys):
+    calls = []
+    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(
+        remote,
+        "_remote_sha256",
+        lambda _path: (_ for _ in ()).throw(SystemExit("checksum failed")),
+    )
+    monkeypatch.setattr(remote, "_run", lambda command, **_kw: calls.append(command))
+
+    remote.pull(["hopg"], grid=True, no_sync=True)
+
+    assert ["ssh", "-n", remote.HOST, "rm -f /tmp/hopg.grid.pkl"] in calls
+    assert "warning: could not pull checkpoint 'hopg'" in capsys.readouterr().out
+
+
+def test_grid_pull_removes_temp_when_slim_fails(monkeypatch, tmp_path, capsys):
+    calls = []
+    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+
+    def run(command, **_kw):
+        calls.append(command)
+        if any("cxr slim" in part for part in command):
+            raise subprocess.CalledProcessError(1, command)
+
+    monkeypatch.setattr(remote, "_run", run)
+
+    remote.pull(["hopg"], grid=True, no_sync=True)
+
+    assert ["ssh", "-n", remote.HOST, "rm -f /tmp/hopg.grid.pkl"] in calls
+    assert "warning: could not pull checkpoint 'hopg'" in capsys.readouterr().out
 
 
 def test_remote_start_all_uses_toml_manifest(monkeypatch, tmp_path):
@@ -1180,6 +1344,8 @@ def test_pull_validates_safe_stems_without_requiring_catalog_membership(monkeypa
     calls = []
     monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
     monkeypatch.setattr(remote, "_run", lambda cmd, **kw: calls.append(cmd))
+    monkeypatch.setattr(remote, "_remote_sha256", lambda _path: "remote")
+    monkeypatch.setattr(remote, "_local_sha256", lambda _path: "local")
 
     remote.pull(["hopg_quick", "zhai"], no_sync=True)
 
