@@ -104,6 +104,57 @@ def test_niobium_transport_parameters_and_fallback(monkeypatch):
         transport._NO_MOTT.update(previous_no_mott)
 
 
+@pytest.mark.parametrize(
+    ("element", "expected"),
+    [
+        ("Fe", {"Z": 26, "A": 55.845, "J_keV": 0.286}),
+        ("Bi", {"Z": 83, "A": 208.98040, "J_keV": 0.823}),
+        ("Re", {"Z": 75, "A": 186.207, "J_keV": 0.736}),
+        ("Ta", {"Z": 73, "A": 180.94788, "J_keV": 0.718}),
+    ],
+)
+def test_new_element_transport_parameters(element, expected):
+    assert TRANSPORT_ELEMENTS[element] == expected
+
+
+@pytest.mark.parametrize(("element", "Z"), [("Fe", 26), ("Bi", 83), ("Re", 75), ("Ta", 73)])
+def test_new_elements_use_analytic_fallback_without_mott_table(monkeypatch, element, Z):
+    mott_calls = []
+    alpha_calls = []
+    original_alpha_sr_joy = transport._alpha_sr_joy
+
+    def missing_mott_table(called_element, called_Z):
+        mott_calls.append((called_element, called_Z))
+        raise FileNotFoundError
+
+    def spy_alpha_sr_joy(called_Z, E_keV):
+        alpha_calls.append((called_Z, E_keV.copy()))
+        return original_alpha_sr_joy(called_Z, E_keV)
+
+    monkeypatch.setattr(transport, "_mott_alpha_table", missing_mott_table)
+    monkeypatch.setattr(transport, "_alpha_sr_joy", spy_alpha_sr_joy)
+
+    previous_no_mott = set(transport._NO_MOTT)
+    transport._NO_MOTT.discard(element)
+    energies = np.array([30.0, 25.0])
+    try:
+        cos_theta = transport._sample_cos_theta(
+            Z, energies, np.random.default_rng(1), "mott", element
+        )
+        transport._sample_cos_theta(Z, energies, np.random.default_rng(2), "mott", element)
+
+        assert mott_calls == [(element, Z)]
+        assert len(alpha_calls) == 2
+        for called_Z, called_energies in alpha_calls:
+            assert called_Z == Z
+            np.testing.assert_array_equal(called_energies, energies)
+        assert np.all((-1.0 <= cos_theta) & (cos_theta <= 1.0))
+        assert element in transport._NO_MOTT
+    finally:
+        transport._NO_MOTT.clear()
+        transport._NO_MOTT.update(previous_no_mott)
+
+
 def test_hbn_composition_runs_transport():
     cp = crystal_params("hbn")
 

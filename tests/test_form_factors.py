@@ -15,7 +15,27 @@ from cxr_mc.materials.atomic import (
 )
 
 # the structure-factor elements the project models (light + edge-prone + heavy)
-ELEMENTS = ["C", "Li", "F", "Si", "Ge", "S", "Mo", "Nb", "Pd", "Se", "Zr", "Te", "Hf", "W", "Pt"]
+ELEMENTS = [
+    "C",
+    "Li",
+    "F",
+    "Si",
+    "Ge",
+    "S",
+    "Fe",
+    "Mo",
+    "Nb",
+    "Pd",
+    "Se",
+    "Zr",
+    "Te",
+    "Hf",
+    "Ta",
+    "W",
+    "Re",
+    "Pt",
+    "Bi",
+]
 
 
 @pytest.mark.parametrize("element", ELEMENTS)
@@ -48,6 +68,19 @@ def test_phosphorus_registered_and_edge_prone():
 
     E, f1, f2 = load_henke("P")
     assert E.size > 0 and np.all(np.isfinite(f1)) and np.all(f2 >= 0)
+
+
+@pytest.mark.parametrize("element", ["Fe", "Bi", "Re", "Ta"])
+def test_new_transport_elements_have_edge_aware_form_factors(element):
+    # These elements have L (Fe) or M (Bi/Re/Ta) edges in the catalog's
+    # 350--3500 eV line grid, so the default structure-factor path must retain
+    # xraydb's anomalous terms rather than reducing them to f0.
+    assert element in crystal_module._EDGE_PRONE
+
+    F = atomic_form_factor(element, 1.0, np.array([1000.0, 3000.0]))
+    assert F.shape == (2,)
+    assert np.all(np.isfinite(F.real))
+    assert np.all(np.isfinite(F.imag))
 
 
 def test_unknown_element_raises():

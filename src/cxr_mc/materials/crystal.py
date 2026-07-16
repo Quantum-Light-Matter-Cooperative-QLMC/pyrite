@@ -44,9 +44,11 @@ M_E_EV = 510998.95  # electron rest energy [eV]
 R_E_ANG = 2.8179403e-5  # classical electron radius [Angstrom]
 E2_EV_ANG = ALPHA_FS * HBARC_EV_ANG  # e^2 (Gaussian) = alpha hbar c = 14.3996 [eV*Angstrom]
 
-# elements whose edges fall in the soft-x-ray band -> force Henke correction
-# (Nb M and Te L edges land inside the line grids).
-_EDGE_PRONE = {"P", "Si", "Ge", "Mo", "Nb", "Se", "Te"}
+# Elements whose edges fall in the soft-x-ray band -> force Chantler correction.
+# xraydb edge energies confirm that the 350--3500 eV catalog line grids cross
+# Fe L (707--845 eV), Bi M4/M5/M3 (2580--3177 eV), Re M (1883--2932 eV),
+# and Ta M (1735--2708 eV), in addition to the previously reviewed elements.
+_EDGE_PRONE = {"P", "Si", "Fe", "Ge", "Mo", "Nb", "Se", "Te", "Ta", "Re", "Bi"}
 
 
 # ---- lattice geometry --------------------------------------------------------

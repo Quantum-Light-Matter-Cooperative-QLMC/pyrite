@@ -1,4 +1,12 @@
-"""Leaf transport element data shared by catalog validation and Monte Carlo."""
+"""Leaf transport element data shared by catalog validation and Monte Carlo.
+
+``Z`` and ``A`` use CIAAW's 2024 standard atomic weights; ``J_keV`` uses the
+PDG Atomic and Nuclear Properties elemental mean excitation energies (the PDG
+tables are based on the ICRU stopping-power compilation):
+
+* https://ciaaw.org/atomic-weights.htm
+* https://pdg.lbl.gov/2025/AtomicNuclearProperties/
+"""
 
 TRANSPORT_ELEMENTS = {
     "B": {"Z": 5, "A": 10.81, "J_keV": 0.076},
@@ -12,13 +20,17 @@ TRANSPORT_ELEMENTS = {
     "S": {"Z": 16, "A": 32.06, "J_keV": 0.180},
     "Ti": {"Z": 22, "A": 47.867, "J_keV": 0.233},
     "V": {"Z": 23, "A": 50.9415, "J_keV": 0.245},
+    "Fe": {"Z": 26, "A": 55.845, "J_keV": 0.286},
     "Mo": {"Z": 42, "A": 95.95, "J_keV": 0.424},
     "Nb": {"Z": 41, "A": 92.906, "J_keV": 0.417},
     "Pd": {"Z": 46, "A": 106.42, "J_keV": 0.477},
     "W": {"Z": 74, "A": 183.84, "J_keV": 0.727},
     "Zr": {"Z": 40, "A": 91.224, "J_keV": 0.393},
     "Hf": {"Z": 72, "A": 178.49, "J_keV": 0.705},
+    "Ta": {"Z": 73, "A": 180.94788, "J_keV": 0.718},
+    "Re": {"Z": 75, "A": 186.207, "J_keV": 0.736},
     "Pt": {"Z": 78, "A": 195.08, "J_keV": 0.790},
+    "Bi": {"Z": 83, "A": 208.98040, "J_keV": 0.823},
     "O": {"Z": 8, "A": 15.999, "J_keV": 0.095},
     "Al": {"Z": 13, "A": 26.982, "J_keV": 0.166},
 }
