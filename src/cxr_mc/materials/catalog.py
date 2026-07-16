@@ -185,8 +185,8 @@ class MaterialCatalog:
         Boundaries are cumulative from the beam-entrance face. Composition is
         resolved from the catalog's CIF-derived crystal density or named
         medium number density. A crystalline layer inherits its configured
-        zone axis unless the layer overrides it; amorphous media have no
-        default orientation.
+        direct-axis or reciprocal-surface orientation unless the layer supplies
+        a direct-axis override; amorphous media have no default orientation.
         """
         thickness = _number(film_thickness_ang)
         if thickness is None or thickness <= 0:
@@ -201,6 +201,7 @@ class MaterialCatalog:
             layer_thickness: float,
             composition: tuple[tuple[str, float], ...],
             beam_uvw: tuple[int, int, int] | None,
+            surface_hkl: tuple[int, int, int] | None,
             azimuth_deg: float,
         ) -> None:
             nonlocal z_top
@@ -213,26 +214,41 @@ class MaterialCatalog:
                         "z_bottom_ang": z_bottom,
                         "composition": composition,
                         "beam_uvw": beam_uvw,
+                        "surface_hkl": surface_hkl,
                         "azimuth_deg": azimuth_deg,
                     }
                 )
             )
             z_top = z_bottom
 
-        append_layer(film.key, thickness, film.composition, film.beam_uvw, 0.0)
+        append_layer(
+            film.key,
+            thickness,
+            film.composition,
+            film.beam_uvw,
+            film.surface_hkl,
+            0.0,
+        )
         for layer in material.stack:
             crystal = self.crystals.get(layer.material)
             if crystal is not None:
                 composition = crystal.composition
-                beam_uvw = layer.beam_uvw or crystal.beam_uvw
+                if layer.beam_uvw is None:
+                    beam_uvw = crystal.beam_uvw
+                    surface_hkl = crystal.surface_hkl
+                else:
+                    beam_uvw = layer.beam_uvw
+                    surface_hkl = None
             else:
                 composition = self.media[layer.material].composition
                 beam_uvw = layer.beam_uvw
+                surface_hkl = None
             append_layer(
                 layer.material,
                 layer.thickness_ang,
                 composition,
                 beam_uvw,
+                surface_hkl,
                 layer.azimuth_deg,
             )
         return tuple(physical)

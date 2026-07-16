@@ -3,8 +3,9 @@
 import numpy as np
 import pytest
 
-from cxr_mc.materials import LayerSpec
-from cxr_mc.materials.crystal import reciprocal_g_vector
+from cxr_mc.materials import LayerSpec, load_material_catalog
+from cxr_mc.materials.crystal import HBARC_EV_ANG
+from cxr_mc.montecarlo import beta_from_keV, mc_spectrum
 from cxr_mc.montecarlo.geometry import _orientation_R
 from cxr_mc.sweep import Sweep, build_cases, layer_radiator
 
@@ -21,7 +22,33 @@ GENERAL_LATTICE = {
 
 def test_surface_hkl_aligns_nonorthogonal_plane_normal_with_sample_z():
     surface_hkl = (2, 0, -1)
-    g_surface, _ = reciprocal_g_vector(surface_hkl, GENERAL_LATTICE)
+    a, b, c = (GENERAL_LATTICE[name] for name in ("a", "b", "c"))
+    alpha, beta, gamma = np.deg2rad(
+        [GENERAL_LATTICE[name] for name in ("alpha", "beta", "gamma")]
+    )
+    a1 = np.array([a, 0.0, 0.0])
+    a2 = np.array([b * np.cos(gamma), b * np.sin(gamma), 0.0])
+    a3 = np.array(
+        [
+            c * np.cos(beta),
+            c * (np.cos(alpha) - np.cos(beta) * np.cos(gamma)) / np.sin(gamma),
+            0.0,
+        ]
+    )
+    a3[2] = np.sqrt(c**2 - a3[0] ** 2 - a3[1] ** 2)
+    # (2, 0, -1) plane translations satisfy 2*u - w = 0. Their Cartesian
+    # cross product is an independently constructed surface normal.
+    plane_t1 = a2
+    plane_t2 = a1 + 2.0 * a3
+    g_surface = np.cross(plane_t1, plane_t2)
+    if g_surface @ a1 < 0.0:  # choose the +h reciprocal-normal direction
+        g_surface = -g_surface
+
+    for translation in (plane_t1, plane_t2):
+        cosine = (g_surface @ translation) / (
+            np.linalg.norm(g_surface) * np.linalg.norm(translation)
+        )
+        assert cosine == pytest.approx(0.0, abs=1e-15)
 
     R = _orientation_R(
         GENERAL_LATTICE,
@@ -196,3 +223,87 @@ def test_orientation_rejects_conflicting_direct_and_reciprocal_contracts():
             0.0,
             surface_hkl=(0, 0, 1),
         )
+
+
+def test_real_surface_catalog_case_changes_real_cpu_spectrum(tmp_path, monkeypatch):
+    import cxr_mc.sweep as sweep_module
+
+    catalog_text = """
+schema_version = 1
+[profiles.base]
+thickness_ang = 100.0
+energy_keV = 30.0
+tilt_deg = 0.0
+tilt_azim_deg = 0.0
+E_grid_line = { arange = { start = 800.0, stop = 3500.0, step = 5.0 } }
+E_grid_brem = 100.0
+[crystals.mos2]
+cif = "cifs/mos2.cif"
+validation_id = "mos2-cif-migration"
+B_ang2 = 0.6
+surface_hkl = [1, 0, 0]
+E_grid = { arange = { start = 800.0, stop = 3500.0, step = 5.0 } }
+hkl_families = [[1, 0, 0]]
+hkl_reason = "test surface-parallel reflection"
+[media.sio2]
+composition = { Si = 0.02205, O = 0.04410 }
+[materials.sample]
+label = "surface sample"
+profile = "base"
+crystal = "mos2"
+"""
+    path = tmp_path / "materials.toml"
+    path.write_text(catalog_text)
+    catalog = load_material_catalog(path)
+    monkeypatch.setattr(sweep_module, "CATALOG", catalog)
+
+    grid = np.arange(800.0, 3500.0, 5.0)
+    base = dict(
+        material="sample",
+        thickness_ang=100.0,
+        energy_keV=30.0,
+        tilt_deg=0.0,
+        E_grid_line=grid,
+        E_grid_brem=np.array([100.0]),
+    )
+    surface_case = build_cases(Sweep(**base), n_electrons=1, n_electrons_brem=1)[0]
+    direct_case = build_cases(
+        Sweep(**base, beam_uvw=(1, 0, 0)), n_electrons=1, n_electrons_brem=1
+    )[0]
+    segments = {
+        "r_mid": np.array([[0.0, 0.0, 50.0]]),
+        "v_hat": np.array([[0.0, 0.0, 1.0]]),
+        "L_ang": np.array([1000.0]),
+        "E_keV": np.array([30.0]),
+        "Ne": 1,
+        "thickness_ang": 100.0,
+    }
+    n_hat = np.array([1.0, 0.0, 0.2])
+
+    def spectrum(case):
+        return mc_spectrum(
+            segments,
+            grid,
+            crystal=case["crystal"],
+            hkl_list=case["hkl_list"],
+            B_ang2=case["B_ang2"],
+            composition=case["composition"],
+            beam_uvw=case["beam_uvw"],
+            surface_hkl=case["surface_hkl"],
+            n_hat=n_hat,
+            chunk=1,
+        )
+
+    surface_spec = spectrum(surface_case)
+    direct_spec = spectrum(direct_case)
+
+    assert surface_case["surface_hkl"] == (1, 0, 0)
+    assert surface_case["beam_uvw"] is None
+    assert float(np.max(surface_spec)) > 0.0
+    a_ang = float(catalog.crystal("mos2").lattice["a"])
+    g_100 = 4.0 * np.pi / (np.sqrt(3.0) * a_ang)
+    beta_30 = beta_from_keV(30.0)
+    n_unit = n_hat / np.linalg.norm(n_hat)
+    expected_resonance_eV = HBARC_EV_ANG * beta_30 * g_100 / (1.0 - beta_30 * n_unit[2])
+    assert grid[int(np.argmax(surface_spec))] == pytest.approx(expected_resonance_eV, abs=5.0)
+    assert not np.allclose(surface_spec, direct_spec, rtol=1e-6, atol=0.0)

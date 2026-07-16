@@ -528,6 +528,30 @@ def test_catalog_resolves_stack_layers_to_serialized_physical_data(serialized_ca
         assert actual == expected["layers"]
 
 
+def test_resolved_stack_inherits_surface_and_direct_override_clears_it(tmp_path):
+    from cxr_mc.materials import load_material_catalog
+
+    text = _minimal_catalog(
+        material_rows="""
+[materials.sample]
+label = "sample"
+profile = "base"
+crystal = "mos2"
+stack = [
+  { material = "mos2", thickness_ang = 10.0 },
+  { material = "mos2", thickness_ang = 20.0, beam_uvw = [0, 1, 0] },
+]
+""",
+    ).replace("beam_uvw = [0, 0, 2]", "surface_hkl = [2, 0, -1]")
+    layers = load_material_catalog(_write_catalog(tmp_path, text)).resolve_stack("sample", 5.0)
+
+    assert [(layer["beam_uvw"], layer["surface_hkl"]) for layer in layers] == [
+        (None, (2, 0, -1)),
+        (None, (2, 0, -1)),
+        ((0, 1, 0), None),
+    ]
+
+
 def test_catalog_matches_serialized_physics_for_every_crystal(serialized_catalog_golden):
     from cxr_mc.materials import CATALOG
     from cxr_mc.materials import crystal as crystal_module
