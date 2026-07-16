@@ -1503,7 +1503,9 @@ def _(
             "For every material whose checkpoint exists, the single best geometry's "
             "dominant line: energy vs flux. The three comparisons select by line "
             "quality, peak flux, and local line-to-bremsstrahlung ratio. Each "
-            "label reports the selected geometry's beam energy, θ, and φ."
+            "label reports the selected geometry's beam energy, θ, and φ. "
+            "Every comparison rejects candidate lines with quality below 0.25 "
+            "before selecting the best point."
         )
         _by_material = {}
         for _material_key in CATALOG.material_keys:
@@ -1523,18 +1525,21 @@ def _(
                         settings,
                         select="quality_peak",
                         beam_energy_keV=_beam_energy,
+                        min_line_quality=0.25,
                     ),
                     plot_material_comparison(
                         _by_material,
                         settings,
                         select="peak",
                         beam_energy_keV=_beam_energy,
+                        min_line_quality=0.25,
                     ),
                     plot_material_comparison(
                         _by_material,
                         settings,
                         select="line_brem_ratio",
                         beam_energy_keV=_beam_energy,
+                        min_line_quality=0.25,
                     ),
                 ]
             )
