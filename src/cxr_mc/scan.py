@@ -30,8 +30,8 @@ from pathlib import Path
 import numpy as np
 
 from .config import (
-    PENETRATION_SURVIVAL_FLOOR,
     default_settings,
+    format_penetration_watchdog_summary,
     gate_cases_by_penetration,
     material_sweep,
 )
@@ -154,15 +154,9 @@ def _run_material(args, material):
 
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
     cases, dropped = gate_cases_by_penetration(cases)
-    if dropped:
-        dead_energies = sorted({c["E0_keV"] for c in dropped})
-        print(
-            f"{material}: penetration watchdog dropped {len(dropped)} case(s) "
-            f"at {len(dead_energies)} beam energy(ies) "
-            f"({', '.join(f'{e:g} keV' for e in dead_energies)}) -- "
-            f"electron population already below {100 * PENETRATION_SURVIVAL_FLOOR:g}% "
-            f"before those thicknesses"
-        )
+    summary = format_penetration_watchdog_summary(dropped, material=material)
+    if summary is not None:
+        print(summary)
     print(
         f"{material}: {len(cases)} cases across "
         f"{len({c['name'] for c in cases})} configs" + (" (quick grid)" if args.quick else "")

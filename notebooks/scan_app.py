@@ -17,6 +17,7 @@ def _():
     from cxr_mc.config import (
         COLLAPSE_AZIMUTH,
         default_settings,
+        format_penetration_watchdog_summary,
         gate_cases_by_penetration,
         material_sweep,
     )
@@ -30,6 +31,7 @@ def _():
         CATALOG,
         build_cases,
         default_settings,
+        format_penetration_watchdog_summary,
         gate_cases_by_penetration,
         geometry_table,
         material_sweep,
@@ -72,6 +74,7 @@ def _(CATALOG, mo):
 def _(
     build_cases,
     default_settings,
+    format_penetration_watchdog_summary,
     gate_cases_by_penetration,
     geometry_table,
     material_sweep,
@@ -84,13 +87,9 @@ def _(
 
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
     cases, dropped = gate_cases_by_penetration(cases)
-    if dropped:
-        dead_energies = sorted({c["E0_keV"] for c in dropped})
-        print(
-            f"penetration watchdog dropped {len(dropped)} case(s) at "
-            f"{len(dead_energies)} beam energy(ies) "
-            f"({', '.join(f'{e:g} keV' for e in dead_energies)})"
-        )
+    summary = format_penetration_watchdog_summary(dropped)
+    if summary is not None:
+        print(summary)
     print(f"{len(cases)} cases across {len({c['name'] for c in cases})} configs")
     return MATERIAL, cases, settings
 

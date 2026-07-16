@@ -262,3 +262,40 @@ def gate_cases_by_penetration(
         else:
             kept.append(case)
     return kept, dropped
+
+
+def format_penetration_watchdog_summary(
+    dropped,
+    *,
+    floor: float = PENETRATION_SURVIVAL_FLOOR,
+    material: str | None = None,
+) -> str | None:
+    """Format the ``gate_cases_by_penetration`` drop summary printed by both
+    ``cxr_mc.scan`` (CLI) and ``notebooks/scan_app.py`` (interactive) --
+    shared here so the two call sites can't drift on how they compute
+    ``dead_energies`` from ``dropped``.
+
+    Returns ``None`` when ``dropped`` is empty (nothing to report). When
+    ``material`` is given, prefixes the message with ``"{material}: "`` and
+    appends the floor-percentage explanation -- the CLI shape, where the
+    material isn't otherwise obvious from context. When ``material`` is
+    ``None``, omits both -- the notebook shape, where the material is
+    already visible in the UI.
+    """
+    if not dropped:
+        return None
+    dead_energies = sorted({c["E0_keV"] for c in dropped})
+    energies_str = ", ".join(f"{e:g} keV" for e in dead_energies)
+    if material is not None:
+        return (
+            f"{material}: penetration watchdog dropped {len(dropped)} case(s) "
+            f"at {len(dead_energies)} beam energy(ies) "
+            f"({energies_str}) -- "
+            f"electron population already below {100 * floor:g}% "
+            f"before those thicknesses"
+        )
+    return (
+        f"penetration watchdog dropped {len(dropped)} case(s) at "
+        f"{len(dead_energies)} beam energy(ies) "
+        f"({energies_str})"
+    )
