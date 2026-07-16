@@ -87,6 +87,27 @@ def test_gate_cases_by_penetration_uses_normal_incidence_reference(monkeypatch):
     assert seen_compositions == ["right"]
 
 
+def test_gate_cases_by_penetration_forwards_abs_layers_total_thickness(monkeypatch):
+    # Film-on-substrate materials (e.g. mos2-on-sapphire) carry an
+    # ``abs_layers`` stack; the watchdog must simulate through the FULL
+    # stack (abs_layers[-1][1], the substrate's far face) rather than the
+    # case's own (film-only) thickness_ang, and forward ``abs_layers``
+    # verbatim as the ``layers`` kwarg.
+    calls = []
+
+    def fake_simulate_trajectories(E0_keV, Ne, thickness_ang, layers=None, **kwargs):
+        calls.append((E0_keV, thickness_ang, layers))
+        return {"n_transmitted": Ne}
+
+    monkeypatch.setattr(config, "simulate_trajectories", fake_simulate_trajectories)
+
+    abs_layers = [(0.0, 50.0, []), (50.0, 150.0, [])]
+    cases = [_case(30.0, 50.0, abs_layers=abs_layers)]
+    config.gate_cases_by_penetration(cases, floor=0.05, Ne=10, seed=0)
+
+    assert calls == [(30.0, 150.0, abs_layers)]
+
+
 def test_gate_cases_by_penetration_drops_with_real_transport():
     # A real (unmocked) cxr_mc.montecarlo.simulate_trajectories call: a 15 keV
     # beam through a light element (carbon) should fully transmit at 10nm,
