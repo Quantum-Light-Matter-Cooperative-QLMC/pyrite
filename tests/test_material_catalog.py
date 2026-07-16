@@ -127,6 +127,29 @@ def test_per_beam_line_grid_keys_match_beam_energies(tmp_path, replacement, erro
     assert error_path in str(caught.value)
 
 
+def test_per_beam_line_grid_duplicate_is_reported_after_invalid_grid(tmp_path):
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    replacement = (
+        "{ energy_keV = 25.0, grid = { values = [] } },\n  "
+        "{ energy_keV = 25.0, grid = 60.0 },\n  "
+        "{ energy_keV = 30.0, grid = 70.0 }"
+    )
+    text = _catalog_with_per_beam_line_grids().replace(PER_BEAM_ENTRIES, replacement)
+
+    with pytest.raises(MaterialConfigError) as caught:
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+    assert any(
+        "E_grid_line_by_energy[0].grid: grid must be nonempty" in error
+        for error in caught.value.errors
+    )
+    assert any(
+        "E_grid_line_by_energy[1].energy_keV: duplicates beam energy 25" in error
+        for error in caught.value.errors
+    )
+
+
 def test_bundled_crystal_validation_ids_are_ledgered():
     from cxr_mc import DATA_DIR
 

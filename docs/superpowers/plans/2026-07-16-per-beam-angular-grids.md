@@ -131,7 +131,7 @@ def test_per_beam_line_grid_keys_match_beam_energies(tmp_path, replacement, erro
 Run:
 
 ```bash
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test tests/test_material_catalog.py -k "per_beam or fixed_material_line_grid" 
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test tests/test_material_catalog.py -k "per_beam or fixed_material_line_grid"
 ```
 
 Expected: FAIL because `E_grid_line_by_energy` is an unknown key and `ScanSpec`/`Sweep` do not expose the mapping.

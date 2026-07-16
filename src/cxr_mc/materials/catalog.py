@@ -388,6 +388,7 @@ def _line_grids_by_energy(
         errors.add(path, "must be a nonempty array of line-grid entries")
         return None
     parsed: dict[float, np.ndarray] = {}
+    seen_energies: set[float] = set()
     energy_indexes: dict[float, int] = {}
     for index, item in enumerate(value):
         item_path = f"{path}[{index}]"
@@ -399,9 +400,10 @@ def _line_grids_by_energy(
         if energy is None or energy <= 0:
             errors.add(f"{item_path}.energy_keV", "must be finite and positive")
             continue
-        if energy in parsed:
+        if energy in seen_energies:
             errors.add(f"{item_path}.energy_keV", f"duplicates beam energy {energy:g}")
             continue
+        seen_energies.add(energy)
         energy_indexes[energy] = index
         grid = _grid(row.get("grid"), f"{item_path}.grid", errors)
         if grid is None or np.any(grid <= 0):
