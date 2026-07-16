@@ -20,7 +20,7 @@ energy grid) is looked up per material; the detector geometry defaults to the
 are imported here (no GPU), so this module is cheap to import and test.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import product
 from typing import Any
@@ -216,6 +216,7 @@ class Sweep:
     #       measured spectrum without inflating the line cost. Default spans the
     #       line start up to the highest beam energy at a 50 eV step.
     E_grid_line: np.ndarray | None = None
+    E_grid_line_by_energy: Mapping[float, np.ndarray] | None = None
     E_grid_brem: np.ndarray | None = None
     e_grid_eV: np.ndarray | None = None  # deprecated: alias for E_grid_line
     dtheta_obs_deg: float | None = None  # None -> Timepix3 default
@@ -272,6 +273,27 @@ def _seq(x):
     return np.atleast_1d(np.asarray(x, dtype=float))
 
 
+def _quantized_angles(values: ScalarOrSeq) -> np.ndarray:
+    """Round degrees to nearest half away from zero at ties, then stable-unique."""
+    source = _seq(values)
+    scaled = source * 2.0
+    quantized = np.copysign(np.floor(np.abs(scaled) + 0.5), scaled) / 2.0
+    return np.asarray(list(dict.fromkeys(float(value) for value in quantized)), dtype=float)
+
+
+def _line_grid_for_energy(sweep: Sweep, default_grid: np.ndarray, energy_keV: float) -> np.ndarray:
+    """Select the fixed, legacy, mapped, or material-default line grid."""
+    fixed = sweep.E_grid_line if sweep.E_grid_line is not None else sweep.e_grid_eV
+    if fixed is not None:
+        return np.asarray(fixed, dtype=float)
+    if sweep.E_grid_line_by_energy is None:
+        return np.asarray(default_grid, dtype=float)
+    try:
+        return np.asarray(sweep.E_grid_line_by_energy[float(energy_keV)], dtype=float)
+    except KeyError:
+        raise ValueError(f"no E_grid_line configured for beam energy {energy_keV:g} keV") from None
+
+
 def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     """Expand a :class:`Sweep` into a list of run_case dicts (the Cartesian
     product over the swept thickness / tilt / azimuth / optional footprint, each
@@ -280,18 +302,29 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     infinite slab, otherwise both must be positive. Returns the ``cases`` list; preview it with
     :func:`geometry_table`."""
     cp = crystal_params(sweep.material, sweep.n_families)
-    # line grid: fine + narrow (per-material default, E_grid_line, or the
-    # deprecated e_grid_eV alias). brem grid: coarse + wide -- each case spans
-    # up to that case's beam energy because brem cuts off at the particle energy.
+    # line grid: fine + narrow (per-material default, per-energy mapping,
+    # E_grid_line, or the deprecated e_grid_eV alias). brem grid: coarse + wide
+    # -- each case spans up to that case's beam energy because brem cuts off at
+    # the particle energy.
     # A uniform E_grid_brem keeps the legacy start/spacing behavior and extends
     # to each beam energy. Scalar/nonuniform grids are explicit and stay exact.
-    line_src = sweep.E_grid_line if sweep.E_grid_line is not None else sweep.e_grid_eV
-    line_grid = cp["E_grid"] if line_src is None else np.asarray(line_src, float)
     energies = _seq(sweep.energy_keV)
+    line_grids = tuple(
+        _line_grid_for_energy(sweep, cp["E_grid"], float(energy)) for energy in energies
+    )
+    fixed_line_grid = sweep.E_grid_line if sweep.E_grid_line is not None else sweep.e_grid_eV
     if sweep.E_grid_brem is not None:
         brem_grid = np.asarray(sweep.E_grid_brem, float)
     else:
-        brem_grid = np.arange(float(line_grid[0]), float(energies.max()) * 1e3 + 50.0, 50.0)  # type: ignore[reportIndexIssue,reportArgumentType]
+        if fixed_line_grid is not None:
+            brem_start = float(np.atleast_1d(fixed_line_grid)[0])
+        elif sweep.E_grid_line_by_energy is not None:
+            brem_start = min(
+                float(np.atleast_1d(grid)[0]) for grid in sweep.E_grid_line_by_energy.values()
+            )
+        else:
+            brem_start = float(cp["E_grid"][0])
+        brem_grid = np.arange(brem_start, float(energies.max()) * 1e3 + 50.0, 50.0)  # type: ignore[reportArgumentType]
 
     dtheta = TIMEPIX3_DTHETA_OBS_DEG if sweep.dtheta_obs_deg is None else sweep.dtheta_obs_deg
     domega = TIMEPIX3_DOMEGA_SR if sweep.domega_sr is None else sweep.domega_sr
@@ -332,8 +365,9 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     mosaic_analytic_rad = None if mosaic_mc else mosaic_fwhm_rad
     mosaic_mc_rad = mosaic_fwhm_rad if mosaic_mc else None
 
-    line_case_grid = encode_energy_grid(line_grid)
     brem_case_grid = encode_energy_grid(brem_grid)
+    tilts = _quantized_angles(sweep.tilt_deg)
+    azimuths = _quantized_angles(sweep.tilt_azim_deg)
 
     # normalize the substrate sugar onto the general stack (mutually exclusive)
     stack = sweep.stack
@@ -346,8 +380,8 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     for i_c, (thickness, tilt, azim, (width, height)) in enumerate(
         product(
             _seq(sweep.thickness_ang),
-            _seq(sweep.tilt_deg),
-            _seq(sweep.tilt_azim_deg),
+            tilts,
+            azimuths,
             footprints,
         )
     ):
@@ -370,6 +404,7 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
         if width is not None:
             name = f"{name} footprint={width:g}x{height:g}mm"
         for i_e, E0 in enumerate(energies):
+            line_case_grid = encode_energy_grid(line_grids[i_e])
             cases.append(
                 dict(
                     name=name,
