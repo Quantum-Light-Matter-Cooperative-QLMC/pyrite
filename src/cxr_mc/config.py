@@ -112,7 +112,7 @@ def trajectory_sweep(
     material: str,
     *,
     tilts=PENETRATION_TILT_DEG,
-    energies=(30, 60),
+    energies=(30, 50),
     thickness_ang: float | None = None,
     n_tilts: int | None = None,
     tilt_span: float | None = None,

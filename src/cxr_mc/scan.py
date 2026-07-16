@@ -139,7 +139,7 @@ def _run_material(args, material):
         overrides.update(
             tilt_deg=np.linspace(0.0, 85.0, 5),
             tilt_azim_deg=np.array([10.0, 30.0]),
-            energy_keV=[30, 60],
+            energy_keV=[30, 50],
         )
     if args.n_families is not None:
         overrides["n_families"] = args.n_families

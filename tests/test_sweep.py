@@ -123,6 +123,16 @@ def test_build_cases_selects_and_encodes_line_grid_for_each_beam_energy():
         assert case["E_grid"] is case["E_grid_line"]
 
 
+def test_catalog_line_grid_is_selected_for_each_standard_beam_energy():
+    sweep = material_sweep("mose2")
+    cases = build_cases(sweep)
+
+    assert {case["E0_keV"] for case in cases} == set(sweep.energy_keV)
+    for case in cases:
+        expected = CATALOG.material("mose2").scan.E_grid_line_by_energy[case["E0_keV"]]
+        np.testing.assert_array_equal(decode_energy_grid(case["E_grid_line"]), expected)
+
+
 def test_fixed_line_grid_takes_precedence_over_per_beam_mapping():
     fixed = np.array([75.0, 78.0])
     cases = build_cases(
@@ -567,6 +577,7 @@ def test_named_stack_registered():
 
 def test_trajectory_sweep_uses_penetration_angle_set():
     sweep = trajectory_sweep("hopg")
+    assert sweep.energy_keV == [30, 50]
     cases = build_cases(sweep, 10, 5)
 
     assert tuple(sweep.tilt_deg) == PENETRATION_TILT_DEG
@@ -728,6 +739,7 @@ def test_scan_forwards_n_families_and_beam_uvw_overrides(monkeypatch, tmp_path):
     )
     scan.run(args)
 
+    assert {case["E0_keV"] for case in seen["cases"]} == {30.0, 50.0}
     case = seen["cases"][0]
     assert case["beam_uvw"] == (1, 0, 0)
     assert len(case["hkl_list"]) == len(override_hkl)

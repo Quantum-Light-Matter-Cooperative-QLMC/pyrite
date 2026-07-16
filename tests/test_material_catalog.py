@@ -170,8 +170,36 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
 
     np.testing.assert_array_equal(
         CATALOG.material("hbn").scan.thickness_ang,
-        np.concatenate([np.logspace(2, 5, 6), np.logspace(5, 6, 2, endpoint=False)]),
+        [10000000.0],
     )
+
+
+def test_standard_profile_uses_requested_angles_energies_and_line_grids():
+    from cxr_mc.materials import CATALOG
+
+    expected_bounds = {
+        30.0: (10.0, 2500.0),
+        50.0: (10.0, 3000.0),
+        100.0: (50.0, 3500.0),
+        150.0: (50.0, 4000.0),
+        200.0: (50.0, 4500.0),
+        250.0: (50.0, 5000.0),
+        300.0: (50.0, 5000.0),
+    }
+    for material in CATALOG.materials.values():
+        scan = material.scan
+        np.testing.assert_array_equal(scan.energy_keV, list(expected_bounds))
+        np.testing.assert_array_equal(scan.tilt_deg, np.linspace(0.0, 89.0, 10))
+        np.testing.assert_array_equal(scan.tilt_azim_deg, np.linspace(90.0, 180.0, 10))
+        assert scan.E_grid_line is None
+        assert tuple(scan.E_grid_line_by_energy) == tuple(expected_bounds)
+        for energy, (start, stop) in expected_bounds.items():
+            grid = scan.E_grid_line_by_energy[energy]
+            assert grid[0] == start
+            assert grid[-1] == stop
+            spacing = np.diff(grid)
+            assert np.all(spacing == pytest.approx(spacing[0]))
+            assert spacing[0] == pytest.approx(3.0, abs=0.002)
 
 
 def test_exposed_arrays_cannot_have_writes_reenabled():
@@ -189,10 +217,13 @@ def test_exposed_arrays_cannot_have_writes_reenabled():
                 material.scan.energy_keV,
                 material.scan.tilt_deg,
                 material.scan.tilt_azim_deg,
-                material.scan.E_grid_line,
                 material.scan.E_grid_brem,
             )
         )
+        if material.scan.E_grid_line is not None:
+            arrays.append(material.scan.E_grid_line)
+        if material.scan.E_grid_line_by_energy is not None:
+            arrays.extend(material.scan.E_grid_line_by_energy.values())
         if material.scan.thickness_layers is not None:
             arrays.append(material.scan.thickness_layers)
 
@@ -533,8 +564,21 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
             }
             for layer in actual.stack
         ] == expected["stack"]
-        for grid_name, fingerprint in expected["scan"].items():
+        scan_golden = expected["scan"]
+        for grid_name in (
+            "thickness_ang",
+            "energy_keV",
+            "tilt_deg",
+            "tilt_azim_deg",
+            "E_grid_brem",
+        ):
+            fingerprint = scan_golden[grid_name]
             assert _array_fingerprint(getattr(actual.scan, grid_name)) == fingerprint
+        assert actual.scan.E_grid_line is None
+        expected_line_grids = scan_golden["E_grid_line_by_energy"]
+        assert tuple(map(str, actual.scan.E_grid_line_by_energy)) == tuple(expected_line_grids)
+        for energy, fingerprint in expected_line_grids.items():
+            assert _array_fingerprint(actual.scan.E_grid_line_by_energy[float(energy)]) == fingerprint
 
     special = golden["special_grids"]
     np.testing.assert_array_equal(
