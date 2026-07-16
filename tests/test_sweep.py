@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from cxr_mc import materials as material_registry
+from cxr_mc._energy_grid import decode_energy_grid
 from cxr_mc.config import (
     MATERIALS,
     PENETRATION_TILT_DEG,
@@ -97,6 +98,118 @@ def test_build_cases_is_cartesian_product():
     }
 
     assert required <= set(cases[0])
+
+
+def test_build_cases_selects_and_encodes_line_grid_for_each_beam_energy():
+    grids = {
+        30.0: np.linspace(10.0, 2500.0, 831),
+        50.0: np.linspace(10.0, 3000.0, 998),
+    }
+    cases = build_cases(
+        Sweep(
+            material="mose2",
+            thickness_ang=100.0,
+            energy_keV=[30.0, 50.0],
+            tilt_deg=0.0,
+            E_grid_line_by_energy=grids,
+            E_grid_brem=75.0,
+        )
+    )
+
+    assert [case["E0_keV"] for case in cases] == [30.0, 50.0]
+    for case in cases:
+        expected = grids[case["E0_keV"]]
+        np.testing.assert_array_equal(decode_energy_grid(case["E_grid_line"]), expected)
+        assert case["E_grid"] is case["E_grid_line"]
+
+
+def test_fixed_line_grid_takes_precedence_over_per_beam_mapping():
+    fixed = np.array([75.0, 78.0])
+    cases = build_cases(
+        Sweep(
+            material="mose2",
+            energy_keV=[30.0, 50.0],
+            E_grid_line=fixed,
+            E_grid_line_by_energy={30.0: np.array([10.0]), 50.0: np.array([20.0])},
+        )
+    )
+    for case in cases:
+        np.testing.assert_array_equal(decode_energy_grid(case["E_grid_line"]), fixed)
+
+
+def test_deprecated_line_grid_alias_takes_precedence_over_per_beam_mapping():
+    fixed = np.array([75.0, 78.0])
+    cases = build_cases(
+        Sweep(
+            material="mose2",
+            energy_keV=[30.0, 50.0],
+            e_grid_eV=fixed,
+            E_grid_line_by_energy={30.0: np.array([10.0]), 50.0: np.array([20.0])},
+        )
+    )
+    for case in cases:
+        np.testing.assert_array_equal(decode_energy_grid(case["E_grid_line"]), fixed)
+
+
+def test_missing_per_beam_line_grid_fails_before_cases_are_built():
+    with pytest.raises(ValueError, match=r"no E_grid_line configured for beam energy 50"):
+        build_cases(
+            Sweep(
+                material="mose2",
+                energy_keV=[30.0, 50.0],
+                E_grid_line_by_energy={30.0: np.array([10.0])},
+            )
+        )
+
+
+def test_implicit_brem_grid_starts_at_lowest_per_beam_line_grid_start():
+    cases = build_cases(
+        Sweep(
+            material="mose2",
+            energy_keV=[30.0, 50.0],
+            E_grid_line_by_energy={
+                30.0: np.array([25.0, 50.0]),
+                50.0: np.array([10.0, 50.0]),
+            },
+        )
+    )
+
+    assert {case["E_grid_brem"][0] for case in cases} == {10.0}
+
+
+def test_build_cases_quantizes_angles_symmetrically_and_removes_duplicates():
+    cases = build_cases(
+        Sweep(
+            material="mose2",
+            energy_keV=30.0,
+            thickness_ang=100.0,
+            tilt_deg=[1.24, 1.26, 1.25, 1.24],
+            tilt_azim_deg=[-1.24, -1.26, -1.25, -1.24],
+            E_grid_line=np.array([75.0]),
+            E_grid_brem=np.array([75.0]),
+        )
+    )
+
+    assert [(case["tilt_deg"], case["tilt_azim_deg"]) for case in cases] == [
+        (1.0, -1.0),
+        (1.0, -1.5),
+        (1.5, -1.0),
+        (1.5, -1.5),
+    ]
+    assert [case["seed"] for case in cases] == [1, 1001, 2001, 3001]
+    assert [case["name"] for case in cases] == [
+        "MoSe2 10nm pol=1 az=-1",
+        "MoSe2 10nm pol=1 az=-1.5",
+        "MoSe2 10nm pol=1.5 az=-1",
+        "MoSe2 10nm pol=1.5 az=-1.5",
+    ]
+    for case in cases:
+        assert np.deg2rad(case["tilt_deg"]) == pytest.approx(
+            np.deg2rad(float(case["name"].split("pol=")[1].split()[0]))
+        )
+        assert np.deg2rad(case["tilt_azim_deg"]) == pytest.approx(
+            np.deg2rad(float(case["name"].split("az=")[1]))
+        )
 
 
 @pytest.mark.parametrize(
