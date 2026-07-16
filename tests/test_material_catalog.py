@@ -45,12 +45,12 @@ PER_BEAM_ENTRIES = """{ energy_keV = 25.0, grid = { linspace = { start = 10.0, s
 
 def _catalog_with_per_beam_line_grids() -> str:
     return _minimal_catalog(
-        material_rows='''
+        material_rows="""
 [materials.sample]
 label = "sample"
 profile = "base"
 crystal = "mos2"
-'''
+"""
     ).replace(
         "E_grid_line = { arange = { start = 50.0, stop = 60.0, step = 2.0 } }",
         f"E_grid_line_by_energy = [\n  {PER_BEAM_ENTRIES},\n]",
@@ -61,16 +61,12 @@ def test_per_beam_line_grids_are_exact_read_only_and_projected(tmp_path, monkeyp
     from cxr_mc import config
     from cxr_mc.materials import load_material_catalog
 
-    catalog = load_material_catalog(
-        _write_catalog(tmp_path, _catalog_with_per_beam_line_grids())
-    )
+    catalog = load_material_catalog(_write_catalog(tmp_path, _catalog_with_per_beam_line_grids()))
     scan = catalog.material("sample").scan
 
     assert scan.E_grid_line is None
     assert tuple(scan.E_grid_line_by_energy) == (25.0, 30.0)
-    np.testing.assert_array_equal(
-        scan.E_grid_line_by_energy[25.0], np.linspace(10.0, 58.0, 17)
-    )
+    np.testing.assert_array_equal(scan.E_grid_line_by_energy[25.0], np.linspace(10.0, 58.0, 17))
     with pytest.raises(TypeError):
         scan.E_grid_line_by_energy[25.0] = np.array([1.0])
     with pytest.raises(ValueError):
@@ -105,8 +101,7 @@ def test_fixed_material_line_grid_overrides_profile_mapping(tmp_path):
     ("replacement", "error_path"),
     [
         (
-            "{ energy_keV = 25.0, grid = 50.0 },\n  "
-            "{ energy_keV = 25.0, grid = 60.0 }",
+            "{ energy_keV = 25.0, grid = 50.0 },\n  { energy_keV = 25.0, grid = 60.0 }",
             "E_grid_line_by_energy[1].energy_keV",
         ),
         ("{ energy_keV = 25.0, grid = 50.0 }", "E_grid_line_by_energy"),
@@ -163,9 +158,7 @@ def test_bundled_crystal_validation_ids_are_ledgered():
     ledger = (Path(__file__).parents[1] / "docs" / "physics-validation-ledger.md").read_text()
 
     missing = sorted(
-        validation_id
-        for validation_id in validation_ids
-        if f"| `{validation_id}` |" not in ledger
+        validation_id for validation_id in validation_ids if f"| `{validation_id}` |" not in ledger
     )
     assert not missing, f"catalog validation IDs missing from ledger: {missing}"
 
@@ -175,7 +168,7 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
 
     assert isinstance(CATALOG, MaterialCatalog)
     assert len(CATALOG.crystals) == 48
-    assert len(CATALOG.materials) == 48
+    assert len(CATALOG.materials) == 49
     assert CATALOG.material_keys == tuple(CATALOG.materials)
     assert CATALOG.crystal("hbn") is CATALOG.crystals["hbn"]
     assert CATALOG.material("mote2") is CATALOG.materials["mote2"]
@@ -193,7 +186,7 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
 
     np.testing.assert_array_equal(
         CATALOG.material("hbn").scan.thickness_ang,
-        [10000000.0],
+        [1000.0, 5000.0, 10000.0, 40000.0, 100000.0, 200000.0, 500000.0, 1000000.0],
     )
 
 
@@ -643,7 +636,9 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
         expected_line_grids = scan_golden["E_grid_line_by_energy"]
         assert tuple(map(str, actual.scan.E_grid_line_by_energy)) == tuple(expected_line_grids)
         for energy, fingerprint in expected_line_grids.items():
-            assert _array_fingerprint(actual.scan.E_grid_line_by_energy[float(energy)]) == fingerprint
+            assert (
+                _array_fingerprint(actual.scan.E_grid_line_by_energy[float(energy)]) == fingerprint
+            )
 
     special = golden["special_grids"]
     np.testing.assert_array_equal(

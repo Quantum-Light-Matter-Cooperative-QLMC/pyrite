@@ -447,7 +447,10 @@ def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcog
     assert material in MATERIALS
 
     grid = material_grid(material)
-    assert grid["thickness_ang"] == 10e4
+    np.testing.assert_array_equal(
+        grid["thickness_ang"],
+        [1000.0, 5000.0, 10000.0, 40000.0, 100000.0, 200000.0, 500000.0, 1000000.0],
+    )
     assert "substrate" not in grid
 
     params = crystal_params(material)
@@ -495,7 +498,10 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
     assert material in MATERIALS
 
     grid = material_grid(material)
-    assert grid["thickness_ang"] == 10e4
+    np.testing.assert_array_equal(
+        grid["thickness_ang"],
+        [1000.0, 5000.0, 10000.0, 40000.0, 100000.0, 200000.0, 500000.0, 1000000.0],
+    )
     assert "substrate" not in grid
 
     params = crystal_params(material, n_families=999)
@@ -547,15 +553,21 @@ def test_layer_spec_is_the_frozen_stack_type():
 
 
 def test_mote2_material_grid_is_bulk():
-    # Bulk 2H-MoTe2 without substrate (default ~10 um thickness).
+    # Bulk 2H-MoTe2 without substrate (default thickness sweep).
     grid = material_grid("mote2")
 
     assert "substrate" not in grid  # bulk material, no substrate in default grid
-    assert grid["thickness_ang"] == 10e4
+    np.testing.assert_array_equal(
+        grid["thickness_ang"],
+        [1000.0, 5000.0, 10000.0, 40000.0, 100000.0, 200000.0, 500000.0, 1000000.0],
+    )
 
     sweep = material_sweep("mote2")
     assert sweep.substrate is None
-    assert sweep.thickness_ang == 10e4
+    np.testing.assert_array_equal(
+        sweep.thickness_ang,
+        [1000.0, 5000.0, 10000.0, 40000.0, 100000.0, 200000.0, 500000.0, 1000000.0],
+    )
 
 
 def test_mote2_product_material_grid_matches_few_layer_sapphire():
