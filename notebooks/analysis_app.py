@@ -1470,9 +1470,9 @@ def _(CATALOG, load_checkpoint, mo, records):
         _results = load_checkpoint(_material_key)
         if _results:
             _energies.update(r["case"]["E0_keV"] for r in records(_results))
-    cross_material_energy_options = {
-        f"{energy:g} keV": energy for energy in sorted(_energies)
-    } or {"— no data —": None}
+    cross_material_energy_options = {f"{energy:g} keV": energy for energy in sorted(_energies)} or {
+        "— no data —": None
+    }
     compare_all_beam_energies_ui = mo.ui.checkbox(value=True, label="Compare all beam energies")
     return cross_material_energy_options, compare_all_beam_energies_ui
 
@@ -1504,8 +1504,10 @@ def _(
             "dominant line: energy vs flux. The three comparisons select by line "
             "quality, peak flux, and local line-to-bremsstrahlung ratio. Each "
             "label reports the selected geometry's beam energy, θ, and φ. "
-            "Every comparison rejects candidate lines with quality below 0.25 "
-            "before selecting the best point."
+            "Every comparison rejects candidate lines with quality below 0.5 "
+            "before selecting the best point; a material with no line clearing "
+            "that bar is dropped from the plot and reported in a printed "
+            "statement below it."
         )
         _by_material = {}
         for _material_key in CATALOG.material_keys:
@@ -1525,21 +1527,21 @@ def _(
                         settings,
                         select="quality_peak",
                         beam_energy_keV=_beam_energy,
-                        min_line_quality=0.25,
+                        min_line_quality=0.5,
                     ),
                     plot_material_comparison(
                         _by_material,
                         settings,
                         select="peak",
                         beam_energy_keV=_beam_energy,
-                        min_line_quality=0.25,
+                        min_line_quality=0.5,
                     ),
                     plot_material_comparison(
                         _by_material,
                         settings,
                         select="line_brem_ratio",
                         beam_energy_keV=_beam_energy,
-                        min_line_quality=0.25,
+                        min_line_quality=0.5,
                     ),
                 ]
             )

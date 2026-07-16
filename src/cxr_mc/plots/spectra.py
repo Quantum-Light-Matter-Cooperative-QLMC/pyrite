@@ -378,7 +378,7 @@ def plot_material_comparison(
     rel_prominence=0.03,
     line_metric="sharpness",
     beam_energy_keV=None,
-    min_line_quality: float | None = 0.25,
+    min_line_quality: float | None = 0.5,
 ):
     """Cross-material headline: for each material's results store, find the single
     BEST geometry/energy (results.selection_score ``select``) and plot its
@@ -392,9 +392,11 @@ def plot_material_comparison(
     (skip empties).  ``beam_energy_keV`` optionally restricts each material to
     that beam energy before selecting its best geometry. ``min_line_quality``
     rejects ill-defined-line candidates before ranking; ``None`` disables that
-    gate. Labels are offset automatically when their rendered bounding boxes
-    would overlap."""
+    gate. A material with records but no candidate clearing the gate is
+    dropped from the plot and reported in a printed statement. Labels are
+    offset automatically when their rendered bounding boxes would overlap."""
     pts = []  # (label, line_eV, line_flux, quality, case)
+    dropped = []
     for label, results in results_by_material.items():
         recs = records(results)
         if not recs:
@@ -404,14 +406,12 @@ def plot_material_comparison(
             r
             for r in recs
             if (beam_energy_keV is None or r["case"]["E0_keV"] == beam_energy_keV)
-            and (
-                min_line_quality is None
-                or metrics[id(r)]["line_quality"] >= min_line_quality
-            )
+            and (min_line_quality is None or metrics[id(r)]["line_quality"] >= min_line_quality)
         ]
         if select == "line_brem_ratio":
             candidates = [r for r in candidates if np.isfinite(metrics[id(r)]["line_brem_ratio"])]
         if not candidates:
+            dropped.append(label)
             continue
         best = max(candidates, key=lambda r: selection_score(metrics[id(r)], select))
         m = metrics[id(best)]
@@ -458,9 +458,7 @@ def plot_material_comparison(
     energy_scope = (
         "all beam energies" if beam_energy_keV is None else f"{beam_energy_keV:g} keV beam energy"
     )
-    quality_scope = (
-        "" if min_line_quality is None else f", line quality >= {min_line_quality:g}"
-    )
+    quality_scope = "" if min_line_quality is None else f", line quality >= {min_line_quality:g}"
     ax.set_title(
         f"Cross-material comparison — {selection_title} ({energy_scope}{quality_scope})",
         fontsize=12,
@@ -471,4 +469,9 @@ def plot_material_comparison(
     cb.set_label("line-definition quality")
     fig.tight_layout()
     _separate_annotation_boxes(fig, annotations)
+    if dropped:
+        print(
+            f"Dropped from cross-material comparison (select={select!r}{quality_scope}): "
+            f"{', '.join(dropped)} -- no candidate line met the gate."
+        )
     return fig
