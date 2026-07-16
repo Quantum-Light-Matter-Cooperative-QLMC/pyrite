@@ -30,12 +30,13 @@
 **Files:**
 - Modify: `src/cxr_mc/materials/catalog.py`
 - Modify: `src/cxr_mc/config.py`
+- Modify: `src/cxr_mc/sweep.py` (dataclass field only; selection remains Task 2)
 - Test: `tests/test_material_catalog.py`
 - Test: `tests/test_sweep.py`
 
 **Interfaces:**
 - Consumes: existing `_grid(value, path, errors) -> np.ndarray | None`, `_readonly(values) -> np.ndarray`, `ScanSpec`, `material_grid()`, `material_sweep()`, and `trajectory_sweep()`.
-- Produces: `LineGridByEnergy = Mapping[float, np.ndarray]`; `ScanSpec.E_grid_line: np.ndarray | None`; `ScanSpec.E_grid_line_by_energy: LineGridByEnergy | None`; and `Sweep.E_grid_line_by_energy: Mapping[float, np.ndarray] | None` for Task 2.
+- Produces: `LineGridByEnergy = Mapping[float, np.ndarray]`; `ScanSpec.E_grid_line: np.ndarray | None`; `ScanSpec.E_grid_line_by_energy: LineGridByEnergy | None`; and the inert `Sweep.E_grid_line_by_energy: Mapping[float, np.ndarray] | None` field consumed by Task 2.
 
 - [ ] **Step 1: Write failing parser, validation, immutability, and projection tests**
 
@@ -229,6 +230,16 @@ Export `LineGridByEnergy` in `__all__`.
 
 - [ ] **Step 4: Project both line-grid forms through configuration**
 
+In `src/cxr_mc/sweep.py`, import `Mapping` and add the inert dataclass field without changing `build_cases` yet:
+
+```python
+from collections.abc import Mapping, Sequence
+
+E_grid_line: np.ndarray | None = None
+E_grid_line_by_energy: Mapping[float, np.ndarray] | None = None
+E_grid_brem: np.ndarray | None = None
+```
+
 In `src/cxr_mc/config.py`, include the mapping in `material_grid`, `material_sweep`, and `trajectory_sweep`:
 
 ```python
@@ -258,7 +269,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit the catalog boundary**
 
 ```bash
-git add src/cxr_mc/materials/catalog.py src/cxr_mc/config.py tests/test_material_catalog.py tests/test_sweep.py
+git add src/cxr_mc/materials/catalog.py src/cxr_mc/config.py src/cxr_mc/sweep.py tests/test_material_catalog.py tests/test_sweep.py
 git commit -m "feat: add per-beam line grid catalog schema"
 ```
 
@@ -381,19 +392,9 @@ Expected: FAIL because `Sweep` lacks the mapping field and angles are not canoni
 
 - [ ] **Step 4: Add mapping selection and symmetric half-degree canonicalization**
 
-In `src/cxr_mc/sweep.py`, import `Mapping`, extend `Sweep`, and add focused helpers:
+In `src/cxr_mc/sweep.py`, use the `Mapping` import and `Sweep.E_grid_line_by_energy` field added by Task 1, then add focused helpers:
 
 ```python
-from collections.abc import Mapping, Sequence
-
-@dataclass
-class Sweep:
-    # existing fields...
-    E_grid_line: np.ndarray | None = None
-    E_grid_line_by_energy: Mapping[float, np.ndarray] | None = None
-    E_grid_brem: np.ndarray | None = None
-
-
 def _quantized_angles(values: ScalarOrSeq) -> np.ndarray:
     """Round degrees to nearest half away from zero at ties, then stable-unique."""
     source = _seq(values)
