@@ -1,0 +1,36 @@
+data_pds2
+# Phase identity: ambient orthorhombic PdS2-type PdS2, Pbca, Z=4.
+# Provenance: Gronvold and Rost, Acta Cryst. 10, 329--331 (1957),
+# COD 2310589 (CC0): https://www.crystallography.net/cod/2310589.cif
+# This P1 representation explicitly expands Pd 4a and S 8c from the source.
+# The weakly bonded layers are normal to (001). Pbca extinguishes odd 00l,
+# so the catalog pins the first usable parallel reciprocal vector, (002).
+# Limiting checks: V=abc, 4Pd+8S, and finite basal (002) coupling.
+# Validation: pds2-pbca-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 5.460
+_cell_length_b 5.541
+_cell_length_c 7.531
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 90.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Pd1 Pd 0.000 0.000 0.000 1.0
+Pd2 Pd 0.500 0.000 0.500 1.0
+Pd3 Pd 0.000 0.500 0.500 1.0
+Pd4 Pd 0.500 0.500 0.000 1.0
+S1 S 0.107 0.112 0.425 1.0
+S2 S 0.393 0.888 0.925 1.0
+S3 S 0.893 0.612 0.075 1.0
+S4 S 0.607 0.388 0.575 1.0
+S5 S 0.893 0.888 0.575 1.0
+S6 S 0.607 0.112 0.075 1.0
+S7 S 0.107 0.388 0.925 1.0
+S8 S 0.393 0.612 0.425 1.0

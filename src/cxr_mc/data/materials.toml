@@ -148,8 +148,46 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 cif = "cifs/pts2.cif"
 validation_id = "pts2-p3m1-structure"
 B_ang2 = 0.6
-beam_uvw = [0, 0, 1]
+surface_hkl = [0, 0, 1]
 E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Pin the allowed basal 1T-PtS2(001) symmetric cut parallel to the c-axis-normal cleavage surface; the existing relaxed structural model is retained."
+
+[crystals.pds2]
+cif = "cifs/pds2.cif"
+validation_id = "pds2-pbca-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 2]]
+hkl_reason = "Ambient Pbca PdS2 cleaves on (001), but odd 00l are extinct; pin the first allowed parallel (002) family and orient by the reciprocal surface normal."
+
+[crystals.pdte2]
+cif = "cifs/pdte2.cif"
+validation_id = "pdte2-p3m1-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Pin the allowed basal 1T-PdTe2(001) symmetric cut parallel to the c-axis-normal cleavage surface."
+
+[crystals.ptbi2]
+cif = "cifs/ptbi2.cif"
+validation_id = "ptbi2-p31m-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Pin the allowed basal trigonal beta-PtBi2(001) symmetric cut parallel to the c-axis-normal layered surface."
+
+[crystals.ptte2]
+cif = "cifs/ptte2.cif"
+validation_id = "ptte2-p3m1-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Pin the allowed basal 1T-PtTe2(001) symmetric cut parallel to the c-axis-normal cleavage surface."
 
 [crystals.pdse2]
 cif = "cifs/pdse2.cif"
@@ -346,6 +384,22 @@ profile = "standard"
 
 [materials.pts2]
 label = "PtS2"
+profile = "standard"
+
+[materials.pds2]
+label = "Palladium disulfide (PdS2)"
+profile = "standard"
+
+[materials.pdte2]
+label = "1T-PdTe2 (001)"
+profile = "standard"
+
+[materials.ptbi2]
+label = "Trigonal beta-PtBi2 (001)"
+profile = "standard"
+
+[materials.ptte2]
+label = "1T-PtTe2 (001)"
 profile = "standard"
 
 [materials.pdse2]

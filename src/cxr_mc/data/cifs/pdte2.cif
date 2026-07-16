@@ -1,0 +1,27 @@
+data_pdte2
+# Phase identity: layered 1T CdI2-type PdTe2, P-3m1, Z=1.
+# Provenance: Pell, Mironov, and Ibers, Acta Cryst. C52, 1331--1332
+# (1996), doi:10.1107/S0108270195016246; COD 2004955 (CC0):
+# https://www.crystallography.net/cod/2004955.cif
+# The source 1a Pd and 2d Te sites are expanded explicitly in P1. Layers
+# stack along c; primitive P-3m1 permits a finite basal (001) reflection.
+# Limiting checks: V=sqrt(3)a^2c/2, 1Pd+2Te, finite (001) coupling.
+# Validation: pdte2-p3m1-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 4.024
+_cell_length_b 4.024
+_cell_length_c 5.113
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 120.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Pd1 Pd 0.0000000000 0.0000000000 0.00000 1.0
+Te1 Te 0.3333333333 0.6666666667 0.26628 1.0
+Te2 Te 0.6666666667 0.3333333333 0.73372 1.0

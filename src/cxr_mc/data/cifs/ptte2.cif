@@ -1,0 +1,27 @@
+data_ptte2
+# Phase identity: layered 1T CdI2-type PtTe2, P-3m1, Z=1.
+# Provenance: Furuseth, Selte, and Kjekshus, Acta Chem. Scand. 19,
+# 257--258 (1965), doi:10.3891/acta.chem.scand.19-0257;
+# COD 1537197 (CC0): https://www.crystallography.net/cod/1537197.cif
+# The source 1a Pt and 2d Te sites are expanded explicitly in P1. Layers
+# stack along c; primitive P-3m1 permits a finite basal (001) reflection.
+# Limiting checks: V=sqrt(3)a^2c/2, 1Pt+2Te, finite (001) coupling.
+# Validation: ptte2-p3m1-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 4.0259
+_cell_length_b 4.0259
+_cell_length_c 5.2209
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 120.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Pt1 Pt 0.0000000000 0.0000000000 0.000 1.0
+Te1 Te 0.3333333333 0.6666666667 0.254 1.0
+Te2 Te 0.6666666667 0.3333333333 0.746 1.0
