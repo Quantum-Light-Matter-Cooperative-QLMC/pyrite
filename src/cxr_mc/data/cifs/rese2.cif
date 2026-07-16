@@ -1,0 +1,39 @@
+data_rese2
+# Phase identity: ambient distorted-1T ReSe2, triclinic P-1, Z=4.
+# Provenance: Alcock and Kjekshus, Acta Chem. Scand. 19, 79--94 (1965),
+# doi:10.3891/acta.chem.scand.19-0079; COD 1539529 (CC0):
+# https://www.crystallography.net/cod/1539529.cif
+# The source asymmetric sites are expanded explicitly in P1. This historical
+# model is provisional: later refinements report corrected pseudo-centres and
+# somewhat different cell parameters, but no comparably redistributable modern
+# CIF was identified. Low-temperature superstructures are outside scope.
+# The catalog B_ang2=0.6 A^2 is a modeling placeholder, not source-derived.
+# Limiting checks: Re4Se8, source triclinic volume, finite basal (001) coupling.
+# Validation: rese2-cod1539529-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 6.7272
+_cell_length_b 6.6065
+_cell_length_c 6.7196
+_cell_angle_alpha 118.93
+_cell_angle_beta 91.82
+_cell_angle_gamma 104.93
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Re1a Re 0.4937 0.3038 0.3020 1.0
+Re1b Re 0.5063 0.6962 0.6980 1.0
+Re2a Re 0.4943 0.7474 0.3027 1.0
+Re2b Re 0.5057 0.2526 0.6973 1.0
+Se1a Se 0.2228 0.4875 0.3600 1.0
+Se1b Se 0.7772 0.5125 0.6400 1.0
+Se2a Se 0.2220 0.9830 0.3620 1.0
+Se2b Se 0.7780 0.0170 0.6380 1.0
+Se3a Se 0.7089 0.4893 0.1221 1.0
+Se3b Se 0.2911 0.5107 0.8779 1.0
+Se4a Se 0.7089 0.9893 0.1221 1.0
+Se4b Se 0.2911 0.0107 0.8779 1.0

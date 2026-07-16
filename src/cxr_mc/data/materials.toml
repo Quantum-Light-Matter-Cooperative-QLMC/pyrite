@@ -327,6 +327,51 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 hkl_families = [[0, 0, 2]]
 hkl_reason = "Layered beta-GeSe2 in the transformed standard P21/c:b1 setting cleaves on (001); the c-glide extinguishes odd 00l, so pin the first allowed parallel (002) family and orient by the reciprocal surface normal."
 
+[crystals.res2]
+cif = "cifs/res2.cif"
+validation_id = "res2-mp572758-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Use the finite basal (001) harmonic of the license-clean MP mp-572758 doubled-c distorted-1T ReS2 fallback, parallel to the reciprocal-normal cleavage surface."
+
+[crystals.rese2]
+cif = "cifs/rese2.cif"
+validation_id = "rese2-cod1539529-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Pin the allowed basal distorted-1T ReSe2(001) harmonic from provisional COD 1539529 parallel to its reciprocal-normal cleavage surface."
+
+[crystals.2h_tas2]
+cif = "cifs/2h_tas2.cif"
+validation_id = "2h-tas2-p63mmc-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 2]]
+hkl_reason = "Room-temperature 2H-TaS2 cleaves on (001), but P63/mmc stacking extinguishes odd 00l; pin the first allowed parallel (002) family."
+
+[crystals.2h_tase2]
+cif = "cifs/2h_tase2.cif"
+validation_id = "2h-tase2-p63mmc-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 2]]
+hkl_reason = "Room-temperature 2H-TaSe2 cleaves on (001), but P63/mmc stacking extinguishes odd 00l; pin the first allowed parallel (002) family."
+
+[crystals.tate2]
+cif = "cifs/tate2.cif"
+validation_id = "tate2-c2m-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "In the preserved ambient Brown/COD 2310358 C2/m setting, distorted TaTe2 cleaves on (001); C centering permits 001 and the explicit basis gives a finite coupling."
+
 [media.sio2]
 composition = { Si = 0.02205, O = 0.04410 }
 
@@ -444,6 +489,26 @@ profile = "standard"
 
 [materials.gese2]
 label = "Germanium diselenide (beta-GeSe2)"
+profile = "standard"
+
+[materials.res2]
+label = "Distorted 1T-ReS2 (001)"
+profile = "standard"
+
+[materials.rese2]
+label = "Distorted 1T-ReSe2 (001)"
+profile = "standard"
+
+[materials.2h_tas2]
+label = "2H-TaS2 (002)"
+profile = "standard"
+
+[materials.2h_tase2]
+label = "2H-TaSe2 (002)"
+profile = "standard"
+
+[materials.tate2]
+label = "Ambient distorted TaTe2 (001)"
 profile = "standard"
 
 [materials.hfse2]

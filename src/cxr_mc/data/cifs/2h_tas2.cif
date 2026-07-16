@@ -1,0 +1,32 @@
+data_2h_tas2
+# Phase identity: room-temperature parent 2H-TaS2, P63/mmc, Z=2.
+# Provenance: Meetsma et al., Acta Cryst. C46, 1598--1599 (1990),
+# doi:10.1107/S0108270190000014; COD 9007815 (CC0):
+# https://www.crystallography.net/cod/9007815.cif
+# The source 2b/4f sites are expanded explicitly in P1. The low-temperature
+# CDW superstructure is intentionally excluded. Odd 00l cancel between layers,
+# so (002) is the first allowed reflection parallel to basal cleavage (001).
+# The catalog B_ang2=0.6 A^2 is a modeling placeholder, not source-derived.
+# Limiting checks: V=sqrt(3)a^2c/2, Ta2S4, F001=0 and finite F002.
+# Validation: 2h-tas2-p63mmc-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 3.314
+_cell_length_b 3.314
+_cell_length_c 12.097
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 120.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Ta1 Ta 0.0 0.0 0.25 1.0
+Ta2 Ta 0.0 0.0 0.75 1.0
+S1 S 0.3333333333 0.6666666667 0.1212 1.0
+S2 S 0.3333333333 0.6666666667 0.3788 1.0
+S3 S 0.6666666667 0.3333333333 0.6212 1.0
+S4 S 0.6666666667 0.3333333333 0.8788 1.0
