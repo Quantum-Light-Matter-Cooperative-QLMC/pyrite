@@ -23,6 +23,7 @@ from dataclasses import replace
 import numpy as np
 
 from .materials import CATALOG, MaterialSpec
+from .montecarlo import simulate_trajectories
 from .results import Settings
 from .sweep import Sweep
 
@@ -165,3 +166,99 @@ def trajectory_sweep(
         E_grid_brem=scan.E_grid_brem,
         **stack_kwargs,
     )
+
+
+# Below this fraction of the incident electron population is still exiting
+# the far face, a thicker slab in the same (material, beam energy) sweep is
+# statistically indistinguishable from "the beam is dead" -- see
+# gate_cases_by_penetration.
+PENETRATION_SURVIVAL_FLOOR = 0.05
+PENETRATION_WATCHDOG_NE = 500  # electrons per pre-run transmission check
+
+
+def gate_cases_by_penetration(
+    cases,
+    *,
+    floor: float = PENETRATION_SURVIVAL_FLOOR,
+    Ne: int = PENETRATION_WATCHDOG_NE,
+    seed: int = 0,
+):
+    """Drop thickness values a beam energy has already died in, before the
+    (expensive) spectral Monte Carlo ever runs them.
+
+    For each beam energy present in ``cases``, walks that energy's distinct
+    ``thickness_ang`` values ascending and runs one direct-CPU transmission
+    check per thickness with :func:`cxr_mc.montecarlo.simulate_trajectories`
+    -- the SAME prebuilt penetration-depth transport behind
+    :func:`cxr_mc.plots.plot_penetration_survival` -- at normal incidence
+    (``beam_dir`` left at its ``simulate_trajectories`` default, +z), using
+    the (energy, thickness) group's normal-incidence case for
+    composition/stack, and ``Ne`` electrons. The transmitted fraction
+    (``n_transmitted / Ne``) is a direct Monte-Carlo estimate of the
+    fraction of the original beam still exiting the far face of that
+    thickness of crystal -- the average remaining electron population at
+    the end of that slab.
+
+    Normal incidence is the reference geometry because it MAXIMIZES
+    transmission at fixed nominal thickness: any nonzero tilt lengthens the
+    in-material path length needed to reach a given depth below the entry
+    surface by ~1/cos(tilt), so the beam sees more scattering and stopping
+    power per unit depth at any tilt > 0 than at normal incidence. If the
+    beam is already dead at normal incidence for a given thickness, it is
+    at least as dead at every larger tilt in the sweep -- so checking only
+    tilt=0 is a safe, cheap proxy for the whole tilt grid (one trajectory
+    MC per (energy, thickness) instead of one per (energy, thickness, tilt,
+    azimuth)).
+
+    The first thickness whose transmitted fraction drops below ``floor`` is
+    KEPT (so the "beam is basically dead" case is still represented in the
+    checkpoint) but every LARGER thickness for that same energy is dropped
+    WITHOUT running the check -- transmission is monotonically
+    non-increasing with thickness at fixed energy, so a thicker slab can
+    only be equally or more dead.
+
+    Returns ``(kept_cases, dropped_cases)``, both preserving the input's
+    relative order. ``dropped_cases`` is empty when no beam energy's
+    transmitted fraction crosses ``floor`` anywhere in the sweep's
+    thickness grid.
+    """
+    reference_case: dict[tuple[float, float], dict] = {}
+    thicknesses_by_energy: dict[float, set] = {}
+    for case in cases:
+        energy = case["E0_keV"]
+        thickness = case["thickness_ang"]
+        thicknesses_by_energy.setdefault(energy, set()).add(thickness)
+        key = (energy, thickness)
+        current = reference_case.get(key)
+        if current is None or abs(case["tilt_deg"]) < abs(current["tilt_deg"]):
+            reference_case[key] = case
+
+    cutoff_by_energy: dict[float, float | None] = {}
+    for energy, thicknesses in thicknesses_by_energy.items():
+        cutoff = None
+        for thickness in sorted(thicknesses):
+            ref = reference_case[(energy, thickness)]
+            abs_layers = ref.get("abs_layers")
+            total_thickness = float(abs_layers[-1][1]) if abs_layers is not None else thickness
+            segs = simulate_trajectories(
+                energy,
+                Ne,
+                total_thickness,
+                composition=ref["composition"],
+                layers=abs_layers,
+                seed=seed,
+            )
+            fraction = float(segs["n_transmitted"]) / Ne
+            if fraction < floor:
+                cutoff = thickness
+                break
+        cutoff_by_energy[energy] = cutoff
+
+    kept, dropped = [], []
+    for case in cases:
+        cutoff = cutoff_by_energy.get(case["E0_keV"])
+        if cutoff is not None and case["thickness_ang"] > cutoff:
+            dropped.append(case)
+        else:
+            kept.append(case)
+    return kept, dropped
