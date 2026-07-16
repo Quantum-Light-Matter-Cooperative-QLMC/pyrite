@@ -648,6 +648,38 @@ def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
     assert seen["path"].endswith("mos2-on-sio2-si.pkl")
 
 
+def test_run_material_applies_penetration_watchdog(monkeypatch, tmp_path):
+    import argparse
+
+    from cxr_mc import scan
+
+    captured = {}
+
+    def fake_gate(cases, **kwargs):
+        captured["input_len"] = len(cases)
+        half = len(cases) // 2
+        return cases[:half], cases[half:]
+
+    def fake_run_sweep(cases, results, checkpoint_dir=None, checkpoint_path=None, **kw):
+        captured["run_sweep_cases"] = len(cases)
+
+    monkeypatch.setattr(scan, "gate_cases_by_penetration", fake_gate)
+    monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
+
+    args = argparse.Namespace(
+        material="mose2",
+        workers=0,
+        quick=True,
+        n_families=None,
+        beam_uvw=None,
+        checkpoint_dir=str(tmp_path),
+    )
+    scan.run(args)
+
+    assert captured["input_len"] > 0
+    assert captured["run_sweep_cases"] == captured["input_len"] // 2
+
+
 def test_scan_progress_record_is_atomically_replaced(tmp_path):
     from cxr_mc.scan import _write_progress_record
 
