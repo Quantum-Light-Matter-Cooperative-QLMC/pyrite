@@ -1,0 +1,26 @@
+data_ges
+# Phase identity: ambient alpha-GeS, standard Pnma (No. 62).
+# Source: COD 8104282 (CC0); H. Wiedemeier and H. G. von Schnering,
+# Z. Kristallogr. 148 (1978) 295-303,
+# doi:10.1524/zkri.1978.148.3-4.295.
+# The legacy COD/Paper Pbnm presentation is axis-normalized here to standard
+# Pnma (a=10.481, b=3.646, c=4.299 A) with the corresponding 4c sites below.
+# The natural (100) surface is extinct; the catalog pins allowed (200).
+# Validation: ges-pnma-structure
+_symmetry_space_group_name_H-M 'P n m a'
+_symmetry_Int_Tables_number 62
+_cell_length_a 10.481
+_cell_length_b 3.646
+_cell_length_c 4.299
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 90.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Ge1 Ge 0.1221 0.25 0.1277 1.0
+S1 S 0.8495 0.25 0.5023 1.0

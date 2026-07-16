@@ -1,0 +1,45 @@
+data_gese2
+# Phase identity: layered beta-GeSe2 (GeSe2-I), standard P21/c:b1.
+# Source structure: Materials Project mp-540625 experimental initial structure
+# from matminer mp_all_20181018 snapshot (2018-10-18), CC BY 4.0.
+# Artifact SHA-256: 1f3de2dc7c68959647240921b841293fce918ea1708e6f3760ba35a9cdfe0500
+# https://materialsproject.org/materials/mp-540625/
+# https://materialsproject.org/terms
+# The snapshot axes were transformed losslessly as a'=A, b'=-C, c'=B and
+# (x',y',z')=(x,-z mod 1,y), producing standard unique-b P21/c:b1. This is
+# the initial experimental Dittmar-Schaefer structure, not the relaxed output
+# and not tetragonal high-pressure COD 1521080.
+# Primary structure: G. Dittmar and H. Schaefer, Acta Cryst. B32 (1976)
+# 2726-2728, doi:10.1107/S0567740876008704.
+# The catalog's B=0.6 A2 is an explicit placeholder, not an experimental value.
+# Layered beta-GeSe2 cleaves on (001); the c-glide extinguishes odd 00l, so the
+# catalog pins the first allowed parallel reflection (002).
+# Validation: gese2-beta-p21c-structure
+_symmetry_space_group_name_H-M 'P 21/c'
+_symmetry_Int_Tables_number 14
+_space_group_name_Hall '-P 2ybc'
+_cell_length_a 7.016000
+_cell_length_b 16.796000
+_cell_length_c 11.8310003268
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.6500021204
+_cell_angle_gamma 90.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Ge1 Ge 0.6558 0.1537 0.7791 1.0
+Ge2 Ge 0.8283 0.1494 0.2227 1.0
+Ge3 Ge 0.1586 0.0008 0.2983 1.0
+Ge4 Ge 0.3248 0.3090 0.7266 1.0
+Se1 Se 0.3243 0.1770 0.7905 1.0
+Se2 Se 0.7222 0.0357 0.8809 1.0
+Se3 Se 0.7695 0.1156 0.5998 1.0
+Se4 Se 0.8353 0.2559 0.8674 1.0
+Se5 Se 0.5722 0.3302 0.5972 1.0
+Se6 Se 0.0801 0.3373 0.5952 1.0
+Se7 Se 0.3249 0.3926 0.8855 1.0
+Se8 Se 0.8262 0.4779 0.8061 1.0
