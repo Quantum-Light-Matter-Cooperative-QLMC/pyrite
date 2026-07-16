@@ -20,7 +20,7 @@ energy grid) is looked up per material; the detector geometry defaults to the
 are imported here (no GPU), so this module is cheap to import and test.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import product
 from typing import Any
@@ -216,6 +216,7 @@ class Sweep:
     #       measured spectrum without inflating the line cost. Default spans the
     #       line start up to the highest beam energy at a 50 eV step.
     E_grid_line: np.ndarray | None = None
+    E_grid_line_by_energy: Mapping[float, np.ndarray] | None = None
     E_grid_brem: np.ndarray | None = None
     e_grid_eV: np.ndarray | None = None  # deprecated: alias for E_grid_line
     dtheta_obs_deg: float | None = None  # None -> Timepix3 default

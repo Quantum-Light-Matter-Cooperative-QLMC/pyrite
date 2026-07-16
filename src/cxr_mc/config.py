@@ -74,6 +74,7 @@ def material_grid(material: str) -> dict[str, object]:
         "tilt_deg": scan.tilt_deg,
         "tilt_azim_deg": scan.tilt_azim_deg,
         "E_grid_line": scan.E_grid_line,
+        "E_grid_line_by_energy": scan.E_grid_line_by_energy,
         "E_grid_brem": scan.E_grid_brem,
     }
     if spec.substrate is not None:
@@ -99,6 +100,7 @@ def material_sweep(material: str, *, theta_obs_deg=90.0, **overrides):
         tilt_deg=scan.tilt_deg,
         tilt_azim_deg=scan.tilt_azim_deg,
         E_grid_line=scan.E_grid_line,
+        E_grid_line_by_energy=scan.E_grid_line_by_energy,
         E_grid_brem=scan.E_grid_brem,
         substrate=spec.substrate,
         stack=spec.stack or None,
@@ -159,6 +161,7 @@ def trajectory_sweep(
         tilt_azim_deg=0.0,
         theta_obs_deg=90.0,
         E_grid_line=scan.E_grid_line,
+        E_grid_line_by_energy=scan.E_grid_line_by_energy,
         E_grid_brem=scan.E_grid_brem,
         **stack_kwargs,
     )

@@ -26,6 +26,7 @@ from ._transport_data import TRANSPORT_ELEMENTS
 logger = logging.getLogger(__name__)
 
 GridValue = int | float | Mapping[str, object]
+LineGridByEnergy = Mapping[float, np.ndarray]
 _SCAN_KEYS = (
     "thickness_ang",
     "thickness_layers",
@@ -33,6 +34,7 @@ _SCAN_KEYS = (
     "tilt_deg",
     "tilt_azim_deg",
     "E_grid_line",
+    "E_grid_line_by_energy",
     "E_grid_brem",
 )
 _GRID_KINDS = frozenset({"values", "arange", "linspace", "logspace"})
@@ -119,7 +121,8 @@ class ScanSpec:
     energy_keV: np.ndarray
     tilt_deg: np.ndarray
     tilt_azim_deg: np.ndarray
-    E_grid_line: np.ndarray
+    E_grid_line: np.ndarray | None
+    E_grid_line_by_energy: LineGridByEnergy | None
     E_grid_brem: np.ndarray
     thickness_layers: np.ndarray | None = None
 
@@ -375,6 +378,53 @@ def _grid(value: object, path: str, errors: _Errors) -> np.ndarray | None:
     return out
 
 
+def _line_grids_by_energy(
+    value: object,
+    energy_grid: np.ndarray | None,
+    path: str,
+    errors: _Errors,
+) -> LineGridByEnergy | None:
+    if not isinstance(value, list) or not value:
+        errors.add(path, "must be a nonempty array of line-grid entries")
+        return None
+    parsed: dict[float, np.ndarray] = {}
+    energy_indexes: dict[float, int] = {}
+    for index, item in enumerate(value):
+        item_path = f"{path}[{index}]"
+        row = _table(item, item_path, errors)
+        if row is None:
+            continue
+        errors.keys(row, item_path, {"energy_keV", "grid"})
+        energy = _number(row.get("energy_keV"))
+        if energy is None or energy <= 0:
+            errors.add(f"{item_path}.energy_keV", "must be finite and positive")
+            continue
+        if energy in parsed:
+            errors.add(f"{item_path}.energy_keV", f"duplicates beam energy {energy:g}")
+            continue
+        energy_indexes[energy] = index
+        grid = _grid(row.get("grid"), f"{item_path}.grid", errors)
+        if grid is None or np.any(grid <= 0):
+            if grid is not None:
+                errors.add(f"{item_path}.grid", "values must be positive")
+            continue
+        parsed[energy] = grid
+    if energy_grid is not None:
+        configured = set(float(value) for value in energy_grid)
+        mapped = set(parsed)
+        missing = sorted(configured - mapped)
+        extra = sorted(mapped - configured)
+        if missing:
+            errors.add(path, f"missing beam energies {missing}")
+        for energy in extra:
+            index = energy_indexes[energy]
+            errors.add(
+                f"{path}[{index}].energy_keV",
+                f"is not configured in energy_keV: {energy:g}",
+            )
+    return MappingProxyType(parsed) if parsed else None
+
+
 def _table(value: object, path: str, errors: _Errors) -> Mapping[str, object] | None:
     if not isinstance(value, Mapping):
         errors.add(path, "must be a table")
@@ -571,15 +621,29 @@ def _scan(
     has_layers = "thickness_layers" in values
     if has_ang == has_layers:
         errors.add(path, "requires exactly one of thickness_ang or thickness_layers")
+    has_line = "E_grid_line" in values
+    has_line_by_energy = "E_grid_line_by_energy" in values
+    if has_line == has_line_by_energy:
+        errors.add(path, "requires exactly one of E_grid_line or E_grid_line_by_energy")
     grids: dict[str, np.ndarray | None] = {}
-    for key in _SCAN_KEYS:
-        if key in ("thickness_ang", "thickness_layers"):
-            continue
+    for key in ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem"):
         if key not in values:
             errors.add(f"{path}.{key}", "missing required key")
             grids[key] = None
         else:
             grids[key] = _grid(values[key], f"{path}.{key}", errors)
+    if has_line:
+        grids["E_grid_line"] = _grid(values["E_grid_line"], f"{path}.E_grid_line", errors)
+    else:
+        grids["E_grid_line"] = None
+    line_grids = None
+    if has_line_by_energy:
+        line_grids = _line_grids_by_energy(
+            values["E_grid_line_by_energy"],
+            grids.get("energy_keV"),
+            f"{path}.E_grid_line_by_energy",
+            errors,
+        )
     thickness = None
     layer_grid = None
     if has_ang:
@@ -613,7 +677,14 @@ def _scan(
         grid = grids.get(key)
         if grid is not None and not _validate_angle_grid(key, grid, f"{path}.{key}", errors):
             grids[key] = None
-    if thickness is None or any(grids.get(key) is None for key in _SCAN_KEYS[2:]):
+    ordinary_required = ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem")
+    line_valid = grids["E_grid_line"] is not None or line_grids is not None
+    if (
+        thickness is None
+        or any(grids.get(key) is None for key in ordinary_required)
+        or not line_valid
+        or has_line == has_line_by_energy
+    ):
         return None
     return ScanSpec(
         thickness_ang=thickness,
@@ -621,7 +692,8 @@ def _scan(
         energy_keV=grids["energy_keV"],  # type: ignore[arg-type]
         tilt_deg=grids["tilt_deg"],  # type: ignore[arg-type]
         tilt_azim_deg=grids["tilt_azim_deg"],  # type: ignore[arg-type]
-        E_grid_line=grids["E_grid_line"],  # type: ignore[arg-type]
+        E_grid_line=grids["E_grid_line"],
+        E_grid_line_by_energy=line_grids,
         E_grid_brem=grids["E_grid_brem"],  # type: ignore[arg-type]
     )
 
@@ -641,16 +713,29 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         has_layers = "thickness_layers" in row
         if has_ang == has_layers:
             errors.add(path, "requires exactly one of thickness_ang or thickness_layers")
-        for name in _SCAN_KEYS:
-            if name in ("thickness_ang", "thickness_layers"):
-                continue
+        has_line = "E_grid_line" in row
+        has_line_by_energy = "E_grid_line_by_energy" in row
+        if has_line == has_line_by_energy:
+            errors.add(path, "requires exactly one of E_grid_line or E_grid_line_by_energy")
+        for name in ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem"):
             if name not in row:
                 errors.add(f"{path}.{name}", "missing required key")
+        parsed_grids: dict[str, np.ndarray] = {}
         for name in _SCAN_KEYS:
+            if name == "E_grid_line_by_energy":
+                continue
             if name in row:
                 grid = _grid(row[name], f"{path}.{name}", errors)
                 if grid is not None:
+                    parsed_grids[name] = grid
                     _validate_angle_grid(name, grid, f"{path}.{name}", errors)
+        if has_line_by_energy:
+            _line_grids_by_energy(
+                row["E_grid_line_by_energy"],
+                parsed_grids.get("energy_keV"),
+                f"{path}.E_grid_line_by_energy",
+                errors,
+            )
         out[key] = row
     return out
 
@@ -737,6 +822,10 @@ def _parse_materials(
         if "thickness_ang" in row or "thickness_layers" in row:
             values.pop("thickness_ang", None)
             values.pop("thickness_layers", None)
+        if "E_grid_line" in row:
+            values.pop("E_grid_line_by_energy", None)
+        elif "E_grid_line_by_energy" in row:
+            values.pop("E_grid_line", None)
         values.update({name: row[name] for name in _SCAN_KEYS if name in row})
         scan = _scan(values, f"{path}.scan", crystals.get(str(crystal_key)), errors)
         substrate = row.get("substrate")
@@ -838,6 +927,7 @@ __all__ = [
     "CrystalInfo",
     "CrystalSpec",
     "LayerSpec",
+    "LineGridByEnergy",
     "MaterialCatalog",
     "MaterialConfigError",
     "MaterialSpec",

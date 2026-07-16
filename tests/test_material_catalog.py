@@ -39,6 +39,94 @@ composition = {{ Si = 0.02205, O = 0.04410 }}
 """
 
 
+PER_BEAM_ENTRIES = """{ energy_keV = 25.0, grid = { linspace = { start = 10.0, stop = 58.0, num = 17, endpoint = true } } },
+  { energy_keV = 30.0, grid = { values = [20.0, 23.0, 26.0] } }"""
+
+
+def _catalog_with_per_beam_line_grids() -> str:
+    return _minimal_catalog(
+        material_rows='''
+[materials.sample]
+label = "sample"
+profile = "base"
+crystal = "mos2"
+'''
+    ).replace(
+        "E_grid_line = { arange = { start = 50.0, stop = 60.0, step = 2.0 } }",
+        f"E_grid_line_by_energy = [\n  {PER_BEAM_ENTRIES},\n]",
+    )
+
+
+def test_per_beam_line_grids_are_exact_read_only_and_projected(tmp_path, monkeypatch):
+    from cxr_mc import config
+    from cxr_mc.materials import load_material_catalog
+
+    catalog = load_material_catalog(
+        _write_catalog(tmp_path, _catalog_with_per_beam_line_grids())
+    )
+    scan = catalog.material("sample").scan
+
+    assert scan.E_grid_line is None
+    assert tuple(scan.E_grid_line_by_energy) == (25.0, 30.0)
+    np.testing.assert_array_equal(
+        scan.E_grid_line_by_energy[25.0], np.linspace(10.0, 58.0, 17)
+    )
+    with pytest.raises(TypeError):
+        scan.E_grid_line_by_energy[25.0] = np.array([1.0])
+    with pytest.raises(ValueError):
+        scan.E_grid_line_by_energy[25.0][0] = 1.0
+
+    monkeypatch.setattr(config, "CATALOG", catalog)
+    grid = config.material_grid("sample")
+    sweep = config.material_sweep("sample")
+    trajectory = config.trajectory_sweep("sample")
+    assert grid["E_grid_line"] is None
+    assert grid["E_grid_line_by_energy"] is scan.E_grid_line_by_energy
+    assert sweep.E_grid_line is None
+    assert sweep.E_grid_line_by_energy is scan.E_grid_line_by_energy
+    assert trajectory.E_grid_line is None
+    assert trajectory.E_grid_line_by_energy is scan.E_grid_line_by_energy
+
+
+def test_fixed_material_line_grid_overrides_profile_mapping(tmp_path):
+    from cxr_mc.materials import load_material_catalog
+
+    text = _catalog_with_per_beam_line_grids().replace(
+        'profile = "base"',
+        'profile = "base"\nE_grid_line = { values = [75.0, 78.0] }',
+        1,
+    )
+    scan = load_material_catalog(_write_catalog(tmp_path, text)).material("sample").scan
+    np.testing.assert_array_equal(scan.E_grid_line, [75.0, 78.0])
+    assert scan.E_grid_line_by_energy is None
+
+
+@pytest.mark.parametrize(
+    ("replacement", "error_path"),
+    [
+        (
+            "{ energy_keV = 25.0, grid = 50.0 },\n  "
+            "{ energy_keV = 25.0, grid = 60.0 }",
+            "E_grid_line_by_energy[1].energy_keV",
+        ),
+        ("{ energy_keV = 25.0, grid = 50.0 }", "E_grid_line_by_energy"),
+        (
+            "{ energy_keV = 25.0, grid = 50.0 },\n  "
+            "{ energy_keV = 30.0, grid = 60.0 },\n  "
+            "{ energy_keV = 40.0, grid = 70.0 }",
+            "E_grid_line_by_energy[2].energy_keV",
+        ),
+    ],
+)
+def test_per_beam_line_grid_keys_match_beam_energies(tmp_path, replacement, error_path):
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    text = _catalog_with_per_beam_line_grids().replace(PER_BEAM_ENTRIES, replacement)
+    with pytest.raises(MaterialConfigError) as caught:
+        load_material_catalog(_write_catalog(tmp_path, text))
+    assert error_path in str(caught.value)
+
+
 def test_bundled_crystal_validation_ids_are_ledgered():
     from cxr_mc import DATA_DIR
 
