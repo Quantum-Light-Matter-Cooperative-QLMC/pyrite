@@ -14,7 +14,13 @@ app = marimo.App()
 def _():
     import marimo as mo
 
-    from cxr_mc.config import COLLAPSE_AZIMUTH, default_settings, material_sweep
+    from cxr_mc.config import (
+        COLLAPSE_AZIMUTH,
+        default_settings,
+        format_penetration_watchdog_summary,
+        gate_cases_by_penetration,
+        material_sweep,
+    )
     from cxr_mc.materials import CATALOG
     from cxr_mc.plots import stream_chunk
     from cxr_mc.run import run_sweep
@@ -25,6 +31,8 @@ def _():
         CATALOG,
         build_cases,
         default_settings,
+        format_penetration_watchdog_summary,
+        gate_cases_by_penetration,
         geometry_table,
         material_sweep,
         mo,
@@ -63,13 +71,25 @@ def _(CATALOG, mo):
 
 
 @app.cell
-def _(build_cases, default_settings, geometry_table, material_sweep, material_ui):
+def _(
+    build_cases,
+    default_settings,
+    format_penetration_watchdog_summary,
+    gate_cases_by_penetration,
+    geometry_table,
+    material_sweep,
+    material_ui,
+):
     MATERIAL = material_ui.value
 
     settings = default_settings()
     sweep = material_sweep(MATERIAL)  # full parametric grid (data/materials.toml)
 
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
+    cases, dropped = gate_cases_by_penetration(cases)
+    summary = format_penetration_watchdog_summary(dropped)
+    if summary is not None:
+        print(summary)
     print(f"{len(cases)} cases across {len({c['name'] for c in cases})} configs")
     return MATERIAL, cases, settings
 

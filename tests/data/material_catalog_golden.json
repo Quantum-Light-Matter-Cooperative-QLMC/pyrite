@@ -149,6 +149,7 @@
   "6h_sic",
   "ws2",
   "mos2",
+  "mos2-on-sapphire",
   "mos2-on-sio2-si",
   "sapphire"
  ],
@@ -8724,9 +8725,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "561895751f6fcb74d60cbe6cf3dde91abbb1c01f270b95fcdcdd838826e45d86"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -8808,9 +8809,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "561895751f6fcb74d60cbe6cf3dde91abbb1c01f270b95fcdcdd838826e45d86"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -8892,9 +8893,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -8976,9 +8977,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -9060,9 +9061,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -9144,9 +9145,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -9228,9 +9229,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -9312,9 +9313,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -9396,9 +9397,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -9564,9 +9565,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -9648,9 +9649,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -9732,9 +9733,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -9816,9 +9817,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -9900,9 +9901,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -9984,9 +9985,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -10068,9 +10069,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -10152,9 +10153,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -10236,9 +10237,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -10320,9 +10321,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -10404,9 +10405,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -10488,9 +10489,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -10572,9 +10573,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -10656,9 +10657,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -10740,9 +10741,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -10824,9 +10825,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -10908,9 +10909,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -10992,9 +10993,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -11076,9 +11077,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -11160,9 +11161,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -11244,9 +11245,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -11328,9 +11329,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -11412,9 +11413,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -11496,9 +11497,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -11580,9 +11581,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -11664,9 +11665,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -11748,9 +11749,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -11832,9 +11833,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -11916,9 +11917,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -12000,9 +12001,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -12084,9 +12085,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -12168,9 +12169,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -12252,9 +12253,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -12336,9 +12337,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -12420,9 +12421,9 @@
    "scan": {
     "thickness_ang": {
      "shape": [
-      1
+      8
      ],
-     "sha256": "f088acafbda82c9811822d560fddbb6092daba0acf4cb749b2709e6e7bc7df6a"
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
     },
     "energy_keV": {
      "shape": [
@@ -12497,6 +12498,90 @@
   },
   "mos2": {
    "label": "MoS2",
+   "profile": "standard",
+   "crystal_key": "mos2",
+   "substrate": null,
+   "stack": [],
+   "scan": {
+    "thickness_ang": {
+     "shape": [
+      8
+     ],
+     "sha256": "4669351f90ee45c234d5c5b75c10b928bfdf071f0e009eb9f052bbcfab270baa"
+    },
+    "energy_keV": {
+     "shape": [
+      7
+     ],
+     "sha256": "9de24bb4de311e21abbaa1d23b4653bd7711180d6504a6bd39c76f850a91b6a9"
+    },
+    "tilt_deg": {
+     "shape": [
+      10
+     ],
+     "sha256": "3262c2c44279f2cfddeeb2bea71b7dea04617734635dadee3d335832d1fba8ee"
+    },
+    "tilt_azim_deg": {
+     "shape": [
+      10
+     ],
+     "sha256": "f3e7b8cea8b77643c452141cd982fe1db6ccef73ac5f91dc1b25bd07630e425f"
+    },
+    "E_grid_line": null,
+    "E_grid_line_by_energy": {
+     "30.0": {
+      "shape": [
+       831
+      ],
+      "sha256": "a948ba367fb83b6f0f9baf841e32c6cba32629c2b1d773365973799046451980"
+     },
+     "50.0": {
+      "shape": [
+       998
+      ],
+      "sha256": "2cca96472b1967a68cbd3bc8e91a50bc387549d58f99c0dc4b93a38ed541f8ed"
+     },
+     "100.0": {
+      "shape": [
+       1151
+      ],
+      "sha256": "406028346ad463af53c3db6a4b3eb81a3c6c961a5fbbe98d4e946829dcce9c39"
+     },
+     "150.0": {
+      "shape": [
+       1318
+      ],
+      "sha256": "26f9b55669014bf28f176dc13efda6acac6c6945694ce270412aaee7b91cf717"
+     },
+     "200.0": {
+      "shape": [
+       1484
+      ],
+      "sha256": "d595bf7a209ca7b98915f27ca05b794055532364fbe31e3d1415dceafc7d0ee8"
+     },
+     "250.0": {
+      "shape": [
+       1651
+      ],
+      "sha256": "653a9f75678880f10e6c42fdf3f5df09c4d29167c8f546f9e62cfc175648b264"
+     },
+     "300.0": {
+      "shape": [
+       1651
+      ],
+      "sha256": "653a9f75678880f10e6c42fdf3f5df09c4d29167c8f546f9e62cfc175648b264"
+     }
+    },
+    "E_grid_brem": {
+     "shape": [
+      1200
+     ],
+     "sha256": "79f8f20c412aa260b3f00a9e0cb7c2e01c140a18067e9f5fe5e8c9aab64638d2"
+    }
+   }
+  },
+  "mos2-on-sapphire": {
+   "label": "MoS2 on sapphire",
    "profile": "standard",
    "crystal_key": "mos2",
    "substrate": "sapphire",
@@ -12825,7 +12910,14 @@
  },
  "special_grids": {
   "hbn_thickness_ang": [
-   10000000.0
+   1000.0,
+   5000.0,
+   10000.0,
+   40000.0,
+   100000.0,
+   200000.0,
+   500000.0,
+   1000000.0
   ],
   "hbn_tilt_deg": [
    0.0,
