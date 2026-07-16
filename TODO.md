@@ -44,3 +44,5 @@ on `main` once the branch exists.
 ## Long term features
 
 1. **High-energy electron support.** Evaluate `Geant4` or similar integration for REGAE@DESY-scale beams (3–5 MeV, 50 fs, 100 fC, 200–300 µm target diameter) and a JungFrau detector roughly 0.5–4.5 m from the interaction point.
+
+2. **Complex shapes** 3D patterned sufaces, maybe diffraction-grating style, and other interesting shapes
