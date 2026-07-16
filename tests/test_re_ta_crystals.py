@@ -168,7 +168,7 @@ def test_re_ta_structures_match_source_cells_and_full_bases(
 @pytest.mark.parametrize(
     ("key", "reflection"),
     [
-        ("res2", (0, 0, 1)),
+        ("res2", (0, 0, 2)),
         ("rese2", (0, 0, 1)),
         ("2h_tas2", (0, 0, 2)),
         ("2h_tase2", (0, 0, 2)),

@@ -7131,15 +7131,15 @@
      [
       0,
       0,
-      1
+      2
      ],
      [
       0,
       0,
-      -1
+      -2
      ]
     ],
-    "hkl_reason": "Use the finite basal (001) harmonic of the license-clean MP mp-572758 doubled-c distorted-1T ReS2 fallback, parallel to the reciprocal-normal cleavage surface.",
+    "hkl_reason": "The license-clean MP mp-572758 distorted-1T ReS2 fallback carries a doubled c-axis, so odd 00l are near-extinct supercell harmonics (|S(001)|~=3); pin the first strong allowed parallel (002) family, the true single-layer basal reflection, and orient by the reciprocal (001) cleavage surface normal.",
     "layers_per_cell": null
    },
    "physics": {

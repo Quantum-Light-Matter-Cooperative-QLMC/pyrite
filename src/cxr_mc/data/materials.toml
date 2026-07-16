@@ -341,8 +341,8 @@ validation_id = "res2-mp572758-structure"
 B_ang2 = 0.6
 surface_hkl = [0, 0, 1]
 E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
-hkl_families = [[0, 0, 1]]
-hkl_reason = "Use the finite basal (001) harmonic of the license-clean MP mp-572758 doubled-c distorted-1T ReS2 fallback, parallel to the reciprocal-normal cleavage surface."
+hkl_families = [[0, 0, 2]]
+hkl_reason = "The license-clean MP mp-572758 distorted-1T ReS2 fallback carries a doubled c-axis, so odd 00l are near-extinct supercell harmonics (|S(001)|~=3); pin the first strong allowed parallel (002) family, the true single-layer basal reflection, and orient by the reciprocal (001) cleavage surface normal."
 
 [crystals.rese2]
 cif = "cifs/rese2.cif"
