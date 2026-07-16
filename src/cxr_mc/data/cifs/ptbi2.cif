@@ -3,9 +3,13 @@ data_ptbi2
 # Provenance: Feng et al., Nature Communications 10, 4765 (2019),
 # doi:10.1038/s41467-019-12805-2, Supplementary Tables I--II (CC BY 4.0):
 # https://www.physics.okayama-u.ac.jp/jeschke_homepage/papers/NatureCommun10p4765_Supplement.pdf
-# This P1 basis expands the SI's Pt 3c, Bi1 1a, Bi2 2b, and Bi3 3c sites
-# in the detailed 273 K cell. It is the layered trigonal phase, not cubic
+# This P1 basis uses the detailed 273 K cell from SI Table I and expands the
+# Pt 3c, Bi1 1a, Bi2 2b, and Bi3 3c coordinates tabulated at 295 K in SI
+# Table II. This mixed-temperature use is explicit rather than implying a
+# single-temperature refinement. It is the layered trigonal phase, not cubic
 # pyrite PtBi2. Layers stack along c and the explicit basis makes 001 finite.
+# The catalog B_ang2=0.6 A^2 is a shared modeling placeholder, not either
+# displacement parameter reported in the SI.
 # Limiting checks: V=sqrt(3)a^2c/2, 3Pt+6Bi, finite basal (001) coupling.
 # Validation: ptbi2-p31m-structure
 _symmetry_space_group_name_H-M 'P 1'

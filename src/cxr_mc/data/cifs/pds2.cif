@@ -5,6 +5,7 @@ data_pds2
 # This P1 representation explicitly expands Pd 4a and S 8c from the source.
 # The weakly bonded layers are normal to (001). Pbca extinguishes odd 00l,
 # so the catalog pins the first usable parallel reciprocal vector, (002).
+# The catalog B_ang2=0.6 A^2 is a modeling placeholder, not source-derived.
 # Limiting checks: V=abc, 4Pd+8S, and finite basal (002) coupling.
 # Validation: pds2-pbca-structure
 _symmetry_space_group_name_H-M 'P 1'
