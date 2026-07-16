@@ -309,6 +309,9 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     # A uniform E_grid_brem keeps the legacy start/spacing behavior and extends
     # to each beam energy. Scalar/nonuniform grids are explicit and stay exact.
     energies = _seq(sweep.energy_keV)
+    line_grids = tuple(
+        _line_grid_for_energy(sweep, cp["E_grid"], float(energy)) for energy in energies
+    )
     fixed_line_grid = sweep.E_grid_line if sweep.E_grid_line is not None else sweep.e_grid_eV
     if sweep.E_grid_brem is not None:
         brem_grid = np.asarray(sweep.E_grid_brem, float)
@@ -401,8 +404,7 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
         if width is not None:
             name = f"{name} footprint={width:g}x{height:g}mm"
         for i_e, E0 in enumerate(energies):
-            line_grid = _line_grid_for_energy(sweep, cp["E_grid"], float(E0))
-            line_case_grid = encode_energy_grid(line_grid)
+            line_case_grid = encode_energy_grid(line_grids[i_e])
             cases.append(
                 dict(
                     name=name,

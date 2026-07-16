@@ -162,6 +162,17 @@ def test_missing_per_beam_line_grid_fails_before_cases_are_built():
         )
 
 
+def test_empty_per_beam_line_grid_fails_with_selected_energy():
+    with pytest.raises(ValueError, match=r"no E_grid_line configured for beam energy 30 keV"):
+        build_cases(
+            Sweep(
+                material="mose2",
+                energy_keV=30.0,
+                E_grid_line_by_energy={},
+            )
+        )
+
+
 def test_implicit_brem_grid_starts_at_lowest_per_beam_line_grid_start():
     cases = build_cases(
         Sweep(
