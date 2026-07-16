@@ -40,7 +40,8 @@ def test_material_comparison_compares_low_energy_lines_without_a_floor():
     assert fig.axes[0].texts[0].get_text() == "  Test (30 keV, θ=0°, φ=0°)"
     assert (
         fig.axes[0].get_title()
-        == "Cross-material comparison — highest peak flux (all beam energies)"
+        == "Cross-material comparison — highest peak flux "
+        "(all beam energies, line quality >= 0.25)"
     )
 
 
@@ -76,6 +77,27 @@ def test_material_comparison_omits_all_invalid_local_ratio_material():
     assert len(fig.axes[0].collections[0].get_offsets()) == 1
 
 
+def test_material_comparison_applies_default_quality_floor_before_every_selection():
+    low_quality = _record("Quality floor", 30.0, 150.0, peak=100.0)
+    low_quality["spec"] = np.full_like(low_quality["spec"], 100.0)
+    high_quality = _record("Quality floor", 60.0, 200.0, peak=10.0)
+    results = {"Test": {"scan": {30.0: low_quality, 60.0: high_quality}}}
+
+    assert inspect.signature(plot_material_comparison).parameters["min_line_quality"].default == 0.25
+    for select in ("quality_peak", "peak", "line_brem_ratio"):
+        fig = plot_material_comparison(results, default_settings(), select=select)
+        assert fig.axes[0].texts[0].get_text() == "  Test (60 keV, θ=0°, φ=0°)"
+
+
+def test_material_comparison_omits_material_with_no_well_defined_line():
+    low_quality = _record("Low quality", 30.0, 150.0, peak=100.0)
+    low_quality["spec"] = np.full_like(low_quality["spec"], 100.0)
+    results = {"Low quality": {"scan": {30.0: low_quality}}}
+
+    for select in ("quality_peak", "peak", "line_brem_ratio"):
+        assert plot_material_comparison(results, default_settings(), select=select) is None
+
+
 def test_material_comparison_separates_overlapping_labels():
     first = _record("First", 30.0, 150.0, peak=100.0)
     second = _record("Second", 30.0, 150.0, peak=100.0)
@@ -102,3 +124,5 @@ def test_cross_material_tab_requests_new_comparisons():
     assert 'label="Compare all beam energies"' in source
     assert 'label="beam energy"' in source
     assert "cross_material_energy_options" in source
+    assert source.count("min_line_quality=0.25") == 3
+    assert "exclude_labels" not in source

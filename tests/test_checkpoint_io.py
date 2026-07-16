@@ -19,6 +19,19 @@ def test_dump_writes_gzip_magic_header(tmp_path):
     assert path.read_bytes()[:2] == b"\x1f\x8b"
 
 
+def test_dump_is_byte_stable_across_paths_and_write_times(tmp_path, monkeypatch):
+    """Remote slim exports must compare equal to equivalent local checkpoints."""
+    local_path = tmp_path / "hopg.pkl"
+    remote_path = tmp_path / "hopg.grid.pkl"
+    monkeypatch.setattr(ckio.gzip.time, "time", lambda: 1)
+    ckio.dump(_payload(), str(local_path))
+
+    monkeypatch.setattr(ckio.gzip.time, "time", lambda: 2)
+    ckio.dump(_payload(), str(remote_path))
+
+    assert remote_path.read_bytes() == local_path.read_bytes()
+
+
 def test_dump_load_roundtrips(tmp_path):
     path = tmp_path / "hopg.pkl"
     payload = _payload()

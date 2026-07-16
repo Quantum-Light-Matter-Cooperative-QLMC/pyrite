@@ -35,6 +35,7 @@ on `main` once the branch exists.
 1. **pyelsepa / ELSEPA transport.** Maintain the landed, validated adapter's externally provisioned CI environment. Design: [`docs/cstool-nebula-evaluation.md`](docs/cstool-nebula-evaluation.md).
 2. **Sweep cache standardization.** Include the energy grid in cache reuse and report stale/mixed checkpoint records without changing default behavior. → `feature/sweep-cache-standardization`.
 3. **Material filters.** Model calibration-filter transmission between the x-ray beam and detector. → `feature/material-filters`.
+4. **Crystal definitions.** Review/confirm various crystal lattice definitions & parameter values
 
 ## P3 - lower / exploratory
 
@@ -44,3 +45,5 @@ on `main` once the branch exists.
 ## Long term features
 
 1. **High-energy electron support.** Evaluate `Geant4` or similar integration for REGAE@DESY-scale beams (3–5 MeV, 50 fs, 100 fC, 200–300 µm target diameter) and a JungFrau detector roughly 0.5–4.5 m from the interaction point.
+
+2. **Complex shapes** 3D patterned sufaces, maybe diffraction-grating style, and other interesting shapes

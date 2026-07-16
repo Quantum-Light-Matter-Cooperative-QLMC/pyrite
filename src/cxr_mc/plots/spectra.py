@@ -378,6 +378,7 @@ def plot_material_comparison(
     rel_prominence=0.03,
     line_metric="sharpness",
     beam_energy_keV=None,
+    min_line_quality: float | None = 0.25,
 ):
     """Cross-material headline: for each material's results store, find the single
     BEST geometry/energy (results.selection_score ``select``) and plot its
@@ -389,8 +390,10 @@ def plot_material_comparison(
     ``results_by_material`` : ``{label: results_store}``, e.g. built in the
     notebook with ``{m: load_checkpoint(m) for m in CATALOG.material_keys}``
     (skip empties).  ``beam_energy_keV`` optionally restricts each material to
-    that beam energy before selecting its best geometry. Labels are offset
-    automatically when their rendered bounding boxes would overlap."""
+    that beam energy before selecting its best geometry. ``min_line_quality``
+    rejects ill-defined-line candidates before ranking; ``None`` disables that
+    gate. Labels are offset automatically when their rendered bounding boxes
+    would overlap."""
     pts = []  # (label, line_eV, line_flux, quality, case)
     for label, results in results_by_material.items():
         recs = records(results)
@@ -398,7 +401,13 @@ def plot_material_comparison(
             continue
         metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
         candidates = [
-            r for r in recs if (beam_energy_keV is None or r["case"]["E0_keV"] == beam_energy_keV)
+            r
+            for r in recs
+            if (beam_energy_keV is None or r["case"]["E0_keV"] == beam_energy_keV)
+            and (
+                min_line_quality is None
+                or metrics[id(r)]["line_quality"] >= min_line_quality
+            )
         ]
         if select == "line_brem_ratio":
             candidates = [r for r in candidates if np.isfinite(metrics[id(r)]["line_brem_ratio"])]
@@ -449,7 +458,13 @@ def plot_material_comparison(
     energy_scope = (
         "all beam energies" if beam_energy_keV is None else f"{beam_energy_keV:g} keV beam energy"
     )
-    ax.set_title(f"Cross-material comparison — {selection_title} ({energy_scope})", fontsize=12)
+    quality_scope = (
+        "" if min_line_quality is None else f", line quality >= {min_line_quality:g}"
+    )
+    ax.set_title(
+        f"Cross-material comparison — {selection_title} ({energy_scope}{quality_scope})",
+        fontsize=12,
+    )
     ax.grid(alpha=0.3, which="both")
     ax.margins(x=0.12)
     cb = fig.colorbar(sc, ax=ax)

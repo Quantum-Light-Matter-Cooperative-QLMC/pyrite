@@ -33,8 +33,13 @@ def dump(obj: Any, path: str, *, compresslevel: int = 6) -> None:
     Callers own atomicity (write to a ``.tmp`` sibling, then ``os.replace``);
     this function just does the encode+write.
     """
-    with gzip.GzipFile(path, "wb", compresslevel=compresslevel) as f:
-        pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
+    # Fixed header metadata keeps equivalent ``cxr slim`` outputs byte-identical,
+    # so remote pulls can compare their SHA-256 digests without re-copying them.
+    with open(path, "wb") as raw:
+        with gzip.GzipFile(
+            filename="", fileobj=raw, mode="wb", compresslevel=compresslevel, mtime=0
+        ) as f:
+            pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def load(path: str) -> Any:

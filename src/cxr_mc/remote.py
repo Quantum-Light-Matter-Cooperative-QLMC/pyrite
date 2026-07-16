@@ -60,6 +60,7 @@ Override the box via env: CXR_REMOTE_HOST / CXR_REMOTE_DIR / CXR_REMOTE_UV.
 
 import argparse
 import datetime
+import hashlib
 import io
 import json
 import os
@@ -151,6 +152,26 @@ def _ssh_capture(remote_cmd):
         sys.stderr.write(r.stderr)
         raise SystemExit(f"ssh command failed (exit {r.returncode})")
     return r.stdout
+
+
+def _local_sha256(path: Path) -> str | None:
+    """Return a checkpoint's SHA-256 digest, or ``None`` when it is absent."""
+    if not path.is_file():
+        return None
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _remote_sha256(path: str) -> str:
+    """Return the SHA-256 digest of one remote checkpoint artifact."""
+    output = _ssh_capture(f"sha256sum {path}").strip()
+    match = re.fullmatch(r"([0-9a-fA-F]{64})\s+\S+", output)
+    if match is None:
+        raise SystemExit(f"invalid sha256sum output for remote artifact {path!r}")
+    return match.group(1).lower()
 
 
 def _check_shell_tokens(tokens):
@@ -292,22 +313,38 @@ def pull(stems, grid=False, drop_wide_brem=False, downcast=False, no_sync=False)
                     flags += " --downcast"
                 remote_tmp = f"/tmp/{stem}.grid.pkl"
                 ckpt = f"{REMOTE_DIR}/checkpoints/{stem}.pkl"
-                _run(
-                    [
-                        "ssh",
-                        "-n",
-                        HOST,
-                        f"cd {REMOTE_DIR} && {REMOTE_UV} run --no-sync cxr slim "
-                        f"{ckpt}{flags} -o {remote_tmp}",
-                    ]
-                )
-                _run(["scp", f"{HOST}:{remote_tmp}", str(local)])
-                _run(["ssh", "-n", HOST, f"rm -f {remote_tmp}"])
-                print(f"pulled (grid) -> checkpoints/{stem}.pkl")
+                try:
+                    _run(
+                        [
+                            "ssh",
+                            "-n",
+                            HOST,
+                            f"cd {REMOTE_DIR} && {REMOTE_UV} run --no-sync cxr slim "
+                            f"{ckpt}{flags} -o {remote_tmp}",
+                        ]
+                    )
+                    if (digest := _remote_sha256(remote_tmp)) and digest == _local_sha256(local):
+                        print(f"already current -> checkpoints/{stem}.pkl")
+                    else:
+                        _run(["scp", f"{HOST}:{remote_tmp}", str(local)])
+                        print(f"pulled (grid) -> checkpoints/{stem}.pkl")
+                finally:
+                    _run(["ssh", "-n", HOST, f"rm -f {remote_tmp}"])
             else:
-                _run(["scp", f"{HOST}:{REMOTE_DIR}/checkpoints/{stem}.pkl", str(local)])
-                print(f"pulled -> checkpoints/{stem}.pkl")
-        except subprocess.CalledProcessError:
+                ckpt = f"{REMOTE_DIR}/checkpoints/{stem}.pkl"
+                remote_tmp = f"{REMOTE_DIR}/checkpoints/.{stem}.pull.{uuid.uuid4().hex}.pkl"
+                try:
+                    # Checkpoint writers publish with os.replace; a sibling hard link
+                    # freezes the exact inode that both the digest and scp will read.
+                    _run(["ssh", "-n", HOST, f"ln {ckpt} {remote_tmp}"])
+                    if (digest := _remote_sha256(remote_tmp)) and digest == _local_sha256(local):
+                        print(f"already current -> checkpoints/{stem}.pkl")
+                    else:
+                        _run(["scp", f"{HOST}:{remote_tmp}", str(local)])
+                        print(f"pulled -> checkpoints/{stem}.pkl")
+                finally:
+                    _run(["ssh", "-n", HOST, f"rm -f {remote_tmp}"])
+        except (OSError, subprocess.CalledProcessError, SystemExit):
             print(f"warning: could not pull checkpoint {stem!r}; continuing")
 
 
@@ -696,6 +733,21 @@ def _submit_staged_job(jobid: str, stems: list[str]) -> str:
     return scheduler_id
 
 
+def _squeue_state_command(scheduler_id: str, *, retired: str) -> str:
+    """Build fail-closed Bash that stores a live SLURM state in ``STATE``.
+
+    SLURM reports a recently retired ID as a nonzero error on some clusters;
+    callers provide the control-flow action that means "not queued" in their
+    surrounding shell context. Every other query failure remains fatal.
+    """
+    return (
+        f"STATE=$(squeue -h -j {scheduler_id} -o '%T' 2>&1); STATUS=$?; "
+        'if [ "$STATUS" -ne 0 ]; then case "$STATE" in '
+        f'*"Invalid job id specified"*) {retired} ;; '
+        f'*) echo "could not query SLURM job {scheduler_id}" >&2; exit "$STATUS" ;; esac; fi; '
+    )
+
+
 def _live_jobs():
     """[(jobid, quick, [materials])] for jobs still reported by SLURM.
 
@@ -707,9 +759,8 @@ def _live_jobs():
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$d/meta" 2>/dev/null | tail -1); '
         'case "$SID" in \'\'|*[!0-9]*) continue ;; esac; '
-        'if ! STATE=$(squeue -h -j "$SID" -o \'%T\'); then '
-        'echo "could not query SLURM job $SID" >&2; exit 1; fi; '
-        '[ -n "$STATE" ] || continue; '
+        + _squeue_state_command("$SID", retired="continue")
+        + '[ -n "$STATE" ] || continue; '
         'q=$(sed -n "s/^quick: //p" "$d/meta" 2>/dev/null); '
         'm=$(sed -n "s/^materials: //p" "$d/meta" 2>/dev/null); '
         'printf "%s\\t%s\\t%s\\n" "$(basename "$d")" "$q" "$m"; done'
@@ -788,7 +839,9 @@ def _slurm_state(slurm_job_id: str) -> str | None:
     """Return the live SLURM state, or ``None`` after it leaves ``squeue``."""
     if not slurm_job_id.isdigit():
         return None
-    state = _ssh_capture(f"squeue -h -j {slurm_job_id} -o '%T'").strip()
+    state = _ssh_capture(
+        _squeue_state_command(slurm_job_id, retired="exit 0") + 'printf "%s\\n" "$STATE"'
+    ).strip()
     return state.splitlines()[0] if state else None
 
 
@@ -1052,9 +1105,9 @@ def job_status(jobid=None):
         'echo "-- state --"; cat "$D/state" 2>/dev/null || echo "(no state yet)"; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
         'case "$SID" in \'\'|*[!0-9]*) echo "slurm: (none) not queued" ;; '
-        '*) if ! S=$(squeue -h -j "$SID" -o \'%T\'); then '
-        'echo "could not query SLURM job $SID" >&2; exit 1; fi; '
-        'if [ -n "$S" ]; then echo "slurm: $SID $S"; '
+        '*) '
+        + _squeue_state_command("$SID", retired="STATE=")
+        + 'if [ -n "$STATE" ]; then echo "slurm: $SID $STATE"; '
         'else echo "slurm: $SID not queued"; fi ;; esac; '
         'echo "-- log tail --"; tail -n 20 "$D/log" 2>/dev/null'
     )
@@ -1189,9 +1242,8 @@ def _attach_log_stream(jobid=None):
         'case "$SID" in \'\'|*[!0-9]*) SID= ;; *) break ;; esac; sleep 1; done; '
         'if [ -n "$SID" ]; then '
         'while :; do '
-        'if ! STATE=$(squeue -h -j "$SID" -o \'%T\'); then '
-        'echo "could not query SLURM job $SID" >&2; kill "$TP" 2>/dev/null; exit 1; fi; '
-        '[ -n "$STATE" ] || break; sleep 2; done; '
+        + _squeue_state_command("$SID", retired="break")
+        + '[ -n "$STATE" ] || break; sleep 2; done; '
         'else echo "no recorded SLURM job ID for {jobid}" >&2; kill "$TP" 2>/dev/null; exit 1; fi; '
         'sleep 1; kill "$TP" 2>/dev/null; '
         'printf "\\n--- job finished ---\\n"; cat "$D/state" 2>/dev/null'
@@ -1222,7 +1274,7 @@ def _attach_progress_dashboard(jobid, metadata):
             unit="case",
             position=position,
             leave=True,
-            dynamic_ncols=True,
+            nrows=len(materials) + 1,
         )
         for position, material in enumerate(materials)
     }
@@ -1272,11 +1324,8 @@ def _stop_jobid(jobid):
         f'scancel {scheduler_id} || exit $?; '
         f'echo "cancelling [{scheduler_id}] $(date -Is)" > "$D/state"; '
         'while :; do '
-        f'S=$(squeue -h -j {scheduler_id} -o \'%T\'); STATUS=$?; '
-        'if [ "$STATUS" -ne 0 ]; then '
-        'echo "could not confirm SLURM cancellation; keeping checkpoint reservations" >&2; '
-        'exit "$STATUS"; fi; '
-        '[ -n "$S" ] || break; sleep 1; done; '
+        + _squeue_state_command(str(scheduler_id), retired="break")
+        + '[ -n "$STATE" ] || break; sleep 1; done; '
         f'{release}; '
         f'echo "cancelled [{scheduler_id}] $(date -Is)" > "$D/state"; '
         f'echo "cancelled SLURM job {scheduler_id} for job {jobid}"'

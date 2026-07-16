@@ -6,19 +6,46 @@ materials = [
     "hopg",
     "hbn",
     "black_phosphorus",
+    # "fete", TODO: add FeTe
     "hfs2",
     "hfse2",
     "hfte2",
+    # "GeP", TODO: add GeP
+    # "GeS", TODO: add GeS
+    # "GeSe", TODO: add GeSe
+    # "GeSe2", TODO: add GeSe2
     "mos2",
     "mose2",
     "mote2",
+    "nbs2",
+    "nbse2",
+    # "nbte2", TODO: add NbTe2
+    # "pds2", TODO: add PdS2
     "pdse2",
+    # "pdte2", TODO: add PdTe2
+    # "ptbi2", TODO: add PtBi2
+    "pts2",
     "ptse2",
-    "tis2",
+    # "ptte2", TODO: add PtTe2
+    # "res2", TODO: add ReS2
+    # "rese2", TODO: add ReSe2
+    # "2h-tas2", TODO: add 2H-TaS2
+    # "2h-tase2", TODO: add 2H-TaSe2
+    # "tate2", TODO: add TaTe2
     "tise2",
+    # "tite2", TODO: add TiTe2
     "v2o5",
+    # "vse2", TODO: add VSe2
+    # "vte2", TODO: add VTe2
     "ws2",
     "wse2",
-    # "wte2",
+    # "wte2", TODO: add WTe2
     "zrse2",
+    # "zrte3", TODO: add ZrTe3
+    # "zrte5", TODO: add ZrTe5
+
+# ! --- Everything below here is already implemented, just not worth including in sim --- ! #
+    # "4h_sic",
+    # "6h_sic",
+    # "tis2",
 ]
