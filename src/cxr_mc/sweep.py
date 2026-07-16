@@ -110,7 +110,8 @@ def film_on_substrate_layers(
 
 def _radiator(cp, *, beam_uvw=None, azimuth_rad=None):
     """Coherent-radiator dict from a :func:`crystal_params` result ``cp``: crystal,
-    hkl_list, B_ang2, and beam_uvw (``cp``'s own default unless overridden). The
+    hkl_list, B_ang2, and its mutually exclusive beam_uvw/surface_hkl orientation.
+    An explicit beam_uvw overrides and clears ``cp``'s reciprocal surface. The
     ``azimuth_rad`` key is included only when given -- a bare substrate radiator
     carries no azimuth of its own (:func:`substrate_radiator`); only a stack/film
     use of a radiator (:func:`layer_radiator`, :func:`build_cases`) does. The one
@@ -120,6 +121,7 @@ def _radiator(cp, *, beam_uvw=None, azimuth_rad=None):
         hkl_list=cp["hkl_list"],
         B_ang2=cp["B_ang2"],
         beam_uvw=cp["beam_uvw"] if beam_uvw is None else tuple(beam_uvw),
+        surface_hkl=cp["surface_hkl"] if beam_uvw is None else None,
     )
     if azimuth_rad is not None:
         rad["azimuth_rad"] = float(azimuth_rad)
@@ -129,7 +131,7 @@ def _radiator(cp, *, beam_uvw=None, azimuth_rad=None):
 def substrate_radiator(substrate, n_families=4):
     """Coherent-radiation crystal params for a substrate, or None if it radiates
     no lines. A CRYSTALLINE substrate (a CRYSTALS key, e.g. 'silicon') returns
-    {crystal, hkl_list, B_ang2, beam_uvw} (from crystal_params) so it emits its
+    {crystal, hkl_list, B_ang2, beam_uvw, surface_hkl} (from crystal_params) so it emits its
     own PXR/CBS; an AMORPHOUS preset ('sio2') returns None (it only
     absorbs + brems). This is the per-layer-radiation half of the multilayer
     feature -- the absorber stack (film_on_substrate_layers) is the other half.
@@ -147,21 +149,24 @@ def substrate_radiator(substrate, n_families=4):
 def layer_radiator(layer: LayerSpec, n_families: int = 4):
     """Coherent radiator params for one stack :class:`LayerSpec`, or None if the
     layer is amorphous. Same dict as :func:`substrate_radiator` plus the
-    per-layer orientation: ``beam_uvw`` (overridden if the spec sets one) and
-    ``azimuth_rad`` (the spec's in-plane rotation, radians)."""
+    per-layer orientation: ``beam_uvw`` (overridden if the spec sets one, clearing
+    any catalog surface_hkl) and ``azimuth_rad`` (the spec's in-plane rotation,
+    radians)."""
     rad = substrate_radiator(layer.material, n_families)
     if rad is None:
         return None
     if layer.beam_uvw is not None:
         rad["beam_uvw"] = tuple(layer.beam_uvw)
+        rad["surface_hkl"] = None
     rad["azimuth_rad"] = float(np.deg2rad(layer.azimuth_deg))
     return rad
 
 
 def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
     """Fixed crystallography for a material: composition, the dominant
-    reflections, the beam zone axis [uvw], the (isotropic) B-factor, and a
-    sensible default photon-energy grid. Override the grid via Sweep.e_grid_eV."""
+    reflections, exactly one direct beam axis [uvw] or reciprocal surface (hkl),
+    the isotropic B-factor, and a sensible default photon-energy grid. Override
+    the grid via Sweep.e_grid_eV."""
     crystal_key = material
     if material in CATALOG.materials:
         crystal_key = CATALOG.material(material).crystal_key
@@ -180,6 +185,7 @@ def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
         composition=list(spec.composition),
         hkl_list=hkl_list,
         beam_uvw=spec.beam_uvw,
+        surface_hkl=spec.surface_hkl,
         B_ang2=spec.B_ang2,
         E_grid=spec.E_grid,
     )
@@ -296,6 +302,7 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     dtheta = TIMEPIX3_DTHETA_OBS_DEG if sweep.dtheta_obs_deg is None else sweep.dtheta_obs_deg
     domega = TIMEPIX3_DOMEGA_SR if sweep.domega_sr is None else sweep.domega_sr
     beam_uvw = cp["beam_uvw"] if sweep.beam_uvw is None else sweep.beam_uvw
+    surface_hkl = cp["surface_hkl"] if sweep.beam_uvw is None else None
     material_spec = CATALOG.materials.get(sweep.material)
     label = material_spec.label if material_spec is not None else sweep.material
     width_src, height_src = sweep.crystal_width_mm, sweep.crystal_height_mm
@@ -392,6 +399,7 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
                     tilt_deg=float(tilt),
                     tilt_azim_deg=float(azim),
                     beam_uvw=beam_uvw,
+                    surface_hkl=surface_hkl,
                     mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")
                     mosaic_mc_fwhm_rad=mosaic_mc_rad,  # exact MC route (None if route="analytic")
                     mosaic_mc_nodes=sweep.mosaic_nodes,
@@ -440,6 +448,7 @@ def geometry_table(cases):
             {
                 "config": c["name"],
                 "beam_uvw": c["beam_uvw"],
+                "surface_hkl": c.get("surface_hkl"),
                 "refl": len(c["hkl_list"]),
                 "t [um]": c["thickness_ang"] / 1e4,
                 "width [mm]": c.get("crystal_width_mm"),

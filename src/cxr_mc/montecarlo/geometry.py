@@ -17,7 +17,7 @@ plane (zero y-component).
 
 import numpy as np
 
-from ..materials.crystal import _direct_lattice_vectors, _rotation_between
+from ..materials.crystal import _direct_lattice_vectors, _rotation_between, reciprocal_g_vector
 
 X_MIN = 0
 X_MAX = 1
@@ -213,13 +213,30 @@ def detector_directions(
 
 
 def _orientation_R(
-    lattice, beam_uvw, azimuth_rad, recip_miscut_rad: tuple[float, float] | None = None
+    lattice,
+    beam_uvw,
+    azimuth_rad,
+    recip_miscut_rad: tuple[float, float] | None = None,
+    surface_hkl: tuple[int, int, int] | None = None,
 ):
     """Rotation applied to EVERY reciprocal vector: the minimal rotation taking the
-    crystal direct-lattice direction `beam_uvw` onto +z (the slab normal), then a
-    roll of `azimuth_rad` about +z. Returns None for the construction-frame default
-    (beam_uvw is None and azimuth_rad == 0). Shared by mc_spectrum and mosaic_psi_rad
-    so the orientation convention lives in one place.
+    selected crystal direction onto +z (the slab normal), then a roll of
+    `azimuth_rad` about +z. ``beam_uvw`` selects a direct-lattice direction;
+    ``surface_hkl`` selects the reciprocal-lattice plane normal
+    ``g_hkl = h*b1 + k*b2 + l*b3``. They are mutually exclusive. The reciprocal
+    definition is exact for nonorthogonal cells; for an orthogonal cell a
+    one-axis ``surface_hkl`` reduces to its parallel direct axis. Both paths use
+    a proper minimal rotation, so handedness is preserved. Returns None for the
+    construction-frame default (both orientations are None and azimuth_rad == 0).
+    Shared by mc_spectrum and mosaic_psi_rad so the orientation convention lives
+    in one place.
+
+    Assumptions: Miller indices are expressed in the reciprocal basis owned by
+    :func:`materials.crystal.reciprocal_g_vector`, and sample +z is the outward
+    slab normal. A zero azimuth is the minimal-rotation in-plane convention;
+    positive azimuth is a right-handed roll about sample +z.
+
+    Validation: surface-hkl-orientation
 
     recip_miscut_rad: optional (polar_rad, azim_rad) EXTRA tilt of the
     reciprocal vector g away from the slab normal n -- a crystal miscut, where
@@ -235,12 +252,18 @@ def _orientation_R(
     that always passes recip_miscut_rad=(0.0, 0.0) gets the None behavior
     exactly. Not yet wired into any grid/study -- plumbed for a future
     asymmetric-reflection (g not || n) study."""
+    if beam_uvw is not None and surface_hkl is not None:
+        raise ValueError("beam_uvw and surface_hkl are mutually exclusive")
+
     R = None
     if beam_uvw is not None:
         u, v, w = np.asarray(beam_uvw, dtype=float)
         a1, a2, a3 = _direct_lattice_vectors(lattice)
         axis = u * a1 + v * a2 + w * a3
         R = _rotation_between(axis / np.linalg.norm(axis), np.array([0.0, 0.0, 1.0]))
+    elif surface_hkl is not None:
+        axis, axis_norm = reciprocal_g_vector(surface_hkl, lattice)
+        R = _rotation_between(axis / axis_norm, np.array([0.0, 0.0, 1.0]))
     if azimuth_rad:
         ca, sa = np.cos(azimuth_rad), np.sin(azimuth_rad)
         Rz = np.array([[ca, -sa, 0.0], [sa, ca, 0.0], [0.0, 0.0, 1.0]])

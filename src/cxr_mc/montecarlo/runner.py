@@ -209,6 +209,8 @@ def run_case(case):
                 uniform brem triples extend to the beam energy; scalar/nonuniform
                 exact arrays retain their specified samples.
         optional: tilt_deg (0), tilt_azim_deg (0), beam_uvw (None),
+                surface_hkl (None; reciprocal plane normal, mutually exclusive
+                with beam_uvw),
                 azimuth_rad (0), recip_miscut_rad (None; (polar_rad, azim_rad)
                 crystal miscut of g relative to n -- None is a strict no-op,
                 see montecarlo.geometry._orientation_R), E_cut_lines_keV (5),
@@ -398,6 +400,7 @@ def _spectrum_case(case, tp):
             B_ang2=case["B_ang2"],
             composition=case["composition"],
             beam_uvw=case.get("beam_uvw"),
+            surface_hkl=case.get("surface_hkl"),
             azimuth_rad=case.get("azimuth_rad", 0.0),
             recip_miscut_rad=case.get("recip_miscut_rad"),
             sinc_cutoff=case.get("sinc_cutoff"),
@@ -422,6 +425,7 @@ def _spectrum_case(case, tp):
                 B_ang2=rad["B_ang2"],
                 composition=abs_layers[L][2],
                 beam_uvw=rad.get("beam_uvw"),
+                surface_hkl=rad.get("surface_hkl"),
                 # per-layer in-plane orientation (LayerSpec.azimuth_deg); radiators
                 # from pre-stack checkpoints lack the key -> case-level fallback
                 azimuth_rad=rad.get("azimuth_rad", case.get("azimuth_rad", 0.0)),

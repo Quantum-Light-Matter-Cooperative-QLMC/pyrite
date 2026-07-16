@@ -127,6 +127,7 @@ def mosaic_psi_rad(case, E_pk_eV):
         case.get("beam_uvw"),
         case.get("azimuth_rad", 0.0),
         case.get("recip_miscut_rad"),
+        surface_hkl=case.get("surface_hkl"),
     )
     denom = 1.0 - beta * float(beam_dir @ n_hat)  # g-independent (Doppler denominator)
     if denom <= 0.0:

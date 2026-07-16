@@ -65,12 +65,13 @@ class CrystalSpec:
     cif: Path
     validation_id: str
     B_ang2: float
-    beam_uvw: tuple[int, int, int]
+    beam_uvw: tuple[int, int, int] | None
     E_grid: np.ndarray | None
     hkl_families: tuple[tuple[int, int, int], ...]
     hkl_reason: str | None
     layers_per_cell: int | None
     info: CrystalInfo
+    surface_hkl: tuple[int, int, int] | None
 
     @property
     def hkl_list(self) -> tuple[tuple[int, int, int], ...]:
@@ -437,13 +438,14 @@ def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
         "validation_id",
         "B_ang2",
         "beam_uvw",
+        "surface_hkl",
         "mosaic_fwhm_deg",
         "E_grid",
         "hkl_families",
         "hkl_reason",
         "layers_per_cell",
     }
-    required = {"cif", "validation_id", "B_ang2", "beam_uvw"}
+    required = {"cif", "validation_id", "B_ang2"}
     for key, value in table.items():
         path = f"crystals.{key}"
         row = _table(value, path, errors)
@@ -461,7 +463,14 @@ def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
         if B is None or B < 0:
             errors.add(f"{path}.B_ang2", "must be finite and nonnegative")
             B = 0.0
-        beam = _direction(row.get("beam_uvw"), f"{path}.beam_uvw", errors)
+        has_beam = "beam_uvw" in row
+        has_surface = "surface_hkl" in row
+        if has_beam == has_surface:
+            errors.add(path, "requires exactly one of beam_uvw or surface_hkl")
+        beam = _direction(row["beam_uvw"], f"{path}.beam_uvw", errors) if has_beam else None
+        surface = (
+            _direction(row["surface_hkl"], f"{path}.surface_hkl", errors) if has_surface else None
+        )
         mosaic_raw = row.get("mosaic_fwhm_deg")
         mosaic = None
         if mosaic_raw is not None:
@@ -508,13 +517,14 @@ def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
             else:
                 layers = layers_raw
         info = _parse_info(key, cif, mosaic, f"{path}.cif", errors) if cif else None
-        if cif is not None and beam is not None and info is not None:
+        if cif is not None and info is not None and (beam is not None or surface is not None):
             out[key] = CrystalSpec(
                 key=key,
                 cif=cif,
                 validation_id=str(validation_id),
                 B_ang2=B,
                 beam_uvw=beam,
+                surface_hkl=surface,
                 E_grid=e_grid,
                 hkl_families=tuple(families),
                 hkl_reason=reason_raw.strip() if isinstance(reason_raw, str) else None,

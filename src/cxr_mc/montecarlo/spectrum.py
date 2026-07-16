@@ -114,6 +114,7 @@ def mc_spectrum(
     layers=None,
     mosaic_fwhm_rad=None,
     mosaic_nodes=1,
+    surface_hkl: tuple[int, int, int] | None = None,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron]
@@ -166,6 +167,13 @@ def mc_spectrum(
     azimuth_rad about +z (the in-plane setting of the crystal relative to
     the detector azimuth -- it matters for individual family members).
 
+    surface_hkl: reciprocal-lattice PLANE NORMAL along the slab normal (+z).
+    This is mutually exclusive with beam_uvw and is the exact cleavage-plane
+    contract for nonorthogonal crystals. The reciprocal vector is rotated by
+    the minimal proper rotation, followed by azimuth_rad about +z.
+
+    Validation: surface-hkl-orientation
+
     recip_miscut_rad: optional (polar_rad, azim_rad) crystal miscut -- an
     EXTRA tilt applied only to the reciprocal vectors g, leaving the
     transported slab normal/beam_dir (set by tilted_geometry() upstream,
@@ -205,7 +213,13 @@ def mc_spectrum(
     abs_comp = _normalize_composition(absorber_element, n_atoms, composition)
 
     # crystal orientation: rotation applied to all reciprocal vectors
-    R_orient = _orientation_R(info["lattice"], beam_uvw, azimuth_rad, recip_miscut_rad)
+    R_orient = _orientation_R(
+        info["lattice"],
+        beam_uvw,
+        azimuth_rad,
+        recip_miscut_rad,
+        surface_hkl=surface_hkl,
+    )
     thickness = segments["thickness_ang"]
     Ne = segments["Ne"]
 

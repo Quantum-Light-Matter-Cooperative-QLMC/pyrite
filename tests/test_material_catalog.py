@@ -326,6 +326,45 @@ stack = [{ material = "missing", thickness_ang = -2.0 }]
         assert expected in message
 
 
+def test_crystal_requires_exactly_one_orientation(tmp_path):
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    material = """
+[materials.mos2]
+label = "MoS2"
+profile = "base"
+"""
+    neither = _minimal_catalog(material_rows=material).replace("beam_uvw = [0, 0, 2]\n", "")
+    with pytest.raises(
+        MaterialConfigError, match="requires exactly one of beam_uvw or surface_hkl"
+    ):
+        load_material_catalog(_write_catalog(tmp_path, neither))
+
+    both = _minimal_catalog(material_rows=material).replace(
+        "beam_uvw = [0, 0, 2]", "beam_uvw = [0, 0, 2]\nsurface_hkl = [0, 0, 1]"
+    )
+    with pytest.raises(
+        MaterialConfigError, match="requires exactly one of beam_uvw or surface_hkl"
+    ):
+        load_material_catalog(_write_catalog(tmp_path, both))
+
+
+def test_crystal_accepts_reciprocal_surface_orientation(tmp_path):
+    from cxr_mc.materials import load_material_catalog
+
+    text = _minimal_catalog(
+        material_rows="""
+[materials.mos2]
+label = "MoS2"
+profile = "base"
+""",
+    ).replace("beam_uvw = [0, 0, 2]", "surface_hkl = [2, 0, -1]")
+    spec = load_material_catalog(_write_catalog(tmp_path, text)).crystal("mos2")
+
+    assert spec.beam_uvw is None
+    assert spec.surface_hkl == (2, 0, -1)
+
+
 def test_duplicate_toml_definition_is_material_config_error(tmp_path):
     from cxr_mc.materials import MaterialConfigError, load_material_catalog
 
