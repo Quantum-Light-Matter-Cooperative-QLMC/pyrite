@@ -1,0 +1,33 @@
+data_zrte3
+# Phase identity: room-temperature type-A ZrTe3, P21/m parent phase, Z=2.
+# Provenance: Furuseth and Fjellvag, Acta Chem. Scand. 45, 694--697
+# (1991), doi:10.3891/acta.chem.scand.45-0694; COD 1559502 (CC0):
+# https://www.crystallography.net/cod/1559502.cif
+# The diffraction temperature is 293 K; the low-temperature CDW modulation is
+# excluded. Four source 2e sites are expanded explicitly in P1.
+# The catalog B_ang2=0.6 A^2 is a modeling placeholder, not source-derived.
+# Limiting checks: V=abc sin(beta), Zr2Te6, finite basal (001) coupling.
+# Validation: zrte3-p21m-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 5.8948
+_cell_length_b 3.9264
+_cell_length_c 10.104
+_cell_angle_alpha 90.0
+_cell_angle_beta 97.93
+_cell_angle_gamma 90.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Zr1 Zr 0.28825000 0.25000000 0.66571000 1.0
+Zr2 Zr 0.71175000 0.75000000 0.33429000 1.0
+Te1 Te 0.23645000 0.75000000 0.44485000 1.0
+Te2 Te 0.76355000 0.25000000 0.55515000 1.0
+Te3 Te 0.43267000 0.25000000 0.16749000 1.0
+Te4 Te 0.56733000 0.75000000 0.83251000 1.0
+Te5 Te 0.09523000 0.75000000 0.83904000 1.0
+Te6 Te 0.90477000 0.25000000 0.16096000 1.0

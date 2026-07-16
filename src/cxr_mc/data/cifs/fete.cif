@@ -1,0 +1,31 @@
+data_fete
+# Phase identity: idealized stoichiometric beta-FeTe framework, PbO-type P4/nmm.
+# Provenance: Rodriguez et al., JACS 132, 10006--10008 (2010),
+# doi:10.1021/ja104004t; COD 4102703 (CC0):
+# https://www.crystallography.net/cod/4102703.cif
+# IMPORTANT IDEALIZATION: the experimental parent is Fe1.095Te at 250(2) K.
+# cxr-mc supports only fully occupied sites, so the source's 0.095-occupied
+# interstitial Fe 2c orbit at (0.25,0.25,0.7811) is intentionally omitted.
+# The retained fully occupied framework Fe 2b and Te 2c sites are expanded in P1.
+# The catalog B_ang2=0.6 A^2 is a modeling placeholder, not source-derived.
+# Limiting checks: V=a^2*c, Fe2Te2, finite basal (001) coupling.
+# Validation: fete-p4nmm-idealized-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 3.8139
+_cell_length_b 3.8139
+_cell_length_c 6.2631
+_cell_angle_alpha 90.0
+_cell_angle_beta 90.0
+_cell_angle_gamma 90.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Fe1 Fe 0.25000 0.75000 0.50000 1.0
+Fe2 Fe 0.75000 0.25000 0.50000 1.0
+Te1 Te 0.25000 0.25000 0.21799 1.0
+Te2 Te 0.75000 0.75000 0.78201 1.0

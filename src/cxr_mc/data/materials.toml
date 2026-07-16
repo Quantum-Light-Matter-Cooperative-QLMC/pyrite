@@ -372,6 +372,42 @@ E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
 hkl_families = [[0, 0, 1]]
 hkl_reason = "In the preserved ambient Brown/COD 2310358 C2/m setting, distorted TaTe2 cleaves on (001); C centering permits 001 and the explicit basis gives a finite coupling."
 
+[crystals.fete]
+cif = "cifs/fete.cif"
+validation_id = "fete-p4nmm-idealized-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Idealized stoichiometric beta-FeTe uses the fully occupied PbO-type framework from experimental Fe1.095Te COD 4102703; the 9.5%-occupied interstitial Fe orbit is intentionally omitted because cxr-mc supports only fully occupied sites. Pin the finite basal (001) harmonic parallel to its cleavage surface."
+
+[crystals.wte2]
+cif = "cifs/wte2.cif"
+validation_id = "wte2-td-pnm21-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 2]]
+hkl_reason = "Ambient Td-WTe2 in the preserved Brown/COD 2310355 Pnm21 axis setting cleaves on (001); odd 00l are extinct, so pin the first allowed parallel (002) family."
+
+[crystals.zrte3]
+cif = "cifs/zrte3.cif"
+validation_id = "zrte3-p21m-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Room-temperature parent-phase ZrTe3 cleaves on (001); the explicit COD 1559502 P21/m basis gives a finite (001) coupling, so pin the first basal harmonic."
+
+[crystals.zrte5]
+cif = "cifs/zrte5.cif"
+validation_id = "zrte5-cmcm-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 1, 0]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 2, 0]]
+hkl_reason = "Room-temperature Cmcm ZrTe5 layers lie in the a-c plane and cleave on (010); C centering extinguishes (010), so pin the first allowed parallel (020) family."
+
 [media.sio2]
 composition = { Si = 0.02205, O = 0.04410 }
 
@@ -509,6 +545,22 @@ profile = "standard"
 
 [materials.tate2]
 label = "Ambient distorted TaTe2 (001)"
+profile = "standard"
+
+[materials.fete]
+label = "Idealized stoichiometric beta-FeTe (001)"
+profile = "standard"
+
+[materials.wte2]
+label = "Td-WTe2 (002)"
+profile = "standard"
+
+[materials.zrte3]
+label = "ZrTe3 (001)"
+profile = "standard"
+
+[materials.zrte5]
+label = "ZrTe5 (020)"
 profile = "standard"
 
 [materials.hfse2]
