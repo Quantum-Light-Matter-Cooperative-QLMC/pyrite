@@ -71,6 +71,22 @@ def test_crystal_params_unknown_raises():
         crystal_params("unobtanium")
 
 
+def test_real_manifest_materials_are_unique_and_buildable():
+    """The shipped ``mats_to_sim.toml`` resolves to unique catalog keys, each of
+    which builds at least one case through the standard sweep path."""
+    from cxr_mc.scan import MATS_FILE, load_all_materials
+
+    materials = load_all_materials(MATS_FILE)
+    assert materials, "manifest is empty"
+    assert len(materials) == len(set(materials)), "manifest has duplicate keys"
+    assert all(key in CATALOG.materials for key in materials)
+
+    for key in materials:
+        sweep = Sweep(material=key, thickness_ang=100.0, energy_keV=30.0, tilt_deg=0.0)
+        cases = build_cases(sweep)
+        assert cases, f"{key} produced no cases"
+
+
 def test_build_cases_is_cartesian_product():
     sw = Sweep(
         material="mose2",

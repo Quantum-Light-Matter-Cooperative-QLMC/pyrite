@@ -174,8 +174,8 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
     from cxr_mc.materials import CATALOG, MaterialCatalog
 
     assert isinstance(CATALOG, MaterialCatalog)
-    assert len(CATALOG.crystals) == 27
-    assert len(CATALOG.materials) == 27
+    assert len(CATALOG.crystals) == 48
+    assert len(CATALOG.materials) == 48
     assert CATALOG.material_keys == tuple(CATALOG.materials)
     assert CATALOG.crystal("hbn") is CATALOG.crystals["hbn"]
     assert CATALOG.material("mote2") is CATALOG.materials["mote2"]
@@ -593,7 +593,10 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
         )
         config = expected["config"]
         assert actual.B_ang2 == config["B_ang2"]
-        assert list(actual.beam_uvw) == config["beam_uvw"]
+        beam_uvw = list(actual.beam_uvw) if actual.beam_uvw is not None else None
+        surface_hkl = list(actual.surface_hkl) if actual.surface_hkl is not None else None
+        assert beam_uvw == config["beam_uvw"]
+        assert surface_hkl == config["surface_hkl"]
         assert list(map(list, actual.hkl_list)) == config["hkl_list"]
         assert actual.hkl_reason == config["hkl_reason"]
         assert actual.layers_per_cell == config["layers_per_cell"]
