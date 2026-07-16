@@ -189,12 +189,12 @@ def test_substrate_radiator_crystalline_vs_amorphous():
     si = substrate_radiator("silicon")
     assert si is not None
     assert si["crystal"] == "silicon"
-    assert set(si) == {"crystal", "hkl_list", "B_ang2", "beam_uvw"}
+    assert set(si) == {"crystal", "hkl_list", "B_ang2", "beam_uvw", "surface_hkl"}
     assert len(si["hkl_list"]) > 0
     sapphire = substrate_radiator("sapphire")
     assert sapphire is not None
     assert sapphire["crystal"] == "sapphire"
-    assert set(sapphire) == {"crystal", "hkl_list", "B_ang2", "beam_uvw"}
+    assert set(sapphire) == {"crystal", "hkl_list", "B_ang2", "beam_uvw", "surface_hkl"}
     assert len(sapphire["hkl_list"]) > 0
     with pytest.raises(ValueError):
         substrate_radiator("unobtainium")
