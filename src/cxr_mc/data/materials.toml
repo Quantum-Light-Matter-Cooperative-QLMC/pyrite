@@ -217,6 +217,42 @@ E_grid = { arange = { start = 50.0, stop = 3500.0, step = 3.0 } }
 hkl_families = [[0, 0, 1]]
 hkl_reason = "Use the basal (001) symmetric cut of 1T-HfTe2 so the reciprocal vector remains parallel to the cleavable c-axis slab normal."
 
+[crystals.nbte2]
+cif = "cifs/nbte2.cif"
+validation_id = "nbte2-c2m-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "In the preserved Brown/COD 2310357 C2/m setting, distorted NbTe2 cleaves on (001); C centering permits 001 and the explicit basis gives a finite coupling."
+
+[crystals.tite2]
+cif = "cifs/tite2.cif"
+validation_id = "tite2-p3m1-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Pin the allowed basal 1T-TiTe2(001) symmetric cut parallel to the c-axis-normal cleavage surface."
+
+[crystals.vse2]
+cif = "cifs/vse2.cif"
+validation_id = "vse2-p3m1-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "Pin the allowed basal ambient 1T-VSe2(001) symmetric cut parallel to the c-axis-normal cleavage surface."
+
+[crystals.vte2]
+cif = "cifs/vte2.cif"
+validation_id = "vte2-c2m-structure"
+B_ang2 = 0.6
+surface_hkl = [0, 0, 1]
+E_grid = { arange = { start = 350.0, stop = 3500.0, step = 3.0 } }
+hkl_families = [[0, 0, 1]]
+hkl_reason = "In the preserved COD 1535594 C2/m setting, ambient distorted VTe2 cleaves on (001); C centering permits 001 and the idealized stoichiometric basis gives a finite coupling."
+
 [crystals.gep]
 cif = "cifs/gep.cif"
 validation_id = "gep-c2m-structure"
@@ -322,6 +358,22 @@ profile = "standard"
 
 [materials.hfte2]
 label = "1T-HfTe2 (001)"
+profile = "standard"
+
+[materials.nbte2]
+label = "Niobium ditelluride (NbTe2)"
+profile = "standard"
+
+[materials.tite2]
+label = "1T-TiTe2 (001)"
+profile = "standard"
+
+[materials.vse2]
+label = "1T-VSe2 (001)"
+profile = "standard"
+
+[materials.vte2]
+label = "Vanadium ditelluride (1T''-VTe2)"
 profile = "standard"
 
 [materials.gep]

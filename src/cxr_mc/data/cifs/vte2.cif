@@ -1,0 +1,43 @@
+data_vte2
+# Phase identity: ambient distorted 1T'' VTe2, C2/m, conventional source cell.
+# Provenance: Bronsema, Bus & Wiegers, J. Solid State Chem. 53, 415--421
+# (1984), COD 1535594 (CC0). The source sample is V1.04Te2; because its minor
+# interstitial V site is not part of the supplied coordinate packet and partial
+# occupancies are rejected by cxr-mc, this model explicitly idealizes the fully
+# occupied primary sites to stoichiometric VTe2. It is not the high-T trigonal phase.
+# The P1 basis expands the reported 2a, 4i, and 4j sites in the source setting.
+# Limiting checks: V=abc sin(beta), 6V+12Te, and finite basal (001) coupling.
+# Validation: vte2-c2m-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 18.984
+_cell_length_b 3.5947
+_cell_length_c 9.069
+_cell_angle_alpha 90.0
+_cell_angle_beta 134.62
+_cell_angle_gamma 90.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+V1 V 0.0000 0.0000 0.0000 1.0
+V2 V 0.5000 0.5000 0.0000 1.0
+V3 V 0.1431 0.5000 0.9892 1.0
+V4 V 0.8569 0.5000 0.0108 1.0
+V5 V 0.6431 0.0000 0.9892 1.0
+V6 V 0.3569 0.0000 0.0108 1.0
+Te1 Te 0.1447 0.5000 0.2764 1.0
+Te2 Te 0.8553 0.5000 0.7236 1.0
+Te3 Te 0.6447 0.0000 0.2764 1.0
+Te4 Te 0.3553 0.0000 0.7236 1.0
+Te5 Te 0.2954 0.0000 0.2141 1.0
+Te6 Te 0.7046 0.0000 0.7859 1.0
+Te7 Te 0.7954 0.5000 0.2141 1.0
+Te8 Te 0.2046 0.5000 0.7859 1.0
+Te9 Te 0.4915 0.5000 0.2897 1.0
+Te10 Te 0.5085 0.5000 0.7103 1.0
+Te11 Te 0.9915 0.0000 0.2897 1.0
+Te12 Te 0.0085 0.0000 0.7103 1.0

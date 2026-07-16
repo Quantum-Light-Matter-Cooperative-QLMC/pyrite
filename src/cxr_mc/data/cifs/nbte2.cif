@@ -1,0 +1,41 @@
+data_nbte2
+# Phase identity: ambient distorted 1T'' NbTe2, C2/m, conventional Brown cell.
+# Provenance: Brown, Acta Cryst. 20, 264--267 (1966), COD 2310357 (CC0).
+# This P1 representation explicitly expands the reported 2a, 4i, and 4j sites.
+# The weakly bonded layers are normal to reciprocal (001) in this exact setting;
+# indices from the smaller vendor setting must not be mixed with this cell.
+# Limiting checks: V=abc sin(beta), 6Nb+12Te, and finite basal (001) coupling.
+# Validation: nbte2-c2m-structure
+_symmetry_space_group_name_H-M 'P 1'
+_symmetry_Int_Tables_number 1
+_cell_length_a 19.390
+_cell_length_b 3.642
+_cell_length_c 9.375
+_cell_angle_alpha 90.0
+_cell_angle_beta 134.58
+_cell_angle_gamma 90.0
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+Nb1 Nb 0.0000 0.0000 0.0000 1.0
+Nb2 Nb 0.5000 0.5000 0.0000 1.0
+Nb3 Nb 0.1397 0.5000 0.9882 1.0
+Nb4 Nb 0.8603 0.5000 0.0118 1.0
+Nb5 Nb 0.6397 0.0000 0.9882 1.0
+Nb6 Nb 0.3603 0.0000 0.0118 1.0
+Te1 Te 0.1497 0.5000 0.2898 1.0
+Te2 Te 0.8503 0.5000 0.7102 1.0
+Te3 Te 0.6497 0.0000 0.2898 1.0
+Te4 Te 0.3503 0.0000 0.7102 1.0
+Te5 Te 0.2970 0.0000 0.2148 1.0
+Te6 Te 0.7030 0.0000 0.7852 1.0
+Te7 Te 0.7970 0.5000 0.2148 1.0
+Te8 Te 0.2030 0.5000 0.7852 1.0
+Te9 Te 0.4961 0.5000 0.3020 1.0
+Te10 Te 0.5039 0.5000 0.6980 1.0
+Te11 Te 0.9961 0.0000 0.3020 1.0
+Te12 Te 0.0039 0.0000 0.6980 1.0
