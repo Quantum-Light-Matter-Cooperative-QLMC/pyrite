@@ -37,7 +37,7 @@ Add sourced Z, atomic mass, and mean excitation energy for Fe, Bi, Re, and Ta. V
 
 **Files:** Create CIFs and a focused test module; modify `src/cxr_mc/data/materials.toml` and the validation ledger.
 
-Implement GeP layered C2/m with surface `(20-1)`; GeS and GeSe ambient orthorhombic Pnma with surface `(100)` and `(200)` reflection; micaceous beta-GeSe2 with its source-confirmed basal surface and lowest allowed parallel reflection. Pin sourced lattice, volume, basis multiplicity/stoichiometry, orientation, and finite nonzero `F_g`, `chi_g`, `U_g`.
+Implement GeP layered C2/m with source-backed surface `(10-1)` and lowest allowed parallel reflection `(20-2)`; GeS and GeSe ambient orthorhombic Pnma with surface `(100)` and `(200)` reflection; micaceous beta-GeSe2 with its source-confirmed basal surface and lowest allowed parallel reflection. Pin sourced lattice, volume, basis multiplicity/stoichiometry, orientation, and finite nonzero `F_g`, `chi_g`, `U_g`.
 
 ### Task 4: Nb/Ti/V crystals
 
