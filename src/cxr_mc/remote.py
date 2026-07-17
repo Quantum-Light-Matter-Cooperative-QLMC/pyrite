@@ -395,9 +395,7 @@ def _completed_materials(jobid, materials):
     _check_shell_tokens([jobid, *materials])
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     completed = set(
-        _ssh_capture(
-            f'D="{jobdir}"; sed -n "s/^completed: //p" "$D/log" 2>/dev/null'
-        ).split()
+        _ssh_capture(f'D="{jobdir}"; sed -n "s/^completed: //p" "$D/log" 2>/dev/null').split()
     )
     return [material for material in materials if material in completed]
 
@@ -408,9 +406,7 @@ def _validate_parallel_materials(parallel_materials):
         not isinstance(parallel_materials, int)
         or not 1 <= parallel_materials <= MAX_PARALLEL_MATERIALS
     ):
-        raise SystemExit(
-            f"parallel materials must be between 1 and {MAX_PARALLEL_MATERIALS}"
-        )
+        raise SystemExit(f"parallel materials must be between 1 and {MAX_PARALLEL_MATERIALS}")
     return parallel_materials
 
 
@@ -515,7 +511,7 @@ def _release_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
     _check_shell_tokens([jobid, *stems])
     reservations = _reservation_root()
     releases = "; ".join(
-        f'if [ "$(cat \"$R/{stem}/jobid\" 2>/dev/null)" = "$J" ]; then rm -rf "$R/{stem}"; fi'
+        f'if [ "$(cat "$R/{stem}/jobid" 2>/dev/null)" = "$J" ]; then rm -rf "$R/{stem}"; fi'
         for stem in stems
     )
     command = f'R="{reservations}"; J="{jobid}"'
@@ -569,7 +565,7 @@ def _slurm_batch_script(
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     reservations = _reservation_root()
     release_lines = "\n  ".join(
-        f'if [ "$(cat \"$RESERVATIONS/{stem}/jobid\" 2>/dev/null)" = "$JOBID" ]; then rm -rf "$RESERVATIONS/{stem}"; fi;'
+        f'if [ "$(cat "$RESERVATIONS/{stem}/jobid" 2>/dev/null)" = "$JOBID" ]; then rm -rf "$RESERVATIONS/{stem}"; fi;'
         for stem in reservation_stems
     )
     return f"""#!/usr/bin/env bash
@@ -700,12 +696,12 @@ def _submission_outcome(jobid: str) -> str:
         f'D="{jobdir}"; '
         '[ -d "$D" ] || { echo missing; exit 0; }; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
-        'case "$SID" in *[!0-9]*|\'\') ;; *) echo submitted; exit 0 ;; esac; '
+        "case \"$SID\" in *[!0-9]*|'') ;; *) echo submitted; exit 0 ;; esac; "
         'STATE=$(cat "$D/state" 2>/dev/null || true); '
         'case "$STATE" in '
         '"FAILED (sbatch submission)"*) echo failed ;; '
-        'queued*|running*|cancelling*) echo pending ;; '
-        '*) echo unknown ;; esac'
+        "queued*|running*|cancelling*) echo pending ;; "
+        "*) echo unknown ;; esac"
     )
     return _ssh_capture(remote).strip()
 
@@ -758,7 +754,7 @@ def _live_jobs():
         f'JOBS="{REMOTE_DIR}/{JOBS_SUBDIR}"; [ -d "$JOBS" ] || exit 0; '
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$d/meta" 2>/dev/null | tail -1); '
-        'case "$SID" in \'\'|*[!0-9]*) continue ;; esac; '
+        "case \"$SID\" in ''|*[!0-9]*) continue ;; esac; "
         + _squeue_state_command("$SID", retired="continue")
         + '[ -n "$STATE" ] || continue; '
         'q=$(sed -n "s/^quick: //p" "$d/meta" 2>/dev/null); '
@@ -785,7 +781,7 @@ def _reservation_holders(stems: list[str]) -> list[tuple[str, str]]:
     _check_shell_tokens(stems)
     remote = (
         f'R="{_reservation_root()}"; [ -d "$R" ] || exit 0; '
-        f'for stem in {" ".join(stems)}; do '
+        f"for stem in {' '.join(stems)}; do "
         '[ -d "$R/$stem" ] || continue; '
         'OWNER=$(cat "$R/$stem/jobid" 2>/dev/null) || OWNER="unknown"; '
         'printf "%s\\t%s\\n" "$stem" "$OWNER"; done'
@@ -980,9 +976,7 @@ def start_queue(
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     stems = _stems(materials, quick)
     payload = _queue_script(jobid, materials, quick, workers, parallel_materials)
-    script = _slurm_batch_script(
-        jobid, payload, job_name=f"cxr-{jobid}", reservation_stems=stems
-    )
+    script = _slurm_batch_script(jobid, payload, job_name=f"cxr-{jobid}", reservation_stems=stems)
     upload = _write_job_script_command(
         jobdir, _queue_metadata(jobid, materials, quick, workers, parallel_materials)
     )
@@ -1033,9 +1027,7 @@ def start_zhai_queue(
     script = _slurm_batch_script(
         jobid, payload, job_name=f"cxr-zhai-{jobid}", reservation_stems=stems
     )
-    upload = _write_job_script_command(
-        jobdir, _zhai_queue_metadata(jobid, ne, ne_brem, ne_supp)
-    )
+    upload = _write_job_script_command(jobdir, _zhai_queue_metadata(jobid, ne, ne_brem, ne_supp))
     submit = _submit_slurm_command(jobid, stems)
 
     if dry_run:
@@ -1080,7 +1072,7 @@ def list_jobs():
         'found=; for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
         '[ -f "$d/meta" ] || continue; found=1; '
         'printf "%s  %s\\n" "$(basename "$d")" '
-        '"$(cat "$d/state" 2>/dev/null || echo \"?\")"; done; '
+        '"$(cat "$d/state" 2>/dev/null || echo "?")"; done; '
         '[ -n "$found" ] || echo "(no jobs)"'
     )
     print(_ssh_capture(remote), end="")
@@ -1091,7 +1083,7 @@ def _job_assign(jobid):
     if jobid:
         _check_shell_tokens([jobid])
         return f'JOB="{jobid}"'
-    return f'JOB=$({_recorded_job_dirs_command()} | tail -1)'
+    return f"JOB=$({_recorded_job_dirs_command()} | tail -1)"
 
 
 def job_status(jobid=None):
@@ -1105,7 +1097,7 @@ def job_status(jobid=None):
         'echo "-- state --"; cat "$D/state" 2>/dev/null || echo "(no state yet)"; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
         'case "$SID" in \'\'|*[!0-9]*) echo "slurm: (none) not queued" ;; '
-        '*) '
+        "*) "
         + _squeue_state_command("$SID", retired="STATE=")
         + 'if [ -n "$STATE" ]; then echo "slurm: $SID $STATE"; '
         'else echo "slurm: $SID not queued"; fi ;; esac; '
@@ -1183,7 +1175,7 @@ def _parse_progress_records(payload):
             continue
         if total < 0 or cached < 0 or completed < 0 or cached + completed > total:
             continue
-        if state not in {"running", "done", "failed"}:
+        if state not in {"running", "done", "failed", "paused"}:
             continue
         records[material] = record
     return records
@@ -1239,9 +1231,9 @@ def _attach_log_stream(jobid=None):
         # for the submit protocol to append its scheduler ID before polling.
         "SID=; for _ in $(seq 1 30); do "
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
-        'case "$SID" in \'\'|*[!0-9]*) SID= ;; *) break ;; esac; sleep 1; done; '
+        "case \"$SID\" in ''|*[!0-9]*) SID= ;; *) break ;; esac; sleep 1; done; "
         'if [ -n "$SID" ]; then '
-        'while :; do '
+        "while :; do "
         + _squeue_state_command("$SID", retired="break")
         + '[ -n "$STATE" ] || break; sleep 2; done; '
         'else echo "no recorded SLURM job ID for {jobid}" >&2; kill "$TP" 2>/dev/null; exit 1; fi; '
@@ -1321,12 +1313,12 @@ def _stop_jobid(jobid):
     release = _release_job_reservations_command(jobid)
     remote = (
         f'D="{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"; '
-        f'scancel {scheduler_id} || exit $?; '
+        f"scancel {scheduler_id} || exit $?; "
         f'echo "cancelling [{scheduler_id}] $(date -Is)" > "$D/state"; '
-        'while :; do '
+        "while :; do "
         + _squeue_state_command(str(scheduler_id), retired="break")
         + '[ -n "$STATE" ] || break; sleep 1; done; '
-        f'{release}; '
+        f"{release}; "
         f'echo "cancelled [{scheduler_id}] $(date -Is)" > "$D/state"; '
         f'echo "cancelled SLURM job {scheduler_id} for job {jobid}"'
     )

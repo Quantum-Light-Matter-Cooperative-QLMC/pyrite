@@ -24,6 +24,7 @@ a harmless no-op.
 import argparse
 import json
 import os
+import time
 import tomllib
 from pathlib import Path
 
@@ -112,6 +113,12 @@ def _build_parser(ap):
         help="override the beam zone axis [uvw] (default: the catalog crystal's beam_uvw)",
     )
     ap.add_argument("--checkpoint-dir", default="checkpoints")
+    ap.add_argument(
+        "--max-minutes",
+        type=float,
+        default=None,
+        help="soft wall-clock budget; exit 75 if work remains (chained remote slices)",
+    )
     ap.add_argument("--progress-file", type=Path, help=argparse.SUPPRESS)
     ap.add_argument("--no-progress", action="store_true", help=argparse.SUPPRESS)
     ap.set_defaults(func=run)
@@ -133,11 +140,21 @@ def run(args):
     else:
         raise SystemExit("scan needs a material name, or use --all")
     validate_materials(materials)
+    # One deadline spans the whole invocation (including --all): each material
+    # below gets whatever's left of it, not a fresh --max-minutes apiece.
+    deadline = None
+    if getattr(args, "max_minutes", None) is not None:
+        deadline = time.monotonic() + args.max_minutes * 60.0
+    incomplete = False
     for material in materials:
-        _run_material(args, material)
+        remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+        if not _run_material(args, material, max_seconds=remaining):
+            incomplete = True
+    if incomplete:
+        raise SystemExit(75)  # EX_TEMPFAIL: budget hit, work remains
 
 
-def _run_material(args, material):
+def _run_material(args, material, max_seconds=None):
     settings = default_settings()
     overrides = {}
     if args.quick:
@@ -206,14 +223,22 @@ def _run_material(args, material):
             **latest_progress,
         )
     try:
-        run_sweep(
-            cases,
-            results,
-            checkpoint_dir=args.checkpoint_dir,
-            checkpoint_path=ckpt,
-            max_workers=args.workers,
-            progress=not getattr(args, "no_progress", False),
-            on_progress=_record_progress if progress_file is not None else None,
+        # run_sweep returns a bool (Task 2); guard with "is not False" rather
+        # than bare truthiness so test doubles that don't bother returning
+        # anything (predating the budget feature, elsewhere in the suite)
+        # still read as complete instead of silently pausing.
+        complete = (
+            run_sweep(
+                cases,
+                results,
+                checkpoint_dir=args.checkpoint_dir,
+                checkpoint_path=ckpt,
+                max_workers=args.workers,
+                progress=not getattr(args, "no_progress", False),
+                on_progress=_record_progress if progress_file is not None else None,
+                max_seconds=max_seconds,
+            )
+            is not False
         )
     except BaseException:
         if progress_file is not None:
@@ -228,11 +253,15 @@ def _run_material(args, material):
         _write_progress_record(
             progress_file,
             material=material,
-            state="done",
+            state="done" if complete else "paused",
             **latest_progress,
         )
     n = sum(len(v) for v in results.values())
-    print(f"done -> {args.checkpoint_dir}/{stem}.pkl ({n} records)")
+    if complete:
+        print(f"done -> {args.checkpoint_dir}/{stem}.pkl ({n} records)")
+    else:
+        print(f"paused (budget) -> {args.checkpoint_dir}/{stem}.pkl ({n} records)")
+    return complete
 
 
 def _write_progress_record(

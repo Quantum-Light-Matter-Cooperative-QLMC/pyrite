@@ -259,8 +259,12 @@ def test_remote_dry_run_describes_sbatch_submission(monkeypatch, capsys):
     monkeypatch.setattr(
         remote.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
     )
-    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh"))
-    monkeypatch.setattr(remote, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh"))
+    monkeypatch.setattr(
+        remote, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh")
+    )
+    monkeypatch.setattr(
+        remote, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
+    )
 
     remote.start_queue(["hopg"], dry_run=True)
 
@@ -286,9 +290,7 @@ def test_start_writes_static_metadata_before_sbatch(monkeypatch):
         lambda command: submissions.append(["ssh", "-n", remote.HOST, command]) or "48291\n",
     )
 
-    remote.start_queue(
-        ["hopg"], quick=True, workers=3, parallel_materials=3, no_sync=True
-    )
+    remote.start_queue(["hopg"], quick=True, workers=3, parallel_materials=3, no_sync=True)
 
     upload_command = uploads[0][0][0][-1]
     assert "job: " in upload_command
@@ -300,7 +302,7 @@ def test_start_writes_static_metadata_before_sbatch(monkeypatch):
     assert "started:" not in upload_command
     assert "started: $(date -Is)" in uploads[0][1]["input"].decode()
     assert "materials: hopg" not in uploads[0][1]["input"].decode()
-    assert "mkdir \"$R/$stem\"" in submissions[0][-1]
+    assert 'mkdir "$R/$stem"' in submissions[0][-1]
     assert "sbatch --parsable" in submissions[1][-1]
 
 
@@ -400,7 +402,9 @@ def test_slurm_state_treats_retired_ids_as_not_queued_but_surfaces_other_failure
         return result.stdout
 
     monkeypatch.setattr(remote, "_ssh_capture", run_remote)
-    squeue.write_text("#!/bin/sh\necho 'slurm_load_jobs error: Invalid job id specified' >&2\nexit 1\n")
+    squeue.write_text(
+        "#!/bin/sh\necho 'slurm_load_jobs error: Invalid job id specified' >&2\nexit 1\n"
+    )
     squeue.chmod(0o755)
     assert remote._slurm_state("48291") is None
 
@@ -537,6 +541,15 @@ def test_parse_progress_records_ignores_malformed_snapshots():
     assert remote._parse_progress_records(payload) == {"hopg": valid}
 
 
+def test_parse_progress_records_accepts_paused_state():
+    payload = (
+        '{"material":"hopg","total_cases":4,"cached_cases":1,'
+        '"completed_new_cases":1,"state":"paused"}'
+    )
+    records = remote._parse_progress_records(payload)
+    assert records["hopg"]["state"] == "paused"
+
+
 class _FakeProgressBar:
     def __init__(self, **kwargs):
         self.total = kwargs["total"]
@@ -605,11 +618,7 @@ def test_attach_dashboard_allocates_every_material_row_without_dynamic_width(mon
 
 
 def test_dashboard_attach_closes_bars_and_prints_final_state(monkeypatch, capsys):
-    metadata = (
-        "materials: hopg hbn\n"
-        "progress_dashboard: True\n"
-        "slurm_job_id: 48291\n"
-    )
+    metadata = "materials: hopg hbn\nprogress_dashboard: True\nslurm_job_id: 48291\n"
     payload = "\n".join(
         [
             json.dumps(
@@ -635,7 +644,9 @@ def test_dashboard_attach_closes_bars_and_prints_final_state(monkeypatch, capsys
     bars = []
     scheduler_states = iter(["RUNNING", None])
     monkeypatch.setattr(remote, "_job_metadata", lambda _jobid: metadata)
-    monkeypatch.setattr(remote, "_read_progress_records", lambda _jobid: remote._parse_progress_records(payload))
+    monkeypatch.setattr(
+        remote, "_read_progress_records", lambda _jobid: remote._parse_progress_records(payload)
+    )
     monkeypatch.setattr(remote, "_slurm_state", lambda _sid: next(scheduler_states))
     monkeypatch.setattr(remote, "_job_state", lambda _jobid: "done with 1 warning(s)")
     monkeypatch.setattr(remote.time, "sleep", lambda _seconds: None)
@@ -659,9 +670,7 @@ def test_dashboard_attach_ctrl_c_disconnects_viewer_only(monkeypatch):
     monkeypatch.setattr(
         remote,
         "_job_metadata",
-        lambda _jobid: (
-            "materials: hopg\nprogress_dashboard: True\nslurm_job_id: 48291\n"
-        ),
+        lambda _jobid: "materials: hopg\nprogress_dashboard: True\nslurm_job_id: 48291\n",
     )
     monkeypatch.setattr(
         remote,
@@ -838,7 +847,7 @@ def test_clear_yes_deletes_existing_files(monkeypatch, capsys):
     monkeypatch.setattr(remote, "_run", lambda cmd, **kw: runs.append(cmd))
     remote.clear_remote("hopg", yes=True)
     assert runs == []
-    assert "mkdir \"$R/$stem\"" in commands[0]
+    assert 'mkdir "$R/$stem"' in commands[0]
     assert 'rm -f "$f"' in commands[0]
     assert "cleared on the box" in capsys.readouterr().out
 
@@ -904,9 +913,7 @@ def test_parallel_queue_script_preserves_partial_failure_results(monkeypatch, tm
 
 
 @pytest.mark.parametrize("parallel_materials", [1, 2, 4])
-def test_parallel_queue_script_enforces_process_limit(
-    monkeypatch, tmp_path, parallel_materials
-):
+def test_parallel_queue_script_enforces_process_limit(monkeypatch, tmp_path, parallel_materials):
     """Measure the generated payload's peak simultaneous scan processes."""
     bash = _bash_or_skip(tmp_path)
     jobdir = tmp_path / "jobs" / "j"
@@ -1086,9 +1093,7 @@ def test_full_pull_warns_without_scp_when_remote_checksum_fails(monkeypatch, tmp
     remote.pull(["hopg"], no_sync=True)
 
     assert len(commands) == 1
-    assert commands[0].startswith(
-        f"sha256sum {remote.REMOTE_DIR}/checkpoints/.hopg.pull."
-    )
+    assert commands[0].startswith(f"sha256sum {remote.REMOTE_DIR}/checkpoints/.hopg.pull.")
     assert not any(command[0] == "scp" for command in calls)
     assert "warning: could not pull checkpoint 'hopg'" in capsys.readouterr().out
 
@@ -1292,7 +1297,9 @@ def test_interrupted_remote_scan_does_not_pull(monkeypatch):
 
 def test_remote_scan_preserves_hyphenated_catalog_material(monkeypatch):
     calls = []
-    monkeypatch.setattr(remote, "start_queue", lambda materials, **_kw: calls.append(materials) or "j")
+    monkeypatch.setattr(
+        remote, "start_queue", lambda materials, **_kw: calls.append(materials) or "j"
+    )
     monkeypatch.setattr(remote, "attach", lambda _jobid: None)
     monkeypatch.setattr(remote, "_completed_materials", lambda _jobid, materials: materials)
     monkeypatch.setattr(remote, "pull", lambda *_args, **_kwargs: None)
@@ -1311,7 +1318,7 @@ def test_completed_materials_reads_success_markers_from_the_queue_log(monkeypatc
     )
 
     assert remote._completed_materials("j", ["hopg", "wse2", "hbn"]) == ["hopg", "hbn"]
-    assert 's/^completed: //p' in commands[0]
+    assert "s/^completed: //p" in commands[0]
 
 
 def test_remote_scan_rejects_unknown_before_busy_or_sync(monkeypatch):
