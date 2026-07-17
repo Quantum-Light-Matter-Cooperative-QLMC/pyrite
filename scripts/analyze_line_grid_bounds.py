@@ -12,11 +12,15 @@ smallest standard polar tilts (near tilt=0, where E_res is maximized) across
 every standard azimuth, plus a couple of larger-tilt spot checks. Rank by the
 energy at which 99% of coherent-line intensity is captured, refine the top
 candidates at higher Ne, then report a +15%-margined ``stop`` and the ``num``
-that preserves ~3 eV endpoint-inclusive spacing.
+that preserves ~3 eV endpoint-inclusive spacing. Each coarse/refine batch of
+geometries is run through cxr_mc.montecarlo.runner.run_cases, which pipelines
+the independent per-geometry transports across a CPU worker pool instead of
+running them one at a time.
 
     uv run python scripts/analyze_line_grid_bounds.py
     uv run python scripts/analyze_line_grid_bounds.py --materials hopg,diamond --energies 30,50
     uv run python scripts/analyze_line_grid_bounds.py --json-out /tmp/line_grid_bounds.json
+    uv run python scripts/analyze_line_grid_bounds.py --max-workers 12
 """
 
 from __future__ import annotations
@@ -30,7 +34,7 @@ import numpy as np
 from cxr_mc.config import material_sweep
 from cxr_mc.line_grid_bounds import coverage_energy, margined_stop, spacing_num
 from cxr_mc.materials import CATALOG
-from cxr_mc.montecarlo.runner import run_case
+from cxr_mc.montecarlo.runner import run_cases
 from cxr_mc.sweep import build_cases
 
 COVERAGE = 0.99
@@ -53,10 +57,13 @@ class Candidate:
     total_intensity: float
 
 
-def _run_geometry(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons):
-    """One transported spectrum at a fixed material/energy/geometry, on the
-    wide diagnostic grid. Pins the material's first configured thickness so
-    only the tilt/azimuth axis varies across the scan."""
+def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons):
+    """One run_case dict for a fixed material/energy/geometry, on the wide
+    diagnostic grid. Pins the material's first configured thickness so only
+    the tilt/azimuth axis varies across the scan. Building is cheap and pure;
+    running happens in a batch via _run_specs so the whole scan shares one
+    worker pool instead of paying pool-startup and per-call overhead once per
+    geometry."""
     thickness_ang = float(np.atleast_1d(CATALOG.material(material).scan.thickness_ang)[0])
     sweep = material_sweep(
         material,
@@ -67,12 +74,10 @@ def _run_geometry(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons):
         E_grid_line=WIDE_GRID_EV,
         E_grid_line_by_energy=None,
     )
-    case = build_cases(sweep, n_electrons=n_electrons)[0]
-    return run_case(case)
+    return build_cases(sweep, n_electrons=n_electrons)[0]
 
 
-def _candidate(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons):
-    result = _run_geometry(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons)
+def _candidate_from_result(material, tilt_deg, tilt_azim_deg, result):
     E_grid, spec = result["E_grid"], result["spec"]
     return Candidate(
         material=material,
@@ -83,13 +88,27 @@ def _candidate(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons):
     )
 
 
-def _scan(materials, energy_keV, tilts, azimuths, n_electrons):
-    return [
-        _candidate(material, energy_keV, tilt, azim, n_electrons)
-        for material in materials
-        for tilt in tilts
-        for azim in azimuths
+def _run_specs(specs, energy_keV, n_electrons, max_workers):
+    """Build and run every (material, tilt_deg, tilt_azim_deg) geometry in
+    ``specs`` as one run_cases batch, so the CPU worker pool stays saturated
+    across the whole batch. run_cases returns results in the same order as
+    ``specs`` (index-aligned, per its docstring), so zipping is safe."""
+    cases = [
+        _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons)
+        for material, tilt_deg, tilt_azim_deg in specs
     ]
+    results = run_cases(cases, max_workers=max_workers)
+    return [
+        _candidate_from_result(material, tilt_deg, tilt_azim_deg, result)
+        for (material, tilt_deg, tilt_azim_deg), result in zip(specs, results, strict=True)
+    ]
+
+
+def _scan(materials, energy_keV, tilts, azimuths, n_electrons, max_workers):
+    specs = [
+        (material, tilt, azim) for material in materials for tilt in tilts for azim in azimuths
+    ]
+    return _run_specs(specs, energy_keV, n_electrons, max_workers)
 
 
 def _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero_candidates):
@@ -119,7 +138,14 @@ def _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero_candidates)
             )
 
 
-def derive_bounds(materials, energies, top_k=TOP_K, coarse_ne=COARSE_NE, refine_ne=REFINE_NE):
+def derive_bounds(
+    materials,
+    energies,
+    top_k=TOP_K,
+    coarse_ne=COARSE_NE,
+    refine_ne=REFINE_NE,
+    max_workers=None,
+):
     reference_scan = CATALOG.material(materials[0]).scan
     near_zero_tilts = [float(reference_scan.tilt_deg[i]) for i in (0, 1)]
     spot_check_tilts = [float(reference_scan.tilt_deg[i]) for i in SPOT_CHECK_TILT_INDICES]
@@ -127,19 +153,23 @@ def derive_bounds(materials, energies, top_k=TOP_K, coarse_ne=COARSE_NE, refine_
 
     rows = []
     for energy_keV in energies:
-        near_zero = _scan(materials, energy_keV, near_zero_tilts, azimuths, coarse_ne)
+        near_zero = _scan(materials, energy_keV, near_zero_tilts, azimuths, coarse_ne, max_workers)
         _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero)
-        spot_check = _scan(materials, energy_keV, spot_check_tilts, azimuths, coarse_ne)
+        spot_check = _scan(
+            materials, energy_keV, spot_check_tilts, azimuths, coarse_ne, max_workers
+        )
 
         top = sorted(near_zero, key=lambda c: c.coverage_energy_eV, reverse=True)[:top_k]
         best_spot = max(spot_check, key=lambda c: c.coverage_energy_eV)
         flagged = best_spot.coverage_energy_eV > top[0].coverage_energy_eV
         candidates = top + ([best_spot] if flagged else [])
 
-        refined = [
-            _candidate(c.material, energy_keV, c.tilt_deg, c.tilt_azim_deg, refine_ne)
-            for c in candidates
-        ]
+        refined = _run_specs(
+            [(c.material, c.tilt_deg, c.tilt_azim_deg) for c in candidates],
+            energy_keV,
+            refine_ne,
+            max_workers,
+        )
         driver = max(refined, key=lambda c: c.coverage_energy_eV)
 
         start_eV = float(reference_scan.E_grid_line_by_energy[energy_keV][0])
@@ -192,6 +222,12 @@ def build_parser():
     parser.add_argument("--top-k", type=int, default=TOP_K)
     parser.add_argument("--coarse-ne", type=int, default=COARSE_NE)
     parser.add_argument("--refine-ne", type=int, default=REFINE_NE)
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=None,
+        help="worker processes for each run_cases batch (default: auto-sized, ~3/4 of CPUs)",
+    )
     parser.add_argument("--json-out", default=None, help="optional path to write rows as JSON")
     return parser
 
@@ -203,7 +239,9 @@ def main(argv=None):
         energies = [float(e) for e in args.energies.split(",")]
     else:
         energies = [float(e) for e in CATALOG.material(materials[0]).scan.energy_keV]
-    rows = derive_bounds(materials, energies, args.top_k, args.coarse_ne, args.refine_ne)
+    rows = derive_bounds(
+        materials, energies, args.top_k, args.coarse_ne, args.refine_ne, args.max_workers
+    )
     _print_report(rows)
     if args.json_out:
         with open(args.json_out, "w") as f:
