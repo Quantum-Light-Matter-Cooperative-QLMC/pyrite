@@ -82,3 +82,33 @@ def test_scan_no_max_minutes_passes_none_max_seconds(monkeypatch, tmp_path):
     args.checkpoint_dir = str(tmp_path)
     scan.run(args)
     assert captured["max_seconds"] is None
+
+
+def test_scan_all_threads_one_deadline_across_materials(monkeypatch, tmp_path):
+    """--all shares ONE deadline: each material gets what's left, clamped >= 0.
+
+    A 5-minute budget with a fake clock that burns 200 s per material must hand
+    the second material less time than the first, and still CALL the third with
+    max_seconds=0.0 (so its fully-cached cases can resolve) instead of skipping.
+    """
+    clock = {"t": 0.0}
+    seen = []
+
+    def _fake_run_sweep(*args, **kwargs):
+        seen.append(kwargs["max_seconds"])
+        clock["t"] += 200.0
+        return True
+
+    monkeypatch.setattr(scan.time, "monotonic", lambda: clock["t"])
+    monkeypatch.setattr(scan, "run_sweep", _fake_run_sweep)
+    monkeypatch.setattr(scan, "load_all_materials", lambda *a, **kw: ["hopg", "hbn", "mose2"])
+    _stub_cases(monkeypatch)
+
+    ap = scan._build_parser(argparse.ArgumentParser())
+    args = ap.parse_args(["--all", "--max-minutes", "5"])
+    args.checkpoint_dir = str(tmp_path)
+    scan.run(args)  # all complete -> no SystemExit
+
+    assert seen == [300.0, 100.0, 0.0]
+    assert seen[1] <= seen[0]  # the second material only gets what's left
+    assert seen[2] == 0.0  # deadline elapsed: still called, with zero budget

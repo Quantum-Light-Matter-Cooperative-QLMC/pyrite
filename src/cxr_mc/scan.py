@@ -223,23 +223,20 @@ def _run_material(args, material, max_seconds=None):
             **latest_progress,
         )
     try:
-        # run_sweep returns a bool (Task 2); guard with "is not False" rather
-        # than bare truthiness so test doubles that don't bother returning
-        # anything (predating the budget feature, elsewhere in the suite)
-        # still read as complete instead of silently pausing.
-        complete = (
-            run_sweep(
-                cases,
-                results,
-                checkpoint_dir=args.checkpoint_dir,
-                checkpoint_path=ckpt,
-                max_workers=args.workers,
-                progress=not getattr(args, "no_progress", False),
-                on_progress=_record_progress if progress_file is not None else None,
-                max_seconds=max_seconds,
-            )
-            is not False
+        result = run_sweep(
+            cases,
+            results,
+            checkpoint_dir=args.checkpoint_dir,
+            checkpoint_path=ckpt,
+            max_workers=args.workers,
+            progress=not getattr(args, "no_progress", False),
+            on_progress=_record_progress if progress_file is not None else None,
+            max_seconds=max_seconds,
         )
+        # run_sweep returns a bool (complete?). Only a bare None -- test doubles
+        # that predate the budget feature and don't bother returning anything --
+        # is read as complete; every other falsy return fails loud as incomplete.
+        complete = True if result is None else bool(result)
     except BaseException:
         if progress_file is not None:
             _write_progress_record(
