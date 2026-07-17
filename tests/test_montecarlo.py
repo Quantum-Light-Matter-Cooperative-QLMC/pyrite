@@ -337,3 +337,36 @@ def test_finite_footprint_rejects_invalid_dimension_pairs(width_mm, height_mm):
             crystal_width_mm=width_mm,
             crystal_height_mm=height_mm,
         )
+
+
+def test_run_cases_should_stop_halts_new_dispatch(monkeypatch):
+    from cxr_mc.montecarlo import runner
+
+    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    calls = {"n": 0}
+
+    def stop_after_two():
+        return calls["n"] >= 2
+
+    seen = []
+
+    def cb(i, case, out):
+        calls["n"] += 1
+        seen.append(case["name"])
+
+    cases = [{"name": f"c{i}"} for i in range(5)]
+    results = runner.run_cases(
+        cases, max_workers=0, progress=False, callback=cb, should_stop=stop_after_two
+    )
+    assert seen == ["c0", "c1"]
+    assert results[0] is not None and results[1] is not None
+    assert results[2] is None and results[3] is None and results[4] is None
+
+
+def test_run_cases_should_stop_none_runs_everything(monkeypatch):
+    from cxr_mc.montecarlo import runner
+
+    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    cases = [{"name": f"c{i}"} for i in range(3)]
+    results = runner.run_cases(cases, max_workers=0, progress=False, should_stop=None)
+    assert all(r is not None for r in results)

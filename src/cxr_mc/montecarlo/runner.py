@@ -492,7 +492,7 @@ def _worker_init():
             pass
 
 
-def run_cases(cases, max_workers=None, progress=True, callback=None):
+def run_cases(cases, max_workers=None, progress=True, callback=None, should_stop=None):
     """
     Run a list of case dicts through run_case, results in input order.
 
@@ -512,6 +512,10 @@ def run_cases(cases, max_workers=None, progress=True, callback=None):
     callback: callable(i, case, out) invoked in THIS process as each case
         finishes; stream/checkpoint/plot without waiting for the batch.
         Exceptions propagate and abort the run.
+    should_stop: optional callable() -> bool, checked before each new case
+        starts. Once it returns True, no new case is dispatched; work already
+        in flight drains normally (callbacks still fire for those cases), and
+        results for never-started cases stay None.
 
     Crawl protections: workers run BELOW_NORMAL priority (_worker_init) and get
     single-threaded BLAS (OMP/OPENBLAS/MKL_NUM_THREADS=1, inherited) -- N workers
@@ -545,6 +549,8 @@ def run_cases(cases, max_workers=None, progress=True, callback=None):
 
     def _serial():
         for i in _maybe_bar(range(n)):
+            if should_stop is not None and should_stop():
+                break
             out = run_case(cases[i])
             if timing is not None:
                 timing.collect(out)
@@ -581,13 +587,18 @@ def run_cases(cases, max_workers=None, progress=True, callback=None):
         prefetch = nw + 2  # keep the transport pool ahead
         with ProcessPoolExecutor(max_workers=nw, initializer=_worker_init) as ex:
             inflight = {i: ex.submit(_transport_case, cases[i]) for i in range(min(prefetch, n))}
+            stopped = False
             for i in _maybe_bar(range(n)):
+                if not stopped and should_stop is not None and should_stop():
+                    stopped = True
+                if stopped and i not in inflight:
+                    break
                 tw0 = perf_counter() if timing is not None else 0.0
                 tp = inflight.pop(i).result()  # transport (already overlapped)
                 if timing is not None:
                     timing.wait.append(perf_counter() - tw0)  # GPU idle: draining the pool
                 j = i + prefetch
-                if j < n:
+                if j < n and not stopped:
                     inflight[j] = ex.submit(_transport_case, cases[j])
                 out = _spectrum_case(cases[i], tp)  # GPU, THIS process only
                 if timing is not None:
@@ -610,7 +621,10 @@ def run_cases(cases, max_workers=None, progress=True, callback=None):
 
     with ProcessPoolExecutor(max_workers=max_workers, initializer=_worker_init) as ex:
         futures = {ex.submit(run_case, c): i for i, c in enumerate(cases)}
+        stopped = False
         for fut in _maybe_bar(as_completed(futures)):
+            if fut.cancelled():
+                continue
             i = futures[fut]
             out = fut.result()
             if timing is not None:
@@ -618,6 +632,10 @@ def run_cases(cases, max_workers=None, progress=True, callback=None):
             results[i] = out
             if callback is not None:
                 callback(i, cases[i], out)
+            if not stopped and should_stop is not None and should_stop():
+                stopped = True
+                for f in futures:
+                    f.cancel()
     if timing is not None:
         timing.report("CPU-pool", nw=max_workers)
     return results
