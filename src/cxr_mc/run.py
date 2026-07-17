@@ -117,6 +117,8 @@ def run_sweep(
     group_key=None,
     on_chunk=None,
     on_progress=None,
+    max_seconds=None,
+    time_fn=None,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
@@ -143,6 +145,22 @@ def run_sweep(
         group, with all of that group's config names (cached + freshly run).
     on_progress : optional callback(completed_new_cases, total_cases, cached_cases)
         fired once after resume filtering and after every newly completed case.
+    max_seconds : optional soft wall-clock budget, measured from just before
+        ``run_cases`` starts. None (default) means unbounded. When set, a
+        deadline of ``time_fn() + max_seconds`` is checked (via ``run_cases``'s
+        ``should_stop`` hook) before each new case starts; once it passes, no
+        new case begins but in-flight work still drains and is still stored.
+        Unstarted configs are simply left for the next call to pick up --
+        resume filtering is per ``(name, E0_keV)`` (see checkpoint_path).
+    time_fn : clock used for the deadline; defaults to ``time.monotonic``.
+        Override for deterministic tests.
+
+    Returns True iff every requested ``(name, E0_keV)`` pair ended up in
+    ``results`` (i.e. the sweep ran to completion, budget or not); False if
+    ``max_seconds`` cut it short. On an incomplete return, one final
+    ``_save()`` runs (beyond the per-config saves already done in ``_cb``) so
+    whatever finished before the deadline is persisted -- harmless and
+    idempotent even when it turns out nothing new needed saving.
     """
     if group_key is None:
         group_key = _default_group_key
@@ -232,9 +250,20 @@ def run_sweep(
             )
             on_chunk(group_names[g])
 
+    if time_fn is None:
+        time_fn = time.monotonic
+    deadline = None if max_seconds is None else time_fn() + max_seconds
+    should_stop = None if deadline is None else (lambda: time_fn() >= deadline)
+
     t0 = time.perf_counter()
-    run_cases(todo, max_workers=max_workers, progress=progress, callback=_cb)
+    run_cases(
+        todo, max_workers=max_workers, progress=progress, callback=_cb, should_stop=should_stop
+    )
     print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
+    complete = all(c["name"] in results and c["E0_keV"] in results[c["name"]] for c in cases)
+    if not complete:
+        _save()  # persist whatever finished before the budget ran out
+    return complete
 
 
 # ---- brem-only repair --------------------------------------------------------

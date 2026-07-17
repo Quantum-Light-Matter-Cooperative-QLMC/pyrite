@@ -76,7 +76,7 @@ def _fake_out(case):
     )
 
 
-def _stub_run_cases(cases, max_workers=None, progress=False, callback=None):
+def _stub_run_cases(cases, max_workers=None, progress=False, callback=None, should_stop=None):
     """Replaces run_cases: fires the callback immediately, no real MC."""
     for i, case in enumerate(cases):
         if callback is not None:
@@ -232,7 +232,9 @@ def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
 
     ran = []
 
-    def _tracking_run_cases(cases, max_workers=None, progress=False, callback=None):
+    def _tracking_run_cases(
+        cases, max_workers=None, progress=False, callback=None, should_stop=None
+    ):
         ran.extend(c["name"] for c in cases)
         _stub_run_cases(cases, callback=callback)
 
@@ -258,9 +260,7 @@ def test_run_sweep_reports_initial_and_per_case_progress(tmp_path, monkeypatch):
         {},
         checkpoint_dir=str(tmp_path),
         progress=False,
-        on_progress=lambda completed, total, cached: progress.append(
-            (completed, total, cached)
-        ),
+        on_progress=lambda completed, total, cached: progress.append((completed, total, cached)),
     )
 
     assert progress == [(0, 3, 0), (1, 3, 0), (2, 3, 0), (3, 3, 0)]
@@ -279,9 +279,7 @@ def test_run_sweep_progress_counts_cached_cases_on_resume(tmp_path, monkeypatch)
         {},
         checkpoint_dir=str(tmp_path),
         progress=False,
-        on_progress=lambda completed, total, cached: progress.append(
-            (completed, total, cached)
-        ),
+        on_progress=lambda completed, total, cached: progress.append((completed, total, cached)),
     )
 
     assert progress == [(0, 2, 1), (1, 2, 1)]
@@ -335,6 +333,106 @@ def test_run_sweep_resume_replays_cached_chunks(tmp_path, monkeypatch):
         progress=False,
     )
     assert chunks == [["cfg_a"]]  # fully-cached group replayed immediately
+
+
+def test_run_sweep_budget_stops_early_and_resumes(tmp_path, monkeypatch):
+    from cxr_mc import run as run_mod
+
+    clock = {"t": 0.0}
+
+    def fake_run_cases(todo, max_workers=None, progress=True, callback=None, should_stop=None):
+        for i, c in enumerate(todo):
+            if should_stop is not None and should_stop():
+                break
+            clock["t"] += 10.0  # each case takes 10 "seconds"
+            callback(i, c, {"out": c["name"]})
+        return []
+
+    monkeypatch.setattr(run_mod, "run_cases", fake_run_cases)
+    monkeypatch.setattr(
+        run_mod,
+        "store_result",
+        lambda results, case, out: results.setdefault(case["name"], {}).__setitem__(
+            case["E0_keV"], {"case": case}
+        ),
+    )
+    cases = [
+        {
+            "name": f"cfg{i}",
+            "E0_keV": 30,
+            "crystal": "hopg",
+            "thickness_ang": 1e4,
+            "tilt_deg": 0.0,
+        }
+        for i in range(4)
+    ]
+    ckpt = tmp_path / "hopg.pkl"
+
+    results = {}
+    complete = run_mod.run_sweep(
+        cases,
+        results,
+        checkpoint_path=str(ckpt),
+        max_seconds=25.0,
+        time_fn=lambda: clock["t"],
+    )
+    assert complete is False
+    assert len(results) == 3  # budget passed after case 3 (t=30 > 25)
+    # the final save persisted the partial state: a fresh resume skips them
+    results2 = {}
+    complete2 = run_mod.run_sweep(
+        cases,
+        results2,
+        checkpoint_path=str(ckpt),
+        max_seconds=1000.0,
+        time_fn=lambda: clock["t"],
+    )
+    assert complete2 is True
+    assert len(results2) == 4
+
+
+def test_run_sweep_no_budget_returns_complete(tmp_path, monkeypatch):
+    from cxr_mc import run as run_mod
+
+    clock = {"t": 0.0}
+
+    def fake_run_cases(todo, max_workers=None, progress=True, callback=None, should_stop=None):
+        for i, c in enumerate(todo):
+            if should_stop is not None and should_stop():
+                break
+            clock["t"] += 10.0  # each case takes 10 "seconds"
+            callback(i, c, {"out": c["name"]})
+        return []
+
+    monkeypatch.setattr(run_mod, "run_cases", fake_run_cases)
+    monkeypatch.setattr(
+        run_mod,
+        "store_result",
+        lambda results, case, out: results.setdefault(case["name"], {}).__setitem__(
+            case["E0_keV"], {"case": case}
+        ),
+    )
+    cases = [
+        {
+            "name": f"cfg{i}",
+            "E0_keV": 30,
+            "crystal": "hopg",
+            "thickness_ang": 1e4,
+            "tilt_deg": 0.0,
+        }
+        for i in range(4)
+    ]
+    ckpt = tmp_path / "hopg.pkl"
+
+    results = {}
+    complete = run_mod.run_sweep(
+        cases,
+        results,
+        checkpoint_path=str(ckpt),
+        max_seconds=None,
+    )
+    assert complete is True
+    assert len(results) == 4
 
 
 # ---------------------------------------------------------------------------
@@ -418,8 +516,6 @@ def test_repair_brem_wide_preserves_exact_nonuniform_case_grid(monkeypatch):
 
     monkeypatch.setattr("cxr_mc.montecarlo._brem_for_case", _spy)
 
-    assert repair_brem_wide(
-        {"cfg_a": {30.0: record}}, only_nonfinite=True, progress=False
-    ) == 1
+    assert repair_brem_wide({"cfg_a": {30.0: record}}, only_nonfinite=True, progress=False) == 1
     np.testing.assert_array_equal(seen["E_brem"], [10.0, 100.0, 1000.0])
     np.testing.assert_array_equal(record["E_grid_brem"], [10.0, 100.0, 1000.0])
