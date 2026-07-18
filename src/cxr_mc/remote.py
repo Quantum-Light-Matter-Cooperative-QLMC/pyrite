@@ -63,6 +63,7 @@ import datetime
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import shlex
@@ -254,7 +255,7 @@ def remote_scan(material, quick=False, workers=None):
     checkpoint can apply their own grid/trim policy after it returns.
     """
     _check_materials([material])
-    jobid = start_queue([material], quick=quick, workers=workers)
+    jobid = start_queue([material], quick=quick, workers=workers, chunk_minutes=0)
     attach(jobid)
     return jobid
 
@@ -477,6 +478,80 @@ fi
 """
 
 
+def _chunked_queue_script(jobid, materials, quick, workers, chunk_minutes):
+    """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
+
+    Reused verbatim by every slice: it resumes from checkpoint, does about
+    chunk_minutes of work via scan.py --max-minutes, and either terminates the
+    chain (all materials completed:/failed:) or hands off: write the
+    'queued slice' state FIRST, then sbatch fail-closed, then append the SID.
+    State-first ordering keeps the EXIT trap from releasing reservations while
+    the next slice is already pending (spec Component 2 step 4).
+    """
+    flags = ""
+    if quick:
+        flags += " --quick"
+    if workers is not None:
+        flags += f" --workers {workers}"
+    mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    chunk_seconds = int(round(chunk_minutes * 60))
+    return f"""JOBDIR="{jobdir}"
+cd "{REMOTE_DIR}" || exit 1
+mkdir -p "$JOBDIR/progress"
+echo "started: $(date -Is)" >> "$JOBDIR/meta"
+{REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+mats=({mats})
+total=${{#mats[@]}}
+chunk_seconds={chunk_seconds}
+slice_start=$(date +%s)
+n=0
+for m in "${{mats[@]}}"; do
+  n=$((n + 1))
+  grep -qx "completed: $m" "$JOBDIR/log" 2>/dev/null && continue
+  grep -qx "failed: $m" "$JOBDIR/log" 2>/dev/null && continue
+  now=$(date +%s)
+  remaining=$((slice_start + chunk_seconds - now))
+  [ "$remaining" -gt 0 ] || break
+  remaining_min=$(awk "BEGIN {{ printf \\"%.2f\\", $remaining / 60 }}")
+  echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
+  printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
+  rc=0
+  {REMOTE_UV} run --no-sync python scan.py "$m"{flags} --max-minutes "$remaining_min" \
+    --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1 || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "completed: $m" >> "$JOBDIR/log"
+  elif [ "$rc" -ne 75 ]; then
+    echo "WARNING: scan failed for $m (exit $rc); will not retry" >> "$JOBDIR/log"
+    echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
+    echo "failed: $m" >> "$JOBDIR/log"
+  fi
+done
+unresolved=0
+failures=0
+for m in "${{mats[@]}}"; do
+  grep -qx "failed: $m" "$JOBDIR/log" 2>/dev/null && {{ failures=$((failures + 1)); continue; }}
+  grep -qx "completed: $m" "$JOBDIR/log" 2>/dev/null && continue
+  unresolved=1
+done
+if [ "$unresolved" -eq 0 ]; then
+  if [ "$failures" -gt 0 ]; then
+    echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
+  else
+    echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
+  fi
+  exit 0
+fi
+[ -f "$JOBDIR/STOP" ] && exit 0
+k=$(grep -c "^slurm_job_id: " "$JOBDIR/meta" 2>/dev/null)
+echo "queued slice $((k + 1)) $(date -Is)" > "$JOBDIR/state"
+SID=$(sbatch --parsable --nice=10000 "$JOBDIR/run.sh") || {{ echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+SID=${{SID%%;*}}
+case "$SID" in ''|*[!0-9]*) echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1 ;; esac
+printf 'slurm_job_id: %s\\n' "$SID" >> "$JOBDIR/meta"
+"""
+
+
 def _zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     flags = f" --ne {ne} --ne-brem {ne_brem} --ne-supp {ne_supp} --tmd-azimuth {tmd_azimuth}"
     if refresh:
@@ -558,6 +633,7 @@ def _slurm_batch_script(
     *,
     job_name: str,
     reservation_stems: list[str] | None = None,
+    time_limit: str = SLURM_TIME,
 ) -> str:
     """Wrap a CXR queue payload in the lab box's one-GPU SLURM profile."""
     reservation_stems = reservation_stems or []
@@ -574,7 +650,7 @@ def _slurm_batch_script(
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node={SLURM_GPUS}
 #SBATCH --gres=gpu:{SLURM_GPUS}
-#SBATCH --time={SLURM_TIME}
+#SBATCH --time={time_limit}
 #SBATCH --output={jobdir}/slurm-%j.out
 #SBATCH --error={jobdir}/slurm-%j.err
 
@@ -592,10 +668,10 @@ finish() {{
   status=$?
   current=$(cat "$JOBDIR/state" 2>/dev/null || true)
   case "$current" in
-    done*|FAILED*|cancelled*|cancelling*) ;;
-    *) echo "FAILED (exit $status) $(date -Is)" > "$JOBDIR/state" ;;
+    "queued slice"*) ;;
+    done*|FAILED*|cancelled*|cancelling*) release_reservations ;;
+    *) echo "FAILED (exit $status) $(date -Is)" > "$JOBDIR/state"; release_reservations ;;
   esac
-  release_reservations
 }}
 trap finish EXIT
 echo "running $(date -Is)" > "$JOBDIR/state"
@@ -610,15 +686,18 @@ echo "running $(date -Is)" > "$JOBDIR/state"
 {payload}"""
 
 
-def _submit_slurm_command(jobid: str, reservation_stems: list[str] | None = None) -> str:
+def _submit_slurm_command(
+    jobid: str, reservation_stems: list[str] | None = None, *, nice: bool = False
+) -> str:
     """Return the remote submission protocol for an already-written batch script."""
     reservation_stems = reservation_stems or []
     _check_shell_tokens([jobid, *reservation_stems])
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     release = _release_checkpoint_stems_command(jobid, reservation_stems)
+    sbatch = "sbatch --parsable --nice=10000" if nice else "sbatch --parsable"
     return f"""D='{jobdir}'; \
 echo "queued $(date -Is)" > "$D/state"; \
-SID=$(sbatch --parsable '{jobdir}/run.sh') || {{ \
+SID=$({sbatch} '{jobdir}/run.sh') || {{ \
   echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; {release}; exit 1; \
 }}; \
 SID=${{SID%%;*}}; \
@@ -635,7 +714,8 @@ def _queue_metadata(
     materials,
     quick,
     workers,
-    parallel_materials=DEFAULT_PARALLEL_MATERIALS,
+    parallel_materials: int | None = DEFAULT_PARALLEL_MATERIALS,
+    chunk_minutes: float = 0,
 ):
     """Static metadata persisted before a queue becomes visible to SLURM."""
     return "\n".join(
@@ -645,6 +725,7 @@ def _queue_metadata(
             f"quick: {bool(quick)}",
             f"workers: {workers}",
             f"parallel_materials: {parallel_materials}",
+            f"chunk_minutes: {chunk_minutes}",
             "progress_dashboard: True",
             "",
         ]
@@ -965,22 +1046,48 @@ def start_queue(
     workers=None,
     no_sync=False,
     dry_run=False,
-    parallel_materials=DEFAULT_PARALLEL_MATERIALS,
+    parallel_materials=None,
+    chunk_minutes=10.0,
 ):
-    """Submit a bounded-concurrency material queue to SLURM. Returns its job id."""
+    """Submit a material queue to SLURM. Returns its job id.
+
+    By default the queue is chunked: each ~chunk_minutes slice resumes from
+    checkpoint, does bounded work via ``scan.py --max-minutes``, and either
+    terminates the chain or resubmits itself with ``--nice=10000`` so other
+    users of the single-GPU box get priority at every slice boundary. Pass
+    ``chunk_minutes=0`` for the original monolithic allocation, which is the
+    only mode that accepts ``parallel_materials``.
+    """
     _check_materials(materials)
-    parallel_materials = _validate_parallel_materials(parallel_materials)
+    chunked = chunk_minutes > 0
+    if chunked and parallel_materials is not None:
+        raise SystemExit(
+            "--parallel-materials only applies to a monolithic allocation; "
+            "pass --chunk-minutes 0 to use it"
+        )
     if not dry_run:
         _refuse_if_busy(materials, quick)
     jobid = _new_jobid()
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     stems = _stems(materials, quick)
-    payload = _queue_script(jobid, materials, quick, workers, parallel_materials)
-    script = _slurm_batch_script(jobid, payload, job_name=f"cxr-{jobid}", reservation_stems=stems)
-    upload = _write_job_script_command(
-        jobdir, _queue_metadata(jobid, materials, quick, workers, parallel_materials)
+    if chunked:
+        parallel_materials = None
+        payload = _chunked_queue_script(jobid, materials, quick, workers, chunk_minutes)
+        time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
+    else:
+        parallel_materials = _validate_parallel_materials(
+            DEFAULT_PARALLEL_MATERIALS if parallel_materials is None else parallel_materials
+        )
+        payload = _queue_script(jobid, materials, quick, workers, parallel_materials)
+        time_limit = SLURM_TIME
+    script = _slurm_batch_script(
+        jobid, payload, job_name=f"cxr-{jobid}", reservation_stems=stems, time_limit=time_limit
     )
-    submit = _submit_slurm_command(jobid, stems)
+    upload = _write_job_script_command(
+        jobdir,
+        _queue_metadata(jobid, materials, quick, workers, parallel_materials, chunk_minutes),
+    )
+    submit = _submit_slurm_command(jobid, stems, nice=chunked)
 
     if dry_run:
         print(f"# job {jobid}: {' '.join(materials)}{' (quick)' if quick else ''}")
@@ -997,10 +1104,15 @@ def start_queue(
     _stage_job_script(jobid, stems, upload, script)
     scheduler_id = _submit_staged_job(jobid, stems)
 
+    detail = (
+        f"chunk minutes: {chunk_minutes} (self-resubmitting)"
+        if chunked
+        else f"parallel materials: {parallel_materials}"
+    )
     print(
         f"\nsubmitted SLURM job {scheduler_id} as local job {jobid} on {HOST}: {' '.join(materials)}"
         f"{' (quick)' if quick else ''}\n"
-        f"  parallel materials: {parallel_materials}\n"
+        f"  {detail}\n"
         f"  watch:  cxr remote status {jobid}\n"
         f"  logs:   cxr remote logs {jobid} --follow\n"
         f"  pull:   cxr remote pull {' '.join(stems)}   (when state is 'done')"
@@ -1414,7 +1526,8 @@ def _cli_scan(args):
         materials,
         quick=args.quick,
         workers=args.workers,
-        parallel_materials=getattr(args, "parallel_materials", DEFAULT_PARALLEL_MATERIALS),
+        parallel_materials=getattr(args, "parallel_materials", None),
+        chunk_minutes=getattr(args, "chunk_minutes", 10.0),
         no_sync=args.no_sync,
     )
     if not attach(jobid):
@@ -1459,6 +1572,7 @@ def _cli_start(args):
         quick=args.quick,
         workers=args.workers,
         parallel_materials=args.parallel_materials,
+        chunk_minutes=args.chunk_minutes,
         no_sync=args.no_sync,
         dry_run=args.dry_run,
     )
@@ -1542,9 +1656,17 @@ def _build_remote_parser(ap):
         "--parallel-materials",
         type=int,
         choices=range(1, MAX_PARALLEL_MATERIALS + 1),
-        default=DEFAULT_PARALLEL_MATERIALS,
+        default=None,
         metavar="N",
-        help="simultaneous material scans in one GPU allocation (default: 2; max: 4)",
+        help="simultaneous material scans in one GPU allocation; only with "
+        "--chunk-minutes 0 (default: 2; max: 4)",
+    )
+    s.add_argument(
+        "--chunk-minutes",
+        type=float,
+        default=10.0,
+        help="length of each self-resubmitting SLURM slice in minutes; "
+        "0 = one whole-box monolithic run (default: 10.0)",
     )
     s.add_argument("--no-sync", action="store_true", help="skip the code upload")
     s.add_argument(
@@ -1568,9 +1690,17 @@ def _build_remote_parser(ap):
         "--parallel-materials",
         type=int,
         choices=range(1, MAX_PARALLEL_MATERIALS + 1),
-        default=DEFAULT_PARALLEL_MATERIALS,
+        default=None,
         metavar="N",
-        help="simultaneous material scans in one GPU allocation (default: 2; max: 4)",
+        help="simultaneous material scans in one GPU allocation; only with "
+        "--chunk-minutes 0 (default: 2; max: 4)",
+    )
+    st.add_argument(
+        "--chunk-minutes",
+        type=float,
+        default=10.0,
+        help="length of each self-resubmitting SLURM slice in minutes; "
+        "0 = one whole-box monolithic run (default: 10.0)",
     )
     st.add_argument("--no-sync", action="store_true", help="skip the code upload")
     st.add_argument(

@@ -274,6 +274,95 @@ def test_remote_dry_run_describes_sbatch_submission(monkeypatch, capsys):
     assert "nohup" not in out and "setsid" not in out
 
 
+def test_chunked_dry_run_emits_chain_script(monkeypatch, capsys):
+    monkeypatch.setattr(
+        remote,
+        "_refuse_if_busy",
+        lambda *_args: pytest.fail("dry-run must not check busy"),
+    )
+    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("dry-run must not sync"))
+    monkeypatch.setattr(
+        remote.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
+    )
+    monkeypatch.setattr(
+        remote, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh")
+    )
+    monkeypatch.setattr(
+        remote, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
+    )
+
+    remote.start_queue(["hopg"], dry_run=True)  # chunked is the default
+
+    out = capsys.readouterr().out
+    assert "--max-minutes" in out
+    assert "sbatch --parsable --nice=10000" in out  # resubmit + slice 0
+    assert "queued slice" in out  # handoff state written BEFORE sbatch
+    assert "FAILED (slice resubmission)" in out  # fail-closed resubmit
+    assert '[ -f "$JOBDIR/STOP" ]' in out or '"$JOBDIR/STOP"' in out
+    assert "failed: $m" in out  # hard-failure marker, never retried
+    assert "#SBATCH --time=30" in out  # 3 x 10 min backstop
+    assert '"queued slice"*' in out  # trap handoff case
+    # handoff must not release reservations: the trap's release happens only in
+    # terminal branches -- assert the handoff case body is empty (';;' right after)
+    assert '"queued slice"*) ;;' in out
+
+
+def test_chunk_minutes_zero_emits_monolithic_script(monkeypatch, capsys):
+    monkeypatch.setattr(
+        remote,
+        "_refuse_if_busy",
+        lambda *_args: pytest.fail("dry-run must not check busy"),
+    )
+    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("dry-run must not sync"))
+    monkeypatch.setattr(
+        remote.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
+    )
+    monkeypatch.setattr(
+        remote, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh")
+    )
+    monkeypatch.setattr(
+        remote, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
+    )
+
+    remote.start_queue(["hopg"], dry_run=True, chunk_minutes=0)
+
+    out = capsys.readouterr().out
+    assert "#SBATCH --time=UNLIMITED" in out
+    assert "parallel_materials=2" in out
+    assert "--max-minutes" not in out
+
+
+def test_parallel_materials_rejected_in_chunked_mode(monkeypatch):
+    with pytest.raises(SystemExit, match="chunk-minutes 0"):
+        remote.start_queue(["hopg"], dry_run=True, parallel_materials=2)
+
+
+def test_cli_start_chunk_flags(monkeypatch, capsys):
+    monkeypatch.setattr(
+        remote,
+        "_refuse_if_busy",
+        lambda *_args: pytest.fail("dry-run must not check busy"),
+    )
+    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("dry-run must not sync"))
+    monkeypatch.setattr(
+        remote.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
+    )
+    monkeypatch.setattr(
+        remote, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh")
+    )
+    monkeypatch.setattr(
+        remote, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
+    )
+
+    remote.main(
+        ["start", "hopg", "--dry-run", "--chunk-minutes", "0", "--parallel-materials", "3"]
+    )  # legal: monolithic
+    with pytest.raises(SystemExit):
+        remote.main(
+            ["start", "hopg", "--dry-run", "--parallel-materials", "3"]
+        )  # illegal: chunked default
+
+
 def test_start_writes_static_metadata_before_sbatch(monkeypatch):
     uploads = []
     submissions = []
@@ -290,7 +379,9 @@ def test_start_writes_static_metadata_before_sbatch(monkeypatch):
         lambda command: submissions.append(["ssh", "-n", remote.HOST, command]) or "48291\n",
     )
 
-    remote.start_queue(["hopg"], quick=True, workers=3, parallel_materials=3, no_sync=True)
+    remote.start_queue(
+        ["hopg"], quick=True, workers=3, parallel_materials=3, chunk_minutes=0, no_sync=True
+    )
 
     upload_command = uploads[0][0][0][-1]
     assert "job: " in upload_command
@@ -1186,7 +1277,11 @@ def test_remote_start_all_uses_toml_manifest(monkeypatch, tmp_path):
     assert calls == [["hopg", "hbn"]]
 
 
-def test_remote_start_defaults_to_two_parallel_materials(monkeypatch):
+def test_remote_start_defers_parallel_materials_default_to_start_queue(monkeypatch):
+    """The CLI no longer bakes in a default: --parallel-materials is None
+    unless given explicitly, so start_queue (mode-aware) resolves it. The
+    monolithic default of 2 is exercised by
+    test_chunk_minutes_zero_emits_monolithic_script."""
     calls = []
     monkeypatch.setattr(
         remote,
@@ -1194,9 +1289,10 @@ def test_remote_start_defaults_to_two_parallel_materials(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
     )
 
-    remote.main(["start", "hopg", "--dry-run"])
+    remote.main(["start", "hopg", "--dry-run", "--chunk-minutes", "0"])
 
-    assert calls[0][1]["parallel_materials"] == 2
+    assert calls[0][1]["parallel_materials"] is None
+    assert calls[0][1]["chunk_minutes"] == 0.0
 
 
 def test_remote_start_accepts_parallel_materials_three_and_four(monkeypatch):
@@ -1207,8 +1303,12 @@ def test_remote_start_accepts_parallel_materials_three_and_four(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
     )
 
-    remote.main(["start", "hopg", "hbn", "--parallel-materials", "3", "--dry-run"])
-    remote.main(["start", "hopg", "hbn", "--parallel-materials", "4", "--dry-run"])
+    remote.main(
+        ["start", "hopg", "hbn", "--parallel-materials", "3", "--chunk-minutes", "0", "--dry-run"]
+    )
+    remote.main(
+        ["start", "hopg", "hbn", "--parallel-materials", "4", "--chunk-minutes", "0", "--dry-run"]
+    )
 
     assert [kwargs["parallel_materials"] for _materials, kwargs in calls] == [3, 4]
 
@@ -1224,7 +1324,7 @@ def test_remote_start_rejects_parallel_materials_above_four(monkeypatch):
 
 def test_start_queue_rejects_parallel_materials_above_four():
     with pytest.raises(SystemExit, match="between 1 and 4"):
-        remote.start_queue(["hopg"], parallel_materials=5, dry_run=True)
+        remote.start_queue(["hopg"], parallel_materials=5, chunk_minutes=0, dry_run=True)
 
 
 def test_remote_scan_forwards_parallel_materials(monkeypatch):
@@ -1236,7 +1336,7 @@ def test_remote_scan_forwards_parallel_materials(monkeypatch):
     )
     monkeypatch.setattr(remote, "attach", lambda _jobid: False)
 
-    remote.main(["scan", "hopg", "--parallel-materials", "3", "--no-sync"])
+    remote.main(["scan", "hopg", "--parallel-materials", "3", "--chunk-minutes", "0", "--no-sync"])
 
     assert calls[0][1]["parallel_materials"] == 3
 
