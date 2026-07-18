@@ -370,3 +370,124 @@ def test_run_cases_should_stop_none_runs_everything(monkeypatch):
     cases = [{"name": f"c{i}"} for i in range(3)]
     results = runner.run_cases(cases, max_workers=0, progress=False, should_stop=None)
     assert all(r is not None for r in results)
+
+
+# ---- engine= regime-split dispatch (2026-07-18 design) ----------------------
+# CI has no GPU (_GPU is False), so the dispatch tests below monkeypatch
+# runner._GPU to exercise all four branch combinations, and stand in a
+# same-process "pool" (real, already-finished concurrent.futures.Future
+# objects, so as_completed's normal machinery still works) for
+# ProcessPoolExecutor so no real subprocess/CUDA context is ever requested.
+# Only test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum spins up a
+# real (1-worker) pool, to prove the NumPy spectrum path actually works when
+# a worker is forced onto it (design doc Sec. 2 verification item).
+
+
+class _SyncProcessPoolExecutor:
+    """Stand-in for ProcessPoolExecutor that runs every submission synchronously
+    in THIS process and returns a real (already-finished) Future, so the CPU-
+    pool branch's as_completed(...) drain works unmodified. Records its
+    constructor args on the class so a test can assert which initializer/
+    initargs run_cases chose without touching a real worker process."""
+
+    captured: dict = {}
+
+    def __init__(self, max_workers=None, initializer=None, initargs=()):
+        type(self).captured = dict(
+            max_workers=max_workers, initializer=initializer, initargs=initargs
+        )
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+    def submit(self, fn, *args):
+        from concurrent.futures import Future
+
+        fut = Future()
+        fut.set_result(fn(*args))
+        return fut
+
+
+def test_run_cases_invalid_engine_raises():
+    from cxr_mc.montecarlo import runner
+
+    with pytest.raises(ValueError, match="engine"):
+        runner.run_cases([{"name": "c0"}], engine="bogus")
+
+
+def test_run_cases_engine_auto_uses_cpu_pool_when_no_gpu(monkeypatch):
+    from cxr_mc.montecarlo import runner
+
+    monkeypatch.setattr(runner, "_GPU", False)
+    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
+
+    cases = [{"name": f"c{i}"} for i in range(3)]
+    results = runner.run_cases(cases, max_workers=2, progress=False, engine="auto")
+
+    assert [r["name"] for r in results] == ["c0", "c1", "c2"]
+    assert _SyncProcessPoolExecutor.captured["initializer"] is runner._worker_init
+    assert _SyncProcessPoolExecutor.captured["initargs"] == (False,)
+
+
+def test_run_cases_engine_cpu_forces_cpu_pool_when_gpu_present(monkeypatch):
+    from cxr_mc.montecarlo import runner
+
+    # _GPU True simulates a GPU box; engine="cpu" must still take the
+    # full-case CPU pool (not the GPU-pipeline branch, which submits
+    # _transport_case/_spectrum_case instead and would blow up on these
+    # name-only stub cases).
+    monkeypatch.setattr(runner, "_GPU", True)
+    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
+
+    cases = [{"name": f"c{i}"} for i in range(3)]
+    results = runner.run_cases(cases, max_workers=2, progress=False, engine="cpu")
+
+    assert [r["name"] for r in results] == ["c0", "c1", "c2"]
+    assert _SyncProcessPoolExecutor.captured["initializer"] is runner._worker_init
+    assert _SyncProcessPoolExecutor.captured["initargs"] == (True,)
+
+
+def test_run_cases_engine_gpu_falls_back_to_cpu_pool_with_warning(monkeypatch):
+    from cxr_mc.montecarlo import runner
+
+    monkeypatch.setattr(runner, "_GPU", False)
+    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
+
+    cases = [{"name": f"c{i}"} for i in range(3)]
+    with pytest.warns(UserWarning, match="engine='gpu'"):
+        results = runner.run_cases(cases, max_workers=2, progress=False, engine="gpu")
+
+    assert [r["name"] for r in results] == ["c0", "c1", "c2"]
+    assert _SyncProcessPoolExecutor.captured["initargs"] == (False,)  # engine != "cpu"
+
+
+def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
+    """A real (1-worker) engine="cpu" run: proves _worker_init(force_cpu=True)
+    doesn't break the worker, and that mc_spectrum/mc_brem_spectrum's xp/REAL
+    (rebound by force_cpu) still produce a finite spectrum -- the design doc's
+    Sec. 2 verification item, covered end-to-end rather than assumed."""
+    from cxr_mc.montecarlo import runner
+    from cxr_mc.sweep import Sweep, build_cases
+
+    sweep = Sweep(
+        material="hopg",
+        thickness_ang=1e4,
+        energy_keV=30,
+        tilt_deg=30.0,
+        E_grid_line=np.arange(50.0, 300.0, 5.0),
+        E_grid_brem=np.arange(0.0, 1000.0, 100.0),
+    )
+    cases = build_cases(sweep, n_electrons=40, n_electrons_brem=20)
+    results = runner.run_cases(cases, max_workers=1, progress=False, engine="cpu")
+
+    assert len(results) == 1
+    out = results[0]
+    assert out["spec"].size > 0
+    assert np.all(np.isfinite(out["spec"]))
+    assert np.all(np.isfinite(out["brem"]))

@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import tempfile
 from dataclasses import dataclass
 
 import numpy as np
@@ -41,10 +43,27 @@ COVERAGE = 0.99
 MARGIN = 0.15
 ROUND_TO_EV = 100.0
 TARGET_SPACING_EV = 3.0
-WIDE_GRID_EV = np.arange(10.0, 10000.0, 5.0)
+# Diagnostic histogram grid for measuring coverage. Its CEILING must sit well
+# above the widest true 99% coverage energy at any beam energy, or coverage_energy
+# silently truncates and reports a bound pinned near the ceiling (the failure the
+# 2026-07-16 full scan hit at 150-300 keV). Overridable via --grid-stop/--grid-step;
+# the spacing only needs to resolve the cumulative envelope, not each narrow line,
+# since the final catalog `stop` is rounded to 100 eV regardless.
+WIDE_GRID_START_EV = 10.0
+WIDE_GRID_STOP_EV = 10000.0
+WIDE_GRID_STEP_EV = 5.0
+WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, WIDE_GRID_STOP_EV, WIDE_GRID_STEP_EV)
 COARSE_NE = 500
 REFINE_NE = 5000
 TOP_K = 5
+# Coarse (near-zero scan + spot-check) is structurally CPU-bound at ne=500 (a
+# few % GPU utilisation -- see docs/superpowers/plans/2026-07-18-line-grid-gpu-
+# throughput-findings.md), so it defaults to the full-case CPU pool
+# (engine="cpu") rather than the GPU-pipeline branch a GPU box would otherwise
+# pick via engine="auto". Refine (the reported max-E_line_grid driver) always
+# passes engine="auto" -- unchanged, still GPU on a GPU box. See
+# docs/superpowers/specs/2026-07-18-regime-split-scheduling-design.md.
+COARSE_ENGINE = "cpu"
 SPOT_CHECK_TILT_INDICES = (4, 9)  # the standard grid's ~40deg and 89deg points
 
 
@@ -88,27 +107,32 @@ def _candidate_from_result(material, tilt_deg, tilt_azim_deg, result):
     )
 
 
-def _run_specs(specs, energy_keV, n_electrons, max_workers):
+def _run_specs(specs, energy_keV, n_electrons, max_workers, engine):
     """Build and run every (material, tilt_deg, tilt_azim_deg) geometry in
     ``specs`` as one run_cases batch, so the CPU worker pool stays saturated
     across the whole batch. run_cases returns results in the same order as
-    ``specs`` (index-aligned, per its docstring), so zipping is safe."""
+    ``specs`` (index-aligned, per its docstring), so zipping is safe.
+
+    ``engine`` is threaded straight through to run_cases (see
+    docs/superpowers/specs/2026-07-18-regime-split-scheduling-design.md):
+    the CPU-bound coarse regime can force the full-case CPU pool even on a
+    GPU box, while the refine regime keeps "auto" (GPU pipeline, unchanged)."""
     cases = [
         _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons)
         for material, tilt_deg, tilt_azim_deg in specs
     ]
-    results = run_cases(cases, max_workers=max_workers)
+    results = run_cases(cases, max_workers=max_workers, engine=engine)
     return [
         _candidate_from_result(material, tilt_deg, tilt_azim_deg, result)
         for (material, tilt_deg, tilt_azim_deg), result in zip(specs, results, strict=True)
     ]
 
 
-def _scan(materials, energy_keV, tilts, azimuths, n_electrons, max_workers):
+def _scan(materials, energy_keV, tilts, azimuths, n_electrons, max_workers, engine):
     specs = [
         (material, tilt, azim) for material in materials for tilt in tilts for azim in azimuths
     ]
-    return _run_specs(specs, energy_keV, n_electrons, max_workers)
+    return _run_specs(specs, energy_keV, n_electrons, max_workers, engine)
 
 
 def _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero_candidates):
@@ -138,6 +162,24 @@ def _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero_candidates)
             )
 
 
+def _atomic_write_json(path, rows):
+    """Write ``rows`` to ``path`` atomically (temp file in the same dir + rename)
+    so a killed slice never leaves a half-written checkpoint that a resume would
+    choke on."""
+    directory = os.path.dirname(os.path.abspath(path)) or "."
+    fd, tmp = tempfile.mkstemp(dir=directory, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(rows, f, indent=2)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def derive_bounds(
     materials,
     energies,
@@ -145,18 +187,36 @@ def derive_bounds(
     coarse_ne=COARSE_NE,
     refine_ne=REFINE_NE,
     max_workers=None,
+    existing_rows=None,
+    on_progress=None,
+    coarse_engine=COARSE_ENGINE,
 ):
     reference_scan = CATALOG.material(materials[0]).scan
     near_zero_tilts = [float(reference_scan.tilt_deg[i]) for i in (0, 1)]
     spot_check_tilts = [float(reference_scan.tilt_deg[i]) for i in SPOT_CHECK_TILT_INDICES]
     azimuths = [float(a) for a in reference_scan.tilt_azim_deg]
 
+    existing = {float(r["energy_keV"]): r for r in (existing_rows or [])}
     rows = []
     for energy_keV in energies:
-        near_zero = _scan(materials, energy_keV, near_zero_tilts, azimuths, coarse_ne, max_workers)
+        if float(energy_keV) in existing:
+            print(
+                f"[analyze_line_grid_bounds] energy {energy_keV:g} keV already in checkpoint; skipping"
+            )
+            rows.append(existing[float(energy_keV)])
+            continue
+        near_zero = _scan(
+            materials, energy_keV, near_zero_tilts, azimuths, coarse_ne, max_workers, coarse_engine
+        )
         _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero)
         spot_check = _scan(
-            materials, energy_keV, spot_check_tilts, azimuths, coarse_ne, max_workers
+            materials,
+            energy_keV,
+            spot_check_tilts,
+            azimuths,
+            coarse_ne,
+            max_workers,
+            coarse_engine,
         )
 
         top = sorted(near_zero, key=lambda c: c.coverage_energy_eV, reverse=True)[:top_k]
@@ -169,6 +229,7 @@ def derive_bounds(
             energy_keV,
             refine_ne,
             max_workers,
+            "auto",
         )
         driver = max(refined, key=lambda c: c.coverage_energy_eV)
 
@@ -188,6 +249,8 @@ def derive_bounds(
                 spot_check_flagged=flagged,
             )
         )
+        if on_progress is not None:
+            on_progress(rows)
     return rows
 
 
@@ -228,24 +291,67 @@ def build_parser():
         default=None,
         help="worker processes for each run_cases batch (default: auto-sized, ~3/4 of CPUs)",
     )
+    parser.add_argument(
+        "--coarse-engine",
+        choices=("cpu", "auto"),
+        default=COARSE_ENGINE,
+        help="run_cases engine for the coarse near-zero/spot-check scans (the CPU-bound "
+        "regime); the refine scan always passes engine='auto' (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--grid-stop",
+        type=float,
+        default=WIDE_GRID_STOP_EV,
+        help="ceiling (eV) of the diagnostic coverage grid; must clear the widest true "
+        "99%% coverage energy at any beam energy (default: %(default)g)",
+    )
+    parser.add_argument(
+        "--grid-step",
+        type=float,
+        default=WIDE_GRID_STEP_EV,
+        help="spacing (eV) of the diagnostic coverage grid (default: %(default)g)",
+    )
     parser.add_argument("--json-out", default=None, help="optional path to write rows as JSON")
     return parser
 
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    global WIDE_GRID_EV
+    WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, args.grid_stop, args.grid_step)
     materials = args.materials.split(",") if args.materials else list(CATALOG.materials)
     if args.energies:
         energies = [float(e) for e in args.energies.split(",")]
     else:
         energies = [float(e) for e in CATALOG.material(materials[0]).scan.energy_keV]
+    existing_rows = []
+    if args.json_out and os.path.exists(args.json_out):
+        with open(args.json_out) as f:
+            existing_rows = json.load(f)
+        done = sorted({float(r["energy_keV"]) for r in existing_rows})
+        print(
+            f"[analyze_line_grid_bounds] resuming from {args.json_out}; "
+            f"{len(done)} energ(ies) already done: {done}"
+        )
+
+    def _save(rows):
+        if args.json_out:
+            _atomic_write_json(args.json_out, rows)
+
     rows = derive_bounds(
-        materials, energies, args.top_k, args.coarse_ne, args.refine_ne, args.max_workers
+        materials,
+        energies,
+        args.top_k,
+        args.coarse_ne,
+        args.refine_ne,
+        args.max_workers,
+        existing_rows=existing_rows,
+        on_progress=_save,
+        coarse_engine=args.coarse_engine,
     )
     _print_report(rows)
     if args.json_out:
-        with open(args.json_out, "w") as f:
-            json.dump(rows, f, indent=2)
+        _atomic_write_json(args.json_out, rows)
         print(f"[analyze_line_grid_bounds] wrote {args.json_out}")
     return 0
 

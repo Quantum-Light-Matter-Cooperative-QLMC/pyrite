@@ -10,12 +10,14 @@ workers.
 
 import os
 import sys
+import warnings
 from time import perf_counter
 from typing import Any
 
 import numpy as np
 
 from .._energy_grid import decode_energy_grid
+from . import spectrum as _spectrum_mod
 from ._backend import _GPU, cp
 from .geometry import tilted_geometry
 from .spectrum import _segments_in_layer, mc_brem_spectrum, mc_spectrum
@@ -469,12 +471,26 @@ def _spectrum_case(case, tp):
     return out
 
 
-def _worker_init():
+def _worker_init(force_cpu=False):
     """
     Runs once in each worker process: drop to BELOW_NORMAL priority so the
     desktop stays responsive. Workers still use idle CPU at full speed; the
     OS just schedules interactive applications first.
+
+    force_cpu: when True (the engine="cpu" full-case pool), rebind THIS
+    worker process's copy of runner._GPU and spectrum.xp/REAL to their CPU
+    equivalents, so _spectrum_case (via mc_spectrum/mc_brem_spectrum) takes
+    the NumPy path even when cupy is importable and a real GPU is present on
+    the box -- the per-worker CUDA context the single-context GPU-pipeline
+    design exists to avoid. A no-op fork/spawn-local mutation: it never
+    touches the driver process's globals. Harmless when _GPU is already
+    False.
     """
+    if force_cpu:
+        global _GPU
+        _GPU = False
+        _spectrum_mod.xp = np
+        _spectrum_mod.REAL = np.float64
     try:
         import ctypes
 
@@ -492,7 +508,9 @@ def _worker_init():
             pass
 
 
-def run_cases(cases, max_workers=None, progress=True, callback=None, should_stop=None):
+def run_cases(
+    cases, max_workers=None, progress=True, callback=None, should_stop=None, engine="auto"
+):
     """
     Run a list of case dicts through run_case, results in input order.
 
@@ -505,6 +523,18 @@ def run_cases(cases, max_workers=None, progress=True, callback=None, should_stop
 
     No GPU: cases run through a worker pool (or serially), completion order.
 
+    engine: which branch to run, independent of the hardware probe.
+        "auto" (default) -> today's behaviour exactly: the GPU pipeline above
+            if a GPU is present, else the CPU pool below. Bit-for-bit
+            unchanged for every existing caller.
+        "gpu"  -> force the GPU pipeline. If no GPU is present, warns and
+            falls back to the CPU pool.
+        "cpu"  -> force the full-case CPU pool below even when a GPU is
+            present (e.g. a CPU-bound workload that would otherwise be
+            starved onto the GPU pipeline's half-core transport pool). Each
+            worker is forced onto the NumPy spectrum path (see
+            _worker_init's force_cpu), so no worker opens a CUDA context.
+        Anything else raises ValueError.
     max_workers: None -> sized automatically (a few transport workers when a GPU
         is present; ~3/4 of the CPUs otherwise). An integer pins the count; 0
         runs everything serially in this process (debugging / safe fallback).
@@ -521,6 +551,15 @@ def run_cases(cases, max_workers=None, progress=True, callback=None, should_stop
     single-threaded BLAS (OMP/OPENBLAS/MKL_NUM_THREADS=1, inherited) -- N workers
     x M BLAS threads is the classic oversubscription freeze.
     """
+    if engine not in ("auto", "gpu", "cpu"):
+        raise ValueError(f"engine must be one of 'auto', 'gpu', 'cpu'; got {engine!r}")
+    use_gpu = _GPU if engine == "auto" else engine == "gpu"
+    if engine == "gpu" and not _GPU:
+        warnings.warn(
+            "run_cases(engine='gpu') requested but no GPU is present; falling back to the CPU pool",
+            stacklevel=2,
+        )
+        use_gpu = False
 
     def _maybe_bar(iterable):
         if not progress:
@@ -571,7 +610,7 @@ def run_cases(cases, max_workers=None, progress=True, callback=None, should_stop
             os.environ[var] = "1"
 
     # ---- GPU: pipeline CPU transport (worker pool) behind the serial GPU ------
-    if _GPU:
+    if use_gpu:
         if max_workers == 0:
             return _serial()
         if max_workers is None:
@@ -619,7 +658,9 @@ def run_cases(cases, max_workers=None, progress=True, callback=None, should_stop
     _single_thread_blas()
     from concurrent.futures import ProcessPoolExecutor, as_completed
 
-    with ProcessPoolExecutor(max_workers=max_workers, initializer=_worker_init) as ex:
+    with ProcessPoolExecutor(
+        max_workers=max_workers, initializer=_worker_init, initargs=(engine == "cpu",)
+    ) as ex:
         futures = {ex.submit(run_case, c): i for i, c in enumerate(cases)}
         stopped = False
         for fut in _maybe_bar(as_completed(futures)):
