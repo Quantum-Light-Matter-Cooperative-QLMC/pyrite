@@ -1069,6 +1069,199 @@ def test_parallel_queue_script_enforces_process_limit(monkeypatch, tmp_path, par
     assert peak == parallel_materials
 
 
+def test_chunked_script_hands_off_state_before_resubmitting(monkeypatch, tmp_path):
+    """Chain state machine (design spec Component 2 step 4, state-first handoff
+    ordering): the chain must write 'queued slice N+1' to state BEFORE calling
+    sbatch, so a crash between the two still leaves a non-terminal state for the
+    EXIT trap (a FAILED stamp there would race a next slice that really is
+    pending). Runs the generated chunk payload under bash with a fake sbatch
+    that snapshots state at the instant it is invoked."""
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.mkdir(parents=True)
+    (jobdir / "meta").write_text("slurm_job_id: 100\n")
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = sync ]; then exit 0; fi\n'
+        'case "$*" in\n'
+        "  *hopg*) exit 75 ;;\n"  # stays unresolved: budget hit, not a failure
+        "  *hbn*) exit 0 ;;\n"
+        "esac\n"
+        "exit 9\n"  # unexpected material: fail loudly rather than silently pass
+    )
+    fake_uv.chmod(0o755)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    witness = tmp_path / "witness"
+    state_path = (jobdir / "state").as_posix()
+    fake_sbatch = bin_dir / "sbatch"
+    fake_sbatch.write_text(
+        "#!/bin/sh\n"
+        f'printf \'argv: %s\\nstate: \' "$*" > "{witness.as_posix()}"\n'
+        f'cat "{state_path}" >> "{witness.as_posix()}"\n'
+        "echo 4242\n"
+    )
+    fake_sbatch.chmod(0o755)
+    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    script = remote._chunked_queue_script(
+        "j", ["hopg", "hbn"], quick=False, workers=None, chunk_minutes=10.0
+    )
+
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    result = subprocess.run([bash, "-c", script], capture_output=True, text=True, env=env)
+
+    assert result.returncode == 0, result.stderr
+    assert (jobdir / "state").read_text().startswith("queued slice 2")
+    witness_text = witness.read_text()
+    assert "--parsable" in witness_text
+    assert "--nice=10000" in witness_text
+    assert "state: queued slice 2" in witness_text  # sbatch saw the handoff state first
+    assert (jobdir / "meta").read_text().rstrip("\n").endswith("slurm_job_id: 4242")
+
+
+def test_chunked_script_skips_failed_materials_and_terminates_without_resubmitting(
+    monkeypatch, tmp_path
+):
+    """Persistent-failure regression (design spec Testing / 'Chain state
+    machine'): a material already carrying a 'failed:' marker in the log (left
+    by an earlier slice) must be skipped, not retried, and once every material
+    is completed-or-failed the chain must reach a terminal state and NEVER call
+    sbatch again -- otherwise a permanently-crashing material resubmits an
+    endless chain of short SLURM jobs."""
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.mkdir(parents=True)
+    (jobdir / "log").write_text("failed: hopg\n")
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = sync ]; then exit 0; fi\n'
+        'case "$*" in\n'
+        "  *hbn*) exit 0 ;;\n"
+        "esac\n"
+        "exit 9\n"  # hopg must never be re-scanned once it is marked failed
+    )
+    fake_uv.chmod(0o755)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    marker = tmp_path / "sbatch_called"
+    fake_sbatch = bin_dir / "sbatch"
+    fake_sbatch.write_text(f"#!/bin/sh\ntouch '{marker.as_posix()}'\necho 4242\n")
+    fake_sbatch.chmod(0o755)
+    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    script = remote._chunked_queue_script(
+        "j", ["hopg", "hbn"], quick=False, workers=None, chunk_minutes=10.0
+    )
+
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    result = subprocess.run([bash, "-c", script], capture_output=True, text=True, env=env)
+
+    assert result.returncode == 0, result.stderr
+    assert (jobdir / "state").read_text().startswith("done with 1 warning(s)")
+    assert not marker.exists(), "a fully-resolved chain must not resubmit"
+    log = (jobdir / "log").read_text()
+    assert log.count("failed: hopg") == 1
+    assert "completed: hbn" in log
+
+
+@pytest.mark.parametrize(
+    "sbatch_body",
+    ["#!/bin/sh\nexit 1\n", "#!/bin/sh\necho not-a-sid\n"],
+    ids=["sbatch-fails", "sbatch-returns-garbage"],
+)
+def test_chunked_script_fails_closed_when_resubmission_fails(monkeypatch, tmp_path, sbatch_body):
+    """Fail-closed regression (design spec Component 2 step 4): if sbatch
+    itself fails, or 'succeeds' but prints something that isn't a numeric SID,
+    the chain must not limp along with a dangling 'queued slice' state -- it
+    must stamp FAILED (slice resubmission) and exit nonzero so the EXIT trap
+    releases reservations and attach can terminate instead of polling forever."""
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.mkdir(parents=True)
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = sync ]; then exit 0; fi\n'
+        "exit 75\n"  # budget hit every slice: hopg stays unresolved
+    )
+    fake_uv.chmod(0o755)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    (bin_dir / "sbatch").write_text(sbatch_body)
+    (bin_dir / "sbatch").chmod(0o755)
+    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    script = remote._chunked_queue_script(
+        "j", ["hopg"], quick=False, workers=None, chunk_minutes=10.0
+    )
+
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    result = subprocess.run([bash, "-c", script], capture_output=True, text=True, env=env)
+
+    assert result.returncode != 0
+    assert (jobdir / "state").read_text().startswith("FAILED (slice resubmission)")
+
+
+def test_chunked_script_honors_stop_sentinel_without_resubmitting(monkeypatch, tmp_path):
+    """Stop-must-not-zombie-the-chain regression (design spec 3b): once
+    _stop_jobid drops a STOP sentinel into the jobdir, the running slice's
+    handoff step must see it and cancel instead of resubmitting the next
+    slice."""
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.mkdir(parents=True)
+    (jobdir / "STOP").write_text("")
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text('#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\nexit 75\n')
+    fake_uv.chmod(0o755)
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    marker = tmp_path / "sbatch_called"
+    (bin_dir / "sbatch").write_text(f"#!/bin/sh\ntouch '{marker.as_posix()}'\necho 4242\n")
+    (bin_dir / "sbatch").chmod(0o755)
+    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    script = remote._chunked_queue_script(
+        "j", ["hopg"], quick=False, workers=None, chunk_minutes=10.0
+    )
+
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"}
+    result = subprocess.run([bash, "-c", script], capture_output=True, text=True, env=env)
+
+    assert result.returncode == 0, result.stderr
+    assert (jobdir / "state").read_text().startswith("cancelled (stop requested)")
+    assert not marker.exists(), "STOP must prevent resubmission"
+
+
+def test_chunked_script_marks_hard_failure_and_never_retries(monkeypatch, tmp_path):
+    """Hard-failure marker regression (design spec Component 2 step 2): a
+    material whose scan exits with a code other than 0 or 75 is a real crash,
+    not a budget timeout -- the chain must log it as 'failed:' (so later slices
+    skip it) instead of resubmitting the same doomed material forever."""
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.mkdir(parents=True)
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text('#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\nexit 7\n')
+    fake_uv.chmod(0o755)
+    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    script = remote._chunked_queue_script(
+        "j", ["hopg"], quick=False, workers=None, chunk_minutes=10.0
+    )
+
+    result = subprocess.run([bash, "-c", script], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    log = (jobdir / "log").read_text()
+    assert "WARNING: scan failed for hopg (exit 7); will not retry" in log
+    assert "failed: hopg" in log
+    assert (jobdir / "state").read_text().startswith("done with 1 warning(s)")
+
+
 def test_clear_fails_closed_when_squeue_cannot_be_queried(monkeypatch, tmp_path):
     """A scheduler outage cannot be mistaken for an absent job before deletion."""
     bash = _bash_or_skip(tmp_path)
