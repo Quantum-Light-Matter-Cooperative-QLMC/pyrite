@@ -726,9 +726,7 @@ def test_attach_dashboard_allocates_every_material_row_without_dynamic_width(mon
             pass
 
     monkeypatch.setattr(remote, "tqdm", lambda **kwargs: created.append(kwargs) or Bar())
-    monkeypatch.setattr(remote, "_read_progress_records", lambda _jobid: {})
-    monkeypatch.setattr(remote, "_slurm_state", lambda _scheduler_id: None)
-    monkeypatch.setattr(remote, "_job_state", lambda _jobid: "done")
+    monkeypatch.setattr(remote, "_poll_chain", lambda _jobid: ("done [3/3] now", False, {}))
 
     remote._attach_progress_dashboard("j", "materials: a b c\nslurm_job_id: 1\n")
 
@@ -761,13 +759,15 @@ def test_dashboard_attach_closes_bars_and_prints_final_state(monkeypatch, capsys
         ]
     )
     bars = []
-    scheduler_states = iter(["RUNNING", None])
-    monkeypatch.setattr(remote, "_job_metadata", lambda _jobid: metadata)
-    monkeypatch.setattr(
-        remote, "_read_progress_records", lambda _jobid: remote._parse_progress_records(payload)
+    records = remote._parse_progress_records(payload)
+    polls = iter(
+        [
+            ("running hbn [2/2] since now", True, records),
+            ("done with 1 warning(s) [2/2] now", False, records),
+        ]
     )
-    monkeypatch.setattr(remote, "_slurm_state", lambda _sid: next(scheduler_states))
-    monkeypatch.setattr(remote, "_job_state", lambda _jobid: "done with 1 warning(s)")
+    monkeypatch.setattr(remote, "_job_metadata", lambda _jobid: metadata)
+    monkeypatch.setattr(remote, "_poll_chain", lambda _jobid: next(polls))
     monkeypatch.setattr(remote.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(
         remote,
@@ -793,7 +793,7 @@ def test_dashboard_attach_ctrl_c_disconnects_viewer_only(monkeypatch):
     )
     monkeypatch.setattr(
         remote,
-        "_read_progress_records",
+        "_poll_chain",
         lambda _jobid: (_ for _ in ()).throw(KeyboardInterrupt),
     )
     monkeypatch.setattr(
@@ -1720,4 +1720,65 @@ def test_check_cli_rejects_pull_with_detached(monkeypatch, capsys, args):
 
 def test_sync_paths_ship_checks_and_zhai_shim():
     assert "checks" in remote.SYNC_PATHS
+
+
+def _poll_payload(state, sid="123", squeue="RUNNING", progress=""):
+    return f"@@STATE\n{state}\n@@SID\n{sid}\n@@SQUEUE\n{squeue}\n@@PROGRESS\n{progress}\n"
+
+
+def test_poll_chain_parses_sections(monkeypatch):
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda cmd: _poll_payload(
+            "running hopg [1/1] since now",
+            progress='{"material":"hopg","total_cases":4,"cached_cases":1,'
+            '"completed_new_cases":2,"state":"running"}',
+        ),
+    )
+    state, live, records = remote._poll_chain("20260717-abc")
+    assert state.startswith("running")
+    assert live is True
+    assert records["hopg"]["completed_new_cases"] == 2
+
+
+def test_attach_dashboard_survives_slice_gap_and_ends_terminal(monkeypatch):
+    responses = iter(
+        [
+            _poll_payload("running hopg [1/1] since now"),
+            _poll_payload("queued slice 2 now", squeue=""),  # inter-slice gap: not live
+            _poll_payload("running hopg [1/1] since now"),  # next slice picked up
+            _poll_payload("done [1/1] now", squeue=""),
+        ]
+    )
+    monkeypatch.setattr(remote, "_ssh_capture", lambda cmd: next(responses))
+    monkeypatch.setattr(remote.time, "sleep", lambda s: None)
+    ok = remote._attach_progress_dashboard(
+        "20260717-abc", "job: 20260717-abc\nmaterials: hopg\nslurm_job_id: 123\n"
+    )
+    assert ok is True
+
+
+def test_attach_dashboard_watchdog_exits_on_broken_chain(monkeypatch, capsys):
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda cmd: _poll_payload("queued slice 2 now", squeue=""),
+    )
+    monkeypatch.setattr(remote.time, "sleep", lambda s: None)
+    ok = remote._attach_progress_dashboard(
+        "20260717-abc", "job: 20260717-abc\nmaterials: hopg\nslurm_job_id: 123\n"
+    )
+    assert ok is False
+    assert "chain appears broken" in capsys.readouterr().out
+
+
+def test_stop_writes_stop_sentinel_before_scancel(monkeypatch):
+    commands = []
+    monkeypatch.setattr(remote, "_slurm_job_id", lambda jobid: "123")
+    monkeypatch.setattr(remote, "_slurm_state", lambda sid: "RUNNING")
+    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: commands.append(cmd[-1]))
+    remote._stop_jobid("20260717-abc")
+    (cmd,) = commands
+    assert cmd.index("STOP") < cmd.index("scancel")
     assert "reproduce_zhai.py" in remote.SYNC_PATHS

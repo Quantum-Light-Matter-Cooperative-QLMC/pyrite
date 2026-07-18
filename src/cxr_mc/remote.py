@@ -1293,17 +1293,6 @@ def _parse_progress_records(payload):
     return records
 
 
-def _read_progress_records(jobid):
-    """Read every complete per-material record in a job directory."""
-    _check_shell_tokens([jobid])
-    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
-    payload = _ssh_capture(
-        f'D="{jobdir}"; for f in "$D"/progress/*.json; do '
-        '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done'
-    )
-    return _parse_progress_records(payload)
-
-
 def _update_progress_bars(bars, records):
     """Apply the latest independent material snapshots to local tqdm bars."""
     for material, bar in bars.items():
@@ -1321,6 +1310,54 @@ def _update_progress_bars(bars, records):
         bar.refresh()
 
 
+# How many consecutive not-live polls the attach viewers tolerate before the
+# chain is declared broken: ~30 s at the 2 s poll, covering normal inter-slice
+# SLURM latency (a slice exits, the queued next slice has not started yet)
+# without masking a chain whose resubmission actually failed.
+_POLL_GRACE_POLLS = 15
+
+
+def _is_terminal_state(state):
+    """Chain-terminal persisted states (spec 3c): done / FAILED / cancelled."""
+    return state.startswith(("done", "FAILED", "cancelled"))
+
+
+def _poll_chain(jobid):
+    """State + latest-SID squeue liveness + progress records in ONE round-trip.
+
+    A chunked chain hops SLURM IDs at every slice boundary, so a viewer must
+    re-read the latest recorded ID each poll; batching the persisted state,
+    the squeue liveness of that ID, and the progress snapshots into one ssh
+    command keeps the 2 s poll loop at a single round-trip. Returns
+    ``(state, slurm_live, records)``.
+    """
+    _check_shell_tokens([jobid])
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    remote_cmd = (
+        f'D="{jobdir}"; '
+        'echo "@@STATE"; cat "$D/state" 2>/dev/null; '
+        'echo "@@SID"; SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
+        'printf "%s\\n" "$SID"; '
+        'echo "@@SQUEUE"; case "$SID" in \'\'|*[!0-9]*) ;; *) '
+        + _squeue_state_command("$SID", retired="STATE=")
+        + 'printf "%s\\n" "$STATE" ;; esac; '
+        'echo "@@PROGRESS"; for f in "$D"/progress/*.json; do '
+        '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done'
+    )
+    out = _ssh_capture(remote_cmd)
+    sections = {"STATE": [], "SID": [], "SQUEUE": [], "PROGRESS": []}
+    current = None
+    for line in out.splitlines():
+        if line.startswith("@@"):
+            current = line[2:]
+        elif current in sections:
+            sections[current].append(line)
+    state = sections["STATE"][0].strip() if sections["STATE"] else ""
+    live = any(line.strip() for line in sections["SQUEUE"])
+    records = _parse_progress_records("\n".join(sections["PROGRESS"]))
+    return state, live, records
+
+
 def _attach_log_stream(jobid=None):
     """Use the original raw-log viewer for a job without progress records.
 
@@ -1332,23 +1369,30 @@ def _attach_log_stream(jobid=None):
         raise SystemExit("no jobs to attach to (start one: cxr remote start <materials>)")
     _check_shell_tokens([jobid])
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
-    # Tail the log live, but self-terminate after SLURM no longer reports the
-    # job, so a finished job doesn't leave us stuck in tail -f. The tail is a
-    # viewer only: Ctrl-C or a dropped SSH connection leaves the job untouched.
+    # Tail the log live, but self-terminate once the persisted state goes
+    # terminal, so a finished job doesn't leave us stuck in tail -f. A chunked
+    # chain hops SLURM IDs between slices, so re-read the latest recorded ID
+    # every poll; only give up after _POLL_GRACE_POLLS consecutive polls with
+    # no live SLURM job (the watchdog: a broken chain never goes terminal).
+    # The wait-for-a-first-SID window right after submission is covered by the
+    # same grace counter. The tail is a viewer only: Ctrl-C or a dropped SSH
+    # connection leaves the job untouched.
     remote = (
         f'D="{jobdir}"; '
         f'[ -d "$D" ] || {{ echo "no such job: {jobid}"; exit 1; }}; '
         'tail -n 50 -F --retry "$D/log" 2>/dev/null & TP=$!; '
-        # `start --follow` can attach immediately after submission; wait briefly
-        # for the submit protocol to append its scheduler ID before polling.
-        "SID=; for _ in $(seq 1 30); do "
-        'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
-        "case \"$SID\" in ''|*[!0-9]*) SID= ;; *) break ;; esac; sleep 1; done; "
-        'if [ -n "$SID" ]; then '
+        "missed=0; "
         "while :; do "
-        + _squeue_state_command("$SID", retired="break")
-        + '[ -n "$STATE" ] || break; sleep 2; done; '
-        'else echo "no recorded SLURM job ID for {jobid}" >&2; kill "$TP" 2>/dev/null; exit 1; fi; '
+        'ST=$(cat "$D/state" 2>/dev/null); '
+        'case "$ST" in done*|FAILED*|cancelled*) break ;; esac; '
+        'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
+        "LIVE=; case \"$SID\" in ''|*[!0-9]*) ;; *) "
+        + _squeue_state_command("$SID", retired="STATE=")
+        + 'LIVE="$STATE" ;; esac; '
+        'if [ -n "$LIVE" ]; then missed=0; else missed=$((missed + 1)); fi; '
+        f'if [ "$missed" -ge {_POLL_GRACE_POLLS} ]; then '
+        f'echo "chain appears broken -- check cxr remote status {jobid}" >&2; break; fi; '
+        "sleep 2; done; "
         'sleep 1; kill "$TP" 2>/dev/null; '
         'printf "\\n--- job finished ---\\n"; cat "$D/state" 2>/dev/null'
     )
@@ -1383,14 +1427,20 @@ def _attach_progress_dashboard(jobid, metadata):
         for position, material in enumerate(materials)
     }
     print(f"attached to job {jobid} on {HOST} -- Ctrl-C to disconnect (the job keeps running).")
-    interrupted = False
+    interrupted = broken = False
+    missed = 0
+    state = ""
     try:
         while True:
-            _update_progress_bars(bars, _read_progress_records(jobid))
-            if _slurm_state(scheduler_id) is None:
+            state, live, records = _poll_chain(jobid)
+            _update_progress_bars(bars, records)
+            if _is_terminal_state(state):
+                break
+            missed = 0 if live else missed + 1
+            if missed >= _POLL_GRACE_POLLS:
+                broken = True
                 break
             time.sleep(2)
-        _update_progress_bars(bars, _read_progress_records(jobid))
     except KeyboardInterrupt:
         interrupted = True
     finally:
@@ -1399,8 +1449,14 @@ def _attach_progress_dashboard(jobid, metadata):
     if interrupted:
         _disconnect_hint(jobid)
         return False
+    if broken:
+        print(
+            f"\nchain appears broken: no live SLURM job for ~30 s and job state is "
+            f"not terminal -- check `cxr remote status {jobid}`"
+        )
+        return False
     print("\n--- job finished ---")
-    print(_job_state(jobid))
+    print(state)
     return True
 
 
@@ -1423,8 +1479,12 @@ def _stop_jobid(jobid):
     if scheduler_id is None or _slurm_state(scheduler_id) is None:
         raise SystemExit(f"job {jobid} is not an active SLURM job")
     release = _release_job_reservations_command(jobid)
+    # Write the STOP sentinel BEFORE scancel (spec 3b): if the cancelled slice
+    # was already past its scan loop and about to resubmit, the next slice's
+    # STOP check still terminates the chain instead of re-queueing it.
     remote = (
         f'D="{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"; '
+        ': > "$D/STOP"; '
         f"scancel {scheduler_id} || exit $?; "
         f'echo "cancelling [{scheduler_id}] $(date -Is)" > "$D/state"; '
         "while :; do "
