@@ -542,7 +542,7 @@ if [ "$unresolved" -eq 0 ]; then
   fi
   exit 0
 fi
-[ -f "$JOBDIR/STOP" ] && exit 0
+[ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
 k=$(grep -c "^slurm_job_id: " "$JOBDIR/meta" 2>/dev/null)
 echo "queued slice $((k + 1)) $(date -Is)" > "$JOBDIR/state"
 SID=$(sbatch --parsable --nice=10000 "$JOBDIR/run.sh") || {{ echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
@@ -797,10 +797,10 @@ def _release_if_submission_definitely_failed(jobid: str, stems: list[str]) -> No
         _run(["ssh", "-n", HOST, _release_checkpoint_stems_command(jobid, stems)])
 
 
-def _submit_staged_job(jobid: str, stems: list[str]) -> str:
+def _submit_staged_job(jobid: str, stems: list[str], *, nice: bool = False) -> str:
     """Submit an uploaded script without freeing locks after an ambiguous SSH loss."""
     try:
-        scheduler_id = _ssh_capture(_submit_slurm_command(jobid, stems)).strip()
+        scheduler_id = _ssh_capture(_submit_slurm_command(jobid, stems, nice=nice)).strip()
     except BaseException:
         _release_if_submission_definitely_failed(jobid, stems)
         raise
@@ -1102,7 +1102,7 @@ def start_queue(
     # Send as LF-only bytes: text=True on Windows translates \n->\r\n,
     # which produces a CRLF run.sh that bash silently refuses to execute.
     _stage_job_script(jobid, stems, upload, script)
-    scheduler_id = _submit_staged_job(jobid, stems)
+    scheduler_id = _submit_staged_job(jobid, stems, nice=chunked)
 
     detail = (
         f"chunk minutes: {chunk_minutes} (self-resubmitting)"
@@ -1659,7 +1659,7 @@ def _build_remote_parser(ap):
         default=None,
         metavar="N",
         help="simultaneous material scans in one GPU allocation; only with "
-        "--chunk-minutes 0 (default: 2; max: 4)",
+        "--chunk-minutes 0, which defaults it to 2 (max: 4)",
     )
     s.add_argument(
         "--chunk-minutes",
@@ -1693,7 +1693,7 @@ def _build_remote_parser(ap):
         default=None,
         metavar="N",
         help="simultaneous material scans in one GPU allocation; only with "
-        "--chunk-minutes 0 (default: 2; max: 4)",
+        "--chunk-minutes 0, which defaults it to 2 (max: 4)",
     )
     st.add_argument(
         "--chunk-minutes",

@@ -299,6 +299,9 @@ def test_chunked_dry_run_emits_chain_script(monkeypatch, capsys):
     assert "queued slice" in out  # handoff state written BEFORE sbatch
     assert "FAILED (slice resubmission)" in out  # fail-closed resubmit
     assert '[ -f "$JOBDIR/STOP" ]' in out or '"$JOBDIR/STOP"' in out
+    # STOP writes a terminal state so the finish trap releases reservations
+    # instead of stamping FAILED over an operator-requested stop
+    assert "cancelled (stop requested)" in out
     assert "failed: $m" in out  # hard-failure marker, never retried
     assert "#SBATCH --time=30" in out  # 3 x 10 min backstop
     assert '"queued slice"*' in out  # trap handoff case
@@ -389,12 +392,37 @@ def test_start_writes_static_metadata_before_sbatch(monkeypatch):
     assert "quick: True" in upload_command
     assert "workers: 3" in upload_command
     assert "parallel_materials: 3" in upload_command
+    assert "chunk_minutes: 0" in upload_command
     assert "progress_dashboard: True" in upload_command
     assert "started:" not in upload_command
     assert "started: $(date -Is)" in uploads[0][1]["input"].decode()
     assert "materials: hopg" not in uploads[0][1]["input"].decode()
     assert 'mkdir "$R/$stem"' in submissions[0][-1]
     assert "sbatch --parsable" in submissions[1][-1]
+    assert "--nice=10000" not in submissions[1][-1]  # monolithic: full priority
+
+
+def test_real_chunked_submission_carries_the_nice_flag(monkeypatch):
+    """The LIVE submission path (not just dry-run) must emit --nice=10000:
+    start_queue delegates to _submit_staged_job, which rebuilds the sbatch
+    command itself, so the courtesy flag has to survive that hop too."""
+    uploads = []
+    submissions = []
+    monkeypatch.setattr(remote, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(
+        remote.subprocess, "run", lambda *args, **kwargs: uploads.append((args, kwargs))
+    )
+    monkeypatch.setattr(remote, "_run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        remote, "_ssh_capture", lambda command: submissions.append(command) or "48291\n"
+    )
+
+    remote.start_queue(["hopg"], no_sync=True)  # chunked is the default
+
+    assert "chunk_minutes: 10.0" in uploads[0][0][0][-1]
+    sbatch_commands = [command for command in submissions if "sbatch" in command]
+    assert sbatch_commands, "the live path must reach sbatch"
+    assert all("sbatch --parsable --nice=10000" in command for command in sbatch_commands)
 
 
 def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
