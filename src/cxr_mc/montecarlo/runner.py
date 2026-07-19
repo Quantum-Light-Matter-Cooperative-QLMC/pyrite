@@ -15,6 +15,7 @@ from time import perf_counter
 from typing import Any
 
 import numpy as np
+import psutil
 
 from .._energy_grid import decode_energy_grid
 from . import spectrum as _spectrum_mod
@@ -32,6 +33,8 @@ from .transport import simulate_trajectories
 # timing never leaks into the pickle. The flag is read at import so it applies in
 # every spawned transport worker too (env is inherited on spawn/forkserver).
 _TIMING = os.environ.get("CXR_MC_TIMING", "") not in ("", "0")
+_N_CPUS = os.cpu_count()
+_TOTAL_MEM = psutil.virtual_memory().total // 1_000_000
 
 
 def _env_chunk(name, default):
@@ -47,8 +50,36 @@ def _env_chunk(name, default):
     return v if v > 0 else default
 
 
-_SPEC_CHUNK = _env_chunk("CXR_MC_SPEC_CHUNK", 40000)  # segments per line-spectrum GPU matmul
-_BREM_CHUNK = _env_chunk("CXR_MC_BREM_CHUNK", 20000)  # segments per brem-spectrum GPU matmul
+# Segments per spectrum matmul. 0 (the default) = size adaptively per call from
+# the energy-grid width via _adaptive_chunk; a positive CXR_MC_SPEC_CHUNK /
+# CXR_MC_BREM_CHUNK env value pins a fixed chunk (A1 sweep-accel spike), and an
+# explicit per-case spec_chunk/brem_chunk still wins over both.
+_SPEC_CHUNK = _env_chunk("CXR_MC_SPEC_CHUNK", 0)
+_BREM_CHUNK = _env_chunk("CXR_MC_BREM_CHUNK", 0)
+# Transient-memory budget [MB] for one spectrum matmul. The chunk loops in
+# mc_spectrum / mc_brem_spectrum hold ~3 float64 (chunk, nbins) arrays at peak
+# (x, S = sinc(x)**2, and sinc's internal temporary), so transient bytes
+# ~= 3 * chunk * nbins * 8. Default 1920 MB reproduces the old fixed
+# chunk=40000 exactly on the pre-2026-07 ~2000-bin line grid.
+_SPEC_BUDGET_MB = _env_chunk("CXR_MC_SPEC_BUDGET_MB", 1920)
+
+
+def _adaptive_chunk(nbins):
+    """Segments per spectrum matmul sized so the ~3 concurrent float64
+    (chunk, nbins) intermediates in the mc_spectrum / mc_brem_spectrum chunk
+    loops fit in _SPEC_BUDGET_MB.
+
+    Replaces the fixed defaults after the 2026-07-18 qlmc OOMs: widening the
+    line grid to 30000 eV grew nbins ~3x and silently tripled the per-matmul
+    transient (the fixed chunk had been tuned on the old narrow grid). Holding
+    the byte product constant instead means the chunk shrinks as the grid
+    widens and grows as it narrows. Chunking is mathematically exact (it only
+    partitions a sum over segments), so this changes memory/speed, not physics.
+    """
+    worker_intermediate_arrays = 3
+    adaptive_chunk_size = 1_000_000 * _SPEC_BUDGET_MB // (worker_intermediate_arrays * nbins * 8)
+    return max(1000, min(adaptive_chunk_size, 100_000))
+
 
 # A2 (docs/acceleration-technique-evaluation.md): stretch the CuPy memory-pool
 # free cadence. free_all_blocks() forces a device sync + full realloc, so paying
@@ -56,6 +87,10 @@ _BREM_CHUNK = _env_chunk("CXR_MC_BREM_CHUNK", 20000)  # segments per brem-spectr
 # leans on a reserved-pool watermark to stay bounded. Read once at import; the
 # GPU free path is driver-process only (workers run transport), so no locking.
 _FREE_EVERY = _env_chunk("CXR_MC_FREE_EVERY", 1)  # free the pool every N GPU cases (1 = per-case)
+# Per-worker host-RAM budget [MB] for the full-case CPU pool. Default is the
+# measured footprint from the 2026-07-18 OOM'd coarse run on qlmc: the killed
+# worker held ~5.5 GB anon-rss at 200 keV (ne=500, 30000 eV grid), rounded up.
+_WORKER_MEM_MB = _env_chunk("CXR_MC_WORKER_MEM_MB", 6144)
 _FREE_WATERMARK_MB = _env_chunk(
     "CXR_MC_FREE_WATERMARK_MB", 0
 )  # ...or when reserved pool exceeds this; 0 = off
@@ -217,11 +252,12 @@ def run_case(case):
                 crystal miscut of g relative to n -- None is a strict no-op,
                 see montecarlo.geometry._orientation_R), E_cut_lines_keV (5),
                 E_cut_brem_keV (1),
-                spec_chunk (40000) / brem_chunk (20000): segments per GPU matmul
-                -- lower these to cap peak GPU memory on a busy/shared device;
-                the per-case default is overridable via the CXR_MC_SPEC_CHUNK /
-                CXR_MC_BREM_CHUNK env vars (A1 sweep-accel spike, an explicit
-                per-case value still wins),
+                spec_chunk / brem_chunk: segments per spectrum matmul -- by
+                default sized adaptively from the energy-grid width so the
+                matmul transients fit CXR_MC_SPEC_BUDGET_MB (_adaptive_chunk);
+                set to cap peak GPU memory on a busy/shared device. Precedence:
+                per-case value > CXR_MC_SPEC_CHUNK / CXR_MC_BREM_CHUNK env pins
+                (A1 sweep-accel spike) > adaptive,
                 sinc_cutoff (None = exact lineshapes; windowing buys nothing
                 for bulk targets, where scattering Doppler-spreads the lines
                 across the whole grid),
@@ -308,7 +344,7 @@ def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers):
     ``brem_chunk`` (segments per GPU matmul). Pure move of _spectrum_case's brem
     block; shared with :func:`_brem_for_case` so a brem-only repair regenerates
     the SAME multilayer background as a live sweep."""
-    brem_chunk = case.get("brem_chunk") or _BREM_CHUNK
+    brem_chunk = case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(E_brem.size)
     n_lay = int(segs_b.get("n_layers", 1))
     if n_lay == 1:
         return mc_brem_spectrum(
@@ -391,7 +427,7 @@ def _spectrum_case(case, tp):
         mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),  # None -> perfect crystal
         mosaic_nodes=case.get("mosaic_mc_nodes", 1),
     )
-    spec_chunk = case.get("spec_chunk") or _SPEC_CHUNK
+    spec_chunk = case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(E_grid.size)
     if radiators is None:
         spec = mc_spectrum(
             segs,
@@ -508,6 +544,44 @@ def _worker_init(force_cpu=False):
             pass
 
 
+def _available_mem_mb():
+    """Return available system memory in MB"""
+    return psutil.virtual_memory().available // 1_000_000
+
+
+def _cpu_pool_workers(max_workers, n):
+    """Size the full-case CPU pool, capped so it cannot oversubscribe host RAM.
+
+    Each full-case worker holds transport AND spectrum state (unlike the GPU
+    pipeline's transport-only workers): ~5.5 GB anon-rss measured per worker at
+    200 keV on qlmc, where the uncapped ncpu*3//4 = 24-worker pool OOM'd the
+    45 GiB box (2026-07-18: kernel killed one worker, BrokenProcessPool lost
+    the whole run after swap-thrash had already crawled it).
+
+    max_workers: the caller's request -- None means size automatically from
+        core count (ncpu*3//4), an integer requests that many (0 is handled by
+        the caller, never seen here).
+    n: number of cases (never spawn more workers than cases).
+
+    The memory cap binds BOTH branches: even an explicit request is clamped to
+    min(MemAvailable, 0.85*MemTotal) // _WORKER_MEM_MB, so a pinned count can't
+    re-create the OOM. To deliberately run tighter than the measured budget,
+    raise CXR_MC_WORKER_MEM_MB -- that's the knob for "my workload is smaller
+    than the default assumes", not a bigger --max-workers.
+
+    Returns the worker count to use, >= 1.
+    """
+    if _N_CPUS is not None:
+        _max_allowed_workers = _N_CPUS * 3 // 4
+    else:
+        _max_allowed_workers = 6
+
+    worker_cap = min(_available_mem_mb(), int(_TOTAL_MEM * 0.85)) // _WORKER_MEM_MB
+    if max_workers is None:
+        max_workers = _max_allowed_workers
+    return max(1, min(max_workers, worker_cap, n))
+
+
 def run_cases(
     cases, max_workers=None, progress=True, callback=None, should_stop=None, engine="auto"
 ):
@@ -538,6 +612,9 @@ def run_cases(
     max_workers: None -> sized automatically (a few transport workers when a GPU
         is present; ~3/4 of the CPUs otherwise). An integer pins the count; 0
         runs everything serially in this process (debugging / safe fallback).
+        On the full-case CPU pool (no GPU, or engine="cpu") both auto and
+        pinned counts are additionally clamped by host RAM -- see
+        _cpu_pool_workers; per-worker budget via CXR_MC_WORKER_MEM_MB.
     progress: tqdm bar over completed cases.
     callback: callable(i, case, out) invoked in THIS process as each case
         finishes; stream/checkpoint/plot without waiting for the batch.
@@ -650,11 +727,9 @@ def run_cases(
         return results
 
     # ---- no GPU: serial in-process, or a full-case worker pool ---------------
-    if max_workers is None:
-        ncpu = os.process_cpu_count() or os.cpu_count() or 8
-        max_workers = max(1, min(n, ncpu * 3 // 4))
     if max_workers == 0:
         return _serial()
+    max_workers = _cpu_pool_workers(max_workers, n)
     _single_thread_blas()
     from concurrent.futures import ProcessPoolExecutor, as_completed
 

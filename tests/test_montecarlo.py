@@ -491,3 +491,108 @@ def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
     assert out["spec"].size > 0
     assert np.all(np.isfinite(out["spec"]))
     assert np.all(np.isfinite(out["brem"]))
+
+
+# ---- _cpu_pool_workers memory-aware sizing (2026-07-18 OOM fix) -------------
+# The uncapped ncpu*3//4 = 24-worker pool OOM'd qlmc (45 GiB box, ~5.5 GB
+# anon-rss per full-case worker at 200 keV): the kernel killed one worker and
+# BrokenProcessPool lost the whole run. These tests pin the host probes so the
+# sizing is deterministic on any machine.
+
+
+def _patch_host(monkeypatch, *, ncpus=32, avail_mb=44_900, total_mb=48_000, budget_mb=6_144):
+    """Fake a host for _cpu_pool_workers; defaults reproduce qlmc's shape."""
+    from cxr_mc.montecarlo import runner
+
+    monkeypatch.setattr(runner, "_N_CPUS", ncpus)
+    monkeypatch.setattr(runner, "_available_mem_mb", lambda: avail_mb)
+    monkeypatch.setattr(runner, "_TOTAL_MEM", total_mb)
+    monkeypatch.setattr(runner, "_WORKER_MEM_MB", budget_mb)
+    return runner
+
+
+def test_cpu_pool_workers_autosize_is_memory_bound_on_qlmc_shape(monkeypatch):
+    """qlmc regression: 32 cores asks for 24 workers, RAM only carries 6."""
+    runner = _patch_host(monkeypatch)
+    # min(44_900, 0.85 * 48_000 = 40_800) // 6_144 = 6
+    assert runner._cpu_pool_workers(None, 980) == 6
+
+
+def test_cpu_pool_workers_autosize_is_cpu_bound_with_ample_ram(monkeypatch):
+    runner = _patch_host(monkeypatch, avail_mb=1_000_000, total_mb=1_000_000)
+    assert runner._cpu_pool_workers(None, 980) == 24  # ncpu * 3 // 4
+
+
+def test_cpu_pool_workers_pin_is_clamped_by_memory(monkeypatch):
+    """An explicit pin cannot re-create the OOM; raise CXR_MC_WORKER_MEM_MB to
+    deliberately run tighter than the measured per-worker budget."""
+    runner = _patch_host(monkeypatch)
+    assert runner._cpu_pool_workers(24, 980) == 6
+
+
+def test_cpu_pool_workers_pin_under_cap_is_honored(monkeypatch):
+    runner = _patch_host(monkeypatch)
+    assert runner._cpu_pool_workers(3, 980) == 3
+
+
+def test_cpu_pool_workers_bounded_by_cases_and_floored_at_one(monkeypatch):
+    runner = _patch_host(monkeypatch, avail_mb=1_000_000, total_mb=1_000_000)
+    assert runner._cpu_pool_workers(None, 2) == 2  # never more workers than cases
+    _patch_host(monkeypatch, avail_mb=1_000, total_mb=1_000)  # cap rounds to 0
+    assert runner._cpu_pool_workers(None, 980) == 1  # degrade, don't refuse
+
+
+def test_cpu_pool_workers_unknown_cpu_count_falls_back(monkeypatch):
+    runner = _patch_host(monkeypatch, ncpus=None, avail_mb=1_000_000, total_mb=1_000_000)
+    assert runner._cpu_pool_workers(None, 980) == 6
+
+
+def test_run_cases_cpu_pool_receives_the_capped_worker_count(monkeypatch):
+    """Wiring check: the executor must see the clamped count. Guards the
+    fall-through-returns-None failure, which ProcessPoolExecutor would
+    silently accept as 'use all cores' -- worse than the bug being fixed."""
+    runner = _patch_host(monkeypatch)
+    monkeypatch.setattr(runner, "_GPU", False)
+    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
+
+    cases = [{"name": f"c{i}"} for i in range(10)]
+    runner.run_cases(cases, progress=False, engine="cpu")
+    assert _SyncProcessPoolExecutor.captured["max_workers"] == 6
+
+
+# ---- _adaptive_chunk grid-aware sizing (2026-07-18 OOM fix, part 2) ---------
+# The fixed spec/brem chunk defaults were tuned on the old ~2000-bin line grid;
+# widening the grid to 30000 eV (~6000 bins) silently tripled the (chunk, nbins)
+# matmul transients per worker. _adaptive_chunk holds the byte product constant:
+# chunk = budget_bytes // (3 arrays * nbins * 8 B), clamped to [1000, 100_000].
+
+
+def test_adaptive_chunk_reproduces_old_default_on_narrow_grid():
+    """Default 1920 MB budget was chosen so the pre-2026-07 ~2000-bin grid gets
+    back exactly the old fixed chunk=40000 -- no behavior change on old runs."""
+    from cxr_mc.montecarlo import runner
+
+    assert runner._adaptive_chunk(2000) == 40_000
+
+
+def test_adaptive_chunk_shrinks_on_the_widened_grid():
+    from cxr_mc.montecarlo import runner
+
+    # 1920e6 // (3 * 6000 * 8) = 13_333: ~3x fewer segments for ~3x more bins,
+    # so the matmul transient stays ~1.9 GB instead of the ~5.7 GB that OOM'd.
+    assert runner._adaptive_chunk(6000) == 13_333
+
+
+def test_adaptive_chunk_clamps_to_floor_and_ceiling():
+    from cxr_mc.montecarlo import runner
+
+    assert runner._adaptive_chunk(10**9) == 1000  # degenerate wide grid: slow, not zero
+    assert runner._adaptive_chunk(10) == 100_000  # coarse brem grid: bound kernel size
+
+
+def test_adaptive_chunk_honors_budget_override(monkeypatch):
+    from cxr_mc.montecarlo import runner
+
+    monkeypatch.setattr(runner, "_SPEC_BUDGET_MB", 480)  # CXR_MC_SPEC_BUDGET_MB
+    assert runner._adaptive_chunk(2000) == 10_000
