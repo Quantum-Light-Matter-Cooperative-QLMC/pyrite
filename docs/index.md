@@ -22,6 +22,7 @@ crystal-mosaicity
 detector-solid-angle
 multilayer-materials
 atomic-data-sources
+relativistic-electron-transport
 ```
 
 ```{toctree}
