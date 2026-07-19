@@ -2,8 +2,12 @@
 
 Navigation aid for `src/cxr_mc/` — the importable package. Read this before
 exploring source. For *why* (physics, validation, provenance) see
-[`README.md`](../README.md) and the design notes in [`docs/`](.); for the backlog
-see [`TODO.md`](../TODO.md). Regenerate the directory inventory with
+[`README.md`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc/blob/main/README.md)
+and the design notes in
+[`docs/`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc/tree/main/docs);
+for the backlog see
+[`TODO.md`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc/blob/main/TODO.md).
+Regenerate the directory inventory with
 `uv run python scripts/dev.py repo-map`.
 
 ## Dependency layers (leaf → driver)

@@ -30,6 +30,42 @@ relativistic-electron-transport
 :maxdepth: 1
 
 nonrelativistic-pxr-cbs-material-survey
+parameter-space-sampling-review
+```
+
+```{toctree}
+:caption: Reference
+:maxdepth: 1
+
+grazing-grating
+physics-validation-ledger
+repo_map
+tilt-convention
+units-evaluation
+```
+
+```{toctree}
+:caption: Physics validation
+:maxdepth: 1
+:glob:
+
+validation/*
+```
+
+```{toctree}
+:caption: Implementation plans
+:maxdepth: 1
+:glob:
+
+superpowers/plans/*
+```
+
+```{toctree}
+:caption: Design specifications
+:maxdepth: 1
+:glob:
+
+superpowers/specs/*
 ```
 
 ```{toctree}

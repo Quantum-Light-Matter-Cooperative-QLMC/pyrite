@@ -30,7 +30,6 @@ extensions = [
     "sphinx.ext.autosummary",  # per-module summary tables + stub pages
     "sphinx.ext.napoleon",  # Google/NumPy docstring styles
     "sphinx.ext.viewcode",  # [source] links
-    "sphinx.ext.intersphinx",  # cross-link to numpy/scipy/python
     "sphinx.ext.mathjax",  # the docstrings carry LaTeX
 ]
 
@@ -59,13 +58,6 @@ suppress_warnings = ["docutils"]
 # -- MyST --------------------------------------------------------------------
 myst_enable_extensions = ["dollarmath", "amsmath", "deflist", "colon_fence"]
 myst_heading_anchors = 3
-
-# -- Intersphinx -------------------------------------------------------------
-intersphinx_mapping = {
-    "python": ("https://docs.python.org/3", None),
-    "numpy": ("https://numpy.org/doc/stable", None),
-    "scipy": ("https://docs.scipy.org/doc/scipy", None),
-}
 
 # -- General -----------------------------------------------------------------
 root_doc = "index"
