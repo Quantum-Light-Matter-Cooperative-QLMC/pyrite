@@ -11,6 +11,7 @@ matplotlib or Altair imports; renderers turn the returned ``pandas.DataFrame``
 import pandas as pd
 
 from ..results import records_for_cases, selection_score
+from ..sweep import fmt_thickness
 from ._common import _metrics_map
 
 
@@ -89,6 +90,8 @@ def _axis_disp(key, vals):
 
 def _value_label(key, v):
     """'30 keV' / '17 um' style label for one swept value."""
+    if key == "thickness_ang":
+        return fmt_thickness(float(v))
     _lbl, div, unit, fmt = _AXIS_SPECS.get(key, (key, 1.0, "", "{:g}"))
     return f"{fmt.format(float(v) / div)} {unit}".strip()
 

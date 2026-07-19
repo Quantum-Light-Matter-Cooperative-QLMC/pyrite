@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import altair as alt
 import numpy as np
 
-from cxr_mc.plots._frames import heatmap_frame, metric_vs_frame
+from cxr_mc.plots._frames import _value_label, heatmap_frame, metric_vs_frame
 from cxr_mc.plots.altair_sweeps import (
     heatmap_chart,
     heatmap_select_chart,
@@ -22,6 +22,10 @@ from cxr_mc.plots.altair_sweeps import (
 
 def _settings():
     return SimpleNamespace(beam_current_na=1.0)
+
+
+def test_thickness_value_labels_switch_to_millimetres():
+    assert _value_label("thickness_ang", 10_000_000.0) == "1mm"
 
 
 def _record(name, E0, tilt, azim, amp, n=80):

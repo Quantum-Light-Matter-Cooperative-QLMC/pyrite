@@ -186,7 +186,17 @@ def test_packaged_catalog_exposes_frozen_ordered_public_api():
 
     np.testing.assert_array_equal(
         CATALOG.material("hbn").scan.thickness_ang,
-        [1000.0, 5000.0, 10000.0, 40000.0, 100000.0, 200000.0, 500000.0, 1000000.0],
+        [
+            1000.0,
+            5000.0,
+            10000.0,
+            40000.0,
+            100000.0,
+            200000.0,
+            500000.0,
+            1000000.0,
+            10000000.0,
+        ],
     )
 
 

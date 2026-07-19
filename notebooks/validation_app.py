@@ -7,7 +7,7 @@
 import marimo
 
 __generated_with = "0.23.11"
-app = marimo.App(width="medium")
+app = marimo.App(width="full")
 
 
 @app.cell
@@ -18,6 +18,7 @@ def _():
     from pathlib import Path
 
     import marimo as mo
+    from _design import page_title, status_badge, style_sheet
 
     from cxr_mc import check as check_support
 
@@ -68,25 +69,50 @@ def _():
             )
         return reports
 
-    return af, check_support, mo, run_checks
+    check_authorities = {
+        "mosaic_mc_check.py": "Anchor",
+        "detector_solid_angle_check.py": "Anchor",
+        "multilayer_validation_check.py": "Anchor",
+        "multilayer_check.py": "Anchor",
+        "multilayer_slice3_check.py": "Anchor",
+        "dans_diffraction_oracle.py": "Optional oracle",
+        "feranchuk_check_script.py": "Diagnostic",
+        "feranchuk_vs_zhai_check.py": "Diagnostic",
+        "kinematic_validity_check.py": "Diagnostic",
+    }
+
+    return (
+        af,
+        check_authorities,
+        check_support,
+        mo,
+        page_title,
+        run_checks,
+        status_badge,
+        style_sheet,
+    )
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    # CXR physics validation dashboard
-
-    One place to run and inspect the repository's publication-oriented checks.
-    The notebook separates **anchors** (checks with a pass/fail contract),
-    **diagnostics** (scientifically useful reports without a universal pass
-    threshold), and **provenance** (derivations that should be reviewed rather
-    than treated as tests).
-
-    Expensive work is never started automatically. Choose a section's controls
-    and press its run button, or use the remote-first cache preparation control
-    near the supplementary studies. Standalone checks remain the reusable/headless
-    source of truth; this notebook is a thin reactive driver over them.
-    """)
+def _(mo, page_title, status_badge, style_sheet):
+    mo.vstack(
+        [
+            style_sheet(mo),
+            page_title(
+                mo,
+                "CXR physics validation",
+                "Run evidence with explicit authority, inspect complete reports, and keep derivation provenance distinct from pass/fail claims.",
+                eyebrow="Beamline control / validation",
+            ),
+            mo.hstack(
+                [
+                    status_badge(mo, "Ready"),
+                    mo.md("**Evidence summary:** actions remain idle until their run button is pressed."),
+                ],
+                justify="start",
+            ),
+        ]
+    )
     return
 
 
@@ -178,21 +204,21 @@ def _(mo):
             "reason": "Superseded by anchor_figures.py and this dashboard's Zhai section.",
         },
     ]
-    mo.accordion(
+    provenance_audit = mo.accordion(
         {
-            "Audit: what is authoritative, diagnostic, or redundant?": mo.ui.table(
+            "Provenance: authority audit and unresolved methods": mo.ui.table(
                 audit_rows,
                 selection=None,
                 page_size=20,
             )
         }
     )
-    return
+    return (provenance_audit,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.callout(
+    provenance_findings = mo.callout(
         mo.md(r"""
         **Audit findings from the current implementations**
 
@@ -208,12 +234,12 @@ def _(mo):
         """),
         kind="warn",
     )
-    return
+    return (provenance_findings,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
+    anchors_intro = mo.md(r"""
     ## Standalone anchors and diagnostics
 
     Select related checks and run them in fresh child processes. CPU forcing is
@@ -221,7 +247,7 @@ def _(mo):
     exit code means the program completed its own contract; diagnostic programs
     still require interpretation and are deliberately not presented as “passed”.
     """)
-    return
+    return (anchors_intro,)
 
 
 @app.cell
@@ -251,55 +277,78 @@ def _(mo):
     )
     force_cpu_ui = mo.ui.checkbox(value=True, label="Force CPU (disable CuPy in child processes)")
     run_checks_ui = mo.ui.run_button(label="Run selected checks")
-    mo.vstack([checks_ui, mo.hstack([force_cpu_ui, run_checks_ui])])
-    return checks_ui, force_cpu_ui, run_checks_ui
+    anchors_controls = mo.vstack([checks_ui, mo.hstack([force_cpu_ui, run_checks_ui])])
+    return anchors_controls, checks_ui, force_cpu_ui, run_checks_ui
 
 
 @app.cell
 def _(checks_ui, force_cpu_ui, mo, run_checks, run_checks_ui):
-    mo.stop(
-        not run_checks_ui.value,
-        mo.callout("Select checks above, then run them when ready.", kind="info"),
-    )
-    mo.stop(not checks_ui.value, mo.callout("Select at least one check.", kind="warn"))
-    with mo.status.spinner(
-        title="Running validation programs",
-        subtitle="The complete console report for each check will appear below.",
-    ):
-        check_reports = run_checks(checks_ui.value, force_cpu_ui.value)
+    if not run_checks_ui.value:
+        check_reports = None
+    elif not checks_ui.value:
+        check_reports = []
+    else:
+        with mo.status.spinner(
+            title="Running validation programs",
+            subtitle="The complete console report for each check will appear below.",
+        ):
+            check_reports = run_checks(checks_ui.value, force_cpu_ui.value)
     return (check_reports,)
 
 
 @app.cell
-def _(check_reports, mo):
+def _(check_authorities, check_reports, mo):
     report_panels = {}
     summary = []
-    for report in check_reports:
-        completed = report["returncode"] == 0
-        marker = "✓" if completed else "✗"
+    for report in check_reports or []:
         name = report["filename"]
+        authority = check_authorities[name]
+        if report["returncode"] != 0:
+            state = "Failed"
+            next_action = "Inspect full report and fix failure."
+        elif authority == "Diagnostic":
+            state = "Completed—interpret"
+            next_action = "Interpret output against method and source assumptions."
+        elif authority == "Optional oracle" and "skip" in report["output"].lower():
+            state = "Skipped"
+            next_action = "Install optional dependency to run oracle."
+        elif authority == "Optional oracle":
+            state = "Completed—interpret"
+            next_action = "Review independent comparison output."
+        else:
+            state = "Passed"
+            next_action = "No action required."
         summary.append(
             {
                 "check": name,
-                "exit code": report["returncode"],
+                "authority": authority,
+                "state": state,
                 "elapsed (s)": round(report["seconds"], 1),
+                "next action": next_action,
             }
         )
-        report_panels[f"{marker} {name} ({report['seconds']:.1f} s)"] = mo.md(
+        report_panels[f"{state} — {name} ({report['seconds']:.1f} s)"] = mo.md(
             f"```text\n{report['output']}\n```"
         )
-    mo.vstack(
-        [
-            mo.ui.table(summary, selection=None),
-            mo.accordion(report_panels, multiple=True),
-        ]
-    )
-    return
+    if check_reports is None:
+        anchors_results = mo.callout(
+            "Select checks above, then run them when ready.", kind="info"
+        )
+    elif not check_reports:
+        anchors_results = mo.callout("Select at least one check.", kind="warn")
+    else:
+        anchors_results = mo.vstack(
+            [
+                mo.ui.table(summary, selection=None),
+                mo.accordion(report_panels, multiple=True),
+            ]
+        )
+    return (anchors_results,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
+    reproductions_intro = mo.md(r"""
     ## Zhai Fig. 1c reproduction
 
     Reproduces the HOPG spectra and bulk-versus-film comparison from Zhai et al.,
@@ -309,7 +358,7 @@ def _(mo):
     electrons for publication-quality output. Results are cached locally by
     sample counts, experimental inputs, and implementation version.
     """)
-    return
+    return (reproductions_intro,)
 
 
 @app.cell
@@ -330,15 +379,17 @@ def _(mo):
     )
     run_zhai_ui = mo.ui.run_button(label="Run Zhai reproduction")
     refresh_zhai_ui = mo.ui.checkbox(value=False, label="Recompute (ignore cache)")
-    mo.vstack([mo.hstack([ne_ui, ne_brem_ui]), mo.hstack([refresh_zhai_ui, run_zhai_ui])])
-    return ne_brem_ui, ne_ui, refresh_zhai_ui, run_zhai_ui
+    reproductions_controls = mo.vstack(
+        [mo.hstack([ne_ui, ne_brem_ui]), mo.hstack([refresh_zhai_ui, run_zhai_ui])]
+    )
+    return ne_brem_ui, ne_ui, refresh_zhai_ui, reproductions_controls, run_zhai_ui
 
 
 @app.cell
 def _(af, mo):
     anchor = af.ZhaiAnchor()
     theory_energies = af.theory_line_energies(anchor)
-    mo.ui.table(
+    line_energy_anchors = mo.ui.table(
         [
             {"Beam energy (keV)": energy, "Eq. (10) line energy (eV)": line_energy}
             for energy, line_energy in theory_energies.items()
@@ -346,26 +397,28 @@ def _(af, mo):
         selection=None,
         label="Analytic line-energy anchors",
     )
-    return (anchor,)
+    return anchor, line_energy_anchors
 
 
 @app.cell
 def _(af, anchor, mo, ne_brem_ui, ne_ui, refresh_zhai_ui, run_zhai_ui):
-    mo.stop(
-        not run_zhai_ui.value,
-        mo.callout("Choose the sample counts, then run the reproduction.", kind="info"),
-    )
-    with mo.status.spinner(
-        title="Running Monte Carlo spectra",
-        subtitle="This is the expensive step; all three figures reuse the result.",
-    ):
-        zhai_model, zhai_cache_hit, zhai_cache_path = af.cached_model_spectra(
-            anchor,
-            ne=int(ne_ui.value),
-            ne_brem=int(ne_brem_ui.value),
-            refresh=refresh_zhai_ui.value,
-        )
-        zhai_reference = af.reference_curve(anchor)
+    if not run_zhai_ui.value:
+        zhai_cache_hit = None
+        zhai_cache_path = None
+        zhai_model = None
+        zhai_reference = None
+    else:
+        with mo.status.spinner(
+            title="Running Monte Carlo spectra",
+            subtitle="This is the expensive step; all three figures reuse the result.",
+        ):
+            zhai_model, zhai_cache_hit, zhai_cache_path = af.cached_model_spectra(
+                anchor,
+                ne=int(ne_ui.value),
+                ne_brem=int(ne_brem_ui.value),
+                refresh=refresh_zhai_ui.value,
+            )
+            zhai_reference = af.reference_curve(anchor)
     return zhai_cache_hit, zhai_cache_path, zhai_model, zhai_reference
 
 
@@ -379,60 +432,65 @@ def _(
     zhai_model,
     zhai_reference,
 ):
-    rows = af.validation_table(anchor, zhai_model)
-    headers = [
-        "E0 (keV)",
-        "MC peak (eV)",
-        "Eq. 10 (eV)",
-        "difference (eV)",
-        "MC / closed (one segment)",
-        "line flux (ph/e/0.066 sr)",
-        "backscatter",
-    ]
-    validation = mo.ui.table(
-        [dict(zip(headers, row, strict=True)) for row in rows],
-        selection=None,
-        label="Validation summary",
-    )
-
-    def spectra_tab():
-        note = (
-            "Digitized Zhai reference curves loaded."
-            if zhai_reference
-            else "No digitized reference CSV found; showing the theory-only overlay."
+    if zhai_model is None:
+        reproductions_results = mo.callout(
+            "Choose the sample counts, then run the reproduction.", kind="info"
         )
-        return mo.vstack([mo.md(note), af.figure_spectra(anchor, zhai_model, zhai_reference)])
-
-    def flux_tab():
-        return af.figure_flux_anchor(anchor, zhai_model)
-
-    def enhancement_tab():
-        return af.figure_enhancement(anchor, zhai_model)
-
-    mo.vstack(
-        [
-            mo.callout(
-                f"{'Loaded cached' if zhai_cache_hit else 'Computed and cached'} result at "
-                f"`{zhai_cache_path.relative_to(zhai_cache_path.parents[1])}`.",
-                kind="success",
-            ),
-            validation,
-            mo.ui.tabs(
-                {
-                    "Fig. 1c spectra": spectra_tab,
-                    "Absolute-flux anchor": flux_tab,
-                    "Bulk vs 29 nm film": enhancement_tab,
-                },
-                lazy=True,
-            ),
+    else:
+        rows = af.validation_table(anchor, zhai_model)
+        headers = [
+            "E0 (keV)",
+            "MC peak (eV)",
+            "Eq. 10 (eV)",
+            "difference (eV)",
+            "MC / closed (one segment)",
+            "line flux (ph/e/0.066 sr)",
+            "backscatter",
         ]
-    )
-    return
+        validation = mo.ui.table(
+            [dict(zip(headers, row, strict=True)) for row in rows],
+            selection=None,
+            label="Validation summary",
+        )
+
+        def spectra_tab():
+            note = (
+                "Digitized Zhai reference curves loaded."
+                if zhai_reference
+                else "No digitized reference CSV found; showing the theory-only overlay."
+            )
+            return mo.vstack([mo.md(note), af.figure_spectra(anchor, zhai_model, zhai_reference)])
+
+        def flux_tab():
+            return af.figure_flux_anchor(anchor, zhai_model)
+
+        def enhancement_tab():
+            return af.figure_enhancement(anchor, zhai_model)
+
+        reproductions_results = mo.vstack(
+            [
+                mo.callout(
+                    f"{'Loaded cached' if zhai_cache_hit else 'Computed and cached'} result at "
+                    f"`{zhai_cache_path.relative_to(zhai_cache_path.parents[1])}`.",
+                    kind="success",
+                ),
+                validation,
+                mo.ui.tabs(
+                    {
+                        "Fig. 1c spectra": spectra_tab,
+                        "Absolute-flux anchor": flux_tab,
+                        "Bulk vs 29 nm film": enhancement_tab,
+                    },
+                    lazy=True,
+                ),
+            ]
+        )
+    return (reproductions_results,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
+    supplementary_intro = mo.md(r"""
     ## Zhai supplementary coherent-emission studies
 
     These are separate from the Fig. 1c anchor: each run contains coherent
@@ -444,7 +502,7 @@ def _(mo):
     in Supplementary Table 4 and overlay the 17.5, 20, 22.5, and 25 keV SEM
     spectra (the 219 nm h-BN sample has two reported orientations).
     """)
-    return
+    return (supplementary_intro,)
 
 
 @app.cell
@@ -505,10 +563,10 @@ def _(af, check_support, mo, supplementary_study_ui, supplementary_thickness_ui)
         value=check_support.load_default_azimuth(),
         label="Exploratory TMD azimuth (deg; unreported)",
     )
-    save_supplementary_azimuth_ui = mo.ui.run_button(label="Save as repository default")
+    save_supplementary_azimuth_ui = mo.ui.run_button(label="Save repository default")
     run_supplementary_ui = mo.ui.run_button(label="Run supplementary study")
     refresh_supplementary_ui = mo.ui.checkbox(value=False, label="Recompute (ignore cache)")
-    mo.vstack(
+    supplementary_controls = mo.vstack(
         [
             mo.hstack(
                 [
@@ -523,12 +581,19 @@ def _(af, check_support, mo, supplementary_study_ui, supplementary_thickness_ui)
                 "**Reported orientation(s):** encoded per thickness from Supplementary Table 4."
             ),
             mo.hstack([supplementary_ne_ui, refresh_supplementary_ui, run_supplementary_ui]),
+            mo.md(
+                "`Save repository default` mutates `tmd_exploratory_azimuth_deg` in "
+                "`notebooks/validation_defaults.json`; the selected value is shown above."
+            )
+            if _study.has_unreported_azimuth
+            else mo.md("Reported orientations are provenance inputs and are not persisted here."),
         ]
     )
     return (
         refresh_supplementary_ui,
         run_supplementary_ui,
         save_supplementary_azimuth_ui,
+        supplementary_controls,
         supplementary_azimuth_ui,
         supplementary_ne_ui,
         supplementary_orientation_ui,
@@ -537,19 +602,21 @@ def _(af, check_support, mo, supplementary_study_ui, supplementary_thickness_ui)
 
 @app.cell
 def _(check_support, mo, save_supplementary_azimuth_ui, supplementary_azimuth_ui):
-    mo.stop(not save_supplementary_azimuth_ui.value)
-    check_support.save_default_azimuth(float(supplementary_azimuth_ui.value))
-    mo.callout(
-        f"Saved {float(supplementary_azimuth_ui.value):g}° as the repository default. "
-        "It will be selected on the next app startup.",
-        kind="success",
-    )
-    return
+    if save_supplementary_azimuth_ui.value:
+        check_support.save_default_azimuth(float(supplementary_azimuth_ui.value))
+        supplementary_save_status = mo.callout(
+            f"Saved {float(supplementary_azimuth_ui.value):g}° as the repository default. "
+            "It will be selected on the next app startup.",
+            kind="success",
+        )
+    else:
+        supplementary_save_status = mo.md("")
+    return (supplementary_save_status,)
 
 
 @app.cell(hide_code=True)
 def _(mo):
-    mo.md(r"""
+    remote_intro = mo.md(r"""
     ### Remote-first cache preparation
 
     This optional launcher prepares all expensive Zhai caches using the values
@@ -558,17 +625,28 @@ def _(mo):
     status is polled below and completed caches are pulled automatically. If the
     SSH tools or host are unavailable before launch, the same batch runs locally.
     """)
-    return
+    return (remote_intro,)
 
 
 @app.cell
-def _(mo):
+def _(mo, ne_brem_ui, ne_ui, supplementary_azimuth_ui, supplementary_ne_ui):
     prepare_zhai_caches_ui = mo.ui.run_button(label="Prepare expensive caches (remote first)")
     remote_status_refresh_ui = mo.ui.refresh(
         options=[5, 15, 30], default_interval=15, label="Remote status refresh"
     )
-    mo.hstack([prepare_zhai_caches_ui, remote_status_refresh_ui])
-    return prepare_zhai_caches_ui, remote_status_refresh_ui
+    remote_controls = mo.vstack(
+        [
+            mo.md(
+                f"Selected batch: {int(ne_ui.value)} line electrons, "
+                f"{int(ne_brem_ui.value)} bremsstrahlung electrons, "
+                f"{int(supplementary_ne_ui.value)} supplementary electrons, "
+                f"TMD azimuth {float(supplementary_azimuth_ui.value):g}°. "
+                "Remote probe runs only after button press; unavailable SSH/GPU falls back locally."
+            ),
+            mo.hstack([prepare_zhai_caches_ui, remote_status_refresh_ui]),
+        ]
+    )
+    return prepare_zhai_caches_ui, remote_controls, remote_status_refresh_ui
 
 
 @app.cell
@@ -643,8 +721,8 @@ def _(
             set_remote_zhai_message(f"Remote job `{_jobid}` {_state}.\n\n{_report}")
         else:
             set_remote_zhai_message(f"Remote job `{_jobid}`: {_state}.\n\n{_report}")
-    mo.callout(get_remote_zhai_message(), kind="info")
-    return
+    remote_status = mo.callout(get_remote_zhai_message(), kind="info")
+    return (remote_status,)
 
 
 @app.cell
@@ -659,51 +737,122 @@ def _(
     supplementary_study_ui,
     supplementary_thickness_ui,
 ):
-    mo.stop(
-        not run_supplementary_ui.value,
-        mo.callout("Choose a material and thickness, then run the study.", kind="info"),
-    )
-    study = af.supplementary_study(supplementary_study_ui.value)
-    thickness_nm = float(supplementary_thickness_ui.value)
-    exploratory_azimuth_deg = (
-        float(supplementary_azimuth_ui.value) if study.has_unreported_azimuth else None
-    )
-    with mo.status.spinner(
-        title="Running detector-convolved supplementary spectra",
-        subtitle="Reported-condition spectra are computed or loaded from cache.",
-    ):
-        spectra, cache_hit, cache_path = af.cached_coherent_spectra(
-            study,
-            thickness_nm,
-            ne=int(supplementary_ne_ui.value),
-            exploratory_azimuth_deg=exploratory_azimuth_deg,
-            refresh=refresh_supplementary_ui.value,
+    if not run_supplementary_ui.value:
+        supplementary_results = mo.callout(
+            "Choose a material and thickness, then run the study.", kind="info"
         )
-    figure = (
-        af.figure_supplementary_sem(
-            study,
-            thickness_nm,
-            spectra,
-            orientation=tuple(supplementary_orientation_ui.value),
+    else:
+        study = af.supplementary_study(supplementary_study_ui.value)
+        thickness_nm = float(supplementary_thickness_ui.value)
+        exploratory_azimuth_deg = (
+            float(supplementary_azimuth_ui.value) if study.has_unreported_azimuth else None
         )
-        if study.crystal in {"hbn", "hopg"}
-        else af.figure_supplementary_tmd(study, thickness_nm, spectra)
-    )
-    mo.vstack(
-        [
-            mo.callout(
-                f"{'Loaded cached' if cache_hit else 'Computed and cached'} result at "
-                f"`{cache_path.relative_to(cache_path.parents[1])}`."
-                + (
-                    f" Exploratory TMD azimuth: {exploratory_azimuth_deg:g}° "
-                    "(not reported by Zhai et al.)."
-                    if exploratory_azimuth_deg is not None
-                    else " Reported Table 4 orientation(s) selected for this thickness."
+        with mo.status.spinner(
+            title="Running detector-convolved supplementary spectra",
+            subtitle="Reported-condition spectra are computed or loaded from cache.",
+        ):
+            spectra, cache_hit, cache_path = af.cached_coherent_spectra(
+                study,
+                thickness_nm,
+                ne=int(supplementary_ne_ui.value),
+                exploratory_azimuth_deg=exploratory_azimuth_deg,
+                refresh=refresh_supplementary_ui.value,
+            )
+        figure = (
+            af.figure_supplementary_sem(
+                study,
+                thickness_nm,
+                spectra,
+                orientation=tuple(supplementary_orientation_ui.value),
+            )
+            if study.crystal in {"hbn", "hopg"}
+            else af.figure_supplementary_tmd(study, thickness_nm, spectra)
+        )
+        supplementary_results = mo.vstack(
+            [
+                mo.callout(
+                    f"{'Loaded cached' if cache_hit else 'Computed and cached'} result at "
+                    f"`{cache_path.relative_to(cache_path.parents[1])}`."
+                    + (
+                        f" Exploratory TMD azimuth: {exploratory_azimuth_deg:g}° "
+                        "(not reported by Zhai et al.)."
+                        if exploratory_azimuth_deg is not None
+                        else " Reported Table 4 orientation(s) selected for this thickness."
+                    ),
+                    kind="success",
                 ),
-                kind="success",
+                mo.center(figure),
+            ]
+        )
+    return (supplementary_results,)
+
+
+@app.cell(hide_code=True)
+def _(
+    anchors_controls,
+    anchors_intro,
+    anchors_results,
+    line_energy_anchors,
+    mo,
+    provenance_audit,
+    provenance_findings,
+    remote_controls,
+    remote_intro,
+    remote_status,
+    reproductions_controls,
+    reproductions_intro,
+    reproductions_results,
+    supplementary_controls,
+    supplementary_intro,
+    supplementary_results,
+    supplementary_save_status,
+):
+    mo.ui.tabs(
+        {
+            "Anchors": mo.vstack(
+                [
+                    mo.md("**Authority: Anchor, Diagnostic, or Optional oracle**"),
+                    anchors_intro,
+                    anchors_controls,
+                    anchors_results,
+                ]
             ),
-            mo.center(figure),
-        ]
+            "Reproductions": mo.vstack(
+                [
+                    mo.md("**Authority: Anchor** — published-condition reproduction."),
+                    reproductions_intro,
+                    reproductions_controls,
+                    line_energy_anchors,
+                    reproductions_results,
+                ]
+            ),
+            "Supplementary": mo.vstack(
+                [
+                    mo.md("**Authority: Diagnostic** — complete output requires interpretation."),
+                    supplementary_intro,
+                    supplementary_controls,
+                    supplementary_save_status,
+                    supplementary_results,
+                    mo.accordion(
+                        {
+                            "Remote-first cache preparation": mo.vstack(
+                                [remote_intro, remote_controls, remote_status]
+                            )
+                        }
+                    ),
+                ]
+            ),
+            "Provenance": mo.vstack(
+                [
+                    mo.md(
+                        "**Authority: Provenance** — derivation and reference artifacts; "
+                        "not executable evidence."
+                    ),
+                    provenance_findings,
+                    provenance_audit,
+                ]
+            ),
+        }
     )
     return
 

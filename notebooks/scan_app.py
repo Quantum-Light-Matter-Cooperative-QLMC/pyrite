@@ -7,12 +7,15 @@
 import marimo
 
 __generated_with = "0.23.11"
-app = marimo.App()
+app = marimo.App(width="full")
 
 
 @app.cell
 def _():
+    from pathlib import Path
+
     import marimo as mo
+    from _design import context_rail, directional_state, page_title, style_sheet
 
     from cxr_mc.config import (
         COLLAPSE_AZIMUTH,
@@ -23,38 +26,44 @@ def _():
     )
     from cxr_mc.materials import CATALOG
     from cxr_mc.plots import stream_chunk
-    from cxr_mc.run import run_sweep
+    from cxr_mc.run import checkpoint_path_for, load_checkpoint, run_sweep
     from cxr_mc.sweep import build_cases, geometry_table
 
     return (
         COLLAPSE_AZIMUTH,
         CATALOG,
+        Path,
         build_cases,
+        checkpoint_path_for,
+        context_rail,
         default_settings,
+        directional_state,
         format_penetration_watchdog_summary,
         gate_cases_by_penetration,
         geometry_table,
         material_sweep,
         mo,
+        page_title,
+        load_checkpoint,
         run_sweep,
+        style_sheet,
         stream_chunk,
     )
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    # Bulk-crystal CXR — scan runner (marimo)
-
-    Runs the Monte-Carlo CXR parameter sweep for one material and writes the
-    per-material checkpoint (`checkpoints/<material>.pkl`). The companion analysis
-    app loads that checkpoint and draws every figure — keeping the long scan
-    and the (re-runnable) plotting in separate kernels.
-
-    Pick a material below, then run top to bottom. Every material's sweep grid
-    lives in `src/cxr_mc/data/materials.toml`, shared through the catalog so the
-    scan and analysis apps never drift.
-    """)
+def _(mo, page_title, style_sheet):
+    mo.vstack(
+        [
+            style_sheet(mo),
+            page_title(
+                mo,
+                "Bulk-crystal CXR scan",
+                "Preview catalog-backed geometry, checkpoint state, and penetration exclusions before starting resumable Monte Carlo work.",
+                eyebrow="Beamline control / scan",
+            ),
+        ]
+    )
     return
 
 
@@ -72,11 +81,14 @@ def _(CATALOG, mo):
 
 @app.cell
 def _(
+    CATALOG,
+    Path,
     build_cases,
+    checkpoint_path_for,
     default_settings,
     format_penetration_watchdog_summary,
     gate_cases_by_penetration,
-    geometry_table,
+    load_checkpoint,
     material_sweep,
     material_ui,
 ):
@@ -87,37 +99,144 @@ def _(
 
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
     cases, dropped = gate_cases_by_penetration(cases)
-    summary = format_penetration_watchdog_summary(dropped)
-    if summary is not None:
-        print(summary)
-    print(f"{len(cases)} cases across {len({c['name'] for c in cases})} configs")
-    return MATERIAL, cases, settings
+    penetration_summary = format_penetration_watchdog_summary(dropped)
+    checkpoint_path = Path(checkpoint_path_for(MATERIAL))
+    checkpoint_results = load_checkpoint(MATERIAL) if checkpoint_path.exists() else {}
+    requested_pairs = {(case["name"], case["E0_keV"]) for case in cases}
+    cached_pairs = {
+        (name, energy)
+        for name, energy_records in checkpoint_results.items()
+        for energy in energy_records
+    }
+    cached_count = len(requested_pairs & cached_pairs)
+    remaining_count = len(requested_pairs - cached_pairs)
+    configuration_count = len({case["name"] for case in cases})
+    material_label = CATALOG.material(MATERIAL).label
+    return (
+        MATERIAL,
+        cached_count,
+        cases,
+        checkpoint_path,
+        configuration_count,
+        dropped,
+        material_label,
+        penetration_summary,
+        remaining_count,
+        settings,
+    )
 
 
-@app.cell
-def _(cases, geometry_table):
-    geometry_table(cases)
+@app.cell(hide_code=True)
+def _(
+    MATERIAL,
+    cached_count,
+    cases,
+    checkpoint_path,
+    configuration_count,
+    context_rail,
+    directional_state,
+    dropped,
+    geometry_table,
+    material_label,
+    mo,
+    penetration_summary,
+    remaining_count,
+):
+    exclusion_detail = penetration_summary or "No cases excluded by penetration watchdog."
+    preview = mo.vstack(
+        [
+            context_rail(
+                mo,
+                {
+                    "Material": material_label,
+                    "Checkpoint": "Cached" if checkpoint_path.exists() else "Ready",
+                    "Cases": len(cases),
+                    "Configs": configuration_count,
+                    "Cached": cached_count,
+                    "Remaining": remaining_count,
+                },
+            ),
+            directional_state(
+                mo,
+                "Scan preview ready",
+                f"Checkpoint: `{checkpoint_path}`. Changing material updates this preview only; no compute starts.",
+                "Run scan" if cached_count == 0 else "Resume scan",
+            ),
+            mo.accordion(
+                {
+                    f"Penetration exclusions ({len(dropped)})": mo.md(exclusion_detail),
+                    "Geometry preview": mo.lazy(lambda: geometry_table(cases)),
+                },
+            ),
+        ]
+    )
+    preview
     return
 
 
 @app.cell
-def _(COLLAPSE_AZIMUTH, MATERIAL, cases, run_sweep, settings, stream_chunk):
+def _(cached_count, mo):
+    run_scan_ui = mo.ui.run_button(label="Resume scan" if cached_count else "Run scan")
+    run_scan_ui
+    return (run_scan_ui,)
+
+
+@app.cell
+def _(
+    COLLAPSE_AZIMUTH,
+    MATERIAL,
+    cached_count,
+    cases,
+    checkpoint_path,
+    directional_state,
+    mo,
+    remaining_count,
+    run_scan_ui,
+    run_sweep,
+    settings,
+    stream_chunk,
+):
+    mo.stop(
+        not run_scan_ui.value,
+        mo.callout(
+            f"Ready. {cached_count} cached; {remaining_count} remaining. Scan starts only from the button above.",
+            kind="info",
+        ),
+    )
     # Run (resumes from the checkpoint, skipping cached cases). The per-tilt
     # photon-counting tables stream live; all the figures are in the analysis app.
     results = {}
     try:
-        run_sweep(
-            cases,
-            results,
-            on_chunk=lambda batch: stream_chunk(
-                results, batch, settings, collapse_azimuth=COLLAPSE_AZIMUTH
-            ),
+        with mo.status.spinner(
+            title="Running checkpointed scan",
+            subtitle=f"Writing `{checkpoint_path}` after each completed configuration group.",
+        ):
+            run_sweep(
+                cases,
+                results,
+                on_chunk=lambda batch: stream_chunk(
+                    results, batch, settings, collapse_azimuth=COLLAPSE_AZIMUTH
+                ),
+            )
+    except EOFError as error:
+        if remaining_count == 0:
+            output = directional_state(
+                mo,
+                "Checkpoint already complete",
+                f"All requested cases already exist in `{checkpoint_path}`.",
+                f"cxr analyze {MATERIAL}",
+            )
+        else:
+            output = mo.callout(f"Scan failed while reading checkpoint: `{error}`", kind="danger")
+    else:
+        output = directional_state(
+            mo,
+            "Scan complete",
+            f"Results saved at `{checkpoint_path}`. Checkpoint remains resumable.",
+            f"cxr analyze {MATERIAL}",
+            kind="success",
         )
-    except EOFError:
-        print("EOF Error -- the script has already processed all data")
-
-    print(f"\nDone -> checkpoints/{MATERIAL}.pkl")
-    print("Open the analysis app with the same MATERIAL to visualize.")
+    output
     return
 
 

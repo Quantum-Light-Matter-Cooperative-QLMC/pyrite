@@ -44,6 +44,16 @@ def test_notebook_commands_only_target_the_legacy_validation_notebook(
     ]
 
 
+def test_nbqa_passes_ruff_subcommand_as_one_shell_command(dev_module, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+
+    dev_module.cmd_nbqa(Namespace())
+
+    notebook = str(dev_module.ROOT / "checks" / "cxr_analysis_feranchuk.ipynb")
+    assert calls == [("-m", "nbqa", "ruff check", notebook, "--nbqa-shell")]
+
+
 @pytest.mark.parametrize(
     ("command", "expected"),
     [

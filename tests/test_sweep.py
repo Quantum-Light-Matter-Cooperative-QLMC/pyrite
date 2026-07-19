@@ -24,6 +24,7 @@ from cxr_mc.sweep import (
     Sweep,
     build_cases,
     crystal_params,
+    fmt_thickness,
     geometry_table,
 )
 
@@ -49,6 +50,10 @@ ALL = [
     "v2o5",
     "tis2",
 ]
+
+
+def test_fmt_thickness_uses_millimetres_at_one_mm():
+    assert fmt_thickness(10_000_000.0) == "1mm"
 
 
 def test_sweep_requires_material():
@@ -473,7 +478,17 @@ def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcog
     grid = material_grid(material)
     np.testing.assert_array_equal(
         grid["thickness_ang"],
-        [1000.0, 5000.0, 10000.0, 40000.0, 100000.0, 200000.0, 500000.0, 1000000.0],
+        [
+            1000.0,
+            5000.0,
+            10000.0,
+            40000.0,
+            100000.0,
+            200000.0,
+            500000.0,
+            1000000.0,
+            10000000.0,
+        ],
     )
     assert "substrate" not in grid
 
@@ -524,7 +539,17 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
     grid = material_grid(material)
     np.testing.assert_array_equal(
         grid["thickness_ang"],
-        [1000.0, 5000.0, 10000.0, 40000.0, 100000.0, 200000.0, 500000.0, 1000000.0],
+        [
+            1000.0,
+            5000.0,
+            10000.0,
+            40000.0,
+            100000.0,
+            200000.0,
+            500000.0,
+            1000000.0,
+            10000000.0,
+        ],
     )
     assert "substrate" not in grid
 
@@ -583,14 +608,34 @@ def test_mote2_material_grid_is_bulk():
     assert "substrate" not in grid  # bulk material, no substrate in default grid
     np.testing.assert_array_equal(
         grid["thickness_ang"],
-        [1000.0, 5000.0, 10000.0, 40000.0, 100000.0, 200000.0, 500000.0, 1000000.0],
+        [
+            1000.0,
+            5000.0,
+            10000.0,
+            40000.0,
+            100000.0,
+            200000.0,
+            500000.0,
+            1000000.0,
+            10000000.0,
+        ],
     )
 
     sweep = material_sweep("mote2")
     assert sweep.substrate is None
     np.testing.assert_array_equal(
         sweep.thickness_ang,
-        [1000.0, 5000.0, 10000.0, 40000.0, 100000.0, 200000.0, 500000.0, 1000000.0],
+        [
+            1000.0,
+            5000.0,
+            10000.0,
+            40000.0,
+            100000.0,
+            200000.0,
+            500000.0,
+            1000000.0,
+            10000000.0,
+        ],
     )
 
 

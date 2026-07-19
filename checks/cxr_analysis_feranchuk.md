@@ -12,13 +12,29 @@ kernelspec:
   name: sci
 ---
 
-# Parametric X-ray Radiation (PXR)
+# Parametric X-ray Radiation (PXR) and Coherent Bremsstrahlung Radiation (CBR)
 
-# and Coherent Bremsstrahlung Radiation (CBR)
+## Contents
+
+- [Coordinate system and source equation](#coordinate-system-and-source-equation)
+- [Dielectric response and reciprocal-lattice notation](#dielectric-response-and-reciprocal-lattice-notation)
+- [Kinematic photon energy](#pxr-photon-energy-kinematic)
+- [Dynamical correction](#pxr-photon-energy-dynamical-correction)
+- [Assumptions, validity limits, and unresolved ambiguities](#assumptions-validity-limits-and-unresolved-ambiguities)
+- [Flux and amplitude derivation](#pxr-flux-and-amplitude-derivation)
+- [Numerical studies and figure interpretation](#numerical-studies-and-figure-interpretation)
+- [References](#references)
+
+## Coordinate System and Source Equation
+
+> **Source**
+> Kleiner et al. (1994) provides the far-field starting equation and notation used below.
 
 The coordinate system used in the following derivation is defined as in the following figure:
 
-![{5AE41139-D2AD-4701-A1B2-D9718DD67A1F}.png](attachment:{5AE41139-D2AD-4701-A1B2-D9718DD67A1F}.png)
+![Coordinate system for an electron incident on a crystal, showing the beam, reciprocal-lattice vector, diffracted photon direction, Bragg angle, and observation angle.](attachment:{5AE41139-D2AD-4701-A1B2-D9718DD67A1F}.png)
+
+*Coordinate system used for the PXR and CBR derivation.*
 
 +++
 
@@ -32,7 +48,12 @@ $$
 = 2 i \omega q\int \mathrm{d}t \, \mathbf{V}_q \, \delta(\mathbf{r} - \mathbf{r}_q)e^{i \omega t}
 $$
 
-where the dielectric function is
+## Dielectric Response and Reciprocal-Lattice Notation
+
+> **Assumption**
+> The derivation uses a small electron scattering angle and simplified units $\hbar=c=1$.
+
+The dielectric function is
 
 $$
 \varepsilon(\omega, \, r) = 1 + \varkappa_0(\omega) + \sum_g ' \varkappa_g (\omega)e^{i\mathbf{gr}}
@@ -136,6 +157,9 @@ The above expressions are valid in the small detuning regime, $\Delta_g \ll k_0$
 
 ## PXR Photon Energy (Kinematic)
 
+> **Assumption**
+> The kinematic result neglects $\xi_g^{(l)}$ when coupling is weak and/or the X-ray absorption length is much shorter than the extinction length.
+
 The PXR reflex in $E_\lambda^{(g)}$ is the term carrying the lattice vector $\mathbf{g}$ (the $\omega_g^2$ contribution);
 the $\mathbf{g}'$ sum describes coherent bremsstrahlung (CBR), which we set aside for the moment. The emitted PXR angular
 frequency for a given lattice vector $\mathbf{g}$, Bragg angle $\theta_B$, and observation angle $\Omega$ is fixed
@@ -218,7 +242,10 @@ $$
 \;}
 $$
 
-## PXR Photon Energy (Dynamical)
+## PXR Photon Energy (Dynamical Correction)
+
+> **Limit**
+> The full dynamical framework applies only when absorption, path length, and Bragg-detuning conditions permit sequential diffraction.
 
 Under the full dynamical framework, $\xi_g^{(l)}$ cannot be neglected. This is the case when the following conditions are met:
 1) X-ray absorption length within the crystal, $L_\mathrm{abs}$, is similar to or longer than the
@@ -321,14 +348,33 @@ lines per branch $l \in \{1,\, 2\}$, per polarization $\lambda \in \{1,\, 2\}$, 
 lattice vector $\mathbf{g}$ in the crystal. In our regime, the linewidths should be sufficiently broad
 so as to make the two lines indistinguishable.
 
-NOTE: The R.H.S implicitly contains $\omega_{\lambda g}^{(l)}$ via the $k_0$ terms within $\xi_{\lambda g}^{(l)}$.
+## Assumptions, Validity Limits, and Unresolved Ambiguities
+
+> **Limit**
+> The small-detuning expressions above require $\Delta_g \ll k_0$. The dynamical regime additionally requires the absorption length and actual X-ray path length to be comparable to or longer than the extinction length, with emission within roughly the Darwin width.
+
+> **Assumption**
+> In the numerical regime considered here, the two dynamical branches are treated as indistinguishable because their splitting is expected to remain below the linewidth.
+
+> **Interpretation**
+> The right-hand side implicitly contains $\omega_{\lambda g}^{(l)}$ through the $k_0$ terms within $\xi_{\lambda g}^{(l)}$.
+
+The R.H.S implicitly contains $\omega_{\lambda g}^{(l)}$ via the $k_0$ terms within $\xi_{\lambda g}^{(l)}$.
 The correction term $\xi_{\lambda g}^{(l)}$ is generally small compared to $k_0$ and $\mathbf{g}$
 (especially so in our energy regime), so it should generally be acceptable to evaluate
 $\xi_{\lambda g}^{(l)}$ at the approximate kinematic result for $\omega$.
 
-## PXR Photon Flux
+> **Unresolved ambiguity**
+> The dynamical correction is implicit in $\omega_{\lambda g}^{(l)}$; the calculation below evaluates it at the approximate kinematic result rather than solving the implicit relation exactly.
+
+## PXR Flux and Amplitude Derivation
 
 Assuming we examine small displacements about the Bragg angle
+
+## Numerical Studies and Figure Interpretation
+
+> **Interpretation**
+> The studies below compare line energy, coherent flux, and PXR fraction across emission angle, crystal, and fixed detector geometries. Figure-specific limits remain adjacent to each experiment.
 
 
 
@@ -342,20 +388,26 @@ Assuming we examine small displacements about the Bragg angle
 | `h_c` $=hc$                                           | $1.2398$ keV·nm                                                                                                                 |
 | `eps_0` $=\varepsilon_0\approx 1-(\omega_0/\omega)^2$ | mean crystal dielectric constant; $\sqrt{\varepsilon_0}\approx 1$ for X-rays (rendered as 1 in code, contributes &lt;0.1% here) |
 
+### Notebook Environment
+
+Core library modules live in `src/`; run this notebook from the repository root.
+
 ```{code-cell} ipython3
-# Core library modules live in src/; put it on the import path. Run from repo root.
 import sys
 
 sys.path.insert(0, "src")
 ```
 
+### Crystal and Reflection Selection
+
+Structure data—lattice, basis, interplanar spacing, and elements—comes from the bundled CIF catalog via `CRYSTALS`. Only reflection choices and plot labels live here.
+
 ```{code-cell} ipython3
-# Reflections to study. Structure data (lattice, basis -> d-spacing, elements)
-# comes from the bundled CIF catalog via CRYSTALS; only the reflection choice
-# and the plot label live here.
-import numpy as np
 import time
+
+import numpy as np
 from scipy import constants as const
+
 from cxr_mc.materials.crystal import CRYSTALS, reciprocal_g_vector
 
 reflections = {
@@ -379,28 +431,28 @@ for key, sel in reflections.items():
 ```
 
 ```{code-cell} ipython3
-import numpy as np
 import matplotlib.pyplot as plt
-from cxr_mc.materials.atomic import atomic_form_factor
-from cxr_mc.materials.crystal import (
-    beta_from_Ee,
-    absorption_length_ang,
-    reciprocal_g_vector,
-    Z_TABLE,
-    ALPHA_FS,
-    HC_EV_ANG,
-    CRYSTALS,
-)
+import numpy as np
 from feranchuk_spence import (
-    omega_n,
     amplitudes_PXR_CBS_sweep,
-    delta_g,
-    cxr_to_bremsstrahlung,
+)
+
+from cxr_mc.materials.crystal import (
+    ALPHA_FS,
+    CRYSTALS,
+    HC_EV_ANG,
+    Z_TABLE,
+    absorption_length_ang,
+    beta_from_Ee,
+    reciprocal_g_vector,
 )
 
 %matplotlib inline
+```
 
+### Shared Numerical Helpers
 
+```{code-cell} ipython3
 def plot_photon_energy(result, title):
     plt.figure(figsize=(8, 6))
     betas = result[:, 0]
@@ -522,11 +574,11 @@ def flux_and_ratio_vs_Omega(
     return E_keV, flux, pxr_frac
 ```
 
+### Study 1: Line Energy Versus Emission Angle
+
+Per-crystal configuration records `(hkl, Debye-Waller B [Ang²], use_henke)`. `use_henke=True` covers elements with edges in the 1–4 keV range (Si, Ge, Mo, and Se).
+
 ```{code-cell} ipython3
-# ============================================================================
-# per-crystal config: (hkl, Debye-Waller B [Ang^2], use_henke)
-# use_henke=True for elements with edges in 1-4 keV (Si, Ge, Mo, Se)
-# ============================================================================
 h_c = const.Planck * const.c / const.elementary_charge  # Convert J to eV
 eps_0 = 1
 electron_energies = np.array([30e3, 40e3, 50e3, 60e3])  # eV
@@ -584,11 +636,11 @@ for crystal in crystals_to_plot:
     ax_E.legend(fontsize=12, title="Electron energy")
 ```
 
+### Study 2: PXR and CBS Balance by Crystal
+
+This study repeats the per-crystal configuration over a broader electron-energy set and shows line energy, total coherent flux, and the PXR fraction in both angle and energy coordinates.
+
 ```{code-cell} ipython3
-# ============================================================================
-# per-crystal config: (hkl, Debye-Waller B [Ang^2], use_henke)
-# use_henke=True for elements with edges in 1-4 keV (Si, Ge, Mo, Se)
-# ============================================================================
 h_c = const.Planck * const.c / const.elementary_charge  # Convert J to eV
 eps_0 = 1
 electron_energies = np.array([15e3, 30e3, 45e3, 60e3, 75e3])  # eV
@@ -690,16 +742,12 @@ for crystal in crystals_to_plot:
 print(f"all crystals: {time.perf_counter() - t_all:.2f} s")
 ```
 
-[1] B. L. Henke, E. M. Gullikson, and J. C. Davis, "X-ray interactions: photoabsorption, scattering, transmission, and reflection at E = 50–30000 eV, Z = 1–92," Atomic Data and Nuclear Data Tables 54, 181–342 (1993). Data retrieved from the Center for X-Ray Optics, Lawrence Berkeley National Laboratory, https://henke.lbl.gov/optical_constants/ (accessed 2026).
+### Study 3: Cross-Crystal Overlay
 
-[2] Cromer–Mann four-Gaussian atomic form factor coefficients from International Tables for Crystallography, Vol. C, ed. E. Prince (Wiley, 2004), Ch. 6.1. Coefficients and calculator: P. Hadley, "Atomic form factors," Graz University of Technology, https://lampz.tugraz.at/~hadley/ss1/crystaldiffraction/atomicformfactors/formfactors.php (accessed 2026).
+> **Interpretation**
+> Each curve is parametric in $\Omega$ under the Bragg condition. The overlay asks which crystal reaches a given photon energy with the greatest flux and how PXR-dominated it is there.
 
 ```{code-cell} ipython3
-# ============================================================================
-# cross-crystal overlay at a fixed electron energy: which crystal reaches a
-# given photon energy with the most flux, and how PXR-dominated is it there?
-# (each curve is parametric in Omega, Bragg condition assumed)
-# ============================================================================
 for Ee_overlay_eV in [30e3, 45e3, 60e3]:
     beta_ov = beta_from_Ee(Ee_overlay_eV)
 
@@ -741,31 +789,20 @@ for Ee_overlay_eV in [30e3, 45e3, 60e3]:
     plt.show()
 ```
 
+### Study 4: Full Fixed-Crystal Spectrum Through the Detector Aperture
+
+The crystal is fixed at $\theta_\mathrm{Bragg}=22.5^\circ$ for the configured reflection, so $\Omega=45^\circ$ is its specular direction. All reciprocal vectors with $\mathbf{g}\cdot\mathbf{v}_0>0$ contribute a line through `cxr_lines_fixed` using the full Eq. 13/14 amplitudes.
+
+> **Interpretation**
+> The dense forest of weak high-$g$ lines is not detectable peak structure. It is the model's coherent decomposition of part of the bremsstrahlung continuum. Its binned level is cutoff-dependent: it grows approximately logarithmically with `g_max_invang`, because the transverse-$g$ sum is the Coulomb logarithm of bremsstrahlung, physically regulated only near electron momentum, $g\sim130\ \mathrm{\mathring{A}}^{-1}$. It sits at the incoherent-BS background of Eq. (17), shown as a dashed line. Trustworthy detectable peaks rise above that background under the Eq. (18) criterion, $\eta>1$, and appear as stems. The same `CAL` prefactor applies to lines and background, making their ratio meaningful.
+
+> **Limit**
+> Bins approximate detector resolution. Each line's intrinsic plus aperture width, below about 50 eV, occupies at most about one bin. Azimuth about the configured $\mathbf{g}$ follows the minimal-rotation convention; out-of-plane line positions depend on it.
+
+#### Fixed-Spectrum Configuration
+
 ```{code-cell} ipython3
-# ============================================================================
-# FULL energy spectrum through the detector aperture, crystal FIXED
-# ----------------------------------------------------------------------------
-# Crystal fixed at theta_Bragg = 22.5 deg for the configured reflection (so
-# Omega = 45 deg is its specular direction); all reciprocal vectors with
-# g.v0 > 0 contribute a line (cxr_lines_fixed, full Eq. 13/14 amplitudes).
-#
-# READING THIS FIGURE: the dense forest of weak high-g lines is NOT
-# detectable peak structure -- it is the model's coherent decomposition of
-# (part of) the bremsstrahlung continuum. Its binned level is cutoff-
-# dependent (grows ~logarithmically with g_max_invang: the transverse-g sum
-# is the Coulomb logarithm of bremsstrahlung, physically regulated only at
-# g ~ electron momentum ~130 1/A) and sits at the incoherent-BS background
-# of Eq. (17) (dashed line). Trustworthy, detectable peaks are the lines
-# rising ABOVE that background (Eq. 18 criterion, eta > 1) -- highlighted
-# as stems. The same CAL prefactor is applied to lines and background so the
-# ratio is meaningful.
-# Bins ~ detector resolution; each line's intrinsic + aperture width
-# (<~50 eV) is at most about one bin. The azimuthal setting about the
-# configured g is the minimal-rotation convention (out-of-plane line
-# positions depend on it).
-# ============================================================================
-from cxr_mc.materials.atomic import Z_TABLE
-from feranchuk_spence import cxr_lines_fixed, bremsstrahlung_background
+from feranchuk_spence import bremsstrahlung_background, cxr_lines_fixed
 
 Ee_spec_eV = 120e3
 beta_sp = beta_from_Ee(Ee_spec_eV)
@@ -778,7 +815,11 @@ E_min_eV, E_max_eV = 1000.0, 10000.0
 bin_edges_eV = np.arange(E_min_eV, E_max_eV + bin_eV, bin_eV)
 bin_ctr_eV = 0.5 * (bin_edges_eV[1:] + bin_edges_eV[:-1])
 n_e_per_s = current_A / 1.602176634e-19
+```
 
+#### Spectrum Calculation and Figure
+
+```{code-cell} ipython3
 fig, axes = plt.subplots(len(crystals_to_plot), 1, figsize=(14, 11), sharex=True)
 fig.suptitle(
     rf"CXR lines vs. bremsstrahlung background in the aperture "
@@ -788,7 +829,7 @@ fig.suptitle(
     fontsize=14,
 )
 
-for ax, crystal in zip(np.atleast_1d(axes), crystals_to_plot):
+for ax, crystal in zip(np.atleast_1d(axes), crystals_to_plot, strict=False):
     cfg = configs[crystal]
     info = CRYSTALS[crystal]
     el0 = info["basis"][0][0]
@@ -903,25 +944,19 @@ plt.tight_layout()
 plt.show()
 ```
 
+### Study 5: Paper Figure 2(a,b) Reproduction
+
+This study reproduces the ideal CXR spectra for Si at 120 keV and a $96^\circ$ observation angle, with electron velocity parallel to $\langle111\rangle$ in panel (a) and $\langle100\rangle$ in panel (b).
+
+> **Assumption**
+> “Electron velocity parallel to $\langle uvw\rangle$” is established by orienting the crystal, not the beam. `cxr_lines_fixed(beam_uvw=[u,v,w])` rotates direct-lattice direction $[uvw]$ onto beam axis $+z$. Along a zone axis every line energy depends only on $g_z$, so thousands of allowed reflections collapse onto a discrete series $E\sim(h+k+l\text{-projection})$. Azimuth about the axis (`azimuth_rad`) changes individual line intensities at the detector, but not series energies.
+
+> **Interpretation**
+> Dark fill is the PXR part, $\sum|A_\mathrm{PXR}|^2$; light bars are total CXR, analogous to the paper's filled and full bars. The paper's bar heights use its angle-independent Eq. (28) estimate, while these results use full Eqs. (13)/(14) at the specific detector geometry: $96^\circ$ and minimal-rotation azimuth. Relative heights can therefore differ; series positions should match exactly. The detector solid angle is the Table I value, 0.05 sr, and the vertical scale uses this notebook's beam current plus `CAL` anchor.
+
+#### Figure 2 Configuration
+
 ```{code-cell} ipython3
-# ============================================================================
-# Replication of paper Fig. 2 (a),(b): ideal CXR spectra, Si, 120 keV,
-# observation angle 96 deg, beam parallel to <111> (a) and <100> (b)
-# ----------------------------------------------------------------------------
-# "Electron velocity parallel to <uvw>" is set by ORIENTING THE CRYSTAL, not
-# the beam: cxr_lines_fixed(beam_uvw=[u,v,w]) rotates the direct-lattice
-# direction [uvw] onto the beam axis (+z). Along a zone axis every line
-# energy depends only on g_z, so the thousands of allowed reflections
-# collapse onto a discrete series E ~ (h+k+l-projection); the azimuth about
-# the axis (azimuth_rad) changes individual line intensities at the detector
-# but not the series energies.
-# Dark fill = PXR part (sum |A_PXR|^2), light bar = total CXR, the analog of
-# the paper's filled/full bars. NOTE: the paper's bar heights use their
-# angle-independent Eq. (28) estimate; ours use the full Eqs. (13)/(14) at
-# this specific detector geometry (96 deg, minimal-rotation azimuth), so
-# relative heights can differ -- series positions should match exactly.
-# dOmega from Table I (0.05 sr); y-scale uses our beam current + CAL anchor.
-# ============================================================================
 from feranchuk_spence import cxr_lines_fixed
 
 Ee_f2_eV = 120e3
@@ -937,7 +972,11 @@ info = CRYSTALS[crystal]
 n_atoms = len(info["basis"]) / info["V_cell"]
 B_si = configs[crystal]["B_ang2"]
 n_e_per_s = current_A / 1.602176634e-19
+```
 
+#### Figure 2 Calculation and Figure
+
+```{code-cell} ipython3
 fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(15, 5.0))
 fig.suptitle(
     rf"Paper Fig. 2 (a),(b) analog: Si, $E_e$={Ee_f2_eV / 1e3:.0f} keV, "
@@ -1019,3 +1058,9 @@ for ax, uvw, yscale, panel in (
 plt.tight_layout()
 plt.show()
 ```
+
+## References
+
+[1] B. L. Henke, E. M. Gullikson, and J. C. Davis, "X-ray interactions: photoabsorption, scattering, transmission, and reflection at E = 50–30000 eV, Z = 1–92," Atomic Data and Nuclear Data Tables 54, 181–342 (1993). Data retrieved from the Center for X-Ray Optics, Lawrence Berkeley National Laboratory, https://henke.lbl.gov/optical_constants/ (accessed 2026).
+
+[2] Cromer–Mann four-Gaussian atomic form factor coefficients from International Tables for Crystallography, Vol. C, ed. E. Prince (Wiley, 2004), Ch. 6.1. Coefficients and calculator: P. Hadley, "Atomic form factors," Graz University of Technology, https://lampz.tugraz.at/~hadley/ss1/crystaldiffraction/atomicformfactors/formfactors.php (accessed 2026).

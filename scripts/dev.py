@@ -149,7 +149,13 @@ def cmd_nbqa(_: argparse.Namespace) -> None:
     if not notebooks:
         print("No notebooks found.")
         return
-    run("-m", "nbqa", "ruff", "check", *[str(p) for p in notebooks])
+    run(
+        "-m",
+        "nbqa",
+        "ruff check",
+        *[str(p) for p in notebooks],
+        "--nbqa-shell",
+    )
 
 
 def cmd_nbstrip(_: argparse.Namespace) -> None:

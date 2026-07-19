@@ -6,7 +6,7 @@
 import marimo
 
 __generated_with = "0.23.11"
-app = marimo.App(width="medium")
+app = marimo.App(width="full")
 
 
 @app.cell
@@ -14,6 +14,7 @@ def _():
     import altair as alt
     import marimo as mo
     import traitlets
+    from _design import context_rail, directional_state, page_title, style_sheet
     from anywidget import AnyWidget
 
     class MaterialSelect(AnyWidget):
@@ -86,23 +87,28 @@ def _():
         sweep_values,
         top_geometries,
     )
-    from cxr_mc.run import cases_from_results, load_checkpoint
-    from cxr_mc.sweep import build_cases
+    from cxr_mc.run import cases_from_results, checkpoint_path_for, load_checkpoint
+    from cxr_mc.sweep import build_cases, fmt_thickness
 
     return (
         CATALOG,
         MaterialSelect,
         build_cases,
         cases_from_results,
+        checkpoint_path_for,
         compare_spectrum_chart,
+        context_rail,
         default_settings,
+        directional_state,
         eaglexo_charge_chart,
         eaglexo_detected_chart,
         filter_results,
+        fmt_thickness,
         heatmap_select_chart,
         load_checkpoint,
         metric_vs_chart,
         mo,
+        page_title,
         penetration_survival_chart,
         plot_best_spectra,
         plot_eaglexo_charge_map,
@@ -115,6 +121,7 @@ def _():
         select_results,
         spectrum_chart,
         sweep_values,
+        style_sheet,
         timepix_detected_chart,
         top_geometries,
         trajectory_chart,
@@ -123,12 +130,18 @@ def _():
 
 
 @app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    # Bulk-crystal Coherent X-ray Radiation — analysis & visualization
-    Loads the checkpoint written by **`scan_app.py`** and draws every figure — no
-    sweep runs here.
-    """)
+def _(mo, page_title, style_sheet):
+    mo.vstack(
+        [
+            style_sheet(mo),
+            page_title(
+                mo,
+                "Coherent X-ray radiation analysis",
+                "Explore checkpoint spectra, optimize geometry, inspect instrument response, and compare materials. No sweep runs here.",
+                eyebrow="Beamline control / analysis",
+            ),
+        ]
+    )
     return
 
 
@@ -167,6 +180,67 @@ def _(cases_from_results, default_settings, filter_results, load_checkpoint, mat
     return MATERIAL, cases, res, settings
 
 
+@app.cell(hide_code=True)
+def _(
+    CATALOG,
+    MATERIAL,
+    checkpoint_path_for,
+    context_rail,
+    directional_state,
+    mo,
+    records,
+    res,
+    sweep_values,
+):
+    checkpoint_path = checkpoint_path_for(MATERIAL) if MATERIAL is not None else None
+    checkpoint_records = list(records(res))
+    checkpoint_sweeps = sweep_values(res) if checkpoint_records else {}
+    swept_dimensions = {
+        name: len(values) for name, values in checkpoint_sweeps.items() if len(values) > 1
+    }
+    checkpoint_summary = mo.vstack(
+        [
+            context_rail(
+                mo,
+                {
+                    "Material": CATALOG.material(MATERIAL).label if MATERIAL else None,
+                    "Checkpoint": "loaded" if checkpoint_records else "empty",
+                    "Records": len(checkpoint_records),
+                    "Swept dimensions": len(swept_dimensions),
+                },
+            ),
+            (
+                mo.accordion(
+                    {
+                        "Checkpoint contents and provenance": mo.vstack(
+                            [
+                                mo.md(f"Path: `{checkpoint_path}`"),
+                                mo.ui.table(
+                                    [
+                                        {"dimension": name, "values": len(values)}
+                                        for name, values in checkpoint_sweeps.items()
+                                    ],
+                                    selection=None,
+                                ),
+                            ]
+                        )
+                    }
+                )
+                if checkpoint_records
+                else directional_state(
+                    mo,
+                    "Checkpoint is empty",
+                    f"No records found at `{checkpoint_path}`.",
+                    f"cxr scan {MATERIAL or '<material>'}",
+                    kind="warn",
+                )
+            ),
+        ]
+    )
+    checkpoint_summary
+    return
+
+
 @app.cell
 def _(mo, records, res):
     # Energy-comparison tilt selector. Created top-level for reactivity, rendered
@@ -178,7 +252,7 @@ def _(mo, records, res):
 
 
 @app.cell
-def _(mo, records, res, sweep_values):
+def _(fmt_thickness, mo, records, res, sweep_values):
     # Energy-comparison thickness selector. Created top-level for reactivity,
     # rendered only inside the Energy comparison tab.
     #
@@ -190,7 +264,7 @@ def _(mo, records, res, sweep_values):
     # dropdown to compare thicknesses. Shown only when >1 thickness was swept; a
     # single-thickness checkpoint leaves the slice a no-op.
     _thk = sweep_values(res).get("thickness_ang", []) if records(res) else []
-    _opts = {f"{t:g} Å ({t / 1e4:g} µm)": t for t in _thk} or {"— no data —": None}
+    _opts = {fmt_thickness(t): t for t in _thk} or {"— no data —": None}
     thickness_ui = mo.ui.dropdown(_opts, value=list(_opts)[-1], label="crystal thickness")
     return (thickness_ui,)
 
@@ -209,10 +283,10 @@ def _(res, select_results, thickness_ui):
 
 
 @app.cell
-def _(mo, records, res, sweep_values):
+def _(fmt_thickness, mo, records, res, sweep_values):
     # Geometry & scans thickness selector.
     _thk = sweep_values(res).get("thickness_ang", []) if records(res) else []
-    _opts = {f"{t:g} Å ({t / 1e4:g} µm)": t for t in _thk} or {"— no data —": None}
+    _opts = {fmt_thickness(t): t for t in _thk} or {"— no data —": None}
     scan_thickness_ui = mo.ui.dropdown(_opts, value=list(_opts)[-1], label="crystal thickness")
     return (scan_thickness_ui,)
 
@@ -228,7 +302,7 @@ def _(res, scan_thickness_ui, select_results):
 
 
 @app.cell
-def _(mo, records, res, sweep_values):
+def _(fmt_thickness, mo, records, res, sweep_values):
     # Detector tab selectors.
     _sv = sweep_values(res) if records(res) else {}
     _tilts = _sv.get("tilt_deg", [])
@@ -237,29 +311,33 @@ def _(mo, records, res, sweep_values):
     _tilt_opts = {f"{t:g} deg": t for t in _tilts} or {"— no data —": None}
     detector_tilt_ui = mo.ui.dropdown(_tilt_opts, value=next(iter(_tilt_opts)), label="polar tilt")
 
-    _azim_opts = {f"{a:g} deg": a for a in _azim} or {"â€” no data â€”": None}
+    _azim_opts = {f"{a:g} °": a for a in _azim} or {"— no data —": None}
     detector_azim_ui = mo.ui.dropdown(_azim_opts, value=next(iter(_azim_opts)), label="azimuth")
 
-    _thk_opts = {f"{t:g} Å ({t / 1e4:g} µm)": t for t in _thk} or {"— no data —": None}
+    _thk_opts = {fmt_thickness(t): t for t in _thk} or {"— no data —": None}
     detector_thickness_ui = mo.ui.dropdown(
         _thk_opts, value=list(_thk_opts)[-1], label="crystal thickness"
     )
 
-    detector_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV, 0 = auto)")
-    detector_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV, 0 = auto)")
-    detector_ymin_ui = mo.ui.number(value=0.0, label="narrow y-min (0 = auto)")
-    detector_ymax_ui = mo.ui.number(value=0.0, label="narrow y-max (0 = auto)")
+    detector_auto_ui = mo.ui.switch(value=True, label="Auto narrow domains")
+    detector_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV)")
+    detector_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV)")
+    detector_ymin_ui = mo.ui.number(value=0.0, label="narrow y-min")
+    detector_ymax_ui = mo.ui.number(value=0.0, label="narrow y-max")
     detector_xlog_ui = mo.ui.switch(value=False, label="narrow log x")
     detector_ylog_ui = mo.ui.switch(value=True, label="narrow log y")
 
-    detector_broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV, 0 = auto)")
-    detector_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV, 0 = auto)")
-    detector_broad_ymin_ui = mo.ui.number(value=0.0, label="broad y-min (0 = auto)")
-    detector_broad_ymax_ui = mo.ui.number(value=0.0, label="broad y-max (0 = auto)")
+    detector_broad_auto_ui = mo.ui.switch(value=True, label="Auto broad domains")
+    detector_broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV)")
+    detector_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV)")
+    detector_broad_ymin_ui = mo.ui.number(value=0.0, label="broad y-min")
+    detector_broad_ymax_ui = mo.ui.number(value=0.0, label="broad y-max")
     detector_broad_xlog_ui = mo.ui.switch(value=True, label="broad log x")
     detector_broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
     return (
         detector_azim_ui,
+        detector_auto_ui,
+        detector_broad_auto_ui,
         detector_broad_xlog_ui,
         detector_broad_xmax_ui,
         detector_broad_xmin_ui,
@@ -290,6 +368,8 @@ def _(detector_azim_ui, detector_thickness_ui, res, select_results):
 
 @app.cell
 def _(
+    detector_auto_ui,
+    detector_broad_auto_ui,
     detector_broad_xmax_ui,
     detector_broad_xmin_ui,
     detector_broad_ymax_ui,
@@ -299,15 +379,27 @@ def _(
     detector_ymax_ui,
     detector_ymin_ui,
 ):
-    def _domain(xmin, xmax):
-        if not xmin and not xmax:
+    def _domain(auto, xmin, xmax):
+        if auto:
             return None
-        return (xmin if xmin else None, xmax if xmax else None)
+        return (xmin, xmax)
 
-    detector_x_domain = _domain(detector_xmin_ui.value, detector_xmax_ui.value)
-    detector_y_domain = _domain(detector_ymin_ui.value, detector_ymax_ui.value)
-    detector_broad_x_domain = _domain(detector_broad_xmin_ui.value, detector_broad_xmax_ui.value)
-    detector_broad_y_domain = _domain(detector_broad_ymin_ui.value, detector_broad_ymax_ui.value)
+    detector_x_domain = _domain(
+        detector_auto_ui.value, detector_xmin_ui.value, detector_xmax_ui.value
+    )
+    detector_y_domain = _domain(
+        detector_auto_ui.value, detector_ymin_ui.value, detector_ymax_ui.value
+    )
+    detector_broad_x_domain = _domain(
+        detector_broad_auto_ui.value,
+        detector_broad_xmin_ui.value,
+        detector_broad_xmax_ui.value,
+    )
+    detector_broad_y_domain = _domain(
+        detector_broad_auto_ui.value,
+        detector_broad_ymin_ui.value,
+        detector_broad_ymax_ui.value,
+    )
     return (
         detector_broad_x_domain,
         detector_broad_y_domain,
@@ -317,7 +409,7 @@ def _(
 
 
 @app.cell
-def _(CATALOG, MATERIAL, mo):
+def _(CATALOG, MATERIAL, fmt_thickness, mo):
     # The penetration figures run transport directly, so use the selected
     # material's configured scan grids instead of requiring a checkpoint.
     _scan = CATALOG.material(MATERIAL).scan
@@ -342,8 +434,8 @@ def _(CATALOG, MATERIAL, mo):
         _source_options, value="material scan grid", label="crystal thickness source"
     )
     penetration_thickness_grid_ui = mo.ui.dropdown(
-        {f"{value:g} Å ({value / 1e4:g} µm)": value for value in _thickness_values},
-        value=f"{_thickness_values[0]:g} Å ({_thickness_values[0] / 1e4:g} µm)",
+        {fmt_thickness(value): value for value in _thickness_values},
+        value=fmt_thickness(_thickness_values[0]),
         label="crystal thickness",
     )
     penetration_thickness_manual_ui = mo.ui.number(
@@ -454,7 +546,7 @@ def _(heatmap_E0_ui, heatmap_select_chart, mo, res_view, settings):
 
 
 @app.cell
-def _(mo, records, res, sweep_values):
+def _(fmt_thickness, mo, records, res, sweep_values):
     # Selectors for the "Polar-angle comparison" tab -- overlays one spectrum
     # line per POLAR TILT, so the OTHER swept knobs (beam energy, azimuth,
     # thickness) must each be pinned to a single value here. Built as TOP-LEVEL
@@ -475,7 +567,7 @@ def _(mo, records, res, sweep_values):
     _azim_opts = {f"{a:g} deg": a for a in _azim} or {"— no data —": None}
     polar_azim_ui = mo.ui.dropdown(_azim_opts, value=next(iter(_azim_opts)), label="azimuth")
 
-    _thk_opts = {f"{t:g} Å ({t / 1e4:g} µm)": t for t in _thk} or {"— no data —": None}
+    _thk_opts = {fmt_thickness(t): t for t in _thk} or {"— no data —": None}
     polar_thk_ui = mo.ui.dropdown(_thk_opts, value=list(_thk_opts)[-1], label="thickness")
 
     # Default multiselect picks up to ~4 tilts spread across the available
@@ -496,7 +588,7 @@ def _(mo, records, res, sweep_values):
 
 
 @app.cell
-def _(mo, records, res, sweep_values):
+def _(fmt_thickness, mo, records, res, sweep_values):
     # Selectors for the "Azimuthal comparison" tab -- overlays one spectrum
     # line per AZIMUTH, pinning beam energy / polar tilt / thickness. Same
     # top-level-DAG requirement as the polar-tab selectors above.
@@ -512,7 +604,7 @@ def _(mo, records, res, sweep_values):
     _tilt_opts = {f"{t:g} deg": t for t in _tilts} or {"— no data —": None}
     azim_tilt_ui = mo.ui.dropdown(_tilt_opts, value=next(iter(_tilt_opts)), label="polar tilt")
 
-    _thk_opts = {f"{t:g} Å ({t / 1e4:g} µm)": t for t in _thk} or {"— no data —": None}
+    _thk_opts = {fmt_thickness(t): t for t in _thk} or {"— no data —": None}
     azim_thk_ui = mo.ui.dropdown(_thk_opts, value=list(_thk_opts)[-1], label="thickness")
 
     if len(_azim) <= 4:
@@ -533,18 +625,22 @@ def _(mo, records, res, sweep_values):
 def _(mo):
     # Polar-angle comparison spectral controls.
     polar_brem_ui = mo.ui.checkbox(value=True, label="show brem background")
-    polar_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV, 0 = auto)")
-    polar_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV, 0 = auto)")
+    polar_auto_ui = mo.ui.switch(value=True, label="Auto narrow domain")
+    polar_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV)")
+    polar_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV)")
     polar_xlog_ui = mo.ui.switch(value=False, label="narrow log x")
     polar_ylog_ui = mo.ui.switch(value=False, label="narrow log y")
 
-    polar_broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV, 0 = auto)")
-    polar_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV, 0 = auto)")
+    polar_broad_auto_ui = mo.ui.switch(value=True, label="Auto broad domain")
+    polar_broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV)")
+    polar_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV)")
     polar_broad_xlog_ui = mo.ui.switch(value=False, label="broad log x")
     polar_broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
 
     return (
         polar_brem_ui,
+        polar_auto_ui,
+        polar_broad_auto_ui,
         polar_broad_xlog_ui,
         polar_broad_xmax_ui,
         polar_broad_xmin_ui,
@@ -557,14 +653,23 @@ def _(mo):
 
 
 @app.cell
-def _(polar_broad_xmax_ui, polar_broad_xmin_ui, polar_xmax_ui, polar_xmin_ui):
-    def _domain(xmin, xmax):
-        if not xmin and not xmax:
+def _(
+    polar_auto_ui,
+    polar_broad_auto_ui,
+    polar_broad_xmax_ui,
+    polar_broad_xmin_ui,
+    polar_xmax_ui,
+    polar_xmin_ui,
+):
+    def _domain(auto, xmin, xmax):
+        if auto:
             return None
-        return (xmin if xmin else None, xmax if xmax else None)
+        return (xmin, xmax)
 
-    polar_x_domain = _domain(polar_xmin_ui.value, polar_xmax_ui.value)
-    polar_broad_x_domain = _domain(polar_broad_xmin_ui.value, polar_broad_xmax_ui.value)
+    polar_x_domain = _domain(polar_auto_ui.value, polar_xmin_ui.value, polar_xmax_ui.value)
+    polar_broad_x_domain = _domain(
+        polar_broad_auto_ui.value, polar_broad_xmin_ui.value, polar_broad_xmax_ui.value
+    )
     return polar_broad_x_domain, polar_x_domain
 
 
@@ -572,18 +677,22 @@ def _(polar_broad_xmax_ui, polar_broad_xmin_ui, polar_xmax_ui, polar_xmin_ui):
 def _(mo):
     # Azimuthal comparison spectral controls.
     azim_brem_ui = mo.ui.checkbox(value=True, label="show brem background")
-    azim_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV, 0 = auto)")
-    azim_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV, 0 = auto)")
+    azim_auto_ui = mo.ui.switch(value=True, label="Auto narrow domain")
+    azim_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV)")
+    azim_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV)")
     azim_xlog_ui = mo.ui.switch(value=False, label="narrow log x")
     azim_ylog_ui = mo.ui.switch(value=False, label="narrow log y")
 
-    azim_broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV, 0 = auto)")
-    azim_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV, 0 = auto)")
+    azim_broad_auto_ui = mo.ui.switch(value=True, label="Auto broad domain")
+    azim_broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV)")
+    azim_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV)")
     azim_broad_xlog_ui = mo.ui.switch(value=False, label="broad log x")
     azim_broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
 
     return (
         azim_brem_ui,
+        azim_auto_ui,
+        azim_broad_auto_ui,
         azim_broad_xlog_ui,
         azim_broad_xmax_ui,
         azim_broad_xmin_ui,
@@ -596,14 +705,23 @@ def _(mo):
 
 
 @app.cell
-def _(azim_broad_xmax_ui, azim_broad_xmin_ui, azim_xmax_ui, azim_xmin_ui):
-    def _domain(xmin, xmax):
-        if not xmin and not xmax:
+def _(
+    azim_auto_ui,
+    azim_broad_auto_ui,
+    azim_broad_xmax_ui,
+    azim_broad_xmin_ui,
+    azim_xmax_ui,
+    azim_xmin_ui,
+):
+    def _domain(auto, xmin, xmax):
+        if auto:
             return None
-        return (xmin if xmin else None, xmax if xmax else None)
+        return (xmin, xmax)
 
-    azim_x_domain = _domain(azim_xmin_ui.value, azim_xmax_ui.value)
-    azim_broad_x_domain = _domain(azim_broad_xmin_ui.value, azim_broad_xmax_ui.value)
+    azim_x_domain = _domain(azim_auto_ui.value, azim_xmin_ui.value, azim_xmax_ui.value)
+    azim_broad_x_domain = _domain(
+        azim_broad_auto_ui.value, azim_broad_xmin_ui.value, azim_broad_xmax_ui.value
+    )
     return azim_broad_x_domain, azim_x_domain
 
 
@@ -613,23 +731,27 @@ def _(mo):
     # rendered only inside the Energy comparison tab.
     brem_ui = mo.ui.checkbox(value=True, label="show brem background")
 
-    narrow_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV, 0 = auto)")
-    narrow_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV, 0 = auto)")
+    narrow_auto_ui = mo.ui.switch(value=True, label="Auto narrow domain")
+    narrow_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV)")
+    narrow_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV)")
     narrow_xlog_ui = mo.ui.switch(value=False, label="narrow log x")
     ylog_ui = mo.ui.switch(value=False, label="narrow log y")
 
-    broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV, 0 = auto)")
-    broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV, 0 = auto)")
+    broad_auto_ui = mo.ui.switch(value=True, label="Auto broad domain")
+    broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV)")
+    broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV)")
     broad_xlog_ui = mo.ui.switch(value=False, label="broad log x")
     broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
 
     return (
         brem_ui,
+        broad_auto_ui,
         broad_xlog_ui,
         broad_xmax_ui,
         broad_xmin_ui,
         broad_ylog_ui,
         narrow_xlog_ui,
+        narrow_auto_ui,
         narrow_xmax_ui,
         narrow_xmin_ui,
         ylog_ui,
@@ -637,24 +759,34 @@ def _(mo):
 
 
 @app.cell
-def _(broad_xmax_ui, broad_xmin_ui, narrow_xmax_ui, narrow_xmin_ui):
-    # (0, 0) -> None (autoscale); otherwise an explicit (lo, hi) domain.
-    def _domain(xmin, xmax):
-        if not xmin and not xmax:
+def _(
+    broad_auto_ui,
+    broad_xmax_ui,
+    broad_xmin_ui,
+    narrow_auto_ui,
+    narrow_xmax_ui,
+    narrow_xmin_ui,
+):
+    def _domain(auto, xmin, xmax):
+        if auto:
             return None
-        return (xmin if xmin else None, xmax if xmax else None)
+        return (xmin, xmax)
 
-    x_domain = _domain(narrow_xmin_ui.value, narrow_xmax_ui.value)
-    broad_x_domain = _domain(broad_xmin_ui.value, broad_xmax_ui.value)
+    x_domain = _domain(narrow_auto_ui.value, narrow_xmin_ui.value, narrow_xmax_ui.value)
+    broad_x_domain = _domain(broad_auto_ui.value, broad_xmin_ui.value, broad_xmax_ui.value)
     return broad_x_domain, x_domain
 
 
 @app.cell
 def _(
     MATERIAL,
+    context_rail,
+    fmt_thickness,
     mo,
+    records,
     res,
     settings,
+    sweep_values,
     top_geometries,
 ):
     def rankings_tab():
@@ -662,10 +794,34 @@ def _(
         # thickness column disambiguates rows, so a thickness sweep shows every
         # thickness competing head-to-head rather than being collapsed to the pin.
         df = top_geometries(res, settings, top_n=20, select="quality_peak")
+        _sv = sweep_values(res) if records(res) else {}
+
+        def _dimension(key, unit):
+            _values = _sv.get(key, [])
+            if len(_values) > 1:
+                return "multiple"
+            if key == "thickness_ang" and _values:
+                return fmt_thickness(_values[0])
+            return f"{_values[0]:g} {unit}" if _values else None
+
+        _rail = context_rail(
+            mo,
+            {
+                "Material": MATERIAL,
+                "E0": _dimension("E0_keV", "keV"),
+                "theta": _dimension("tilt_deg", "°"),
+                "phi": _dimension("tilt_azim_deg", "°"),
+                "Thickness": _dimension("thickness_ang", "Å"),
+                "Records": len(records(res)),
+            },
+        )
         if df.empty:
-            return mo.md(f"**No checkpoint for `{MATERIAL}`** — run `scan_app.py` first.")
+            return mo.vstack(
+                [_rail, mo.md(f"**No checkpoint for `{MATERIAL}`** — run `scan_app.py` first.")]
+            )
         return mo.vstack(
             [
+                _rail,
                 mo.md(
                     f"Top 20 geometries ranked by *quality × peak flux* "
                     f"({settings.beam_current_na:g} nA beam; quality score in [0, 1])."
@@ -686,15 +842,20 @@ def _(
 
 @app.cell
 def _(
+    MATERIAL,
     brem_ui,
+    broad_auto_ui,
     broad_x_domain,
     broad_xlog_ui,
     broad_xmax_ui,
     broad_xmin_ui,
     broad_ylog_ui,
+    context_rail,
+    fmt_thickness,
     heatmap_E0_ui,
     heatmap_select,
     mo,
+    narrow_auto_ui,
     narrow_xlog_ui,
     narrow_xmax_ui,
     narrow_xmin_ui,
@@ -712,24 +873,69 @@ def _(
 ):
     def spectra_tab():
         _md = mo.md(
-            "The INTRINSIC coherent CXR line spectrum at the selected polar tilt, "
-            "one line per beam energy."
+            "Coherent CXR line spectra at pinned polar tilt and thickness. "
+            "Beam energy varies across curves."
         )
         _sv = sweep_values(res) if records(res) else {}
+        _rail = context_rail(
+            mo,
+            {
+                "Material": MATERIAL,
+                "E0": "multiple"
+                if len(_sv.get("E0_keV", [])) > 1
+                else (f"{_sv['E0_keV'][0]:g} keV" if _sv.get("E0_keV") else None),
+                "theta": f"{tilt_ui.value:g} °" if tilt_ui.value is not None else None,
+                "phi": "best per E0",
+                "Thickness": (
+                    fmt_thickness(thickness_ui.value) if thickness_ui.value is not None else None
+                ),
+                "Records": len(
+                    records(select_results(res_view, tilt_deg=tilt_ui.value))
+                    if tilt_ui.value is not None
+                    else records(res_view)
+                ),
+            },
+        )
         _thk_widget = (
             thickness_ui
             if len(_sv.get("thickness_ang", [])) > 1
             else mo.md(
-                f"crystal thickness: {thickness_ui.value:g} Å"
+                f"crystal thickness: {fmt_thickness(thickness_ui.value)}"
                 if thickness_ui.value is not None
                 else ""
             )
         )
         _controls = mo.vstack(
             [
-                mo.hstack([tilt_ui, _thk_widget, brem_ui]),
-                mo.hstack([narrow_xmin_ui, narrow_xmax_ui, narrow_xlog_ui, ylog_ui]),
-                mo.hstack([broad_xmin_ui, broad_xmax_ui, broad_xlog_ui, broad_ylog_ui]),
+                mo.hstack([tilt_ui, _thk_widget, brem_ui], wrap=True),
+                mo.accordion(
+                    {
+                        "Axes and scaling": mo.vstack(
+                            [
+                                mo.hstack(
+                                    [
+                                        narrow_auto_ui,
+                                        narrow_xmin_ui,
+                                        narrow_xmax_ui,
+                                        narrow_xlog_ui,
+                                        ylog_ui,
+                                    ],
+                                    wrap=True,
+                                ),
+                                mo.hstack(
+                                    [
+                                        broad_auto_ui,
+                                        broad_xmin_ui,
+                                        broad_xmax_ui,
+                                        broad_xlog_ui,
+                                        broad_ylog_ui,
+                                    ],
+                                    wrap=True,
+                                ),
+                            ]
+                        )
+                    }
+                ),
             ]
         )
 
@@ -813,6 +1019,7 @@ def _(
         )
         return mo.vstack(
             [
+                _rail,
                 _md,
                 _controls,
                 mo.md("**Narrowband**"),
@@ -835,11 +1042,16 @@ def _(
 
 @app.cell
 def _(
+    MATERIAL,
     compare_spectrum_chart,
+    context_rail,
+    fmt_thickness,
     mo,
     polar_E0_ui,
     polar_azim_ui,
+    polar_auto_ui,
     polar_brem_ui,
+    polar_broad_auto_ui,
     polar_broad_x_domain,
     polar_broad_xlog_ui,
     polar_broad_xmax_ui,
@@ -867,21 +1079,66 @@ def _(
         # res_view would apply the (unrelated) top-of-notebook thickness pin
         # underneath it.
         _md = mo.md(
-            "The INTRINSIC coherent CXR line spectrum, one line per POLAR TILT, at "
-            "a pinned beam energy / azimuth / thickness. Pick a few tilts below to "
-            "compare."
+            "Coherent CXR line spectra at pinned beam energy, azimuth, and thickness. "
+            "Polar tilt varies across selected curves."
+        )
+        _selected_tilts = list(polar_tilts_ui.value)
+        _rail_constraints = {"tilt_deg": _selected_tilts}
+        if polar_E0_ui.value is not None:
+            _rail_constraints["E0_keV"] = polar_E0_ui.value
+        if polar_azim_ui.value is not None:
+            _rail_constraints["tilt_azim_deg"] = polar_azim_ui.value
+        if polar_thk_ui.value is not None:
+            _rail_constraints["thickness_ang"] = polar_thk_ui.value
+        _rail = context_rail(
+            mo,
+            {
+                "Material": MATERIAL,
+                "E0": f"{polar_E0_ui.value:g} keV" if polar_E0_ui.value is not None else None,
+                "theta": (
+                    "multiple"
+                    if len(_selected_tilts) > 1
+                    else f"{_selected_tilts[0]:g} °"
+                    if _selected_tilts
+                    else None
+                ),
+                "phi": (f"{polar_azim_ui.value:g} °" if polar_azim_ui.value is not None else None),
+                "Thickness": (
+                    fmt_thickness(polar_thk_ui.value) if polar_thk_ui.value is not None else None
+                ),
+                "Records": len(records(select_results(res, **_rail_constraints))),
+            },
         )
         _spectral_controls = mo.vstack(
             [
                 polar_brem_ui,
-                mo.hstack([polar_xmin_ui, polar_xmax_ui, polar_xlog_ui, polar_ylog_ui]),
-                mo.hstack(
-                    [
-                        polar_broad_xmin_ui,
-                        polar_broad_xmax_ui,
-                        polar_broad_xlog_ui,
-                        polar_broad_ylog_ui,
-                    ]
+                mo.accordion(
+                    {
+                        "Axes and scaling": mo.vstack(
+                            [
+                                mo.hstack(
+                                    [
+                                        polar_auto_ui,
+                                        polar_xmin_ui,
+                                        polar_xmax_ui,
+                                        polar_xlog_ui,
+                                        polar_ylog_ui,
+                                    ],
+                                    wrap=True,
+                                ),
+                                mo.hstack(
+                                    [
+                                        polar_broad_auto_ui,
+                                        polar_broad_xmin_ui,
+                                        polar_broad_xmax_ui,
+                                        polar_broad_xlog_ui,
+                                        polar_broad_ylog_ui,
+                                    ],
+                                    wrap=True,
+                                ),
+                            ]
+                        )
+                    }
                 ),
             ]
         )
@@ -904,7 +1161,9 @@ def _(
             polar_thk_ui
             if len(_sv.get("thickness_ang", [])) > 1
             else mo.md(
-                f"thickness: {polar_thk_ui.value:g} Å" if polar_thk_ui.value is not None else ""
+                f"thickness: {fmt_thickness(polar_thk_ui.value)}"
+                if polar_thk_ui.value is not None
+                else ""
             )
         )
         _note = (
@@ -915,6 +1174,7 @@ def _(
         if not polar_tilts_ui.value:
             return mo.vstack(
                 [
+                    _rail,
                     _md,
                     _e0_widget,
                     _azim_widget,
@@ -967,7 +1227,15 @@ def _(
             )
             return _chart if _chart is not None else mo.md("*No broadband spectra for this slice.*")
 
-        _parts = [_md, _e0_widget, _azim_widget, _thk_widget, _spectral_controls, polar_tilts_ui]
+        _parts = [
+            _rail,
+            _md,
+            _e0_widget,
+            _azim_widget,
+            _thk_widget,
+            _spectral_controls,
+            polar_tilts_ui,
+        ]
         if _note is not None:
             _parts.append(_note)
         _parts.extend(
@@ -985,9 +1253,12 @@ def _(
 
 @app.cell
 def _(
+    MATERIAL,
     azim_E0_ui,
     azim_azims_ui,
+    azim_auto_ui,
     azim_brem_ui,
+    azim_broad_auto_ui,
     azim_broad_x_domain,
     azim_broad_xlog_ui,
     azim_broad_xmax_ui,
@@ -1001,6 +1272,8 @@ def _(
     azim_xmin_ui,
     azim_ylog_ui,
     compare_spectrum_chart,
+    context_rail,
+    fmt_thickness,
     mo,
     records,
     res,
@@ -1014,21 +1287,66 @@ def _(
         # mirrors _polar_compare_tab with the swept dimension swapped. Also
         # uses the raw `res`; thickness is pinned by azim_thk_ui here.
         _md = mo.md(
-            "The INTRINSIC coherent CXR line spectrum, one line per AZIMUTH, at "
-            "a pinned beam energy / polar tilt / thickness. Pick a few azimuths "
-            "below to compare."
+            "Coherent CXR line spectra at pinned beam energy, polar tilt, and thickness. "
+            "Azimuth varies across selected curves."
+        )
+        _selected_azims = list(azim_azims_ui.value)
+        _rail_constraints = {"tilt_azim_deg": _selected_azims}
+        if azim_E0_ui.value is not None:
+            _rail_constraints["E0_keV"] = azim_E0_ui.value
+        if azim_tilt_ui.value is not None:
+            _rail_constraints["tilt_deg"] = azim_tilt_ui.value
+        if azim_thk_ui.value is not None:
+            _rail_constraints["thickness_ang"] = azim_thk_ui.value
+        _rail = context_rail(
+            mo,
+            {
+                "Material": MATERIAL,
+                "E0": f"{azim_E0_ui.value:g} keV" if azim_E0_ui.value is not None else None,
+                "theta": f"{azim_tilt_ui.value:g} °" if azim_tilt_ui.value is not None else None,
+                "phi": (
+                    "multiple"
+                    if len(_selected_azims) > 1
+                    else f"{_selected_azims[0]:g} °"
+                    if _selected_azims
+                    else None
+                ),
+                "Thickness": (
+                    fmt_thickness(azim_thk_ui.value) if azim_thk_ui.value is not None else None
+                ),
+                "Records": len(records(select_results(res, **_rail_constraints))),
+            },
         )
         _spectral_controls = mo.vstack(
             [
                 azim_brem_ui,
-                mo.hstack([azim_xmin_ui, azim_xmax_ui, azim_xlog_ui, azim_ylog_ui]),
-                mo.hstack(
-                    [
-                        azim_broad_xmin_ui,
-                        azim_broad_xmax_ui,
-                        azim_broad_xlog_ui,
-                        azim_broad_ylog_ui,
-                    ]
+                mo.accordion(
+                    {
+                        "Axes and scaling": mo.vstack(
+                            [
+                                mo.hstack(
+                                    [
+                                        azim_auto_ui,
+                                        azim_xmin_ui,
+                                        azim_xmax_ui,
+                                        azim_xlog_ui,
+                                        azim_ylog_ui,
+                                    ],
+                                    wrap=True,
+                                ),
+                                mo.hstack(
+                                    [
+                                        azim_broad_auto_ui,
+                                        azim_broad_xmin_ui,
+                                        azim_broad_xmax_ui,
+                                        azim_broad_xlog_ui,
+                                        azim_broad_ylog_ui,
+                                    ],
+                                    wrap=True,
+                                ),
+                            ]
+                        )
+                    }
                 ),
             ]
         )
@@ -1051,7 +1369,9 @@ def _(
             azim_thk_ui
             if len(_sv.get("thickness_ang", [])) > 1
             else mo.md(
-                f"thickness: {azim_thk_ui.value:g} Å" if azim_thk_ui.value is not None else ""
+                f"thickness: {fmt_thickness(azim_thk_ui.value)}"
+                if azim_thk_ui.value is not None
+                else ""
             )
         )
         _note = (
@@ -1062,6 +1382,7 @@ def _(
         if not azim_azims_ui.value:
             return mo.vstack(
                 [
+                    _rail,
                     _md,
                     _e0_widget,
                     _tilt_widget,
@@ -1114,7 +1435,15 @@ def _(
             )
             return _chart if _chart is not None else mo.md("*No broadband spectra for this slice.*")
 
-        _parts = [_md, _e0_widget, _tilt_widget, _thk_widget, _spectral_controls, azim_azims_ui]
+        _parts = [
+            _rail,
+            _md,
+            _e0_widget,
+            _tilt_widget,
+            _thk_widget,
+            _spectral_controls,
+            azim_azims_ui,
+        ]
         if _note is not None:
             _parts.append(_note)
         _parts.extend(
@@ -1132,7 +1461,10 @@ def _(
 
 @app.cell
 def _(
+    MATERIAL,
     cases,
+    context_rail,
+    fmt_thickness,
     metric_vs_chart,
     mo,
     plot_best_spectra,
@@ -1160,17 +1492,41 @@ def _(
             return mo.vstack(parts) if parts else mo.md("*No metric results.*")
 
         _sv = sweep_values(res) if records(res) else {}
+        _scan_sv = sweep_values(scan_res_view) if records(scan_res_view) else {}
+
+        def _dimension(key, unit):
+            _values = _scan_sv.get(key, [])
+            if len(_values) > 1:
+                return "multiple"
+            return f"{_values[0]:g} {unit}" if _values else None
+
+        _rail = context_rail(
+            mo,
+            {
+                "Material": MATERIAL,
+                "E0": _dimension("E0_keV", "keV"),
+                "theta": _dimension("tilt_deg", "°"),
+                "phi": _dimension("tilt_azim_deg", "°"),
+                "Thickness": (
+                    fmt_thickness(scan_thickness_ui.value)
+                    if scan_thickness_ui.value is not None
+                    else None
+                ),
+                "Records": len(records(scan_res_view)),
+            },
+        )
         _thk_widget = (
             scan_thickness_ui
             if len(_sv.get("thickness_ang", [])) > 1
             else mo.md(
-                f"crystal thickness: {scan_thickness_ui.value:g} Å"
+                f"crystal thickness: {fmt_thickness(scan_thickness_ui.value)}"
                 if scan_thickness_ui.value is not None
                 else ""
             )
         )
         return mo.vstack(
             [
+                _rail,
                 mo.md(
                     "`scan_charts` auto-picks a heatmap or line scans (one per swept quantity); "
                     "then 1-D metric scans vs polar tilt. Each section loads as it becomes "
@@ -1195,8 +1551,12 @@ def _(
 
 @app.cell
 def _(
+    MATERIAL,
     cases,
+    context_rail,
     detector_azim_ui,
+    detector_auto_ui,
+    detector_broad_auto_ui,
     detector_broad_x_domain,
     detector_broad_xlog_ui,
     detector_broad_xmax_ui,
@@ -1218,12 +1578,14 @@ def _(
     detector_ymin_ui,
     eaglexo_charge_chart,
     eaglexo_detected_chart,
+    fmt_thickness,
     mo,
     plot_eaglexo_charge_map,
     plot_eaglexo_efficiency,
     plot_timepix_efficiency,
     records,
     res,
+    select_results,
     settings,
     sweep_values,
     timepix_detected_chart,
@@ -1238,11 +1600,43 @@ def _(
         # The accordion lazily defers each section's compute exactly like the
         # inner tabs did, without the nesting problem.
         _sv = sweep_values(res) if records(res) else {}
+        _detector_sv = sweep_values(detector_res_view) if records(detector_res_view) else {}
+        _energies = _detector_sv.get("E0_keV", [])
+        _rail = context_rail(
+            mo,
+            {
+                "Material": MATERIAL,
+                "E0": "multiple"
+                if len(_energies) > 1
+                else (f"{_energies[0]:g} keV" if _energies else None),
+                "theta": (
+                    f"{detector_tilt_ui.value:g} °" if detector_tilt_ui.value is not None else None
+                ),
+                "phi": (
+                    f"{detector_azim_ui.value:g} °" if detector_azim_ui.value is not None else None
+                ),
+                "Thickness": (
+                    fmt_thickness(detector_thickness_ui.value)
+                    if detector_thickness_ui.value is not None
+                    else None
+                ),
+                "Records": len(
+                    records(
+                        select_results(
+                            detector_res_view,
+                            tilt_deg=detector_tilt_ui.value,
+                        )
+                    )
+                    if detector_tilt_ui.value is not None
+                    else records(detector_res_view)
+                ),
+            },
+        )
         _thk_widget = (
             detector_thickness_ui
             if len(_sv.get("thickness_ang", [])) > 1
             else mo.md(
-                f"crystal thickness: {detector_thickness_ui.value:g} Å"
+                f"crystal thickness: {fmt_thickness(detector_thickness_ui.value)}"
                 if detector_thickness_ui.value is not None
                 else ""
             )
@@ -1258,26 +1652,38 @@ def _(
         )
         _controls = mo.vstack(
             [
-                mo.hstack([detector_tilt_ui, _azim_widget, _thk_widget]),
-                mo.hstack(
-                    [
-                        detector_xmin_ui,
-                        detector_xmax_ui,
-                        detector_ymin_ui,
-                        detector_ymax_ui,
-                        detector_xlog_ui,
-                        detector_ylog_ui,
-                    ]
-                ),
-                mo.hstack(
-                    [
-                        detector_broad_xmin_ui,
-                        detector_broad_xmax_ui,
-                        detector_broad_ymin_ui,
-                        detector_broad_ymax_ui,
-                        detector_broad_xlog_ui,
-                        detector_broad_ylog_ui,
-                    ]
+                mo.hstack([detector_tilt_ui, _azim_widget, _thk_widget], wrap=True),
+                mo.accordion(
+                    {
+                        "Axes and scaling": mo.vstack(
+                            [
+                                mo.hstack(
+                                    [
+                                        detector_auto_ui,
+                                        detector_xmin_ui,
+                                        detector_xmax_ui,
+                                        detector_ymin_ui,
+                                        detector_ymax_ui,
+                                        detector_xlog_ui,
+                                        detector_ylog_ui,
+                                    ],
+                                    wrap=True,
+                                ),
+                                mo.hstack(
+                                    [
+                                        detector_broad_auto_ui,
+                                        detector_broad_xmin_ui,
+                                        detector_broad_xmax_ui,
+                                        detector_broad_ymin_ui,
+                                        detector_broad_ymax_ui,
+                                        detector_broad_xlog_ui,
+                                        detector_broad_ylog_ui,
+                                    ],
+                                    wrap=True,
+                                ),
+                            ]
+                        )
+                    }
                 ),
             ]
         )
@@ -1344,6 +1750,7 @@ def _(
 
         return mo.vstack(
             [
+                _rail,
                 _controls,
                 mo.accordion({"Eagle XO": _eaglexo_inner, "Timepix3": _timepix_inner}, lazy=True),
             ]
@@ -1356,6 +1763,8 @@ def _(
 def _(
     MATERIAL,
     build_cases,
+    context_rail,
+    fmt_thickness,
     mo,
     penetration_energy_grid_ui,
     penetration_energy_keV,
@@ -1377,6 +1786,17 @@ def _(
 ):
     def penetration_tab():
         _angle = penetration_tilt_deg
+        _rail = context_rail(
+            mo,
+            {
+                "Material": MATERIAL,
+                "E0": f"{penetration_energy_keV:g} keV",
+                "theta": f"{penetration_tilt_deg:g} °",
+                "phi": None,
+                "Thickness": fmt_thickness(penetration_thickness_ang),
+                "Records": "direct transport",
+            },
+        )
         _md = mo.md(
             "Surviving-electron fraction vs depth (one curve per beam energy) and "
             "an interactive low-Ne track cross-section, at the polar tilt selected "
@@ -1395,13 +1815,14 @@ def _(
         )
         _traj = build_cases(_sweep, settings.n_electrons, settings.n_electrons_brem)
         if not _traj:
-            return mo.vstack([_md, mo.md("*No trajectory cases.*")])
+            return mo.vstack([_rail, _md, mo.md("*No trajectory cases.*")])
         _survival = penetration_survival_chart(_traj, Ne=500, tilt=_angle)
         # The sweep has one selected energy and tilt; keep the nearest-case guard
         # in case a future sweep adds a surrounding grid.
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
         _track = trajectory_chart(_nc, Ne=40)
         _parts = [
+            _rail,
             _md,
             mo.vstack(
                 [
@@ -1413,7 +1834,8 @@ def _(
                                 if penetration_energy_source_ui.value == "grid"
                                 else penetration_energy_manual_ui
                             ),
-                        ]
+                        ],
+                        wrap=True,
                     ),
                     mo.hstack(
                         [
@@ -1423,7 +1845,8 @@ def _(
                                 if penetration_thickness_source_ui.value == "grid"
                                 else penetration_thickness_manual_ui
                             ),
-                        ]
+                        ],
+                        wrap=True,
                     ),
                     mo.hstack(
                         [
@@ -1433,7 +1856,8 @@ def _(
                                 if penetration_tilt_source_ui.value == "grid"
                                 else penetration_tilt_manual_ui
                             ),
-                        ]
+                        ],
+                        wrap=True,
                     ),
                 ]
             ),
@@ -1492,10 +1916,12 @@ def _(compare_all_beam_energies_ui, cross_material_energy_options, mo):
 def _(
     CATALOG,
     compare_all_beam_energies_ui,
+    context_rail,
     cross_material_energy_ui,
     load_checkpoint,
     mo,
     plot_material_comparison,
+    records,
     settings,
 ):
     def cross_material_tab():
@@ -1514,14 +1940,41 @@ def _(
             _r = load_checkpoint(_material_key)
             if _r:
                 _by_material[CATALOG.material(_material_key).label] = _r
+        _beam_energy = (
+            None if compare_all_beam_energies_ui.value else cross_material_energy_ui.value
+        )
+        _beam_energies = {
+            record["case"]["E0_keV"]
+            for _results in _by_material.values()
+            for record in records(_results)
+        }
+        _rail = context_rail(
+            mo,
+            {
+                "Material": (
+                    "multiple" if len(_by_material) > 1 else next(iter(_by_material), None)
+                ),
+                "E0": (
+                    f"{_beam_energy:g} keV"
+                    if _beam_energy is not None
+                    else "multiple"
+                    if len(_beam_energies) > 1
+                    else f"{next(iter(_beam_energies)):g} keV"
+                    if _beam_energies
+                    else None
+                ),
+                "theta": "best per material",
+                "phi": "best per material",
+                "Thickness": "best per material",
+                "Records": sum(len(records(_results)) for _results in _by_material.values()),
+            },
+        )
         if len(_by_material) >= 2:
-            _beam_energy = (
-                None if compare_all_beam_energies_ui.value else cross_material_energy_ui.value
-            )
             return mo.vstack(
                 [
+                    _rail,
                     _md,
-                    mo.hstack([compare_all_beam_energies_ui, cross_material_energy_ui]),
+                    mo.hstack([compare_all_beam_energies_ui, cross_material_energy_ui], wrap=True),
                     plot_material_comparison(
                         _by_material,
                         settings,
@@ -1546,7 +1999,11 @@ def _(
                 ]
             )
         return mo.vstack(
-            [_md, mo.md("*Run `scan_app.py` for more materials to populate this comparison.*")]
+            [
+                _rail,
+                _md,
+                mo.md("*Run `scan_app.py` for more materials to populate this comparison.*"),
+            ]
         )
 
     return (cross_material_tab,)
@@ -1564,34 +2021,35 @@ def _(
     scans_tab,
     spectra_tab,
 ):
-    # Each tab value is a zero-arg builder closure from its own cell, so
-    # `lazy=True` still defers chart work while each builder closes over
-    # only the widgets and data it actually reads.
+    # Four scientific tasks form the only top-level navigation. Accordions keep
+    # individual view builders lazy without nesting tab widgets.
+    def task_surface(views):
+        return mo.accordion(views, lazy=True)
+
     mo.ui.tabs(
         {
-            "Energy comparison": spectra_tab,
-            "Polar-angle comparison": polar_compare_tab,
-            "Azimuthal comparison": azim_compare_tab,
-            "Top geometries": rankings_tab,
-            "Geometry & scans": scans_tab,
-            "Detectors": detectors_tab,
-            "Penetration": penetration_tab,
-            "Cross-material": cross_material_tab,
+            "Explore": lambda: task_surface(
+                {
+                    "Compare beam energies": spectra_tab,
+                    "Compare polar angles": polar_compare_tab,
+                    "Compare azimuths": azim_compare_tab,
+                },
+            ),
+            "Optimize": lambda: task_surface(
+                {
+                    "Rank geometries": rankings_tab,
+                    "Inspect scan maps": scans_tab,
+                },
+            ),
+            "Instrument": lambda: task_surface(
+                {
+                    "Model detectors": detectors_tab,
+                    "Inspect penetration": penetration_tab,
+                },
+            ),
+            "Compare": lambda: task_surface({"Compare materials": cross_material_tab}),
         },
         lazy=True,
-    )
-    return
-
-
-@app.cell
-def _(mo, records, res, sweep_values):
-    # What's actually in this checkpoint -- swept knobs and their values.
-    mo.accordion(
-        {
-            "Checkpoint contents (swept knobs & values)": (
-                sweep_values(res) if records(res) else mo.md("*(load a checkpoint above)*")
-            )
-        }
     )
     return
 

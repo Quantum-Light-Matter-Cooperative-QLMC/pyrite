@@ -232,3 +232,47 @@ def test_validation_app_centers_the_supplementary_figure():
     source = (repo_dir / check.NOTEBOOK).read_text(encoding="utf-8")
 
     assert "mo.center(figure)" in source
+
+
+def test_validation_app_declares_evidence_tasks_and_authorities():
+    source = (Path(__file__).resolve().parents[1] / check.NOTEBOOK).read_text(encoding="utf-8")
+
+    for task in ("Anchors", "Reproductions", "Supplementary", "Provenance"):
+        assert f'"{task}"' in source
+    for authority in ("Anchor", "Diagnostic", "Optional oracle", "Provenance"):
+        assert authority in source
+
+    task_navigation = source[source.rindex("mo.ui.tabs(") :]
+    grouped_surfaces = {
+        "Anchors": ("anchors_controls", "anchors_results"),
+        "Reproductions": ("reproductions_controls", "reproductions_results"),
+        "Supplementary": ("supplementary_controls", "supplementary_results", "remote_controls"),
+        "Provenance": ("provenance_findings", "provenance_audit"),
+    }
+    task_offsets = {
+        task: task_navigation.index(f'"{task}": mo.vstack(') for task in grouped_surfaces
+    }
+    ordered_tasks = list(grouped_surfaces)
+    for index, task in enumerate(ordered_tasks):
+        start = task_offsets[task]
+        stop = task_offsets[ordered_tasks[index + 1]] if index + 1 < len(ordered_tasks) else None
+        task_source = task_navigation[start:stop]
+        for surface in grouped_surfaces[task]:
+            assert surface in task_source
+
+
+def test_validation_diagnostic_success_requires_interpretation():
+    source = (Path(__file__).resolve().parents[1] / check.NOTEBOOK).read_text(encoding="utf-8")
+
+    assert 'authority == "Diagnostic"' in source
+    assert 'state = "Completed—interpret"' in source
+    assert 'state = "Passed"' in source
+    assert 'marker = "✓"' not in source
+
+
+def test_repository_default_save_names_mutated_setting_and_file():
+    source = (Path(__file__).resolve().parents[1] / check.NOTEBOOK).read_text(encoding="utf-8")
+
+    assert "Save repository default" in source
+    assert "tmd_exploratory_azimuth_deg" in source
+    assert "notebooks/validation_defaults.json" in source
