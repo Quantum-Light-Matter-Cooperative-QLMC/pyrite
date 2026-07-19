@@ -500,6 +500,13 @@ def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
 # sizing is deterministic on any machine.
 
 
+def test_case_progress_label_names_single_material():
+    from cxr_mc.montecarlo import runner
+
+    assert runner._case_progress_label([{"crystal": "hopg"}, {"crystal": "hopg"}]) == ("hopg cases")
+    assert runner._case_progress_label([{"crystal": "hopg"}, {"crystal": "hbn"}]) == ("mixed cases")
+
+
 def _patch_host(monkeypatch, *, ncpus=32, avail_mb=44_900, total_mb=48_000, budget_mb=6_144):
     """Fake a host for _cpu_pool_workers; defaults reproduce qlmc's shape."""
     from cxr_mc.montecarlo import runner

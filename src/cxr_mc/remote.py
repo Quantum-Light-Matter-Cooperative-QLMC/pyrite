@@ -33,7 +33,7 @@ Asynchronous SLURM queue (survives ssh disconnect -- launch, walk away, reconnec
     cxr remote start mose2 --quick      # detached quick smoke test
     cxr remote attach [JOBID]           # (re)connect + track live (default: latest)
     cxr remote jobs                     # list jobs on the box + their state
-    cxr remote status [JOBID]           # one job: meta + state + log tail (default: latest)
+    cxr remote status [JOBID] [-v|-vv]  # job summary; SLURM details; case progress
     cxr remote logs [JOBID] --follow    # tail the remote log (live)
     cxr remote stop mose2 wse2          # cancel live SLURM job(s) by material
     cxr remote stop --all               # cancel every live SLURM job
@@ -108,6 +108,23 @@ ZHAI_STEM = "zhai"
 # shell commands. Hyphens are valid catalog-key characters, while whitespace
 # and shell metacharacters remain forbidden.
 _SHELL_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+_STATE_COLORS = {
+    "active": (92, 207, 230),
+    "done": (170, 217, 76),
+    "warning": (255, 213, 128),
+    "failed": (240, 113, 120),
+    "inactive": (127, 140, 152),
+}
+_TQDM_COLORS = {
+    group: f"#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}"
+    for group, rgb in _STATE_COLORS.items()
+}
+_TQDM_FRAME_RE = re.compile(
+    r"^\s*(?:(?P<label>[^:\r\n]{1,80}):\s*)?"
+    r"(?P<percent>\d{1,3})%\|.*?\s(?P<completed>\d+)/(?P<total>\d+)\s+"
+    r"\[(?P<timing>[^\]]*)\]"
+)
 
 # what `sync` ships up: the code that changes (the src/ package now also carries
 # data/, so it travels too), plus the root scan.py shim the box invokes and
@@ -1105,18 +1122,27 @@ def start_queue(
     _stage_job_script(jobid, stems, upload, script)
     scheduler_id = _submit_staged_job(jobid, stems, nice=chunked)
 
-    detail = (
-        f"chunk minutes: {chunk_minutes} (self-resubmitting)"
-        if chunked
-        else f"parallel materials: {parallel_materials}"
-    )
     print(
-        f"\nsubmitted SLURM job {scheduler_id} as local job {jobid} on {HOST}: {' '.join(materials)}"
-        f"{' (quick)' if quick else ''}\n"
-        f"  {detail}\n"
-        f"  watch:  cxr remote status {jobid}\n"
-        f"  logs:   cxr remote logs {jobid} --follow\n"
-        f"  pull:   cxr remote pull {' '.join(stems)}   (when state is 'done')"
+        f"\nJOB {jobid} · SUBMITTED\n"
+        + _format_fields(
+            [
+                ("SLURM", scheduler_id),
+                ("Host", HOST),
+                ("Materials", ", ".join(materials)),
+                (
+                    "Mode",
+                    _mode_summary(
+                        _queue_metadata(
+                            jobid, materials, quick, workers, parallel_materials, chunk_minutes
+                        )
+                    ),
+                ),
+                ("Attach", f"cxr remote attach {jobid}"),
+                ("Status", f"cxr remote status {jobid} -vv"),
+                ("Logs", f"cxr remote logs {jobid} --follow"),
+                ("Pull", f"cxr remote pull {' '.join(stems)}  (after completion)"),
+            ]
+        )
     )
     return jobid
 
@@ -1156,10 +1182,18 @@ def start_zhai_queue(
     scheduler_id = _submit_staged_job(jobid, stems)
 
     print(
-        f"\nsubmitted SLURM job {scheduler_id} as local Zhai job {jobid} on {HOST}\n"
-        f"  watch:  cxr remote status {jobid}\n"
-        f"  logs:   cxr remote logs {jobid} --follow\n"
-        f"  pull:   cxr remote check --pull   (when state is 'done')"
+        f"\nJOB {jobid} · SUBMITTED\n"
+        + _format_fields(
+            [
+                ("SLURM", scheduler_id),
+                ("Host", HOST),
+                ("Workload", "Zhai reproduction"),
+                ("Attach", f"cxr remote attach {jobid}"),
+                ("Status", f"cxr remote status {jobid} -vv"),
+                ("Logs", f"cxr remote logs {jobid} --follow"),
+                ("Pull", "cxr remote check --pull  (after completion)"),
+            ]
+        )
     )
     return jobid
 
@@ -1178,17 +1212,31 @@ def _recorded_job_dirs_command() -> str:
 
 
 def list_jobs():
-    """Print every submitted job with its current state, oldest first."""
+    """Print every submitted job with identifying metadata, oldest first."""
     remote = (
         f'JOBS="{REMOTE_DIR}/{JOBS_SUBDIR}"; '
-        '[ -d "$JOBS" ] || { echo "(no jobs)"; exit 0; }; '
-        'found=; for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
-        '[ -f "$d/meta" ] || continue; found=1; '
-        'printf "%s  %s\\n" "$(basename "$d")" '
-        '"$(cat "$d/state" 2>/dev/null || echo "?")"; done; '
-        '[ -n "$found" ] || echo "(no jobs)"'
+        '[ -d "$JOBS" ] || exit 0; '
+        'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
+        '[ -f "$d/meta" ] || continue; '
+        'SID=$(sed -n "s/^slurm_job_id: //p" "$d/meta" 2>/dev/null | tail -1); '
+        'Q=$(sed -n "s/^quick: //p" "$d/meta" 2>/dev/null | tail -1); '
+        'M=$(sed -n "s/^materials: //p" "$d/meta" 2>/dev/null | tail -1); '
+        'S=$(cat "$d/state" 2>/dev/null | tr "\\n\\t" "  "); '
+        'printf "%s\\t%s\\t%s\\t%s\\t%s\\n" "$(basename "$d")" '
+        '"${SID:--}" "${Q:-?}" "${M:--}" "${S:-(no state yet)}"; done'
     )
-    print(_ssh_capture(remote), end="")
+    rows = []
+    for line in _ssh_capture(remote).splitlines():
+        fields = line.split("\t", 4)
+        if len(fields) != 5:
+            continue
+        jobid, scheduler_id, quick, materials, state = fields
+        mode = "quick" if quick == "True" else "standard" if quick == "False" else "?"
+        rows.append((jobid, scheduler_id, mode, materials.replace(" ", ", "), state))
+    if not rows:
+        print(f"No remote jobs on {HOST}. Start one with `cxr remote start <materials>`.")
+        return
+    print(_style_states(_format_table(("JOB", "SLURM", "MODE", "MATERIALS", "LAST EVENT"), rows)))
 
 
 def _job_assign(jobid):
@@ -1199,24 +1247,313 @@ def _job_assign(jobid):
     return f"JOB=$({_recorded_job_dirs_command()} | tail -1)"
 
 
-def job_status(jobid=None):
-    """Print one job's metadata, scheduler state, persisted state, and log tail."""
+def _format_table(headers, rows, *, indent=""):
+    """Render plain aligned columns; wrapping remains the terminal's choice."""
+    string_rows = [tuple(str(value) for value in row) for row in rows]
+    widths = [
+        max(len(str(header)), *(len(row[index]) for row in string_rows))
+        for index, header in enumerate(headers)
+    ]
+
+    def render(row):
+        return indent + "  ".join(
+            value.ljust(width) if index < len(row) - 1 else value
+            for index, (value, width) in enumerate(zip(row, widths, strict=True))
+        )
+
+    return "\n".join(
+        [render(tuple(headers)), render(tuple("-" * w for w in widths)), *map(render, string_rows)]
+    )
+
+
+def _style_states(text):
+    """Add redundant state color only for an interactive color-capable terminal."""
+    if os.environ.get("NO_COLOR") is not None or os.environ.get("TERM") == "dumb":
+        return text
+    isatty = getattr(sys.stdout, "isatty", None)
+    if not callable(isatty) or not isatty():
+        return text
+    groups = {
+        "active": ("RUNNING", "PENDING", "QUEUED", "SUBMITTED"),
+        "done": ("DONE", "FINISHED", "COMPLETED"),
+        "warning": ("PAUSED", "STALLED", "CANCELLING", "NOT_QUEUED"),
+        "failed": ("FAILED", "CANCELLED"),
+    }
+    for group, words in groups.items():
+        red, green, blue = _STATE_COLORS[group]
+        pattern = rf"\b({'|'.join(words)})\b"
+        text = re.sub(
+            pattern,
+            rf"\033[38;2;{red};{green};{blue}m\1\033[0m",
+            text,
+            flags=re.IGNORECASE,
+        )
+    return text
+
+
+def _color_enabled():
+    if os.environ.get("NO_COLOR") is not None or os.environ.get("TERM") == "dumb":
+        return False
+    isatty = getattr(sys.stdout, "isatty", None)
+    return callable(isatty) and isatty()
+
+
+def _paint(text, group):
+    if not _color_enabled():
+        return text
+    red, green, blue = _STATE_COLORS[group]
+    return f"\033[38;2;{red};{green};{blue}m{text}\033[0m"
+
+
+def _format_fields(rows, *, indent="  "):
+    width = max(len(str(label)) for label, _value in rows)
+    return "\n".join(f"{indent}{label:<{width}}  {value}" for label, value in rows)
+
+
+def _metadata_fields(metadata):
+    """Parse the last value for each simple ``key: value`` metadata field."""
+    fields = {}
+    for line in metadata.splitlines():
+        key, separator, value = line.partition(": ")
+        if separator:
+            fields[key] = value
+    return fields
+
+
+def _mode_summary(metadata):
+    fields = _metadata_fields(metadata)
+    if "ne" in fields or fields.get("materials") == ZHAI_STEM:
+        return "Zhai reproduction"
+    if "quick" not in fields:
+        return "unspecified"
+    speed = "quick" if fields.get("quick") == "True" else "standard"
+    if "chunk_minutes" not in fields and "parallel_materials" not in fields:
+        return speed
+    try:
+        chunk_minutes = float(fields.get("chunk_minutes", "0"))
+    except ValueError:
+        chunk_minutes = 0
+    if chunk_minutes > 0:
+        return f"{speed} · chunked into {chunk_minutes:g} min slices"
+    parallel = fields.get("parallel_materials")
+    suffix = f" · {parallel} materials at once" if parallel not in {None, "None"} else ""
+    return f"{speed} · monolithic{suffix}"
+
+
+def _material_label(material):
+    spec = CATALOG.materials.get(material)
+    return spec.label if spec is not None else material
+
+
+def _progress_group(state):
+    if state == "done":
+        return "done"
+    if state == "failed":
+        return "failed"
+    if state == "paused":
+        return "warning"
+    return "active"
+
+
+def _progress_track(completed, total, *, width=16):
+    filled = width if total == 0 else round(width * completed / total)
+    filled = min(width, max(0, filled))
+    return "█" * filled + "░" * (width - filled)
+
+
+def _format_case_progress(records, materials=()):
+    """Render the latest validated atomic case snapshots."""
+    if not records:
+        return "  No case progress reported yet. Use `cxr remote logs` for diagnostics."
+    order = [material for material in materials if material in records]
+    order.extend(material for material in records if material not in order)
+    labels = {material: _material_label(material) for material in order}
+    label_width = max(len("MATERIAL"), *(len(label) for label in labels.values()))
+    lines = [f"  {'MATERIAL':<{label_width}}  {'PROGRESS':<16}  CASES  DONE  STATE    WORK"]
+    for material in order:
+        record = records[material]
+        completed = record["cached_cases"] + record["completed_new_cases"]
+        total = record["total_cases"]
+        percent = 100 if total == 0 else round(100 * completed / total)
+        state = record["state"]
+        glyph = {"done": "✓", "failed": "×", "paused": "Ⅱ"}.get(state, "●")
+        track = _progress_track(completed, total)
+        accent = _paint(f"{glyph} {track}", _progress_group(state))
+        lines.append(
+            f"  {labels[material]:<{label_width}}  {accent}  "
+            f"{completed:>{len(str(total))}}/{total}  {percent:>3}%  {state:<7}  "
+            f"{record['cached_cases']} cached · {record['completed_new_cases']} new"
+        )
+    return "\n".join(lines)
+
+
+def _active_work_label(state):
+    match = re.match(r"(?:running|warning at)\s+(.+)", state, flags=re.IGNORECASE)
+    if match is None:
+        return "last case batch"
+    label = re.split(
+        r"\s+\[\d+/\d+\]|\s+(?:since\s+)?\d{4}-\d{2}-\d{2}", match.group(1), maxsplit=1
+    )[0]
+    return _material_label(label.strip())
+
+
+def _legacy_progress(log, state):
+    frames = []
+    for line in log.splitlines():
+        match = _TQDM_FRAME_RE.match(line)
+        if match is not None:
+            frames.append(match.groupdict())
+    if not frames:
+        return None
+    frame = frames[-1]
+    completed = int(frame["completed"])
+    total = int(frame["total"])
+    label = (frame["label"] or "").strip()
+    if label.lower() in {"", "case", "cases"}:
+        label = _active_work_label(state)
+    else:
+        if label.lower().endswith(" cases"):
+            label = label[: -len(" cases")]
+        label = _material_label(label)
+    if completed >= total:
+        progress_state = "done"
+    elif state.lower().startswith(("failed", "cancelled")):
+        progress_state = "failed"
+    elif state.lower().startswith("done"):
+        progress_state = "paused"
+    else:
+        progress_state = "running"
+    percent = 100 if total == 0 else round(100 * completed / total)
+    glyph = {"done": "✓", "failed": "×", "paused": "Ⅱ"}.get(progress_state, "●")
+    accent = _paint(
+        f"{glyph} {_progress_track(completed, total)}",
+        _progress_group(progress_state),
+    )
+    return (
+        "  MATERIAL / WORK      PROGRESS          CASES  DONE  TIMING\n"
+        f"  {label:<20} {accent}  {completed}/{total}  {percent:>3}%  {frame['timing']}"
+    )
+
+
+def _clean_recent_log(log, *, limit=12):
+    diagnostics = [
+        line.strip()
+        for line in log.splitlines()
+        if line.strip() and _TQDM_FRAME_RE.match(line) is None
+    ]
+    if not diagnostics:
+        return "  (no recent diagnostic messages)"
+    return "\n".join(diagnostics[-limit:])
+
+
+def _marked_sections(output):
+    """Split an internal marker stream returned by one remote round trip."""
+    sections = {}
+    current = None
+    for line in output.splitlines():
+        if line.startswith("@@"):
+            current = line[2:]
+            sections.setdefault(current, [])
+        elif current is not None:
+            sections[current].append(line)
+    return {key: "\n".join(lines).strip() for key, lines in sections.items()}
+
+
+def _scheduler_fields(payload):
+    fields = {}
+    for item in payload.split("|"):
+        key, separator, value = item.partition("=")
+        if separator:
+            fields[key] = value
+    return fields
+
+
+def _format_job_status(sections, detail):
+    metadata = sections.get("META", "")
+    fields = _metadata_fields(metadata)
+    scheduler = _scheduler_fields(sections.get("SQUEUE", ""))
+    jobid = sections.get("JOB") or fields.get("job", "?")
+    materials = fields.get("materials", "-").split()
+    scheduler_id = scheduler.get("job_id") or fields.get("slurm_job_id", "-")
+    scheduler_state = scheduler.get("state", "NOT_QUEUED")
+    rows = [
+        ("State", sections.get("STATE") or "(no state yet)"),
+        ("SLURM", f"{scheduler_id} · {scheduler_state}"),
+        ("Materials", ", ".join(materials) or "-"),
+        ("Mode", _mode_summary(metadata)),
+    ]
+    output = [f"JOB {jobid}", _format_fields(rows)]
+    if detail >= 1:
+        allocation = [
+            ("Partition", scheduler.get("partition", "-")),
+            ("Elapsed", scheduler.get("elapsed", "-")),
+            ("Remaining", scheduler.get("left", "-")),
+            ("Nodes", scheduler.get("nodes", "-")),
+            ("Reason", scheduler.get("reason", "-")),
+            ("Workers", fields.get("workers", "-")),
+        ]
+        output.extend(["", "ALLOCATION", _format_fields(allocation)])
+    if detail >= 2:
+        records = _parse_progress_records(sections.get("PROGRESS", ""))
+        log = sections.get("LOG", "")
+        progress = _format_case_progress(records, materials)
+        if not records:
+            progress = _legacy_progress(log, sections.get("STATE", "")) or progress
+        output.extend(
+            [
+                "",
+                "CASE PROGRESS",
+                progress,
+                "",
+                "RECENT LOG (diagnostics only)",
+                _clean_recent_log(log),
+            ]
+        )
+    return "\n".join(output)
+
+
+def job_status(jobid=None, detail=0):
+    """Print one structured job report; verbosity adds allocation and progress."""
+    if detail < 0:
+        raise ValueError("detail must be non-negative")
+    slurm_detail = (
+        'squeue -h -j "$SID" -o '
+        "'job_id=%i|state=%T|name=%j|partition=%P|elapsed=%M|left=%L|nodes=%D|reason=%R'; "
+        if detail >= 1
+        else 'printf "job_id=%s|state=%s\\n" "$SID" "$STATE"; '
+    )
+    progress = (
+        'echo "@@PROGRESS"; for f in "$D"/progress/*.json; do '
+        '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done; '
+        if detail >= 2
+        else ""
+    )
+    log = 'echo "@@LOG"; tail -c 32768 "$D/log" 2>/dev/null; ' if detail >= 2 else ""
     remote = (
         f'JOBS="{REMOTE_DIR}/{JOBS_SUBDIR}"; {_job_assign(jobid)}; '
         'D="$JOBS/$JOB"; '
         'if [ -z "$JOB" ] || [ ! -d "$D" ]; then echo "no such job: ${JOB:-<none>}"; '
         "exit 1; fi; "
-        'echo "== job $JOB =="; cat "$D/meta" 2>/dev/null; '
-        'echo "-- state --"; cat "$D/state" 2>/dev/null || echo "(no state yet)"; '
+        'echo "@@JOB"; printf "%s\\n" "$JOB"; '
+        'echo "@@META"; cat "$D/meta" 2>/dev/null; '
+        'echo "@@STATE"; cat "$D/state" 2>/dev/null; '
+        'echo "@@SQUEUE"; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
-        'case "$SID" in \'\'|*[!0-9]*) echo "slurm: (none) not queued" ;; '
+        'case "$SID" in \'\'|*[!0-9]*) echo "job_id=-|state=NOT_QUEUED" ;; '
         "*) "
         + _squeue_state_command("$SID", retired="STATE=")
-        + 'if [ -n "$STATE" ]; then echo "slurm: $SID $STATE"; '
-        'else echo "slurm: $SID not queued"; fi ;; esac; '
-        'echo "-- log tail --"; tail -n 20 "$D/log" 2>/dev/null'
+        + 'if [ -n "$STATE" ]; then '
+        + slurm_detail
+        + 'else printf "job_id=%s|state=NOT_QUEUED\\n" "$SID"; fi ;; esac; '
+        + progress
+        + log
     )
-    print(_ssh_capture(remote), end="")
+    output = _ssh_capture(remote)
+    sections = _marked_sections(output)
+    if not sections:
+        print(output, end="")
+        return
+    print(_style_states(_format_job_status(sections, detail)))
 
 
 def tail_logs(jobid=None, follow=False):
@@ -1227,6 +1564,7 @@ def tail_logs(jobid=None, follow=False):
         'D="$JOBS/$JOB"; '
         'if [ -z "$JOB" ] || [ ! -d "$D" ]; then echo "no such job: ${JOB:-<none>}"; '
         "exit 1; fi; "
+        f'printf "LOG %s · {HOST}\\n\\n" "$JOB"; '
         f'{tail} "$D/log"'
     )
     if follow:
@@ -1250,10 +1588,10 @@ def _latest_jobid():
 
 def _disconnect_hint(jobid):
     print(
-        f"\n\ndisconnected from job {jobid} -- it keeps running on {HOST}.\n"
-        f"  reconnect: cxr remote attach {jobid}\n"
-        f"  status:    cxr remote status {jobid}\n"
-        "  stop:      cxr remote stop <material>"
+        f"\n\nVIEWER DISCONNECTED · job {jobid} keeps running on {HOST}\n"
+        f"  Reconnect  cxr remote attach {jobid}\n"
+        f"  Status     cxr remote status {jobid} -vv\n"
+        "  Stop       cxr remote stop <material>"
     )
 
 
@@ -1294,21 +1632,30 @@ def _parse_progress_records(payload):
     return records
 
 
-def _update_progress_bars(bars, records):
-    """Apply the latest independent material snapshots to local tqdm bars."""
+def _update_progress_bars(bars, records, finished=None):
+    """Apply snapshots, closing terminal material rows exactly once."""
+    finished = set() if finished is None else finished
     for material, bar in bars.items():
+        if material in finished:
+            continue
         record = records.get(material)
         if record is None:
             continue
         bar.total = record["total_cases"]
         bar.n = record["cached_cases"] + record["completed_new_cases"]
-        bar.set_description_str(f"{material}: {record['state']}", refresh=False)
+        state = record["state"]
+        bar.colour = _TQDM_COLORS[_progress_group(state)]
+        bar.set_description_str(f"{_material_label(material)} · {state}", refresh=False)
         bar.set_postfix(
             cached=record["cached_cases"],
             new=record["completed_new_cases"],
             refresh=False,
         )
         bar.refresh()
+        if state in {"done", "failed"}:
+            bar.close()
+            finished.add(material)
+    return finished
 
 
 # How many consecutive not-live polls the attach viewers tolerate before the
@@ -1397,7 +1744,16 @@ def _attach_log_stream(jobid=None):
         'sleep 1; kill "$TP" 2>/dev/null; '
         'printf "\\n--- job finished ---\\n"; cat "$D/state" 2>/dev/null'
     )
-    print(f"attached to job {jobid} on {HOST} -- Ctrl-C to disconnect (the job keeps running).\n")
+    print(
+        f"JOB {jobid} · LEGACY LOG VIEW\n"
+        + _format_fields(
+            [
+                ("Host", HOST),
+                ("Viewer", "Ctrl-C disconnects; remote job keeps running"),
+            ]
+        )
+        + "\n"
+    )
     try:
         result = subprocess.run(["ssh", "-n", HOST, remote])
     except KeyboardInterrupt:
@@ -1416,25 +1772,39 @@ def _attach_progress_dashboard(jobid, metadata):
     if not materials or not scheduler_id.isdigit():
         raise SystemExit(f"job {jobid} has incomplete progress metadata")
 
+    print(
+        f"JOB {jobid} · SLURM {scheduler_id}\n"
+        + _format_fields(
+            [
+                ("Host", HOST),
+                ("Materials", ", ".join(materials)),
+                ("Mode", _mode_summary(metadata)),
+                ("Viewer", "Ctrl-C disconnects; remote job keeps running"),
+            ]
+        )
+        + "\n"
+    )
     bars = {
         material: tqdm(
             total=None,
-            desc=f"{material}: pending",
+            desc=f"{_material_label(material)} · pending",
             unit="case",
             position=position,
             leave=True,
             nrows=len(materials) + 1,
+            colour=_TQDM_COLORS["inactive"],
+            bar_format="{l_bar}{bar:16}| {n_fmt}/{total_fmt} cases [{elapsed}<{remaining}]",
         )
         for position, material in enumerate(materials)
     }
-    print(f"attached to job {jobid} on {HOST} -- Ctrl-C to disconnect (the job keeps running).")
     interrupted = broken = False
     missed = 0
     state = ""
+    finished = set()
     try:
         while True:
             state, live, records = _poll_chain(jobid)
-            _update_progress_bars(bars, records)
+            _update_progress_bars(bars, records, finished)
             if _is_terminal_state(state):
                 break
             missed = 0 if live else missed + 1
@@ -1445,19 +1815,21 @@ def _attach_progress_dashboard(jobid, metadata):
     except KeyboardInterrupt:
         interrupted = True
     finally:
-        for bar in bars.values():
-            bar.close()
+        for material, bar in bars.items():
+            if material not in finished:
+                bar.close()
     if interrupted:
         _disconnect_hint(jobid)
         return False
     if broken:
         print(
-            f"\nchain appears broken: no live SLURM job for ~30 s and job state is "
-            f"not terminal -- check `cxr remote status {jobid}`"
+            f"\nJOB {jobid} · CHAIN STALLED\n"
+            "  No live SLURM allocation for ~30 s; recorded state is not terminal.\n"
+            f"  Inspect  cxr remote status {jobid} -vv\n"
+            f"  Logs     cxr remote logs {jobid}"
         )
         return False
-    print("\n--- job finished ---")
-    print(state)
+    print(f"\nJOB {jobid} · FINISHED\n  State   {state}\n  Inspect cxr remote status {jobid} -vv")
     return True
 
 
@@ -1650,7 +2022,7 @@ def _cli_jobs(args):
 
 
 def _cli_status(args):
-    job_status(args.jobid)
+    job_status(args.jobid, args.verbose)
 
 
 def _cli_logs(args):
@@ -1784,16 +2156,30 @@ def _build_remote_parser(ap):
     at.add_argument("jobid", nargs="?", default=None)
     at.set_defaults(func=_dispatch(_cli_attach))
 
-    jb = sub.add_parser("jobs", help="list jobs on the box and their state")
+    jb = sub.add_parser("jobs", help="list jobs with SLURM IDs, materials, and last events")
     jb.set_defaults(func=_dispatch(_cli_jobs))
 
-    js = sub.add_parser("status", help="show one job (default: latest)")
+    js = sub.add_parser(
+        "status", help="show one job; -v allocation, -vv case progress and recent log"
+    )
     js.add_argument("jobid", nargs="?", default=None)
+    js.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="add SLURM allocation detail; repeat for case progress and recent log",
+    )
     js.set_defaults(func=_dispatch(_cli_status))
 
-    lg = sub.add_parser("logs", help="tail a job's log (default: latest)")
+    lg = sub.add_parser("logs", help="show a job's diagnostic log (default: latest)")
     lg.add_argument("jobid", nargs="?", default=None)
-    lg.add_argument("--follow", "-f", action="store_true", help="stream live")
+    lg.add_argument(
+        "--follow",
+        "-f",
+        action="store_true",
+        help="stream live; Ctrl-C disconnects without stopping the job",
+    )
     lg.set_defaults(func=_dispatch(_cli_logs))
 
     sp = sub.add_parser(

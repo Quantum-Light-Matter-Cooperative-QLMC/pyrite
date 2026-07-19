@@ -582,6 +582,12 @@ def _cpu_pool_workers(max_workers, n):
     return max(1, min(max_workers, worker_cap, n))
 
 
+def _case_progress_label(cases):
+    """Name a tqdm case bar by its material when the batch is homogeneous."""
+    materials = {case.get("crystal") for case in cases if case.get("crystal")}
+    return f"{next(iter(materials))} cases" if len(materials) == 1 else "mixed cases"
+
+
 def run_cases(
     cases, max_workers=None, progress=True, callback=None, should_stop=None, engine="auto"
 ):
@@ -638,13 +644,15 @@ def run_cases(
         )
         use_gpu = False
 
+    progress_label = _case_progress_label(cases)
+
     def _maybe_bar(iterable):
         if not progress:
             return iterable
         try:
             from tqdm.auto import tqdm
 
-            return tqdm(iterable, total=len(cases), desc="cases")
+            return tqdm(iterable, total=len(cases), desc=progress_label)
         except ImportError:
             # tqdm.auto picks the widget bar inside Jupyter, and that bar
             # raises ImportError AT CONSTRUCTION if ipywidgets is missing --
@@ -652,7 +660,7 @@ def run_cases(
             try:
                 from tqdm import tqdm
 
-                return tqdm(iterable, total=len(cases), desc="cases")
+                return tqdm(iterable, total=len(cases), desc=progress_label)
             except ImportError:
                 return iterable
 

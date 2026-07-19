@@ -433,7 +433,12 @@ def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
 
     remote.start_queue(["hopg"], no_sync=True)
 
-    assert "submitted SLURM job 48291" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "· SUBMITTED" in output
+    assert "SLURM" in output
+    assert "48291" in output
+    assert "cxr remote attach" in output
+    assert "cxr remote status" in output
 
 
 def test_interrupted_job_upload_releases_its_checkpoint_reservations(monkeypatch):
@@ -563,15 +568,140 @@ def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, ca
     monkeypatch.setattr(
         remote,
         "_ssh_capture",
-        lambda command: commands.append(command) or "slurm: 48291 RUNNING\n",
+        lambda command: (
+            commands.append(command)
+            or (
+                "@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nquick: False\n"
+                "chunk_minutes: 10\nslurm_job_id: 48291\n@@STATE\nrunning hopg\n"
+                "@@SQUEUE\njob_id=48291|state=RUNNING\n"
+            )
+        ),
     )
 
     remote.job_status("j")
 
-    assert "slurm: 48291 RUNNING" in capsys.readouterr().out
+    output = capsys.readouterr().out
+    assert "JOB j" in output
+    assert "48291 · RUNNING" in output
+    assert "hopg" in output
+    assert "standard · chunked into 10 min slices" in output
     assert "squeue" in commands[0]
     assert "kill -0" not in commands[0]
     assert "/pid" not in commands[0]
+
+
+def test_job_status_verbose_adds_scheduler_allocation_fields(monkeypatch, capsys):
+    commands = []
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda command: (
+            commands.append(command)
+            or (
+                "@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nworkers: None\n"
+                "slurm_job_id: 48291\n@@STATE\nrunning hopg\n@@SQUEUE\n"
+                "job_id=48291|state=RUNNING|name=cxr-j|partition=gpu|elapsed=1:02|"
+                "left=UNLIMITED|nodes=1|reason=None\n"
+            )
+        ),
+    )
+
+    remote.job_status("j", detail=1)
+
+    output = capsys.readouterr().out
+    assert "ALLOCATION" in output
+    assert "Partition  gpu" in output
+    assert "Elapsed    1:02" in output
+    assert "Reason     None" in output
+    assert "elapsed=%M" in commands[0]
+    assert "reason=%R" in commands[0]
+
+
+def test_job_status_double_verbose_renders_case_progress(monkeypatch, capsys):
+    commands = []
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda command: (
+            commands.append(command)
+            or (
+                "@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nslurm_job_id: 48291\n"
+                "@@STATE\nrunning hopg\n@@SQUEUE\njob_id=48291|state=RUNNING\n@@PROGRESS\n"
+                '{"material":"hopg","total_cases":5,"cached_cases":1,'
+                '"completed_new_cases":2,"state":"running"}\n'
+                "@@LOG\nlast log line\n"
+            )
+        ),
+    )
+
+    remote.job_status("j", detail=2)
+
+    output = capsys.readouterr().out
+    assert "CASE PROGRESS" in output
+    assert "MATERIAL" in output
+    assert "hopg" in output
+    assert "3/5" in output
+    assert "60%" in output
+    assert "RECENT LOG (diagnostics only)" in output
+    assert '{"material"' not in output
+    assert "last log line" in output
+    assert '"$D"/progress/*.json' in commands[0]
+    assert 'tail -c 32768 "$D/log"' in commands[0]
+
+
+def test_status_collapses_legacy_tqdm_history_to_latest_material_bar(monkeypatch, capsys):
+    legacy_log = (
+        "setup complete\n"
+        "cases:   0%|          | 0/10 [00:00<?, ?it/s]\r"
+        "cases:  50%|█████     | 5/10 [00:01<00:01, 4.0it/s]\r"
+        "cases: 100%|██████████| 10/10 [00:02<00:00, 5.0it/s]\n"
+        "next sweep\n"
+        "cases:   0%|          | 0/5 [00:00<?, ?it/s]\r"
+        "cases:  40%|████      | 2/5 [00:03<00:04, 1.4s/it]\r"
+    )
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda _command: (
+            "@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nslurm_job_id: 48291\n"
+            "@@STATE\nrunning hopg [1/1]\n@@SQUEUE\njob_id=48291|state=RUNNING\n"
+            f"@@PROGRESS\n@@LOG\n{legacy_log}"
+        ),
+    )
+
+    remote.job_status("j", detail=2)
+
+    output = capsys.readouterr().out
+    assert "HOPG" in output
+    assert "2/5" in output
+    assert "40%" in output
+    assert "5/10" not in output
+    assert "10/10" not in output
+    assert "0/5" not in output
+    assert "setup complete" in output
+    assert "next sweep" in output
+    assert "cases:" not in output
+
+
+def test_failed_legacy_status_marks_incomplete_bar_as_last_batch():
+    output = remote._legacy_progress(
+        "cases: 40%|████      | 2/5 [00:03<00:04, 1.4s/it]\r",
+        "FAILED (exit 1) now",
+    )
+
+    assert output is not None
+    assert "last case batch" in output
+    assert "×" in output
+    assert "2/5" in output
+
+
+def test_status_cli_repeats_verbose_for_case_progress(monkeypatch):
+    calls = []
+    monkeypatch.setattr(remote, "job_status", lambda jobid, detail: calls.append((jobid, detail)))
+
+    remote.main(["status", "j", "-vv"])
+
+    assert calls == [("j", 2)]
 
 
 def test_attach_uses_stdin_closed_ssh_for_live_view(monkeypatch):
@@ -622,8 +752,44 @@ def test_implicit_job_selection_excludes_checkpoint_reservations(monkeypatch, tm
     result = subprocess.run(["bash", "-c", list_command], capture_output=True, text=True)
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout == "20260715-113910-b0240c4f  running\n"
+    assert result.stdout == "20260715-113910-b0240c4f\t48291\t?\t-\trunning \n"
     assert all('[ -f "$d/meta" ] || continue' in command for command in commands)
+
+
+def test_jobs_report_identifiers_materials_and_last_event(monkeypatch, capsys):
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda _command: "20260719-120000-abcd1234\t48291\tFalse\thopg hbn\trunning hbn [2/2]\n",
+    )
+
+    remote.list_jobs()
+
+    output = capsys.readouterr().out
+    assert "JOB" in output
+    assert "SLURM" in output
+    assert "MODE" in output
+    assert "MATERIALS" in output
+    assert "LAST EVENT" in output
+    assert "20260719-120000-abcd1234" in output
+    assert "48291" in output
+    assert "standard" in output
+    assert "hopg, hbn" in output
+    assert "running hbn [2/2]" in output
+
+
+def test_logs_identify_resolved_job_and_host(monkeypatch, capsys):
+    commands = []
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda command: commands.append(command) or "LOG j · qlmc\n\nline\n",
+    )
+
+    remote.tail_logs("j")
+
+    assert capsys.readouterr().out == "LOG j · qlmc\n\nline\n"
+    assert 'printf "LOG %s · qlmc' in commands[0]
 
 
 def test_attach_returns_false_when_the_viewer_is_interrupted(monkeypatch):
@@ -718,6 +884,73 @@ def test_progress_bars_update_materials_independently():
     assert bars["hbn"].description == "hbn: pending"
 
 
+def test_progress_bars_close_terminal_material_once():
+    bars = {"hopg": _FakeProgressBar(total=None, desc="HOPG · pending")}
+    records = remote._parse_progress_records(
+        json.dumps(
+            {
+                "material": "hopg",
+                "total_cases": 5,
+                "cached_cases": 1,
+                "completed_new_cases": 4,
+                "state": "done",
+            }
+        )
+    )
+
+    finished = remote._update_progress_bars(bars, records)
+    remote._update_progress_bars(bars, records, finished)
+
+    assert finished == {"hopg"}
+    assert bars["hopg"].description == "HOPG · done"
+    assert bars["hopg"].refreshes == 1
+    assert bars["hopg"].closed is True
+
+
+def test_static_case_progress_uses_catalog_labels_and_one_row_per_material():
+    records = remote._parse_progress_records(
+        "\n".join(
+            [
+                '{"material":"hopg","total_cases":5,"cached_cases":1,'
+                '"completed_new_cases":4,"state":"done"}',
+                '{"material":"hbn","total_cases":4,"cached_cases":1,'
+                '"completed_new_cases":1,"state":"running"}',
+            ]
+        )
+    )
+
+    output = remote._format_case_progress(records, ["hopg", "hbn"])
+
+    assert output.count("HOPG") == 1
+    assert output.count("h-BN") == 1
+    assert "████████████████" in output
+    assert "████████░░░░░░░░" in output
+    assert "5/5" in output
+    assert "2/4" in output
+
+
+def test_static_case_progress_colors_tracks_only_on_tty(monkeypatch):
+    record = {
+        "hopg": {
+            "material": "hopg",
+            "total_cases": 2,
+            "cached_cases": 0,
+            "completed_new_cases": 1,
+            "state": "running",
+        }
+    }
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.setattr(remote.sys.stdout, "isatty", lambda: True)
+
+    colored = remote._format_case_progress(record, ["hopg"])
+    monkeypatch.setenv("NO_COLOR", "1")
+    plain = remote._format_case_progress(record, ["hopg"])
+
+    assert "\033[38;2;92;207;230m" in colored
+    assert "\033[" not in plain
+
+
 def test_attach_dashboard_allocates_every_material_row_without_dynamic_width(monkeypatch):
     created = []
 
@@ -732,6 +965,8 @@ def test_attach_dashboard_allocates_every_material_row_without_dynamic_width(mon
 
     assert [kwargs["nrows"] for kwargs in created] == [4, 4, 4]
     assert all("dynamic_ncols" not in kwargs for kwargs in created)
+    assert all(kwargs["colour"] == "#7f8c98" for kwargs in created)
+    assert all("cases" in kwargs["bar_format"] for kwargs in created)
 
 
 def test_dashboard_attach_closes_bars_and_prints_final_state(monkeypatch, capsys):
@@ -780,7 +1015,7 @@ def test_dashboard_attach_closes_bars_and_prints_final_state(monkeypatch, capsys
     assert [bar.n for bar in bars] == [4, 1]
     assert all(bar.closed for bar in bars)
     output = capsys.readouterr().out
-    assert "--- job finished ---" in output
+    assert "JOB j · FINISHED" in output
     assert "done with 1 warning(s)" in output
 
 
@@ -1963,7 +2198,7 @@ def test_attach_dashboard_watchdog_exits_on_broken_chain(monkeypatch, capsys):
         "20260717-abc", "job: 20260717-abc\nmaterials: hopg\nslurm_job_id: 123\n"
     )
     assert ok is False
-    assert "chain appears broken" in capsys.readouterr().out
+    assert "CHAIN STALLED" in capsys.readouterr().out
 
 
 def test_stop_writes_stop_sentinel_before_scancel(monkeypatch):
