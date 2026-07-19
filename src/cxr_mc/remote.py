@@ -682,8 +682,21 @@ RESERVATIONS="{reservations}"
 release_reservations() {{
   {release_lines}
 }}
+termination_signal=""
+termination_status=0
+record_termination() {{
+  termination_signal=$1
+  termination_status=$2
+  echo "FAILED (signal $termination_signal) $(date -Is)" > "$JOBDIR/state"
+}}
 finish() {{
   status=$?
+  if [ -n "$termination_signal" ]; then
+    echo "FAILED (signal $termination_signal) $(date -Is)" > "$JOBDIR/state"
+    release_reservations
+    trap - EXIT
+    exit "$termination_status"
+  fi
   current=$(cat "$JOBDIR/state" 2>/dev/null || true)
   case "$current" in
     "queued slice"*) ;;
@@ -691,6 +704,9 @@ finish() {{
     *) echo "FAILED (exit $status) $(date -Is)" > "$JOBDIR/state"; release_reservations ;;
   esac
 }}
+trap 'record_termination TERM 143' TERM
+trap 'record_termination INT 130' INT
+trap 'record_termination HUP 129' HUP
 trap finish EXIT
 echo "running $(date -Is)" > "$JOBDIR/state"
 {{
@@ -1473,15 +1489,36 @@ def _format_job_status(sections, detail):
     fields = _metadata_fields(metadata)
     scheduler = _scheduler_fields(sections.get("SQUEUE", ""))
     jobid = sections.get("JOB") or fields.get("job", "?")
+    kind = fields.get("kind", "material-sweep")
+    diagnostic = kind == "line-grid-bounds"
     materials = fields.get("materials", "-").split()
     scheduler_id = scheduler.get("job_id") or fields.get("slurm_job_id", "-")
     scheduler_state = scheduler.get("state", "NOT_QUEUED")
     rows = [
         ("State", sections.get("STATE") or "(no state yet)"),
         ("SLURM", f"{scheduler_id} · {scheduler_state}"),
-        ("Materials", ", ".join(materials) or "-"),
-        ("Mode", _mode_summary(metadata)),
     ]
+    if diagnostic:
+        slice_text = fields.get("slice_minutes", "-")
+        try:
+            hard_minutes = max(1, math.ceil(float(slice_text) * 3))
+        except ValueError:
+            hard_minutes = "-"
+        rows.extend(
+            [
+                ("Kind", kind),
+                ("Energies", f"{fields.get('energies', '-')} keV"),
+                ("Slice", f"{slice_text} min soft / {hard_minutes} min hard"),
+                ("Output", fields.get("json_out", "-")),
+            ]
+        )
+    else:
+        rows.extend(
+            [
+                ("Materials", ", ".join(materials) or "-"),
+                ("Mode", _mode_summary(metadata)),
+            ]
+        )
     output = [f"JOB {jobid}", _format_fields(rows)]
     if detail >= 1:
         allocation = [
@@ -1496,19 +1533,12 @@ def _format_job_status(sections, detail):
     if detail >= 2:
         records = _parse_progress_records(sections.get("PROGRESS", ""))
         log = sections.get("LOG", "")
-        progress = _format_case_progress(records, materials)
-        if not records:
-            progress = _legacy_progress(log, sections.get("STATE", "")) or progress
-        output.extend(
-            [
-                "",
-                "CASE PROGRESS",
-                progress,
-                "",
-                "RECENT LOG (diagnostics only)",
-                _clean_recent_log(log),
-            ]
-        )
+        if not diagnostic:
+            progress = _format_case_progress(records, materials)
+            if not records:
+                progress = _legacy_progress(log, sections.get("STATE", "")) or progress
+            output.extend(["", "CASE PROGRESS", progress])
+        output.extend(["", "RECENT LOG (diagnostics only)", _clean_recent_log(log)])
     return "\n".join(output)
 
 

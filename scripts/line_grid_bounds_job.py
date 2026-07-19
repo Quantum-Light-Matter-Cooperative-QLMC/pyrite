@@ -27,6 +27,7 @@ def _slice_payload(jobid, *, slice_minutes, json_out, energies, grid_stop):
         [
             "CXR_MC_FREE_EVERY=40",
             "CXR_MC_FREE_WATERMARK_MB=15000",
+            "CXR_MC_TIMING=1",
             shlex.quote(remote.REMOTE_UV),
             "run --no-sync python scripts/analyze_line_grid_bounds.py",
             f"--grid-stop {grid_stop:g}",

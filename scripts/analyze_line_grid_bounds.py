@@ -58,6 +58,10 @@ COARSE_NE = 200
 REFINE_NE = 2000
 TOP_K = 5
 CASE_BATCH_SIZE = 10
+# Refine cases are spectrum-dominated and ran for about nine minutes each on
+# qlmc at 250 keV.  Keep them individually checkpointable so the 10-minute
+# soft slice budget can hand off well before the 30-minute SLURM backstop.
+REFINE_BATCH_SIZE = 1
 # At the 30 keV diagnostic ceiling, spectrum work dominates and the GPU path is
 # about 6x faster for a measured heavy case. Both regimes therefore use auto.
 COARSE_ENGINE = "auto"
@@ -153,8 +157,9 @@ def _resume_phase(
     if key in active and cursor_key not in active:
         return values, False
     cursor = int(active.get(cursor_key, 0))
+    batch_size = REFINE_BATCH_SIZE if key == "refined" else CASE_BATCH_SIZE
     while cursor < len(specs):
-        end = min(cursor + CASE_BATCH_SIZE, len(specs))
+        end = min(cursor + batch_size, len(specs))
         values.extend(
             runner(specs[cursor:end], energy_keV, n_electrons, max_workers, engine)
         )

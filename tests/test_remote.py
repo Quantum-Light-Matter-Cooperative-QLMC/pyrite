@@ -695,6 +695,31 @@ def test_failed_legacy_status_marks_incomplete_bar_as_last_batch():
     assert "2/5" in output
 
 
+def test_line_grid_bounds_status_uses_diagnostic_metadata(monkeypatch, capsys):
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda _command: (
+            "@@JOB\nj\n@@META\njob: j\nkind: line-grid-bounds\n"
+            "slice_minutes: 10\nenergies: 200,250,300\nslurm_job_id: 227\n"
+            "@@STATE\nFAILED (signal TERM) now\n"
+            "@@SQUEUE\njob_id=227|state=NOT_QUEUED\n@@PROGRESS\n@@LOG\n"
+            "cases: 40%|████      | 2/5 [17:31<26:18, 526.18s/it]\r"
+        ),
+    )
+
+    remote.job_status("j", detail=2)
+
+    output = capsys.readouterr().out
+    assert "Kind      line-grid-bounds" in output
+    assert "Energies  200,250,300 keV" in output
+    assert "Slice     10 min soft / 30 min hard" in output
+    assert "Materials" not in output
+    assert "Mode" not in output
+    assert "CASE PROGRESS" not in output
+    assert "last case batch" not in output
+
+
 def test_status_cli_repeats_verbose_for_case_progress(monkeypatch):
     calls = []
     monkeypatch.setattr(remote, "job_status", lambda jobid, detail: calls.append((jobid, detail)))

@@ -152,6 +152,68 @@ def test_partial_phase_resume_starts_at_saved_geometry_cursor(monkeypatch):
     assert len(values) == 8
 
 
+def test_refine_phase_checkpoints_each_expensive_geometry():
+    analyze = _load_script("analyze_line_grid_bounds")
+    calls = []
+    snapshots = []
+
+    def runner(specs, *_args):
+        calls.append(specs)
+        material, tilt, azim = specs[0]
+        return [analyze.Candidate(material, tilt, azim, 1000.0, 1.0)]
+
+    values, timed_out = analyze._resume_phase(
+        "refined",
+        [("hopg", 1.0, float(index)) for index in range(3)],
+        250.0,
+        2000,
+        None,
+        "auto",
+        {"energy_keV": 250.0},
+        lambda value: snapshots.append(dict(value)),
+        0.0,
+        None,
+        lambda: 0.0,
+        runner,
+    )
+
+    assert timed_out is False
+    assert [len(specs) for specs in calls] == [1, 1, 1]
+    assert [snapshot["refined_cursor"] for snapshot in snapshots] == [1, 2, 3]
+    assert len(values) == 3
+
+
+def test_refine_phase_hands_off_after_one_case_overshoots_soft_budget():
+    analyze = _load_script("analyze_line_grid_bounds")
+    calls = []
+    snapshots = []
+
+    def runner(specs, *_args):
+        calls.append(specs)
+        material, tilt, azim = specs[0]
+        return [analyze.Candidate(material, tilt, azim, 1000.0, 1.0)]
+
+    values, timed_out = analyze._resume_phase(
+        "refined",
+        [("hopg", 1.0, float(index)) for index in range(3)],
+        250.0,
+        2000,
+        None,
+        "auto",
+        {"energy_keV": 250.0},
+        lambda value: snapshots.append(dict(value)),
+        0.0,
+        600.0,
+        lambda: 601.0,
+        runner,
+    )
+
+    assert timed_out is True
+    assert len(calls) == 1
+    assert snapshots[-1]["refined_cursor"] == 1
+    assert len(values) == 1
+
+
 def test_reduced_sampling_defaults_match_handoff():
     analyze = _load_script("analyze_line_grid_bounds")
     assert analyze.COARSE_NE == 200

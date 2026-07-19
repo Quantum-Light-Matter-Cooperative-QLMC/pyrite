@@ -36,6 +36,7 @@ def test_generated_slice_shell_has_fail_closed_handoff_contract():
     assert "--max-minutes 10" in shell
     assert "CXR_MC_FREE_EVERY=40" in shell
     assert "CXR_MC_FREE_WATERMARK_MB=15000" in shell
+    assert "CXR_MC_TIMING=1" in shell
 
 
 def test_batch_script_uses_three_times_slice_budget_backstop():
@@ -51,6 +52,25 @@ def test_batch_script_uses_three_times_slice_budget_backstop():
     assert "#SBATCH --time=30" in script
     assert '"queued slice"*) ;;' in script
     subprocess.run(["bash", "-n"], input=script, text=True, check=True)
+
+
+def test_batch_script_records_signal_termination(tmp_path, monkeypatch):
+    job = _load_job_script()
+    monkeypatch.setattr(job.remote, "REMOTE_DIR", str(tmp_path))
+    jobid = "20260719-120000-deadbeef"
+    jobdir = tmp_path / job.remote.JOBS_SUBDIR / jobid
+    jobdir.mkdir(parents=True)
+    script = job.remote._slurm_batch_script(
+        jobid,
+        "kill -TERM $$",
+        job_name="line-grid-bounds",
+        time_limit="30",
+    )
+
+    result = subprocess.run(["bash"], input=script, text=True, check=False)
+
+    assert result.returncode == 143
+    assert (jobdir / "state").read_text().startswith("FAILED (signal TERM)")
 
 
 def test_start_submits_slice_zero_with_nice(monkeypatch):
