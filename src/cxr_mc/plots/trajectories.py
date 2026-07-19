@@ -71,9 +71,9 @@ def _beam_detector_basis(beam, n_hat):
 
 def _trajectory_data(case, Ne, seed) -> dict[str, Any]:
     """Simulate one case and project the cascade into the beam-detector plane.
-    Returns 2D segment endpoints (M,2,2) in display units, per-segment energy/age/
-    depth, the slab + detector unit vectors in that plane, and the back/through
-    fractions.
+    Returns both the projected 2D tracks and true 3D segment endpoints in sample
+    coordinates, all in the same display units, plus per-segment energy/age/depth,
+    slab + detector directions, and back/through fractions.
 
     Multilayer/stacked materials (``case["abs_layers"]`` set -- film-on-substrate,
     e.g. mos2-on-sapphire) are transported through the FULL stack via
@@ -136,6 +136,10 @@ def _trajectory_data(case, Ne, seed) -> dict[str, Any]:
         / u,  # depth of segment ENDPOINT; transmitted electrons reach thick exactly
         elec_id=segs["elec_id"],  # emitting electron index, per segment
         L=segs["L_ang"],
+        start_xyz=start / u,
+        end_xyz=(r + 0.5 * L[:, None] * v) / u,
+        beam=np.asarray(beam, dtype=float),
+        detector=np.asarray(n_hat, dtype=float),
         ndet=ndet,
         nslab=nslab,
         u=u,

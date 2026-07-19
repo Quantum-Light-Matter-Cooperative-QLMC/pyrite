@@ -80,6 +80,7 @@ def _():
         penetration_survival_chart,
         trajectory_chart,
     )
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure
     from cxr_mc.results import (
         filter_results,
         records,
@@ -125,6 +126,7 @@ def _():
         timepix_detected_chart,
         top_geometries,
         trajectory_chart,
+        trajectory_volume_figure,
         trajectory_sweep,
     )
 
@@ -1782,6 +1784,7 @@ def _(
     plot_trajectory_grid,
     settings,
     trajectory_chart,
+    trajectory_volume_figure,
     trajectory_sweep,
 ):
     def penetration_tab():
@@ -1799,13 +1802,14 @@ def _(
         )
         _md = mo.md(
             "Surviving-electron fraction vs depth (one curve per beam energy) and "
-            "an interactive low-Ne track cross-section, at the polar tilt selected "
+            "an interactive 3D track cutaway, at the polar tilt selected "
             "in this tab. These run the cheap CPU-only "
             "transport directly — no checkpoint needed. For a stacked/multilayer "
             "material (e.g. mos2 on sapphire) the cascade is transported through "
             "the FULL stack, not just the top film. Manual beam energies above 30 keV "
             "are exploratory because the free-path fit is documented through 30 keV. "
-            "Dense grid loads on expand."
+            "The translucent crystal's lateral extent is fitted to the tracks; depth "
+            "and layer interfaces retain true scale. Dense and 2D views load on expand."
         )
         _sweep = trajectory_sweep(
             MATERIAL,
@@ -1820,7 +1824,7 @@ def _(
         # The sweep has one selected energy and tilt; keep the nearest-case guard
         # in case a future sweep adds a surrounding grid.
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
-        _track = trajectory_chart(_nc, Ne=40)
+        _volume = trajectory_volume_figure(_nc, Ne=40)
         _parts = [
             _rail,
             _md,
@@ -1861,7 +1865,7 @@ def _(
                     ),
                 ]
             ),
-            *(p for p in (_survival, _track) if p is not None),
+            *(p for p in (_survival, _volume) if p is not None),
         ]
 
         def _dense_grid():
@@ -1874,9 +1878,18 @@ def _(
             _dense_traj = build_cases(_dense_sweep, settings.n_electrons, settings.n_electrons_brem)
             return plot_trajectory_grid(_dense_traj, energy=penetration_energy_keV, Ne=120)
 
+        def _track_cross_section():
+            return trajectory_chart(_nc, Ne=40)
+
         _parts.append(
             mo.accordion(
                 {"Dense penetration grid (datashader, matplotlib)": _dense_grid},
+                lazy=True,
+            )
+        )
+        _parts.append(
+            mo.accordion(
+                {"2D track cross-section (Altair)": _track_cross_section},
                 lazy=True,
             )
         )

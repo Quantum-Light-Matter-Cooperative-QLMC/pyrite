@@ -25,6 +25,15 @@ def test_penetration_controls_read_the_active_material_scan() -> None:
     assert "_scan = CATALOG.material(MATERIAL).scan" in source
 
 
+def test_penetration_view_uses_interactive_3d_volume_as_primary_track_plot() -> None:
+    source = APP.read_text()
+
+    assert "from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure" in source
+    assert "_volume = trajectory_volume_figure(_nc, Ne=40)" in source
+    assert '"2D track cross-section (Altair)"' in source
+    assert "lateral extent is fitted to the tracks" in source
+
+
 def test_penetration_controls_offer_material_presets_and_bounded_manual_values() -> None:
     source = APP.read_text()
 
