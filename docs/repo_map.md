@@ -7,7 +7,7 @@ and the design notes in
 [`docs/`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc/tree/main/docs);
 for the backlog see
 [`TODO.md`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc/blob/main/TODO.md).
-Regenerate the directory inventory with
+Print the current top-level directory inventory with
 `uv run python scripts/dev.py repo-map`.
 
 ## Dependency layers (leaf → driver)
@@ -33,7 +33,8 @@ config  ◄── results, sweep
 run     ◄── montecarlo, results
 scan    ◄── config, run, sweep
 plots   ◄── montecarlo, results, detectors.timepix_response, detectors.eaglexo_response
-cli     ◄── scan, export          (the `cxr` console script)
+cli     ◄── analyze, archive, check, check_config, export, remote, scan, slim
+                                  (the `cxr` console script)
 ```
 
 `detectors.timepix_response` / `detectors.eaglexo_response` depend only on `materials.crystal` plus
@@ -43,8 +44,8 @@ Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
 ## Entry points
 
 - **`cxr` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
-  dispatching the `scan`, `check-config`, `export`, `slim`, `archive`, `restore`,
-  `archives` and `union` subcommands.
+  dispatching `scan`, `export`, `analyze`, `slim`, `archive`, `restore`,
+  `archives`, `union`, `remote`, `check`, and `check-config`.
 - **`cxr check-config [catalog]`** → `check_config:_run`: validate the bundled
   offline catalog or an explicit complete catalog without starting a simulation.
 - **`cxr scan <material>`** → `scan:main` → `run.run_sweep` → writes
@@ -53,6 +54,12 @@ Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any cwd.
   `notebooks/analysis_app.py` (all figures, Altair + matplotlib, lazy tabbed
   layout), and `notebooks/validation_app.py` (validation-study interface). The
   scan and analysis apps read the per-material grids in `config.py`.
+- **`cxr analyze [material]`** → `analyze:_cli`: launch or smoke-test the
+  analysis app with an explicit or persisted initial material.
+- **`cxr check`** → `check:_cli`: launch the validation app or export its
+  literature-validation figures from cached results.
+- **`cxr remote ...`** → `remote:*`: optional SSH/SLURM lifecycle for the lab
+  GPU box, including submit, attach/status/logs, pull, stop, and validation jobs.
 - **`cxr export [stem]`** → `export:main`: `marimo export html` of the analysis
   app → `results/<stem>.html`.
 - **`cxr slim <checkpoint> [--grid]`** → `slim:slim_checkpoint` →
@@ -143,7 +150,8 @@ re-exported from the package**, so `from cxr_mc.montecarlo import X` is unchange
 - `detector` — `detector_efficiency`, `eds_fwhm_eV`, `aperture_fwhm_eV`,
   `mosaic_fwhm_eV`, `mosaic_psi_rad`, `convolve_detector`. Deps: `materials.attenuation`,
   `geometry`, `transport`, `materials.crystal`.
-- `runner` — `run_case`, `run_cases` (GPU-serial / CPU-pooled), `_transport_case`,
+- `runner` — `run_case`, `run_cases` (CPU transport pipelined behind one CUDA
+  spectrum context, or memory-capped full-case CPU pool), `_transport_case`,
   `_spectrum_case`, `_worker_init`. Deps: `_backend`, `transport`, `geometry`,
   `spectrum`.
 - Deps: `materials.crystal`, `materials.attenuation`, `DATA_DIR`.
@@ -297,7 +305,33 @@ wired into the pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
 ### `cli.py`
 The `cxr` console-script dispatcher.
 - Public: `main`.
-- Deps: `scan`, `export`, `slim`, `archive`, `__version__`.
+- Deps: `analyze`, `archive`, `check`, `check_config`, `export`, `remote`,
+  `scan`, `slim`, `__version__`.
+
+### `analyze.py`
+`cxr analyze` launcher for `notebooks/analysis_app.py`, including persisted
+initial-material selection, smoke execution, edit/watch mode, ACP bridges, and
+SSH-tunnel-friendly fixed-port launch.
+- Public: `material_menu`, `select_initial_material`, `initial_material`,
+  `get_default_material`, `set_default_material`, `add_subparser`, `main`.
+
+### `check.py`
+`cxr check` launcher for `notebooks/validation_app.py` and cached validation
+figure export, with optional remote Zhai-job launch/status/pull helpers.
+- Public: `load_default_azimuth`, `save_default_azimuth`, `probe_remote_zhai`,
+  `start_remote_zhai`, `remote_zhai_status`, `pull_remote_zhai`,
+  `add_subparser`, `main`.
+
+### `check_config.py`
+`cxr check-config` validates the bundled material catalog or an explicit full
+catalog without importing GPU-heavy CLI modules.
+- Public: `add_subparser`, `main`.
+
+### `remote.py`
+Optional SSH/SLURM orchestration for the configured lab box: sync, bounded and
+chunked submissions, progress/status/log viewers, checkpoint pulls, safe stop
+and clear operations, and remote validation jobs.
+- Public CLI: `add_subparser`, `main`.
 
 ### `export.py`
 `cxr export` subcommand — `marimo export html` of `notebooks/analysis_app.py`

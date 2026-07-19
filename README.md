@@ -73,15 +73,15 @@ delta-function of the closed-form theory.
 ```
 notebooks/scan_app.py     RUNNER:  pick material → Sweep → run_sweep → checkpoints/<material>.pkl
 notebooks/analysis_app.py VIZ:     load that checkpoint → all figures (no sweeps here)
+notebooks/validation_app.py CHECK: literature anchors and validation studies
 scan.py            root shim → cxr_mc.scan (guarded; python scan.py, or cxr scan)
-scripts/export_pdf.py  shim → cxr_mc.export (checkpoint → PDF, or cxr export)
+scripts/export_pdf.py  legacy-named shim → cxr_mc.export (analysis app → static HTML)
 src/cxr_mc/     importable package: physics modules + the cxr CLI entry point
 src/cxr_mc/data/  materials.toml, cifs/, atomic_scattering_factors/, mott_transport_cross_sections/, *_qe.csv
 checks/            validation scripts + notebooks (Feranchuk anchor, Zhai Fig 1c, kinematic audit)
-dev/               author-only helpers (remote.py — run scan.py on a personal GPU box over ssh)
 docs/              design notes & decision records (deferred features, library choices)
 checkpoints/       per-material results pickles (gitignored)
-results/           exported figures / PDFs (PNGs gitignored)
+results/           exported static HTML and figures (generated artifacts gitignored)
 ```
 
 Packaged data resolves via `cxr_mc.DATA_DIR`, so imports work from any working
@@ -190,7 +190,7 @@ uv run python scan.py <material> [--quick]       # identical, via the root shim
 drops into any batch scheduler — install once, then submit one job per material.
 See [`docs/running-on-a-cluster.md`](docs/running-on-a-cluster.md) for a SLURM
 `sbatch` template (including a job-array sweep over several materials). Pull the
-checkpoints back and do all the matplotlib/PDF work locally.
+checkpoints back and do all interactive analysis and static-HTML export locally.
 
 > The author's own loop uses a small personal helper, `cxr remote` (see
 > [`src/cxr_mc/remote.py`](src/cxr_mc/remote.py)), to push the working tree to
@@ -406,9 +406,11 @@ numbers:
   Windows, `forkserver` on Linux as of Python 3.14). Any script that drives a
   sweep must be guarded with `if __name__ == "__main__":` or it relaunches itself
   recursively. Notebooks are guarded-equivalent; `scan.py` is guarded.
-- **GPU ⇒ serial.** With CuPy active, `run_cases` runs serially (one CUDA
-  context). Multiprocessing speedups apply only on the CPU path; cap
-  `max_workers` near your physical core count.
+- **GPU spectrum, pipelined CPU transport.** With CuPy active, one main-process
+  CUDA context handles spectrum/bremsstrahlung work while a process pool prepares
+  electron transport. `max_workers=0` forces fully serial execution. Full-case
+  CPU pools are capped by available memory as well as core count; tune their
+  per-worker estimate with `CXR_MC_WORKER_MEM_MB`.
 - A benign `RuntimeWarning: divide by zero` can appear because the wide brem grid
   starts at 0 eV (λ→∞); the values are clamped downstream. It is not a bug.
 

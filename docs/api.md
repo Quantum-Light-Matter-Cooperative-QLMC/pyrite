@@ -18,6 +18,9 @@ registries.
    :recursive:
 
    cxr_mc.materials
+   cxr_mc.analyze
+   cxr_mc.archive
+   cxr_mc.check
    cxr_mc.check_config
    cxr_mc.config
    cxr_mc.detectors
@@ -25,6 +28,8 @@ registries.
    cxr_mc.plots
    cxr_mc.results
    cxr_mc.run
+   cxr_mc.remote
+   cxr_mc.slim
    cxr_mc.sweep
    cxr_mc.cli
    cxr_mc.scan

@@ -19,8 +19,9 @@ the best azimuth per energy (see plots.stream_chunk).
 run_cases shows a tqdm bar over completed cases; it renders once at the top of
 the cell, so as streamed plots/tables pile up below it scrolls out of view --
 hence the explicit "tilt N/M" progress line printed with each chunk here, which
-stays next to the latest output. With a GPU present the run is serial (one CUDA
-context); see montecarlo.run_cases.
+stays next to the latest output. With a GPU present, CPU transport is pipelined
+through workers behind one main-process CUDA spectrum context; see
+montecarlo.run_cases.
 """
 
 import os
@@ -133,8 +134,9 @@ def run_sweep(
     checkpoint_path : explicit override for the pickle path; None (default)
         derives the per-material path above. A rerun with resume=True skips every
         config already in the pickle.
-    max_workers : forwarded to run_cases (None -> serial on GPU, ~3/4 cores on
-        CPU); >1 on a GPU is coerced to serial there.
+    max_workers : forwarded to run_cases. None sizes the GPU transport pool or
+        the full-case CPU pool automatically; 0 forces serial execution. CPU
+        full-case pools are also capped by available memory.
     progress : forwarded to run_cases (the per-case tqdm bar).
     group_key : case -> hashable. Configs sharing a key form one group;
         on_chunk fires once the WHOLE group has finished. Default groups by

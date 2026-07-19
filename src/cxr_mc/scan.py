@@ -3,8 +3,8 @@
 Runs the Monte-Carlo CXR parameter sweep for one material and writes the
 per-material checkpoint (checkpoints/<material>.pkl). Use this to run sweeps
 non-interactively -- in particular over SSH on the GPU box; see cxr_mc.remote,
-which drives this and pulls the checkpoint back so the (matplotlib / PDF)
-data-vis can stay on the laptop.
+which drives this and pulls the checkpoint back so interactive analysis and
+static-HTML export can stay on the laptop.
 
     cxr scan mose2                # the full per-material grid (config)
     cxr scan mose2 --quick        # tiny grid: smoke test / pipeline check

@@ -2,9 +2,9 @@
 
 `cxr scan` is a headless entry point: it runs one material's Monte-Carlo sweep and
 writes a single `checkpoints/<material>.pkl`. That makes it a clean fit for any
-batch scheduler — there is no bespoke remote-execution tool to adopt. Install the
-package once on the cluster, submit one job per material, then pull the
-checkpoints back and do all the (matplotlib / PDF) visualization locally.
+batch scheduler without requiring the optional lab-box helper described below.
+Install the package once on the cluster, submit one job per material, then pull
+the checkpoints back and do interactive analysis or static-HTML export locally.
 
 > The scripts below are **templates** — partition names, the CUDA module, account
 > strings, and resource limits are site-specific. Adapt them to your cluster.
@@ -46,9 +46,12 @@ MATERIAL="${1:?usage: sbatch run_cxr.sh <material>}"
 uv run cxr scan "$MATERIAL"      # -> checkpoints/<material>.pkl
 ```
 
-On a GPU node `run_cases` runs serially (one CUDA context), so `--cpus-per-task`
-mainly helps the CPU fallback. For a **CPU-only** partition, drop `--gres` and the
-CUDA module and pass `--workers $SLURM_CPUS_PER_TASK` to use the transport pool.
+On a GPU node one main-process CUDA context handles spectrum/bremsstrahlung while
+a process pool prepares CPU electron transport, so `--cpus-per-task` supplies
+those transport workers. For a **CPU-only** partition, drop `--gres` and the CUDA
+module; `run_cases` uses a full-case worker pool capped by both core count and
+available memory. Pass `--workers $SLURM_CPUS_PER_TASK` to request the allocation's
+CPU count; the memory cap still applies.
 
 ## 3. Several materials as a job array
 
@@ -83,8 +86,7 @@ rsync -avz login-node:~/cxr-mc/checkpoints/ ./checkpoints/
 
 Then run `cxr analyze <material>` (the `notebooks/analysis_app.py` marimo app) or
 run `cxr export` locally —
-all the matplotlib / webpdf work stays on your workstation, where that toolchain
-lives.
+all interactive visualization and static-HTML export stay on your workstation.
 
 ## Notes
 

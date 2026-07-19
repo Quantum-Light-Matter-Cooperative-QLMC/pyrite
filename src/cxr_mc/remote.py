@@ -1,13 +1,13 @@
 """``cxr remote`` -- schedule heavy CXR scans on the lab GPU box, keep data-vis local.
 
-The split this enables: the laptop holds the project and does ALL the data-vis +
-PDF export (where matplotlib and the xelatex/webpdf toolchain are set up), while
+The split this enables: the laptop holds the project and does all interactive
+analysis and static-HTML export, while
 the lab box (an RTX 5080, ssh host 'qlmc') only does the GPU-heavy Monte-Carlo
 sweep. Every compute-producing subcommand ships the current code up, submits a
 one-GPU SLURM batch script there (see :mod:`cxr_mc.scan`), and pulls results into
 ./checkpoints
--- so you never hand-ssh in or copy files, and you never need a PDF toolchain on
-the lab box.
+-- so you never hand-ssh in or copy files, and the lab box needs no visualization
+toolchain.
 
 Optional, dev-only tool: it is only useful if you have an ssh host configured
 (default 'qlmc', override via CXR_REMOTE_HOST) to run sweeps on. Every other
@@ -51,7 +51,7 @@ finishes. To DISCONNECT, just Ctrl-C (or close the terminal / drop the link) --
 that tears down the viewer only, and the job runs to completion. Reconnect any
 time with `attach`/`status`/`logs`, then `pull` once state is `done`.
 
-Then locally: run ``cxr analyze <material>`` or ``scripts/export_pdf.py``.
+Then locally: run ``cxr analyze <material>`` or ``cxr export [stem]``.
 
 Transport is ssh/scp only (uses the 'qlmc' host in ~/.ssh/config, cloudflared
 ProxyCommand and all) -- no rsync dependency, so it works from Windows Git Bash.
@@ -2013,8 +2013,8 @@ def _cli_scan(args):
     for stem in stems:
         print(
             f"\ndone. checkpoints/{stem}.pkl is local; run `cxr analyze {stem}` "
-            f"(or run scripts/export_pdf.py) -- all viz/PDF "
-            "stays local."
+            f"(or run `cxr export`) -- visualization and static-HTML export "
+            "stay local."
         )
 
 
