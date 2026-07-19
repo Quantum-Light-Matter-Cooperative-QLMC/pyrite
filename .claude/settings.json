@@ -1,12 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(uv run python scripts/dev.py:*)",
-      "Bash(uv run cxr:*)",
-      "Bash(uv run marimo:*)",
-      "Bash(git diff:*)",
-      "Bash(git status:*)",
-      "Bash(git add:*)",
+      "Bash(rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py:*)",
+      "Bash(rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr:*)",
+      "Bash(rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run marimo:*)",
+      "Bash(rtk git diff:*)",
+      "Bash(rtk git status:*)",
+      "Bash(rtk git add:*)",
       "Read(*)",
       "Write(*)",
       "Edit(*)"

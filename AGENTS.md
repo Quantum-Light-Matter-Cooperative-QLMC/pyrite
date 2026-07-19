@@ -13,52 +13,55 @@ Read `docs/repo_map.md` before explore source files.
 
 ## Canonical commands
 
+Run shell commands through `rtk`. For `uv`, always use the shared writable
+cache: `rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv ...`.
+
 Run all tests:
 
 ```bash
-uv run python scripts/dev.py test
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test
 ```
 
 Run single test:
 
 ```bash
-uv run python scripts/dev.py test path/to/test.py -k test_name
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test path/to/test.py -k test_name
 ```
 
 Lint:
 
 ```bash
-uv run python scripts/dev.py lint
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py lint
 ```
 
 Format:
 
 ```bash
-uv run python scripts/dev.py format
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py format
 ```
 
 Type check:
 
 ```bash
-uv run python scripts/dev.py typecheck
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py typecheck
 ```
 
 Notebook cleanup:
 
 ```bash
-uv run python scripts/dev.py nbstrip
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py nbstrip
 ```
 
 Run full verification:
 
 ```bash
-uv run python scripts/dev.py verify
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py verify
 ```
 
 Run all pre-commit hooks:
 
 ```bash
-uv run python scripts/dev.py precommit
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py precommit
 ```
 
 Agents prefer these commands always.
@@ -68,9 +71,18 @@ Agents prefer these commands always.
 - Prefer edits in `src/cxr_mc/` over notebook logic.
 - Notebook changes stay output-free on commit.
 - Don't duplicate README or TODO content here.
-- Locate something: use `uv run python scripts/dev.py repo-map` first.
-- `serena` available for semantic search
-  - `grep` and other tools last resort
+- Read `docs/repo_map.md`, then use Tokensave for indexed code search,
+  dependency/caller analysis, impact, and affected tests.
+- Use Serena for symbol-precise navigation, references, renames, and LSP
+  diagnostics when its language server is healthy.
+- Query `.tokensave/tokensave.db` for structural questions unsupported by the
+  Tokensave tools. Use direct source reads or `rg` for exact text, non-code,
+  generated files, or unindexed details.
+- Use Context7 only for current external-library documentation, never as a
+  repository source. Headroom manages context/model transport; RTK filters
+  shell output. Neither replaces repository navigation or verification.
+- Treat plugin workflows as optional helpers. Repo safety, physics-validation,
+  remote-compute, and verification rules remain authoritative.
 - Keep changes surgical, verify with smallest useful command.
 
 New/edited physics needs derivation docstring:

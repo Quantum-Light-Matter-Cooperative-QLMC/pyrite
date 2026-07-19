@@ -18,20 +18,27 @@ description: Use when locating code, choosing an owning module, assessing cxr-mc
 
 ## Canonical Commands
 
+- `rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py repo-map`
+- `rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py lint`
+- `rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py format`
+- `rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test`
+- `rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py verify`
 
-- `uv run python scripts/dev.py repo-map`
-- `uv run python scripts/dev.py lint`
-- `uv run python scripts/dev.py format`
-- `uv run python scripts/dev.py test`
-- `uv run python scripts/dev.py verify`
+## Navigation
 
-## Optional semantic navigation (Serena)
+1. Read `docs/repo_map.md` for ownership and layer boundaries.
+2. Use Tokensave for indexed search, callers/callees, impact, dependencies,
+   branch context, and affected-test selection.
+3. Use Serena for symbol-precise references, renames, and LSP diagnostics when
+   its language server is healthy.
+4. Query `.tokensave/tokensave.db` when a structural query lacks a native tool.
+5. Use direct source reads or `rg` for exact text, non-code, generated files,
+   runtime artifacts, or unindexed details.
 
-When Serena is available, prefer its `find_symbol`,
-`find_referencing_symbols`, and `get_symbols_overview` tools for code
-navigation; use `rename_symbol` for cross-file renames.
+Use Context7 only for current external-library documentation. Headroom handles
+context/model transport; RTK filters shell output. Neither is a code index.
 
-Troubleshooting: `serena project health-check`
+Troubleshooting: `rtk serena project health-check`
 
 ## Before Changing Code
 
@@ -40,5 +47,5 @@ Troubleshooting: `serena project health-check`
 3. Prefer a focused test over a broad refactor.
 4. Keep notebook edits limited to presentation or analysis flow.
 
-Regenerate the inventory with `uv run python scripts/dev.py repo-map` after
-entry points, packages, or agent-tooling top-levels change.
+Regenerate inventory with the canonical `repo-map` command after entry points,
+packages, or agent-tooling top-levels change.
