@@ -123,14 +123,23 @@ def henke_dispersion(element, E_eV, on_out_of_range="nan"):
 
 
 def atomic_form_factor(element, g, E_eV, on_out_of_range="nan"):
-    """
-    Full complex atomic form factor F(g, E) = f0(g) + f'(E) + i f''(E).
+    """Return ``F(g, E) = f0(g) + f'(E) + i f''(E)``.
+
+    ``f0`` uses Waasmaier--Kirfel through ``xraydb.f0`` with the crystallographic
+    argument ``q = g / (4*pi)``. ``f'`` and positive ``f''`` use the
+    Chantler/FFAST tables through xraydb. This assumes the repository's
+    structure-factor phase and passive-medium sign convention.
 
     g    : reciprocal lattice vector magnitude [1/Angstrom] (= 2*pi/d_hkl)
     E_eV : photon energy [eV]
 
     Out-of-range energies return NaN (shape preserved) by default, so the result
     stays index-aligned with E_eV. Pass on_out_of_range="raise" for strict mode.
+
+    In the forward-scattering limit ``g -> 0``, ``f0 -> Z``; when anomalous
+    terms vanish, the result reduces to the ordinary elastic form factor.
+
+    Validation: atomic-form-factor
     """
     f0 = cromer_mann_f0(element, g)  # real, energy-independent
     fp, fpp = henke_dispersion(element, E_eV, on_out_of_range)

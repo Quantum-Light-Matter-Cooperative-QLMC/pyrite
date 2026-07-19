@@ -224,11 +224,22 @@ def structure_factor(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
 
 # ---- couplings: chi_g (PXR) and U_g (CBS) ----------------------------------
 def chi_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
-    """
-    Polarizability Fourier component, Eq. (3):
-        chi_g = -(4 pi e^2 / m omega^2) * S(g)/V * exp(-W)
+    """Return the polarizability Fourier component from Feranchuk Eq. (3).
+
+    With the Debye--Waller factor already included in ``S(g)`` by
+    :func:`structure_factor`,
+
+        chi_g = -(4 pi e^2 / m omega^2) * S(g) / V.
+
     In the direct electron-density form with classical electron radius r_e:
+
         chi_g = - r_e lambda^2 / (pi V_cell) * S(g)     [dimensionless]
+
+    Assumes the kinematic, independent-atom susceptibility convention used by
+    Feranchuk--Spence (2000). An extinct reflection has ``S(g) -> 0`` and hence
+    ``chi_g -> 0``; at high photon energy, ``chi_g`` falls as ``lambda**2``.
+
+    Validation: pxr-amplitude
     """
     S, _ = structure_factor(crystal, hkl, photon_E_eV, B_ang2, use_henke)
     lam = HC_EV_ANG / photon_E_eV  # wavelength [Angstrom]

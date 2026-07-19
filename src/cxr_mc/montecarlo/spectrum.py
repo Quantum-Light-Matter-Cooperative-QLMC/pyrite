@@ -152,6 +152,8 @@ def mc_spectrum(
     rather than the single slab; the RADIATION still comes from crystal/hkl_list
     (the film). None -> single slab (bit-for-bit unchanged).
 
+    Validation: self-absorption
+
     Finite transverse dimensions stored on ``segments`` attenuate each photon to
     the first of the rectangular prism's six faces along the fixed far-field
     ``n_hat``. When both dimensions are omitted, the original z-only slab
@@ -202,6 +204,8 @@ def mc_spectrum(
     across the cone, and yields the correct (generally asymmetric) lineshape and
     integrated yield. Do NOT also apply the analytic term to the result (double
     count); build_cases handles that mutual exclusion.
+
+    Validation: mosaic-mc
     """
     if B_ang2 is None:
         raise ValueError(

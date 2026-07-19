@@ -83,7 +83,7 @@ def aperture_fwhm_eV(E_eV, beta, theta_obs_rad, dtheta_obs_rad):
 
 
 def mosaic_fwhm_eV(E_eV, psi_rad, mosaic_fwhm_rad):
-    """Line broadening from crystal mosaicity -- the INITIAL ANALYTIC model.
+    """Return first-order analytic line broadening from crystal mosaicity.
 
     A mosaic crystal is an incoherent ensemble of crystallites whose orientations
     are Gaussian-spread about the mean with a rocking-curve FWHM `mosaic_fwhm_rad`.
@@ -103,8 +103,13 @@ def mosaic_fwhm_eV(E_eV, psi_rad, mosaic_fwhm_rad):
     the amplitudes / lineshape weight fixed across the mosaic cone (good while the
     line stays narrow); (ii) the linearization diverges as psi -> 90 deg (g grazing
     the velocity), so the caller should cap the result (store_result clips it at E).
-    The exact treatment is the per-orientation MC sum inside mc_spectrum (future
-    work). psi is supplied by mosaic_psi_rad() at the nominal (unscattered) geometry.
+    The exact alternative is the per-orientation Gauss--Hermite sum inside
+    mc_spectrum. psi is supplied by mosaic_psi_rad() at the nominal (unscattered)
+    geometry. The derivation and model assumptions are documented in
+    ``docs/crystal-mosaicity.md``. The width vanishes for zero mosaic spread or
+    ``psi = 0`` and is even under ``psi -> -psi``.
+
+    Validation: mosaic-analytic
     """
     return E_eV * np.abs(np.tan(psi_rad)) * mosaic_fwhm_rad
 

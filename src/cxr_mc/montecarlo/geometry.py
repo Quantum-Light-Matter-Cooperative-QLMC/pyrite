@@ -307,7 +307,10 @@ def _mosaic_quadrature(fwhm_rad, nodes):
     integrand (spectrum vs crystallite tilt) is smooth, so product Gauss-Hermite
     converges in far fewer evaluations than random sampling and needs no RNG
     sub-stream. Cost is K = nodes**2 evaluations of the per-reflection block, a
-    direct wall-clock multiplier on the (serial, with CuPy) GPU hot loop."""
+    direct wall-clock multiplier on the (serial, with CuPy) GPU hot loop.
+
+    Validation: mosaic-mc
+    """
     if not fwhm_rad or nodes is None or nodes <= 1:
         return None
     x, w = np.polynomial.hermite.hermgauss(int(nodes))

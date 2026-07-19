@@ -90,7 +90,10 @@ def _stack_tau(layers, z_mid, n_z, E, *, exit_distance_ang=None):
     arrays (E the resonance energy); the result matches their device. A single
     layer over [0, total_thickness] reproduces the single-slab escape exactly,
     so passing layers=None elsewhere stays bit-for-bit identical.  Supplying an
-    exit distance caps paths at the selected prism face."""
+    exit distance caps paths at the selected prism face.
+
+    Validation: self-absorption
+    """
     if exit_distance_ang is not None:
         tau = 0.0
         for z_top, z_bot, comp in layers:

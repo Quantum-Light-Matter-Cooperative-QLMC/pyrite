@@ -128,7 +128,7 @@ def solid_angle_sr(width_mm, height_mm, distance_mm):
 
     This is the rigorous result for a centred rectangle (not the small-angle
     A/d^2, though it reduces to it when a, b << d: the Eagle's 27.6 mm sensor at
-    0.4 m differs from A/d^2 by <0.1%, but at a few cm the exact form matters).
+    0.4 m differs from A/d^2 by about 0.12%, but at a few cm the exact form matters).
     Scalar in, scalar out."""
     a, b, d = 0.5 * width_mm, 0.5 * height_mm, float(distance_mm)
     return 4.0 * np.arctan(a * b / (d * np.sqrt(a * a + b * b + d * d)))
@@ -280,6 +280,8 @@ class EagleResponse:
     resolve_energy : default False (the ``solid_angle x QE`` view). True applies
         the Fano + read-noise photon-counting line shape (needs a uniform grid).
     n_pix : pixels per photon cluster for the energy-resolution term.
+
+    Validation: detector-eaglexo
     """
 
     def __init__(self, E_grid_eV, *, coating="BN", resolve_energy=False, n_pix=4):
