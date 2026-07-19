@@ -222,6 +222,8 @@ def test_build_cases_quantizes_angles_symmetrically_and_removes_duplicates():
             thickness_ang=100.0,
             tilt_deg=[1.24, 1.26, 1.25, 1.24],
             tilt_azim_deg=[-1.24, -1.26, -1.25, -1.24],
+            crystal_width_mm=None,
+            crystal_height_mm=None,
             E_grid_line=np.array([75.0]),
             E_grid_brem=np.array([75.0]),
         )
@@ -403,14 +405,36 @@ def test_build_cases_rejects_invalid_footprint(width, height):
         build_cases(Sweep(material="mose2", crystal_width_mm=width, crystal_height_mm=height))
 
 
-def test_build_cases_preserves_legacy_name_for_omitted_footprint():
-    case = build_cases(Sweep(material="mose2", thickness_ang=100.0, energy_keV=30.0, tilt_deg=0.0))[
-        0
-    ]
+def test_build_cases_preserves_legacy_name_for_explicit_none_footprint():
+    case = build_cases(
+        Sweep(
+            material="mose2",
+            thickness_ang=100.0,
+            energy_keV=30.0,
+            tilt_deg=0.0,
+            crystal_width_mm=None,
+            crystal_height_mm=None,
+        )
+    )[0]
 
     assert case["name"] == "MoSe2 10nm pol=0 az=0"
     assert case["crystal_width_mm"] is None
     assert case["crystal_height_mm"] is None
+
+
+def test_build_cases_defaults_to_finite_footprint_and_beam_spot():
+    """A bare Sweep() -- no explicit footprint or beam size override -- gets a
+    finite 5x5 mm crystal footprint and a 1 mm FWHM Gaussian beam spot, so
+    default sweeps transport a physically finite beam into a physically finite
+    crystal rather than the legacy point-beam / laterally-infinite slab."""
+    case = build_cases(Sweep(material="mose2", thickness_ang=100.0, energy_keV=30.0, tilt_deg=0.0))[
+        0
+    ]
+
+    assert case["crystal_width_mm"] == 5.0
+    assert case["crystal_height_mm"] == 5.0
+    assert case["beam_fwhm_mm"] == 1.0
+    assert case["name"] == "MoSe2 10nm pol=0 az=0 footprint=5x5mm"
 
 
 def test_brem_grid_upper_limit_tracks_case_beam_energy():

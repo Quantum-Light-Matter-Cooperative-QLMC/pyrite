@@ -199,8 +199,10 @@ class Sweep:
     ``tilt_azim_deg``, ``crystal_width_mm``, and ``crystal_height_mm`` is either
     a single number (fixed) or a sequence/array (swept); build_cases() takes the
     product. The transverse dimensions must be both ``None`` (the legacy
-    infinite slab) or both strictly positive full dimensions in mm. The
-    remaining fields are fixed setup that rarely changes per run.
+    infinite slab) or both strictly positive full dimensions in mm; they
+    default to a finite 5x5 mm footprint. ``beam_fwhm_mm`` defaults to a 1 mm
+    FWHM Gaussian beam spot (pass ``None`` for the legacy point-source beam).
+    The remaining fields are fixed setup that rarely changes per run.
     """
 
     material: str  # required: no default, so a Sweep can't silently load MoSe2
@@ -208,8 +210,9 @@ class Sweep:
     energy_keV: ScalarOrSeq = (30.0, 45.0, 60.0)
     tilt_deg: ScalarOrSeq = 30.0
     tilt_azim_deg: ScalarOrSeq = 0.0
-    crystal_width_mm: ScalarOrSeq | None = None
-    crystal_height_mm: ScalarOrSeq | None = None
+    crystal_width_mm: ScalarOrSeq | None = 5.0
+    crystal_height_mm: ScalarOrSeq | None = 5.0
+    beam_fwhm_mm: float | None = 1.0  # None -> legacy point-source beam
     # fixed setup (single values) ------------------------------------------
     theta_obs_deg: float = 90.0
     n_families: int = 4
@@ -302,10 +305,13 @@ def _line_grid_for_energy(sweep: Sweep, default_grid: np.ndarray, energy_keV: fl
 
 def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     """Expand a :class:`Sweep` into a list of run_case dicts (the Cartesian
-    product over the swept thickness / tilt / azimuth / optional footprint, each
+    product over the swept thickness / tilt / azimuth / footprint, each
     crossed with every beam energy). ``crystal_width_mm`` and
-    ``crystal_height_mm`` are full dimensions: both are ``None`` for the legacy
-    infinite slab, otherwise both must be positive. Returns the ``cases`` list; preview it with
+    ``crystal_height_mm`` are full dimensions: both ``None`` recovers the
+    legacy infinite slab, otherwise both must be positive (default: a finite
+    5x5 mm footprint). Each case also carries ``beam_fwhm_mm`` from the sweep
+    (default: a 1 mm FWHM Gaussian beam spot; ``None`` recovers the legacy
+    point-source beam). Returns the ``cases`` list; preview it with
     :func:`geometry_table`."""
     cp = crystal_params(sweep.material, sweep.n_families)
     # line grid: fine + narrow (per-material default, per-energy mapping,
@@ -423,6 +429,9 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
                     thickness_ang=float(thickness),
                     crystal_width_mm=None if width is None else float(width),
                     crystal_height_mm=None if height is None else float(height),
+                    beam_fwhm_mm=(
+                        None if sweep.beam_fwhm_mm is None else float(sweep.beam_fwhm_mm)
+                    ),
                     E_grid=line_case_grid,  # legacy key (== line grid)
                     E_grid_line=line_case_grid,
                     E_grid_brem=(
@@ -465,10 +474,7 @@ def geometry_table(cases):
             return "-"
         values = decode_energy_grid(encoded)
         if isinstance(encoded, tuple):
-            return (
-                f"{values[0] / 1e3:g}-{values[-1] / 1e3:g} keV"
-                f" @ {encoded[2]:g} eV"
-            )
+            return f"{values[0] / 1e3:g}-{values[-1] / 1e3:g} keV @ {encoded[2]:g} eV"
         if values.size == 1:
             return f"{values[0] / 1e3:g} keV (1 value)"
         return f"{values[0] / 1e3:g}-{values[-1] / 1e3:g} keV ({values.size} values)"
