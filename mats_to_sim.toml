@@ -1,8 +1,5 @@
 # Materials selected by `cxr scan --all` and `cxr remote ... --all`.
 materials = [
-    # "diamond",
-    # "sapphire",
-    # "silicon",
     "hopg",
     "hbn",
     "black_phosphorus",
@@ -10,8 +7,6 @@ materials = [
     "hfs2",
     "hfse2",
     "hfte2",
-    "gep",
-    "ges",
     "gese",
     "gese2",
     "mos2",
@@ -28,24 +23,34 @@ materials = [
     "ptse2",
     "ptte2",
     "res2",
-    "rese2",
     "2h_tas2",
     "2h_tase2",
     "tate2",
-    "tise2",
-    "tite2",
-    "v2o5",
+    # "v2o5",
     "vse2",
-    "vte2",
-    "ws2",
-    "wse2",
+    # "ws2",
+    # "wse2",
     "wte2",
     "zrse2",
     "zrte3",
     "zrte5",
+]
 
-# ! --- Everything below here is already implemented, just not worth including in sim --- ! #
-    # "4h_sic",
-    # "6h_sic",
-    # "tis2",
+high_energy_materials = [
+# ! --- Everything below is only worthwhile to sim for higher beam energies (e.g., 300 keV) --- ! #
+    "tise2", # 100 keV and above
+    "gep",
+    "ges",
+    "rese2",
+]
+
+materials_to_leave_out = [
+    "diamond",
+    "sapphire",
+    "silicon",
+    "4h_sic",
+    "6h_sic",
+    "tis2",
+    "tite2",
+    "vte2",
 ]
