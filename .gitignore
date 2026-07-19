@@ -253,7 +253,6 @@ jobs/
 
 # Local session logs (full conversation transcripts written by the /compress skill)
 /CC-Session-Logs/*
-!/CC-Session-Logs/.gitkeep
 
 # cxr analyze persisted default material
 .cxr-analyze-default
@@ -261,3 +260,9 @@ jobs/
 # Ephemeral tool / assistant scratch output
 /.playwright-mcp/
 /claudedocs/
+rule-tests/
+rules/
+utils/
+.tokensave/
+
+sgconfig.yml
