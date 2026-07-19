@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+
 from cxr_mc.line_grid_bounds import coverage_energy, margined_stop, spacing_num
 
 

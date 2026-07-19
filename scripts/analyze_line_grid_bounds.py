@@ -29,7 +29,8 @@ import argparse
 import json
 import os
 import tempfile
-from dataclasses import dataclass
+import time
+from dataclasses import asdict, dataclass
 
 import numpy as np
 
@@ -53,18 +54,13 @@ WIDE_GRID_START_EV = 10.0
 WIDE_GRID_STOP_EV = 10000.0
 WIDE_GRID_STEP_EV = 5.0
 WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, WIDE_GRID_STOP_EV, WIDE_GRID_STEP_EV)
-COARSE_NE = 500
-REFINE_NE = 5000
+COARSE_NE = 200
+REFINE_NE = 2000
 TOP_K = 5
-# Coarse (near-zero scan + spot-check) is structurally CPU-bound at ne=500 (a
-# few % GPU utilisation -- see docs/superpowers/plans/2026-07-18-line-grid-gpu-
-# throughput-findings.md), so it defaults to the full-case CPU pool
-# (engine="cpu") rather than the GPU-pipeline branch a GPU box would otherwise
-# pick via engine="auto". Refine (the reported max-E_line_grid driver) always
-# passes engine="auto" -- unchanged, still GPU on a GPU box. See
-# docs/superpowers/specs/2026-07-18-regime-split-scheduling-design.md.
-COARSE_ENGINE = "cpu"
-SPOT_CHECK_TILT_INDICES = (4, 9)  # the standard grid's ~40deg and 89deg points
+CASE_BATCH_SIZE = 10
+# At the 30 keV diagnostic ceiling, spectrum work dominates and the GPU path is
+# about 6x faster for a measured heavy case. Both regimes therefore use auto.
+COARSE_ENGINE = "auto"
 
 
 @dataclass(frozen=True)
@@ -128,11 +124,74 @@ def _run_specs(specs, energy_keV, n_electrons, max_workers, engine):
     ]
 
 
-def _scan(materials, energy_keV, tilts, azimuths, n_electrons, max_workers, engine):
-    specs = [
-        (material, tilt, azim) for material in materials for tilt in tilts for azim in azimuths
-    ]
+def _scan_specs(specs, energy_keV, n_electrons, max_workers, engine):
     return _run_specs(specs, energy_keV, n_electrons, max_workers, engine)
+
+
+def _resume_phase(
+    key,
+    specs,
+    energy_keV,
+    n_electrons,
+    max_workers,
+    engine,
+    active,
+    on_phase_progress,
+    started,
+    max_seconds,
+    time_fn,
+    runner,
+):
+    """Run one phase in resumable geometry batches.
+
+    Cursor is persisted separately from candidate count because tests and future
+    runners may filter results. Older sidecars lacking a cursor represent a
+    completed phase, preserving compatibility with phase-level checkpoints.
+    """
+    values = [Candidate(**value) for value in active.get(key, [])]
+    cursor_key = f"{key}_cursor"
+    if key in active and cursor_key not in active:
+        return values, False
+    cursor = int(active.get(cursor_key, 0))
+    while cursor < len(specs):
+        end = min(cursor + CASE_BATCH_SIZE, len(specs))
+        values.extend(
+            runner(specs[cursor:end], energy_keV, n_electrons, max_workers, engine)
+        )
+        cursor = end
+        active[key] = [asdict(candidate) for candidate in values]
+        active[cursor_key] = cursor
+        if on_phase_progress is not None:
+            on_phase_progress(active)
+        if max_seconds is not None and time_fn() - started >= max_seconds:
+            return values, True
+    return values, False
+
+
+def _geometry_plan(materials, reference_scan):
+    """Return reduced coarse geometry specs for the 99%-coverage search.
+
+    Resonant energy is maximized near zero polar tilt. Keep one explicit 0deg
+    geometry (azimuth is redundant there), then retain every standard azimuth
+    at the next tilt (~9.89deg), where all completed campaign rows found their
+    driver. A minimal large-tilt guard samples 89deg at the azimuth endpoints
+    and middle grid point. This retains the maximizing boundary and an explicit
+    counterexample check while reducing 40 to 14 geometries per material.
+    """
+    tilts = [float(value) for value in reference_scan.tilt_deg]
+    azimuths = [float(value) for value in reference_scan.tilt_azim_deg]
+    near_zero_geometry = [(tilts[0], azimuths[0]), *[(tilts[1], azim) for azim in azimuths]]
+    spot_azimuths = [azimuths[index] for index in (0, len(azimuths) // 2, len(azimuths) - 1)]
+    spot_geometry = [(tilts[-1], azim) for azim in spot_azimuths]
+    near_zero = [
+        (material, tilt, azim)
+        for material in materials
+        for tilt, azim in near_zero_geometry
+    ]
+    spot_check = [
+        (material, tilt, azim) for material in materials for tilt, azim in spot_geometry
+    ]
+    return near_zero, spot_check
 
 
 def _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero_candidates):
@@ -189,69 +248,129 @@ def derive_bounds(
     max_workers=None,
     existing_rows=None,
     on_progress=None,
+    phase_state=None,
+    on_phase_progress=None,
     coarse_engine=COARSE_ENGINE,
+    max_seconds=None,
+    time_fn=time.monotonic,
 ):
     reference_scan = CATALOG.material(materials[0]).scan
     near_zero_tilts = [float(reference_scan.tilt_deg[i]) for i in (0, 1)]
-    spot_check_tilts = [float(reference_scan.tilt_deg[i]) for i in SPOT_CHECK_TILT_INDICES]
-    azimuths = [float(a) for a in reference_scan.tilt_azim_deg]
+    near_zero_specs, spot_check_specs = _geometry_plan(materials, reference_scan)
 
     existing = {float(r["energy_keV"]): r for r in (existing_rows or [])}
-    rows = []
+    rows_by_energy = dict(existing)
+    started = time_fn()
+    complete = True
     for energy_keV in energies:
         if float(energy_keV) in existing:
             print(
                 f"[analyze_line_grid_bounds] energy {energy_keV:g} keV already in checkpoint; skipping"
             )
-            rows.append(existing[float(energy_keV)])
             continue
-        near_zero = _scan(
-            materials, energy_keV, near_zero_tilts, azimuths, coarse_ne, max_workers, coarse_engine
-        )
-        _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero)
-        spot_check = _scan(
-            materials,
+        if max_seconds is not None and time_fn() - started >= max_seconds:
+            complete = False
+            break
+        active = phase_state if phase_state and phase_state.get("energy_keV") == energy_keV else {}
+        if active.get("near_zero") is not None:
+            print(f"[analyze_line_grid_bounds] resuming {energy_keV:g} keV after near-zero")
+        else:
+            active = {
+                "energy_keV": energy_keV,
+            }
+        near_zero, timed_out = _resume_phase(
+            "near_zero",
+            near_zero_specs,
             energy_keV,
-            spot_check_tilts,
-            azimuths,
             coarse_ne,
             max_workers,
             coarse_engine,
+            active,
+            on_phase_progress,
+            started,
+            max_seconds,
+            time_fn,
+            _scan_specs,
         )
+        if timed_out:
+            complete = False
+            break
+        _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero)
+        if max_seconds is not None and time_fn() - started >= max_seconds:
+            complete = False
+            break
+
+        if active.get("spot_check") is not None:
+            print(f"[analyze_line_grid_bounds] resuming {energy_keV:g} keV after spot-check")
+        spot_check, timed_out = _resume_phase(
+            "spot_check",
+            spot_check_specs,
+            energy_keV,
+            coarse_ne,
+            max_workers,
+            coarse_engine,
+            active,
+            on_phase_progress,
+            started,
+            max_seconds,
+            time_fn,
+            _scan_specs,
+        )
+        if timed_out:
+            complete = False
+            break
 
         top = sorted(near_zero, key=lambda c: c.coverage_energy_eV, reverse=True)[:top_k]
         best_spot = max(spot_check, key=lambda c: c.coverage_energy_eV)
         flagged = best_spot.coverage_energy_eV > top[0].coverage_energy_eV
         candidates = top + ([best_spot] if flagged else [])
 
-        refined = _run_specs(
+        if max_seconds is not None and time_fn() - started >= max_seconds:
+            complete = False
+            break
+
+        if active.get("refined") is not None:
+            print(f"[analyze_line_grid_bounds] resuming {energy_keV:g} keV after refine")
+        refined, timed_out = _resume_phase(
+            "refined",
             [(c.material, c.tilt_deg, c.tilt_azim_deg) for c in candidates],
             energy_keV,
             refine_ne,
             max_workers,
             "auto",
+            active,
+            on_phase_progress,
+            started,
+            max_seconds,
+            time_fn,
+            _run_specs,
         )
+        if timed_out:
+            complete = False
+            break
         driver = max(refined, key=lambda c: c.coverage_energy_eV)
 
         start_eV = float(reference_scan.E_grid_line_by_energy[energy_keV][0])
         stop_eV = margined_stop(driver.coverage_energy_eV, MARGIN, ROUND_TO_EV)
         num = spacing_num(start_eV, stop_eV, TARGET_SPACING_EV)
-        rows.append(
-            dict(
-                energy_keV=energy_keV,
-                raw_eV=driver.coverage_energy_eV,
-                start_eV=start_eV,
-                stop_eV=stop_eV,
-                num=num,
-                driver_material=driver.material,
-                driver_tilt_deg=driver.tilt_deg,
-                driver_azim_deg=driver.tilt_azim_deg,
-                spot_check_flagged=flagged,
-            )
+        rows_by_energy[float(energy_keV)] = dict(
+            energy_keV=energy_keV,
+            raw_eV=driver.coverage_energy_eV,
+            start_eV=start_eV,
+            stop_eV=stop_eV,
+            num=num,
+            driver_material=driver.material,
+            driver_tilt_deg=driver.tilt_deg,
+            driver_azim_deg=driver.tilt_azim_deg,
+            spot_check_flagged=flagged,
         )
         if on_progress is not None:
-            on_progress(rows)
-    return rows
+            on_progress([rows_by_energy[key] for key in sorted(rows_by_energy)])
+        phase_state = None
+        if on_phase_progress is not None:
+            on_phase_progress(None)
+    rows = [rows_by_energy[key] for key in sorted(rows_by_energy)]
+    return rows, complete
 
 
 def _print_report(rows):
@@ -312,6 +431,12 @@ def build_parser():
         help="spacing (eV) of the diagnostic coverage grid (default: %(default)g)",
     )
     parser.add_argument("--json-out", default=None, help="optional path to write rows as JSON")
+    parser.add_argument(
+        "--max-minutes",
+        type=float,
+        default=None,
+        help="soft slice budget checked between completed phases; exit 75 when work remains",
+    )
     return parser
 
 
@@ -325,6 +450,8 @@ def main(argv=None):
     else:
         energies = [float(e) for e in CATALOG.material(materials[0]).scan.energy_keV]
     existing_rows = []
+    phase_path = f"{args.json_out}.phase.json" if args.json_out else None
+    phase_state = None
     if args.json_out and os.path.exists(args.json_out):
         with open(args.json_out) as f:
             existing_rows = json.load(f)
@@ -333,12 +460,19 @@ def main(argv=None):
             f"[analyze_line_grid_bounds] resuming from {args.json_out}; "
             f"{len(done)} energ(ies) already done: {done}"
         )
+    if phase_path and os.path.exists(phase_path):
+        with open(phase_path) as f:
+            phase_state = json.load(f) or None
 
     def _save(rows):
         if args.json_out:
             _atomic_write_json(args.json_out, rows)
 
-    rows = derive_bounds(
+    def _save_phase(value):
+        if phase_path:
+            _atomic_write_json(phase_path, value or {})
+
+    rows, complete = derive_bounds(
         materials,
         energies,
         args.top_k,
@@ -347,12 +481,18 @@ def main(argv=None):
         args.max_workers,
         existing_rows=existing_rows,
         on_progress=_save,
+        phase_state=phase_state,
+        on_phase_progress=_save_phase,
         coarse_engine=args.coarse_engine,
+        max_seconds=None if args.max_minutes is None else args.max_minutes * 60.0,
     )
     _print_report(rows)
     if args.json_out:
         _atomic_write_json(args.json_out, rows)
         print(f"[analyze_line_grid_bounds] wrote {args.json_out}")
+    if not complete:
+        print("[analyze_line_grid_bounds] slice budget exhausted; work remains")
+        return 75
     return 0
 
 

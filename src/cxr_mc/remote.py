@@ -117,6 +117,7 @@ SYNC_PATHS = [
     "scan.py",
     "reproduce_zhai.py",
     "checks",
+    "scripts/analyze_line_grid_bounds.py",
     "pyproject.toml",
     "uv.lock",
     "README.md",
@@ -643,7 +644,7 @@ def _slurm_batch_script(
     release_lines = "\n  ".join(
         f'if [ "$(cat "$RESERVATIONS/{stem}/jobid" 2>/dev/null)" = "$JOBID" ]; then rm -rf "$RESERVATIONS/{stem}"; fi;'
         for stem in reservation_stems
-    )
+    ) or ":"
     return f"""#!/usr/bin/env bash
 #SBATCH --job-name={job_name}
 #SBATCH --partition={SLURM_PARTITION}
