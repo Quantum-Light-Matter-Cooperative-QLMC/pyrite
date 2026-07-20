@@ -86,6 +86,7 @@ def _trajectory_data(case, Ne, seed) -> dict[str, Any]:
         np.deg2rad(case.get("tilt_deg", 0.0)),
         np.deg2rad(case.get("tilt_azim_deg", 0.0)),
     )
+    n_hat = -n_hat
     abs_layers = case.get("abs_layers")
     total_thickness_ang = (
         float(abs_layers[-1][1]) if abs_layers is not None else case["thickness_ang"]
@@ -95,7 +96,7 @@ def _trajectory_data(case, Ne, seed) -> dict[str, Any]:
         Ne,
         total_thickness_ang,
         composition=case["composition"],
-        E_cut_keV=case.get("E_cut_lines_keV", 5.0),
+        E_cut_keV=case.get("E_cut_lines_keV", 1.0),
         seed=seed,
         beam_dir=beam,
         layers=abs_layers,
