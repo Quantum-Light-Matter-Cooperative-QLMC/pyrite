@@ -10,9 +10,9 @@ E_grid_line_by_energy = [
   { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 3000.0, num = 998, endpoint = true } } },
   { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 3500.0, num = 1151, endpoint = true } } },
   { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 4000.0, num = 1318, endpoint = true } } },
-  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 4500.0, num = 1484, endpoint = true } } },
-  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 5000.0, num = 1651, endpoint = true } } },
-  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 5000.0, num = 1651, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 16300.0, num = 5418, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 20800.0, num = 6918, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 24700.0, num = 8218, endpoint = true } } },
 ]
 E_grid_brem = { arange = { start = 0.0, stop = 30000.0, step = 25.0 } }
 
