@@ -208,9 +208,9 @@ def test_standard_profile_uses_requested_angles_energies_and_line_grids():
         50.0: (10.0, 3000.0),
         100.0: (50.0, 3500.0),
         150.0: (50.0, 4000.0),
-        200.0: (50.0, 4500.0),
-        250.0: (50.0, 5000.0),
-        300.0: (50.0, 5000.0),
+        200.0: (50.0, 13200.0),
+        250.0: (50.0, 16300.0),
+        300.0: (50.0, 19600.0),
     }
     for material in CATALOG.materials.values():
         scan = material.scan

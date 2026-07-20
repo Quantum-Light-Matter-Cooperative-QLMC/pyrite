@@ -25,7 +25,10 @@ def test_reduced_geometry_plan_keeps_full_near_zero_azimuth_coverage():
 
     near_zero, spot_check = analyze._geometry_plan(["a", "b"], scan)
 
-    assert near_zero[:2] == [("a", 0.0, 90.0), ("a", 89.0 / 9.0, 90.0)]
+    # tilts[1] is the raw catalog 89/9 = 9.888.. deg, which the plan quantizes to
+    # the nearest 0.5 deg (10.0) -- the same rounding build_cases applies -- so the
+    # recorded driver geometry matches what is actually simulated.
+    assert near_zero[:2] == [("a", 0.0, 90.0), ("a", 10.0, 90.0)]
     assert len(near_zero) == 2 * 11
     assert len(spot_check) == 2 * 3
     assert {spec[2] for spec in spot_check} == {90.0, 140.0, 180.0}

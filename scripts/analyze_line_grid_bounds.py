@@ -10,8 +10,8 @@ full method. Summary: for every requested material and standard beam energy,
 run a small-Ne diagnostic spectrum on a wide ``E_grid_line`` at the two
 smallest standard polar tilts (near tilt=0, where E_res is maximized) across
 every standard azimuth, plus a couple of larger-tilt spot checks. Rank by the
-energy at which 99% of coherent-line intensity is captured, refine the top
-candidates at higher Ne, then report a +15%-margined ``stop`` and the ``num``
+energy at which 95% of coherent-line intensity is captured, refine the top
+candidates at higher Ne, then report a +5%-margined ``stop`` and the ``num``
 that preserves ~3 eV endpoint-inclusive spacing. Each coarse/refine batch of
 geometries is run through cxr_mc.montecarlo.runner.run_cases, which pipelines
 the independent per-geometry transports across a CPU worker pool instead of
@@ -38,20 +38,26 @@ from cxr_mc.config import material_sweep
 from cxr_mc.line_grid_bounds import coverage_energy, margined_stop, spacing_num
 from cxr_mc.materials import CATALOG
 from cxr_mc.montecarlo.runner import run_cases
-from cxr_mc.sweep import build_cases
+from cxr_mc.sweep import _quantized_angles, build_cases
 
-COVERAGE = 0.99
-MARGIN = 0.15
+COVERAGE = 0.95
+MARGIN = 0.05
 ROUND_TO_EV = 100.0
 TARGET_SPACING_EV = 3.0
 # Diagnostic histogram grid for measuring coverage. Its CEILING must sit well
-# above the widest true 99% coverage energy at any beam energy, or coverage_energy
+# above the widest true 95% coverage energy at any beam energy, or coverage_energy
 # silently truncates and reports a bound pinned near the ceiling (the failure the
 # 2026-07-16 full scan hit at 150-300 keV). Overridable via --grid-stop/--grid-step;
 # the spacing only needs to resolve the cumulative envelope, not each narrow line,
 # since the final catalog `stop` is rounded to 100 eV regardless.
 WIDE_GRID_START_EV = 10.0
-WIDE_GRID_STOP_EV = 10000.0
+# 30 keV matches line_grid_bounds_job.py's DEFAULT_GRID_STOP and the E_grid_brem
+# ceiling, and clears the widest measured 95% line-coverage energy (~18.7 keV raw
+# at the 300 keV beam) with headroom. A 10 keV default silently clipped the
+# 200-300 keV bounds (the 2026-07-16 full-scan failure noted above), because
+# coverage_energy pins to the grid ceiling instead of raising when the true
+# envelope runs past it.
+WIDE_GRID_STOP_EV = 30000.0
 WIDE_GRID_STEP_EV = 5.0
 WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, WIDE_GRID_STOP_EV, WIDE_GRID_STEP_EV)
 COARSE_NE = 200
@@ -160,9 +166,7 @@ def _resume_phase(
     batch_size = REFINE_BATCH_SIZE if key == "refined" else CASE_BATCH_SIZE
     while cursor < len(specs):
         end = min(cursor + batch_size, len(specs))
-        values.extend(
-            runner(specs[cursor:end], energy_keV, n_electrons, max_workers, engine)
-        )
+        values.extend(runner(specs[cursor:end], energy_keV, n_electrons, max_workers, engine))
         cursor = end
         active[key] = [asdict(candidate) for candidate in values]
         active[cursor_key] = cursor
@@ -174,28 +178,30 @@ def _resume_phase(
 
 
 def _geometry_plan(materials, reference_scan):
-    """Return reduced coarse geometry specs for the 99%-coverage search.
+    """Return reduced coarse geometry specs for the 95%-coverage search.
 
     Resonant energy is maximized near zero polar tilt. Keep one explicit 0deg
     geometry (azimuth is redundant there), then retain every standard azimuth
-    at the next tilt (~9.89deg), where all completed campaign rows found their
-    driver. A minimal large-tilt guard samples 89deg at the azimuth endpoints
-    and middle grid point. This retains the maximizing boundary and an explicit
-    counterexample check while reducing 40 to 14 geometries per material.
+    at the next tilt (~9.89deg quantizes to 10deg), where all completed campaign
+    rows found their driver. A minimal large-tilt guard samples 89deg at the
+    azimuth endpoints and middle grid point. This retains the maximizing boundary
+    and an explicit counterexample check while reducing 40 to 14 geometries per
+    material.
+
+    Both axes pass through ``_quantized_angles`` -- the same nearest-0.5deg
+    rounding ``build_cases`` applies -- so the geometry recorded on each
+    ``Candidate`` (and reported as the driver) is the geometry actually
+    simulated, not the raw catalog linspace value.
     """
-    tilts = [float(value) for value in reference_scan.tilt_deg]
-    azimuths = [float(value) for value in reference_scan.tilt_azim_deg]
+    tilts = [float(value) for value in _quantized_angles(reference_scan.tilt_deg)]
+    azimuths = [float(value) for value in _quantized_angles(reference_scan.tilt_azim_deg)]
     near_zero_geometry = [(tilts[0], azimuths[0]), *[(tilts[1], azim) for azim in azimuths]]
     spot_azimuths = [azimuths[index] for index in (0, len(azimuths) // 2, len(azimuths) - 1)]
     spot_geometry = [(tilts[-1], azim) for azim in spot_azimuths]
     near_zero = [
-        (material, tilt, azim)
-        for material in materials
-        for tilt, azim in near_zero_geometry
+        (material, tilt, azim) for material in materials for tilt, azim in near_zero_geometry
     ]
-    spot_check = [
-        (material, tilt, azim) for material in materials for tilt, azim in spot_geometry
-    ]
+    spot_check = [(material, tilt, azim) for material in materials for tilt, azim in spot_geometry]
     return near_zero, spot_check
 
 
@@ -260,7 +266,10 @@ def derive_bounds(
     time_fn=time.monotonic,
 ):
     reference_scan = CATALOG.material(materials[0]).scan
-    near_zero_tilts = [float(reference_scan.tilt_deg[i]) for i in (0, 1)]
+    # Quantized to match _geometry_plan / build_cases, so the degeneracy warning's
+    # exact tilt comparison lines up with each Candidate's quantized tilt_deg.
+    quantized_tilts = _quantized_angles(reference_scan.tilt_deg)
+    near_zero_tilts = [float(quantized_tilts[i]) for i in (0, 1)]
     near_zero_specs, spot_check_specs = _geometry_plan(materials, reference_scan)
 
     existing = {float(r["energy_keV"]): r for r in (existing_rows or [])}
@@ -427,7 +436,7 @@ def build_parser():
         type=float,
         default=WIDE_GRID_STOP_EV,
         help="ceiling (eV) of the diagnostic coverage grid; must clear the widest true "
-        "99%% coverage energy at any beam energy (default: %(default)g)",
+        "95%% coverage energy at any beam energy (default: %(default)g)",
     )
     parser.add_argument(
         "--grid-step",
