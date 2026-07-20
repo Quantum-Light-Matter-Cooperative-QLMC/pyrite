@@ -266,3 +266,4 @@ utils/
 .tokensave/
 
 sgconfig.yml
+*.local.md
