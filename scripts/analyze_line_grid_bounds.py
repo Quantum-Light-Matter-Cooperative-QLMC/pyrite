@@ -51,18 +51,15 @@ TARGET_SPACING_EV = 3.0
 # the spacing only needs to resolve the cumulative envelope, not each narrow line,
 # since the final catalog `stop` is rounded to 100 eV regardless.
 WIDE_GRID_START_EV = 10.0
-# 30 keV matches line_grid_bounds_job.py's DEFAULT_GRID_STOP and the E_grid_brem
+# 20 keV matches line_grid_bounds_job.py's DEFAULT_GRID_STOP and the E_grid_brem
 # ceiling, and clears the widest measured 95% line-coverage energy (~18.7 keV raw
-# at the 300 keV beam) with headroom. A 10 keV default silently clipped the
-# 200-300 keV bounds (the 2026-07-16 full-scan failure noted above), because
-# coverage_energy pins to the grid ceiling instead of raising when the true
-# envelope runs past it.
-WIDE_GRID_STOP_EV = 30000.0
-WIDE_GRID_STEP_EV = 5.0
+# at the 300 keV beam) with headroom.
+WIDE_GRID_STOP_EV = 20000.0
+WIDE_GRID_STEP_EV = 10.0
 WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, WIDE_GRID_STOP_EV, WIDE_GRID_STEP_EV)
 COARSE_NE = 200
 REFINE_NE = 2000
-TOP_K = 5
+TOP_K = 3
 CASE_BATCH_SIZE = 10
 # Refine cases are spectrum-dominated and ran for about nine minutes each on
 # qlmc at 250 keV.  Keep them individually checkpointable so the 10-minute
@@ -71,6 +68,11 @@ REFINE_BATCH_SIZE = 1
 # At the 30 keV diagnostic ceiling, spectrum work dominates and the GPU path is
 # about 6x faster for a measured heavy case. Both regimes therefore use auto.
 COARSE_ENGINE = "auto"
+# Single 1 mm crystal for every diagnostic geometry (issue_notes.md #1): thick
+# crystals are the high-energy-dominated worst case, so pinning the thickest
+# slab bounds the widest grid any thinner production crystal needs. No thickness
+# scan here -- only tilt/azimuth vary.
+DIAGNOSTIC_THICKNESS_ANG = 1.0e7
 
 
 @dataclass(frozen=True)
@@ -78,21 +80,25 @@ class Candidate:
     material: str
     tilt_deg: float
     tilt_azim_deg: float
+    # coherent = PXR/CBS line spectrum (r["spec"]); incoherent = bremsstrahlung
+    # background (r["brem_wide"]). Both channels' 95% coverage is tracked so the
+    # line grid and the brem grid are each bounded separately (issue_notes.md #1).
     coverage_energy_eV: float
     total_intensity: float
+    incoherent_coverage_energy_eV: float
+    incoherent_total_intensity: float
 
 
 def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons):
     """One run_case dict for a fixed material/energy/geometry, on the wide
-    diagnostic grid. Pins the material's first configured thickness so only
-    the tilt/azimuth axis varies across the scan. Building is cheap and pure;
+    diagnostic grid. Pins :data:`DIAGNOSTIC_THICKNESS_ANG` (1 mm) so only the
+    tilt/azimuth axis varies across the scan. Building is cheap and pure;
     running happens in a batch via _run_specs so the whole scan shares one
     worker pool instead of paying pool-startup and per-call overhead once per
     geometry."""
-    thickness_ang = float(np.atleast_1d(CATALOG.material(material).scan.thickness_ang)[0])
     sweep = material_sweep(
         material,
-        thickness_ang=thickness_ang,
+        thickness_ang=DIAGNOSTIC_THICKNESS_ANG,
         energy_keV=energy_keV,
         tilt_deg=tilt_deg,
         tilt_azim_deg=tilt_azim_deg,
@@ -104,12 +110,15 @@ def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons):
 
 def _candidate_from_result(material, tilt_deg, tilt_azim_deg, result):
     E_grid, spec = result["E_grid"], result["spec"]
+    E_brem, brem = result["E_grid_brem"], result["brem_wide"]
     return Candidate(
         material=material,
         tilt_deg=tilt_deg,
         tilt_azim_deg=tilt_azim_deg,
         coverage_energy_eV=coverage_energy(E_grid, spec, COVERAGE),
         total_intensity=float(np.trapezoid(spec, E_grid)),
+        incoherent_coverage_energy_eV=coverage_energy(E_brem, brem, COVERAGE),
+        incoherent_total_intensity=float(np.trapezoid(brem, E_brem)),
     )
 
 
@@ -178,58 +187,29 @@ def _resume_phase(
 
 
 def _geometry_plan(materials, reference_scan):
-    """Return reduced coarse geometry specs for the 95%-coverage search.
+    """Return coarse geometry specs for the 95%-coverage search: the full
+    quantized tilt x azimuth product per material.
 
-    Resonant energy is maximized near zero polar tilt. Keep one explicit 0deg
-    geometry (azimuth is redundant there), then retain every standard azimuth
-    at the next tilt (~9.89deg quantizes to 10deg), where all completed campaign
-    rows found their driver. A minimal large-tilt guard samples 89deg at the
-    azimuth endpoints and middle grid point. This retains the maximizing boundary
-    and an explicit counterexample check while reducing 40 to 14 geometries per
-    material.
+    The production grid is now a small, deliberately curated set (issue_notes.md
+    #1: tilt in {5, 45} deg, azimuth in {100, 140, 180} deg -- polar=0 and
+    azim=90 are excluded and rejected at build_cases). That is only a handful of
+    geometries, so every one is sampled instead of a near-zero/large-tilt subset.
+    The 5 deg tilt maximizes resonant line energy (the widest line-grid driver);
+    the coarse scan ranks the product and the refine phase re-measures the top
+    few at higher Ne.
 
     Both axes pass through ``_quantized_angles`` -- the same nearest-0.5deg
-    rounding ``build_cases`` applies -- so the geometry recorded on each
-    ``Candidate`` (and reported as the driver) is the geometry actually
-    simulated, not the raw catalog linspace value.
+    rounding ``build_cases`` applies -- so each ``Candidate``'s recorded geometry
+    (reported as the driver) is the geometry actually simulated, not the raw
+    catalog value. The second return value (a legacy large-tilt spot-check set)
+    is empty: the full product already spans the largest tilt.
     """
     tilts = [float(value) for value in _quantized_angles(reference_scan.tilt_deg)]
     azimuths = [float(value) for value in _quantized_angles(reference_scan.tilt_azim_deg)]
-    near_zero_geometry = [(tilts[0], azimuths[0]), *[(tilts[1], azim) for azim in azimuths]]
-    spot_azimuths = [azimuths[index] for index in (0, len(azimuths) // 2, len(azimuths) - 1)]
-    spot_geometry = [(tilts[-1], azim) for azim in spot_azimuths]
-    near_zero = [
-        (material, tilt, azim) for material in materials for tilt, azim in near_zero_geometry
+    coarse = [
+        (material, tilt, azim) for material in materials for tilt in tilts for azim in azimuths
     ]
-    spot_check = [(material, tilt, azim) for material in materials for tilt, azim in spot_geometry]
-    return near_zero, spot_check
-
-
-def _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero_candidates):
-    """Flag any material whose exact tilt=0 geometry radiates zero coherent-
-    line intensity while its next-smallest tilt does not -- a possible
-    geometric degeneracy at tilt=0, distinct from ordinary MC noise. Does not
-    change ranking: coverage_energy already returns the grid floor for
-    zero-intensity geometries, so they can't win the top-k selection below."""
-    zero_tilt, next_tilt = near_zero_tilts
-    for material in materials:
-        zero_total = sum(
-            c.total_intensity
-            for c in near_zero_candidates
-            if c.material == material and c.tilt_deg == zero_tilt
-        )
-        next_total = sum(
-            c.total_intensity
-            for c in near_zero_candidates
-            if c.material == material and c.tilt_deg == next_tilt
-        )
-        if zero_total <= 0.0 and next_total > 0.0:
-            print(
-                f"[warn] {material}: zero coherent-line intensity at "
-                f"tilt={zero_tilt:g} deg but not at tilt={next_tilt:g} deg -- "
-                "possible geometric degeneracy at exact zero tilt; tilt=0 "
-                "remains a valid production sweep point regardless."
-            )
+    return coarse, []
 
 
 def _atomic_write_json(path, rows):
@@ -266,10 +246,6 @@ def derive_bounds(
     time_fn=time.monotonic,
 ):
     reference_scan = CATALOG.material(materials[0]).scan
-    # Quantized to match _geometry_plan / build_cases, so the degeneracy warning's
-    # exact tilt comparison lines up with each Candidate's quantized tilt_deg.
-    quantized_tilts = _quantized_angles(reference_scan.tilt_deg)
-    near_zero_tilts = [float(quantized_tilts[i]) for i in (0, 1)]
     near_zero_specs, spot_check_specs = _geometry_plan(materials, reference_scan)
 
     existing = {float(r["energy_keV"]): r for r in (existing_rows or [])}
@@ -309,7 +285,6 @@ def derive_bounds(
         if timed_out:
             complete = False
             break
-        _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero)
         if max_seconds is not None and time_fn() - started >= max_seconds:
             complete = False
             break
@@ -335,9 +310,13 @@ def derive_bounds(
             break
 
         top = sorted(near_zero, key=lambda c: c.coverage_energy_eV, reverse=True)[:top_k]
-        best_spot = max(spot_check, key=lambda c: c.coverage_energy_eV)
-        flagged = best_spot.coverage_energy_eV > top[0].coverage_energy_eV
-        candidates = top + ([best_spot] if flagged else [])
+        # spot_check is empty under the curated grid (the coarse product already
+        # spans the largest tilt); keep the flag machinery for legacy sidecars
+        # that still carry a spot-check phase.
+        best_spot = max(spot_check, key=lambda c: c.coverage_energy_eV) if spot_check else None
+        flagged = best_spot is not None and best_spot.coverage_energy_eV > top[0].coverage_energy_eV
+        extra = [best_spot] if best_spot is not None and flagged else []
+        candidates = top + extra
 
         if max_seconds is not None and time_fn() - started >= max_seconds:
             complete = False
@@ -362,11 +341,22 @@ def derive_bounds(
         if timed_out:
             complete = False
             break
+        # Coherent driver sets the LINE grid; incoherent (brem) driver sets the
+        # BREM grid. They are measured and bounded separately (issue_notes.md #1),
+        # so the material/geometry that maximizes each channel's 95% energy can
+        # differ.
         driver = max(refined, key=lambda c: c.coverage_energy_eV)
+        brem_driver = max(refined, key=lambda c: c.incoherent_coverage_energy_eV)
 
-        start_eV = float(reference_scan.E_grid_line_by_energy[energy_keV][0])
+        line_by_energy = reference_scan.E_grid_line_by_energy
+        if line_by_energy is None:
+            raise ValueError(
+                f"reference material {materials[0]!r} has no E_grid_line_by_energy configured"
+            )
+        start_eV = float(line_by_energy[energy_keV][0])
         stop_eV = margined_stop(driver.coverage_energy_eV, MARGIN, ROUND_TO_EV)
         num = spacing_num(start_eV, stop_eV, TARGET_SPACING_EV)
+        brem_stop_eV = margined_stop(brem_driver.incoherent_coverage_energy_eV, MARGIN, ROUND_TO_EV)
         rows_by_energy[float(energy_keV)] = dict(
             energy_keV=energy_keV,
             raw_eV=driver.coverage_energy_eV,
@@ -377,6 +367,11 @@ def derive_bounds(
             driver_tilt_deg=driver.tilt_deg,
             driver_azim_deg=driver.tilt_azim_deg,
             spot_check_flagged=flagged,
+            brem_raw_eV=brem_driver.incoherent_coverage_energy_eV,
+            brem_stop_eV=brem_stop_eV,
+            brem_driver_material=brem_driver.material,
+            brem_driver_tilt_deg=brem_driver.tilt_deg,
+            brem_driver_azim_deg=brem_driver.tilt_azim_deg,
         )
         if on_progress is not None:
             on_progress([rows_by_energy[key] for key in sorted(rows_by_energy)])
@@ -390,16 +385,26 @@ def derive_bounds(
 def _print_report(rows):
     header = (
         f"{'energy':>8} {'raw_eV':>10} {'stop_eV':>9} {'num':>6} "
-        f"{'driver':>14} {'tilt':>6} {'azim':>7} {'spot?':>6}"
+        f"{'driver':>14} {'tilt':>6} {'azim':>7} {'spot?':>6} "
+        f"{'brem_raw':>10} {'brem_stop':>10} {'brem_drv':>14}"
     )
     print(header)
     print("-" * len(header))
     for row in rows:
+        brem_raw = row.get("brem_raw_eV")
+        brem_stop = row.get("brem_stop_eV")
+        brem_drv = row.get("brem_driver_material", "-")
+        # Legacy rows (older checkpoints) carry no brem channel; show placeholders.
+        if brem_raw is None:
+            brem_cols = f"{'-':>10} {'-':>10} {'-':>14}"
+        else:
+            brem_cols = f"{brem_raw:>10.1f} {brem_stop:>10.1f} {brem_drv:>14}"
         print(
             f"{row['energy_keV']:>8g} {row['raw_eV']:>10.1f} {row['stop_eV']:>9.1f} "
             f"{row['num']:>6d} {row['driver_material']:>14} "
             f"{row['driver_tilt_deg']:>6.2f} {row['driver_azim_deg']:>7.2f} "
-            f"{'yes' if row['spot_check_flagged'] else 'no':>6}"
+            f"{'yes' if row['spot_check_flagged'] else 'no':>6} "
+            f"{brem_cols}"
         )
 
 

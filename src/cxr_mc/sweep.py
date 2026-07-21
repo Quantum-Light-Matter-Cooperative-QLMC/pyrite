@@ -275,6 +275,13 @@ class Sweep:
     # so e.g. a few-layer film / thin a-SiO2 / thick crystalline Si device stack
     # is stack=(LayerSpec("sio2", 2850), LayerSpec("silicon", 5e6)).
     stack: Sequence[LayerSpec] | None = None
+    # Transport-only escape hatch for the polar tilt_deg==0 ban (issue_notes.md
+    # #1). tilt=0 is a degenerate ZERO coherent-line geometry, so emission /
+    # line-grid sweeps must never sample it; the penetration-depth study, though,
+    # is transport only and uses normal incidence (tilt=0, normal azimuth) as its
+    # physical baseline. Only that study sets this True. azimuth==90 stays banned
+    # regardless -- no legitimate use, and it carried the azim-90 ranking bug.
+    allow_normal_incidence: bool = False
 
 
 def _seq(x):
@@ -288,6 +295,37 @@ def _quantized_angles(values: ScalarOrSeq) -> np.ndarray:
     scaled = source * 2.0
     quantized = np.copysign(np.floor(np.abs(scaled) + 0.5), scaled) / 2.0
     return np.asarray(list(dict.fromkeys(float(value) for value in quantized)), dtype=float)
+
+
+def _reject_banned_angles(
+    tilts: np.ndarray, azimuths: np.ndarray, *, allow_normal_incidence: bool = False
+) -> None:
+    """Refuse the degenerate geometries no emission sweep may use (issue_notes.md #1).
+
+    polar tilt == 0 deg radiates zero coherent-line intensity (the tilt=0
+    degeneracy the line-grid coverage search flags), and azimuth == 90 deg sits
+    on a symmetry axis that mis-ranked the coverage search (the azim-90 bug).
+    Guarding at case-build time makes every downstream path -- production sweeps,
+    catalog grids, the analyze_line_grid_bounds diagnostic -- structurally
+    incapable of silently sampling them; callers must pick a small nonzero tilt
+    (e.g. 5 deg) and an azimuth off 90 (e.g. 100-180 deg) instead.
+
+    ``allow_normal_incidence`` is the transport-only escape hatch: the
+    penetration-depth study is not an emission sweep and uses tilt=0 as its
+    physical baseline, so it opts out of the tilt check only. The azimuth==90 ban
+    is unconditional -- it has no legitimate use.
+    """
+    if not allow_normal_incidence and np.any(np.isclose(tilts, 0.0)):
+        raise ValueError(
+            "polar tilt_deg == 0 is disallowed for emission sweeps (degenerate "
+            "zero coherent-line geometry); use a small nonzero tilt such as 5 deg, "
+            "or set Sweep(allow_normal_incidence=True) for a transport-only study"
+        )
+    if np.any(np.isclose(azimuths, 90.0)):
+        raise ValueError(
+            "tilt_azim_deg == 90 is disallowed (degenerate symmetry axis, the "
+            "azim-90 ranking bug); use an azimuth off 90 such as 100-180 deg"
+        )
 
 
 def _line_grid_for_energy(sweep: Sweep, default_grid: np.ndarray, energy_keV: float) -> np.ndarray:
@@ -381,6 +419,7 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     brem_case_grid = encode_energy_grid(brem_grid)
     tilts = _quantized_angles(sweep.tilt_deg)
     azimuths = _quantized_angles(sweep.tilt_azim_deg)
+    _reject_banned_angles(tilts, azimuths, allow_normal_incidence=sweep.allow_normal_incidence)
 
     # normalize the substrate sugar onto the general stack (mutually exclusive)
     stack = sweep.stack

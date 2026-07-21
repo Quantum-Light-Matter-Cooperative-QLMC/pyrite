@@ -23,6 +23,7 @@ detector-solid-angle
 multilayer-materials
 atomic-data-sources
 relativistic-electron-transport
+channeling-radiation-physics
 ```
 
 ```{toctree}

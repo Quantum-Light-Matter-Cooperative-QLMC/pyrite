@@ -1,7 +1,12 @@
 import numpy as np
 import pytest
 
-from cxr_mc.line_grid_bounds import coverage_energy, margined_stop, spacing_num
+from cxr_mc.line_grid_bounds import (
+    CoverageGridTooNarrow,
+    coverage_energy,
+    margined_stop,
+    spacing_num,
+)
 
 
 def test_coverage_energy_flat_spectrum_half_coverage_is_midpoint():
@@ -10,10 +15,16 @@ def test_coverage_energy_flat_spectrum_half_coverage_is_midpoint():
     assert coverage_energy(E_grid, spec, coverage=0.5) == pytest.approx(2.0)
 
 
-def test_coverage_energy_flat_spectrum_near_full_coverage_is_last_point():
+def test_coverage_energy_reaching_coverage_only_at_ceiling_refuses_silently():
+    """Coverage met only in the final bin means the emission tail runs past the
+    grid ceiling, so a reported bound would be a silent floor pinned to it.
+    Without an explicit override this must raise, not clamp (issue_notes.md #1)."""
     E_grid = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
     spec = np.ones_like(E_grid)
-    assert coverage_energy(E_grid, spec, coverage=0.99) == pytest.approx(4.0)
+    with pytest.raises(CoverageGridTooNarrow):
+        coverage_energy(E_grid, spec, coverage=0.99)
+    # allow_shortfall is the explicit opt-in that returns the ceiling-pinned floor.
+    assert coverage_energy(E_grid, spec, coverage=0.99, allow_shortfall=True) == pytest.approx(4.0)
 
 
 def test_coverage_energy_zero_spectrum_returns_grid_start():

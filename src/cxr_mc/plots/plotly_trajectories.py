@@ -213,7 +213,7 @@ def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0):
                 "zeroline": False,
             },
             "aspectmode": "data",
-            "camera": {"eye": {"x": 1.55, "y": 1.35, "z": 0.9}},
+            "camera": {"eye": {"x": -0.8, "y": 1.5, "z": -0.4}},
             "bgcolor": _FIELD,
         },
         uirevision="penetration-volume",

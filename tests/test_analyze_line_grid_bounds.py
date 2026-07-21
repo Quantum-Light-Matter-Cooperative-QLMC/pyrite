@@ -3,8 +3,6 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-import numpy as np
-
 
 def _load_script(name):
     path = Path(__file__).parents[1] / "scripts" / f"{name}.py"
@@ -16,23 +14,24 @@ def _load_script(name):
     return module
 
 
-def test_reduced_geometry_plan_keeps_full_near_zero_azimuth_coverage():
+def test_geometry_plan_is_full_curated_tilt_azimuth_product():
     analyze = _load_script("analyze_line_grid_bounds")
+    # Curated production grid (issue_notes.md #1): tilt in {5, 45}, azimuth in
+    # {100, 140, 180}; polar=0 and azim=90 are excluded upstream.
     scan = SimpleNamespace(
-        tilt_deg=np.linspace(0.0, 89.0, 10),
-        tilt_azim_deg=np.linspace(90.0, 180.0, 10),
+        tilt_deg=(5.0, 45.0),
+        tilt_azim_deg=(100.0, 140.0, 180.0),
     )
 
-    near_zero, spot_check = analyze._geometry_plan(["a", "b"], scan)
+    coarse, spot_check = analyze._geometry_plan(["a", "b"], scan)
 
-    # tilts[1] is the raw catalog 89/9 = 9.888.. deg, which the plan quantizes to
-    # the nearest 0.5 deg (10.0) -- the same rounding build_cases applies -- so the
-    # recorded driver geometry matches what is actually simulated.
-    assert near_zero[:2] == [("a", 0.0, 90.0), ("a", 10.0, 90.0)]
-    assert len(near_zero) == 2 * 11
-    assert len(spot_check) == 2 * 3
-    assert {spec[2] for spec in spot_check} == {90.0, 140.0, 180.0}
-    assert {spec[1] for spec in spot_check} == {89.0}
+    # The full quantized tilt x azimuth product, every geometry sampled; the
+    # legacy large-tilt spot-check set is empty (the product already spans it).
+    assert spot_check == []
+    assert len(coarse) == 2 * 2 * 3
+    assert coarse[:3] == [("a", 5.0, 100.0), ("a", 5.0, 140.0), ("a", 5.0, 180.0)]
+    assert {spec[1] for spec in coarse} == {5.0, 45.0}
+    assert {spec[2] for spec in coarse} == {100.0, 140.0, 180.0}
 
 
 def test_subset_resume_preserves_unrequested_checkpoint_rows(monkeypatch):
@@ -41,12 +40,12 @@ def test_subset_resume_preserves_unrequested_checkpoint_rows(monkeypatch):
     monkeypatch.setattr(
         analyze,
         "_scan_specs",
-        lambda *args, **kwargs: [analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0)],
+        lambda *args, **kwargs: [analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0, 500.0, 0.5)],
     )
     monkeypatch.setattr(
         analyze,
         "_run_specs",
-        lambda *args, **kwargs: [analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0)],
+        lambda *args, **kwargs: [analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0, 500.0, 0.5)],
     )
     snapshots = []
 
@@ -84,7 +83,7 @@ def test_budget_expiry_returns_tempfail_without_starting_next_energy(monkeypatch
 
 def test_budget_expiry_checkpoints_completed_phase(monkeypatch):
     analyze = _load_script("analyze_line_grid_bounds")
-    candidate = analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0)
+    candidate = analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0, 500.0, 0.5)
     monkeypatch.setattr(analyze, "_scan_specs", lambda *args, **kwargs: [candidate])
     clock = iter([0.0, 0.0, 11.0])
     phases = []
@@ -105,7 +104,7 @@ def test_budget_expiry_checkpoints_completed_phase(monkeypatch):
 
 def test_resume_after_near_zero_does_not_rerun_completed_phase(monkeypatch):
     analyze = _load_script("analyze_line_grid_bounds")
-    candidate = analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0)
+    candidate = analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0, 500.0, 0.5)
     calls = []
     monkeypatch.setattr(
         analyze,
@@ -121,13 +120,15 @@ def test_resume_after_near_zero_does_not_rerun_completed_phase(monkeypatch):
     )
 
     assert complete is True
-    assert calls == ["spot"]
+    # near_zero was resumed from checkpoint (not rerun); spot_check is empty under
+    # the curated plan, so the coarse scanner is never called again this energy.
+    assert calls == []
     assert [row["energy_keV"] for row in rows] == [200.0]
 
 
 def test_partial_phase_resume_starts_at_saved_geometry_cursor(monkeypatch):
     analyze = _load_script("analyze_line_grid_bounds")
-    candidate = analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0)
+    candidate = analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0, 500.0, 0.5)
     seen = []
 
     values, timed_out = analyze._resume_phase(
@@ -163,7 +164,7 @@ def test_refine_phase_checkpoints_each_expensive_geometry():
     def runner(specs, *_args):
         calls.append(specs)
         material, tilt, azim = specs[0]
-        return [analyze.Candidate(material, tilt, azim, 1000.0, 1.0)]
+        return [analyze.Candidate(material, tilt, azim, 1000.0, 1.0, 500.0, 0.5)]
 
     values, timed_out = analyze._resume_phase(
         "refined",
@@ -194,7 +195,7 @@ def test_refine_phase_hands_off_after_one_case_overshoots_soft_budget():
     def runner(specs, *_args):
         calls.append(specs)
         material, tilt, azim = specs[0]
-        return [analyze.Candidate(material, tilt, azim, 1000.0, 1.0)]
+        return [analyze.Candidate(material, tilt, azim, 1000.0, 1.0, 500.0, 0.5)]
 
     values, timed_out = analyze._resume_phase(
         "refined",
