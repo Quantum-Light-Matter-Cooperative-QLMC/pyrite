@@ -97,6 +97,33 @@ def test_fixed_material_line_grid_overrides_profile_mapping(tmp_path):
     assert scan.E_grid_line_by_energy is None
 
 
+def test_material_scan_overrides_apply_bespoke_line_and_brem_grids(tmp_path):
+    # The key enabling fact for bespoke per-material grids: a [materials.X] block
+    # may override BOTH E_grid_line_by_energy and E_grid_brem on top of its
+    # profile, and the resolved ScanSpec carries the material's own values -- no
+    # catalog schema change is needed to give each material a bespoke grid.
+    from cxr_mc.materials import load_material_catalog
+
+    material_line = (
+        "{ energy_keV = 25.0, grid = { values = [11.0, 14.0] } },\n  "
+        "{ energy_keV = 30.0, grid = { values = [40.0, 44.0] } }"
+    )
+    text = _catalog_with_per_beam_line_grids().replace(
+        'profile = "base"',
+        'profile = "base"\n'
+        f"E_grid_line_by_energy = [\n  {material_line},\n]\n"
+        "E_grid_brem = { values = [7.0, 8.0, 9.0] }",
+        1,
+    )
+    scan = load_material_catalog(_write_catalog(tmp_path, text)).material("sample").scan
+
+    # brem override wins over the profile's E_grid_brem = 0.0
+    np.testing.assert_array_equal(scan.E_grid_brem, [7.0, 8.0, 9.0])
+    # line-by-energy override wins over the profile's per-beam mapping
+    np.testing.assert_array_equal(scan.E_grid_line_by_energy[25.0], [11.0, 14.0])
+    np.testing.assert_array_equal(scan.E_grid_line_by_energy[30.0], [40.0, 44.0])
+
+
 @pytest.mark.parametrize(
     ("replacement", "error_path"),
     [
