@@ -145,7 +145,7 @@ def browse_plotly(
     *,
     include_brem=True,
     collapse_azimuth=True,
-    floor_frac=1e-5,
+    floor_frac=1e-3,
 ):
     """Fast WebGL spectral browser: ONE Plotly figure holding every (polar tilt,
     beam energy) curve as a ``Scattergl`` trace, with a client-side tilt slider

@@ -83,7 +83,7 @@ def _windowed_frame(df, x_domain):
     return windowed if not windowed.empty else df
 
 
-def _log_y_scale(df, floor_frac=1e-5):
+def _log_y_scale(df, floor_frac=1e-3):
     """Log-scale ``y`` with an explicit positive ``domainMin``, clamped.
 
     Vega-Lite auto-computes the y domain from the data's raw (min, max) when
@@ -149,7 +149,7 @@ def _scale(scale_type, domain=None):
     return alt.Scale(**kwargs) if kwargs else alt.Undefined
 
 
-def _record_frame(r, settings, *, include_brem, band, meta):
+def _record_frame(r, settings, *, include_brem, meta):
     E = np.asarray(r["E_grid"], dtype=float)
     line_det, brem_det = _line_brem(r, settings, convolve=False)
     line_det = np.asarray(line_det, dtype=float)
@@ -160,7 +160,7 @@ def _record_frame(r, settings, *, include_brem, band, meta):
     brem_E = E
     brem = brem_det
 
-    if band == "broad" and include_brem:
+    if include_brem:
         E_wide, brem_wide = _detected_background_wide(r, settings, convolve=False)
         E_wide = np.asarray(E_wide, dtype=float)
         brem_wide = np.asarray(brem_wide, dtype=float) / r["scale"]
@@ -252,9 +252,13 @@ def spectrum_frame(
     tilt): one row per (beam energy, energy-grid point, component). Mirrors the
     intrinsic per-energy view of :func:`cxr_mc.plots.spectra._draw_by_energy`.
 
-    ``band="narrow"`` uses the line grid exactly as before. ``band="broad"``
-    keeps that fine grid through the line-grid cutoff and appends the stored
-    ``brem_wide`` continuum above it when available. ``max_points`` applies a
+    Whenever ``include_brem`` and a wide continuum (``brem_wide`` /
+    ``E_grid_brem``) are available, the ``brem``/``total`` traces extend past
+    the line grid's own cutoff with that continuum (line contribution taken as
+    zero there) for BOTH ``band`` values, so neither view cuts off abruptly at
+    the line grid's edge. ``band="narrow"``/``"broad"`` no longer changes this
+    data prep -- callers use it only to pick which default ``x_domain`` a chart
+    renders (see :func:`spectrum_chart`). ``max_points`` applies a
     peak-preserving plot-time decimation across rendered traces.
     """
     _validate_band(band)
@@ -268,9 +272,7 @@ def spectrum_frame(
                 "E0_keV": float(E0),
                 "azimuth_deg": az,
             }
-            frames.extend(
-                _record_frame(r, settings, include_brem=include_brem, band=band, meta=meta)
-            )
+            frames.extend(_record_frame(r, settings, include_brem=include_brem, meta=meta))
     if not frames:
         return pd.DataFrame(columns=_FRAME_COLUMNS)
     return _decimate_frame(pd.concat(frames, ignore_index=True), max_points)
@@ -293,12 +295,14 @@ def spectrum_chart(
 ):
     """Interactive Altair line chart of the intrinsic spectra at ONE polar tilt.
 
-    ``band="narrow"`` draws the current line-grid view. ``band="broad"`` appends
-    the stored wide bremsstrahlung tail above the line-grid cutoff, so broadband
-    spectra can extend to the beam-energy grid without recomputing CXR lines.
-    ``x_type``/``y_type`` are ``"linear"`` or ``"log"``; ``max_points`` applies
-    peak-preserving plot-time decimation before the Vega-Lite spec is built.
-    Returns an :class:`altair.Chart`, or ``None`` when there are no records.
+    Both ``band`` values now draw the wide bremsstrahlung continuum past the
+    line grid's cutoff whenever it's stored (see :func:`spectrum_frame`);
+    ``band`` only tags which default ``x_domain`` this call renders, letting a
+    caller pair a narrow line-grid-scale view with a broad beam-energy-scale
+    view of the SAME underlying data. ``x_type``/``y_type`` are ``"linear"``
+    or ``"log"``; ``max_points`` applies peak-preserving plot-time decimation
+    before the Vega-Lite spec is built. Returns an :class:`altair.Chart`, or
+    ``None`` when there are no records.
     """
     recs = _tilt_records(results, tilt_deg)
     if not recs:
@@ -361,9 +365,7 @@ def _compare_frame(recs, settings, *, hue, include_brem=True, band="narrow", max
             "tilt_deg": float(r["case"]["tilt_deg"]),
             "tilt_azim_deg": float(r["case"]["tilt_azim_deg"]),
         }
-        frames.extend(
-            _record_frame(r, settings, include_brem=include_brem, band=band, meta=row_meta)
-        )
+        frames.extend(_record_frame(r, settings, include_brem=include_brem, meta=row_meta))
     _columns = ["energy_eV", "intensity", "E0_keV", "tilt_deg", "tilt_azim_deg", "component"]
     if not frames:
         return pd.DataFrame(columns=_columns)

@@ -116,7 +116,7 @@ def plot_by_energy(results, settings, include_brem=True, collapse_azimuth=True):
 
 
 def _draw_full_spectrum(
-    fig, trecs, settings, collapse_azimuth=True, logy=True, logx=True, floor_frac=1e-5
+    fig, trecs, settings, collapse_azimuth=True, logy=True, logx=True, floor_frac=1e-3
 ):
     """Render ONE polar tilt of the full measured-range view onto ``fig``: sharp
     lines + wide brem out to the beam energy, log-log, INTRINSIC (single axis; the
@@ -126,7 +126,8 @@ def _draw_full_spectrum(
     percentile across the full range), not a fixed fraction of the line peak, so
     the whole bremsstrahlung shoulder out to the beam energy stays on-screen
     instead of being clipped under a tall, narrow line. ``floor_frac`` only caps
-    the dynamic range (deepest allowed = floor_frac x the peak)."""
+    the dynamic range (deepest allowed = floor_frac x the peak; default 1e-3
+    is 30 dB down)."""
     fig.clear()
     ax = fig.subplots(1, 1)
     energies = sorted({r["case"]["E0_keV"] for r in trecs})
@@ -181,12 +182,12 @@ def _draw_full_spectrum(
     fig.tight_layout()
 
 
-def plot_full_spectrum(results, settings, collapse_azimuth=True, logy=True, floor_frac=1e-5):
+def plot_full_spectrum(results, settings, collapse_azimuth=True, logy=True, floor_frac=1e-3):
     """Full measured-range view (sharp lines on the wide brem, log-log), ONE figure
     per polar tilt. The x-axis spans the full brem grid (to the beam energy) and
     the y-floor follows the brem continuum, so the broad bremsstrahlung shoulder
     is on-screen instead of clipped under the lines (``floor_frac`` caps the depth
-    at floor_frac x the peak). For click-through use
+    at floor_frac x the peak; default 1e-3 is 30 dB down). For click-through use
     ``browse(results, settings, kind="full")``. Needs records run with a separate
     ``E_grid_brem`` (``brem_wide`` present)."""
     recs = [r for r in records(results) if r.get("brem_wide") is not None]

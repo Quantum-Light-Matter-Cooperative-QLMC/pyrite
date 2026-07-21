@@ -100,10 +100,18 @@ def test_spectrum_frame_broadband_clips_tail_to_beam_energy():
     assert 30500.0 not in set(df["energy_eV"])
 
 
-def test_spectrum_frame_narrow_ignores_wide_brem_tail():
+def test_spectrum_frame_narrow_extends_with_wide_brem_tail():
+    # A narrow chart must not cut off abruptly at the line grid's own edge --
+    # it should keep drawing the stored continuum past that point too, same
+    # as "broad" (with zero line contribution there, since the line grid
+    # doesn't extend that far).
     df = spectrum_frame([_record(30.0, -20.0, 0.0, wide_brem=True)], _settings())
 
-    assert df["energy_eV"].max() == 5000.0
+    assert df["energy_eV"].max() == 30000.0
+    tail = df[(df.component == "total") & (df.energy_eV > 5000.0)]
+    brem_tail = df[(df.component == "brem") & (df.energy_eV > 5000.0)]
+    assert not tail.empty
+    assert np.allclose(tail["intensity"].to_numpy(), brem_tail["intensity"].to_numpy())
 
 
 def test_spectrum_frame_peak_preserving_decimation_keeps_line_peak():
