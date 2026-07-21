@@ -245,8 +245,10 @@ def test_standard_profile_uses_requested_angles_energies_and_line_grids():
     # covered by test_material_scan_overrides_apply_bespoke_line_and_brem_grids.
     scan = CATALOG.material("silicon").scan
     np.testing.assert_array_equal(scan.energy_keV, list(expected_bounds))
-    np.testing.assert_array_equal(scan.tilt_deg, [5.0, 45.0])
-    np.testing.assert_array_equal(scan.tilt_azim_deg, np.linspace(100.0, 180.0, 3))
+    np.testing.assert_array_equal(scan.tilt_deg, [5.0, 15.0, 30.0, 45.0, 60.0, 75.0, 85.0])
+    np.testing.assert_array_equal(
+        scan.tilt_azim_deg, [95.0, 105.0, 120.0, 135.0, 150.0, 165.0, 180.0]
+    )
     assert scan.E_grid_line is None
     assert tuple(scan.E_grid_line_by_energy) == tuple(expected_bounds)
     for energy, (start, stop) in expected_bounds.items():
