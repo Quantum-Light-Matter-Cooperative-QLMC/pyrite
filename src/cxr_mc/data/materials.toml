@@ -422,6 +422,16 @@ composition = { Si = 0.02205, O = 0.04410 }
 [materials.hopg]
 label = "HOPG"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2600.0, num = 864, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 3300.0, num = 1098, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 4600.0, num = 1518, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 5500.0, num = 1818, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 6300.0, num = 2084, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 7500.0, num = 2484, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 8400.0, num = 2784, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 136500.0, step = 25.0 } }
 
 [materials.hbn]
 label = "h-BN"
@@ -430,6 +440,16 @@ profile = "standard"
 [materials.diamond]
 label = "diamond"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 4600.0, num = 1531, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 6000.0, num = 1998, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 8700.0, num = 2884, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 12100.0, num = 4018, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 15200.0, num = 5051, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 17600.0, num = 5851, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 18900.0, num = 6284, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 140700.0, step = 25.0 } }
 
 [materials.silicon]
 label = "silicon"
@@ -438,10 +458,30 @@ profile = "standard"
 [materials.mose2]
 label = "MoSe2"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1800.0, num = 598, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 2300.0, num = 764, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 3200.0, num = 1051, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 4500.0, num = 1484, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 6700.0, num = 2218, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 9600.0, num = 3184, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 12300.0, num = 4084, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 225100.0, step = 25.0 } }
 
 [materials.wse2]
 label = "WSe2"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1700.0, num = 564, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 2100.0, num = 698, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 3100.0, num = 1018, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 4300.0, num = 1418, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 6900.0, num = 2284, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 9900.0, num = 3284, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 10200.0, num = 3384, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 262400.0, step = 25.0 } }
 
 [materials.nbs2]
 label = "NbS2"
