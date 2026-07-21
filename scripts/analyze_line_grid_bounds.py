@@ -392,6 +392,147 @@ def derive_bounds(
     return rows, complete
 
 
+def _brem_grid_for_rows(rows):
+    """Collapse a material's per-energy line-grid rows into ONE bespoke brem
+    grid descriptor.
+
+    ``E_grid_brem`` is a single grid per scan (not a per-energy table), so the
+    material's brem ceiling must cover its widest-energy brem tail across every
+    beam energy. Each row already carries a per-energy ``brem_stop_eV`` (the
+    +5%-margined, 100 eV-rounded coverage energy) and the unmargined
+    ``brem_raw_eV`` that produced it.
+
+    Returns ``{"stop_eV": float, "raw_eV": float, "step_eV": WIDE_BREM_STEP_EV}``.
+    """
+    driver = max(rows, key=lambda row: row["brem_stop_eV"])
+    return {
+        "stop_eV": driver["brem_stop_eV"],
+        "raw_eV": driver["brem_raw_eV"],
+        "step_eV": WIDE_BREM_STEP_EV,
+    }
+
+
+def _material_checkpoint_paths(json_out, material):
+    """Per-material checkpoint + phase-sidecar paths, or ``(None, None)`` when no
+    ``json_out`` is configured. Each material keeps today's flat single-material
+    checkpoint format (``<json_out>.<material>.json`` + ``.phase.json``) so the
+    proven resume/phase machinery is reused verbatim per material."""
+    if not json_out:
+        return None, None
+    path = f"{json_out}.{material}.json"
+    return path, f"{path}.phase.json"
+
+
+def _run_one_material(
+    material,
+    energies,
+    json_out,
+    *,
+    top_k,
+    coarse_ne,
+    refine_ne,
+    max_workers,
+    coarse_engine,
+    max_seconds,
+    time_fn,
+):
+    """Derive one material's bespoke line rows against its OWN flat checkpoint
+    and phase sidecar -- a thin per-material wrapper that reproduces ``main``'s
+    resume-load / atomic-save wiring for a single material. Returns
+    ``(rows, complete)`` from the underlying single-material ``derive_bounds``."""
+    path, phase_path = _material_checkpoint_paths(json_out, material)
+    existing_rows = []
+    phase_state = None
+    if path and os.path.exists(path):
+        with open(path) as f:
+            existing_rows = json.load(f)
+    if phase_path and os.path.exists(phase_path):
+        with open(phase_path) as f:
+            phase_state = json.load(f) or None
+
+    def _save(rows):
+        if path:
+            _atomic_write_json(path, rows)
+
+    def _save_phase(value):
+        if phase_path:
+            _atomic_write_json(phase_path, value or {})
+
+    rows, complete = derive_bounds(
+        [material],
+        energies,
+        top_k,
+        coarse_ne,
+        refine_ne,
+        max_workers,
+        existing_rows=existing_rows,
+        on_progress=_save,
+        phase_state=phase_state,
+        on_phase_progress=_save_phase,
+        coarse_engine=coarse_engine,
+        max_seconds=max_seconds,
+        time_fn=time_fn,
+    )
+    if path and complete:
+        _atomic_write_json(path, rows)
+    return rows, complete
+
+
+def derive_all_materials(
+    materials,
+    energies,
+    top_k=TOP_K,
+    coarse_ne=COARSE_NE,
+    refine_ne=REFINE_NE,
+    max_workers=None,
+    json_out=None,
+    coarse_engine=COARSE_ENGINE,
+    max_seconds=None,
+    time_fn=time.monotonic,
+):
+    """Derive a bespoke per-material line grid + brem grid for each material,
+    running the per-energy derivation independently per material (Approach A:
+    each single-material ``derive_bounds`` call's driver is that material's own
+    worst geometry).
+
+    Returns ``(combined, complete)`` where ``combined`` maps each material to
+    ``{"line_rows": [<rows>], "brem": {"stop_eV", "raw_eV", "step_eV"}}``. The
+    soft ``max_seconds`` budget is threaded across the WHOLE material x energy
+    set -- checked between materials and (inside ``derive_bounds``) between
+    phases; when it is exhausted the function returns early with
+    ``complete=False`` (the exit-75 "work remains" contract). The combined
+    ``json_out`` is written only once every material is complete; per-material
+    checkpoint files carry the resumable state in the meantime.
+    """
+    started = time_fn()
+    combined = {}
+    complete = True
+    for material in materials:
+        if max_seconds is not None and time_fn() - started >= max_seconds:
+            complete = False
+            break
+        remaining = None if max_seconds is None else max_seconds - (time_fn() - started)
+        rows, material_complete = _run_one_material(
+            material,
+            energies,
+            json_out,
+            top_k=top_k,
+            coarse_ne=coarse_ne,
+            refine_ne=refine_ne,
+            max_workers=max_workers,
+            coarse_engine=coarse_engine,
+            max_seconds=remaining,
+            time_fn=time_fn,
+        )
+        combined[material] = {"line_rows": rows, "brem": _brem_grid_for_rows(rows)}
+        if not material_complete:
+            complete = False
+            break
+    if complete and json_out:
+        _atomic_write_json(json_out, combined)
+    return combined, complete
+
+
 def _print_report(rows):
     header = (
         f"{'energy':>8} {'raw_eV':>10} {'stop_eV':>9} {'num':>6} "
@@ -486,46 +627,31 @@ def main(argv=None):
         energies = [float(e) for e in args.energies.split(",")]
     else:
         energies = [float(e) for e in CATALOG.material(materials[0]).scan.energy_keV]
-    existing_rows = []
-    phase_path = f"{args.json_out}.phase.json" if args.json_out else None
-    phase_state = None
-    if args.json_out and os.path.exists(args.json_out):
-        with open(args.json_out) as f:
-            existing_rows = json.load(f)
-        done = sorted({float(r["energy_keV"]) for r in existing_rows})
-        print(
-            f"[analyze_line_grid_bounds] resuming from {args.json_out}; "
-            f"{len(done)} energ(ies) already done: {done}"
-        )
-    if phase_path and os.path.exists(phase_path):
-        with open(phase_path) as f:
-            phase_state = json.load(f) or None
 
-    def _save(rows):
-        if args.json_out:
-            _atomic_write_json(args.json_out, rows)
-
-    def _save_phase(value):
-        if phase_path:
-            _atomic_write_json(phase_path, value or {})
-
-    rows, complete = derive_bounds(
+    combined, complete = derive_all_materials(
         materials,
         energies,
         args.top_k,
         args.coarse_ne,
         args.refine_ne,
         args.max_workers,
-        existing_rows=existing_rows,
-        on_progress=_save,
-        phase_state=phase_state,
-        on_phase_progress=_save_phase,
+        json_out=args.json_out,
         coarse_engine=args.coarse_engine,
         max_seconds=None if args.max_minutes is None else args.max_minutes * 60.0,
     )
-    _print_report(rows)
-    if args.json_out:
-        _atomic_write_json(args.json_out, rows)
+    for material in materials:
+        entry = combined.get(material)
+        if entry is None:
+            continue
+        print(f"=== {material} ===")
+        _print_report(entry["line_rows"])
+        brem = entry["brem"]
+        print(
+            f"brem grid: stop={brem['stop_eV']:g} eV  raw={brem['raw_eV']:g} eV  "
+            f"step={brem['step_eV']:g} eV"
+        )
+    if args.json_out and complete:
+        _atomic_write_json(args.json_out, combined)
         print(f"[analyze_line_grid_bounds] wrote {args.json_out}")
     if not complete:
         print("[analyze_line_grid_bounds] slice budget exhausted; work remains")

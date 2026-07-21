@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -230,7 +231,9 @@ def test_reduced_sampling_defaults_match_handoff():
 
 def test_main_returns_tempfail_when_budget_leaves_work(monkeypatch):
     analyze = _load_script("analyze_line_grid_bounds")
-    monkeypatch.setattr(analyze, "derive_bounds", lambda *args, **kwargs: ([], False))
+    # main() now drives derive_all_materials, not derive_bounds directly; an
+    # incomplete run (complete=False) must still surface the exit-75 contract.
+    monkeypatch.setattr(analyze, "derive_all_materials", lambda *args, **kwargs: ({}, False))
     monkeypatch.setattr(analyze, "_print_report", lambda rows: None)
 
     assert analyze.main(["--materials", "hopg", "--energies", "200"]) == 75
@@ -272,3 +275,87 @@ def test_candidate_brem_channel_refuses_silent_truncation():
 
     with pytest.raises(CoverageGridTooNarrow):
         analyze._candidate_from_result("hopg", 5.0, 100.0, result)
+
+
+def test_derive_all_materials_produces_independent_per_material_output(monkeypatch):
+    # Approach A: each material's rows come from its OWN single-material
+    # derive_bounds call, so the driver is that material's own worst geometry --
+    # not a single worst-case shared across all materials.
+    analyze = _load_script("analyze_line_grid_bounds")
+
+    def fake_derive_bounds(materials, energies, *args, **kwargs):
+        m = materials[0]
+        rows = [
+            {"energy_keV": e, "driver_material": m, "brem_stop_eV": 100.0 * e} for e in energies
+        ]
+        return rows, True
+
+    monkeypatch.setattr(analyze, "derive_bounds", fake_derive_bounds)
+    monkeypatch.setattr(
+        analyze,
+        "_brem_grid_for_rows",
+        lambda rows: {
+            "stop_eV": max(r["brem_stop_eV"] for r in rows),
+            "raw_eV": 0.0,
+            "step_eV": 25.0,
+        },
+    )
+
+    combined, complete = analyze.derive_all_materials(["hopg", "diamond"], [100.0, 200.0])
+
+    assert complete is True
+    assert set(combined) == {"hopg", "diamond"}
+    assert [r["driver_material"] for r in combined["hopg"]["line_rows"]] == ["hopg", "hopg"]
+    assert [r["driver_material"] for r in combined["diamond"]["line_rows"]] == [
+        "diamond",
+        "diamond",
+    ]
+    assert combined["hopg"]["brem"]["stop_eV"] == 200.0 * 100.0
+
+
+def test_derive_all_materials_skips_material_with_complete_checkpoint(monkeypatch, tmp_path):
+    # A per-material checkpoint that already holds every requested energy must be
+    # loaded, not recomputed: the coarse/refine scanners are never called.
+    analyze = _load_script("analyze_line_grid_bounds")
+    monkeypatch.setattr(
+        analyze,
+        "_scan_specs",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("coarse scan started")),
+    )
+    monkeypatch.setattr(
+        analyze,
+        "_run_specs",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("refine started")),
+    )
+    monkeypatch.setattr(
+        analyze,
+        "_brem_grid_for_rows",
+        lambda rows: {"stop_eV": 0.0, "raw_eV": 0.0, "step_eV": 25.0},
+    )
+    json_out = str(tmp_path / "bounds.json")
+    seeded = [{"energy_keV": 200.0, "raw_eV": 1.0, "brem_stop_eV": 1.0}]
+    with open(f"{json_out}.hopg.json", "w") as f:
+        json.dump(seeded, f)
+
+    combined, complete = analyze.derive_all_materials(["hopg"], [200.0], json_out=json_out)
+
+    assert complete is True
+    assert combined["hopg"]["line_rows"] == seeded
+
+
+def test_brem_grid_for_rows_covers_worst_energy_brem_stop():
+    # One E_grid_brem per material must clear the widest-energy brem tail: the
+    # max over the per-energy brem_stop_eV, reporting the raw of the row that set
+    # it, at the production brem spacing.
+    analyze = _load_script("analyze_line_grid_bounds")
+    rows = [
+        {"energy_keV": 100.0, "brem_stop_eV": 5000.0, "brem_raw_eV": 4700.0},
+        {"energy_keV": 300.0, "brem_stop_eV": 12000.0, "brem_raw_eV": 11500.0},
+        {"energy_keV": 200.0, "brem_stop_eV": 9000.0, "brem_raw_eV": 8600.0},
+    ]
+
+    grid = analyze._brem_grid_for_rows(rows)
+
+    assert grid["stop_eV"] == 12000.0
+    assert grid["raw_eV"] == 11500.0
+    assert grid["step_eV"] == analyze.WIDE_BREM_STEP_EV
