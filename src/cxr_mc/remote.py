@@ -661,10 +661,13 @@ def _slurm_batch_script(
     _check_shell_tokens([jobid, *reservation_stems])
     jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
     reservations = _reservation_root()
-    release_lines = "\n  ".join(
-        f'if [ "$(cat "$RESERVATIONS/{stem}/jobid" 2>/dev/null)" = "$JOBID" ]; then rm -rf "$RESERVATIONS/{stem}"; fi;'
-        for stem in reservation_stems
-    ) or ":"
+    release_lines = (
+        "\n  ".join(
+            f'if [ "$(cat "$RESERVATIONS/{stem}/jobid" 2>/dev/null)" = "$JOBID" ]; then rm -rf "$RESERVATIONS/{stem}"; fi;'
+            for stem in reservation_stems
+        )
+        or ":"
+    )
     return f"""#!/usr/bin/env bash
 #SBATCH --job-name={job_name}
 #SBATCH --partition={SLURM_PARTITION}
@@ -979,6 +982,84 @@ def _job_metadata(jobid: str) -> str:
 def _job_succeeded(jobid: str) -> bool:
     """Whether the batch script recorded a successful terminal state."""
     return _job_state(jobid).startswith("done")
+
+
+def _reservation_ledger() -> tuple[int, list[tuple[str, str, int]]]:
+    """Return ``(now_epoch, [(stem, jobid, mtime_epoch)])`` for every held reservation.
+
+    One ``ssh`` round trip enumerates the whole reservation root and stamps the
+    box's own clock, so reservation age is measured against the box -- never the
+    caller -- keeping the staging-race guard immune to client/host clock skew.
+    """
+    remote = (
+        f'R="{_reservation_root()}"; [ -d "$R" ] || exit 0; '
+        'printf "NOW\\t%s\\n" "$(date +%s)"; '
+        'for d in "$R"/*/; do [ -d "$d" ] || continue; '
+        's=$(basename "$d"); '
+        'j=$(cat "$d/jobid" 2>/dev/null) || j="unknown"; '
+        'm=$(stat -c %Y "$d" 2>/dev/null) || m=0; '
+        'printf "%s\\t%s\\t%s\\n" "$s" "$j" "$m"; done'
+    )
+    now = 0
+    rows: list[tuple[str, str, int]] = []
+    for line in _ssh_capture(remote).splitlines():
+        parts = line.split("\t")
+        if parts[0] == "NOW" and len(parts) == 2 and parts[1].isdigit():
+            now = int(parts[1])
+        elif len(parts) == 3:
+            stem, jobid, mtime = parts
+            rows.append(
+                (stem.strip(), jobid.strip() or "unknown", int(mtime) if mtime.isdigit() else 0)
+            )
+    return now, rows
+
+
+def _is_reapable(live_state: str | None, age_seconds: int, min_age_seconds: float) -> bool:
+    """Decide whether a reservation-holding job is a safe reap target.
+
+    ``live_state`` is the job's current SLURM state (e.g. ``"RUNNING"``), or
+    ``None`` when the scheduler has no allocation recorded for it. ``age_seconds``
+    is how long the job's newest reservation has sat untouched on the box;
+    ``min_age_seconds`` is the staging-race guard.
+    """
+    # Reap only when both hold: no live SLURM allocation (dead), and the newest
+    # lock is older than the staging-race guard (not a job mid-submit).
+    return live_state is None and age_seconds >= min_age_seconds
+
+
+def _orphaned_reservation_jobs(
+    min_age_seconds: float,
+) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+    """Partition reservation holders into reapable orphans and protected jobs.
+
+    Returns ``(orphans, protected)``, each mapping ``jobid -> sorted[stem]``.
+    Liveness reuses the same recorded-scheduler-ID + ``squeue`` signal as
+    ``_live_jobs``; PID guessing is never a safe fallback for scheduler work.
+    """
+    now, rows = _reservation_ledger()
+    by_job: dict[str, list[tuple[str, int]]] = {}
+    for stem, jobid, mtime in rows:
+        by_job.setdefault(jobid, []).append((stem, mtime))
+    orphans: dict[str, list[str]] = {}
+    protected: dict[str, list[str]] = {}
+    for jobid, entries in by_job.items():
+        stems = sorted(stem for stem, _m in entries)
+        scheduler_id = _slurm_job_id(jobid) if jobid != "unknown" else None
+        live_state = _slurm_state(scheduler_id) if scheduler_id else None
+        newest = max(mtime for _s, mtime in entries)
+        age = now - newest if now else 0
+        if _is_reapable(live_state, age, min_age_seconds):
+            orphans[jobid] = stems
+        else:
+            protected[jobid] = stems
+    return orphans, protected
+
+
+def _reap_job_command(jobid: str) -> str:
+    """Remote command: release a job's reservations, then stamp its state terminal."""
+    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
+    release = _release_job_reservations_command(jobid)
+    return f'{release}; echo "reaped (orphan reservations released) $(date -Is)" > "{jobdir}/state"'
 
 
 def _refuse_if_busy(materials, quick):
@@ -1597,6 +1678,39 @@ def stop_jobs(materials=None, all_jobs=False):
         _stop_jobid(jobid)
 
 
+def reap_reservations(min_age_minutes=5.0, yes=False):
+    """Release checkpoint reservations orphaned by hard-killed jobs.
+
+    A reservation is a ``mkdir`` lock released by the batch job's EXIT trap. A
+    hard kill (OOM, node reboot, ``kill -9``) skips the trap and strands every
+    lock, wedging ``start``/``scan`` with no recovery path -- ``stop`` refuses a
+    job the scheduler no longer knows. This reaps locks whose owning job has no
+    SLURM allocation and whose newest lock predates the staging-race guard.
+
+    Without ``yes`` this is a safe dry preview. With ``yes`` it releases the
+    orphans and stamps each reaped job's state terminal.
+    """
+    min_age_seconds = max(0.0, min_age_minutes) * 60
+    orphans, protected = _orphaned_reservation_jobs(min_age_seconds)
+    if not orphans and not protected:
+        print("(no active checkpoint reservations on the box)")
+        return
+    for jobid, stems in sorted(protected.items()):
+        print(f"keeping {jobid}: {len(stems)} reservation(s) held by a live or too-recent job")
+    if not orphans:
+        print("(no orphaned reservations to reap)")
+        return
+    for jobid, stems in sorted(orphans.items()):
+        verb = "releasing" if yes else "would release"
+        print(f"{verb} {jobid}: {len(stems)} orphan reservation(s) -> {', '.join(stems)}")
+    if not yes:
+        print("re-run with --yes to release them")
+        return
+    for jobid in sorted(orphans):
+        _run(["ssh", "-n", HOST, _reap_job_command(jobid)])
+    print(f"reaped {len(orphans)} orphaned job(s)")
+
+
 def _ensure_utf8_stdio():
     """The box's output is UTF-8 (job logs embed tqdm block-glyph progress bars
     like `████▌`). On Windows stdout defaults to cp1252 -- and when it is,
@@ -1722,6 +1836,10 @@ def _cli_logs(args):
 
 def _cli_stop(args):
     stop_jobs(args.materials, args.all)
+
+
+def _cli_reap(args):
+    reap_reservations(min_age_minutes=args.min_age_minutes, yes=args.yes)
 
 
 def _cli_clear(args):
@@ -1881,6 +1999,24 @@ def _build_remote_parser(ap):
     sp.add_argument("materials", nargs="*", help="material name(s) owned by live jobs")
     sp.add_argument("-a", "--all", action="store_true", help="stop every live job")
     sp.set_defaults(func=_dispatch(_cli_stop))
+
+    rp = sub.add_parser(
+        "reap",
+        help="release checkpoint reservations orphaned by hard-killed jobs (dry preview unless --yes)",
+        description="release checkpoint reservations orphaned by hard-killed jobs "
+        "whose owning SLURM allocation is gone (dry preview unless --yes)",
+    )
+    rp.add_argument(
+        "--min-age-minutes",
+        type=float,
+        default=5.0,
+        help="only reap reservations whose newest lock is older than this, guarding "
+        "the reserve-before-submit window (default: 5.0)",
+    )
+    rp.add_argument(
+        "--yes", action="store_true", help="actually release (default: dry preview only)"
+    )
+    rp.set_defaults(func=_dispatch(_cli_reap))
 
     p = sub.add_parser("pull", help="fetch one or more existing checkpoints from the box")
     p.add_argument("material", nargs="*", help="checkpoint stem(s), e.g. mose2 mose2_quick")

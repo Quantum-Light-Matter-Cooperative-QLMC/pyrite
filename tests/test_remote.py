@@ -2235,3 +2235,103 @@ def test_stop_writes_stop_sentinel_before_scancel(monkeypatch):
     (cmd,) = commands
     assert cmd.index("STOP") < cmd.index("scancel")
     assert "reproduce_zhai.py" in remote.SYNC_PATHS
+
+
+def test_is_reapable_only_when_dead_and_past_guard():
+    guard = 300.0
+    # dead (no SLURM allocation) AND old enough -> reap
+    assert remote._is_reapable(None, 301, guard) is True
+    assert remote._is_reapable(None, 300, guard) is True
+    # dead but still inside the staging-race window -> keep
+    assert remote._is_reapable(None, 299, guard) is False
+    # live allocation is never reaped, however old the lock looks
+    assert remote._is_reapable("RUNNING", 10_000, guard) is False
+    assert remote._is_reapable("PENDING", 10_000, guard) is False
+
+
+def test_orphaned_reservation_jobs_partitions_dead_stale_from_live_and_recent(monkeypatch):
+    now = 10_000
+    monkeypatch.setattr(
+        remote,
+        "_reservation_ledger",
+        lambda: (
+            now,
+            [
+                ("hopg", "dead", now - 600),  # dead + stale -> orphan
+                ("hbn", "dead", now - 600),
+                ("mose2", "live", now - 600),  # has SLURM allocation -> protected
+                ("wse2", "fresh", now - 10),  # dead but mid-submit window -> protected
+            ],
+        ),
+    )
+    monkeypatch.setattr(
+        remote, "_slurm_job_id", lambda jobid: "48291" if jobid in {"live", "fresh"} else None
+    )
+    monkeypatch.setattr(remote, "_slurm_state", lambda sid: "RUNNING" if sid == "48291" else None)
+
+    orphans, protected = remote._orphaned_reservation_jobs(300.0)
+
+    assert orphans == {"dead": ["hbn", "hopg"]}
+    assert protected == {"live": ["mose2"], "fresh": ["wse2"]}
+
+
+def test_reap_reservations_dry_run_previews_without_releasing(monkeypatch, capsys):
+    monkeypatch.setattr(
+        remote,
+        "_orphaned_reservation_jobs",
+        lambda _min_age: ({"dead": ["hopg", "hbn"]}, {"live": ["mose2"]}),
+    )
+    runs = []
+    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: runs.append(cmd))
+
+    remote.reap_reservations(yes=False)
+
+    out = capsys.readouterr().out
+    assert "would release dead" in out
+    assert "keeping live" in out
+    assert "re-run with --yes" in out
+    assert runs == []
+
+
+def test_reap_reservations_yes_releases_orphans_and_stamps_terminal_state(monkeypatch, capsys):
+    monkeypatch.setattr(
+        remote, "_orphaned_reservation_jobs", lambda _min_age: ({"dead": ["hopg"]}, {})
+    )
+    runs = []
+    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: runs.append(cmd[-1]))
+
+    remote.reap_reservations(yes=True)
+
+    (command,) = runs
+    assert 'J="dead"' in command  # releases only the orphan's own locks
+    assert "rm -rf" in command
+    assert "reaped (orphan reservations released)" in command
+    assert "reaped 1 orphaned job(s)" in capsys.readouterr().out
+
+
+def test_reap_job_command_releases_only_matching_owner(tmp_path):
+    bash = _bash_or_skip(tmp_path)
+    monkeypatch_dir = tmp_path
+    reservations = monkeypatch_dir / "jobs" / "reservations"
+    for stem, owner in (("hopg", "dead"), ("mose2", "dead"), ("wse2", "other")):
+        d = reservations / stem
+        d.mkdir(parents=True)
+        (d / "jobid").write_text(f"{owner}\n")
+    (monkeypatch_dir / "jobs" / "dead").mkdir(parents=True)
+
+    import cxr_mc.remote as R
+
+    old = R.REMOTE_DIR
+    R.REMOTE_DIR = str(monkeypatch_dir)
+    try:
+        result = subprocess.run(
+            [bash, "-c", R._reap_job_command("dead")], capture_output=True, text=True
+        )
+    finally:
+        R.REMOTE_DIR = old
+
+    assert result.returncode == 0, result.stderr
+    assert not (reservations / "hopg").exists()
+    assert not (reservations / "mose2").exists()
+    assert (reservations / "wse2").exists()  # another owner's lock untouched
+    assert "reaped" in (monkeypatch_dir / "jobs" / "dead" / "state").read_text()
