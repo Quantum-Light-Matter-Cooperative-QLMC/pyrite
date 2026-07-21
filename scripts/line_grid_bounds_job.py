@@ -11,16 +11,36 @@ from __future__ import annotations
 import argparse
 import math
 import shlex
+from datetime import date
 
 from cxr_mc import remote
 
+today = date.today()
+
 DEFAULT_SLICE_MINUTES = 10.0
-DEFAULT_JSON_OUT = "line_grid_bounds_rerun.json"
-DEFAULT_ENERGIES = "200,250,300"
-DEFAULT_GRID_STOP = 30_000.0
+DEFAULT_JSON_OUT = f"line_grid_bounds_eval_{today}.json"
+# All seven standard beam energies: bespoke per-material grids need a complete
+# self-contained table per material, matching the profile's seven rows.
+DEFAULT_ENERGIES = "30,50,100,150,200,250,300"
+DEFAULT_GRID_STOP = 20_000.0
+# Ceiling of the diagnostic brem coverage grid; mirrors analyze_line_grid_bounds
+# WIDE_BREM_STOP_EV so per-material bespoke brem stops are not clipped.
+DEFAULT_BREM_GRID_STOP = 40_000.0
+# The line-grid eval targets the four standard-profile crystals (issue_notes.md
+# #1). Overridable via --materials so other catalog keys can be scanned.
+DEFAULT_MATERIALS = "hopg,diamond,wse2,mose2"
 
 
-def _slice_payload(jobid, *, slice_minutes, json_out, energies, grid_stop):
+def _slice_payload(
+    jobid,
+    *,
+    slice_minutes,
+    json_out,
+    energies,
+    grid_stop,
+    brem_grid_stop=DEFAULT_BREM_GRID_STOP,
+    materials=DEFAULT_MATERIALS,
+):
     """Build one resumable slice payload using remote.py's chain contract."""
     jobdir = f"{remote.REMOTE_DIR}/{remote.JOBS_SUBDIR}/{jobid}"
     command = " ".join(
@@ -31,10 +51,12 @@ def _slice_payload(jobid, *, slice_minutes, json_out, energies, grid_stop):
             shlex.quote(remote.REMOTE_UV),
             "run --no-sync python scripts/analyze_line_grid_bounds.py",
             f"--grid-stop {grid_stop:g}",
+            f"--brem-grid-stop {brem_grid_stop:g}",
             f"--energies {shlex.quote(energies)}",
             "--coarse-engine auto",
             f"--json-out {shlex.quote(json_out)}",
             f"--max-minutes {slice_minutes:g}",
+            f"--materials {shlex.quote(materials)}",
         ]
     )
     return f'''JOBDIR="{jobdir}"
@@ -61,13 +83,24 @@ printf 'slurm_job_id: %s\n' "$SID" >> "$JOBDIR/meta"
 '''
 
 
-def _job_script(jobid, *, slice_minutes, json_out, energies, grid_stop):
+def _job_script(
+    jobid,
+    *,
+    slice_minutes,
+    json_out,
+    energies,
+    grid_stop,
+    brem_grid_stop=DEFAULT_BREM_GRID_STOP,
+    materials=DEFAULT_MATERIALS,
+):
     payload = _slice_payload(
         jobid,
         slice_minutes=slice_minutes,
         json_out=json_out,
         energies=energies,
         grid_stop=grid_stop,
+        brem_grid_stop=brem_grid_stop,
+        materials=materials,
     )
     time_limit = str(max(1, math.ceil(slice_minutes * 3)))
     return remote._slurm_batch_script(
@@ -78,7 +111,16 @@ def _job_script(jobid, *, slice_minutes, json_out, energies, grid_stop):
     )
 
 
-def _metadata(jobid, *, slice_minutes, json_out, energies, grid_stop):
+def _metadata(
+    jobid,
+    *,
+    slice_minutes,
+    json_out,
+    energies,
+    grid_stop,
+    brem_grid_stop=DEFAULT_BREM_GRID_STOP,
+    materials=DEFAULT_MATERIALS,
+):
     return "\n".join(
         [
             f"job: {jobid}",
@@ -87,6 +129,8 @@ def _metadata(jobid, *, slice_minutes, json_out, energies, grid_stop):
             f"json_out: {json_out}",
             f"energies: {energies}",
             f"grid_stop: {grid_stop:g}",
+            f"brem_grid_stop: {brem_grid_stop:g}",
+            f"materials: {materials}",
             "progress_dashboard: False",
             "",
         ]
@@ -99,6 +143,8 @@ def start(
     json_out=DEFAULT_JSON_OUT,
     energies=DEFAULT_ENERGIES,
     grid_stop=DEFAULT_GRID_STOP,
+    brem_grid_stop=DEFAULT_BREM_GRID_STOP,
+    materials=DEFAULT_MATERIALS,
     no_sync=False,
     dry_run=False,
 ):
@@ -113,6 +159,8 @@ def start(
         json_out=json_out,
         energies=energies,
         grid_stop=grid_stop,
+        brem_grid_stop=brem_grid_stop,
+        materials=materials,
     )
     metadata = _metadata(
         jobid,
@@ -120,6 +168,8 @@ def start(
         json_out=json_out,
         energies=energies,
         grid_stop=grid_stop,
+        brem_grid_stop=brem_grid_stop,
+        materials=materials,
     )
     upload = remote._write_job_script_command(jobdir, metadata)
     if dry_run:
@@ -143,6 +193,8 @@ def build_parser():
     start_parser.add_argument("--json-out", default=DEFAULT_JSON_OUT)
     start_parser.add_argument("--energies", default=DEFAULT_ENERGIES)
     start_parser.add_argument("--grid-stop", type=float, default=DEFAULT_GRID_STOP)
+    start_parser.add_argument("--brem-grid-stop", type=float, default=DEFAULT_BREM_GRID_STOP)
+    start_parser.add_argument("--materials", default=DEFAULT_MATERIALS)
     start_parser.add_argument("--no-sync", action="store_true")
     start_parser.add_argument("--dry-run", action="store_true")
     for command in ("status", "attach", "stop"):
@@ -159,6 +211,8 @@ def main(argv=None):
             json_out=args.json_out,
             energies=args.energies,
             grid_stop=args.grid_stop,
+            brem_grid_stop=args.brem_grid_stop,
+            materials=args.materials,
             no_sync=args.no_sync,
             dry_run=args.dry_run,
         )

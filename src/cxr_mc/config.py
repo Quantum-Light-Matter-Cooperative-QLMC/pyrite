@@ -164,6 +164,9 @@ def trajectory_sweep(
         E_grid_line=scan.E_grid_line,
         E_grid_line_by_energy=scan.E_grid_line_by_energy,
         E_grid_brem=scan.E_grid_brem,
+        # transport-only study; normal incidence (tilt=0) is its baseline, so it
+        # opts out of the emission-sweep tilt=0 ban (issue_notes.md #1).
+        allow_normal_incidence=True,
         **stack_kwargs,
     )
 

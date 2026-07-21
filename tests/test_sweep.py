@@ -87,7 +87,7 @@ def test_real_manifest_materials_are_unique_and_buildable():
     assert all(key in CATALOG.materials for key in materials)
 
     for key in materials:
-        sweep = Sweep(material=key, thickness_ang=100.0, energy_keV=30.0, tilt_deg=0.0)
+        sweep = Sweep(material=key, thickness_ang=100.0, energy_keV=30.0, tilt_deg=5.0)
         cases = build_cases(sweep)
         assert cases, f"{key} produced no cases"
 
@@ -131,7 +131,7 @@ def test_build_cases_selects_and_encodes_line_grid_for_each_beam_energy():
             material="mose2",
             thickness_ang=100.0,
             energy_keV=[30.0, 50.0],
-            tilt_deg=0.0,
+            tilt_deg=5.0,
             E_grid_line_by_energy=grids,
             E_grid_brem=75.0,
         )
@@ -271,7 +271,7 @@ def test_build_cases_and_runner_preserve_exact_nonuniform_and_scalar_energy_grid
             material="mose2",
             thickness_ang=100.0,
             energy_keV=30.0,
-            tilt_deg=0.0,
+            tilt_deg=5.0,
             E_grid_line=line_grid,
             E_grid_brem=brem_grid,
         ),
@@ -295,7 +295,7 @@ def test_build_cases_keeps_legacy_triples_for_uniform_energy_grids():
             material="mose2",
             thickness_ang=100.0,
             energy_keV=30.0,
-            tilt_deg=0.0,
+            tilt_deg=5.0,
             E_grid_line=np.arange(50.0, 100.0, 5.0),
             E_grid_brem=np.arange(0.0, 1000.0, 100.0),
         )
@@ -313,7 +313,7 @@ def test_uniform_linspace_endpoint_grid_roundtrips_through_legacy_triple(monkeyp
             material="mose2",
             thickness_ang=100.0,
             energy_keV=30.0,
-            tilt_deg=0.0,
+            tilt_deg=5.0,
             E_grid_line=line_grid,
             E_grid_brem=75.0,
         ),
@@ -344,7 +344,7 @@ def test_scalar_constant_and_near_uniform_energy_grids_stay_exact(monkeypatch, l
             material="mose2",
             thickness_ang=100.0,
             energy_keV=[30.0, 40.0],
-            tilt_deg=0.0,
+            tilt_deg=5.0,
             E_grid_line=line_grid,
             E_grid_brem=75.0,
         ),
@@ -371,7 +371,7 @@ def test_build_cases_sweeps_rectangular_footprints_and_labels_them():
             material="mose2",
             thickness_ang=100.0,
             energy_keV=30.0,
-            tilt_deg=0.0,
+            tilt_deg=5.0,
             crystal_width_mm=[0.1, 0.2],
             crystal_height_mm=[0.3, 0.4],
         )
@@ -416,13 +416,13 @@ def test_build_cases_preserves_legacy_name_for_explicit_none_footprint():
             material="mose2",
             thickness_ang=100.0,
             energy_keV=30.0,
-            tilt_deg=0.0,
+            tilt_deg=5.0,
             crystal_width_mm=None,
             crystal_height_mm=None,
         )
     )[0]
 
-    assert case["name"] == "MoSe2 10nm pol=0 az=0"
+    assert case["name"] == "MoSe2 10nm pol=5 az=0"
     assert case["crystal_width_mm"] is None
     assert case["crystal_height_mm"] is None
 
@@ -432,14 +432,14 @@ def test_build_cases_defaults_to_finite_footprint_and_beam_spot():
     finite 5x5 mm crystal footprint and a 1 mm FWHM Gaussian beam spot, so
     default sweeps transport a physically finite beam into a physically finite
     crystal rather than the legacy point-beam / laterally-infinite slab."""
-    case = build_cases(Sweep(material="mose2", thickness_ang=100.0, energy_keV=30.0, tilt_deg=0.0))[
+    case = build_cases(Sweep(material="mose2", thickness_ang=100.0, energy_keV=30.0, tilt_deg=5.0))[
         0
     ]
 
     assert case["crystal_width_mm"] == 5.0
     assert case["crystal_height_mm"] == 5.0
     assert case["beam_fwhm_mm"] == 1.0
-    assert case["name"] == "MoSe2 10nm pol=0 az=0 footprint=5x5mm"
+    assert case["name"] == "MoSe2 10nm pol=5 az=0 footprint=5x5mm"
 
 
 def test_brem_grid_upper_limit_tracks_case_beam_energy():

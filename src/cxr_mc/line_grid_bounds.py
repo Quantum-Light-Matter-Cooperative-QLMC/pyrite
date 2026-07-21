@@ -8,15 +8,42 @@ See docs/superpowers/specs/2026-07-16-line-grid-max-energy-design.md.
 import numpy as np
 
 
-def coverage_energy(E_grid: np.ndarray, spec: np.ndarray, coverage: float = 0.99) -> float:
+class CoverageGridTooNarrow(ValueError):
+    """The ``coverage`` fraction is only reached in the final grid bin, so the
+    diagnostic grid ceiling almost certainly clips the true emission tail and
+    any reported bound would be silently pinned to the ceiling (issue_notes.md
+    #1: no silent truncation without an explicit override)."""
+
+    DEFAULT_MESSAGE = (
+        "E_grid width is insufficient to support full X-ray spectral bandwidth. "
+        "Either widen `--grid-stop`, or, if truncation/narrowband operation is "
+        "acceptable, pass `allow_shortfall=True`."
+    )
+
+    def __init__(self, message=DEFAULT_MESSAGE):
+        super().__init__(message)
+
+
+def coverage_energy(
+    E_grid: np.ndarray,
+    spec: np.ndarray,
+    coverage: float = 0.99,
+    *,
+    allow_shortfall: bool = False,
+) -> float:
     """The smallest energy on ``E_grid`` at or below which the trapezoidal-
     integrated ``spec`` reaches ``coverage`` (0-1) of its total integral over
     ``E_grid``.
 
     Returns ``E_grid[0]`` when ``spec`` integrates to zero: a geometry with no
-    coherent-line intensity places no requirement on the grid width, and must
-    not be mistaken for the widest requirement when candidates are ranked by
-    this value.
+    emission intensity places no requirement on the grid width, and must not be
+    mistaken for the widest requirement when candidates are ranked by this value.
+
+    The integral only spans ``E_grid``, so any emission above ``E_grid[-1]`` is
+    invisible: when ``coverage`` is not reached until the final bin, the true
+    coverage energy lies beyond the ceiling and the returned value is a floor
+    pinned to it, not a real bound. That case is detected as ``truncated`` and,
+    unless ``allow_shortfall`` is set, is refused rather than reported silently.
     """
     E_grid = np.asarray(E_grid, dtype=float)
     spec = np.asarray(spec, dtype=float)
@@ -28,6 +55,11 @@ def coverage_energy(E_grid: np.ndarray, spec: np.ndarray, coverage: float = 0.99
         return float(E_grid[0])
     cumulative = np.cumsum(increments) / total
     index = int(np.searchsorted(cumulative, coverage))
+    # `cumulative` is normalized to end at 1.0, so `index` can only reach the
+    # last bin; landing there means `coverage` was not met until the ceiling.
+    truncated = index >= cumulative.size - 1
+    if truncated and not allow_shortfall:
+        raise CoverageGridTooNarrow()
     index = min(index, cumulative.size - 1)
     return float(E_grid[index + 1])
 

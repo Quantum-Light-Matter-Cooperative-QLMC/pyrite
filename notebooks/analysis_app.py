@@ -121,13 +121,13 @@ def _():
         scan_charts,
         select_results,
         spectrum_chart,
-        sweep_values,
         style_sheet,
+        sweep_values,
         timepix_detected_chart,
         top_geometries,
         trajectory_chart,
-        trajectory_volume_figure,
         trajectory_sweep,
+        trajectory_volume_figure,
     )
 
 
@@ -173,7 +173,13 @@ def _(MaterialSelect, mo):
 
 
 @app.cell
-def _(cases_from_results, default_settings, filter_results, load_checkpoint, material_ui):
+def _(
+    cases_from_results,
+    default_settings,
+    filter_results,
+    load_checkpoint,
+    material_ui,
+):
     MATERIAL = material_ui.value["value"]
     settings = default_settings()
     _results = load_checkpoint(MATERIAL) if MATERIAL is not None else {}
@@ -337,8 +343,8 @@ def _(fmt_thickness, mo, records, res, sweep_values):
     detector_broad_xlog_ui = mo.ui.switch(value=True, label="broad log x")
     detector_broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
     return (
-        detector_azim_ui,
         detector_auto_ui,
+        detector_azim_ui,
         detector_broad_auto_ui,
         detector_broad_xlog_ui,
         detector_broad_xmax_ui,
@@ -402,12 +408,7 @@ def _(
         detector_broad_ymin_ui.value,
         detector_broad_ymax_ui.value,
     )
-    return (
-        detector_broad_x_domain,
-        detector_broad_y_domain,
-        detector_x_domain,
-        detector_y_domain,
-    )
+    return (detector_x_domain,)
 
 
 @app.cell
@@ -451,15 +452,20 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
     penetration_tilt_source_ui = mo.ui.dropdown(
         _source_options, value="material scan grid", label="polar tilt source"
     )
+    if len(_tilt_values) > 1:
+        default_tilt_ind = len(_tilt_values) // 2
+        default_tilt_value = _tilt_values[default_tilt_ind]
+    else:
+        default_tilt_value = _tilt_values[0]
+
     penetration_tilt_grid_ui = mo.ui.dropdown(
         {f"{value:g} deg": value for value in _tilt_values},
-        value=f"{_tilt_values[0]:g} deg",
+        value=f"{default_tilt_value:g} deg",
         label="polar tilt",
     )
     penetration_tilt_manual_ui = mo.ui.number(
         start=0.0, stop=89.9, step=0.1, value=_tilt_values[0], label="polar tilt (deg)"
     )
-
     return (
         penetration_energy_grid_ui,
         penetration_energy_manual_ui,
@@ -500,7 +506,11 @@ def _(
         if penetration_tilt_source_ui.value == "grid"
         else penetration_tilt_manual_ui.value
     )
-    return penetration_energy_keV, penetration_thickness_ang, penetration_tilt_deg
+    return (
+        penetration_energy_keV,
+        penetration_thickness_ang,
+        penetration_tilt_deg,
+    )
 
 
 @app.cell
@@ -638,10 +648,9 @@ def _(mo):
     polar_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV)")
     polar_broad_xlog_ui = mo.ui.switch(value=False, label="broad log x")
     polar_broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
-
     return (
-        polar_brem_ui,
         polar_auto_ui,
+        polar_brem_ui,
         polar_broad_auto_ui,
         polar_broad_xlog_ui,
         polar_broad_xmax_ui,
@@ -690,10 +699,9 @@ def _(mo):
     azim_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV)")
     azim_broad_xlog_ui = mo.ui.switch(value=False, label="broad log x")
     azim_broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
-
     return (
-        azim_brem_ui,
         azim_auto_ui,
+        azim_brem_ui,
         azim_broad_auto_ui,
         azim_broad_xlog_ui,
         azim_broad_xmax_ui,
@@ -744,7 +752,6 @@ def _(mo):
     broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV)")
     broad_xlog_ui = mo.ui.switch(value=False, label="broad log x")
     broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
-
     return (
         brem_ui,
         broad_auto_ui,
@@ -752,8 +759,8 @@ def _(mo):
         broad_xmax_ui,
         broad_xmin_ui,
         broad_ylog_ui,
-        narrow_xlog_ui,
         narrow_auto_ui,
+        narrow_xlog_ui,
         narrow_xmax_ui,
         narrow_xmin_ui,
         ylog_ui,
@@ -1050,8 +1057,8 @@ def _(
     fmt_thickness,
     mo,
     polar_E0_ui,
-    polar_azim_ui,
     polar_auto_ui,
+    polar_azim_ui,
     polar_brem_ui,
     polar_broad_auto_ui,
     polar_broad_x_domain,
@@ -1257,8 +1264,8 @@ def _(
 def _(
     MATERIAL,
     azim_E0_ui,
-    azim_azims_ui,
     azim_auto_ui,
+    azim_azims_ui,
     azim_brem_ui,
     azim_broad_auto_ui,
     azim_broad_x_domain,
@@ -1556,14 +1563,12 @@ def _(
     MATERIAL,
     cases,
     context_rail,
-    detector_azim_ui,
     detector_auto_ui,
+    detector_azim_ui,
     detector_broad_auto_ui,
-    detector_broad_x_domain,
     detector_broad_xlog_ui,
     detector_broad_xmax_ui,
     detector_broad_xmin_ui,
-    detector_broad_y_domain,
     detector_broad_ylog_ui,
     detector_broad_ymax_ui,
     detector_broad_ymin_ui,
@@ -1574,7 +1579,6 @@ def _(
     detector_xlog_ui,
     detector_xmax_ui,
     detector_xmin_ui,
-    detector_y_domain,
     detector_ylog_ui,
     detector_ymax_ui,
     detector_ymin_ui,
@@ -1772,6 +1776,7 @@ def _(
     penetration_energy_keV,
     penetration_energy_manual_ui,
     penetration_energy_source_ui,
+    penetration_survival_chart,
     penetration_thickness_ang,
     penetration_thickness_grid_ui,
     penetration_thickness_manual_ui,
@@ -1780,12 +1785,11 @@ def _(
     penetration_tilt_grid_ui,
     penetration_tilt_manual_ui,
     penetration_tilt_source_ui,
-    penetration_survival_chart,
     plot_trajectory_grid,
     settings,
     trajectory_chart,
-    trajectory_volume_figure,
     trajectory_sweep,
+    trajectory_volume_figure,
 ):
     def penetration_tab():
         _angle = penetration_tilt_deg
@@ -1911,7 +1915,7 @@ def _(CATALOG, load_checkpoint, mo, records):
         "— no data —": None
     }
     compare_all_beam_energies_ui = mo.ui.checkbox(value=True, label="Compare all beam energies")
-    return cross_material_energy_options, compare_all_beam_energies_ui
+    return compare_all_beam_energies_ui, cross_material_energy_options
 
 
 @app.cell

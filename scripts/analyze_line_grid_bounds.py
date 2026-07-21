@@ -51,18 +51,24 @@ TARGET_SPACING_EV = 3.0
 # the spacing only needs to resolve the cumulative envelope, not each narrow line,
 # since the final catalog `stop` is rounded to 100 eV regardless.
 WIDE_GRID_START_EV = 10.0
-# 30 keV matches line_grid_bounds_job.py's DEFAULT_GRID_STOP and the E_grid_brem
+# 20 keV matches line_grid_bounds_job.py's DEFAULT_GRID_STOP and the E_grid_brem
 # ceiling, and clears the widest measured 95% line-coverage energy (~18.7 keV raw
-# at the 300 keV beam) with headroom. A 10 keV default silently clipped the
-# 200-300 keV bounds (the 2026-07-16 full-scan failure noted above), because
-# coverage_energy pins to the grid ceiling instead of raising when the true
-# envelope runs past it.
-WIDE_GRID_STOP_EV = 30000.0
-WIDE_GRID_STEP_EV = 5.0
+# at the 300 keV beam) with headroom.
+WIDE_GRID_STOP_EV = 20000.0
+WIDE_GRID_STEP_EV = 10.0
 WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, WIDE_GRID_STOP_EV, WIDE_GRID_STEP_EV)
+# Diagnostic brem grid for measuring the incoherent (brem) coverage. The
+# production profile's E_grid_brem tops out at 30 keV, but a per-material bespoke
+# brem stop must be measured on a grid that clears the widest true 95%
+# brem-coverage energy, or coverage_energy clips it to the ceiling and refuses
+# (CoverageGridTooNarrow). 40 keV carries headroom over the 30 keV production
+# grid; overridable via --brem-grid-stop. Step matches the production E_grid_brem.
+WIDE_BREM_STOP_EV = 40000.0
+WIDE_BREM_STEP_EV = 25.0
+WIDE_BREM_EV = np.arange(0.0, WIDE_BREM_STOP_EV, WIDE_BREM_STEP_EV)
 COARSE_NE = 200
 REFINE_NE = 2000
-TOP_K = 5
+TOP_K = 3
 CASE_BATCH_SIZE = 10
 # Refine cases are spectrum-dominated and ran for about nine minutes each on
 # qlmc at 250 keV.  Keep them individually checkpointable so the 10-minute
@@ -71,6 +77,11 @@ REFINE_BATCH_SIZE = 1
 # At the 30 keV diagnostic ceiling, spectrum work dominates and the GPU path is
 # about 6x faster for a measured heavy case. Both regimes therefore use auto.
 COARSE_ENGINE = "auto"
+# Single 1 mm crystal for every diagnostic geometry (issue_notes.md #1): thick
+# crystals are the high-energy-dominated worst case, so pinning the thickest
+# slab bounds the widest grid any thinner production crystal needs. No thickness
+# scan here -- only tilt/azimuth vary.
+DIAGNOSTIC_THICKNESS_ANG = 1.0e7
 
 
 @dataclass(frozen=True)
@@ -78,38 +89,46 @@ class Candidate:
     material: str
     tilt_deg: float
     tilt_azim_deg: float
+    # coherent = PXR/CBS line spectrum (r["spec"]); incoherent = bremsstrahlung
+    # background (r["brem_wide"]). Both channels' 95% coverage is tracked so the
+    # line grid and the brem grid are each bounded separately (issue_notes.md #1).
     coverage_energy_eV: float
     total_intensity: float
+    incoherent_coverage_energy_eV: float
+    incoherent_total_intensity: float
 
 
 def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons):
     """One run_case dict for a fixed material/energy/geometry, on the wide
-    diagnostic grid. Pins the material's first configured thickness so only
-    the tilt/azimuth axis varies across the scan. Building is cheap and pure;
+    diagnostic grid. Pins :data:`DIAGNOSTIC_THICKNESS_ANG` (1 mm) so only the
+    tilt/azimuth axis varies across the scan. Building is cheap and pure;
     running happens in a batch via _run_specs so the whole scan shares one
     worker pool instead of paying pool-startup and per-call overhead once per
     geometry."""
-    thickness_ang = float(np.atleast_1d(CATALOG.material(material).scan.thickness_ang)[0])
     sweep = material_sweep(
         material,
-        thickness_ang=thickness_ang,
+        thickness_ang=DIAGNOSTIC_THICKNESS_ANG,
         energy_keV=energy_keV,
         tilt_deg=tilt_deg,
         tilt_azim_deg=tilt_azim_deg,
         E_grid_line=WIDE_GRID_EV,
         E_grid_line_by_energy=None,
+        E_grid_brem=WIDE_BREM_EV,
     )
     return build_cases(sweep, n_electrons=n_electrons)[0]
 
 
 def _candidate_from_result(material, tilt_deg, tilt_azim_deg, result):
     E_grid, spec = result["E_grid"], result["spec"]
+    E_brem, brem = result["E_grid_brem"], result["brem_wide"]
     return Candidate(
         material=material,
         tilt_deg=tilt_deg,
         tilt_azim_deg=tilt_azim_deg,
         coverage_energy_eV=coverage_energy(E_grid, spec, COVERAGE),
         total_intensity=float(np.trapezoid(spec, E_grid)),
+        incoherent_coverage_energy_eV=coverage_energy(E_brem, brem, COVERAGE),
+        incoherent_total_intensity=float(np.trapezoid(brem, E_brem)),
     )
 
 
@@ -178,58 +197,29 @@ def _resume_phase(
 
 
 def _geometry_plan(materials, reference_scan):
-    """Return reduced coarse geometry specs for the 95%-coverage search.
+    """Return coarse geometry specs for the 95%-coverage search: the full
+    quantized tilt x azimuth product per material.
 
-    Resonant energy is maximized near zero polar tilt. Keep one explicit 0deg
-    geometry (azimuth is redundant there), then retain every standard azimuth
-    at the next tilt (~9.89deg quantizes to 10deg), where all completed campaign
-    rows found their driver. A minimal large-tilt guard samples 89deg at the
-    azimuth endpoints and middle grid point. This retains the maximizing boundary
-    and an explicit counterexample check while reducing 40 to 14 geometries per
-    material.
+    The production grid is now a small, deliberately curated set (issue_notes.md
+    #1: tilt in {5, 45} deg, azimuth in {100, 140, 180} deg -- polar=0 and
+    azim=90 are excluded and rejected at build_cases). That is only a handful of
+    geometries, so every one is sampled instead of a near-zero/large-tilt subset.
+    The 5 deg tilt maximizes resonant line energy (the widest line-grid driver);
+    the coarse scan ranks the product and the refine phase re-measures the top
+    few at higher Ne.
 
     Both axes pass through ``_quantized_angles`` -- the same nearest-0.5deg
-    rounding ``build_cases`` applies -- so the geometry recorded on each
-    ``Candidate`` (and reported as the driver) is the geometry actually
-    simulated, not the raw catalog linspace value.
+    rounding ``build_cases`` applies -- so each ``Candidate``'s recorded geometry
+    (reported as the driver) is the geometry actually simulated, not the raw
+    catalog value. The second return value (a legacy large-tilt spot-check set)
+    is empty: the full product already spans the largest tilt.
     """
     tilts = [float(value) for value in _quantized_angles(reference_scan.tilt_deg)]
     azimuths = [float(value) for value in _quantized_angles(reference_scan.tilt_azim_deg)]
-    near_zero_geometry = [(tilts[0], azimuths[0]), *[(tilts[1], azim) for azim in azimuths]]
-    spot_azimuths = [azimuths[index] for index in (0, len(azimuths) // 2, len(azimuths) - 1)]
-    spot_geometry = [(tilts[-1], azim) for azim in spot_azimuths]
-    near_zero = [
-        (material, tilt, azim) for material in materials for tilt, azim in near_zero_geometry
+    coarse = [
+        (material, tilt, azim) for material in materials for tilt in tilts for azim in azimuths
     ]
-    spot_check = [(material, tilt, azim) for material in materials for tilt, azim in spot_geometry]
-    return near_zero, spot_check
-
-
-def _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero_candidates):
-    """Flag any material whose exact tilt=0 geometry radiates zero coherent-
-    line intensity while its next-smallest tilt does not -- a possible
-    geometric degeneracy at tilt=0, distinct from ordinary MC noise. Does not
-    change ranking: coverage_energy already returns the grid floor for
-    zero-intensity geometries, so they can't win the top-k selection below."""
-    zero_tilt, next_tilt = near_zero_tilts
-    for material in materials:
-        zero_total = sum(
-            c.total_intensity
-            for c in near_zero_candidates
-            if c.material == material and c.tilt_deg == zero_tilt
-        )
-        next_total = sum(
-            c.total_intensity
-            for c in near_zero_candidates
-            if c.material == material and c.tilt_deg == next_tilt
-        )
-        if zero_total <= 0.0 and next_total > 0.0:
-            print(
-                f"[warn] {material}: zero coherent-line intensity at "
-                f"tilt={zero_tilt:g} deg but not at tilt={next_tilt:g} deg -- "
-                "possible geometric degeneracy at exact zero tilt; tilt=0 "
-                "remains a valid production sweep point regardless."
-            )
+    return coarse, []
 
 
 def _atomic_write_json(path, rows):
@@ -266,10 +256,6 @@ def derive_bounds(
     time_fn=time.monotonic,
 ):
     reference_scan = CATALOG.material(materials[0]).scan
-    # Quantized to match _geometry_plan / build_cases, so the degeneracy warning's
-    # exact tilt comparison lines up with each Candidate's quantized tilt_deg.
-    quantized_tilts = _quantized_angles(reference_scan.tilt_deg)
-    near_zero_tilts = [float(quantized_tilts[i]) for i in (0, 1)]
     near_zero_specs, spot_check_specs = _geometry_plan(materials, reference_scan)
 
     existing = {float(r["energy_keV"]): r for r in (existing_rows or [])}
@@ -309,7 +295,6 @@ def derive_bounds(
         if timed_out:
             complete = False
             break
-        _warn_degenerate_zero_tilt(materials, near_zero_tilts, near_zero)
         if max_seconds is not None and time_fn() - started >= max_seconds:
             complete = False
             break
@@ -335,9 +320,13 @@ def derive_bounds(
             break
 
         top = sorted(near_zero, key=lambda c: c.coverage_energy_eV, reverse=True)[:top_k]
-        best_spot = max(spot_check, key=lambda c: c.coverage_energy_eV)
-        flagged = best_spot.coverage_energy_eV > top[0].coverage_energy_eV
-        candidates = top + ([best_spot] if flagged else [])
+        # spot_check is empty under the curated grid (the coarse product already
+        # spans the largest tilt); keep the flag machinery for legacy sidecars
+        # that still carry a spot-check phase.
+        best_spot = max(spot_check, key=lambda c: c.coverage_energy_eV) if spot_check else None
+        flagged = best_spot is not None and best_spot.coverage_energy_eV > top[0].coverage_energy_eV
+        extra = [best_spot] if best_spot is not None and flagged else []
+        candidates = top + extra
 
         if max_seconds is not None and time_fn() - started >= max_seconds:
             complete = False
@@ -362,11 +351,22 @@ def derive_bounds(
         if timed_out:
             complete = False
             break
+        # Coherent driver sets the LINE grid; incoherent (brem) driver sets the
+        # BREM grid. They are measured and bounded separately (issue_notes.md #1),
+        # so the material/geometry that maximizes each channel's 95% energy can
+        # differ.
         driver = max(refined, key=lambda c: c.coverage_energy_eV)
+        brem_driver = max(refined, key=lambda c: c.incoherent_coverage_energy_eV)
 
-        start_eV = float(reference_scan.E_grid_line_by_energy[energy_keV][0])
+        line_by_energy = reference_scan.E_grid_line_by_energy
+        if line_by_energy is None:
+            raise ValueError(
+                f"reference material {materials[0]!r} has no E_grid_line_by_energy configured"
+            )
+        start_eV = float(line_by_energy[energy_keV][0])
         stop_eV = margined_stop(driver.coverage_energy_eV, MARGIN, ROUND_TO_EV)
         num = spacing_num(start_eV, stop_eV, TARGET_SPACING_EV)
+        brem_stop_eV = margined_stop(brem_driver.incoherent_coverage_energy_eV, MARGIN, ROUND_TO_EV)
         rows_by_energy[float(energy_keV)] = dict(
             energy_keV=energy_keV,
             raw_eV=driver.coverage_energy_eV,
@@ -377,6 +377,11 @@ def derive_bounds(
             driver_tilt_deg=driver.tilt_deg,
             driver_azim_deg=driver.tilt_azim_deg,
             spot_check_flagged=flagged,
+            brem_raw_eV=brem_driver.incoherent_coverage_energy_eV,
+            brem_stop_eV=brem_stop_eV,
+            brem_driver_material=brem_driver.material,
+            brem_driver_tilt_deg=brem_driver.tilt_deg,
+            brem_driver_azim_deg=brem_driver.tilt_azim_deg,
         )
         if on_progress is not None:
             on_progress([rows_by_energy[key] for key in sorted(rows_by_energy)])
@@ -387,19 +392,170 @@ def derive_bounds(
     return rows, complete
 
 
+def _brem_grid_for_rows(rows):
+    """Collapse a material's per-energy line-grid rows into ONE bespoke brem
+    grid descriptor.
+
+    ``E_grid_brem`` is a single grid per scan (not a per-energy table), so the
+    material's brem ceiling must cover its widest-energy brem tail across every
+    beam energy. Each row already carries a per-energy ``brem_stop_eV`` (the
+    +5%-margined, 100 eV-rounded coverage energy) and the unmargined
+    ``brem_raw_eV`` that produced it.
+
+    Returns ``{"stop_eV": float, "raw_eV": float, "step_eV": WIDE_BREM_STEP_EV}``.
+    """
+    driver = max(rows, key=lambda row: row["brem_stop_eV"])
+    return {
+        "stop_eV": driver["brem_stop_eV"],
+        "raw_eV": driver["brem_raw_eV"],
+        "step_eV": WIDE_BREM_STEP_EV,
+    }
+
+
+def _material_checkpoint_paths(json_out, material):
+    """Per-material checkpoint + phase-sidecar paths, or ``(None, None)`` when no
+    ``json_out`` is configured. Each material keeps today's flat single-material
+    checkpoint format (``<json_out>.<material>.json`` + ``.phase.json``) so the
+    proven resume/phase machinery is reused verbatim per material."""
+    if not json_out:
+        return None, None
+    path = f"{json_out}.{material}.json"
+    return path, f"{path}.phase.json"
+
+
+def _run_one_material(
+    material,
+    energies,
+    json_out,
+    *,
+    top_k,
+    coarse_ne,
+    refine_ne,
+    max_workers,
+    coarse_engine,
+    max_seconds,
+    time_fn,
+):
+    """Derive one material's bespoke line rows against its OWN flat checkpoint
+    and phase sidecar -- a thin per-material wrapper that reproduces ``main``'s
+    resume-load / atomic-save wiring for a single material. Returns
+    ``(rows, complete)`` from the underlying single-material ``derive_bounds``."""
+    path, phase_path = _material_checkpoint_paths(json_out, material)
+    existing_rows = []
+    phase_state = None
+    if path and os.path.exists(path):
+        with open(path) as f:
+            existing_rows = json.load(f)
+    if phase_path and os.path.exists(phase_path):
+        with open(phase_path) as f:
+            phase_state = json.load(f) or None
+
+    def _save(rows):
+        if path:
+            _atomic_write_json(path, rows)
+
+    def _save_phase(value):
+        if phase_path:
+            _atomic_write_json(phase_path, value or {})
+
+    rows, complete = derive_bounds(
+        [material],
+        energies,
+        top_k,
+        coarse_ne,
+        refine_ne,
+        max_workers,
+        existing_rows=existing_rows,
+        on_progress=_save,
+        phase_state=phase_state,
+        on_phase_progress=_save_phase,
+        coarse_engine=coarse_engine,
+        max_seconds=max_seconds,
+        time_fn=time_fn,
+    )
+    if path and complete:
+        _atomic_write_json(path, rows)
+    return rows, complete
+
+
+def derive_all_materials(
+    materials,
+    energies,
+    top_k=TOP_K,
+    coarse_ne=COARSE_NE,
+    refine_ne=REFINE_NE,
+    max_workers=None,
+    json_out=None,
+    coarse_engine=COARSE_ENGINE,
+    max_seconds=None,
+    time_fn=time.monotonic,
+):
+    """Derive a bespoke per-material line grid + brem grid for each material,
+    running the per-energy derivation independently per material (Approach A:
+    each single-material ``derive_bounds`` call's driver is that material's own
+    worst geometry).
+
+    Returns ``(combined, complete)`` where ``combined`` maps each material to
+    ``{"line_rows": [<rows>], "brem": {"stop_eV", "raw_eV", "step_eV"}}``. The
+    soft ``max_seconds`` budget is threaded across the WHOLE material x energy
+    set -- checked between materials and (inside ``derive_bounds``) between
+    phases; when it is exhausted the function returns early with
+    ``complete=False`` (the exit-75 "work remains" contract). The combined
+    ``json_out`` is written only once every material is complete; per-material
+    checkpoint files carry the resumable state in the meantime.
+    """
+    started = time_fn()
+    combined = {}
+    complete = True
+    for material in materials:
+        if max_seconds is not None and time_fn() - started >= max_seconds:
+            complete = False
+            break
+        remaining = None if max_seconds is None else max_seconds - (time_fn() - started)
+        rows, material_complete = _run_one_material(
+            material,
+            energies,
+            json_out,
+            top_k=top_k,
+            coarse_ne=coarse_ne,
+            refine_ne=refine_ne,
+            max_workers=max_workers,
+            coarse_engine=coarse_engine,
+            max_seconds=remaining,
+            time_fn=time_fn,
+        )
+        combined[material] = {"line_rows": rows, "brem": _brem_grid_for_rows(rows)}
+        if not material_complete:
+            complete = False
+            break
+    if complete and json_out:
+        _atomic_write_json(json_out, combined)
+    return combined, complete
+
+
 def _print_report(rows):
     header = (
         f"{'energy':>8} {'raw_eV':>10} {'stop_eV':>9} {'num':>6} "
-        f"{'driver':>14} {'tilt':>6} {'azim':>7} {'spot?':>6}"
+        f"{'driver':>14} {'tilt':>6} {'azim':>7} {'spot?':>6} "
+        f"{'brem_raw':>10} {'brem_stop':>10} {'brem_drv':>14}"
     )
     print(header)
     print("-" * len(header))
     for row in rows:
+        brem_raw = row.get("brem_raw_eV")
+        brem_stop = row.get("brem_stop_eV")
+        brem_drv = row.get("brem_driver_material", "-")
+        # Legacy rows (older checkpoints) carry no brem channel; show placeholders.
+        if brem_raw is None:
+            brem_cols = f"{'-':>10} {'-':>10} {'-':>14}"
+        else:
+            brem_cols = f"{brem_raw:>10.1f} {brem_stop:>10.1f} {brem_drv:>14}"
         print(
             f"{row['energy_keV']:>8g} {row['raw_eV']:>10.1f} {row['stop_eV']:>9.1f} "
             f"{row['num']:>6d} {row['driver_material']:>14} "
             f"{row['driver_tilt_deg']:>6.2f} {row['driver_azim_deg']:>7.2f} "
-            f"{'yes' if row['spot_check_flagged'] else 'no':>6}"
+            f"{'yes' if row['spot_check_flagged'] else 'no':>6} "
+            f"{brem_cols}"
         )
 
 
@@ -444,6 +600,13 @@ def build_parser():
         default=WIDE_GRID_STEP_EV,
         help="spacing (eV) of the diagnostic coverage grid (default: %(default)g)",
     )
+    parser.add_argument(
+        "--brem-grid-stop",
+        type=float,
+        default=WIDE_BREM_STOP_EV,
+        help="ceiling (eV) of the diagnostic brem coverage grid; must clear the widest "
+        "true 95%% brem-coverage energy at any beam energy (default: %(default)g)",
+    )
     parser.add_argument("--json-out", default=None, help="optional path to write rows as JSON")
     parser.add_argument(
         "--max-minutes",
@@ -456,53 +619,39 @@ def build_parser():
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    global WIDE_GRID_EV
+    global WIDE_GRID_EV, WIDE_BREM_EV
     WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, args.grid_stop, args.grid_step)
+    WIDE_BREM_EV = np.arange(0.0, args.brem_grid_stop, WIDE_BREM_STEP_EV)
     materials = args.materials.split(",") if args.materials else list(CATALOG.materials)
     if args.energies:
         energies = [float(e) for e in args.energies.split(",")]
     else:
         energies = [float(e) for e in CATALOG.material(materials[0]).scan.energy_keV]
-    existing_rows = []
-    phase_path = f"{args.json_out}.phase.json" if args.json_out else None
-    phase_state = None
-    if args.json_out and os.path.exists(args.json_out):
-        with open(args.json_out) as f:
-            existing_rows = json.load(f)
-        done = sorted({float(r["energy_keV"]) for r in existing_rows})
-        print(
-            f"[analyze_line_grid_bounds] resuming from {args.json_out}; "
-            f"{len(done)} energ(ies) already done: {done}"
-        )
-    if phase_path and os.path.exists(phase_path):
-        with open(phase_path) as f:
-            phase_state = json.load(f) or None
 
-    def _save(rows):
-        if args.json_out:
-            _atomic_write_json(args.json_out, rows)
-
-    def _save_phase(value):
-        if phase_path:
-            _atomic_write_json(phase_path, value or {})
-
-    rows, complete = derive_bounds(
+    combined, complete = derive_all_materials(
         materials,
         energies,
         args.top_k,
         args.coarse_ne,
         args.refine_ne,
         args.max_workers,
-        existing_rows=existing_rows,
-        on_progress=_save,
-        phase_state=phase_state,
-        on_phase_progress=_save_phase,
+        json_out=args.json_out,
         coarse_engine=args.coarse_engine,
         max_seconds=None if args.max_minutes is None else args.max_minutes * 60.0,
     )
-    _print_report(rows)
-    if args.json_out:
-        _atomic_write_json(args.json_out, rows)
+    for material in materials:
+        entry = combined.get(material)
+        if entry is None:
+            continue
+        print(f"=== {material} ===")
+        _print_report(entry["line_rows"])
+        brem = entry["brem"]
+        print(
+            f"brem grid: stop={brem['stop_eV']:g} eV  raw={brem['raw_eV']:g} eV  "
+            f"step={brem['step_eV']:g} eV"
+        )
+    if args.json_out and complete:
+        _atomic_write_json(args.json_out, combined)
         print(f"[analyze_line_grid_bounds] wrote {args.json_out}")
     if not complete:
         print("[analyze_line_grid_bounds] slice budget exhausted; work remains")

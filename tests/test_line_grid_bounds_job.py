@@ -29,7 +29,7 @@ def test_generated_slice_shell_has_fail_closed_handoff_contract():
     state_pos = shell.index("queued slice")
     submit_pos = shell.index("sbatch --parsable --nice=10000")
     assert state_pos < submit_pos
-    assert 'SID=${SID%%;*}' in shell
+    assert "SID=${SID%%;*}" in shell
     assert "*[!0-9]*" in shell
     assert "FAILED (slice resubmission)" in shell
     assert '[ -f "$JOBDIR/STOP" ]' in shell
@@ -128,3 +128,35 @@ def test_resubmit_failure_is_terminal_and_fail_closed(tmp_path, monkeypatch):
     result, state = _run_payload(tmp_path, monkeypatch, analysis_exit=75)
     assert result.returncode != 0
     assert state.startswith("FAILED (slice resubmission)")
+
+
+def test_default_energies_span_all_seven_standard_beams():
+    job = _load_job_script()
+    assert job.DEFAULT_ENERGIES == "30,50,100,150,200,250,300"
+
+
+def test_slice_payload_threads_brem_grid_stop():
+    job = _load_job_script()
+    shell = job._slice_payload(
+        "20260720-000000-abcdef01",
+        slice_minutes=10.0,
+        json_out="bounds.json",
+        energies=job.DEFAULT_ENERGIES,
+        grid_stop=20000.0,
+        brem_grid_stop=40000.0,
+    )
+    assert "--brem-grid-stop 40000" in shell
+    assert "--energies 30,50,100,150,200,250,300" in shell
+
+
+def test_metadata_records_brem_grid_stop():
+    job = _load_job_script()
+    meta = job._metadata(
+        "20260720-000000-abcdef01",
+        slice_minutes=10.0,
+        json_out="bounds.json",
+        energies=job.DEFAULT_ENERGIES,
+        grid_stop=20000.0,
+        brem_grid_stop=40000.0,
+    )
+    assert "brem_grid_stop: 40000" in meta

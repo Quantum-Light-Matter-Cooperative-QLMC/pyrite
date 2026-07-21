@@ -23,9 +23,7 @@ GENERAL_LATTICE = {
 def test_surface_hkl_aligns_nonorthogonal_plane_normal_with_sample_z():
     surface_hkl = (2, 0, -1)
     a, b, c = (GENERAL_LATTICE[name] for name in ("a", "b", "c"))
-    alpha, beta, gamma = np.deg2rad(
-        [GENERAL_LATTICE[name] for name in ("alpha", "beta", "gamma")]
-    )
+    alpha, beta, gamma = np.deg2rad([GENERAL_LATTICE[name] for name in ("alpha", "beta", "gamma")])
     a1 = np.array([a, 0.0, 0.0])
     a2 = np.array([b * np.cos(gamma), b * np.sin(gamma), 0.0])
     a3 = np.array(
@@ -111,7 +109,7 @@ def test_surface_orientation_reaches_case_and_explicit_sweep_beam_clears_it(monk
         material="mose2",
         thickness_ang=100.0,
         energy_keV=30.0,
-        tilt_deg=0.0,
+        tilt_deg=5.0,
         E_grid_line=np.array([100.0]),
         E_grid_brem=np.array([100.0]),
     )
@@ -262,14 +260,14 @@ crystal = "mos2"
         material="sample",
         thickness_ang=100.0,
         energy_keV=30.0,
-        tilt_deg=0.0,
+        tilt_deg=5.0,
         E_grid_line=grid,
         E_grid_brem=np.array([100.0]),
     )
     surface_case = build_cases(Sweep(**base), n_electrons=1, n_electrons_brem=1)[0]
-    direct_case = build_cases(
-        Sweep(**base, beam_uvw=(1, 0, 0)), n_electrons=1, n_electrons_brem=1
-    )[0]
+    direct_case = build_cases(Sweep(**base, beam_uvw=(1, 0, 0)), n_electrons=1, n_electrons_brem=1)[
+        0
+    ]
     segments = {
         "r_mid": np.array([[0.0, 0.0, 50.0]]),
         "v_hat": np.array([[0.0, 0.0, 1.0]]),

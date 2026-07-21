@@ -97,6 +97,33 @@ def test_fixed_material_line_grid_overrides_profile_mapping(tmp_path):
     assert scan.E_grid_line_by_energy is None
 
 
+def test_material_scan_overrides_apply_bespoke_line_and_brem_grids(tmp_path):
+    # The key enabling fact for bespoke per-material grids: a [materials.X] block
+    # may override BOTH E_grid_line_by_energy and E_grid_brem on top of its
+    # profile, and the resolved ScanSpec carries the material's own values -- no
+    # catalog schema change is needed to give each material a bespoke grid.
+    from cxr_mc.materials import load_material_catalog
+
+    material_line = (
+        "{ energy_keV = 25.0, grid = { values = [11.0, 14.0] } },\n  "
+        "{ energy_keV = 30.0, grid = { values = [40.0, 44.0] } }"
+    )
+    text = _catalog_with_per_beam_line_grids().replace(
+        'profile = "base"',
+        'profile = "base"\n'
+        f"E_grid_line_by_energy = [\n  {material_line},\n]\n"
+        "E_grid_brem = { values = [7.0, 8.0, 9.0] }",
+        1,
+    )
+    scan = load_material_catalog(_write_catalog(tmp_path, text)).material("sample").scan
+
+    # brem override wins over the profile's E_grid_brem = 0.0
+    np.testing.assert_array_equal(scan.E_grid_brem, [7.0, 8.0, 9.0])
+    # line-by-energy override wins over the profile's per-beam mapping
+    np.testing.assert_array_equal(scan.E_grid_line_by_energy[25.0], [11.0, 14.0])
+    np.testing.assert_array_equal(scan.E_grid_line_by_energy[30.0], [40.0, 44.0])
+
+
 @pytest.mark.parametrize(
     ("replacement", "error_path"),
     [
@@ -206,26 +233,29 @@ def test_standard_profile_uses_requested_angles_energies_and_line_grids():
     expected_bounds = {
         30.0: (10.0, 2500.0),
         50.0: (10.0, 3000.0),
-        100.0: (50.0, 3500.0),
-        150.0: (50.0, 4000.0),
-        200.0: (50.0, 13200.0),
-        250.0: (50.0, 16300.0),
-        300.0: (50.0, 19600.0),
+        100.0: (50.0, 9000.0),
+        150.0: (50.0, 11800.0),
+        200.0: (50.0, 13600.0),
+        250.0: (50.0, 14800.0),
+        300.0: (50.0, 16400.0),
     }
-    for material in CATALOG.materials.values():
-        scan = material.scan
-        np.testing.assert_array_equal(scan.energy_keV, list(expected_bounds))
-        np.testing.assert_array_equal(scan.tilt_deg, np.linspace(0.0, 89.0, 10))
-        np.testing.assert_array_equal(scan.tilt_azim_deg, np.linspace(90.0, 180.0, 10))
-        assert scan.E_grid_line is None
-        assert tuple(scan.E_grid_line_by_energy) == tuple(expected_bounds)
-        for energy, (start, stop) in expected_bounds.items():
-            grid = scan.E_grid_line_by_energy[energy]
-            assert grid[0] == start
-            assert grid[-1] == stop
-            spacing = np.diff(grid)
-            assert np.all(spacing == pytest.approx(spacing[0]))
-            assert spacing[0] == pytest.approx(3.0, abs=0.002)
+    # silicon carries the standard profile unmodified (no per-material overrides),
+    # so it exposes the profile's requested angles, energies, and line grids. The
+    # bespoke crystals (hopg/diamond/wse2/mose2) override the line grids and are
+    # covered by test_material_scan_overrides_apply_bespoke_line_and_brem_grids.
+    scan = CATALOG.material("silicon").scan
+    np.testing.assert_array_equal(scan.energy_keV, list(expected_bounds))
+    np.testing.assert_array_equal(scan.tilt_deg, [5.0, 45.0])
+    np.testing.assert_array_equal(scan.tilt_azim_deg, np.linspace(100.0, 180.0, 3))
+    assert scan.E_grid_line is None
+    assert tuple(scan.E_grid_line_by_energy) == tuple(expected_bounds)
+    for energy, (start, stop) in expected_bounds.items():
+        grid = scan.E_grid_line_by_energy[energy]
+        assert grid[0] == start
+        assert grid[-1] == stop
+        spacing = np.diff(grid)
+        assert np.all(spacing == pytest.approx(spacing[0]))
+        assert spacing[0] == pytest.approx(3.0, abs=0.002)
 
 
 def test_exposed_arrays_cannot_have_writes_reenabled():
@@ -380,12 +410,22 @@ profile = "base"
 crystal = "mos2"
 """,
     )
-    text = text.replace(
-        "E_grid_line = { arange = { start = 50.0, stop = 60.0, step = 2.0 } }",
-        "E_grid_line = 75.0",
-    ).replace(
-        "E_grid_brem = 0.0",
-        "E_grid_brem = { logspace = { start = 1.0, stop = 3.0, num = 3 } }",
+    text = (
+        text.replace(
+            "E_grid_line = { arange = { start = 50.0, stop = 60.0, step = 2.0 } }",
+            "E_grid_line = 75.0",
+        )
+        .replace(
+            "E_grid_brem = 0.0",
+            "E_grid_brem = { logspace = { start = 1.0, stop = 3.0, num = 3 } }",
+        )
+        # the base fixture's tilt_deg spans 0 deg, which build_cases now rejects
+        # (the azim-rework banned-angle guard); pin legal emission angles so this
+        # test exercises the grid passthrough, not the guard.
+        .replace(
+            "tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 3, endpoint = false } }",
+            "tilt_deg = { values = [5.0, 45.0] }",
+        )
     )
     catalog = load_material_catalog(_write_catalog(tmp_path, text))
     monkeypatch.setattr(config, "CATALOG", catalog)
