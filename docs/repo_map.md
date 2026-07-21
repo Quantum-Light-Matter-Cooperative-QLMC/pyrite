@@ -91,7 +91,16 @@ transport support, pinned-reflection policy, and stacks, then returns deeply
 immutable typed records. `material_keys` preserves TOML declaration order.
 - Public: `MaterialCatalog`, `MaterialConfigError`, `CrystalInfo`, `CrystalSpec`,
   `MediumSpec`, `MaterialSpec`, `ScanSpec`, `LayerSpec`, `load_material_catalog`.
-- Deps: `materials._cif`, `materials._transport_data`, `DATA_DIR`.
+- Deps: `materials._cif`, `materials._transport_data`, `materials._catalog_decode`,
+  `DATA_DIR`.
+
+### `materials/_catalog_decode.py`
+Primitive decoders for the schema-version-1 catalog grids and descriptors:
+number/negative validation, immutable float64 grid construction, and the
+`values`/`arange`/`linspace`/`logspace` line-grid kinds. `catalog.py` orchestrates
+these while owning the record types and error aggregation.
+- Internal: grid/descriptor decode helpers; `GridValue`, `LineGridByEnergy` aliases.
+- Deps: NumPy.
 
 ### `materials/_cif.py`
 Structural adapter around `crystals` 1.7: CIF parsing, symmetry expansion, cell

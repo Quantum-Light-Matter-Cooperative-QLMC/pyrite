@@ -1,0 +1,369 @@
+"""Formatting and progress rendering for :mod:`cxr_mc.remote`."""
+
+import json
+import math
+import os
+import re
+import sys
+
+from ..materials import CATALOG
+
+_SHELL_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+_STATE_COLORS = {
+    "active": (92, 207, 230),
+    "done": (170, 217, 76),
+    "warning": (255, 213, 128),
+    "failed": (240, 113, 120),
+    "inactive": (127, 140, 152),
+}
+_TQDM_COLORS = {
+    group: f"#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}" for group, rgb in _STATE_COLORS.items()
+}
+_TQDM_FRAME_RE = re.compile(
+    r"^\s*(?:(?P<label>[^:\r\n]{1,80}):\s*)?"
+    r"(?P<percent>\d{1,3})%\|.*?\s(?P<completed>\d+)/(?P<total>\d+)\s+"
+    r"\[(?P<timing>[^\]]*)\]"
+)
+
+
+def _format_table(headers, rows, *, indent=""):
+    """Render plain aligned columns; wrapping remains the terminal's choice."""
+    string_rows = [tuple(str(value) for value in row) for row in rows]
+    widths = [
+        max(len(str(header)), *(len(row[index]) for row in string_rows))
+        for index, header in enumerate(headers)
+    ]
+
+    def render(row):
+        return indent + "  ".join(
+            value.ljust(width) if index < len(row) - 1 else value
+            for index, (value, width) in enumerate(zip(row, widths, strict=True))
+        )
+
+    return "\n".join(
+        [render(tuple(headers)), render(tuple("-" * w for w in widths)), *map(render, string_rows)]
+    )
+
+
+def _style_states(text):
+    """Add redundant state color only for an interactive color-capable terminal."""
+    if os.environ.get("NO_COLOR") is not None or os.environ.get("TERM") == "dumb":
+        return text
+    isatty = getattr(sys.stdout, "isatty", None)
+    if not callable(isatty) or not isatty():
+        return text
+    groups = {
+        "active": ("RUNNING", "PENDING", "QUEUED", "SUBMITTED"),
+        "done": ("DONE", "FINISHED", "COMPLETED"),
+        "warning": ("PAUSED", "STALLED", "CANCELLING", "NOT_QUEUED"),
+        "failed": ("FAILED", "CANCELLED"),
+    }
+    for group, words in groups.items():
+        red, green, blue = _STATE_COLORS[group]
+        pattern = rf"\b({'|'.join(words)})\b"
+        text = re.sub(
+            pattern,
+            rf"\033[38;2;{red};{green};{blue}m\1\033[0m",
+            text,
+            flags=re.IGNORECASE,
+        )
+    return text
+
+
+def _color_enabled():
+    if os.environ.get("NO_COLOR") is not None or os.environ.get("TERM") == "dumb":
+        return False
+    isatty = getattr(sys.stdout, "isatty", None)
+    return callable(isatty) and isatty()
+
+
+def _paint(text, group):
+    if not _color_enabled():
+        return text
+    red, green, blue = _STATE_COLORS[group]
+    return f"\033[38;2;{red};{green};{blue}m{text}\033[0m"
+
+
+def _format_fields(rows, *, indent="  "):
+    width = max(len(str(label)) for label, _value in rows)
+    return "\n".join(f"{indent}{label:<{width}}  {value}" for label, value in rows)
+
+
+def _metadata_fields(metadata):
+    """Parse the last value for each simple ``key: value`` metadata field."""
+    fields = {}
+    for line in metadata.splitlines():
+        key, separator, value = line.partition(": ")
+        if separator:
+            fields[key] = value
+    return fields
+
+
+def _mode_summary(metadata):
+    fields = _metadata_fields(metadata)
+    if "ne" in fields or fields.get("materials") == "zhai":
+        return "Zhai reproduction"
+    if "quick" not in fields:
+        return "unspecified"
+    speed = "quick" if fields.get("quick") == "True" else "standard"
+    if "chunk_minutes" not in fields and "parallel_materials" not in fields:
+        return speed
+    try:
+        chunk_minutes = float(fields.get("chunk_minutes", "0"))
+    except ValueError:
+        chunk_minutes = 0
+    if chunk_minutes > 0:
+        return f"{speed} · chunked into {chunk_minutes:g} min slices"
+    parallel = fields.get("parallel_materials")
+    suffix = f" · {parallel} materials at once" if parallel not in {None, "None"} else ""
+    return f"{speed} · monolithic{suffix}"
+
+
+def _material_label(material):
+    spec = CATALOG.materials.get(material)
+    return spec.label if spec is not None else material
+
+
+def _progress_group(state):
+    if state == "done":
+        return "done"
+    if state == "failed":
+        return "failed"
+    if state == "paused":
+        return "warning"
+    return "active"
+
+
+def _progress_track(completed, total, *, width=16):
+    filled = width if total == 0 else round(width * completed / total)
+    filled = min(width, max(0, filled))
+    return "█" * filled + "░" * (width - filled)
+
+
+def _format_case_progress(records, materials=()):
+    """Render the latest validated atomic case snapshots."""
+    if not records:
+        return "  No case progress reported yet. Use `cxr remote logs` for diagnostics."
+    order = [material for material in materials if material in records]
+    order.extend(material for material in records if material not in order)
+    labels = {material: _material_label(material) for material in order}
+    label_width = max(len("MATERIAL"), *(len(label) for label in labels.values()))
+    lines = [f"  {'MATERIAL':<{label_width}}  {'PROGRESS':<16}  CASES  DONE  STATE    WORK"]
+    for material in order:
+        record = records[material]
+        completed = record["cached_cases"] + record["completed_new_cases"]
+        total = record["total_cases"]
+        percent = 100 if total == 0 else round(100 * completed / total)
+        state = record["state"]
+        glyph = {"done": "✓", "failed": "×", "paused": "Ⅱ"}.get(state, "●")
+        track = _progress_track(completed, total)
+        accent = _paint(f"{glyph} {track}", _progress_group(state))
+        lines.append(
+            f"  {labels[material]:<{label_width}}  {accent}  "
+            f"{completed:>{len(str(total))}}/{total}  {percent:>3}%  {state:<7}  "
+            f"{record['cached_cases']} cached · {record['completed_new_cases']} new"
+        )
+    return "\n".join(lines)
+
+
+def _active_work_label(state):
+    match = re.match(r"(?:running|warning at)\s+(.+)", state, flags=re.IGNORECASE)
+    if match is None:
+        return "last case batch"
+    label = re.split(
+        r"\s+\[\d+/\d+\]|\s+(?:since\s+)?\d{4}-\d{2}-\d{2}", match.group(1), maxsplit=1
+    )[0]
+    return _material_label(label.strip())
+
+
+def _legacy_progress(log, state):
+    frames = []
+    for line in log.splitlines():
+        match = _TQDM_FRAME_RE.match(line)
+        if match is not None:
+            frames.append(match.groupdict())
+    if not frames:
+        return None
+    frame = frames[-1]
+    completed = int(frame["completed"])
+    total = int(frame["total"])
+    label = (frame["label"] or "").strip()
+    if label.lower() in {"", "case", "cases"}:
+        label = _active_work_label(state)
+    else:
+        if label.lower().endswith(" cases"):
+            label = label[: -len(" cases")]
+        label = _material_label(label)
+    if completed >= total:
+        progress_state = "done"
+    elif state.lower().startswith(("failed", "cancelled")):
+        progress_state = "failed"
+    elif state.lower().startswith("done"):
+        progress_state = "paused"
+    else:
+        progress_state = "running"
+    percent = 100 if total == 0 else round(100 * completed / total)
+    glyph = {"done": "✓", "failed": "×", "paused": "Ⅱ"}.get(progress_state, "●")
+    accent = _paint(
+        f"{glyph} {_progress_track(completed, total)}",
+        _progress_group(progress_state),
+    )
+    return (
+        "  MATERIAL / WORK      PROGRESS          CASES  DONE  TIMING\n"
+        f"  {label:<20} {accent}  {completed}/{total}  {percent:>3}%  {frame['timing']}"
+    )
+
+
+def _clean_recent_log(log, *, limit=12):
+    diagnostics = [
+        line.strip()
+        for line in log.splitlines()
+        if line.strip() and _TQDM_FRAME_RE.match(line) is None
+    ]
+    if not diagnostics:
+        return "  (no recent diagnostic messages)"
+    return "\n".join(diagnostics[-limit:])
+
+
+def _marked_sections(output):
+    """Split an internal marker stream returned by one remote round trip."""
+    sections = {}
+    current = None
+    for line in output.splitlines():
+        if line.startswith("@@"):
+            current = line[2:]
+            sections.setdefault(current, [])
+        elif current is not None:
+            sections[current].append(line)
+    return {key: "\n".join(lines).strip() for key, lines in sections.items()}
+
+
+def _scheduler_fields(payload):
+    fields = {}
+    for item in payload.split("|"):
+        key, separator, value = item.partition("=")
+        if separator:
+            fields[key] = value
+    return fields
+
+
+def _format_job_status(sections, detail):
+    metadata = sections.get("META", "")
+    fields = _metadata_fields(metadata)
+    scheduler = _scheduler_fields(sections.get("SQUEUE", ""))
+    jobid = sections.get("JOB") or fields.get("job", "?")
+    kind = fields.get("kind", "material-sweep")
+    diagnostic = kind == "line-grid-bounds"
+    materials = fields.get("materials", "-").split()
+    scheduler_id = scheduler.get("job_id") or fields.get("slurm_job_id", "-")
+    scheduler_state = scheduler.get("state", "NOT_QUEUED")
+    rows = [
+        ("State", sections.get("STATE") or "(no state yet)"),
+        ("SLURM", f"{scheduler_id} · {scheduler_state}"),
+    ]
+    if diagnostic:
+        slice_text = fields.get("slice_minutes", "-")
+        try:
+            hard_minutes = max(1, math.ceil(float(slice_text) * 3))
+        except ValueError:
+            hard_minutes = "-"
+        rows.extend(
+            [
+                ("Kind", kind),
+                ("Energies", f"{fields.get('energies', '-')} keV"),
+                ("Slice", f"{slice_text} min soft / {hard_minutes} min hard"),
+                ("Output", fields.get("json_out", "-")),
+            ]
+        )
+    else:
+        rows.extend(
+            [
+                ("Materials", ", ".join(materials) or "-"),
+                ("Mode", _mode_summary(metadata)),
+            ]
+        )
+    output = [f"JOB {jobid}", _format_fields(rows)]
+    if detail >= 1:
+        allocation = [
+            ("Partition", scheduler.get("partition", "-")),
+            ("Elapsed", scheduler.get("elapsed", "-")),
+            ("Remaining", scheduler.get("left", "-")),
+            ("Nodes", scheduler.get("nodes", "-")),
+            ("Reason", scheduler.get("reason", "-")),
+            ("Workers", fields.get("workers", "-")),
+        ]
+        output.extend(["", "ALLOCATION", _format_fields(allocation)])
+    if detail >= 2:
+        records = _parse_progress_records(sections.get("PROGRESS", ""))
+        log = sections.get("LOG", "")
+        if not diagnostic:
+            progress = _format_case_progress(records, materials)
+            if not records:
+                progress = _legacy_progress(log, sections.get("STATE", "")) or progress
+            output.extend(["", "CASE PROGRESS", progress])
+        output.extend(["", "RECENT LOG (diagnostics only)", _clean_recent_log(log)])
+    return "\n".join(output)
+
+
+def _metadata_value(metadata, key):
+    prefix = f"{key}: "
+    values = [line[len(prefix) :] for line in metadata.splitlines() if line.startswith(prefix)]
+    return values[-1] if values else None
+
+
+def _parse_progress_records(payload):
+    """Parse complete one-line JSON records, ignoring malformed snapshots."""
+    records = {}
+    for line in payload.splitlines():
+        try:
+            record = json.loads(line)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(record, dict):
+            continue
+        material = record.get("material")
+        total = record.get("total_cases")
+        cached = record.get("cached_cases")
+        completed = record.get("completed_new_cases")
+        state = record.get("state")
+        if not isinstance(material, str) or not _SHELL_TOKEN_RE.fullmatch(material):
+            continue
+        if not isinstance(total, int) or isinstance(total, bool):
+            continue
+        if not isinstance(cached, int) or isinstance(cached, bool):
+            continue
+        if not isinstance(completed, int) or isinstance(completed, bool):
+            continue
+        if total < 0 or cached < 0 or completed < 0 or cached + completed > total:
+            continue
+        if state not in {"running", "done", "failed", "paused"}:
+            continue
+        records[material] = record
+    return records
+
+
+def _update_progress_bars(bars, records, finished=None):
+    """Apply snapshots, closing terminal material rows exactly once."""
+    finished = set() if finished is None else finished
+    for material, bar in bars.items():
+        if material in finished:
+            continue
+        record = records.get(material)
+        if record is None:
+            continue
+        bar.total = record["total_cases"]
+        bar.n = record["cached_cases"] + record["completed_new_cases"]
+        state = record["state"]
+        bar.colour = _TQDM_COLORS[_progress_group(state)]
+        bar.set_description_str(f"{_material_label(material)} · {state}", refresh=False)
+        bar.set_postfix(
+            cached=record["cached_cases"],
+            new=record["completed_new_cases"],
+            refresh=False,
+        )
+        bar.refresh()
+        if state in {"done", "failed"}:
+            bar.close()
+            finished.add(material)
+    return finished
