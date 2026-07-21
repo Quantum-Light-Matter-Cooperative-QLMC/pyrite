@@ -57,6 +57,15 @@ WIDE_GRID_START_EV = 10.0
 WIDE_GRID_STOP_EV = 20000.0
 WIDE_GRID_STEP_EV = 10.0
 WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, WIDE_GRID_STOP_EV, WIDE_GRID_STEP_EV)
+# Diagnostic brem grid for measuring the incoherent (brem) coverage. The
+# production profile's E_grid_brem tops out at 30 keV, but a per-material bespoke
+# brem stop must be measured on a grid that clears the widest true 95%
+# brem-coverage energy, or coverage_energy clips it to the ceiling and refuses
+# (CoverageGridTooNarrow). 40 keV carries headroom over the 30 keV production
+# grid; overridable via --brem-grid-stop. Step matches the production E_grid_brem.
+WIDE_BREM_STOP_EV = 40000.0
+WIDE_BREM_STEP_EV = 25.0
+WIDE_BREM_EV = np.arange(0.0, WIDE_BREM_STOP_EV, WIDE_BREM_STEP_EV)
 COARSE_NE = 200
 REFINE_NE = 2000
 TOP_K = 3
@@ -104,6 +113,7 @@ def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons):
         tilt_azim_deg=tilt_azim_deg,
         E_grid_line=WIDE_GRID_EV,
         E_grid_line_by_energy=None,
+        E_grid_brem=WIDE_BREM_EV,
     )
     return build_cases(sweep, n_electrons=n_electrons)[0]
 
@@ -449,6 +459,13 @@ def build_parser():
         default=WIDE_GRID_STEP_EV,
         help="spacing (eV) of the diagnostic coverage grid (default: %(default)g)",
     )
+    parser.add_argument(
+        "--brem-grid-stop",
+        type=float,
+        default=WIDE_BREM_STOP_EV,
+        help="ceiling (eV) of the diagnostic brem coverage grid; must clear the widest "
+        "true 95%% brem-coverage energy at any beam energy (default: %(default)g)",
+    )
     parser.add_argument("--json-out", default=None, help="optional path to write rows as JSON")
     parser.add_argument(
         "--max-minutes",
@@ -461,8 +478,9 @@ def build_parser():
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
-    global WIDE_GRID_EV
+    global WIDE_GRID_EV, WIDE_BREM_EV
     WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, args.grid_stop, args.grid_step)
+    WIDE_BREM_EV = np.arange(0.0, args.brem_grid_stop, WIDE_BREM_STEP_EV)
     materials = args.materials.split(",") if args.materials else list(CATALOG.materials)
     if args.energies:
         energies = [float(e) for e in args.energies.split(",")]

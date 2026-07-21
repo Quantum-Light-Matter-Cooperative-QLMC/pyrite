@@ -3,6 +3,9 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
+import pytest
+
 
 def _load_script(name):
     path = Path(__file__).parents[1] / "scripts" / f"{name}.py"
@@ -231,3 +234,41 @@ def test_main_returns_tempfail_when_budget_leaves_work(monkeypatch):
     monkeypatch.setattr(analyze, "_print_report", lambda rows: None)
 
     assert analyze.main(["--materials", "hopg", "--energies", "200"]) == 75
+
+
+def test_build_case_passes_wide_brem_grid_to_diagnostic_sweep(monkeypatch):
+    # The brem coverage channel must be measured on the WIDE diagnostic brem
+    # grid, not the profile's 30 keV E_grid_brem -- otherwise a per-material
+    # bespoke brem stop would be silently clipped to the narrow profile ceiling.
+    analyze = _load_script("analyze_line_grid_bounds")
+    captured = {}
+    real_sweep = analyze.material_sweep
+
+    def spy(material, **kwargs):
+        captured.update(kwargs)
+        return real_sweep(material, **kwargs)
+
+    monkeypatch.setattr(analyze, "material_sweep", spy)
+    monkeypatch.setattr(analyze, "build_cases", lambda sweep, **kw: [{"sweep": sweep}])
+
+    analyze._build_case("hopg", 100.0, 5.0, 100.0, 10)
+
+    assert "E_grid_brem" in captured
+    np.testing.assert_array_equal(captured["E_grid_brem"], analyze.WIDE_BREM_EV)
+
+
+def test_candidate_brem_channel_refuses_silent_truncation():
+    # The incoherent (brem) coverage call must keep allow_shortfall=False: a brem
+    # spectrum whose 95% mass sits in the final bin means the true coverage lies
+    # beyond the diagnostic ceiling and must raise, never clamp (issue_notes.md #1).
+    from cxr_mc.line_grid_bounds import CoverageGridTooNarrow
+
+    analyze = _load_script("analyze_line_grid_bounds")
+    E = np.arange(0.0, 100.0, 10.0)
+    coherent = np.ones_like(E)
+    truncated = np.zeros_like(E)
+    truncated[-1] = 1.0
+    result = {"E_grid": E, "spec": coherent, "E_grid_brem": E, "brem_wide": truncated}
+
+    with pytest.raises(CoverageGridTooNarrow):
+        analyze._candidate_from_result("hopg", 5.0, 100.0, result)
