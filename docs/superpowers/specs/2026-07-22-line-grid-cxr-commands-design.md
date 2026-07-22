@@ -58,6 +58,7 @@ cxr line-grid set      <material> --energy E --stop S [--num N] [--start S0] [--
 cxr line-grid set-brem <material> --stop S [--step ST] [--note "…"]
 cxr line-grid defaults [--set <flags>]        # show or update persistent defaults
 cxr line-grid show     [material]
+cxr line-grid regen-golden [--check]          # rebuild the independent catalog golden
 ```
 
 Geometry flags (on `derive`/`submit`): `--tilts d1,d2,…` (diagnostic polar
@@ -204,9 +205,16 @@ catalog schema change and no golden-fixture churn. It holds:
 tilts = []            # [] = use each material's profile tilt_deg (today's default)
 azimuths = []         # [] = use profile tilt_azim_deg
 thickness_ang = [1.0e7]
+brem_step_ev = 25.0   # default E_grid_brem step; --step overrides per-run/-set
 energies = [30, 40, 50, 60, 100, 150, 200, 250, 300]
 materials = ["hopg", "diamond", "wse2", "mose2"]
 ```
+
+`set-brem --step` overrides the brem grid step for one write; unset it uses
+`brem_step_ev` from this file. The default is changeable via
+`cxr line-grid defaults --set --brem-step …` (or `--set-default` on a run that
+passed `--brem-step`), same partial-merge/atomic-write path as the other
+defaults.
 
 - Runs read this file for their defaults (replacing the current module-level
   `DEFAULT_*` constants). Missing file → built-in fallbacks equal to today's
@@ -230,6 +238,31 @@ materials = ["hopg", "diamond", "wse2", "mose2"]
 - `cxr line-grid show hopg` — prints the resolved line rows + brem grid with
   their `source`/`note`, plus a `(manual)` / `(derived …)` tag per row.
 
+## Golden config regeneration
+
+`tests/data/material_catalog_golden.json` is the **independent** oracle for
+`test_packaged_catalog_matches_independent_serialized_golden` — it captures each
+material's resolved grids (energies, tilts, `E_grid_line_by_energy`, brem, …) as
+fingerprints. `apply` / `set` / `set-brem` change real bound values, so the
+resolved grids move and the golden must be refreshed. Today that refresh is
+manual; this adds a command.
+
+`cxr line-grid regen-golden` rebuilds the golden and writes it. `--check`
+regenerates in memory and diffs against the checked-in file, exiting nonzero on
+drift (for CI / pre-commit) without writing.
+
+**Independence requirement**: the golden is only meaningful if it is *not* a
+straight dump of the runtime `CATALOG`. The regenerator must serialize by
+parsing `materials.toml` directly (raw `tomllib`) and computing the grid
+fingerprints through its own path — never by calling the resolver under test.
+The implementation reuses the existing independent serializer if one is found;
+otherwise it adds one under `scripts/`. (Implementation plan resolves which.)
+
+Wiring: `cxr line-grid apply` accepts `--regen-golden` to invoke it right after
+a successful write; without the flag, `apply` prints a one-line reminder that the
+golden is now stale. A matching `scripts/dev.py regen-golden` alias keeps it in
+the dev-tooling surface next to `lint`/`format`/`verify`.
+
 ## Testing
 
 - `apply` merge/write-back: golden-in / golden-out TOML fixtures — derived JSON +
@@ -248,8 +281,11 @@ materials = ["hopg", "diamond", "wse2", "mose2"]
   `_build_case`; unset flags reproduce today's profile-angle + 1e7-thickness scan
   (regression); multi-thickness expands the geometry product.
 - Defaults file: `defaults --set` / `--set-default` round-trip (partial merge,
-  atomic write, missing-file fallbacks equal today's constants); `derive`/`submit`
-  read defaults from it.
+  atomic write, missing-file fallbacks equal today's constants, `brem_step_ev`);
+  `derive`/`submit`/`set-brem` read defaults from it.
+- `regen-golden`: rebuild reproduces the current checked-in golden byte-for-byte
+  from an unchanged catalog; `--check` exits nonzero on injected drift and does
+  not write; regenerator does not import the runtime resolver.
 - Keep existing `tests/test_line_grid_bounds_job.py` /
   `tests/test_analyze_line_grid_bounds.py` green through the thin shims.
 
