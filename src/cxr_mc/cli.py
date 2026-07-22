@@ -37,7 +37,17 @@ def main(argv=None):
 
             check_config.add_subparser(sub)
         else:
-            from . import analyze, archive, check, check_config, export, remote, scan, slim
+            from . import (
+                analyze,
+                archive,
+                check,
+                check_config,
+                export,
+                line_grid,
+                remote,
+                scan,
+                slim,
+            )
 
             scan.add_subparser(sub)
             export.add_subparser(sub)
@@ -45,6 +55,7 @@ def main(argv=None):
             slim.add_subparser(sub)
             archive.add_subparser(sub)
             remote.add_subparser(sub)
+            line_grid.add_subparser(sub)
             check.add_subparser(sub)
             check_config.add_subparser(sub)
 
