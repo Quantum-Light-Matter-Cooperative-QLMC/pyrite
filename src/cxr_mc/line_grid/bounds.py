@@ -1,4 +1,4 @@
-"""Pure helpers for scripts/analyze_line_grid_bounds.py: turn a simulated
+"""Pure helpers for cxr_mc.line_grid.derive: turn a simulated
 coherent-line spectrum into a coverage energy, and a coverage energy into a
 catalog-ready line-grid ``stop``/``num`` pair.
 
