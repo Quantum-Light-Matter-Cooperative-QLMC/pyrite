@@ -524,7 +524,8 @@ def derive_all_materials(
             max_seconds=remaining,
             time_fn=time_fn,
         )
-        combined[material] = {"line_rows": rows, "brem": _brem_grid_for_rows(rows)}
+        if rows:
+            combined[material] = {"line_rows": rows, "brem": _brem_grid_for_rows(rows)}
         if not material_complete:
             complete = False
             break
