@@ -107,6 +107,7 @@ src/cxr_mc/line_grid/
   job.py         # remote submit + SLURM job-script builder, from scripts/line_grid_bounds_job.py
   apply.py       # materials.toml write-back; set / set-brem / show
   defaults.py    # line_grid_defaults.toml read/write
+  provenance.py  # line_grid_provenance.toml read/write (source/note, sticky-manual)
   golden.py      # regen-golden (independent serializer)
 ```
 
@@ -167,32 +168,44 @@ the current TOML (`start=10.0` at ≤60 keV, `start=50.0` above, `endpoint=true`
 re-loads the catalog to validate (fail loudly if the regenerated TOML doesn't
 parse).
 
-## Notes + provenance (schema addition)
+## Notes + provenance (tool-owned sidecar, not TOML fields)
 
-To make CLI-managed overrides and notes first-class (not comments that die on
-regeneration), each managed grid entry carries optional structured metadata:
+Provenance/notes live in a **tool-owned sidecar**, NOT in `materials.toml`.
+Reason: the catalog decoder (`_catalog_decode._grid`) requires the `E_grid_brem`
+table to contain *exactly one* grid descriptor, so a `source`/`note` sibling key
+on the brem grid is rejected by construction; and line-row keys are a closed set
+too. Storing provenance in the catalog would force a decoder change **and**
+churn the golden. The sidecar avoids both, and matches the same tool-owned
+pattern as `line_grid_defaults.toml`. `materials.toml` therefore holds pure grid
+values only — `_catalog_decode.py` is untouched.
 
-- Line row allowed keys extend from `{energy_keV, grid}` to
-  `{energy_keV, grid, source, note}` in
-  `src/cxr_mc/materials/_catalog_decode.py::_line_grids_by_energy`
-  (line 167 `errors.keys(...)`).
-- The brem grid tolerates optional `source`/`note` alongside its `arange`/
-  `linspace` payload (via the `_grid` allowed-keys check,
-  `_catalog_decode.py:109`).
-- **Both fields are parsed then ignored by physics** — they never reach a
-  `ScanSpec` grid array. They exist for provenance/display only.
+File: `src/cxr_mc/data/line_grid_provenance.toml`, keyed by material / channel /
+energy:
 
-Provenance stamping:
+```toml
+# managed by cxr line-grid; do not hand-edit
+[hopg.line.60]
+source = "manual"
+note = "widened for detector X tail"
 
-- `apply` derived rows: `source = "derived job <slurm_id> (<date>)"`.
+[hopg.brem]
+source = "derived job 458 (2026-07-22)"
+```
+
+Provenance stamping (written to the sidecar, atomic write):
+
+- `apply` derived entries: `source = "derived job <slurm_id> (<date>)"`.
 - `set` / `set-brem`: `source = "manual"`, plus the user's `--note` string.
+- Entries with no sidecar record are treated as `source = "derived"` (unknown
+  provenance) — never `manual`.
 
 ### Sticky manual overrides
 
-`apply` will **not** overwrite any row/grid whose `source = "manual"` unless
-`--force` is passed. This protects hand-tuned grids from being clobbered by a
-later rerun. `apply` reports which rows it skipped for this reason; `show` lists
-each material's `source`/`note` so overrides are auditable.
+`apply` will **not** overwrite any material/energy whose sidecar
+`source = "manual"` unless `--force` is passed. This protects hand-tuned grids
+from being clobbered by a later rerun. `apply` reports which entries it skipped;
+`show` reads both `materials.toml` (values) and the sidecar (source/note) so
+overrides are auditable.
 
 ## Diagnostic geometry & thickness overrides + persistent defaults
 
@@ -293,10 +306,10 @@ the dev-tooling surface next to `lint`/`format`/`verify`.
   emits diff without writing, regenerated TOML re-parses.
 - `set` / `set-brem`: single-row regen, `source="manual"` + note stamped,
   `--num` auto-compute path.
-- Schema tolerance: catalog parses `source`/`note` on line rows and brem grid,
-  ignores them in resolved `ScanSpec`. Regenerate
-  `tests/data/material_catalog_golden.json` and refresh
-  `tests/test_material_catalog.py` expectations.
+- Provenance sidecar: `set`/`set-brem`/`apply` write `source`/`note` to
+  `line_grid_provenance.toml`; sticky-manual skip reads it; `show` merges it with
+  values. `materials.toml` schema and the golden are unaffected by provenance
+  (only bound-value changes from `apply` regen the golden).
 - Status parity: `cxr line-grid status [-v/-vv]` calls `remote.job_status` with
   the same `detail` — assert delegation (mock `job_status`, check `detail` arg).
 - Geometry overrides: `--tilts/--azimuths/--thickness` reach `_geometry_plan` /
@@ -316,7 +329,8 @@ the dev-tooling surface next to `lint`/`format`/`verify`.
 - **Text-surgery brittleness**: block boundaries located by naive scan could
   mis-parse. Mitigation: after every write, re-load the catalog and fail if it
   doesn't parse or a targeted material's resolved grid doesn't match intent.
-- **Golden churn**: schema addition forces golden regen. Contained, expected.
+- **Golden churn**: only `apply`/`set` bound-value changes move the golden;
+  `regen-golden` handles it. Provenance sidecar does not touch the catalog.
 - **Remote invocation switch**: the SLURM payload moves from a path-invoked
   script to `python -m cxr_mc.line_grid.derive`. Mitigation: keep the module's
   CLI flags byte-identical to the old script's; a `--dry-run` submit asserts the
