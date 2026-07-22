@@ -29,7 +29,10 @@ def test_penetration_view_uses_interactive_3d_volume_as_primary_track_plot() -> 
     source = APP.read_text()
 
     assert "from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure" in source
-    assert "_volume = trajectory_volume_figure(_nc, Ne=40)" in source
+    assert (
+        "_volume = trajectory_volume_figure(_nc, Ne=40, realistic=penetration_realistic_ui.value)"
+        in source
+    )
     assert '"2D track cross-section (Altair)"' in source
     assert "lateral extent is fitted to the tracks" in source
 

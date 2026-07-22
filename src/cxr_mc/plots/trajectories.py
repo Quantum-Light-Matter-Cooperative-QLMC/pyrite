@@ -69,11 +69,28 @@ def _beam_detector_basis(beam, n_hat):
     return e1, perp / np.linalg.norm(perp)
 
 
-def _trajectory_data(case, Ne, seed) -> dict[str, Any]:
+def _trajectory_data(
+    case,
+    Ne,
+    seed,
+    *,
+    beam_fwhm_mm=None,
+    crystal_width_mm=None,
+    crystal_height_mm=None,
+) -> dict[str, Any]:
     """Simulate one case and project the cascade into the beam-detector plane.
     Returns both the projected 2D tracks and true 3D segment endpoints in sample
     coordinates, all in the same display units, plus per-segment energy/age/depth,
     slab + detector directions, and back/through fractions.
+
+    ``beam_fwhm_mm`` (and, for a finite footprint, ``crystal_width_mm`` /
+    ``crystal_height_mm``) are forwarded to :func:`simulate_trajectories`, which
+    draws each electron's entry point from the Gaussian spot and projects it onto
+    the tilted entrance face (grazing-incidence ``1/cos`` stretch). All default
+    ``None`` -- the legacy point source entering at the origin, bit-for-bit -- so
+    the 2D cross-section callers are unchanged. With a finite crystal footprint,
+    entries landing off the crystal are dropped by transport (``n_missed``) and
+    never appear as tracks.
 
     Multilayer/stacked materials (``case["abs_layers"]`` set -- film-on-substrate,
     e.g. mos2-on-sapphire) are transported through the FULL stack via
@@ -81,11 +98,9 @@ def _trajectory_data(case, Ne, seed) -> dict[str, Any]:
     without this the electron cascade (and hence the trajectory/penetration
     plots) only ever saw the top film layer, silently dropping the substrate's
     backscatter contribution and reporting only the film's thickness."""
-    beam, n_hat = tilted_geometry(
-        case["theta_obs_rad"],
-        np.deg2rad(case.get("tilt_deg", 0.0)),
-        np.deg2rad(case.get("tilt_azim_deg", 0.0)),
-    )
+    tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
+    tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
+    beam, n_hat = tilted_geometry(case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad)
     n_hat = -n_hat
     abs_layers = case.get("abs_layers")
     total_thickness_ang = (
@@ -100,6 +115,11 @@ def _trajectory_data(case, Ne, seed) -> dict[str, Any]:
         seed=seed,
         beam_dir=beam,
         layers=abs_layers,
+        beam_fwhm_mm=beam_fwhm_mm,
+        crystal_width_mm=crystal_width_mm,
+        crystal_height_mm=crystal_height_mm,
+        tilt_polar_rad=tilt_polar_rad,
+        tilt_azim_rad=tilt_azim_rad,
     )
     e1, e2 = _beam_detector_basis(beam, n_hat)
     L, v, r = segs["L_ang"], segs["v_hat"], segs["r_mid"]

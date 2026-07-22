@@ -12,6 +12,7 @@ from __future__ import annotations
 import numpy as np
 import plotly.graph_objects as go
 
+from ..montecarlo.geometry import project_beam_entry
 from .trajectories import _case_of, _trajectory_data
 
 _CRYSTAL = "#B9D9EB"
@@ -20,6 +21,15 @@ _BEAM = "#E76F51"
 _DETECTOR = "#42C7C7"
 _FIELD = "#17202A"
 _GRID = "#34495E"
+
+# Zoomed (non-realistic) view spot FWHM [mm]: a micron-scale beam so the incident
+# bundle has visible width at the fitted, sub-micron cascade scale.
+_ZOOM_BEAM_FWHM_MM = 1.0e-3
+
+# Both views transport 4x the requested electrons: the incident bundle reads as a
+# beam only when densely populated, and at grazing tilt a large fraction of the
+# realistic spot misses the finite crystal (n_missed), thinning it further.
+_NE_SCALE = 4
 
 
 def track_vertices_3d(data):
@@ -61,9 +71,9 @@ def _transverse_window(data):
     return -radius, radius
 
 
-def _crystal_mesh(lo, hi, thick):
-    x = [lo, hi, hi, lo, lo, hi, hi, lo]
-    y = [lo, lo, hi, hi, lo, lo, hi, hi]
+def _crystal_mesh(lox, hix, loy, hiy, thick):
+    x = [lox, hix, hix, lox, lox, hix, hix, lox]
+    y = [loy, loy, hiy, hiy, loy, loy, hiy, hiy]
     z = [0.0, 0.0, 0.0, 0.0, thick, thick, thick, thick]
     # Two triangles per face.  Slight transparency keeps internal tracks legible.
     i = [0, 0, 4, 4, 0, 0, 1, 1, 2, 2, 3, 3]
@@ -85,10 +95,10 @@ def _crystal_mesh(lo, hi, thick):
     )
 
 
-def _plane_outline(z, lo, hi, *, name, dash="solid"):
+def _plane_outline(z, lox, hix, loy, hiy, *, name, dash="solid"):
     return go.Scatter3d(
-        x=[lo, hi, hi, lo, lo],
-        y=[lo, lo, hi, hi, lo],
+        x=[lox, hix, hix, lox, lox],
+        y=[loy, loy, hiy, hiy, loy],
         z=[z] * 5,
         mode="lines",
         line={"color": _CRYSTAL_EDGE, "width": 3, "dash": dash},
@@ -131,20 +141,130 @@ def _direction_arrow(direction, length, *, color, name, reverse=False):
     return line, cone
 
 
-def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0):
+def _crystal_footprint_extent(case, u):
+    """True lateral crystal extent ``(lox, hix, loy, hiy)`` in display units.
+
+    Uses the case's finite footprint (``crystal_width_mm`` x ``crystal_height_mm``,
+    full dimensions centred on the transverse origin); a missing/None dimension
+    falls back to the 5 mm default. 1 mm = 1e7 Ang.
+    """
+    width_mm = case.get("crystal_width_mm") or 5.0
+    height_mm = case.get("crystal_height_mm") or 5.0
+    hx = 0.5 * float(width_mm) * 1e7 / u
+    hy = 0.5 * float(height_mm) * 1e7 / u
+    return -hx, hx, -hy, hy
+
+
+def _beam_footprint_outline(case, u, *, n_points=96):
+    """Closed ``(x, y)`` outline [display units] of the collimated beam spot where
+    it strikes the tilted entrance face ``z = 0``, for the realistic-scale view.
+
+    The lab beam is a round spot travelling along ``+z_lab``; on a face tilted by
+    (``tilt_deg``, ``tilt_azim_deg``) its footprint elongates by ``1 / cos(tilt)``
+    along the azimuth -- the grazing-incidence stretch that can outgrow the finite
+    crystal. Reuse :func:`cxr_mc.montecarlo.geometry.project_beam_entry` so the
+    drawn outline matches transport's own entry mapping exactly. Returns ``None``
+    for the legacy point beam (``beam_fwhm_mm`` falsy / absent).
+
+    ``beam_fwhm_mm`` is the lab-plane spot FWHM; draw the outline at the FWHM
+    contour (lab radius = ``beam_fwhm_mm / 2``, mm -> Ang factor 1e7). Sample a
+    ring of ``n_points`` lab offsets ``(u_i, v_i)`` on that circle, project them,
+    and divide the resulting sample-frame (x, y) by ``u`` for display units.
+    """
+    fwhm_mm = case.get("beam_fwhm_mm")
+    if not fwhm_mm:
+        return None
+    radius_ang = 0.5 * float(fwhm_mm) * 1e7  # FWHM-contour radius, mm -> Ang
+    phi = np.linspace(0.0, 2.0 * np.pi, n_points, endpoint=True)  # closed loop
+    offsets_uv = radius_ang * np.column_stack((np.cos(phi), np.sin(phi)))
+    entry = project_beam_entry(
+        offsets_uv,
+        np.deg2rad(case.get("tilt_deg", 0.0)),
+        np.deg2rad(case.get("tilt_azim_deg", 0.0)),
+    )
+    return entry[:, 0] / u, entry[:, 1] / u
+
+
+def _incident_beam_lines(data, length):
+    """NaN-separated incident-beam segments -- one short stub per electron drawn
+    UPSTREAM along the beam direction into its true entry point on the ``z = 0``
+    face, so the beam reads as a bundle of incoming particles rather than a single
+    arrow. Entry points are each electron's first-segment start; electrons whose
+    Gaussian draw missed a finite crystal are already absent from ``data`` (dropped
+    as ``n_missed`` by transport), so this never draws a particle that missed."""
+    sid = np.asarray(data["elec_id"])
+    start = np.asarray(data["start_xyz"], dtype=float)
+    _, first = np.unique(sid, return_index=True)  # one entry per electron
+    entry = start[first]
+    beam = np.asarray(data["beam"], dtype=float)
+    beam = beam / np.linalg.norm(beam)
+    upstream = entry - length * beam  # where each incoming ray starts, off the face
+    n = len(entry)
+    xyz = np.full((3 * n, 3), np.nan)  # start, entry, NaN per electron
+    xyz[0::3] = upstream
+    xyz[1::3] = entry
+    return go.Scatter3d(
+        x=xyz[:, 0],
+        y=xyz[:, 1],
+        z=xyz[:, 2],
+        mode="lines",
+        line={"color": _BEAM, "width": 3},
+        hovertemplate="incident beam<extra></extra>",
+        name="incident beam",
+    )
+
+
+def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0, realistic=False):
     """Interactive 3D cutaway of electron tracks inside the crystal slab.
 
-    Axes are sample-frame coordinates.  Crystal x/y extent is a fitted display
-    window around simulated tracks, not a claim about physical lateral footprint.
-    Depth and internal layer-interface positions retain their true scale.
+    Axes are sample-frame coordinates. The incident beam is drawn as a BUNDLE of
+    particles: each electron enters at its own Gaussian-sampled, tilt-projected
+    point on the ``z = 0`` face, and a short red stub upstream of that point marks
+    the incoming ray (replacing the old single beam arrow).
+
+    By default (``realistic=False``) the crystal x/y extent is a fitted display
+    window around the simulated tracks, not a claim about physical lateral
+    footprint; depth and internal layer-interface positions retain their true
+    scale. The spot is a micron-scale (``_ZOOM_BEAM_FWHM_MM``) Gaussian so the
+    bundle has visible width at that zoom, with no finite footprint to miss.
+
+    ``realistic=True`` instead draws the box at the case's TRUE lateral footprint
+    (``crystal_width_mm`` x ``crystal_height_mm``, default 5x5 mm), transports a
+    physical beam spot (``beam_fwhm_mm``, default 1 mm), and overlays the FWHM
+    entry footprint on the ``z = 0`` face. At a large polar tilt that footprint
+    stretches by ``1 / cos(tilt)`` along the azimuth and can exceed the crystal --
+    the finite-crystal grazing-incidence overlap loss; electrons landing off the
+    crystal are dropped by transport and never drawn. At true 5 mm scale the
+    ~micron cascade collapses toward the origin, as expected.
     """
     case = _case_of(rec_or_case)
-    data = _trajectory_data(case, Ne, seed)
+    Ne = Ne * _NE_SCALE  # both bundles need enough particles to read as a beam
+    if realistic:
+        # true finite crystal + physical beam spot: transport samples each entry
+        # from the Gaussian, projects it onto the tilted face, and drops off-crystal
+        # entries (n_missed) so they never render.
+        data = _trajectory_data(
+            case,
+            Ne,
+            seed,
+            beam_fwhm_mm=case.get("beam_fwhm_mm") or 1.0,
+            crystal_width_mm=case.get("crystal_width_mm") or 5.0,
+            crystal_height_mm=case.get("crystal_height_mm") or 5.0,
+        )
+    else:
+        # zoomed view: a micron-scale spot so the bundle has visible width at the
+        # fitted window scale, but no finite footprint (nothing to miss).
+        data = _trajectory_data(case, Ne, seed, beam_fwhm_mm=_ZOOM_BEAM_FWHM_MM)
     xyz, energy, elec_id = track_vertices_3d(data)
     lo, hi = _transverse_window(data)
     thick = float(data["thick"])
     unit = "µm" if data["u"] == 1e4 else "nm"
-    span = max(hi - lo, thick)
+    if realistic:
+        lox, hix, loy, hiy = _crystal_footprint_extent(case, data["u"])
+    else:
+        lox = loy = lo
+        hix = hiy = hi
+    span = max(hix - lox, hiy - loy, thick)
 
     custom = np.column_stack((energy, elec_id, xyz[:, 2]))
     tracks = go.Scatter3d(
@@ -174,15 +294,29 @@ def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0):
         name="electron tracks",
     )
 
-    fig = go.Figure([_crystal_mesh(lo, hi, thick), tracks])
-    fig.add_trace(_plane_outline(0.0, lo, hi, name="entrance face"))
-    fig.add_trace(_plane_outline(thick, lo, hi, name="exit face"))
+    fig = go.Figure([_crystal_mesh(lox, hix, loy, hiy, thick), tracks])
+    fig.add_trace(_plane_outline(0.0, lox, hix, loy, hiy, name="entrance face"))
+    fig.add_trace(_plane_outline(thick, lox, hix, loy, hiy, name="exit face"))
     for index, depth in enumerate(data.get("layer_bounds", ()), start=1):
         fig.add_trace(
-            _plane_outline(depth, lo, hi, name=f"layer interface {index}", dash="dash")
+            _plane_outline(depth, lox, hix, loy, hiy, name=f"layer interface {index}", dash="dash")
         )
-    for trace in _direction_arrow(data["beam"], 0.28 * span, color=_BEAM, name="beam", reverse=True):
-        fig.add_trace(trace)
+    if realistic:
+        outline = _beam_footprint_outline(case, data["u"])
+        if outline is not None:
+            fx, fy = outline
+            fig.add_trace(
+                go.Scatter3d(
+                    x=fx,
+                    y=fy,
+                    z=[0.0] * len(fx),
+                    mode="lines",
+                    line={"color": _BEAM, "width": 5},
+                    hovertemplate="beam footprint (z=0)<extra></extra>",
+                    name="beam footprint",
+                )
+            )
+    fig.add_trace(_incident_beam_lines(data, 0.28 * span))
     for trace in _direction_arrow(
         data["detector"], 0.28 * span, color=_DETECTOR, name="detector direction"
     ):

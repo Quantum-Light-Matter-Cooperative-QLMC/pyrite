@@ -48,6 +48,9 @@ def test_trajectory_volume_figure_contains_volume_tracks_and_direction_arrows():
     tracks = next(trace for trace in fig.data if trace.name == "electron tracks")
     assert tracks.type == "scatter3d"
     assert tracks.line.colorscale
-    assert {trace.name for trace in fig.data} >= {"beam", "detector direction"}
+    # beam is now a particle BUNDLE (one stub per electron), not a single arrow
+    assert {trace.name for trace in fig.data} >= {"incident beam", "detector direction"}
+    beam = next(trace for trace in fig.data if trace.name == "incident beam")
+    assert beam.type == "scatter3d"
     assert fig.layout.scene.aspectmode == "data"
     fig.to_json()  # browser/export payload remains serializable

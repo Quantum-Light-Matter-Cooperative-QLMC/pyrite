@@ -1831,6 +1831,19 @@ def _(
 
 
 @app.cell
+def _(mo):
+    # Off by default: the fitted-window 3D view exaggerates lateral scale so the
+    # cascade is legible. Checking this redraws the box at the true 5x5 mm crystal
+    # footprint and overlays the beam entry footprint, which outgrows the crystal
+    # at grazing tilt (1/cos stretch). The ~micron cascade then collapses toward
+    # the origin -- expected at true scale.
+    penetration_realistic_ui = mo.ui.checkbox(
+        value=False, label="Realistic beam & crystal size (5×5 mm, true scale)"
+    )
+    return (penetration_realistic_ui,)
+
+
+@app.cell
 def _(
     MATERIAL,
     build_cases,
@@ -1841,6 +1854,7 @@ def _(
     penetration_energy_keV,
     penetration_energy_manual_ui,
     penetration_energy_source_ui,
+    penetration_realistic_ui,
     penetration_survival_chart,
     penetration_thickness_ang,
     penetration_thickness_grid_ui,
@@ -1893,7 +1907,7 @@ def _(
         # The sweep has one selected energy and tilt; keep the nearest-case guard
         # in case a future sweep adds a surrounding grid.
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
-        _volume = trajectory_volume_figure(_nc, Ne=40)
+        _volume = trajectory_volume_figure(_nc, Ne=40, realistic=penetration_realistic_ui.value)
         _parts = [
             _rail,
             _md,
@@ -1932,6 +1946,7 @@ def _(
                         ],
                         wrap=True,
                     ),
+                    penetration_realistic_ui,
                 ]
             ),
             *(p for p in (_survival, _volume) if p is not None),
