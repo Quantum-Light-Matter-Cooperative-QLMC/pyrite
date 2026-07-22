@@ -82,3 +82,21 @@ def test_apply_file_writes_stamps_provenance_and_validates(tmp_path, monkeypatch
     apply.apply_file(json_path, slurm_id="458", date="2026-07-22")
     assert "stop = 2700.0, num = 897" in toml_path.read_text()
     assert ("hopg", 30.0, "derived job 458 (2026-07-22)") in stamped
+
+
+def test_set_line_grid_stamps_manual_and_autocomputes_num(tmp_path, monkeypatch):
+    toml_path = tmp_path / "materials.toml"
+    toml_path.write_text(BASE_TOML)
+    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    calls = []
+    monkeypatch.setattr(
+        apply._provenance,
+        "set_line",
+        lambda m, e, s, note=None: calls.append((m, float(e), s, note)),
+    )
+    monkeypatch.setattr(apply._provenance, "is_manual_line", lambda *a: False)
+    monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *a: False)
+    apply.set_line_grid("hopg", 30.0, 3000.0, note="widen tail")
+    text = toml_path.read_text()
+    assert "stop = 3000.0" in text
+    assert calls == [("hopg", 30.0, "manual", "widen tail")]

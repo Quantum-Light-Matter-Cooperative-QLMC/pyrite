@@ -20,6 +20,7 @@ import tomllib
 from pathlib import Path
 
 from cxr_mc.line_grid import provenance as _provenance
+from cxr_mc.line_grid.bounds import spacing_num
 from cxr_mc.materials import load_material_catalog
 
 _MATERIALS_TOML = Path(__file__).resolve().parent.parent / "data" / "materials.toml"
@@ -224,3 +225,55 @@ def apply_file(
             if not regen_golden
             else "[line-grid apply] regenerating golden"
         )
+
+
+def set_line_grid(material, energy, stop_eV, *, num=None, start_eV=None, note=None):
+    e = float(energy)
+    start = float(start_eV) if start_eV is not None else _line_start_eV(e)
+    n = int(num) if num is not None else spacing_num(start, float(stop_eV), 3.0)
+    row = {"energy_keV": e, "start_eV": start, "stop_eV": float(stop_eV), "num": n}
+    original = Path(_MATERIALS_TOML).read_text()
+    new_text, _ = _merge_line_rows(original, material, [row], True, _provenance)
+    tomllib.loads(new_text)
+    _atomic_write(_MATERIALS_TOML, new_text)
+    _provenance.set_line(material, e, "manual", note=note)
+
+
+def set_brem_grid(material, stop_eV, *, step_eV=None, note=None):
+    from cxr_mc.line_grid.defaults import load_defaults
+
+    step = float(step_eV) if step_eV is not None else float(load_defaults()["brem_step_ev"])
+    original = Path(_MATERIALS_TOML).read_text()
+    new_text, _ = _merge_brem(
+        original, material, {"stop_eV": float(stop_eV), "step_eV": step}, True, _provenance
+    )
+    tomllib.loads(new_text)
+    _atomic_write(_MATERIALS_TOML, new_text)
+    _provenance.set_brem(material, "manual", note=note)
+
+
+def show(material=None) -> str:
+    original = tomllib.loads(Path(_MATERIALS_TOML).read_text())
+    mats = original["materials"]
+    keys = [material] if material else list(mats)
+    out = []
+    for key in keys:
+        block = mats.get(key, {})
+        rows = block.get("E_grid_line_by_energy", [])
+        out.append(f"=== {key} ===")
+        for item in rows:
+            e = float(item["energy_keV"])
+            g = item["grid"]["linspace"]
+            rec = _provenance.get_line(key, e)
+            tag = (
+                f"manual: {rec.get('note', '')}"
+                if rec and rec["source"] == "manual"
+                else (rec["source"] if rec else "derived")
+            )
+            out.append(f"  {e:>6g} keV  stop={g['stop']:>8g}  num={g['num']:>5}  [{tag}]")
+        brem = block.get("E_grid_brem", {}).get("arange")
+        if brem:
+            rec = _provenance.get_brem(key)
+            tag = rec["source"] if rec else "derived"
+            out.append(f"  brem stop={brem['stop']:g} step={brem['step']:g}  [{tag}]")
+    return "\n".join(out)
