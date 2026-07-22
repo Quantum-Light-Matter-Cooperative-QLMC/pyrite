@@ -1,23 +1,10 @@
-import importlib.util
 import os
 import subprocess
-import sys
-from pathlib import Path
 
-
-def _load_job_script():
-    path = Path(__file__).parents[1] / "scripts" / "line_grid_bounds_job.py"
-    spec = importlib.util.spec_from_file_location("line_grid_bounds_job", path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+from cxr_mc.line_grid import job
 
 
 def test_generated_slice_shell_has_fail_closed_handoff_contract():
-    job = _load_job_script()
-
     shell = job._slice_payload(
         "20260719-120000-deadbeef",
         slice_minutes=10.0,
@@ -37,10 +24,11 @@ def test_generated_slice_shell_has_fail_closed_handoff_contract():
     assert "CXR_MC_FREE_EVERY=40" in shell
     assert "CXR_MC_FREE_WATERMARK_MB=15000" in shell
     assert "CXR_MC_TIMING=1" in shell
+    assert "python -m cxr_mc.line_grid.derive" in shell
+    assert "scripts/analyze_line_grid_bounds.py" not in shell
 
 
 def test_batch_script_uses_three_times_slice_budget_backstop():
-    job = _load_job_script()
     script = job._job_script(
         "20260719-120000-deadbeef",
         slice_minutes=10.0,
@@ -55,7 +43,6 @@ def test_batch_script_uses_three_times_slice_budget_backstop():
 
 
 def test_batch_script_records_signal_termination(tmp_path, monkeypatch):
-    job = _load_job_script()
     monkeypatch.setattr(job.remote, "REMOTE_DIR", str(tmp_path))
     jobid = "20260719-120000-deadbeef"
     jobdir = tmp_path / job.remote.JOBS_SUBDIR / jobid
@@ -74,8 +61,7 @@ def test_batch_script_records_signal_termination(tmp_path, monkeypatch):
 
 
 def test_start_submits_slice_zero_with_nice(monkeypatch):
-    job = _load_job_script()
-    assert "scripts/analyze_line_grid_bounds.py" in job.remote.SYNC_PATHS
+    assert "scripts/analyze_line_grid_bounds.py" not in job.remote.SYNC_PATHS
     calls = []
     monkeypatch.setattr(job.remote, "sync_code", lambda: calls.append("sync"))
     monkeypatch.setattr(job.remote, "_new_jobid", lambda: "20260719-120000-deadbeef")
@@ -92,7 +78,6 @@ def test_start_submits_slice_zero_with_nice(monkeypatch):
 
 
 def _run_payload(tmp_path, monkeypatch, analysis_exit):
-    job = _load_job_script()
     remote_root = tmp_path / "remote"
     jobid = "20260719-120000-deadbeef"
     jobdir = remote_root / "jobs" / jobid
@@ -131,12 +116,10 @@ def test_resubmit_failure_is_terminal_and_fail_closed(tmp_path, monkeypatch):
 
 
 def test_default_energies_span_all_seven_standard_beams():
-    job = _load_job_script()
     assert job.DEFAULT_ENERGIES == "30,50,100,150,200,250,300"
 
 
 def test_slice_payload_threads_brem_grid_stop():
-    job = _load_job_script()
     shell = job._slice_payload(
         "20260720-000000-abcdef01",
         slice_minutes=10.0,
@@ -150,7 +133,6 @@ def test_slice_payload_threads_brem_grid_stop():
 
 
 def test_metadata_records_brem_grid_stop():
-    job = _load_job_script()
     meta = job._metadata(
         "20260720-000000-abcdef01",
         slice_minutes=10.0,

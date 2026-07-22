@@ -137,7 +137,6 @@ SYNC_PATHS = [
     "scan.py",
     "reproduce_zhai.py",
     "checks",
-    "scripts/analyze_line_grid_bounds.py",
     "pyproject.toml",
     "uv.lock",
     "README.md",

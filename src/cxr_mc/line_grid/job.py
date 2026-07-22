@@ -49,7 +49,7 @@ def _slice_payload(
             "CXR_MC_FREE_WATERMARK_MB=15000",
             "CXR_MC_TIMING=1",
             shlex.quote(remote.REMOTE_UV),
-            "run --no-sync python scripts/analyze_line_grid_bounds.py",
+            "run --no-sync python -m cxr_mc.line_grid.derive",
             f"--grid-stop {grid_stop:g}",
             f"--brem-grid-stop {brem_grid_stop:g}",
             f"--energies {shlex.quote(energies)}",
@@ -180,8 +180,8 @@ def start(
     remote._stage_job_script(jobid, [], upload, script)
     scheduler_id = remote._submit_staged_job(jobid, [], nice=True)
     print(f"submitted SLURM job {scheduler_id} as {jobid}")
-    print(f"status: uv run python scripts/line_grid_bounds_job.py status {jobid}")
-    print(f"attach: uv run python scripts/line_grid_bounds_job.py attach {jobid}")
+    print(f"status: cxr line-grid status {jobid}")
+    print(f"attach: cxr line-grid attach {jobid}")
     return jobid
 
 
