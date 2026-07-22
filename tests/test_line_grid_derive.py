@@ -1,25 +1,13 @@
-import importlib.util
 import json
-import sys
-from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
-
-def _load_script(name):
-    path = Path(__file__).parents[1] / "scripts" / f"{name}.py"
-    spec = importlib.util.spec_from_file_location(name, path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+from cxr_mc.line_grid import derive as analyze
 
 
 def test_geometry_plan_is_full_curated_tilt_azimuth_product():
-    analyze = _load_script("analyze_line_grid_bounds")
     # Curated production grid (issue_notes.md #1): tilt in {5, 45}, azimuth in
     # {100, 140, 180}; polar=0 and azim=90 are excluded upstream.
     scan = SimpleNamespace(
@@ -39,7 +27,6 @@ def test_geometry_plan_is_full_curated_tilt_azimuth_product():
 
 
 def test_subset_resume_preserves_unrequested_checkpoint_rows(monkeypatch):
-    analyze = _load_script("analyze_line_grid_bounds")
     existing = [{"energy_keV": 30.0, "raw_eV": 1.0}]
     monkeypatch.setattr(
         analyze,
@@ -66,7 +53,6 @@ def test_subset_resume_preserves_unrequested_checkpoint_rows(monkeypatch):
 
 
 def test_budget_expiry_returns_tempfail_without_starting_next_energy(monkeypatch):
-    analyze = _load_script("analyze_line_grid_bounds")
     monkeypatch.setattr(
         analyze,
         "_scan_specs",
@@ -86,7 +72,6 @@ def test_budget_expiry_returns_tempfail_without_starting_next_energy(monkeypatch
 
 
 def test_budget_expiry_checkpoints_completed_phase(monkeypatch):
-    analyze = _load_script("analyze_line_grid_bounds")
     candidate = analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0, 500.0, 0.5)
     monkeypatch.setattr(analyze, "_scan_specs", lambda *args, **kwargs: [candidate])
     clock = iter([0.0, 0.0, 11.0])
@@ -107,7 +92,6 @@ def test_budget_expiry_checkpoints_completed_phase(monkeypatch):
 
 
 def test_resume_after_near_zero_does_not_rerun_completed_phase(monkeypatch):
-    analyze = _load_script("analyze_line_grid_bounds")
     candidate = analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0, 500.0, 0.5)
     calls = []
     monkeypatch.setattr(
@@ -131,7 +115,6 @@ def test_resume_after_near_zero_does_not_rerun_completed_phase(monkeypatch):
 
 
 def test_partial_phase_resume_starts_at_saved_geometry_cursor(monkeypatch):
-    analyze = _load_script("analyze_line_grid_bounds")
     candidate = analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0, 500.0, 0.5)
     seen = []
 
@@ -161,7 +144,6 @@ def test_partial_phase_resume_starts_at_saved_geometry_cursor(monkeypatch):
 
 
 def test_refine_phase_checkpoints_each_expensive_geometry():
-    analyze = _load_script("analyze_line_grid_bounds")
     calls = []
     snapshots = []
 
@@ -192,7 +174,6 @@ def test_refine_phase_checkpoints_each_expensive_geometry():
 
 
 def test_refine_phase_hands_off_after_one_case_overshoots_soft_budget():
-    analyze = _load_script("analyze_line_grid_bounds")
     calls = []
     snapshots = []
 
@@ -223,14 +204,12 @@ def test_refine_phase_hands_off_after_one_case_overshoots_soft_budget():
 
 
 def test_reduced_sampling_defaults_match_handoff():
-    analyze = _load_script("analyze_line_grid_bounds")
     assert analyze.COARSE_NE == 200
     assert analyze.REFINE_NE == 2000
     assert analyze.COARSE_ENGINE == "auto"
 
 
 def test_main_returns_tempfail_when_budget_leaves_work(monkeypatch):
-    analyze = _load_script("analyze_line_grid_bounds")
     # main() now drives derive_all_materials, not derive_bounds directly; an
     # incomplete run (complete=False) must still surface the exit-75 contract.
     monkeypatch.setattr(analyze, "derive_all_materials", lambda *args, **kwargs: ({}, False))
@@ -243,7 +222,6 @@ def test_build_case_passes_wide_brem_grid_to_diagnostic_sweep(monkeypatch):
     # The brem coverage channel must be measured on the WIDE diagnostic brem
     # grid, not the profile's 30 keV E_grid_brem -- otherwise a per-material
     # bespoke brem stop would be silently clipped to the narrow profile ceiling.
-    analyze = _load_script("analyze_line_grid_bounds")
     captured = {}
     real_sweep = analyze.material_sweep
 
@@ -266,7 +244,6 @@ def test_candidate_brem_channel_refuses_silent_truncation():
     # beyond the diagnostic ceiling and must raise, never clamp (issue_notes.md #1).
     from cxr_mc.line_grid.bounds import CoverageGridTooNarrow
 
-    analyze = _load_script("analyze_line_grid_bounds")
     E = np.arange(0.0, 100.0, 10.0)
     coherent = np.ones_like(E)
     truncated = np.zeros_like(E)
@@ -281,7 +258,6 @@ def test_derive_all_materials_produces_independent_per_material_output(monkeypat
     # Approach A: each material's rows come from its OWN single-material
     # derive_bounds call, so the driver is that material's own worst geometry --
     # not a single worst-case shared across all materials.
-    analyze = _load_script("analyze_line_grid_bounds")
 
     def fake_derive_bounds(materials, energies, *args, **kwargs):
         m = materials[0]
@@ -316,7 +292,6 @@ def test_derive_all_materials_produces_independent_per_material_output(monkeypat
 def test_derive_all_materials_skips_material_with_complete_checkpoint(monkeypatch, tmp_path):
     # A per-material checkpoint that already holds every requested energy must be
     # loaded, not recomputed: the coarse/refine scanners are never called.
-    analyze = _load_script("analyze_line_grid_bounds")
     monkeypatch.setattr(
         analyze,
         "_scan_specs",
@@ -347,7 +322,6 @@ def test_brem_grid_for_rows_covers_worst_energy_brem_stop():
     # One E_grid_brem per material must clear the widest-energy brem tail: the
     # max over the per-energy brem_stop_eV, reporting the raw of the row that set
     # it, at the production brem spacing.
-    analyze = _load_script("analyze_line_grid_bounds")
     rows = [
         {"energy_keV": 100.0, "brem_stop_eV": 5000.0, "brem_raw_eV": 4700.0},
         {"energy_keV": 300.0, "brem_stop_eV": 12000.0, "brem_raw_eV": 11500.0},

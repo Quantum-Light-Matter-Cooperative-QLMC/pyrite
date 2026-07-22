@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# scripts/analyze_line_grid_bounds.py
 """Empirically derive per-beam-energy line-grid upper bounds (``stop``) for
 the standard profile's ``E_grid_line_by_energy`` in
 ``src/cxr_mc/data/materials.toml``, from simulated coherent-line intensity
@@ -17,10 +15,9 @@ geometries is run through cxr_mc.montecarlo.runner.run_cases, which pipelines
 the independent per-geometry transports across a CPU worker pool instead of
 running them one at a time.
 
-    uv run python scripts/analyze_line_grid_bounds.py
-    uv run python scripts/analyze_line_grid_bounds.py --materials hopg,diamond --energies 30,50
-    uv run python scripts/analyze_line_grid_bounds.py --json-out /tmp/line_grid_bounds.json
-    uv run python scripts/analyze_line_grid_bounds.py --max-workers 12
+    python -m cxr_mc.line_grid.derive
+    python -m cxr_mc.line_grid.derive --materials hopg,diamond --energies 30,50
+    python -m cxr_mc.line_grid.derive --json-out /tmp/line_grid_bounds.json
 """
 
 from __future__ import annotations
