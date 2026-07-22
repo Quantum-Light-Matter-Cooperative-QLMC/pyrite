@@ -549,6 +549,33 @@ def _available_mem_mb():
     return psutil.virtual_memory().available // 1_000_000
 
 
+def _mem_worker_cap():
+    """Max workers host RAM allows at ``_WORKER_MEM_MB`` each.
+
+    ``min(MemAvailable, 0.85 * MemTotal) // _WORKER_MEM_MB``. Binds BOTH worker
+    pools (full-case CPU pool and GPU-pipeline transport pool) so neither can
+    oversubscribe host RAM and re-create the 2026-07-18 qlmc OOM, where the
+    kernel killed one worker and ``BrokenProcessPool`` lost the whole run."""
+    return min(_available_mem_mb(), int(_TOTAL_MEM * 0.85)) // _WORKER_MEM_MB
+
+
+def _gpu_pipeline_workers(max_workers, n):
+    """Size the GPU-pipeline transport pool (transport-only workers feeding the
+    serial GPU). Auto = ~half the physical cores (transport is the tail); an
+    explicit request is honored. BOTH are then clamped by ``_mem_worker_cap()``
+    -- the transport pool spawns full worker processes just like the CPU pool,
+    so without the cap ``ncpu // 2`` workers OOM'd a worker at pool startup and
+    the first ``submit`` raised ``BrokenProcessPool`` (the CPU pool got this cap
+    in the 2026-07-18 fix; this path had been missing it). Returns the worker
+    count; the caller drops to serial below 2."""
+    if max_workers is None:
+        ncpu = _N_CPUS or 8
+        nw = max(2, min(n, ncpu // 2))
+    else:
+        nw = min(max_workers, n)
+    return min(nw, _mem_worker_cap())
+
+
 def _cpu_pool_workers(max_workers, n):
     """Size the full-case CPU pool, capped so it cannot oversubscribe host RAM.
 
@@ -576,7 +603,7 @@ def _cpu_pool_workers(max_workers, n):
     else:
         _max_allowed_workers = 6
 
-    worker_cap = min(_available_mem_mb(), int(_TOTAL_MEM * 0.85)) // _WORKER_MEM_MB
+    worker_cap = _mem_worker_cap()
     if max_workers is None:
         max_workers = _max_allowed_workers
     return max(1, min(max_workers, worker_cap, n))
@@ -698,11 +725,9 @@ def run_cases(
     if use_gpu:
         if max_workers == 0:
             return _serial()
-        if max_workers is None:
-            ncpu = os.process_cpu_count() or os.cpu_count() or 8
-            nw = max(2, min(n, ncpu // 2))  # ~physical cores; transport is the tail
-        else:
-            nw = min(max_workers, n)
+        # RAM-capped (_mem_worker_cap): an uncapped ncpu//2 transport pool OOM'd
+        # a worker at pool startup on the box -> BrokenProcessPool lost the run.
+        nw = _gpu_pipeline_workers(max_workers, n)
         if nw < 2:
             return _serial()
         _single_thread_blas()

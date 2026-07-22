@@ -568,6 +568,36 @@ def test_run_cases_cpu_pool_receives_the_capped_worker_count(monkeypatch):
     assert _SyncProcessPoolExecutor.captured["max_workers"] == 6
 
 
+# ---- _gpu_pipeline_workers memory-aware sizing -------------------------------
+# The GPU-pipeline transport pool spawns full worker processes just like the CPU
+# pool, but originally sized them as ncpu//2 with no RAM cap. On qlmc that OOM'd
+# a worker at pool startup and the first submit raised BrokenProcessPool, losing
+# the whole hopg scan (exit 1). The cap now binds this path too.
+
+
+def test_gpu_pipeline_workers_autosize_is_memory_bound_on_qlmc_shape(monkeypatch):
+    """32 cores would ask for ncpu // 2 = 16 transport workers; RAM carries 6."""
+    runner = _patch_host(monkeypatch)
+    assert runner._gpu_pipeline_workers(None, 980) == 6
+
+
+def test_gpu_pipeline_workers_autosize_is_cpu_bound_with_ample_ram(monkeypatch):
+    runner = _patch_host(monkeypatch, avail_mb=1_000_000, total_mb=1_000_000)
+    assert runner._gpu_pipeline_workers(None, 980) == 16  # ncpu // 2
+
+
+def test_gpu_pipeline_workers_pin_is_clamped_by_memory(monkeypatch):
+    """An explicit --max-workers pin cannot re-create the OOM either."""
+    runner = _patch_host(monkeypatch)
+    assert runner._gpu_pipeline_workers(16, 980) == 6
+
+
+def test_gpu_pipeline_workers_degrades_to_serial_under_memory_pressure(monkeypatch):
+    """Cap rounds to 0/1 -> caller sees < 2 and drops to serial, never OOMs."""
+    runner = _patch_host(monkeypatch, avail_mb=1_000, total_mb=1_000)
+    assert runner._gpu_pipeline_workers(None, 980) < 2
+
+
 # ---- _adaptive_chunk grid-aware sizing (2026-07-18 OOM fix, part 2) ---------
 # The fixed spec/brem chunk defaults were tuned on the old ~2000-bin line grid;
 # widening the grid to 30000 eV (~6000 bins) silently tripled the (chunk, nbins)
