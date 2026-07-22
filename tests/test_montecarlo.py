@@ -307,6 +307,56 @@ def test_all_missed_entries_return_typed_empty_segment_arrays():
     assert segs["layer"].dtype == np.dtype("int16")
 
 
+def test_grazing_incidence_projects_beam_off_finite_sample():
+    # A 1 mm beam sits well inside a 5 mm sample at normal incidence (no
+    # misses). At 89 deg tilt the entry spot stretches by 1/cos(89 deg) ~ 57x
+    # along the tilt azimuth, overfilling the 5 mm sample, so most of the beam
+    # now lands off the tilted face and is counted as missed -- the geometric
+    # overlap loss that competes with the 1/cos path-length yield enhancement.
+    from cxr_mc.montecarlo.geometry import tilted_geometry
+
+    cp = crystal_params("hbn")
+    kw = dict(
+        composition=cp["composition"],
+        seed=11,
+        elastic_model="sr",
+        max_steps=1,
+        beam_fwhm_mm=1.0,
+        crystal_width_mm=5.0,
+        crystal_height_mm=5.0,
+    )
+    beam0, _ = tilted_geometry(np.deg2rad(20.0), 0.0, 0.0)
+    beam89, _ = tilted_geometry(np.deg2rad(20.0), np.deg2rad(89.0), 0.0)
+    normal = simulate_trajectories(
+        30.0, 4000, 100.0, beam_dir=beam0, tilt_polar_rad=0.0, tilt_azim_rad=0.0, **kw
+    )
+    grazing = simulate_trajectories(
+        30.0, 4000, 100.0, beam_dir=beam89, tilt_polar_rad=np.deg2rad(89.0), tilt_azim_rad=0.0, **kw
+    )
+    assert normal["n_missed"] == 0
+    assert grazing["n_missed"] > 3000
+    assert grazing["Ne"] == 4000  # misses stay in Ne (per-incident normalization)
+
+
+def test_grazing_projection_identity_at_normal_incidence_is_bitwise():
+    # tilt_polar_rad=0 makes project_beam_entry the identity, so passing the new
+    # tilt kwargs leaves every beam_fwhm_mm result bit-for-bit.
+    cp = crystal_params("hbn")
+    kw = dict(
+        composition=cp["composition"],
+        seed=5,
+        elastic_model="sr",
+        max_steps=5,
+        beam_fwhm_mm=1.0,
+        crystal_width_mm=5.0,
+        crystal_height_mm=5.0,
+    )
+    a = simulate_trajectories(30.0, 60, 100.0, **kw)
+    b = simulate_trajectories(30.0, 60, 100.0, tilt_polar_rad=0.0, tilt_azim_rad=0.0, **kw)
+    for key in ("r_mid", "v_hat", "L_ang", "E_keV", "elec_id"):
+        assert np.array_equal(a[key], b[key]), key
+
+
 def test_omitted_footprint_is_bitwise_legacy_transport():
     cp = crystal_params("hbn")
     kw = dict(composition=cp["composition"], seed=19, elastic_model="sr", max_steps=5)

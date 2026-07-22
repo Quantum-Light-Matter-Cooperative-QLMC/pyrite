@@ -25,6 +25,7 @@ from .geometry import (
     Z_MAX,
     Z_MIN,
     first_prism_exit,
+    project_beam_entry,
     validate_transverse_dimensions,
 )
 
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 MOTT_DIR = str(DATA_DIR / "mott_transport_cross_sections")
 A0_SQ_CM2 = 2.8002852e-17  # Bohr radius squared [cm^2] (NIST SRD 64 unit)
+
 
 def beta_from_keV(E_keV):
     g = 1.0 + E_keV / 510.99895
@@ -203,6 +205,8 @@ def simulate_trajectories(
     beam_fwhm_mm=None,
     crystal_width_mm=None,
     crystal_height_mm=None,
+    tilt_polar_rad=0.0,
+    tilt_azim_rad=0.0,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -241,8 +245,12 @@ def simulate_trajectories(
     azimuthally-symmetric Gaussian spot of the given FULL WIDTH AT HALF MAXIMUM
     [mm] (same FWHM convention as mosaic_fwhm_rad / eds_fwhm_eV / aperture_fwhm_eV
     elsewhere in this package). Each electron's entry point is drawn independently
-    as x0, y0 ~ Normal(0, sigma), sigma = beam_fwhm_mm / (2 sqrt(2 ln 2)), and
-    used as its initial transverse position. With a laterally infinite crystal,
+    as x0, y0 ~ Normal(0, sigma), sigma = beam_fwhm_mm / (2 sqrt(2 ln 2)) in the
+    LAB plane perpendicular to the fixed beam axis, then PROJECTED onto the
+    tilted sample entrance face by geometry.project_beam_entry (the spot
+    stretches by 1/cos(tilt_polar) along the tilt azimuth). At tilt_polar_rad=0
+    the projection is the identity, so the entry is x0, y0 exactly. The result is
+    used as the electron's initial transverse position. With a laterally infinite crystal,
     this rigidly translates the whole trajectory; beam_dir, common to the whole
     beam, is unaffected. None (default) is a strict no-op -- the old point-source
     (delta-function) beam entering at the origin, BIT-FOR-BIT. Limiting case:
@@ -280,13 +288,21 @@ def simulate_trajectories(
     capped at the smallest positive ray boundary solution ``p + s d`` on a
     prism face; this assumes an axis-aligned rectangular footprint.
 
+    tilt_polar_rad, tilt_azim_rad: sample tilt (Zhai convention, same angles
+    passed to :func:`geometry.tilted_geometry`) used ONLY to project the
+    ``beam_fwhm_mm`` Gaussian spot onto the tilted entrance face via
+    :func:`geometry.project_beam_entry`. Both default to 0 (normal incidence),
+    making the projection the identity and leaving every ``beam_fwhm_mm`` result
+    bit-for-bit. They have no effect when ``beam_fwhm_mm`` is None.
+
     Returns dict of per-segment arrays:
       "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
       "t_ang" (M,), "elec_id" (M,), "layer" (M,) [emitting layer index]
     and diagnostics: "n_backscattered", "n_transmitted", "n_side_exited",
     "n_missed", "n_stopped", "n_layers".
 
-    Validation: electron-transport, finite-beam-size, finite-transverse-crystal
+    Validation: electron-transport, finite-beam-size, finite-transverse-crystal,
+    grazing-beam-projection
     """
     width_mm, height_mm = validate_transverse_dimensions(
         crystal_width_mm, crystal_height_mm, unit="mm"
@@ -347,7 +363,11 @@ def simulate_trajectories(
         MM_TO_ANG = 1.0e7
         sigma_ang = float(beam_fwhm_mm) * MM_TO_ANG / (2.0 * np.sqrt(2.0 * np.log(2.0)))
         beam_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(2)[1])
-        pos[:, :2] = beam_rng.normal(0.0, sigma_ang, size=(Ne, 2))
+        offsets = beam_rng.normal(0.0, sigma_ang, size=(Ne, 2))
+        # Project the lab-frame Gaussian spot onto the tilted sample entrance
+        # face (grazing-incidence footprint elongation). tilt=0 -> (u, v)
+        # bit-for-bit, so the untilted beam draw is unchanged.
+        pos[:, :2] = project_beam_entry(offsets, tilt_polar_rad, tilt_azim_rad)
     if beam_dir is None:
         beam_dir = np.array([0.0, 0.0, 1.0])
     beam_dir = np.asarray(beam_dir, dtype=float)

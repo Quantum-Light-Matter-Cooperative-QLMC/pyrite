@@ -9,6 +9,7 @@ from cxr_mc.montecarlo.geometry import (
     Z_MAX,
     Z_MIN,
     first_prism_exit,
+    project_beam_entry,
     validate_transverse_dimensions,
 )
 
@@ -59,6 +60,32 @@ def test_first_prism_exit_ignores_parallel_faces_and_falls_back_to_slab():
     )
     np.testing.assert_allclose(distance, [4.0, 6.0])
     assert face.tolist() == [Z_MIN, Z_MAX]
+
+
+def test_project_beam_entry_normal_incidence_is_identity():
+    offsets = np.array([[1.0, 2.0], [-3.0, 0.5], [0.0, 0.0]])
+    entry = project_beam_entry(offsets, 0.0, 0.0)
+    np.testing.assert_array_equal(entry, offsets)
+
+
+@pytest.mark.parametrize("tilt_deg", [30.0, 60.0, 89.0])
+def test_project_beam_entry_stretches_inplane_by_one_over_cos(tilt_deg):
+    theta = np.deg2rad(tilt_deg)
+    # azimuth 0 puts the tilt in the x-z (scattering) plane: an in-plane (u, 0)
+    # offset stretches by 1/cos(theta); an out-of-plane (0, v) offset is
+    # unchanged (grazing-incidence footprint elongation along the tilt azimuth).
+    entry = project_beam_entry(np.array([[1.0, 0.0], [0.0, 1.0]]), theta, 0.0)
+    np.testing.assert_allclose(entry[0], [1.0 / np.cos(theta), 0.0], atol=1e-9)
+    np.testing.assert_allclose(entry[1], [0.0, 1.0], atol=1e-9)
+
+
+def test_project_beam_entry_stretch_axis_follows_azimuth():
+    # azimuth 90 deg rotates the tilt into the y-z plane: now the (0, v) offset
+    # is the one that stretches by 1/cos, and (u, 0) is unchanged.
+    theta = np.deg2rad(60.0)
+    entry = project_beam_entry(np.array([[1.0, 0.0], [0.0, 1.0]]), theta, np.deg2rad(90.0))
+    np.testing.assert_allclose(entry[0], [1.0, 0.0], atol=1e-9)
+    np.testing.assert_allclose(entry[1], [0.0, 1.0 / np.cos(theta)], atol=1e-9)
 
 
 @pytest.mark.parametrize(("width", "height"), [(None, 1.0), (1.0, None), (0.0, 1.0), (-1.0, 1.0)])

@@ -294,11 +294,9 @@ def _transport_case(case):
         E_grid = decode_energy_grid(case["E_grid"])
         step_b = case.get("brem_step_eV", 10.0)
         E_brem = np.arange(E_grid[0], E_grid[-1] + step_b, step_b)
-    beam, n_hat = tilted_geometry(
-        case["theta_obs_rad"],
-        np.deg2rad(case.get("tilt_deg", 0.0)),
-        np.deg2rad(case.get("tilt_azim_deg", 0.0)),
-    )
+    tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
+    tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
+    beam, n_hat = tilted_geometry(case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad)
     # film-on-substrate stack drives multilayer transport too (substrate
     # backscatter / substrate brem); None -> single-material slab (unchanged).
     layers = case.get("abs_layers")
@@ -315,6 +313,8 @@ def _transport_case(case):
         beam_fwhm_mm=beam_fwhm_mm,
         crystal_width_mm=case.get("crystal_width_mm"),
         crystal_height_mm=case.get("crystal_height_mm"),
+        tilt_polar_rad=tilt_polar_rad,
+        tilt_azim_rad=tilt_azim_rad,
     )
     segs_b = simulate_trajectories(
         case["E0_keV"],
@@ -328,6 +328,8 @@ def _transport_case(case):
         beam_fwhm_mm=beam_fwhm_mm,
         crystal_width_mm=case.get("crystal_width_mm"),
         crystal_height_mm=case.get("crystal_height_mm"),
+        tilt_polar_rad=tilt_polar_rad,
+        tilt_azim_rad=tilt_azim_rad,
     )
     tp: dict[str, Any] = dict(E_grid=E_grid, E_brem=E_brem, n_hat=n_hat, segs=segs, segs_b=segs_b)
     if _TIMING:
@@ -383,11 +385,9 @@ def _brem_for_case(case, E_brem):
     no per-layer sum, ``brem_chunk`` ignored -- silently dropping substrate
     backscatter/brem and cross-stack absorption on stacked/multilayer records."""
     abs_layers = case.get("abs_layers")
-    beam, n_hat = tilted_geometry(
-        case["theta_obs_rad"],
-        np.deg2rad(case.get("tilt_deg", 0.0)),
-        np.deg2rad(case.get("tilt_azim_deg", 0.0)),
-    )
+    tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
+    tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
+    beam, n_hat = tilted_geometry(case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad)
     segs_b = simulate_trajectories(
         case["E0_keV"],
         case["Ne_brem"],
@@ -400,6 +400,8 @@ def _brem_for_case(case, E_brem):
         beam_fwhm_mm=case.get("beam_fwhm_mm"),
         crystal_width_mm=case.get("crystal_width_mm"),
         crystal_height_mm=case.get("crystal_height_mm"),
+        tilt_polar_rad=tilt_polar_rad,
+        tilt_azim_rad=tilt_azim_rad,
     )
     return _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers)
 

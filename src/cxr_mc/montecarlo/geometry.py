@@ -142,6 +142,56 @@ def tilted_geometry(theta_obs_rad, tilt_polar_rad, tilt_azim_rad=0.0):
     return beam_dir, n_hat
 
 
+def project_beam_entry(offsets_uv, tilt_polar_rad, tilt_azim_rad=0.0):
+    """Sample-frame (x, y) entry points on the z=0 face for a COLLIMATED lab beam.
+
+    ``offsets_uv`` is an ``(N, 2)`` array of transverse offsets ``(u, v)`` [Ang]
+    of each electron in the LAB plane perpendicular to the fixed beam axis
+    ``+z_lab`` (e.g. Gaussian beam-spot draws). The lab beam is a parallel
+    bundle: ray i starts at ``o_lab = (u_i, v_i, 0)`` and travels along
+    ``+z_lab``. Mapping into the sample frame uses the SAME tilt rotation
+    ``R = _rotation_between(+z, normal_lab)`` as :func:`tilted_geometry`
+    (``o_sample = R.T @ o_lab``; ``beam_dir = R.T @ +z_lab``), then intersects
+    each ray with the sample entrance face ``z = 0``:
+
+        s* = -o_sample_z / beam_dir_z,    p0 = o_sample + s* beam_dir   (p0_z = 0)
+
+    Geometric content: the incident spot on the tilted face stretches by
+    ``1 / cos(tilt_polar)`` along the tilt azimuth (the grazing-incidence
+    footprint elongation), while the perpendicular extent is unchanged. Feeding
+    the stretched entry points to the finite-footprint test in
+    :func:`simulate_trajectories` makes an off-sample tail at grazing incidence
+    register as ``n_missed`` -- the overlap loss that competes with the
+    ``1/cos`` path-length yield enhancement.
+
+    Source: elementary ray-plane intersection (no literature equation).
+    Assumptions: perfectly collimated lab beam (zero divergence); the sample
+    entrance face is the plane ``z = 0`` in the sample frame; an electron whose
+    projected entry lands outside the transverse footprint misses the sample
+    (handled by the caller, kept in ``Ne``).
+    Limiting case: ``tilt_polar_rad = 0`` gives ``R = I``, so ``p0 = (u, v)``
+    exactly -- the untilted isotropic entry, bit-for-bit.
+
+    Validation: grazing-beam-projection
+    """
+    offsets_uv = np.asarray(offsets_uv, dtype=float)
+    if not tilt_polar_rad:
+        # R = I: the lab transverse plane IS the sample z=0 face; no projection.
+        return offsets_uv.copy()
+    st, ct = np.sin(tilt_polar_rad), np.cos(tilt_polar_rad)
+    normal_lab = np.array([st * np.cos(tilt_azim_rad), st * np.sin(tilt_azim_rad), ct])
+    Rt = _rotation_between(np.array([0.0, 0.0, 1.0]), normal_lab).T
+    e_x, e_y, beam_dir = Rt[:, 0], Rt[:, 1], Rt[:, 2]
+    # sample-frame origin of each lab ray = its transverse offset carried into
+    # the sample frame (the ray then continues along beam_dir).
+    o = offsets_uv[:, 0:1] * e_x + offsets_uv[:, 1:2] * e_y  # (N, 3)
+    s_star = -o[:,2] / beam_dir[2]
+    p0 = o + s_star[:, None] * beam_dir
+    # entrance face ``z = 0`` and return the (N, 2) sample-frame (x, y) entry
+    # points. Solve for s* that zeroes the z-component, form p0, drop z.
+    return p0[:, :2]
+
+
 def detector_directions(
     theta_obs_rad,
     tilt_polar_rad=0.0,
