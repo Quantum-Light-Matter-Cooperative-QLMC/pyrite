@@ -1,0 +1,8 @@
+# managed by `cxr line-grid defaults --set`; edit via CLI, not by hand
+
+tilts = []
+azimuths = []
+thickness_ang = [10000000.0]
+energies = [30, 40, 50, 60, 100, 150, 200, 250, 300]
+materials = ["hopg", "diamond", "wse2", "mose2"]
+brem_step_ev = 25.0
