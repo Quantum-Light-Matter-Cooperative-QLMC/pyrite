@@ -96,22 +96,44 @@ combined `json_out` from qlmc, so the JSON is never touched by hand either.
 
 ## Module layout
 
-- New `src/cxr_mc/line_grid.py` — houses the CLI (`add_subparser`, `_cli_*`
-  handlers), the `apply` merge/write-back logic, and `set`/`show`. Delegates job
-  management to `remote.py` and derivation to the existing analysis module.
-- The **derivation logic** (`derive_all_materials` etc.) stays where it is
-  importable; the script file remains because the SLURM payload invokes
-  `scripts/analyze_line_grid_bounds.py` **by path on qlmc**. Both scripts are
-  therefore **kept as thin shims** that import and call into the module. This:
-  - preserves the remote SLURM invocation path (`uv run python
-    scripts/analyze_line_grid_bounds.py …`) unchanged,
-  - keeps `tests/test_line_grid_bounds_job.py` and
-    `tests/test_analyze_line_grid_bounds.py` entry points valid.
-- To avoid a two-home split, the submit/job-script builder currently in
-  `scripts/line_grid_bounds_job.py` moves into `src/cxr_mc/line_grid.py`; the
-  script shim calls it. The derivation stays in
-  `scripts/analyze_line_grid_bounds.py` (path-invoked remotely) with its
-  reusable functions imported by the module where needed.
+Both scripts move **fully** into `src/cxr_mc/`, matching the repo convention
+that every subcommand impl lives there (`remote.py`, `scan.py`, `export.py`,
+`line_grid_bounds.py`); `scripts/` keeps only `dev.py`. New `line_grid` package:
+
+```
+src/cxr_mc/line_grid/
+  __init__.py    # add_subparser + _cli_* handlers (the cxr line-grid group)
+  derive.py      # derivation, from scripts/analyze_line_grid_bounds.py
+  job.py         # remote submit + SLURM job-script builder, from scripts/line_grid_bounds_job.py
+  apply.py       # materials.toml write-back; set / set-brem / show
+  defaults.py    # line_grid_defaults.toml read/write
+  golden.py      # regen-golden (independent serializer)
+```
+
+`__init__.py` delegates job management to `remote.py` (status/attach/logs/stop)
+and calls `derive`/`job`/`apply` for the rest. The existing math helpers in
+`src/cxr_mc/line_grid_bounds.py` (`coverage_energy`, `margined_stop`,
+`spacing_num`) fold into the package as `line_grid/bounds.py` (rename; update its
+importers).
+
+**Scripts deleted**: `scripts/line_grid_bounds_job.py` and
+`scripts/analyze_line_grid_bounds.py` are removed. Two consequences to handle:
+
+1. **Remote SLURM payload** (`job.py`'s `_slice_payload`) currently runs
+   `uv run --no-sync python scripts/analyze_line_grid_bounds.py …` **by path on
+   qlmc**. It switches to invoking the installed module —
+   `uv run --no-sync python -m cxr_mc.line_grid.derive …` (same repo is synced to
+   qlmc, so the module is importable). The derive module keeps a
+   `python -m cxr_mc.line_grid.derive` entry (`__main__` / `main(argv)`) with the
+   identical CLI flags the payload passes.
+2. **Tests**: `tests/test_line_grid_bounds_job.py` and
+   `tests/test_analyze_line_grid_bounds.py` update their imports from
+   `scripts...` to `cxr_mc.line_grid.job` / `cxr_mc.line_grid.derive`; behaviour
+   assertions unchanged. Rename the test files to match if that follows repo
+   convention.
+
+`cxr line-grid derive` (local) and `python -m cxr_mc.line_grid.derive` (remote
+payload) share the same `derive.main`, so local and remote runs stay identical.
 
 ## `apply` write-back — surgical block regeneration
 
@@ -295,5 +317,7 @@ the dev-tooling surface next to `lint`/`format`/`verify`.
   mis-parse. Mitigation: after every write, re-load the catalog and fail if it
   doesn't parse or a targeted material's resolved grid doesn't match intent.
 - **Golden churn**: schema addition forces golden regen. Contained, expected.
-- **Remote path coupling**: derivation stays path-invoked on qlmc; shim keeps
-  that stable.
+- **Remote invocation switch**: the SLURM payload moves from a path-invoked
+  script to `python -m cxr_mc.line_grid.derive`. Mitigation: keep the module's
+  CLI flags byte-identical to the old script's; a `--dry-run` submit asserts the
+  generated payload command in tests before any live qlmc run.
