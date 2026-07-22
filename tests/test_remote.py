@@ -15,6 +15,7 @@ from types import SimpleNamespace
 import pytest
 
 from cxr_mc import remote
+from cxr_mc._remote import cli, config, lifecycle, scripts, state, transport, viewer  # noqa: F401
 
 
 def test_check_materials_accepts_crystal_keys():
@@ -98,7 +99,7 @@ def test_submit_command_uses_sbatch_parsable_and_records_scheduler_id():
 def test_same_second_starters_use_unique_exclusive_job_directories(monkeypatch):
     """Two submitters must not overwrite a shared second-resolution job dir."""
 
-    real_datetime = remote.datetime.datetime
+    real_datetime = scripts.datetime.datetime
 
     class FixedDatetime:
         @classmethod
@@ -107,21 +108,21 @@ def test_same_second_starters_use_unique_exclusive_job_directories(monkeypatch):
 
     suffixes = iter(["a" * 32, "b" * 32])
     uploads = []
-    monkeypatch.setattr(remote.datetime, "datetime", FixedDatetime)
+    monkeypatch.setattr(scripts.datetime, "datetime", FixedDatetime)
     monkeypatch.setattr(
-        remote,
+        scripts,
         "uuid",
         SimpleNamespace(uuid4=lambda: SimpleNamespace(hex=next(suffixes))),
         raising=False,
     )
-    monkeypatch.setattr(remote, "_refuse_if_busy", lambda *_args: None)
-    monkeypatch.setattr(remote, "_run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(transport, "_run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
-        remote.subprocess,
+        transport.subprocess,
         "run",
         lambda command, **_kwargs: uploads.append(command) or SimpleNamespace(returncode=0),
     )
-    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "48291\n")
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "48291\n")
 
     first = remote.start_queue(["hopg"], no_sync=True)
     second = remote.start_queue(["hbn"], no_sync=True)
@@ -135,7 +136,7 @@ def test_same_second_starters_use_unique_exclusive_job_directories(monkeypatch):
 
 def test_checkpoint_reservation_rejects_a_second_stager_for_the_same_stem(monkeypatch, tmp_path):
     """The remote ``mkdir`` lock closes the gap between a busy check and sbatch."""
-    monkeypatch.setattr(remote, "REMOTE_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
 
     first = subprocess.run(
         ["bash", "-c", remote._reserve_checkpoint_stems_command("first", ["hopg"])],
@@ -182,7 +183,7 @@ def test_submit_command_with_reservations_is_valid_bash(monkeypatch, tmp_path):
     fake_sbatch = tmp_path / "sbatch"
     fake_sbatch.write_text("#!/bin/sh\nprintf '48291\\n'\n")
     fake_sbatch.chmod(0o755)
-    monkeypatch.setattr(remote, "REMOTE_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
     env = os.environ.copy()
     env["PATH"] = f"{tmp_path}:{env['PATH']}"
 
@@ -200,9 +201,9 @@ def test_submit_command_with_reservations_is_valid_bash(monkeypatch, tmp_path):
 
 def test_stop_waits_for_scheduler_cancellation_before_releasing_reservations(monkeypatch):
     commands = []
-    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "48291\n")
-    monkeypatch.setattr(remote, "_slurm_state", lambda _scheduler_id: "RUNNING")
-    monkeypatch.setattr(remote, "_run", lambda command, **_kwargs: commands.append(command))
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "48291\n")
+    monkeypatch.setattr(state, "_slurm_state", lambda _scheduler_id: "RUNNING")
+    monkeypatch.setattr(transport, "_run", lambda command, **_kwargs: commands.append(command))
 
     remote._stop_jobid("j")
 
@@ -229,9 +230,9 @@ def test_stop_retains_reservations_if_squeue_cancellation_query_fails(monkeypatc
     (commands / "scancel").chmod(0o755)
     (commands / "squeue").chmod(0o755)
 
-    monkeypatch.setattr(remote, "REMOTE_DIR", str(tmp_path))
-    monkeypatch.setattr(remote, "_slurm_job_id", lambda _jobid: "48291")
-    monkeypatch.setattr(remote, "_slurm_state", lambda _scheduler_id: "RUNNING")
+    monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
+    monkeypatch.setattr(state, "_slurm_job_id", lambda _jobid: "48291")
+    monkeypatch.setattr(state, "_slurm_state", lambda _scheduler_id: "RUNNING")
 
     def run_remote(command, **_kwargs):
         subprocess.run(
@@ -240,7 +241,7 @@ def test_stop_retains_reservations_if_squeue_cancellation_query_fails(monkeypatc
             env={**os.environ, "PATH": f"{commands}:{os.environ['PATH']}"},
         )
 
-    monkeypatch.setattr(remote, "_run", run_remote)
+    monkeypatch.setattr(transport, "_run", run_remote)
 
     with pytest.raises(subprocess.CalledProcessError):
         remote._stop_jobid("j")
@@ -251,19 +252,19 @@ def test_stop_retains_reservations_if_squeue_cancellation_query_fails(monkeypatc
 
 def test_remote_dry_run_describes_sbatch_submission(monkeypatch, capsys):
     monkeypatch.setattr(
-        remote,
+        lifecycle,
         "_refuse_if_busy",
         lambda *_args: pytest.fail("dry-run must not check busy"),
     )
-    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("dry-run must not sync"))
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("dry-run must not sync"))
     monkeypatch.setattr(
-        remote.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
+        transport.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
     )
     monkeypatch.setattr(
-        remote, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh")
+        transport, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh")
     )
     monkeypatch.setattr(
-        remote, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
+        transport, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
     )
 
     remote.start_queue(["hopg"], dry_run=True)
@@ -276,19 +277,19 @@ def test_remote_dry_run_describes_sbatch_submission(monkeypatch, capsys):
 
 def test_chunked_dry_run_emits_chain_script(monkeypatch, capsys):
     monkeypatch.setattr(
-        remote,
+        lifecycle,
         "_refuse_if_busy",
         lambda *_args: pytest.fail("dry-run must not check busy"),
     )
-    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("dry-run must not sync"))
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("dry-run must not sync"))
     monkeypatch.setattr(
-        remote.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
+        transport.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
     )
     monkeypatch.setattr(
-        remote, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh")
+        transport, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh")
     )
     monkeypatch.setattr(
-        remote, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
+        transport, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
     )
 
     remote.start_queue(["hopg"], dry_run=True)  # chunked is the default
@@ -312,19 +313,19 @@ def test_chunked_dry_run_emits_chain_script(monkeypatch, capsys):
 
 def test_chunk_minutes_zero_emits_monolithic_script(monkeypatch, capsys):
     monkeypatch.setattr(
-        remote,
+        lifecycle,
         "_refuse_if_busy",
         lambda *_args: pytest.fail("dry-run must not check busy"),
     )
-    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("dry-run must not sync"))
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("dry-run must not sync"))
     monkeypatch.setattr(
-        remote.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
+        transport.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
     )
     monkeypatch.setattr(
-        remote, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh")
+        transport, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh")
     )
     monkeypatch.setattr(
-        remote, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
+        transport, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
     )
 
     remote.start_queue(["hopg"], dry_run=True, chunk_minutes=0)
@@ -342,19 +343,19 @@ def test_parallel_materials_rejected_in_chunked_mode(monkeypatch):
 
 def test_cli_start_chunk_flags(monkeypatch, capsys):
     monkeypatch.setattr(
-        remote,
+        lifecycle,
         "_refuse_if_busy",
         lambda *_args: pytest.fail("dry-run must not check busy"),
     )
-    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("dry-run must not sync"))
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("dry-run must not sync"))
     monkeypatch.setattr(
-        remote.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
+        transport.subprocess, "run", lambda *args, **kwargs: pytest.fail("dry-run must not ssh")
     )
     monkeypatch.setattr(
-        remote, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh")
+        transport, "_ssh_capture", lambda _command: pytest.fail("dry-run must not ssh")
     )
     monkeypatch.setattr(
-        remote, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
+        transport, "_run", lambda *_args, **_kwargs: pytest.fail("dry-run must not ssh")
     )
 
     remote.main(
@@ -369,15 +370,15 @@ def test_cli_start_chunk_flags(monkeypatch, capsys):
 def test_start_writes_static_metadata_before_sbatch(monkeypatch):
     uploads = []
     submissions = []
-    monkeypatch.setattr(remote, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
     monkeypatch.setattr(
-        remote.subprocess,
+        transport.subprocess,
         "run",
         lambda *args, **kwargs: uploads.append((args, kwargs)),
     )
-    monkeypatch.setattr(remote, "_run", lambda command, **_kwargs: submissions.append(command))
+    monkeypatch.setattr(transport, "_run", lambda command, **_kwargs: submissions.append(command))
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda command: submissions.append(["ssh", "-n", remote.HOST, command]) or "48291\n",
     )
@@ -408,13 +409,13 @@ def test_real_chunked_submission_carries_the_nice_flag(monkeypatch):
     command itself, so the courtesy flag has to survive that hop too."""
     uploads = []
     submissions = []
-    monkeypatch.setattr(remote, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
     monkeypatch.setattr(
-        remote.subprocess, "run", lambda *args, **kwargs: uploads.append((args, kwargs))
+        transport.subprocess, "run", lambda *args, **kwargs: uploads.append((args, kwargs))
     )
-    monkeypatch.setattr(remote, "_run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(transport, "_run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
-        remote, "_ssh_capture", lambda command: submissions.append(command) or "48291\n"
+        transport, "_ssh_capture", lambda command: submissions.append(command) or "48291\n"
     )
 
     remote.start_queue(["hopg"], no_sync=True)  # chunked is the default
@@ -426,10 +427,10 @@ def test_real_chunked_submission_carries_the_nice_flag(monkeypatch):
 
 
 def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
-    monkeypatch.setattr(remote, "_refuse_if_busy", lambda *_args: None)
-    monkeypatch.setattr(remote.subprocess, "run", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(remote, "_run", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "48291\n")
+    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(transport.subprocess, "run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(transport, "_run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "48291\n")
 
     remote.start_queue(["hopg"], no_sync=True)
 
@@ -443,14 +444,14 @@ def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
 
 def test_interrupted_job_upload_releases_its_checkpoint_reservations(monkeypatch):
     commands = []
-    monkeypatch.setattr(remote, "_refuse_if_busy", lambda *_args: None)
-    monkeypatch.setattr(remote, "_run", lambda command, **_kwargs: commands.append(command))
+    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(transport, "_run", lambda command, **_kwargs: commands.append(command))
     monkeypatch.setattr(
-        remote.subprocess,
+        transport.subprocess,
         "run",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(KeyboardInterrupt),
     )
-    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: pytest.fail("must not submit"))
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: pytest.fail("must not submit"))
 
     with pytest.raises(KeyboardInterrupt):
         remote.start_queue(["hopg"], no_sync=True)
@@ -463,9 +464,9 @@ def test_interrupted_job_upload_releases_its_checkpoint_reservations(monkeypatch
 def test_ambiguous_submit_failure_inspects_queued_state_and_keeps_reservations(monkeypatch):
     commands = []
     captures = []
-    monkeypatch.setattr(remote, "_refuse_if_busy", lambda *_args: None)
-    monkeypatch.setattr(remote, "_run", lambda command, **_kwargs: commands.append(command))
-    monkeypatch.setattr(remote.subprocess, "run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(transport, "_run", lambda command, **_kwargs: commands.append(command))
+    monkeypatch.setattr(transport.subprocess, "run", lambda *_args, **_kwargs: None)
 
     def capture(command):
         captures.append(command)
@@ -473,7 +474,7 @@ def test_ambiguous_submit_failure_inspects_queued_state_and_keeps_reservations(m
             raise SystemExit("ssh command failed (exit 255)")
         return "queued\n"
 
-    monkeypatch.setattr(remote, "_ssh_capture", capture)
+    monkeypatch.setattr(transport, "_ssh_capture", capture)
 
     with pytest.raises(SystemExit, match="ssh command failed"):
         remote.start_queue(["hopg"], no_sync=True)
@@ -487,7 +488,7 @@ def test_ambiguous_submit_failure_inspects_queued_state_and_keeps_reservations(m
 def test_slurm_job_id_reads_recorded_scheduler_id(monkeypatch):
     commands = []
     monkeypatch.setattr(
-        remote, "_ssh_capture", lambda command: commands.append(command) or "48291\n"
+        transport, "_ssh_capture", lambda command: commands.append(command) or "48291\n"
     )
 
     assert remote._slurm_job_id("j") == "48291"
@@ -497,7 +498,7 @@ def test_slurm_job_id_reads_recorded_scheduler_id(monkeypatch):
 def test_slurm_state_queries_squeue(monkeypatch):
     commands = []
     monkeypatch.setattr(
-        remote, "_ssh_capture", lambda command: commands.append(command) or "RUNNING\n"
+        transport, "_ssh_capture", lambda command: commands.append(command) or "RUNNING\n"
     )
 
     assert remote._slurm_state("48291") == "RUNNING"
@@ -525,7 +526,7 @@ def test_slurm_state_treats_retired_ids_as_not_queued_but_surfaces_other_failure
             raise SystemExit(f"ssh command failed (exit {result.returncode})")
         return result.stdout
 
-    monkeypatch.setattr(remote, "_ssh_capture", run_remote)
+    monkeypatch.setattr(transport, "_ssh_capture", run_remote)
     squeue.write_text(
         "#!/bin/sh\necho 'slurm_load_jobs error: Invalid job id specified' >&2\nexit 1\n"
     )
@@ -540,7 +541,7 @@ def test_slurm_state_treats_retired_ids_as_not_queued_but_surfaces_other_failure
 def test_live_jobs_queries_squeue_for_recorded_scheduler_ids(monkeypatch):
     commands = []
     monkeypatch.setattr(
-        remote, "_ssh_capture", lambda command: commands.append(command) or "j\tFalse\thopg\n"
+        transport, "_ssh_capture", lambda command: commands.append(command) or "j\tFalse\thopg\n"
     )
 
     assert remote._live_jobs() == [("j", False, ["hopg"])]
@@ -553,7 +554,7 @@ def test_live_jobs_queries_squeue_for_recorded_scheduler_ids(monkeypatch):
 def test_live_jobs_skips_retired_scheduler_ids_without_masking_other_query_failures(monkeypatch):
     commands = []
     monkeypatch.setattr(
-        remote, "_ssh_capture", lambda command: commands.append(command) or "j\tFalse\thopg\n"
+        transport, "_ssh_capture", lambda command: commands.append(command) or "j\tFalse\thopg\n"
     )
 
     remote._live_jobs()
@@ -566,7 +567,7 @@ def test_live_jobs_skips_retired_scheduler_ids_without_masking_other_query_failu
 def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, capsys):
     commands = []
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda command: (
             commands.append(command)
@@ -593,7 +594,7 @@ def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, ca
 def test_job_status_verbose_adds_scheduler_allocation_fields(monkeypatch, capsys):
     commands = []
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda command: (
             commands.append(command)
@@ -620,7 +621,7 @@ def test_job_status_verbose_adds_scheduler_allocation_fields(monkeypatch, capsys
 def test_job_status_double_verbose_renders_case_progress(monkeypatch, capsys):
     commands = []
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda command: (
             commands.append(command)
@@ -660,7 +661,7 @@ def test_status_collapses_legacy_tqdm_history_to_latest_material_bar(monkeypatch
         "cases:  40%|████      | 2/5 [00:03<00:04, 1.4s/it]\r"
     )
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda _command: (
             "@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nslurm_job_id: 48291\n"
@@ -697,7 +698,7 @@ def test_failed_legacy_status_marks_incomplete_bar_as_last_batch():
 
 def test_line_grid_bounds_status_uses_diagnostic_metadata(monkeypatch, capsys):
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda _command: (
             "@@JOB\nj\n@@META\njob: j\nkind: line-grid-bounds\n"
@@ -722,7 +723,7 @@ def test_line_grid_bounds_status_uses_diagnostic_metadata(monkeypatch, capsys):
 
 def test_status_cli_repeats_verbose_for_case_progress(monkeypatch):
     calls = []
-    monkeypatch.setattr(remote, "job_status", lambda jobid, detail: calls.append((jobid, detail)))
+    monkeypatch.setattr(viewer, "job_status", lambda jobid, detail: calls.append((jobid, detail)))
 
     remote.main(["status", "j", "-vv"])
 
@@ -754,8 +755,8 @@ def test_attach_redraws_the_status_report_until_terminal(monkeypatch, capsys):
             _status_output("done [1/1] now", squeue_state="NOT_QUEUED", progress=done),
         ]
     )
-    monkeypatch.setattr(remote, "_ssh_capture", lambda _cmd: next(outputs))
-    monkeypatch.setattr(remote.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _cmd: next(outputs))
+    monkeypatch.setattr(viewer.time, "sleep", lambda _s: None)
 
     assert remote.attach("20260101-000000") is True
 
@@ -771,7 +772,7 @@ def test_attach_redraws_the_status_report_until_terminal(monkeypatch, capsys):
 def test_attach_omits_log_tail_at_base_verbosity_but_still_fetches_progress(monkeypatch):
     commands = []
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda cmd: commands.append(cmd) or _status_output("done now", squeue_state="NOT_QUEUED"),
     )
@@ -785,7 +786,7 @@ def test_attach_omits_log_tail_at_base_verbosity_but_still_fetches_progress(monk
 def test_attach_forwards_double_verbose_to_the_status_command(monkeypatch):
     commands = []
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda cmd: commands.append(cmd) or _status_output("done now", squeue_state="NOT_QUEUED"),
     )
@@ -800,11 +801,11 @@ def test_attach_forwards_double_verbose_to_the_status_command(monkeypatch):
 
 def test_attach_watchdog_exits_on_a_stalled_chain(monkeypatch, capsys):
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda _cmd: _status_output("queued slice 2 now", squeue_state="NOT_QUEUED"),
     )
-    monkeypatch.setattr(remote.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(viewer.time, "sleep", lambda _s: None)
 
     assert remote.attach("20260101-000000") is False
     assert "CHAIN STALLED" in capsys.readouterr().out
@@ -812,7 +813,7 @@ def test_attach_watchdog_exits_on_a_stalled_chain(monkeypatch, capsys):
 
 def test_attach_cli_repeats_verbose_for_the_live_report(monkeypatch):
     calls = []
-    monkeypatch.setattr(remote, "attach", lambda jobid, detail: calls.append((jobid, detail)))
+    monkeypatch.setattr(viewer, "attach", lambda jobid, detail: calls.append((jobid, detail)))
 
     remote.main(["attach", "j", "-vv"])
 
@@ -822,7 +823,7 @@ def test_attach_cli_repeats_verbose_for_the_live_report(monkeypatch):
 def test_implicit_job_selection_excludes_checkpoint_reservations(monkeypatch, tmp_path):
     """Bare queue commands must not mistake jobs/reservations for a job."""
     commands = []
-    monkeypatch.setattr(remote, "_ssh_capture", lambda command: commands.append(command) or "")
+    monkeypatch.setattr(transport, "_ssh_capture", lambda command: commands.append(command) or "")
 
     remote.list_jobs()
     remote.job_status()
@@ -847,7 +848,7 @@ def test_implicit_job_selection_excludes_checkpoint_reservations(monkeypatch, tm
 
 def test_jobs_report_identifiers_materials_and_last_event(monkeypatch, capsys):
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda _command: "20260719-120000-abcd1234\t48291\tFalse\thopg hbn\trunning hbn [2/2]\n",
     )
@@ -870,7 +871,7 @@ def test_jobs_report_identifiers_materials_and_last_event(monkeypatch, capsys):
 def test_logs_identify_resolved_job_and_host(monkeypatch, capsys):
     commands = []
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda command: commands.append(command) or "LOG j · qlmc\n\nline\n",
     )
@@ -883,7 +884,7 @@ def test_logs_identify_resolved_job_and_host(monkeypatch, capsys):
 
 def test_attach_returns_false_when_the_viewer_is_interrupted(monkeypatch, capsys):
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda _cmd: (_ for _ in ()).throw(KeyboardInterrupt),
     )
@@ -951,7 +952,7 @@ def test_overall_progress_line_is_none_without_records():
 
 def test_status_renders_progress_bars_at_base_verbosity(monkeypatch, capsys):
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda _cmd: (
             "@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nslurm_job_id: 48291\n"
@@ -974,7 +975,7 @@ def test_status_renders_progress_bars_at_base_verbosity(monkeypatch, capsys):
 def test_status_always_fetches_progress_even_at_base_verbosity(monkeypatch):
     commands = []
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda cmd: commands.append(cmd) or "",
     )
@@ -1019,7 +1020,7 @@ def test_static_case_progress_colors_tracks_only_on_tty(monkeypatch):
     }
     monkeypatch.delenv("NO_COLOR", raising=False)
     monkeypatch.setenv("TERM", "xterm-256color")
-    monkeypatch.setattr(remote.sys.stdout, "isatty", lambda: True)
+    monkeypatch.setattr(viewer.sys.stdout, "isatty", lambda: True)
 
     colored = remote._format_case_progress(record, ["hopg"])
     monkeypatch.setenv("NO_COLOR", "1")
@@ -1031,8 +1032,8 @@ def test_static_case_progress_colors_tracks_only_on_tty(monkeypatch):
 
 def test_stop_jobid_uses_scancel_not_kill(monkeypatch):
     commands = []
-    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "48291\n")
-    monkeypatch.setattr(remote, "_run", lambda command, **_kwargs: commands.append(command))
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "48291\n")
+    monkeypatch.setattr(transport, "_run", lambda command, **_kwargs: commands.append(command))
 
     remote._stop_jobid("j")
 
@@ -1042,8 +1043,10 @@ def test_stop_jobid_uses_scancel_not_kill(monkeypatch):
 
 
 def test_stop_jobid_rejects_legacy_job_without_scheduler_id(monkeypatch):
-    monkeypatch.setattr(remote, "_ssh_capture", lambda _command: "")
-    monkeypatch.setattr(remote, "_run", lambda *_args, **_kwargs: pytest.fail("must not scancel"))
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "")
+    monkeypatch.setattr(
+        transport, "_run", lambda *_args, **_kwargs: pytest.fail("must not scancel")
+    )
 
     with pytest.raises(SystemExit, match="not an active SLURM job"):
         remote._stop_jobid("j")
@@ -1060,7 +1063,7 @@ def test_stop_help_describes_slurm_cancellation(capsys):
 
 def test_follow_logs_use_stdin_closed_ssh(monkeypatch):
     runs = []
-    monkeypatch.setattr(remote.subprocess, "run", lambda cmd: runs.append(cmd))
+    monkeypatch.setattr(transport.subprocess, "run", lambda cmd: runs.append(cmd))
 
     remote.tail_logs("20260101-000000", follow=True)
 
@@ -1077,11 +1080,11 @@ def test_stems_quick_suffix():
 def test_stop_materials_resolve_unique_live_jobs(monkeypatch):
     stopped = []
     monkeypatch.setattr(
-        remote,
+        state,
         "_live_jobs",
         lambda: [("job1", False, ["hopg"]), ("job2", False, ["mose2", "wse2"])],
     )
-    monkeypatch.setattr(remote, "_stop_jobid", stopped.append)
+    monkeypatch.setattr(lifecycle, "_stop_jobid", stopped.append)
 
     remote.stop_jobs(["wse2", "mose2"])
 
@@ -1091,11 +1094,11 @@ def test_stop_materials_resolve_unique_live_jobs(monkeypatch):
 def test_stop_all_stops_every_live_job(monkeypatch):
     stopped = []
     monkeypatch.setattr(
-        remote,
+        state,
         "_live_jobs",
         lambda: [("job1", False, ["hopg"]), ("job2", True, ["mose2"])],
     )
-    monkeypatch.setattr(remote, "_stop_jobid", stopped.append)
+    monkeypatch.setattr(lifecycle, "_stop_jobid", stopped.append)
 
     remote.stop_jobs(all_jobs=True)
 
@@ -1104,7 +1107,7 @@ def test_stop_all_stops_every_live_job(monkeypatch):
 
 def test_stop_rejects_bad_material_before_live_job_lookup(monkeypatch):
     monkeypatch.setattr(
-        remote,
+        state,
         "_live_jobs",
         lambda: pytest.fail("must validate before checking live jobs"),
     )
@@ -1116,7 +1119,7 @@ def test_stop_rejects_bad_material_before_live_job_lookup(monkeypatch):
 def test_stop_cli_accepts_materials(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        remote, "stop_jobs", lambda materials, all_jobs: calls.append((materials, all_jobs))
+        lifecycle, "stop_jobs", lambda materials, all_jobs: calls.append((materials, all_jobs))
     )
 
     remote.main(["stop", "hopg", "mose2"])
@@ -1127,7 +1130,7 @@ def test_stop_cli_accepts_materials(monkeypatch):
 def test_stop_cli_accepts_all(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        remote, "stop_jobs", lambda materials, all_jobs: calls.append((materials, all_jobs))
+        lifecycle, "stop_jobs", lambda materials, all_jobs: calls.append((materials, all_jobs))
     )
 
     remote.main(["stop", "--all"])
@@ -1137,14 +1140,14 @@ def test_stop_cli_accepts_all(monkeypatch):
 
 # ---- clear <material> (checkpoint lifecycle, component 3) ----------------------
 def _no_live_jobs(monkeypatch):
-    monkeypatch.setattr(remote, "_live_jobs", lambda: [])
+    monkeypatch.setattr(state, "_live_jobs", lambda: [])
 
 
 def test_clear_refuses_when_a_live_job_produces_the_stem(monkeypatch):
     # a live job producing hopg -> clearing hopg must refuse before any ssh
-    monkeypatch.setattr(remote, "_live_jobs", lambda: [("job1", False, ["hopg"])])
+    monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", False, ["hopg"])])
     monkeypatch.setattr(
-        remote, "_ssh_capture", lambda *a: pytest.fail("must not ssh when refusing")
+        transport, "_ssh_capture", lambda *a: pytest.fail("must not ssh when refusing")
     )
     with pytest.raises(SystemExit, match="refusing to clear"):
         remote.clear_remote("hopg", yes=True)
@@ -1152,7 +1155,7 @@ def test_clear_refuses_when_a_live_job_produces_the_stem(monkeypatch):
 
 def test_clear_refuses_for_quick_stem_collision(monkeypatch):
     # a live --quick job producing hopg_quick still blocks a clear of hopg
-    monkeypatch.setattr(remote, "_live_jobs", lambda: [("job1", True, ["hopg"])])
+    monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", True, ["hopg"])])
     with pytest.raises(SystemExit, match="refusing to clear"):
         remote.clear_remote("hopg")
 
@@ -1160,7 +1163,7 @@ def test_clear_refuses_for_quick_stem_collision(monkeypatch):
 def test_clear_refuses_when_an_ambiguous_submission_holds_a_reservation(monkeypatch):
     """A retained pre-sbatch lock protects a possibly queued job without an ID."""
     _no_live_jobs(monkeypatch)
-    monkeypatch.setattr(remote, "_ssh_capture", lambda *_args: "RESERVED\thopg\n")
+    monkeypatch.setattr(transport, "_ssh_capture", lambda *_args: "RESERVED\thopg\n")
 
     with pytest.raises(SystemExit, match="reservation"):
         remote.clear_remote("hopg", yes=True)
@@ -1168,9 +1171,9 @@ def test_clear_refuses_when_an_ambiguous_submission_holds_a_reservation(monkeypa
 
 def test_clear_dry_preview_lists_but_does_not_delete(monkeypatch, capsys):
     _no_live_jobs(monkeypatch)
-    monkeypatch.setattr(remote, "_ssh_capture", lambda *a: "hopg.pkl\nhopg_quick.pkl\n")
+    monkeypatch.setattr(transport, "_ssh_capture", lambda *a: "hopg.pkl\nhopg_quick.pkl\n")
     runs = []
-    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: runs.append(cmd))
+    monkeypatch.setattr(transport, "_run", lambda cmd, **kw: runs.append(cmd))
     remote.clear_remote("hopg", yes=False)
     out = capsys.readouterr().out
     assert "would delete" in out and "hopg.pkl" in out and "hopg_quick.pkl" in out
@@ -1181,12 +1184,12 @@ def test_clear_yes_deletes_existing_files(monkeypatch, capsys):
     _no_live_jobs(monkeypatch)
     commands = []
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda command: commands.append(command) or "CLEARED\thopg.pkl\nCLEARED\thopg_quick.pkl\n",
     )
     runs = []
-    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: runs.append(cmd))
+    monkeypatch.setattr(transport, "_run", lambda cmd, **kw: runs.append(cmd))
     remote.clear_remote("hopg", yes=True)
     assert runs == []
     assert 'mkdir "$R/$stem"' in commands[0]
@@ -1196,9 +1199,9 @@ def test_clear_yes_deletes_existing_files(monkeypatch, capsys):
 
 def test_clear_reports_nothing_when_no_files(monkeypatch, capsys):
     _no_live_jobs(monkeypatch)
-    monkeypatch.setattr(remote, "_ssh_capture", lambda *a: "\n")
+    monkeypatch.setattr(transport, "_ssh_capture", lambda *a: "\n")
     runs = []
-    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: runs.append(cmd))
+    monkeypatch.setattr(transport, "_run", lambda cmd, **kw: runs.append(cmd))
     remote.clear_remote("hopg", yes=True)
     assert "nothing to clear" in capsys.readouterr().out
     assert runs == []  # nothing to delete
@@ -1208,7 +1211,7 @@ def test_clear_multiple_materials_yes_deletes_all_stems(monkeypatch, capsys):
     _no_live_jobs(monkeypatch)
     commands = []
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda command: (
             commands.append(command)
@@ -1228,7 +1231,7 @@ def test_clear_multiple_materials_dry_preview_lists_each(monkeypatch, capsys):
     _no_live_jobs(monkeypatch)
     commands = []
     monkeypatch.setattr(
-        remote, "_ssh_capture", lambda command: commands.append(command) or "hopg.pkl\nhbn.pkl\n"
+        transport, "_ssh_capture", lambda command: commands.append(command) or "hopg.pkl\nhbn.pkl\n"
     )
     remote.clear_remote(["hopg", "hbn"], yes=False)
     listing = commands[-1]
@@ -1239,16 +1242,16 @@ def test_clear_multiple_materials_dry_preview_lists_each(monkeypatch, capsys):
 
 def test_clear_rejects_bad_material(monkeypatch):
     monkeypatch.setattr(
-        remote, "_live_jobs", lambda: pytest.fail("must validate before touching jobs")
+        state, "_live_jobs", lambda: pytest.fail("must validate before touching jobs")
     )
     with pytest.raises(SystemExit):
         remote.clear_remote("rm -rf /")
 
 
 def test_clear_all_refuses_when_a_live_job_is_running(monkeypatch):
-    monkeypatch.setattr(remote, "_live_jobs", lambda: [("job1", False, ["hopg"])])
+    monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", False, ["hopg"])])
     monkeypatch.setattr(
-        remote, "_ssh_capture", lambda *a: pytest.fail("must not ssh when refusing")
+        transport, "_ssh_capture", lambda *a: pytest.fail("must not ssh when refusing")
     )
     with pytest.raises(SystemExit, match="refusing to clear --all"):
         remote.clear_all_remote(yes=True)
@@ -1256,17 +1259,17 @@ def test_clear_all_refuses_when_a_live_job_is_running(monkeypatch):
 
 def test_clear_all_refuses_when_a_reservation_is_held(monkeypatch):
     _no_live_jobs(monkeypatch)
-    monkeypatch.setattr(remote, "_reservation_ledger", lambda: (1000, [("hopg", "job1", 900)]))
+    monkeypatch.setattr(state, "_reservation_ledger", lambda: (1000, [("hopg", "job1", 900)]))
     with pytest.raises(SystemExit, match="reservation"):
         remote.clear_all_remote(yes=True)
 
 
 def test_clear_all_dry_preview_lists_but_does_not_delete(monkeypatch, capsys):
     _no_live_jobs(monkeypatch)
-    monkeypatch.setattr(remote, "_reservation_ledger", lambda: (1000, []))
+    monkeypatch.setattr(state, "_reservation_ledger", lambda: (1000, []))
     commands = []
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda command: commands.append(command) or "hopg.pkl\nzhai_reproduction/a.pkl\n",
     )
@@ -1279,14 +1282,14 @@ def test_clear_all_dry_preview_lists_but_does_not_delete(monkeypatch, capsys):
 
 def test_clear_all_yes_deletes_every_pkl(monkeypatch, capsys):
     _no_live_jobs(monkeypatch)
-    monkeypatch.setattr(remote, "_reservation_ledger", lambda: (1000, []))
+    monkeypatch.setattr(state, "_reservation_ledger", lambda: (1000, []))
     commands = []
 
     def capture(command):
         commands.append(command)
         return "" if "-delete" in command else "hopg.pkl\nhopg_quick.pkl\n"
 
-    monkeypatch.setattr(remote, "_ssh_capture", capture)
+    monkeypatch.setattr(transport, "_ssh_capture", capture)
     remote.clear_all_remote(yes=True)
     out = capsys.readouterr().out
     assert "cleared on the box: 2 checkpoint file(s)" in out
@@ -1295,8 +1298,8 @@ def test_clear_all_yes_deletes_every_pkl(monkeypatch, capsys):
 
 def test_clear_all_reports_nothing_when_empty(monkeypatch, capsys):
     _no_live_jobs(monkeypatch)
-    monkeypatch.setattr(remote, "_reservation_ledger", lambda: (1000, []))
-    monkeypatch.setattr(remote, "_ssh_capture", lambda *a: "\n")
+    monkeypatch.setattr(state, "_reservation_ledger", lambda: (1000, []))
+    monkeypatch.setattr(transport, "_ssh_capture", lambda *a: "\n")
     remote.clear_all_remote(yes=True)
     assert "nothing to clear" in capsys.readouterr().out
 
@@ -1327,8 +1330,8 @@ def test_parallel_queue_script_preserves_partial_failure_results(monkeypatch, tm
         "exit 0\n"
     )
     fake_uv.chmod(0o755)
-    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
     script = remote._queue_script(
         "j", ["hopg", "hbn", "hfse2"], quick=False, workers=4, parallel_materials=2
     )
@@ -1359,8 +1362,8 @@ def test_parallel_queue_script_enforces_process_limit(monkeypatch, tmp_path, par
         f'echo "end $$" >> "{trace.as_posix()}"\n'
     )
     fake_uv.chmod(0o755)
-    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
     materials = ["hopg", "hbn", "hfse2", "v2o5"]
     script = remote._queue_script(
         "j",
@@ -1415,8 +1418,8 @@ def test_chunked_script_hands_off_state_before_resubmitting(monkeypatch, tmp_pat
         "echo 4242\n"
     )
     fake_sbatch.chmod(0o755)
-    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
     script = remote._chunked_queue_script(
         "j", ["hopg", "hbn"], quick=False, workers=None, chunk_minutes=10.0
     )
@@ -1462,8 +1465,8 @@ def test_chunked_script_skips_failed_materials_and_terminates_without_resubmitti
     fake_sbatch = bin_dir / "sbatch"
     fake_sbatch.write_text(f"#!/bin/sh\ntouch '{marker.as_posix()}'\necho 4242\n")
     fake_sbatch.chmod(0o755)
-    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
     script = remote._chunked_queue_script(
         "j", ["hopg", "hbn"], quick=False, workers=None, chunk_minutes=10.0
     )
@@ -1504,8 +1507,8 @@ def test_chunked_script_fails_closed_when_resubmission_fails(monkeypatch, tmp_pa
     bin_dir.mkdir()
     (bin_dir / "sbatch").write_text(sbatch_body)
     (bin_dir / "sbatch").chmod(0o755)
-    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
     script = remote._chunked_queue_script(
         "j", ["hopg"], quick=False, workers=None, chunk_minutes=10.0
     )
@@ -1534,8 +1537,8 @@ def test_chunked_script_honors_stop_sentinel_without_resubmitting(monkeypatch, t
     marker = tmp_path / "sbatch_called"
     (bin_dir / "sbatch").write_text(f"#!/bin/sh\ntouch '{marker.as_posix()}'\necho 4242\n")
     (bin_dir / "sbatch").chmod(0o755)
-    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
     script = remote._chunked_queue_script(
         "j", ["hopg"], quick=False, workers=None, chunk_minutes=10.0
     )
@@ -1559,8 +1562,8 @@ def test_chunked_script_marks_hard_failure_and_never_retries(monkeypatch, tmp_pa
     fake_uv = tmp_path / "uv"
     fake_uv.write_text('#!/bin/sh\nif [ "$1" = sync ]; then exit 0; fi\nexit 7\n')
     fake_uv.chmod(0o755)
-    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
-    monkeypatch.setattr(remote, "REMOTE_UV", fake_uv.as_posix())
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
     script = remote._chunked_queue_script(
         "j", ["hopg"], quick=False, workers=None, chunk_minutes=10.0
     )
@@ -1584,7 +1587,7 @@ def test_clear_fails_closed_when_squeue_cannot_be_queried(monkeypatch, tmp_path)
     commands.mkdir()
     (commands / "squeue").write_text("#!/bin/sh\nexit 7\n")
     (commands / "squeue").chmod(0o755)
-    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
 
     def local_bash_capture(remote_cmd):
         env = {**os.environ, "PATH": f"{commands}:{os.environ.get('PATH', '')}"}
@@ -1593,8 +1596,8 @@ def test_clear_fails_closed_when_squeue_cannot_be_queried(monkeypatch, tmp_path)
             raise SystemExit(f"ssh command failed (exit {result.returncode})")
         return result.stdout.decode()
 
-    monkeypatch.setattr(remote, "_ssh_capture", local_bash_capture)
-    monkeypatch.setattr(remote, "_run", lambda *_args, **_kw: pytest.fail("must not delete"))
+    monkeypatch.setattr(transport, "_ssh_capture", local_bash_capture)
+    monkeypatch.setattr(transport, "_run", lambda *_args, **_kw: pytest.fail("must not delete"))
 
     with pytest.raises(SystemExit, match="ssh command failed"):
         remote.clear_remote("hopg", yes=True)
@@ -1612,7 +1615,7 @@ def test_clear_listing_snippet_exits_zero_when_quick_pkl_missing(monkeypatch, tm
     (tmp_path / "checkpoints" / "hopg.pkl").write_bytes(b"x")  # no hopg_quick.pkl
 
     _no_live_jobs(monkeypatch)
-    monkeypatch.setattr(remote, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
 
     def local_bash_capture(remote_cmd):
         # same semantics as _ssh_capture, but run the snippet locally
@@ -1621,9 +1624,9 @@ def test_clear_listing_snippet_exits_zero_when_quick_pkl_missing(monkeypatch, tm
             raise SystemExit(f"ssh command failed (exit {r.returncode})")
         return r.stdout
 
-    monkeypatch.setattr(remote, "_ssh_capture", local_bash_capture)
+    monkeypatch.setattr(transport, "_ssh_capture", local_bash_capture)
     monkeypatch.setattr(
-        remote, "_run", lambda cmd, **kw: pytest.fail("dry preview must not delete")
+        transport, "_run", lambda cmd, **kw: pytest.fail("dry preview must not delete")
     )
     remote.clear_remote("hopg", yes=False)  # must not raise SystemExit
     out = capsys.readouterr().out
@@ -1636,11 +1639,11 @@ def test_scan_rejects_quick_plus_grid_before_any_work(monkeypatch):
     so scan --quick --grid must fail up front -- not run the whole sweep and then
     traceback on the trailing pull."""
     monkeypatch.setattr(
-        remote, "_live_jobs", lambda: pytest.fail("must reject before the busy check")
+        state, "_live_jobs", lambda: pytest.fail("must reject before the busy check")
     )
-    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("must reject before syncing"))
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must reject before syncing"))
     monkeypatch.setattr(
-        remote, "remote_scan", lambda *a, **kw: pytest.fail("must reject before scanning")
+        cli, "remote_scan", lambda *a, **kw: pytest.fail("must reject before scanning")
     )
     with pytest.raises(SystemExit, match="grid"):
         remote.main(["scan", "hopg", "--quick", "--grid"])
@@ -1649,21 +1652,21 @@ def test_scan_rejects_quick_plus_grid_before_any_work(monkeypatch):
 # ---- pull defaults to --grid; -f/--full opts into the plain whole-file pull -----
 def test_pull_defaults_to_grid(monkeypatch):
     calls = []
-    monkeypatch.setattr(remote, "pull", lambda *a, **kw: calls.append(kw))
+    monkeypatch.setattr(lifecycle, "pull", lambda *a, **kw: calls.append(kw))
     remote.main(["pull", "hopg"])
     assert calls[0]["grid"] is True
 
 
 def test_pull_full_flag_disables_grid(monkeypatch):
     calls = []
-    monkeypatch.setattr(remote, "pull", lambda *a, **kw: calls.append(kw))
+    monkeypatch.setattr(lifecycle, "pull", lambda *a, **kw: calls.append(kw))
     remote.main(["pull", "hopg", "--full"])
     assert calls[0]["grid"] is False
 
 
 def test_pull_short_full_flag(monkeypatch):
     calls = []
-    monkeypatch.setattr(remote, "pull", lambda *a, **kw: calls.append(kw))
+    monkeypatch.setattr(lifecycle, "pull", lambda *a, **kw: calls.append(kw))
     remote.main(["pull", "hopg", "-f"])
     assert calls[0]["grid"] is False
 
@@ -1676,10 +1679,10 @@ def test_pull_warns_and_continues_when_one_checkpoint_is_missing(monkeypatch, ca
         if "missing.pkl" in " ".join(cmd):
             raise subprocess.CalledProcessError(1, cmd)
 
-    monkeypatch.setattr(remote, "_run", fake_run)
-    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
-    monkeypatch.setattr(remote, "_remote_sha256", lambda _path: "remote")
-    monkeypatch.setattr(remote, "_local_sha256", lambda _path: "local")
+    monkeypatch.setattr(transport, "_run", fake_run)
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(transport, "_remote_sha256", lambda _path: "remote")
+    monkeypatch.setattr(transport, "_local_sha256", lambda _path: "local")
 
     remote.pull(["hopg", "missing"], no_sync=True)
 
@@ -1691,10 +1694,10 @@ def test_pull_skips_scp_when_remote_artifact_matches_local(monkeypatch, tmp_path
     (tmp_path / "checkpoints").mkdir()
     (tmp_path / "checkpoints" / "hopg.pkl").write_bytes(b"same")
     calls = []
-    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
-    monkeypatch.setattr(remote, "_remote_sha256", lambda _path: "digest")
-    monkeypatch.setattr(remote, "_local_sha256", lambda _path: "digest")
-    monkeypatch.setattr(remote, "_run", lambda command, **_kw: calls.append(command))
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(transport, "_remote_sha256", lambda _path: "digest")
+    monkeypatch.setattr(transport, "_local_sha256", lambda _path: "digest")
+    monkeypatch.setattr(transport, "_run", lambda command, **_kw: calls.append(command))
 
     remote.pull(["hopg"], no_sync=True)
 
@@ -1706,13 +1709,13 @@ def test_full_pull_warns_without_scp_when_remote_checksum_fails(monkeypatch, tmp
     """A failed remote hash must not fall through to an unchecked transfer."""
     calls = []
     commands = []
-    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda command: commands.append(command) or "sha256sum: missing file\\n",
     )
-    monkeypatch.setattr(remote, "_run", lambda command, **_kw: calls.append(command))
+    monkeypatch.setattr(transport, "_run", lambda command, **_kw: calls.append(command))
 
     remote.pull(["hopg"], no_sync=True)
 
@@ -1724,10 +1727,10 @@ def test_full_pull_warns_without_scp_when_remote_checksum_fails(monkeypatch, tmp
 
 def test_full_pull_transfers_stable_snapshot_once_when_artifacts_differ(monkeypatch, tmp_path):
     calls = []
-    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
-    monkeypatch.setattr(remote, "_remote_sha256", lambda _path: "remote-digest")
-    monkeypatch.setattr(remote, "_local_sha256", lambda _path: "local-digest")
-    monkeypatch.setattr(remote, "_run", lambda command, **_kw: calls.append(command))
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(transport, "_remote_sha256", lambda _path: "remote-digest")
+    monkeypatch.setattr(transport, "_local_sha256", lambda _path: "local-digest")
+    monkeypatch.setattr(transport, "_run", lambda command, **_kw: calls.append(command))
 
     remote.pull(["hopg"], no_sync=True)
 
@@ -1750,10 +1753,10 @@ def test_grid_pull_skips_scp_and_removes_matching_temp_artifact(monkeypatch, tmp
     (tmp_path / "checkpoints").mkdir()
     (tmp_path / "checkpoints" / "hopg.pkl").write_bytes(b"same")
     calls = []
-    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
-    monkeypatch.setattr(remote, "_remote_sha256", lambda _path: "digest")
-    monkeypatch.setattr(remote, "_local_sha256", lambda _path: "digest")
-    monkeypatch.setattr(remote, "_run", lambda command, **_kw: calls.append(command))
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(transport, "_remote_sha256", lambda _path: "digest")
+    monkeypatch.setattr(transport, "_local_sha256", lambda _path: "digest")
+    monkeypatch.setattr(transport, "_run", lambda command, **_kw: calls.append(command))
 
     remote.pull(["hopg"], grid=True, no_sync=True)
 
@@ -1765,13 +1768,13 @@ def test_grid_pull_skips_scp_and_removes_matching_temp_artifact(monkeypatch, tmp
 
 def test_grid_pull_removes_temp_when_checksum_fails(monkeypatch, tmp_path, capsys):
     calls = []
-    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
     monkeypatch.setattr(
-        remote,
+        transport,
         "_remote_sha256",
         lambda _path: (_ for _ in ()).throw(SystemExit("checksum failed")),
     )
-    monkeypatch.setattr(remote, "_run", lambda command, **_kw: calls.append(command))
+    monkeypatch.setattr(transport, "_run", lambda command, **_kw: calls.append(command))
 
     remote.pull(["hopg"], grid=True, no_sync=True)
 
@@ -1781,14 +1784,14 @@ def test_grid_pull_removes_temp_when_checksum_fails(monkeypatch, tmp_path, capsy
 
 def test_grid_pull_removes_temp_when_slim_fails(monkeypatch, tmp_path, capsys):
     calls = []
-    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
 
     def run(command, **_kw):
         calls.append(command)
         if any("cxr slim" in part for part in command):
             raise subprocess.CalledProcessError(1, command)
 
-    monkeypatch.setattr(remote, "_run", run)
+    monkeypatch.setattr(transport, "_run", run)
 
     remote.pull(["hopg"], grid=True, no_sync=True)
 
@@ -1799,10 +1802,10 @@ def test_grid_pull_removes_temp_when_slim_fails(monkeypatch, tmp_path, capsys):
 def test_remote_start_all_uses_toml_manifest(monkeypatch, tmp_path):
     manifest = tmp_path / "mats_to_sim.toml"
     manifest.write_text('materials = ["hopg", "hbn"]\n')
-    monkeypatch.setattr(remote, "MATS_FILE", manifest)
+    monkeypatch.setattr(config, "MATS_FILE", manifest)
     calls = []
     monkeypatch.setattr(
-        remote, "start_queue", lambda materials, *args, **kwargs: calls.append(materials)
+        lifecycle, "start_queue", lambda materials, *args, **kwargs: calls.append(materials)
     )
 
     remote.main(["start", "--all", "--dry-run"])
@@ -1817,7 +1820,7 @@ def test_remote_start_defers_parallel_materials_default_to_start_queue(monkeypat
     test_chunk_minutes_zero_emits_monolithic_script."""
     calls = []
     monkeypatch.setattr(
-        remote,
+        lifecycle,
         "start_queue",
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
     )
@@ -1831,7 +1834,7 @@ def test_remote_start_defers_parallel_materials_default_to_start_queue(monkeypat
 def test_remote_start_accepts_parallel_materials_three_and_four(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        remote,
+        lifecycle,
         "start_queue",
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
     )
@@ -1848,7 +1851,7 @@ def test_remote_start_accepts_parallel_materials_three_and_four(monkeypatch):
 
 def test_remote_start_rejects_parallel_materials_above_four(monkeypatch):
     monkeypatch.setattr(
-        remote, "start_queue", lambda *_args, **_kwargs: pytest.fail("must reject before start")
+        lifecycle, "start_queue", lambda *_args, **_kwargs: pytest.fail("must reject before start")
     )
 
     with pytest.raises(SystemExit):
@@ -1863,11 +1866,11 @@ def test_start_queue_rejects_parallel_materials_above_four():
 def test_remote_scan_forwards_parallel_materials(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        remote,
+        lifecycle,
         "start_queue",
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
     )
-    monkeypatch.setattr(remote, "attach", lambda _jobid: False)
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
 
     remote.main(["scan", "hopg", "--parallel-materials", "3", "--chunk-minutes", "0", "--no-sync"])
 
@@ -1877,13 +1880,13 @@ def test_remote_scan_forwards_parallel_materials(monkeypatch):
 def test_remote_scan_submits_then_attaches_and_pulls(monkeypatch):
     events = []
     monkeypatch.setattr(
-        remote,
+        lifecycle,
         "start_queue",
         lambda materials, **_kw: events.append(("start", materials)) or "j",
     )
-    monkeypatch.setattr(remote, "attach", lambda jobid: events.append(("attach", jobid)) or True)
-    monkeypatch.setattr(remote, "_completed_materials", lambda _jobid, materials: materials)
-    monkeypatch.setattr(remote, "pull", lambda stems, **_kw: events.append(("pull", stems)))
+    monkeypatch.setattr(viewer, "attach", lambda jobid: events.append(("attach", jobid)) or True)
+    monkeypatch.setattr(state, "_completed_materials", lambda _jobid, materials: materials)
+    monkeypatch.setattr(lifecycle, "pull", lambda stems, **_kw: events.append(("pull", stems)))
 
     remote._cli_scan(
         argparse.Namespace(
@@ -1904,12 +1907,12 @@ def test_remote_scan_submits_then_attaches_and_pulls(monkeypatch):
 
 def test_interrupted_remote_scan_does_not_pull(monkeypatch):
     events = []
-    monkeypatch.setattr(remote, "start_queue", lambda *_args, **_kwargs: "j")
-    monkeypatch.setattr(remote, "attach", lambda _jobid: False)
+    monkeypatch.setattr(lifecycle, "start_queue", lambda *_args, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
     monkeypatch.setattr(
-        remote, "_completed_materials", lambda *_args: pytest.fail("must not inspect completion")
+        state, "_completed_materials", lambda *_args: pytest.fail("must not inspect completion")
     )
-    monkeypatch.setattr(remote, "pull", lambda *_args, **_kwargs: events.append("pull"))
+    monkeypatch.setattr(lifecycle, "pull", lambda *_args, **_kwargs: events.append("pull"))
 
     remote._cli_scan(
         argparse.Namespace(
@@ -1931,11 +1934,11 @@ def test_interrupted_remote_scan_does_not_pull(monkeypatch):
 def test_remote_scan_preserves_hyphenated_catalog_material(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        remote, "start_queue", lambda materials, **_kw: calls.append(materials) or "j"
+        lifecycle, "start_queue", lambda materials, **_kw: calls.append(materials) or "j"
     )
-    monkeypatch.setattr(remote, "attach", lambda _jobid: None)
-    monkeypatch.setattr(remote, "_completed_materials", lambda _jobid, materials: materials)
-    monkeypatch.setattr(remote, "pull", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: None)
+    monkeypatch.setattr(state, "_completed_materials", lambda _jobid, materials: materials)
+    monkeypatch.setattr(lifecycle, "pull", lambda *_args, **_kwargs: None)
 
     remote.main(["scan", "mos2-on-sio2-si", "--no-sync"])
 
@@ -1945,7 +1948,7 @@ def test_remote_scan_preserves_hyphenated_catalog_material(monkeypatch):
 def test_completed_materials_reads_success_markers_from_the_queue_log(monkeypatch):
     commands = []
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda command: commands.append(command) or "hopg\nhbn\n",
     )
@@ -1956,9 +1959,9 @@ def test_completed_materials_reads_success_markers_from_the_queue_log(monkeypatc
 
 def test_remote_scan_rejects_unknown_before_busy_or_sync(monkeypatch):
     monkeypatch.setattr(
-        remote, "_live_jobs", lambda: pytest.fail("must validate before checking busy jobs")
+        state, "_live_jobs", lambda: pytest.fail("must validate before checking busy jobs")
     )
-    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("must validate before syncing"))
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must validate before syncing"))
 
     with pytest.raises(SystemExit, match="unknown material"):
         remote.main(["scan", "not_in_catalog"])
@@ -1972,9 +1975,9 @@ def test_remote_start_accepts_hyphenated_catalog_material(capsys):
 
 def test_remote_start_rejects_unknown_before_busy_or_sync(monkeypatch):
     monkeypatch.setattr(
-        remote, "_live_jobs", lambda: pytest.fail("must validate before checking busy jobs")
+        state, "_live_jobs", lambda: pytest.fail("must validate before checking busy jobs")
     )
-    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("must validate before syncing"))
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must validate before syncing"))
 
     with pytest.raises(SystemExit, match="unknown material"):
         remote.main(["start", "not_in_catalog"])
@@ -1982,10 +1985,10 @@ def test_remote_start_rejects_unknown_before_busy_or_sync(monkeypatch):
 
 def test_pull_validates_safe_stems_without_requiring_catalog_membership(monkeypatch, tmp_path):
     calls = []
-    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
-    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: calls.append(cmd))
-    monkeypatch.setattr(remote, "_remote_sha256", lambda _path: "remote")
-    monkeypatch.setattr(remote, "_local_sha256", lambda _path: "local")
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(transport, "_run", lambda cmd, **kw: calls.append(cmd))
+    monkeypatch.setattr(transport, "_remote_sha256", lambda _path: "remote")
+    monkeypatch.setattr(transport, "_local_sha256", lambda _path: "local")
 
     remote.pull(["hopg_quick", "zhai"], no_sync=True)
 
@@ -1994,8 +1997,8 @@ def test_pull_validates_safe_stems_without_requiring_catalog_membership(monkeypa
 
 
 def test_pull_rejects_unsafe_stem_before_sync_or_local_mutation(monkeypatch, tmp_path):
-    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
-    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("must validate before syncing"))
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must validate before syncing"))
 
     with pytest.raises(SystemExit, match="invalid remote shell token"):
         remote.pull(["bad;stem"], grid=True)
@@ -2032,16 +2035,16 @@ def test_zhai_queue_script_no_refresh_flag_when_unset():
 
 
 def test_zhai_start_refuses_when_a_zhai_job_is_already_live(monkeypatch):
-    monkeypatch.setattr(remote, "_live_jobs", lambda: [("job1", False, ["zhai"])])
+    monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", False, ["zhai"])])
     with pytest.raises(SystemExit, match="refusing to start"):
         remote.start_zhai_queue()
 
 
 def test_zhai_start_dry_run_prints_without_ssh_or_sync(monkeypatch, capsys):
-    monkeypatch.setattr(remote, "_live_jobs", lambda: pytest.fail("dry-run must not check busy"))
-    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("dry-run must not sync"))
+    monkeypatch.setattr(state, "_live_jobs", lambda: pytest.fail("dry-run must not check busy"))
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("dry-run must not sync"))
     monkeypatch.setattr(
-        remote.subprocess, "run", lambda *a, **kw: pytest.fail("dry-run must not ssh")
+        transport.subprocess, "run", lambda *a, **kw: pytest.fail("dry-run must not ssh")
     )
 
     jobid = remote.start_zhai_queue(dry_run=True)
@@ -2051,18 +2054,18 @@ def test_zhai_start_dry_run_prints_without_ssh_or_sync(monkeypatch, capsys):
 
 
 def test_remote_check_refuses_when_a_zhai_job_is_already_live(monkeypatch):
-    monkeypatch.setattr(remote, "_live_jobs", lambda: [("job1", False, ["zhai"])])
-    monkeypatch.setattr(remote, "sync_code", lambda: pytest.fail("must refuse before syncing"))
+    monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", False, ["zhai"])])
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must refuse before syncing"))
     with pytest.raises(SystemExit, match="refusing to start"):
         remote.remote_check()
 
 
 def test_foreground_check_submits_then_attaches_and_pulls(monkeypatch):
     events = []
-    monkeypatch.setattr(remote, "start_zhai_queue", lambda **_kw: events.append("start") or "j")
-    monkeypatch.setattr(remote, "attach", lambda jobid: events.append(("attach", jobid)) or True)
-    monkeypatch.setattr(remote, "_job_succeeded", lambda _jobid: True, raising=False)
-    monkeypatch.setattr(remote, "pull_zhai_cache", lambda: events.append("pull"))
+    monkeypatch.setattr(lifecycle, "start_zhai_queue", lambda **_kw: events.append("start") or "j")
+    monkeypatch.setattr(viewer, "attach", lambda jobid: events.append(("attach", jobid)) or True)
+    monkeypatch.setattr(state, "_job_succeeded", lambda _jobid: True, raising=False)
+    monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: events.append("pull"))
 
     remote.remote_check(no_sync=True)
 
@@ -2070,23 +2073,23 @@ def test_foreground_check_submits_then_attaches_and_pulls(monkeypatch):
 
 
 def test_interrupted_foreground_check_does_not_pull(monkeypatch):
-    monkeypatch.setattr(remote, "start_zhai_queue", lambda **_kw: "j")
-    monkeypatch.setattr(remote, "attach", lambda _jobid: False)
+    monkeypatch.setattr(lifecycle, "start_zhai_queue", lambda **_kw: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
     monkeypatch.setattr(
-        remote, "pull_zhai_cache", lambda: pytest.fail("must not pull after interruption")
+        lifecycle, "pull_zhai_cache", lambda: pytest.fail("must not pull after interruption")
     )
 
     remote.remote_check(no_sync=True)
 
 
-@pytest.mark.parametrize("state", ["FAILED (exit 1)", "cancelled [48291]"])
-def test_failed_foreground_check_does_not_pull_stale_cache(monkeypatch, state):
-    monkeypatch.setattr(remote, "start_zhai_queue", lambda **_kw: "j")
-    monkeypatch.setattr(remote, "attach", lambda _jobid: True)
-    monkeypatch.setattr(remote, "_job_succeeded", lambda _jobid: False, raising=False)
-    monkeypatch.setattr(remote, "_job_state", lambda _jobid: state, raising=False)
+@pytest.mark.parametrize("job_state", ["FAILED (exit 1)", "cancelled [48291]"])
+def test_failed_foreground_check_does_not_pull_stale_cache(monkeypatch, job_state):
+    monkeypatch.setattr(lifecycle, "start_zhai_queue", lambda **_kw: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(state, "_job_succeeded", lambda _jobid: False, raising=False)
+    monkeypatch.setattr(state, "_job_state", lambda _jobid: job_state, raising=False)
     monkeypatch.setattr(
-        remote, "pull_zhai_cache", lambda: pytest.fail("failed job must not pull stale cache")
+        lifecycle, "pull_zhai_cache", lambda: pytest.fail("failed job must not pull stale cache")
     )
 
     with pytest.raises(SystemExit, match="did not complete successfully"):
@@ -2095,10 +2098,10 @@ def test_failed_foreground_check_does_not_pull_stale_cache(monkeypatch, state):
 
 def test_remote_check_no_sync_skips_sync(monkeypatch):
     calls = []
-    monkeypatch.setattr(remote, "start_zhai_queue", lambda **kw: calls.append(kw) or "j")
-    monkeypatch.setattr(remote, "attach", lambda _jobid: calls.append("attach") or True)
-    monkeypatch.setattr(remote, "_job_succeeded", lambda _jobid: True)
-    monkeypatch.setattr(remote, "pull_zhai_cache", lambda: calls.append("pull"))
+    monkeypatch.setattr(lifecycle, "start_zhai_queue", lambda **kw: calls.append(kw) or "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: calls.append("attach") or True)
+    monkeypatch.setattr(state, "_job_succeeded", lambda _jobid: True)
+    monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: calls.append("pull"))
 
     remote.remote_check(no_sync=True)
 
@@ -2117,9 +2120,9 @@ def test_remote_check_no_sync_skips_sync(monkeypatch):
 
 
 def test_pull_zhai_cache_fetches_every_listed_file(monkeypatch, tmp_path):
-    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
     monkeypatch.setattr(
-        remote,
+        transport,
         "_ssh_capture",
         lambda *a: (
             "/r/checkpoints/zhai_reproduction/zhai-a.pkl\n"
@@ -2127,7 +2130,7 @@ def test_pull_zhai_cache_fetches_every_listed_file(monkeypatch, tmp_path):
         ),
     )
     runs = []
-    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: runs.append(cmd))
+    monkeypatch.setattr(transport, "_run", lambda cmd, **kw: runs.append(cmd))
 
     remote.pull_zhai_cache()
 
@@ -2137,10 +2140,10 @@ def test_pull_zhai_cache_fetches_every_listed_file(monkeypatch, tmp_path):
 
 
 def test_pull_zhai_cache_reports_when_empty(monkeypatch, tmp_path, capsys):
-    monkeypatch.setattr(remote, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
     commands = []
-    monkeypatch.setattr(remote, "_ssh_capture", lambda command: commands.append(command) or "")
-    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: pytest.fail("nothing to pull"))
+    monkeypatch.setattr(transport, "_ssh_capture", lambda command: commands.append(command) or "")
+    monkeypatch.setattr(transport, "_run", lambda cmd, **kw: pytest.fail("nothing to pull"))
 
     remote.pull_zhai_cache()
 
@@ -2150,9 +2153,9 @@ def test_pull_zhai_cache_reports_when_empty(monkeypatch, tmp_path, capsys):
 
 def test_check_cli_pull_flag_skips_run(monkeypatch):
     calls = []
-    monkeypatch.setattr(remote, "pull_zhai_cache", lambda: calls.append("pull"))
+    monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: calls.append("pull"))
     monkeypatch.setattr(
-        remote, "remote_check", lambda **kw: pytest.fail("--pull must not run the reproduction")
+        cli, "remote_check", lambda **kw: pytest.fail("--pull must not run the reproduction")
     )
 
     remote.main(["check", "--pull"])
@@ -2162,8 +2165,8 @@ def test_check_cli_pull_flag_skips_run(monkeypatch):
 
 def test_check_cli_detached_starts_queue(monkeypatch):
     calls = []
-    monkeypatch.setattr(remote, "start_zhai_queue", lambda **kw: calls.append(kw) or "jid")
-    monkeypatch.setattr(remote, "attach", lambda jobid: pytest.fail("no --follow: must not attach"))
+    monkeypatch.setattr(lifecycle, "start_zhai_queue", lambda **kw: calls.append(kw) or "jid")
+    monkeypatch.setattr(viewer, "attach", lambda jobid: pytest.fail("no --follow: must not attach"))
 
     remote.main(["check", "--detached", "--ne", "11"])
 
@@ -2171,9 +2174,9 @@ def test_check_cli_detached_starts_queue(monkeypatch):
 
 
 def test_check_cli_detached_follow_attaches(monkeypatch):
-    monkeypatch.setattr(remote, "start_zhai_queue", lambda **kw: "jid")
+    monkeypatch.setattr(lifecycle, "start_zhai_queue", lambda **kw: "jid")
     attached = []
-    monkeypatch.setattr(remote, "attach", attached.append)
+    monkeypatch.setattr(viewer, "attach", attached.append)
 
     remote.main(["check", "--detached", "--follow"])
 
@@ -2182,7 +2185,7 @@ def test_check_cli_detached_follow_attaches(monkeypatch):
 
 def test_check_cli_foreground_calls_remote_check(monkeypatch):
     calls = []
-    monkeypatch.setattr(remote, "remote_check", lambda **kw: calls.append(kw))
+    monkeypatch.setattr(cli, "remote_check", lambda **kw: calls.append(kw))
 
     remote.main(["check", "--ne", "11", "--refresh"])
 
@@ -2199,9 +2202,7 @@ def test_check_cli_foreground_calls_remote_check(monkeypatch):
 
 
 def test_check_cli_rejects_follow_without_detached(monkeypatch, capsys):
-    monkeypatch.setattr(
-        remote, "remote_check", lambda **kw: pytest.fail("must reject before running")
-    )
+    monkeypatch.setattr(cli, "remote_check", lambda **kw: pytest.fail("must reject before running"))
 
     with pytest.raises(SystemExit) as excinfo:
         remote.main(["check", "--follow"])
@@ -2213,7 +2214,7 @@ def test_check_cli_rejects_follow_without_detached(monkeypatch, capsys):
 @pytest.mark.parametrize("args", [["--pull", "--detached"], ["--pull", "--detached", "--follow"]])
 def test_check_cli_rejects_pull_with_detached(monkeypatch, capsys, args):
     monkeypatch.setattr(
-        remote, "pull_zhai_cache", lambda: pytest.fail("must reject before pulling")
+        lifecycle, "pull_zhai_cache", lambda: pytest.fail("must reject before pulling")
     )
 
     with pytest.raises(SystemExit) as excinfo:
@@ -2229,9 +2230,9 @@ def test_sync_paths_ship_checks_and_zhai_shim():
 
 def test_stop_writes_stop_sentinel_before_scancel(monkeypatch):
     commands = []
-    monkeypatch.setattr(remote, "_slurm_job_id", lambda jobid: "123")
-    monkeypatch.setattr(remote, "_slurm_state", lambda sid: "RUNNING")
-    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: commands.append(cmd[-1]))
+    monkeypatch.setattr(state, "_slurm_job_id", lambda jobid: "123")
+    monkeypatch.setattr(state, "_slurm_state", lambda sid: "RUNNING")
+    monkeypatch.setattr(transport, "_run", lambda cmd, **kw: commands.append(cmd[-1]))
     remote._stop_jobid("20260717-abc")
     (cmd,) = commands
     assert cmd.index("STOP") < cmd.index("scancel")
@@ -2253,7 +2254,7 @@ def test_is_reapable_only_when_dead_and_past_guard():
 def test_orphaned_reservation_jobs_partitions_dead_stale_from_live_and_recent(monkeypatch):
     now = 10_000
     monkeypatch.setattr(
-        remote,
+        state,
         "_reservation_ledger",
         lambda: (
             now,
@@ -2266,9 +2267,9 @@ def test_orphaned_reservation_jobs_partitions_dead_stale_from_live_and_recent(mo
         ),
     )
     monkeypatch.setattr(
-        remote, "_slurm_job_id", lambda jobid: "48291" if jobid in {"live", "fresh"} else None
+        state, "_slurm_job_id", lambda jobid: "48291" if jobid in {"live", "fresh"} else None
     )
-    monkeypatch.setattr(remote, "_slurm_state", lambda sid: "RUNNING" if sid == "48291" else None)
+    monkeypatch.setattr(state, "_slurm_state", lambda sid: "RUNNING" if sid == "48291" else None)
 
     orphans, protected = remote._orphaned_reservation_jobs(300.0)
 
@@ -2278,12 +2279,12 @@ def test_orphaned_reservation_jobs_partitions_dead_stale_from_live_and_recent(mo
 
 def test_reap_reservations_dry_run_previews_without_releasing(monkeypatch, capsys):
     monkeypatch.setattr(
-        remote,
+        state,
         "_orphaned_reservation_jobs",
         lambda _min_age: ({"dead": ["hopg", "hbn"]}, {"live": ["mose2"]}),
     )
     runs = []
-    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: runs.append(cmd))
+    monkeypatch.setattr(transport, "_run", lambda cmd, **kw: runs.append(cmd))
 
     remote.reap_reservations(yes=False)
 
@@ -2296,10 +2297,10 @@ def test_reap_reservations_dry_run_previews_without_releasing(monkeypatch, capsy
 
 def test_reap_reservations_yes_releases_orphans_and_stamps_terminal_state(monkeypatch, capsys):
     monkeypatch.setattr(
-        remote, "_orphaned_reservation_jobs", lambda _min_age: ({"dead": ["hopg"]}, {})
+        state, "_orphaned_reservation_jobs", lambda _min_age: ({"dead": ["hopg"]}, {})
     )
     runs = []
-    monkeypatch.setattr(remote, "_run", lambda cmd, **kw: runs.append(cmd[-1]))
+    monkeypatch.setattr(transport, "_run", lambda cmd, **kw: runs.append(cmd[-1]))
 
     remote.reap_reservations(yes=True)
 
@@ -2320,16 +2321,14 @@ def test_reap_job_command_releases_only_matching_owner(tmp_path):
         (d / "jobid").write_text(f"{owner}\n")
     (monkeypatch_dir / "jobs" / "dead").mkdir(parents=True)
 
-    import cxr_mc.remote as R
-
-    old = R.REMOTE_DIR
-    R.REMOTE_DIR = str(monkeypatch_dir)
+    old = config.REMOTE_DIR
+    config.REMOTE_DIR = str(monkeypatch_dir)
     try:
         result = subprocess.run(
-            [bash, "-c", R._reap_job_command("dead")], capture_output=True, text=True
+            [bash, "-c", scripts._reap_job_command("dead")], capture_output=True, text=True
         )
     finally:
-        R.REMOTE_DIR = old
+        config.REMOTE_DIR = old
 
     assert result.returncode == 0, result.stderr
     assert not (reservations / "hopg").exists()

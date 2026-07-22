@@ -1,0 +1,465 @@
+"""SLURM script and remote-command string builders (pure, no ssh)."""
+
+import datetime
+import shlex
+import uuid
+
+from . import config, transport
+
+
+# ---- detached job queue -------------------------------------------------------
+def _stems(materials, quick):
+    """Checkpoint stems a queue produces (scan.py writes <material>_quick.pkl
+    for --quick runs)."""
+    return [f"{m}_quick" if quick else m for m in materials]
+
+
+def _new_jobid() -> str:
+    """Return a collision-resistant, shell-safe local job directory name."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"{timestamp}-{uuid.uuid4().hex[:8]}"
+
+
+def _validate_parallel_materials(parallel_materials):
+    """Return a supported in-allocation material-process limit."""
+    if (
+        not isinstance(parallel_materials, int)
+        or not 1 <= parallel_materials <= config.MAX_PARALLEL_MATERIALS
+    ):
+        raise SystemExit(
+            f"parallel materials must be between 1 and {config.MAX_PARALLEL_MATERIALS}"
+        )
+    return parallel_materials
+
+
+def _queue_script(
+    jobid,
+    materials,
+    quick,
+    workers,
+    parallel_materials=config.DEFAULT_PARALLEL_MATERIALS,
+):
+    """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
+    parallel_materials = _validate_parallel_materials(parallel_materials)
+    flags = ""
+    if quick:
+        flags += " --quick"
+    if workers is not None:
+        flags += f" --workers {workers}"
+    mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    return f"""JOBDIR="{jobdir}"
+cd "{config.REMOTE_DIR}" || exit 1
+mkdir -p "$JOBDIR/progress"
+echo "started: $(date -Is)" >> "$JOBDIR/meta"
+{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+mats=({mats})
+total=${{#mats[@]}}
+parallel_materials={parallel_materials}
+n=0
+failures=0
+active=0
+run_material() {{
+  local i="$1"
+  local m="$2"
+  echo "running $m [$i/$total] since $(date -Is)" > "$JOBDIR/state"
+  printf '\\n===== [%s/%s] %s  %s =====\\n' "$i" "$total" "$m" "$(date -Is)" \
+>> "$JOBDIR/log"
+  if ! {config.REMOTE_UV} run --no-sync python scan.py "$m"{flags} \
+    --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1
+  then
+    echo "WARNING: scan failed for $m; continuing" >> "$JOBDIR/log"
+    echo "warning at $m [$i/$total] $(date -Is)" > "$JOBDIR/state"
+    return 1
+  fi
+  echo "completed: $m" >> "$JOBDIR/log"
+}}
+for m in "${{mats[@]}}"; do
+  n=$((n + 1))
+  run_material "$n" "$m" &
+  active=$((active + 1))
+  if [ "$active" -ge "$parallel_materials" ]; then
+    if ! wait -n; then
+      failures=$((failures + 1))
+    fi
+    active=$((active - 1))
+  fi
+done
+while [ "$active" -gt 0 ]; do
+  if ! wait -n; then
+    failures=$((failures + 1))
+  fi
+  active=$((active - 1))
+done
+if [ "$failures" -gt 0 ]; then
+  echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
+else
+  echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
+fi
+"""
+
+
+def _chunked_queue_script(jobid, materials, quick, workers, chunk_minutes):
+    """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
+
+    Reused verbatim by every slice: it resumes from checkpoint, does about
+    chunk_minutes of work via scan.py --max-minutes, and either terminates the
+    chain (all materials completed:/failed:) or hands off: write the
+    'queued slice' state FIRST, then sbatch fail-closed, then append the SID.
+    State-first ordering keeps the EXIT trap from releasing reservations while
+    the next slice is already pending (spec Component 2 step 4).
+    """
+    flags = ""
+    if quick:
+        flags += " --quick"
+    if workers is not None:
+        flags += f" --workers {workers}"
+    mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    chunk_seconds = int(round(chunk_minutes * 60))
+    return f"""JOBDIR="{jobdir}"
+cd "{config.REMOTE_DIR}" || exit 1
+mkdir -p "$JOBDIR/progress"
+echo "started: $(date -Is)" >> "$JOBDIR/meta"
+{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+mats=({mats})
+total=${{#mats[@]}}
+chunk_seconds={chunk_seconds}
+slice_start=$(date +%s)
+n=0
+for m in "${{mats[@]}}"; do
+  n=$((n + 1))
+  grep -qx "completed: $m" "$JOBDIR/log" 2>/dev/null && continue
+  grep -qx "failed: $m" "$JOBDIR/log" 2>/dev/null && continue
+  now=$(date +%s)
+  remaining=$((slice_start + chunk_seconds - now))
+  [ "$remaining" -gt 0 ] || break
+  remaining_min=$(awk "BEGIN {{ printf \\"%.2f\\", $remaining / 60 }}")
+  echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
+  printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
+  rc=0
+  {config.REMOTE_UV} run --no-sync python scan.py "$m"{flags} --max-minutes "$remaining_min" \
+    --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1 || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "completed: $m" >> "$JOBDIR/log"
+  elif [ "$rc" -ne 75 ]; then
+    echo "WARNING: scan failed for $m (exit $rc); will not retry" >> "$JOBDIR/log"
+    echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
+    echo "failed: $m" >> "$JOBDIR/log"
+  fi
+done
+unresolved=0
+failures=0
+for m in "${{mats[@]}}"; do
+  grep -qx "failed: $m" "$JOBDIR/log" 2>/dev/null && {{ failures=$((failures + 1)); continue; }}
+  grep -qx "completed: $m" "$JOBDIR/log" 2>/dev/null && continue
+  unresolved=1
+done
+if [ "$unresolved" -eq 0 ]; then
+  if [ "$failures" -gt 0 ]; then
+    echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
+  else
+    echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
+  fi
+  exit 0
+fi
+[ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
+k=$(grep -c "^slurm_job_id: " "$JOBDIR/meta" 2>/dev/null)
+echo "queued slice $((k + 1)) $(date -Is)" > "$JOBDIR/state"
+SID=$(sbatch --parsable --nice=10000 "$JOBDIR/run.sh") || {{ echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+SID=${{SID%%;*}}
+case "$SID" in ''|*[!0-9]*) echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1 ;; esac
+printf 'slurm_job_id: %s\\n' "$SID" >> "$JOBDIR/meta"
+"""
+
+
+def _zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
+    flags = f" --ne {ne} --ne-brem {ne_brem} --ne-supp {ne_supp} --tmd-azimuth {tmd_azimuth}"
+    if refresh:
+        flags += " --refresh"
+    return flags
+
+
+def _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh):
+    """CXR payload for one Zhai reproduction inside a SLURM allocation."""
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    flags = _zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh)
+    return f"""JOBDIR="{jobdir}"
+cd "{config.REMOTE_DIR}" || exit 1
+echo "started: $(date -Is)" >> "$JOBDIR/meta"
+{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+echo "running zhai reproduction since $(date -Is)" > "$JOBDIR/state"
+if ! {config.REMOTE_UV} run --no-sync python reproduce_zhai.py{flags} >> "$JOBDIR/log" 2>&1
+then
+  echo "FAILED $(date -Is)" > "$JOBDIR/state"
+  exit 1
+fi
+echo "done $(date -Is)" > "$JOBDIR/state"
+"""
+
+
+def _reservation_root() -> str:
+    return f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{config.RESERVATIONS_SUBDIR}"
+
+
+def _release_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
+    """Return a remote command that releases only reservations owned by ``jobid``."""
+    transport._check_shell_tokens([jobid, *stems])
+    reservations = _reservation_root()
+    releases = "; ".join(
+        f'if [ "$(cat "$R/{stem}/jobid" 2>/dev/null)" = "$J" ]; then rm -rf "$R/{stem}"; fi'
+        for stem in stems
+    )
+    command = f'R="{reservations}"; J="{jobid}"'
+    return f"{command}; {releases}" if releases else command
+
+
+def _release_job_reservations_command(jobid: str) -> str:
+    """Return a remote command that releases every reservation owned by a job."""
+    transport._check_shell_tokens([jobid])
+    return (
+        f'R="{_reservation_root()}"; J="{jobid}"; '
+        'for d in "$R"/*; do [ -d "$d" ] || continue; '
+        '[ "$(cat "$d/jobid" 2>/dev/null)" = "$J" ] && rm -rf "$d"; done'
+    )
+
+
+def _reserve_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
+    """Atomically reserve checkpoint stems while a job is being staged.
+
+    Each ``mkdir`` is the cross-client compare-and-set: a second submitter
+    cannot pass between the prior ``squeue`` snapshot and ``sbatch``.
+    """
+    transport._check_shell_tokens([jobid, *stems])
+    reservations = _reservation_root()
+    stem_words = " ".join(stems)
+    return f'''R="{reservations}"; J="{jobid}"; mkdir -p "$R"; claimed=""; \
+for stem in {stem_words}; do \
+  if mkdir "$R/$stem" 2>/dev/null; then \
+    printf '%s\\n' "$J" > "$R/$stem/jobid"; claimed="$claimed $stem"; \
+  else \
+    owner=$(cat "$R/$stem/jobid" 2>/dev/null || true); \
+    for held in $claimed; do \
+      [ "$(cat "$R/$held/jobid" 2>/dev/null)" = "$J" ] && rm -rf "$R/$held"; \
+    done; \
+    echo "refusing to stage job $J: checkpoint $stem is reserved by ${{owner:-another staging job}}" >&2; \
+    exit 17; \
+  fi; \
+done'''
+
+
+def _slurm_batch_script(
+    jobid: str,
+    payload: str,
+    *,
+    job_name: str,
+    reservation_stems: list[str] | None = None,
+    time_limit: str = config.SLURM_TIME,
+) -> str:
+    """Wrap a CXR queue payload in the lab box's one-GPU SLURM profile."""
+    reservation_stems = reservation_stems or []
+    transport._check_shell_tokens([jobid, *reservation_stems])
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    reservations = _reservation_root()
+    release_lines = (
+        "\n  ".join(
+            f'if [ "$(cat "$RESERVATIONS/{stem}/jobid" 2>/dev/null)" = "$JOBID" ]; then rm -rf "$RESERVATIONS/{stem}"; fi;'
+            for stem in reservation_stems
+        )
+        or ":"
+    )
+    return f"""#!/usr/bin/env bash
+#SBATCH --job-name={job_name}
+#SBATCH --partition={config.SLURM_PARTITION}
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node={config.SLURM_GPUS}
+#SBATCH --gres=gpu:{config.SLURM_GPUS}
+#SBATCH --time={time_limit}
+#SBATCH --output={jobdir}/slurm-%j.out
+#SBATCH --error={jobdir}/slurm-%j.err
+
+set -u
+module purge 2>/dev/null || true
+module load cuda openmpi hdf5 2>/dev/null || true
+
+JOBDIR="{jobdir}"
+JOBID="{jobid}"
+RESERVATIONS="{reservations}"
+release_reservations() {{
+  {release_lines}
+}}
+termination_signal=""
+termination_status=0
+record_termination() {{
+  termination_signal=$1
+  termination_status=$2
+  echo "FAILED (signal $termination_signal) $(date -Is)" > "$JOBDIR/state"
+}}
+finish() {{
+  status=$?
+  if [ -n "$termination_signal" ]; then
+    echo "FAILED (signal $termination_signal) $(date -Is)" > "$JOBDIR/state"
+    release_reservations
+    trap - EXIT
+    exit "$termination_status"
+  fi
+  current=$(cat "$JOBDIR/state" 2>/dev/null || true)
+  case "$current" in
+    "queued slice"*) ;;
+    done*|FAILED*|cancelled*|cancelling*) release_reservations ;;
+    *) echo "FAILED (exit $status) $(date -Is)" > "$JOBDIR/state"; release_reservations ;;
+  esac
+}}
+trap 'record_termination TERM 143' TERM
+trap 'record_termination INT 130' INT
+trap 'record_termination HUP 129' HUP
+trap finish EXIT
+echo "running $(date -Is)" > "$JOBDIR/state"
+{{
+  echo "===== SLURM job ${{SLURM_JOB_ID:-unknown}} ====="
+  echo "host: $(hostname)"
+  echo "gpus: {config.SLURM_GPUS}"
+  echo "partition: {config.SLURM_PARTITION}"
+  echo "started: $(date -Is)"
+}} >> "$JOBDIR/log"
+
+{payload}"""
+
+
+def _submit_slurm_command(
+    jobid: str, reservation_stems: list[str] | None = None, *, nice: bool = False
+) -> str:
+    """Return the remote submission protocol for an already-written batch script."""
+    reservation_stems = reservation_stems or []
+    transport._check_shell_tokens([jobid, *reservation_stems])
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    release = _release_checkpoint_stems_command(jobid, reservation_stems)
+    sbatch = "sbatch --parsable --nice=10000" if nice else "sbatch --parsable"
+    return f"""D='{jobdir}'; \
+echo "queued $(date -Is)" > "$D/state"; \
+SID=$({sbatch} '{jobdir}/run.sh') || {{ \
+  echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; {release}; exit 1; \
+}}; \
+SID=${{SID%%;*}}; \
+case "$SID" in ''|*[!0-9]*) \
+  echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; {release}; exit 1 ;; \
+esac; \
+printf 'slurm_job_id: %s\\n' "$SID" >> "$D/meta"; \
+printf '%s\\n' "$SID"
+"""
+
+
+def _queue_metadata(
+    jobid,
+    materials,
+    quick,
+    workers,
+    parallel_materials: int | None = config.DEFAULT_PARALLEL_MATERIALS,
+    chunk_minutes: float = 0,
+):
+    """Static metadata persisted before a queue becomes visible to SLURM."""
+    return "\n".join(
+        [
+            f"job: {jobid}",
+            f"materials: {' '.join(materials)}",
+            f"quick: {bool(quick)}",
+            f"workers: {workers}",
+            f"parallel_materials: {parallel_materials}",
+            f"chunk_minutes: {chunk_minutes}",
+            "progress_dashboard: True",
+            "",
+        ]
+    )
+
+
+def _zhai_queue_metadata(jobid, ne, ne_brem, ne_supp):
+    """Static metadata persisted before the Zhai batch job is submitted."""
+    return "\n".join(
+        [
+            f"job: {jobid}",
+            f"materials: {config.ZHAI_STEM}",
+            "quick: False",
+            f"ne: {ne}",
+            f"ne_brem: {ne_brem}",
+            f"ne_supp: {ne_supp}",
+            "",
+        ]
+    )
+
+
+def _write_job_script_command(jobdir, metadata):
+    """Exclusively create a job directory, then receive its script on stdin."""
+    return (
+        f"mkdir '{jobdir}' && cat > '{jobdir}/run.sh' && "
+        f"printf %s {shlex.quote(metadata)} > '{jobdir}/meta'"
+    )
+
+
+def _squeue_state_command(scheduler_id: str, *, retired: str) -> str:
+    """Build fail-closed Bash that stores a live SLURM state in ``STATE``.
+
+    SLURM reports a recently retired ID as a nonzero error on some clusters;
+    callers provide the control-flow action that means "not queued" in their
+    surrounding shell context. Every other query failure remains fatal.
+    """
+    return (
+        f"STATE=$(squeue -h -j {scheduler_id} -o '%T' 2>&1); STATUS=$?; "
+        'if [ "$STATUS" -ne 0 ]; then case "$STATE" in '
+        f'*"Invalid job id specified"*) {retired} ;; '
+        f'*) echo "could not query SLURM job {scheduler_id}" >&2; exit "$STATUS" ;; esac; fi; '
+    )
+
+
+def _clear_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
+    """Atomically reserve and delete checkpoint stems on the remote box.
+
+    The temporary reservation spans the delete itself, closing the interval
+    between a clear's liveness check and ``rm`` where a concurrent ``start``
+    could otherwise claim the same checkpoint.  The EXIT trap releases only
+    reservations owned by this clear, including after a failed deletion.
+    """
+    transport._check_shell_tokens([jobid, *stems])
+    reservations = _reservation_root()
+    stem_words = " ".join(stems)
+    releases = " ".join(
+        f'if [ "$(cat "$R/{stem}/jobid" 2>/dev/null)" = "$J" ]; then rm -rf "$R/{stem}"; fi;'
+        for stem in stems
+    )
+    return f'''R="{reservations}"; J="{jobid}"; C="{config.REMOTE_DIR}/checkpoints"; \
+mkdir -p "$R" || exit $?; \
+release() {{ {releases} }}; trap release EXIT; \
+for stem in {stem_words}; do \
+  if mkdir "$R/$stem" 2>/dev/null; then printf '%s\\n' "$J" > "$R/$stem/jobid"; \
+  else printf 'RESERVED\\t%s\\n' "$stem"; exit 0; fi; \
+done; \
+cd "$C" 2>/dev/null || exit 0; \
+for stem in {stem_words}; do f="$stem.pkl"; [ -f "$f" ] || continue; rm -f "$f" || exit $?; \
+  printf 'CLEARED\\t%s\\n' "$f"; done'''
+
+
+def _reap_job_command(jobid: str) -> str:
+    """Remote command: release a job's reservations, then stamp its state terminal."""
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    release = _release_job_reservations_command(jobid)
+    return f'{release}; echo "reaped (orphan reservations released) $(date -Is)" > "{jobdir}/state"'
+
+
+def _recorded_job_dirs_command() -> str:
+    """Shell fragment that emits only submitted job directories, in order.
+
+    ``jobs/reservations`` is bookkeeping for checkpoint ownership, not a job.
+    A submitted job has its metadata file written before ``sbatch`` runs, so
+    that marker also excludes incomplete or unrelated directories safely.
+    """
+    return (
+        'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
+        '[ -f "$d/meta" ] || continue; printf "%s\\n" "$(basename "$d")"; done'
+    )
+
+
+def _job_assign(jobid):
+    """Bash that sets JOB to the given id, or the latest job dir if none given."""
+    if jobid:
+        transport._check_shell_tokens([jobid])
+        return f'JOB="{jobid}"'
+    return f"JOB=$({_recorded_job_dirs_command()} | tail -1)"

@@ -335,11 +335,24 @@ figure export, optional remote Zhai-job launch/status/pull helpers.
 catalog without importing GPU-heavy CLI modules.
 - Public: `add_subparser`, `main`.
 
-### `remote.py`
+### `remote.py` (facade over `_remote/`)
 Optional SSH/SLURM orchestration for configured lab box: sync, bounded and
 chunked submissions, progress/status/log viewers, checkpoint pulls, safe stop
 and clear, remote validation jobs.
 - Public CLI: `add_subparser`, `main`.
+- Thin re-export facade. Implementation split into `_remote/` submodules
+  (acyclic: `config` ◄ `transport` ◄ `scripts` ◄ `state` ◄ `lifecycle`/`viewer`
+  ◄ `cli`; plus `presentation`):
+  - `config.py` — env-driven hosts/paths/SLURM constants.
+  - `transport.py` — ssh/scp primitives, hashing, code-tar sync, material checks.
+  - `scripts.py` — pure SLURM/shell string + command builders, job-id minting.
+  - `state.py` — read-only job/reservation state queries over ssh.
+  - `lifecycle.py` — submit/stage/stop/clear/pull job lifecycle.
+  - `viewer.py` — live attach/status/logs rendering.
+  - `cli.py` — argparse wiring and subcommand dispatch.
+  Names re-export as import-time snapshots; internal cross-module calls resolve
+  through the owning submodule, so tests patch the owner (e.g.
+  `transport._ssh_capture`), not the facade.
 
 ### `export.py`
 `cxr export` subcommand — `marimo export html` of `notebooks/analysis_app.py`

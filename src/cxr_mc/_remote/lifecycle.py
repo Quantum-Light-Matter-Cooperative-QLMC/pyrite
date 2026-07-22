@@ -1,0 +1,552 @@
+"""Job lifecycle: submit, stop, clear, reap, pull."""
+
+import math
+import subprocess
+import uuid
+from pathlib import Path
+
+from . import config, presentation, scripts, state, transport
+
+
+def _refuse_if_busy(materials, quick):
+    """Abort `start` if a live job is already producing any checkpoint this run
+    would write. Two runs writing the same `<stem>.pkl` share one `<stem>.pkl.tmp`
+    and race on `os.replace` -- the first rename consumes the temp, the second
+    dies with FileNotFoundError (see run.py:_checkpoint_save). Comparing *stems*
+    (material, or material_quick) not bare materials lets a `--quick` smoke test
+    run alongside a full sweep of the same material, since they write different
+    files."""
+    wanted = set(scripts._stems(materials, quick))
+    busy = [
+        (jid, sorted(clash))
+        for jid, jquick, jmats in state._live_jobs()
+        if (clash := wanted.intersection(scripts._stems(jmats, jquick)))
+    ]
+    if busy:
+        detail = "\n".join(f"  job {jid} is running -> {', '.join(s)}" for jid, s in busy)
+        raise SystemExit(
+            "refusing to start: a live job is already producing the same "
+            "checkpoint(s), and two runs writing one <stem>.pkl race on its "
+            f".tmp and crash.\n{detail}\n"
+            "attach to it (cxr remote attach <jobid>) or stop it "
+            "(cxr remote stop <material>) first, or run different materials."
+        )
+
+
+def clear_remote(materials, yes=False):
+    """Delete one or more materials' accumulated checkpoints on the box: both
+    ``checkpoints/<material>.pkl`` and ``checkpoints/<material>_quick.pkl`` for
+    each material.  Accepts a single crystal key or a list.
+
+    Refuses (before touching anything) if a live job or a pre-submission
+    reservation protects any stem.  Without ``yes`` this is a safe dry preview:
+    it prints exactly which files exist and would be deleted, then stops. With
+    ``yes`` it ``rm -f``s them and reports what went."""
+    if isinstance(materials, str):
+        materials = [materials]
+    transport._check_materials(materials)  # interpolated into a remote shell command
+    label = ", ".join(materials)
+    wanted = {stem for m in materials for stem in (m, f"{m}_quick")}
+    busy = [
+        (jid, sorted(clash))
+        for jid, jquick, jmats in state._live_jobs()
+        if (clash := wanted.intersection(scripts._stems(jmats, jquick)))
+    ]
+    if busy:
+        detail = "\n".join(f"  job {jid} is producing -> {', '.join(s)}" for jid, s in busy)
+        raise SystemExit(
+            "refusing to clear: a live job is still producing one of these "
+            f"checkpoints, and clearing it would race a running sweep.\n{detail}\n"
+            "stop it (cxr remote stop <material>) first, or wait for it to finish."
+        )
+    stems = [stem for m in materials for stem in (m, f"{m}_quick")]
+    if yes:
+        outcome = transport._ssh_capture(
+            scripts._clear_checkpoint_stems_command(f"clear-{scripts._new_jobid()}", stems)
+        ).splitlines()
+        reservations = [line.split("\t", 1)[1] for line in outcome if line.startswith("RESERVED\t")]
+        if reservations:
+            raise SystemExit(
+                "refusing to clear: a checkpoint reservation is still active for "
+                f"{', '.join(reservations)}. Wait for submission to resolve, or stop "
+                "the recorded job before clearing."
+            )
+        existing = [line.split("\t", 1)[1] for line in outcome if line.startswith("CLEARED\t")]
+        if not existing:
+            print(f"(nothing to clear for {label})")
+            return
+        print("cleared on the box:")
+        for f in existing:
+            print(f"  checkpoints/{f}")
+        return
+    reservations = state._reservation_holders(stems)
+    if reservations:
+        detail = "\n".join(
+            f"  reservation {owner} protects -> {stem}" for stem, owner in reservations
+        )
+        raise SystemExit(
+            "refusing to clear: a checkpoint reservation is still active, which can "
+            "belong to a submission whose SLURM outcome is not yet known.\n"
+            f"{detail}\n"
+            "wait for submission to resolve, or stop the recorded job before clearing."
+        )
+    # which stems actually exist on the box; the `|| true` keeps a missing last
+    # stem's failed `[ -f ]` from becoming the loop's -- and hence ssh's -- exit
+    # status, which would make _ssh_capture abort the whole clear
+    pkl_names = " ".join(f"{stem}.pkl" for stem in stems)
+    listing = (
+        f"cd {config.REMOTE_DIR}/checkpoints 2>/dev/null || exit 0; "
+        f'for f in {pkl_names}; do [ -f "$f" ] && echo "$f" || true; done'
+    )
+    existing = transport._ssh_capture(listing).split()
+    if not existing:
+        print(f"(nothing to clear for {label})")
+        return
+    if not yes:
+        print("would delete on the box (re-run with --yes to delete):")
+        for f in existing:
+            print(f"  checkpoints/{f}")
+        return
+
+
+def clear_all_remote(yes=False):
+    """Empty the box's ``checkpoints/`` directory: delete every ``*.pkl`` file
+    under it (recursively, so per-reproduction subdirs are included too).
+
+    Refuses (before touching anything) if any live job is running or any
+    checkpoint reservation is held: both signal an in-flight sweep whose output
+    a blanket clear would destroy or race. Without ``yes`` this is a safe dry
+    preview: it lists the files that would be deleted, then stops. With ``yes``
+    it deletes them and reports the count."""
+    live = state._live_jobs()
+    if live:
+        detail = "\n".join(
+            f"  job {jid} is producing -> {', '.join(sorted(scripts._stems(jmats, jquick)))}"
+            for jid, jquick, jmats in live
+        )
+        raise SystemExit(
+            "refusing to clear --all: live job(s) are still producing checkpoints, "
+            f"and clearing would race running sweeps.\n{detail}\n"
+            "stop them (cxr remote stop --all) first, or wait for them to finish."
+        )
+    _now, reservations = state._reservation_ledger()
+    if reservations:
+        detail = "\n".join(
+            f"  reservation {jobid} protects -> {stem}" for stem, jobid, _mtime in reservations
+        )
+        raise SystemExit(
+            "refusing to clear --all: a checkpoint reservation is still active, which can "
+            "belong to a submission whose SLURM outcome is not yet known.\n"
+            f"{detail}\n"
+            "wait for submission to resolve, reap orphans (cxr remote reap), or stop the "
+            "recorded job before clearing."
+        )
+    # list first (dry preview), then delete only under --yes. `|| true` keeps a
+    # missing checkpoints/ dir or a find failure from becoming ssh's exit status.
+    listing = (
+        f"cd {config.REMOTE_DIR}/checkpoints 2>/dev/null || exit 0; "
+        r'find . -type f -name "*.pkl" 2>/dev/null | sed "s|^\./||" | sort || true'
+    )
+    existing = transport._ssh_capture(listing).split()
+    if not existing:
+        print("(nothing to clear: checkpoints/ holds no .pkl files)")
+        return
+    if not yes:
+        print(f"would delete on the box (re-run with --yes to delete) -- {len(existing)} file(s):")
+        for f in existing:
+            print(f"  checkpoints/{f}")
+        return
+    transport._ssh_capture(
+        f"cd {config.REMOTE_DIR}/checkpoints 2>/dev/null || exit 0; "
+        r'find . -type f -name "*.pkl" -delete'
+    )
+    print(f"cleared on the box: {len(existing)} checkpoint file(s) under checkpoints/")
+
+
+def start_queue(
+    materials,
+    quick=False,
+    workers=None,
+    no_sync=False,
+    dry_run=False,
+    parallel_materials=None,
+    chunk_minutes=10.0,
+):
+    """Submit a material queue to SLURM. Returns its job id.
+
+    By default the queue is chunked: each ~chunk_minutes slice resumes from
+    checkpoint, does bounded work via ``scan.py --max-minutes``, and either
+    terminates the chain or resubmits itself with ``--nice=10000`` so other
+    users of the single-GPU box get priority at every slice boundary. Pass
+    ``chunk_minutes=0`` for the original monolithic allocation, which is the
+    only mode that accepts ``parallel_materials``.
+    """
+    transport._check_materials(materials)
+    chunked = chunk_minutes > 0
+    if chunked and parallel_materials is not None:
+        raise SystemExit(
+            "--parallel-materials only applies to a monolithic allocation; "
+            "pass --chunk-minutes 0 to use it"
+        )
+    if not dry_run:
+        _refuse_if_busy(materials, quick)
+    jobid = scripts._new_jobid()
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    stems = scripts._stems(materials, quick)
+    if chunked:
+        parallel_materials = None
+        payload = scripts._chunked_queue_script(jobid, materials, quick, workers, chunk_minutes)
+        time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
+    else:
+        parallel_materials = scripts._validate_parallel_materials(
+            config.DEFAULT_PARALLEL_MATERIALS if parallel_materials is None else parallel_materials
+        )
+        payload = scripts._queue_script(jobid, materials, quick, workers, parallel_materials)
+        time_limit = config.SLURM_TIME
+    script = scripts._slurm_batch_script(
+        jobid, payload, job_name=f"cxr-{jobid}", reservation_stems=stems, time_limit=time_limit
+    )
+    upload = scripts._write_job_script_command(
+        jobdir,
+        scripts._queue_metadata(
+            jobid, materials, quick, workers, parallel_materials, chunk_minutes
+        ),
+    )
+    submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
+
+    if dry_run:
+        print(f"# job {jobid}: {' '.join(materials)}{' (quick)' if quick else ''}")
+        print(f"# --- ssh {config.HOST}: {upload} <<\n")
+        print(script)
+        print(f"# --- ssh {config.HOST}: {submit}")
+        return jobid
+
+    if not no_sync:
+        transport.sync_code()
+    # create the job dir and write run.sh (script piped over stdin).
+    # Send as LF-only bytes: text=True on Windows translates \n->\r\n,
+    # which produces a CRLF run.sh that bash silently refuses to execute.
+    _stage_job_script(jobid, stems, upload, script)
+    scheduler_id = _submit_staged_job(jobid, stems, nice=chunked)
+
+    print(
+        f"\nJOB {jobid} · SUBMITTED\n"
+        + presentation._format_fields(
+            [
+                ("SLURM", scheduler_id),
+                ("Host", config.HOST),
+                ("Materials", ", ".join(materials)),
+                (
+                    "Mode",
+                    presentation._mode_summary(
+                        scripts._queue_metadata(
+                            jobid, materials, quick, workers, parallel_materials, chunk_minutes
+                        )
+                    ),
+                ),
+                ("Attach", f"cxr remote attach {jobid}"),
+                ("Status", f"cxr remote status {jobid} -vv"),
+                ("Logs", f"cxr remote logs {jobid} --follow"),
+                ("Pull", f"cxr remote pull {' '.join(stems)}  (after completion)"),
+            ]
+        )
+    )
+    return jobid
+
+
+def start_zhai_queue(
+    ne=20_000,
+    ne_brem=200,
+    ne_supp=200,
+    tmd_azimuth=0.0,
+    refresh=False,
+    no_sync=False,
+    dry_run=False,
+):
+    """Submit a Zhai-reproduction batch job to SLURM. Returns the local job id."""
+    if not dry_run:
+        _refuse_if_busy([config.ZHAI_STEM], False)
+    jobid = scripts._new_jobid()
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    stems = [config.ZHAI_STEM]
+    payload = scripts._zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh)
+    script = scripts._slurm_batch_script(
+        jobid, payload, job_name=f"cxr-zhai-{jobid}", reservation_stems=stems
+    )
+    upload = scripts._write_job_script_command(
+        jobdir, scripts._zhai_queue_metadata(jobid, ne, ne_brem, ne_supp)
+    )
+    submit = scripts._submit_slurm_command(jobid, stems)
+
+    if dry_run:
+        print(f"# zhai job {jobid}: ne={ne} ne_brem={ne_brem} ne_supp={ne_supp}")
+        print(f"# --- ssh {config.HOST}: {upload} <<\n")
+        print(script)
+        print(f"# --- ssh {config.HOST}: {submit}")
+        return jobid
+
+    if not no_sync:
+        transport.sync_code()
+    _stage_job_script(jobid, stems, upload, script)
+    scheduler_id = _submit_staged_job(jobid, stems)
+
+    print(
+        f"\nJOB {jobid} · SUBMITTED\n"
+        + presentation._format_fields(
+            [
+                ("SLURM", scheduler_id),
+                ("Host", config.HOST),
+                ("Workload", "Zhai reproduction"),
+                ("Attach", f"cxr remote attach {jobid}"),
+                ("Status", f"cxr remote status {jobid} -vv"),
+                ("Logs", f"cxr remote logs {jobid} --follow"),
+                ("Pull", "cxr remote check --pull  (after completion)"),
+            ]
+        )
+    )
+    return jobid
+
+
+def _stage_job_script(jobid: str, stems: list[str], upload: str, script: str) -> None:
+    """Reserve stems and upload a batch script, releasing on upload failure."""
+    transport._run(
+        ["ssh", "-n", config.HOST, scripts._reserve_checkpoint_stems_command(jobid, stems)]
+    )
+    try:
+        subprocess.run(
+            ["ssh", config.HOST, upload],
+            input=script.replace("\r\n", "\n").encode(),
+            check=True,
+        )
+    except BaseException:
+        transport._run(
+            ["ssh", "-n", config.HOST, scripts._release_checkpoint_stems_command(jobid, stems)]
+        )
+        raise
+
+
+def _submission_outcome(jobid: str) -> str:
+    """Classify a submission whose SSH response was lost, conservatively."""
+    transport._check_shell_tokens([jobid])
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    remote = (
+        f'D="{jobdir}"; '
+        '[ -d "$D" ] || { echo missing; exit 0; }; '
+        'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
+        "case \"$SID\" in *[!0-9]*|'') ;; *) echo submitted; exit 0 ;; esac; "
+        'STATE=$(cat "$D/state" 2>/dev/null || true); '
+        'case "$STATE" in '
+        '"FAILED (sbatch submission)"*) echo failed ;; '
+        "queued*|running*|cancelling*) echo pending ;; "
+        "*) echo unknown ;; esac"
+    )
+    return transport._ssh_capture(remote).strip()
+
+
+def _release_if_submission_definitely_failed(jobid: str, stems: list[str]) -> None:
+    """Release staging locks only after remote state proves ``sbatch`` failed."""
+    try:
+        definitely_failed = _submission_outcome(jobid) == "failed"
+    except BaseException:
+        return
+    if definitely_failed:
+        transport._run(
+            ["ssh", "-n", config.HOST, scripts._release_checkpoint_stems_command(jobid, stems)]
+        )
+
+
+def _submit_staged_job(jobid: str, stems: list[str], *, nice: bool = False) -> str:
+    """Submit an uploaded script without freeing locks after an ambiguous SSH loss."""
+    try:
+        scheduler_id = transport._ssh_capture(
+            scripts._submit_slurm_command(jobid, stems, nice=nice)
+        ).strip()
+    except BaseException:
+        _release_if_submission_definitely_failed(jobid, stems)
+        raise
+    if not scheduler_id.isdigit():
+        _release_if_submission_definitely_failed(jobid, stems)
+        raise SystemExit(f"SLURM submission for job {jobid} returned no scheduler ID")
+    return scheduler_id
+
+
+def _stop_jobid(jobid):
+    """Cancel one active scheduler job and record the terminal job state."""
+    transport._check_shell_tokens([jobid])
+    scheduler_id = state._slurm_job_id(jobid)
+    if scheduler_id is None or state._slurm_state(scheduler_id) is None:
+        raise SystemExit(f"job {jobid} is not an active SLURM job")
+    release = scripts._release_job_reservations_command(jobid)
+    # Write the STOP sentinel BEFORE scancel (spec 3b): if the cancelled slice
+    # was already past its scan loop and about to resubmit, the next slice's
+    # STOP check still terminates the chain instead of re-queueing it.
+    remote = (
+        f'D="{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"; '
+        ': > "$D/STOP"; '
+        f"scancel {scheduler_id} || exit $?; "
+        f'echo "cancelling [{scheduler_id}] $(date -Is)" > "$D/state"; '
+        "while :; do "
+        + scripts._squeue_state_command(str(scheduler_id), retired="break")
+        + '[ -n "$STATE" ] || break; sleep 1; done; '
+        f"{release}; "
+        f'echo "cancelled [{scheduler_id}] $(date -Is)" > "$D/state"; '
+        f'echo "cancelled SLURM job {scheduler_id} for job {jobid}"'
+    )
+    transport._run(["ssh", "-n", config.HOST, remote])
+
+
+def stop_jobs(materials=None, all_jobs=False):
+    """Stop live queue jobs by material name, or every live job with ``all_jobs``.
+
+    Each material can only be owned by one live job because start/scan refuse
+    checkpoint-stem collisions, so material names are the useful user-facing
+    handle and job ids stay an internal implementation detail.
+    """
+    if all_jobs:
+        if materials:
+            raise SystemExit("stop --all does not take material names")
+        live = state._live_jobs()
+        jobids = [jobid for jobid, _quick, _materials in live]
+        if not jobids:
+            print("(no live jobs to stop)")
+            return
+    else:
+        if not materials:
+            raise SystemExit("stop needs material(s), or use --all")
+        transport._check_shell_tokens(materials)
+        wanted = set(materials)
+        live = state._live_jobs()
+        matches = [
+            (jobid, wanted.intersection(jmats))
+            for jobid, _quick, jmats in live
+            if wanted.intersection(jmats)
+        ]
+        found = {material for _jobid, matched in matches for material in matched}
+        missing = sorted(wanted - found)
+        if missing:
+            raise SystemExit("no live job found for material(s): " + ", ".join(missing))
+        jobids = sorted({jobid for jobid, _matched in matches})
+
+    for jobid in jobids:
+        _stop_jobid(jobid)
+
+
+def reap_reservations(min_age_minutes=5.0, yes=False):
+    """Release checkpoint reservations orphaned by hard-killed jobs.
+
+    A reservation is a ``mkdir`` lock released by the batch job's EXIT trap. A
+    hard kill (OOM, node reboot, ``kill -9``) skips the trap and strands every
+    lock, wedging ``start``/``scan`` with no recovery path -- ``stop`` refuses a
+    job the scheduler no longer knows. This reaps locks whose owning job has no
+    SLURM allocation and whose newest lock predates the staging-race guard.
+
+    Without ``yes`` this is a safe dry preview. With ``yes`` it releases the
+    orphans and stamps each reaped job's state terminal.
+    """
+    min_age_seconds = max(0.0, min_age_minutes) * 60
+    orphans, protected = state._orphaned_reservation_jobs(min_age_seconds)
+    if not orphans and not protected:
+        print("(no active checkpoint reservations on the box)")
+        return
+    for jobid, stems in sorted(protected.items()):
+        print(f"keeping {jobid}: {len(stems)} reservation(s) held by a live or too-recent job")
+    if not orphans:
+        print("(no orphaned reservations to reap)")
+        return
+    for jobid, stems in sorted(orphans.items()):
+        verb = "releasing" if yes else "would release"
+        print(f"{verb} {jobid}: {len(stems)} orphan reservation(s) -> {', '.join(stems)}")
+    if not yes:
+        print("re-run with --yes to release them")
+        return
+    for jobid in sorted(orphans):
+        transport._run(["ssh", "-n", config.HOST, scripts._reap_job_command(jobid)])
+    print(f"reaped {len(orphans)} orphaned job(s)")
+
+
+def pull(stems, grid=False, drop_wide_brem=False, downcast=False, no_sync=False):
+    """Fetch checkpoints/<stem>.pkl back from the box for each stem (stem =
+    material, or material_quick for a --quick run).
+
+    With ``grid``, filter on the box BEFORE the transfer: slim each checkpoint to
+    just the material's current grid (``cxr slim --grid``, plus the optional byte
+    trimmers) into a box temp, scp that smaller file into the local active slot,
+    and delete the temp. ``sync_code()`` runs first (unless ``no_sync``) so the
+    box rebuilds the grid from the same ``config.py`` the laptop has -- closing
+    sync drift. Without ``grid`` this is the plain whole-file scp."""
+    transport._check_shell_tokens(stems)
+    dest = config.LOCAL_ROOT / "checkpoints"
+    dest.mkdir(exist_ok=True)
+    if grid and not no_sync:
+        transport.sync_code()  # box must rebuild the grid from the same config.py
+    for stem in stems:
+        local = dest / f"{stem}.pkl"
+        try:
+            if grid:
+                flags = " --grid"
+                if drop_wide_brem:
+                    flags += " --drop-wide-brem"
+                if downcast:
+                    flags += " --downcast"
+                remote_tmp = f"/tmp/{stem}.grid.pkl"
+                ckpt = f"{config.REMOTE_DIR}/checkpoints/{stem}.pkl"
+                try:
+                    transport._run(
+                        [
+                            "ssh",
+                            "-n",
+                            config.HOST,
+                            f"cd {config.REMOTE_DIR} && {config.REMOTE_UV} run --no-sync cxr slim "
+                            f"{ckpt}{flags} -o {remote_tmp}",
+                        ]
+                    )
+                    if (
+                        digest := transport._remote_sha256(remote_tmp)
+                    ) and digest == transport._local_sha256(local):
+                        print(f"already current -> checkpoints/{stem}.pkl")
+                    else:
+                        transport._run(["scp", f"{config.HOST}:{remote_tmp}", str(local)])
+                        print(f"pulled (grid) -> checkpoints/{stem}.pkl")
+                finally:
+                    transport._run(["ssh", "-n", config.HOST, f"rm -f {remote_tmp}"])
+            else:
+                ckpt = f"{config.REMOTE_DIR}/checkpoints/{stem}.pkl"
+                remote_tmp = f"{config.REMOTE_DIR}/checkpoints/.{stem}.pull.{uuid.uuid4().hex}.pkl"
+                try:
+                    # Checkpoint writers publish with os.replace; a sibling hard link
+                    # freezes the exact inode that both the digest and scp will read.
+                    transport._run(["ssh", "-n", config.HOST, f"ln {ckpt} {remote_tmp}"])
+                    if (
+                        digest := transport._remote_sha256(remote_tmp)
+                    ) and digest == transport._local_sha256(local):
+                        print(f"already current -> checkpoints/{stem}.pkl")
+                    else:
+                        transport._run(["scp", f"{config.HOST}:{remote_tmp}", str(local)])
+                        print(f"pulled -> checkpoints/{stem}.pkl")
+                finally:
+                    transport._run(["ssh", "-n", config.HOST, f"rm -f {remote_tmp}"])
+        except (OSError, subprocess.CalledProcessError, SystemExit):
+            print(f"warning: could not pull checkpoint {stem!r}; continuing")
+
+
+def pull_zhai_cache():
+    """Fetch every cache file under checkpoints/zhai_reproduction/ from the
+    box.
+
+    Lists remote filenames first (like clear_remote's listing step) rather
+    than `scp -r`, which double-nests the directory when the local destination
+    already exists -- listing + per-file scp is unambiguous either way."""
+    remote_dir = f"{config.REMOTE_DIR}/checkpoints/zhai_reproduction"
+    listing = (
+        f'[ -d "{remote_dir}" ] || exit 0; '
+        f'find "{remote_dir}" -maxdepth 1 -type f -name "*.pkl" -printf "%f\\n"'
+    )
+    names = [Path(p).name for p in transport._ssh_capture(listing).split()]
+    if not names:
+        print("(no zhai cache files on the box -- run `cxr remote check` first)")
+        return
+    dest = config.LOCAL_ROOT / "checkpoints" / "zhai_reproduction"
+    dest.mkdir(parents=True, exist_ok=True)
+    for name in names:
+        transport._run(["scp", f"{config.HOST}:{remote_dir}/{name}", str(dest / name)])
+    print(f"pulled -> checkpoints/zhai_reproduction/ ({len(names)} cache files)")

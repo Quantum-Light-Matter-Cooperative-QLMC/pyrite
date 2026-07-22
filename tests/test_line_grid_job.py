@@ -43,7 +43,7 @@ def test_batch_script_uses_three_times_slice_budget_backstop():
 
 
 def test_batch_script_records_signal_termination(tmp_path, monkeypatch):
-    monkeypatch.setattr(job.remote, "REMOTE_DIR", str(tmp_path))
+    monkeypatch.setattr(job.remote.config, "REMOTE_DIR", str(tmp_path))
     jobid = "20260719-120000-deadbeef"
     jobdir = tmp_path / job.remote.JOBS_SUBDIR / jobid
     jobdir.mkdir(parents=True)
