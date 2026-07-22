@@ -17,9 +17,9 @@ _STATE_COLORS = {
     "failed": (240, 113, 120),
     "inactive": (127, 140, 152),
 }
-_TQDM_COLORS = {
-    group: f"#{rgb[0]:02x}{rgb[1]:02x}{rgb[2]:02x}" for group, rgb in _STATE_COLORS.items()
-}
+# Glyph carried beside every progress track so state is never color-alone
+# (colorblind / NO_COLOR / piped output all still read the state).
+_STATE_GLYPHS = {"done": "✓", "failed": "×", "paused": "Ⅱ"}
 _TQDM_FRAME_RE = re.compile(
     r"^\s*(?:(?P<label>[^:\r\n]{1,80}):\s*)?"
     r"(?P<percent>\d{1,3})%\|.*?\s(?P<completed>\d+)/(?P<total>\d+)\s+"
@@ -141,6 +141,53 @@ def _progress_track(completed, total, *, width=16):
     return "█" * filled + "░" * (width - filled)
 
 
+def _aggregate_progress(records):
+    """Sum every material's case counts into one job-wide (completed, total, state).
+
+    The aggregate state follows severity/activity precedence so the overall bar
+    reads at a glance: any still-running material dominates (active), else any
+    hard failure, else a pause, else all-done.
+    """
+    if not records:
+        return None
+    completed = total = 0
+    states = set()
+    for record in records.values():
+        completed += record["cached_cases"] + record["completed_new_cases"]
+        total += record["total_cases"]
+        states.add(record["state"])
+    if "running" in states:
+        state = "running"
+    elif "failed" in states:
+        state = "failed"
+    elif "paused" in states:
+        state = "paused"
+    elif states == {"done"}:
+        state = "done"
+    else:
+        state = "running"
+    return completed, total, state
+
+
+def _overall_progress_line(records):
+    """One job-wide progress bar for the status header, shown at every level."""
+    aggregate = _aggregate_progress(records)
+    if aggregate is None:
+        return None
+    completed, total, state = aggregate
+    percent = 100 if total == 0 else round(100 * completed / total)
+    glyph = _STATE_GLYPHS.get(state, "●")
+    accent = _paint(f"{glyph} {_progress_track(completed, total)}", _progress_group(state))
+    materials = (
+        ""
+        if len(records) == 1
+        else (
+            f" · {sum(1 for r in records.values() if r['state'] == 'done')}/{len(records)} materials"
+        )
+    )
+    return f"{accent}  {percent:>3}%  {completed}/{total} cases{materials}"
+
+
 def _format_case_progress(records, materials=()):
     """Render the latest validated atomic case snapshots."""
     if not records:
@@ -156,7 +203,7 @@ def _format_case_progress(records, materials=()):
         total = record["total_cases"]
         percent = 100 if total == 0 else round(100 * completed / total)
         state = record["state"]
-        glyph = {"done": "✓", "failed": "×", "paused": "Ⅱ"}.get(state, "●")
+        glyph = _STATE_GLYPHS.get(state, "●")
         track = _progress_track(completed, total)
         accent = _paint(f"{glyph} {track}", _progress_group(state))
         lines.append(
@@ -204,7 +251,7 @@ def _legacy_progress(log, state):
     else:
         progress_state = "running"
     percent = 100 if total == 0 else round(100 * completed / total)
-    glyph = {"done": "✓", "failed": "×", "paused": "Ⅱ"}.get(progress_state, "●")
+    glyph = _STATE_GLYPHS.get(progress_state, "●")
     accent = _paint(
         f"{glyph} {_progress_track(completed, total)}",
         _progress_group(progress_state),
@@ -258,6 +305,10 @@ def _format_job_status(sections, detail):
     materials = fields.get("materials", "-").split()
     scheduler_id = scheduler.get("job_id") or fields.get("slurm_job_id", "-")
     scheduler_state = scheduler.get("state", "NOT_QUEUED")
+    # Progress is fetched at every verbosity now, so the overall bar and the
+    # per-material CASE PROGRESS block render at levels 0/1/2 alike; the log is
+    # still only pulled (and legacy-parsed) at -vv.
+    records = {} if diagnostic else _parse_progress_records(sections.get("PROGRESS", ""))
     rows = [
         ("State", sections.get("STATE") or "(no state yet)"),
         ("SLURM", f"{scheduler_id} · {scheduler_state}"),
@@ -283,7 +334,17 @@ def _format_job_status(sections, detail):
                 ("Mode", _mode_summary(metadata)),
             ]
         )
+        overall = _overall_progress_line(records)
+        if overall is not None:
+            rows.append(("Progress", overall))
     output = [f"JOB {jobid}", _format_fields(rows)]
+    if not diagnostic:
+        progress = _format_case_progress(records, materials)
+        if not records and detail >= 2:
+            progress = (
+                _legacy_progress(sections.get("LOG", ""), sections.get("STATE", "")) or progress
+            )
+        output.extend(["", "CASE PROGRESS", progress])
     if detail >= 1:
         allocation = [
             ("Partition", scheduler.get("partition", "-")),
@@ -295,14 +356,9 @@ def _format_job_status(sections, detail):
         ]
         output.extend(["", "ALLOCATION", _format_fields(allocation)])
     if detail >= 2:
-        records = _parse_progress_records(sections.get("PROGRESS", ""))
-        log = sections.get("LOG", "")
-        if not diagnostic:
-            progress = _format_case_progress(records, materials)
-            if not records:
-                progress = _legacy_progress(log, sections.get("STATE", "")) or progress
-            output.extend(["", "CASE PROGRESS", progress])
-        output.extend(["", "RECENT LOG (diagnostics only)", _clean_recent_log(log)])
+        output.extend(
+            ["", "RECENT LOG (diagnostics only)", _clean_recent_log(sections.get("LOG", ""))]
+        )
     return "\n".join(output)
 
 
@@ -341,29 +397,3 @@ def _parse_progress_records(payload):
             continue
         records[material] = record
     return records
-
-
-def _update_progress_bars(bars, records, finished=None):
-    """Apply snapshots, closing terminal material rows exactly once."""
-    finished = set() if finished is None else finished
-    for material, bar in bars.items():
-        if material in finished:
-            continue
-        record = records.get(material)
-        if record is None:
-            continue
-        bar.total = record["total_cases"]
-        bar.n = record["cached_cases"] + record["completed_new_cases"]
-        state = record["state"]
-        bar.colour = _TQDM_COLORS[_progress_group(state)]
-        bar.set_description_str(f"{_material_label(material)} · {state}", refresh=False)
-        bar.set_postfix(
-            cached=record["cached_cases"],
-            new=record["completed_new_cases"],
-            refresh=False,
-        )
-        bar.refresh()
-        if state in {"done", "failed"}:
-            bar.close()
-            finished.add(material)
-    return finished

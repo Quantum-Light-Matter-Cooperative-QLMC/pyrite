@@ -74,17 +74,16 @@ import time
 import uuid
 from pathlib import Path
 
-from tqdm import tqdm
-
 from ._remote import presentation as _presentation
 from .materials import CATALOG
 from .scan import load_all_materials
 
 _SHELL_TOKEN_RE = _presentation._SHELL_TOKEN_RE
 _STATE_COLORS = _presentation._STATE_COLORS
-_TQDM_COLORS = _presentation._TQDM_COLORS
 _TQDM_FRAME_RE = _presentation._TQDM_FRAME_RE
 _active_work_label = _presentation._active_work_label
+_aggregate_progress = _presentation._aggregate_progress
+_overall_progress_line = _presentation._overall_progress_line
 _clean_recent_log = _presentation._clean_recent_log
 _color_enabled = _presentation._color_enabled
 _format_case_progress = _presentation._format_case_progress
@@ -103,7 +102,6 @@ _progress_group = _presentation._progress_group
 _progress_track = _presentation._progress_track
 _scheduler_fields = _presentation._scheduler_fields
 _style_states = _presentation._style_states
-_update_progress_bars = _presentation._update_progress_bars
 
 HOST = os.environ.get("CXR_REMOTE_HOST", "qlmc")
 REMOTE_DIR = os.environ.get("CXR_REMOTE_DIR", "/home/aamador/dev/cxr-mc")
@@ -1086,16 +1084,20 @@ def _refuse_if_busy(materials, quick):
         )
 
 
-def clear_remote(material, yes=False):
-    """Delete a material's accumulated checkpoints on the box: both
-    ``checkpoints/<material>.pkl`` and ``checkpoints/<material>_quick.pkl``.
+def clear_remote(materials, yes=False):
+    """Delete one or more materials' accumulated checkpoints on the box: both
+    ``checkpoints/<material>.pkl`` and ``checkpoints/<material>_quick.pkl`` for
+    each material.  Accepts a single crystal key or a list.
 
     Refuses (before touching anything) if a live job or a pre-submission
-    reservation protects either stem.  Without ``yes`` this is a safe dry
-    preview: it prints exactly which of the two files exist and would be deleted,
-    then stops. With ``yes`` it ``rm -f``s them and reports what went."""
-    _check_materials([material])  # interpolated into a remote shell command
-    wanted = {material, f"{material}_quick"}
+    reservation protects any stem.  Without ``yes`` this is a safe dry preview:
+    it prints exactly which files exist and would be deleted, then stops. With
+    ``yes`` it ``rm -f``s them and reports what went."""
+    if isinstance(materials, str):
+        materials = [materials]
+    _check_materials(materials)  # interpolated into a remote shell command
+    label = ", ".join(materials)
+    wanted = {stem for m in materials for stem in (m, f"{m}_quick")}
     busy = [
         (jid, sorted(clash))
         for jid, jquick, jmats in _live_jobs()
@@ -1108,7 +1110,7 @@ def clear_remote(material, yes=False):
             f"checkpoints, and clearing it would race a running sweep.\n{detail}\n"
             "stop it (cxr remote stop <material>) first, or wait for it to finish."
         )
-    stems = [material, f"{material}_quick"]
+    stems = [stem for m in materials for stem in (m, f"{m}_quick")]
     if yes:
         outcome = _ssh_capture(
             _clear_checkpoint_stems_command(f"clear-{_new_jobid()}", stems)
@@ -1122,7 +1124,7 @@ def clear_remote(material, yes=False):
             )
         existing = [line.split("\t", 1)[1] for line in outcome if line.startswith("CLEARED\t")]
         if not existing:
-            print(f"(nothing to clear for {material})")
+            print(f"(nothing to clear for {label})")
             return
         print("cleared on the box:")
         for f in existing:
@@ -1139,22 +1141,77 @@ def clear_remote(material, yes=False):
             f"{detail}\n"
             "wait for submission to resolve, or stop the recorded job before clearing."
         )
-    # which of the two stems actually exist on the box; the `|| true` keeps a
-    # missing last stem's failed `[ -f ]` from becoming the loop's -- and hence
-    # ssh's -- exit status, which would make _ssh_capture abort the whole clear
+    # which stems actually exist on the box; the `|| true` keeps a missing last
+    # stem's failed `[ -f ]` from becoming the loop's -- and hence ssh's -- exit
+    # status, which would make _ssh_capture abort the whole clear
+    pkl_names = " ".join(f"{stem}.pkl" for stem in stems)
     listing = (
         f"cd {REMOTE_DIR}/checkpoints 2>/dev/null || exit 0; "
-        f'for f in {material}.pkl {material}_quick.pkl; do [ -f "$f" ] && echo "$f" || true; done'
+        f'for f in {pkl_names}; do [ -f "$f" ] && echo "$f" || true; done'
     )
     existing = _ssh_capture(listing).split()
     if not existing:
-        print(f"(nothing to clear for {material})")
+        print(f"(nothing to clear for {label})")
         return
     if not yes:
         print("would delete on the box (re-run with --yes to delete):")
         for f in existing:
             print(f"  checkpoints/{f}")
         return
+
+
+def clear_all_remote(yes=False):
+    """Empty the box's ``checkpoints/`` directory: delete every ``*.pkl`` file
+    under it (recursively, so per-reproduction subdirs are included too).
+
+    Refuses (before touching anything) if any live job is running or any
+    checkpoint reservation is held: both signal an in-flight sweep whose output
+    a blanket clear would destroy or race. Without ``yes`` this is a safe dry
+    preview: it lists the files that would be deleted, then stops. With ``yes``
+    it deletes them and reports the count."""
+    live = _live_jobs()
+    if live:
+        detail = "\n".join(
+            f"  job {jid} is producing -> {', '.join(sorted(_stems(jmats, jquick)))}"
+            for jid, jquick, jmats in live
+        )
+        raise SystemExit(
+            "refusing to clear --all: live job(s) are still producing checkpoints, "
+            f"and clearing would race running sweeps.\n{detail}\n"
+            "stop them (cxr remote stop --all) first, or wait for them to finish."
+        )
+    _now, reservations = _reservation_ledger()
+    if reservations:
+        detail = "\n".join(
+            f"  reservation {jobid} protects -> {stem}" for stem, jobid, _mtime in reservations
+        )
+        raise SystemExit(
+            "refusing to clear --all: a checkpoint reservation is still active, which can "
+            "belong to a submission whose SLURM outcome is not yet known.\n"
+            f"{detail}\n"
+            "wait for submission to resolve, reap orphans (cxr remote reap), or stop the "
+            "recorded job before clearing."
+        )
+    # list first (dry preview), then delete only under --yes. `|| true` keeps a
+    # missing checkpoints/ dir or a find failure from becoming ssh's exit status.
+    listing = (
+        f"cd {REMOTE_DIR}/checkpoints 2>/dev/null || exit 0; "
+        r'find . -type f -name "*.pkl" 2>/dev/null | sed "s|^\./||" | sort || true'
+    )
+    existing = _ssh_capture(listing).split()
+    if not existing:
+        print("(nothing to clear: checkpoints/ holds no .pkl files)")
+        return
+    if not yes:
+        print(f"would delete on the box (re-run with --yes to delete) -- {len(existing)} file(s):")
+        for f in existing:
+            print(f"  checkpoints/{f}")
+        return
+    _ssh_capture(
+        f"cd {REMOTE_DIR}/checkpoints 2>/dev/null || exit 0; "
+        r'find . -type f -name "*.pkl" -delete'
+    )
+    print(f"cleared on the box: {len(existing)} checkpoint file(s) under checkpoints/")
 
 
 def start_queue(
@@ -1346,10 +1403,14 @@ def _job_assign(jobid):
     return f"JOB=$({_recorded_job_dirs_command()} | tail -1)"
 
 
-def job_status(jobid=None, detail=0):
-    """Print one structured job report; verbosity adds allocation and progress."""
-    if detail < 0:
-        raise ValueError("detail must be non-negative")
+def _status_remote_command(job_assign, detail):
+    """One round-trip that emits the marked sections ``_format_job_status`` reads.
+
+    Progress snapshots are cheap per-material JSON, so they ship at every
+    verbosity (the overall bar and CASE PROGRESS block render at 0/1/2 alike);
+    only the 32 KiB log tail is gated behind ``-vv``. Shared verbatim by the
+    one-shot ``status`` and the live ``attach`` loop so both render identically.
+    """
     slurm_detail = (
         'squeue -h -j "$SID" -o '
         "'job_id=%i|state=%T|name=%j|partition=%P|elapsed=%M|left=%L|nodes=%D|reason=%R'; "
@@ -1359,12 +1420,10 @@ def job_status(jobid=None, detail=0):
     progress = (
         'echo "@@PROGRESS"; for f in "$D"/progress/*.json; do '
         '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done; '
-        if detail >= 2
-        else ""
     )
     log = 'echo "@@LOG"; tail -c 32768 "$D/log" 2>/dev/null; ' if detail >= 2 else ""
-    remote = (
-        f'JOBS="{REMOTE_DIR}/{JOBS_SUBDIR}"; {_job_assign(jobid)}; '
+    return (
+        f'JOBS="{REMOTE_DIR}/{JOBS_SUBDIR}"; {job_assign}; '
         'D="$JOBS/$JOB"; '
         'if [ -z "$JOB" ] || [ ! -d "$D" ]; then echo "no such job: ${JOB:-<none>}"; '
         "exit 1; fi; "
@@ -1382,7 +1441,13 @@ def job_status(jobid=None, detail=0):
         + progress
         + log
     )
-    output = _ssh_capture(remote)
+
+
+def job_status(jobid=None, detail=0):
+    """Print one structured job report; verbosity adds allocation and log tail."""
+    if detail < 0:
+        raise ValueError("detail must be non-negative")
+    output = _ssh_capture(_status_remote_command(_job_assign(jobid), detail))
     sections = _marked_sections(output)
     if not sections:
         print(output, end="")
@@ -1441,141 +1506,61 @@ def _is_terminal_state(state):
     return state.startswith(("done", "FAILED", "cancelled"))
 
 
-def _poll_chain(jobid):
-    """State + latest-SID squeue liveness + progress records in ONE round-trip.
+def _render_frame(frame, *, tty):
+    """Repaint one attach frame: in place on a tty, appended when piped."""
+    if tty:
+        # Home the cursor, clear the screen and scrollback so each poll
+        # overwrites the previous frame instead of scrolling -- the
+        # "continually updating" status view.
+        sys.stdout.write("\x1b[H\x1b[2J\x1b[3J" + frame + "\n")
+        sys.stdout.flush()
+    else:
+        print(frame)
+        print("─" * 60)
 
-    A chunked chain hops SLURM IDs at every slice boundary, so a viewer must
-    re-read the latest recorded ID each poll; batching the persisted state,
-    the squeue liveness of that ID, and the progress snapshots into one ssh
-    command keeps the 2 s poll loop at a single round-trip. Returns
-    ``(state, slurm_live, records)``.
+
+def _attach_header(refresh):
+    """One-line banner above each live frame; the counter proves it's polling."""
+    return _paint(
+        f"ATTACHED · {HOST} · refresh {refresh} · Ctrl-C detaches (job keeps running)",
+        "inactive",
+    )
+
+
+def _live_status(jobid, detail):
+    """Re-render ``status <jobid>`` at ``detail`` each poll until the job is terminal.
+
+    The viewer is read-only: Ctrl-C or a dropped SSH link tears down only this
+    loop, never the SLURM job. A chunked chain hops scheduler IDs between
+    slices, so the shared status command re-reads the latest recorded ID each
+    poll; the same ``_POLL_GRACE_POLLS`` watchdog declares a chain broken only
+    after ~30 s with no live allocation and a non-terminal recorded state.
+    Returns True once the job reaches a terminal state, False on viewer
+    disconnect or a stalled chain.
     """
-    _check_shell_tokens([jobid])
-    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
-    remote_cmd = (
-        f'D="{jobdir}"; '
-        'echo "@@STATE"; cat "$D/state" 2>/dev/null; '
-        'echo "@@SID"; SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
-        'printf "%s\\n" "$SID"; '
-        'echo "@@SQUEUE"; case "$SID" in \'\'|*[!0-9]*) ;; *) '
-        + _squeue_state_command("$SID", retired="STATE=")
-        + 'printf "%s\\n" "$STATE" ;; esac; '
-        'echo "@@PROGRESS"; for f in "$D"/progress/*.json; do '
-        '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done'
-    )
-    out = _ssh_capture(remote_cmd)
-    sections = {"STATE": [], "SID": [], "SQUEUE": [], "PROGRESS": []}
-    current = None
-    for line in out.splitlines():
-        if line.startswith("@@"):
-            current = line[2:]
-        elif current in sections:
-            sections[current].append(line)
-    state = sections["STATE"][0].strip() if sections["STATE"] else ""
-    live = any(line.strip() for line in sections["SQUEUE"])
-    records = _parse_progress_records("\n".join(sections["PROGRESS"]))
-    return state, live, records
-
-
-def _attach_log_stream(jobid=None):
-    """Use the original raw-log viewer for a job without progress records.
-
-    Disconnecting the viewer leaves the SLURM allocation running. Defaults to
-    the most recent job when called directly.
-    """
-    jobid = jobid or _latest_jobid()
-    if not jobid:
-        raise SystemExit("no jobs to attach to (start one: cxr remote start <materials>)")
-    _check_shell_tokens([jobid])
-    jobdir = f"{REMOTE_DIR}/{JOBS_SUBDIR}/{jobid}"
-    # Tail the log live, but self-terminate once the persisted state goes
-    # terminal, so a finished job doesn't leave us stuck in tail -f. A chunked
-    # chain hops SLURM IDs between slices, so re-read the latest recorded ID
-    # every poll; only give up after _POLL_GRACE_POLLS consecutive polls with
-    # no live SLURM job (the watchdog: a broken chain never goes terminal).
-    # The wait-for-a-first-SID window right after submission is covered by the
-    # same grace counter. The tail is a viewer only: Ctrl-C or a dropped SSH
-    # connection leaves the job untouched.
-    remote = (
-        f'D="{jobdir}"; '
-        f'[ -d "$D" ] || {{ echo "no such job: {jobid}"; exit 1; }}; '
-        'tail -n 50 -F --retry "$D/log" 2>/dev/null & TP=$!; '
-        "missed=0; "
-        "while :; do "
-        'ST=$(cat "$D/state" 2>/dev/null); '
-        'case "$ST" in done*|FAILED*|cancelled*) break ;; esac; '
-        'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
-        "LIVE=; case \"$SID\" in ''|*[!0-9]*) ;; *) "
-        + _squeue_state_command("$SID", retired="STATE=")
-        + 'LIVE="$STATE" ;; esac; '
-        'if [ -n "$LIVE" ]; then missed=0; else missed=$((missed + 1)); fi; '
-        f'if [ "$missed" -ge {_POLL_GRACE_POLLS} ]; then '
-        f'echo "chain appears broken -- check cxr remote status {jobid}" >&2; break; fi; '
-        "sleep 2; done; "
-        'sleep 1; kill "$TP" 2>/dev/null; '
-        'printf "\\n--- job finished ---\\n"; cat "$D/state" 2>/dev/null'
-    )
-    print(
-        f"JOB {jobid} · LEGACY LOG VIEW\n"
-        + _format_fields(
-            [
-                ("Host", HOST),
-                ("Viewer", "Ctrl-C disconnects; remote job keeps running"),
-            ]
-        )
-        + "\n"
-    )
-    try:
-        result = subprocess.run(["ssh", "-n", HOST, remote])
-    except KeyboardInterrupt:
-        _disconnect_hint(jobid)
-        return False
-    if getattr(result, "returncode", 0) != 0:
-        _disconnect_hint(jobid)
-        return False
-    return True
-
-
-def _attach_progress_dashboard(jobid, metadata):
-    """Poll one new-style job and render its material records locally."""
-    materials = (_metadata_value(metadata, "materials") or "").split()
-    scheduler_id = _metadata_value(metadata, "slurm_job_id") or ""
-    if not materials or not scheduler_id.isdigit():
-        raise SystemExit(f"job {jobid} has incomplete progress metadata")
-
-    print(
-        f"JOB {jobid} · SLURM {scheduler_id}\n"
-        + _format_fields(
-            [
-                ("Host", HOST),
-                ("Materials", ", ".join(materials)),
-                ("Mode", _mode_summary(metadata)),
-                ("Viewer", "Ctrl-C disconnects; remote job keeps running"),
-            ]
-        )
-        + "\n"
-    )
-    bars = {
-        material: tqdm(
-            total=None,
-            desc=f"{_material_label(material)} · pending",
-            unit="case",
-            position=position,
-            leave=True,
-            nrows=len(materials) + 1,
-            colour=_TQDM_COLORS["inactive"],
-            bar_format="{l_bar}{bar:16}| {n_fmt}/{total_fmt} cases [{elapsed}<{remaining}]",
-        )
-        for position, material in enumerate(materials)
-    }
-    interrupted = broken = False
+    remote = _status_remote_command(_job_assign(jobid), detail)
+    tty = _color_enabled()
+    refresh = 0
     missed = 0
     state = ""
-    finished = set()
+    broken = False
     try:
         while True:
-            state, live, records = _poll_chain(jobid)
-            _update_progress_bars(bars, records, finished)
+            refresh += 1
+            output = _ssh_capture(remote)
+            sections = _marked_sections(output)
+            if not sections:
+                print(output, end="")
+                return False
+            state = sections.get("STATE", "")
+            scheduler = _scheduler_fields(sections.get("SQUEUE", ""))
+            live = scheduler.get("state", "") not in ("", "NOT_QUEUED")
+            frame = (
+                _attach_header(refresh)
+                + "\n\n"
+                + _style_states(_format_job_status(sections, detail))
+            )
+            _render_frame(frame, tty=tty)
             if _is_terminal_state(state):
                 break
             missed = 0 if live else missed + 1
@@ -1584,12 +1569,6 @@ def _attach_progress_dashboard(jobid, metadata):
                 break
             time.sleep(2)
     except KeyboardInterrupt:
-        interrupted = True
-    finally:
-        for material, bar in bars.items():
-            if material not in finished:
-                bar.close()
-    if interrupted:
         _disconnect_hint(jobid)
         return False
     if broken:
@@ -1604,16 +1583,20 @@ def _attach_progress_dashboard(jobid, metadata):
     return True
 
 
-def attach(jobid=None):
-    """Track a job with per-material progress or legacy raw-log streaming."""
+def attach(jobid=None, detail=0):
+    """Live-track a job: re-render its ``status`` report at ``detail`` until terminal.
+
+    Equivalent to ``cxr remote status [-v|-vv]``, but the same report repaints
+    in place every ~2 s. Ctrl-C (or a dropped link) detaches the viewer only;
+    the SLURM job keeps running. Returns True once the job reaches a terminal
+    state, False on disconnect or a stalled chain -- callers (scan/check) key
+    their auto-pull off that.
+    """
     jobid = jobid or _latest_jobid()
     if not jobid:
         raise SystemExit("no jobs to attach to (start one: cxr remote start <materials>)")
     _check_shell_tokens([jobid])
-    metadata = _job_metadata(jobid)
-    if _metadata_value(metadata, "progress_dashboard") == "True":
-        return _attach_progress_dashboard(jobid, metadata)
-    return _attach_log_stream(jobid)
+    return _live_status(jobid, detail)
 
 
 def _stop_jobid(jobid):
@@ -1818,7 +1801,7 @@ def _cli_start(args):
 
 
 def _cli_attach(args):
-    attach(args.jobid)
+    attach(args.jobid, args.verbose)
 
 
 def _cli_jobs(args):
@@ -1842,7 +1825,14 @@ def _cli_reap(args):
 
 
 def _cli_clear(args):
-    clear_remote(args.material, args.yes)
+    if args.all_checkpoints:
+        if args.materials:
+            args._clear_parser.error("clear --all takes no material argument")
+        clear_all_remote(args.yes)
+        return
+    if not args.materials:
+        args._clear_parser.error("clear needs material(s), or --all")
+    clear_remote(args.materials, args.yes)
 
 
 def _cli_sync(args):
@@ -1959,9 +1949,16 @@ def _build_remote_parser(ap):
 
     at = sub.add_parser(
         "attach",
-        help="live-track a job until it finishes (Ctrl-C disconnects; default: latest)",
+        help="live-track a job: status report, refreshed in place (Ctrl-C disconnects; default: latest)",
     )
     at.add_argument("jobid", nargs="?", default=None)
+    at.add_argument(
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="add SLURM allocation detail; repeat for the recent log tail (mirrors status)",
+    )
     at.set_defaults(func=_dispatch(_cli_attach))
 
     jb = sub.add_parser("jobs", help="list jobs with SLURM IDs, materials, and last events")
@@ -2039,12 +2036,23 @@ def _build_remote_parser(ap):
     )
     p.set_defaults(func=_dispatch(_cli_pull))
 
-    c = sub.add_parser("clear", help="delete a material's accumulated checkpoints on the box")
+    c = sub.add_parser(
+        "clear", help="delete a material's accumulated checkpoints on the box, or --all"
+    )
     c.add_argument(
-        "material", help="crystal key; clears both <material>.pkl and <material>_quick.pkl"
+        "materials",
+        nargs="*",
+        metavar="material",
+        help="crystal key(s); clears both <material>.pkl and <material>_quick.pkl for each",
+    )
+    c.add_argument(
+        "--all",
+        dest="all_checkpoints",
+        action="store_true",
+        help="empty the entire checkpoints/ directory (mutually exclusive with a material)",
     )
     c.add_argument("--yes", action="store_true", help="actually delete (default: dry preview only)")
-    c.set_defaults(func=_dispatch(_cli_clear))
+    c.set_defaults(func=_dispatch(_cli_clear), _clear_parser=c)
 
     sy = sub.add_parser("sync", help="push the current code to the box only")
     sy.set_defaults(func=_dispatch(_cli_sync))

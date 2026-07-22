@@ -729,30 +729,94 @@ def test_status_cli_repeats_verbose_for_case_progress(monkeypatch):
     assert calls == [("j", 2)]
 
 
-def test_attach_uses_stdin_closed_ssh_for_live_view(monkeypatch):
-    runs = []
-    monkeypatch.setattr(remote, "_job_metadata", lambda _jobid: "materials: hopg\n")
-    monkeypatch.setattr(remote.subprocess, "run", lambda cmd: runs.append(cmd))
+def _status_output(state, *, squeue_state="RUNNING", sid="48291", progress=""):
+    """Fake one round-trip of the shared status command (the marked sections
+    _format_job_status / the attach loop read)."""
+    return (
+        f"@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nslurm_job_id: {sid}\n"
+        f"@@STATE\n{state}\n@@SQUEUE\njob_id={sid}|state={squeue_state}\n"
+        f"@@PROGRESS\n{progress}\n"
+    )
+
+
+def test_attach_redraws_the_status_report_until_terminal(monkeypatch, capsys):
+    running = (
+        '{"material":"hopg","total_cases":4,"cached_cases":1,'
+        '"completed_new_cases":2,"state":"running"}'
+    )
+    done = (
+        '{"material":"hopg","total_cases":4,"cached_cases":1,'
+        '"completed_new_cases":3,"state":"done"}'
+    )
+    outputs = iter(
+        [
+            _status_output("running hopg [1/1] since now", progress=running),
+            _status_output("done [1/1] now", squeue_state="NOT_QUEUED", progress=done),
+        ]
+    )
+    monkeypatch.setattr(remote, "_ssh_capture", lambda _cmd: next(outputs))
+    monkeypatch.setattr(remote.time, "sleep", lambda _s: None)
+
+    assert remote.attach("20260101-000000") is True
+
+    out = capsys.readouterr().out
+    assert "ATTACHED" in out  # live banner with refresh counter
+    assert "Progress" in out  # overall aggregate bar in the header
+    assert "CASE PROGRESS" in out  # per-material bars at base verbosity
+    assert "3/4" in out
+    assert "JOB 20260101-000000 · FINISHED" in out
+    assert "done [1/1] now" in out
+
+
+def test_attach_omits_log_tail_at_base_verbosity_but_still_fetches_progress(monkeypatch):
+    commands = []
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda cmd: commands.append(cmd) or _status_output("done now", squeue_state="NOT_QUEUED"),
+    )
 
     remote.attach("20260101-000000")
 
-    assert len(runs) == 1
-    assert runs[0][:3] == ["ssh", "-n", remote.HOST]
-    assert len(runs[0]) == 4
-    assert "squeue" in runs[0][-1]
-    assert "slurm_job_id" in runs[0][-1]
-    assert "kill -0" not in runs[0][-1]
-    assert "/pid" not in runs[0][-1]
+    assert '"$D"/progress/*.json' in commands[0]  # bars at every level need it
+    assert "tail -c 32768" not in commands[0]  # log tail is still -vv only
 
 
-def test_attach_retries_until_a_queued_job_creates_its_log(monkeypatch):
-    runs = []
-    monkeypatch.setattr(remote, "_job_metadata", lambda _jobid: "materials: hopg\n")
-    monkeypatch.setattr(remote.subprocess, "run", lambda cmd: runs.append(cmd))
+def test_attach_forwards_double_verbose_to_the_status_command(monkeypatch):
+    commands = []
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda cmd: commands.append(cmd) or _status_output("done now", squeue_state="NOT_QUEUED"),
+    )
 
-    remote.attach("20260101-000000")
+    remote.attach("20260101-000000", detail=2)
 
-    assert 'tail -n 50 -F --retry "$D/log"' in runs[0][-1]
+    assert 'tail -c 32768 "$D/log"' in commands[0]
+    assert "squeue" in commands[0]
+    assert "kill -0" not in commands[0]
+    assert "/pid" not in commands[0]
+
+
+def test_attach_watchdog_exits_on_a_stalled_chain(monkeypatch, capsys):
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda _cmd: _status_output("queued slice 2 now", squeue_state="NOT_QUEUED"),
+    )
+    monkeypatch.setattr(remote.time, "sleep", lambda _s: None)
+
+    assert remote.attach("20260101-000000") is False
+    assert "CHAIN STALLED" in capsys.readouterr().out
+
+
+def test_attach_cli_repeats_verbose_for_the_live_report(monkeypatch):
+    calls = []
+    monkeypatch.setattr(remote, "attach", lambda jobid, detail: calls.append((jobid, detail)))
+
+    remote.main(["attach", "j", "-vv"])
+
+    assert calls == [("j", 2)]
 
 
 def test_implicit_job_selection_excludes_checkpoint_reservations(monkeypatch, tmp_path):
@@ -817,15 +881,15 @@ def test_logs_identify_resolved_job_and_host(monkeypatch, capsys):
     assert 'printf "LOG %s · qlmc' in commands[0]
 
 
-def test_attach_returns_false_when_the_viewer_is_interrupted(monkeypatch):
-    monkeypatch.setattr(remote, "_job_metadata", lambda _jobid: "materials: hopg\n")
+def test_attach_returns_false_when_the_viewer_is_interrupted(monkeypatch, capsys):
     monkeypatch.setattr(
-        remote.subprocess,
-        "run",
+        remote,
+        "_ssh_capture",
         lambda _cmd: (_ for _ in ()).throw(KeyboardInterrupt),
     )
 
     assert remote.attach("20260101-000000") is False
+    assert "VIEWER DISCONNECTED" in capsys.readouterr().out
 
 
 def test_parse_progress_records_ignores_malformed_snapshots():
@@ -860,76 +924,65 @@ def test_parse_progress_records_accepts_paused_state():
     assert records["hopg"]["state"] == "paused"
 
 
-class _FakeProgressBar:
-    def __init__(self, **kwargs):
-        self.total = kwargs["total"]
-        self.n = 0
-        self.description = kwargs["desc"]
-        self.postfix = {}
-        self.refreshes = 0
-        self.closed = False
-
-    def set_description_str(self, description, refresh=False):
-        self.description = description
-
-    def set_postfix(self, **kwargs):
-        kwargs.pop("refresh", None)
-        self.postfix = kwargs
-
-    def refresh(self):
-        self.refreshes += 1
-
-    def close(self):
-        self.closed = True
-
-
-def test_progress_bars_update_materials_independently():
-    bars = {
-        "hopg": _FakeProgressBar(total=None, desc="hopg: pending"),
-        "hbn": _FakeProgressBar(total=None, desc="hbn: pending"),
-    }
+def test_overall_progress_line_sums_cases_and_counts_done_materials():
     records = remote._parse_progress_records(
-        json.dumps(
-            {
-                "material": "hopg",
-                "total_cases": 5,
-                "cached_cases": 1,
-                "completed_new_cases": 2,
-                "state": "running",
-            }
+        "\n".join(
+            [
+                '{"material":"hopg","total_cases":4,"cached_cases":2,'
+                '"completed_new_cases":2,"state":"done"}',
+                '{"material":"hbn","total_cases":6,"cached_cases":0,'
+                '"completed_new_cases":3,"state":"running"}',
+            ]
         )
     )
 
-    remote._update_progress_bars(bars, records)
+    line = remote._overall_progress_line(records)
 
-    assert bars["hopg"].n == 3
-    assert bars["hopg"].total == 5
-    assert bars["hopg"].postfix == {"cached": 1, "new": 2}
-    assert bars["hbn"].n == 0
-    assert bars["hbn"].description == "hbn: pending"
+    assert line is not None
+    assert "7/10 cases" in line  # 4 (hopg) + 3 (hbn)
+    assert " 70%" in line
+    assert "1/2 materials" in line  # only hopg is done
+    assert "●" in line  # a still-running material keeps the aggregate active
 
 
-def test_progress_bars_close_terminal_material_once():
-    bars = {"hopg": _FakeProgressBar(total=None, desc="HOPG · pending")}
-    records = remote._parse_progress_records(
-        json.dumps(
-            {
-                "material": "hopg",
-                "total_cases": 5,
-                "cached_cases": 1,
-                "completed_new_cases": 4,
-                "state": "done",
-            }
-        )
+def test_overall_progress_line_is_none_without_records():
+    assert remote._overall_progress_line({}) is None
+
+
+def test_status_renders_progress_bars_at_base_verbosity(monkeypatch, capsys):
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda _cmd: (
+            "@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nslurm_job_id: 48291\n"
+            "@@STATE\nrunning hopg\n@@SQUEUE\njob_id=48291|state=RUNNING\n@@PROGRESS\n"
+            '{"material":"hopg","total_cases":5,"cached_cases":1,'
+            '"completed_new_cases":2,"state":"running"}\n'
+        ),
     )
 
-    finished = remote._update_progress_bars(bars, records)
-    remote._update_progress_bars(bars, records, finished)
+    remote.job_status("j")  # detail 0
 
-    assert finished == {"hopg"}
-    assert bars["hopg"].description == "HOPG · done"
-    assert bars["hopg"].refreshes == 1
-    assert bars["hopg"].closed is True
+    out = capsys.readouterr().out
+    assert "Progress" in out  # overall aggregate bar in the header
+    assert "CASE PROGRESS" in out  # per-material block promoted to level 0
+    assert "3/5" in out
+    assert "ALLOCATION" not in out  # still -v only
+    assert "RECENT LOG" not in out  # still -vv only
+
+
+def test_status_always_fetches_progress_even_at_base_verbosity(monkeypatch):
+    commands = []
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda cmd: commands.append(cmd) or "",
+    )
+
+    remote.job_status("j")  # detail 0
+
+    assert '"$D"/progress/*.json' in commands[0]
+    assert "tail -c 32768" not in commands[0]  # log tail stays -vv only
 
 
 def test_static_case_progress_uses_catalog_labels_and_one_row_per_material():
@@ -974,96 +1027,6 @@ def test_static_case_progress_colors_tracks_only_on_tty(monkeypatch):
 
     assert "\033[38;2;92;207;230m" in colored
     assert "\033[" not in plain
-
-
-def test_attach_dashboard_allocates_every_material_row_without_dynamic_width(monkeypatch):
-    created = []
-
-    class Bar:
-        def close(self):
-            pass
-
-    monkeypatch.setattr(remote, "tqdm", lambda **kwargs: created.append(kwargs) or Bar())
-    monkeypatch.setattr(remote, "_poll_chain", lambda _jobid: ("done [3/3] now", False, {}))
-
-    remote._attach_progress_dashboard("j", "materials: a b c\nslurm_job_id: 1\n")
-
-    assert [kwargs["nrows"] for kwargs in created] == [4, 4, 4]
-    assert all("dynamic_ncols" not in kwargs for kwargs in created)
-    assert all(kwargs["colour"] == "#7f8c98" for kwargs in created)
-    assert all("cases" in kwargs["bar_format"] for kwargs in created)
-
-
-def test_dashboard_attach_closes_bars_and_prints_final_state(monkeypatch, capsys):
-    metadata = "materials: hopg hbn\nprogress_dashboard: True\nslurm_job_id: 48291\n"
-    payload = "\n".join(
-        [
-            json.dumps(
-                {
-                    "material": "hopg",
-                    "total_cases": 4,
-                    "cached_cases": 1,
-                    "completed_new_cases": 3,
-                    "state": "done",
-                }
-            ),
-            json.dumps(
-                {
-                    "material": "hbn",
-                    "total_cases": 2,
-                    "cached_cases": 0,
-                    "completed_new_cases": 1,
-                    "state": "failed",
-                }
-            ),
-        ]
-    )
-    bars = []
-    records = remote._parse_progress_records(payload)
-    polls = iter(
-        [
-            ("running hbn [2/2] since now", True, records),
-            ("done with 1 warning(s) [2/2] now", False, records),
-        ]
-    )
-    monkeypatch.setattr(remote, "_job_metadata", lambda _jobid: metadata)
-    monkeypatch.setattr(remote, "_poll_chain", lambda _jobid: next(polls))
-    monkeypatch.setattr(remote.time, "sleep", lambda _seconds: None)
-    monkeypatch.setattr(
-        remote,
-        "tqdm",
-        lambda **kwargs: bars.append(_FakeProgressBar(**kwargs)) or bars[-1],
-    )
-
-    assert remote.attach("j") is True
-
-    assert [bar.n for bar in bars] == [4, 1]
-    assert all(bar.closed for bar in bars)
-    output = capsys.readouterr().out
-    assert "JOB j · FINISHED" in output
-    assert "done with 1 warning(s)" in output
-
-
-def test_dashboard_attach_ctrl_c_disconnects_viewer_only(monkeypatch):
-    bars = []
-    monkeypatch.setattr(
-        remote,
-        "_job_metadata",
-        lambda _jobid: "materials: hopg\nprogress_dashboard: True\nslurm_job_id: 48291\n",
-    )
-    monkeypatch.setattr(
-        remote,
-        "_poll_chain",
-        lambda _jobid: (_ for _ in ()).throw(KeyboardInterrupt),
-    )
-    monkeypatch.setattr(
-        remote,
-        "tqdm",
-        lambda **kwargs: bars.append(_FakeProgressBar(**kwargs)) or bars[-1],
-    )
-
-    assert remote.attach("j") is False
-    assert bars[0].closed is True
 
 
 def test_stop_jobid_uses_scancel_not_kill(monkeypatch):
@@ -1241,12 +1204,101 @@ def test_clear_reports_nothing_when_no_files(monkeypatch, capsys):
     assert runs == []  # nothing to delete
 
 
+def test_clear_multiple_materials_yes_deletes_all_stems(monkeypatch, capsys):
+    _no_live_jobs(monkeypatch)
+    commands = []
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda command: (
+            commands.append(command)
+            or "CLEARED\thopg.pkl\nCLEARED\thbn.pkl\nCLEARED\tdiamond.pkl\n"
+        ),
+    )
+    remote.clear_remote(["hopg", "hbn", "diamond"], yes=True)
+    # one reserving delete command covering every stem (material + _quick)
+    assert len(commands) == 1
+    for stem in ("hopg", "hopg_quick", "hbn", "hbn_quick", "diamond", "diamond_quick"):
+        assert stem in commands[0]
+    out = capsys.readouterr().out
+    assert "cleared on the box" in out and "diamond.pkl" in out
+
+
+def test_clear_multiple_materials_dry_preview_lists_each(monkeypatch, capsys):
+    _no_live_jobs(monkeypatch)
+    commands = []
+    monkeypatch.setattr(
+        remote, "_ssh_capture", lambda command: commands.append(command) or "hopg.pkl\nhbn.pkl\n"
+    )
+    remote.clear_remote(["hopg", "hbn"], yes=False)
+    listing = commands[-1]
+    for name in ("hopg.pkl", "hopg_quick.pkl", "hbn.pkl", "hbn_quick.pkl"):
+        assert name in listing
+    assert "would delete" in capsys.readouterr().out
+
+
 def test_clear_rejects_bad_material(monkeypatch):
     monkeypatch.setattr(
         remote, "_live_jobs", lambda: pytest.fail("must validate before touching jobs")
     )
     with pytest.raises(SystemExit):
         remote.clear_remote("rm -rf /")
+
+
+def test_clear_all_refuses_when_a_live_job_is_running(monkeypatch):
+    monkeypatch.setattr(remote, "_live_jobs", lambda: [("job1", False, ["hopg"])])
+    monkeypatch.setattr(
+        remote, "_ssh_capture", lambda *a: pytest.fail("must not ssh when refusing")
+    )
+    with pytest.raises(SystemExit, match="refusing to clear --all"):
+        remote.clear_all_remote(yes=True)
+
+
+def test_clear_all_refuses_when_a_reservation_is_held(monkeypatch):
+    _no_live_jobs(monkeypatch)
+    monkeypatch.setattr(remote, "_reservation_ledger", lambda: (1000, [("hopg", "job1", 900)]))
+    with pytest.raises(SystemExit, match="reservation"):
+        remote.clear_all_remote(yes=True)
+
+
+def test_clear_all_dry_preview_lists_but_does_not_delete(monkeypatch, capsys):
+    _no_live_jobs(monkeypatch)
+    monkeypatch.setattr(remote, "_reservation_ledger", lambda: (1000, []))
+    commands = []
+    monkeypatch.setattr(
+        remote,
+        "_ssh_capture",
+        lambda command: commands.append(command) or "hopg.pkl\nzhai_reproduction/a.pkl\n",
+    )
+    remote.clear_all_remote(yes=False)
+    out = capsys.readouterr().out
+    assert "would delete" in out and "hopg.pkl" in out and "zhai_reproduction/a.pkl" in out
+    assert len(commands) == 1  # listing only; no delete
+    assert "-delete" not in commands[0]
+
+
+def test_clear_all_yes_deletes_every_pkl(monkeypatch, capsys):
+    _no_live_jobs(monkeypatch)
+    monkeypatch.setattr(remote, "_reservation_ledger", lambda: (1000, []))
+    commands = []
+
+    def capture(command):
+        commands.append(command)
+        return "" if "-delete" in command else "hopg.pkl\nhopg_quick.pkl\n"
+
+    monkeypatch.setattr(remote, "_ssh_capture", capture)
+    remote.clear_all_remote(yes=True)
+    out = capsys.readouterr().out
+    assert "cleared on the box: 2 checkpoint file(s)" in out
+    assert any("-delete" in c for c in commands)
+
+
+def test_clear_all_reports_nothing_when_empty(monkeypatch, capsys):
+    _no_live_jobs(monkeypatch)
+    monkeypatch.setattr(remote, "_reservation_ledger", lambda: (1000, []))
+    monkeypatch.setattr(remote, "_ssh_capture", lambda *a: "\n")
+    remote.clear_all_remote(yes=True)
+    assert "nothing to clear" in capsys.readouterr().out
 
 
 def _bash_or_skip(tmp_path):
@@ -2173,57 +2225,6 @@ def test_check_cli_rejects_pull_with_detached(monkeypatch, capsys, args):
 
 def test_sync_paths_ship_checks_and_zhai_shim():
     assert "checks" in remote.SYNC_PATHS
-
-
-def _poll_payload(state, sid="123", squeue="RUNNING", progress=""):
-    return f"@@STATE\n{state}\n@@SID\n{sid}\n@@SQUEUE\n{squeue}\n@@PROGRESS\n{progress}\n"
-
-
-def test_poll_chain_parses_sections(monkeypatch):
-    monkeypatch.setattr(
-        remote,
-        "_ssh_capture",
-        lambda cmd: _poll_payload(
-            "running hopg [1/1] since now",
-            progress='{"material":"hopg","total_cases":4,"cached_cases":1,'
-            '"completed_new_cases":2,"state":"running"}',
-        ),
-    )
-    state, live, records = remote._poll_chain("20260717-abc")
-    assert state.startswith("running")
-    assert live is True
-    assert records["hopg"]["completed_new_cases"] == 2
-
-
-def test_attach_dashboard_survives_slice_gap_and_ends_terminal(monkeypatch):
-    responses = iter(
-        [
-            _poll_payload("running hopg [1/1] since now"),
-            _poll_payload("queued slice 2 now", squeue=""),  # inter-slice gap: not live
-            _poll_payload("running hopg [1/1] since now"),  # next slice picked up
-            _poll_payload("done [1/1] now", squeue=""),
-        ]
-    )
-    monkeypatch.setattr(remote, "_ssh_capture", lambda cmd: next(responses))
-    monkeypatch.setattr(remote.time, "sleep", lambda s: None)
-    ok = remote._attach_progress_dashboard(
-        "20260717-abc", "job: 20260717-abc\nmaterials: hopg\nslurm_job_id: 123\n"
-    )
-    assert ok is True
-
-
-def test_attach_dashboard_watchdog_exits_on_broken_chain(monkeypatch, capsys):
-    monkeypatch.setattr(
-        remote,
-        "_ssh_capture",
-        lambda cmd: _poll_payload("queued slice 2 now", squeue=""),
-    )
-    monkeypatch.setattr(remote.time, "sleep", lambda s: None)
-    ok = remote._attach_progress_dashboard(
-        "20260717-abc", "job: 20260717-abc\nmaterials: hopg\nslurm_job_id: 123\n"
-    )
-    assert ok is False
-    assert "CHAIN STALLED" in capsys.readouterr().out
 
 
 def test_stop_writes_stop_sentinel_before_scancel(monkeypatch):
