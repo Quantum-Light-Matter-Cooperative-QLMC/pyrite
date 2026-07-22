@@ -19,11 +19,40 @@ def test_geometry_plan_is_full_curated_tilt_azimuth_product():
 
     # The full quantized tilt x azimuth product, every geometry sampled; the
     # legacy large-tilt spot-check set is empty (the product already spans it).
+    # Specs are now 4-tuples carrying the (default) diagnostic thickness.
     assert spot_check == []
     assert len(coarse) == 2 * 2 * 3
-    assert coarse[:3] == [("a", 5.0, 100.0), ("a", 5.0, 140.0), ("a", 5.0, 180.0)]
+    assert coarse[:3] == [
+        ("a", 5.0, 100.0, analyze.DIAGNOSTIC_THICKNESS_ANG),
+        ("a", 5.0, 140.0, analyze.DIAGNOSTIC_THICKNESS_ANG),
+        ("a", 5.0, 180.0, analyze.DIAGNOSTIC_THICKNESS_ANG),
+    ]
     assert {spec[1] for spec in coarse} == {5.0, 45.0}
     assert {spec[2] for spec in coarse} == {100.0, 140.0, 180.0}
+
+
+def test_geometry_plan_defaults_to_profile_angles_single_thickness():
+    class Scan:
+        tilt_deg = [5.0, 45.0]
+        tilt_azim_deg = [100.0, 180.0]
+
+    coarse, _ = analyze._geometry_plan(["hopg"], Scan())
+    # 2 tilts x 2 azimuths x 1 default thickness, all 4-tuples ending in 1e7
+    assert len(coarse) == 4
+    assert all(len(spec) == 4 for spec in coarse)
+    assert {spec[3] for spec in coarse} == {analyze.DIAGNOSTIC_THICKNESS_ANG}
+
+
+def test_geometry_plan_overrides_expand_thickness_axis():
+    class Scan:
+        tilt_deg = [5.0]
+        tilt_azim_deg = [180.0]
+
+    coarse, _ = analyze._geometry_plan(
+        ["hopg"], Scan(), tilts=[5.0], azimuths=[180.0], thicknesses=[1.0e6, 1.0e7]
+    )
+    assert len(coarse) == 2
+    assert sorted(spec[3] for spec in coarse) == [1.0e6, 1.0e7]
 
 
 def test_subset_resume_preserves_unrequested_checkpoint_rows(monkeypatch):
@@ -232,7 +261,7 @@ def test_build_case_passes_wide_brem_grid_to_diagnostic_sweep(monkeypatch):
     monkeypatch.setattr(analyze, "material_sweep", spy)
     monkeypatch.setattr(analyze, "build_cases", lambda sweep, **kw: [{"sweep": sweep}])
 
-    analyze._build_case("hopg", 100.0, 5.0, 100.0, 10)
+    analyze._build_case("hopg", 100.0, 5.0, 100.0, analyze.DIAGNOSTIC_THICKNESS_ANG, 10)
 
     assert "E_grid_brem" in captured
     np.testing.assert_array_equal(captured["E_grid_brem"], analyze.WIDE_BREM_EV)
@@ -251,7 +280,7 @@ def test_candidate_brem_channel_refuses_silent_truncation():
     result = {"E_grid": E, "spec": coherent, "E_grid_brem": E, "brem_wide": truncated}
 
     with pytest.raises(CoverageGridTooNarrow):
-        analyze._candidate_from_result("hopg", 5.0, 100.0, result)
+        analyze._candidate_from_result("hopg", 5.0, 100.0, analyze.DIAGNOSTIC_THICKNESS_ANG, result)
 
 
 def test_derive_all_materials_produces_independent_per_material_output(monkeypatch):

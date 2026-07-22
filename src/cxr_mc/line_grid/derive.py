@@ -32,6 +32,7 @@ from dataclasses import asdict, dataclass
 import numpy as np
 
 from cxr_mc.config import material_sweep
+from cxr_mc.line_grid import defaults as lg_defaults
 from cxr_mc.line_grid.bounds import coverage_energy, margined_stop, spacing_num
 from cxr_mc.materials import CATALOG
 from cxr_mc.montecarlo.runner import run_cases
@@ -93,18 +94,23 @@ class Candidate:
     total_intensity: float
     incoherent_coverage_energy_eV: float
     incoherent_total_intensity: float
+    # Crystal thickness the geometry was simulated at. Trails with a default so
+    # the refine phase can reconstruct the exact geometry and so pre-thickness
+    # checkpoints/callers stay valid (single-thickness scans use the diagnostic
+    # slab).
+    thickness_ang: float = DIAGNOSTIC_THICKNESS_ANG
 
 
-def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons):
+def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, thickness_ang, n_electrons):
     """One run_case dict for a fixed material/energy/geometry, on the wide
-    diagnostic grid. Pins :data:`DIAGNOSTIC_THICKNESS_ANG` (1 mm) so only the
-    tilt/azimuth axis varies across the scan. Building is cheap and pure;
-    running happens in a batch via _run_specs so the whole scan shares one
+    diagnostic grid. ``thickness_ang`` selects the crystal slab (default is the
+    1 mm :data:`DIAGNOSTIC_THICKNESS_ANG` worst case); building is cheap and
+    pure, running happens in a batch via _run_specs so the whole scan shares one
     worker pool instead of paying pool-startup and per-call overhead once per
     geometry."""
     sweep = material_sweep(
         material,
-        thickness_ang=DIAGNOSTIC_THICKNESS_ANG,
+        thickness_ang=thickness_ang,
         energy_keV=energy_keV,
         tilt_deg=tilt_deg,
         tilt_azim_deg=tilt_azim_deg,
@@ -115,7 +121,7 @@ def _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons):
     return build_cases(sweep, n_electrons=n_electrons)[0]
 
 
-def _candidate_from_result(material, tilt_deg, tilt_azim_deg, result):
+def _candidate_from_result(material, tilt_deg, tilt_azim_deg, thickness_ang, result):
     E_grid, spec = result["E_grid"], result["spec"]
     E_brem, brem = result["E_grid_brem"], result["brem_wide"]
     return Candidate(
@@ -126,27 +132,30 @@ def _candidate_from_result(material, tilt_deg, tilt_azim_deg, result):
         total_intensity=float(np.trapezoid(spec, E_grid)),
         incoherent_coverage_energy_eV=coverage_energy(E_brem, brem, COVERAGE),
         incoherent_total_intensity=float(np.trapezoid(brem, E_brem)),
+        thickness_ang=thickness_ang,
     )
 
 
 def _run_specs(specs, energy_keV, n_electrons, max_workers, engine):
-    """Build and run every (material, tilt_deg, tilt_azim_deg) geometry in
-    ``specs`` as one run_cases batch, so the CPU worker pool stays saturated
-    across the whole batch. run_cases returns results in the same order as
-    ``specs`` (index-aligned, per its docstring), so zipping is safe.
+    """Build and run every (material, tilt_deg, tilt_azim_deg, thickness_ang)
+    geometry in ``specs`` as one run_cases batch, so the CPU worker pool stays
+    saturated across the whole batch. run_cases returns results in the same order
+    as ``specs`` (index-aligned, per its docstring), so zipping is safe.
 
     ``engine`` is threaded straight through to run_cases (see
     docs/superpowers/specs/2026-07-18-regime-split-scheduling-design.md):
     the CPU-bound coarse regime can force the full-case CPU pool even on a
     GPU box, while the refine regime keeps "auto" (GPU pipeline, unchanged)."""
     cases = [
-        _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, n_electrons)
-        for material, tilt_deg, tilt_azim_deg in specs
+        _build_case(material, energy_keV, tilt_deg, tilt_azim_deg, thickness_ang, n_electrons)
+        for material, tilt_deg, tilt_azim_deg, thickness_ang in specs
     ]
     results = run_cases(cases, max_workers=max_workers, engine=engine)
     return [
-        _candidate_from_result(material, tilt_deg, tilt_azim_deg, result)
-        for (material, tilt_deg, tilt_azim_deg), result in zip(specs, results, strict=True)
+        _candidate_from_result(material, tilt_deg, tilt_azim_deg, thickness_ang, result)
+        for (material, tilt_deg, tilt_azim_deg, thickness_ang), result in zip(
+            specs, results, strict=True
+        )
     ]
 
 
@@ -193,28 +202,41 @@ def _resume_phase(
     return values, False
 
 
-def _geometry_plan(materials, reference_scan):
+def _geometry_plan(materials, reference_scan, tilts=None, azimuths=None, thicknesses=None):
     """Return coarse geometry specs for the 95%-coverage search: the full
-    quantized tilt x azimuth product per material.
+    quantized tilt x azimuth x thickness product per material, as 4-tuples
+    ``(material, tilt_deg, tilt_azim_deg, thickness_ang)``.
 
-    The production grid is now a small, deliberately curated set (issue_notes.md
-    #1: tilt in {5, 45} deg, azimuth in {100, 140, 180} deg -- polar=0 and
-    azim=90 are excluded and rejected at build_cases). That is only a handful of
-    geometries, so every one is sampled instead of a near-zero/large-tilt subset.
-    The 5 deg tilt maximizes resonant line energy (the widest line-grid driver);
-    the coarse scan ranks the product and the refine phase re-measures the top
-    few at higher Ne.
+    With no overrides the tilt/azimuth axes default to the reference material's
+    profile angles and the thickness axis to a single :data:`DIAGNOSTIC_THICKNESS_ANG`
+    slab -- exactly today's scan. ``tilts``/``azimuths``/``thicknesses`` (from
+    ``--tilts``/``--azimuths``/``--thickness`` or persistent defaults) override
+    each axis independently for diagnostic sweeps.
 
-    Both axes pass through ``_quantized_angles`` -- the same nearest-0.5deg
+    The production grid is a small, deliberately curated set (issue_notes.md #1:
+    tilt in {5, 45} deg, azimuth in {100, 140, 180} deg -- polar=0 and azim=90 are
+    excluded and rejected at build_cases). That is only a handful of geometries, so
+    every one is sampled instead of a near-zero/large-tilt subset. The 5 deg tilt
+    maximizes resonant line energy (the widest line-grid driver); the coarse scan
+    ranks the product and the refine phase re-measures the top few at higher Ne.
+
+    Both angle axes pass through ``_quantized_angles`` -- the same nearest-0.5deg
     rounding ``build_cases`` applies -- so each ``Candidate``'s recorded geometry
     (reported as the driver) is the geometry actually simulated, not the raw
     catalog value. The second return value (a legacy large-tilt spot-check set)
     is empty: the full product already spans the largest tilt.
     """
-    tilts = [float(value) for value in _quantized_angles(reference_scan.tilt_deg)]
-    azimuths = [float(value) for value in _quantized_angles(reference_scan.tilt_azim_deg)]
+    raw_tilts = tilts if tilts else reference_scan.tilt_deg
+    raw_azims = azimuths if azimuths else reference_scan.tilt_azim_deg
+    thicks = thicknesses if thicknesses else [DIAGNOSTIC_THICKNESS_ANG]
+    tilt_vals = [float(value) for value in _quantized_angles(raw_tilts)]
+    azim_vals = [float(value) for value in _quantized_angles(raw_azims)]
     coarse = [
-        (material, tilt, azim) for material in materials for tilt in tilts for azim in azimuths
+        (material, tilt, azim, float(thick))
+        for material in materials
+        for tilt in tilt_vals
+        for azim in azim_vals
+        for thick in thicks
     ]
     return coarse, []
 
@@ -251,9 +273,14 @@ def derive_bounds(
     coarse_engine=COARSE_ENGINE,
     max_seconds=None,
     time_fn=time.monotonic,
+    tilts=None,
+    azimuths=None,
+    thicknesses=None,
 ):
     reference_scan = CATALOG.material(materials[0]).scan
-    near_zero_specs, spot_check_specs = _geometry_plan(materials, reference_scan)
+    near_zero_specs, spot_check_specs = _geometry_plan(
+        materials, reference_scan, tilts=tilts, azimuths=azimuths, thicknesses=thicknesses
+    )
 
     existing = {float(r["energy_keV"]): r for r in (existing_rows or [])}
     rows_by_energy = dict(existing)
@@ -333,7 +360,7 @@ def derive_bounds(
             print(f"[analyze_line_grid_bounds] resuming {energy_keV:g} keV after refine")
         refined, timed_out = _resume_phase(
             "refined",
-            [(c.material, c.tilt_deg, c.tilt_azim_deg) for c in candidates],
+            [(c.material, c.tilt_deg, c.tilt_azim_deg, c.thickness_ang) for c in candidates],
             energy_keV,
             refine_ne,
             max_workers,
@@ -432,6 +459,9 @@ def _run_one_material(
     coarse_engine,
     max_seconds,
     time_fn,
+    tilts=None,
+    azimuths=None,
+    thicknesses=None,
 ):
     """Derive one material's bespoke line rows against its OWN flat checkpoint
     and phase sidecar -- a thin per-material wrapper that reproduces ``main``'s
@@ -469,6 +499,9 @@ def _run_one_material(
         coarse_engine=coarse_engine,
         max_seconds=max_seconds,
         time_fn=time_fn,
+        tilts=tilts,
+        azimuths=azimuths,
+        thicknesses=thicknesses,
     )
     if path and complete:
         _atomic_write_json(path, rows)
@@ -486,6 +519,9 @@ def derive_all_materials(
     coarse_engine=COARSE_ENGINE,
     max_seconds=None,
     time_fn=time.monotonic,
+    tilts=None,
+    azimuths=None,
+    thicknesses=None,
 ):
     """Derive a bespoke per-material line grid + brem grid for each material,
     running the per-energy derivation independently per material (Approach A:
@@ -520,6 +556,9 @@ def derive_all_materials(
             coarse_engine=coarse_engine,
             max_seconds=remaining,
             time_fn=time_fn,
+            tilts=tilts,
+            azimuths=azimuths,
+            thicknesses=thicknesses,
         )
         if rows:
             combined[material] = {"line_rows": rows, "brem": _brem_grid_for_rows(rows)}
@@ -612,11 +651,45 @@ def build_parser():
         default=None,
         help="soft slice budget checked between completed phases; exit 75 when work remains",
     )
+    parser.add_argument(
+        "--tilts",
+        default=None,
+        help="comma polar tilts (deg); default: profile/persistent",
+    )
+    parser.add_argument(
+        "--azimuths",
+        default=None,
+        help="comma azimuths (deg); default: profile/persistent",
+    )
+    parser.add_argument(
+        "--thickness",
+        default=None,
+        help="comma crystal thicknesses (Angstrom); default: single 1 mm diagnostic slab",
+    )
+    parser.add_argument(
+        "--brem-step",
+        type=float,
+        default=None,
+        help="E_grid_brem step (eV) for downstream apply",
+    )
+    parser.add_argument(
+        "--set-default",
+        action="store_true",
+        help="persist supplied geometry/energies/materials as new defaults",
+    )
     return parser
+
+
+def _floats(text):
+    return [float(x) for x in text.split(",")] if text else None
 
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    persisted = lg_defaults.load_defaults()
+    tilts = _floats(args.tilts) or (persisted["tilts"] or None)
+    azimuths = _floats(args.azimuths) or (persisted["azimuths"] or None)
+    thicknesses = _floats(args.thickness) or (persisted["thickness_ang"] or None)
     global WIDE_GRID_EV, WIDE_BREM_EV
     WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, args.grid_stop, args.grid_step)
     WIDE_BREM_EV = np.arange(0.0, args.brem_grid_stop, WIDE_BREM_STEP_EV)
@@ -625,6 +698,15 @@ def main(argv=None):
         energies = [float(e) for e in args.energies.split(",")]
     else:
         energies = [float(e) for e in CATALOG.material(materials[0]).scan.energy_keV]
+    if args.set_default:
+        lg_defaults.update_defaults(
+            tilts=_floats(args.tilts),
+            azimuths=_floats(args.azimuths),
+            thickness_ang=_floats(args.thickness),
+            brem_step_ev=args.brem_step,
+            energies=energies if args.energies else None,
+            materials=materials if args.materials else None,
+        )
 
     combined, complete = derive_all_materials(
         materials,
@@ -636,6 +718,9 @@ def main(argv=None):
         json_out=args.json_out,
         coarse_engine=args.coarse_engine,
         max_seconds=None if args.max_minutes is None else args.max_minutes * 60.0,
+        tilts=tilts,
+        azimuths=azimuths,
+        thicknesses=thicknesses,
     )
     for material in materials:
         entry = combined.get(material)
