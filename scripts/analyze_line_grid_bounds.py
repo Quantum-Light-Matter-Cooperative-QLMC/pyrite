@@ -35,7 +35,7 @@ from dataclasses import asdict, dataclass
 import numpy as np
 
 from cxr_mc.config import material_sweep
-from cxr_mc.line_grid_bounds import coverage_energy, margined_stop, spacing_num
+from cxr_mc.line_grid.bounds import coverage_energy, margined_stop, spacing_num
 from cxr_mc.materials import CATALOG
 from cxr_mc.montecarlo.runner import run_cases
 from cxr_mc.sweep import _quantized_angles, build_cases

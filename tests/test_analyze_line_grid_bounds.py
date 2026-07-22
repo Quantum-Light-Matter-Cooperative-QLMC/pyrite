@@ -264,7 +264,7 @@ def test_candidate_brem_channel_refuses_silent_truncation():
     # The incoherent (brem) coverage call must keep allow_shortfall=False: a brem
     # spectrum whose 95% mass sits in the final bin means the true coverage lies
     # beyond the diagnostic ceiling and must raise, never clamp (issue_notes.md #1).
-    from cxr_mc.line_grid_bounds import CoverageGridTooNarrow
+    from cxr_mc.line_grid.bounds import CoverageGridTooNarrow
 
     analyze = _load_script("analyze_line_grid_bounds")
     E = np.arange(0.0, 100.0, 10.0)
