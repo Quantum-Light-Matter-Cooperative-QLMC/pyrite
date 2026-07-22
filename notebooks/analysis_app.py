@@ -408,7 +408,12 @@ def _(
         detector_broad_ymin_ui.value,
         detector_broad_ymax_ui.value,
     )
-    return (detector_x_domain,)
+    return (
+        detector_broad_x_domain,
+        detector_broad_y_domain,
+        detector_x_domain,
+        detector_y_domain,
+    )
 
 
 @app.cell
@@ -1566,9 +1571,11 @@ def _(
     detector_auto_ui,
     detector_azim_ui,
     detector_broad_auto_ui,
+    detector_broad_x_domain,
     detector_broad_xlog_ui,
     detector_broad_xmax_ui,
     detector_broad_xmin_ui,
+    detector_broad_y_domain,
     detector_broad_ylog_ui,
     detector_broad_ymax_ui,
     detector_broad_ymin_ui,
@@ -1579,6 +1586,7 @@ def _(
     detector_xlog_ui,
     detector_xmax_ui,
     detector_xmin_ui,
+    detector_y_domain,
     detector_ylog_ui,
     detector_ymax_ui,
     detector_ymin_ui,
@@ -1694,25 +1702,56 @@ def _(
             ]
         )
 
+        def _eaglexo_charts(band, x_domain, y_domain, xlog, ylog):
+            _det = eaglexo_detected_chart(
+                detector_res_view,
+                settings,
+                tilt_deg=detector_tilt_ui.value,
+                x_domain=x_domain,
+                y_domain=y_domain,
+                x_type="log" if xlog else "linear",
+                y_type="log" if ylog else "linear",
+                band=band,
+            )
+            _chg = eaglexo_charge_chart(
+                detector_res_view,
+                settings,
+                tilt_deg=detector_tilt_ui.value,
+                x_domain=x_domain,
+                y_domain=y_domain,
+                x_type="log" if xlog else "linear",
+                y_type="log" if ylog else "linear",
+                band=band,
+            )
+            return [c for c in (_det, _chg) if c is not None]
+
         def _eaglexo_inner():
             _md = mo.md(
                 "Raptor Eagle XO direct-detection CCD (`solid_angle x QE(E)`): soft PXR "
                 "lines pass at ~90% QE, hard brem is crushed by the thin sensor. "
                 "Photon density (detected vs incident), then recorded-charge density."
             )
-            _detected = eaglexo_detected_chart(
-                detector_res_view,
-                settings,
-                tilt_deg=detector_tilt_ui.value,
-                x_domain=detector_x_domain,
+            _narrow = _eaglexo_charts(
+                "narrow",
+                detector_x_domain,
+                detector_y_domain,
+                detector_xlog_ui.value,
+                detector_ylog_ui.value,
             )
-            _charge = eaglexo_charge_chart(
-                detector_res_view,
-                settings,
-                tilt_deg=detector_tilt_ui.value,
-                x_domain=detector_x_domain,
+            _broad = _eaglexo_charts(
+                "broad",
+                detector_broad_x_domain,
+                detector_broad_y_domain,
+                detector_broad_xlog_ui.value,
+                detector_broad_ylog_ui.value,
             )
-            _parts = [_md, *(c for c in (_detected, _charge) if c is not None)]
+            _parts = [_md]
+            if _narrow:
+                _parts.append(mo.md("**Narrowband**"))
+                _parts.extend(_narrow)
+            if _broad:
+                _parts.append(mo.md("**Broadband**"))
+                _parts.extend(_broad)
             _parts.append(
                 mo.accordion(
                     {
@@ -1730,18 +1769,44 @@ def _(
             )
             return mo.vstack(_parts)
 
+        def _timepix_chart(band, x_domain, y_domain, xlog, ylog):
+            return timepix_detected_chart(
+                detector_res_view,
+                settings,
+                tilt_deg=detector_tilt_ui.value,
+                x_domain=x_domain,
+                y_domain=y_domain,
+                x_type="log" if xlog else "linear",
+                y_type="log" if ylog else "linear",
+                band=band,
+            )
+
         def _timepix_inner():
             _md = mo.md(
                 "Si quad forward model: photoabsorption → charge sharing → per-pixel "
                 "threshold counting. Detected vs incident at the selected tilt."
             )
-            _detected = timepix_detected_chart(
-                detector_res_view,
-                settings,
-                tilt_deg=detector_tilt_ui.value,
-                x_domain=detector_x_domain,
+            _narrow = _timepix_chart(
+                "narrow",
+                detector_x_domain,
+                detector_y_domain,
+                detector_xlog_ui.value,
+                detector_ylog_ui.value,
             )
-            _parts = [_md, *([_detected] if _detected is not None else [])]
+            _broad = _timepix_chart(
+                "broad",
+                detector_broad_x_domain,
+                detector_broad_y_domain,
+                detector_broad_xlog_ui.value,
+                detector_broad_ylog_ui.value,
+            )
+            _parts = [_md]
+            if _narrow is not None:
+                _parts.append(mo.md("**Narrowband**"))
+                _parts.append(_narrow)
+            if _broad is not None:
+                _parts.append(mo.md("**Broadband**"))
+                _parts.append(_broad)
             _parts.append(
                 mo.accordion(
                     {
