@@ -320,6 +320,12 @@ def cmd_verify(args: argparse.Namespace) -> None:
     cmd_test(args)
 
 
+def cmd_regen_golden(args: argparse.Namespace) -> None:
+    from cxr_mc.line_grid.golden import regen
+
+    raise SystemExit(regen(check=getattr(args, "check", False)))
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="dev.py")
     sub = ap.add_subparsers(dest="command", required=True)
@@ -349,6 +355,9 @@ def build_parser() -> argparse.ArgumentParser:
     verify = sub.add_parser("verify")
     verify.add_argument("pytest_args", nargs=argparse.REMAINDER)
     verify.set_defaults(func=cmd_verify)
+    regen_golden = sub.add_parser("regen-golden")
+    regen_golden.add_argument("--check", action="store_true")
+    regen_golden.set_defaults(func=cmd_regen_golden)
     return ap
 
 

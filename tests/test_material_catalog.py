@@ -232,7 +232,9 @@ def test_standard_profile_uses_requested_angles_energies_and_line_grids():
 
     expected_bounds = {
         30.0: (10.0, 2500.0),
+        40.0: (10.0, 2800.0),
         50.0: (10.0, 3000.0),
+        60.0: (10.0, 4200.0),
         100.0: (50.0, 9000.0),
         150.0: (50.0, 11800.0),
         200.0: (50.0, 13600.0),
