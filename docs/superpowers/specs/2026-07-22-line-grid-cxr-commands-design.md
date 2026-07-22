@@ -47,8 +47,8 @@ New top-level group `cxr line-grid`, registered in `cli.py` alongside the
 others via a `line_grid.add_subparser(sub)`:
 
 ```
-cxr line-grid derive   [--materials …] [--energies …] [derivation flags]
-cxr line-grid submit   [--materials …] [--energies …] [--slice-minutes N] [--no-sync] [--dry-run]
+cxr line-grid derive   [--materials …] [--energies …] [geometry flags] [--set-default] [derivation flags]
+cxr line-grid submit   [--materials …] [--energies …] [geometry flags] [--set-default] [--slice-minutes N] [--no-sync] [--dry-run]
 cxr line-grid status   [jobid] [-v|-vv]
 cxr line-grid attach   [jobid]
 cxr line-grid logs     [jobid] [-f]
@@ -56,8 +56,15 @@ cxr line-grid stop     [jobid]
 cxr line-grid apply    [json] [--materials …] [--pull] [--force] [--dry-run]
 cxr line-grid set      <material> --energy E --stop S [--num N] [--start S0] [--note "…"]
 cxr line-grid set-brem <material> --stop S [--step ST] [--note "…"]
+cxr line-grid defaults [--set <flags>]        # show or update persistent defaults
 cxr line-grid show     [material]
 ```
+
+Geometry flags (on `derive`/`submit`): `--tilts d1,d2,…` (diagnostic polar
+tilts, deg), `--azimuths a1,a2,…` (azimuths, deg), `--thickness A1,A2,…`
+(crystal thickness/thicknesses, Å). Each overrides the corresponding default
+for **that run only**. Adding `--set-default` also persists the run's
+geometry/energies/materials as the new standing defaults (see below).
 
 - `derive` — run the derivation **locally** (thin wrapper over the current
   `analyze_line_grid_bounds.main` logic). Same flags: `--top-k`, `--coarse-ne`,
@@ -164,6 +171,54 @@ Provenance stamping:
 later rerun. `apply` reports which rows it skipped for this reason; `show` lists
 each material's `source`/`note` so overrides are auditable.
 
+## Diagnostic geometry & thickness overrides + persistent defaults
+
+The derivation samples a geometry × thickness set to find each material's
+worst-case coverage. Today these are effectively hardcoded:
+
+- **Thickness**: pinned to `DIAGNOSTIC_THICKNESS_ANG = 1e7` Å (1 mm, thickest
+  slab = high-energy worst case) in `analyze_line_grid_bounds.py`.
+- **Angles**: `_geometry_plan` reads the reference material's profile
+  `tilt_deg` / `tilt_azim_deg` arrays (quantized) — the full tilt × azimuth
+  product.
+
+New behaviour:
+
+- `--tilts`, `--azimuths`, `--thickness` override each per run. `_geometry_plan`
+  and `_build_case` gain explicit tilt/azimuth/thickness parameters; when a flag
+  is unset the value falls back to the persistent default, which itself defaults
+  to today's behaviour (angles from the profile scan, thickness `1e7`). This
+  preserves current output when no flag is given.
+- `--thickness` accepts a comma list; each thickness becomes an extra axis in the
+  diagnostic geometry product (the worst coverage across all sampled thicknesses
+  drives the bound). A single value reproduces today's single-slab scan.
+
+### Persistent defaults file
+
+Defaults live in a **tool-owned** `src/cxr_mc/data/line_grid_defaults.toml`,
+fully owned by the `line-grid` tool — not part of the material catalog, so no
+catalog schema change and no golden-fixture churn. It holds:
+
+```toml
+# managed by `cxr line-grid defaults --set` / `--set-default`; edit via CLI
+tilts = []            # [] = use each material's profile tilt_deg (today's default)
+azimuths = []         # [] = use profile tilt_azim_deg
+thickness_ang = [1.0e7]
+energies = [30, 40, 50, 60, 100, 150, 200, 250, 300]
+materials = ["hopg", "diamond", "wse2", "mose2"]
+```
+
+- Runs read this file for their defaults (replacing the current module-level
+  `DEFAULT_*` constants). Missing file → built-in fallbacks equal to today's
+  values.
+- `cxr line-grid defaults` prints the current defaults.
+- `cxr line-grid defaults --set --tilts … --thickness …` (or `--set-default` on a
+  `derive`/`submit` run) writes them. Written via the same atomic-write helper;
+  a stamped `# last set: <date>` comment records provenance.
+- `--set-default` persists **only the flags supplied on that run** merged over the
+  existing file (a run that sets just `--thickness` leaves `tilts`/materials
+  untouched).
+
 ## `set` / `show`
 
 - `cxr line-grid set hopg --energy 60 --stop 3800 --num 1264 --note "widened for
@@ -189,6 +244,12 @@ each material's `source`/`note` so overrides are auditable.
   `tests/test_material_catalog.py` expectations.
 - Status parity: `cxr line-grid status [-v/-vv]` calls `remote.job_status` with
   the same `detail` — assert delegation (mock `job_status`, check `detail` arg).
+- Geometry overrides: `--tilts/--azimuths/--thickness` reach `_geometry_plan` /
+  `_build_case`; unset flags reproduce today's profile-angle + 1e7-thickness scan
+  (regression); multi-thickness expands the geometry product.
+- Defaults file: `defaults --set` / `--set-default` round-trip (partial merge,
+  atomic write, missing-file fallbacks equal today's constants); `derive`/`submit`
+  read defaults from it.
 - Keep existing `tests/test_line_grid_bounds_job.py` /
   `tests/test_analyze_line_grid_bounds.py` green through the thin shims.
 
