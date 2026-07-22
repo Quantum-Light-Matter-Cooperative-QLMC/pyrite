@@ -85,7 +85,9 @@ def _():
         filter_results,
         records,
         select_results,
+        select_thickness,
         sweep_values,
+        thicknesses_by_energy,
         top_geometries,
     )
     from cxr_mc.run import cases_from_results, checkpoint_path_for, load_checkpoint
@@ -120,9 +122,11 @@ def _():
         records,
         scan_charts,
         select_results,
+        select_thickness,
         spectrum_chart,
         style_sheet,
         sweep_values,
+        thicknesses_by_energy,
         timepix_detected_chart,
         top_geometries,
         trajectory_chart,
@@ -260,7 +264,7 @@ def _(mo, records, res):
 
 
 @app.cell
-def _(fmt_thickness, mo, records, res, sweep_values):
+def _(fmt_thickness, mo, records, res, sweep_values, thicknesses_by_energy):
     # Energy-comparison thickness selector. Created top-level for reactivity,
     # rendered only inside the Energy comparison tab.
     #
@@ -273,20 +277,29 @@ def _(fmt_thickness, mo, records, res, sweep_values):
     # single-thickness checkpoint leaves the slice a no-op.
     _thk = sweep_values(res).get("thickness_ang", []) if records(res) else []
     _opts = {fmt_thickness(t): t for t in _thk} or {"— no data —": None}
-    thickness_ui = mo.ui.dropdown(_opts, value=list(_opts)[-1], label="crystal thickness")
+    # Default to the THICKEST slab at which the LOWEST beam energy was still
+    # computed. The penetration watchdog stops computing an energy past the depth
+    # where its beam is dead, so the bulk-thickness end of the sweep silently
+    # loses 30/50 keV. Anchoring the default here keeps every beam energy visible
+    # out of the box; stepping to a thicker slab hits select_thickness's
+    # per-energy fallback (with a note) rather than dropping the low energies.
+    _inv = thicknesses_by_energy(res) if records(res) else {}
+    _default_key = fmt_thickness(_inv[min(_inv)][-1]) if _inv else list(_opts)[-1]
+    thickness_ui = mo.ui.dropdown(_opts, value=_default_key, label="crystal thickness")
     return (thickness_ui,)
 
 
 @app.cell
-def _(res, select_results, thickness_ui):
+def _(res, select_thickness, thickness_ui):
     # The pinned-thickness view of the checkpoint. Every per-geometry chart below
     # draws from this instead of the raw `res`, so a thickness sweep no longer
     # collapses to one hidden record. None (no data / single option) -> pass through.
-    res_view = (
-        select_results(res, thickness_ang=thickness_ui.value)
-        if thickness_ui.value is not None
-        else res
-    )
+    #
+    # select_thickness (not select_results) so a bulk thickness never DROPS a beam
+    # energy the penetration watchdog stopped computing early: those energies fall
+    # back to their thickest computed slab (spectrum saturated past that depth),
+    # carrying a case["thickness_fallback"] marker the spectra tab surfaces.
+    res_view = select_thickness(res, thickness_ui.value) if thickness_ui.value is not None else res
     return (res_view,)
 
 
@@ -891,6 +904,16 @@ def _(
             "Beam energy varies across curves."
         )
         _sv = sweep_values(res) if records(res) else {}
+        # Beam energies whose beam died before the pinned thickness: select_thickness
+        # substituted their thickest computed slab (spectrum saturated past that
+        # depth). Note it honestly in the rail rather than silently dropping them.
+        _fallback_energies = sorted(
+            {_r["case"]["E0_keV"] for _r in records(res_view) if "thickness_fallback" in _r["case"]}
+        )
+        _thk_label = fmt_thickness(thickness_ui.value) if thickness_ui.value is not None else None
+        if _thk_label is not None and _fallback_energies:
+            _thk_label += " · " + ", ".join(f"{_e:g}" for _e in _fallback_energies)
+            _thk_label += " keV shown at max computed slab (watchdog-saturated)"
         _rail = context_rail(
             mo,
             {
@@ -900,9 +923,7 @@ def _(
                 else (f"{_sv['E0_keV'][0]:g} keV" if _sv.get("E0_keV") else None),
                 "theta": f"{tilt_ui.value:g} °" if tilt_ui.value is not None else None,
                 "phi": "best per E0",
-                "Thickness": (
-                    fmt_thickness(thickness_ui.value) if thickness_ui.value is not None else None
-                ),
+                "Thickness": _thk_label,
                 "Records": len(
                     records(select_results(res_view, tilt_deg=tilt_ui.value))
                     if tilt_ui.value is not None
@@ -1702,28 +1723,33 @@ def _(
             ]
         )
 
-        def _eaglexo_charts(band, x_domain, y_domain, xlog, ylog):
-            _det = eaglexo_detected_chart(
+        # Each detector chart is rendered twice, mirroring the spectra tab: a
+        # narrow "line" band (PXR/CXR lines only, its own domain + log toggles)
+        # stacked above a "broad" band (lines + brem, separate domain + logs).
+        # `_band_pair` fans one chart function across both bands so the narrow-
+        # and broad-axis controls both drive a chart instead of sitting orphaned.
+        def _band_pair(chart_fn):
+            _line = chart_fn(
                 detector_res_view,
                 settings,
                 tilt_deg=detector_tilt_ui.value,
-                x_domain=x_domain,
-                y_domain=y_domain,
-                x_type="log" if xlog else "linear",
-                y_type="log" if ylog else "linear",
-                band=band,
+                x_domain=detector_x_domain,
+                y_domain=detector_y_domain,
+                x_type="log" if detector_xlog_ui.value else "linear",
+                y_type="log" if detector_ylog_ui.value else "linear",
+                band="line",
             )
-            _chg = eaglexo_charge_chart(
+            _broad = chart_fn(
                 detector_res_view,
                 settings,
                 tilt_deg=detector_tilt_ui.value,
-                x_domain=x_domain,
-                y_domain=y_domain,
-                x_type="log" if xlog else "linear",
-                y_type="log" if ylog else "linear",
-                band=band,
+                x_domain=detector_broad_x_domain,
+                y_domain=detector_broad_y_domain,
+                x_type="log" if detector_broad_xlog_ui.value else "linear",
+                y_type="log" if detector_broad_ylog_ui.value else "linear",
+                band="broad",
             )
-            return [c for c in (_det, _chg) if c is not None]
+            return [c for c in (_line, _broad) if c is not None]
 
         def _eaglexo_inner():
             _md = mo.md(
@@ -1731,27 +1757,7 @@ def _(
                 "lines pass at ~90% QE, hard brem is crushed by the thin sensor. "
                 "Photon density (detected vs incident), then recorded-charge density."
             )
-            _narrow = _eaglexo_charts(
-                "narrow",
-                detector_x_domain,
-                detector_y_domain,
-                detector_xlog_ui.value,
-                detector_ylog_ui.value,
-            )
-            _broad = _eaglexo_charts(
-                "broad",
-                detector_broad_x_domain,
-                detector_broad_y_domain,
-                detector_broad_xlog_ui.value,
-                detector_broad_ylog_ui.value,
-            )
-            _parts = [_md]
-            if _narrow:
-                _parts.append(mo.md("**Narrowband**"))
-                _parts.extend(_narrow)
-            if _broad:
-                _parts.append(mo.md("**Broadband**"))
-                _parts.extend(_broad)
+            _parts = [_md, *_band_pair(eaglexo_detected_chart), *_band_pair(eaglexo_charge_chart)]
             _parts.append(
                 mo.accordion(
                     {
@@ -1769,44 +1775,12 @@ def _(
             )
             return mo.vstack(_parts)
 
-        def _timepix_chart(band, x_domain, y_domain, xlog, ylog):
-            return timepix_detected_chart(
-                detector_res_view,
-                settings,
-                tilt_deg=detector_tilt_ui.value,
-                x_domain=x_domain,
-                y_domain=y_domain,
-                x_type="log" if xlog else "linear",
-                y_type="log" if ylog else "linear",
-                band=band,
-            )
-
         def _timepix_inner():
             _md = mo.md(
                 "Si quad forward model: photoabsorption → charge sharing → per-pixel "
                 "threshold counting. Detected vs incident at the selected tilt."
             )
-            _narrow = _timepix_chart(
-                "narrow",
-                detector_x_domain,
-                detector_y_domain,
-                detector_xlog_ui.value,
-                detector_ylog_ui.value,
-            )
-            _broad = _timepix_chart(
-                "broad",
-                detector_broad_x_domain,
-                detector_broad_y_domain,
-                detector_broad_xlog_ui.value,
-                detector_broad_ylog_ui.value,
-            )
-            _parts = [_md]
-            if _narrow is not None:
-                _parts.append(mo.md("**Narrowband**"))
-                _parts.append(_narrow)
-            if _broad is not None:
-                _parts.append(mo.md("**Broadband**"))
-                _parts.append(_broad)
+            _parts = [_md, *_band_pair(timepix_detected_chart)]
             _parts.append(
                 mo.accordion(
                     {
