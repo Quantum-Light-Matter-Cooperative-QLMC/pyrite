@@ -27,7 +27,7 @@ class CoverageGridTooNarrow(ValueError):
 def coverage_energy(
     E_grid: np.ndarray,
     spec: np.ndarray,
-    coverage: float = 0.99,
+    coverage: float = 0.9,
     *,
     allow_shortfall: bool = False,
 ) -> float:
