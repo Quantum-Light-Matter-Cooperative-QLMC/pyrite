@@ -122,6 +122,69 @@ def select_results(results, **constraints):
     return out
 
 
+def thicknesses_by_energy(results):
+    """``{E0_keV: sorted[thickness_ang]}`` -- every COMPUTED slab per beam energy.
+
+    The penetration watchdog (:func:`config.gate_cases_by_penetration`) stops
+    computing an energy past the depth where its beam is dead, so a low beam
+    energy carries FEWER thicknesses than a high one. This inventory is what
+    :func:`select_thickness` consults to decide, per energy, whether a requested
+    thickness was actually computed or must fall back to that energy's thickest
+    computed slab.
+    """
+    out: dict[float, set] = {}
+    for by_E in results.values():
+        for E0, r in by_E.items():
+            t = r["case"].get("thickness_ang")
+            if t is not None:
+                out.setdefault(E0, set()).add(t)
+    return {E0: sorted(ts) for E0, ts in out.items()}
+
+
+def select_thickness(results, thickness_ang):
+    """Pin one crystal thickness across a multi-beam-energy overlay WITHOUT ever
+    dropping a beam energy the penetration watchdog stopped computing early.
+
+    A plain ``select_results(results, thickness_ang=T)`` silently loses every
+    energy whose beam is already dead before ``T`` -- exactly the low beams
+    (30/50 keV) at a bulk thickness -- because the watchdog never computed those
+    (energy, T) cases. But past its penetration cutoff an energy's emitted
+    spectrum is SATURATED (further thickness adds negligible emission -- the very
+    invariant the watchdog encodes), so that energy's THICKEST computed slab is
+    the physically-correct stand-in for any thicker request.
+
+    So: for each energy that WAS computed at ``thickness_ang`` keep exactly those
+    records; for each energy that was NOT, substitute its thickest computed slab
+    and stamp ``case["thickness_fallback"] = (thickness_ang, actual_thickness)``
+    on a COPY of the case so the UI can annotate the substitution. Returns a new
+    ``{name: {E0: record}}`` store; never mutates the input.
+    """
+    inventory = thicknesses_by_energy(results)
+
+    def _has_exact(E0):
+        return any(np.isclose(thickness_ang, t, rtol=1e-9, atol=1e-6) for t in inventory[E0])
+
+    out: dict = {}
+    for name, by_E in results.items():
+        for E0, r in by_E.items():
+            case = r["case"]
+            record_thickness = case.get("thickness_ang")
+            if record_thickness is None:
+                continue
+            exact = _has_exact(E0)
+            # Past its penetration cutoff an energy is saturated, so any thicker
+            # request collapses onto that energy's thickest computed slab.
+            target = thickness_ang if exact else inventory[E0][-1]
+            keep = bool(np.isclose(record_thickness, target, rtol=1e-9, atol=1e-6))
+            if not keep:
+                continue
+            if not exact:
+                # copy, don't mutate: other views share these records
+                case = {**case, "thickness_fallback": (thickness_ang, target)}
+            out.setdefault(name, {})[E0] = {**r, "case": case}
+    return out
+
+
 # record array fields, by size; the wide-brem pair is the largest (full-range grid)
 _RECORD_ARRAY_FIELDS = ("E_grid", "spec", "brem", "E_grid_brem", "brem_wide")
 _WIDE_BREM_FIELDS = ("brem_wide", "E_grid_brem")

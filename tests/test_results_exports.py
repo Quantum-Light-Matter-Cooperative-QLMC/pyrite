@@ -27,6 +27,8 @@ FROZEN_EXPORTS = frozenset(
         "filter_results",
         "sweep_values",
         "select_results",
+        "select_thickness",
+        "thicknesses_by_energy",
         "_RECORD_ARRAY_FIELDS",
         "_WIDE_BREM_FIELDS",
         "_grid_names",
