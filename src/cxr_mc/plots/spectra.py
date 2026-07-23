@@ -372,8 +372,8 @@ def _separate_annotation_boxes(fig, annotations):
                 break
 
 
-def plot_material_comparison(
-    results_by_material,
+def material_comparison_point(
+    results,
     settings,
     select="quality_peak",
     rel_prominence=0.03,
@@ -381,45 +381,53 @@ def plot_material_comparison(
     beam_energy_keV=None,
     min_line_quality: float | None = 0.5,
 ):
-    """Cross-material headline: for each material's results store, find the single
-    BEST geometry/energy (results.selection_score ``select``) and plot its
-    dominant coherent line ENERGY vs its integrated line FLUX -- one point per
-    material, coloured by line-definition quality. Answers "which crystal gives
-    the brightest well-defined line, and at what energy" for comparison against
-    the paper's catalogue.
+    """Best-geometry summary for one material's results store: the per-material
+    selection body of :func:`plot_material_comparison`, factored out so it can
+    be cached per (checkpoint, selection) -- see
+    :func:`cxr_mc.run.cached_material_analysis` -- without re-unpickling the
+    checkpoint on every call. Returns ``(line_eV, line_flux, quality, case)``
+    for the selected geometry, the string ``"dropped"`` if ``results`` has
+    records but none clears the ``min_line_quality``/``line_brem_ratio``
+    gates, or ``None`` if ``results`` has no records at all."""
+    recs = records(results)
+    if not recs:
+        return None
+    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
+    candidates = [
+        r
+        for r in recs
+        if (beam_energy_keV is None or r["case"]["E0_keV"] == beam_energy_keV)
+        and (min_line_quality is None or metrics[id(r)]["line_quality"] >= min_line_quality)
+    ]
+    if select == "line_brem_ratio":
+        candidates = [r for r in candidates if np.isfinite(metrics[id(r)]["line_brem_ratio"])]
+    if not candidates:
+        return "dropped"
+    best = max(candidates, key=lambda r: selection_score(metrics[id(r)], select))
+    m = metrics[id(best)]
+    return (m["line_eV"], m["line_flux"], m["line_quality"], best["case"])
 
-    ``results_by_material`` : ``{label: results_store}``, e.g. built in the
-    notebook with ``{m: load_checkpoint(m) for m in CATALOG.material_keys}``
-    (skip empties).  ``beam_energy_keV`` optionally restricts each material to
-    that beam energy before selecting its best geometry. ``min_line_quality``
-    rejects ill-defined-line candidates before ranking; ``None`` disables that
-    gate. A material with records but no candidate clearing the gate is
-    dropped from the plot and reported in a printed statement. Labels are
-    offset automatically when their rendered bounding boxes would overlap."""
-    pts = []  # (label, line_eV, line_flux, quality, case)
-    dropped = []
-    for label, results in results_by_material.items():
-        recs = records(results)
-        if not recs:
-            continue
-        metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
-        candidates = [
-            r
-            for r in recs
-            if (beam_energy_keV is None or r["case"]["E0_keV"] == beam_energy_keV)
-            and (min_line_quality is None or metrics[id(r)]["line_quality"] >= min_line_quality)
-        ]
-        if select == "line_brem_ratio":
-            candidates = [r for r in candidates if np.isfinite(metrics[id(r)]["line_brem_ratio"])]
-        if not candidates:
-            dropped.append(label)
-            continue
-        best = max(candidates, key=lambda r: selection_score(metrics[id(r)], select))
-        m = metrics[id(best)]
-        pts.append((label, m["line_eV"], m["line_flux"], m["line_quality"], best["case"]))
-    if not pts:
+
+def draw_material_comparison(
+    points,
+    dropped,
+    select="quality_peak",
+    beam_energy_keV=None,
+    min_line_quality: float | None = 0.5,
+):
+    """Draw the cross-material scatter from precomputed ``(label, line_eV,
+    line_flux, quality, case)`` points -- the plotting half of
+    :func:`plot_material_comparison`, split out so a caller that resolves
+    :func:`material_comparison_point` per material through a cache (see
+    :func:`cxr_mc.run.cached_material_analysis`) can draw straight from cache
+    hits without touching any checkpoint. ``dropped`` lists labels with
+    records but no candidate clearing the gate, printed the same way
+    ``plot_material_comparison`` does. Labels are offset automatically when
+    their rendered bounding boxes would overlap."""
+    if not points:
         print("no results in any material")
         return None
+    pts = points
     fig, ax = plt.subplots(figsize=(9.5, 5.6))
     sc = ax.scatter(
         [p[1] / 1e3 for p in pts],
@@ -476,3 +484,55 @@ def plot_material_comparison(
             f"{', '.join(dropped)} -- no candidate line met the gate."
         )
     return fig
+
+
+def plot_material_comparison(
+    results_by_material,
+    settings,
+    select="quality_peak",
+    rel_prominence=0.03,
+    line_metric="sharpness",
+    beam_energy_keV=None,
+    min_line_quality: float | None = 0.5,
+):
+    """Cross-material headline: for each material's results store, find the single
+    BEST geometry/energy (results.selection_score ``select``) and plot its
+    dominant coherent line ENERGY vs its integrated line FLUX -- one point per
+    material, coloured by line-definition quality. Answers "which crystal gives
+    the brightest well-defined line, and at what energy" for comparison against
+    the paper's catalogue.
+
+    ``results_by_material`` : ``{label: results_store}``, e.g. built in the
+    notebook with ``{m: load_checkpoint(m) for m in CATALOG.material_keys}``
+    (skip empties).  ``beam_energy_keV`` optionally restricts each material to
+    that beam energy before selecting its best geometry. ``min_line_quality``
+    rejects ill-defined-line candidates before ranking; ``None`` disables that
+    gate. A material with records but no candidate clearing the gate is
+    dropped from the plot and reported in a printed statement. Labels are
+    offset automatically when their rendered bounding boxes would overlap.
+
+    Thin wrapper around :func:`material_comparison_point` (per-material
+    selection) and :func:`draw_material_comparison` (plotting) -- split out so
+    the analysis app's cross-material tab can cache the per-material
+    selection by checkpoint identity (see
+    :func:`cxr_mc.run.cached_material_analysis`) instead of recomputing it,
+    and re-unpickling every material's checkpoint, on every tab render."""
+    pts = []
+    dropped = []
+    for label, results in results_by_material.items():
+        point = material_comparison_point(
+            results,
+            settings,
+            select,
+            rel_prominence,
+            line_metric,
+            beam_energy_keV,
+            min_line_quality,
+        )
+        if point is None:
+            continue
+        if point == "dropped":
+            dropped.append(label)
+            continue
+        pts.append((label, *point))
+    return draw_material_comparison(pts, dropped, select, beam_energy_keV, min_line_quality)

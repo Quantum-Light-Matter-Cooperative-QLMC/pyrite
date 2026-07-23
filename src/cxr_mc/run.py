@@ -117,6 +117,37 @@ def load_checkpoint(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
     return _load_checkpoint_cached(path, os.path.getmtime(path))
 
 
+_material_analysis_cache = {}
+
+
+def cached_material_analysis(material, analyze, key, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
+    """Cache ``analyze(load_checkpoint(material))`` per material, keyed on the
+    checkpoint's ``(path, mtime)`` plus caller-supplied ``key`` (e.g. the
+    selection parameters distinguishing what ``analyze`` computed).
+
+    Distinct from :func:`_load_checkpoint_cached`, which memoizes the raw
+    unpickle itself with ``maxsize=4`` -- fine for a user paging through 1-2
+    materials at a time, but a cross-material comparison that touches every
+    catalog material thrashes it, forcing a full 140-225 MB gzip re-unpickle
+    of every material on each re-render. This cache instead stores
+    ``analyze``'s (small) return value with no size cap, so once a material's
+    checkpoint has been analyzed for a given ``key`` the pickle is never
+    touched again on that ``key`` -- even after it falls out of the small
+    unpickle cache -- until the checkpoint's mtime changes (a re-run scan).
+
+    Returns ``None`` if no checkpoint exists for ``material``, without
+    calling ``analyze``."""
+    path = checkpoint_path_for(material, checkpoint_dir)
+    if not os.path.exists(path):
+        return None
+    cache_key = (path, os.path.getmtime(path), key)
+    if cache_key in _material_analysis_cache:
+        return _material_analysis_cache[cache_key]
+    value = analyze(load_checkpoint(material, checkpoint_dir))
+    _material_analysis_cache[cache_key] = value
+    return value
+
+
 def _manifest_for(results):
     """Build the sidecar manifest dict for a ``results`` store: distinct beam
     energies, total record count, and the swept case fields (see
