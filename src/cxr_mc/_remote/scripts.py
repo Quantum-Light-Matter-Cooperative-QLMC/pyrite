@@ -253,6 +253,76 @@ fi
 """
 
 
+def _rebrem_chunked_queue_script(jobid, materials, ne_brem, brem_step_eV, redo_all, chunk_minutes):
+    """One SLURM slice of a self-resubmitting brem-only recompute chain.
+
+    Mirror of ``_reline_chunked_queue_script`` for ``cxr rebrem``: each slice
+    resumes from checkpoint, does about ``chunk_minutes`` of work via ``cxr
+    rebrem --max-minutes``, and either terminates the chain (all materials
+    completed:/failed:) or self-resubmits with ``--nice=10000``. Exit-code
+    contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave
+    unresolved (a later slice finishes it), else -> ``failed:``.
+    """
+    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all)
+    mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    chunk_seconds = int(round(chunk_minutes * 60))
+    return f"""JOBDIR="{jobdir}"
+cd "{config.REMOTE_DIR}" || exit 1
+mkdir -p "$JOBDIR/progress"
+echo "started: $(date -Is)" >> "$JOBDIR/meta"
+{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+mats=({mats})
+total=${{#mats[@]}}
+chunk_seconds={chunk_seconds}
+slice_start=$(date +%s)
+n=0
+for m in "${{mats[@]}}"; do
+  n=$((n + 1))
+  grep -qx "completed: $m" "$JOBDIR/log" 2>/dev/null && continue
+  grep -qx "failed: $m" "$JOBDIR/log" 2>/dev/null && continue
+  now=$(date +%s)
+  remaining=$((slice_start + chunk_seconds - now))
+  [ "$remaining" -gt 0 ] || break
+  remaining_min=$(awk "BEGIN {{ printf \\"%.2f\\", $remaining / 60 }}")
+  echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
+  printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
+  rc=0
+  {config.REMOTE_UV} run --no-sync cxr rebrem "$m"{flags} --max-minutes "$remaining_min" \
+    --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "completed: $m" >> "$JOBDIR/log"
+  elif [ "$rc" -ne 75 ]; then
+    echo "WARNING: rebrem failed for $m (exit $rc); will not retry" >> "$JOBDIR/log"
+    echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
+    echo "failed: $m" >> "$JOBDIR/log"
+  fi
+done
+unresolved=0
+failures=0
+for m in "${{mats[@]}}"; do
+  grep -qx "failed: $m" "$JOBDIR/log" 2>/dev/null && {{ failures=$((failures + 1)); continue; }}
+  grep -qx "completed: $m" "$JOBDIR/log" 2>/dev/null && continue
+  unresolved=1
+done
+if [ "$unresolved" -eq 0 ]; then
+  if [ "$failures" -gt 0 ]; then
+    echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
+  else
+    echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
+  fi
+  exit 0
+fi
+[ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
+k=$(grep -c "^slurm_job_id: " "$JOBDIR/meta" 2>/dev/null)
+echo "queued slice $((k + 1)) $(date -Is)" > "$JOBDIR/state"
+SID=$(sbatch --parsable --nice=10000 "$JOBDIR/run.sh") || {{ echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+SID=${{SID%%;*}}
+case "$SID" in ''|*[!0-9]*) echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1 ;; esac
+printf 'slurm_job_id: %s\\n' "$SID" >> "$JOBDIR/meta"
+"""
+
+
 def _rebrem_queue_metadata(jobid, materials, ne_brem, brem_step_eV, redo_all):
     """Static metadata persisted before a rebrem queue is submitted. ``kind:
     rebrem`` keys the Mode line in status/attach; ``materials``/``quick`` keep

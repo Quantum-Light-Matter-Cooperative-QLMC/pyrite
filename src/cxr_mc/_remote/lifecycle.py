@@ -315,26 +315,43 @@ def start_rebrem_queue(
     redo_all=False,
     no_sync=False,
     dry_run=False,
+    chunk_minutes=10.0,
 ):
     """Submit a brem-only checkpoint recompute (``cxr rebrem``) to SLURM.
 
     Reserves the same ``<material>.pkl`` stems as a sweep -- rebrem rewrites
     those checkpoints in place, so it must not race a live scan of the same
-    material (and vice versa). Returns the local job id."""
+    material (and vice versa). By default the recompute is chunked: each
+    ~chunk_minutes slice does bounded work via ``cxr rebrem --max-minutes`` and
+    self-resubmits with ``--nice=10000`` so the single-GPU box stays shareable
+    at every slice boundary. Pass ``chunk_minutes=0`` for the original
+    monolithic allocation. Returns the local job id."""
     transport._check_materials(materials)
     if not dry_run:
         _refuse_if_busy(materials, False)
     jobid = scripts._new_jobid()
     jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
     stems = list(materials)
-    payload = scripts._rebrem_queue_script(jobid, materials, ne_brem, brem_step_eV, redo_all)
+    chunked = chunk_minutes > 0
+    if chunked:
+        payload = scripts._rebrem_chunked_queue_script(
+            jobid, materials, ne_brem, brem_step_eV, redo_all, chunk_minutes
+        )
+        time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
+    else:
+        payload = scripts._rebrem_queue_script(jobid, materials, ne_brem, brem_step_eV, redo_all)
+        time_limit = config.SLURM_TIME
     script = scripts._slurm_batch_script(
-        jobid, payload, job_name=f"cxr-rebrem-{jobid}", reservation_stems=stems
+        jobid,
+        payload,
+        job_name=f"cxr-rebrem-{jobid}",
+        reservation_stems=stems,
+        time_limit=time_limit,
     )
     upload = scripts._write_job_script_command(
         jobdir, scripts._rebrem_queue_metadata(jobid, materials, ne_brem, brem_step_eV, redo_all)
     )
-    submit = scripts._submit_slurm_command(jobid, stems)
+    submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
 
     if dry_run:
         print(
@@ -349,7 +366,7 @@ def start_rebrem_queue(
     if not no_sync:
         transport.sync_code()
     _stage_job_script(jobid, stems, upload, script)
-    scheduler_id = _submit_staged_job(jobid, stems)
+    scheduler_id = _submit_staged_job(jobid, stems, nice=chunked)
 
     print(
         f"\nJOB {jobid} · SUBMITTED\n"

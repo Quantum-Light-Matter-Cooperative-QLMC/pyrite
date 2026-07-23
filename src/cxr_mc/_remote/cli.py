@@ -139,6 +139,7 @@ def _cli_rebrem(args):
         redo_all=args.redo_all,
         no_sync=args.no_sync,
         dry_run=args.dry_run,
+        chunk_minutes=args.chunk_minutes,
     )
     if args.dry_run:
         return
@@ -149,9 +150,8 @@ def _cli_rebrem(args):
     if not completed:
         print("warning: the SLURM rebrem updated no checkpoints successfully; nothing to pull")
         return
-    # code is already synced by the queue; plain whole-file pull (the fresh
-    # wide-brem arrays are the point, so no --drop-wide-brem trimming here)
-    lifecycle.pull(completed)
+    # merge ONLY the fresh brem into the local pickle, preserving any local line spectra
+    lifecycle.pull(completed, dataset="brem")
 
 
 def _cli_reline(args):
@@ -336,6 +336,13 @@ def _build_remote_parser(ap):
         "--redo-all",
         action="store_true",
         help="recompute every record even if already at the target parameters",
+    )
+    rb.add_argument(
+        "--chunk-minutes",
+        type=float,
+        default=10.0,
+        help="length of each self-resubmitting SLURM slice in minutes; "
+        "0 = one whole-box monolithic run (default: 10.0)",
     )
     rb.add_argument("--no-sync", action="store_true", help="skip the code upload")
     rb.add_argument(

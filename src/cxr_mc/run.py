@@ -440,6 +440,8 @@ def repair_brem_wide(
     ne_brem=None,
     brem_step_eV=None,
     on_progress=None,
+    max_seconds=None,
+    status=None,
 ):
     """Regenerate ``brem_wide`` (and the line-grid ``brem``) for cached records
     using the CURRENT ``mc_brem_spectrum`` -- WITHOUT re-running the expensive
@@ -479,8 +481,15 @@ def repair_brem_wide(
         fired once before the loop and after every repaired record -- same shape
         as run_sweep's ``on_progress(completed_new_cases, total, cached_cases)``,
         so ``cxr rebrem --progress-file`` feeds the remote progress dashboard.
-    Returns the number of records repaired. Mutates ``results`` in place; re-pickle
-    the checkpoint afterwards (or use :func:`repair_checkpoint`).
+    max_seconds / status : chunked resubmission (mirror of ``repair_line_spec``).
+        When ``max_seconds`` is not ``None`` a ``time.monotonic``-based deadline is
+        checked BEFORE each record; on expiry the loop breaks with unprocessed
+        records left. When ``status`` is a dict, ``status["complete"]`` is set to
+        ``False`` iff the deadline cut the pass short (``True`` otherwise). Both
+        default to a no-op so the local path is byte-identical to today.
+    Returns the number of records actually repaired (0 on an immediate deadline).
+    Mutates ``results`` in place; re-pickle the checkpoint afterwards (or use
+    :func:`repair_checkpoint`).
     """
     import numpy as np
 
@@ -515,10 +524,18 @@ def repair_brem_wide(
             if retune
             else "nothing to repair (all brem_wide already finite)"
         )
+        if status is not None:
+            status["complete"] = True
         return 0
     print(f"repairing brem for {len(todo)} record(s)...")
     t0 = time.perf_counter()
+    deadline = None if max_seconds is None else time.monotonic() + max_seconds
+    done = 0
+    broke = False
     for k, r in enumerate(todo, 1):
+        if deadline is not None and time.monotonic() >= deadline:
+            broke = True
+            break
         c = r["case"]
         if ne_brem is not None:
             c["Ne_brem"] = int(ne_brem)
@@ -534,6 +551,7 @@ def repair_brem_wide(
         r["brem_wide"] = brem_wide
         r["E_grid_brem"] = E_brem
         r["brem"] = np.interp(np.asarray(r["E_grid"], float), E_brem, brem_wide)
+        done = k
         if on_progress is not None:
             on_progress(k, len(todo), n_skipped)
         if save_cb is not None and save_every and (k % save_every == 0):
@@ -544,17 +562,20 @@ def repair_brem_wide(
             print(f"  {k}/{len(todo)}  ({time.perf_counter() - t0:.0f} s)")
     if save_cb is not None:
         save_cb(results)  # final save
-    return len(todo)
+    if status is not None:
+        status["complete"] = not broke
+    return done
 
 
-def repair_checkpoint(checkpoint_path, save_every=100, **kw):
+def repair_checkpoint(checkpoint_path, save_every=100, max_seconds=None, status=None, **kw):
     """Load a per-material checkpoint, repair its ``brem_wide`` (see
     :func:`repair_brem_wide`), and re-pickle it in place -- saving progress every
     ``save_every`` records (atomic temp+replace) so a crash/OOM is RESUMABLE: just
     call again and only_nonfinite picks up where it left off. Extra ``**kw``
     (e.g. ``ne_brem=``, ``brem_step_eV=`` -- ``cxr rebrem``) pass through to
-    :func:`repair_brem_wide`. Returns the repaired ``results`` dict (also usable
-    directly in the notebook)."""
+    :func:`repair_brem_wide`. ``max_seconds``/``status`` thread the
+    chunked-resubmission deadline through. Returns the repaired ``results`` dict
+    (also usable directly in the notebook)."""
     if not os.path.exists(checkpoint_path):
         print(f"no such checkpoint: {checkpoint_path}")
         return {}
@@ -564,7 +585,14 @@ def repair_checkpoint(checkpoint_path, save_every=100, **kw):
         _checkpoint_save(checkpoint_path, results)
         _manifest_save(checkpoint_path, results)
 
-    n = repair_brem_wide(results, save_every=save_every, save_cb=save_cb, **kw)
+    n = repair_brem_wide(
+        results,
+        save_every=save_every,
+        save_cb=save_cb,
+        max_seconds=max_seconds,
+        status=status,
+        **kw,
+    )
     print(f"re-saved {checkpoint_path}" if n else "checkpoint unchanged")
     return results
 

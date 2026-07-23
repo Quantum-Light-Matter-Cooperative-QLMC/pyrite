@@ -2528,6 +2528,46 @@ def test_rebrem_cli_skips_pull_when_viewer_disconnects(monkeypatch):
     remote.main(["rebrem", "hopg"])
 
 
+def test_cli_rebrem_pulls_brem_dataset(monkeypatch):
+    monkeypatch.setattr(lifecycle, "start_rebrem_queue", lambda *a, **k: "J1")
+    monkeypatch.setattr(viewer, "attach", lambda jobid: True)
+    monkeypatch.setattr(state, "_completed_materials", lambda jobid, mats: ["mos2"])
+    captured = {}
+    monkeypatch.setattr(lifecycle, "pull", lambda stems, **kw: captured.update(stems=stems, kw=kw))
+    args = type(
+        "A",
+        (),
+        dict(
+            material=["mos2"],
+            all=False,
+            ne_brem=None,
+            step=None,
+            redo_all=False,
+            no_sync=False,
+            dry_run=False,
+            chunk_minutes=10.0,
+            remote_command="rebrem",
+        ),
+    )()
+    cli._cli_rebrem(args)
+    assert captured["stems"] == ["mos2"]
+    assert captured["kw"].get("dataset") == "brem"
+
+
+def test_rebrem_chunked_queue_script_self_resubmits():
+    s = scripts._rebrem_chunked_queue_script(
+        "J1", ["mos2", "w"], ne_brem=1000, brem_step_eV=None, redo_all=False, chunk_minutes=10.0
+    )
+    assert "cxr rebrem" in s
+    assert "--ne-brem 1000" in s
+    assert "--max-minutes" in s
+    assert "--nice=10000" in s
+    assert '--progress-file "$JOBDIR/progress/$m.json"' in s
+    # metadata unchanged by chunking
+    meta = scripts._rebrem_queue_metadata("J1", ["mos2", "w"], 1000, None, False)
+    assert "kind: rebrem" in meta
+
+
 def test_reline_queue_script_and_metadata():
     from cxr_mc._remote import scripts
 

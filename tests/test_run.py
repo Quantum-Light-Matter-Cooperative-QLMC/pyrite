@@ -884,6 +884,27 @@ def test_repair_brem_wide_on_progress_reports_skipped_and_done(monkeypatch):
     assert calls == [(0, 1, 1), (1, 1, 1)]
 
 
+def test_repair_brem_wide_max_seconds_stops_early(monkeypatch):
+    """An immediate deadline (max_seconds=0.0) breaks before the sole stale
+    record: returns 0 and marks status incomplete (mirror of the reline path)."""
+    stale = _finite_record(_fake_case("cfg_a", 30.0))
+    stale["case"]["Ne_brem"] = 7  # parameter mismatch -> selected for repair
+    monkeypatch.setattr(
+        "cxr_mc.montecarlo._brem_for_case",
+        lambda c, E_brem: np.ones(np.asarray(E_brem, float).shape),
+    )
+    n = repair_brem_wide(
+        {"cfg_a": {30.0: stale}},
+        progress=False,
+        ne_brem=5,
+        brem_step_eV=50.0,
+        max_seconds=0.0,
+        status=(s := {}),
+    )
+    assert n == 0
+    assert s["complete"] is False
+
+
 def test_rebrem_checkpoints_progress_file_writes_dashboard_records(monkeypatch, tmp_path):
     from cxr_mc.rebrem import rebrem_checkpoints
 
