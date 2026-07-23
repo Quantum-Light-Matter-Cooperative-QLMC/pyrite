@@ -1017,3 +1017,37 @@ def test_repair_line_spec_max_seconds_stops_early(monkeypatch):
     )
     assert n == 0
     assert s["complete"] is False
+
+
+def test_reline_checkpoints_forwards_flags(monkeypatch, tmp_path):
+    import cxr_mc.run as run
+    from cxr_mc import reline
+
+    calls = []
+    monkeypatch.setattr(
+        run,
+        "reline_checkpoint",
+        lambda path, material, **kw: calls.append((material, kw)) or {},
+    )
+    (tmp_path / "mos2.pkl").write_bytes(b"x")
+    reline.reline_checkpoints(
+        materials=["mos2"],
+        checkpoint_dir=str(tmp_path),
+        line_ne=40000,
+        line_step_eV=5.0,
+        redo_all=True,
+    )
+    assert calls == [
+        (
+            "mos2",
+            {
+                "line_ne": 40000,
+                "line_step_eV": 5.0,
+                "from_config": True,
+                "redo_all": True,
+                "save_every": 100,
+                "max_seconds": None,
+                "status": {},
+            },
+        )
+    ]

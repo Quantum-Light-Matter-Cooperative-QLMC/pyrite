@@ -48,6 +48,7 @@ def main(argv=None):
                 export,
                 line_grid,
                 rebrem,
+                reline,
                 remote,
                 scan,
                 slim,
@@ -59,6 +60,7 @@ def main(argv=None):
             analyze.add_subparser(sub)
             slim.add_subparser(sub)
             rebrem.add_subparser(sub)
+            reline.add_subparser(sub)
             archive.add_subparser(sub)
             remote.add_subparser(sub)
             line_grid.add_subparser(sub)
