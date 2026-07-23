@@ -210,6 +210,11 @@ class Sweep:
     energy_keV: ScalarOrSeq = (30.0, 45.0, 60.0)
     tilt_deg: ScalarOrSeq = 30.0
     tilt_azim_deg: ScalarOrSeq = 0.0
+    groove_spacing_ang: float | None = None
+    # Blazed sawtooth grooves on the beam-entrance face (docs/superpowers/
+    # plans/2026-07-23-blazed-groove-geometry.md). Scalar, not sweepable in
+    # v1. Requires tilt_azim_deg == 180, 0 < tilt_deg < 90, theta_obs = 90,
+    # no substrate/stack, no finite footprint.
     crystal_width_mm: ScalarOrSeq | None = 5.0
     crystal_height_mm: ScalarOrSeq | None = 5.0
     beam_fwhm_mm: float | None = 1.0  # None -> legacy point-source beam
@@ -328,6 +333,31 @@ def _reject_banned_angles(
         )
 
 
+def _reject_invalid_groove_geometry(
+    groove_spacing_ang: float, sweep: "Sweep", tilts: np.ndarray, azimuths: np.ndarray, stack
+) -> None:
+    """Refuse case geometries the v1 blazed-groove entrance face cannot model
+    (docs/superpowers/plans/2026-07-23-blazed-groove-geometry.md). Grooves are
+    a laterally infinite, single-slab feature machined into one flat face at a
+    fixed in-plane orientation (montecarlo.groove.blazed_groove_spec), so
+    every case must sit at tilt_azim_deg == 180 and 0 < tilt_deg < 90, and
+    neither a substrate/stack nor a finite footprint may be present (both
+    assume a flat, laterally infinite entrance face)."""
+    if groove_spacing_ang <= 0:
+        raise ValueError("groove_spacing_ang must be positive")
+    if not np.allclose(azimuths, 180.0):
+        raise ValueError("grooves require tilt_azim_deg == 180 for every case")
+    if not np.all((tilts > 0.0) & (tilts < 90.0)):
+        raise ValueError("grooves require 0 < tilt_deg < 90 for every case")
+    if stack is not None:
+        raise ValueError("grooves are v1 single-slab only (no substrate/stack)")
+    if sweep.crystal_width_mm is not None or sweep.crystal_height_mm is not None:
+        raise ValueError(
+            "grooves require a laterally infinite slab "
+            "(crystal_width_mm/crystal_height_mm must be None)"
+        )
+
+
 def _line_grid_for_energy(sweep: Sweep, default_grid: np.ndarray, energy_keV: float) -> np.ndarray:
     """Select the fixed, legacy, mapped, or material-default line grid."""
     fixed = sweep.E_grid_line if sweep.E_grid_line is not None else sweep.e_grid_eV
@@ -428,6 +458,9 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
             raise ValueError("give either substrate= or stack=, not both")
         stack = (LayerSpec(sweep.substrate, sweep.substrate_thickness_ang),)
 
+    if sweep.groove_spacing_ang is not None:
+        _reject_invalid_groove_geometry(sweep.groove_spacing_ang, sweep, tilts, azimuths, stack)
+
     cases = []
     for i_c, (thickness, tilt, azim, (width, height)) in enumerate(
         product(
@@ -481,6 +514,11 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
                     theta_obs_rad=np.deg2rad(sweep.theta_obs_deg),
                     tilt_deg=float(tilt),
                     tilt_azim_deg=float(azim),
+                    **(
+                        {"groove_spacing_ang": float(sweep.groove_spacing_ang)}
+                        if sweep.groove_spacing_ang is not None
+                        else {}
+                    ),
                     beam_uvw=beam_uvw,
                     surface_hkl=surface_hkl,
                     mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")

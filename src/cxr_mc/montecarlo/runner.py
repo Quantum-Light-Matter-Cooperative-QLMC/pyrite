@@ -21,6 +21,7 @@ from .._energy_grid import decode_energy_grid
 from . import spectrum as _spectrum_mod
 from ._backend import _GPU, cp
 from .geometry import tilted_geometry
+from .groove import blazed_groove_spec
 from .spectrum import _segments_in_layer, mc_brem_spectrum, mc_spectrum
 from .transport import simulate_trajectories
 
@@ -302,6 +303,15 @@ def _transport_case(case):
     # backscatter / substrate brem); None -> single-material slab (unchanged).
     layers = case.get("abs_layers")
     beam_fwhm_mm = case.get("beam_fwhm_mm")
+    # blazed sawtooth entrance-face grooves (docs/superpowers/plans/
+    # 2026-07-23-blazed-groove-geometry.md): built once per case, then threaded
+    # into both electron-entry transport calls and the line-spectrum escape
+    # model. None -> a strict no-op (the flat-face slab, unchanged).
+    groove = None
+    if case.get("groove_spacing_ang") is not None:
+        groove = blazed_groove_spec(
+            case["groove_spacing_ang"], case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad
+        )
     segs = simulate_trajectories(
         case["E0_keV"],
         case["Ne"],
@@ -316,7 +326,9 @@ def _transport_case(case):
         crystal_height_mm=case.get("crystal_height_mm"),
         tilt_polar_rad=tilt_polar_rad,
         tilt_azim_rad=tilt_azim_rad,
+        groove=groove,
     )
+    # brem segs: the electrons enter through the same grooved face either way.
     segs_b = simulate_trajectories(
         case["E0_keV"],
         case["Ne_brem"],
@@ -331,8 +343,11 @@ def _transport_case(case):
         crystal_height_mm=case.get("crystal_height_mm"),
         tilt_polar_rad=tilt_polar_rad,
         tilt_azim_rad=tilt_azim_rad,
+        groove=groove,
     )
-    tp: dict[str, Any] = dict(E_grid=E_grid, E_brem=E_brem, n_hat=n_hat, segs=segs, segs_b=segs_b)
+    tp: dict[str, Any] = dict(
+        E_grid=E_grid, E_brem=E_brem, n_hat=n_hat, segs=segs, segs_b=segs_b, groove=groove
+    )
     if _TIMING:
         tp["_t_transport"] = perf_counter() - t0
     return tp
@@ -389,6 +404,14 @@ def _brem_for_case(case, E_brem):
     tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
     tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
     beam, n_hat = tilted_geometry(case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad)
+    # electron entry (not escape) honors the groove, matching the live-sweep
+    # transport in _transport_case; the brem escape model stays flat-face in
+    # v1 (see _brem_wide_from_segments), so no groove flows past this point.
+    groove = None
+    if case.get("groove_spacing_ang") is not None:
+        groove = blazed_groove_spec(
+            case["groove_spacing_ang"], case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad
+        )
     segs_b = simulate_trajectories(
         case["E0_keV"],
         case["Ne_brem"],
@@ -403,6 +426,7 @@ def _brem_for_case(case, E_brem):
         crystal_height_mm=case.get("crystal_height_mm"),
         tilt_polar_rad=tilt_polar_rad,
         tilt_azim_rad=tilt_azim_rad,
+        groove=groove,
     )
     return _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers)
 
@@ -447,9 +471,15 @@ def _spectrum_case(case, tp):
             sinc_cutoff=case.get("sinc_cutoff"),
             chunk=spec_chunk,
             layers=abs_layers,
+            groove=tp.get("groove"),
             **mosaic_kw,
         )
     else:
+        # grooves are v1 single-slab only (sweep.build_cases rejects
+        # substrate/stack when groove_spacing_ang is set), so this per-layer
+        # branch never sees a groove; mc_spectrum's own guard (layers=
+        # non-None + groove) would catch it if that ever changed.
+        assert case.get("groove_spacing_ang") is None
         spec = np.zeros(E_grid.shape, dtype=float)
         for L, rad in enumerate(radiators):
             if rad is None:  # amorphous layer -> no coherent lines
@@ -482,6 +512,9 @@ def _spectrum_case(case, tp):
     # over layers (a single layer is exactly the old single-material brem).
     # Factored into _brem_wide_from_segments so run.repair_brem_wide reuses this
     # SAME path (via _brem_for_case) and can't drift back to single-slab brem.
+    # grooves: brem escape stays flat-face in v1 (line yield is the target;
+    # brem bias < groove depth / L_abs) -- _brem_wide_from_segments does not
+    # take a groove.
     brem_wide = _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers)
     brem = np.interp(E_grid, E_brem, brem_wide)  # brem under the lines (line grid)
     # Return this case's GPU scratch on the A2 cadence so the CuPy memory pool

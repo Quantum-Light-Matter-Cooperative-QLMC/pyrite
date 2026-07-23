@@ -749,6 +749,94 @@ def test_run_material_applies_penetration_watchdog(monkeypatch, tmp_path):
     assert captured["run_sweep_cases"] == captured["input_len"] // 2
 
 
+def test_build_cases_carries_groove_spacing():
+    sweep = Sweep(
+        material="hopg",
+        tilt_deg=45.0,
+        tilt_azim_deg=180.0,
+        groove_spacing_ang=2.0e4,
+        thickness_ang=2.0e5,
+        energy_keV=100.0,
+        crystal_width_mm=None,
+        crystal_height_mm=None,
+    )
+    cases = build_cases(sweep)
+    assert all(c["groove_spacing_ang"] == 2.0e4 for c in cases)
+
+
+def test_build_cases_omits_groove_spacing_when_unset():
+    cases = build_cases(Sweep(material="hopg", thickness_ang=100.0, energy_keV=30.0, tilt_deg=5.0))
+    assert "groove_spacing_ang" not in cases[0]
+
+
+def test_build_cases_groove_requires_azim_180():
+    with pytest.raises(ValueError):
+        build_cases(
+            Sweep(
+                material="hopg",
+                tilt_deg=45.0,
+                tilt_azim_deg=0.0,
+                groove_spacing_ang=2.0e4,
+                crystal_width_mm=None,
+                crystal_height_mm=None,
+            )
+        )
+
+
+def test_build_cases_groove_requires_tilt_between_0_and_90():
+    with pytest.raises(ValueError):
+        build_cases(
+            Sweep(
+                material="hopg",
+                tilt_deg=0.0,
+                tilt_azim_deg=180.0,
+                groove_spacing_ang=2.0e4,
+                crystal_width_mm=None,
+                crystal_height_mm=None,
+                allow_normal_incidence=True,
+            )
+        )
+
+
+def test_build_cases_groove_rejects_substrate():
+    with pytest.raises(ValueError):
+        build_cases(
+            Sweep(
+                material="hopg",
+                tilt_deg=45.0,
+                tilt_azim_deg=180.0,
+                groove_spacing_ang=2.0e4,
+                substrate="silicon",
+            )
+        )
+
+
+def test_build_cases_groove_rejects_finite_footprint():
+    with pytest.raises(ValueError):
+        build_cases(
+            Sweep(
+                material="hopg",
+                tilt_deg=45.0,
+                tilt_azim_deg=180.0,
+                groove_spacing_ang=2.0e4,
+            )
+        )  # default crystal_width_mm/height_mm is a finite 5x5 mm footprint
+
+
+def test_build_cases_groove_rejects_nonpositive_spacing():
+    with pytest.raises(ValueError):
+        build_cases(
+            Sweep(
+                material="hopg",
+                tilt_deg=45.0,
+                tilt_azim_deg=180.0,
+                groove_spacing_ang=0.0,
+                crystal_width_mm=None,
+                crystal_height_mm=None,
+            )
+        )
+
+
 def test_scan_progress_record_is_atomically_replaced(tmp_path):
     from cxr_mc.scan import _write_progress_record
 
