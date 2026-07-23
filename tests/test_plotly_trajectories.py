@@ -3,7 +3,14 @@
 import numpy as np
 import plotly.graph_objects as go
 
-from cxr_mc.plots.plotly_trajectories import track_vertices_3d
+from cxr_mc.plots.plotly_trajectories import (
+    N_FRAMES,
+    _exit_paths_3d,
+    advance_frame,
+    dataset_t_max,
+    frame_reveal_fs,
+    track_vertices_3d,
+)
 
 
 def test_track_vertices_3d_separates_every_physical_segment():
@@ -129,3 +136,105 @@ def test_ne_is_transported_literally_not_scaled():
     elec_id = np.asarray(tracks.customdata)[:, 1]
     n_electrons = len(np.unique(elec_id[np.isfinite(elec_id)]))
     assert n_electrons <= 10  # never inflated by a hidden multiplier
+
+
+def test_track_vertices_3d_reveal_until_fs_filters_by_start_age():
+    data = {
+        "start_xyz": np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0], [2.0, 2.0, 2.0]]),
+        "end_xyz": np.array([[0.5, 0.5, 0.5], [1.5, 1.5, 1.5], [2.5, 2.5, 2.5]]),
+        "E": np.array([30.0, 20.0, 10.0]),
+        "elec_id": np.array([0, 0, 1]),
+        "t_fs": np.array([0.0, 5.0, 9.0]),
+    }
+    xyz_full, _, _ = track_vertices_3d(data)
+    xyz_cut, energy_cut, _ = track_vertices_3d(data, t_fs=data["t_fs"], reveal_until_fs=5.0)
+
+    assert xyz_cut.shape[0] < xyz_full.shape[0]  # strictly fewer vertices
+    assert xyz_cut.shape[0] == 6  # 2 of 3 segments (t_fs 0.0, 5.0 <= 5.0) survive
+    # revealed segment's energy (30, 20) is the pair with t_fs <= cutoff, not (10,)
+    np.testing.assert_array_equal(energy_cut[[0, 1, 3, 4]], [30.0, 30.0, 20.0, 20.0])
+
+
+def test_track_vertices_3d_reveal_until_fs_none_is_unfiltered():
+    data = {
+        "start_xyz": np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]]),
+        "end_xyz": np.array([[0.5, 0.5, 0.5], [1.5, 1.5, 1.5]]),
+        "E": np.array([30.0, 20.0]),
+        "elec_id": np.array([0, 1]),
+        "t_fs": np.array([0.0, 9.0]),
+    }
+    xyz_default, _, _ = track_vertices_3d(data)
+    xyz_explicit_none, _, _ = track_vertices_3d(data, t_fs=data["t_fs"], reveal_until_fs=None)
+    np.testing.assert_array_equal(xyz_default, xyz_explicit_none)
+
+
+def test_exit_paths_3d_reveal_until_fs_gates_by_terminal_start_age():
+    data = {
+        "elec_id": np.array([0, 1]),
+        "start_xyz": np.array([[0.0, 0.0, 0.9], [0.0, 0.0, 0.1]]),
+        "end_xyz": np.array([[0.0, 0.0, 1.0], [0.0, 0.0, 0.0]]),
+        "t_fs": np.array([2.0, 8.0]),
+        "thick": 1.0,
+    }
+    full = _exit_paths_3d(data, 0.1)
+    gated = _exit_paths_3d(data, 0.1, reveal_until_fs=5.0)
+
+    assert len(full.x) == 6  # 2 electrons x (start, end, NaN)
+    assert len(gated.x) == 3  # only electron 0 (age 2.0 <= 5.0) survives
+    assert np.isnan(gated.z[2])
+
+
+def test_trajectory_volume_figure_reveal_until_fs_reduces_track_vertices():
+    from cxr_mc.plots.plotly_trajectories import (
+        _ZOOM_BEAM_FWHM_MM,
+        _trajectory_data,
+        trajectory_volume_figure,
+    )
+    from cxr_mc.plots.trajectories import _case_of
+
+    case = _hopg_thin_slab_case()
+    data = _trajectory_data(_case_of(case), 80, 0, beam_fwhm_mm=_ZOOM_BEAM_FWHM_MM)
+    t_max = dataset_t_max(data)
+    cutoff = frame_reveal_fs(N_FRAMES // 2, t_max)
+    assert 0.0 < cutoff < t_max  # midpoint strictly inside range, else test proves nothing
+
+    fig_full = trajectory_volume_figure(case, Ne=80, seed=0)
+    fig_cut = trajectory_volume_figure(case, Ne=80, seed=0, reveal_until_fs=cutoff)
+
+    tracks_full = next(t for t in fig_full.data if t.name == "electron tracks")
+    tracks_cut = next(t for t in fig_cut.data if t.name == "electron tracks")
+    n_full = np.count_nonzero(np.isfinite(np.asarray(tracks_full.x)))
+    n_cut = np.count_nonzero(np.isfinite(np.asarray(tracks_cut.x)))
+    assert n_cut < n_full
+
+
+def test_frame_reveal_fs_endpoints_and_midpoint():
+    t_max = 120.0
+    assert frame_reveal_fs(0, t_max) == 0.0
+    assert frame_reveal_fs(N_FRAMES - 1, t_max) == t_max
+    mid = frame_reveal_fs((N_FRAMES - 1) // 2, t_max)
+    assert 0.0 < mid < t_max
+
+
+def test_dataset_t_max_from_synthetic_data():
+    data = {"t_fs": np.array([1.0, np.nan, 7.5, 3.0])}
+    assert dataset_t_max(data) == 7.5
+    assert dataset_t_max({"t_fs": np.array([])}) == 0.0
+
+
+def test_advance_frame_wraps_when_repeat():
+    next_index, playing = advance_frame(N_FRAMES - 2, speed=5, repeat=True)
+    assert next_index == 0
+    assert playing is True
+
+
+def test_advance_frame_clamps_when_not_repeat():
+    next_index, playing = advance_frame(N_FRAMES - 2, speed=5, repeat=False)
+    assert next_index == N_FRAMES - 1
+    assert playing is False
+
+
+def test_advance_frame_speed_scaling():
+    next_index, playing = advance_frame(0, speed=3, repeat=False)
+    assert next_index == 3
+    assert playing is True

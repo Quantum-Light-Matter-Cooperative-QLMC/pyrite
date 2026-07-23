@@ -27,13 +27,22 @@ _EXIT_PATH = "#9AA5B1"  # muted slate-grey: neutral vs. the turbo track colorsca
 # bundle has visible width at the fitted, sub-micron cascade scale.
 _ZOOM_BEAM_FWHM_MM = 1.0e-3
 
+# Playback frame count for the reveal-until-fs scrubber (Task 3's marimo slider).
+N_FRAMES = 60
 
-def track_vertices_3d(data):
+
+def track_vertices_3d(data, *, t_fs=None, reveal_until_fs=None):
     """Return NaN-separated physical segments for one Plotly ``Scatter3d``.
 
     Each transport segment contributes ``start, end, NaN``.  Separators prevent
     Plotly from joining different segments or electrons.  Energy and electron ID
     repeat at both endpoints, preserving segment-wise color and hover metadata.
+
+    ``t_fs`` (per-segment START age, fs, same order as ``start_xyz``/``end_xyz``)
+    and ``reveal_until_fs`` together implement playback: when BOTH are given, a
+    segment contributes only if its start age ``t_fs <= reveal_until_fs`` -- whole
+    segments are kept or dropped, never sub-segment-interpolated. Either left
+    ``None`` (the default) reproduces today's full-reveal behaviour unchanged.
     """
     start = np.asarray(data["start_xyz"], dtype=float)
     end = np.asarray(data["end_xyz"], dtype=float)
@@ -43,6 +52,13 @@ def track_vertices_3d(data):
         raise ValueError("start_xyz and end_xyz must both have shape (N, 3)")
     if len(start) != len(energy) or len(start) != len(elec_id):
         raise ValueError("3D segment, energy, and electron arrays must have equal length")
+    if t_fs is not None:
+        t_fs = np.asarray(t_fs, dtype=float)
+        if len(t_fs) != len(start):
+            raise ValueError("t_fs must have the same length as the segment arrays")
+        if reveal_until_fs is not None:
+            keep = t_fs <= reveal_until_fs
+            start, end, energy, elec_id = start[keep], end[keep], energy[keep], elec_id[keep]
 
     xyz = np.full((3 * len(start), 3), np.nan)
     xyz[0::3] = start
@@ -212,7 +228,7 @@ def _incident_beam_lines(data, length):
     )
 
 
-def _exit_paths_3d(data, length, *, tol_frac=1e-6):
+def _exit_paths_3d(data, length, *, tol_frac=1e-6, reveal_until_fs=None):
     """ONE NaN-separated ``Scatter3d`` of dashed exit-path continuations, one per
     electron that leaves through the TOP (``z ~ 0``, backscattered) or BOTTOM
     (``z ~ thick``, transmitted) face. Side exits (terminal ``z`` strictly
@@ -227,6 +243,12 @@ def _exit_paths_3d(data, length, *, tol_frac=1e-6):
     integrator's floating-point precision, so an exact ``==`` comparison would
     spuriously miss real exits; ``1e-6`` of the slab thickness is generous
     against that roundoff while still well inside any physical slab.
+
+    ``reveal_until_fs`` (playback cutoff, ``None`` -> unfiltered) additionally
+    gates each electron's dash on its terminal segment's own start age: the dash
+    appears only once that segment has itself been revealed (``t_fs <=
+    reveal_until_fs``), so the exit continuation never appears ahead of the track
+    that produced it.
 
     Returns ``None`` when no electron exits through the top or bottom face.
     """
@@ -247,8 +269,11 @@ def _exit_paths_3d(data, length, *, tol_frac=1e-6):
 
     term_start = start[terminal]
     term_end = end[terminal]
+    term_t_fs = t_fs[terminal]
     tol = max(tol_frac * thick, np.finfo(float).eps)
     exits = (np.abs(term_end[:, 2]) <= tol) | (np.abs(term_end[:, 2] - thick) <= tol)
+    if reveal_until_fs is not None:
+        exits = exits & (term_t_fs <= reveal_until_fs)
     if not np.any(exits):
         return None
     term_start = term_start[exits]
@@ -276,7 +301,9 @@ def _exit_paths_3d(data, length, *, tol_frac=1e-6):
     )
 
 
-def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0, realistic=False, beam_fwhm_mm=None):
+def trajectory_volume_figure(
+    rec_or_case, *, Ne=40, seed=0, realistic=False, beam_fwhm_mm=None, reveal_until_fs=None
+):
     """Interactive 3D cutaway of electron tracks inside the crystal slab.
 
     Axes are sample-frame coordinates. The incident beam is drawn as a BUNDLE of
@@ -307,6 +334,13 @@ def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0, realistic=False, bea
     (``z = thick``, transmitted) face get a short dashed "exit path" continuing
     straight past their last transported point, in their terminal segment's own
     direction; side exits are not drawn (see :func:`_exit_paths_3d`).
+
+    ``reveal_until_fs`` (``None`` by default -> unchanged full reveal) drives
+    playback: only segments whose start age ``t_fs <= reveal_until_fs`` are drawn
+    for the in-crystal tracks (:func:`track_vertices_3d`), and an electron's exit
+    dash appears only once its terminal segment has itself been revealed (see
+    :func:`_exit_paths_3d`). Use :func:`dataset_t_max` and :func:`frame_reveal_fs`
+    to derive a cutoff for a given animation frame.
     """
     case = _case_of(rec_or_case)
     if realistic:
@@ -326,7 +360,9 @@ def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0, realistic=False, bea
         # zoomed view: a micron-scale spot so the bundle has visible width at the
         # fitted window scale, but no finite footprint (nothing to miss).
         data = _trajectory_data(case, Ne, seed, beam_fwhm_mm=_ZOOM_BEAM_FWHM_MM)
-    xyz, energy, elec_id = track_vertices_3d(data)
+    xyz, energy, elec_id = track_vertices_3d(
+        data, t_fs=data["t_fs"], reveal_until_fs=reveal_until_fs
+    )
     lo, hi = _transverse_window(data)
     thick = float(data["thick"])
     unit = "µm" if data["u"] == 1e4 else "nm"
@@ -388,7 +424,7 @@ def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0, realistic=False, bea
                 )
             )
     fig.add_trace(_incident_beam_lines(data, 0.28 * span))
-    exit_paths = _exit_paths_3d(data, 0.28 * span)
+    exit_paths = _exit_paths_3d(data, 0.28 * span, reveal_until_fs=reveal_until_fs)
     if exit_paths is not None:
         fig.add_trace(exit_paths)
     for trace in _direction_arrow(
@@ -427,3 +463,35 @@ def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0, realistic=False, bea
         uirevision="penetration-volume",
     )
     return fig
+
+
+def frame_reveal_fs(frame_index, t_max, n_frames=N_FRAMES):
+    """Reveal cutoff [fs] for animation ``frame_index`` of ``n_frames``, linear
+    from ``0`` (frame 0) to ``t_max`` (the last frame, ``n_frames - 1``). Pure --
+    no marimo import -- so it is unit-testable and reusable by Task 3's slider
+    cell without dragging in UI state."""
+    return frame_index / (n_frames - 1) * t_max
+
+
+def dataset_t_max(data):
+    """Oldest finite per-segment start age [fs] in ``data["t_fs"]``, or ``0.0``
+    for an empty/all-non-finite dataset -- the natural upper bound for a
+    playback scrubber over this dataset."""
+    t_fs = np.asarray(data.get("t_fs", []), dtype=float)
+    finite = t_fs[np.isfinite(t_fs)]
+    return float(np.max(finite)) if finite.size else 0.0
+
+
+def advance_frame(frame_index, speed, repeat, n_frames=N_FRAMES):
+    """Advance one playback tick: ``frame_index`` moves by a ``speed``-scaled
+    step (rounded to the nearest int). Reaching or passing the last frame
+    (``n_frames - 1``) wraps to ``0`` when ``repeat`` else clamps at
+    ``n_frames - 1`` and reports ``still_playing=False``. Returns
+    ``(next_index, still_playing)``. Pure -- no marimo import -- so Task 3's
+    marimo cell only has to call this and assign, keeping the Repeat loop/stop
+    logic unit-testable in isolation."""
+    step = int(round(speed))
+    next_index = frame_index + step
+    if next_index >= n_frames - 1:
+        return (0, True) if repeat else (n_frames - 1, False)
+    return next_index, True
