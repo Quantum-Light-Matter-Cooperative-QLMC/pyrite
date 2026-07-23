@@ -323,6 +323,48 @@ def _exit_paths_3d(data, length, *, cmax, tol_frac=1e-6, reveal_until_fs=None):
     )
 
 
+def _resolve_beam_fwhm(case, beam_fwhm_mm):
+    """Effective realistic-mode beam FWHM [mm]: the explicit ``beam_fwhm_mm``
+    override if given, else the case's own ``beam_fwhm_mm`` (falling back to
+    ``1.0``). Shared by the transport call and the drawn footprint outline so
+    both use the same spot size."""
+    return beam_fwhm_mm if beam_fwhm_mm is not None else (case.get("beam_fwhm_mm") or 1.0)
+
+
+def trajectory_volume_data(rec_or_case, *, Ne=40, seed=0, realistic=False, beam_fwhm_mm=None):
+    """Transport the penetration-tab dataset ONCE for a given parameter set and
+    return the raw ``_trajectory_data`` dict, without building any figure.
+
+    This is the single source of the ``realistic`` (finite crystal + physical
+    beam spot) vs. zoomed (``_ZOOM_BEAM_FWHM_MM`` micron spot) transport branch,
+    shared by :func:`trajectory_volume_figure` and :func:`case_t_max` so the two
+    never drift. The marimo playback cell caches the returned dict keyed on the
+    parameter set and reuses it across every animation frame -- a 60-frame scrub
+    then re-runs only the cheap reveal filter and trace assembly per frame
+    (:func:`trajectory_volume_figure_from_data`), not full Monte Carlo transport
+    per tick.
+
+    Not new physics -- delegates to the already-ledgered ``_trajectory_data``.
+    """
+    case = _case_of(rec_or_case)
+    if realistic:
+        # true finite crystal + physical beam spot: transport samples each entry
+        # from the Gaussian, projects it onto the tilted face, and drops off-crystal
+        # entries (n_missed) so they never render.
+        fwhm_mm = _resolve_beam_fwhm(case, beam_fwhm_mm)
+        return _trajectory_data(
+            case,
+            Ne,
+            seed,
+            beam_fwhm_mm=fwhm_mm,
+            crystal_width_mm=case.get("crystal_width_mm") or 5.0,
+            crystal_height_mm=case.get("crystal_height_mm") or 5.0,
+        )
+    # zoomed view: a micron-scale spot so the bundle has visible width at the
+    # fitted window scale, but no finite footprint (nothing to miss).
+    return _trajectory_data(case, Ne, seed, beam_fwhm_mm=_ZOOM_BEAM_FWHM_MM)
+
+
 def trajectory_volume_figure(
     rec_or_case, *, Ne=40, seed=0, realistic=False, beam_fwhm_mm=None, reveal_until_fs=None
 ):
@@ -364,24 +406,32 @@ def trajectory_volume_figure(
     :func:`_exit_paths_3d`). Use :func:`dataset_t_max` and :func:`frame_reveal_fs`
     to derive a cutoff for a given animation frame.
     """
+    data = trajectory_volume_data(
+        rec_or_case, Ne=Ne, seed=seed, realistic=realistic, beam_fwhm_mm=beam_fwhm_mm
+    )
+    return trajectory_volume_figure_from_data(
+        rec_or_case,
+        data,
+        realistic=realistic,
+        beam_fwhm_mm=beam_fwhm_mm,
+        reveal_until_fs=reveal_until_fs,
+    )
+
+
+def trajectory_volume_figure_from_data(
+    rec_or_case, data, *, realistic=False, beam_fwhm_mm=None, reveal_until_fs=None
+):
+    """Assemble the 3D cutaway figure from an ALREADY-transported ``data`` dict
+    (see :func:`trajectory_volume_data`) plus a playback reveal cutoff.
+
+    Split out of :func:`trajectory_volume_figure` so the marimo playback cell can
+    transport once per parameter set and rebuild the figure per frame from the
+    cached dataset -- only the ``reveal_until_fs`` filter and trace assembly rerun
+    per frame, not Monte Carlo transport. ``realistic`` and ``beam_fwhm_mm`` must
+    match the values ``data`` was transported with; here they drive only the
+    drawn crystal footprint and beam-spot outline, not transport.
+    """
     case = _case_of(rec_or_case)
-    if realistic:
-        # true finite crystal + physical beam spot: transport samples each entry
-        # from the Gaussian, projects it onto the tilted face, and drops off-crystal
-        # entries (n_missed) so they never render.
-        fwhm_mm = beam_fwhm_mm if beam_fwhm_mm is not None else (case.get("beam_fwhm_mm") or 1.0)
-        data = _trajectory_data(
-            case,
-            Ne,
-            seed,
-            beam_fwhm_mm=fwhm_mm,
-            crystal_width_mm=case.get("crystal_width_mm") or 5.0,
-            crystal_height_mm=case.get("crystal_height_mm") or 5.0,
-        )
-    else:
-        # zoomed view: a micron-scale spot so the bundle has visible width at the
-        # fitted window scale, but no finite footprint (nothing to miss).
-        data = _trajectory_data(case, Ne, seed, beam_fwhm_mm=_ZOOM_BEAM_FWHM_MM)
     xyz, energy, elec_id = track_vertices_3d(
         data, t_fs=data["t_fs"], reveal_until_fs=reveal_until_fs
     )
@@ -431,7 +481,7 @@ def trajectory_volume_figure(
             _plane_outline(depth, lox, hix, loy, hiy, name=f"layer interface {index}", dash="dash")
         )
     if realistic:
-        outline = _beam_footprint_outline(case, data["u"], fwhm_mm)
+        outline = _beam_footprint_outline(case, data["u"], _resolve_beam_fwhm(case, beam_fwhm_mm))
         if outline is not None:
             fx, fy = outline
             fig.add_trace(
@@ -522,20 +572,11 @@ def case_t_max(rec_or_case, *, Ne, seed, realistic=False, beam_fwhm_mm=None):
     already used and ledgered by :func:`trajectory_volume_figure`; no separate
     validation entry needed.
     """
-    case = _case_of(rec_or_case)
-    if realistic:
-        fwhm_mm = beam_fwhm_mm if beam_fwhm_mm is not None else (case.get("beam_fwhm_mm") or 1.0)
-        data = _trajectory_data(
-            case,
-            Ne,
-            seed,
-            beam_fwhm_mm=fwhm_mm,
-            crystal_width_mm=case.get("crystal_width_mm") or 5.0,
-            crystal_height_mm=case.get("crystal_height_mm") or 5.0,
+    return dataset_t_max(
+        trajectory_volume_data(
+            rec_or_case, Ne=Ne, seed=seed, realistic=realistic, beam_fwhm_mm=beam_fwhm_mm
         )
-    else:
-        data = _trajectory_data(case, Ne, seed, beam_fwhm_mm=_ZOOM_BEAM_FWHM_MM)
-    return dataset_t_max(data)
+    )
 
 
 def advance_frame(frame_index, speed, repeat, n_frames=N_FRAMES):

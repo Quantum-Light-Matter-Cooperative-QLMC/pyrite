@@ -83,9 +83,10 @@ def _():
     )
     from cxr_mc.plots.plotly_trajectories import (
         advance_frame,
-        case_t_max,
+        dataset_t_max,
         frame_reveal_fs,
-        trajectory_volume_figure,
+        trajectory_volume_data,
+        trajectory_volume_figure_from_data,
     )
     from cxr_mc.results import (
         filter_results,
@@ -104,11 +105,11 @@ def _():
         MaterialSelect,
         advance_frame,
         build_cases,
-        case_t_max,
         cases_from_results,
         checkpoint_path_for,
         compare_spectrum_chart,
         context_rail,
+        dataset_t_max,
         default_settings,
         directional_state,
         eaglexo_charge_chart,
@@ -141,7 +142,8 @@ def _():
         top_geometries,
         trajectory_chart,
         trajectory_sweep,
-        trajectory_volume_figure,
+        trajectory_volume_data,
+        trajectory_volume_figure_from_data,
     )
 
 
@@ -1868,16 +1870,16 @@ def _(mo):
     get_penetration_play, set_penetration_play = mo.state(False)
     get_penetration_frame, set_penetration_frame = mo.state(0)
     get_penetration_started, set_penetration_started = mo.state(False)
-    get_penetration_t_max, set_penetration_t_max = mo.state(None)
+    get_penetration_data, set_penetration_data = mo.state(None)
     return (
         get_penetration_frame,
         get_penetration_play,
         get_penetration_started,
-        get_penetration_t_max,
+        get_penetration_data,
         set_penetration_frame,
         set_penetration_play,
         set_penetration_started,
-        set_penetration_t_max,
+        set_penetration_data,
     )
 
 
@@ -1935,13 +1937,13 @@ def _(
     MATERIAL,
     advance_frame,
     build_cases,
-    case_t_max,
     context_rail,
+    dataset_t_max,
     fmt_thickness,
     frame_reveal_fs,
     get_penetration_frame,
     get_penetration_started,
-    get_penetration_t_max,
+    get_penetration_data,
     mo,
     penetration_beam_fwhm_ui,
     penetration_energy_grid_ui,
@@ -1968,11 +1970,12 @@ def _(
     set_penetration_frame,
     set_penetration_play,
     set_penetration_started,
-    set_penetration_t_max,
+    set_penetration_data,
     settings,
     trajectory_chart,
     trajectory_sweep,
-    trajectory_volume_figure,
+    trajectory_volume_data,
+    trajectory_volume_figure_from_data,
 ):
     def penetration_tab():
         _angle = penetration_tilt_deg
@@ -2017,11 +2020,13 @@ def _(
         _beam_fwhm = float(penetration_beam_fwhm_ui.value)
         _realistic = penetration_realistic_ui.value
 
-        # T_max depends only on (case, Ne, seed, realistic, beam_fwhm) -- cache
-        # it in mo.state keyed on that tuple so case_t_max (a full
-        # _trajectory_data call) runs once per parameter set, not once per
-        # animation frame.
-        _t_max_key = (
+        # The transported dataset depends only on (case, Ne, seed, realistic,
+        # beam_fwhm) -- NOT on the frame. Cache the whole `data` dict in mo.state
+        # keyed on that tuple so Monte Carlo transport runs once per parameter
+        # set; every playback tick then rebuilds the figure from the cached data
+        # (reveal filter only), never re-transporting per frame. T_max is derived
+        # cheaply from the cached data.
+        _data_key = (
             _nc["name"],
             _nc["E0_keV"],
             _nc.get("tilt_deg"),
@@ -2030,14 +2035,15 @@ def _(
             _realistic,
             _beam_fwhm,
         )
-        _cached_t_max = get_penetration_t_max()
-        if _cached_t_max is not None and _cached_t_max[0] == _t_max_key:
-            _t_max = _cached_t_max[1]
+        _cached = get_penetration_data()
+        if _cached is not None and _cached[0] == _data_key:
+            _data = _cached[1]
         else:
-            _t_max = case_t_max(
+            _data = trajectory_volume_data(
                 _nc, Ne=_Ne, seed=_seed, realistic=_realistic, beam_fwhm_mm=_beam_fwhm
             )
-            set_penetration_t_max((_t_max_key, _t_max))
+            set_penetration_data((_data_key, _data))
+        _t_max = dataset_t_max(_data)
 
         _frame = get_penetration_frame()
         _started = get_penetration_started()
@@ -2057,10 +2063,9 @@ def _(
         _reveal_until_fs = (
             None if (_frame == 0 and not _started) else frame_reveal_fs(_frame, _t_max)
         )
-        _volume = trajectory_volume_figure(
+        _volume = trajectory_volume_figure_from_data(
             _nc,
-            Ne=_Ne,
-            seed=_seed,
+            _data,
             realistic=_realistic,
             beam_fwhm_mm=_beam_fwhm,
             reveal_until_fs=_reveal_until_fs,
