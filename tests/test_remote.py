@@ -2447,3 +2447,134 @@ def test_reap_job_command_releases_only_matching_owner(tmp_path):
     assert not (reservations / "mose2").exists()
     assert (reservations / "wse2").exists()  # another owner's lock untouched
     assert "reaped" in (monkeypatch_dir / "jobs" / "dead" / "state").read_text()
+
+
+# ---- cxr remote rebrem (brem-only checkpoint recompute) ---------------------
+def test_rebrem_queue_script_flags_progress_and_markers():
+    s = remote._rebrem_queue_script(
+        "20260101-000000", ["hopg", "hbn"], ne_brem=1000, brem_step_eV=25.0, redo_all=True
+    )
+    assert "cxr rebrem" in s
+    assert "--ne-brem 1000" in s and "--step 25" in s and "--redo-all" in s
+    # per-material progress record feeds the shared status/attach dashboard
+    assert '--progress-file "$JOBDIR/progress/$m.json"' in s
+    # completion markers match the scan queue's so _completed_materials works
+    assert 'echo "completed: $m"' in s and 'echo "failed: $m"' in s
+    assert "mats=(hopg hbn)" in s
+
+
+def test_rebrem_queue_script_omits_unset_flags():
+    s = remote._rebrem_queue_script("j", ["hopg"], ne_brem=None, brem_step_eV=None, redo_all=False)
+    assert "--ne-brem" not in s and "--step" not in s and "--redo-all" not in s
+
+
+def test_rebrem_metadata_keys_mode_line_and_live_job_plumbing():
+    meta = remote._rebrem_queue_metadata("j", ["hopg"], 1000, 25.0, False)
+    assert "kind: rebrem" in meta
+    assert "materials: hopg" in meta and "quick: False" in meta  # _live_jobs fields
+    summary = remote._mode_summary(meta)
+    assert "brem-only recompute" in summary
+    assert "Ne_brem=1000" in summary and "step 25.0 eV" in summary
+    # zhai detection must not shadow rebrem despite the ne_brem field
+    assert "Zhai" not in summary
+
+
+def test_rebrem_start_refuses_when_material_checkpoint_is_busy(monkeypatch):
+    monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", False, ["hopg"])])
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must refuse before syncing"))
+    with pytest.raises(SystemExit, match="refusing to start"):
+        remote.start_rebrem_queue(["hopg"], ne_brem=1000)
+
+
+def test_rebrem_start_dry_run_prints_without_ssh_or_sync(monkeypatch, capsys):
+    monkeypatch.setattr(state, "_live_jobs", lambda: pytest.fail("dry-run must not check busy"))
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("dry-run must not sync"))
+    monkeypatch.setattr(
+        transport.subprocess, "run", lambda *a, **kw: pytest.fail("dry-run must not ssh")
+    )
+
+    jobid = remote.start_rebrem_queue(["hopg"], ne_brem=1000, dry_run=True)
+
+    out = capsys.readouterr().out
+    assert jobid in out and "cxr rebrem" in out
+
+
+def test_rebrem_cli_submits_attaches_and_pulls_completed(monkeypatch):
+    events = []
+    monkeypatch.setattr(
+        lifecycle,
+        "start_rebrem_queue",
+        lambda mats, **kw: events.append(("start", mats, kw)) or "j",
+    )
+    monkeypatch.setattr(viewer, "attach", lambda jobid: events.append(("attach", jobid)) or True)
+    monkeypatch.setattr(state, "_completed_materials", lambda jobid, mats: ["hopg"])
+    monkeypatch.setattr(lifecycle, "pull", lambda stems, **kw: events.append(("pull", stems)))
+
+    remote.main(["rebrem", "hopg", "hbn", "--ne-brem", "1000", "--step", "25"])
+
+    assert events[0][0] == "start" and events[0][1] == ["hopg", "hbn"]
+    assert events[0][2]["ne_brem"] == 1000 and events[0][2]["brem_step_eV"] == 25.0
+    assert events[1] == ("attach", "j")
+    assert events[2] == ("pull", ["hopg"])
+
+
+def test_rebrem_cli_skips_pull_when_viewer_disconnects(monkeypatch):
+    monkeypatch.setattr(lifecycle, "start_rebrem_queue", lambda mats, **kw: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
+    monkeypatch.setattr(
+        lifecycle, "pull", lambda *a, **kw: pytest.fail("must not pull after disconnect")
+    )
+
+    remote.main(["rebrem", "hopg"])
+
+
+def test_pull_dataset_merges_and_archives(monkeypatch, tmp_path):
+    import numpy as np
+
+    from cxr_mc import _checkpoint_io
+    from cxr_mc._remote import lifecycle
+
+    # local checkpoint with a line record
+    ckpt = tmp_path / "checkpoints" / "mos2.pkl"
+    ckpt.parent.mkdir(parents=True)
+    local = {
+        "n": {
+            30.0: {
+                "case": {},
+                "spec": np.zeros(3),
+                "E_grid": np.array([1.0, 2.0, 3.0]),
+                "brem_wide": np.array([1.0, 1.0, 1.0]),
+                "E_grid_brem": np.array([1.0, 2.0, 3.0]),
+                "brem": np.zeros(3),
+            }
+        }
+    }
+    _checkpoint_io.dump(local, str(ckpt))
+    # the "remote" sub-pickle (what scp would land): new spec only
+    remote_tmp = tmp_path / "remote.pkl"
+    _checkpoint_io.dump(
+        {"n": {30.0: {"case": {}, "spec": np.full(3, 7.0), "E_grid": np.array([1.0, 2.0, 3.0])}}},
+        str(remote_tmp),
+    )
+
+    monkeypatch.setattr(lifecycle.config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(lifecycle.transport, "sync_code", lambda: None)
+    archived = []
+    monkeypatch.setattr(
+        lifecycle.archive, "archive_checkpoint", lambda stem, **kw: archived.append(stem)
+    )
+
+    # stub the box round-trip: ssh slim (no-op), scp copies our remote_tmp into place
+    def fake_run(cmd):
+        if cmd[0] == "scp":
+            import shutil
+
+            shutil.copy(remote_tmp, cmd[-1])
+
+    monkeypatch.setattr(lifecycle.transport, "_run", fake_run)
+
+    lifecycle.pull(["mos2"], dataset="line")
+
+    merged = _checkpoint_io.load(str(ckpt))["n"][30.0]
+    assert np.all(merged["spec"] == 7.0)  # line overwritten
+    assert archived == ["mos2"]  # archived before merge

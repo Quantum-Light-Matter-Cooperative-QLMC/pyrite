@@ -129,14 +129,42 @@ def _cli_scan(args):
         )
 
 
+def _cli_rebrem(args):
+    """Submit a brem-only checkpoint recompute, follow it, pull what completed."""
+    materials = _selected_materials(args, "material")
+    jobid = lifecycle.start_rebrem_queue(
+        materials,
+        ne_brem=args.ne_brem,
+        brem_step_eV=args.step,
+        redo_all=args.redo_all,
+        no_sync=args.no_sync,
+        dry_run=args.dry_run,
+    )
+    if args.dry_run:
+        return
+    if not viewer.attach(jobid):
+        print("rebrem is still running or its viewer disconnected; skipping automatic pull")
+        return
+    completed = state._completed_materials(jobid, materials)
+    if not completed:
+        print("warning: the SLURM rebrem updated no checkpoints successfully; nothing to pull")
+        return
+    # code is already synced by the queue; plain whole-file pull (the fresh
+    # wide-brem arrays are the point, so no --drop-wide-brem trimming here)
+    lifecycle.pull(completed)
+
+
 def _cli_pull(args):
+    dataset = "brem" if args.brem_only else ("line" if args.line_only else None)
     lifecycle.pull(
         _selected_materials(args, "material"),
-        grid=not args.full,
+        grid=(not args.full) and dataset is None,
         drop_wide_brem=args.drop_wide_brem,
         downcast=args.downcast,
         level9=args.level9,
         no_sync=args.no_sync,
+        dataset=dataset,
+        force=args.force,
     )
 
 
@@ -261,6 +289,37 @@ def _build_remote_parser(ap):
     s.add_argument("--drop-wide-brem", action="store_true", help="with --grid: drop wide-brem too")
     s.add_argument("--downcast", action="store_true", help="with --grid: downcast to float32 too")
     s.set_defaults(func=_dispatch(_cli_scan))
+
+    rb = sub.add_parser(
+        "rebrem",
+        help="recompute brem-only in the box's checkpoints (GPU), follow, and pull them back",
+    )
+    rb.add_argument("material", nargs="*", help="one or more crystal keys")
+    rb.add_argument("-a", "--all", action="store_true", help="every material in mats_to_sim.toml")
+    rb.add_argument(
+        "--ne-brem",
+        type=int,
+        default=None,
+        help="new brem electron count (noise ~ 1/sqrt(Ne_brem); sweep default 100)",
+    )
+    rb.add_argument(
+        "--step",
+        type=float,
+        default=None,
+        help="new uniform wide-brem grid spacing [eV] (sweep default 50)",
+    )
+    rb.add_argument(
+        "--redo-all",
+        action="store_true",
+        help="recompute every record even if already at the target parameters",
+    )
+    rb.add_argument("--no-sync", action="store_true", help="skip the code upload")
+    rb.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the SLURM batch script + submission command, don't ssh",
+    )
+    rb.set_defaults(func=_dispatch(_cli_rebrem))
 
     st = sub.add_parser(
         "start",
@@ -394,6 +453,22 @@ def _build_remote_parser(ap):
     )
     p.add_argument(
         "--no-sync", action="store_true", help="with grid pull: skip the pre-pull code sync"
+    )
+    grp = p.add_mutually_exclusive_group()
+    grp.add_argument(
+        "--brem-only",
+        action="store_true",
+        help="merge ONLY the brem arrays into the local pickle (keep local line spectra)",
+    )
+    grp.add_argument(
+        "--line-only",
+        action="store_true",
+        help="merge ONLY the line spectra into the local pickle (keep local brem)",
+    )
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help="with --brem-only/--line-only: insert records absent locally (default: skip + warn)",
     )
     p.set_defaults(func=_dispatch(_cli_pull))
 
