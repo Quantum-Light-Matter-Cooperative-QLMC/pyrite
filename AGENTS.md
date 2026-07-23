@@ -86,6 +86,7 @@ Agents prefer these commands always.
 
 - Prefer edits in `src/cxr_mc/` over notebook logic.
 - Notebook changes stay output-free on commit.
+- When edit marimo notebooks, always run `uvx marimo check` on file, fix all issues you find
 - Don't duplicate README or TODO content here.
 - Read `docs/repo_map.md`, then use Tokensave for indexed code search,
   dependency/caller analysis, impact, and affected tests.
