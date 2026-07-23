@@ -14,7 +14,7 @@ def _():
     import altair as alt
     import marimo as mo
     import traitlets
-    from _design import context_rail, directional_state, page_title, style_sheet
+    from _design import page_title, style_sheet
     from anywidget import AnyWidget
 
     class MaterialSelect(AnyWidget):
@@ -61,9 +61,7 @@ def _():
         plot_best_spectra,
         plot_eaglexo_charge_map,
         plot_eaglexo_efficiency,
-        plot_material_comparison,
         plot_timepix_efficiency,
-        plot_trajectory_grid,
     )
     from cxr_mc.plots.altair_detectors import (
         eaglexo_charge_chart,
@@ -82,11 +80,8 @@ def _():
         trajectory_chart,
     )
     from cxr_mc.plots.plotly_trajectories import (
-        advance_frame,
-        dataset_t_max,
-        frame_reveal_fs,
+        trajectory_volume_animation,
         trajectory_volume_data,
-        trajectory_volume_figure_from_data,
     )
     from cxr_mc.results import (
         filter_results,
@@ -97,26 +92,20 @@ def _():
         thicknesses_by_energy,
         top_geometries,
     )
-    from cxr_mc.run import cases_from_results, checkpoint_path_for, load_checkpoint
+    from cxr_mc.run import cases_from_results, load_checkpoint
     from cxr_mc.sweep import build_cases, fmt_thickness
 
     return (
         CATALOG,
         MaterialSelect,
-        advance_frame,
         build_cases,
         cases_from_results,
-        checkpoint_path_for,
         compare_spectrum_chart,
-        context_rail,
-        dataset_t_max,
         default_settings,
-        directional_state,
         eaglexo_charge_chart,
         eaglexo_detected_chart,
         filter_results,
         fmt_thickness,
-        frame_reveal_fs,
         heatmap_chart,
         heatmap_select_chart,
         load_checkpoint,
@@ -127,9 +116,7 @@ def _():
         plot_best_spectra,
         plot_eaglexo_charge_map,
         plot_eaglexo_efficiency,
-        plot_material_comparison,
         plot_timepix_efficiency,
-        plot_trajectory_grid,
         records,
         scan_charts,
         select_results,
@@ -142,8 +129,8 @@ def _():
         top_geometries,
         trajectory_chart,
         trajectory_sweep,
+        trajectory_volume_animation,
         trajectory_volume_data,
-        trajectory_volume_figure_from_data,
     )
 
 
@@ -155,8 +142,8 @@ def _(mo, page_title, style_sheet):
             page_title(
                 mo,
                 "Coherent X-ray radiation analysis",
-                "Explore checkpoint spectra, optimize geometry, inspect instrument response, and compare materials. No sweep runs here.",
-                eyebrow="Beamline control / analysis",
+                "Explore spectra, optimize geometry, inspect instrument response, and compare materials.",
+                eyebrow="Electron transport and radiation from crystalline materials",
             ),
         ]
     )
@@ -180,7 +167,7 @@ def _(MaterialSelect, mo):
         MaterialSelect(
             options=list(material_options),
             value=initial_selection,
-            label="Material (match the scan you ran)",
+            label="Material ",
             disabled=initial_selection is None,
         )
     )
@@ -202,67 +189,6 @@ def _(
     cases = cases_from_results(_results)  # rebuild the case list from the records
     res = filter_results(_results, cases)  # all loaded cases for this material
     return MATERIAL, cases, res, settings
-
-
-@app.cell(hide_code=True)
-def _(
-    CATALOG,
-    MATERIAL,
-    checkpoint_path_for,
-    context_rail,
-    directional_state,
-    mo,
-    records,
-    res,
-    sweep_values,
-):
-    checkpoint_path = checkpoint_path_for(MATERIAL) if MATERIAL is not None else None
-    checkpoint_records = list(records(res))
-    checkpoint_sweeps = sweep_values(res) if checkpoint_records else {}
-    swept_dimensions = {
-        name: len(values) for name, values in checkpoint_sweeps.items() if len(values) > 1
-    }
-    checkpoint_summary = mo.vstack(
-        [
-            context_rail(
-                mo,
-                {
-                    "Material": CATALOG.material(MATERIAL).label if MATERIAL else None,
-                    "Checkpoint": "loaded" if checkpoint_records else "empty",
-                    "Records": len(checkpoint_records),
-                    "Swept dimensions": len(swept_dimensions),
-                },
-            ),
-            (
-                mo.accordion(
-                    {
-                        "Checkpoint contents and provenance": mo.vstack(
-                            [
-                                mo.md(f"Path: `{checkpoint_path}`"),
-                                mo.ui.table(
-                                    [
-                                        {"dimension": name, "values": len(values)}
-                                        for name, values in checkpoint_sweeps.items()
-                                    ],
-                                    selection=None,
-                                ),
-                            ]
-                        )
-                    }
-                )
-                if checkpoint_records
-                else directional_state(
-                    mo,
-                    "Checkpoint is empty",
-                    f"No records found at `{checkpoint_path}`.",
-                    f"cxr scan {MATERIAL or '<material>'}",
-                    kind="warn",
-                )
-            ),
-        ]
-    )
-    checkpoint_summary
-    return
 
 
 @app.cell
@@ -450,38 +376,32 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
     _thickness_values = tuple(float(value) for value in _scan.thickness_ang)
     _tilt_values = tuple(float(value) for value in _scan.tilt_deg)
 
-    _source_options = {"material scan grid": "grid", "manual entry": "manual"}
-    penetration_energy_source_ui = mo.ui.dropdown(
-        _source_options, value="material scan grid", label="beam energy source"
-    )
+    _source_options = {"Presets": "grid", "Custom": "manual"}
+    penetration_energy_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")
     penetration_energy_grid_ui = mo.ui.dropdown(
         {f"{value:g} keV": value for value in _energy_values},
         value=f"{_energy_values[0]:g} keV",
-        label="beam energy",
+        label="",
     )
     penetration_energy_manual_ui = mo.ui.number(
-        start=1.0, stop=300.0, step=1.0, value=_energy_values[0], label="beam energy (keV)"
+        start=1.0, stop=300.0, step=1.0, value=_energy_values[0], label="(keV)"
     )
 
-    penetration_thickness_source_ui = mo.ui.dropdown(
-        _source_options, value="material scan grid", label="crystal thickness source"
-    )
+    penetration_thickness_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")
     penetration_thickness_grid_ui = mo.ui.dropdown(
         {fmt_thickness(value): value for value in _thickness_values},
         value=fmt_thickness(_thickness_values[0]),
-        label="crystal thickness",
+        label="",
     )
     penetration_thickness_manual_ui = mo.ui.number(
         start=0.001,
         stop=10000.0,
         step=0.001,
         value=min(max(_thickness_values[0] / 1e4, 0.001), 10000.0),
-        label="crystal thickness (µm)",
+        label="(µm)",
     )
 
-    penetration_tilt_source_ui = mo.ui.dropdown(
-        _source_options, value="material scan grid", label="polar tilt source"
-    )
+    penetration_tilt_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")
     if len(_tilt_values) > 1:
         default_tilt_ind = len(_tilt_values) // 2
         default_tilt_value = _tilt_values[default_tilt_ind]
@@ -491,10 +411,10 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
     penetration_tilt_grid_ui = mo.ui.dropdown(
         {f"{value:g} deg": value for value in _tilt_values},
         value=f"{default_tilt_value:g} deg",
-        label="polar tilt",
+        label="",
     )
     penetration_tilt_manual_ui = mo.ui.number(
-        start=0.0, stop=89.9, step=0.1, value=_tilt_values[0], label="polar tilt (deg)"
+        start=0.0, stop=89.9, step=0.1, value=_tilt_values[0], label="(deg)"
     )
     return (
         penetration_energy_grid_ui,
@@ -817,50 +737,16 @@ def _(
 
 
 @app.cell
-def _(
-    MATERIAL,
-    context_rail,
-    fmt_thickness,
-    mo,
-    records,
-    res,
-    settings,
-    sweep_values,
-    top_geometries,
-):
+def _(MATERIAL, mo, res, settings, top_geometries):
     def rankings_tab():
         # Rank across ALL thicknesses (raw `res`, not the pinned `res_view`): the
         # thickness column disambiguates rows, so a thickness sweep shows every
         # thickness competing head-to-head rather than being collapsed to the pin.
         df = top_geometries(res, settings, top_n=20, select="quality_peak")
-        _sv = sweep_values(res) if records(res) else {}
-
-        def _dimension(key, unit):
-            _values = _sv.get(key, [])
-            if len(_values) > 1:
-                return "multiple"
-            if key == "thickness_ang" and _values:
-                return fmt_thickness(_values[0])
-            return f"{_values[0]:g} {unit}" if _values else None
-
-        _rail = context_rail(
-            mo,
-            {
-                "Material": MATERIAL,
-                "E0": _dimension("E0_keV", "keV"),
-                "theta": _dimension("tilt_deg", "°"),
-                "phi": _dimension("tilt_azim_deg", "°"),
-                "Thickness": _dimension("thickness_ang", "Å"),
-                "Records": len(records(res)),
-            },
-        )
         if df.empty:
-            return mo.vstack(
-                [_rail, mo.md(f"**No checkpoint for `{MATERIAL}`** — run `scan_app.py` first.")]
-            )
+            return mo.md(f"**No checkpoint for `{MATERIAL}`** — run `scan_app.py` first.")
         return mo.vstack(
             [
-                _rail,
                 mo.md(
                     f"Top 20 geometries ranked by *quality × peak flux* "
                     f"({settings.beam_current_na:g} nA beam; quality score in [0, 1])."
@@ -881,7 +767,6 @@ def _(
 
 @app.cell
 def _(
-    MATERIAL,
     brem_ui,
     broad_auto_ui,
     broad_x_domain,
@@ -889,7 +774,6 @@ def _(
     broad_xmax_ui,
     broad_xmin_ui,
     broad_ylog_ui,
-    context_rail,
     fmt_thickness,
     heatmap_E0_ui,
     heatmap_select,
@@ -918,30 +802,18 @@ def _(
         _sv = sweep_values(res) if records(res) else {}
         # Beam energies whose beam died before the pinned thickness: select_thickness
         # substituted their thickest computed slab (spectrum saturated past that
-        # depth). Note it honestly in the rail rather than silently dropping them.
+        # depth). Surface it rather than silently dropping them.
         _fallback_energies = sorted(
             {_r["case"]["E0_keV"] for _r in records(res_view) if "thickness_fallback" in _r["case"]}
         )
-        _thk_label = fmt_thickness(thickness_ui.value) if thickness_ui.value is not None else None
-        if _thk_label is not None and _fallback_energies:
-            _thk_label += " · " + ", ".join(f"{_e:g}" for _e in _fallback_energies)
-            _thk_label += " keV shown at max computed slab (watchdog-saturated)"
-        _rail = context_rail(
-            mo,
-            {
-                "Material": MATERIAL,
-                "E0": "multiple"
-                if len(_sv.get("E0_keV", [])) > 1
-                else (f"{_sv['E0_keV'][0]:g} keV" if _sv.get("E0_keV") else None),
-                "theta": f"{tilt_ui.value:g} °" if tilt_ui.value is not None else None,
-                "phi": "best per E0",
-                "Thickness": _thk_label,
-                "Records": len(
-                    records(select_results(res_view, tilt_deg=tilt_ui.value))
-                    if tilt_ui.value is not None
-                    else records(res_view)
-                ),
-            },
+        _fallback_note = (
+            mo.md(
+                "*Beam died before pinned thickness for "
+                + ", ".join(f"{_e:g}" for _e in _fallback_energies)
+                + " keV — shown at max computed slab (watchdog-saturated).*"
+            )
+            if _fallback_energies
+            else None
         )
         _thk_widget = (
             thickness_ui
@@ -1064,10 +936,11 @@ def _(
             if heatmap_select is not None
             else mo.md("*No 2-D heatmap for this checkpoint / thickness.*")
         )
-        return mo.vstack(
+        _parts = [_md]
+        if _fallback_note is not None:
+            _parts.append(_fallback_note)
+        _parts.extend(
             [
-                _rail,
-                _md,
                 _controls,
                 mo.md("**Narrowband**"),
                 mo.lazy(_narrow_spectrum, show_loading_indicator=True),
@@ -1083,15 +956,14 @@ def _(
                 mo.lazy(_pixel_spectrum, show_loading_indicator=True),
             ]
         )
+        return mo.vstack(_parts)
 
     return (spectra_tab,)
 
 
 @app.cell
 def _(
-    MATERIAL,
     compare_spectrum_chart,
-    context_rail,
     fmt_thickness,
     mo,
     polar_E0_ui,
@@ -1128,33 +1000,6 @@ def _(
         _md = mo.md(
             "Coherent CXR line spectra at pinned beam energy, azimuth, and thickness. "
             "Polar tilt varies across selected curves."
-        )
-        _selected_tilts = list(polar_tilts_ui.value)
-        _rail_constraints = {"tilt_deg": _selected_tilts}
-        if polar_E0_ui.value is not None:
-            _rail_constraints["E0_keV"] = polar_E0_ui.value
-        if polar_azim_ui.value is not None:
-            _rail_constraints["tilt_azim_deg"] = polar_azim_ui.value
-        if polar_thk_ui.value is not None:
-            _rail_constraints["thickness_ang"] = polar_thk_ui.value
-        _rail = context_rail(
-            mo,
-            {
-                "Material": MATERIAL,
-                "E0": f"{polar_E0_ui.value:g} keV" if polar_E0_ui.value is not None else None,
-                "theta": (
-                    "multiple"
-                    if len(_selected_tilts) > 1
-                    else f"{_selected_tilts[0]:g} °"
-                    if _selected_tilts
-                    else None
-                ),
-                "phi": (f"{polar_azim_ui.value:g} °" if polar_azim_ui.value is not None else None),
-                "Thickness": (
-                    fmt_thickness(polar_thk_ui.value) if polar_thk_ui.value is not None else None
-                ),
-                "Records": len(records(select_results(res, **_rail_constraints))),
-            },
         )
         _spectral_controls = mo.vstack(
             [
@@ -1221,7 +1066,6 @@ def _(
         if not polar_tilts_ui.value:
             return mo.vstack(
                 [
-                    _rail,
                     _md,
                     _e0_widget,
                     _azim_widget,
@@ -1275,7 +1119,6 @@ def _(
             return _chart if _chart is not None else mo.md("*No broadband spectra for this slice.*")
 
         _parts = [
-            _rail,
             _md,
             _e0_widget,
             _azim_widget,
@@ -1300,7 +1143,6 @@ def _(
 
 @app.cell
 def _(
-    MATERIAL,
     azim_E0_ui,
     azim_auto_ui,
     azim_azims_ui,
@@ -1319,7 +1161,6 @@ def _(
     azim_xmin_ui,
     azim_ylog_ui,
     compare_spectrum_chart,
-    context_rail,
     fmt_thickness,
     mo,
     records,
@@ -1336,33 +1177,6 @@ def _(
         _md = mo.md(
             "Coherent CXR line spectra at pinned beam energy, polar tilt, and thickness. "
             "Azimuth varies across selected curves."
-        )
-        _selected_azims = list(azim_azims_ui.value)
-        _rail_constraints = {"tilt_azim_deg": _selected_azims}
-        if azim_E0_ui.value is not None:
-            _rail_constraints["E0_keV"] = azim_E0_ui.value
-        if azim_tilt_ui.value is not None:
-            _rail_constraints["tilt_deg"] = azim_tilt_ui.value
-        if azim_thk_ui.value is not None:
-            _rail_constraints["thickness_ang"] = azim_thk_ui.value
-        _rail = context_rail(
-            mo,
-            {
-                "Material": MATERIAL,
-                "E0": f"{azim_E0_ui.value:g} keV" if azim_E0_ui.value is not None else None,
-                "theta": f"{azim_tilt_ui.value:g} °" if azim_tilt_ui.value is not None else None,
-                "phi": (
-                    "multiple"
-                    if len(_selected_azims) > 1
-                    else f"{_selected_azims[0]:g} °"
-                    if _selected_azims
-                    else None
-                ),
-                "Thickness": (
-                    fmt_thickness(azim_thk_ui.value) if azim_thk_ui.value is not None else None
-                ),
-                "Records": len(records(select_results(res, **_rail_constraints))),
-            },
         )
         _spectral_controls = mo.vstack(
             [
@@ -1429,7 +1243,6 @@ def _(
         if not azim_azims_ui.value:
             return mo.vstack(
                 [
-                    _rail,
                     _md,
                     _e0_widget,
                     _tilt_widget,
@@ -1483,7 +1296,6 @@ def _(
             return _chart if _chart is not None else mo.md("*No broadband spectra for this slice.*")
 
         _parts = [
-            _rail,
             _md,
             _e0_widget,
             _tilt_widget,
@@ -1508,9 +1320,7 @@ def _(
 
 @app.cell
 def _(
-    MATERIAL,
     cases,
-    context_rail,
     fmt_thickness,
     heatmap_chart,
     metric_vs_chart,
@@ -1562,29 +1372,6 @@ def _(
             return mo.vstack(parts) if parts else mo.md("*No metric results.*")
 
         _sv = sweep_values(res) if records(res) else {}
-        _scan_sv = sweep_values(scan_res_view) if records(scan_res_view) else {}
-
-        def _dimension(key, unit):
-            _values = _scan_sv.get(key, [])
-            if len(_values) > 1:
-                return "multiple"
-            return f"{_values[0]:g} {unit}" if _values else None
-
-        _rail = context_rail(
-            mo,
-            {
-                "Material": MATERIAL,
-                "E0": _dimension("E0_keV", "keV"),
-                "theta": _dimension("tilt_deg", "°"),
-                "phi": _dimension("tilt_azim_deg", "°"),
-                "Thickness": (
-                    fmt_thickness(scan_thickness_ui.value)
-                    if scan_thickness_ui.value is not None
-                    else None
-                ),
-                "Records": len(records(scan_res_view)),
-            },
-        )
         _thk_widget = (
             scan_thickness_ui
             if len(_sv.get("thickness_ang", [])) > 1
@@ -1596,7 +1383,6 @@ def _(
         )
         return mo.vstack(
             [
-                _rail,
                 mo.md(
                     "`scan_charts` auto-picks a heatmap or line scans (one per swept quantity); "
                     "then 1-D metric scans vs polar tilt. Each section loads as it becomes "
@@ -1628,9 +1414,7 @@ def _(
 
 @app.cell
 def _(
-    MATERIAL,
     cases,
-    context_rail,
     detector_auto_ui,
     detector_azim_ui,
     detector_broad_auto_ui,
@@ -1662,7 +1446,6 @@ def _(
     plot_timepix_efficiency,
     records,
     res,
-    select_results,
     settings,
     sweep_values,
     timepix_detected_chart,
@@ -1677,38 +1460,6 @@ def _(
         # The accordion lazily defers each section's compute exactly like the
         # inner tabs did, without the nesting problem.
         _sv = sweep_values(res) if records(res) else {}
-        _detector_sv = sweep_values(detector_res_view) if records(detector_res_view) else {}
-        _energies = _detector_sv.get("E0_keV", [])
-        _rail = context_rail(
-            mo,
-            {
-                "Material": MATERIAL,
-                "E0": "multiple"
-                if len(_energies) > 1
-                else (f"{_energies[0]:g} keV" if _energies else None),
-                "theta": (
-                    f"{detector_tilt_ui.value:g} °" if detector_tilt_ui.value is not None else None
-                ),
-                "phi": (
-                    f"{detector_azim_ui.value:g} °" if detector_azim_ui.value is not None else None
-                ),
-                "Thickness": (
-                    fmt_thickness(detector_thickness_ui.value)
-                    if detector_thickness_ui.value is not None
-                    else None
-                ),
-                "Records": len(
-                    records(
-                        select_results(
-                            detector_res_view,
-                            tilt_deg=detector_tilt_ui.value,
-                        )
-                    )
-                    if detector_tilt_ui.value is not None
-                    else records(detector_res_view)
-                ),
-            },
-        )
         _thk_widget = (
             detector_thickness_ui
             if len(_sv.get("thickness_ang", [])) > 1
@@ -1730,37 +1481,33 @@ def _(
         _controls = mo.vstack(
             [
                 mo.hstack([detector_tilt_ui, _azim_widget, _thk_widget], wrap=True),
-                mo.accordion(
-                    {
-                        "Axes and scaling": mo.vstack(
+                mo.vstack(
+                    [
+                        mo.hstack(
                             [
-                                mo.hstack(
-                                    [
-                                        detector_auto_ui,
-                                        detector_xmin_ui,
-                                        detector_xmax_ui,
-                                        detector_ymin_ui,
-                                        detector_ymax_ui,
-                                        detector_xlog_ui,
-                                        detector_ylog_ui,
-                                    ],
-                                    wrap=True,
-                                ),
-                                mo.hstack(
-                                    [
-                                        detector_broad_auto_ui,
-                                        detector_broad_xmin_ui,
-                                        detector_broad_xmax_ui,
-                                        detector_broad_ymin_ui,
-                                        detector_broad_ymax_ui,
-                                        detector_broad_xlog_ui,
-                                        detector_broad_ylog_ui,
-                                    ],
-                                    wrap=True,
-                                ),
-                            ]
-                        )
-                    }
+                                detector_auto_ui,
+                                detector_xmin_ui,
+                                detector_xmax_ui,
+                                detector_ymin_ui,
+                                detector_ymax_ui,
+                                detector_xlog_ui,
+                                detector_ylog_ui,
+                            ],
+                            wrap=True,
+                        ),
+                        mo.hstack(
+                            [
+                                detector_broad_auto_ui,
+                                detector_broad_xmin_ui,
+                                detector_broad_xmax_ui,
+                                detector_broad_ymin_ui,
+                                detector_broad_ymax_ui,
+                                detector_broad_xlog_ui,
+                                detector_broad_ylog_ui,
+                            ],
+                            wrap=True,
+                        ),
+                    ]
                 ),
             ]
         )
@@ -1779,7 +1526,7 @@ def _(
                 y_domain=detector_y_domain,
                 x_type="log" if detector_xlog_ui.value else "linear",
                 y_type="log" if detector_ylog_ui.value else "linear",
-                band="line",
+                band="narrow",
             )
             _broad = chart_fn(
                 detector_res_view,
@@ -1812,7 +1559,6 @@ def _(
                             else mo.md("*No results.*")
                         ),
                     },
-                    lazy=True,
                 )
             )
             return mo.vstack(_parts)
@@ -1837,7 +1583,6 @@ def _(
 
         return mo.vstack(
             [
-                _rail,
                 _controls,
                 mo.accordion({"Eagle XO": _eaglexo_inner, "Timepix3": _timepix_inner}, lazy=True),
             ]
@@ -1853,34 +1598,35 @@ def _(mo):
     # footprint and overlays the beam entry footprint, which outgrows the crystal
     # at grazing tilt (1/cos stretch). The ~micron cascade then collapses toward
     # the origin -- expected at true scale.
-    penetration_realistic_ui = mo.ui.checkbox(
-        value=False, label="Realistic beam & crystal size (5×5 mm, true scale)"
-    )
+    penetration_realistic_ui = mo.ui.checkbox(value=False, label="")
     return (penetration_realistic_ui,)
 
 
 @app.cell
 def _(mo):
-    # Playback state lives in mo.state (not bare UI-element values) because the
-    # penetration tab body needs to WRITE it back -- e.g. auto-flipping Play off
-    # when a non-repeating pass reaches the last frame -- which only a
-    # mo.state-bound element supports. get_penetration_started distinguishes
-    # "frame 0, never played" (full reveal) from "frame 0 after a repeat wrap"
-    # (reveal nothing yet, per the mapped cutoff).
-    get_penetration_play, set_penetration_play = mo.state(False)
-    get_penetration_frame, set_penetration_frame = mo.state(0)
-    get_penetration_started, set_penetration_started = mo.state(False)
+    # Transported-dataset cache. Playback is now client-side (Plotly's own
+    # frame animation inside the figure -- see trajectory_volume_animation),
+    # so nothing here needs to WRITE this back reactively the way the old
+    # frame counter did; this cache exists purely to avoid re-running Monte
+    # Carlo transport when an UNRELATED control (e.g. a different tab) reruns
+    # this cell but the transport parameters (case, Ne, seed, realistic,
+    # beam_fwhm) haven't changed.
     get_penetration_data, set_penetration_data = mo.state(None)
-    return (
-        get_penetration_frame,
-        get_penetration_play,
-        get_penetration_started,
-        get_penetration_data,
-        set_penetration_frame,
-        set_penetration_play,
-        set_penetration_started,
-        set_penetration_data,
-    )
+    return get_penetration_data, set_penetration_data
+
+
+@app.cell
+def _(mo):
+    # Survival-chart cache, same pattern as get_penetration_data above.
+    # penetration_survival_chart(...) runs its OWN fresh Ne=500-electron
+    # transport, so without caching it would redo that work every time the
+    # tab body reruns for ANY reason -- e.g. toggling Realistic mode, which
+    # the survival curve does not even depend on. Keyed on the smaller set of
+    # knobs the chart itself actually depends on (material, beam energy,
+    # polar tilt, thickness) in the tab body below. Altair charts are plain
+    # objects, so caching/reusing one is safe.
+    get_penetration_survival, set_penetration_survival = mo.state(None)
+    return get_penetration_survival, set_penetration_survival
 
 
 @app.cell
@@ -1892,58 +1638,34 @@ def _(mo):
         value=0, on_click=lambda value: value + 1, label="🎲 Regenerate"
     )
     penetration_ne_ui = mo.ui.slider(
-        start=50, stop=500, value=250, step=10, label="Electrons (Ne)", show_value=True
+        start=25, stop=300, value=75, step=5, label="Electrons (Ne)", show_value=True
     )
     penetration_beam_fwhm_ui = mo.ui.number(
-        value=1.0, start=0.001, step=0.1, label="Beam FWHM (mm, realistic mode)"
+        value=1.0, start=0.001, step=0.1, label="Beam FWHM (mm)"
     )
     return penetration_beam_fwhm_ui, penetration_ne_ui, penetration_regen_ui
 
 
 @app.cell
-def _(get_penetration_play, mo, set_penetration_play):
-    # Play is bound to mo.state (not a bare mo.ui.switch) so the tab body can
-    # flip it back off programmatically -- the Repeat-off "stop at the last
-    # frame" behavior -- and have that reflected in the rendered switch.
-    penetration_play_ui = mo.ui.switch(
-        value=get_penetration_play(), on_change=set_penetration_play, label="Play"
-    )
+def _(mo):
+    # Speed now drives the animation FIGURE's own frame duration
+    # (trajectory_volume_animation's base_ms / speed), not a server-side
+    # mo.ui.refresh tick -- Play/Pause/scrub all live inside the Plotly figure
+    # itself now, so the old Play switch, Repeat switch, and refresh-ticker
+    # cell are gone; see the animation builder's docstring for the duration
+    # mapping and the loop-doesn't-exist caveat that replaces Repeat.
     penetration_speed_ui = mo.ui.slider(
         start=0.25, stop=4, value=1, step=0.25, label="Speed (×)", show_value=True
     )
-    penetration_repeat_ui = mo.ui.switch(value=False, label="Repeat")
-    return penetration_play_ui, penetration_repeat_ui, penetration_speed_ui
-
-
-@app.cell
-def _(mo, penetration_play_ui, penetration_speed_ui):
-    # mo.ui.refresh only ticks while it is mounted in rendered output, so the
-    # tab body includes it in its output ONLY while Play is on -- ticking stops
-    # the instant Play flips off, whether by hand or via the Repeat-off
-    # auto-stop. Rebuilt from Speed each time either input changes:
-    # advance_frame always steps >=1 frame per tick (never stalls at sub-1x),
-    # so the "feels slower" part of sub-1x speeds comes from a LONGER interval
-    # here, not a smaller step.
-    if penetration_play_ui.value:
-        _interval_s = round(1.0 / float(penetration_speed_ui.value), 2)
-        penetration_refresh_ui = mo.ui.refresh(default_interval=f"{_interval_s}s")
-    else:
-        penetration_refresh_ui = None
-    return (penetration_refresh_ui,)
+    return (penetration_speed_ui,)
 
 
 @app.cell
 def _(
     MATERIAL,
-    advance_frame,
     build_cases,
-    context_rail,
-    dataset_t_max,
-    fmt_thickness,
-    frame_reveal_fs,
-    get_penetration_frame,
-    get_penetration_started,
     get_penetration_data,
+    get_penetration_survival,
     mo,
     penetration_beam_fwhm_ui,
     penetration_energy_grid_ui,
@@ -1951,11 +1673,8 @@ def _(
     penetration_energy_manual_ui,
     penetration_energy_source_ui,
     penetration_ne_ui,
-    penetration_play_ui,
     penetration_realistic_ui,
-    penetration_refresh_ui,
     penetration_regen_ui,
-    penetration_repeat_ui,
     penetration_speed_ui,
     penetration_survival_chart,
     penetration_thickness_ang,
@@ -1966,40 +1685,20 @@ def _(
     penetration_tilt_grid_ui,
     penetration_tilt_manual_ui,
     penetration_tilt_source_ui,
-    plot_trajectory_grid,
-    set_penetration_frame,
-    set_penetration_play,
-    set_penetration_started,
     set_penetration_data,
+    set_penetration_survival,
     settings,
     trajectory_chart,
     trajectory_sweep,
+    trajectory_volume_animation,
     trajectory_volume_data,
-    trajectory_volume_figure_from_data,
 ):
     def penetration_tab():
         _angle = penetration_tilt_deg
-        _rail = context_rail(
-            mo,
-            {
-                "Material": MATERIAL,
-                "E0": f"{penetration_energy_keV:g} keV",
-                "theta": f"{penetration_tilt_deg:g} °",
-                "phi": None,
-                "Thickness": fmt_thickness(penetration_thickness_ang),
-                "Records": "direct transport",
-            },
-        )
         _md = mo.md(
-            "Surviving-electron fraction vs depth (one curve per beam energy) and "
-            "an interactive 3D track cutaway, at the polar tilt selected "
-            "in this tab. These run the cheap CPU-only "
-            "transport directly — no checkpoint needed. For a stacked/multilayer "
-            "material (e.g. mos2 on sapphire) the cascade is transported through "
-            "the FULL stack, not just the top film. Manual beam energies above 30 keV "
-            "are exploratory because the free-path fit is documented through 30 keV. "
-            "The translucent crystal's lateral extent is fitted to the tracks; depth "
-            "and layer interfaces retain true scale. Dense and 2D views load on expand."
+            "An interactive 3D electron track cutaway and a surviving-electron fraction vs depth, at the polar tilt selected "
+            "in this tab. The translucent crystal's lateral extent is fitted to the tracks; depth "
+            "and layer interfaces retain true scale. "
         )
         _sweep = trajectory_sweep(
             MATERIAL,
@@ -2009,11 +1708,28 @@ def _(
         )
         _traj = build_cases(_sweep, settings.n_electrons, settings.n_electrons_brem)
         if not _traj:
-            return mo.vstack([_rail, _md, mo.md("*No trajectory cases.*")])
-        _survival = penetration_survival_chart(_traj, Ne=500, tilt=_angle)
+            return mo.vstack([_md, mo.md("*No trajectory cases.*")])
         # The sweep has one selected energy and tilt; keep the nearest-case guard
         # in case a future sweep adds a surrounding grid.
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
+
+        # Survival-chart cache: penetration_survival_chart runs its OWN fresh
+        # Ne=500-electron transport, so without caching it would redo that work
+        # every time the tab body reruns for ANY reason -- e.g. toggling
+        # Realistic mode, which the survival curve does not even depend on.
+        # Keyed on just the knobs the chart itself depends on.
+        _survival_key = (
+            MATERIAL,
+            penetration_energy_keV,
+            penetration_tilt_deg,
+            penetration_thickness_ang,
+        )
+        _cached_survival = get_penetration_survival()
+        if _cached_survival is not None and _cached_survival[0] == _survival_key:
+            _survival = _cached_survival[1]
+        else:
+            _survival = penetration_survival_chart(_traj, Ne=500, tilt=_angle)
+            set_penetration_survival((_survival_key, _survival))
 
         _seed = int(penetration_regen_ui.value)
         _Ne = int(penetration_ne_ui.value)
@@ -2021,11 +1737,10 @@ def _(
         _realistic = penetration_realistic_ui.value
 
         # The transported dataset depends only on (case, Ne, seed, realistic,
-        # beam_fwhm) -- NOT on the frame. Cache the whole `data` dict in mo.state
+        # beam_fwhm) -- NOT on playback state (playback is now client-side, see
+        # trajectory_volume_animation). Cache the whole `data` dict in mo.state
         # keyed on that tuple so Monte Carlo transport runs once per parameter
-        # set; every playback tick then rebuilds the figure from the cached data
-        # (reveal filter only), never re-transporting per frame. T_max is derived
-        # cheaply from the cached data.
+        # set, not once per rerun of an unrelated control.
         _data_key = (
             _nc["name"],
             _nc["E0_keV"],
@@ -2043,142 +1758,164 @@ def _(
                 _nc, Ne=_Ne, seed=_seed, realistic=_realistic, beam_fwhm_mm=_beam_fwhm
             )
             set_penetration_data((_data_key, _data))
-        _t_max = dataset_t_max(_data)
 
-        _frame = get_penetration_frame()
-        _started = get_penetration_started()
-        if penetration_play_ui.value and penetration_refresh_ui is not None:
-            _ = penetration_refresh_ui.value  # subscribe: reruns this cell on each tick
-            _frame, _still_playing = advance_frame(
-                _frame, float(penetration_speed_ui.value), penetration_repeat_ui.value
-            )
-            set_penetration_frame(_frame)
-            set_penetration_started(True)
-            _started = True
-            if not _still_playing:
-                set_penetration_play(False)  # Repeat-off: stop at the last frame
-
-        # Idle at frame 0, never played -> full reveal; playing/advanced (incl.
-        # a repeat wrap back to frame 0) -> the mapped cutoff.
-        _reveal_until_fs = (
-            None if (_frame == 0 and not _started) else frame_reveal_fs(_frame, _t_max)
-        )
-        _volume = trajectory_volume_figure_from_data(
+        # Playback (Play/Pause, frame scrubbing) is native Plotly animation
+        # running entirely in the browser -- see trajectory_volume_animation's
+        # docstring. The Speed slider maps to the figure's own frame duration;
+        # changing it rebuilds the figure once, server-side, same as any other
+        # control here.
+        _volume = trajectory_volume_animation(
             _nc,
             _data,
             realistic=_realistic,
             beam_fwhm_mm=_beam_fwhm,
-            reveal_until_fs=_reveal_until_fs,
+            speed=float(penetration_speed_ui.value),
         )
+        # Narrower than the old full-row default so the 2D cross-section fits
+        # beside it instead of stacked below.
+        if _volume is not None:
+            _volume.update_layout(width=700)
+
+        def _row_label(text):
+            return mo.md(text).style({"min-width": "9rem", "display": "inline-block"})
+
+        # Beam FWHM only matters in true-beamsize mode; gray it out (dim +
+        # non-interactive) rather than hide it, so its value stays visible.
+        _beam_fwhm_display = (
+            penetration_beam_fwhm_ui
+            if _realistic
+            else penetration_beam_fwhm_ui.style({"opacity": "0.4", "pointer-events": "none"})
+        )
+
+        # Built eagerly (cheap at Ne=40); no longer behind a lazy accordion.
+        # Narrower than its 480 default now that it sits beside the 3D plot
+        # rather than filling the row on its own.
+        _cross_section_chart = trajectory_chart(_nc, Ne=40, width=420)
+        _cross_section_block = _cross_section_chart
+
+        _trace_cols = [p for p in (_volume, _cross_section_block) if p is not None]
+        _trace_row = (
+            mo.hstack(_trace_cols, justify="start", align="start", gap=2, wrap=True)
+            if _trace_cols
+            else None
+        )
+
         _parts = [
-            _rail,
             _md,
             mo.vstack(
                 [
                     mo.hstack(
                         [
-                            penetration_energy_source_ui,
-                            (
-                                penetration_energy_grid_ui
-                                if penetration_energy_source_ui.value == "grid"
-                                else penetration_energy_manual_ui
+                            mo.hstack(
+                                [
+                                    _row_label("**Beam energy**"),
+                                    penetration_energy_source_ui,
+                                    (
+                                        penetration_energy_grid_ui
+                                        if penetration_energy_source_ui.value == "grid"
+                                        else penetration_energy_manual_ui
+                                    ),
+                                ],
+                                justify="start",
+                                align="center",
+                                gap=1,
+                                wrap=True,
+                            ),
+                            mo.hstack(
+                                [
+                                    _row_label("True beamsize"),
+                                    penetration_realistic_ui,
+                                    _beam_fwhm_display,
+                                ],
+                                justify="end",
+                                align="end",
+                                gap=1,
+                                wrap=True,
                             ),
                         ],
+                        justify="space-between",
+                        align="center",
                         wrap=True,
                     ),
                     mo.hstack(
                         [
-                            penetration_thickness_source_ui,
-                            (
-                                penetration_thickness_grid_ui
-                                if penetration_thickness_source_ui.value == "grid"
-                                else penetration_thickness_manual_ui
+                            mo.hstack(
+                                [
+                                    _row_label("**Crystal thickness**"),
+                                    penetration_thickness_source_ui,
+                                    (
+                                        penetration_thickness_grid_ui
+                                        if penetration_thickness_source_ui.value == "grid"
+                                        else penetration_thickness_manual_ui
+                                    ),
+                                ],
+                                justify="start",
+                                align="center",
+                                gap=1,
+                                wrap=True,
                             ),
-                        ],
-                        wrap=True,
-                    ),
-                    mo.hstack(
-                        [
-                            penetration_tilt_source_ui,
-                            (
-                                penetration_tilt_grid_ui
-                                if penetration_tilt_source_ui.value == "grid"
-                                else penetration_tilt_manual_ui
-                            ),
-                        ],
-                        wrap=True,
-                    ),
-                    mo.hstack(
-                        [
-                            penetration_realistic_ui,
-                            penetration_regen_ui,
                             penetration_ne_ui,
-                            penetration_beam_fwhm_ui,
                         ],
+                        justify="space-between",
+                        align="center",
                         wrap=True,
                     ),
                     mo.hstack(
                         [
-                            penetration_play_ui,
-                            penetration_speed_ui,
-                            penetration_repeat_ui,
-                            *(
-                                [penetration_refresh_ui]
-                                if penetration_refresh_ui is not None
-                                else []
+                            mo.hstack(
+                                [
+                                    _row_label("**Polar tilt**"),
+                                    penetration_tilt_source_ui,
+                                    (
+                                        penetration_tilt_grid_ui
+                                        if penetration_tilt_source_ui.value == "grid"
+                                        else penetration_tilt_manual_ui
+                                    ),
+                                ],
+                                justify="start",
+                                align="center",
+                                gap=1,
+                                wrap=True,
                             ),
+                            penetration_speed_ui,
                         ],
+                        justify="space-between",
+                        align="center",
                         wrap=True,
                     ),
+                    mo.hstack([penetration_regen_ui], justify="end", wrap=True),
                 ]
             ),
-            *(p for p in (_survival, _volume) if p is not None),
+            *(p for p in (_trace_row, _survival) if p is not None),
         ]
-
-        def _dense_grid():
-            _dense_sweep = trajectory_sweep(
-                MATERIAL,
-                energies=(penetration_energy_keV,),
-                tilts=(penetration_tilt_deg,),
-                thickness_ang=penetration_thickness_ang,
-            )
-            _dense_traj = build_cases(_dense_sweep, settings.n_electrons, settings.n_electrons_brem)
-            return plot_trajectory_grid(_dense_traj, energy=penetration_energy_keV, Ne=120)
-
-        def _track_cross_section():
-            return trajectory_chart(_nc, Ne=40)
-
-        _parts.append(
-            mo.accordion(
-                {"Dense penetration grid (datashader, matplotlib)": _dense_grid},
-                lazy=True,
-            )
-        )
-        _parts.append(
-            mo.accordion(
-                {"2D track cross-section (Altair)": _track_cross_section},
-                lazy=True,
-            )
-        )
         return mo.vstack(_parts)
 
     return (penetration_tab,)
 
 
 @app.cell
-def _(CATALOG, load_checkpoint, mo, records):
+def _(CATALOG, mo):
     # Cross-material controls are top-level so switching them reruns the lazy
-    # tab body.  The selector contains only energies present in loaded data.
+    # tab body. The selector contains only energies present in loaded data --
+    # read from each material's checkpoint manifest, not load_checkpoint,
+    # which would unpickle every material's checkpoint (140-225 MB gzip each)
+    # just to enumerate beam energies.
+    from cxr_mc.run import checkpoint_manifest
+
     _energies = set()
     for _material_key in CATALOG.material_keys:
-        _results = load_checkpoint(_material_key)
-        if _results:
-            _energies.update(r["case"]["E0_keV"] for r in records(_results))
+        _manifest = checkpoint_manifest(_material_key)
+        if _manifest:
+            _energies.update(_manifest["energies_keV"])
     cross_material_energy_options = {f"{energy:g} keV": energy for energy in sorted(_energies)} or {
         "— no data —": None
     }
     compare_all_beam_energies_ui = mo.ui.checkbox(value=True, label="Compare all beam energies")
-    return compare_all_beam_energies_ui, cross_material_energy_options
+    return (
+        checkpoint_manifest,
+        compare_all_beam_energies_ui,
+        cross_material_energy_options,
+    )
 
 
 @app.cell
@@ -2195,92 +1932,75 @@ def _(compare_all_beam_energies_ui, cross_material_energy_options, mo):
 @app.cell
 def _(
     CATALOG,
+    checkpoint_manifest,
     compare_all_beam_energies_ui,
-    context_rail,
     cross_material_energy_ui,
-    load_checkpoint,
     mo,
-    plot_material_comparison,
-    records,
     settings,
 ):
+    from cxr_mc.plots import draw_material_comparison, material_comparison_point
+    from cxr_mc.run import cached_material_analysis
+
     def cross_material_tab():
         _md = mo.md(
             "For every material whose checkpoint exists, the single best geometry's "
             "dominant line: energy vs flux. The three comparisons select by line "
             "quality, peak flux, and local line-to-bremsstrahlung ratio. Each "
-            "label reports the selected geometry's beam energy, θ, and φ. "
+            "label reports the selected geometry's beam energy, \u03b8, and \u03c6. "
             "Every comparison rejects candidate lines with quality below 0.5 "
             "before selecting the best point; a material with no line clearing "
             "that bar is dropped from the plot and reported in a printed "
-            "statement below it."
+            "statement below it. Each material's checkpoint is analyzed once and "
+            "cached, so reopening this tab re-analyzes only checkpoints that "
+            "changed since."
         )
-        _by_material = {}
-        for _material_key in CATALOG.material_keys:
-            _r = load_checkpoint(_material_key)
-            if _r:
-                _by_material[CATALOG.material(_material_key).label] = _r
         _beam_energy = (
             None if compare_all_beam_energies_ui.value else cross_material_energy_ui.value
         )
-        _beam_energies = {
-            record["case"]["E0_keV"]
-            for _results in _by_material.values()
-            for record in records(_results)
-        }
-        _rail = context_rail(
-            mo,
-            {
-                "Material": (
-                    "multiple" if len(_by_material) > 1 else next(iter(_by_material), None)
-                ),
-                "E0": (
-                    f"{_beam_energy:g} keV"
-                    if _beam_energy is not None
-                    else "multiple"
-                    if len(_beam_energies) > 1
-                    else f"{next(iter(_beam_energies)):g} keV"
-                    if _beam_energies
-                    else None
-                ),
-                "theta": "best per material",
-                "phi": "best per material",
-                "Thickness": "best per material",
-                "Records": sum(len(records(_results)) for _results in _by_material.values()),
-            },
+        _n_with_data = sum(
+            1
+            for _material_key in CATALOG.material_keys
+            if (checkpoint_manifest(_material_key) or {}).get("n_records", 0) > 0
         )
-        if len(_by_material) >= 2:
+
+        def _comparison(select):
+            _pts = []
+            _dropped = []
+            for _material_key in CATALOG.material_keys:
+                _point = cached_material_analysis(
+                    _material_key,
+                    lambda _results: material_comparison_point(
+                        _results,
+                        settings,
+                        select=select,
+                        beam_energy_keV=_beam_energy,
+                        min_line_quality=0.5,
+                    ),
+                    (select, _beam_energy, 0.5, settings.beam_current_na),
+                )
+                if _point is None:
+                    continue
+                _label = CATALOG.material(_material_key).label
+                if _point == "dropped":
+                    _dropped.append(_label)
+                    continue
+                _pts.append((_label, *_point))
+            return draw_material_comparison(
+                _pts, _dropped, select=select, beam_energy_keV=_beam_energy, min_line_quality=0.5
+            )
+
+        if _n_with_data >= 2:
             return mo.vstack(
                 [
-                    _rail,
                     _md,
                     mo.hstack([compare_all_beam_energies_ui, cross_material_energy_ui], wrap=True),
-                    plot_material_comparison(
-                        _by_material,
-                        settings,
-                        select="quality_peak",
-                        beam_energy_keV=_beam_energy,
-                        min_line_quality=0.5,
-                    ),
-                    plot_material_comparison(
-                        _by_material,
-                        settings,
-                        select="peak",
-                        beam_energy_keV=_beam_energy,
-                        min_line_quality=0.5,
-                    ),
-                    plot_material_comparison(
-                        _by_material,
-                        settings,
-                        select="line_brem_ratio",
-                        beam_energy_keV=_beam_energy,
-                        min_line_quality=0.5,
-                    ),
+                    _comparison("quality_peak"),
+                    _comparison("peak"),
+                    _comparison("line_brem_ratio"),
                 ]
             )
         return mo.vstack(
             [
-                _rail,
                 _md,
                 mo.md("*Run `scan_app.py` for more materials to populate this comparison.*"),
             ]
@@ -2304,7 +2024,7 @@ def _(
     # Four scientific tasks form the only top-level navigation. Accordions keep
     # individual view builders lazy without nesting tab widgets.
     def task_surface(views):
-        return mo.accordion(views, lazy=True)
+        return mo.accordion(views, lazy=True, multiple=True)
 
     mo.ui.tabs(
         {
@@ -2321,12 +2041,8 @@ def _(
                     "Inspect scan maps": scans_tab,
                 },
             ),
-            "Instrument": lambda: task_surface(
-                {
-                    "Model detectors": detectors_tab,
-                    "Inspect penetration": penetration_tab,
-                },
-            ),
+            "Instruments": detectors_tab,
+            "Trace": penetration_tab,
             "Compare": lambda: task_surface({"Compare materials": cross_material_tab}),
         },
         lazy=True,
