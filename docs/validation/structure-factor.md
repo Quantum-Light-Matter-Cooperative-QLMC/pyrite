@@ -247,3 +247,48 @@ Final `signed-off` remains a human decision.
 > verifier's opinion, not as a validated claim. To reach `anchored`, add a regression
 test pinning the diamond `(222)`-extinct / `(111)`-allowed selection rules and the
 `exp(-B g²/16π²)` DW value at one `(g,B)` point.
+
+---
+
+## 7. Second independent verifier pass (2026-07-22)
+
+A second fresh, independent verifier — with no access to the first verifier's
+numerics and re-deriving from standard kinematical crystallography — reproduced
+every result above. This is the algebraic+numeric second lens the section-6
+caveat said had not yet run.
+
+**Independent re-derivation (matches).** Starting only from the cited standard
+form `F(g) = Σ_j f_j(g,E) exp(±i g·r_j) exp(−M_j)` and the module's documented
+`|g| = 2π/d` convention (verified via `_reciprocal_basis`, which carries the `2π`
+prefactor so `b_i·a_j = 2π δ_ij`):
+
+- Phase: `g·r_j = 2π (hkl·R_j)` for fractional coords → `exp(2π i hkl·R_j)`,
+  matching the code's `np.exp(1j*2π*np.dot(hkl,R))`. The global `+i` is a
+  convention that conjugates `S` and leaves `|S|²` invariant.
+- Bragg `λ = 2d sinθ` with `g = 2π/d` gives `sinθ/λ = g/(4π)`, so
+  `M = B (sinθ/λ)² = B (g/4π)² = B g²/(16π²)`. This is the *amplitude* exponent;
+  the `4` denominator would require the no-2π `g=1/d` convention, which this
+  module does not use. Code's `s = g/(4π); exp(−B s²)` is exactly this.
+- `B = 8π²⟨u_g²⟩` (single along-`g` component, not 3-D total): matches docstring.
+
+**Independent numerics (this pass, own probes).**
+- `debye_waller` at `B=0.5`, `g∈{0,1,3,2π}` reproduces `exp(−B g²/16π²)` to 10
+  digits and diverges sharply from the `factor4` candidate (e.g. `g=2π`:
+  code/16π² = 0.88250 vs factor4 = 0.00719).
+- Silicon (diamond) at 8 keV: `(222)` and `(200)` extinct to machine zero;
+  `(111)`, `(220)`, `(311)`, `(400)` allowed — the phase-sign-sensitive diamond
+  selection rule. `S(000) = 113.98 + 2.67j ≈ 8·Z_Si = 112` (excess/imag from Si
+  anomalous `f'+if''` at 8 keV).
+- LiF (rock-salt) at 8 keV: `F` real (centrosymmetric, imag ≈ 0);
+  `|S(111)| = 18.97` (difference `∝ |f_F − f_Li|`) `< |S(200)| = 30.04`
+  (sum `∝ |f_F + f_Li|`) — the correct NaCl-type sum/difference rule.
+
+**Concurrence.** Both traps (`B` vs `⟨u²⟩`; `16π²` vs `4`) handled correctly;
+phase convention verified via selection rules. No divergent term found. Two
+documented non-defects stand: single scalar `B_ang2` shared across basis atoms
+(isotropic single-B approximation, consistent with the handed-in single-`B`
+formula) and the absent in-code `Validation: structure-factor` marker on
+`structure_factor`/`debye_waller` (traceability gap for a human to close).
+
+**Verdict of this pass:** `rederived` (independent derivation matches the code).
+Promotion of the ledger row and any `signed-off` remain human decisions.
