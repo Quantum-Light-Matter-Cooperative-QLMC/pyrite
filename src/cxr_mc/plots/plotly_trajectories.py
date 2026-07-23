@@ -489,8 +489,12 @@ def advance_frame(frame_index, speed, repeat, n_frames=N_FRAMES):
     ``n_frames - 1`` and reports ``still_playing=False``. Returns
     ``(next_index, still_playing)``. Pure -- no marimo import -- so Task 3's
     marimo cell only has to call this and assign, keeping the Repeat loop/stop
-    logic unit-testable in isolation."""
-    step = int(round(speed))
+    logic unit-testable in isolation.
+
+    Sub-1x speeds (e.g. 0.25x) are floored to a 1-frame step so playback
+    never stalls -- the perceived slowdown is Task 3's responsibility, via
+    scaling the marimo refresh interval, not a fractional frame step here."""
+    step = max(1, int(round(speed))) if speed > 0 else 0
     next_index = frame_index + step
     if next_index >= n_frames - 1:
         return (0, True) if repeat else (n_frames - 1, False)

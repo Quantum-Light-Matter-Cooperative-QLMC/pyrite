@@ -238,3 +238,11 @@ def test_advance_frame_speed_scaling():
     next_index, playing = advance_frame(0, speed=3, repeat=False)
     assert next_index == 3
     assert playing is True
+
+
+def test_advance_frame_slow_speed_never_stalls():
+    # speed=0.25 -> round(0.25) == 0, which must be floored to a 1-frame
+    # step, not a no-op (see advance_frame stall bug fix).
+    next_index, playing = advance_frame(0, speed=0.25, repeat=False)
+    assert next_index == 1
+    assert playing is True
