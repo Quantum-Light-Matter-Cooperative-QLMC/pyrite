@@ -159,6 +159,7 @@ re-exported from package** — `from cxr_mc.montecarlo import X` unchanged
 - `detector` — `detector_efficiency`, `eds_fwhm_eV`, `aperture_fwhm_eV`,
   `mosaic_fwhm_eV`, `mosaic_psi_rad`, `convolve_detector`. Deps: `materials.attenuation`,
   `geometry`, `transport`, `materials.crystal`.
+- `montecarlo/groove.py` — blazed sawtooth entrance-face grooves (escape-path engineering): closed-form entry/escape, `Sweep.groove_spacing_ang` knob.
 - `runner` — `run_case`, `run_cases` (CPU transport pipelined behind one CUDA
   spectrum context, or memory-capped full-case CPU pool), `_transport_case`,
   `_spectrum_case`, `_worker_init`. Deps: `_backend`, `transport`, `geometry`,
