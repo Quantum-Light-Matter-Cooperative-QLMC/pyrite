@@ -202,6 +202,18 @@ def _run_material(args, material, max_seconds=None):
         "cached_cases": 0,
         "completed_new_cases": 0,
     }
+    latest_case = {}
+
+    def _note_case(case):
+        # Frontier crystal case just finished -- surface its parameters so a live
+        # viewer can show what's under test (energy, both tilts, thickness).
+        latest_case.clear()
+        latest_case.update(
+            energy_keV=round(float(case["E0_keV"]), 3),
+            tilt_deg=round(float(case["tilt_deg"]), 2),
+            azimuth_deg=round(float(case["tilt_azim_deg"]), 2),
+            thickness_um=round(float(case["thickness_ang"]) / 1e4, 4),
+        )
 
     def _record_progress(completed_new_cases, total_cases, cached_cases):
         latest_progress.update(
@@ -214,6 +226,7 @@ def _run_material(args, material, max_seconds=None):
                 progress_file,
                 material=material,
                 state="running",
+                current=dict(latest_case) or None,
                 **latest_progress,
             )
 
@@ -233,6 +246,7 @@ def _run_material(args, material, max_seconds=None):
             max_workers=args.workers,
             progress=not getattr(args, "no_progress", False),
             on_progress=_record_progress if progress_file is not None else None,
+            on_case=_note_case if progress_file is not None else None,
             max_seconds=max_seconds,
         )
         # run_sweep returns a bool (complete?). Only a bare None -- test doubles
@@ -271,8 +285,14 @@ def _write_progress_record(
     cached_cases,
     completed_new_cases,
     state,
+    current=None,
 ):
-    """Atomically replace one scan's compact JSON progress record."""
+    """Atomically replace one scan's compact JSON progress record.
+
+    ``current`` (optional) is the frontier crystal case's parameters (energy,
+    both tilts, thickness) so a live viewer can show what's under test; it is
+    omitted from the record when None (start/done/failed/paused snapshots).
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     record = {
@@ -282,6 +302,8 @@ def _write_progress_record(
         "completed_new_cases": completed_new_cases,
         "state": state,
     }
+    if current:
+        record["current"] = current
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(record, separators=(",", ":")) + "\n", encoding="utf-8")
     os.replace(tmp, path)

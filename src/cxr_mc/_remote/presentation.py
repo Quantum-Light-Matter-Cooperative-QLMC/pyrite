@@ -5,6 +5,7 @@ import math
 import os
 import re
 import sys
+import textwrap
 
 from ..materials import CATALOG
 
@@ -86,8 +87,32 @@ def _paint(text, group):
 
 
 def _format_fields(rows, *, indent="  "):
+    """Aligned ``label  value`` block; a value with embedded newlines wraps with
+    its continuation lines hanging under the value column."""
     width = max(len(str(label)) for label, _value in rows)
-    return "\n".join(f"{indent}{label:<{width}}  {value}" for label, value in rows)
+    pad = indent + " " * (width + 2)
+    lines = []
+    for label, value in rows:
+        head, *rest = str(value).split("\n")
+        lines.append(f"{indent}{label:<{width}}  {head}")
+        lines.extend(f"{pad}{extra}" for extra in rest)
+    return "\n".join(lines)
+
+
+def _format_material_roster(materials):
+    """Compact, readable material list for the status header.
+
+    A short roster stays on one line; a long one is summarized by count and
+    wrapped so a 34-material sweep does not spill one ragged comma line across
+    the terminal.  The per-material breakdown still lives in CASE PROGRESS.
+    """
+    materials = [material for material in materials if material and material != "-"]
+    if not materials:
+        return "-"
+    joined = ", ".join(materials)
+    if len(materials) <= 6 and len(joined) <= 60:
+        return joined
+    return f"{len(materials)} total\n{textwrap.fill(joined, width=60)}"
 
 
 def _metadata_fields(metadata):
@@ -169,23 +194,52 @@ def _aggregate_progress(records):
     return completed, total, state
 
 
-def _overall_progress_line(records):
-    """One job-wide progress bar for the status header, shown at every level."""
+def _overall_progress_line(records, materials=()):
+    """One job-wide progress bar for the status header, shown at every level.
+
+    ``materials`` is the full roster from job metadata. The bar is material-
+    weighted over that roster: each material contributes ``done/total`` in
+    [0, 1] and materials that have not started yet (no progress record) count as
+    0.  This keeps the headline honest -- a sweep with 2 of 34 materials barely
+    begun reads a few percent, not ~99% as a records-only case sum would when
+    the unstarted materials are absent from both numerator and denominator.
+    """
     aggregate = _aggregate_progress(records)
     if aggregate is None:
         return None
     completed, total, state = aggregate
-    percent = 100 if total == 0 else round(100 * completed / total)
+    roster = [material for material in materials if material and material != "-"]
+    n_materials = len(roster) or len(records)
+    frac_sum = 0.0
+    for record in records.values():
+        record_total = record["total_cases"]
+        record_done = record["cached_cases"] + record["completed_new_cases"]
+        frac_sum += 1.0 if record_total == 0 else record_done / record_total
+    overall = 0.0 if n_materials == 0 else min(1.0, frac_sum / n_materials)
+    percent = round(100 * overall)
     glyph = _STATE_GLYPHS.get(state, "●")
-    accent = _paint(f"{glyph} {_progress_track(completed, total)}", _progress_group(state))
-    materials = (
-        ""
-        if len(records) == 1
-        else (
-            f" · {sum(1 for r in records.values() if r['state'] == 'done')}/{len(records)} materials"
+    accent = _paint(f"{glyph} {_progress_track(percent, 100)}", _progress_group(state))
+    if n_materials <= 1:
+        return f"{accent}  {percent:>3}%  {completed}/{total} cases"
+    done = sum(1 for record in records.values() if record["state"] == "done")
+    return f"{accent}  {percent:>3}%  {completed}/{total} cases · {done}/{n_materials} materials"
+
+
+def _format_now_testing(current):
+    """Compact 'currently on this crystal case' clause -- energy, both tilts,
+    thickness -- from a progress record's optional ``current`` snapshot. Returns
+    "" when absent or malformed so a row simply omits it."""
+    if not isinstance(current, dict):
+        return ""
+    try:
+        return (
+            f"{float(current['energy_keV']):g} keV · "
+            f"tilt {float(current['tilt_deg']):g}° · "
+            f"azim {float(current['azimuth_deg']):g}° · "
+            f"{float(current['thickness_um']):g} µm"
         )
-    )
-    return f"{accent}  {percent:>3}%  {completed}/{total} cases{materials}"
+    except (KeyError, TypeError, ValueError):
+        return ""
 
 
 def _format_case_progress(records, materials=()):
@@ -196,7 +250,7 @@ def _format_case_progress(records, materials=()):
     order.extend(material for material in records if material not in order)
     labels = {material: _material_label(material) for material in order}
     label_width = max(len("MATERIAL"), *(len(label) for label in labels.values()))
-    lines = [f"  {'MATERIAL':<{label_width}}  {'PROGRESS':<16}  CASES  DONE  STATE    WORK"]
+    lines = [f"  {'MATERIAL':<{label_width}}  {'PROGRESS':<16}  CASES  DONE  STATE    NOW TESTING"]
     for material in order:
         record = records[material]
         completed = record["cached_cases"] + record["completed_new_cases"]
@@ -206,10 +260,11 @@ def _format_case_progress(records, materials=()):
         glyph = _STATE_GLYPHS.get(state, "●")
         track = _progress_track(completed, total)
         accent = _paint(f"{glyph} {track}", _progress_group(state))
+        now = _format_now_testing(record.get("current")) if state == "running" else ""
+        tail = now or f"{record['cached_cases']} cached · {record['completed_new_cases']} new"
         lines.append(
             f"  {labels[material]:<{label_width}}  {accent}  "
-            f"{completed:>{len(str(total))}}/{total}  {percent:>3}%  {state:<7}  "
-            f"{record['cached_cases']} cached · {record['completed_new_cases']} new"
+            f"{completed:>{len(str(total))}}/{total}  {percent:>3}%  {state:<7}  {tail}"
         )
     return "\n".join(lines)
 
@@ -330,11 +385,11 @@ def _format_job_status(sections, detail):
     else:
         rows.extend(
             [
-                ("Materials", ", ".join(materials) or "-"),
+                ("Materials", _format_material_roster(materials)),
                 ("Mode", _mode_summary(metadata)),
             ]
         )
-        overall = _overall_progress_line(records)
+        overall = _overall_progress_line(records, materials)
         if overall is not None:
             rows.append(("Progress", overall))
     output = [f"JOB {jobid}", _format_fields(rows)]

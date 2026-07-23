@@ -221,6 +221,7 @@ def run_sweep(
     group_key=None,
     on_chunk=None,
     on_progress=None,
+    on_case=None,
     max_seconds=None,
     time_fn=None,
 ):
@@ -250,6 +251,11 @@ def run_sweep(
         group, with all of that group's config names (cached + freshly run).
     on_progress : optional callback(completed_new_cases, total_cases, cached_cases)
         fired once after resume filtering and after every newly completed case.
+    on_case : optional callback(case) fired with each case dict as it finishes,
+        just before ``on_progress`` -- the frontier the sweep is working through.
+        Lets a live viewer surface which crystal case (energy, tilts, thickness)
+        is currently under test without threading it through ``on_progress``'s
+        fixed count signature.
     max_seconds : optional soft wall-clock budget, measured from just before
         ``run_cases`` starts. None (default) means unbounded. When set, a
         deadline of ``time_fn() + max_seconds`` is checked (via ``run_cases``'s
@@ -326,6 +332,8 @@ def run_sweep(
     def _cb(i, case, out):
         nonlocal completed_new_cases
         store_result(results, case, out)
+        if on_case is not None:
+            on_case(case)
         name = case["name"]
         energies_remaining[name] -= 1
         if energies_remaining[name] == 0:  # this config (all energies) is done

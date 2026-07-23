@@ -941,9 +941,33 @@ def test_overall_progress_line_sums_cases_and_counts_done_materials():
 
     assert line is not None
     assert "7/10 cases" in line  # 4 (hopg) + 3 (hbn)
-    assert " 70%" in line
+    # material-weighted over the two started materials: (4/4 + 3/6) / 2 = 75%.
+    assert " 75%" in line
     assert "1/2 materials" in line  # only hopg is done
     assert "●" in line  # a still-running material keeps the aggregate active
+
+
+def test_overall_progress_line_counts_unstarted_materials_in_the_denominator():
+    # 2 of 4 rostered materials have started (one done, one half); the other two
+    # have no progress record yet. The headline must weight over ALL four, not
+    # read ~75% off the two that reported.
+    records = remote._parse_progress_records(
+        "\n".join(
+            [
+                '{"material":"hopg","total_cases":4,"cached_cases":4,'
+                '"completed_new_cases":0,"state":"done"}',
+                '{"material":"hbn","total_cases":4,"cached_cases":0,'
+                '"completed_new_cases":2,"state":"running"}',
+            ]
+        )
+    )
+
+    line = remote._overall_progress_line(records, ["hopg", "hbn", "mos2", "wse2"])
+
+    assert line is not None
+    # (4/4 + 2/4 + 0 + 0) / 4 = 37.5% -> 38%, not ~75%.
+    assert " 38%" in line
+    assert "1/4 materials" in line
 
 
 def test_overall_progress_line_is_none_without_records():
@@ -1028,6 +1052,45 @@ def test_static_case_progress_colors_tracks_only_on_tty(monkeypatch):
 
     assert "\033[38;2;92;207;230m" in colored
     assert "\033[" not in plain
+
+
+def test_case_progress_shows_current_crystal_parameters_for_running_material():
+    records = remote._parse_progress_records(
+        '{"material":"hopg","total_cases":5,"cached_cases":1,'
+        '"completed_new_cases":2,"state":"running",'
+        '"current":{"energy_keV":30,"tilt_deg":25,"azimuth_deg":110,"thickness_um":0.5}}'
+    )
+
+    output = remote._format_case_progress(records, ["hopg"])
+
+    assert "NOW TESTING" in output
+    assert "30 keV" in output
+    assert "tilt 25°" in output
+    assert "azim 110°" in output
+    assert "0.5 µm" in output
+
+
+def test_case_progress_omits_current_params_for_non_running_material():
+    records = remote._parse_progress_records(
+        '{"material":"hopg","total_cases":5,"cached_cases":5,'
+        '"completed_new_cases":0,"state":"done",'
+        '"current":{"energy_keV":30,"tilt_deg":25,"azimuth_deg":110,"thickness_um":0.5}}'
+    )
+
+    output = remote._format_case_progress(records, ["hopg"])
+
+    assert "keV" not in output  # done row falls back to the cached/new tally
+
+
+def test_material_roster_summarizes_and_wraps_a_long_list():
+    short = remote._format_material_roster(["hopg", "hbn"])
+    assert short == "hopg, hbn"
+
+    long_roster = [f"mat{i:02d}" for i in range(20)]
+    rendered = remote._format_material_roster(long_roster)
+    assert rendered.splitlines()[0] == "20 total"
+    assert "mat00" in rendered
+    assert "\n" in rendered  # wrapped, not one ragged line
 
 
 def test_stop_jobid_uses_scancel_not_kill(monkeypatch):

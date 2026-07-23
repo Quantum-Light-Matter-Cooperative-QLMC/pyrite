@@ -460,6 +460,22 @@ def test_run_sweep_reports_initial_and_per_case_progress(tmp_path, monkeypatch):
     assert progress == [(0, 3, 0), (1, 3, 0), (2, 3, 0), (3, 3, 0)]
 
 
+def test_run_sweep_on_case_fires_with_each_finished_case(tmp_path, monkeypatch):
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 45.0)]
+    seen = []
+
+    run_sweep(
+        cases,
+        {},
+        checkpoint_dir=str(tmp_path),
+        progress=False,
+        on_case=lambda case: seen.append((case["name"], case["E0_keV"])),
+    )
+
+    assert seen == [("cfg_a", 30.0), ("cfg_b", 45.0)]
+
+
 def test_run_sweep_progress_counts_cached_cases_on_resume(tmp_path, monkeypatch):
     cached_case = _fake_case("cfg_a", 30.0)
     existing = {"cfg_a": {30.0: {"case": cached_case, "spec": np.array([1.0])}}}
