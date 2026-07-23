@@ -2528,6 +2528,28 @@ def test_rebrem_cli_skips_pull_when_viewer_disconnects(monkeypatch):
     remote.main(["rebrem", "hopg"])
 
 
+def test_reline_queue_script_and_metadata():
+    from cxr_mc._remote import scripts
+
+    # Default remote reline is chunked like `cxr remote start`.
+    s = scripts._reline_chunked_queue_script(
+        "J1", ["mos2", "w"], line_ne=40000, line_step_eV=None, redo_all=True, chunk_minutes=10.0
+    )
+    assert "cxr reline" in s
+    assert "--line-ne 40000" in s
+    assert "--redo-all" in s
+    assert "--max-minutes" in s
+    assert "--nice=10000" in s
+    assert "--progress-file" in s
+    # The monolithic (chunk_minutes==0) path still runs `cxr reline` per material.
+    mono = scripts._reline_queue_script("J1", ["mos2", "w"], 40000, None, True)
+    assert "cxr reline" in mono and "--line-ne 40000" in mono and "--redo-all" in mono
+    assert "--progress-file" in mono
+    meta = scripts._reline_queue_metadata("J1", ["mos2", "w"], 40000, None, True)
+    assert "kind: reline" in meta
+    assert "line_ne: 40000" in meta
+
+
 def test_pull_dataset_merges_and_archives(monkeypatch, tmp_path):
     import numpy as np
 

@@ -127,6 +127,24 @@ def _metadata_fields(metadata):
 
 def _mode_summary(metadata):
     fields = _metadata_fields(metadata)
+    if fields.get("kind") == "rebrem":
+        parts = ["brem-only recompute"]
+        if fields.get("ne_brem") not in (None, "None"):
+            parts.append(f"Ne_brem={fields['ne_brem']}")
+        if fields.get("brem_step_eV") not in (None, "None"):
+            parts.append(f"step {fields['brem_step_eV']} eV")
+        if fields.get("redo_all") == "True":
+            parts.append("redo-all")
+        return " · ".join(parts)
+    if fields.get("kind") == "reline":
+        parts = ["line-only recompute"]
+        if fields.get("line_ne") not in (None, "None"):
+            parts.append(f"Ne_line={fields['line_ne']}")
+        if fields.get("line_step_eV") not in (None, "None"):
+            parts.append(f"step {fields['line_step_eV']} eV")
+        if fields.get("redo_all") == "True":
+            parts.append("redo-all")
+        return " · ".join(parts)
     if "ne" in fields or fields.get("materials") == "zhai":
         return "Zhai reproduction"
     if "quick" not in fields:

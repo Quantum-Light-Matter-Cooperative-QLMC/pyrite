@@ -154,6 +154,30 @@ def _cli_rebrem(args):
     lifecycle.pull(completed)
 
 
+def _cli_reline(args):
+    """Submit a line-only checkpoint recompute, follow it, pull what completed."""
+    materials = _selected_materials(args, "material")
+    jobid = lifecycle.start_reline_queue(
+        materials,
+        line_ne=args.line_ne,
+        line_step_eV=args.line_step,
+        redo_all=args.redo_all,
+        no_sync=args.no_sync,
+        dry_run=args.dry_run,
+        chunk_minutes=args.chunk_minutes,
+    )
+    if args.dry_run:
+        return
+    if not viewer.attach(jobid):
+        print("reline is still running or its viewer disconnected; skipping automatic pull")
+        return
+    completed = state._completed_materials(jobid, materials)
+    if not completed:
+        print("warning: the SLURM reline updated no checkpoints successfully; nothing to pull")
+        return
+    lifecycle.pull(completed, dataset="line")
+
+
 def _cli_pull(args):
     dataset = "brem" if args.brem_only else ("line" if args.line_only else None)
     lifecycle.pull(
@@ -320,6 +344,39 @@ def _build_remote_parser(ap):
         help="print the SLURM batch script + submission command, don't ssh",
     )
     rb.set_defaults(func=_dispatch(_cli_rebrem))
+
+    rl = sub.add_parser(
+        "reline",
+        help="recompute line-only in the box's checkpoints (GPU), follow, and pull them back",
+    )
+    rl.add_argument("material", nargs="*", help="one or more crystal keys")
+    rl.add_argument("-a", "--all", action="store_true", help="every material in mats_to_sim.toml")
+    rl.add_argument("--line-ne", type=int, default=None, help="new line electron count")
+    rl.add_argument(
+        "--line-step",
+        type=float,
+        default=None,
+        help="explicit uniform line-grid spacing [eV] (default: from config)",
+    )
+    rl.add_argument(
+        "--redo-all",
+        action="store_true",
+        help="recompute every record even if already at target",
+    )
+    rl.add_argument(
+        "--chunk-minutes",
+        type=float,
+        default=10.0,
+        help="length of each self-resubmitting SLURM slice in minutes; "
+        "0 = one whole-box monolithic run (default: 10.0)",
+    )
+    rl.add_argument("--no-sync", action="store_true", help="skip the code upload")
+    rl.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the SLURM batch script + submission command, don't ssh",
+    )
+    rl.set_defaults(func=_dispatch(_cli_reline))
 
     st = sub.add_parser(
         "start",

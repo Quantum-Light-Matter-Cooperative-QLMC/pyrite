@@ -198,6 +198,219 @@ echo "done $(date -Is)" > "$JOBDIR/state"
 """
 
 
+def _rebrem_flags(ne_brem, brem_step_eV, redo_all):
+    flags = ""
+    if ne_brem is not None:
+        flags += f" --ne-brem {int(ne_brem)}"
+    if brem_step_eV is not None:
+        flags += f" --step {float(brem_step_eV):g}"
+    if redo_all:
+        flags += " --redo-all"
+    return flags
+
+
+def _rebrem_queue_script(jobid, materials, ne_brem, brem_step_eV, redo_all):
+    """CXR payload for a brem-only checkpoint recompute in a SLURM allocation.
+
+    One sequential ``cxr rebrem`` per material (brem is cheap; no in-allocation
+    parallelism needed), each writing the SAME per-material JSON progress
+    record a scan does (``--progress-file``), so ``status``/``attach`` render
+    the shared case-progress dashboard. The ``completed:``/``failed:`` log
+    markers match the scan queue's so ``state._completed_materials`` drives the
+    post-attach pull unchanged."""
+    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all)
+    mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    return f"""JOBDIR="{jobdir}"
+cd "{config.REMOTE_DIR}" || exit 1
+mkdir -p "$JOBDIR/progress"
+echo "started: $(date -Is)" >> "$JOBDIR/meta"
+{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+mats=({mats})
+total=${{#mats[@]}}
+n=0
+failures=0
+for m in "${{mats[@]}}"; do
+  n=$((n + 1))
+  echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
+  printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
+  if ! {config.REMOTE_UV} run --no-sync cxr rebrem "$m"{flags} \
+    --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
+  then
+    echo "WARNING: rebrem failed for $m; continuing" >> "$JOBDIR/log"
+    echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
+    failures=$((failures + 1))
+    echo "failed: $m" >> "$JOBDIR/log"
+    continue
+  fi
+  echo "completed: $m" >> "$JOBDIR/log"
+done
+if [ "$failures" -gt 0 ]; then
+  echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
+else
+  echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
+fi
+"""
+
+
+def _rebrem_queue_metadata(jobid, materials, ne_brem, brem_step_eV, redo_all):
+    """Static metadata persisted before a rebrem queue is submitted. ``kind:
+    rebrem`` keys the Mode line in status/attach; ``materials``/``quick`` keep
+    the shared _live_jobs/_refuse_if_busy/jobs-listing plumbing working."""
+    return "\n".join(
+        [
+            f"job: {jobid}",
+            f"materials: {' '.join(materials)}",
+            "quick: False",
+            "kind: rebrem",
+            f"ne_brem: {ne_brem}",
+            f"brem_step_eV: {brem_step_eV}",
+            f"redo_all: {bool(redo_all)}",
+            "progress_dashboard: True",
+            "",
+        ]
+    )
+
+
+def _reline_flags(line_ne, line_step_eV, redo_all):
+    flags = ""
+    if line_ne is not None:
+        flags += f" --line-ne {int(line_ne)}"
+    if line_step_eV is not None:
+        flags += f" --line-step {float(line_step_eV):g}"
+    if redo_all:
+        flags += " --redo-all"
+    return flags
+
+
+def _reline_queue_script(jobid, materials, line_ne, line_step_eV, redo_all):
+    """CXR payload for a line-only checkpoint recompute (``cxr reline``) in a
+    SLURM allocation. One sequential reline per material; each writes the same
+    per-material JSON progress record a scan/rebrem does, and the
+    ``completed:``/``failed:`` markers match so ``state._completed_materials``
+    drives the post-attach pull unchanged."""
+    flags = _reline_flags(line_ne, line_step_eV, redo_all)
+    mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    return f"""JOBDIR="{jobdir}"
+cd "{config.REMOTE_DIR}" || exit 1
+mkdir -p "$JOBDIR/progress"
+echo "started: $(date -Is)" >> "$JOBDIR/meta"
+{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+mats=({mats})
+total=${{#mats[@]}}
+n=0
+failures=0
+for m in "${{mats[@]}}"; do
+  n=$((n + 1))
+  echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
+  printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
+  if ! {config.REMOTE_UV} run --no-sync cxr reline "$m"{flags} \
+    --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
+  then
+    echo "WARNING: reline failed for $m; continuing" >> "$JOBDIR/log"
+    echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
+    failures=$((failures + 1))
+    echo "failed: $m" >> "$JOBDIR/log"
+    continue
+  fi
+  echo "completed: $m" >> "$JOBDIR/log"
+done
+if [ "$failures" -gt 0 ]; then
+  echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
+else
+  echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
+fi
+"""
+
+
+def _reline_chunked_queue_script(jobid, materials, line_ne, line_step_eV, redo_all, chunk_minutes):
+    """One SLURM slice of a self-resubmitting line-only recompute chain.
+
+    Mirror of ``_chunked_queue_script`` for ``cxr reline``: each slice resumes
+    from checkpoint, does about ``chunk_minutes`` of work via ``cxr reline
+    --max-minutes``, and either terminates the chain (all materials
+    completed:/failed:) or self-resubmits with ``--nice=10000``. Exit-code
+    contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave
+    unresolved (a later slice finishes it), else -> ``failed:``.
+    """
+    flags = _reline_flags(line_ne, line_step_eV, redo_all)
+    mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
+    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    chunk_seconds = int(round(chunk_minutes * 60))
+    return f"""JOBDIR="{jobdir}"
+cd "{config.REMOTE_DIR}" || exit 1
+mkdir -p "$JOBDIR/progress"
+echo "started: $(date -Is)" >> "$JOBDIR/meta"
+{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+mats=({mats})
+total=${{#mats[@]}}
+chunk_seconds={chunk_seconds}
+slice_start=$(date +%s)
+n=0
+for m in "${{mats[@]}}"; do
+  n=$((n + 1))
+  grep -qx "completed: $m" "$JOBDIR/log" 2>/dev/null && continue
+  grep -qx "failed: $m" "$JOBDIR/log" 2>/dev/null && continue
+  now=$(date +%s)
+  remaining=$((slice_start + chunk_seconds - now))
+  [ "$remaining" -gt 0 ] || break
+  remaining_min=$(awk "BEGIN {{ printf \\"%.2f\\", $remaining / 60 }}")
+  echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
+  printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
+  rc=0
+  {config.REMOTE_UV} run --no-sync cxr reline "$m"{flags} --max-minutes "$remaining_min" \
+    --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "completed: $m" >> "$JOBDIR/log"
+  elif [ "$rc" -ne 75 ]; then
+    echo "WARNING: scan failed for $m (exit $rc); will not retry" >> "$JOBDIR/log"
+    echo "warning at $m [$n/$total] $(date -Is)" > "$JOBDIR/state"
+    echo "failed: $m" >> "$JOBDIR/log"
+  fi
+done
+unresolved=0
+failures=0
+for m in "${{mats[@]}}"; do
+  grep -qx "failed: $m" "$JOBDIR/log" 2>/dev/null && {{ failures=$((failures + 1)); continue; }}
+  grep -qx "completed: $m" "$JOBDIR/log" 2>/dev/null && continue
+  unresolved=1
+done
+if [ "$unresolved" -eq 0 ]; then
+  if [ "$failures" -gt 0 ]; then
+    echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
+  else
+    echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
+  fi
+  exit 0
+fi
+[ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
+k=$(grep -c "^slurm_job_id: " "$JOBDIR/meta" 2>/dev/null)
+echo "queued slice $((k + 1)) $(date -Is)" > "$JOBDIR/state"
+SID=$(sbatch --parsable --nice=10000 "$JOBDIR/run.sh") || {{ echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+SID=${{SID%%;*}}
+case "$SID" in ''|*[!0-9]*) echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1 ;; esac
+printf 'slurm_job_id: %s\\n' "$SID" >> "$JOBDIR/meta"
+"""
+
+
+def _reline_queue_metadata(jobid, materials, line_ne, line_step_eV, redo_all):
+    """Static metadata for a reline queue. ``kind: reline`` keys the Mode line."""
+    return "\n".join(
+        [
+            f"job: {jobid}",
+            f"materials: {' '.join(materials)}",
+            "quick: False",
+            "kind: reline",
+            f"line_ne: {line_ne}",
+            f"line_step_eV: {line_step_eV}",
+            f"redo_all: {bool(redo_all)}",
+            "progress_dashboard: True",
+            "",
+        ]
+    )
+
+
 def _reservation_root() -> str:
     return f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{config.RESERVATIONS_SUBDIR}"
 
