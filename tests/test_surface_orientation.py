@@ -197,6 +197,7 @@ def test_runner_forwards_surface_hkl_to_spectrum(monkeypatch):
     }
     segments = {
         "n_backscattered": 0,
+        "n_missed": 0,
         "Ne": 1,
         "L_ang": np.array([1.0]),
     }

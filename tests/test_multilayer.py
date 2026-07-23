@@ -322,6 +322,7 @@ def test_spectrum_case_passes_per_layer_azimuth(monkeypatch):
         layer=np.array([0, 1, 1]),
         L_ang=np.array([1.0, 2.0, 3.0]),
         n_backscattered=0,
+        n_missed=0,
         Ne=1,
         n_layers=2,
     )

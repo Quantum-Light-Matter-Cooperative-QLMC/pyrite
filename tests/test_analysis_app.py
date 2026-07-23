@@ -29,18 +29,15 @@ def test_penetration_view_uses_interactive_3d_volume_as_primary_track_plot() -> 
     source = APP.read_text()
 
     assert "from cxr_mc.plots.plotly_trajectories import (" in source
-    assert "trajectory_volume_figure," in source
-    assert "_volume = trajectory_volume_figure(" in source
-    # Task 3 wiring: Ne/seed/realistic/beam_fwhm_mm/reveal_until_fs all driven
-    # by the playback controls, not literal/hardcoded values.
-    for arg in (
-        "_nc,",
-        "Ne=_Ne,",
-        "seed=_seed,",
-        "realistic=_realistic,",
-        "beam_fwhm_mm=_beam_fwhm,",
-        "reveal_until_fs=_reveal_until_fs,",
-    ):
+    assert "trajectory_volume_animation," in source
+    assert "trajectory_volume_data," in source
+    # Playback controls drive the transport data (Ne/seed/realistic/beam_fwhm);
+    # Play/Pause/scrub is native Plotly animation in the browser from there.
+    assert "_data = trajectory_volume_data(" in source
+    for arg in ("Ne=_Ne", "seed=_seed", "realistic=_realistic", "beam_fwhm_mm=_beam_fwhm"):
+        assert arg in source
+    assert "_volume = trajectory_volume_animation(" in source
+    for arg in ("_nc,", "_data,", "realistic=_realistic,", "beam_fwhm_mm=_beam_fwhm,", "speed="):
         assert arg in source
     assert '"2D track cross-section (Altair)"' in source
     assert "lateral extent is fitted to the tracks" in source
