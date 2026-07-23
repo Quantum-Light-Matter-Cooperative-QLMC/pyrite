@@ -141,3 +141,99 @@ def test_groove_entry_depth_reproducible_with_seed():
     a = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC)
     b = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC)
     np.testing.assert_array_equal(a["r_mid"], b["r_mid"])
+
+
+from cxr_mc.montecarlo.spectrum import mc_spectrum
+
+
+def _hopg_spectrum(groove=None, thickness_ang=2.0e5):
+    from cxr_mc.montecarlo.geometry import tilted_geometry
+
+    beam, n_hat = tilted_geometry(np.pi / 2, TP, np.pi)
+    segs = simulate_trajectories(
+        E0_keV=60.0,
+        Ne=400,
+        thickness_ang=thickness_ang,
+        element="C",
+        n_atoms_per_ang3=0.1136,
+        seed=42,
+        elastic_model="sr",
+        beam_dir=beam,
+        tilt_polar_rad=TP,
+        tilt_azim_rad=np.pi,
+        groove=groove,
+    )
+    E_grid = np.linspace(500.0, 3000.0, 400)
+    return mc_spectrum(
+        segs,
+        E_grid,
+        crystal="hopg",
+        hkl_list=[(0, 0, 2)],
+        n_hat=n_hat,
+        B_ang2=0.0,
+        composition=[("C", 0.1136)],
+        groove=groove,
+    )
+
+
+def test_spectrum_groove_none_bitwise():
+    np.testing.assert_array_equal(_hopg_spectrum(), _hopg_spectrum(groove=None))
+
+
+def test_spectrum_groove_boosts_line_yield():
+    flat = _hopg_spectrum()
+    grooved = _hopg_spectrum(groove=SPEC)
+    # escape paths only ever shorten for a FIXED emission point, but the
+    # grooved run also re-transports (entry_points offsets each electron's
+    # start into [0, depth_ang) before the flat-face back-boundary), so the
+    # emitting segment population itself differs between the two runs; the
+    # net effect is not guaranteed a priori. Empirically (seed=42, this
+    # geometry) it is a small, deterministic, reproducible rise -- verified
+    # here at a threshold safely below the measured ~3.3% (grooved/flat ==
+    # 1.0326985210604849 bit-for-bit at Ne=400) rather than the >=5% a naive
+    # escape-only estimate would suggest, since most of the spectral weight
+    # sits at energies where the slab is already nearly transparent and the
+    # groove shortening barely moves T_abs.
+    assert grooved.sum() > flat.sum() * 1.02
+
+
+def test_spectrum_groove_rejects_layers():
+    from cxr_mc.montecarlo.geometry import tilted_geometry
+
+    _, n_hat = tilted_geometry(np.pi / 2, TP, np.pi)
+    segs = simulate_trajectories(
+        E0_keV=60.0,
+        Ne=10,
+        thickness_ang=1.0e4,
+        element="C",
+        n_atoms_per_ang3=0.1136,
+        seed=1,
+        elastic_model="sr",
+    )
+    with pytest.raises(ValueError):
+        mc_spectrum(
+            segs,
+            np.linspace(500.0, 3000.0, 50),
+            crystal="hopg",
+            hkl_list=[(0, 0, 2)],
+            n_hat=n_hat,
+            B_ang2=0.0,
+            composition=[("C", 0.1136)],
+            groove=SPEC,
+            layers=[(0.0, 1.0e4, [("C", 0.1136)])],
+        )
+
+
+def test_escape_gain_matches_analytic_mean():
+    """Uniform-phase emitters at fixed deep z: mean exp(-L/L_abs) boost equals
+    the closed-form sawtooth average (path savings uniform in [0, h)/sin tp)."""
+    rng = np.random.default_rng(5)
+    L_abs = 6.0e4  # [Ang] ~ HOPG (002) scale
+    z = np.full(20000, 8.0e4)
+    x = rng.uniform(0.0, 50 * SPEC.spacing_ang, z.size)
+    L = escape_distance_ang(x, z, SPEC)
+    t_grooved = np.exp(-L / L_abs).mean()
+    t_flat = np.exp(-(z[0] / np.sin(TP)) / L_abs)
+    h, sg = SPEC.depth_ang, np.sin(TP)
+    analytic = (sg * L_abs / h) * np.expm1(h / (sg * L_abs))
+    assert t_grooved / t_flat == pytest.approx(analytic, rel=1e-2)

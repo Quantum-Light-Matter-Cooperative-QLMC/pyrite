@@ -28,6 +28,7 @@ from ..materials.crystal import (
 )
 from ._backend import REAL, _to_cpu, xp
 from .geometry import _mosaic_quadrature, _orientation_R, first_prism_exit
+from .groove import escape_distance_ang
 from .transport import TRANSPORT_ELEMENTS, beta_from_keV
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
@@ -115,6 +116,7 @@ def mc_spectrum(
     mosaic_fwhm_rad=None,
     mosaic_nodes=1,
     surface_hkl: tuple[int, int, int] | None = None,
+    groove=None,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron]
@@ -206,6 +208,32 @@ def mc_spectrum(
     count); build_cases handles that mutual exclusion.
 
     Validation: mosaic-mc
+
+    groove: optional GrooveSpec (montecarlo.groove) cutting the beam-entrance
+    face into a blazed sawtooth relief profile instead of a flat face. The
+    working facet is perpendicular to n_hat and the relief facet is
+    perpendicular to the beam (zero shadowing by construction), so a photon's
+    straight-line escape path along n_hat is shortened to the nearest working
+    facet rather than running the full flat-face distance z_mid/(-n_hat[2])
+    (source: elementary ray-plane intersection on a periodic sawtooth --
+    montecarlo.groove.escape_distance_ang). This ONLY replaces the escape
+    DISTANCE fed into the existing straight-ray incoherent Beer-Lambert
+    attenuation (T_abs = exp(-mu*L_esc)); the radiation amplitudes (Eqs.
+    13/14) and resonance kinematics (Eq. 10) are unchanged -- grooving is
+    purely an absorption-path effect in this v1 model.
+
+    Assumptions: profile invariant along y; laterally infinite slab (no
+    finite crystal_width_ang/crystal_height_ang); photons travel straight
+    along n_hat with no wave-optics diffraction off the groove edges
+    (consistent with the rest of mc_spectrum's incoherent transport).
+
+    v1 exclusions (raise ValueError rather than silently mismodeling):
+    groove with layers (single-slab absorber only); groove with a finite
+    transverse footprint; groove with n_hat[2] >= 0 (escape must be back out
+    the entrance face -- the relief geometry is defined for that exit only).
+    None (default) is a strict no-op: today's flat-face result bit-for-bit.
+
+    Validation: blazed-groove-geometry
     """
     if B_ang2 is None:
         raise ValueError(
@@ -228,6 +256,19 @@ def mc_spectrum(
     Ne = segments["Ne"]
 
     n_hat = _observation_direction(theta_obs_rad, n_hat)
+    if groove is not None:
+        if layers is not None:
+            raise ValueError("groove escape is v1 single-slab only (no layers)")
+        if (
+            segments.get("crystal_width_ang") is not None
+            and segments.get("crystal_height_ang") is not None
+        ):
+            raise ValueError("groove escape requires a laterally infinite slab")
+        if n_hat[2] >= 0.0:
+            raise ValueError(
+                "groove escape requires exit through the entrance face "
+                "(n_hat z-component < 0); check theta_obs/tilt geometry"
+            )
     E_grid = xp.asarray(E_grid_eV, dtype=REAL)
     spec = xp.zeros(E_grid.size, dtype=REAL)
     spec_pxr = xp.zeros(E_grid.size, dtype=REAL)
@@ -360,7 +401,13 @@ def mc_spectrum(
         else:
             if layers is None:
                 if n_hat[2] < 0:
-                    L_esc = z_mid / (-n_hat[2])  # out the entrance face
+                    if groove is not None:
+                        # Blazed sawtooth entrance face: closed-form path to
+                        # the working facet (grooves shorten, never lengthen,
+                        # the flat-face path). Validation: blazed-groove-geometry
+                        L_esc = escape_distance_ang(seg_r[idx, 0], z_mid, groove)
+                    else:
+                        L_esc = z_mid / (-n_hat[2])  # out the entrance face
                 else:
                     L_esc = (thickness - z_mid) / n_hat[2]  # out the back face
                 tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)
@@ -450,6 +497,7 @@ def mc_spectrum_solid_angle(
     *,
     n_hats,
     weights,
+    groove=None,
     **kwargs,
 ):
     """
@@ -471,6 +519,16 @@ def mc_spectrum_solid_angle(
     term). This is an opt-in tool; it does not change the checkpoint pipeline's
     single-n_hat unit convention. ``**kwargs`` forward to mc_spectrum (B_ang2,
     use_henke, layers, composition, beam_uvw, azimuth_rad, mosaic_*, ...).
+
+    groove: forwarded to mc_spectrum's blazed-groove escape model, but ONLY
+    when ``n_hats`` carries a single direction (the ``n_side=1`` case of
+    detector_directions() -- N == n_side**2, so N > 1 means n_side > 1).
+    Tiling the detector face into multiple directions breaks the relief-facet
+    parallelism the groove geometry assumes (each tile would need its own
+    working-facet family), so a multi-direction grid with groove set raises
+    ValueError rather than silently mixing per-tile escape paths.
+
+    Validation: blazed-groove-geometry
     """
     n_hats = np.asarray(n_hats, dtype=float)
     weights = np.asarray(weights, dtype=float)
@@ -478,10 +536,15 @@ def mc_spectrum_solid_angle(
         raise ValueError("n_hats must be (N, 3)")
     if weights.shape != (n_hats.shape[0],):
         raise ValueError("weights must be (N,) matching n_hats")
+    if groove is not None and n_hats.shape[0] > 1:
+        raise ValueError(
+            "groove escape supports n_side=1 only -- detector tiles break "
+            "the relief-facet parallelism"
+        )
     total = None
     for n_i, w_i in zip(n_hats, weights, strict=True):
         spec_i = np.asarray(
-            mc_spectrum(segments, E_grid_eV, crystal, hkl_list, n_hat=n_i, **kwargs)
+            mc_spectrum(segments, E_grid_eV, crystal, hkl_list, n_hat=n_i, groove=groove, **kwargs)
         )
         contrib = float(w_i) * spec_i
         total = contrib if total is None else total + contrib
