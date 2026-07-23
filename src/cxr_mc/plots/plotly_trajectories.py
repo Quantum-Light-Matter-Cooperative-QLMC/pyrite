@@ -228,7 +228,7 @@ def _incident_beam_lines(data, length):
 
 
 def _exit_paths_3d(data, length, *, cmax, tol_frac=1e-6, reveal_until_fs=None):
-    """ONE NaN-separated ``Scatter3d`` of dashed exit-path continuations, one per
+    """ONE NaN-separated ``Scatter3d`` of solid exit-path continuations, one per
     electron that leaves through the TOP (``z ~ 0``, backscattered) or BOTTOM
     (``z ~ thick``, transmitted) face. Side exits (terminal ``z`` strictly
     between the two faces -- absorbed, or the rare true side leak) are not drawn.
@@ -247,10 +247,9 @@ def _exit_paths_3d(data, length, *, cmax, tol_frac=1e-6, reveal_until_fs=None):
     Turbo scale as the in-crystal tracks (``cmin=0``, ``cmax=E0_keV``), so an
     exit continuation reads as a faint prolongation of the track that produced
     it rather than a disconnected gray stub. ``showscale`` stays off so the
-    tracks own the single energy colorbar. A tight ``"dot"`` pattern keeps the
-    first mark flush against the exit point (the wide ``"dash"`` gap looked like
-    the line began in mid-air); ``scatter3d.line.dash`` is enum-only, so ``"dot"``
-    is the closest-spaced style available.
+    tracks own the single energy colorbar. The line is ``"solid"``: any dashed
+    ``scatter3d.line.dash`` style rendered with gaps wide enough to look like the
+    continuation began in mid-air, so it draws continuous from the exit point.
 
     ``reveal_until_fs`` (playback cutoff, ``None`` -> unfiltered) additionally
     gates each electron's dash on its terminal segment's own start age: the dash
@@ -315,7 +314,7 @@ def _exit_paths_3d(data, length, *, cmax, tol_frac=1e-6, reveal_until_fs=None):
             "cmax": cmax,
             "showscale": False,
             "width": 3,
-            "dash": "dot",
+            "dash": "solid",
         },
         opacity=0.4,
         hovertemplate="exit path<extra></extra>",

@@ -90,7 +90,7 @@ def test_exit_paths_drawn_once_for_backscatter_and_transmission():
     assert len(exit_traces) == 1  # one legend entry for every electron's exit dash
     exit_trace = exit_traces[0]
     assert exit_trace.type == "scatter3d"
-    assert exit_trace.line.dash == "dot"  # tight dotted: first mark flush to exit point
+    assert exit_trace.line.dash == "solid"  # solid: continuous from exit point, no gaps
     # dashes are colored by exit energy on the tracks' Turbo scale (per-vertex
     # color array), not one flat muted color, and don't add a second colorbar.
     assert exit_trace.line.colorscale is not None
