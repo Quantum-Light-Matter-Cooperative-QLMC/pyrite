@@ -13,7 +13,7 @@ physics and units are identical -- only the renderer differs. The matplotlib
 re-exported from ``cxr_mc.plots`` (that package has a frozen export-set guard);
 import them from the submodule:
 
-    from cxr_mc.plots.altair_spectra import spectrum_chart, compare_spectrum_chart
+    from cxr_mc.plots.altair_spectra import spectrum_chart, compare_spectrum_chart, material_comparison_chart
 
 Functions return :class:`altair.Chart` objects, which render directly in marimo
 and Jupyter.
@@ -434,3 +434,88 @@ def compare_spectrum_chart(
             )
         )
     return alt.layer(*layers).properties(width=width, height=height, title=title).interactive()
+
+
+_COMPARISON_SELECTION_TITLES = {
+    "quality_peak": "highest line-definition quality",
+    "peak": "highest peak flux",
+    "line_brem_ratio": "highest local line-to-bremsstrahlung ratio",
+}
+
+
+def material_comparison_chart(
+    points,
+    dropped,
+    select="quality_peak",
+    beam_energy_keV=None,
+    min_line_quality: float | None = 0.5,
+    width=760,
+    height=460,
+):
+    """Interactive counterpart of :func:`cxr_mc.plots.draw_material_comparison` --
+    same precomputed ``(label, line_eV, line_flux, quality, case)`` points and the
+    same dropped-material print, only the renderer differs. Point labels shorten
+    to just the material name; the selected geometry's beam energy/theta/phi
+    (baked into the matplotlib annotation text) move into the hover tooltip
+    instead, so Vega-Lite's own overlap handling replaces the matplotlib
+    bounding-box separation pass. Returns an :class:`altair.Chart`, or ``None``
+    when ``points`` is empty.
+    """
+    if not points:
+        print("no results in any material")
+        return None
+    df = pd.DataFrame(
+        {
+            "label": [p[0] for p in points],
+            "line_keV": [p[1] / 1e3 for p in points],
+            "line_flux": [p[2] for p in points],
+            "quality": [p[3] for p in points],
+            "E0_keV": [p[4]["E0_keV"] for p in points],
+            "tilt_deg": [p[4]["tilt_deg"] for p in points],
+            "tilt_azim_deg": [p[4]["tilt_azim_deg"] for p in points],
+        }
+    )
+    selection_title = _COMPARISON_SELECTION_TITLES.get(select, select.replace("_", " "))
+    energy_scope = (
+        "all beam energies" if beam_energy_keV is None else f"{beam_energy_keV:g} keV beam energy"
+    )
+    quality_scope = "" if min_line_quality is None else f", line quality >= {min_line_quality:g}"
+    title = f"Cross-material comparison — {selection_title} ({energy_scope}{quality_scope})"
+
+    base = alt.Chart(df).encode(
+        x=alt.X("line_keV:Q", title="dominant coherent line energy (keV)"),
+        y=alt.Y(
+            "line_flux:Q",
+            title="integrated line flux at best geometry (Phs/s)",
+            scale=alt.Scale(type="log"),
+        ),
+    )
+    points_mark = base.mark_point(filled=True, size=110, stroke="black", strokeWidth=0.6).encode(
+        color=alt.Color(
+            "quality:Q",
+            title="line-definition quality",
+            scale=alt.Scale(scheme="viridis", domain=[0.0, 1.0]),
+        ),
+        tooltip=[
+            alt.Tooltip("label:N", title="material"),
+            alt.Tooltip("line_keV:Q", title="line energy (keV)", format=".3~g"),
+            alt.Tooltip("line_flux:Q", title="line flux (Phs/s)", format=".3~g"),
+            alt.Tooltip("quality:Q", title="line-definition quality", format=".2f"),
+            alt.Tooltip("E0_keV:Q", title="beam energy (keV)"),
+            alt.Tooltip("tilt_deg:Q", title="theta (deg)"),
+            alt.Tooltip("tilt_azim_deg:Q", title="phi (deg)"),
+        ],
+    )
+    # The notebook pins display.theme = "dark" (marimo config header), so the
+    # default black text-mark fill is invisible against the dark chart
+    # background -- force a light fill instead of relying on a theme default.
+    labels_mark = base.mark_text(align="left", dx=7, fontSize=10, color="#e8e8e8").encode(
+        text="label:N"
+    )
+    chart = (points_mark + labels_mark).properties(width=width, height=height, title=title)
+    if dropped:
+        print(
+            f"Dropped from cross-material comparison (select={select!r}{quality_scope}): "
+            f"{', '.join(dropped)} -- no candidate line met the gate."
+        )
+    return chart.interactive()

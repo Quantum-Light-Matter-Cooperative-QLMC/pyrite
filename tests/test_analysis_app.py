@@ -179,8 +179,8 @@ def test_analysis_app_discovers_materials_directly_from_catalog() -> None:
 def test_analysis_app_uses_five_top_level_tabs_and_action_names() -> None:
     source = APP.read_text()
 
-    # "Instruments" and "Trace" hold a single view each, so they're bare
-    # top-level tabs rather than nested action-accordion groups.
+    # "Instruments", "Trace", and "Compare" hold a single view each, so
+    # they're bare top-level tabs rather than nested action-accordion groups.
     for group in ('"Explore"', '"Optimize"', '"Instruments"', '"Trace"', '"Compare"'):
         assert group in source
     for action in (
@@ -189,7 +189,6 @@ def test_analysis_app_uses_five_top_level_tabs_and_action_names() -> None:
         "Compare azimuths",
         "Rank geometries",
         "Inspect scan maps",
-        "Compare materials",
     ):
         assert action in source
 

@@ -167,7 +167,7 @@ def _(MaterialSelect, mo):
         MaterialSelect(
             options=list(material_options),
             value=initial_selection,
-            label="Material ",
+            label="**Material**",
             disabled=initial_selection is None,
         )
     )
@@ -1946,7 +1946,8 @@ def _(
     mo,
     settings,
 ):
-    from cxr_mc.plots import draw_material_comparison, material_comparison_point
+    from cxr_mc.plots import material_comparison_point
+    from cxr_mc.plots.altair_spectra import material_comparison_chart
     from cxr_mc.run import cached_material_analysis
 
 
@@ -1955,7 +1956,8 @@ def _(
             "For every material whose checkpoint exists, the single best geometry's "
             "dominant line: energy vs flux. The three comparisons select by line "
             "quality, peak flux, and local line-to-bremsstrahlung ratio. Each "
-            "label reports the selected geometry's beam energy, \u03b8, and \u03c6. "
+            "point is labeled with its material; hover a point for the selected "
+            "geometry's beam energy, \u03b8, and \u03c6. "
             "Every comparison rejects candidate lines with quality below 0.5 "
             "before selecting the best point; a material with no line clearing "
             "that bar is dropped from the plot and reported in a printed "
@@ -1994,7 +1996,7 @@ def _(
                     _dropped.append(_label)
                     continue
                 _pts.append((_label, *_point))
-            return draw_material_comparison(
+            return material_comparison_chart(
                 _pts, _dropped, select=select, beam_energy_keV=_beam_energy, min_line_quality=0.5
             )
 
@@ -2031,32 +2033,34 @@ def _(
     scans_tab,
     spectra_tab,
 ):
-    # Four scientific tasks form the only top-level navigation. Accordions keep
-    # individual view builders lazy without nesting tab widgets.
-    def task_surface(views):
-        return mo.accordion(views, lazy=True, multiple=True)
-
+    # Every top-level tab holds exactly one view, so each is a bare tab body
+    # rather than a nested action-accordion group.
     mo.ui.tabs(
         {
-            "Explore": lambda: task_surface(
+            "Explore": lambda: mo.accordion(
                 {
                     "Compare beam energies": spectra_tab,
                     "Compare polar angles": polar_compare_tab,
                     "Compare azimuths": azim_compare_tab,
                 },
+                lazy=True,
+                multiple=True,
             ),
-            "Optimize": lambda: task_surface(
+            "Optimize": lambda: mo.accordion(
                 {
                     "Rank geometries": rankings_tab,
                     "Inspect scan maps": scans_tab,
                 },
+                lazy=True,
+                multiple=True,
             ),
             "Instruments": detectors_tab,
             "Trace": penetration_tab,
-            "Compare": lambda: task_surface({"Compare materials": cross_material_tab}),
+            "Compare": cross_material_tab,
         },
         lazy=True,
     )
+
     return
 
 
