@@ -7,6 +7,7 @@ layer (resume/skip, checkpoint writes, on_chunk dispatch), not the physics.
 import json
 import os
 import pickle
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -729,3 +730,106 @@ def test_repair_brem_wide_preserves_exact_nonuniform_case_grid(monkeypatch):
     assert repair_brem_wide({"cfg_a": {30.0: record}}, only_nonfinite=True, progress=False) == 1
     np.testing.assert_array_equal(seen["E_brem"], [10.0, 100.0, 1000.0])
     np.testing.assert_array_equal(record["E_grid_brem"], [10.0, 100.0, 1000.0])
+
+
+def _finite_record(case):
+    Eb = np.arange(*case["E_grid_brem"])
+    return dict(
+        E_grid=np.arange(*case["E_grid"]),
+        spec=np.ones(10),
+        brem=np.ones(10) * 0.01,
+        E_grid_brem=Eb,
+        brem_wide=np.full_like(Eb, 0.001),
+        eta=0.05,
+        scale=1.0,
+        case=case,
+    )
+
+
+def test_repair_brem_wide_retunes_finite_record_and_persists_params(monkeypatch):
+    """New ne_brem/brem_step_eV select an all-finite record (parameter mismatch),
+    rebuild the grid at the sweep-convention stop, and persist both into the
+    case so a re-run skips it (resumability)."""
+    record = _finite_record(_fake_case("cfg_a", 30.0))  # Ne_brem=5, step 50 eV
+    seen: dict[str, Any] = {}
+
+    def _spy(c, E_brem):
+        seen["Ne_brem"] = c["Ne_brem"]
+        seen["E_brem"] = np.asarray(E_brem, float)
+        return np.full(np.asarray(E_brem, float).shape, 0.002)
+
+    monkeypatch.setattr("cxr_mc.montecarlo._brem_for_case", _spy)
+    results = {"cfg_a": {30.0: record}}
+    n = repair_brem_wide(results, progress=False, ne_brem=1000, brem_step_eV=25.0)
+    assert n == 1
+    assert seen["Ne_brem"] == 1000
+    # grid: old start (0.0) -> E0*1e3 + step, at the new spacing
+    np.testing.assert_allclose(seen["E_brem"], np.arange(0.0, 30_025.0, 25.0))
+    case = record["case"]
+    assert case["Ne_brem"] == 1000
+    assert case["E_grid_brem"] == (0.0, 30_025.0, 25.0)
+    np.testing.assert_array_equal(record["E_grid_brem"], seen["E_brem"])
+    assert np.allclose(record["brem_wide"], 0.002)
+    # brem re-interpolated onto the line grid from the new wide curve
+    assert np.allclose(record["brem"], 0.002)
+    # re-run at the same target: already-at-target record is skipped
+    assert repair_brem_wide(results, progress=False, ne_brem=1000, brem_step_eV=25.0) == 0
+
+
+def test_repair_brem_wide_retune_skips_record_already_at_target():
+    record = _finite_record(_fake_case("cfg_a", 30.0))
+    n = repair_brem_wide({"cfg_a": {30.0: record}}, progress=False, ne_brem=5, brem_step_eV=50.0)
+    assert n == 0  # Ne_brem and spacing already match; nothing recomputed
+
+
+def test_rebrem_checkpoints_enumerates_pkls_and_passes_params(monkeypatch, tmp_path):
+    from cxr_mc.rebrem import rebrem_checkpoints
+
+    (tmp_path / "MoS2.pkl").write_bytes(b"")
+    (tmp_path / "W_grooved.pkl").write_bytes(b"")
+    (tmp_path / "MoS2.slim.pkl").write_bytes(b"")  # transfer copy: excluded
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def _spy(path, **kw):
+        calls.append((path, kw))
+        return {}
+
+    monkeypatch.setattr("cxr_mc.run.repair_checkpoint", _spy)
+    out = rebrem_checkpoints(checkpoint_dir=str(tmp_path), ne_brem=1000, brem_step_eV=25.0)
+    assert sorted(out) == ["MoS2", "W_grooved"]
+    assert all(kw["ne_brem"] == 1000 and kw["brem_step_eV"] == 25.0 for _, kw in calls)
+    assert all(kw["only_nonfinite"] is True for _, kw in calls)  # resumable default
+
+    calls.clear()
+    rebrem_checkpoints(
+        materials=["MoS2"], checkpoint_dir=str(tmp_path), ne_brem=1000, redo_all=True
+    )
+    assert [Path(p).name for p, _ in calls] == ["MoS2.pkl"]
+    assert calls[0][1]["only_nonfinite"] is False
+
+
+def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
+    """`cxr rebrem` refuses no-selection and materials+--all; accepts either alone."""
+    import argparse
+
+    from cxr_mc import rebrem
+
+    ap = argparse.ArgumentParser()
+    rebrem.add_subparser(ap.add_subparsers(dest="command"))
+    seen: list[Any] = []
+    monkeypatch.setattr(rebrem, "rebrem_checkpoints", lambda **kw: seen.append(kw) or {})
+
+    with pytest.raises(SystemExit):
+        args = ap.parse_args(["rebrem", "--ne-brem", "1000"])  # neither
+        args.func(args)
+    with pytest.raises(SystemExit):
+        args = ap.parse_args(["rebrem", "MoS2", "--all"])  # both
+        args.func(args)
+    assert seen == []
+
+    args = ap.parse_args(["rebrem", "MoS2"])
+    args.func(args)
+    assert seen[-1]["materials"] == ["MoS2"]
+    args = ap.parse_args(["rebrem", "-a"])
+    args.func(args)
+    assert seen[-1]["materials"] is None

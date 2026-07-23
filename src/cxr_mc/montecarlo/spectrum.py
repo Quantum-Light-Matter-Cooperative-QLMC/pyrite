@@ -294,6 +294,7 @@ def mc_spectrum(
 
     _pad = 0.2 * (float(E_grid_eV[-1]) - float(E_grid_eV[0]))
     _lo, _hi = float(E_grid_eV[0]) - _pad, float(E_grid_eV[-1]) + _pad
+    _lo = max(_lo, 1.0)  # keep tabulation energies positive: chi_g/U_g need lambda = HC_EV_ANG / E
     _grids = [np.arange(_lo, _hi + 1.0, 1.0)]
     for _el in {el for el, _ in info["basis"]}:
         try:

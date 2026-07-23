@@ -10,6 +10,7 @@ A single console script with subcommands, wired in pyproject.toml as
     cxr check [--watch] [--edit]                  # launch the validation app
     cxr check-config [manifest]                    # validate a full material catalog
     cxr slim <checkpoint> [--grid] [--drop-wide-brem] [--downcast]  # shrink a pkl for transfer
+    cxr rebrem (<material> ... | -a/--all) [--ne-brem N] [--step EV]  # recompute brem-only in checkpoints
     cxr archive <stem> [label]                    # copy active checkpoint to the shelf
     cxr restore <label> [--as <stem>]             # copy a shelved checkpoint back
     cxr archives                                  # list the shelf
@@ -46,6 +47,7 @@ def main(argv=None):
                 check_config,
                 export,
                 line_grid,
+                rebrem,
                 remote,
                 scan,
                 slim,
@@ -56,6 +58,7 @@ def main(argv=None):
             export.add_subparser(sub)
             analyze.add_subparser(sub)
             slim.add_subparser(sub)
+            rebrem.add_subparser(sub)
             archive.add_subparser(sub)
             remote.add_subparser(sub)
             line_grid.add_subparser(sub)

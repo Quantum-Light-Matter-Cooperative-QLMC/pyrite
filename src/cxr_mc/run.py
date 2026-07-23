@@ -415,7 +415,31 @@ def run_sweep(
 
 
 # ---- brem-only repair --------------------------------------------------------
-def repair_brem_wide(results, only_nonfinite=True, progress=True, save_every=0, save_cb=None):
+def _stored_brem_grid(r):
+    """The brem grid a cached record was computed on: the case's encoded grid,
+    the record's stored array, or the legacy single-grid fallback."""
+    import numpy as np
+
+    c = r["case"]
+    if "E_grid_brem" in c:
+        return decode_energy_grid(c["E_grid_brem"])
+    if r.get("E_grid_brem") is not None and np.asarray(r["E_grid_brem"]).size:
+        return np.asarray(r["E_grid_brem"], float)
+    # legacy single-grid record
+    step_b = c.get("brem_step_eV", 10.0)
+    eg = np.asarray(r["E_grid"], float)
+    return np.arange(eg[0], eg[-1] + step_b, step_b)
+
+
+def repair_brem_wide(
+    results,
+    only_nonfinite=True,
+    progress=True,
+    save_every=0,
+    save_cb=None,
+    ne_brem=None,
+    brem_step_eV=None,
+):
     """Regenerate ``brem_wide`` (and the line-grid ``brem``) for cached records
     using the CURRENT ``mc_brem_spectrum`` -- WITHOUT re-running the expensive
     line spectrum.
@@ -433,8 +457,19 @@ def repair_brem_wide(results, only_nonfinite=True, progress=True, save_every=0, 
     (``layers=abs_layers``, per-layer Z^2 sum, ``brem_chunk`` honored) rather
     than being silently rewritten as single-slab brem.
 
+    ne_brem / brem_step_eV : NEW brem parameters to recompute with (``cxr
+        rebrem``). ``ne_brem`` overrides the electron count (noise goes down as
+        1/sqrt(Ne_brem)); ``brem_step_eV`` rebuilds a uniform grid at that
+        spacing from the record's existing low cutoff up to the sweep-convention
+        stop ``E0_keV*1e3 + step``. Both are persisted into ``r["case"]``, so a
+        record already at the target parameters is SKIPPED on a re-run (crash/
+        OOM resumable) -- and downstream re-repairs keep the new parameters.
+        With either set, selection is by parameter mismatch (plus nonfinite
+        ``brem_wide``) instead of nonfinite alone.
     only_nonfinite : skip records whose ``brem_wide`` is already all-finite
-        (default), so only the stale ones are touched. Set False to redo all.
+        (default), so only the stale ones are touched -- or, with new
+        parameters given, skip records already at those parameters. Set False
+        to redo all.
     save_every / save_cb : if both set, call ``save_cb(results)`` every
         ``save_every`` repaired records (and once at the end) -- used by
         :func:`repair_checkpoint` to checkpoint progress so a crash/OOM doesn't
@@ -446,28 +481,46 @@ def repair_brem_wide(results, only_nonfinite=True, progress=True, save_every=0, 
 
     from .montecarlo import _brem_for_case
 
+    retune = ne_brem is not None or brem_step_eV is not None
     todo = []
     for name in results:
         for r in results[name].values():
             bw = r.get("brem_wide")
-            if only_nonfinite and bw is not None and np.isfinite(np.asarray(bw)).all():
-                continue
+            finite = bw is not None and np.isfinite(np.asarray(bw)).all()
+            if only_nonfinite:
+                at_target = finite
+                if retune:
+                    c = r["case"]
+                    if ne_brem is not None and int(c.get("Ne_brem", -1)) != int(ne_brem):
+                        at_target = False
+                    if brem_step_eV is not None:
+                        g = _stored_brem_grid(r)
+                        if g.size < 2 or not np.isclose(g[1] - g[0], float(brem_step_eV)):
+                            at_target = False
+                if at_target:
+                    continue
             todo.append(r)
     if not todo:
-        print("nothing to repair (all brem_wide already finite)")
+        print(
+            "nothing to redo (all records already at target brem parameters)"
+            if retune
+            else "nothing to repair (all brem_wide already finite)"
+        )
         return 0
     print(f"repairing brem for {len(todo)} record(s)...")
     t0 = time.perf_counter()
     for k, r in enumerate(todo, 1):
         c = r["case"]
-        if "E_grid_brem" in c:
-            E_brem = decode_energy_grid(c["E_grid_brem"])
-        elif r.get("E_grid_brem") is not None and np.asarray(r["E_grid_brem"]).size:
-            E_brem = np.asarray(r["E_grid_brem"], float)
-        else:  # legacy single-grid record
-            step_b = c.get("brem_step_eV", 10.0)
-            eg = np.asarray(r["E_grid"], float)
-            E_brem = np.arange(eg[0], eg[-1] + step_b, step_b)
+        if ne_brem is not None:
+            c["Ne_brem"] = int(ne_brem)
+        if brem_step_eV is not None:
+            step_b = float(brem_step_eV)
+            start = float(_stored_brem_grid(r)[0])
+            stop = float(c["E0_keV"]) * 1e3 + step_b  # sweep-convention stop (build_cases)
+            E_brem = np.arange(start, stop, step_b)
+            c["E_grid_brem"] = (start, stop, step_b)
+        else:
+            E_brem = _stored_brem_grid(r)
         brem_wide = _brem_for_case(c, E_brem)
         r["brem_wide"] = brem_wide
         r["E_grid_brem"] = E_brem
@@ -487,8 +540,10 @@ def repair_checkpoint(checkpoint_path, save_every=100, **kw):
     """Load a per-material checkpoint, repair its ``brem_wide`` (see
     :func:`repair_brem_wide`), and re-pickle it in place -- saving progress every
     ``save_every`` records (atomic temp+replace) so a crash/OOM is RESUMABLE: just
-    call again and only_nonfinite picks up where it left off. Returns the repaired
-    ``results`` dict (also usable directly in the notebook)."""
+    call again and only_nonfinite picks up where it left off. Extra ``**kw``
+    (e.g. ``ne_brem=``, ``brem_step_eV=`` -- ``cxr rebrem``) pass through to
+    :func:`repair_brem_wide`. Returns the repaired ``results`` dict (also usable
+    directly in the notebook)."""
     if not os.path.exists(checkpoint_path):
         print(f"no such checkpoint: {checkpoint_path}")
         return {}
