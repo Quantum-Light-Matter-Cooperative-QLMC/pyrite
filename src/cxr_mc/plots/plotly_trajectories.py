@@ -106,9 +106,12 @@ def _tracks_trace(case, data, unit, *, reveal_until_fs=None):
             "cmin": 0.0,
             "cmax": float(case["E0_keV"]),
             "width": 4,
-            # No colorbar: redundant with the 2D cross-section's own energy
-            # legend sitting right next to this figure in the Trace tab.
-            "showscale": False,
+            "colorbar": {
+                "title": {"text": "electron<br>energy (keV)"},
+                "thickness": 14,
+                "len": 0.62,
+                "x": 1.02,
+            },
         },
         customdata=custom,
         hovertemplate=(

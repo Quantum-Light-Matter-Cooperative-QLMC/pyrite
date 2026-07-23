@@ -377,7 +377,9 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
     _tilt_values = tuple(float(value) for value in _scan.tilt_deg)
 
     _source_options = {"Presets": "grid", "Custom": "manual"}
-    penetration_energy_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")
+    penetration_energy_source_ui = mo.ui.dropdown(
+        _source_options, value="Presets", label=""
+    )
     penetration_energy_grid_ui = mo.ui.dropdown(
         {f"{value:g} keV": value for value in _energy_values},
         value=f"{_energy_values[0]:g} keV",
@@ -387,7 +389,9 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
         start=1.0, stop=300.0, step=1.0, value=_energy_values[0], label="(keV)"
     )
 
-    penetration_thickness_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")
+    penetration_thickness_source_ui = mo.ui.dropdown(
+        _source_options, value="Presets", label=""
+    )
     penetration_thickness_grid_ui = mo.ui.dropdown(
         {fmt_thickness(value): value for value in _thickness_values},
         value=fmt_thickness(_thickness_values[0]),
@@ -401,7 +405,9 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
         label="(µm)",
     )
 
-    penetration_tilt_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")
+    penetration_tilt_source_ui = mo.ui.dropdown(
+        _source_options, value="Presets", label=""
+    )
     if len(_tilt_values) > 1:
         default_tilt_ind = len(_tilt_values) // 2
         default_tilt_value = _tilt_values[default_tilt_ind]
@@ -1508,7 +1514,7 @@ def _(
                             wrap=True,
                         ),
                     ]
-                ),
+                )
             ]
         )
 
@@ -1728,7 +1734,7 @@ def _(
         if _cached_survival is not None and _cached_survival[0] == _survival_key:
             _survival = _cached_survival[1]
         else:
-            _survival = penetration_survival_chart(_traj, Ne=500, tilt=_angle)
+            _survival = penetration_survival_chart(_traj, Ne=500, tilt=_angle, width=700)
             set_penetration_survival((_survival_key, _survival))
 
         _seed = int(penetration_regen_ui.value)
@@ -1771,10 +1777,11 @@ def _(
             beam_fwhm_mm=_beam_fwhm,
             speed=float(penetration_speed_ui.value),
         )
-        # Narrower than the old full-row default so the 2D cross-section fits
-        # beside it instead of stacked below.
+        # Full-row plot now that the 2D cross-section moved down beside the
+        # survival chart; widened past Plotly's 700 default now the colorbar
+        # (restored below) has room without cramping the scene.
         if _volume is not None:
-            _volume.update_layout(width=700)
+            _volume.update_layout(width=900)
 
         def _row_label(text):
             return mo.md(text).style({"min-width": "9rem", "display": "inline-block"})
@@ -1788,15 +1795,15 @@ def _(
         )
 
         # Built eagerly (cheap at Ne=40); no longer behind a lazy accordion.
-        # Narrower than its 480 default now that it sits beside the 3D plot
-        # rather than filling the row on its own.
+        # Sits beside the survival chart now, not the 3D plot, so back to its
+        # own 480 default width.
         _cross_section_chart = trajectory_chart(_nc, Ne=40, width=420)
         _cross_section_block = _cross_section_chart
 
-        _trace_cols = [p for p in (_volume, _cross_section_block) if p is not None]
-        _trace_row = (
-            mo.hstack(_trace_cols, justify="start", align="start", gap=2, wrap=True)
-            if _trace_cols
+        _bottom_cols = [p for p in (_cross_section_block, _survival) if p is not None]
+        _bottom_row = (
+            mo.hstack(_bottom_cols, justify="start", align="start", gap=1, wrap=True)
+            if _bottom_cols
             else None
         )
 
@@ -1886,9 +1893,10 @@ def _(
                     mo.hstack([penetration_regen_ui], justify="end", wrap=True),
                 ]
             ),
-            *(p for p in (_trace_row, _survival) if p is not None),
+            *(p for p in (_volume, _bottom_row) if p is not None),
         ]
         return mo.vstack(_parts)
+
 
     return (penetration_tab,)
 
@@ -1940,6 +1948,7 @@ def _(
 ):
     from cxr_mc.plots import draw_material_comparison, material_comparison_point
     from cxr_mc.run import cached_material_analysis
+
 
     def cross_material_tab():
         _md = mo.md(
@@ -2005,6 +2014,7 @@ def _(
                 mo.md("*Run `scan_app.py` for more materials to populate this comparison.*"),
             ]
         )
+
 
     return (cross_material_tab,)
 

@@ -134,7 +134,23 @@ def penetration_survival_chart(
             tooltip=["energy:N", "depth:Q", "survival:Q"],
         )
     )
-    return chart.properties(width=width, height=height, title=title).interactive()
+    return (
+        chart
+        # Top-level `background`, not `.configure(background=...)`: marimo's
+        # vegafusion fixup (altair_chart.maybe_fix_vegafusion_background)
+        # force-overrides to "transparent" whenever the top-level key is
+        # unset, clobbering a config-level background. Mirrors
+        # trajectory_chart's dark panel so the two read as one system when
+        # they sit side by side.
+        .properties(width=width, height=height, title=title, background=_FIELD)
+        .configure_view(strokeWidth=0)
+        .configure_axis(
+            labelColor=_TEXT, titleColor=_TEXT, gridColor=_GRID, domainColor=_GRID, tickColor=_GRID
+        )
+        .configure_legend(labelColor=_TEXT, titleColor=_TEXT)
+        .configure_title(color=_TEXT)
+        .interactive()
+    )
 
 
 # ---- interactive low-Ne trajectory cross-section -----------------------------
