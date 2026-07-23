@@ -83,6 +83,7 @@ from .geometry import (
 from .groove import GrooveSpec, blazed_groove_spec
 from .runner import (
     _brem_for_case,
+    _lines_for_case,
     _spectrum_case,
     _transport_case,
     _worker_init,
@@ -190,6 +191,7 @@ __all__ = [
     "_transport_case",
     "_spectrum_case",
     "_brem_for_case",
+    "_lines_for_case",
     "_worker_init",
     "run_cases",
 ]

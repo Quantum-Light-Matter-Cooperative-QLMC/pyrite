@@ -706,6 +706,33 @@ def test_repair_brem_wide_delegates_stacked_case_to_runner(monkeypatch):
     assert np.allclose(record["brem_wide"], 0.002)  # repaired in place
 
 
+def test_lines_for_case_matches_spectrum_case_single_slab():
+    import numpy as np
+
+    from cxr_mc.montecarlo import _lines_for_case, runner
+
+    case = dict(
+        E0_keV=30.0,
+        Ne=200,
+        Ne_brem=50,
+        thickness_ang=1.0e4,
+        composition=[("Mo", 1.0), ("S", 2.0)],
+        crystal="mos2",
+        hkl_list=[(1, 0, 0)],
+        B_ang2=0.5,
+        theta_obs_rad=np.deg2rad(90.0),
+        seed=7,
+        E_cut_lines_keV=5.0,
+        E_cut_brem_keV=1.0,
+    )
+    E_grid = np.linspace(1000.0, 30000.0, 64)
+    tp = runner._transport_case({**case, "E_grid": E_grid})
+    spec_ref = runner._spectrum_case({**case, "E_grid": E_grid}, tp)["spec"]
+    spec = _lines_for_case(case, E_grid)
+    assert spec.shape == E_grid.shape
+    np.testing.assert_allclose(spec, spec_ref, rtol=0, atol=0)
+
+
 def test_repair_brem_wide_preserves_exact_nonuniform_case_grid(monkeypatch):
     case = _fake_case("cfg_a", 30.0)
     case["E_grid_brem"] = np.array([10.0, 100.0, 1000.0])
@@ -833,3 +860,73 @@ def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
     args = ap.parse_args(["rebrem", "-a"])
     args.func(args)
     assert seen[-1]["materials"] is None
+
+
+def test_repair_brem_wide_on_progress_reports_skipped_and_done(monkeypatch):
+    """on_progress fires with (done, todo_total, skipped): one record already at
+    target counts as skipped, the stale one ticks through the loop."""
+    at_target = _finite_record(_fake_case("cfg_a", 30.0))  # Ne_brem=5, 50 eV: matches
+    stale = _finite_record(_fake_case("cfg_b", 30.0))
+    stale["case"]["Ne_brem"] = 7  # mismatch -> selected
+    monkeypatch.setattr(
+        "cxr_mc.montecarlo._brem_for_case",
+        lambda c, E_brem: np.ones(np.asarray(E_brem, float).shape),
+    )
+    calls: list[tuple[int, int, int]] = []
+    n = repair_brem_wide(
+        {"cfg_a": {30.0: at_target}, "cfg_b": {30.0: stale}},
+        progress=False,
+        ne_brem=5,
+        brem_step_eV=50.0,
+        on_progress=lambda *a: calls.append(a),
+    )
+    assert n == 1
+    assert calls == [(0, 1, 1), (1, 1, 1)]
+
+
+def test_rebrem_checkpoints_progress_file_writes_dashboard_records(monkeypatch, tmp_path):
+    from cxr_mc.rebrem import rebrem_checkpoints
+
+    (tmp_path / "hopg.pkl").write_bytes(b"")
+    progress = tmp_path / "hopg.json"
+    states: list[dict[str, Any]] = []
+
+    def _spy(path, **kw):
+        kw["on_progress"](2, 5, 3)  # mid-run tick
+        return {}
+
+    def _snoop_write(path):
+        states.append(json.loads(Path(path).read_text()))
+
+    monkeypatch.setattr("cxr_mc.run.repair_checkpoint", _spy)
+    rebrem_checkpoints(
+        materials=["hopg"], checkpoint_dir=str(tmp_path), ne_brem=1000, progress_file=str(progress)
+    )
+    final = json.loads(progress.read_text())
+    assert final["state"] == "done"
+    assert final["material"] == "hopg"
+    assert final["total_cases"] == 8  # todo 5 + skipped 3
+    assert final["cached_cases"] == 3 and final["completed_new_cases"] == 2
+
+
+def test_rebrem_checkpoints_progress_file_marks_failed_and_rejects_multi(monkeypatch, tmp_path):
+    from cxr_mc.rebrem import rebrem_checkpoints
+
+    (tmp_path / "hopg.pkl").write_bytes(b"")
+    (tmp_path / "hbn.pkl").write_bytes(b"")
+    progress = tmp_path / "p.json"
+
+    with pytest.raises(SystemExit, match="exactly one material"):
+        rebrem_checkpoints(
+            materials=["hopg", "hbn"], checkpoint_dir=str(tmp_path), progress_file=str(progress)
+        )
+
+    def _boom(path, **kw):
+        raise RuntimeError("kaput")
+
+    monkeypatch.setattr("cxr_mc.run.repair_checkpoint", _boom)
+    with pytest.raises(RuntimeError):
+        rebrem_checkpoints(
+            materials=["hopg"], checkpoint_dir=str(tmp_path), progress_file=str(progress)
+        )
+    assert json.loads(progress.read_text())["state"] == "failed"

@@ -431,6 +431,103 @@ def _brem_for_case(case, E_brem):
     return _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers)
 
 
+def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove):
+    """Coherent line spectrum on ``E_grid`` from already-transported line
+    segments ``segs``. Single slab (``layer_radiators`` absent) radiates from
+    all segments via the case's scalar crystal keys; a multilayer stack sums
+    each CRYSTALLINE layer's lines incoherently, every line self-absorbing
+    through the whole stack. Pure move of _spectrum_case's line block, shared
+    with :func:`_lines_for_case` so a line-only reline reproduces the SAME
+    spectrum as a live sweep."""
+    radiators = case.get("layer_radiators")
+    mosaic_kw = dict(
+        mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
+        mosaic_nodes=case.get("mosaic_mc_nodes", 1),
+    )
+    spec_chunk = case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(E_grid.size)
+    if radiators is None:
+        return mc_spectrum(
+            segs,
+            E_grid,
+            crystal=case["crystal"],
+            hkl_list=case["hkl_list"],
+            n_hat=n_hat,
+            B_ang2=case["B_ang2"],
+            composition=case["composition"],
+            beam_uvw=case.get("beam_uvw"),
+            surface_hkl=case.get("surface_hkl"),
+            azimuth_rad=case.get("azimuth_rad", 0.0),
+            recip_miscut_rad=case.get("recip_miscut_rad"),
+            sinc_cutoff=case.get("sinc_cutoff"),
+            chunk=spec_chunk,
+            layers=abs_layers,
+            groove=groove,
+            **mosaic_kw,
+        )
+    assert case.get("groove_spacing_ang") is None
+    spec = np.zeros(E_grid.shape, dtype=float)
+    for L, rad in enumerate(radiators):
+        if rad is None:
+            continue
+        sL = _segments_in_layer(segs, L)
+        if sL["L_ang"].size == 0:
+            continue
+        spec = spec + mc_spectrum(
+            sL,
+            E_grid,
+            crystal=rad["crystal"],
+            hkl_list=rad["hkl_list"],
+            n_hat=n_hat,
+            B_ang2=rad["B_ang2"],
+            composition=abs_layers[L][2],
+            beam_uvw=rad.get("beam_uvw"),
+            surface_hkl=rad.get("surface_hkl"),
+            azimuth_rad=rad.get("azimuth_rad", case.get("azimuth_rad", 0.0)),
+            recip_miscut_rad=rad.get("recip_miscut_rad", case.get("recip_miscut_rad")),
+            sinc_cutoff=case.get("sinc_cutoff"),
+            chunk=spec_chunk,
+            layers=abs_layers,
+            **mosaic_kw,
+        )
+    return spec
+
+
+def _lines_for_case(case, E_grid):
+    """Regenerate a case's coherent line spectrum on ``E_grid`` from scratch:
+    tilted geometry + optional groove, transport ``Ne`` electrons at ``seed``
+    (the line seed, NOT ``seed + 1``), then the per-layer line spectrum via
+    :func:`_lines_for_segments`. Returns ``spec``. The line half of run_case's
+    transport + spectrum phases factored out so :func:`cxr_mc.run.repair_line_spec`
+    (``cxr reline``) reuses the EXACT live-sweep line path -- multilayer,
+    mosaic, groove and all -- rather than re-deriving it by hand."""
+    abs_layers = case.get("abs_layers")
+    tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
+    tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
+    beam, n_hat = tilted_geometry(case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad)
+    groove = None
+    if case.get("groove_spacing_ang") is not None:
+        groove = blazed_groove_spec(
+            case["groove_spacing_ang"], case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad
+        )
+    segs = simulate_trajectories(
+        case["E0_keV"],
+        case["Ne"],
+        case["thickness_ang"],
+        composition=case["composition"],
+        E_cut_keV=case.get("E_cut_lines_keV", 5.0),
+        seed=case["seed"],
+        beam_dir=beam,
+        layers=abs_layers,
+        beam_fwhm_mm=case.get("beam_fwhm_mm"),
+        crystal_width_mm=case.get("crystal_width_mm"),
+        crystal_height_mm=case.get("crystal_height_mm"),
+        tilt_polar_rad=tilt_polar_rad,
+        tilt_azim_rad=tilt_azim_rad,
+        groove=groove,
+    )
+    return _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove)
+
+
 def _spectrum_case(case, tp):
     """GPU phase of run_case: line spectrum + brem from the already-transported
     segments ``tp`` (from _transport_case). Runs in the main process, so only one
@@ -449,63 +546,7 @@ def _spectrum_case(case, tp):
     # (no coherent lines). layer_radiators absent -> single slab: the film radiates
     # from ALL its segments via the case's scalar crystal keys (bit-for-bit the
     # pre-multilayer path). See docs/multilayer-materials.md (per-layer radiation).
-    radiators = case.get("layer_radiators")
-    mosaic_kw = dict(
-        mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),  # None -> perfect crystal
-        mosaic_nodes=case.get("mosaic_mc_nodes", 1),
-    )
-    spec_chunk = case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(E_grid.size)
-    if radiators is None:
-        spec = mc_spectrum(
-            segs,
-            E_grid,
-            crystal=case["crystal"],
-            hkl_list=case["hkl_list"],
-            n_hat=n_hat,
-            B_ang2=case["B_ang2"],
-            composition=case["composition"],
-            beam_uvw=case.get("beam_uvw"),
-            surface_hkl=case.get("surface_hkl"),
-            azimuth_rad=case.get("azimuth_rad", 0.0),
-            recip_miscut_rad=case.get("recip_miscut_rad"),
-            sinc_cutoff=case.get("sinc_cutoff"),
-            chunk=spec_chunk,
-            layers=abs_layers,
-            groove=tp.get("groove"),
-            **mosaic_kw,
-        )
-    else:
-        # grooves are v1 single-slab only (sweep.build_cases rejects
-        # substrate/stack when groove_spacing_ang is set), so this per-layer
-        # branch never sees a groove; mc_spectrum's own guard (layers=
-        # non-None + groove) would catch it if that ever changed.
-        assert case.get("groove_spacing_ang") is None
-        spec = np.zeros(E_grid.shape, dtype=float)
-        for L, rad in enumerate(radiators):
-            if rad is None:  # amorphous layer -> no coherent lines
-                continue
-            sL = _segments_in_layer(segs, L)
-            if sL["L_ang"].size == 0:
-                continue
-            spec = spec + mc_spectrum(
-                sL,
-                E_grid,
-                crystal=rad["crystal"],
-                hkl_list=rad["hkl_list"],
-                n_hat=n_hat,
-                B_ang2=rad["B_ang2"],
-                composition=abs_layers[L][2],
-                beam_uvw=rad.get("beam_uvw"),
-                surface_hkl=rad.get("surface_hkl"),
-                # per-layer in-plane orientation (LayerSpec.azimuth_deg); radiators
-                # from pre-stack checkpoints lack the key -> case-level fallback
-                azimuth_rad=rad.get("azimuth_rad", case.get("azimuth_rad", 0.0)),
-                recip_miscut_rad=rad.get("recip_miscut_rad", case.get("recip_miscut_rad")),
-                sinc_cutoff=case.get("sinc_cutoff"),
-                chunk=spec_chunk,
-                layers=abs_layers,
-                **mosaic_kw,
-            )
+    spec = _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, tp.get("groove"))
 
     # BREM: EVERY layer radiates with its OWN composition (each Z^2 cross
     # section); each layer's brem self-absorbs through the whole stack, summed
