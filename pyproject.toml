@@ -29,6 +29,7 @@ dependencies = [
     "vl-convert-python>=1.9.0.post1",
     "xraydb>=4.5.8",
     "psutil>=7.2.2",
+    "dpctl>=0.22.1",
 ]
 
 [project.scripts]
@@ -62,6 +63,9 @@ docs = [
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.marimo.runtime]
+watcher_on_save = "autorun"
 
 [tool.jupytext]
 formats = "ipynb,md:myst"

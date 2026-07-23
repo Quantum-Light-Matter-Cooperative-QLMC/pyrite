@@ -267,3 +267,4 @@ utils/
 
 sgconfig.yml
 *.local.md
+./checkpoints/*.json
