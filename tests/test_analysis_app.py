@@ -39,7 +39,9 @@ def test_penetration_view_uses_interactive_3d_volume_as_primary_track_plot() -> 
     assert "_volume = trajectory_volume_animation(" in source
     for arg in ("_nc,", "_data,", "realistic=_realistic,", "beam_fwhm_mm=_beam_fwhm,", "speed="):
         assert arg in source
-    assert '"2D track cross-section (Altair)"' in source
+    # The 2D cross-section renders eagerly beside the survival chart (no lazy
+    # accordion wrapper -- see the rail-free declutter).
+    assert "_cross_section_chart = trajectory_chart(_nc, Ne=40, width=420)" in source
     assert "lateral extent is fitted to the tracks" in source
 
 
@@ -50,7 +52,9 @@ def test_penetration_controls_offer_material_presets_and_bounded_manual_values()
         assert grid in source
     for bound in ("start=1.0", "stop=300.0", "start=0.001", "stop=10000.0", "stop=89.9"):
         assert bound in source
-    assert 'label="crystal thickness (µm)"' in source
+    # The compact control-row layout supplies the "Crystal thickness" label once
+    # via the shared row label; the manual widget's own label is just the unit.
+    assert 'label="(µm)"' in source
     assert "penetration_thickness_manual_ui.value * 1e4" in source
     for name in (
         "penetration_energy_keV",
@@ -66,7 +70,10 @@ def test_thickness_controls_and_context_use_shared_human_units() -> None:
     assert "from cxr_mc.sweep import build_cases, fmt_thickness" in source
     assert source.count("fmt_thickness(t)") == 5
     assert "fmt_thickness(value)" in source
-    assert source.count("fmt_thickness(") >= 17
+    # Context-rail summaries (each with their own fmt_thickness call) were
+    # dropped in the rail-free declutter, so the floor is lower than it used
+    # to be; this still guards against silently losing shared-unit calls.
+    assert source.count("fmt_thickness(") >= 13
 
 
 def test_penetration_control_values_are_read_in_a_downstream_cell() -> None:
@@ -169,10 +176,12 @@ def test_analysis_app_discovers_materials_directly_from_catalog() -> None:
     assert "from cxr_mc.config import MATERIALS" not in source
 
 
-def test_analysis_app_uses_four_task_groups_and_action_names() -> None:
+def test_analysis_app_uses_five_top_level_tabs_and_action_names() -> None:
     source = APP.read_text()
 
-    for group in ('"Explore"', '"Optimize"', '"Instrument"', '"Compare"'):
+    # "Instruments" and "Trace" hold a single view each, so they're bare
+    # top-level tabs rather than nested action-accordion groups.
+    for group in ('"Explore"', '"Optimize"', '"Instruments"', '"Trace"', '"Compare"'):
         assert group in source
     for action in (
         "Compare beam energies",
@@ -180,40 +189,18 @@ def test_analysis_app_uses_four_task_groups_and_action_names() -> None:
         "Compare azimuths",
         "Rank geometries",
         "Inspect scan maps",
-        "Model detectors",
-        "Inspect penetration",
         "Compare materials",
     ):
         assert action in source
 
 
-def test_each_lazy_view_builds_its_own_context_rail() -> None:
-    tree = ast.parse(APP.read_text())
-    builders = {
-        node.name: node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.FunctionDef)
-        and node.name
-        in {
-            "spectra_tab",
-            "polar_compare_tab",
-            "azim_compare_tab",
-            "rankings_tab",
-            "scans_tab",
-            "detectors_tab",
-            "penetration_tab",
-            "cross_material_tab",
-        }
-    }
-
-    assert len(builders) == 8
-    for name, builder in builders.items():
-        assert any(
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Name)
-            and node.func.id == "context_rail"
-            for node in ast.walk(builder)
-        ), f"{name} lacks active-view context"
+def test_no_lazy_view_uses_a_context_rail() -> None:
+    # Every context_rail block (per-tab Material/E0/theta/phi/Thickness/Records
+    # summary) was dropped in the rail-free declutter -- the controls above
+    # each chart already carry that information. Guard against it creeping
+    # back in (e.g. a live marimo-pair session resaving from stale kernel state).
+    source = APP.read_text()
+    assert "context_rail" not in source
 
 
 def test_control_rows_wrap_at_narrow_widths() -> None:
@@ -230,12 +217,12 @@ def test_control_rows_wrap_at_narrow_widths() -> None:
         assert isinstance(wrap, ast.Constant) and wrap.value is True
 
 
-def test_analysis_app_has_checkpoint_summary_and_no_mojibake() -> None:
+def test_analysis_app_has_no_mojibake() -> None:
+    # The checkpoint-contents/provenance accordion (path, swept-dimensions
+    # table, empty-checkpoint warning) was dropped in the rail-free declutter;
+    # only the encoding/stale-name guards remain relevant.
     source = APP.read_text()
 
-    assert "Checkpoint contents and provenance" in source
-    assert "Swept dimensions" in source
-    assert "cxr scan {MATERIAL or '<material>'}" in source
     assert "â€”" not in source
     assert "INTRINSIC" not in source
 

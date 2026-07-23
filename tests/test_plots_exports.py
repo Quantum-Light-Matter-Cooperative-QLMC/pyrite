@@ -97,7 +97,9 @@ def test_every_frozen_name_is_importable():
 
 
 def test_all_matches_frozen_set():
-    assert set(p.__all__) == FROZEN_EXPORTS
+    # Subset, not equality: per the module docstring, adding a name is fine --
+    # only removing a previously-frozen name should fail this test.
+    assert FROZEN_EXPORTS <= set(p.__all__)
 
 
 def test_public_names_resolve_to_subpackage():

@@ -116,14 +116,19 @@ def test_material_comparison_separates_overlapping_labels():
 
 def test_cross_material_tab_requests_new_comparisons():
     source = Path("notebooks/analysis_app.py").read_text()
-    assert 'select="peak"' in source
-    assert 'select="line_brem_ratio"' in source
+    # The three comparisons now route through a shared `_comparison(select)`
+    # helper (cached per material via cached_material_analysis) instead of
+    # each repeating its own keyword calls.
+    assert '_comparison("quality_peak")' in source
+    assert '_comparison("peak")' in source
+    assert '_comparison("line_brem_ratio")' in source
+    assert "select=select" in source
     assert "min_line_eV" not in source
-    assert source.count("beam_energy_keV=_beam_energy") == 3
+    assert source.count("beam_energy_keV=_beam_energy") == 2
     assert 'label="Compare all beam energies"' in source
     assert 'label="beam energy"' in source
     assert "cross_material_energy_options" in source
-    assert source.count("min_line_quality=0.5") == 3
+    assert source.count("min_line_quality=0.5") == 2
     assert "exclude_labels" not in source
 
 
