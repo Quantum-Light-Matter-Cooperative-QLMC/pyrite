@@ -176,19 +176,59 @@ def _(MaterialSelect, mo):
 
 
 @app.cell
+def _(MaterialSelect, material_ui, mo):
+    from cxr_mc.analyze import face_menu as _face_menu
+    from cxr_mc.analyze import select_initial_material as _select_initial_face
+    from cxr_mc.run import _DEFAULT_CHECKPOINT_DIR as _FACE_CHECKPOINT_DIR
+
+    # Rebuilds whenever the material changes, so the flat/blazed disabled flags
+    # track that material's available checkpoints. Default face = first
+    # non-disabled row (flat preferred; blazed only when it's the sole one).
+    _face_material = material_ui.value["value"]
+    face_options = _face_menu(_face_material, _FACE_CHECKPOINT_DIR) if _face_material else ()
+    initial_face = _select_initial_face(None, face_options)
+    face_ui = mo.ui.anywidget(
+        MaterialSelect(
+            options=list(face_options),
+            value=initial_face,
+            label="**Face**",
+            disabled=initial_face is None,
+        )
+    )
+    face_ui
+    return (face_ui,)
+
+
+@app.cell
 def _(
     cases_from_results,
     default_settings,
+    face_ui,
     filter_results,
     load_checkpoint,
     material_ui,
 ):
+    from cxr_mc.analyze import checkpoint_stem
+
     MATERIAL = material_ui.value["value"]
+    FACE = face_ui.value["value"]
     settings = default_settings()
-    _results = load_checkpoint(MATERIAL) if MATERIAL is not None else {}
+    # Load the selected face's checkpoint (flat -> <material>.pkl,
+    # blazed -> <material>_blazed.pkl). MATERIAL stays the catalog key
+    # everywhere else (labels, CATALOG.material(MATERIAL), manifest lookups).
+    _stem = checkpoint_stem(MATERIAL, FACE) if MATERIAL is not None and FACE is not None else None
+    _results = load_checkpoint(_stem) if _stem is not None else {}
     cases = cases_from_results(_results)  # rebuild the case list from the records
     res = filter_results(_results, cases)  # all loaded cases for this material
-    return MATERIAL, cases, res, settings
+
+    def face_title(chart):
+        """Append a ` (blazed)` suffix to a chart's title on the blazed face, so a
+        blazed spectrum is never mistaken for the flat one. No-op for flat / None."""
+        if chart is None or FACE != "blazed" or not hasattr(chart, "title"):
+            return chart
+        return chart.properties(title=f"{chart.title} (blazed)")
+
+    return FACE, MATERIAL, cases, face_title, res, settings
 
 
 @app.cell
@@ -810,14 +850,15 @@ def _(
 
 
 @app.cell
-def _(MATERIAL, mo, res, settings, top_geometries):
+def _(FACE, MATERIAL, mo, res, settings, top_geometries):
     def rankings_tab():
         # Rank across ALL thicknesses (raw `res`, not the pinned `res_view`): the
         # thickness column disambiguates rows, so a thickness sweep shows every
         # thickness competing head-to-head rather than being collapsed to the pin.
         df = top_geometries(res, settings, top_n=20, select="quality_peak")
         if df.empty:
-            return mo.md(f"**No checkpoint for `{MATERIAL}`** — run `scan_app.py` first.")
+            _how = "cxr blaze" if FACE == "blazed" else "scan_app.py"
+            return mo.md(f"**No {FACE} checkpoint for `{MATERIAL}`** — run `{_how}` first.")
         return mo.vstack(
             [
                 mo.md(
@@ -847,6 +888,7 @@ def _(
     broad_xmax_ui,
     broad_xmin_ui,
     broad_ylog_ui,
+    face_title,
     fmt_thickness,
     heatmap_E0_ui,
     heatmap_select,
@@ -943,7 +985,7 @@ def _(
                 band="narrow",
             )
             return (
-                _chart
+                face_title(_chart)
                 if _chart is not None
                 else mo.md("*No narrowband spectra -- run the scan first.*")
             )
@@ -960,7 +1002,7 @@ def _(
                 band="broad",
             )
             return (
-                _chart
+                face_title(_chart)
                 if _chart is not None
                 else mo.md("*No broadband spectra -- run the scan first.*")
             )

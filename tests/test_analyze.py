@@ -101,6 +101,47 @@ def test_material_menu_defaults_to_catalog_materials_and_spec_labels(tmp_path):
     assert labels == sorted(labels, key=str.casefold)
 
 
+def test_checkpoint_stem_flat_is_material_blazed_is_suffixed():
+    assert analyze.checkpoint_stem("hopg", "flat") == "hopg"
+    assert analyze.checkpoint_stem("hopg", "blazed") == "hopg_blazed"
+
+
+@pytest.mark.parametrize(
+    ("present", "flat_disabled", "blazed_disabled"),
+    [
+        ((), True, True),  # neither checkpoint
+        (("hopg",), False, True),  # only flat
+        (("hopg_blazed",), True, False),  # only blazed
+        (("hopg", "hopg_blazed"), False, False),  # both
+    ],
+)
+def test_face_menu_disabled_flags_track_present_checkpoints(
+    tmp_path, present, flat_disabled, blazed_disabled
+):
+    for stem in present:
+        (tmp_path / f"{stem}.pkl").touch()
+
+    menu = analyze.face_menu("hopg", tmp_path)
+
+    # Flat first (preferred default), then blazed; labels are stable.
+    assert menu == (
+        {"value": "flat", "label": "Flat", "disabled": flat_disabled},
+        {"value": "blazed", "label": "Blazed", "disabled": blazed_disabled},
+    )
+
+
+def test_face_menu_default_reuses_select_initial_material_flat_preferred(tmp_path):
+    # Both present -> flat preferred; only blazed present -> blazed defaults.
+    (tmp_path / "hopg.pkl").touch()
+    (tmp_path / "hopg_blazed.pkl").touch()
+    both = analyze.face_menu("hopg", tmp_path)
+    assert analyze.select_initial_material(None, both) == "flat"
+
+    (tmp_path / "hopg.pkl").unlink()
+    blazed_only = analyze.face_menu("hopg", tmp_path)
+    assert analyze.select_initial_material(None, blazed_only) == "blazed"
+
+
 def test_select_initial_material_falls_back_to_first_available():
     menu = (
         {"value": "hopg", "label": "HOPG", "disabled": True},

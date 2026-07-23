@@ -332,8 +332,11 @@ wired into pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
 `cxr analyze` launcher for `notebooks/analysis_app.py`: persisted
 initial-material selection, smoke execution, edit/watch mode, ACP bridges,
 SSH-tunnel-friendly fixed-port launch.
-- Public: `material_menu`, `select_initial_material`, `initial_material`,
-  `get_default_material`, `set_default_material`, `add_subparser`, `main`.
+- Public: `material_menu`, `select_initial_material`, `face_menu`,
+  `checkpoint_stem`, `initial_material`, `get_default_material`,
+  `set_default_material`, `add_subparser`, `main`. `face_menu`/`checkpoint_stem`
+  back the app's flat/blazed **Face** dropdown (blazed loads
+  `<material>_blazed.pkl` from `cxr blaze`).
 
 ### `check.py`
 `cxr check` launcher for `notebooks/validation_app.py` plus cached validation

@@ -95,6 +95,37 @@ def select_initial_material(requested: str | None, menu: tuple[MaterialMenuRow, 
     return requested if requested in selectable else next(iter(selectable), None)
 
 
+def checkpoint_stem(material: str, face: str) -> str:
+    """Checkpoint stem for a material's face variant.
+
+    ``material`` itself for the flat (``cxr scan``) face; ``f"{material}_blazed"``
+    for the blazed (sawtooth entrance-face) checkpoint written by ``cxr blaze``.
+    Passing this stem to :func:`~cxr_mc.run.load_checkpoint` loads the matching
+    ``.pkl`` -- no change to ``load_checkpoint`` / ``checkpoint_path_for`` needed.
+    """
+    return material if face == "flat" else f"{material}_blazed"
+
+
+def face_menu(material: str, checkpoint_dir: Path | str) -> tuple[MaterialMenuRow, ...]:
+    """Two face rows (flat, blazed) for ``material``, each disabled when absent.
+
+    Mirrors :func:`material_menu`'s ``Path(checkpoint_dir).glob("*.pkl")``
+    existence convention so the face menu's ``disabled`` flags stay consistent
+    with the material menu: a face is enabled iff its ``checkpoint_stem`` has a
+    direct ``<stem>.pkl`` child of ``checkpoint_dir``. Flat is listed first
+    (preferred default via :func:`select_initial_material` semantics).
+    """
+    available = {path.stem for path in Path(checkpoint_dir).glob("*.pkl")}
+    return tuple(
+        {
+            "value": face,
+            "label": label,
+            "disabled": checkpoint_stem(material, face) not in available,
+        }
+        for face, label in (("flat", "Flat"), ("blazed", "Blazed"))
+    )
+
+
 def get_default_material():
     """The persisted default material, or None if never set / empty."""
     try:
