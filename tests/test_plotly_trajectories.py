@@ -90,7 +90,12 @@ def test_exit_paths_drawn_once_for_backscatter_and_transmission():
     assert len(exit_traces) == 1  # one legend entry for every electron's exit dash
     exit_trace = exit_traces[0]
     assert exit_trace.type == "scatter3d"
-    assert exit_trace.line.dash == "dash"
+    assert exit_trace.line.dash == "dot"  # tight dotted: first mark flush to exit point
+    # dashes are colored by exit energy on the tracks' Turbo scale (per-vertex
+    # color array), not one flat muted color, and don't add a second colorbar.
+    assert exit_trace.line.colorscale is not None
+    assert exit_trace.line.showscale is False
+    assert np.asarray(exit_trace.line.color).size == np.asarray(exit_trace.z).size
 
     # exit_trace.{x,y,z} are NaN-separated triples per electron:
     # [face-exit point, extrapolated dash endpoint, NaN, ...]. The face-exit
@@ -174,11 +179,12 @@ def test_exit_paths_3d_reveal_until_fs_gates_by_terminal_start_age():
         "elec_id": np.array([0, 1]),
         "start_xyz": np.array([[0.0, 0.0, 0.9], [0.0, 0.0, 0.1]]),
         "end_xyz": np.array([[0.0, 0.0, 1.0], [0.0, 0.0, 0.0]]),
+        "E": np.array([20.0, 5.0]),
         "t_fs": np.array([2.0, 8.0]),
         "thick": 1.0,
     }
-    full = _exit_paths_3d(data, 0.1)
-    gated = _exit_paths_3d(data, 0.1, reveal_until_fs=5.0)
+    full = _exit_paths_3d(data, 0.1, cmax=30.0)
+    gated = _exit_paths_3d(data, 0.1, cmax=30.0, reveal_until_fs=5.0)
 
     assert len(full.x) == 6  # 2 electrons x (start, end, NaN)
     assert len(gated.x) == 3  # only electron 0 (age 2.0 <= 5.0) survives

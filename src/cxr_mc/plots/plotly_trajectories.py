@@ -21,7 +21,6 @@ _BEAM = "#E76F51"
 _DETECTOR = "#42C7C7"
 _FIELD = "#17202A"
 _GRID = "#34495E"
-_EXIT_PATH = "#9AA5B1"  # muted slate-grey: neutral vs. the turbo track colorscale
 
 # Zoomed (non-realistic) view spot FWHM [mm]: a micron-scale beam so the incident
 # bundle has visible width at the fitted, sub-micron cascade scale.
@@ -228,7 +227,7 @@ def _incident_beam_lines(data, length):
     )
 
 
-def _exit_paths_3d(data, length, *, tol_frac=1e-6, reveal_until_fs=None):
+def _exit_paths_3d(data, length, *, cmax, tol_frac=1e-6, reveal_until_fs=None):
     """ONE NaN-separated ``Scatter3d`` of dashed exit-path continuations, one per
     electron that leaves through the TOP (``z ~ 0``, backscattered) or BOTTOM
     (``z ~ thick``, transmitted) face. Side exits (terminal ``z`` strictly
@@ -244,6 +243,15 @@ def _exit_paths_3d(data, length, *, tol_frac=1e-6, reveal_until_fs=None):
     spuriously miss real exits; ``1e-6`` of the slab thickness is generous
     against that roundoff while still well inside any physical slab.
 
+    Each dash is colored by its electron's terminal-segment energy on the SAME
+    Turbo scale as the in-crystal tracks (``cmin=0``, ``cmax=E0_keV``), so an
+    exit continuation reads as a faint prolongation of the track that produced
+    it rather than a disconnected gray stub. ``showscale`` stays off so the
+    tracks own the single energy colorbar. A tight ``"dot"`` pattern keeps the
+    first mark flush against the exit point (the wide ``"dash"`` gap looked like
+    the line began in mid-air); ``scatter3d.line.dash`` is enum-only, so ``"dot"``
+    is the closest-spaced style available.
+
     ``reveal_until_fs`` (playback cutoff, ``None`` -> unfiltered) additionally
     gates each electron's dash on its terminal segment's own start age: the dash
     appears only once that segment has itself been revealed (``t_fs <=
@@ -255,6 +263,7 @@ def _exit_paths_3d(data, length, *, tol_frac=1e-6, reveal_until_fs=None):
     elec_id = np.asarray(data["elec_id"])
     start = np.asarray(data["start_xyz"], dtype=float)
     end = np.asarray(data["end_xyz"], dtype=float)
+    energy = np.asarray(data["E"], dtype=float)
     t_fs = np.asarray(data["t_fs"], dtype=float)
     thick = float(data["thick"])
     if elec_id.size == 0:
@@ -269,6 +278,7 @@ def _exit_paths_3d(data, length, *, tol_frac=1e-6, reveal_until_fs=None):
 
     term_start = start[terminal]
     term_end = end[terminal]
+    term_energy = energy[terminal]
     term_t_fs = t_fs[terminal]
     tol = max(tol_frac * thick, np.finfo(float).eps)
     exits = (np.abs(term_end[:, 2]) <= tol) | (np.abs(term_end[:, 2] - thick) <= tol)
@@ -278,6 +288,7 @@ def _exit_paths_3d(data, length, *, tol_frac=1e-6, reveal_until_fs=None):
         return None
     term_start = term_start[exits]
     term_end = term_end[exits]
+    term_energy = term_energy[exits]
 
     direction = term_end - term_start
     norm = np.linalg.norm(direction, axis=1, keepdims=True)
@@ -289,13 +300,24 @@ def _exit_paths_3d(data, length, *, tol_frac=1e-6, reveal_until_fs=None):
     xyz = np.full((3 * n, 3), np.nan)
     xyz[0::3] = term_end
     xyz[1::3] = far
+    # per-vertex color = owning electron's exit energy (3 verts/electron incl. the
+    # NaN separator, whose color value is inert since its position breaks the line).
+    color = np.repeat(term_energy, 3)
     return go.Scatter3d(
         x=xyz[:, 0],
         y=xyz[:, 1],
         z=xyz[:, 2],
         mode="lines",
-        line={"color": _EXIT_PATH, "width": 3, "dash": "dash"},
-        opacity=0.45,
+        line={
+            "color": color,
+            "colorscale": "Turbo",
+            "cmin": 0.0,
+            "cmax": cmax,
+            "showscale": False,
+            "width": 3,
+            "dash": "dot",
+        },
+        opacity=0.4,
         hovertemplate="exit path<extra></extra>",
         name="exit path",
     )
@@ -424,7 +446,9 @@ def trajectory_volume_figure(
                 )
             )
     fig.add_trace(_incident_beam_lines(data, 0.28 * span))
-    exit_paths = _exit_paths_3d(data, 0.28 * span, reveal_until_fs=reveal_until_fs)
+    exit_paths = _exit_paths_3d(
+        data, 0.28 * span, cmax=float(case["E0_keV"]), reveal_until_fs=reveal_until_fs
+    )
     if exit_paths is not None:
         fig.add_trace(exit_paths)
     for trace in _direction_arrow(
