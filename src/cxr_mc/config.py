@@ -14,7 +14,8 @@ detector/analysis knobs still live here.
   * :func:`material_sweep`   -- the full parametric scan for a material (thickness,
     beam energies, polar/azimuthal tilt sweeps, the line/brem energy grids).
   * :func:`trajectory_sweep` -- a small, dedicated geometry sweep for the electron
-    -penetration figures (a handful of polar tilts at normal azimuth, 2 energies).
+    -penetration figures (a handful of polar tilts at a configurable azimuth,
+    normal incidence by default, 2 energies).
   * :data:`COLLAPSE_AZIMUTH` -- keep only the best azimuth per (tilt, energy).
 """
 
@@ -117,12 +118,14 @@ def trajectory_sweep(
     thickness_ang: float | None = None,
     n_tilts: int | None = None,
     tilt_span: float | None = None,
+    azim_deg: float = 0.0,
 ):
     """A small dedicated geometry sweep for the electron-penetration figures: a
-    handful of polar tilts at normal azimuth, two beam energies (transport only,
-    so the energy grids are irrelevant -- kept for build_cases). ``n_tilts`` panels
-    span from normal incidence to ``tilt_span`` when supplied; otherwise the
-    sparse default :data:`PENETRATION_TILT_DEG` set is used.
+    handful of polar tilts at a configurable azimuth (``azim_deg``, normal
+    incidence by default), two beam energies (transport only, so the energy
+    grids are irrelevant -- kept for build_cases). ``n_tilts`` panels span from
+    normal incidence to ``tilt_span`` when supplied; otherwise the sparse
+    default :data:`PENETRATION_TILT_DEG` set is used.
 
     Always uses ONE thickness: ``thickness_ang`` when explicitly supplied,
     otherwise the geometric midpoint of the material's thickness array if it is a
@@ -156,7 +159,7 @@ def trajectory_sweep(
         thickness_ang=thick,
         energy_keV=list(energies),
         tilt_deg=tilt_values,
-        tilt_azim_deg=0.0,
+        tilt_azim_deg=float(azim_deg),
         theta_obs_deg=90.0,
         E_grid_line=scan.E_grid_line,
         E_grid_line_by_energy=scan.E_grid_line_by_energy,

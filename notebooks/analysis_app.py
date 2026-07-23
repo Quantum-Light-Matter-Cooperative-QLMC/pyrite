@@ -422,7 +422,19 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
     penetration_tilt_manual_ui = mo.ui.number(
         start=0.0, stop=89.9, step=0.1, value=_tilt_values[0], label="(deg)"
     )
+
+    # Azimuth is not part of the material's scan grid (trajectory_sweep pins it
+    # to normal incidence by default) -- offer a fixed preset list instead of a
+    # Presets/Custom toggle like the other penetration knobs.
+    _azim_values = (100.0, 125.0, 140.0, 165.0, 180.0)
+    penetration_azim_ui = mo.ui.dropdown(
+        {f"{value:g} deg": value for value in _azim_values},
+        value=f"{_azim_values[0]:g} deg",
+        label="",
+    )
+
     return (
+        penetration_azim_ui,
         penetration_energy_grid_ui,
         penetration_energy_manual_ui,
         penetration_energy_source_ui,
@@ -437,6 +449,7 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
 
 @app.cell
 def _(
+    penetration_azim_ui,
     penetration_energy_grid_ui,
     penetration_energy_manual_ui,
     penetration_energy_source_ui,
@@ -462,7 +475,10 @@ def _(
         if penetration_tilt_source_ui.value == "grid"
         else penetration_tilt_manual_ui.value
     )
+    penetration_azim_deg = penetration_azim_ui.value
+
     return (
+        penetration_azim_deg,
         penetration_energy_keV,
         penetration_thickness_ang,
         penetration_tilt_deg,
@@ -1776,6 +1792,8 @@ def _(
     get_penetration_data,
     get_penetration_survival,
     mo,
+    penetration_azim_deg,
+    penetration_azim_ui,
     penetration_beam_fwhm_ui,
     penetration_energy_grid_ui,
     penetration_energy_keV,
@@ -1805,8 +1823,8 @@ def _(
     def penetration_tab():
         _angle = penetration_tilt_deg
         _md = mo.md(
-            "An interactive 3D electron track cutaway and a surviving-electron fraction vs depth, at the polar tilt selected "
-            "in this tab. The translucent crystal's lateral extent is fitted to the tracks; depth "
+            "An interactive 3D electron track cutaway and a surviving-electron fraction vs depth, at the polar tilt and "
+            "azimuth selected in this tab. The translucent crystal's lateral extent is fitted to the tracks; depth "
             "and layer interfaces retain true scale. "
         )
         _sweep = trajectory_sweep(
@@ -1814,6 +1832,7 @@ def _(
             energies=(penetration_energy_keV,),
             tilts=(penetration_tilt_deg,),
             thickness_ang=penetration_thickness_ang,
+            azim_deg=penetration_azim_deg,
         )
         _traj = build_cases(_sweep, settings.n_electrons, settings.n_electrons_brem)
         if not _traj:
@@ -1831,6 +1850,7 @@ def _(
             MATERIAL,
             penetration_energy_keV,
             penetration_tilt_deg,
+            penetration_azim_deg,
             penetration_thickness_ang,
         )
         _cached_survival = get_penetration_survival()
@@ -1854,6 +1874,7 @@ def _(
             _nc["name"],
             _nc["E0_keV"],
             _nc.get("tilt_deg"),
+            _nc.get("tilt_azim_deg"),
             _Ne,
             _seed,
             _realistic,
@@ -1988,6 +2009,23 @@ def _(
                                 wrap=True,
                             ),
                             penetration_speed_ui,
+                        ],
+                        justify="space-between",
+                        align="center",
+                        wrap=True,
+                    ),
+                    mo.hstack(
+                        [
+                            mo.hstack(
+                                [
+                                    _row_label("**Azimuth**"),
+                                    penetration_azim_ui,
+                                ],
+                                justify="start",
+                                align="center",
+                                gap=1,
+                                wrap=True,
+                            ),
                         ],
                         justify="space-between",
                         align="center",
