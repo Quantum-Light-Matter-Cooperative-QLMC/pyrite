@@ -135,6 +135,7 @@ def _cli_pull(args):
         grid=not args.full,
         drop_wide_brem=args.drop_wide_brem,
         downcast=args.downcast,
+        level9=args.level9,
         no_sync=args.no_sync,
     )
 
@@ -384,6 +385,12 @@ def _build_remote_parser(ap):
     )
     p.add_argument(
         "--downcast", action="store_true", help="with grid pull: downcast to float32 too"
+    )
+    p.add_argument(
+        "--level9",
+        action="store_true",
+        help="recompress on the box at gzip level 9 before transfer (lossless, "
+        "just smaller/slower than the level-6 default a live sweep writes at)",
     )
     p.add_argument(
         "--no-sync", action="store_true", help="with grid pull: skip the pre-pull code sync"

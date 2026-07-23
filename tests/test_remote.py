@@ -1734,6 +1734,15 @@ def test_pull_short_full_flag(monkeypatch):
     assert calls[0]["grid"] is False
 
 
+def test_pull_level9_flag_defaults_off_and_wires_through(monkeypatch):
+    calls = []
+    monkeypatch.setattr(lifecycle, "pull", lambda *a, **kw: calls.append(kw))
+    remote.main(["pull", "hopg"])
+    assert calls[0]["level9"] is False
+    remote.main(["pull", "hopg", "--level9"])
+    assert calls[1]["level9"] is True
+
+
 def test_pull_warns_and_continues_when_one_checkpoint_is_missing(monkeypatch, capsys, tmp_path):
     calls = []
 
@@ -1843,6 +1852,46 @@ def test_grid_pull_removes_temp_when_checksum_fails(monkeypatch, tmp_path, capsy
 
     assert ["ssh", "-n", remote.HOST, "rm -f /tmp/hopg.grid.pkl"] in calls
     assert "warning: could not pull checkpoint 'hopg'" in capsys.readouterr().out
+
+
+def test_level9_pull_uses_slim_path_and_distinct_temp_artifact(monkeypatch, tmp_path, capsys):
+    (tmp_path / "checkpoints").mkdir()
+    (tmp_path / "checkpoints" / "hopg.pkl").write_bytes(b"same")
+    calls = []
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(transport, "_remote_sha256", lambda _path: "digest")
+    monkeypatch.setattr(transport, "_local_sha256", lambda _path: "digest")
+    monkeypatch.setattr(transport, "_run", lambda command, **_kw: calls.append(command))
+
+    remote.pull(["hopg"], level9=True, no_sync=True)
+
+    assert any(
+        "cxr slim" in " ".join(command)
+        and "--compresslevel 9" in " ".join(command)
+        and "--grid" not in " ".join(command)
+        for command in calls
+    )
+    assert not any(command[0] == "scp" for command in calls)
+    assert ["ssh", "-n", remote.HOST, "rm -f /tmp/hopg.slim.pkl"] in calls
+    assert "already current -> checkpoints/hopg.pkl" in capsys.readouterr().out
+
+
+def test_grid_and_level9_pull_compose_into_one_slim_call(monkeypatch, tmp_path, capsys):
+    (tmp_path / "checkpoints").mkdir()
+    (tmp_path / "checkpoints" / "hopg.pkl").write_bytes(b"same")
+    calls = []
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(transport, "_remote_sha256", lambda _path: "digest")
+    monkeypatch.setattr(transport, "_local_sha256", lambda _path: "digest")
+    monkeypatch.setattr(transport, "_run", lambda command, **_kw: calls.append(command))
+
+    remote.pull(["hopg"], grid=True, level9=True, no_sync=True)
+
+    assert any(
+        "--grid" in " ".join(command) and "--compresslevel 9" in " ".join(command)
+        for command in calls
+    )
+    assert ["ssh", "-n", remote.HOST, "rm -f /tmp/hopg.grid.pkl"] in calls
 
 
 def test_grid_pull_removes_temp_when_slim_fails(monkeypatch, tmp_path, capsys):

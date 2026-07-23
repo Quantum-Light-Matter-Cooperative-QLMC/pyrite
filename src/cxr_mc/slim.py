@@ -54,14 +54,25 @@ def _pct_smaller(before, after):
 
 
 def slim_checkpoint(
-    in_path, out_path=None, *, grid=False, drop_wide_brem=False, downcast=False, **constraints
+    in_path,
+    out_path=None,
+    *,
+    grid=False,
+    drop_wide_brem=False,
+    downcast=False,
+    compresslevel=6,
+    **constraints,
 ):
     """Load a checkpoint, slim it (:func:`results.slim_results`), write a smaller
     pickle (atomic temp+replace), and report the size saved. ``out_path`` defaults
     to ``<stem>.slim<ext>``. ``grid`` keeps only the material's current-grid
     configs, inferring the material from the checkpoint stem (rejecting a
-    ``_quick`` stem). Extra keyword args are case-field constraints passed straight
-    to ``slim_results``. Returns the slim results dict."""
+    ``_quick`` stem). ``compresslevel`` is forwarded to
+    ``_checkpoint_io.dump`` -- with no other trimming flag it makes this call a
+    pure lossless recompress (e.g. gzip level 9 for a smaller `cxr remote pull`
+    transfer, independent of the level-6 default used while a sweep is still
+    writing checkpoints). Extra keyword args are case-field constraints passed
+    straight to ``slim_results``. Returns the slim results dict."""
     # validate the stem before loading: the load is the expensive step, and a bad
     # --grid stem should fail in milliseconds, not after a gigabyte unpickle
     material = _material_from_stem(in_path) if grid else None
@@ -73,7 +84,7 @@ def slim_checkpoint(
         root, ext = os.path.splitext(in_path)
         out_path = f"{root}.slim{ext or '.pkl'}"
     tmp = out_path + ".tmp"
-    _checkpoint_io.dump(slim, tmp)
+    _checkpoint_io.dump(slim, tmp, compresslevel=compresslevel)
     os.replace(tmp, out_path)  # atomic: never leave a half-written pickle
     before, after = os.path.getsize(in_path), os.path.getsize(out_path)
     n_in = sum(len(v) for v in results.values())
@@ -95,6 +106,7 @@ def _cli(args):
         grid=args.grid,
         drop_wide_brem=args.drop_wide_brem,
         downcast=args.downcast,
+        compresslevel=args.compresslevel,
     )
 
 
@@ -118,6 +130,16 @@ def add_subparser(sub):
         "--downcast",
         action="store_true",
         help="store spectral arrays as float32 (halves their bytes)",
+    )
+    ap.add_argument(
+        "--compresslevel",
+        type=int,
+        default=6,
+        choices=range(1, 10),
+        metavar="1-9",
+        help="gzip level for the output pickle (default: 6, matches a live sweep's "
+        "checkpoint writes); 9 trades CPU for a smaller file, e.g. for a `cxr "
+        "remote pull` transfer",
     )
     ap.set_defaults(func=_cli)
     return ap

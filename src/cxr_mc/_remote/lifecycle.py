@@ -464,31 +464,39 @@ def reap_reservations(min_age_minutes=5.0, yes=False):
     print(f"reaped {len(orphans)} orphaned job(s)")
 
 
-def pull(stems, grid=False, drop_wide_brem=False, downcast=False, no_sync=False):
+def pull(stems, grid=False, drop_wide_brem=False, downcast=False, level9=False, no_sync=False):
     """Fetch checkpoints/<stem>.pkl back from the box for each stem (stem =
     material, or material_quick for a --quick run).
 
-    With ``grid``, filter on the box BEFORE the transfer: slim each checkpoint to
-    just the material's current grid (``cxr slim --grid``, plus the optional byte
-    trimmers) into a box temp, scp that smaller file into the local active slot,
-    and delete the temp. ``sync_code()`` runs first (unless ``no_sync``) so the
-    box rebuilds the grid from the same ``config.py`` the laptop has -- closing
-    sync drift. Without ``grid`` this is the plain whole-file scp."""
+    With ``grid`` and/or ``level9``, prep on the box BEFORE the transfer via
+    ``cxr slim``: ``grid`` filters to just the material's current grid (plus the
+    optional byte trimmers), ``level9`` recompresses at gzip level 9 instead of
+    the level-6 default a live sweep writes at -- lossless, just smaller for the
+    wire. Either way the result lands in a box temp, gets scp'd into the local
+    active slot, and the temp is deleted. ``sync_code()`` runs first (unless
+    ``no_sync``) so the box rebuilds the grid from the same ``config.py`` the
+    laptop has, and has the ``--compresslevel`` flag at all -- closing sync
+    drift. With neither flag this is the plain whole-file scp."""
     transport._check_shell_tokens(stems)
     dest = config.LOCAL_ROOT / "checkpoints"
     dest.mkdir(exist_ok=True)
-    if grid and not no_sync:
+    use_slim = grid or level9
+    if use_slim and not no_sync:
         transport.sync_code()  # box must rebuild the grid from the same config.py
     for stem in stems:
         local = dest / f"{stem}.pkl"
         try:
-            if grid:
-                flags = " --grid"
+            if use_slim:
+                flags = ""
+                if grid:
+                    flags += " --grid"
                 if drop_wide_brem:
                     flags += " --drop-wide-brem"
                 if downcast:
                     flags += " --downcast"
-                remote_tmp = f"/tmp/{stem}.grid.pkl"
+                if level9:
+                    flags += " --compresslevel 9"
+                remote_tmp = f"/tmp/{stem}.grid.pkl" if grid else f"/tmp/{stem}.slim.pkl"
                 ckpt = f"{config.REMOTE_DIR}/checkpoints/{stem}.pkl"
                 try:
                     transport._run(
@@ -506,7 +514,10 @@ def pull(stems, grid=False, drop_wide_brem=False, downcast=False, no_sync=False)
                         print(f"already current -> checkpoints/{stem}.pkl")
                     else:
                         transport._run(["scp", f"{config.HOST}:{remote_tmp}", str(local)])
-                        print(f"pulled (grid) -> checkpoints/{stem}.pkl")
+                        label = "+".join(
+                            filter(None, ["grid" if grid else "", "level9" if level9 else ""])
+                        )
+                        print(f"pulled ({label}) -> checkpoints/{stem}.pkl")
                 finally:
                     transport._run(["ssh", "-n", config.HOST, f"rm -f {remote_tmp}"])
             else:

@@ -100,6 +100,31 @@ def test_slim_checkpoint_default_out_path(tmp_path):
     assert (tmp_path / "hopg.slim.pkl").exists()
 
 
+def test_slim_checkpoint_compresslevel_9_is_lossless_and_no_larger(tmp_path):
+    """No trimming flag + --compresslevel 9 is a pure recompress: same content,
+    same or smaller bytes than the level-6 default -- what `cxr remote pull
+    --level9` relies on."""
+    res = _results()
+    src = tmp_path / "hopg.pkl"
+    with open(src, "wb") as f:
+        pickle.dump(res, f)
+    level6 = tmp_path / "hopg.level6.pkl"
+    level9 = tmp_path / "hopg.level9.pkl"
+    slim_checkpoint(str(src), str(level6))
+    slim_checkpoint(str(src), str(level9), compresslevel=9)
+    assert level9.stat().st_size <= level6.stat().st_size
+    reloaded = _checkpoint_io.load(str(level9))
+    assert reloaded.keys() == res.keys()
+    for name, by_E in res.items():
+        for E0, record in by_E.items():
+            for key, value in record.items():
+                got = reloaded[name][E0][key]
+                if isinstance(value, np.ndarray):
+                    np.testing.assert_array_equal(got, value)
+                else:
+                    assert got == value
+
+
 # ---- grid filtering (checkpoint lifecycle: grid-filtered pull) ----------------
 def _grid_config_names(material="hopg"):
     """The real current-grid config names for a material, straight from the same
