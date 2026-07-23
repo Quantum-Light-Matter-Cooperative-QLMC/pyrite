@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import plotly.graph_objects as go
 
-from ..montecarlo.geometry import project_beam_entry
+from ..montecarlo.geometry import project_beam_entry, sample_to_lab_R
 from .trajectories import _case_of, _trajectory_data
 
 _CRYSTAL = "#B9D9EB"
@@ -41,6 +41,22 @@ _ZOOM_BEAM_FWHM_MM = 1.0e-3
 # ~1 s during play; smaller Ne (the slider's lower half) comes in well under
 # 30 MB at this frame count. See trajectory_volume_animation's docstring.
 N_FRAMES = 8
+
+_IDENTITY_R = np.eye(3)
+
+
+def _case_R(case):
+    """Sample -> lab rotation for this case's tilt (``v_lab = R @ v_sample``);
+    see :func:`cxr_mc.montecarlo.geometry.sample_to_lab_R`."""
+    return sample_to_lab_R(
+        np.deg2rad(case.get("tilt_deg", 0.0)), np.deg2rad(case.get("tilt_azim_deg", 0.0))
+    )
+
+
+def _rotate(points, R):
+    """Apply the sample -> lab rotation ``R`` (``v_lab = R @ v_sample``) to an
+    ``(N, 3)`` array of points/vectors. NaN rows (segment separators) stay NaN."""
+    return np.asarray(points, dtype=float) @ R.T
 
 
 def track_vertices_3d(data, *, t_fs=None, reveal_until_fs=None):
@@ -84,17 +100,23 @@ def track_vertices_3d(data, *, t_fs=None, reveal_until_fs=None):
     return xyz, colors, ids
 
 
-def _tracks_trace(case, data, unit, *, reveal_until_fs=None):
+def _tracks_trace(case, data, unit, *, R=_IDENTITY_R, reveal_until_fs=None):
     """Electron-track ``Scatter3d`` at one reveal cutoff (see
     :func:`track_vertices_3d`). Shared by the full-reveal figure
     (:func:`trajectory_volume_figure_from_data`) and by every animation frame
     -- :func:`trajectory_volume_animation` calls this once per frame with a
     different ``reveal_until_fs``, so the vertex-filtering logic lives in
-    exactly one place."""
+    exactly one place.
+
+    ``R`` (default identity) rotates the plotted ``x``/``y``/``z`` from the
+    sample frame into the lab frame (see :func:`_case_R`); the hover ``depth``
+    stays the SAMPLE-frame ``z`` (true penetration depth) regardless of ``R``."""
     xyz, energy, elec_id = track_vertices_3d(
         data, t_fs=data["t_fs"], reveal_until_fs=reveal_until_fs
     )
-    custom = np.column_stack((energy, elec_id, xyz[:, 2]))
+    depth = xyz[:, 2]
+    xyz = _rotate(xyz, R)
+    custom = np.column_stack((energy, elec_id, depth))
     return go.Scatter3d(
         x=xyz[:, 0],
         y=xyz[:, 1],
@@ -154,10 +176,23 @@ def _display_extent(case, data, *, realistic):
     return lox, hix, loy, hiy, thick, unit, span
 
 
-def _crystal_mesh(lox, hix, loy, hiy, thick):
-    x = [lox, hix, hix, lox, lox, hix, hix, lox]
-    y = [loy, loy, hiy, hiy, loy, loy, hiy, hiy]
-    z = [0.0, 0.0, 0.0, 0.0, thick, thick, thick, thick]
+def _crystal_mesh(lox, hix, loy, hiy, thick, *, R=_IDENTITY_R):
+    corners = _rotate(
+        np.array(
+            [
+                [lox, loy, 0.0],
+                [hix, loy, 0.0],
+                [hix, hiy, 0.0],
+                [lox, hiy, 0.0],
+                [lox, loy, thick],
+                [hix, loy, thick],
+                [hix, hiy, thick],
+                [lox, hiy, thick],
+            ]
+        ),
+        R,
+    )
+    x, y, z = corners[:, 0].tolist(), corners[:, 1].tolist(), corners[:, 2].tolist()
     # Two triangles per face.  Slight transparency keeps internal tracks legible.
     i = [0, 0, 4, 4, 0, 0, 1, 1, 2, 2, 3, 3]
     j = [1, 2, 5, 6, 1, 5, 2, 6, 3, 7, 0, 4]
@@ -178,11 +213,15 @@ def _crystal_mesh(lox, hix, loy, hiy, thick):
     )
 
 
-def _plane_outline(z, lox, hix, loy, hiy, *, name, dash="solid"):
+def _plane_outline(z, lox, hix, loy, hiy, *, R=_IDENTITY_R, name, dash="solid"):
+    pts = _rotate(
+        np.array([[lox, loy, z], [hix, loy, z], [hix, hiy, z], [lox, hiy, z], [lox, loy, z]]),
+        R,
+    )
     return go.Scatter3d(
-        x=[lox, hix, hix, lox, lox],
-        y=[loy, loy, hiy, hiy, loy],
-        z=[z] * 5,
+        x=pts[:, 0],
+        y=pts[:, 1],
+        z=pts[:, 2],
         mode="lines",
         line={"color": _CRYSTAL_EDGE, "width": 3, "dash": dash},
         hovertemplate=f"{name}<br>depth={z:.4g}<extra></extra>",
@@ -238,9 +277,10 @@ def _crystal_footprint_extent(case, u):
     return -hx, hx, -hy, hy
 
 
-def _beam_footprint_outline(case, u, fwhm_mm, *, n_points=96):
-    """Closed ``(x, y)`` outline [display units] of the collimated beam spot where
-    it strikes the tilted entrance face ``z = 0``, for the realistic-scale view.
+def _beam_footprint_outline(case, u, fwhm_mm, *, R=_IDENTITY_R, n_points=96):
+    """Closed ``(x, y, z)`` outline [display units] of the collimated beam spot
+    where it strikes the tilted entrance face ``z = 0`` (SAMPLE frame), for the
+    realistic-scale view, rotated into the lab frame by ``R``.
 
     The lab beam is a round spot travelling along ``+z_lab``; on a face tilted by
     (``tilt_deg``, ``tilt_azim_deg``) its footprint elongates by ``1 / cos(tilt)``
@@ -255,7 +295,7 @@ def _beam_footprint_outline(case, u, fwhm_mm, *, n_points=96):
     ``case`` itself). Draw the outline at the FWHM contour (lab radius =
     ``fwhm_mm / 2``, mm -> Ang factor 1e7). Sample a ring of ``n_points`` lab
     offsets ``(u_i, v_i)`` on that circle, project them, and divide the
-    resulting sample-frame (x, y) by ``u`` for display units.
+    resulting sample-frame (x, y) by ``u`` for display units before rotating.
     """
     if not fwhm_mm:
         return None
@@ -267,16 +307,18 @@ def _beam_footprint_outline(case, u, fwhm_mm, *, n_points=96):
         np.deg2rad(case.get("tilt_deg", 0.0)),
         np.deg2rad(case.get("tilt_azim_deg", 0.0)),
     )
-    return entry[:, 0] / u, entry[:, 1] / u
+    pts = _rotate(np.column_stack((entry[:, 0] / u, entry[:, 1] / u, np.zeros(len(entry)))), R)
+    return pts[:, 0], pts[:, 1], pts[:, 2]
 
 
-def _incident_beam_lines(data, length):
+def _incident_beam_lines(data, length, *, R=_IDENTITY_R):
     """NaN-separated incident-beam segments -- one short stub per electron drawn
     UPSTREAM along the beam direction into its true entry point on the ``z = 0``
     face, so the beam reads as a bundle of incoming particles rather than a single
     arrow. Entry points are each electron's first-segment start; electrons whose
     Gaussian draw missed a finite crystal are already absent from ``data`` (dropped
-    as ``n_missed`` by transport), so this never draws a particle that missed."""
+    as ``n_missed`` by transport), so this never draws a particle that missed.
+    ``R`` (default identity) rotates the plotted points into the lab frame."""
     sid = np.asarray(data["elec_id"])
     start = np.asarray(data["start_xyz"], dtype=float)
     _, first = np.unique(sid, return_index=True)  # one entry per electron
@@ -288,6 +330,7 @@ def _incident_beam_lines(data, length):
     xyz = np.full((3 * n, 3), np.nan)  # start, entry, NaN per electron
     xyz[0::3] = upstream
     xyz[1::3] = entry
+    xyz = _rotate(xyz, R)
     return go.Scatter3d(
         x=xyz[:, 0],
         y=xyz[:, 1],
@@ -299,7 +342,9 @@ def _incident_beam_lines(data, length):
     )
 
 
-def _exit_paths_3d(data, length, *, cmax, tol_frac=1e-6, reveal_until_fs=None, empty_ok=False):
+def _exit_paths_3d(
+    data, length, *, R=_IDENTITY_R, cmax, tol_frac=1e-6, reveal_until_fs=None, empty_ok=False
+):
     """ONE NaN-separated ``Scatter3d`` of solid exit-path continuations, one per
     electron that leaves through the TOP (``z ~ 0``, backscattered) or BOTTOM
     (``z ~ thick``, transmitted) face. Side exits (terminal ``z`` strictly
@@ -335,6 +380,10 @@ def _exit_paths_3d(data, length, *, cmax, tol_frac=1e-6, reveal_until_fs=None, e
     :func:`trajectory_volume_animation`), where a Plotly frame must always be
     able to update this trace's fixed index even when its own reveal cutoff
     has not yet exposed any exit.
+
+    Face membership uses the SAMPLE-frame ``z`` (true penetration depth)
+    regardless of ``R``; ``R`` (default identity) only rotates the final
+    plotted points into the lab frame.
     """
     elec_id = np.asarray(data["elec_id"])
     start = np.asarray(data["start_xyz"], dtype=float)
@@ -383,6 +432,7 @@ def _exit_paths_3d(data, length, *, cmax, tol_frac=1e-6, reveal_until_fs=None, e
         # per-vertex color = owning electron's exit energy (3 verts/electron incl. the
         # NaN separator, whose color value is inert since its position breaks the line).
         color = np.repeat(term_energy, 3)
+    xyz = _rotate(xyz, R)
     return go.Scatter3d(
         x=xyz[:, 0],
         y=xyz[:, 1],
@@ -450,10 +500,17 @@ def trajectory_volume_figure(
 ):
     """Interactive 3D cutaway of electron tracks inside the crystal slab.
 
-    Axes are sample-frame coordinates. The incident beam is drawn as a BUNDLE of
-    particles: each electron enters at its own Gaussian-sampled, tilt-projected
-    point on the ``z = 0`` face, and a short red stub upstream of that point marks
-    the incoming ray (replacing the old single beam arrow).
+    Axes are LAB-frame coordinates (see :func:`cxr_mc.montecarlo.geometry.
+    sample_to_lab_R`): z is the fixed beam axis, x is the in-plane direction 90
+    deg from the beam within the beam-detector plane (the detector direction
+    always has zero lab-y component by convention, so x and the detector
+    direction coincide exactly at ``theta_obs = 90 deg``), and y is out of that
+    plane. The crystal itself is rotated into this frame too, so a tilted slab
+    reads as visibly tilted rather than always face-on. The incident beam is
+    drawn as a BUNDLE of particles: each electron enters at its own
+    Gaussian-sampled, tilt-projected point on the sample's ``z = 0`` face, and a
+    short red stub upstream of that point marks the incoming ray (replacing the
+    old single beam arrow).
 
     By default (``realistic=False``) the crystal x/y extent is a fitted display
     window around the simulated tracks, not a claim about physical lateral
@@ -512,39 +569,47 @@ def trajectory_volume_figure_from_data(
     drawn crystal footprint and beam-spot outline, not transport.
     """
     case = _case_of(rec_or_case)
+    R = _case_R(case)
     lox, hix, loy, hiy, thick, unit, span = _display_extent(case, data, realistic=realistic)
-    tracks = _tracks_trace(case, data, unit, reveal_until_fs=reveal_until_fs)
+    tracks = _tracks_trace(case, data, unit, R=R, reveal_until_fs=reveal_until_fs)
 
-    fig = go.Figure([_crystal_mesh(lox, hix, loy, hiy, thick), tracks])
-    fig.add_trace(_plane_outline(0.0, lox, hix, loy, hiy, name="entrance face"))
-    fig.add_trace(_plane_outline(thick, lox, hix, loy, hiy, name="exit face"))
+    fig = go.Figure([_crystal_mesh(lox, hix, loy, hiy, thick, R=R), tracks])
+    fig.add_trace(_plane_outline(0.0, lox, hix, loy, hiy, R=R, name="entrance face"))
+    fig.add_trace(_plane_outline(thick, lox, hix, loy, hiy, R=R, name="exit face"))
     for index, depth in enumerate(data.get("layer_bounds", ()), start=1):
         fig.add_trace(
-            _plane_outline(depth, lox, hix, loy, hiy, name=f"layer interface {index}", dash="dash")
+            _plane_outline(
+                depth, lox, hix, loy, hiy, R=R, name=f"layer interface {index}", dash="dash"
+            )
         )
     if realistic:
-        outline = _beam_footprint_outline(case, data["u"], _resolve_beam_fwhm(case, beam_fwhm_mm))
+        outline = _beam_footprint_outline(
+            case, data["u"], _resolve_beam_fwhm(case, beam_fwhm_mm), R=R
+        )
         if outline is not None:
-            fx, fy = outline
+            fx, fy, fz = outline
             fig.add_trace(
                 go.Scatter3d(
                     x=fx,
                     y=fy,
-                    z=[0.0] * len(fx),
+                    z=fz,
                     mode="lines",
                     line={"color": _BEAM, "width": 5},
-                    hovertemplate="beam footprint (z=0)<extra></extra>",
+                    hovertemplate="beam footprint (entrance face)<extra></extra>",
                     name="beam footprint",
                 )
             )
-    fig.add_trace(_incident_beam_lines(data, 0.28 * span))
+    fig.add_trace(_incident_beam_lines(data, 0.28 * span, R=R))
     exit_paths = _exit_paths_3d(
-        data, 0.28 * span, cmax=float(case["E0_keV"]), reveal_until_fs=reveal_until_fs
+        data, 0.28 * span, R=R, cmax=float(case["E0_keV"]), reveal_until_fs=reveal_until_fs
     )
     if exit_paths is not None:
         fig.add_trace(exit_paths)
     for trace in _direction_arrow(
-        data["detector"], 0.28 * span, color=_DETECTOR, name="detector direction"
+        R @ np.asarray(data["detector"], dtype=float),
+        0.28 * span,
+        color=_DETECTOR,
+        name="detector direction",
     ):
         fig.add_trace(trace)
 
@@ -553,7 +618,8 @@ def trajectory_volume_figure_from_data(
         title={
             "text": (
                 f"{material} · {case['E0_keV']:g} keV · "
-                f"θ<sub>tilt</sub>={case.get('tilt_deg', 0.0):g}°"
+                f"θ<sub>tilt</sub>={case.get('tilt_deg', 0.0):g}° · "
+                f"φ<sub>azim</sub>={case.get('tilt_azim_deg', 0.0):g}°"
             ),
             "x": 0.02,
         },
@@ -568,10 +634,18 @@ def trajectory_volume_figure_from_data(
         # width, not height); 560 tightens that gap.
         height=560,
         scene={
-            "xaxis": {"title": f"sample x ({unit})", "gridcolor": _GRID, "zeroline": False},
-            "yaxis": {"title": f"sample y ({unit})", "gridcolor": _GRID, "zeroline": False},
+            "xaxis": {
+                "title": f"lab x, beam·detector plane ({unit})",
+                "gridcolor": _GRID,
+                "zeroline": False,
+            },
+            "yaxis": {
+                "title": f"lab y, out of plane ({unit})",
+                "gridcolor": _GRID,
+                "zeroline": False,
+            },
             "zaxis": {
-                "title": f"penetration depth ({unit})",
+                "title": f"lab z, beam axis ({unit})",
                 "gridcolor": _GRID,
                 "zeroline": False,
             },
@@ -688,6 +762,7 @@ def trajectory_volume_animation(
     Play again after doing so) to replay.
     """
     case = _case_of(rec_or_case)
+    R = _case_R(case)
     t_max = dataset_t_max(data)
     cmax = float(case["E0_keV"])
     _, _, _, _, _thick, _unit, span = _display_extent(case, data, realistic=realistic)
@@ -718,6 +793,7 @@ def trajectory_volume_animation(
     for k in range(n_frames):
         cutoff = frame_reveal_fs(k, t_max, n_frames=n_frames)
         xyz, energy, _elec_id = track_vertices_3d(data, t_fs=data["t_fs"], reveal_until_fs=cutoff)
+        xyz = _rotate(xyz, R)
         # No customdata here (see docstring PAYLOAD note): only the base
         # (full-reveal) trace carries hover data, trimming this frame to just
         # the arrays that drive what is actually drawn.
@@ -736,7 +812,7 @@ def trajectory_volume_animation(
             # otherwise it would keep showing the PREVIOUS (fuller) frame's
             # dashes -- exits appearing before the track that produced them.
             exit_trace = _exit_paths_3d(
-                data, length, cmax=cmax, reveal_until_fs=cutoff, empty_ok=True
+                data, length, R=R, cmax=cmax, reveal_until_fs=cutoff, empty_ok=True
             )
             assert exit_trace is not None  # empty_ok=True always yields a trace
             frame_data.append(

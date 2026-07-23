@@ -142,6 +142,28 @@ def tilted_geometry(theta_obs_rad, tilt_polar_rad, tilt_azim_rad=0.0):
     return beam_dir, n_hat
 
 
+def sample_to_lab_R(tilt_polar_rad, tilt_azim_rad=0.0):
+    """Rotation ``R`` with ``v_lab = R @ v_sample``, the SAME rotation
+    :func:`tilted_geometry` builds internally (sample construction ``+z`` ->
+    the tilted slab normal ``normal_lab``). Exposed for callers -- e.g. the 3D
+    trajectory viewer -- that need to express a full sample-frame point cloud
+    in the lab frame, not just the single beam/detector directions
+    ``tilted_geometry`` returns.
+
+    Not new physics -- factors out ``tilted_geometry``'s existing rotation.
+    ``tilted_geometry(theta_obs_rad, tp, ta)`` is exactly
+    ``(R.T @ [0,0,1], R.T @ [sin theta_obs_rad, 0, cos theta_obs_rad])`` for
+    ``R = sample_to_lab_R(tp, ta)``, bit-for-bit.
+
+    Limiting case: ``tilt_polar_rad = 0`` gives ``normal_lab = +z``, so
+    ``_rotation_between`` returns the identity and lab == sample, matching
+    ``tilted_geometry``'s untilted limit.
+    """
+    st, ct = np.sin(tilt_polar_rad), np.cos(tilt_polar_rad)
+    normal_lab = np.array([st * np.cos(tilt_azim_rad), st * np.sin(tilt_azim_rad), ct])
+    return _rotation_between(np.array([0.0, 0.0, 1.0]), normal_lab)
+
+
 def project_beam_entry(offsets_uv, tilt_polar_rad, tilt_azim_rad=0.0):
     """Sample-frame (x, y) entry points on the z=0 face for a COLLIMATED lab beam.
 
@@ -185,7 +207,7 @@ def project_beam_entry(offsets_uv, tilt_polar_rad, tilt_azim_rad=0.0):
     # sample-frame origin of each lab ray = its transverse offset carried into
     # the sample frame (the ray then continues along beam_dir).
     o = offsets_uv[:, 0:1] * e_x + offsets_uv[:, 1:2] * e_y  # (N, 3)
-    s_star = -o[:,2] / beam_dir[2]
+    s_star = -o[:, 2] / beam_dir[2]
     p0 = o + s_star[:, None] * beam_dir
     # entrance face ``z = 0`` and return the (N, 2) sample-frame (x, y) entry
     # points. Solve for s* that zeroes the z-component, form p0, drop z.
