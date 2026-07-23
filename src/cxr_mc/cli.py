@@ -4,6 +4,7 @@ A single console script with subcommands, wired in pyproject.toml as
 ``cxr = "cxr_mc.cli:main"``:
 
     cxr scan <material> [--quick] [--workers N]   # run a sweep -> checkpoint
+    cxr blaze <material> --energy E --spacing S   # grooved-crystal sweep -> _grooved checkpoint
     cxr export [stem]                             # analysis app -> results/<stem>.html
     cxr analyze [-d/--default] [<material>] [--watch] [--edit]  # launch the analysis app
     cxr check [--watch] [--edit]                  # launch the validation app
@@ -40,6 +41,7 @@ def main(argv=None):
             from . import (
                 analyze,
                 archive,
+                blaze,
                 check,
                 check_config,
                 export,
@@ -50,6 +52,7 @@ def main(argv=None):
             )
 
             scan.add_subparser(sub)
+            blaze.add_subparser(sub)
             export.add_subparser(sub)
             analyze.add_subparser(sub)
             slim.add_subparser(sub)

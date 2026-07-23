@@ -492,6 +492,8 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
             ]
         if width is not None:
             name = f"{name} footprint={width:g}x{height:g}mm"
+        if sweep.groove_spacing_ang is not None:
+            name = f"{name} groove={sweep.groove_spacing_ang / 1e4:g}um"
         for i_e, E0 in enumerate(energies):
             line_case_grid = encode_energy_grid(line_grids[i_e])
             cases.append(

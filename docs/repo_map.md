@@ -196,6 +196,17 @@ Headless sweep entry: parse args → build cases → `run_sweep` → checkpoint.
 - Public: `main`, `run`, `add_subparser`.
 - Deps: `config`, `run`, `sweep`.
 
+### `blaze.py`
+Headless blazed-crystal (sawtooth entrance face) sweep entry: `cxr blaze <material>
+--energy E [E...] --spacing S [S...] [--angles A [A...]]`. Mirrors `scan.py`'s
+parse args → build cases → `run_sweep` → checkpoint structure, but forces v1
+groove geometry (`theta_obs=90`, `tilt_azim=180`, no substrate/stack/footprint)
+per (energy, spacing) pair and writes to a dedicated
+`checkpoints/<material>_blazed.pkl`, never the flat-face `<material>.pkl`. See
+`docs/superpowers/specs/2026-07-23-cxr-blaze-grooved-sweep-design.md`.
+- Public: `main`, `run`, `add_subparser`.
+- Deps: `config`, `run`, `scan` (`validate_materials`, `_write_progress_record`), `sweep`.
+
 ## Results & plotting
 
 ### `results/` (package)
@@ -314,8 +325,8 @@ wired into pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
 ### `cli.py`
 `cxr` console-script dispatcher.
 - Public: `main`.
-- Deps: `analyze`, `archive`, `check`, `check_config`, `export`, `remote`,
-  `scan`, `slim`, `__version__`.
+- Deps: `analyze`, `archive`, `blaze`, `check`, `check_config`, `export`,
+  `remote`, `scan`, `slim`, `__version__`.
 
 ### `analyze.py`
 `cxr analyze` launcher for `notebooks/analysis_app.py`: persisted
