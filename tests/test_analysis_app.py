@@ -45,6 +45,21 @@ def test_penetration_view_uses_interactive_3d_volume_as_primary_track_plot() -> 
     assert "lateral extent is fitted to the tracks" in source
 
 
+def test_penetration_tab_wires_groove_control_to_trajectory_sweep() -> None:
+    source = APP.read_text()
+
+    # The groove-spacing control exists (default off) ...
+    assert "penetration_groove_ui = mo.ui.number(" in source
+    assert 'label="Groove spacing (Å, 0 = off)"' in source
+    # ... is read in the penetration tab ...
+    assert "penetration_groove_ui.value" in source
+    # ... and threads into the trajectory sweep only when azim == 180 deg.
+    assert "groove_spacing_ang=spacing" in source
+    assert "penetration_azim_deg == 180.0" in source
+    # the transported dataset cache invalidates on the groove knob
+    assert '_nc.get("groove_spacing_ang")' in source
+
+
 def test_penetration_controls_offer_material_presets_and_bounded_manual_values() -> None:
     source = APP.read_text()
 

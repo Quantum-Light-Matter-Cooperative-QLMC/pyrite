@@ -377,9 +377,7 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
     _tilt_values = tuple(float(value) for value in _scan.tilt_deg)
 
     _source_options = {"Presets": "grid", "Custom": "manual"}
-    penetration_energy_source_ui = mo.ui.dropdown(
-        _source_options, value="Presets", label=""
-    )
+    penetration_energy_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")
     penetration_energy_grid_ui = mo.ui.dropdown(
         {f"{value:g} keV": value for value in _energy_values},
         value=f"{_energy_values[0]:g} keV",
@@ -389,9 +387,7 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
         start=1.0, stop=300.0, step=1.0, value=_energy_values[0], label="(keV)"
     )
 
-    penetration_thickness_source_ui = mo.ui.dropdown(
-        _source_options, value="Presets", label=""
-    )
+    penetration_thickness_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")
     penetration_thickness_grid_ui = mo.ui.dropdown(
         {fmt_thickness(value): value for value in _thickness_values},
         value=fmt_thickness(_thickness_values[0]),
@@ -405,9 +401,7 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
         label="(µm)",
     )
 
-    penetration_tilt_source_ui = mo.ui.dropdown(
-        _source_options, value="Presets", label=""
-    )
+    penetration_tilt_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")
     if len(_tilt_values) > 1:
         default_tilt_ind = len(_tilt_values) // 2
         default_tilt_value = _tilt_values[default_tilt_ind]
@@ -1428,7 +1422,6 @@ def _(
     # closures over locals, only free vars resolvable at cell/module scope.
     _is_heatmap_mode = len(_tilts) >= 4 and len(_azims) >= 4
 
-
     def scans_tab():
         # Click a heatmap cell -> spectrum for THAT (azimuth, tilt) geometry at the
         # heatmap's beam energy, on the scan-pinned-thickness view. `x`/`y` are the
@@ -1452,7 +1445,9 @@ def _(
                     tilt_deg=float(_row["y"]),
                     E0_keV=scan_heatmap_E0_ui.value,
                 )
-                _sp_narrow = spectrum_chart(_sub, settings, tilt_deg=float(_row["y"]), band="narrow")
+                _sp_narrow = spectrum_chart(
+                    _sub, settings, tilt_deg=float(_row["y"]), band="narrow"
+                )
                 _sp_broad = spectrum_chart(_sub, settings, tilt_deg=float(_row["y"]), band="broad")
                 _charts = [c for c in (_sp_narrow, _sp_broad) if c is not None]
                 return mo.vstack(_charts) if _charts else mo.md("*No spectrum for that cell.*")
@@ -1532,7 +1527,6 @@ def _(
             ]
         )
         return mo.vstack(_parts)
-
 
     return (scans_tab,)
 
@@ -1633,7 +1627,7 @@ def _(
                             wrap=True,
                         ),
                     ]
-                )
+                ),
             ]
         )
 
@@ -1768,7 +1762,19 @@ def _(mo):
     penetration_beam_fwhm_ui = mo.ui.number(
         value=1.0, start=0.001, step=0.1, label="Beam FWHM (mm)"
     )
-    return penetration_beam_fwhm_ui, penetration_ne_ui, penetration_regen_ui
+    # Blazed sawtooth entrance-face grooves (Task 6 / docs/superpowers/plans/
+    # 2026-07-23-blazed-groove-geometry.md). 0 = off (flat face). Grooves are only
+    # valid at azimuth = 180 deg with 0 < polar tilt < 90 deg; the tab applies
+    # them only then and shows a note otherwise.
+    penetration_groove_ui = mo.ui.number(
+        value=0.0, start=0.0, step=1000.0, label="Groove spacing (Å, 0 = off)"
+    )
+    return (
+        penetration_beam_fwhm_ui,
+        penetration_groove_ui,
+        penetration_ne_ui,
+        penetration_regen_ui,
+    )
 
 
 @app.cell
@@ -1799,6 +1805,7 @@ def _(
     penetration_energy_keV,
     penetration_energy_manual_ui,
     penetration_energy_source_ui,
+    penetration_groove_ui,
     penetration_ne_ui,
     penetration_realistic_ui,
     penetration_regen_ui,
@@ -1827,14 +1834,42 @@ def _(
             "azimuth selected in this tab. The translucent crystal's lateral extent is fitted to the tracks; depth "
             "and layer interfaces retain true scale. "
         )
-        _sweep = trajectory_sweep(
-            MATERIAL,
-            energies=(penetration_energy_keV,),
-            tilts=(penetration_tilt_deg,),
-            thickness_ang=penetration_thickness_ang,
-            azim_deg=penetration_azim_deg,
+        # Blazed grooves: valid only at azimuth 180 deg with 0 < polar tilt < 90.
+        # Only feed the knob to trajectory_sweep when the selected azimuth admits
+        # it; otherwise show a note and draw the ungrooved slab. build_cases /
+        # Sweep still validate (tilt, substrate/stack, footprint) and raise -- a
+        # substrate material or tilt=0 falls back to ungrooved with the reason.
+        _groove_req = float(penetration_groove_ui.value or 0.0)
+        _groove_spacing = (
+            _groove_req if (_groove_req > 0.0 and penetration_azim_deg == 180.0) else None
         )
-        _traj = build_cases(_sweep, settings.n_electrons, settings.n_electrons_brem)
+        _groove_note = None
+        if _groove_req > 0.0 and _groove_spacing is None:
+            _groove_note = mo.md(
+                f"*Grooves need azimuth = 180 deg (selected {penetration_azim_deg:g} deg); "
+                "showing the ungrooved slab.*"
+            )
+
+        def _make_sweep(spacing):
+            return trajectory_sweep(
+                MATERIAL,
+                energies=(penetration_energy_keV,),
+                tilts=(penetration_tilt_deg,),
+                thickness_ang=penetration_thickness_ang,
+                azim_deg=penetration_azim_deg,
+                groove_spacing_ang=spacing,
+            )
+
+        try:
+            _sweep = _make_sweep(_groove_spacing)
+            _traj = build_cases(_sweep, settings.n_electrons, settings.n_electrons_brem)
+        except ValueError as _exc:
+            # geometry/material rejects grooves (tilt=0, substrate/stack, ...):
+            # fall back to the flat face and surface the reason.
+            _groove_spacing = None
+            _groove_note = mo.md(f"*Grooves not applied: {_exc}*")
+            _sweep = _make_sweep(None)
+            _traj = build_cases(_sweep, settings.n_electrons, settings.n_electrons_brem)
         if not _traj:
             return mo.vstack([_md, mo.md("*No trajectory cases.*")])
         # The sweep has one selected energy and tilt; keep the nearest-case guard
@@ -1852,6 +1887,7 @@ def _(
             penetration_tilt_deg,
             penetration_azim_deg,
             penetration_thickness_ang,
+            _groove_spacing,
         )
         _cached_survival = get_penetration_survival()
         if _cached_survival is not None and _cached_survival[0] == _survival_key:
@@ -1875,6 +1911,7 @@ def _(
             _nc["E0_keV"],
             _nc.get("tilt_deg"),
             _nc.get("tilt_azim_deg"),
+            _nc.get("groove_spacing_ang"),
             _Ne,
             _seed,
             _realistic,
@@ -2026,18 +2063,28 @@ def _(
                                 gap=1,
                                 wrap=True,
                             ),
+                            mo.hstack(
+                                [
+                                    _row_label("**Grooves**"),
+                                    penetration_groove_ui,
+                                ],
+                                justify="end",
+                                align="center",
+                                gap=1,
+                                wrap=True,
+                            ),
                         ],
                         justify="space-between",
                         align="center",
                         wrap=True,
                     ),
+                    *((_groove_note,) if _groove_note is not None else ()),
                     mo.hstack([penetration_regen_ui], justify="end", wrap=True),
                 ]
             ),
             *(p for p in (_volume, _bottom_row) if p is not None),
         ]
         return mo.vstack(_parts)
-
 
     return (penetration_tab,)
 
@@ -2090,7 +2137,6 @@ def _(
     from cxr_mc.plots import material_comparison_point
     from cxr_mc.plots.altair_spectra import material_comparison_chart
     from cxr_mc.run import cached_material_analysis
-
 
     def cross_material_tab():
         _md = mo.md(
@@ -2157,7 +2203,6 @@ def _(
                 mo.md("*Run `scan_app.py` for more materials to populate this comparison.*"),
             ]
         )
-
 
     return (cross_material_tab,)
 
