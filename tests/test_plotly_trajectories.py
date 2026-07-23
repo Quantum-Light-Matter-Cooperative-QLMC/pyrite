@@ -6,7 +6,6 @@ import plotly.graph_objects as go
 from cxr_mc.plots.plotly_trajectories import (
     N_FRAMES,
     _exit_paths_3d,
-    advance_frame,
     case_t_max,
     dataset_t_max,
     frame_reveal_fs,
@@ -229,32 +228,6 @@ def test_dataset_t_max_from_synthetic_data():
     assert dataset_t_max({"t_fs": np.array([])}) == 0.0
 
 
-def test_advance_frame_wraps_when_repeat():
-    next_index, playing = advance_frame(N_FRAMES - 2, speed=5, repeat=True)
-    assert next_index == 0
-    assert playing is True
-
-
-def test_advance_frame_clamps_when_not_repeat():
-    next_index, playing = advance_frame(N_FRAMES - 2, speed=5, repeat=False)
-    assert next_index == N_FRAMES - 1
-    assert playing is False
-
-
-def test_advance_frame_speed_scaling():
-    next_index, playing = advance_frame(0, speed=3, repeat=False)
-    assert next_index == 3
-    assert playing is True
-
-
-def test_advance_frame_slow_speed_never_stalls():
-    # speed=0.25 -> round(0.25) == 0, which must be floored to a 1-frame
-    # step, not a no-op (see advance_frame stall bug fix).
-    next_index, playing = advance_frame(0, speed=0.25, repeat=False)
-    assert next_index == 1
-    assert playing is True
-
-
 def test_case_t_max_positive_for_hopg_case():
     t_max = case_t_max(_hopg_thin_slab_case(), Ne=10, seed=0)
     assert isinstance(t_max, float)
@@ -275,3 +248,140 @@ def test_case_t_max_zero_safe_on_trivial_input():
     # yields no finite ages must not raise -- dataset_t_max's 0.0-safe default
     # propagates through unchanged.
     assert case_t_max(_hopg_thin_slab_case(), Ne=1, seed=0) >= 0.0
+
+
+def test_exit_paths_3d_empty_ok_returns_empty_trace_instead_of_none():
+    # A dataset with zero exits at this cutoff: the default (empty_ok=False)
+    # keeps returning None (unchanged contract); empty_ok=True instead
+    # returns a same-styled, zero-length trace -- what trajectory_volume_
+    # animation needs so a frame can always update this trace's fixed index.
+    data = {
+        "elec_id": np.array([0]),
+        "start_xyz": np.array([[0.0, 0.0, 0.4]]),
+        "end_xyz": np.array([[0.0, 0.0, 0.5]]),
+        "E": np.array([10.0]),
+        "t_fs": np.array([1.0]),
+        "thick": 1.0,
+    }
+    assert _exit_paths_3d(data, 0.1, cmax=30.0) is None
+
+    empty = _exit_paths_3d(data, 0.1, cmax=30.0, empty_ok=True)
+    assert empty is not None
+    assert empty.type == "scatter3d"
+    assert len(empty.x) == 0
+    assert empty.line.colorscale is not None  # still styled like a real exit-path trace
+
+
+def _hopg_thin_slab_data(Ne=80, seed=0):
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_data
+
+    return trajectory_volume_data(_hopg_thin_slab_case(), Ne=Ne, seed=seed)
+
+
+def test_trajectory_volume_animation_returns_expected_frame_count():
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_animation
+
+    case = _hopg_thin_slab_case()
+    data = _hopg_thin_slab_data()
+    fig = trajectory_volume_animation(case, data)
+
+    assert len(fig.frames) == N_FRAMES
+    assert [frame.name for frame in fig.frames] == [str(k) for k in range(N_FRAMES)]
+
+
+def test_trajectory_volume_animation_n_frames_override():
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_animation
+
+    case = _hopg_thin_slab_case()
+    data = _hopg_thin_slab_data()
+    fig = trajectory_volume_animation(case, data, n_frames=5)
+
+    assert len(fig.frames) == 5
+
+
+def test_trajectory_volume_animation_base_traces_match_full_reveal_figure():
+    # Base figure (before any frame is selected) must be the SAME full-reveal
+    # content trajectory_volume_figure_from_data has always produced -- the
+    # animation only ADDS frames + playback controls on top of it.
+    from cxr_mc.plots.plotly_trajectories import (
+        trajectory_volume_animation,
+        trajectory_volume_figure_from_data,
+    )
+
+    case = _hopg_thin_slab_case()
+    data = _hopg_thin_slab_data()
+    fig = trajectory_volume_animation(case, data)
+    full_fig = trajectory_volume_figure_from_data(case, data)
+
+    names = {trace.name for trace in fig.data}
+    assert names == {trace.name for trace in full_fig.data}
+    assert {"crystal volume", "electron tracks", "incident beam", "detector direction"} <= names
+
+    tracks = next(t for t in fig.data if t.name == "electron tracks")
+    full_tracks = next(t for t in full_fig.data if t.name == "electron tracks")
+    n_revealed = np.count_nonzero(np.isfinite(np.asarray(tracks.x, dtype=float)))
+    n_full = np.count_nonzero(np.isfinite(np.asarray(full_tracks.x, dtype=float)))
+    assert n_revealed == n_full
+
+
+def test_trajectory_volume_animation_frames_grow_monotonically_revealed():
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_animation
+
+    case = _hopg_thin_slab_case()
+    data = _hopg_thin_slab_data()
+    fig = trajectory_volume_animation(case, data)
+
+    def n_finite(frame):
+        return np.count_nonzero(np.isfinite(np.asarray(frame.data[0].x, dtype=float)))
+
+    counts = [n_finite(frame) for frame in fig.frames]
+    assert counts == sorted(counts)  # non-decreasing reveal across the pass
+    assert counts[0] < counts[-1]  # frame 0 reveals strictly less than the last frame
+    # frame trace omits per-frame customdata (only the base trace carries it,
+    # see trajectory_volume_animation's PAYLOAD note) -- confirms the trim.
+    assert fig.frames[0].data[0].customdata is None
+
+
+def test_trajectory_volume_animation_exit_path_traced_every_frame_when_present():
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_animation
+
+    case = _hopg_thin_slab_case()
+    data = _hopg_thin_slab_data()
+    fig = trajectory_volume_animation(case, data)
+
+    names = [trace.name for trace in fig.data]
+    assert "exit path" in names  # this fixture always has both exit kinds
+    exit_idx = names.index("exit path")
+    assert all(exit_idx in frame.traces for frame in fig.frames)
+
+
+def test_trajectory_volume_animation_updatemenus_and_slider_present():
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_animation
+
+    case = _hopg_thin_slab_case()
+    data = _hopg_thin_slab_data()
+    fig = trajectory_volume_animation(case, data)
+
+    assert fig.layout.updatemenus
+    labels = [button.label for button in fig.layout.updatemenus[0].buttons]
+    assert any("Play" in label for label in labels)
+    assert any("Pause" in label for label in labels)
+    for button in fig.layout.updatemenus[0].buttons:
+        assert button.args[1]["frame"]["redraw"] is True  # scatter3d needs redraw
+
+    assert fig.layout.sliders
+    assert len(fig.layout.sliders[0].steps) == N_FRAMES
+    fig.to_json()  # the whole animated payload remains serializable
+
+
+def test_trajectory_volume_animation_speed_scales_frame_duration():
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_animation
+
+    case = _hopg_thin_slab_case()
+    data = _hopg_thin_slab_data()
+    fig_1x = trajectory_volume_animation(case, data, speed=1.0)
+    fig_2x = trajectory_volume_animation(case, data, speed=2.0)
+
+    duration_1x = fig_1x.layout.updatemenus[0].buttons[0].args[1]["frame"]["duration"]
+    duration_2x = fig_2x.layout.updatemenus[0].buttons[0].args[1]["frame"]["duration"]
+    assert duration_2x == duration_1x / 2
