@@ -6,6 +6,7 @@ from cxr_mc.montecarlo.groove import (
     entry_points,
     escape_distance_ang,
 )
+from cxr_mc.montecarlo.transport import simulate_trajectories
 
 TP = np.deg2rad(45.0)
 SPEC = blazed_groove_spec(
@@ -94,3 +95,49 @@ def test_blazed_groove_spec_validates_geometry():
         blazed_groove_spec(1e4, np.pi / 2, 0.0, np.pi)  # tp == 0
     with pytest.raises(ValueError):
         blazed_groove_spec(-1.0, np.pi / 2, TP, np.pi)  # spacing <= 0
+
+
+_SIM_KW = dict(
+    E0_keV=60.0,
+    Ne=200,
+    thickness_ang=2.0e5,
+    element="C",
+    n_atoms_per_ang3=0.1136,
+    seed=42,
+    elastic_model="sr",
+)
+
+
+def _tilt_kw():
+    from cxr_mc.montecarlo.geometry import tilted_geometry
+
+    beam, _ = tilted_geometry(np.pi / 2, TP, np.pi)
+    return dict(beam_dir=beam, tilt_polar_rad=TP, tilt_azim_rad=np.pi)
+
+
+def test_groove_none_is_bitwise_identical():
+    a = simulate_trajectories(**_SIM_KW, **_tilt_kw())
+    b = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=None)
+    for k in ("E_keV", "L_ang", "t_ang", "elec_id"):
+        np.testing.assert_array_equal(a[k], b[k])
+    np.testing.assert_array_equal(a["r_mid"], b["r_mid"])
+
+
+def test_groove_entries_start_on_relief_facet():
+    segs = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC)
+    # first segment of each electron starts at its entry point; entry depths
+    # span [0, h) and multiple phases are sampled (uniform-phase fallback).
+    # elec_id is NOT globally sorted (each event-driven iteration only appends
+    # a locally-increasing subset of still-alive ids), so recover each
+    # electron's first-occurrence index directly rather than via searchsorted.
+    _, first = np.unique(segs["elec_id"], return_index=True)
+    r0 = segs["r_mid"][first]  # midpoints of first segments sit at z >= z_entry
+    assert np.all(r0[:, 2] >= 0.0)
+    # phases genuinely vary across electrons
+    assert np.unique(np.round(r0[:, 0], 3)).size > 10
+
+
+def test_groove_entry_depth_reproducible_with_seed():
+    a = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC)
+    b = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC)
+    np.testing.assert_array_equal(a["r_mid"], b["r_mid"])

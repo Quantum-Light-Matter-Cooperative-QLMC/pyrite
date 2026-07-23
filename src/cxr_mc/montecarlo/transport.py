@@ -28,6 +28,7 @@ from .geometry import (
     project_beam_entry,
     validate_transverse_dimensions,
 )
+from .groove import entry_points
 
 logger = logging.getLogger(__name__)
 
@@ -207,6 +208,7 @@ def simulate_trajectories(
     crystal_height_mm=None,
     tilt_polar_rad=0.0,
     tilt_azim_rad=0.0,
+    groove=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -295,6 +297,30 @@ def simulate_trajectories(
     making the projection the identity and leaving every ``beam_fwhm_mm`` result
     bit-for-bit. They have no effect when ``beam_fwhm_mm`` is None.
 
+    groove: optional :class:`~cxr_mc.montecarlo.groove.GrooveSpec` describing a
+    blazed sawtooth relief-groove profile machined into the beam-entrance
+    face (see the ``groove`` module docstring for the facet geometry and
+    ``entry_points`` for the derivation). When given, each electron's flat-
+    face intersection x0 (either the point-source origin x=0, or the sampled
+    beam_fwhm_mm spot) is slid along the beam direction to the first relief-
+    facet crossing via ``entry_points(x0, groove)``, offsetting both the
+    lateral (x) and depth (z) starting coordinates -- the ray never touches
+    the z=0 plane except at the measure-zero groove apexes. When
+    beam_fwhm_mm is None, a point source samples only one groove phase per
+    run, so the lateral phase is instead drawn uniformly over one period
+    ``[0, spacing_ang)`` from an RNG stream independent of the main transport
+    draws (same SeedSequence-spawn pattern as the beam_fwhm_mm offset
+    stream, at a different spawn index so the two never collide -- see the
+    spawn index note below). v1 approximation: only this START point honors
+    the groove profile; in-flight boundary tests (layer crossings, prism
+    exits) keep treating the entrance/exit faces as flat, so backscattered
+    electrons that would physically re-cross a relief or working facet near
+    the surface are bookkept against the flat z=0/z=thickness planes instead
+    -- the resulting error is O(groove depth h / electron range), negligible
+    for grooves shallow compared to the transport length scale. None
+    (default) is a strict no-op -- BIT-FOR-BIT identical to the ungrooved
+    slab. Validation: blazed-groove-geometry
+
     Returns dict of per-segment arrays:
       "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
       "t_ang" (M,), "elec_id" (M,), "layer" (M,) [emitting layer index]
@@ -368,6 +394,21 @@ def simulate_trajectories(
         # face (grazing-incidence footprint elongation). tilt=0 -> (u, v)
         # bit-for-bit, so the untilted beam draw is unchanged.
         pos[:, :2] = project_beam_entry(offsets, tilt_polar_rad, tilt_azim_rad)
+    elif groove is not None:
+        # Groove effects depend on x mod spacing; a point source samples one
+        # phase only. Draw the lateral phase uniformly over one period from an
+        # independent child stream (same spawn pattern as beam_rng, so the
+        # main free-path/scattering draws are untouched).
+        phase_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(3)[2])
+        pos[:, 0] = phase_rng.uniform(0.0, groove.spacing_ang, size=Ne)
+    if groove is not None:
+        # Slide each ray along the beam to its relief-facet entry point.
+        # v1 approximation: only the START point honors the grooves; in-flight
+        # boundary tests keep the flat faces (error O(h / electron range) in
+        # backscatter bookkeeping). Validation: blazed-groove-geometry
+        x_e, z_e = entry_points(pos[:, 0], groove)
+        pos[:, 0] = x_e
+        pos[:, 2] = z_e
     if beam_dir is None:
         beam_dir = np.array([0.0, 0.0, 1.0])
     beam_dir = np.asarray(beam_dir, dtype=float)
