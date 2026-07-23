@@ -1,5 +1,7 @@
 """Case-dictionary encoding helpers for photon-energy grids."""
 
+from typing import cast
+
 import numpy as np
 
 type EnergyGridEncoding = tuple[float, float, float] | np.ndarray
@@ -29,7 +31,8 @@ def encode_energy_grid(grid: object) -> EnergyGridEncoding:
 def decode_energy_grid(encoded: object) -> np.ndarray:
     """Decode a legacy ``(start, stop, step)`` tuple or an exact array."""
     if isinstance(encoded, tuple):
-        return np.arange(*encoded, dtype=float)
+        start, stop, step = cast(tuple[float, float, float], encoded)
+        return np.arange(start, stop, step, dtype=float)
     return np.asarray(encoded, dtype=float)
 
 

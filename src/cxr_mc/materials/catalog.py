@@ -264,7 +264,7 @@ class MaterialCatalog:
 
 
 def _negative(hkl: tuple[int, int, int]) -> tuple[int, int, int]:
-    return tuple(-value for value in hkl)  # type: ignore[return-value]
+    return cast(tuple[int, int, int], tuple(-value for value in hkl))
 
 
 def _cif_path(value: object, path: str, errors: _Errors) -> Path | None:
@@ -530,15 +530,23 @@ def _scan(
         or has_line == has_line_by_energy
     ):
         return None
+    energy_keV = grids["energy_keV"]
+    tilt_deg = grids["tilt_deg"]
+    tilt_azim_deg = grids["tilt_azim_deg"]
+    E_grid_brem = grids["E_grid_brem"]
+    assert energy_keV is not None
+    assert tilt_deg is not None
+    assert tilt_azim_deg is not None
+    assert E_grid_brem is not None
     return ScanSpec(
         thickness_ang=thickness,
         thickness_layers=layer_grid,
-        energy_keV=grids["energy_keV"],  # type: ignore[arg-type]
-        tilt_deg=grids["tilt_deg"],  # type: ignore[arg-type]
-        tilt_azim_deg=grids["tilt_azim_deg"],  # type: ignore[arg-type]
+        energy_keV=energy_keV,
+        tilt_deg=tilt_deg,
+        tilt_azim_deg=tilt_azim_deg,
         E_grid_line=grids["E_grid_line"],
         E_grid_line_by_energy=line_grids,
-        E_grid_brem=grids["E_grid_brem"],  # type: ignore[arg-type]
+        E_grid_brem=E_grid_brem,
     )
 
 
@@ -766,6 +774,7 @@ def _get_default_catalog() -> MaterialCatalog:
             if _DEFAULT_CATALOG is None:
                 _DEFAULT_CATALOG = load_material_catalog()
     return _DEFAULT_CATALOG
+
 
 __all__ = [
     "CrystalInfo",

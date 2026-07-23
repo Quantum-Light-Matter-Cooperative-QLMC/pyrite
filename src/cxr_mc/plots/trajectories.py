@@ -442,7 +442,7 @@ def plot_trajectory_grid(
     azims = sorted({c["tilt_azim_deg"] for c in grp})
     grid2d = len(polars) > 1 and len(azims) > 1
     # one representative case per (polar, azimuth) combo, in a stable order
-    bycombo = {}
+    bycombo: dict[tuple[float, float], Any] = {}
     for c in sorted(grp, key=lambda c: (c["tilt_deg"], c["tilt_azim_deg"])):
         bycombo.setdefault((c["tilt_deg"], c["tilt_azim_deg"]), c)
     combos = list(bycombo)

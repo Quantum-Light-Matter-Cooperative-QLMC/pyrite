@@ -8,6 +8,9 @@ line metrics) and the photon-counting :func:`summary_table` /
 :func:`show_summary`.
 """
 
+from collections.abc import Hashable, Sequence
+from typing import cast
+
 import numpy as np
 import pandas as pd
 
@@ -122,7 +125,7 @@ def summary_table(recs, settings):
     df = pd.DataFrame(rows)
     if df.empty:
         return df
-    df = df.round(_ROUND)  # type: ignore[reportArgumentType]
+    df = df.round(cast(dict[Hashable | Sequence[Hashable], int], _ROUND))
     df.columns = pd.MultiIndex.from_tuples(
         [("config" if c in _CONFIG_COLS else "", c) for c in df.columns]
     )

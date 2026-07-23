@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from types import MappingProxyType
+from typing import cast
 
 import numpy as np
 
@@ -69,11 +70,11 @@ def _direction(value: object, path: str, errors: _Errors) -> tuple[int, int, int
     ):
         errors.add(path, "must be three integer components")
         return None
-    out = tuple(value)
+    out = cast(tuple[int, int, int], tuple(value))
     if out == (0, 0, 0):
         errors.add(path, "must be nonzero")
         return None
-    return out  # type: ignore[return-value]
+    return out
 
 
 def _grid(value: object, path: str, errors: _Errors) -> np.ndarray | None:
@@ -81,6 +82,7 @@ def _grid(value: object, path: str, errors: _Errors) -> np.ndarray | None:
     if scalar is not None:
         out = _readonly([scalar])
     elif isinstance(value, Mapping):
+        value = cast(Mapping[str, object], value)
         kinds = [key for key in value if key in _GRID_KINDS]
         unknown = [key for key in value if key not in _GRID_KINDS]
         for key in unknown:
@@ -101,6 +103,7 @@ def _grid(value: object, path: str, errors: _Errors) -> np.ndarray | None:
             else:
                 if not isinstance(payload, Mapping):
                     raise ValueError(f"{kind} must be a table")
+                payload = cast(Mapping[str, object], payload)
                 allowed = {
                     "arange": {"start", "stop", "step"},
                     "linspace": {"start", "stop", "num", "endpoint"},
@@ -200,7 +203,7 @@ def _table(value: object, path: str, errors: _Errors) -> Mapping[str, object] | 
     if not isinstance(value, Mapping):
         errors.add(path, "must be a table")
         return None
-    return value
+    return cast(Mapping[str, object], value)
 
 
 __all__ = ["GridValue", "LineGridByEnergy"]

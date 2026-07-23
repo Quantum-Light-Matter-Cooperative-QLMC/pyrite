@@ -14,10 +14,14 @@ arrays back to NumPy.
 import logging
 import os
 import warnings
+from types import ModuleType
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+cp: ModuleType | None
+xp: ModuleType
 
 try:
     # cupy-cuda* imports cleanly even with no usable CUDA runtime (e.g. on the
@@ -30,8 +34,9 @@ try:
     # failure, so the laptop runs the notebook on numpy.
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message=".*CUDA path could not be detected.*")
-        import cupy as cp
+        import cupy
 
+    cp = cupy
     if cp.cuda.runtime.getDeviceCount() < 1:
         raise RuntimeError("no CUDA device")
     _GPU = True

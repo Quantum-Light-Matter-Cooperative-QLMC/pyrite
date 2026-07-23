@@ -199,7 +199,7 @@ def _export(outdir="figures", ne=20_000, ne_brem=200, ne_supp=200):
     checks_dir = Path(__file__).resolve().parents[2] / "checks"
     if str(checks_dir) not in sys.path:
         sys.path.insert(0, str(checks_dir))
-    import anchor_figures as af  # type: ignore[reportMissingImports]
+    import anchor_figures as af  # ty: ignore[unresolved-import]
 
     written = af.export_all_figures(outdir, ne=ne, ne_brem=ne_brem, ne_supp=ne_supp)
     for path in written:

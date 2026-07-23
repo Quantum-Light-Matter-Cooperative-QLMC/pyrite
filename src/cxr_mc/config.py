@@ -143,11 +143,8 @@ def trajectory_sweep(
         thick = float(thick_arr[len(thick_arr) // 2])
     else:
         thick = float(thickness_ang)
-    stack_kwargs = {}
-    if spec.stack:
-        stack_kwargs["stack"] = spec.stack
-    elif spec.substrate is not None:
-        stack_kwargs["substrate"] = spec.substrate
+    stack = spec.stack or None
+    substrate = spec.substrate if not stack else None
     if n_tilts is not None or tilt_span is not None:
         count = 9 if n_tilts is None else int(n_tilts)
         span = 80.0 if tilt_span is None else float(tilt_span)
@@ -167,7 +164,8 @@ def trajectory_sweep(
         # transport-only study; normal incidence (tilt=0) is its baseline, so it
         # opts out of the emission-sweep tilt=0 ban (issue_notes.md #1).
         allow_normal_incidence=True,
-        **stack_kwargs,
+        stack=stack,
+        substrate=substrate,
     )
 
 

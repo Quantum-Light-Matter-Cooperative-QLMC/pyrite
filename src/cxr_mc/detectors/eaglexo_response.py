@@ -151,7 +151,9 @@ def geometry(sensor=DEFAULT_SENSOR, distance_m=None):
         raise ValueError(f"unknown sensor {sensor!r} (have {list(SENSORS)})")
     s = SENSORS[sensor]
     d_m = DEFAULT_DISTANCE_M if distance_m is None else float(distance_m)
-    w_mm, h_mm = s["active_mm"]
+    active_mm = s["active_mm"]
+    assert isinstance(active_mm, tuple)
+    w_mm, h_mm = active_mm
     d_mm = d_m * 1e3
     return dict(
         sensor=s["sensor"],

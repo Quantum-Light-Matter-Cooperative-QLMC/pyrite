@@ -45,7 +45,7 @@ def _mu_total_inv_ang(comp, E_eV):
     mu = 0.0
     for el, n_i in comp:
         mu = mu + 1.0 / absorption_length_ang(el, E_cpu, n_i)
-    if _GPU and isinstance(E_eV, cp.ndarray):
+    if _GPU and cp is not None and isinstance(E_eV, cp.ndarray):
         return cp.asarray(mu, dtype=REAL)
     return mu
 

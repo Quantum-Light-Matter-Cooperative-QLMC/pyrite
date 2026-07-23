@@ -26,6 +26,8 @@ or ``altair.data_transformers.disable_max_rows()``. This module does not mutate 
 global state itself.
 """
 
+from typing import Any
+
 import altair as alt
 import numpy as np
 import pandas as pd
@@ -134,7 +136,7 @@ def _linear_y_scale(df, x_domain):
 def _scale(scale_type, domain=None):
     if scale_type not in {"linear", "log"}:
         raise ValueError(f"scale type must be 'linear' or 'log', got {scale_type!r}")
-    kwargs = {}
+    kwargs: dict[str, Any] = {}
     if scale_type != "linear":
         kwargs["type"] = scale_type
     if domain is not None:

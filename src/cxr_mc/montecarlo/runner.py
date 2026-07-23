@@ -121,6 +121,7 @@ def _maybe_free_pool():
     (1 / off) reproduces the original per-case free exactly. Driver-process only,
     so the module counter needs no lock."""
     global _cases_since_free, _pool_peak_bytes
+    assert cp is not None  # only called when _GPU is True
     pool = cp.get_default_memory_pool()
     reserved = pool.total_bytes()
     if reserved > _pool_peak_bytes:
@@ -538,7 +539,7 @@ def _worker_init(force_cpu=False):
     try:
         import ctypes
 
-        k32 = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[reportAttributeAccessIssue]
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)  # ty: ignore[unresolved-attribute]
         # typed signatures matter: the untyped pseudo-handle (-1) gets
         # truncated on 64-bit and the call silently fails
         k32.GetCurrentProcess.restype = ctypes.c_void_p
