@@ -837,6 +837,21 @@ def test_build_cases_groove_rejects_nonpositive_spacing():
         )
 
 
+def test_build_cases_groove_requires_theta_obs_90():
+    with pytest.raises(ValueError):
+        build_cases(
+            Sweep(
+                material="hopg",
+                tilt_deg=45.0,
+                tilt_azim_deg=180.0,
+                groove_spacing_ang=2.0e4,
+                crystal_width_mm=None,
+                crystal_height_mm=None,
+                theta_obs_deg=45.0,
+            )
+        )
+
+
 def test_scan_progress_record_is_atomically_replaced(tmp_path):
     from cxr_mc.scan import _write_progress_record
 

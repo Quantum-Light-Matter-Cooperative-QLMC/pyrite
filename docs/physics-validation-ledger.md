@@ -7,7 +7,7 @@ The single source of truth for **what physics `cxr-mc` claims and whether it has
 
 **Status:** `unverified` → `filtered` (units+limits+signs) → `rederived` (independent derivation matches) → `anchored` (regression test green) → `signed-off` (human-certified). `discrepancy` = a check failed.
 
-Progress: **0 / 79 signed-off** · 13 rederived · 3 anchored · 1 filtered · 1 blocked · 2 discrepancy.
+Progress: **0 / 80 signed-off** · 13 rederived · 3 anchored · 1 filtered · 1 blocked · 2 discrepancy.
 
 ## Core coherent physics (highest risk — verify first)
 

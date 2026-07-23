@@ -340,15 +340,19 @@ def _reject_invalid_groove_geometry(
     (docs/superpowers/plans/2026-07-23-blazed-groove-geometry.md). Grooves are
     a laterally infinite, single-slab feature machined into one flat face at a
     fixed in-plane orientation (montecarlo.groove.blazed_groove_spec), so
-    every case must sit at tilt_azim_deg == 180 and 0 < tilt_deg < 90, and
-    neither a substrate/stack nor a finite footprint may be present (both
-    assume a flat, laterally infinite entrance face)."""
+    every case must sit at tilt_azim_deg == 180, 0 < tilt_deg < 90, and
+    theta_obs_deg == 90, and neither a substrate/stack nor a finite footprint
+    may be present (both assume a flat, laterally infinite entrance face).
+    Mirrors the theta_obs check in montecarlo.groove.blazed_groove_spec so the
+    restriction is enforced both at case-build time and at spec construction."""
     if groove_spacing_ang <= 0:
         raise ValueError("groove_spacing_ang must be positive")
     if not np.allclose(azimuths, 180.0):
         raise ValueError("grooves require tilt_azim_deg == 180 for every case")
     if not np.all((tilts > 0.0) & (tilts < 90.0)):
         raise ValueError("grooves require 0 < tilt_deg < 90 for every case")
+    if not np.isclose(sweep.theta_obs_deg, 90.0):
+        raise ValueError("grooves require theta_obs_deg == 90 for every case")
     if stack is not None:
         raise ValueError("grooves are v1 single-slab only (no substrate/stack)")
     if sweep.crystal_width_mm is not None or sweep.crystal_height_mm is not None:
