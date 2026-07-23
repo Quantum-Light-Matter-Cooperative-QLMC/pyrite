@@ -930,3 +930,90 @@ def test_rebrem_checkpoints_progress_file_marks_failed_and_rejects_multi(monkeyp
             materials=["hopg"], checkpoint_dir=str(tmp_path), progress_file=str(progress)
         )
     assert json.loads(progress.read_text())["state"] == "failed"
+
+
+# ---------------------------------------------------------------------------
+# repair_line_spec / reline_checkpoint
+# ---------------------------------------------------------------------------
+
+
+def _line_record(E0=30.0, ne=200):
+    import numpy as np
+
+    E_grid = np.linspace(1000.0, 30000.0, 32)
+    E_brem = np.linspace(1000.0, 30500.0, 16)
+    brem_wide = np.linspace(1.0, 0.1, 16)
+    case = dict(
+        E0_keV=E0,
+        Ne=ne,
+        Ne_brem=50,
+        thickness_ang=1.0e4,
+        composition={"Mo": 1, "S": 2},
+        crystal="mos2",
+        hkl_list=[(1, 0, 0)],
+        B_ang2=0.5,
+        theta_obs_rad=np.deg2rad(90.0),
+        seed=7,
+    )
+    return {
+        "case": case,
+        "E_grid": E_grid,
+        "spec": np.ones(32),
+        "brem_wide": brem_wide,
+        "E_grid_brem": E_brem,
+        "brem": np.interp(E_grid, E_brem, brem_wide),
+    }
+
+
+def test_repair_line_spec_rewrites_spec_and_reinterp_brem_keeps_brem_wide(monkeypatch):
+    import numpy as np
+
+    from cxr_mc import run
+
+    monkeypatch.setattr(
+        run.runner, "_lines_for_case", lambda case, E_grid: np.full(E_grid.shape, 5.0)
+    )
+    results = {"mos2@30": {30.0: _line_record()}}
+    r = results["mos2@30"][30.0]
+    brem_wide0 = r["brem_wide"].copy()
+    n = run.repair_line_spec(results, material="mos2", line_ne=999, from_config=False)
+    assert n == 1
+    assert np.all(r["spec"] == 5.0)
+    assert r["case"]["Ne"] == 999
+    np.testing.assert_array_equal(r["brem_wide"], brem_wide0)  # brem untouched
+    np.testing.assert_allclose(r["brem"], np.interp(r["E_grid"], r["E_grid_brem"], r["brem_wide"]))
+
+
+def test_repair_line_spec_skips_at_target(monkeypatch):
+    import numpy as np
+
+    from cxr_mc import run
+
+    monkeypatch.setattr(
+        run.runner, "_lines_for_case", lambda case, E_grid: np.full(E_grid.shape, 5.0)
+    )
+    results = {"mos2@30": {30.0: _line_record(ne=200)}}
+    # same Ne, same grid, finite spec -> nothing to redo
+    n = run.repair_line_spec(results, material="mos2", line_ne=200, from_config=False)
+    assert n == 0
+
+
+def test_repair_line_spec_max_seconds_stops_early(monkeypatch):
+    import numpy as np
+
+    from cxr_mc import run
+
+    monkeypatch.setattr(
+        run.runner, "_lines_for_case", lambda case, E_grid: np.full(E_grid.shape, 5.0)
+    )
+    results = {"mos2@30": {30.0: _line_record(ne=200)}}  # 1 stale record (line_ne bump)
+    n = run.repair_line_spec(
+        results,
+        material="mos2",
+        line_ne=999,
+        from_config=False,
+        max_seconds=0.0,
+        status=(s := {}),
+    )
+    assert n == 0
+    assert s["complete"] is False
