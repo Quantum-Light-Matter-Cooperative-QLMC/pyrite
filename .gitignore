@@ -267,4 +267,4 @@ utils/
 
 sgconfig.yml
 *.local.md
-./checkpoints/*.json
+checkpoints/*.meta.json
