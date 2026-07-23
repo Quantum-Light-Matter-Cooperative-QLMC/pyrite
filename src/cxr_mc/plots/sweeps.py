@@ -47,6 +47,13 @@ _EXTRA_QUANTITIES = {
         "coherent / incoherent-brem flux ratio  (CXR / brem)",
         "cividis",
     ),
+    # finite-crystal footprint-hit fraction in [0, 1] (1 = every launched
+    # electron landed on the crystal). Ungated (not in _FLUX_GATED): a pure
+    # geometry diagnostic, valid regardless of line brightness.
+    "hit_frac": (
+        "electron footprint-hit fraction  (hits / launched)",
+        "magma",
+    ),
 }
 _METRIC_LABELS = {key: label for key, label, _ in _HEATMAP_QUANTITIES}
 _METRIC_LABELS.update({k: lbl for k, (lbl, _) in _EXTRA_QUANTITIES.items()})

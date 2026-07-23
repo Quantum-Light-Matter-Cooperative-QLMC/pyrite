@@ -63,6 +63,45 @@ def test_apply_skips_manual_line_unless_forced():
     assert "stop = 2700.0, num = 897" in forced
 
 
+BASE_TOML_NO_GRID = """schema_version = 1
+
+[profiles.standard]
+energy_keV = { values = [30.0, 100.0] }
+
+[materials.hfs2]
+label = "HfS2"
+profile = "standard"
+
+[materials.hopg]
+label = "HOPG"
+profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2600.0, num = 864, endpoint = true } } },
+]
+"""
+
+COMBINED_NO_GRID = {
+    "hfs2": {
+        "line_rows": [
+            {"energy_keV": 30.0, "start_eV": 10.0, "stop_eV": 2800.0, "num": 930},
+        ],
+        "brem": {"stop_eV": 140000.0, "step_eV": 25.0, "raw_eV": 133000.0},
+    }
+}
+
+
+def test_apply_inserts_new_line_and_brem_blocks_when_absent():
+    new_text, skipped = apply.apply_bounds(
+        BASE_TOML_NO_GRID, COMBINED_NO_GRID, provenance_mod=_NoManual()
+    )
+    assert skipped == []
+    assert "stop = 2800.0, num = 930" in new_text
+    assert "E_grid_brem = { arange = { start = 0.0, stop = 140000.0, step = 25.0 } }" in new_text
+    assert 'label = "HfS2"' in new_text  # untouched line preserved
+    assert 'label = "HOPG"' in new_text  # neighboring section untouched
+    tomllib.loads(new_text)  # still valid TOML
+
+
 def test_apply_file_writes_stamps_provenance_and_validates(tmp_path, monkeypatch):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)

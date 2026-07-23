@@ -494,6 +494,12 @@ def _spectrum_case(case, tp):
         E_grid_brem=E_brem,
         brem_wide=brem_wide,
         eta=segs["n_backscattered"] / segs["Ne"],
+        # Finite-crystal footprint-hit fraction: launched electrons whose
+        # projected entry landed ON the transverse footprint / all launched.
+        # 1.0 for the laterally infinite slab (n_missed==0 -> nothing can miss);
+        # < 1 only when a finite crystal_width/height clips the beam spot. Drives
+        # the analysis_app "electron hit fraction" heatmap (bright=all hit).
+        hit_frac=1.0 - segs["n_missed"] / segs["Ne"],
         n_segments=int(segs["L_ang"].size),
         crystal=case["crystal"],
         E0_keV=case["E0_keV"],

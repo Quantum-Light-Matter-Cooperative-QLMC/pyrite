@@ -432,16 +432,28 @@ E_grid_line_by_energy = [
   { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 3300.0, num = 1098, endpoint = true } } },
   { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 3700.0, num = 1231, endpoint = true } } },
   { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 4600.0, num = 1518, endpoint = true } } },
-  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 5500.0, num = 1818, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 5600.0, num = 1851, endpoint = true } } },
   { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 6300.0, num = 2084, endpoint = true } } },
-  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 7500.0, num = 2484, endpoint = true } } },
-  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 8400.0, num = 2784, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 7700.0, num = 2551, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 9100.0, num = 3018, endpoint = true } } },
 ]
-E_grid_brem = { arange = { start = 0.0, stop = 136500.0, step = 25.0 } }
+E_grid_brem = { arange = { start = 0.0, stop = 40000.0, step = 25.0 } }
 
 [materials.hbn]
 label = "h-BN"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2700.0, num = 898, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 3100.0, num = 1031, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 3400.0, num = 1131, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 3700.0, num = 1231, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 4700.0, num = 1551, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 5700.0, num = 1884, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 6400.0, num = 2118, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 7700.0, num = 2551, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 9100.0, num = 3018, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 40500.0, step = 25.0 } }
 
 [materials.diamond]
 label = "diamond"
@@ -469,16 +481,16 @@ label = "MoSe2"
 profile = "standard"
 E_grid_line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1800.0, num = 598, endpoint = true } } },
-  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 2000.0, num = 664, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 2100.0, num = 698, endpoint = true } } },
   { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 2300.0, num = 764, endpoint = true } } },
   { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } } },
-  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 3200.0, num = 1051, endpoint = true } } },
-  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 4500.0, num = 1484, endpoint = true } } },
-  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 6700.0, num = 2218, endpoint = true } } },
-  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 9600.0, num = 3184, endpoint = true } } },
-  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 12300.0, num = 4084, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 3300.0, num = 1084, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 4800.0, num = 1584, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 7100.0, num = 2351, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 10000.0, num = 3318, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 12200.0, num = 4051, endpoint = true } } },
 ]
-E_grid_brem = { arange = { start = 0.0, stop = 225100.0, step = 25.0 } }
+E_grid_brem = { arange = { start = 0.0, stop = 42400.0, step = 25.0 } }
 
 [materials.wse2]
 label = "WSe2"
@@ -500,14 +512,50 @@ E_grid_brem = { arange = { start = 0.0, stop = 262400.0, step = 25.0 } }
 [materials.nbs2]
 label = "NbS2"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2100.0, num = 698, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 2400.0, num = 798, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 3200.0, num = 1051, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 4200.0, num = 1384, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 6900.0, num = 2284, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 9700.0, num = 3218, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 12600.0, num = 4184, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 43300.0, step = 25.0 } }
 
 [materials.nbse2]
 label = "NbSe2"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1800.0, num = 598, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 2200.0, num = 731, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 2400.0, num = 798, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 3400.0, num = 1118, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 5100.0, num = 1684, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 7500.0, num = 2484, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 10100.0, num = 3351, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 12100.0, num = 4018, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 49700.0, step = 25.0 } }
 
 [materials.mote2]
 label = "MoTe2"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1700.0, num = 564, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 2000.0, num = 664, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 2200.0, num = 731, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 2400.0, num = 798, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 3500.0, num = 1151, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 4300.0, num = 1418, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 4800.0, num = 1584, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 5800.0, num = 1918, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 8500.0, num = 2818, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 43400.0, step = 25.0 } }
 
 [materials.mote2_product]
 label = "MoTe2 (product)"
@@ -518,42 +566,162 @@ substrate = "sapphire"
 [materials.ptse2]
 label = "PtSe2"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1900.0, num = 631, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 2100.0, num = 698, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 2300.0, num = 764, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 3500.0, num = 1151, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 4900.0, num = 1618, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 6900.0, num = 2284, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 9400.0, num = 3118, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 11200.0, num = 3718, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 44700.0, step = 25.0 } }
 
 [materials.pts2]
 label = "PtS2"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 1100.0, num = 364, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1200.0, num = 398, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1500.0, num = 498, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 2300.0, num = 751, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 2500.0, num = 818, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 2900.0, num = 951, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 3400.0, num = 1118, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 4200.0, num = 1384, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 38600.0, step = 25.0 } }
 
 [materials.pds2]
 label = "Palladium disulfide (PdS2)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1200.0, num = 398, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 1400.0, num = 464, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1500.0, num = 498, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1800.0, num = 598, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 2600.0, num = 851, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 3200.0, num = 1051, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 3300.0, num = 1084, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 4300.0, num = 1418, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 5500.0, num = 1818, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 37800.0, step = 25.0 } }
 
 [materials.pdte2]
 label = "1T-PdTe2 (001)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1100.0, num = 364, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1200.0, num = 398, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1700.0, num = 551, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 3100.0, num = 1018, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 3500.0, num = 1151, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 3600.0, num = 1184, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 3700.0, num = 1218, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 55200.0, step = 25.0 } }
 
 [materials.ptbi2]
 label = "Trigonal beta-PtBi2 (001)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1200.0, num = 398, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 2100.0, num = 684, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 2500.0, num = 818, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 2600.0, num = 851, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 2700.0, num = 884, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 2900.0, num = 951, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 40300.0, step = 25.0 } }
 
 [materials.ptte2]
 label = "1T-PtTe2 (001)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 1100.0, num = 364, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1100.0, num = 364, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1300.0, num = 431, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 2200.0, num = 718, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 2700.0, num = 884, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 3200.0, num = 1051, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 3700.0, num = 1218, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 4200.0, num = 1384, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 39400.0, step = 25.0 } }
 
 [materials.pdse2]
 label = "PdSe2"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1400.0, num = 464, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 1600.0, num = 531, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1800.0, num = 598, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1900.0, num = 631, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 2800.0, num = 918, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 3400.0, num = 1118, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 3900.0, num = 1284, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 4900.0, num = 1618, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 6200.0, num = 2051, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 46000.0, step = 25.0 } }
 
 [materials.hfs2]
 label = "HfS2"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1600.0, num = 531, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 1700.0, num = 564, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1900.0, num = 631, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 2000.0, num = 664, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 2600.0, num = 851, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 3200.0, num = 1051, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 4400.0, num = 1451, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 6900.0, num = 2284, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 8700.0, num = 2884, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 38300.0, step = 25.0 } }
 
 [materials.hfte2]
 label = "1T-HfTe2 (001)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 700.0, num = 231, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 700.0, num = 231, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1500.0, num = 484, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 1900.0, num = 618, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 2200.0, num = 718, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 2700.0, num = 884, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 3200.0, num = 1051, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 55700.0, step = 25.0 } }
 
 [materials.nbte2]
 label = "Niobium ditelluride (NbTe2)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 700.0, num = 231, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1100.0, num = 351, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 2300.0, num = 751, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 2700.0, num = 884, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 2800.0, num = 918, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 2900.0, num = 951, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 49000.0, step = 25.0 } }
 
 [materials.tite2]
 label = "1T-TiTe2 (001)"
@@ -562,6 +730,18 @@ profile = "standard"
 [materials.vse2]
 label = "1T-VSe2 (001)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1100.0, num = 364, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1300.0, num = 418, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 1500.0, num = 484, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 2100.0, num = 684, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 3000.0, num = 984, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 4700.0, num = 1551, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 55300.0, step = 25.0 } }
 
 [materials.vte2]
 label = "Vanadium ditelluride (1T''-VTe2)"
@@ -578,14 +758,50 @@ profile = "standard"
 [materials.gese]
 label = "Germanium monoselenide (GeSe)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1100.0, num = 364, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1300.0, num = 418, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 1300.0, num = 418, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 1300.0, num = 418, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 1400.0, num = 451, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 1900.0, num = 618, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 51500.0, step = 25.0 } }
 
 [materials.gese2]
 label = "Germanium diselenide (beta-GeSe2)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 600.0, num = 198, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 700.0, num = 231, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1300.0, num = 418, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 1400.0, num = 451, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 1300.0, num = 418, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 1300.0, num = 418, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 1300.0, num = 418, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 54900.0, step = 25.0 } }
 
 [materials.res2]
 label = "Distorted 1T-ReS2 (001)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1100.0, num = 364, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1900.0, num = 618, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 2200.0, num = 718, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 2400.0, num = 784, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 2600.0, num = 851, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 3200.0, num = 1051, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 38100.0, step = 25.0 } }
 
 [materials.rese2]
 label = "Distorted 1T-ReSe2 (001)"
@@ -594,26 +810,98 @@ profile = "standard"
 [materials.2h_tas2]
 label = "2H-TaS2 (002)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1100.0, num = 364, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1400.0, num = 464, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1900.0, num = 618, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 2200.0, num = 718, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 2400.0, num = 784, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 2700.0, num = 884, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 3800.0, num = 1251, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 39000.0, step = 25.0 } }
 
 [materials.2h_tase2]
 label = "2H-TaSe2 (002)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1100.0, num = 364, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1200.0, num = 398, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1800.0, num = 584, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 2200.0, num = 718, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 2600.0, num = 851, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 2900.0, num = 951, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 3700.0, num = 1218, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 39000.0, step = 25.0 } }
 
 [materials.tate2]
 label = "Ambient distorted TaTe2 (001)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 700.0, num = 231, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1800.0, num = 584, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 2100.0, num = 684, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 2500.0, num = 818, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 2900.0, num = 951, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 3300.0, num = 1084, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 48800.0, step = 25.0 } }
 
 [materials.fete]
 label = "Idealized stoichiometric beta-FeTe (001)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1200.0, num = 384, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 1500.0, num = 484, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 1900.0, num = 618, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 2600.0, num = 851, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 3500.0, num = 1151, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 54300.0, step = 25.0 } }
 
 [materials.wte2]
 label = "Td-WTe2 (002)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1800.0, num = 584, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 2100.0, num = 684, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 2500.0, num = 818, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 2900.0, num = 951, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 3300.0, num = 1084, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 52800.0, step = 25.0 } }
 
 [materials.zrte3]
 label = "ZrTe3 (001)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 500.0, num = 164, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 600.0, num = 198, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 600.0, num = 198, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 700.0, num = 231, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 800.0, num = 251, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 800.0, num = 251, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 1700.0, num = 551, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 2400.0, num = 784, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 2500.0, num = 818, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 54800.0, step = 25.0 } }
 
 [materials.zrte5]
 label = "ZrTe5 (020)"
@@ -622,10 +910,34 @@ profile = "standard"
 [materials.hfse2]
 label = "HfSe2"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1600.0, num = 531, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 1800.0, num = 598, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 2000.0, num = 664, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 2200.0, num = 731, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 3100.0, num = 1018, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 4100.0, num = 1351, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 6000.0, num = 1984, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 8100.0, num = 2684, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 9500.0, num = 3151, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 43400.0, step = 25.0 } }
 
 [materials.zrse2]
 label = "ZrSe2"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1600.0, num = 531, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 1900.0, num = 631, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 2200.0, num = 731, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 2300.0, num = 764, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 3200.0, num = 1051, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 4500.0, num = 1484, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 6400.0, num = 2118, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 8900.0, num = 2951, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 10400.0, num = 3451, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 43300.0, step = 25.0 } }
 
 [materials.v2o5]
 label = "V2O5 (010)"
@@ -642,6 +954,18 @@ profile = "standard"
 [materials.black_phosphorus]
 label = "black phosphorus (020)"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 1000.0, num = 331, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 1100.0, num = 364, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 1200.0, num = 398, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 1800.0, num = 584, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 2100.0, num = 684, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 2200.0, num = 718, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 2300.0, num = 751, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 2300.0, num = 751, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 44300.0, step = 25.0 } }
 
 [materials.4h_sic]
 label = "4H-SiC (0004)"
@@ -658,6 +982,18 @@ profile = "standard"
 [materials.mos2]
 label = "MoS2"
 profile = "standard"
+E_grid_line_by_energy = [
+  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2100.0, num = 698, endpoint = true } } },
+  { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 2400.0, num = 798, endpoint = true } } },
+  { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 2600.0, num = 864, endpoint = true } } },
+  { energy_keV = 60.0, grid = { linspace = { start = 10.0, stop = 2600.0, num = 864, endpoint = true } } },
+  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 3100.0, num = 1018, endpoint = true } } },
+  { energy_keV = 150.0, grid = { linspace = { start = 50.0, stop = 4000.0, num = 1318, endpoint = true } } },
+  { energy_keV = 200.0, grid = { linspace = { start = 50.0, stop = 5800.0, num = 1918, endpoint = true } } },
+  { energy_keV = 250.0, grid = { linspace = { start = 50.0, stop = 8300.0, num = 2751, endpoint = true } } },
+  { energy_keV = 300.0, grid = { linspace = { start = 50.0, stop = 11600.0, num = 3851, endpoint = true } } },
+]
+E_grid_brem = { arange = { start = 0.0, stop = 45500.0, step = 25.0 } }
 
 [materials.mos2-on-sapphire]
 label = "MoS2 on sapphire"

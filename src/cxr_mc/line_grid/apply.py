@@ -72,7 +72,9 @@ def _section_span(text: str, header: str) -> tuple[int, int]:
 
 
 def _replace_assignment(section_text: str, key: str, new_assignment: str) -> str:
-    """Replace `key = ...` (single line, or multi-line `[ ... ]` array) in a section."""
+    """Replace `key = ...` (single line, or multi-line `[ ... ]` array) in a
+    section, or append it if the section doesn't have the key yet (e.g. a
+    material with no bespoke bounds derived so far)."""
     # Multi-line array form: key = [ ... ] spanning lines.
     array = re.search(rf"(?m)^{re.escape(key)}\s*=\s*\[.*?^\]", section_text, re.S)
     if array:
@@ -80,7 +82,9 @@ def _replace_assignment(section_text: str, key: str, new_assignment: str) -> str
     single = re.search(rf"(?m)^{re.escape(key)}\s*=.*$", section_text)
     if single:
         return section_text[: single.start()] + new_assignment + section_text[single.end() :]
-    raise KeyError(f"assignment {key} not found in section")
+    stripped = section_text.rstrip("\n")
+    trailing = section_text[len(stripped) :] or "\n"
+    return stripped + "\n" + new_assignment + trailing
 
 
 def _parse_line_rows(section_body: str) -> dict:

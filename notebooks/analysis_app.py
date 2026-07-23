@@ -72,6 +72,7 @@ def _():
     )
     from cxr_mc.plots.altair_spectra import compare_spectrum_chart, spectrum_chart
     from cxr_mc.plots.altair_sweeps import (
+        heatmap_chart,
         heatmap_select_chart,
         metric_vs_chart,
         scan_charts,
@@ -107,6 +108,7 @@ def _():
         eaglexo_detected_chart,
         filter_results,
         fmt_thickness,
+        heatmap_chart,
         heatmap_select_chart,
         load_checkpoint,
         metric_vs_chart,
@@ -1500,6 +1502,7 @@ def _(
     cases,
     context_rail,
     fmt_thickness,
+    heatmap_chart,
     metric_vs_chart,
     mo,
     plot_best_spectra,
@@ -1515,6 +1518,28 @@ def _(
         def _scan_charts_item():
             charts = scan_charts(scan_res_view, settings, cases=cases, line_metric="prominence")
             return mo.vstack(charts) if charts else mo.md("*No scan results.*")
+
+        def _hit_frac_item():
+            # Finite-crystal electron-hit map over the SAME polar x azimuth axes as
+            # the scan heatmaps: fraction of launched electrons that landed on the
+            # crystal footprint (bright = every electron hit, dark = all missed).
+            # Colour pinned to [0, 1] so brightness reads as an absolute hit rate,
+            # not this frame's max. NaN cells (pre-feature checkpoints that never
+            # recorded it) drop out as gaps; the laterally infinite slab reads a
+            # uniform 1.0 (nothing can miss an infinite crystal).
+            chart = heatmap_chart(
+                scan_res_view,
+                settings,
+                quantity="hit_frac",
+                cases=cases,
+                line_metric="prominence",
+                color_domain=(0.0, 1.0),
+            )
+            return (
+                chart
+                if chart is not None
+                else mo.md("*No electron-hit map — needs an azimuth × polar-tilt sweep.*")
+            )
 
         def _metric_lines_item():
             line = metric_vs_chart(
@@ -1569,6 +1594,13 @@ def _(
                 ),
                 _thk_widget,
                 mo.lazy(_scan_charts_item, show_loading_indicator=True),
+                mo.md(
+                    "**Electron footprint-hit fraction** — of the electrons launched at "
+                    "the crystal, the share that landed on its finite footprint "
+                    "(bright = all hit, dark = all missed); 1.0 everywhere for a "
+                    "laterally infinite crystal."
+                ),
+                mo.lazy(_hit_frac_item, show_loading_indicator=True),
                 mo.lazy(_metric_lines_item, show_loading_indicator=True),
                 mo.accordion(
                     {

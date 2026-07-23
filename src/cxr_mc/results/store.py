@@ -82,6 +82,9 @@ def store_result(results, case, out):
         E_pk=E_pk,
         fwhm=fwhm,
         eta=out["eta"],
+        # finite-crystal footprint-hit fraction (NaN on pre-feature checkpoints
+        # that never recorded it); surfaced as the "hit_frac" heatmap quantity.
+        hit_frac=out.get("hit_frac", float("nan")),
         scale=case["domega_sr"] * PER_NA,  # (per e per sr) -> (per s per nA)
         case=case,
     )

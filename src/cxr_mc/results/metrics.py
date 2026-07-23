@@ -168,4 +168,7 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
         "coherent_brem_ratio": (coh_int / brem_int) if brem_int > 0 else float("nan"),
         "line_brem_ratio": (line_int / brem_line_int) if brem_line_int > 0 else float("nan"),
         "line_quality": line_quality(spec, rel_prominence),
+        # geometry diagnostic (not spectrum-derived): finite-crystal footprint-hit
+        # fraction carried straight from the record. NaN on pre-feature checkpoints.
+        "hit_frac": float(r.get("hit_frac", float("nan"))),
     }

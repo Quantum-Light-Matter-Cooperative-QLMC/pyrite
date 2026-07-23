@@ -140,6 +140,7 @@ def heatmap_chart(
     width=_HEATMAP_WIDTH,
     height=_HEATMAP_HEIGHT,
     metrics=None,
+    color_domain=None,
 ):
     """Interactive parametric heatmap of one quantity over ``x`` x ``y``, faceted
     into one panel per ``panel`` value, best record per cell. The Altair
@@ -150,7 +151,9 @@ def heatmap_chart(
     bands, so a dense sweep gets thinner cells rather than a wider chart).
     ``metrics`` is a precomputed ``_common._metrics_map`` (computed in the frame
     builder when omitted); :func:`scan_charts` passes one shared map across its
-    quantities.
+    quantities. ``color_domain`` pins the colour scale to a fixed ``[lo, hi]``
+    (default None -> auto-fit to the data) -- e.g. ``(0.0, 1.0)`` for a fraction
+    so full colour always means 1.0, not just this frame's max.
     Returns an :class:`altair.Chart`, or ``None`` when there are no records."""
     key, label, cmap = _resolve_quantity(quantity)
     df = heatmap_frame(
@@ -170,13 +173,18 @@ def heatmap_chart(
     )
     if df.empty:
         return None
+    _scale = (
+        alt.Scale(scheme=_scheme(cmap))  # type: ignore[arg-type]
+        if color_domain is None
+        else alt.Scale(scheme=_scheme(cmap), domain=list(color_domain))  # type: ignore[arg-type]
+    )
     chart = (
         alt.Chart(df)
         .mark_rect()
         .encode(
             x=alt.X("x:O", title=_axis_label(x), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
             y=alt.Y("y:O", title=_axis_label(y), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
-            color=alt.Color("value:Q", title=label, scale=alt.Scale(scheme=_scheme(cmap))),  # type: ignore[arg-type]
+            color=alt.Color("value:Q", title=label, scale=_scale),  # type: ignore[arg-type]
             tooltip=["panel:N", "x:O", "y:O", "value:Q"],
         )
         .properties(width=width, height=height)
