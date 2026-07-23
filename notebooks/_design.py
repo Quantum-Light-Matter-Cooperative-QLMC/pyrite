@@ -22,7 +22,7 @@ TYPOGRAPHY = {
 }
 BORDERS = {"rule": "#41606f", "width": "1px", "radius": ".35rem"}
 FOCUS = {"color": COLORS["detector_cyan"], "width": "3px", "offset": "3px"}
-WIDTHS = {"prose": "72ch", "rail_item": "8.5rem", "breakpoint": "768px"}
+WIDTHS = {"prose": "72ch", "breakpoint": "768px"}
 
 STATUS_KINDS = {
     "Ready": "ready",
@@ -40,14 +40,14 @@ def notebook_css() -> str:
     return f"""
 <style>
   .cxr-shell {{
-    --cxr-bg: {COLORS['beamline_navy']};
-    --cxr-surface: {COLORS['instrument_slate']};
-    --cxr-text: {COLORS['xray_ice']};
-    --cxr-focus: {COLORS['detector_cyan']};
-    --cxr-compute: {COLORS['tungsten_amber']};
-    --cxr-failure: {COLORS['validation_rose']};
+    --cxr-bg: {COLORS["beamline_navy"]};
+    --cxr-surface: {COLORS["instrument_slate"]};
+    --cxr-text: {COLORS["xray_ice"]};
+    --cxr-focus: {COLORS["detector_cyan"]};
+    --cxr-compute: {COLORS["tungsten_amber"]};
+    --cxr-failure: {COLORS["validation_rose"]};
     color: var(--cxr-text);
-    font-family: {TYPOGRAPHY['body']};
+    font-family: {TYPOGRAPHY["body"]};
     max-width: 100%;
   }}
   body:has(.cxr-shell) {{
@@ -55,36 +55,39 @@ def notebook_css() -> str:
     color: var(--cxr-text, #DCEEF2);
   }}
   body:has(.cxr-shell) :is(button, input, select, [tabindex]):focus-visible {{
-    outline: {FOCUS['width']} solid var(--cxr-focus, {FOCUS['color']});
-    outline-offset: {FOCUS['offset']};
+    outline: {FOCUS["width"]} solid var(--cxr-focus, {FOCUS["color"]});
+    outline-offset: {FOCUS["offset"]};
   }}
   body:has(.cxr-shell) :is(button, select, input:not([type="hidden"])) {{
     min-height: 44px;
   }}
-  .cxr-title {{ max-width: {WIDTHS['prose']}; margin: 0 0 1.25rem; }}
+  .cxr-title {{ max-width: {WIDTHS["prose"]}; margin: 0 0 1.25rem; }}
   .cxr-title__eyebrow {{
     color: var(--cxr-focus); font: 600 .75rem/1.2 "IBM Plex Mono", monospace;
     letter-spacing: .14em; text-transform: uppercase;
   }}
   .cxr-title h1 {{
-    font-family: {TYPOGRAPHY['display']};
+    font-family: {TYPOGRAPHY["display"]};
     font-size: clamp(2rem, 4vw, 3.4rem); line-height: .98; margin: .35rem 0 .7rem;
   }}
   .cxr-title p {{ color: #b9d0d6; line-height: 1.55; margin: 0; }}
   .cxr-rail {{
-    display: grid; grid-template-columns: repeat(auto-fit, minmax({WIDTHS['rail_item']}, 1fr));
-    gap: 0; border-block: {BORDERS['width']} solid {BORDERS['rule']}; margin: 1rem 0 1.5rem;
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem 1.4rem;
+    border-block: {BORDERS["width"]} solid {BORDERS["rule"]};
+    margin: .6rem 0 .9rem; padding: .5rem 0;
   }}
-  .cxr-rail__item {{ padding: .8rem 1rem; position: relative; min-width: 0; }}
-  .cxr-rail__item::before {{
-    background: var(--cxr-focus); content: ""; height: .42rem; left: 1rem;
-    position: absolute; top: -.24rem; width: 2px;
+  .cxr-rail__item {{
+    display: flex; align-items: baseline; gap: .5rem; min-width: 0;
+    border-left: 2px solid var(--cxr-focus); padding-left: .6rem;
   }}
   .cxr-rail dt {{
-    color: #91aeb7; font: 600 .68rem/1.2 "IBM Plex Mono", monospace;
-    letter-spacing: .1em; text-transform: uppercase;
+    color: #91aeb7; font: 600 .64rem/1.2 "IBM Plex Mono", monospace;
+    letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
   }}
-  .cxr-rail dd {{ font: 500 .9rem/1.35 "IBM Plex Mono", monospace; margin: .3rem 0 0; }}
+  .cxr-rail dd {{
+    color: var(--cxr-text); font: 500 .85rem/1.2 "IBM Plex Mono", monospace;
+    margin: 0; white-space: nowrap;
+  }}
   .cxr-badge {{
     border: 1px solid currentColor; border-radius: 999px; display: inline-block;
     font: 600 .72rem/1 "IBM Plex Mono", monospace; padding: .38rem .62rem;
@@ -97,8 +100,7 @@ def notebook_css() -> str:
     color: #91aeb7; font: 600 .72rem/1.2 "IBM Plex Mono", monospace;
     letter-spacing: .08em; margin-bottom: .65rem; text-transform: uppercase;
   }}
-  @media (max-width: {WIDTHS['breakpoint']}) {{
-    .cxr-rail {{ grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+  @media (max-width: {WIDTHS["breakpoint"]}) {{
     .cxr-title h1 {{ font-size: 2rem; }}
   }}
   @media (prefers-reduced-motion: reduce) {{
@@ -136,9 +138,7 @@ def context_rail(mo, values: Mapping[str, object] | Iterable[tuple[str, object]]
 
 def status_badge(mo, state: str):
     kind = STATUS_KINDS.get(state, "skipped")
-    return mo.Html(
-        f'<span class="cxr-shell cxr-badge cxr-badge--{kind}">{escape(state)}</span>'
-    )
+    return mo.Html(f'<span class="cxr-shell cxr-badge cxr-badge--{kind}">{escape(state)}</span>')
 
 
 def control_group(mo, label: str, controls):
