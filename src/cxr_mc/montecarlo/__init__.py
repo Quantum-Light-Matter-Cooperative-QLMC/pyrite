@@ -80,6 +80,7 @@ from .geometry import (
     tilted_geometry,
     validate_transverse_dimensions,
 )
+from .groove import GrooveSpec, blazed_groove_spec
 from .runner import (
     _brem_for_case,
     _spectrum_case,
@@ -162,6 +163,9 @@ __all__ = [
     "_orientation_R",
     "_small_tilt_R",
     "_mosaic_quadrature",
+    # groove
+    "GrooveSpec",
+    "blazed_groove_spec",
     # spectrum
     "_SEG_ARRAYS",
     "_segments_in_layer",
