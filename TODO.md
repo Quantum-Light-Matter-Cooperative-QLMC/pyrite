@@ -33,6 +33,7 @@ Item generation:
 2. **Sweep cache standardization.** Include energy grid in cache reuse, report stale/mixed checkpoint records, no default-behavior change. → `feature/sweep-cache-standardization`.
 3. **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
 4. **Crystal definitions.** Review/confirm crystal lattice definitions + parameter values
+5. **Grating Transport Bugfix** it can be seen in 2D and 3D visualizations that the electrons on blazed crystals do *start* properly at the blazed facets, but the *exit trajectories* of the electrons are calculated to the original crystal surface. This must be fixed, and it should be confirmed whether or not the x-ray escape path is being calculated correctly
 
 ## P3 - lower / exploratory
 
