@@ -106,12 +106,9 @@ def _tracks_trace(case, data, unit, *, reveal_until_fs=None):
             "cmin": 0.0,
             "cmax": float(case["E0_keV"]),
             "width": 4,
-            "colorbar": {
-                "title": {"text": "electron<br>energy (keV)"},
-                "thickness": 14,
-                "len": 0.62,
-                "x": 1.02,
-            },
+            # No colorbar: redundant with the 2D cross-section's own energy
+            # legend sitting right next to this figure in the Trace tab.
+            "showscale": False,
         },
         customdata=custom,
         hovertemplate=(
@@ -563,7 +560,10 @@ def trajectory_volume_figure_from_data(
         font={"family": "IBM Plex Sans, system-ui, sans-serif", "color": "#EDF6F9"},
         legend={"orientation": "h", "y": 1.02, "x": 0.02},
         margin={"l": 8, "r": 86, "t": 72, "b": 8},
-        height=650,
+        # 650 left dead vertical letterbox below the aspect-locked scene before
+        # reaching the animation slider (aspectmode="data" fits the cube by
+        # width, not height); 560 tightens that gap.
+        height=560,
         scene={
             "xaxis": {"title": f"sample x ({unit})", "gridcolor": _GRID, "zeroline": False},
             "yaxis": {"title": f"sample y ({unit})", "gridcolor": _GRID, "zeroline": False},
@@ -764,9 +764,9 @@ def trajectory_volume_animation(
                 "type": "buttons",
                 "direction": "left",
                 "showactive": False,
-                "x": 0.0,
+                "x": 1.0,
                 "y": 1.1,
-                "xanchor": "left",
+                "xanchor": "right",
                 "yanchor": "top",
                 "pad": {"t": 0, "r": 8},
                 "buttons": [

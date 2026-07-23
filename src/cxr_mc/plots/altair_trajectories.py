@@ -44,6 +44,12 @@ from .trajectories import (
     _trajectory_frame,
 )
 
+# Mirrors plotly_trajectories._FIELD/_GRID/font.color so trajectory_chart's
+# panel reads as one system with the 3D volume it sits beside in the Trace tab.
+_FIELD = "#17202A"
+_GRID = "#34495E"
+_TEXT = "#EDF6F9"
+
 
 # ---- penetration / survival --------------------------------------------------
 def _max_depth_per_electron(data):
@@ -308,6 +314,16 @@ def trajectory_chart(
     )
     return (
         alt.layer(slab_shading, *faces, beam, det, tracks)
-        .properties(width=width, height=width, title=title)
+        # Top-level `background`, not `.configure(background=...)`: marimo's
+        # vegafusion fixup (altair_chart.maybe_fix_vegafusion_background)
+        # force-overrides to "transparent" whenever the top-level key is
+        # unset, clobbering a config-level background.
+        .properties(width=width, height=width, title=title, background=_FIELD)
+        .configure_view(strokeWidth=0)
+        .configure_axis(
+            labelColor=_TEXT, titleColor=_TEXT, gridColor=_GRID, domainColor=_GRID, tickColor=_GRID
+        )
+        .configure_legend(labelColor=_TEXT, titleColor=_TEXT)
+        .configure_title(color=_TEXT)
         .interactive()
     )
