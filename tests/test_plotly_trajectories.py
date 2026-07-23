@@ -7,6 +7,7 @@ from cxr_mc.plots.plotly_trajectories import (
     N_FRAMES,
     _exit_paths_3d,
     advance_frame,
+    case_t_max,
     dataset_t_max,
     frame_reveal_fs,
     track_vertices_3d,
@@ -246,3 +247,25 @@ def test_advance_frame_slow_speed_never_stalls():
     next_index, playing = advance_frame(0, speed=0.25, repeat=False)
     assert next_index == 1
     assert playing is True
+
+
+def test_case_t_max_positive_for_hopg_case():
+    t_max = case_t_max(_hopg_thin_slab_case(), Ne=10, seed=0)
+    assert isinstance(t_max, float)
+    assert t_max > 0.0
+
+
+def test_case_t_max_matches_dataset_t_max_of_same_transport():
+    from cxr_mc.plots.plotly_trajectories import _ZOOM_BEAM_FWHM_MM, _trajectory_data
+    from cxr_mc.plots.trajectories import _case_of
+
+    case = _hopg_thin_slab_case()
+    data = _trajectory_data(_case_of(case), 10, 0, beam_fwhm_mm=_ZOOM_BEAM_FWHM_MM)
+    assert case_t_max(case, Ne=10, seed=0) == dataset_t_max(data)
+
+
+def test_case_t_max_zero_safe_on_trivial_input():
+    # An electron count small enough (or a degenerate case) that transport
+    # yields no finite ages must not raise -- dataset_t_max's 0.0-safe default
+    # propagates through unchanged.
+    assert case_t_max(_hopg_thin_slab_case(), Ne=1, seed=0) >= 0.0

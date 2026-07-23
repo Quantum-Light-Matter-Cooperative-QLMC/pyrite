@@ -482,6 +482,38 @@ def dataset_t_max(data):
     return float(np.max(finite)) if finite.size else 0.0
 
 
+def case_t_max(rec_or_case, *, Ne, seed, realistic=False, beam_fwhm_mm=None):
+    """Oldest per-segment start age [fs] for this case/``Ne``/``seed``/``realistic``/
+    ``beam_fwhm_mm`` combination, without building a figure.
+
+    Runs ``_trajectory_data`` the SAME way :func:`trajectory_volume_figure` does
+    (identical ``beam_fwhm_mm`` resolution and ``realistic``-mode crystal
+    footprint) and returns :func:`dataset_t_max` of the result, so a caller (the
+    marimo playback slider) can derive a :func:`frame_reveal_fs` cutoff for every
+    animation frame without re-running transport once per frame -- call this once
+    per parameter set instead, and reuse the returned ``T_max`` across the whole
+    ``0..N_FRAMES-1`` scrub range.
+
+    Not new physics -- delegates to the same ``_trajectory_data`` transport call
+    already used and ledgered by :func:`trajectory_volume_figure`; no separate
+    validation entry needed.
+    """
+    case = _case_of(rec_or_case)
+    if realistic:
+        fwhm_mm = beam_fwhm_mm if beam_fwhm_mm is not None else (case.get("beam_fwhm_mm") or 1.0)
+        data = _trajectory_data(
+            case,
+            Ne,
+            seed,
+            beam_fwhm_mm=fwhm_mm,
+            crystal_width_mm=case.get("crystal_width_mm") or 5.0,
+            crystal_height_mm=case.get("crystal_height_mm") or 5.0,
+        )
+    else:
+        data = _trajectory_data(case, Ne, seed, beam_fwhm_mm=_ZOOM_BEAM_FWHM_MM)
+    return dataset_t_max(data)
+
+
 def advance_frame(frame_index, speed, repeat, n_frames=N_FRAMES):
     """Advance one playback tick: ``frame_index`` moves by a ``speed``-scaled
     step (rounded to the nearest int). Reaching or passing the last frame

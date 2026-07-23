@@ -81,7 +81,12 @@ def _():
         penetration_survival_chart,
         trajectory_chart,
     )
-    from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure
+    from cxr_mc.plots.plotly_trajectories import (
+        advance_frame,
+        case_t_max,
+        frame_reveal_fs,
+        trajectory_volume_figure,
+    )
     from cxr_mc.results import (
         filter_results,
         records,
@@ -97,7 +102,9 @@ def _():
     return (
         CATALOG,
         MaterialSelect,
+        advance_frame,
         build_cases,
+        case_t_max,
         cases_from_results,
         checkpoint_path_for,
         compare_spectrum_chart,
@@ -108,6 +115,7 @@ def _():
         eaglexo_detected_chart,
         filter_results,
         fmt_thickness,
+        frame_reveal_fs,
         heatmap_chart,
         heatmap_select_chart,
         load_checkpoint,
@@ -1850,17 +1858,103 @@ def _(mo):
 
 
 @app.cell
+def _(mo):
+    # Playback state lives in mo.state (not bare UI-element values) because the
+    # penetration tab body needs to WRITE it back -- e.g. auto-flipping Play off
+    # when a non-repeating pass reaches the last frame -- which only a
+    # mo.state-bound element supports. get_penetration_started distinguishes
+    # "frame 0, never played" (full reveal) from "frame 0 after a repeat wrap"
+    # (reveal nothing yet, per the mapped cutoff).
+    get_penetration_play, set_penetration_play = mo.state(False)
+    get_penetration_frame, set_penetration_frame = mo.state(0)
+    get_penetration_started, set_penetration_started = mo.state(False)
+    get_penetration_t_max, set_penetration_t_max = mo.state(None)
+    return (
+        get_penetration_frame,
+        get_penetration_play,
+        get_penetration_started,
+        get_penetration_t_max,
+        set_penetration_frame,
+        set_penetration_play,
+        set_penetration_started,
+        set_penetration_t_max,
+    )
+
+
+@app.cell
+def _(mo):
+    # Regenerate's click COUNT feeds the trajectory `seed`: every click draws a
+    # fresh transport, and everything else re-renders with the SAME seed until
+    # Regenerate is clicked again.
+    penetration_regen_ui = mo.ui.button(
+        value=0, on_click=lambda value: value + 1, label="🎲 Regenerate"
+    )
+    penetration_ne_ui = mo.ui.slider(
+        start=50, stop=500, value=250, step=10, label="Electrons (Ne)", show_value=True
+    )
+    penetration_beam_fwhm_ui = mo.ui.number(
+        value=1.0, start=0.001, step=0.1, label="Beam FWHM (mm, realistic mode)"
+    )
+    return penetration_beam_fwhm_ui, penetration_ne_ui, penetration_regen_ui
+
+
+@app.cell
+def _(get_penetration_play, mo, set_penetration_play):
+    # Play is bound to mo.state (not a bare mo.ui.switch) so the tab body can
+    # flip it back off programmatically -- the Repeat-off "stop at the last
+    # frame" behavior -- and have that reflected in the rendered switch.
+    penetration_play_ui = mo.ui.switch(
+        value=get_penetration_play(), on_change=set_penetration_play, label="Play"
+    )
+    penetration_speed_ui = mo.ui.slider(
+        start=0.25, stop=4, value=1, step=0.25, label="Speed (×)", show_value=True
+    )
+    penetration_repeat_ui = mo.ui.switch(value=False, label="Repeat")
+    return penetration_play_ui, penetration_repeat_ui, penetration_speed_ui
+
+
+@app.cell
+def _(mo, penetration_play_ui, penetration_speed_ui):
+    # mo.ui.refresh only ticks while it is mounted in rendered output, so the
+    # tab body includes it in its output ONLY while Play is on -- ticking stops
+    # the instant Play flips off, whether by hand or via the Repeat-off
+    # auto-stop. Rebuilt from Speed each time either input changes:
+    # advance_frame always steps >=1 frame per tick (never stalls at sub-1x),
+    # so the "feels slower" part of sub-1x speeds comes from a LONGER interval
+    # here, not a smaller step.
+    if penetration_play_ui.value:
+        _interval_s = round(1.0 / float(penetration_speed_ui.value), 2)
+        penetration_refresh_ui = mo.ui.refresh(default_interval=f"{_interval_s}s")
+    else:
+        penetration_refresh_ui = None
+    return (penetration_refresh_ui,)
+
+
+@app.cell
 def _(
     MATERIAL,
+    advance_frame,
     build_cases,
+    case_t_max,
     context_rail,
     fmt_thickness,
+    frame_reveal_fs,
+    get_penetration_frame,
+    get_penetration_started,
+    get_penetration_t_max,
     mo,
+    penetration_beam_fwhm_ui,
     penetration_energy_grid_ui,
     penetration_energy_keV,
     penetration_energy_manual_ui,
     penetration_energy_source_ui,
+    penetration_ne_ui,
+    penetration_play_ui,
     penetration_realistic_ui,
+    penetration_refresh_ui,
+    penetration_regen_ui,
+    penetration_repeat_ui,
+    penetration_speed_ui,
     penetration_survival_chart,
     penetration_thickness_ang,
     penetration_thickness_grid_ui,
@@ -1871,6 +1965,10 @@ def _(
     penetration_tilt_manual_ui,
     penetration_tilt_source_ui,
     plot_trajectory_grid,
+    set_penetration_frame,
+    set_penetration_play,
+    set_penetration_started,
+    set_penetration_t_max,
     settings,
     trajectory_chart,
     trajectory_sweep,
@@ -1913,7 +2011,60 @@ def _(
         # The sweep has one selected energy and tilt; keep the nearest-case guard
         # in case a future sweep adds a surrounding grid.
         _nc = min(_traj, key=lambda c: (abs(c["tilt_deg"] - _angle), c["E0_keV"]))
-        _volume = trajectory_volume_figure(_nc, Ne=40, realistic=penetration_realistic_ui.value)
+
+        _seed = int(penetration_regen_ui.value)
+        _Ne = int(penetration_ne_ui.value)
+        _beam_fwhm = float(penetration_beam_fwhm_ui.value)
+        _realistic = penetration_realistic_ui.value
+
+        # T_max depends only on (case, Ne, seed, realistic, beam_fwhm) -- cache
+        # it in mo.state keyed on that tuple so case_t_max (a full
+        # _trajectory_data call) runs once per parameter set, not once per
+        # animation frame.
+        _t_max_key = (
+            _nc["name"],
+            _nc["E0_keV"],
+            _nc.get("tilt_deg"),
+            _Ne,
+            _seed,
+            _realistic,
+            _beam_fwhm,
+        )
+        _cached_t_max = get_penetration_t_max()
+        if _cached_t_max is not None and _cached_t_max[0] == _t_max_key:
+            _t_max = _cached_t_max[1]
+        else:
+            _t_max = case_t_max(
+                _nc, Ne=_Ne, seed=_seed, realistic=_realistic, beam_fwhm_mm=_beam_fwhm
+            )
+            set_penetration_t_max((_t_max_key, _t_max))
+
+        _frame = get_penetration_frame()
+        _started = get_penetration_started()
+        if penetration_play_ui.value and penetration_refresh_ui is not None:
+            _ = penetration_refresh_ui.value  # subscribe: reruns this cell on each tick
+            _frame, _still_playing = advance_frame(
+                _frame, float(penetration_speed_ui.value), penetration_repeat_ui.value
+            )
+            set_penetration_frame(_frame)
+            set_penetration_started(True)
+            _started = True
+            if not _still_playing:
+                set_penetration_play(False)  # Repeat-off: stop at the last frame
+
+        # Idle at frame 0, never played -> full reveal; playing/advanced (incl.
+        # a repeat wrap back to frame 0) -> the mapped cutoff.
+        _reveal_until_fs = (
+            None if (_frame == 0 and not _started) else frame_reveal_fs(_frame, _t_max)
+        )
+        _volume = trajectory_volume_figure(
+            _nc,
+            Ne=_Ne,
+            seed=_seed,
+            realistic=_realistic,
+            beam_fwhm_mm=_beam_fwhm,
+            reveal_until_fs=_reveal_until_fs,
+        )
         _parts = [
             _rail,
             _md,
@@ -1952,7 +2103,28 @@ def _(
                         ],
                         wrap=True,
                     ),
-                    penetration_realistic_ui,
+                    mo.hstack(
+                        [
+                            penetration_realistic_ui,
+                            penetration_regen_ui,
+                            penetration_ne_ui,
+                            penetration_beam_fwhm_ui,
+                        ],
+                        wrap=True,
+                    ),
+                    mo.hstack(
+                        [
+                            penetration_play_ui,
+                            penetration_speed_ui,
+                            penetration_repeat_ui,
+                            *(
+                                [penetration_refresh_ui]
+                                if penetration_refresh_ui is not None
+                                else []
+                            ),
+                        ],
+                        wrap=True,
+                    ),
                 ]
             ),
             *(p for p in (_survival, _volume) if p is not None),
