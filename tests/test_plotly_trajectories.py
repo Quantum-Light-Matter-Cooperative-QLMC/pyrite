@@ -83,9 +83,24 @@ def test_exit_paths_drawn_once_for_backscatter_and_transmission():
     exit_trace = exit_traces[0]
     assert exit_trace.type == "scatter3d"
     assert exit_trace.line.dash == "dash"
-    # NaN-separated: at least one break between per-electron dashes, i.e. more
-    # than one exit path drawn (both a backscattered and a transmitted electron).
-    assert np.isnan(np.asarray(exit_trace.z, dtype=float)).sum() >= 2
+
+    # exit_trace.{x,y,z} are NaN-separated triples per electron:
+    # [face-exit point, extrapolated dash endpoint, NaN, ...]. The face-exit
+    # point (index 0 of each triple) is the one guaranteed by _exit_paths_3d
+    # to sit within tol of z=0 (backscattered, top face) or z=thick
+    # (transmitted, bottom face); the extrapolated endpoint continues past the
+    # face and is not face-adjacent, so only the face-exit points are checked.
+    z = np.asarray(exit_trace.z, dtype=float)
+    assert np.isnan(z[2::3]).all()  # every third point is the NaN separator
+    face_z = z[0::3]
+    assert np.isfinite(face_z).all()
+
+    exit_face_trace = next(trace for trace in fig.data if trace.name == "exit face")
+    thick = float(np.asarray(exit_face_trace.z, dtype=float)[0])
+    tol = max(1e-6 * thick, np.finfo(float).eps)
+
+    assert np.any(np.abs(face_z) <= tol)  # at least one backscattered (top-face) exit
+    assert np.any(np.abs(face_z - thick) <= tol)  # at least one transmitted (bottom-face) exit
     fig.to_json()
 
 
