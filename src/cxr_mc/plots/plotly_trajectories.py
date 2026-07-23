@@ -21,15 +21,11 @@ _BEAM = "#E76F51"
 _DETECTOR = "#42C7C7"
 _FIELD = "#17202A"
 _GRID = "#34495E"
+_EXIT_PATH = "#9AA5B1"  # muted slate-grey: neutral vs. the turbo track colorscale
 
 # Zoomed (non-realistic) view spot FWHM [mm]: a micron-scale beam so the incident
 # bundle has visible width at the fitted, sub-micron cascade scale.
 _ZOOM_BEAM_FWHM_MM = 1.0e-3
-
-# Both views transport 4x the requested electrons: the incident bundle reads as a
-# beam only when densely populated, and at grazing tilt a large fraction of the
-# realistic spot misses the finite crystal (n_missed), thinning it further.
-_NE_SCALE = 4
 
 
 def track_vertices_3d(data):
@@ -155,7 +151,7 @@ def _crystal_footprint_extent(case, u):
     return -hx, hx, -hy, hy
 
 
-def _beam_footprint_outline(case, u, *, n_points=96):
+def _beam_footprint_outline(case, u, fwhm_mm, *, n_points=96):
     """Closed ``(x, y)`` outline [display units] of the collimated beam spot where
     it strikes the tilted entrance face ``z = 0``, for the realistic-scale view.
 
@@ -164,14 +160,16 @@ def _beam_footprint_outline(case, u, *, n_points=96):
     along the azimuth -- the grazing-incidence stretch that can outgrow the finite
     crystal. Reuse :func:`cxr_mc.montecarlo.geometry.project_beam_entry` so the
     drawn outline matches transport's own entry mapping exactly. Returns ``None``
-    for the legacy point beam (``beam_fwhm_mm`` falsy / absent).
+    for the legacy point beam (``fwhm_mm`` falsy / absent).
 
-    ``beam_fwhm_mm`` is the lab-plane spot FWHM; draw the outline at the FWHM
-    contour (lab radius = ``beam_fwhm_mm / 2``, mm -> Ang factor 1e7). Sample a
-    ring of ``n_points`` lab offsets ``(u_i, v_i)`` on that circle, project them,
-    and divide the resulting sample-frame (x, y) by ``u`` for display units.
+    ``fwhm_mm`` is the ALREADY-RESOLVED lab-plane spot FWHM (the caller's
+    ``beam_fwhm_mm`` override or the case's own default -- resolved once by the
+    caller so this draws exactly the spot that was transported, never re-reading
+    ``case`` itself). Draw the outline at the FWHM contour (lab radius =
+    ``fwhm_mm / 2``, mm -> Ang factor 1e7). Sample a ring of ``n_points`` lab
+    offsets ``(u_i, v_i)`` on that circle, project them, and divide the
+    resulting sample-frame (x, y) by ``u`` for display units.
     """
-    fwhm_mm = case.get("beam_fwhm_mm")
     if not fwhm_mm:
         return None
     radius_ang = 0.5 * float(fwhm_mm) * 1e7  # FWHM-contour radius, mm -> Ang
@@ -214,7 +212,71 @@ def _incident_beam_lines(data, length):
     )
 
 
-def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0, realistic=False):
+def _exit_paths_3d(data, length, *, tol_frac=1e-6):
+    """ONE NaN-separated ``Scatter3d`` of dashed exit-path continuations, one per
+    electron that leaves through the TOP (``z ~ 0``, backscattered) or BOTTOM
+    (``z ~ thick``, transmitted) face. Side exits (terminal ``z`` strictly
+    between the two faces -- absorbed, or the rare true side leak) are not drawn.
+
+    The terminal segment of each electron is its largest-``t_fs`` (oldest-age)
+    entry in ``data``. Its exit direction is the terminal segment's own
+    ``end_xyz - start_xyz`` (normalized), continued straight for ``length``
+    display units past ``end_xyz`` -- an extrapolation, not a further-simulated
+    path. ``tol_frac * thick`` is the face-membership tolerance: transported
+    ``z`` at the exit face agrees with ``0``/``thick`` only up to the segment
+    integrator's floating-point precision, so an exact ``==`` comparison would
+    spuriously miss real exits; ``1e-6`` of the slab thickness is generous
+    against that roundoff while still well inside any physical slab.
+
+    Returns ``None`` when no electron exits through the top or bottom face.
+    """
+    elec_id = np.asarray(data["elec_id"])
+    start = np.asarray(data["start_xyz"], dtype=float)
+    end = np.asarray(data["end_xyz"], dtype=float)
+    t_fs = np.asarray(data["t_fs"], dtype=float)
+    thick = float(data["thick"])
+    if elec_id.size == 0:
+        return None
+
+    # terminal (max t_fs) segment per electron: sort by (electron, age), then
+    # take the last row of each contiguous electron run.
+    order = np.lexsort((t_fs, elec_id))
+    sorted_ids = elec_id[order]
+    run_end = np.flatnonzero(np.diff(sorted_ids) != 0)
+    terminal = order[np.concatenate((run_end, [len(order) - 1]))]
+
+    term_start = start[terminal]
+    term_end = end[terminal]
+    tol = max(tol_frac * thick, np.finfo(float).eps)
+    exits = (np.abs(term_end[:, 2]) <= tol) | (np.abs(term_end[:, 2] - thick) <= tol)
+    if not np.any(exits):
+        return None
+    term_start = term_start[exits]
+    term_end = term_end[exits]
+
+    direction = term_end - term_start
+    norm = np.linalg.norm(direction, axis=1, keepdims=True)
+    norm[norm[:, 0] == 0.0] = 1.0  # degenerate zero-length terminal segment: skip normalizing
+    unit = direction / norm
+    far = term_end + length * unit
+
+    n = len(term_end)
+    xyz = np.full((3 * n, 3), np.nan)
+    xyz[0::3] = term_end
+    xyz[1::3] = far
+    return go.Scatter3d(
+        x=xyz[:, 0],
+        y=xyz[:, 1],
+        z=xyz[:, 2],
+        mode="lines",
+        line={"color": _EXIT_PATH, "width": 3, "dash": "dash"},
+        opacity=0.45,
+        hovertemplate="exit path<extra></extra>",
+        name="exit path",
+    )
+
+
+def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0, realistic=False, beam_fwhm_mm=None):
     """Interactive 3D cutaway of electron tracks inside the crystal slab.
 
     Axes are sample-frame coordinates. The incident beam is drawn as a BUNDLE of
@@ -230,24 +292,33 @@ def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0, realistic=False):
 
     ``realistic=True`` instead draws the box at the case's TRUE lateral footprint
     (``crystal_width_mm`` x ``crystal_height_mm``, default 5x5 mm), transports a
-    physical beam spot (``beam_fwhm_mm``, default 1 mm), and overlays the FWHM
-    entry footprint on the ``z = 0`` face. At a large polar tilt that footprint
-    stretches by ``1 / cos(tilt)`` along the azimuth and can exceed the crystal --
-    the finite-crystal grazing-incidence overlap loss; electrons landing off the
-    crystal are dropped by transport and never drawn. At true 5 mm scale the
-    ~micron cascade collapses toward the origin, as expected.
+    physical beam spot, and overlays the FWHM entry footprint on the ``z = 0``
+    face. At a large polar tilt that footprint stretches by ``1 / cos(tilt)``
+    along the azimuth and can exceed the crystal -- the finite-crystal
+    grazing-incidence overlap loss; electrons landing off the crystal are
+    dropped by transport and never drawn. At true 5 mm scale the ~micron
+    cascade collapses toward the origin, as expected. ``beam_fwhm_mm`` (only
+    meaningful when ``realistic=True``) overrides the case's own
+    ``beam_fwhm_mm``; ``None`` (default) preserves the current default of
+    ``case.get("beam_fwhm_mm") or 1.0``. The zoomed view always uses
+    ``_ZOOM_BEAM_FWHM_MM`` and ignores this argument.
+
+    Electrons that exit through the top (``z = 0``, backscattered) or bottom
+    (``z = thick``, transmitted) face get a short dashed "exit path" continuing
+    straight past their last transported point, in their terminal segment's own
+    direction; side exits are not drawn (see :func:`_exit_paths_3d`).
     """
     case = _case_of(rec_or_case)
-    Ne = Ne * _NE_SCALE  # both bundles need enough particles to read as a beam
     if realistic:
         # true finite crystal + physical beam spot: transport samples each entry
         # from the Gaussian, projects it onto the tilted face, and drops off-crystal
         # entries (n_missed) so they never render.
+        fwhm_mm = beam_fwhm_mm if beam_fwhm_mm is not None else (case.get("beam_fwhm_mm") or 1.0)
         data = _trajectory_data(
             case,
             Ne,
             seed,
-            beam_fwhm_mm=case.get("beam_fwhm_mm") or 1.0,
+            beam_fwhm_mm=fwhm_mm,
             crystal_width_mm=case.get("crystal_width_mm") or 5.0,
             crystal_height_mm=case.get("crystal_height_mm") or 5.0,
         )
@@ -302,7 +373,7 @@ def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0, realistic=False):
             _plane_outline(depth, lox, hix, loy, hiy, name=f"layer interface {index}", dash="dash")
         )
     if realistic:
-        outline = _beam_footprint_outline(case, data["u"])
+        outline = _beam_footprint_outline(case, data["u"], fwhm_mm)
         if outline is not None:
             fx, fy = outline
             fig.add_trace(
@@ -317,6 +388,9 @@ def trajectory_volume_figure(rec_or_case, *, Ne=40, seed=0, realistic=False):
                 )
             )
     fig.add_trace(_incident_beam_lines(data, 0.28 * span))
+    exit_paths = _exit_paths_3d(data, 0.28 * span)
+    if exit_paths is not None:
+        fig.add_trace(exit_paths)
     for trace in _direction_arrow(
         data["detector"], 0.28 * span, color=_DETECTOR, name="detector direction"
     ):

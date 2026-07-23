@@ -54,3 +54,63 @@ def test_trajectory_volume_figure_contains_volume_tracks_and_direction_arrows():
     assert beam.type == "scatter3d"
     assert fig.layout.scene.aspectmode == "data"
     fig.to_json()  # browser/export payload remains serializable
+
+
+def _hopg_thin_slab_case():
+    """30 keV / hopg / 4 um slab at normal incidence: with Ne=80, seed=0 (the
+    ``trajectory_volume_figure`` defaults) this mix produces BOTH backscattered
+    (top-face) and transmitted (bottom-face) terminal segments, so it exercises
+    both exit-path branches."""
+    from cxr_mc.config import default_settings, trajectory_sweep
+    from cxr_mc.sweep import build_cases
+
+    settings = default_settings()
+    return build_cases(
+        trajectory_sweep("hopg", energies=(30.0,), tilts=(0.0,), thickness_ang=40000.0),
+        settings.n_electrons,
+        settings.n_electrons_brem,
+    )[0]
+
+
+def test_exit_paths_drawn_once_for_backscatter_and_transmission():
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure
+
+    case = _hopg_thin_slab_case()
+    fig = trajectory_volume_figure(case, Ne=80)
+
+    exit_traces = [trace for trace in fig.data if trace.name == "exit path"]
+    assert len(exit_traces) == 1  # one legend entry for every electron's exit dash
+    exit_trace = exit_traces[0]
+    assert exit_trace.type == "scatter3d"
+    assert exit_trace.line.dash == "dash"
+    # NaN-separated: at least one break between per-electron dashes, i.e. more
+    # than one exit path drawn (both a backscattered and a transmitted electron).
+    assert np.isnan(np.asarray(exit_trace.z, dtype=float)).sum() >= 2
+    fig.to_json()
+
+
+def test_beam_fwhm_mm_override_changes_footprint_extent():
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure
+
+    case = _hopg_thin_slab_case()
+    fig_narrow = trajectory_volume_figure(case, Ne=6, realistic=True, beam_fwhm_mm=0.2)
+    fig_wide = trajectory_volume_figure(case, Ne=6, realistic=True, beam_fwhm_mm=4.0)
+
+    narrow = next(trace for trace in fig_narrow.data if trace.name == "beam footprint")
+    wide = next(trace for trace in fig_wide.data if trace.name == "beam footprint")
+    narrow_extent = float(np.max(np.abs(narrow.x)))
+    wide_extent = float(np.max(np.abs(wide.x)))
+    assert wide_extent > narrow_extent  # override, not the case's own beam_fwhm_mm
+
+
+def test_ne_is_transported_literally_not_scaled():
+    """``Ne`` used to be silently multiplied by a hidden ``_NE_SCALE`` factor;
+    it is now the literal electron count handed to transport."""
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure
+
+    case = _hopg_thin_slab_case()
+    fig = trajectory_volume_figure(case, Ne=10, seed=0)
+    tracks = next(trace for trace in fig.data if trace.name == "electron tracks")
+    elec_id = np.asarray(tracks.customdata)[:, 1]
+    n_electrons = len(np.unique(elec_id[np.isfinite(elec_id)]))
+    assert n_electrons <= 10  # never inflated by a hidden multiplier
