@@ -46,3 +46,4 @@ Item generation:
 3. **Bent Crystals (After add channeling + relativistic electrons)**
 4. **Crystal structure 3D visualizer (with inv. lattice vector arrows?)**
 5. **Superradiant PXR/CBS** need bunch length knowledge, coherent emission *across segments* (also needed by channeling radiation as in long-term features #1, #3)
+6. **Blazed-groove exit path optimization** blazed grooves to improve exit paths and yield in a given crystal.
