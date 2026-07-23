@@ -222,16 +222,20 @@ def mc_spectrum(
     13/14) and resonance kinematics (Eq. 10) are unchanged -- grooving is
     purely an absorption-path effect in this v1 model.
 
-    Assumptions: profile invariant along y; laterally infinite slab (no
-    finite crystal_width_ang/crystal_height_ang); photons travel straight
-    along n_hat with no wave-optics diffraction off the groove edges
-    (consistent with the rest of mc_spectrum's incoherent transport).
+    Assumptions: profile invariant along y; photons travel straight along
+    n_hat with no wave-optics diffraction off the groove edges (consistent
+    with the rest of mc_spectrum's incoherent transport). A finite crystal
+    footprint (crystal_width_ang/crystal_height_ang) is permitted and only
+    classifies launch hit/miss in transport (hit_frac); the groove escape here
+    ignores it and treats the sawtooth as laterally periodic, an
+    O(groove spacing / crystal width) edge approximation (sub-micron grooves on
+    a mm-scale crystal) of the same order as the other v1 groove assumptions.
 
     v1 exclusions (raise ValueError rather than silently mismodeling):
-    groove with layers (single-slab absorber only); groove with a finite
-    transverse footprint; groove with n_hat[2] >= 0 (escape must be back out
-    the entrance face -- the relief geometry is defined for that exit only).
-    None (default) is a strict no-op: today's flat-face result bit-for-bit.
+    groove with layers (single-slab absorber only); groove with n_hat[2] >= 0
+    (escape must be back out the entrance face -- the relief geometry is defined
+    for that exit only). None (default) is a strict no-op: today's flat-face
+    result bit-for-bit.
 
     Validation: blazed-groove-geometry
     """
@@ -259,11 +263,6 @@ def mc_spectrum(
     if groove is not None:
         if layers is not None:
             raise ValueError("groove escape is v1 single-slab only (no layers)")
-        if (
-            segments.get("crystal_width_ang") is not None
-            and segments.get("crystal_height_ang") is not None
-        ):
-            raise ValueError("groove escape requires a laterally infinite slab")
         if n_hat[2] >= 0.0:
             raise ValueError(
                 "groove escape requires exit through the entrance face "
@@ -393,7 +392,19 @@ def mc_spectrum(
             segments.get("crystal_width_ang") is not None
             and segments.get("crystal_height_ang") is not None
         )
-        if finite_footprint:
+        if groove is not None:
+            # Blazed sawtooth entrance face: closed-form path to the working
+            # facet (grooves shorten, never lengthen, the flat-face path). Takes
+            # precedence over any finite footprint -- the mm-scale crystal extent
+            # only classifies launch hit/miss (hit_frac, set in transport); the
+            # sub-micron groove escape treats the slab as laterally periodic,
+            # with an O(groove spacing / crystal width) edge error consistent
+            # with the other v1 groove approximations. The guard above
+            # guarantees layers is None and n_hat[2] < 0 here.
+            # Validation: blazed-groove-geometry
+            L_esc = escape_distance_ang(seg_r[idx, 0], z_mid, groove)
+            tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)
+        elif finite_footprint:
             L_esc = _segment_escape_distance(segments, n_hat, xp=xp)[idx]
             if layers is None:
                 tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)
@@ -402,13 +413,7 @@ def mc_spectrum(
         else:
             if layers is None:
                 if n_hat[2] < 0:
-                    if groove is not None:
-                        # Blazed sawtooth entrance face: closed-form path to
-                        # the working facet (grooves shorten, never lengthen,
-                        # the flat-face path). Validation: blazed-groove-geometry
-                        L_esc = escape_distance_ang(seg_r[idx, 0], z_mid, groove)
-                    else:
-                        L_esc = z_mid / (-n_hat[2])  # out the entrance face
+                    L_esc = z_mid / (-n_hat[2])  # out the entrance face
                 else:
                     L_esc = (thickness - z_mid) / n_hat[2]  # out the back face
                 tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)

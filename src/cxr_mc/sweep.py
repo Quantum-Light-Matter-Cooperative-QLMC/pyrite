@@ -338,13 +338,21 @@ def _reject_invalid_groove_geometry(
 ) -> None:
     """Refuse case geometries the v1 blazed-groove entrance face cannot model
     (docs/superpowers/plans/2026-07-23-blazed-groove-geometry.md). Grooves are
-    a laterally infinite, single-slab feature machined into one flat face at a
-    fixed in-plane orientation (montecarlo.groove.blazed_groove_spec), so
-    every case must sit at tilt_azim_deg == 180, 0 < tilt_deg < 90, and
-    theta_obs_deg == 90, and neither a substrate/stack nor a finite footprint
-    may be present (both assume a flat, laterally infinite entrance face).
-    Mirrors the theta_obs check in montecarlo.groove.blazed_groove_spec so the
-    restriction is enforced both at case-build time and at spec construction."""
+    a single-slab feature machined into one flat face at a fixed in-plane
+    orientation (montecarlo.groove.blazed_groove_spec), so every case must sit
+    at tilt_azim_deg == 180, 0 < tilt_deg < 90, and theta_obs_deg == 90, and no
+    substrate/stack may be present. Mirrors the theta_obs check in
+    montecarlo.groove.blazed_groove_spec so the restriction is enforced both at
+    case-build time and at spec construction.
+
+    A finite crystal footprint IS allowed and is the default (crystal_width_mm/
+    crystal_height_mm, same 5x5 mm as flat sweeps): the sub-micron groove phase
+    and the mm-scale footprint are independent in transport -- the groove offsets
+    the entry point within one period, the footprint kills beam electrons whose
+    (tilt-elongated) spot lands off the crystal -- so the launch-time hit/miss
+    classification (stored as ``hit_frac``, surfaced in the analysis_app heatmap)
+    applies unchanged to grooved crystals. The alive electrons still see the
+    laterally periodic groove escape profile."""
     if groove_spacing_ang <= 0:
         raise ValueError("groove_spacing_ang must be positive")
     if not np.allclose(azimuths, 180.0):
@@ -355,11 +363,6 @@ def _reject_invalid_groove_geometry(
         raise ValueError("grooves require theta_obs_deg == 90 for every case")
     if stack is not None:
         raise ValueError("grooves are v1 single-slab only (no substrate/stack)")
-    if sweep.crystal_width_mm is not None or sweep.crystal_height_mm is not None:
-        raise ValueError(
-            "grooves require a laterally infinite slab "
-            "(crystal_width_mm/crystal_height_mm must be None)"
-        )
 
 
 def _line_grid_for_energy(sweep: Sweep, default_grid: np.ndarray, energy_keV: float) -> np.ndarray:

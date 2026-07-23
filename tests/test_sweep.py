@@ -811,16 +811,23 @@ def test_build_cases_groove_rejects_substrate():
         )
 
 
-def test_build_cases_groove_rejects_finite_footprint():
-    with pytest.raises(ValueError):
-        build_cases(
-            Sweep(
-                material="hopg",
-                tilt_deg=45.0,
-                tilt_azim_deg=180.0,
-                groove_spacing_ang=2.0e4,
-            )
-        )  # default crystal_width_mm/height_mm is a finite 5x5 mm footprint
+def test_build_cases_groove_allows_default_finite_footprint():
+    # A grooved sweep keeps the default finite 5x5 mm footprint (same as flat
+    # sweeps), so it records a real electron hit/miss fraction; the footprint and
+    # the sub-micron groove phase are independent in transport.
+    cases = build_cases(
+        Sweep(
+            material="hopg",
+            tilt_deg=45.0,
+            tilt_azim_deg=180.0,
+            groove_spacing_ang=2.0e4,
+        )
+    )
+    assert cases
+    for c in cases:
+        assert c["crystal_width_mm"] == 5.0
+        assert c["crystal_height_mm"] == 5.0
+        assert c["groove_spacing_ang"] == 2.0e4
 
 
 def test_build_cases_groove_rejects_nonpositive_spacing():

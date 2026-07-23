@@ -176,11 +176,12 @@ def trajectory_sweep(
         stack=stack,
         substrate=substrate,
         groove_spacing_ang=groove_spacing_ang,
-        # Blazed grooves model a laterally infinite slab (build_cases rejects a
-        # finite footprint with them). Drop the default 5x5 mm footprint when
-        # grooved; keep it otherwise so ungrooved sweeps are unchanged.
-        crystal_width_mm=None if groove_spacing_ang is not None else 5.0,
-        crystal_height_mm=None if groove_spacing_ang is not None else 5.0,
+        # Finite 5x5 mm footprint for grooved and ungrooved alike (the groove
+        # escape treats the slab as laterally periodic and only the launch stage
+        # sees the footprint -- see montecarlo.spectrum.mc_spectrum), so the
+        # penetration figures record the same electron hit/miss as the sweep.
+        crystal_width_mm=5.0,
+        crystal_height_mm=5.0,
     )
 
 

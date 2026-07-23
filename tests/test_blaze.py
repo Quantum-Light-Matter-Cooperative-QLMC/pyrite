@@ -104,8 +104,9 @@ def test_forced_geometry_on_every_case(monkeypatch):
     assert cases
     for c in cases:
         assert c["tilt_azim_deg"] == 180.0
-        assert c["crystal_width_mm"] is None
-        assert c["crystal_height_mm"] is None
+        # default finite 5x5 mm footprint (same as flat sweeps) -> real hit_frac
+        assert c["crystal_width_mm"] == 5.0
+        assert c["crystal_height_mm"] == 5.0
         assert c["theta_obs_rad"] == np.deg2rad(90.0)
         assert "groove_spacing_ang" in c
         assert c["abs_layers"] is None

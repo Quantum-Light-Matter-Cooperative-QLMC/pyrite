@@ -13,10 +13,13 @@ spacing and the scan grid.
 adds a HOPG crystal with 2 micron-spaced grooves, scanned over polar angles
 25 deg and 45 deg.
 
-Grooves are v1 single-slab: laterally infinite, no substrate/stack, no finite
-footprint, ``theta_obs = 90 deg``, ``tilt_azim = 180 deg``, ``0 < tilt < 90
-deg``. These are enforced by ``sweep._reject_invalid_groove_geometry``; this
-driver constructs every Sweep to satisfy them and does not relax them. See
+Grooves are v1 single-slab: no substrate/stack, ``theta_obs = 90 deg``,
+``tilt_azim = 180 deg``, ``0 < tilt < 90 deg``. These are enforced by
+``sweep._reject_invalid_groove_geometry``; this driver constructs every Sweep
+to satisfy them and does not relax them. The crystal keeps the default finite
+5x5 mm footprint (same as flat sweeps), so blazed records carry a real electron
+hit/miss fraction (``hit_frac``, shown in the analysis_app heatmap) rather than
+the trivial 1.0 of a laterally infinite slab. See
 ``docs/superpowers/specs/2026-07-23-cxr-blaze-grooved-sweep-design.md``.
 
 The ``if __name__ == "__main__"`` guard on the entry point is REQUIRED, not
@@ -117,13 +120,16 @@ def run(args):
     settings = default_settings()
     cases = []
     for energy_keV, spacing_ang in pairs:
+        # crystal_width_mm/crystal_height_mm are left at the material_sweep
+        # default (finite 5x5 mm footprint, same as flat sweeps) so the blazed
+        # run records a real electron hit/miss fraction (hit_frac) instead of the
+        # trivial 1.0 of a laterally infinite slab -- surfaced in the analysis_app
+        # heatmap. substrate/stack stay None (grooves are v1 single-slab).
         overrides = dict(
             theta_obs_deg=90.0,
             energy_keV=[energy_keV],
             groove_spacing_ang=spacing_ang,
             tilt_azim_deg=180.0,
-            crystal_width_mm=None,
-            crystal_height_mm=None,
             substrate=None,
             stack=None,
         )
