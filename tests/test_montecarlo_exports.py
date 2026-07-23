@@ -57,6 +57,9 @@ FROZEN_EXPORTS = frozenset(
         "_orientation_R",
         "_small_tilt_R",
         "_mosaic_quadrature",
+        # groove
+        "GrooveSpec",
+        "blazed_groove_spec",
         # spectrum
         "_SEG_ARRAYS",
         "_segments_in_layer",
