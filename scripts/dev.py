@@ -12,7 +12,7 @@ Commands:
     repo-map   print a compact repo tree and the canonical commands
     lint       run Ruff over the repository
     format     run Ruff formatter
-    typecheck  run Pyright
+    typecheck  run ty
     precommit  run all pre-commit hooks
     nbqa       lint notebooks with nbQA + Ruff
     nbstrip    strip notebook outputs in-place
@@ -137,7 +137,7 @@ def cmd_format(_: argparse.Namespace) -> None:
 
 
 def cmd_typecheck(_: argparse.Namespace) -> None:
-    run("-m", "pyright")
+    run("-m", "ty", "check")
 
 
 def cmd_precommit(_: argparse.Namespace) -> None:

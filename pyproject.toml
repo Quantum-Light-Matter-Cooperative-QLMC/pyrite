@@ -20,7 +20,6 @@ dependencies = [
     "pandoc>=2.4",
     "plotly>=6.0",
     "pre-commit>=4.6.0",
-    "pyright>=1.1.410",
     "ruff>=0.15.19",
     "scipy>=1.17.1",
     "tabulate>=0.10.0",
@@ -71,7 +70,7 @@ watcher_on_save = "autorun"
 [tool.jupytext]
 formats = "ipynb,md:myst"
 
-[tool.pyright]
+[tool.ty.src]
 include = ["src"]
 
 [tool.ruff]
