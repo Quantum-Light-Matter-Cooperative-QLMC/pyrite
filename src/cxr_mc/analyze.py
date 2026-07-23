@@ -24,6 +24,7 @@ both.
     cxr analyze --watch            # add marimo's --watch (combinable with either)
     cxr analyze --smoke            # execute the app once without a browser
     cxr analyze --edit             # `marimo edit` instead of `marimo run`
+    cxr analyze --no-token         # pass marimo's --no-token (disable auth token)
 """
 
 import argparse
@@ -60,10 +61,14 @@ def material_menu(
     materials: tuple[str, ...] | None = None,
     labels: Mapping[str, str] | None = None,
 ) -> tuple[MaterialMenuRow, ...]:
-    """Return configured analysis materials, disabling ones without a checkpoint.
+    """Return configured analysis materials, checkpoint-available ones first.
 
     Only direct ``<material>.pkl`` children of ``checkpoint_dir`` count. This
     deliberately excludes archived/reproduction caches and unknown pickle stems.
+    Rows are grouped by availability -- materials with a checkpoint before
+    those without -- and each group is sorted alphabetically by label
+    (case-insensitive), so the dropdown surfaces ready-to-browse materials
+    first instead of raw catalog order.
     """
     materials = CATALOG.material_keys if materials is None else materials
     labels = (
@@ -72,14 +77,16 @@ def material_menu(
         else labels
     )
     available = {path.stem for path in Path(checkpoint_dir).glob("*.pkl") if path.stem in materials}
-    return tuple(
+    rows: list[MaterialMenuRow] = [
         {
             "value": material,
             "label": labels.get(material, material),
             "disabled": material not in available,
         }
         for material in materials
-    )
+    ]
+    rows.sort(key=lambda row: (row["disabled"], row["label"].casefold()))
+    return tuple(rows)
 
 
 def select_initial_material(requested: str | None, menu: tuple[MaterialMenuRow, ...]) -> str | None:
@@ -121,7 +128,7 @@ def initial_material(cli_args, persisted_default):
     return "hopg"
 
 
-def _command(material, *, edit=False, watch=False, tunnel=False):
+def _command(material, *, edit=False, watch=False, tunnel=False, no_token=False):
     """The marimo argv for one launch (module-run through the current
     interpreter so the venv's marimo is the one that runs). Marimo's own flags
     go before the notebook path; app args go after ``--``."""
@@ -132,6 +139,7 @@ def _command(material, *, edit=False, watch=False, tunnel=False):
         "edit" if edit else "run",
         *(["--watch"] if watch else []),
         *(["--port", str(TUNNEL_PORT)] if tunnel else []),
+        *(["--no-token"] if no_token else []),
         NOTEBOOK,
         "--",
         "--material",
@@ -157,8 +165,10 @@ def _smoke_command(material, output):
     ]
 
 
-def _launch(material, *, edit=False, watch=False, smoke=False, acp=False, tunnel=False):
-    cmd = _command(material, edit=edit, watch=watch, tunnel=tunnel)
+def _launch(
+    material, *, edit=False, watch=False, smoke=False, acp=False, tunnel=False, no_token=False
+):
+    cmd = _command(material, edit=edit, watch=watch, tunnel=tunnel, no_token=no_token)
     print(f"launching {NOTEBOOK} ({'edit' if edit else 'run'}) with material={material}")
     if tunnel:
         print(f"ssh -L {TUNNEL_PORT}:127.0.0.1:{TUNNEL_PORT} <your-pi-ssh-host>")
@@ -166,7 +176,9 @@ def _launch(material, *, edit=False, watch=False, smoke=False, acp=False, tunnel
     env = {**os.environ, "CXR_ANALYZE_INITIAL": material}
     if smoke:
         with tempfile.TemporaryDirectory(prefix="cxr-mc-analysis-") as tmpdir:
-            subprocess.run(_smoke_command(material, Path(tmpdir) / "analysis.html"), check=True, env=env)
+            subprocess.run(
+                _smoke_command(material, Path(tmpdir) / "analysis.html"), check=True, env=env
+            )
         return
     if acp:
         with running_acp():
@@ -193,6 +205,8 @@ def _cli(args):
         launch_args["acp"] = True
     if args.tunnel:
         launch_args["tunnel"] = True
+    if args.no_token:
+        launch_args["no_token"] = True
     _launch(material, **launch_args)
 
 
@@ -216,6 +230,9 @@ def add_subparser(sub):
     ap.add_argument("--edit", action="store_true", help="use `marimo edit` instead of `marimo run`")
     ap.add_argument("--acp", action="store_true", help="start local Claude and Codex ACP bridges")
     ap.add_argument("--tunnel", action="store_true", help="use a fixed port for SSH tunneling")
+    ap.add_argument(
+        "--no-token", action="store_true", help="pass marimo's --no-token (disable auth token)"
+    )
     ap.set_defaults(func=_cli)
     return ap
 

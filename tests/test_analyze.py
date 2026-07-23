@@ -48,20 +48,57 @@ def test_material_menu_marks_only_configured_checkpoint_stems_available(tmp_path
         labels={"hopg": "HOPG", "silicon": "Silicon", "quick_only": "Quick"},
     )
 
+    # Available materials (checkpoint exists) sort first; each group is
+    # alphabetical by label. Only "silicon" is available here.
     assert menu == (
-        {"value": "hopg", "label": "HOPG", "disabled": True},
         {"value": "silicon", "label": "Silicon", "disabled": False},
+        {"value": "hopg", "label": "HOPG", "disabled": True},
         {"value": "quick_only", "label": "Quick", "disabled": True},
     )
 
 
-def test_material_menu_defaults_to_catalog_order_and_spec_labels(tmp_path):
+def test_material_menu_sorts_available_before_unavailable_then_alphabetically(tmp_path):
+    checkpoints = tmp_path / "checkpoints"
+    checkpoints.mkdir()
+    for stem in ("zeta", "alpha"):
+        (checkpoints / f"{stem}.pkl").touch()
+
+    menu = analyze.material_menu(
+        checkpoints,
+        materials=("beta", "alpha", "zeta", "delta"),
+        labels={"beta": "beta", "alpha": "Alpha", "zeta": "zeta", "delta": "Delta"},
+    )
+
+    assert menu == (
+        {"value": "alpha", "label": "Alpha", "disabled": False},
+        {"value": "zeta", "label": "zeta", "disabled": False},
+        {"value": "beta", "label": "beta", "disabled": True},
+        {"value": "delta", "label": "Delta", "disabled": True},
+    )
+
+
+def test_material_menu_label_sort_is_case_insensitive(tmp_path):
+    # Raw string comparison would put "Banana" (capital B) before "apple"
+    # (ASCII uppercase < lowercase); casefold sorting must not do that.
+    menu = analyze.material_menu(
+        tmp_path,
+        materials=("b_mat", "a_mat"),
+        labels={"b_mat": "Banana", "a_mat": "apple"},
+    )
+
+    assert tuple(row["value"] for row in menu) == ("a_mat", "b_mat")
+
+
+def test_material_menu_defaults_to_catalog_materials_and_spec_labels(tmp_path):
     menu = analyze.material_menu(tmp_path)
 
-    assert tuple(row["value"] for row in menu) == CATALOG.material_keys
-    assert tuple(row["label"] for row in menu) == tuple(
-        CATALOG.material(key).label for key in CATALOG.material_keys
-    )
+    assert {row["value"] for row in menu} == set(CATALOG.material_keys)
+    assert all(row["disabled"] for row in menu)  # tmp_path has no checkpoints
+    assert {row["value"]: row["label"] for row in menu} == {
+        key: CATALOG.material(key).label for key in CATALOG.material_keys
+    }
+    labels = [row["label"] for row in menu]
+    assert labels == sorted(labels, key=str.casefold)
 
 
 def test_select_initial_material_falls_back_to_first_available():
@@ -79,6 +116,22 @@ def test_select_initial_material_falls_back_to_first_available():
         )
         is None
     )
+
+
+def test_select_initial_material_works_with_material_menu_ordering(tmp_path):
+    checkpoints = tmp_path / "checkpoints"
+    checkpoints.mkdir()
+    (checkpoints / "silicon.pkl").touch()
+
+    menu = analyze.material_menu(
+        checkpoints,
+        materials=("hopg", "silicon"),
+        labels={"hopg": "HOPG", "silicon": "Silicon"},
+    )
+
+    assert analyze.select_initial_material(None, menu) == "silicon"
+    assert analyze.select_initial_material("hopg", menu) == "silicon"
+    assert analyze.select_initial_material("silicon", menu) == "silicon"
 
 
 def test_env_var_fallback_used_between_cli_and_persisted(monkeypatch):
@@ -254,6 +307,33 @@ def test_command_edit():
     cmd = analyze._command("wse2", edit=True)
     assert cmd[3] == "edit"
     assert "--watch" not in cmd
+
+
+def test_command_no_token_passes_marimo_flag():
+    command = analyze._command("hopg", no_token=True)
+    assert "--no-token" in command
+    assert command.index("--no-token") < command.index(analyze.NOTEBOOK)
+
+
+def test_command_no_token_omitted_by_default():
+    command = analyze._command("hopg")
+    assert "--no-token" not in command
+
+
+def test_no_token_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
+    monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
+    launched = {}
+    monkeypatch.setattr(
+        analyze, "_launch", lambda material, **kw: launched.update(material=material, **kw)
+    )
+    args = _parse(["analyze", "--no-token"])
+    args.func(args)
+    assert launched == {
+        "material": "hopg",
+        "edit": False,
+        "watch": False,
+        "no_token": True,
+    }
 
 
 def test_command_watch_combines_with_run_and_edit():
