@@ -24,16 +24,17 @@ through workers behind one main-process CUDA spectrum context; see
 montecarlo.run_cases.
 """
 
+import functools
+import json
 import os
 import time
 from collections import defaultdict
-from functools import partial
 from pathlib import Path
 
 from . import _checkpoint_io
 from ._energy_grid import decode_energy_grid
 from .montecarlo import run_cases
-from .results import store_result
+from .results import records, store_result, sweep_values
 
 # Anchored to the repo root (src/cxr_mc/run.py -> parents[2] = repo root) so
 # checkpoint lookup works regardless of the notebook's kernel cwd.
@@ -43,6 +44,14 @@ _DEFAULT_CHECKPOINT_DIR = str(Path(__file__).resolve().parents[2] / "checkpoints
 def checkpoint_path_for(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
     """Path to the per-material results checkpoint run_sweep writes."""
     return os.path.join(checkpoint_dir, f"{material}.pkl")
+
+
+def _manifest_path_for(checkpoint_path):
+    """Sidecar manifest path for a checkpoint pickle: same stem, ``.meta.json``
+    suffix (``checkpoints/<material>.pkl`` -> ``checkpoints/<material>.meta.json``).
+    See :func:`checkpoint_manifest`."""
+    base, _ = os.path.splitext(checkpoint_path)
+    return f"{base}.meta.json"
 
 
 def _checkpoint_save(checkpoint_path, results):
@@ -64,6 +73,27 @@ def _checkpoint_save(checkpoint_path, results):
     os.replace(tmp, checkpoint_path)
 
 
+@functools.lru_cache(maxsize=4)
+def _load_checkpoint_cached(path, mtime):
+    """The actual gunzip+unpickle behind :func:`load_checkpoint`, memoized
+    module-globally on ``(path, mtime)`` (``functools.lru_cache(maxsize=4)``).
+
+    Checkpoints are 140-225 MB gzip-pickles and the marimo analysis app calls
+    ``load_checkpoint`` repeatedly -- once per material switch, plus once per
+    catalog material just to enumerate beam energies -- so a naive per-call
+    load dominates wall time. Keying on mtime means a re-run scan (which
+    rewrites the ``.pkl`` and bumps its mtime) invalidates the cache
+    automatically; no manual invalidation, no staleness. The "loaded N
+    records" print lives here rather than in ``load_checkpoint`` so cache hits
+    stay silent.
+    """
+    results = _checkpoint_io.load(path)
+    n = sum(len(v) for v in results.values())
+    material = Path(path).stem
+    print(f"loaded {n} {material} records from {path}")
+    return results
+
+
 def load_checkpoint(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
     """Load a per-material results checkpoint (``checkpoints/<material>.pkl``)
     written by :func:`run_sweep`, WITHOUT re-running anything -- this is how the
@@ -73,15 +103,88 @@ def load_checkpoint(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
 
     Reconstruct the sweep's case list straight from it with
     ``cases = [r["case"] for r in results.records(results)]`` -- the records
-    carry their own cases, so the visualization app needs no Sweep to filter/plot."""
+    carry their own cases, so the visualization app needs no Sweep to filter/plot.
+
+    Cached module-globally keyed on the checkpoint's mtime (see
+    :func:`_load_checkpoint_cached`): repeated calls for the same material are
+    free until the checkpoint file next changes. Prefer :func:`checkpoint_manifest`
+    when only the checkpoint's energies/record count/sweep values are needed --
+    it avoids the unpickle entirely on the common path."""
     path = checkpoint_path_for(material, checkpoint_dir)
     if not os.path.exists(path):
         print(f"no checkpoint at {path} -- run `cxr scan {material}` first")
         return {}
-    results = _checkpoint_io.load(path)
-    n = sum(len(v) for v in results.values())
-    print(f"loaded {n} {material} records from {path}")
-    return results
+    return _load_checkpoint_cached(path, os.path.getmtime(path))
+
+
+def _manifest_for(results):
+    """Build the sidecar manifest dict for a ``results`` store: distinct beam
+    energies, total record count, and the swept case fields (see
+    :func:`cxr_mc.results.sweep_values`). Numpy scalars are coerced to plain
+    Python via ``.item()`` so the result is JSON-serializable. Shared by
+    :func:`_manifest_save` (write path) and :func:`checkpoint_manifest`'s
+    backfill (read path)."""
+    sweep = sweep_values(results)
+    sweep_json = {
+        field: [v.item() if hasattr(v, "item") else v for v in values]
+        for field, values in sweep.items()
+    }
+    energies = sorted(float(e) for e in sweep_json.get("E0_keV", []))
+    return {
+        "energies_keV": energies,
+        "n_records": len(records(results)),
+        "sweep": sweep_json,
+    }
+
+
+def _manifest_save(checkpoint_path, results):
+    """Atomically write/refresh the sidecar checkpoint manifest
+    (``<material>.meta.json``) alongside a ``_checkpoint_save`` -- lets
+    :func:`checkpoint_manifest` enumerate a checkpoint's energies/record
+    count/sweep values without unpickling the (140-225 MB) checkpoint itself.
+    JSON is tiny, so this runs on every save. Atomic write mirrors
+    ``_checkpoint_save``: a sibling ``.<pid>.tmp`` then ``os.replace``, so a
+    crash never leaves a half-written ``meta.json``. Returns the manifest dict
+    written."""
+    manifest = _manifest_for(results)
+    manifest_path = _manifest_path_for(checkpoint_path)
+    tmp = f"{manifest_path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as f:
+        json.dump(manifest, f)
+    os.replace(tmp, manifest_path)
+    return manifest
+
+
+def checkpoint_manifest(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
+    """Summary of a checkpoint's contents -- distinct beam energies, record
+    count, and swept case fields -- WITHOUT unpickling the checkpoint itself.
+
+    The analysis app enumerates beam energies across every catalog material
+    just to populate its selectors; doing that through :func:`load_checkpoint`
+    (even cached) means a real gunzip+unpickle of a 140-225 MB pickle the
+    first time each material is touched. This reads the sidecar
+    ``checkpoints/<material>.meta.json`` instead when it is at least as fresh
+    as the ``.pkl`` (mtime comparison) -- a re-run scan bumps the ``.pkl``'s
+    mtime past the last written manifest via :func:`_manifest_save`, so a
+    stale manifest is detected automatically.
+
+    Returns ``None`` if no checkpoint exists for ``material``. If the manifest
+    is missing or stale, backfills it: loads the checkpoint (through the
+    :func:`load_checkpoint` cache), computes the manifest, atomically writes
+    it, and returns it. Schema::
+
+        {"energies_keV": [float, ...], "n_records": int,
+         "sweep": {field: [values, ...]}}
+    """
+    path = checkpoint_path_for(material, checkpoint_dir)
+    if not os.path.exists(path):
+        return None
+    manifest_path = _manifest_path_for(path)
+    if os.path.exists(manifest_path) and os.path.getmtime(manifest_path) >= os.path.getmtime(path):
+        with open(manifest_path) as f:
+            return json.load(f)
+    results = load_checkpoint(material, checkpoint_dir)
+    return _manifest_save(path, results)
 
 
 def cases_from_results(results):
@@ -179,9 +282,13 @@ def run_sweep(
 
     def _save():
         """Pickle just THIS material's configs -- ``results`` may also hold other
-        materials run earlier in the same kernel, which belong in their own pkl."""
+        materials run earlier in the same kernel, which belong in their own pkl.
+        Refreshes the sidecar manifest alongside (see :func:`_manifest_save`) so
+        :func:`checkpoint_manifest` never serves a stale energy/record-count
+        summary after a fresh save."""
         subset = {n: results[n] for n in results if _crystal_of(results[n]) == material}
         _checkpoint_save(checkpoint_path, subset)
+        _manifest_save(checkpoint_path, subset)
 
     if resume and os.path.exists(checkpoint_path):
         loaded = _checkpoint_io.load(checkpoint_path)
@@ -348,7 +455,10 @@ def repair_checkpoint(checkpoint_path, save_every=100, **kw):
         return {}
     results = _checkpoint_io.load(checkpoint_path)
 
-    save_cb = partial(_checkpoint_save, checkpoint_path)  # atomic; resumable on crash
+    def save_cb(results):  # atomic; resumable on crash; keeps the sidecar manifest in step
+        _checkpoint_save(checkpoint_path, results)
+        _manifest_save(checkpoint_path, results)
+
     n = repair_brem_wide(results, save_every=save_every, save_cb=save_cb, **kw)
     print(f"re-saved {checkpoint_path}" if n else "checkpoint unchanged")
     return results

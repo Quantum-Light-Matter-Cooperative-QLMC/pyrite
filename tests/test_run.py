@@ -4,6 +4,8 @@ Monte Carlo work is replaced with a stub — these tests cover the orchestration
 layer (resume/skip, checkpoint writes, on_chunk dispatch), not the physics.
 """
 
+import json
+import os
 import pickle
 from typing import Any
 
@@ -14,12 +16,29 @@ from cxr_mc import _checkpoint_io
 from cxr_mc.montecarlo import runner
 from cxr_mc.run import (
     _checkpoint_save,
+    _load_checkpoint_cached,
+    _manifest_save,
     cases_from_results,
+    checkpoint_manifest,
     checkpoint_path_for,
     load_checkpoint,
     repair_brem_wide,
     run_sweep,
 )
+
+# ---------------------------------------------------------------------------
+# The load_checkpoint cache is module-global (functools.lru_cache) -- clear it
+# around every test so a checkpoint loaded in one test doesn't sit cached (by
+# path/mtime) and leak into an unrelated test.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clear_checkpoint_cache():
+    _load_checkpoint_cached.cache_clear()
+    yield
+    _load_checkpoint_cached.cache_clear()
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -178,6 +197,181 @@ def test_load_checkpoint_reads_existing_pickle(tmp_path):
     loaded = load_checkpoint("hopg", checkpoint_dir=str(tmp_path))
     assert set(loaded) == {"cfg_a"}
     assert 30.0 in loaded["cfg_a"]
+
+
+def test_load_checkpoint_caches_across_calls(tmp_path, monkeypatch):
+    """Two calls for the same (path, mtime) hit disk once -- the second is
+    served from the module-level lru_cache."""
+    rec = {"cfg_a": {30.0: {"case": {"crystal": "hopg"}, "spec": np.array([1.0])}}}
+    pkl = tmp_path / "hopg.pkl"
+    with open(pkl, "wb") as f:
+        pickle.dump(rec, f)
+
+    orig_load = _checkpoint_io.load
+    calls = []
+
+    def _counting_load(path):
+        calls.append(path)
+        return orig_load(path)
+
+    monkeypatch.setattr(_checkpoint_io, "load", _counting_load)
+
+    first = load_checkpoint("hopg", checkpoint_dir=str(tmp_path))
+    second = load_checkpoint("hopg", checkpoint_dir=str(tmp_path))
+    assert len(calls) == 1
+    assert first is second  # cache hit returns the same object, not a re-load
+
+
+def test_load_checkpoint_reloads_after_mtime_change(tmp_path, monkeypatch):
+    """Touching the checkpoint to a new mtime invalidates the cache entry and
+    forces a fresh disk load (e.g. after a re-run scan overwrites the pickle)."""
+    rec = {"cfg_a": {30.0: {"case": {"crystal": "hopg"}, "spec": np.array([1.0])}}}
+    pkl = tmp_path / "hopg.pkl"
+    with open(pkl, "wb") as f:
+        pickle.dump(rec, f)
+
+    orig_load = _checkpoint_io.load
+    calls = []
+
+    def _counting_load(path):
+        calls.append(path)
+        return orig_load(path)
+
+    monkeypatch.setattr(_checkpoint_io, "load", _counting_load)
+
+    load_checkpoint("hopg", checkpoint_dir=str(tmp_path))
+    load_checkpoint("hopg", checkpoint_dir=str(tmp_path))
+    assert len(calls) == 1
+
+    new_mtime = os.path.getmtime(pkl) + 5.0
+    os.utime(pkl, (new_mtime, new_mtime))
+
+    load_checkpoint("hopg", checkpoint_dir=str(tmp_path))
+    assert len(calls) == 2
+
+
+def test_load_checkpoint_cache_hit_is_silent(tmp_path, capsys):
+    """The 'loaded N records' print lives inside the cached function body, so a
+    cache hit prints nothing (only the first, real disk load does)."""
+    rec = {"cfg_a": {30.0: {"case": {"crystal": "hopg"}, "spec": np.array([1.0])}}}
+    pkl = tmp_path / "hopg.pkl"
+    with open(pkl, "wb") as f:
+        pickle.dump(rec, f)
+
+    load_checkpoint("hopg", checkpoint_dir=str(tmp_path))
+    capsys.readouterr()  # discard the first (real) load's print
+    load_checkpoint("hopg", checkpoint_dir=str(tmp_path))
+    assert capsys.readouterr().out == ""
+
+
+# ---------------------------------------------------------------------------
+# checkpoint_manifest / _manifest_save
+# ---------------------------------------------------------------------------
+
+
+def test_checkpoint_manifest_none_when_no_checkpoint(tmp_path):
+    assert checkpoint_manifest("hopg", checkpoint_dir=str(tmp_path)) is None
+
+
+def test_checkpoint_manifest_backfills_when_sidecar_missing(tmp_path):
+    """No meta.json alongside an existing .pkl (e.g. a checkpoint written before
+    this feature existed) -- checkpoint_manifest loads it once, computes the
+    manifest, and writes the sidecar for next time."""
+    results = {
+        "cfg_a": {
+            30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])},
+            45.0: {"case": _fake_case("cfg_a", 45.0), "spec": np.array([1.0])},
+        }
+    }
+    pkl = tmp_path / "hopg.pkl"
+    with open(pkl, "wb") as f:
+        pickle.dump(results, f)
+    meta_path = tmp_path / "hopg.meta.json"
+    assert not meta_path.exists()
+
+    manifest = checkpoint_manifest("hopg", checkpoint_dir=str(tmp_path))
+
+    assert manifest["n_records"] == 2
+    assert manifest["energies_keV"] == [30.0, 45.0]
+    assert manifest["sweep"]["crystal"] == ["hopg"]
+    assert meta_path.exists()  # backfilled for next call
+    with open(meta_path) as f:
+        assert json.load(f) == manifest
+
+
+def test_checkpoint_manifest_regenerates_when_sidecar_stale(tmp_path):
+    """A meta.json older than the .pkl (e.g. left over from before a re-run
+    scan overwrote the checkpoint) is treated as stale and rebuilt, not trusted
+    as-is."""
+    results = {
+        "cfg_a": {
+            30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])},
+            45.0: {"case": _fake_case("cfg_a", 45.0), "spec": np.array([1.0])},
+        }
+    }
+    pkl = tmp_path / "hopg.pkl"
+    with open(pkl, "wb") as f:
+        pickle.dump(results, f)
+    meta_path = tmp_path / "hopg.meta.json"
+    meta_path.write_text(json.dumps({"energies_keV": [999.0], "n_records": 999, "sweep": {}}))
+    pkl_mtime = os.path.getmtime(pkl)
+    os.utime(meta_path, (pkl_mtime - 10.0, pkl_mtime - 10.0))
+
+    manifest = checkpoint_manifest("hopg", checkpoint_dir=str(tmp_path))
+
+    assert manifest["n_records"] == 2
+    assert manifest["energies_keV"] == [30.0, 45.0]
+
+
+def test_checkpoint_manifest_fresh_sidecar_skips_unpickling(tmp_path, monkeypatch):
+    """A meta.json at least as new as the .pkl is read directly -- the whole
+    point of the sidecar is enumerating a checkpoint's contents without paying
+    for the (140-225 MB) unpickle."""
+    pkl = tmp_path / "hopg.pkl"
+    pkl.write_bytes(b"not a real pickle")  # would blow up if load() were ever called
+    meta_path = tmp_path / "hopg.meta.json"
+    meta_path.write_text(json.dumps({"energies_keV": [30.0], "n_records": 1, "sweep": {}}))
+    pkl_mtime = os.path.getmtime(pkl)
+    os.utime(meta_path, (pkl_mtime + 10.0, pkl_mtime + 10.0))
+
+    def _boom(path):
+        raise AssertionError("checkpoint_manifest must not unpickle a fresh sidecar")
+
+    monkeypatch.setattr(_checkpoint_io, "load", _boom)
+
+    manifest = checkpoint_manifest("hopg", checkpoint_dir=str(tmp_path))
+    assert manifest == {"energies_keV": [30.0], "n_records": 1, "sweep": {}}
+
+
+def test_manifest_save_coerces_numpy_scalars_to_json_safe(tmp_path):
+    case = _fake_case("cfg_a", 30.0)
+    case["thickness_ang"] = np.float64(1e4)  # simulate a numpy scalar in a case field
+    results = {"cfg_a": {30.0: {"case": case, "spec": np.array([1.0])}}}
+    ckpt = tmp_path / "hopg.pkl"
+
+    manifest = _manifest_save(str(ckpt), results)
+
+    json.dumps(manifest)  # raises TypeError if a numpy scalar leaked through
+    assert manifest["sweep"]["thickness_ang"] == [1e4]
+    assert (tmp_path / "hopg.meta.json").exists()
+
+
+def test_run_sweep_writes_manifest_alongside_checkpoint(tmp_path, monkeypatch):
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    cases = [
+        _fake_case("cfg_a", 30.0),
+        _fake_case("cfg_a", 45.0),
+        _fake_case("cfg_b", 30.0),
+    ]
+    run_sweep(cases, {}, checkpoint_dir=str(tmp_path), progress=False)
+
+    meta_path = tmp_path / "hopg.meta.json"
+    assert meta_path.exists()
+    with open(meta_path) as f:
+        manifest = json.load(f)
+    assert manifest["n_records"] == 3
+    assert manifest["energies_keV"] == [30.0, 45.0]
+    assert manifest["sweep"]["crystal"] == ["hopg"]
 
 
 # ---------------------------------------------------------------------------
