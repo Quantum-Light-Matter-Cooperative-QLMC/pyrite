@@ -43,8 +43,7 @@ Item generation:
 ## Long term features
 
 1. **High-energy electron support.** Evaluate `Geant4` or similar for REGAE@DESY-scale beams (3–5 MeV, 50 fs, 100 fC, 200–300 µm target diameter), JungFrau detector ~0.5–4.5 m from interaction point. USER QUESTION: What is rep rate?
-2. **Complex shapes** 3D patterned surfaces, maybe diffraction-grating style, other interesting shapes
-3. **Bent Crystals (After add channeling + relativistic electrons)**
-4. **Crystal structure 3D visualizer (with inv. lattice vector arrows?)**
-5. **Superradiant PXR/CBS** need bunch length knowledge, coherent emission *across segments* (also needed by channeling radiation as in long-term features #1, #3)
-6. **Blazed-groove exit path optimization** blazed grooves to improve exit paths and yield in a given crystal.
+2. **Bent Crystals (After add channeling + relativistic electrons)**
+3. **Crystal structure 3D visualizer (with inv. lattice vector arrows?)**
+4. **Superradiant PXR/CBS** need bunch length knowledge, coherent emission *across segments* (also needed by channeling radiation as in long-term features #1, #3)
+5. **Blazed-groove exit path optimization** blazed grooves to improve exit paths and yield in a given crystal.
