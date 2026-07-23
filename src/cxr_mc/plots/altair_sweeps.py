@@ -188,7 +188,16 @@ def heatmap_chart(
             tooltip=["panel:N", "x:O", "y:O", "value:Q"],
         )
         .properties(width=width, height=height)
-        .facet(column=alt.Column("panel:N", title=_AXIS_SPECS.get(panel, (panel,))[0]))
+        .facet(
+            column=alt.Column(
+                "panel:N",
+                title=_AXIS_SPECS.get(panel, (panel,))[0],
+                # Nominal fields default to alphabetical sort ("100 keV" before
+                # "30 keV") -- order panels by the underlying numeric panel_raw
+                # instead, so energy facets read low -> high.
+                sort=alt.EncodingSortField(field="panel_raw", op="min", order="ascending"),
+            )
+        )
         .properties(title=f"{label}    (best per cell: {select})")
     )
     return chart
@@ -213,6 +222,7 @@ def heatmap_select_chart(
     width=_HEATMAP_WIDTH,
     height=_HEATMAP_HEIGHT,
     metrics=None,
+    color_domain=None,
 ):
     """A SINGLE-panel, click-selectable variant of :func:`heatmap_chart`, for
     picking one cell interactively. Unlike ``heatmap_chart`` this does NOT facet
@@ -227,8 +237,10 @@ def heatmap_select_chart(
     at rest, and again once the pointer leaves the chart); the click selection
     itself carries no opacity/dimming so it doesn't wash out the whole grid
     between clicks. The clicked cell instead gets a stroke outline. ``quantity``
-    is a bare key or ``(key, label, cmap)`` triple. Returns an
-    :class:`altair.Chart`, or ``None`` when the (filtered) frame is empty."""
+    is a bare key or ``(key, label, cmap)`` triple. ``color_domain`` pins the
+    colour scale to a fixed ``[lo, hi]`` (default None -> auto-fit to the data),
+    same as :func:`heatmap_chart`. Returns an :class:`altair.Chart`, or ``None``
+    when the (filtered) frame is empty."""
     key, label, cmap = _resolve_quantity(quantity)
     df = heatmap_frame(
         results,
@@ -266,13 +278,18 @@ def heatmap_select_chart(
         encodings=["x", "y"],
     )
     panel_label = str(df["panel"].to_numpy()[0])
+    _scale = (
+        alt.Scale(scheme=_scheme(cmap))  # type: ignore[arg-type]
+        if color_domain is None
+        else alt.Scale(scheme=_scheme(cmap), domain=list(color_domain))  # type: ignore[arg-type]
+    )
     chart = (
         alt.Chart(df)
         .mark_rect()
         .encode(
             x=alt.X("x:O", title=_axis_label(x), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
             y=alt.Y("y:O", title=_axis_label(y), sort="ascending", axis=alt.Axis(format=_TICK_FMT)),
-            color=alt.Color("value:Q", title=label, scale=alt.Scale(scheme=_scheme(cmap))),  # type: ignore[arg-type]
+            color=alt.Color("value:Q", title=label, scale=_scale),  # type: ignore[arg-type]
             opacity=alt.condition(hover, alt.value(1.0), alt.value(0.35)),
             stroke=alt.condition(sel, alt.value("black"), alt.value(None)),
             strokeWidth=alt.condition(sel, alt.value(2.0), alt.value(0.0)),

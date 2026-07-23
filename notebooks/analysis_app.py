@@ -70,7 +70,6 @@ def _():
     )
     from cxr_mc.plots.altair_spectra import compare_spectrum_chart, spectrum_chart
     from cxr_mc.plots.altair_sweeps import (
-        heatmap_chart,
         heatmap_select_chart,
         metric_vs_chart,
         scan_charts,
@@ -83,6 +82,7 @@ def _():
         trajectory_volume_animation,
         trajectory_volume_data,
     )
+    from cxr_mc.plots.sweeps import _HEATMAP_QUANTITIES as HEATMAP_QUANTITIES
     from cxr_mc.results import (
         filter_results,
         records,
@@ -97,6 +97,7 @@ def _():
 
     return (
         CATALOG,
+        HEATMAP_QUANTITIES,
         MaterialSelect,
         build_cases,
         cases_from_results,
@@ -106,7 +107,6 @@ def _():
         eaglexo_detected_chart,
         filter_results,
         fmt_thickness,
-        heatmap_chart,
         heatmap_select_chart,
         load_checkpoint,
         metric_vs_chart,
@@ -511,6 +511,63 @@ def _(heatmap_E0_ui, heatmap_select_chart, mo, res_view, settings):
                 _chart, chart_selection=False, legend_selection=False
             )
     return (heatmap_select,)
+
+
+@app.cell
+def _(mo, records, scan_res_view, sweep_values):
+    # Beam energy for the click-to-select heatmap in the Optimize tab, same
+    # reasoning as heatmap_E0_ui: a faceted Altair chart can't carry a marimo
+    # point selection, so pick ONE energy and render a single panel. Sourced from
+    # scan_res_view (not res_view) so it matches the thickness pinned by
+    # scan_thickness_ui rather than the Explore tab's thickness_ui.
+    _e0 = sweep_values(scan_res_view).get("E0_keV", []) if records(scan_res_view) else []
+    _opts = {f"{e:g} keV": e for e in _e0} or {"— no data —": None}
+    scan_heatmap_E0_ui = mo.ui.dropdown(_opts, value=next(iter(_opts)), label="heatmap beam energy")
+    return (scan_heatmap_E0_ui,)
+
+
+@app.cell
+def _(
+    HEATMAP_QUANTITIES,
+    cases,
+    heatmap_select_chart,
+    mo,
+    scan_heatmap_E0_ui,
+    scan_res_view,
+    settings,
+):
+    # Click-selectable heatmap for EVERY quantity the Optimize tab's scan maps
+    # already show (scan_charts' default quantity set) plus hit_frac, all pinned
+    # to scan_heatmap_E0_ui's energy -- so clicking ANY of the existing heatmaps
+    # (not a separate one) drives its own spectrum panel below it. Built top-level
+    # for the same DAG-reactivity reason as heatmap_select above: a ui made inside
+    # a tab body can lose its click round-trip. Faceted charts don't compose with
+    # a marimo point selection (see heatmap_select_chart), so each quantity gets
+    # its own SINGLE-panel chart at the picked energy rather than the usual
+    # energy-faceted view. Keyed dict quantity -> mo.ui.altair_chart, or None when
+    # that quantity's frame is empty for this view/thickness.
+    import altair as _alt
+
+    _specs = list(HEATMAP_QUANTITIES) + [("hit_frac", "electron footprint-hit fraction", "magma")]
+    scan_pixel_heatmaps = {}
+    with _alt.data_transformers.enable("default"):
+        for _key, _label, _cmap in _specs:
+            _domain = (0.0, 1.0) if _key == "hit_frac" else None
+            _chart = heatmap_select_chart(
+                scan_res_view,
+                settings,
+                quantity=(_key, _label, _cmap),
+                panel_value=scan_heatmap_E0_ui.value,
+                cases=cases,
+                line_metric="prominence",
+                color_domain=_domain,
+            )
+            scan_pixel_heatmaps[_key] = (
+                mo.ui.altair_chart(_chart, chart_selection=False, legend_selection=False)
+                if _chart is not None
+                else None
+            )
+    return (scan_pixel_heatmaps,)
 
 
 @app.cell
@@ -1326,46 +1383,77 @@ def _(
 
 @app.cell
 def _(
+    HEATMAP_QUANTITIES,
     cases,
     fmt_thickness,
-    heatmap_chart,
     metric_vs_chart,
     mo,
     plot_best_spectra,
     records,
     res,
     scan_charts,
+    scan_heatmap_E0_ui,
+    scan_pixel_heatmaps,
     scan_res_view,
     scan_thickness_ui,
+    select_results,
     settings,
+    spectrum_chart,
     sweep_values,
 ):
+    _tilts = {r["case"]["tilt_deg"] for r in records(scan_res_view)}
+    _azims = {r["case"]["tilt_azim_deg"] for r in records(scan_res_view)}
+    # Mirrors scan_charts' own heatmap_min=4 auto-pick: a heatmap is only
+    # meaningful once both axes sweep >= 4 values, otherwise scan_charts falls
+    # back to line plots (nothing to click there). Computed at CELL top level
+    # (not inside scans_tab) so the mo.lazy-deferred nested closures below can
+    # resolve it as a cell global instead of a true function-local closure var
+    # -- marimo's lazy re-render can't reconstruct genuine nested-function
+    # closures over locals, only free vars resolvable at cell/module scope.
+    _is_heatmap_mode = len(_tilts) >= 4 and len(_azims) >= 4
+
+
     def scans_tab():
+        # Click a heatmap cell -> spectrum for THAT (azimuth, tilt) geometry at the
+        # heatmap's beam energy, on the scan-pinned-thickness view. `x`/`y` are the
+        # encoded (tilt_azim_deg, tilt_deg) of the clicked cell. Shown directly
+        # under the SAME heatmap that was clicked, so each of the (already
+        # on-screen) quantity heatmaps drives its own spectrum -- no ambiguity
+        # about which of several independent click widgets fired last.
+        def _pixel_heatmap_block(key):
+            widget = scan_pixel_heatmaps.get(key)
+            if widget is None:
+                return mo.md(f"*No {key} heatmap — needs an azimuth × polar-tilt sweep.*")
+
+            def _spectrum():
+                _sel = widget.value
+                if _sel is None or len(_sel) == 0:
+                    return mo.md("*Click a cell above to plot its spectrum here.*")
+                _row = _sel.iloc[0]
+                _sub = select_results(
+                    scan_res_view,
+                    tilt_azim_deg=float(_row["x"]),
+                    tilt_deg=float(_row["y"]),
+                    E0_keV=scan_heatmap_E0_ui.value,
+                )
+                _sp_narrow = spectrum_chart(_sub, settings, tilt_deg=float(_row["y"]), band="narrow")
+                _sp_broad = spectrum_chart(_sub, settings, tilt_deg=float(_row["y"]), band="broad")
+                _charts = [c for c in (_sp_narrow, _sp_broad) if c is not None]
+                return mo.vstack(_charts) if _charts else mo.md("*No spectrum for that cell.*")
+
+            return mo.vstack([widget, mo.lazy(_spectrum, show_loading_indicator=True)])
+
         def _scan_charts_item():
-            charts = scan_charts(scan_res_view, settings, cases=cases, line_metric="prominence")
-            return mo.vstack(charts) if charts else mo.md("*No scan results.*")
+            if not _is_heatmap_mode:
+                charts = scan_charts(scan_res_view, settings, cases=cases, line_metric="prominence")
+                return mo.vstack(charts) if charts else mo.md("*No scan results.*")
+            _blocks = [_pixel_heatmap_block(_key) for _key, _label, _cmap in HEATMAP_QUANTITIES]
+            return mo.vstack(_blocks) if _blocks else mo.md("*No scan results.*")
 
         def _hit_frac_item():
-            # Finite-crystal electron-hit map over the SAME polar x azimuth axes as
-            # the scan heatmaps: fraction of launched electrons that landed on the
-            # crystal footprint (bright = every electron hit, dark = all missed).
-            # Colour pinned to [0, 1] so brightness reads as an absolute hit rate,
-            # not this frame's max. NaN cells (pre-feature checkpoints that never
-            # recorded it) drop out as gaps; the laterally infinite slab reads a
-            # uniform 1.0 (nothing can miss an infinite crystal).
-            chart = heatmap_chart(
-                scan_res_view,
-                settings,
-                quantity="hit_frac",
-                cases=cases,
-                line_metric="prominence",
-                color_domain=(0.0, 1.0),
-            )
-            return (
-                chart
-                if chart is not None
-                else mo.md("*No electron-hit map — needs an azimuth × polar-tilt sweep.*")
-            )
+            if not _is_heatmap_mode:
+                return mo.md("*No electron-hit map — needs an azimuth × polar-tilt sweep.*")
+            return _pixel_heatmap_block("hit_frac")
 
         def _metric_lines_item():
             line = metric_vs_chart(
@@ -1387,15 +1475,28 @@ def _(
                 else ""
             )
         )
-        return mo.vstack(
+        _parts = [
+            mo.md(
+                "`scan_charts` auto-picks a heatmap or line scans (one per swept quantity); "
+                "then 1-D metric scans vs polar tilt. Each section loads as it becomes "
+                "visible. The best-spectra panel loads on expand."
+            ),
+            _thk_widget,
+        ]
+        if _is_heatmap_mode:
+            _parts.extend(
+                [
+                    mo.md(
+                        "**Click any heatmap cell below to plot its spectrum** — one "
+                        "beam energy shown at a time (a faceted chart can't carry a "
+                        "click selection)."
+                    ),
+                    scan_heatmap_E0_ui,
+                ]
+            )
+        _parts.append(mo.lazy(_scan_charts_item, show_loading_indicator=True))
+        _parts.extend(
             [
-                mo.md(
-                    "`scan_charts` auto-picks a heatmap or line scans (one per swept quantity); "
-                    "then 1-D metric scans vs polar tilt. Each section loads as it becomes "
-                    "visible. The best-spectra panel loads on expand."
-                ),
-                _thk_widget,
-                mo.lazy(_scan_charts_item, show_loading_indicator=True),
                 mo.md(
                     "**Electron footprint-hit fraction** — of the electrons launched at "
                     "the crystal, the share that landed on its finite footprint "
@@ -1414,6 +1515,8 @@ def _(
                 ),
             ]
         )
+        return mo.vstack(_parts)
+
 
     return (scans_tab,)
 
@@ -2046,13 +2149,15 @@ def _(
                 lazy=True,
                 multiple=True,
             ),
-            "Optimize": lambda: mo.accordion(
-                {
-                    "Rank geometries": rankings_tab,
-                    "Inspect scan maps": scans_tab,
-                },
-                lazy=True,
-                multiple=True,
+            "Optimize": lambda: mo.vstack(
+                [
+                    scans_tab(),
+                    mo.accordion(
+                        {"Rank geometries": rankings_tab},
+                        lazy=True,
+                        multiple=True,
+                    ),
+                ]
             ),
             "Instruments": detectors_tab,
             "Trace": penetration_tab,
@@ -2060,7 +2165,6 @@ def _(
         },
         lazy=True,
     )
-
     return
 
 
