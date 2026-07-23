@@ -60,6 +60,7 @@ def slim_checkpoint(
     grid=False,
     drop_wide_brem=False,
     downcast=False,
+    dataset=None,
     compresslevel=6,
     **constraints,
 ):
@@ -77,6 +78,10 @@ def slim_checkpoint(
     # --grid stem should fail in milliseconds, not after a gigabyte unpickle
     material = _material_from_stem(in_path) if grid else None
     results = _checkpoint_io.load(in_path)
+    if dataset is not None:
+        from .results import project_dataset
+
+        results = project_dataset(results, dataset)
     slim = slim_results(
         results, grid=material, drop_wide_brem=drop_wide_brem, downcast=downcast, **constraints
     )
@@ -106,6 +111,7 @@ def _cli(args):
         grid=args.grid,
         drop_wide_brem=args.drop_wide_brem,
         downcast=args.downcast,
+        dataset="brem" if args.brem_only else ("line" if args.line_only else None),
         compresslevel=args.compresslevel,
     )
 
@@ -140,6 +146,17 @@ def add_subparser(sub):
         help="gzip level for the output pickle (default: 6, matches a live sweep's "
         "checkpoint writes); 9 trades CPU for a smaller file, e.g. for a `cxr "
         "remote pull` transfer",
+    )
+    grp = ap.add_mutually_exclusive_group()
+    grp.add_argument(
+        "--brem-only",
+        action="store_true",
+        help="keep only the brem arrays (brem_wide/brem/E_grid_brem) per record",
+    )
+    grp.add_argument(
+        "--line-only",
+        action="store_true",
+        help="keep only the line arrays (spec/E_grid) per record",
     )
     ap.set_defaults(func=_cli)
     return ap

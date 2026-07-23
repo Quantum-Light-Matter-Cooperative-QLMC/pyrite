@@ -212,3 +212,21 @@ def test_slim_checkpoint_grid_rejects_unknown_material_before_load(tmp_path):
     src.write_bytes(b"not a pickle")  # unpickling this would raise, so a load = fail
     with pytest.raises(SystemExit, match="notamaterial"):
         slim_checkpoint(str(src), grid=True)
+
+
+def test_project_dataset_keeps_only_that_datasets_keys():
+    from cxr_mc.results import project_dataset
+
+    rec = {
+        "case": {"E0_keV": 30.0},
+        "spec": [1.0],
+        "E_grid": [1.0],
+        "brem_wide": [2.0],
+        "brem": [3.0],
+        "E_grid_brem": [4.0],
+    }
+    results = {"n": {30.0: rec}}
+    brem = project_dataset(results, "brem")["n"][30.0]
+    line = project_dataset(results, "line")["n"][30.0]
+    assert set(brem) == {"case", "brem_wide", "brem", "E_grid_brem"}
+    assert set(line) == {"case", "spec", "E_grid"}

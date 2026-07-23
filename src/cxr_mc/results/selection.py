@@ -189,6 +189,22 @@ def select_thickness(results, thickness_ang):
 _RECORD_ARRAY_FIELDS = ("E_grid", "spec", "brem", "E_grid_brem", "brem_wide")
 _WIDE_BREM_FIELDS = ("brem_wide", "E_grid_brem")
 
+LINE_RECORD_KEYS = ("spec", "E_grid")
+BREM_RECORD_KEYS = ("brem_wide", "brem", "E_grid_brem")
+
+
+def project_dataset(results, dataset):
+    """Return a NEW results store carrying only ``dataset``'s record arrays
+    (plus ``case``) per record -- the wire payload for a dataset-partial pull
+    (``cxr slim --brem-only/--line-only``). ``dataset`` is ``"line"`` (keeps
+    :data:`LINE_RECORD_KEYS`) or ``"brem"`` (:data:`BREM_RECORD_KEYS`).
+    Delegates to :func:`slim_results`' ``fields`` allow-list so the drop logic
+    lives in one place; ``case`` is always kept."""
+    keys = {"line": LINE_RECORD_KEYS, "brem": BREM_RECORD_KEYS}.get(dataset)
+    if keys is None:
+        raise ValueError(f"dataset must be 'line' or 'brem', got {dataset!r}")
+    return slim_results(results, fields=list(keys))
+
 
 def _grid_names(material):
     """Config names in the CURRENT grid for ``material`` -- exactly the set

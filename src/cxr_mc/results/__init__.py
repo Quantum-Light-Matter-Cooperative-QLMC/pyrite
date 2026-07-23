@@ -41,10 +41,13 @@ from .scoring import (
 from .selection import (
     _RECORD_ARRAY_FIELDS,
     _WIDE_BREM_FIELDS,
+    BREM_RECORD_KEYS,
+    LINE_RECORD_KEYS,
     _grid_names,
     _peak,
     best_azimuth,
     filter_results,
+    project_dataset,
     records,
     records_for_cases,
     select_results,
@@ -87,6 +90,9 @@ __all__ = [
     "_WIDE_BREM_FIELDS",
     "_grid_names",
     "slim_results",
+    "project_dataset",
+    "LINE_RECORD_KEYS",
+    "BREM_RECORD_KEYS",
     "_peak",
     "best_azimuth",
     # metrics
