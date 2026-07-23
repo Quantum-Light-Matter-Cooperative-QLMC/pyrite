@@ -35,6 +35,73 @@ def _case_of(rec_or_case):
     return rec_or_case.get("case", rec_or_case)
 
 
+def _groove_spec(case):
+    """Blazed :class:`~cxr_mc.montecarlo.groove.GrooveSpec` for a case carrying a
+    ``groove_spacing_ang`` knob, or ``None`` when it is absent.
+
+    Mirrors ``montecarlo.runner._transport_case``'s spec construction exactly
+    (``blazed_groove_spec(spacing, theta_obs_rad, tilt_polar_rad,
+    tilt_azim_rad)``) so the penetration figures transport electrons through the
+    SAME relief facets the spectrum runner does -- no new physics, no new
+    convention. ``blazed_groove_spec`` validates the restricted geometry
+    (theta_obs = 90 deg, tilt_azim = 180 deg, 0 < tilt_polar < 90 deg) and
+    raises ``ValueError`` otherwise; callers that build cases via
+    ``sweep.build_cases`` never hit that because it rejects the same geometries
+    up front."""
+    spacing = case.get("groove_spacing_ang")
+    if spacing is None:
+        return None
+    from ..montecarlo import blazed_groove_spec
+
+    return blazed_groove_spec(
+        spacing,
+        case["theta_obs_rad"],
+        np.deg2rad(case.get("tilt_deg", 0.0)),
+        np.deg2rad(case.get("tilt_azim_deg", 0.0)),
+    )
+
+
+def groove_profile_z(x_ang, spec):
+    """Sawtooth surface depth [Ang] into the slab at sample-frame lateral position
+    ``x_ang`` [Ang].
+
+    Apexes (``z = 0``) sit at ``x = k * spacing``; the valley floor is at the
+    groove depth ``spec.depth_ang``. This is the SAME closed-form profile the
+    ``_z_surf`` helper in ``tests/test_groove.py`` evaluates (single geometric
+    source: :mod:`cxr_mc.montecarlo.groove`), reused here only to DRAW the
+    surface -- it introduces no new physics. numpy ufuncs only, so array input
+    works elementwise."""
+    tp = spec.tilt_polar_rad
+    lam, h = spec.spacing_ang, spec.depth_ang
+    u = np.mod(x_ang, lam)
+    x_valley = h * np.tan(tp)
+    return np.where(u <= x_valley, u / np.tan(tp), (lam - u) * np.tan(tp))
+
+
+def groove_profile_knots(x_lo_ang, x_hi_ang, spec, *, max_periods=200):
+    """Minimal sample-frame sawtooth vertices ``(x_ang, z_ang)`` covering
+    ``[x_lo_ang, x_hi_ang]``: two knots per period (apex at ``z = 0``, valley
+    floor at ``z = depth``), so a corrugated surface needs only ~2 vertices per
+    groove instead of a dense sweep.
+
+    Returns ``None`` when the requested span exceeds ``max_periods`` grooves --
+    the caller then falls back to the flat entrance face (drawing thousands of
+    teeth is neither legible nor cheap). ``x`` is returned strictly increasing so
+    the vertices trace the profile directly as a polyline."""
+    lam = spec.spacing_ang
+    k0 = int(np.floor(x_lo_ang / lam))
+    k1 = int(np.ceil(x_hi_ang / lam))
+    if k1 - k0 > max_periods:
+        return None
+    x_valley = spec.depth_ang * np.tan(spec.tilt_polar_rad)
+    xs = np.empty(2 * (k1 - k0 + 1))
+    ks = np.arange(k0, k1 + 1)
+    xs[0::2] = ks * lam  # apexes (z = 0)
+    xs[1::2] = ks * lam + x_valley  # valley floors (z = depth)
+    zs = groove_profile_z(xs, spec)
+    return xs, zs
+
+
 def _trajectory_cases(cases_or_results):
     """Flatten a build_cases list OR a results store into a list of case dicts."""
     if isinstance(cases_or_results, dict):
@@ -120,6 +187,11 @@ def _trajectory_data(
         crystal_height_mm=crystal_height_mm,
         tilt_polar_rad=tilt_polar_rad,
         tilt_azim_rad=tilt_azim_rad,
+        # Blazed grooves (when the case carries the knob): electrons enter on the
+        # relief facets, so the drawn tracks start at z in [0, groove depth) --
+        # groove=None (the default for every ungrooved case) is bit-for-bit the
+        # legacy flat-face entry.
+        groove=_groove_spec(case),
     )
     e1, e2 = _beam_detector_basis(beam, n_hat)
     L, v, r = segs["L_ang"], segs["v_hat"], segs["r_mid"]

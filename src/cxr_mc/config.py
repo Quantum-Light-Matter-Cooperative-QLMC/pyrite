@@ -119,6 +119,7 @@ def trajectory_sweep(
     n_tilts: int | None = None,
     tilt_span: float | None = None,
     azim_deg: float = 0.0,
+    groove_spacing_ang: float | None = None,
 ):
     """A small dedicated geometry sweep for the electron-penetration figures: a
     handful of polar tilts at a configurable azimuth (``azim_deg``, normal
@@ -148,6 +149,11 @@ def trajectory_sweep(
         thick = float(thickness_ang)
     stack = spec.stack or None
     substrate = spec.substrate if not stack else None
+    # Blazed sawtooth entrance-face grooves (docs/superpowers/plans/
+    # 2026-07-23-blazed-groove-geometry.md): forwarded straight to Sweep, which
+    # validates the restricted geometry (tilt_azim_deg == 180, 0 < tilt < 90,
+    # theta_obs = 90, no substrate/stack). None (the default) leaves the sweep
+    # ungrooved, bit-for-bit as before.
     if n_tilts is not None or tilt_span is not None:
         count = 9 if n_tilts is None else int(n_tilts)
         span = 80.0 if tilt_span is None else float(tilt_span)
@@ -169,6 +175,12 @@ def trajectory_sweep(
         allow_normal_incidence=True,
         stack=stack,
         substrate=substrate,
+        groove_spacing_ang=groove_spacing_ang,
+        # Blazed grooves model a laterally infinite slab (build_cases rejects a
+        # finite footprint with them). Drop the default 5x5 mm footprint when
+        # grooved; keep it otherwise so ungrooved sweeps are unchanged.
+        crystal_width_mm=None if groove_spacing_ang is not None else 5.0,
+        crystal_height_mm=None if groove_spacing_ang is not None else 5.0,
     )
 
 

@@ -37,11 +37,14 @@ import pandas as pd
 
 from .sweeps import _value_label
 from .trajectories import (
+    _beam_detector_basis,
     _case_of,
+    _groove_spec,
     _square_frame,
     _trajectory_cases,
     _trajectory_data,
     _trajectory_frame,
+    groove_profile_knots,
 )
 
 # Mirrors plotly_trajectories._FIELD/_GRID/font.color so trajectory_chart's
@@ -49,6 +52,12 @@ from .trajectories import (
 _FIELD = "#17202A"
 _GRID = "#34495E"
 _TEXT = "#EDF6F9"
+# Amber sawtooth overlay -- distinct from the red beam / green detector arrows
+# and matches plotly_trajectories._GROOVE so the 2D and 3D groove views agree.
+_GROOVE = "#E9C46A"
+# Groove-period cap for the 2D overlay (see plotly_trajectories._GROOVE_MAX_PERIODS);
+# larger here because a flat polyline is far cheaper than a 3D mesh.
+_GROOVE_MAX_PERIODS = 400
 
 
 # ---- penetration / survival --------------------------------------------------
@@ -203,6 +212,49 @@ def _segment_df(p0, p1):
     return pd.DataFrame({"x": [p0[0], p1[0]], "y": [p0[1], p1[1]]})
 
 
+def _groove_profile_layer(case, data, frame, xscale, yscale):
+    """Blazed-groove sawtooth overlay for :func:`trajectory_chart`, or ``None``
+    when the case is ungrooved / the extent needs too many teeth.
+
+    The 2D cross-section is drawn in the BEAM-DETECTOR plane (the same basis
+    ``_trajectory_data`` projects tracks into via
+    :func:`~cxr_mc.plots.trajectories._beam_detector_basis`), NOT a raw sample
+    x/z slice, so the sawtooth surface is projected through that basis too: a
+    sample-frame surface point ``(x, 0, groove_profile_z(x))`` maps to chart
+    coordinates ``(P.e1, P.e2) / u``. This keeps the profile riding the entrance
+    face at any tilt with no rotation of its own -- the projection IS the frame.
+    Apexes touch the origin face line; valleys bulge one groove depth into the
+    slab (the ``+nslab`` side the slab shading fills)."""
+    spec = _groove_spec(case)
+    if spec is None:
+        return None
+    e1, e2 = _beam_detector_basis(data["beam"], data["detector"])
+    u = data["u"]
+    xlo, xhi, ylo, yhi = frame
+    # Sample-frame lateral span needed to cover the visible frame along the face:
+    # the sample x-axis projects into the chart with magnitude |(e1[0], e2[0])|
+    # display units per Angstrom, so invert that to reach the far frame corner.
+    r_frame = max(abs(xlo), abs(xhi), abs(ylo), abs(yhi))
+    ax_mag = float(np.hypot(e1[0], e2[0]))
+    x_max_ang = 1.6 * r_frame * u / max(ax_mag, 1e-6)
+    knots = groove_profile_knots(-x_max_ang, x_max_ang, spec, max_periods=_GROOVE_MAX_PERIODS)
+    if knots is None:
+        return None
+    xk, zk = knots
+    cx = (xk * e1[0] + zk * e1[2]) / u
+    cy = (xk * e2[0] + zk * e2[2]) / u
+    df = pd.DataFrame({"x": cx, "y": cy, "i": np.arange(len(cx), dtype=float)})
+    return (
+        alt.Chart(df)
+        .mark_line(color=_GROOVE, strokeWidth=1.4, opacity=0.95)
+        .encode(
+            x=alt.X("x:Q", scale=xscale),
+            y=alt.Y("y:Q", scale=yscale),
+            order=alt.Order("i:Q"),  # trace the profile in x-order, not y-sorted
+        )
+    )
+
+
 def trajectory_chart(
     rec_or_case,
     *,
@@ -328,8 +380,12 @@ def trajectory_chart(
         f"theta={case.get('tilt_deg', 0.0):g} deg, phi={case.get('tilt_azim_deg', 0.0):g} deg  "
         f"-- {data['Ne']} e- ({data['eta']:.0f}% back, {data['thru']:.0f}% through)"
     )
+    groove = _groove_profile_layer(case, data, frame, xscale, yscale)
+    overlays = [slab_shading, *faces, beam, det, tracks]
+    if groove is not None:
+        overlays.append(groove)
     return (
-        alt.layer(slab_shading, *faces, beam, det, tracks)
+        alt.layer(*overlays)
         # Top-level `background`, not `.configure(background=...)`: marimo's
         # vegafusion fixup (altair_chart.maybe_fix_vegafusion_background)
         # force-overrides to "transparent" whenever the top-level key is

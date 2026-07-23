@@ -13,14 +13,26 @@ import numpy as np
 import plotly.graph_objects as go
 
 from ..montecarlo.geometry import project_beam_entry, sample_to_lab_R
-from .trajectories import _case_of, _trajectory_data
+from .trajectories import (
+    _case_of,
+    _groove_spec,
+    _trajectory_data,
+    groove_profile_knots,
+)
 
 _CRYSTAL = "#B9D9EB"
 _CRYSTAL_EDGE = "#EDF6F9"
 _BEAM = "#E76F51"
 _DETECTOR = "#42C7C7"
+_GROOVE = "#E9C46A"
 _FIELD = "#17202A"
 _GRID = "#34495E"
+
+# Cap on how many groove periods the corrugated entrance surface will draw
+# before falling back to the flat face (see _groove_surface_mesh): a realistic
+# mm-scale footprint over a micron-scale spacing spans thousands of teeth, which
+# is neither legible nor cheap as a mesh.
+_GROOVE_MAX_PERIODS = 200
 
 # Zoomed (non-realistic) view spot FWHM [mm]: a micron-scale beam so the incident
 # bundle has visible width at the fitted, sub-micron cascade scale.
@@ -209,6 +221,66 @@ def _crystal_mesh(lox, hix, loy, hiy, thick, *, R=_IDENTITY_R):
         flatshading=True,
         hoverinfo="skip",
         name="crystal volume",
+        showlegend=True,
+    )
+
+
+def _groove_surface_mesh(case, lox, hix, loy, hiy, u, *, R=_IDENTITY_R):
+    """Corrugated blazed-groove entrance surface as a ``Mesh3d`` ribbon, or
+    ``None`` when the case is ungrooved or the extent spans too many teeth.
+
+    The sawtooth is invariant along y (the grooves run along y) and periodic in
+    the sample-frame lateral coordinate x, so the ribbon is the profile
+    ``groove_profile_z(x)`` (in display units) extruded across the displayed y
+    span ``[loy, hiy]``. Apexes sit at ``x = k * spacing`` (``z = 0``); valleys
+    reach the groove depth. Every vertex is rotated through the sample -> lab
+    rotation ``R`` (see :func:`_case_R`) exactly like the crystal mesh and the
+    tracks, so on a tilted slab the corrugation reads correctly rather than
+    face-on.
+
+    Falls back to ``None`` (leaving the flat crystal entrance face already drawn
+    by :func:`_crystal_mesh`) when the displayed lateral extent would need more
+    than :data:`_GROOVE_MAX_PERIODS` teeth -- e.g. a realistic mm-scale footprint
+    over a micron-scale spacing.
+    """
+    spec = _groove_spec(case)
+    if spec is None:
+        return None
+    knots = groove_profile_knots(lox * u, hix * u, spec, max_periods=_GROOVE_MAX_PERIODS)
+    if knots is None:
+        return None
+    xs_ang, zs_ang = knots
+    xs = xs_ang / u  # sample-frame display units, same as lox/hix
+    zs = zs_ang / u
+    n = len(xs)
+    # Two y-rows (front loy, back hiy) of the same x/z profile; triangulate each
+    # x-interval into the quad (front_i, front_i+1, back_i+1, back_i).
+    verts = _rotate(
+        np.column_stack(
+            (
+                np.concatenate((xs, xs)),
+                np.concatenate((np.full(n, loy), np.full(n, hiy))),
+                np.concatenate((zs, zs)),
+            )
+        ),
+        R,
+    )
+    a = np.arange(n - 1)  # front-row left vertices
+    i = np.concatenate((a, a))
+    j = np.concatenate((a + 1, a + 1 + n))
+    k = np.concatenate((a + 1 + n, a + n))
+    return go.Mesh3d(
+        x=verts[:, 0].tolist(),
+        y=verts[:, 1].tolist(),
+        z=verts[:, 2].tolist(),
+        i=i.tolist(),
+        j=j.tolist(),
+        k=k.tolist(),
+        color=_GROOVE,
+        opacity=0.55,
+        flatshading=True,
+        hoverinfo="skip",
+        name="groove profile",
         showlegend=True,
     )
 
@@ -576,6 +648,9 @@ def trajectory_volume_figure_from_data(
     fig = go.Figure([_crystal_mesh(lox, hix, loy, hiy, thick, R=R), tracks])
     fig.add_trace(_plane_outline(0.0, lox, hix, loy, hiy, R=R, name="entrance face"))
     fig.add_trace(_plane_outline(thick, lox, hix, loy, hiy, R=R, name="exit face"))
+    groove = _groove_surface_mesh(case, lox, hix, loy, hiy, data["u"], R=R)
+    if groove is not None:
+        fig.add_trace(groove)
     for index, depth in enumerate(data.get("layer_bounds", ()), start=1):
         fig.add_trace(
             _plane_outline(

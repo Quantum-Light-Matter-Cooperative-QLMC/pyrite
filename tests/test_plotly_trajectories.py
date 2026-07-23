@@ -385,3 +385,93 @@ def test_trajectory_volume_animation_speed_scales_frame_duration():
     duration_1x = fig_1x.layout.updatemenus[0].buttons[0].args[1]["frame"]["duration"]
     duration_2x = fig_2x.layout.updatemenus[0].buttons[0].args[1]["frame"]["duration"]
     assert duration_2x == duration_1x / 2
+
+
+# ---- blazed groove profile (Task 6) ------------------------------------------
+def _hopg_grooved_case(spacing_ang=2.0e4, tilt_deg=45.0, energy=30.0, thickness_ang=2.0e5):
+    """One grooved hopg case: azim=180, 0<tilt<90, theta_obs=90 -- the restricted
+    geometry blazed_groove_spec / build_cases accept."""
+    from cxr_mc.config import default_settings, trajectory_sweep
+    from cxr_mc.sweep import build_cases
+
+    settings = default_settings()
+    sweep = trajectory_sweep(
+        "hopg",
+        energies=(energy,),
+        tilts=(tilt_deg,),
+        thickness_ang=thickness_ang,
+        azim_deg=180.0,
+        groove_spacing_ang=spacing_ang,
+    )
+    return build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)[0]
+
+
+def _groove_spec_45(spacing_ang=2.0e4):
+    from cxr_mc.montecarlo.groove import blazed_groove_spec
+
+    return blazed_groove_spec(spacing_ang, np.pi / 2, np.deg2rad(45.0), np.pi)
+
+
+def test_groove_profile_knots_depth_spans_zero_to_groove_depth():
+    """Sample-frame sawtooth geometry, tested BEFORE any lab-frame rotation:
+    apexes touch z=0, valley floors reach the groove depth, x strictly increases."""
+    from cxr_mc.plots.trajectories import groove_profile_knots
+
+    spec = _groove_spec_45()
+    xs, zs = groove_profile_knots(-3 * spec.spacing_ang, 3 * spec.spacing_ang, spec)
+    assert zs.min() < 1e-6
+    assert abs(zs.max() - spec.depth_ang) < 1e-6 * spec.depth_ang
+    assert np.all(np.diff(xs) > 0)
+
+
+def test_groove_profile_knots_falls_back_over_period_cap():
+    from cxr_mc.plots.trajectories import groove_profile_knots
+
+    spec = _groove_spec_45()
+    assert groove_profile_knots(0.0, 500 * spec.spacing_ang, spec, max_periods=200) is None
+
+
+def test_grooved_case_draws_groove_profile_surface():
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure
+
+    case = _hopg_grooved_case()
+    assert case.get("groove_spacing_ang") == 2.0e4
+    fig = trajectory_volume_figure(case, Ne=12)
+    grooves = [trace for trace in fig.data if trace.name == "groove profile"]
+    assert len(grooves) == 1
+    assert grooves[0].type == "mesh3d"
+    assert len(grooves[0].x) > 0
+    fig.to_json()  # payload stays serializable
+
+
+def test_ungrooved_case_has_no_groove_profile_surface():
+    from cxr_mc.config import default_settings, trajectory_sweep
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure
+    from cxr_mc.sweep import build_cases
+
+    settings = default_settings()
+    case = build_cases(
+        trajectory_sweep("hopg", energies=(30.0,), tilts=(0.0,)),
+        settings.n_electrons,
+        settings.n_electrons_brem,
+    )[0]
+    fig = trajectory_volume_figure(case, Ne=12)
+    assert not any(trace.name == "groove profile" for trace in fig.data)
+
+
+def test_grooved_trajectory_entries_land_on_relief_facets():
+    """Drawn tracks for a grooved case genuinely start on the relief facets: the
+    first segment of each electron enters at depth z in [0, groove depth), and the
+    uniform-phase fallback spreads entries across many phases."""
+    from cxr_mc.plots.trajectories import _trajectory_data
+
+    case = _hopg_grooved_case()
+    data = _trajectory_data(case, 60, 0)
+    h = _groove_spec_45().depth_ang
+    elec = np.asarray(data["elec_id"])
+    _, first = np.unique(elec, return_index=True)
+    entry_z = np.asarray(data["start_xyz"])[first, 2] * data["u"]  # display -> Ang
+    assert np.all(entry_z >= -1e-6)
+    assert np.all(entry_z < h + 1e-3)
+    assert entry_z.max() > 0.1 * h  # on the facets, not the flat face
+    assert np.unique(np.round(entry_z, 3)).size > 3  # multiple lateral phases

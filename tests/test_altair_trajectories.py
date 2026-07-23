@@ -133,3 +133,42 @@ def test_penetration_survival_chart_none_on_empty():
     from cxr_mc.plots.altair_trajectories import penetration_survival_chart
 
     assert penetration_survival_chart([]) is None
+
+
+# ---- blazed groove profile overlay (Task 6) ----------------------------------
+def _grooved_case(spacing_ang=2.0e4, tilt_deg=45.0, energy=30.0, thickness_ang=2.0e5):
+    from cxr_mc.config import default_settings, trajectory_sweep
+    from cxr_mc.sweep import build_cases
+
+    s = default_settings()
+    sweep = trajectory_sweep(
+        "hopg",
+        energies=(energy,),
+        tilts=(tilt_deg,),
+        thickness_ang=thickness_ang,
+        azim_deg=180.0,
+        groove_spacing_ang=spacing_ang,
+    )
+    return build_cases(sweep, s.n_electrons, s.n_electrons_brem)[0]
+
+
+def _mark_color(layer):
+    mark = layer.get("mark")
+    return mark.get("color") if isinstance(mark, dict) else None
+
+
+def test_trajectory_chart_grooved_has_profile_layer():
+    from cxr_mc.plots.altair_trajectories import _GROOVE, trajectory_chart
+
+    spec = trajectory_chart(_grooved_case(), Ne=8).to_dict()
+    groove_layers = [layer for layer in spec["layer"] if _mark_color(layer) == _GROOVE]
+    assert len(groove_layers) == 1
+    enc = groove_layers[0]["encoding"]
+    assert enc["x"]["field"] == "x" and enc["y"]["field"] == "y"
+
+
+def test_trajectory_chart_ungrooved_has_no_profile_layer():
+    from cxr_mc.plots.altair_trajectories import _GROOVE, trajectory_chart
+
+    spec = trajectory_chart(_real_cases()[0], Ne=8).to_dict()
+    assert not [layer for layer in spec["layer"] if _mark_color(layer) == _GROOVE]
