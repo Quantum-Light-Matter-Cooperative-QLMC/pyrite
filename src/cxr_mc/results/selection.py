@@ -206,6 +206,50 @@ def project_dataset(results, dataset):
     return slim_results(results, fields=list(keys))
 
 
+def merge_dataset(local, incoming, dataset, force=False):
+    """Overwrite ONLY ``dataset``'s record keys in ``local`` from ``incoming``,
+    matched by (config name, E0), leaving the other dataset's arrays intact.
+    ``dataset`` is ``"line"`` or ``"brem"``. After copying, ``brem`` is always
+    re-derived as ``interp(E_grid, E_grid_brem, brem_wide)`` so it stays
+    consistent with whichever grid/brem_wide now holds (a line merge that
+    changed ``E_grid`` re-interps the retained local brem_wide; a brem merge
+    re-interps the fresh brem_wide onto the local line grid). Records in
+    ``incoming`` absent from ``local`` are SKIPPED (reported) unless ``force``,
+    which inserts them whole. Mutates ``local``; returns (n_merged, n_skipped)."""
+    import numpy as np
+
+    keys = {"line": LINE_RECORD_KEYS, "brem": BREM_RECORD_KEYS}.get(dataset)
+    if keys is None:
+        raise ValueError(f"dataset must be 'line' or 'brem', got {dataset!r}")
+    n_merged = n_skipped = 0
+    for name, by_E in incoming.items():
+        for E0, inc in by_E.items():
+            local_by_E = local.get(name)
+            if local_by_E is None or E0 not in local_by_E:
+                if force:
+                    local.setdefault(name, {})[E0] = dict(inc)
+                    n_merged += 1
+                else:
+                    n_skipped += 1
+                continue
+            r = local_by_E[E0]
+            for k in keys:
+                if k in inc:
+                    r[k] = inc[k]
+            bw, egb, eg = r.get("brem_wide"), r.get("E_grid_brem"), r.get("E_grid")
+            if bw is not None and egb is not None and eg is not None:
+                r["brem"] = np.interp(
+                    np.asarray(eg, float), np.asarray(egb, float), np.asarray(bw, float)
+                )
+            n_merged += 1
+    if n_skipped:
+        print(
+            f"merge_dataset: skipped {n_skipped} record(s) not present locally "
+            f"(pass force=True to insert them)"
+        )
+    return n_merged, n_skipped
+
+
 def _grid_names(material):
     """Config names in the CURRENT grid for ``material`` -- exactly the set
     ``config.material_sweep(material)`` -> ``sweep.build_cases`` produces now.

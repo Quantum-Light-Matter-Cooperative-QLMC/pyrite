@@ -230,3 +230,51 @@ def test_project_dataset_keeps_only_that_datasets_keys():
     line = project_dataset(results, "line")["n"][30.0]
     assert set(brem) == {"case", "brem_wide", "brem", "E_grid_brem"}
     assert set(line) == {"case", "spec", "E_grid"}
+
+
+def test_merge_dataset_line_overwrites_spec_and_reinterps_brem():
+    import numpy as np
+
+    from cxr_mc.results import merge_dataset
+
+    local = {
+        "n": {
+            30.0: {
+                "case": {},
+                "spec": np.zeros(3),
+                "E_grid": np.array([1.0, 2.0, 3.0]),
+                "brem_wide": np.array([10.0, 8.0, 6.0, 4.0]),
+                "E_grid_brem": np.array([1.0, 2.0, 3.0, 4.0]),
+                "brem": np.zeros(3),
+            }
+        }
+    }
+    incoming = {
+        "n": {
+            30.0: {
+                "case": {},
+                "spec": np.array([5.0, 5.0, 5.0, 5.0, 5.0]),
+                "E_grid": np.array([1.0, 1.5, 2.0, 2.5, 3.0]),
+            }
+        }
+    }
+    merged, skipped = merge_dataset(local, incoming, "line")
+    r = local["n"][30.0]
+    assert (merged, skipped) == (1, 0)
+    assert r["spec"].shape == (5,) and np.all(r["spec"] == 5.0)  # line overwritten
+    np.testing.assert_array_equal(r["E_grid"], incoming["n"][30.0]["E_grid"])
+    assert r["brem_wide"].shape == (4,)  # brem_wide kept
+    np.testing.assert_allclose(r["brem"], np.interp(r["E_grid"], r["E_grid_brem"], r["brem_wide"]))
+
+
+def test_merge_dataset_skips_unmatched_unless_force():
+    from cxr_mc.results import merge_dataset
+
+    local = {"n": {30.0: {"case": {}, "spec": [0.0], "E_grid": [1.0]}}}
+    incoming = {"n": {50.0: {"case": {}, "spec": [9.0], "E_grid": [1.0]}}}
+    merged, skipped = merge_dataset(local, incoming, "line")
+    assert (merged, skipped) == (0, 1)
+    assert 50.0 not in local["n"]
+    merged, skipped = merge_dataset(local, incoming, "line", force=True)
+    assert (merged, skipped) == (1, 0)
+    assert local["n"][50.0]["spec"] == [9.0]
