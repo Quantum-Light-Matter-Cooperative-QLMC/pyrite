@@ -169,10 +169,9 @@ def first_surface_event(
     spacing = spec.spacing_ang
     depth = spec.depth_ang
     eps = max(32 * np.finfo(float).eps * spacing, 1e-12 * spacing)
-    parallel_tol = 32 * np.finfo(float).eps
 
     dz = d[2]
-    if abs(dz) <= parallel_tol:
+    if dz == 0.0:
         if not 0.0 <= p[2] <= depth:
             return np.inf
         band_start = eps
@@ -188,13 +187,13 @@ def first_surface_event(
     tp = spec.tilt_polar_rad
     st, ct = np.sin(tp), np.cos(tp)
     families = (
-        (np.array([ct, 0.0, -st]), spacing * ct),
-        (np.array([st, 0.0, ct]), spacing * st),
+        (np.array([ct, 0.0, -st]), spacing * ct, 1.0),
+        (np.array([st, 0.0, ct]), spacing * st, -1.0),
     )
     best = np.inf
-    for normal, plane_spacing in families:
+    for normal, plane_spacing, exit_rate_sign in families:
         rate = float(np.dot(normal, d))
-        if abs(rate) <= parallel_tol:
+        if rate == 0.0:
             continue
         origin = float(np.dot(normal, p))
         transformed = (origin + band_start * rate) / plane_spacing
@@ -219,6 +218,10 @@ def first_surface_event(
             after = bool(in_material(q + eps * d, np.inf, spec))
             is_exit = before and not after
             is_entry = not before and after
+            if before == after and 0.0 < q[2] < depth:
+                signed_rate = exit_rate_sign * rate
+                is_exit = signed_rate > 0.0
+                is_entry = signed_rate < 0.0
             if (
                 (transition is None and (is_exit or is_entry))
                 or (transition == "exit" and is_exit)

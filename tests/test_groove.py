@@ -99,7 +99,40 @@ def test_surface_event_exit_then_later_entry_matches_reference_march():
 def test_tangent_surface_event_is_skipped():
     p = np.array([0.0, 0.0, 0.0])
     d = np.array([np.sin(TP), 0.0, np.cos(TP)])
+    working_normal = np.array([np.cos(TP), 0.0, -np.sin(TP)])
+    assert np.dot(working_normal, d) == 0.0
     assert np.isinf(first_surface_event(p, d, SPEC, transition="exit"))
+
+
+def test_surface_event_preserves_tiny_nonzero_vertical_direction():
+    tiny_dz = -0.5 * 32 * np.finfo(float).eps
+    z0 = np.nextafter(SPEC.depth_ang, np.inf)
+    s_to_depth = (z0 - SPEC.depth_ang) / -tiny_dz
+    x_valley = SPEC.depth_ang * np.tan(TP)
+    p = np.array([x_valley - 1.0 - s_to_depth, 0.0, z0])
+    d = np.array([1.0, 0.0, tiny_dz])
+    expected = (SPEC.spacing_ang + p[2] - p[0]) / (d[0] - d[2])
+
+    event = first_surface_event(p, d, SPEC, transition="exit")
+
+    assert event == pytest.approx(expected, rel=1e-12)
+
+
+def test_surface_event_preserves_tiny_nonzero_facet_rate():
+    st, ct = np.sin(TP), np.cos(TP)
+    tangent = np.array([st, 0.0, ct])
+    working_normal = np.array([ct, 0.0, -st])
+    d = tangent + 0.75 * 32 * np.finfo(float).eps * working_normal
+    d /= np.linalg.norm(d)
+    expected = 5.0e3
+    q = np.array([0.25 * SPEC.spacing_ang, 0.0, 0.25 * SPEC.spacing_ang])
+    p = q - expected * d
+    rate = np.dot(working_normal, d)
+    assert 0.0 < rate <= 32 * np.finfo(float).eps
+
+    event = first_surface_event(p, d, SPEC, transition="exit")
+
+    assert event == pytest.approx(expected, rel=2e-2)
 
 
 def test_depth_closes_unit_cell():
