@@ -391,7 +391,7 @@ def _draw_trajectory_panel(
         )
         vacuum_energy = np.asarray(data["vacuum_E"], dtype=float)
         collection = LineCollection(
-            vacuum_segments,
+            vacuum_segments.tolist(),
             cmap=cmap or _TRAJ_CMAP,
             linewidths=0.8,
             alpha=0.35,

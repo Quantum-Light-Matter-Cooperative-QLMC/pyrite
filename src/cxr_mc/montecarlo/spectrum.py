@@ -238,9 +238,10 @@ def mc_spectrum(
     with the rest of mc_spectrum's incoherent transport). A finite crystal
     footprint (crystal_width_ang/crystal_height_ang) is permitted and only
     classifies launch hit/miss in transport (hit_frac); the groove escape here
-    ignores it and treats the sawtooth as laterally periodic, an
-    O(groove spacing / crystal width) edge approximation (sub-micron grooves on
-    a mm-scale crystal) of the same order as the other v1 groove assumptions.
+    ignores it and treats the sawtooth as laterally periodic. At emission depth
+    z, the side-edge-affected strip has width
+    ``L_esc*cos(tp) = z*cot(tp) + O(groove spacing)``; its fractional width is
+    ``min(z*cot(tp)/crystal_width + O(groove spacing/crystal_width), 1)``.
 
     v1 exclusions (raise ValueError rather than silently mismodeling):
     groove with layers (single-slab absorber only); groove with n_hat[2] >= 0
@@ -412,10 +413,11 @@ def mc_spectrum(
             # facet (grooves shorten, never lengthen, the flat-face path). Takes
             # precedence over any finite footprint -- the mm-scale crystal extent
             # only classifies launch hit/miss (hit_frac, set in transport); the
-            # sub-micron groove escape treats the slab as laterally periodic,
-            # with an O(groove spacing / crystal width) edge error consistent
-            # with the other v1 groove approximations. The guard above
-            # guarantees layers is None and n_hat[2] < 0 here.
+            # groove escape treats the slab as laterally periodic. At depth z,
+            # the side-edge-affected strip is
+            # L_esc*cos(tp) = z*cot(tp) + O(groove spacing), capped by the
+            # crystal width. The guard above guarantees layers is None and
+            # n_hat[2] < 0 here.
             # Validation: blazed-groove-geometry
             L_esc = escape_distance_ang(seg_r[idx, 0], z_mid, groove)
             tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)

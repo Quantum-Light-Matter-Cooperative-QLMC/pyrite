@@ -1,13 +1,18 @@
 # Validation: blazed-groove-geometry
 
 - **Claim id**: `blazed-groove-geometry`
-- **Anchors**: `src/cxr_mc/montecarlo/groove.py::{blazed_groove_spec, escape_distance_ang, entry_points}`
+- **Anchors**:
+  `src/cxr_mc/montecarlo/groove.py::{blazed_groove_spec,surface_depth_ang,in_material,first_surface_event,escape_distance_ang,entry_points}`;
+  `src/cxr_mc/montecarlo/transport.py::simulate_trajectories`;
+  `src/cxr_mc/montecarlo/spectrum.py::{mc_spectrum,mc_brem_spectrum}`
 - **Source**: elementary periodic ray–plane intersection (no literature
-  equation); design note `docs/superpowers/plans/2026-07-23-blazed-groove-geometry.md`
+  equation); original plan
+  `docs/superpowers/plans/2026-07-23-blazed-groove-geometry.md`; correction
+  design `docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md`
 - **Verifier**: independent fresh context (did not write the implementation),
-  2026-07-23. Derivation below was written **before** reading the
-  implementation bodies (only the ledger row and docstring headers were read
-  first, per the contract in `docs/validation/README.md`).
+  2026-07-24. Sections 1--3 were derived **before** reading implementation
+  bodies (only the ledger row, module/function derivation docstrings, and
+  signatures were read first, per `docs/validation/README.md`).
 
 ## 1. What is claimed
 
@@ -21,13 +26,22 @@ Sample frame: entrance face z = 0, depth +z. Then
 - RELIEF facets on planes b·r = kΛ sin tp (⊥ b, ∥ n̂);
 - groove depth h = Λ sin tp cos tp;
 - closed-form electron entry point (`entry_points`) and photon escape path
-  length (`escape_distance_ang`) as quoted in the docstrings.
+  length (`escape_distance_ang`) as quoted in the docstrings;
+- exact material-to-vacuum and vacuum-to-material facet events for arbitrary
+  electron directions;
+- material-only stopping, scattering, radiation, and Beer--Lambert optical
+  depth, with energy/direction invariant vacuum legs and clock advance
+  `L_vacuum/beta`;
+- finite-footprint electron transport decoupled from laterally periodic photon
+  escape, with claimed edge error `O(Λ / crystal_width)`.
 
 ## 2. Cheap filters
 
 **Dimensions.** Λ, h, c = Λ cos tp, s1, L, x, z all carry Å; tp, θ are
 radians (dimensionless in trig). Every claimed formula is a sum of Å-valued
-terms times dimensionless trig/floor/mod factors. Pass.
+terms times dimensionless trig/floor/mod factors. The stored clock has
+`c t` units Å, so `Δt_ang = L[Å]/beta` is dimensionally correct.
+Beer--Lambert optical depth `tau = mu[Å^-1] L[Å]` is dimensionless. Pass.
 
 **Signs / conventions.** With +z into the material, b_z = cos tp > 0 (beam
 enters) and n̂_z = −sin tp < 0 (photon exits through the entrance face).
@@ -46,6 +60,10 @@ it — zero shadowing). Pass.
   Pass.
 - Λ → 0: claimed z_entry → 0 (flat face). s1 ∈ [0, Λ sin tp) → 0, so
   z_entry = s1 cos tp → 0. Pass.
+
+Analytic signs, flat-profile limits, exact valley-band handling, and
+finite-footprint edge scaling pass after the implementation corrections
+re-checked in §§4.1 and 4.4.
 
 ## 3. Independent derivation
 
@@ -150,73 +168,219 @@ i.e. the grooves shorten the mean escape path by exactly c/2 = Λ cos tp / 2
 relative to the flat face, independent of z (for z ≥ h). Any test asserting
 this identity is asserting the same geometry derived here.
 
+### 3.4 Facet-event signs, bands, and ties
+
+Define signed plane functions
+
+    W_k(r) = n̂·r − kΛ cos tp                 (working)
+    R_k(r) = b·r − kΛ sin tp                 (relief).
+
+On a physical working facet, material is on `W_k <= 0`; on a physical relief
+facet, material is on `R_k >= 0`. Therefore, for ray direction d,
+
+    working exit:  n̂·d > 0       working entry:  n̂·d < 0
+    relief exit:   b·d < 0        relief entry:   b·d > 0.
+
+These signs are independent of period index. Plane intersections outside
+`0 <= z <= h` are not surface events: below the valley (`z > h`) both sides
+are material; above an apex (`z < 0`) both sides are vacuum.
+
+If the relevant plane rate is zero, the ray is tangent to that facet family
+and cannot cross it. It may still reach the other family or a shared
+apex/valley. At an endpoint tie, the physical rule follows the closed-material
+predicate: compare states at `q − epsilon*d` and `q + epsilon*d`; accept only
+an actual state change. A material--material or vacuum--vacuum contact is not
+an event. Strictly forward `s > epsilon` plus one post-re-entry nudge prevents
+the same boundary from being returned indefinitely.
+
+### 3.5 Electron transport through vacuum
+
+Let material collision distance `X` be exponential with rate `lambda^-1`.
+If a facet truncates a flight after material distance `a` and no collision has
+occurred, then
+
+    P(X − a > y | X > a) = exp(−y/lambda).
+
+Thus the residual material free path has the original exponential law.
+Vacuum contributes zero collision hazard, so discarding the old residual and
+sampling a fresh exponential after re-entry is statistically exact under the
+transport kernel's local-rate model. Vacuum also has no stopping or scattering:
+
+    E_after = E_before,       d_after = d_before.
+
+The code's time coordinate is `c*t` in Å. Since speed is `beta*c`,
+
+    Delta(c*t) = c L_vacuum/(beta*c) = L_vacuum/beta  [Å].
+
+Only material intervals may enter segment arrays. A re-entry is not a
+permanent exit and must not increment back/side/transmission counters.
+
+### 3.6 Coherent and bremsstrahlung Beer--Lambert paths
+
+For supported photon direction n̂, `b·n̂ = 0`; relief-plane coordinate stays
+constant. At working planes, `dW_k/ds = n̂·n̂ = 1 > 0`, always the outward
+working-facet sign. After the first physical outward crossing, later working
+crossings have lower z and the ray cannot acquire an inward sign; relief
+crossings are impossible. Hence no material re-entry exists for this direction
+and `escape_distance_ang` is the complete material path.
+
+For attenuation coefficient `mu(E)` in Å^-1, both coherent and bremsstrahlung
+terms must use
+
+    T_abs(E) = exp[−mu(E) L_esc].
+
+Grooving changes `L_esc` only. Coherent amplitudes/resonance kinematics and
+bremsstrahlung cross sections remain unchanged. Bremsstrahlung emission from
+one material segment retains its factor
+`n_i L_segment (d sigma_i/dk)/(4 pi Ne)`; vacuum legs supply neither
+`L_segment` nor optical depth.
+
+### 3.7 Finite photon footprint: independent edge scale
+
+Electron launch and arbitrary-direction transport must use the finite prism.
+Treating photon grooves as periodic is a separate approximation. For an
+emitter at `(x,z)` and supported `n̂ = (cos tp,0,−sin tp)`, horizontal travel
+before groove escape is
+
+    Delta x = L_esc cos tp.
+
+The downstream `+x` side face wins whenever
+
+    W/2 − x < Delta x.
+
+At fixed z, the affected edge strip therefore has width `Delta x`, not
+generally one groove period. From §3.3,
+
+    L_esc = z/sin tp − delta,       0 <= delta < Λ cos tp,
+
+so
+
+    Delta x = z cot tp − delta cos tp
+            = z cot tp + O(Λ).
+
+For emitters uniform in x, the ignored-side fraction at fixed z is
+
+    f_edge(z) = min(Delta x/W, 1)
+              = min(z cot(tp)/W + O(Λ/W), 1).
+
+Thus `O(Λ/W)` is only the phase-scale correction to the edge width. It is not
+the total finite-side error unless all relevant emission depths are `O(h)`.
+
 ## 4. Implementation comparison (read after §3 was frozen)
 
-Read `src/cxr_mc/montecarlo/groove.py` in full after writing §1–3.
+### 4.1 Geometry
 
-- `blazed_groove_spec`: validates θ_obs = 90° and tilt_azim = 180° (atol
-  1e-9 rad), rejects tp ∉ (0, π/2) and spacing ≤ 0 with `ValueError`; sets
-  `depth_ang = spacing * sin(tp) * cos(tp)`. Matches §3.1 exactly, including
-  the reject-don't-degrade behaviour at tp ∈ {0, 90°}.
-- `entry_points`: `s1 = mod(−x0·st, spacing·st)`; returns
-  `(x0 + s1·st, s1·ct)`. Symbol-for-symbol identical to §3.2.
-- `escape_distance_ang`: `d = x·ct − z·st`; `c = spacing·ct`;
-  `s1 = c − mod(d, c)`; `z1 = z − s1·st`;
-  `L = s1 + maximum(floor(z1/depth_ang), 0)·c`. Symbol-for-symbol identical
-  to §3.3, including the `max(·, 0)` boundary guard adjudicated above. Uses
-  only numpy ufuncs (`np.mod`, `np.floor`, `np.maximum`), consistent with the
-  cupy `__array_ufunc__` dispatch claim.
-- Wiring/frame consistency: `runner.py` builds `beam, n_hat =
-  tilted_geometry(theta_obs, tp, azim)` and passes the same angles to
-  `blazed_groove_spec`; `transport.py::simulate_trajectories` applies
-  `entry_points` to the flat-face x (with a uniform groove-phase draw for
-  point sources) before transport; `spectrum.py::mc_spectrum` guards the v1
-  scope (single slab, laterally infinite, n̂_z < 0) and substitutes
-  `escape_distance_ang` only for the escape path. `tilted_geometry(π/2, tp, π)`
-  numerically returns b = (sin tp, 0, cos tp), n̂ = (cos tp, 0, −sin tp) for
-  tp ∈ {0.2, 0.7, 1.2} rad — the exact frame assumed in §1. One boundary-edge
-  note: `entry_points` can yield s1 = 0 → mod boundary, and
-  `escape_distance_ang` gives s1 = c (not 0) for a point exactly on a working
-  plane; both are measure-zero and consistent with a closed-material
-  convention.
+- `blazed_groove_spec`, `surface_depth_ang`, `in_material`, `entry_points`,
+  and `escape_distance_ang` match §§3.1--3.3 symbolically, including facet
+  branches, signs, bands, and the flat-profile limit.
+- `first_surface_event` uses working sign multiplier `+1` and relief multiplier
+  `−1`, exactly matching §3.4. Zero plane rate is skipped. Interior random-ray
+  transitions covered by the focused reference-march tests pass.
+- Exact valley handling now uses
+  `band_tol = 32*eps_machine*max(spacing, depth)` and admits candidates only
+  inside `[-band_tol, h + band_tol]` before applying the two-sided material
+  predicate. Re-check used:
 
-### Numeric spot checks (independent brute-force ray march)
+      Λ = 2 Å, tp = 0.61 rad
+      h = 0.9390993563190676 Å
+      x_valley = h tan(tp) = 0.6563542536839531 Å
+      p = (x_valley, 0, h + 1 Å), d = (0,0,−1)
 
-Script: verifier-written point-in-material test from §3.1 (`z ≥ z_s(x)`,
-sawtooth built from cot/tan branches — no reuse of implementation helpers),
-seed 20260723, run 2026-07-23:
+  Exact geometry exits through the valley at `s = 1 Å`; implementation now
+  returns exactly `1.0 Å`. Here `band_tol = 1.4210854715202004e−14 Å`, while
+  the ray--plane result's former overshoot is one ulp.
+- Independent exclusion probe displaced the nonphysical working-plane
+  intersection by `1e−8 Å`, about `7.0e5*band_tol`, beyond the valley. The
+  implementation rejected that candidate and returned the physical relief
+  event `1.0000000148848758 Å`, matching the independently calculated distance
+  exactly. Thus the tolerance does not admit materially out-of-band
+  intersections.
+- Tangencies away from facet endpoints remain skipped; endpoint state changes
+  remain governed by the two-sided predicate.
 
-- 4 000 random (x, z ∈ [0, 4h], tp ∈ (0.05, π/2−0.05), Λ ∈ [0.5, 50] Å)
-  interior emission points: closed form vs stepped ray march along n̂ with
-  60-step bisection refinement — worst |ΔL| = 5.7·10⁻¹⁴ Å, 0 mismatches. PASS
-- 2 000 interior points with z ≥ h: L ≤ z/sin tp always (escape never exceeds
-  the flat-face path; max shortening observed 48.1 Å). PASS
-- 5 000 random entry points: entry lies on a relief plane (residual of
-  b·r/(Λ sin tp) from integer ≤ 5.7·10⁻¹⁴), z_entry ∈ [0, h), entry point on
-  the §3.1 surface (max |z_e − z_s(x_e)|/Λ = 1.9·10⁻¹³), and the open segment
-  from (x0, 0) to the entry stays in vacuum. PASS
-- h → 0 limit: Λ = 10⁻⁴ Å, z = 50 Å, tp = 37°: L·sin tp/z − 1 = −7.1·10⁻⁷.
-  PASS
-- Mean-gain identity: tp = 28°, Λ = 7.3 Å, z = 5h, 20 000-point period
-  average: ⟨L⟩ vs z/sin tp − c/2 relative error 1.6·10⁻⁶ (finite-sample
-  discretization of the uniform phase). PASS
-- Relief-facet boundary point (z = h/2 on the facet): L = z/sin tp exactly
-  (exit at the apex), finite, matching the z1 = 0 boundary analysis. PASS
-- Degenerate-geometry rejections (θ_obs ≠ 90°, tp ∈ {0, 90°},
-  tilt_azim ≠ 180°, spacing ≤ 0) all raise `ValueError`. PASS
+`escape_distance_ang` returns the next working plane rather than zero for an
+emitter exactly on a working facet because `s1 = c − mod(d,c)` is in `(0,c]`.
+Its documented limit is from just inside, and radiating segment midpoints are
+interior, so this separate measure-zero convention does not change the verdict.
+
+### 4.2 Electron transport
+
+`simulate_trajectories` compares sampled collision/prism/layer distances with
+the exact surface exit, truncates the material segment at the first event,
+applies material stopping and `step/beta`, and suppresses elastic scattering
+at a facet. It then searches for an entry along the unchanged direction.
+On re-entry it:
+
+- copies post-material energy into the vacuum diagnostic;
+- leaves energy and direction unchanged;
+- advances `clock` by `distance/beta_from_keV(E)`;
+- nudges into material by a period-scaled epsilon;
+- resamples the material collision distance on the next iteration;
+- does not increment exit counters.
+
+Permanent no-reentry rays increment entrance-face exit count. Vacuum arrays
+are separate from `r_mid`, `L_ang`, `E_keV`, and `v_hat`; spectrum kernels see
+only material segments. This matches §§3.5--3.6. The exponential
+memorylessness argument is exact for the kernel's locally exponential
+free-path model.
+
+### 4.3 Coherent and bremsstrahlung radiation
+
+Both spectrum functions validate the supported direction and single-slab
+scope. `mc_spectrum` and `mc_brem_spectrum` call the same
+`escape_distance_ang`; both form `exp(−mu*L_esc)`. Vacuum legs never enter
+either segment sum. Coherent amplitude/resonance expressions and
+bremsstrahlung cross sections are unchanged. Supported-direction no-reentry
+proof in §3.6 therefore matches implementation.
+
+### 4.4 Finite-footprint decoupling
+
+Transport correctly honors finite launch misses, material side exits, and a
+side face encountered before vacuum re-entry. Both photon kernels deliberately
+ignore stored finite dimensions when `groove` is present, producing the same
+periodic result with or without footprint metadata.
+
+That decoupling remains intentionally implemented. The correction design,
+ledger row, and coherent-spectrum docstring/comment now state the independently
+derived magnitude:
+
+    f_edge(z) = min(L_esc cos(tp)/W, 1)
+              = min(z cot(tp)/W + O(Λ/W), 1).
+
+They explicitly identify `O(Λ/W)` as only the periodic-phase correction and
+retain the `min(...,1)` cap. Runtime still gives `groove` precedence over stored
+finite dimensions in both photon kernels, so the documented approximation and
+implemented laterally periodic model now agree. Example magnitude remains:
+`Λ = 2 μm`, `W = 5 mm`, `tp = 45°`, `z = 20 μm` gives affected fraction
+`4e−3` (0.4%), while `Λ/W = 4e−4` (0.04%) is only the smaller phase correction.
+
+### 4.5 Checks run
+
+- Current-tree focused CPU re-check:
+  three endpoint/reference tests passed (`3 passed, 30 deselected`).
+- Independent numeric probe confirms the exact one-ulp valley event and
+  materially out-of-band rejection described in §4.1.
+- Supplied remote evidence for the exact fix snapshot:
+  `tests/test_groove.py + tests/test_trajectories.py` — 34 passed; broader
+  suite — 192 passed; typecheck and scoped Ruff clean.
+- No heavy Monte Carlo, GPU job, or external comparison was run.
 
 ## 5. Adjudication
 
-Independent derivation, symbolic comparison, and numeric brute-force checks
-all agree with the implementation. No divergent factor, sign, exponent, unit,
-or convention found. The v1 scope caveats recorded in the ledger (electron
-in-flight boundaries stay flat — entry point only honors grooves; brem
-self-absorption stays flat-face; single laterally-infinite slab, n_side = 1)
-are *scope restrictions*, not errors in the claimed formulas; they are
-enforced by explicit guards in `spectrum.py::mc_spectrum` and disclosed in
-the ledger row and docstrings.
+Analytic profile, ordinary facet signs, flat limit, supported-direction
+no-reentry, material/vacuum state machine, clock units, energy/direction
+invariance, material-only radiation, and coherent/bremsstrahlung
+Beer--Lambert paths match.
 
-**Verdict: `rederived`** (filters + independent re-derivation pass;
-`tests/test_groove.py` exists as the anchor but was not re-run here — the
-independent ray march above covers the same comparison). Sign-off remains a
-human action.
+The two former discrepancies are corrected: closed facet-band endpoints use a
+geometry-scaled roundoff tolerance without accepting materially out-of-band
+planes, and finite-side documentation carries the missing
+`L_esc cos(tp) = z cot(tp) + O(Λ)` leading term while preserving intentional
+periodic runtime behavior. No divergent factor, sign, unit, exponent, or
+convention remains in the reviewed claim.
+
+**Verdict: `rederived`.**
+
+Suggested ledger edit (human applies): change status from `unverified` to
+`rederived`; link this write-up and the endpoint/edge re-review evidence.
+Do not mark `signed-off`.

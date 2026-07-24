@@ -312,7 +312,9 @@ def simulate_trajectories(
     scattering, stopping, or radiation, then resumes material transport.
     Vacuum flight advances the electron clock by ``L_vacuum / beta``. Resampling
     the elastic free path after re-entry is exact because the exponential
-    collision-distance distribution is memoryless.
+    collision-distance distribution is memoryless. Valid exit/re-entry pairs
+    use a separate per-electron event counter and do not consume ``max_steps``
+    material iterations; exhausting that event bound raises ``RuntimeError``.
 
     Groove gaps are returned as separate ``vacuum_*`` diagnostic arrays; they
     never enter the material segment sum. A ray with no later re-entry is a
@@ -448,19 +450,28 @@ def simulate_trajectories(
     zero_surface_events = (
         np.zeros(Ne, dtype=np.int16) if groove is not None else None
     )
+    material_steps = np.zeros(Ne, dtype=np.int32) if groove is not None else None
+    surface_events = np.zeros(Ne, dtype=np.int32) if groove is not None else None
+    lockstep_step = 0
 
-    # Event-driven loop: every iteration is one FREE FLIGHT + one ELASTIC
-    # COLLISION for every still-alive electron, executed in lockstep (pure
-    # vectorization -- electrons are independent, so synchronizing them is
-    # exact). There is no time step and no discretization parameter: flight
-    # lengths are sampled from the physical free-path distribution. With a
-    # multilayer stack the alive electrons are grouped by their CURRENT layer
-    # each iteration so each uses that layer's free path / stopping / scattering;
-    # a single layer is one group, so that path stays bit-for-bit identical.
-    for _ in range(max_steps):
+    # Event-driven loop: ungrooved transport retains the legacy lockstep
+    # max_steps iterations bit-for-bit. Grooved transport counts only material
+    # collision/layer iterations against that budget; valid exit/re-entry pairs
+    # repeat the loop without consuming it. A separate per-electron surface-event
+    # bound prevents pathological geometry from becoming an unbounded loop.
+    while True:
         if not alive.any():
             break
-        idx = np.flatnonzero(alive)  # indices of electrons still in play
+        if groove is None:
+            if lockstep_step >= max_steps:
+                break
+            lockstep_step += 1
+            idx = np.flatnonzero(alive)
+        else:
+            assert material_steps is not None
+            idx = np.flatnonzero(alive & (material_steps < max_steps))
+            if idx.size == 0:
+                break
         if n_layers == 1:
             lay_all = None  # everyone is in layer 0
         else:
@@ -585,10 +596,12 @@ def simulate_trajectories(
             clock[grp] += step / beta_from_keV(Ea)
 
             if groove is not None:
-                assert zero_surface_events is not None
+                zero_event_counts = zero_surface_events
+                assert zero_event_counts is not None
                 below_cut = E[grp] < E_cut_keV
                 active_surface = surface_first & ~below_cut
-                zero_surface_events[grp[~active_surface]] = 0
+                zero_event_counts[grp[~active_surface]] = 0
+                reentered_group = np.zeros(grp.size, dtype=bool)
             if groove is not None and active_surface.any():
                 surf_local = np.flatnonzero(active_surface)
                 surf_global = grp[surf_local]
@@ -618,6 +631,7 @@ def simulate_trajectories(
                 if reentered.any():
                     re_local = surf_local[reentered]
                     re_global = grp[re_local]
+                    reentered_group[re_local] = True
                     distance = entry_distance[reentered]
                     start = surface_points[reentered]
                     direction = dirs[re_global]
@@ -633,14 +647,20 @@ def simulate_trajectories(
                         2e-12 * groove.spacing_ang,
                     )
                     pos[re_global] = end + surface_eps * direction
+                    assert surface_events is not None
+                    surface_events[re_global] += 1
+                    if np.any(surface_events[re_global] > max_steps):
+                        raise RuntimeError(
+                            "grooved surface event limit exhausted"
+                        )
 
                 permanent = ~reentered & ~exit_side[surf_local]
                 exit_top[surf_local[permanent]] = True
                 short = step[surf_local] <= EPS
-                zero_surface_events[surf_global] = np.where(
-                    short, zero_surface_events[surf_global] + 1, 0
+                zero_event_counts[surf_global] = np.where(
+                    short, zero_event_counts[surf_global] + 1, 0
                 )
-                if np.any(zero_surface_events[surf_global] >= 2):
+                if np.any(zero_event_counts[surf_global] >= 2):
                     raise RuntimeError("repeated zero-length grooved surface events")
 
             # -- 5. kill exited / exhausted; pass internal crossers on ----------
@@ -683,6 +703,10 @@ def simulate_trajectories(
                             )
                 phi = 2.0 * np.pi * rng.random(srv.size)
                 dirs[srv] = _rotate_directions(dirs[srv], cos_t, phi)
+            if groove is not None:
+                assert material_steps is not None
+                count_material_step = alive[grp] & ~reentered_group
+                material_steps[grp[count_material_step]] += 1
 
     if finite_footprint and not seg_mid:
         r_mid = np.empty((0, 3), dtype=float)

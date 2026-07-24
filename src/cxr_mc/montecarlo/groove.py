@@ -148,7 +148,9 @@ def first_surface_event(
     relief plane families from the module docstring. For each family, adjacent
     integer period indices at the ray's entry into the physical facet band
     ``0 <= z <= depth`` contain its first possible forward intersection.
-    A two-sided material predicate classifies exit versus entry.
+    A two-sided material predicate classifies exit versus entry. The closed
+    band admits only a geometry-scaled floating-point tolerance at its
+    apex/valley endpoints.
     Assumptions: direction is a sample-frame unit vector and profile is
     laterally periodic/infinite. Limiting case: facet-parallel tangency changes
     no material state and returns infinity.
@@ -169,6 +171,7 @@ def first_surface_event(
     spacing = spec.spacing_ang
     depth = spec.depth_ang
     eps = max(32 * np.finfo(float).eps * spacing, 1e-12 * spacing)
+    band_tol = 32 * np.finfo(float).eps * max(spacing, depth)
 
     dz = d[2]
     if dz == 0.0:
@@ -212,7 +215,10 @@ def first_surface_event(
             if not eps < s <= band_end or s >= best:
                 continue
             q = p + s * d
-            if not 0.0 <= q[2] <= depth:
+            # Plane arithmetic can place an analytic apex/valley one or a few
+            # ULP outside its closed physical band. Admit only geometry-scaled
+            # roundoff; points farther outside remain non-surface intersections.
+            if q[2] < -band_tol or q[2] > depth + band_tol:
                 continue
             before = bool(in_material(q - eps * d, np.inf, spec))
             after = bool(in_material(q + eps * d, np.inf, spec))

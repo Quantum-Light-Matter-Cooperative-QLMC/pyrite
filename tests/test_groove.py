@@ -33,6 +33,12 @@ SHALLOW_SPEC = blazed_groove_spec(
     tilt_polar_rad=TP,
     tilt_azim_rad=np.pi,
 )
+MARCH_SPEC = blazed_groove_spec(
+    spacing_ang=2.0,
+    theta_obs_rad=np.pi / 2,
+    tilt_polar_rad=TP,
+    tilt_azim_rad=np.pi,
+)
 _transport_module = importlib.import_module("cxr_mc.montecarlo.transport")
 
 
@@ -45,24 +51,39 @@ def _z_surf(x, spec):
     return np.where(u <= x_valley, u / np.tan(tp), (lam - u) * np.tan(tp))
 
 
-def _march_escape(x, z, spec, ds=0.05):
-    """Reference ray march along n_hat until the point leaves the material."""
+def _march_escape(x, z, spec, ds=None):
+    """Independent state bracket plus bisection along n_hat."""
     tp = spec.tilt_polar_rad
     n = np.array([np.cos(tp), -np.sin(tp)])
     p = np.array([x, z], dtype=float)
-    s = 0.0
-    while p[1] > 0 and p[1] >= _z_surf(p[0], spec) - 1e-12:
-        p += ds * n
-        s += ds
-    return s
+    ds = 0.02 * spec.spacing_ang if ds is None else ds
+
+    def inside(s):
+        q = p + s * n
+        return bool(q[1] > 0.0 and q[1] >= _z_surf(q[0], spec))
+
+    lo, hi = 0.0, ds
+    for _ in range(10_000):
+        if not inside(hi):
+            break
+        lo, hi = hi, hi + ds
+    else:
+        raise AssertionError("independent escape bracket not found")
+    for _ in range(48):
+        mid = 0.5 * (lo + hi)
+        if inside(mid):
+            lo = mid
+        else:
+            hi = mid
+    return hi
 
 
-def _march_transition(position, direction, transition, ds=0.25):
+def _march_transition(position, direction, spec, transition, ds=2.5e-5):
     """Independent fine-step reference with bisection at a state transition."""
 
     def inside(s):
         q = position + s * direction
-        return bool(q[2] >= _z_surf(q[0], SPEC) and q[2] <= 1e6)
+        return bool(q[2] >= _z_surf(q[0], spec) and q[2] <= 1e6)
 
     lo = 1e-6
     before = inside(lo)
@@ -100,15 +121,27 @@ def test_material_predicate_includes_surface_and_excludes_groove_void():
 
 
 def test_surface_event_exit_then_later_entry_matches_reference_march():
-    p = np.array([0.25 * SPEC.spacing_ang, 0.0, 0.75 * SPEC.depth_ang])
+    p = np.array(
+        [
+            0.25 * MARCH_SPEC.spacing_ang,
+            0.0,
+            0.75 * MARCH_SPEC.depth_ang,
+        ]
+    )
     d = np.array([1.0, 0.0, -0.2])
     d /= np.linalg.norm(d)
-    s_exit = first_surface_event(p, d, SPEC, transition="exit")
+    s_exit = first_surface_event(p, d, MARCH_SPEC, transition="exit")
     p_vac = p + s_exit * d
-    s_entry = first_surface_event(p_vac, d, SPEC, transition="entry")
-    np.testing.assert_allclose(s_exit, _march_transition(p, d, "exit"), rtol=2e-4)
+    s_entry = first_surface_event(p_vac, d, MARCH_SPEC, transition="entry")
     np.testing.assert_allclose(
-        s_entry, _march_transition(p_vac, d, "entry"), rtol=2e-4
+        s_exit,
+        _march_transition(p, d, MARCH_SPEC, "exit"),
+        rtol=2e-4,
+    )
+    np.testing.assert_allclose(
+        s_entry,
+        _march_transition(p_vac, d, MARCH_SPEC, "entry"),
+        rtol=2e-4,
     )
 
 
@@ -116,8 +149,24 @@ def test_tangent_surface_event_is_skipped():
     p = np.array([0.0, 0.0, 0.0])
     d = np.array([np.sin(TP), 0.0, np.cos(TP)])
     working_normal = np.array([np.cos(TP), 0.0, -np.sin(TP)])
-    assert np.dot(working_normal, d) == 0.0
+    assert abs(np.dot(working_normal, d)) <= 8 * np.finfo(float).eps
     assert np.isinf(first_surface_event(p, d, SPEC, transition="exit"))
+
+
+def test_surface_event_accepts_one_ulp_above_valley_band_endpoint():
+    spec = blazed_groove_spec(
+        spacing_ang=2.0,
+        theta_obs_rad=np.pi / 2,
+        tilt_polar_rad=0.61,
+        tilt_azim_rad=np.pi,
+    )
+    valley_x = spec.depth_ang * np.tan(spec.tilt_polar_rad)
+    p = np.array([valley_x, 0.0, spec.depth_ang + 1.0])
+    d = np.array([0.0, 0.0, -1.0])
+
+    event = first_surface_event(p, d, spec, transition="exit")
+
+    assert event == pytest.approx(1.0, abs=8 * np.finfo(float).eps)
 
 
 def test_surface_event_preserves_tiny_nonzero_vertical_direction():
@@ -157,14 +206,24 @@ def test_depth_closes_unit_cell():
 
 def test_escape_matches_ray_march():
     rng = np.random.default_rng(7)
-    lam, h = SPEC.spacing_ang, SPEC.depth_ang
+    lam, h = MARCH_SPEC.spacing_ang, MARCH_SPEC.depth_ang
     x = rng.uniform(0.0, 3 * lam, 200)
     z = rng.uniform(0.0, 4 * h, 200)
-    inside = z >= _z_surf(x, SPEC) + 1e-6
+    inside = z >= _z_surf(x, MARCH_SPEC) + 1e-6
     x, z = x[inside], z[inside]
-    L = escape_distance_ang(x, z, SPEC)
-    ref = np.array([_march_escape(xi, zi, SPEC) for xi, zi in zip(x, z, strict=False)])
-    assert np.all(np.abs(L - ref) < 0.2)  # ray-march step tolerance
+    L = escape_distance_ang(x, z, MARCH_SPEC)
+    ref = np.array(
+        [
+            _march_escape(xi, zi, MARCH_SPEC)
+            for xi, zi in zip(x, z, strict=False)
+        ]
+    )
+    np.testing.assert_allclose(
+        L,
+        ref,
+        rtol=5e-11,
+        atol=5e-11 * MARCH_SPEC.spacing_ang,
+    )
 
 
 def test_escape_flat_limit_small_depth():
@@ -366,7 +425,26 @@ def test_permanent_surface_exit_counts_backscatter(monkeypatch):
     assert out["vacuum_start_ang"].shape == (0, 3)
 
 
-def test_reentry_keeps_exit_counters_neutral_and_supports_repeated_crossings(
+def test_surface_reentry_does_not_consume_material_step_budget(monkeypatch):
+    exit_calls = 0
+
+    def surface_event(_position, _direction, _spec, transition=None):
+        nonlocal exit_calls
+        if transition == "entry":
+            return 1.0
+        exit_calls += 1
+        return 0.5 if exit_calls == 1 else np.inf
+
+    monkeypatch.setattr(_transport_module, "first_surface_event", surface_event)
+
+    out = _one_electron_transport(max_steps=1)
+
+    assert out["vacuum_start_ang"].shape == (1, 3)
+    assert out["n_transmitted"] == 1
+    assert out["n_backscattered"] == out["n_side_exited"] == out["n_stopped"] == 0
+
+
+def test_surface_event_exhaustion_raises_instead_of_classifying_survivor_stopped(
     monkeypatch,
 ):
     monkeypatch.setattr(
@@ -377,13 +455,8 @@ def test_reentry_keeps_exit_counters_neutral_and_supports_repeated_crossings(
         ),
     )
 
-    out = _one_electron_transport(max_steps=3)
-
-    assert out["vacuum_start_ang"].shape == (3, 3)
-    np.testing.assert_array_equal(out["vacuum_elec_id"], np.zeros(3, dtype=np.int64))
-    assert out["n_backscattered"] == 0
-    assert out["n_transmitted"] == 0
-    assert out["n_side_exited"] == 0
+    with pytest.raises(RuntimeError, match="grooved surface event limit exhausted"):
+        _one_electron_transport(max_steps=1)
 
 
 def test_reentry_resumes_material_stopping_and_elastic_scattering(monkeypatch):
