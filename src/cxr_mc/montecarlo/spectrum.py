@@ -28,7 +28,7 @@ from ..materials.crystal import (
 )
 from ._backend import REAL, _to_cpu, xp
 from .geometry import _mosaic_quadrature, _orientation_R, first_prism_exit
-from .groove import escape_distance_ang
+from .groove import _THETA_TOL, escape_distance_ang
 from .transport import TRANSPORT_ELEMENTS, beta_from_keV
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
@@ -65,6 +65,17 @@ def _observation_direction(theta_obs_rad, n_hat):
         return np.array([np.sin(theta_obs_rad), 0.0, np.cos(theta_obs_rad)])
     n_hat = np.asarray(n_hat, dtype=float)
     return n_hat / np.linalg.norm(n_hat)
+
+
+def _validate_groove_escape_direction(n_hat, groove):
+    """Require the exact working-facet normal encoded by ``groove``."""
+    tp = groove.tilt_polar_rad
+    expected = np.array([np.cos(tp), 0.0, -np.sin(tp)])
+    if not np.allclose(n_hat, expected, rtol=0.0, atol=_THETA_TOL):
+        raise ValueError(
+            "groove escape requires n_hat = (cos(tilt_polar), 0, "
+            "-sin(tilt_polar)) along the working-facet normal"
+        )
 
 
 def _escape_length(z_mid, thickness, n_z):
@@ -237,6 +248,14 @@ def mc_spectrum(
     for that exit only). None (default) is a strict no-op: today's flat-face
     result bit-for-bit.
 
+    The first working-facet crossing is also the complete material path:
+    ``n_hat`` is parallel to every relief facet and points outward through the
+    working facets, so an escaped coherent photon cannot intersect a later
+    material interval. This differs from a scattered electron, whose arbitrary
+    direction can leave one facet and re-enter through another. Source: exact
+    periodic ray-plane intersections; see
+    ``docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md``.
+
     Validation: blazed-groove-geometry
     """
     if B_ang2 is None:
@@ -263,11 +282,7 @@ def mc_spectrum(
     if groove is not None:
         if layers is not None:
             raise ValueError("groove escape is v1 single-slab only (no layers)")
-        if n_hat[2] >= 0.0:
-            raise ValueError(
-                "groove escape requires exit through the entrance face "
-                "(n_hat z-component < 0); check theta_obs/tilt geometry"
-            )
+        _validate_groove_escape_direction(n_hat, groove)
     E_grid = xp.asarray(E_grid_eV, dtype=REAL)
     spec = xp.zeros(E_grid.size, dtype=REAL)
     spec_pxr = xp.zeros(E_grid.size, dtype=REAL)
@@ -621,6 +636,7 @@ def mc_brem_spectrum(
     chunk=20000,
     composition=None,
     layers=None,
+    groove=None,
 ):
     """
     Incoherent bremsstrahlung background d2N/dE dOmega
@@ -647,13 +663,35 @@ def mc_brem_spectrum(
     observation direction. With both dimensions omitted, the original z-only
     slab escape branches are retained unchanged.
 
-    Validation: finite-transverse-crystal
+    groove: optional GrooveSpec replacing the flat/prism escape length with the
+    exact periodic working-facet distance from ``escape_distance_ang``. In the
+    supported blazed geometry, ``n_hat = (cos(tp), 0, -sin(tp))`` crosses
+    working facets outward and is parallel to relief facets, so the first
+    crossing is the complete material path and cannot be followed by re-entry.
+    This changes only the existing Beer--Lambert factor; emission cross sections
+    and kinematics remain unchanged. Transport supplies material segments only,
+    so vacuum legs do not radiate.
+
+    Assumptions: straight photon rays, y-invariant and laterally periodic
+    grooves, single-slab absorption, and the exact working-facet-normal
+    observation direction. Layers and other directions raise rather than
+    silently using flat attenuation. Source: exact periodic ray-plane
+    intersections; see
+    ``docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md``.
+    Limiting case: ``groove=None`` retains the original flat/prism path
+    bit-for-bit; vanishing groove depth tends to the flat entrance-face path.
+
+    Validation: finite-transverse-crystal, blazed-groove-geometry
     """
     comp = _normalize_composition(element, n_atoms_per_ang3, composition)
     thickness = segments["thickness_ang"]
     Ne = segments["Ne"]
 
     n_hat = _observation_direction(theta_obs_rad, n_hat)
+    if groove is not None:
+        if layers is not None:
+            raise ValueError("groove escape is v1 single-slab only (no layers)")
+        _validate_groove_escape_direction(n_hat, groove)
 
     E_grid = xp.asarray(E_grid_eV, dtype=REAL)
     mu = _mu_total_inv_ang(comp, E_grid)  # (NE,) [1/Ang], single-slab fallback
@@ -679,7 +717,12 @@ def mc_brem_spectrum(
         segments.get("crystal_width_ang") is not None
         and segments.get("crystal_height_ang") is not None
     )
-    if finite_footprint:
+    if groove is not None:
+        L_esc = xp.asarray(
+            escape_distance_ang(seg_r[:, 0], z_mid, groove),
+            dtype=REAL,
+        )
+    elif finite_footprint:
         L_esc = _segment_escape_distance(segments, n_hat, xp=xp)
     else:
         L_esc = _escape_length(z_mid, thickness, n_hat[2])

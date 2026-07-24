@@ -131,13 +131,114 @@ def test_brem_for_case_forwards_finite_footprint(monkeypatch):
         return {"transport": True}
 
     monkeypatch.setattr(runner, "simulate_trajectories", _transport)
-    monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *args: np.array([0.0]))
+    monkeypatch.setattr(
+        runner, "_brem_wide_from_segments", lambda *args, **kwargs: np.array([0.0])
+    )
 
     runner._brem_for_case(case, np.array([100.0]))
 
     assert len(captured) == 1
     assert captured[0]["crystal_width_mm"] == pytest.approx(0.1)
     assert captured[0]["crystal_height_mm"] == pytest.approx(0.2)
+
+
+def _runner_segments():
+    return {
+        "r_mid": np.array([[0.0, 0.0, 10.0]]),
+        "v_hat": np.array([[0.0, 0.0, 1.0]]),
+        "L_ang": np.array([1.0]),
+        "E_keV": np.array([30.0]),
+        "t_ang": np.array([0.0]),
+        "elec_id": np.array([0]),
+        "layer": np.array([0]),
+        "Ne": 1,
+        "n_layers": 1,
+        "n_backscattered": 0,
+        "n_missed": 0,
+        "thickness_ang": 100.0,
+    }
+
+
+def test_spectrum_case_forwards_groove_to_brem(monkeypatch):
+    groove = object()
+    segments = _runner_segments()
+    grid = np.array([1000.0, 2000.0])
+    seen = []
+
+    monkeypatch.setattr(
+        runner,
+        "_lines_for_segments",
+        lambda *_args, **_kwargs: np.zeros_like(grid),
+    )
+
+    def _brem(*_args, **kwargs):
+        seen.append(kwargs)
+        return np.zeros_like(grid)
+
+    monkeypatch.setattr(runner, "mc_brem_spectrum", _brem)
+    case = _fake_case("grooved", 30.0)
+    tp = dict(
+        E_grid=grid,
+        E_brem=grid,
+        n_hat=np.array([0.0, 0.0, -1.0]),
+        segs=segments,
+        segs_b=segments,
+        groove=groove,
+    )
+
+    runner._spectrum_case(case, tp)
+
+    assert len(seen) == 1
+    assert seen[0]["groove"] is groove
+
+
+def test_brem_for_case_forwards_identical_groove_to_brem_rebuild(monkeypatch):
+    case = _fake_case("grooved", 30.0, tilt_deg=45.0)
+    case.update(tilt_azim_deg=180.0, groove_spacing_ang=20_000.0)
+    segments = _runner_segments()
+    transported = []
+    radiated = []
+
+    def _transport(*_args, **kwargs):
+        transported.append(kwargs)
+        return segments
+
+    def _brem(*_args, **kwargs):
+        radiated.append(kwargs)
+        return np.zeros(2)
+
+    monkeypatch.setattr(runner, "simulate_trajectories", _transport)
+    monkeypatch.setattr(runner, "mc_brem_spectrum", _brem)
+
+    runner._brem_for_case(case, np.array([1000.0, 2000.0]))
+
+    assert len(transported) == len(radiated) == 1
+    assert radiated[0]["groove"] is transported[0]["groove"]
+
+
+def test_brem_wide_from_segments_forwards_groove_to_brem(monkeypatch):
+    groove = object()
+    segments = _runner_segments()
+    grid = np.array([1000.0, 2000.0])
+    seen = []
+
+    def _brem(*_args, **kwargs):
+        seen.append(kwargs)
+        return np.zeros_like(grid)
+
+    monkeypatch.setattr(runner, "mc_brem_spectrum", _brem)
+
+    runner._brem_wide_from_segments(
+        segments,
+        grid,
+        _fake_case("grooved", 30.0),
+        np.array([0.0, 0.0, -1.0]),
+        None,
+        groove=groove,
+    )
+
+    assert len(seen) == 1
+    assert seen[0]["groove"] is groove
 
 
 # ---------------------------------------------------------------------------

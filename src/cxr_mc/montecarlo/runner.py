@@ -353,7 +353,7 @@ def _transport_case(case):
     return tp
 
 
-def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers):
+def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers, groove=None):
     """Bremsstrahlung background on ``E_brem`` from already-transported brem
     segments ``segs_b``. EVERY layer radiates with its OWN composition (each
     Z^2 cross section) and self-absorbs through the WHOLE stack
@@ -372,6 +372,7 @@ def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers):
             n_hat=n_hat,
             chunk=brem_chunk,
             layers=abs_layers,
+            groove=groove,
         )
     brem_wide = np.zeros(E_brem.shape, dtype=float)
     for L in range(n_lay):
@@ -385,6 +386,7 @@ def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers):
             n_hat=n_hat,
             chunk=brem_chunk,
             layers=abs_layers,
+            groove=groove,
         )
     return brem_wide
 
@@ -404,9 +406,8 @@ def _brem_for_case(case, E_brem):
     tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
     tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
     beam, n_hat = tilted_geometry(case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad)
-    # electron entry (not escape) honors the groove, matching the live-sweep
-    # transport in _transport_case; the brem escape model stays flat-face in
-    # v1 (see _brem_wide_from_segments), so no groove flows past this point.
+    # Build once, then forward the identical groove through electron entry and
+    # bremsstrahlung photon escape, matching the live-sweep path.
     groove = None
     if case.get("groove_spacing_ang") is not None:
         groove = blazed_groove_spec(
@@ -428,7 +429,14 @@ def _brem_for_case(case, E_brem):
         tilt_azim_rad=tilt_azim_rad,
         groove=groove,
     )
-    return _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers)
+    return _brem_wide_from_segments(
+        segs_b,
+        E_brem,
+        case,
+        n_hat,
+        abs_layers,
+        groove=groove,
+    )
 
 
 def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove):
@@ -553,10 +561,14 @@ def _spectrum_case(case, tp):
     # over layers (a single layer is exactly the old single-material brem).
     # Factored into _brem_wide_from_segments so run.repair_brem_wide reuses this
     # SAME path (via _brem_for_case) and can't drift back to single-slab brem.
-    # grooves: brem escape stays flat-face in v1 (line yield is the target;
-    # brem bias < groove depth / L_abs) -- _brem_wide_from_segments does not
-    # take a groove.
-    brem_wide = _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers)
+    brem_wide = _brem_wide_from_segments(
+        segs_b,
+        E_brem,
+        case,
+        n_hat,
+        abs_layers,
+        groove=tp.get("groove"),
+    )
     brem = np.interp(E_grid, E_brem, brem_wide)  # brem under the lines (line grid)
     # Return this case's GPU scratch on the A2 cadence so the CuPy memory pool
     # can't accumulate (and fragment) across a long sweep until it fills the card.

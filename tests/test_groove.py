@@ -3,6 +3,7 @@ import importlib
 import numpy as np
 import pytest
 
+from cxr_mc.materials.attenuation import _mu_total_inv_ang
 from cxr_mc.montecarlo.geometry import X_MAX, Z_MAX
 from cxr_mc.montecarlo.groove import (
     blazed_groove_spec,
@@ -12,7 +13,12 @@ from cxr_mc.montecarlo.groove import (
     in_material,
     surface_depth_ang,
 )
-from cxr_mc.montecarlo.transport import beta_from_keV, simulate_trajectories
+from cxr_mc.montecarlo.spectrum import _brem_dsigma_dk, mc_brem_spectrum
+from cxr_mc.montecarlo.transport import (
+    TRANSPORT_ELEMENTS,
+    beta_from_keV,
+    simulate_trajectories,
+)
 
 TP = np.deg2rad(45.0)
 SPEC = blazed_groove_spec(
@@ -558,3 +564,91 @@ def test_escape_gain_matches_analytic_mean():
     h, sg = SPEC.depth_ang, np.sin(TP)
     analytic = (sg * L_abs / h) * np.expm1(h / (sg * L_abs))
     assert t_grooved / t_flat == pytest.approx(analytic, rel=1e-2)
+
+
+def _brem_segments():
+    return {
+        "r_mid": np.array(
+            [
+                [1.0e3, 0.0, 1.5e4],
+                [6.0e3, 0.0, 2.0e4],
+                [1.1e4, 0.0, 2.5e4],
+            ]
+        ),
+        "L_ang": np.array([800.0, 1200.0, 600.0]),
+        "E_keV": np.array([30.0, 24.0, 18.0]),
+        "Ne": 3,
+        "thickness_ang": 1.0e5,
+    }
+
+
+def _independent_brem_with_escape(segments, grid, escape_ang, *, composition):
+    """Direct segment sum with caller-supplied Beer--Lambert path lengths."""
+    mu = _mu_total_inv_ang(composition, grid)
+    transmission = np.exp(-np.asarray(escape_ang)[:, None] * mu[None, :])
+    spectrum = np.zeros(grid.size)
+    path_cm = segments["L_ang"] * 1e-8
+    for element, number_density in composition:
+        dsigma = np.asarray(
+            _brem_dsigma_dk(
+                TRANSPORT_ELEMENTS[element]["Z"],
+                segments["E_keV"],
+                grid,
+            )
+        )
+        spectrum += (number_density * 1e24 * path_cm) @ (dsigma * transmission)
+    return spectrum / (4.0 * np.pi) / segments["Ne"]
+
+
+def test_brem_groove_gain_matches_beer_lambert_escape():
+    segments = _brem_segments()
+    grid = np.linspace(700.0, 5000.0, 32)
+    composition = [("C", 0.1136)]
+    n_hat = np.array([np.cos(TP), 0.0, -np.sin(TP)])
+
+    flat = mc_brem_spectrum(segments, grid, composition=composition, n_hat=n_hat)
+    grooved = mc_brem_spectrum(
+        segments,
+        grid,
+        composition=composition,
+        n_hat=n_hat,
+        groove=SPEC,
+    )
+    expected = _independent_brem_with_escape(
+        segments,
+        grid,
+        escape_distance_ang(
+            segments["r_mid"][:, 0],
+            segments["r_mid"][:, 2],
+            SPEC,
+        ),
+        composition=composition,
+    )
+
+    np.testing.assert_allclose(grooved, expected, rtol=2e-12)
+    assert np.all(grooved >= flat)
+
+
+def test_brem_groove_rejects_layers_and_wrong_direction():
+    segments = _brem_segments()
+    grid = np.linspace(700.0, 5000.0, 8)
+    composition = [("C", 0.1136)]
+    n_hat = np.array([np.cos(TP), 0.0, -np.sin(TP)])
+
+    with pytest.raises(ValueError):
+        mc_brem_spectrum(
+            segments,
+            grid,
+            composition=composition,
+            n_hat=n_hat,
+            groove=SPEC,
+            layers=[(0.0, 1.0e5, composition)],
+        )
+    with pytest.raises(ValueError):
+        mc_brem_spectrum(
+            segments,
+            grid,
+            composition=composition,
+            n_hat=[0.0, 0.0, -1.0],
+            groove=SPEC,
+        )

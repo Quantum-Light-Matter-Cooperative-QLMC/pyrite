@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from cxr_mc.montecarlo.groove import blazed_groove_spec
 from cxr_mc.montecarlo.spectrum import (
     _escape_length,
     _observation_direction,
@@ -10,6 +11,10 @@ from cxr_mc.montecarlo.spectrum import (
     mc_brem_spectrum,
     mc_spectrum,
 )
+
+_TP = np.deg2rad(45.0)
+_GROOVE = blazed_groove_spec(20_000.0, np.pi / 2, _TP, np.pi)
+_GROOVE_N_HAT = np.array([np.cos(_TP), 0.0, -np.sin(_TP)])
 
 
 def test_observation_direction_defaults_to_the_polar_observer_direction():
@@ -139,4 +144,33 @@ def test_all_none_footprint_retains_z_only_spectrum_results():
     np.testing.assert_array_equal(
         mc_brem_spectrum(omitted, np.arange(700.0, 5000.0, 50.0), **brem_kw),
         mc_brem_spectrum(explicit_none, np.arange(700.0, 5000.0, 50.0), **brem_kw),
+    )
+
+
+def test_brem_groove_none_retains_flat_result_bit_for_bit():
+    segments = _finite_segment(10.0)
+    grid = np.arange(700.0, 5000.0, 50.0)
+    kwargs = dict(composition=[("C", 0.176)], n_hat=_GROOVE_N_HAT)
+
+    np.testing.assert_array_equal(
+        mc_brem_spectrum(segments, grid, **kwargs),
+        mc_brem_spectrum(segments, grid, groove=None, **kwargs),
+    )
+
+
+def test_brem_groove_escape_stays_periodic_with_finite_footprint():
+    finite = _finite_segment(10.0)
+    periodic = dict(finite)
+    periodic.pop("crystal_width_ang")
+    periodic.pop("crystal_height_ang")
+    grid = np.arange(700.0, 5000.0, 50.0)
+    kwargs = dict(
+        composition=[("C", 0.176)],
+        n_hat=_GROOVE_N_HAT,
+        groove=_GROOVE,
+    )
+
+    np.testing.assert_array_equal(
+        mc_brem_spectrum(finite, grid, **kwargs),
+        mc_brem_spectrum(periodic, grid, **kwargs),
     )
