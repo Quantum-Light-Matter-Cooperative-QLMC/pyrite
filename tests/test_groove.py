@@ -380,6 +380,33 @@ def test_reentry_keeps_exit_counters_neutral_and_supports_repeated_crossings(
     assert out["n_side_exited"] == 0
 
 
+def test_reentry_resumes_material_stopping_and_elastic_scattering(monkeypatch):
+    exit_calls = 0
+
+    def surface_event(_position, _direction, _spec, transition=None):
+        nonlocal exit_calls
+        if transition == "entry":
+            return 1.0
+        exit_calls += 1
+        return 0.5 if exit_calls == 1 else np.inf
+
+    monkeypatch.setattr(_transport_module, "first_surface_event", surface_event)
+
+    out = _one_electron_transport(
+        thickness_ang=1e6,
+        n_atoms_per_ang3=0.1136,
+        max_steps=3,
+    )
+
+    assert out["vacuum_start_ang"].shape == (1, 3)
+    vacuum_direction = out["vacuum_end_ang"][0] - out["vacuum_start_ang"][0]
+    vacuum_direction /= np.linalg.norm(vacuum_direction)
+    assert out["E_keV"][1] == pytest.approx(out["vacuum_E_keV"][0])
+    np.testing.assert_allclose(out["v_hat"][1], vacuum_direction)
+    assert out["E_keV"][2] < out["E_keV"][1]
+    assert not np.allclose(out["v_hat"][2], out["v_hat"][1])
+
+
 def test_repeated_zero_length_surface_events_raise(monkeypatch):
     monkeypatch.setattr(
         _transport_module,

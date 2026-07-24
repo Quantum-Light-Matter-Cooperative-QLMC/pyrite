@@ -493,36 +493,64 @@ def simulate_trajectories(
             # exits (vacuum -> no re-entry); an INTERNAL boundary instead hands
             # the electron to the neighbor layer with NO collision (it continues
             # straight and re-samples its free path in that layer next iteration).
-            if finite_footprint:
-                exit_distance, exit_face = first_prism_exit(
-                    p,
-                    d,
-                    z_min_ang=z_top_L,
-                    z_max_ang=z_bot_L,
-                    width_ang=width_ang,
-                    height_ang=height_ang,
-                )
-                crossed_face = step > exit_distance
-                step = np.where(crossed_face, exit_distance, step)
-                cross_up = crossed_face & (exit_face == Z_MIN)
-                cross_dn = crossed_face & (exit_face == Z_MAX)
-                exit_side = crossed_face & np.isin(exit_face, (X_MIN, X_MAX, Y_MIN, Y_MAX))
-                exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
-                exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
+            if groove is None:
+                if finite_footprint:
+                    exit_distance, exit_face = first_prism_exit(
+                        p,
+                        d,
+                        z_min_ang=z_top_L,
+                        z_max_ang=z_bot_L,
+                        width_ang=width_ang,
+                        height_ang=height_ang,
+                    )
+                    crossed_face = step > exit_distance
+                    step = np.where(crossed_face, exit_distance, step)
+                    cross_up = crossed_face & (exit_face == Z_MIN)
+                    cross_dn = crossed_face & (exit_face == Z_MAX)
+                    exit_side = crossed_face & np.isin(exit_face, (X_MIN, X_MAX, Y_MIN, Y_MAX))
+                    exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
+                    exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
+                else:
+                    dz = d[:, 2]
+                    pz = p[:, 2]
+                    cross_up = (dz < 0) & (pz + step * dz < z_top_L)
+                    cross_dn = (dz > 0) & (pz + step * dz > z_bot_L)
+                    s_up = np.where(dz < 0, (pz - z_top_L) / (-dz + 1e-300), np.inf)
+                    s_dn = np.where(dz > 0, (z_bot_L - pz) / (dz + 1e-300), np.inf)
+                    step = np.where(cross_up, s_up, step)
+                    step = np.where(cross_dn, s_dn, step)
+                    exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
+                    exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
+                    exit_side = np.zeros(grp.size, dtype=bool)
             else:
-                dz = d[:, 2]
-                pz = p[:, 2]
-                cross_up = (dz < 0) & (pz + step * dz < z_top_L)
-                cross_dn = (dz > 0) & (pz + step * dz > z_bot_L)
-                s_up = np.where(dz < 0, (pz - z_top_L) / (-dz + 1e-300), np.inf)
-                s_dn = np.where(dz > 0, (z_bot_L - pz) / (dz + 1e-300), np.inf)
-                step = np.where(cross_up, s_up, step)
-                step = np.where(cross_dn, s_dn, step)
-                exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
-                exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
-                exit_side = np.zeros(grp.size, dtype=bool)
-
-            if groove is not None:
+                if finite_footprint:
+                    exit_distance, exit_face = first_prism_exit(
+                        p,
+                        d,
+                        z_min_ang=z_top_L,
+                        z_max_ang=z_bot_L,
+                        width_ang=width_ang,
+                        height_ang=height_ang,
+                    )
+                    crossed_face = step > exit_distance
+                    step = np.where(crossed_face, exit_distance, step)
+                    cross_up = crossed_face & (exit_face == Z_MIN)
+                    cross_dn = crossed_face & (exit_face == Z_MAX)
+                    exit_side = crossed_face & np.isin(exit_face, (X_MIN, X_MAX, Y_MIN, Y_MAX))
+                    exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
+                    exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
+                else:
+                    dz = d[:, 2]
+                    pz = p[:, 2]
+                    cross_up = (dz < 0) & (pz + step * dz < z_top_L)
+                    cross_dn = (dz > 0) & (pz + step * dz > z_bot_L)
+                    s_up = np.where(dz < 0, (pz - z_top_L) / (-dz + 1e-300), np.inf)
+                    s_dn = np.where(dz > 0, (z_bot_L - pz) / (dz + 1e-300), np.inf)
+                    step = np.where(cross_up, s_up, step)
+                    step = np.where(cross_dn, s_dn, step)
+                    exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
+                    exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
+                    exit_side = np.zeros(grp.size, dtype=bool)
                 s_surface = np.array(
                     [
                         first_surface_event(pi, di, groove, transition="exit")
@@ -555,10 +583,10 @@ def simulate_trajectories(
             pos[grp] = p + step[:, None] * d
             E[grp] = Ea + _dEds_compound(comp, Ea) * step
             clock[grp] += step / beta_from_keV(Ea)
-            below_cut = E[grp] < E_cut_keV
 
             if groove is not None:
                 assert zero_surface_events is not None
+                below_cut = E[grp] < E_cut_keV
                 active_surface = surface_first & ~below_cut
                 zero_surface_events[grp[~active_surface]] = 0
             if groove is not None and active_surface.any():
@@ -616,7 +644,10 @@ def simulate_trajectories(
                     raise RuntimeError("repeated zero-length grooved surface events")
 
             # -- 5. kill exited / exhausted; pass internal crossers on ----------
-            died = exit_top | exit_bot | exit_side | below_cut
+            if groove is None:
+                died = exit_top | exit_bot | exit_side | (E[grp] < E_cut_keV)
+            else:
+                died = exit_top | exit_bot | exit_side | below_cut
             n_back += int(exit_top.sum())  # exited the entrance face
             n_trans += int(exit_bot.sum())  # punched through the back face
             n_side += int(exit_side.sum())  # exited a transverse prism face
