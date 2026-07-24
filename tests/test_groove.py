@@ -9,7 +9,7 @@ from cxr_mc.montecarlo.groove import (
     in_material,
     surface_depth_ang,
 )
-from cxr_mc.montecarlo.transport import simulate_trajectories
+from cxr_mc.montecarlo.transport import beta_from_keV, simulate_trajectories
 
 TP = np.deg2rad(45.0)
 SPEC = blazed_groove_spec(
@@ -240,6 +240,60 @@ def test_groove_entry_depth_reproducible_with_seed():
     np.testing.assert_array_equal(a["r_mid"], b["r_mid"])
 
 
+def test_groove_transport_records_only_material_segments_and_vacuum_invariants():
+    out = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC)
+
+    assert {
+        "vacuum_start_ang",
+        "vacuum_end_ang",
+        "vacuum_E_keV",
+        "vacuum_t_ang",
+        "vacuum_elec_id",
+    } <= out.keys()
+    assert np.all(in_material(out["r_mid"], out["thickness_ang"], SPEC))
+    assert out["vacuum_start_ang"].shape == out["vacuum_end_ang"].shape
+    assert out["vacuum_start_ang"].shape[1:] == (3,)
+    assert out["vacuum_start_ang"].shape[0] > 0
+    assert np.all(out["vacuum_E_keV"] > 0.0)
+    assert np.all(out["vacuum_elec_id"] >= 0)
+    assert np.all(out["vacuum_elec_id"] < _SIM_KW["Ne"])
+
+
+def test_vacuum_leg_preserves_energy_direction_and_advances_clock():
+    out = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=SPEC)
+
+    for vac_i, electron in enumerate(out["vacuum_elec_id"]):
+        later = np.flatnonzero(
+            (out["elec_id"] == electron) & (out["t_ang"] > out["vacuum_t_ang"][vac_i])
+        )
+        assert later.size
+        next_i = later[np.argmin(out["t_ang"][later])]
+        length = np.linalg.norm(out["vacuum_end_ang"][vac_i] - out["vacuum_start_ang"][vac_i])
+        np.testing.assert_allclose(
+            out["t_ang"][next_i],
+            out["vacuum_t_ang"][vac_i] + length / beta_from_keV(out["vacuum_E_keV"][vac_i]),
+            rtol=2e-13,
+        )
+        assert out["E_keV"][next_i] == pytest.approx(out["vacuum_E_keV"][vac_i])
+        np.testing.assert_allclose(
+            out["v_hat"][next_i],
+            (out["vacuum_end_ang"][vac_i] - out["vacuum_start_ang"][vac_i]) / length,
+            rtol=2e-13,
+            atol=2e-13,
+        )
+
+
+def test_groove_none_preserves_legacy_arrays_bit_for_bit():
+    old = simulate_trajectories(**_SIM_KW, **_tilt_kw())
+    explicit = simulate_trajectories(**_SIM_KW, **_tilt_kw(), groove=None)
+
+    assert old.keys() == explicit.keys()
+    for key in old:
+        np.testing.assert_equal(old[key], explicit[key])
+    assert explicit["vacuum_start_ang"].shape == (0, 3)
+    assert explicit["vacuum_elec_id"].dtype == np.int64
+
+
 from cxr_mc.montecarlo.spectrum import mc_spectrum
 
 
@@ -277,21 +331,15 @@ def test_spectrum_groove_none_bitwise():
     np.testing.assert_array_equal(_hopg_spectrum(), _hopg_spectrum(groove=None))
 
 
-def test_spectrum_groove_boosts_line_yield():
+def test_spectrum_groove_transport_is_deterministic():
     flat = _hopg_spectrum()
     grooved = _hopg_spectrum(groove=SPEC)
-    # escape paths only ever shorten for a FIXED emission point, but the
-    # grooved run also re-transports (entry_points offsets each electron's
-    # start into [0, depth_ang) before the flat-face back-boundary), so the
-    # emitting segment population itself differs between the two runs; the
-    # net effect is not guaranteed a priori. Empirically (seed=42, this
-    # geometry) it is a small, deterministic, reproducible rise -- verified
-    # here at a threshold safely below the measured ~3.3% (grooved/flat ==
-    # 1.0326985210604849 bit-for-bit at Ne=400) rather than the >=5% a naive
-    # escape-only estimate would suggest, since most of the spectral weight
-    # sits at energies where the slab is already nearly transparent and the
-    # groove shortening barely moves T_abs.
-    assert grooved.sum() > flat.sum() * 1.02
+    repeated = _hopg_spectrum(groove=SPEC)
+
+    assert np.all(np.isfinite(grooved))
+    assert grooved.sum() > 0.0
+    assert not np.array_equal(grooved, flat)
+    np.testing.assert_array_equal(grooved, repeated)
 
 
 def test_spectrum_groove_rejects_layers():

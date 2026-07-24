@@ -28,7 +28,7 @@ from .geometry import (
     project_beam_entry,
     validate_transverse_dimensions,
 )
-from .groove import entry_points
+from .groove import entry_points, first_surface_event
 
 logger = logging.getLogger(__name__)
 
@@ -298,32 +298,37 @@ def simulate_trajectories(
     bit-for-bit. They have no effect when ``beam_fwhm_mm`` is None.
 
     groove: optional :class:`~cxr_mc.montecarlo.groove.GrooveSpec` describing a
-    blazed sawtooth relief-groove profile machined into the beam-entrance
-    face (see the ``groove`` module docstring for the facet geometry and
-    ``entry_points`` for the derivation). When given, each electron's flat-
-    face intersection x0 (either the point-source origin x=0, or the sampled
-    beam_fwhm_mm spot) is slid along the beam direction to the first relief-
-    facet crossing via ``entry_points(x0, groove)``, offsetting both the
-    lateral (x) and depth (z) starting coordinates -- the ray never touches
-    the z=0 plane except at the measure-zero groove apexes. When
-    beam_fwhm_mm is None, a point source samples only one groove phase per
-    run, so the lateral phase is instead drawn uniformly over one period
-    ``[0, spacing_ang)`` from an RNG stream independent of the main transport
-    draws (same SeedSequence-spawn pattern as the beam_fwhm_mm offset
-    stream, at a different spawn index so the two never collide -- see the
-    spawn index note below). v1 approximation: only this START point honors
-    the groove profile; in-flight boundary tests (layer crossings, prism
-    exits) keep treating the entrance/exit faces as flat, so backscattered
-    electrons that would physically re-cross a relief or working facet near
-    the surface are bookkept against the flat z=0/z=thickness planes instead
-    -- the resulting error is O(groove depth h / electron range), negligible
-    for grooves shallow compared to the transport length scale. None
-    (default) is a strict no-op -- BIT-FOR-BIT identical to the ungrooved
-    slab. Validation: blazed-groove-geometry
+    blazed sawtooth material/vacuum boundary on the beam-entrance face. Initial
+    rays enter through relief facets via ``entry_points``.
+
+    Every later free flight is intersected with both periodic facet families
+
+        n . r = k*spacing*cos(tp),  b . r = k*spacing*sin(tp),
+
+    accepting only crossings in the physical depth band ``0 <= z <= h`` where
+    ``h = spacing*sin(tp)*cos(tp)``. A material-to-vacuum event truncates the
+    radiating segment at the facet. If the unchanged ray intersects a later
+    facet from the vacuum side, it advances to that re-entry point with no
+    scattering, stopping, or radiation, then resumes material transport.
+    Vacuum flight advances the electron clock by ``L_vacuum / beta``. Resampling
+    the elastic free path after re-entry is exact because the exponential
+    collision-distance distribution is memoryless.
+
+    Groove gaps are returned as separate ``vacuum_*`` diagnostic arrays; they
+    never enter the material segment sum. A ray with no later re-entry is a
+    permanent entrance-face exit. When beam_fwhm_mm is None, lateral phase is
+    sampled uniformly over one groove period using an RNG stream independent of
+    the main transport draws. None is a strict no-op -- BIT-FOR-BIT identical to
+    the ungrooved slab. Source: exact periodic ray-plane intersections; see
+    ``docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md``.
+    Validation: blazed-groove-geometry
 
     Returns dict of per-segment arrays:
       "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
       "t_ang" (M,), "elec_id" (M,), "layer" (M,) [emitting layer index]
+    non-radiating groove-gap flights:
+      "vacuum_start_ang" (V,3), "vacuum_end_ang" (V,3),
+      "vacuum_E_keV" (V,), "vacuum_t_ang" (V,), "vacuum_elec_id" (V,)
     and diagnostics: "n_backscattered", "n_transmitted", "n_side_exited",
     "n_missed", "n_stopped", "n_layers".
 
@@ -440,6 +445,10 @@ def simulate_trajectories(
         [],
         [],
     )
+    vac_start, vac_end, vac_E, vac_t0, vac_id = [], [], [], [], []
+    zero_surface_events = (
+        np.zeros(Ne, dtype=np.int16) if groove is not None else None
+    )
 
     # Event-driven loop: every iteration is one FREE FLIGHT + one ELASTIC
     # COLLISION for every still-alive electron, executed in lockstep (pure
@@ -514,6 +523,21 @@ def simulate_trajectories(
                 exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
                 exit_side = np.zeros(grp.size, dtype=bool)
 
+            if groove is not None:
+                s_surface = np.array(
+                    [
+                        first_surface_event(pi, di, groove, transition="exit")
+                        for pi, di in zip(p, d, strict=False)
+                    ]
+                )
+                surface_first = s_surface < step
+                step = np.where(surface_first, s_surface, step)
+                cross_up = cross_up & ~surface_first
+                cross_dn = cross_dn & ~surface_first
+                exit_top = exit_top & ~surface_first
+                exit_bot = exit_bot & ~surface_first
+                exit_side = exit_side & ~surface_first
+
             # -- 3. record the segment (the radiation source list) --------------
             # midpoint -> escape-absorption path; direction -> v.g, v.n in the
             # amplitudes; length -> interaction time t_L; START energy -> beta.
@@ -533,6 +557,63 @@ def simulate_trajectories(
             E[grp] = Ea + _dEds_compound(comp, Ea) * step
             clock[grp] += step / beta_from_keV(Ea)
 
+            if groove is not None:
+                assert zero_surface_events is not None
+                zero_surface_events[grp[~surface_first]] = 0
+            if groove is not None and surface_first.any():
+                surf_local = np.flatnonzero(surface_first)
+                surf_global = grp[surf_local]
+                surface_points = pos[surf_global].copy()
+                entry_distance = np.array(
+                    [
+                        first_surface_event(pi, di, groove, transition="entry")
+                        for pi, di in zip(surface_points, dirs[surf_global], strict=False)
+                    ]
+                )
+                if finite_footprint:
+                    side_distance, side_face = first_prism_exit(
+                        surface_points,
+                        dirs[surf_global],
+                        z_min_ang=0.0,
+                        z_max_ang=z_total,
+                        width_ang=width_ang,
+                        height_ang=height_ang,
+                    )
+                    side_before_entry = np.isin(side_face, (X_MIN, X_MAX, Y_MIN, Y_MAX)) & (
+                        side_distance < entry_distance
+                    )
+                    exit_side[surf_local[side_before_entry]] = True
+                    entry_distance = np.where(side_before_entry, np.inf, entry_distance)
+
+                reentered = np.isfinite(entry_distance)
+                if reentered.any():
+                    re_local = surf_local[reentered]
+                    re_global = grp[re_local]
+                    distance = entry_distance[reentered]
+                    start = surface_points[reentered]
+                    direction = dirs[re_global]
+                    end = start + distance[:, None] * direction
+                    vac_start.append(start)
+                    vac_end.append(end)
+                    vac_E.append(E[re_global].copy())
+                    vac_t0.append(clock[re_global].copy())
+                    vac_id.append(re_global.copy())
+                    clock[re_global] += distance / beta_from_keV(E[re_global])
+                    surface_eps = max(
+                        64 * np.finfo(float).eps * groove.spacing_ang,
+                        2e-12 * groove.spacing_ang,
+                    )
+                    pos[re_global] = end + surface_eps * direction
+
+                permanent = ~reentered & ~exit_side[surf_local]
+                exit_top[surf_local[permanent]] = True
+                short = step[surf_local] <= EPS
+                zero_surface_events[surf_global] = np.where(
+                    short, zero_surface_events[surf_global] + 1, 0
+                )
+                if np.any(zero_surface_events[surf_global] >= 2):
+                    raise RuntimeError("repeated zero-length grooved surface events")
+
             # -- 5. kill exited / exhausted; pass internal crossers on ----------
             died = exit_top | exit_bot | exit_side | (E[grp] < E_cut_keV)
             n_back += int(exit_top.sum())  # exited the entrance face
@@ -548,7 +629,10 @@ def simulate_trajectories(
             # (truncated flights did not collide). The scattering ELEMENT is
             # chosen with probability n_i sigma_i / sum; the polar angle from that
             # element's screened-Rutherford inversion; azimuth uniform; E unchanged.
-            full = ~(cross_up | cross_dn | exit_side) & ~died
+            if groove is None:
+                full = ~(cross_up | cross_dn | exit_side) & ~died
+            else:
+                full = ~(cross_up | cross_dn | exit_side | surface_first) & ~died
             srv = grp[full]
             if srv.size:
                 cos_t = np.empty(srv.size)
@@ -585,6 +669,14 @@ def simulate_trajectories(
         elec_id = np.concatenate(seg_id)
         layer = np.concatenate(seg_lay)
 
+    vacuum_start_ang = np.concatenate(vac_start) if vac_start else np.empty((0, 3))
+    vacuum_end_ang = np.concatenate(vac_end) if vac_end else np.empty((0, 3))
+    vacuum_E_keV = np.concatenate(vac_E) if vac_E else np.empty(0)
+    vacuum_t_ang = np.concatenate(vac_t0) if vac_t0 else np.empty(0)
+    vacuum_elec_id = (
+        np.concatenate(vac_id).astype(np.int64) if vac_id else np.empty(0, dtype=np.int64)
+    )
+
     return {
         "r_mid": r_mid,
         "v_hat": v_hat,
@@ -593,6 +685,11 @@ def simulate_trajectories(
         "t_ang": t_ang,  # segment-start age sum(L/beta) [Ang, c=1]
         "elec_id": elec_id,  # emitting electron index in [0, Ne)
         "layer": layer,  # emitting layer index in [0, n_layers)
+        "vacuum_start_ang": vacuum_start_ang,
+        "vacuum_end_ang": vacuum_end_ang,
+        "vacuum_E_keV": vacuum_E_keV,
+        "vacuum_t_ang": vacuum_t_ang,
+        "vacuum_elec_id": vacuum_elec_id,
         "n_backscattered": n_back,
         "n_transmitted": n_trans,
         "n_side_exited": n_side,
