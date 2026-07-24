@@ -408,9 +408,8 @@ def simulate_trajectories(
         pos[:, 0] = phase_rng.uniform(0.0, groove.spacing_ang, size=Ne)
     if groove is not None:
         # Slide each ray along the beam to its relief-facet entry point.
-        # v1 approximation: only the START point honors the grooves; in-flight
-        # boundary tests keep the flat faces (error O(h / electron range) in
-        # backscatter bookkeeping). Validation: blazed-groove-geometry
+        # Later flights use exact groove exit/re-entry events below.
+        # Validation: blazed-groove-geometry
         x_e, z_e = entry_points(pos[:, 0], groove)
         pos[:, 0] = x_e
         pos[:, 2] = z_e
@@ -556,12 +555,14 @@ def simulate_trajectories(
             pos[grp] = p + step[:, None] * d
             E[grp] = Ea + _dEds_compound(comp, Ea) * step
             clock[grp] += step / beta_from_keV(Ea)
+            below_cut = E[grp] < E_cut_keV
 
             if groove is not None:
                 assert zero_surface_events is not None
-                zero_surface_events[grp[~surface_first]] = 0
-            if groove is not None and surface_first.any():
-                surf_local = np.flatnonzero(surface_first)
+                active_surface = surface_first & ~below_cut
+                zero_surface_events[grp[~active_surface]] = 0
+            if groove is not None and active_surface.any():
+                surf_local = np.flatnonzero(active_surface)
                 surf_global = grp[surf_local]
                 surface_points = pos[surf_global].copy()
                 entry_distance = np.array(
@@ -615,7 +616,7 @@ def simulate_trajectories(
                     raise RuntimeError("repeated zero-length grooved surface events")
 
             # -- 5. kill exited / exhausted; pass internal crossers on ----------
-            died = exit_top | exit_bot | exit_side | (E[grp] < E_cut_keV)
+            died = exit_top | exit_bot | exit_side | below_cut
             n_back += int(exit_top.sum())  # exited the entrance face
             n_trans += int(exit_bot.sum())  # punched through the back face
             n_side += int(exit_side.sum())  # exited a transverse prism face

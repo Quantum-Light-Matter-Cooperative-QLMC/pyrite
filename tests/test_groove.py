@@ -1,6 +1,9 @@
+import importlib
+
 import numpy as np
 import pytest
 
+from cxr_mc.montecarlo.geometry import X_MAX, Z_MAX
 from cxr_mc.montecarlo.groove import (
     blazed_groove_spec,
     entry_points,
@@ -18,6 +21,13 @@ SPEC = blazed_groove_spec(
     tilt_polar_rad=TP,
     tilt_azim_rad=np.pi,
 )
+SHALLOW_SPEC = blazed_groove_spec(
+    spacing_ang=2.0,
+    theta_obs_rad=np.pi / 2,
+    tilt_polar_rad=TP,
+    tilt_azim_rad=np.pi,
+)
+_transport_module = importlib.import_module("cxr_mc.montecarlo.transport")
 
 
 def _z_surf(x, spec):
@@ -292,6 +302,145 @@ def test_groove_none_preserves_legacy_arrays_bit_for_bit():
         np.testing.assert_equal(old[key], explicit[key])
     assert explicit["vacuum_start_ang"].shape == (0, 3)
     assert explicit["vacuum_elec_id"].dtype == np.int64
+
+
+def _one_electron_transport(**overrides):
+    kwargs = dict(
+        E0_keV=60.0,
+        Ne=1,
+        thickness_ang=100.0,
+        element="C",
+        n_atoms_per_ang3=1e-12,
+        E_cut_keV=5.0,
+        seed=9,
+        max_steps=4,
+        elastic_model="sr",
+        beam_dir=np.array([0.0, 0.0, 1.0]),
+        groove=SHALLOW_SPEC,
+    )
+    kwargs.update(overrides)
+    return simulate_trajectories(**kwargs)
+
+
+def test_surface_cutoff_stops_before_vacuum_reentry(monkeypatch):
+    transitions = []
+
+    def surface_event(_position, _direction, _spec, transition=None):
+        transitions.append(transition)
+        if transition == "entry":
+            raise AssertionError("cutoff electron searched for vacuum re-entry")
+        return 1.0
+
+    monkeypatch.setattr(_transport_module, "first_surface_event", surface_event)
+    out = _one_electron_transport(
+        n_atoms_per_ang3=0.1136,
+        E_cut_keV=60.0,
+    )
+
+    assert transitions == ["exit"]
+    assert out["vacuum_start_ang"].shape == (0, 3)
+    assert out["n_backscattered"] == 0
+    assert out["n_stopped"] == 1
+
+
+def test_permanent_surface_exit_counts_backscatter(monkeypatch):
+    monkeypatch.setattr(
+        _transport_module,
+        "first_surface_event",
+        lambda _p, _d, _spec, transition=None: (
+            0.5 if transition == "exit" else np.inf
+        ),
+    )
+
+    out = _one_electron_transport()
+
+    assert out["n_backscattered"] == 1
+    assert out["n_transmitted"] == out["n_side_exited"] == 0
+    assert out["n_stopped"] == 0
+    assert out["vacuum_start_ang"].shape == (0, 3)
+
+
+def test_reentry_keeps_exit_counters_neutral_and_supports_repeated_crossings(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        _transport_module,
+        "first_surface_event",
+        lambda _p, _d, _spec, transition=None: (
+            0.5 if transition == "exit" else 1.0
+        ),
+    )
+
+    out = _one_electron_transport(max_steps=3)
+
+    assert out["vacuum_start_ang"].shape == (3, 3)
+    np.testing.assert_array_equal(out["vacuum_elec_id"], np.zeros(3, dtype=np.int64))
+    assert out["n_backscattered"] == 0
+    assert out["n_transmitted"] == 0
+    assert out["n_side_exited"] == 0
+
+
+def test_repeated_zero_length_surface_events_raise(monkeypatch):
+    monkeypatch.setattr(
+        _transport_module,
+        "first_surface_event",
+        lambda _p, _d, _spec, transition=None: (
+            0.5e-6 if transition == "exit" else 1.0
+        ),
+    )
+
+    with pytest.raises(
+        RuntimeError, match="repeated zero-length grooved surface events"
+    ):
+        _one_electron_transport(max_steps=2)
+
+
+def test_layer_and_back_face_events_precede_far_surface(monkeypatch):
+    monkeypatch.setattr(
+        _transport_module,
+        "first_surface_event",
+        lambda _p, _d, _spec, transition=None: 100.0,
+    )
+    layers = [
+        (0.0, 2.0, [("C", 1e-12)]),
+        (2.0, 4.0, [("C", 1e-12)]),
+    ]
+
+    out = _one_electron_transport(layers=layers)
+
+    assert set(out["layer"]) == {0, 1}
+    assert out["n_transmitted"] == 1
+    assert out["n_backscattered"] == out["n_side_exited"] == 0
+    assert out["vacuum_start_ang"].shape == (0, 3)
+
+
+def test_finite_side_exit_before_reentry_records_no_vacuum_leg(monkeypatch):
+    prism_calls = 0
+
+    def prism_exit(*_args, **_kwargs):
+        nonlocal prism_calls
+        prism_calls += 1
+        if prism_calls == 1:
+            return np.array([50.0]), np.array([Z_MAX])
+        return np.array([0.25]), np.array([X_MAX])
+
+    monkeypatch.setattr(_transport_module, "first_prism_exit", prism_exit)
+    monkeypatch.setattr(
+        _transport_module,
+        "first_surface_event",
+        lambda _p, _d, _spec, transition=None: (
+            0.5 if transition == "exit" else 1.0
+        ),
+    )
+
+    out = _one_electron_transport(
+        crystal_width_mm=1e-5,
+        crystal_height_mm=1e-5,
+    )
+
+    assert out["n_side_exited"] == 1
+    assert out["n_backscattered"] == out["n_transmitted"] == 0
+    assert out["vacuum_start_ang"].shape == (0, 3)
 
 
 from cxr_mc.montecarlo.spectrum import mc_spectrum
