@@ -228,6 +228,22 @@ def _trajectory_data(
         L=segs["L_ang"],
         start_xyz=start / u,
         end_xyz=(r + 0.5 * L[:, None] * v) / u,
+        # Groove-gap flights remain diagnostic-only: they do not radiate and
+        # therefore must never be appended to E/start_xyz/end_xyz.
+        vacuum_start_xyz=np.asarray(
+            segs.get("vacuum_start_ang", np.empty((0, 3))), dtype=float
+        )
+        / u,
+        vacuum_end_xyz=np.asarray(
+            segs.get("vacuum_end_ang", np.empty((0, 3))), dtype=float
+        )
+        / u,
+        vacuum_E=np.asarray(segs.get("vacuum_E_keV", np.empty(0)), dtype=float),
+        vacuum_t_fs=np.asarray(segs.get("vacuum_t_ang", np.empty(0)), dtype=float)
+        / C_ANG_PER_FS,
+        vacuum_elec_id=np.asarray(
+            segs.get("vacuum_elec_id", np.empty(0, dtype=np.int64)), dtype=np.int64
+        ),
         beam=np.asarray(beam, dtype=float),
         detector=np.asarray(n_hat, dtype=float),
         ndet=ndet,
@@ -357,6 +373,33 @@ def _draw_trajectory_panel(
         interpolation="none",
         zorder=2,
     )
+
+    # Non-radiating groove-gap flights: separate faint rules, never folded into
+    # the datashader track table/aggregation above.
+    vacuum_start = np.asarray(data.get("vacuum_start_xyz", np.empty((0, 3))), dtype=float)
+    vacuum_end = np.asarray(data.get("vacuum_end_xyz", np.empty((0, 3))), dtype=float)
+    if len(vacuum_start):
+        from matplotlib.collections import LineCollection
+
+        e1, e2 = _beam_detector_basis(data["beam"], data["detector"])
+        vacuum_segments = np.stack(
+            (
+                np.column_stack((vacuum_start @ e1, vacuum_start @ e2)),
+                np.column_stack((vacuum_end @ e1, vacuum_end @ e2)),
+            ),
+            axis=1,
+        )
+        vacuum_energy = np.asarray(data["vacuum_E"], dtype=float)
+        collection = LineCollection(
+            vacuum_segments,
+            cmap=cmap or _TRAJ_CMAP,
+            linewidths=0.8,
+            alpha=0.35,
+            zorder=3,
+        )
+        collection.set_clim(E_cut, E0)
+        collection.set_array(vacuum_energy)
+        ax.add_collection(collection)
 
     # beam (red) + detector (green) arrows, anchored at the entry point
     aL = 0.16 * (xhi - xlo)

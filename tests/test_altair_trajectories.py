@@ -81,6 +81,38 @@ def test_track_segments_frame_no_cross_electron_bridge():
     assert list(seg["E"]) == sorted(seg["E"])
 
 
+def test_vacuum_segments_frame_stays_separate_from_radiating_tracks():
+    from cxr_mc.plots.altair_trajectories import vacuum_segments_frame
+
+    data = {
+        "px": np.array([0.0, 1.0]),
+        "py": np.array([0.0, 0.5]),
+        "pE": np.array([30.0, 20.0]),
+        "beam": np.array([1.0, 0.0, 0.0]),
+        "detector": np.array([0.0, 1.0, 0.0]),
+        "u": 10.0,
+        "vacuum_start_xyz": np.array([[1.0, 2.0, 3.0]]),
+        "vacuum_end_xyz": np.array([[4.0, 5.0, 6.0]]),
+        "vacuum_E": np.array([17.0]),
+        "vacuum_t_fs": np.array([0.75]),
+        "vacuum_elec_id": np.array([3], dtype=np.int64),
+    }
+
+    material = track_segments_frame(data)
+    vacuum = vacuum_segments_frame(data)
+
+    assert len(material) == 1
+    assert list(vacuum.columns) == ["x", "y", "x2", "y2", "E", "t_fs", "elec_id"]
+    assert len(vacuum) == 1
+    np.testing.assert_allclose(
+        vacuum.loc[0, ["x", "y", "x2", "y2"]].to_numpy(dtype=float),
+        [1.0, 2.0, 4.0, 5.0],
+    )
+    assert vacuum.loc[0, "E"] == 17.0
+    assert vacuum.loc[0, "t_fs"] == 0.75
+    assert vacuum.loc[0, "elec_id"] == 3
+
+
 # ---- chart plumbing (small-Ne integration on a real case) --------------------
 def _real_cases(material="hopg"):
     from cxr_mc.config import default_settings, trajectory_sweep
@@ -172,3 +204,78 @@ def test_trajectory_chart_ungrooved_has_no_profile_layer():
 
     spec = trajectory_chart(_real_cases()[0], Ne=8).to_dict()
     assert not [layer for layer in spec["layer"] if _mark_color(layer) == _GROOVE]
+
+
+def test_vacuum_legs_stay_separate_from_radiating_track_data():
+    from cxr_mc.plots.trajectories import _trajectory_data
+
+    data = _trajectory_data(_grooved_case(), Ne=40, seed=42)
+
+    assert len(data["vacuum_start_xyz"]) == len(data["vacuum_end_xyz"])
+    assert len(data["vacuum_start_xyz"]) == len(data["vacuum_E"])
+    assert len(data["vacuum_start_xyz"]) > 0
+    assert len(data["start_xyz"]) == len(data["E"])
+    assert len(data["start_xyz"]) != len(data["E"]) + len(data["vacuum_E"])
+
+
+def test_flat_trajectory_data_has_typed_empty_vacuum_arrays():
+    from cxr_mc.plots.trajectories import _trajectory_data
+
+    data = _trajectory_data(_real_cases()[0], Ne=4, seed=7)
+
+    assert data["vacuum_start_xyz"].shape == (0, 3)
+    assert data["vacuum_end_xyz"].shape == (0, 3)
+    assert data["vacuum_E"].shape == (0,)
+    assert data["vacuum_t_fs"].shape == (0,)
+    assert data["vacuum_elec_id"].shape == (0,)
+    assert np.issubdtype(data["vacuum_start_xyz"].dtype, np.floating)
+    assert np.issubdtype(data["vacuum_end_xyz"].dtype, np.floating)
+    assert np.issubdtype(data["vacuum_E"].dtype, np.floating)
+    assert np.issubdtype(data["vacuum_t_fs"].dtype, np.floating)
+    assert data["vacuum_elec_id"].dtype == np.int64
+
+
+def test_trajectory_chart_draws_vacuum_as_separate_faint_rules(monkeypatch):
+    from cxr_mc.plots import altair_trajectories
+
+    data = {
+        "px": np.array([0.0, 1.0]),
+        "py": np.array([0.0, 0.5]),
+        "pE": np.array([30.0, 20.0]),
+        "pts": np.array([[0.0, 0.0], [1.0, 0.5]]),
+        "beam": np.array([1.0, 0.0, 0.0]),
+        "detector": np.array([0.0, 1.0, 0.0]),
+        "nslab": np.array([0.0, 1.0]),
+        "ndet": np.array([0.0, 1.0]),
+        "u": 10.0,
+        "ulab": "nm",
+        "thick": 1.0,
+        "layer_bounds": [],
+        "Ne": 1,
+        "eta": 0.0,
+        "thru": 0.0,
+        "vacuum_start_xyz": np.array([[1.0, 2.0, 3.0]]),
+        "vacuum_end_xyz": np.array([[4.0, 5.0, 6.0]]),
+        "vacuum_E": np.array([17.0]),
+        "vacuum_t_fs": np.array([0.75]),
+        "vacuum_elec_id": np.array([0], dtype=np.int64),
+    }
+    monkeypatch.setattr(altair_trajectories, "_trajectory_data", lambda *_args, **_kw: data)
+
+    spec = altair_trajectories.trajectory_chart(_grooved_case(), Ne=1).to_dict()
+    material_layers = [
+        layer
+        for layer in spec["layer"]
+        if layer.get("encoding", {}).get("color", {}).get("field") == "E"
+    ]
+    faint_rules = [
+        layer
+        for layer in spec["layer"]
+        if isinstance(layer.get("mark"), dict)
+        and layer["mark"].get("type") == "rule"
+        and layer["mark"].get("opacity", 1.0) <= 0.4
+    ]
+
+    assert len(material_layers) == 1
+    assert faint_rules
+    assert all(layer not in material_layers for layer in faint_rules)

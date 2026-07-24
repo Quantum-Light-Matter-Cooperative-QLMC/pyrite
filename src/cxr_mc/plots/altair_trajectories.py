@@ -208,6 +208,33 @@ def track_segments_frame(data):
     return seg.sort_values("E").reset_index(drop=True)
 
 
+def vacuum_segments_frame(data):
+    """Separate 2D rules for non-radiating groove-gap flights.
+
+    Vacuum endpoints already use the trajectory display unit. Project them
+    through the same beam/detector basis as material tracks without adding them
+    to :func:`tracks_frame` or :func:`track_segments_frame`.
+    """
+    columns = ["x", "y", "x2", "y2", "E", "t_fs", "elec_id"]
+    start = np.asarray(data.get("vacuum_start_xyz", np.empty((0, 3))), dtype=float)
+    end = np.asarray(data.get("vacuum_end_xyz", np.empty((0, 3))), dtype=float)
+    if not len(start):
+        return pd.DataFrame(columns=columns)
+    e1, e2 = _beam_detector_basis(data["beam"], data["detector"])
+    return pd.DataFrame(
+        {
+            "x": start @ e1,
+            "y": start @ e2,
+            "x2": end @ e1,
+            "y2": end @ e2,
+            "E": np.asarray(data["vacuum_E"], dtype=float),
+            "t_fs": np.asarray(data["vacuum_t_fs"], dtype=float),
+            "elec_id": np.asarray(data["vacuum_elec_id"], dtype=np.int64),
+        },
+        columns=columns,
+    )
+
+
 def _segment_df(p0, p1):
     return pd.DataFrame({"x": [p0[0], p1[0]], "y": [p0[1], p1[1]]})
 
@@ -273,6 +300,7 @@ def trajectory_chart(
     case = _case_of(rec_or_case)
     data = _trajectory_data(case, Ne, seed)
     seg_df = track_segments_frame(data)
+    vacuum_df = vacuum_segments_frame(data)
     if seg_df.empty:
         return None
     if frame is None:
@@ -299,6 +327,21 @@ def trajectory_chart(
                 title="electron energy (keV)",
                 scale=alt.Scale(scheme="turbo", domain=[E_cut, E0]),  # type: ignore[arg-type]
             ),
+        )
+    )
+    vacuum = (
+        alt.Chart(vacuum_df)
+        .mark_rule(color="#8E9AAF", strokeWidth=0.8, opacity=0.35)
+        .encode(
+            x=alt.X("x:Q", scale=xscale),
+            y=alt.Y("y:Q", scale=yscale),
+            x2="x2:Q",
+            y2="y2:Q",
+            tooltip=[
+                alt.Tooltip("elec_id:Q", title="electron"),
+                alt.Tooltip("E:Q", title="energy (keV)", format=".3g"),
+                alt.Tooltip("t_fs:Q", title="start age (fs)", format=".3g"),
+            ],
         )
     )
 
@@ -381,7 +424,10 @@ def trajectory_chart(
         f"-- {data['Ne']} e- ({data['eta']:.0f}% back, {data['thru']:.0f}% through)"
     )
     groove = _groove_profile_layer(case, data, frame, xscale, yscale)
-    overlays = [slab_shading, *faces, beam, det, tracks]
+    overlays = [slab_shading, *faces, beam, det]
+    if not vacuum_df.empty:
+        overlays.append(vacuum)
+    overlays.append(tracks)
     if groove is not None:
         overlays.append(groove)
     return (

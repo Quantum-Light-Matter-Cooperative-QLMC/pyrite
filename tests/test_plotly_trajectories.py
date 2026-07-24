@@ -2,6 +2,7 @@
 
 import numpy as np
 import plotly.graph_objects as go
+from plotly import colors as plotly_colors
 
 from cxr_mc.plots.plotly_trajectories import (
     N_FRAMES,
@@ -171,6 +172,43 @@ def test_track_vertices_3d_reveal_until_fs_none_is_unfiltered():
     xyz_default, _, _ = track_vertices_3d(data)
     xyz_explicit_none, _, _ = track_vertices_3d(data, t_fs=data["t_fs"], reveal_until_fs=None)
     np.testing.assert_array_equal(xyz_default, xyz_explicit_none)
+
+
+def _synthetic_vacuum_data():
+    return {
+        "vacuum_start_xyz": np.array(
+            [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0], [2.0, 2.0, 2.0]]
+        ),
+        "vacuum_end_xyz": np.array(
+            [[0.5, 0.5, 0.5], [1.5, 1.5, 1.5], [2.5, 2.5, 2.5]]
+        ),
+        "vacuum_E": np.array([30.0, 20.0, 10.0]),
+        "vacuum_t_fs": np.array([0.0, 1.0, 4.0]),
+        "vacuum_elec_id": np.array([0, 0, 1], dtype=np.int64),
+    }
+
+
+def test_plotly_vacuum_trace_is_faint_turbo_colored_and_reveal_gated():
+    from cxr_mc.plots.plotly_trajectories import vacuum_legs_trace
+
+    trace = vacuum_legs_trace(_synthetic_vacuum_data(), reveal_until_fs=1.0)
+
+    assert trace.name == "vacuum legs"
+    assert trace.type == "scatter3d"
+    assert trace.opacity == 0.4
+    assert trace.line.width == 3
+    expected_scale = plotly_colors.get_colorscale("Turbo")
+    assert [entry[1] for entry in trace.line.colorscale] == [
+        entry[1] for entry in expected_scale
+    ]
+    np.testing.assert_allclose(
+        [entry[0] for entry in trace.line.colorscale],
+        [entry[0] for entry in expected_scale],
+        rtol=4 * np.finfo(float).eps,
+        atol=0.0,
+    )
+    assert np.nanmax(np.asarray(trace.customdata)[:, 1]) <= 1.0
+    assert np.count_nonzero(np.isfinite(np.asarray(trace.x))) == 4
 
 
 def test_exit_paths_3d_reveal_until_fs_gates_by_terminal_start_age():
@@ -353,6 +391,38 @@ def test_trajectory_volume_animation_exit_path_traced_every_frame_when_present()
     assert "exit path" in names  # this fixture always has both exit kinds
     exit_idx = names.index("exit path")
     assert all(exit_idx in frame.traces for frame in fig.frames)
+
+
+def test_vacuum_trace_is_present_in_static_grooved_figure():
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure
+
+    fig = trajectory_volume_figure(_hopg_grooved_case(), Ne=40, seed=42)
+    traces = [trace for trace in fig.data if trace.name == "vacuum legs"]
+
+    assert len(traces) == 1
+    assert traces[0].opacity == 0.4
+    assert traces[0].line.width == 3
+
+
+def test_trajectory_volume_animation_updates_vacuum_trace_each_frame():
+    from cxr_mc.plots.plotly_trajectories import (
+        trajectory_volume_animation,
+        trajectory_volume_data,
+    )
+
+    case = _hopg_grooved_case()
+    data = trajectory_volume_data(case, Ne=40, seed=42)
+    fig = trajectory_volume_animation(case, data, n_frames=4)
+    names = [trace.name for trace in fig.data]
+    vacuum_idx = names.index("vacuum legs")
+
+    assert all(vacuum_idx in frame.traces for frame in fig.frames)
+    counts = []
+    for frame in fig.frames:
+        update = frame.data[list(frame.traces).index(vacuum_idx)]
+        counts.append(np.count_nonzero(np.isfinite(np.asarray(update.x, dtype=float))))
+    assert counts == sorted(counts)
+    assert counts[0] < counts[-1]
 
 
 def test_trajectory_volume_animation_updatemenus_and_slider_present():

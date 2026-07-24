@@ -157,6 +157,74 @@ def _tracks_trace(case, data, unit, *, R=_IDENTITY_R, reveal_until_fs=None):
     )
 
 
+def vacuum_legs_trace(
+    data,
+    *,
+    reveal_until_fs=None,
+    R=_IDENTITY_R,
+    unit="",
+    cmax=None,
+):
+    """Faint non-radiating groove-gap flights at one reveal cutoff."""
+    start = np.asarray(data.get("vacuum_start_xyz", np.empty((0, 3))), dtype=float)
+    end = np.asarray(data.get("vacuum_end_xyz", np.empty((0, 3))), dtype=float)
+    energy = np.asarray(data.get("vacuum_E", np.empty(0)), dtype=float)
+    t_fs = np.asarray(data.get("vacuum_t_fs", np.empty(0)), dtype=float)
+    elec_id = np.asarray(data.get("vacuum_elec_id", np.empty(0)), dtype=np.int64)
+    if start.shape != end.shape or start.ndim != 2 or start.shape[1] != 3:
+        raise ValueError("vacuum_start_xyz and vacuum_end_xyz must both have shape (N, 3)")
+    if not (len(start) == len(energy) == len(t_fs) == len(elec_id)):
+        raise ValueError("vacuum segment, energy, age, and electron arrays must have equal length")
+    if reveal_until_fs is not None:
+        keep = t_fs <= reveal_until_fs
+        start, end, energy, t_fs, elec_id = (
+            start[keep],
+            end[keep],
+            energy[keep],
+            t_fs[keep],
+            elec_id[keep],
+        )
+
+    xyz = np.full((3 * len(start), 3), np.nan)
+    xyz[0::3], xyz[1::3] = start, end
+    vertex_energy = np.full(3 * len(start), np.nan)
+    vertex_energy[0::3], vertex_energy[1::3] = energy, energy
+    vertex_time = np.full(3 * len(start), np.nan)
+    vertex_time[0::3], vertex_time[1::3] = t_fs, t_fs
+    vertex_id = np.full(3 * len(start), np.nan)
+    vertex_id[0::3], vertex_id[1::3] = elec_id, elec_id
+    xyz = _rotate(xyz, R)
+    custom = np.column_stack((vertex_energy, vertex_time, vertex_id))
+    color_max = (
+        float(cmax)
+        if cmax is not None
+        else (float(np.max(energy)) if energy.size else 1.0)
+    )
+    return go.Scatter3d(
+        x=xyz[:, 0],
+        y=xyz[:, 1],
+        z=xyz[:, 2],
+        mode="lines",
+        line={
+            "color": vertex_energy,
+            "colorscale": "Turbo",
+            "cmin": 0.0,
+            "cmax": color_max,
+            "width": 3,
+            "showscale": False,
+        },
+        customdata=custom,
+        hovertemplate=(
+            "electron %{customdata[2]:.0f}<br>"
+            "energy %{customdata[0]:.3g} keV<br>"
+            "start age %{customdata[1]:.3g} fs<br>"
+            f"vacuum leg ({unit})<extra></extra>"
+        ),
+        name="vacuum legs",
+        opacity=0.4,
+    )
+
+
 def _transverse_window(data):
     """Robust square x/y display window fitted to tracks, not crystal footprint."""
     points = np.vstack((data["start_xyz"], data["end_xyz"]))
@@ -646,6 +714,16 @@ def trajectory_volume_figure_from_data(
     tracks = _tracks_trace(case, data, unit, R=R, reveal_until_fs=reveal_until_fs)
 
     fig = go.Figure([_crystal_mesh(lox, hix, loy, hiy, thick, R=R), tracks])
+    if len(data.get("vacuum_start_xyz", ())):
+        fig.add_trace(
+            vacuum_legs_trace(
+                data,
+                reveal_until_fs=reveal_until_fs,
+                R=R,
+                unit=unit,
+                cmax=float(case["E0_keV"]),
+            )
+        )
     fig.add_trace(_plane_outline(0.0, lox, hix, loy, hiy, R=R, name="entrance face"))
     fig.add_trace(_plane_outline(thick, lox, hix, loy, hiy, R=R, name="exit face"))
     groove = _groove_surface_mesh(case, lox, hix, loy, hiy, data["u"], R=R)
@@ -743,10 +821,14 @@ def frame_reveal_fs(frame_index, t_max, n_frames=N_FRAMES):
 
 
 def dataset_t_max(data):
-    """Oldest finite per-segment start age [fs] in ``data["t_fs"]``, or ``0.0``
-    for an empty/all-non-finite dataset -- the natural upper bound for a
-    playback scrubber over this dataset."""
-    t_fs = np.asarray(data.get("t_fs", []), dtype=float)
+    """Oldest finite material/vacuum segment start age [fs], or ``0.0`` for an
+    empty/all-non-finite dataset -- the natural playback upper bound."""
+    t_fs = np.concatenate(
+        (
+            np.asarray(data.get("t_fs", []), dtype=float),
+            np.asarray(data.get("vacuum_t_fs", []), dtype=float),
+        )
+    )
     finite = t_fs[np.isfinite(t_fs)]
     return float(np.max(finite)) if finite.size else 0.0
 
@@ -803,11 +885,11 @@ def trajectory_volume_animation(
     ``beam_fwhm_mm`` must match the values ``data`` was transported with, same
     contract as :func:`trajectory_volume_figure_from_data`.
 
-    PAYLOAD: only the two reveal-dependent traces -- "electron tracks"
-    (:func:`_tracks_trace`) and, when the full dataset has any exits at all,
-    "exit path" (:func:`_exit_paths_3d`) -- are re-sent per frame, addressed
-    by trace index via ``go.Frame(traces=...)``; the crystal mesh, plane
-    outlines, beam footprint/incident-beam lines, and detector arrows are
+    PAYLOAD: only reveal-dependent traces -- "electron tracks"
+    (:func:`_tracks_trace`), "vacuum legs" when present, and "exit path"
+    (:func:`_exit_paths_3d`) when the full dataset has exits -- are re-sent per
+    frame, addressed by trace index via ``go.Frame(traces=...)``; crystal mesh,
+    plane outlines, beam footprint/incident-beam lines, and detector arrows are
     static and built ONCE into the base figure, never repeated per frame.
     Each frame trace additionally drops what it can of the PER-FRAME payload
     itself (see :data:`N_FRAMES`'s comment for measured sizes): position and
@@ -853,6 +935,7 @@ def trajectory_volume_animation(
     )
     trace_names = [trace.name for trace in fig.data]  # type: ignore[reportAttributeAccessIssue]
     tracks_idx = trace_names.index("electron tracks")
+    vacuum_idx = trace_names.index("vacuum legs") if "vacuum legs" in trace_names else None
     # Only allocate a per-frame exit-path update when the FULL dataset ever
     # exits through a face at all; if it never does, no frame can either, and
     # the trace (and its per-frame payload) is skipped entirely.
@@ -881,6 +964,23 @@ def trajectory_volume_animation(
             )
         ]
         frame_traces = [tracks_idx]
+        if vacuum_idx is not None:
+            vacuum_trace = vacuum_legs_trace(
+                data,
+                reveal_until_fs=cutoff,
+                R=R,
+                unit=_unit,
+                cmax=cmax,
+            )
+            frame_data.append(
+                go.Scatter3d(
+                    x=_f32(vacuum_trace.x),
+                    y=_f32(vacuum_trace.y),
+                    z=_f32(vacuum_trace.z),
+                    line={"color": _f32(vacuum_trace.line.color)},  # type: ignore[reportAttributeAccessIssue]
+                )
+            )
+            frame_traces.append(vacuum_idx)
         if exit_idx is not None:
             # empty_ok=True: an early frame may reveal zero exits yet, but the
             # trace index must still receive an update (an empty trace),
