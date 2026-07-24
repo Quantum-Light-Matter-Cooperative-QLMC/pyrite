@@ -78,6 +78,7 @@ def _():
         penetration_survival_chart,
         trajectory_chart,
     )
+    from cxr_mc.plots.crystal_lattice import crystal_lattice_figure
     from cxr_mc.plots.plotly_trajectories import (
         trajectory_volume_animation,
         trajectory_volume_data,
@@ -102,6 +103,7 @@ def _():
         build_cases,
         cases_from_results,
         compare_spectrum_chart,
+        crystal_lattice_figure,
         default_settings,
         eaglexo_charge_chart,
         eaglexo_detected_chart,
@@ -2250,8 +2252,76 @@ def _(
 
 
 @app.cell
+def _(mo):
+    # A few unit cells in each direction (a x b x c) gives enough of the stack
+    # to read layering without the scene turning to soup.
+    crystal_na_ui = mo.ui.slider(1, 4, value=3, step=1, label="cells a")
+    crystal_nb_ui = mo.ui.slider(1, 4, value=3, step=1, label="cells b")
+    crystal_nc_ui = mo.ui.slider(1, 3, value=2, step=1, label="cells c")
+    crystal_bonds_ui = mo.ui.switch(value=False, label="show bonds")
+    crystal_layers_ui = mo.ui.switch(value=False, label="color by layer")
+    return (
+        crystal_bonds_ui,
+        crystal_layers_ui,
+        crystal_na_ui,
+        crystal_nb_ui,
+        crystal_nc_ui,
+    )
+
+
+@app.cell
+def _(
+    CATALOG,
+    MATERIAL,
+    crystal_bonds_ui,
+    crystal_lattice_figure,
+    crystal_layers_ui,
+    crystal_na_ui,
+    crystal_nb_ui,
+    crystal_nc_ui,
+    mo,
+):
+    def crystal_tab():
+        _md = mo.md(
+            "### Crystal structure\n"
+            "Ball-and-stick view of the selected material's unit cell tiled over "
+            "a few cells. Spheres are element-colored (sized by covalent radius); "
+            "toggle bonds and per-layer coloring below. Geometry only -- no "
+            "scattering physics."
+        )
+        if MATERIAL is None:
+            return mo.vstack([_md, mo.md("_Select a material to view its lattice._")])
+        _material = CATALOG.material(MATERIAL)
+        _fig = crystal_lattice_figure(
+            CATALOG.crystal(_material.crystal),
+            n_a=crystal_na_ui.value,
+            n_b=crystal_nb_ui.value,
+            n_c=crystal_nc_ui.value,
+            label=_material.label,
+            show_bonds=crystal_bonds_ui.value,
+            color_by="layer" if crystal_layers_ui.value else "element",
+        )
+        _fig.update_layout(height=680)
+        _controls = mo.hstack(
+            [
+                crystal_na_ui,
+                crystal_nb_ui,
+                crystal_nc_ui,
+                crystal_bonds_ui,
+                crystal_layers_ui,
+            ],
+            justify="start",
+            gap=1.5,
+        )
+        return mo.vstack([_md, _controls, _fig])
+
+    return (crystal_tab,)
+
+
+@app.cell
 def _(
     azim_compare_tab,
+    crystal_tab,
     cross_material_tab,
     detectors_tab,
     mo,
@@ -2286,6 +2356,7 @@ def _(
             ),
             "Instruments": detectors_tab,
             "Trace": penetration_tab,
+            "Structure": crystal_tab,
             "Compare": cross_material_tab,
         },
         lazy=True,
