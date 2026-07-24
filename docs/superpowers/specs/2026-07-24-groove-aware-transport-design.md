@@ -1,7 +1,8 @@
 # Groove-Aware Electron and X-Ray Transport
 
 **Date:** 2026-07-24  
-**Status:** implemented; fresh-context verification pending  
+**Status:** implemented; independently rederived in
+`docs/validation/blazed-groove-geometry.md`  
 **Supersedes:** electron-transport and bremsstrahlung limitations documented in
 `docs/superpowers/plans/2026-07-23-blazed-groove-geometry.md`
 
