@@ -5,6 +5,9 @@ from cxr_mc.montecarlo.groove import (
     blazed_groove_spec,
     entry_points,
     escape_distance_ang,
+    first_surface_event,
+    in_material,
+    surface_depth_ang,
 )
 from cxr_mc.montecarlo.transport import simulate_trajectories
 
@@ -36,6 +39,67 @@ def _march_escape(x, z, spec, ds=0.05):
         p += ds * n
         s += ds
     return s
+
+
+def _march_transition(position, direction, transition, ds=0.25):
+    """Independent fine-step reference with bisection at a state transition."""
+
+    def inside(s):
+        q = position + s * direction
+        return bool(q[2] >= _z_surf(q[0], SPEC) and q[2] <= 1e6)
+
+    lo = 1e-6
+    before = inside(lo)
+    for _ in range(400_000):
+        hi = lo + ds
+        after = inside(hi)
+        matched = (before and not after) if transition == "exit" else (
+            not before and after
+        )
+        if matched:
+            for _ in range(48):
+                mid = 0.5 * (lo + hi)
+                if inside(mid) == before:
+                    lo = mid
+                else:
+                    hi = mid
+            return hi
+        lo = hi
+        before = after
+    return np.inf
+
+
+def test_surface_depth_matches_both_analytic_facets():
+    x = np.array([0.0, SPEC.depth_ang * np.tan(TP), SPEC.spacing_ang])
+    np.testing.assert_allclose(
+        surface_depth_ang(x, SPEC), [0.0, SPEC.depth_ang, 0.0]
+    )
+
+
+def test_material_predicate_includes_surface_and_excludes_groove_void():
+    x = 0.25 * SPEC.spacing_ang
+    z = surface_depth_ang(x, SPEC)
+    assert in_material(np.array([x, 0.0, z]), 1e6, SPEC)
+    assert not in_material(np.array([x, 0.0, z - 1e-5]), 1e6, SPEC)
+
+
+def test_surface_event_exit_then_later_entry_matches_reference_march():
+    p = np.array([0.25 * SPEC.spacing_ang, 0.0, 0.75 * SPEC.depth_ang])
+    d = np.array([1.0, 0.0, -0.2])
+    d /= np.linalg.norm(d)
+    s_exit = first_surface_event(p, d, SPEC, transition="exit")
+    p_vac = p + s_exit * d
+    s_entry = first_surface_event(p_vac, d, SPEC, transition="entry")
+    np.testing.assert_allclose(s_exit, _march_transition(p, d, "exit"), rtol=2e-4)
+    np.testing.assert_allclose(
+        s_entry, _march_transition(p_vac, d, "entry"), rtol=2e-4
+    )
+
+
+def test_tangent_surface_event_is_skipped():
+    p = np.array([0.0, 0.0, 0.0])
+    d = np.array([np.sin(TP), 0.0, np.cos(TP)])
+    assert np.isinf(first_surface_event(p, d, SPEC, transition="exit"))
 
 
 def test_depth_closes_unit_cell():

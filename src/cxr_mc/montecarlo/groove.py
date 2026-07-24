@@ -24,6 +24,14 @@ docs/superpowers/plans/2026-07-23-blazed-groove-geometry.md.
 Assumptions: profile invariant along y; laterally infinite slab; photons
 travel straight along n_hat (incoherent Beer-Lambert transport -- no wave
 optics, consistent with mc_spectrum).
+
+For arbitrary scattered-electron direction d, later facet crossings use
+``r(s) = p + s*d`` substituted into both plane families above. A candidate is
+physical only when ``s > 0`` and its depth lies in ``[0, h]``; a two-sided
+surface-predicate check distinguishes material-to-vacuum exits from
+vacuum-to-material re-entries. Exact event handling is specified in
+docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md and is
+implemented below.
 """
 
 from dataclasses import dataclass
@@ -75,6 +83,151 @@ def blazed_groove_spec(spacing_ang, theta_obs_rad, tilt_polar_rad, tilt_azim_rad
     )
 
 
+def surface_depth_ang(
+    x: float | np.ndarray, spec: GrooveSpec
+) -> float | np.ndarray:
+    """
+    Sawtooth entrance-surface depth [Ang] at lateral coordinate ``x`` [Ang].
+
+    Derivation: reduce x modulo the period, then solve the working-facet plane
+    for z before the valley and the relief-facet plane for z after it.
+    Assumptions: exact periodic profile, invariant along y, with facet geometry
+    defined in the module docstring. Limiting case: at each periodic apex the
+    depth is zero; both facet branches meet at ``spec.depth_ang``.
+
+    Validation: blazed-groove-geometry
+    """
+    tp = spec.tilt_polar_rad
+    u = np.mod(x, spec.spacing_ang)
+    x_valley = spec.depth_ang * np.tan(tp)
+    return np.where(
+        u <= x_valley,
+        u / np.tan(tp),
+        (spec.spacing_ang - u) * np.tan(tp),
+    )
+
+
+def in_material(
+    position: np.ndarray,
+    thickness_ang: float,
+    spec: GrooveSpec,
+    width_ang: float | None = None,
+    height_ang: float | None = None,
+) -> np.bool_ | np.ndarray:
+    """
+    Test whether sample-frame positions lie inside grooved slab material.
+
+    Source: intersection of sawtooth half-space ``z >= surface_depth_ang(x)``,
+    back face ``z <= thickness_ang``, and optional centered x/y footprint.
+    Assumptions: boundaries belong to material and slab back face is planar.
+    Limiting case: omitted width/height gives laterally infinite periodic slab.
+
+    Validation: blazed-groove-geometry
+    """
+    p = np.asarray(position, dtype=float)
+    inside = (p[..., 2] >= surface_depth_ang(p[..., 0], spec)) & (
+        p[..., 2] <= thickness_ang
+    )
+    if width_ang is not None:
+        inside &= np.abs(p[..., 0]) <= width_ang / 2
+    if height_ang is not None:
+        inside &= np.abs(p[..., 1]) <= height_ang / 2
+    return inside
+
+
+def first_surface_event(
+    position: np.ndarray,
+    direction: np.ndarray,
+    spec: GrooveSpec,
+    transition: str | None = None,
+) -> float:
+    """
+    Return nearest strictly forward exact sawtooth crossing distance [Ang].
+
+    Derivation: substitute ``r(s) = position + s*direction`` into working and
+    relief plane families from the module docstring. For each family, adjacent
+    integer period indices at the ray's entry into the physical facet band
+    ``0 <= z <= depth`` contain its first possible forward intersection.
+    A two-sided material predicate classifies exit versus entry.
+    Assumptions: direction is a sample-frame unit vector and profile is
+    laterally periodic/infinite. Limiting case: facet-parallel tangency changes
+    no material state and returns infinity.
+
+    ``transition`` may select material-to-vacuum ``"exit"`` or
+    vacuum-to-material ``"entry"``; ``None`` accepts either transition.
+
+    Validation: blazed-groove-geometry
+    """
+    if transition not in (None, "exit", "entry"):
+        raise ValueError("transition must be None, 'exit', or 'entry'")
+
+    p = np.asarray(position, dtype=float)
+    d = np.asarray(direction, dtype=float)
+    if p.shape != (3,) or d.shape != (3,):
+        raise ValueError("position and direction must be three-vectors")
+
+    spacing = spec.spacing_ang
+    depth = spec.depth_ang
+    eps = max(32 * np.finfo(float).eps * spacing, 1e-12 * spacing)
+    parallel_tol = 32 * np.finfo(float).eps
+
+    dz = d[2]
+    if abs(dz) <= parallel_tol:
+        if not 0.0 <= p[2] <= depth:
+            return np.inf
+        band_start = eps
+        band_end = np.inf
+    else:
+        s_at_zero = -p[2] / dz
+        s_at_depth = (depth - p[2]) / dz
+        band_start = max(eps, min(s_at_zero, s_at_depth))
+        band_end = max(s_at_zero, s_at_depth)
+        if band_end <= eps:
+            return np.inf
+
+    tp = spec.tilt_polar_rad
+    st, ct = np.sin(tp), np.cos(tp)
+    families = (
+        (np.array([ct, 0.0, -st]), spacing * ct),
+        (np.array([st, 0.0, ct]), spacing * st),
+    )
+    best = np.inf
+    for normal, plane_spacing in families:
+        rate = float(np.dot(normal, d))
+        if abs(rate) <= parallel_tol:
+            continue
+        origin = float(np.dot(normal, p))
+        transformed = (origin + band_start * rate) / plane_spacing
+        floor_index = int(np.floor(transformed))
+        ceil_index = int(np.ceil(transformed))
+        indices = (
+            floor_index - 1,
+            floor_index,
+            floor_index + 1,
+            ceil_index - 1,
+            ceil_index,
+            ceil_index + 1,
+        )
+        for period_index in indices:
+            s = (period_index * plane_spacing - origin) / rate
+            if not eps < s <= band_end or s >= best:
+                continue
+            q = p + s * d
+            if not 0.0 <= q[2] <= depth:
+                continue
+            before = bool(in_material(q - eps * d, np.inf, spec))
+            after = bool(in_material(q + eps * d, np.inf, spec))
+            is_exit = before and not after
+            is_entry = not before and after
+            if (
+                (transition is None and (is_exit or is_entry))
+                or (transition == "exit" and is_exit)
+                or (transition == "entry" and is_entry)
+            ):
+                best = float(s)
+    return best
+
+
 def escape_distance_ang(x, z, spec):
     """
     Straight-line path length [Ang] inside the grooved material from emission
@@ -95,6 +248,13 @@ def escape_distance_ang(x, z, spec):
     Limiting cases: h -> 0 at fixed z gives L -> z/sin(tp), the flat
     entrance-face path of mc_spectrum's ``z_mid / (-n_hat[2])`` branch; a
     point just inside its own working facet gives L -> 0.
+
+    This first working-facet crossing is the complete material path, not a
+    first-exit approximation: ray direction n is parallel to every relief
+    facet and points outward through the working-facet family, so it cannot
+    cross from vacuum back into material after escape. Arbitrary electron
+    directions do not share this property and require explicit later-facet
+    re-entry handling.
 
     Validation: blazed-groove-geometry
     """

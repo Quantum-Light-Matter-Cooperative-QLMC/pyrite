@@ -12,6 +12,7 @@ from ..montecarlo import (
     simulate_trajectories,
     tilted_geometry,
 )
+from ..montecarlo.groove import surface_depth_ang
 from ..results import (
     records,
 )
@@ -71,11 +72,7 @@ def groove_profile_z(x_ang, spec):
     source: :mod:`cxr_mc.montecarlo.groove`), reused here only to DRAW the
     surface -- it introduces no new physics. numpy ufuncs only, so array input
     works elementwise."""
-    tp = spec.tilt_polar_rad
-    lam, h = spec.spacing_ang, spec.depth_ang
-    u = np.mod(x_ang, lam)
-    x_valley = h * np.tan(tp)
-    return np.where(u <= x_valley, u / np.tan(tp), (lam - u) * np.tan(tp))
+    return surface_depth_ang(x_ang, spec)
 
 
 def groove_profile_knots(x_lo_ang, x_hi_ang, spec, *, max_periods=200):
