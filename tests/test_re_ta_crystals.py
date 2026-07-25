@@ -105,7 +105,7 @@ TATE2_SITES = {
             493.8911406412,
             {"Re": 8, "S": 16},
             RES2_SITES,
-            "Distorted 1T-ReS2 (001)",
+            "1T-ReS2 (001)",
         ),
         (
             "rese2",
@@ -113,7 +113,7 @@ TATE2_SITES = {
             248.194,
             {"Re": 4, "Se": 8},
             RESE2_SITES,
-            "Distorted 1T-ReSe2 (001)",
+            "1T-ReSe2 (001)",
         ),
         (
             "2h_tas2",
@@ -137,7 +137,7 @@ TATE2_SITES = {
             473.779,
             {"Ta": 6, "Te": 12},
             TATE2_SITES,
-            "Ambient distorted TaTe2 (001)",
+            "TaTe2 (001)",
         ),
     ],
 )

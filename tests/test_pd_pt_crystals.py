@@ -38,7 +38,7 @@ from cxr_mc.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
                 ("S", (0.107, 0.388, 0.925)),
                 ("S", (0.393, 0.612, 0.425)),
             },
-            "Palladium disulfide (PdS2)",
+            "PdS2",
         ),
         (
             "pdte2",
@@ -68,7 +68,7 @@ from cxr_mc.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
                 ("Bi", (0.0, 0.6111, 0.6147)),
                 ("Bi", (0.3889, 0.3889, 0.6147)),
             },
-            "Trigonal beta-PtBi2 (001)",
+            "beta-PtBi2 (001)",
         ),
         (
             "ptte2",

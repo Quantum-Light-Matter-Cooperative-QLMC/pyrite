@@ -596,7 +596,7 @@ E_grid_line_by_energy = [
 E_grid_brem = { arange = { start = 0.0, stop = 38600.0, step = 25.0 } }
 
 [materials.pds2]
-label = "Palladium disulfide (PdS2)"
+label = "PdS2"
 profile = "standard"
 E_grid_line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 1200.0, num = 398, endpoint = true } } },
@@ -628,7 +628,7 @@ E_grid_line_by_energy = [
 E_grid_brem = { arange = { start = 0.0, stop = 55200.0, step = 25.0 } }
 
 [materials.ptbi2]
-label = "Trigonal beta-PtBi2 (001)"
+label = "beta-PtBi2 (001)"
 profile = "standard"
 E_grid_line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },
@@ -708,7 +708,7 @@ E_grid_line_by_energy = [
 E_grid_brem = { arange = { start = 0.0, stop = 55700.0, step = 25.0 } }
 
 [materials.nbte2]
-label = "Niobium ditelluride (NbTe2)"
+label = "NbTe2"
 profile = "standard"
 E_grid_line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 700.0, num = 231, endpoint = true } } },
@@ -744,19 +744,19 @@ E_grid_line_by_energy = [
 E_grid_brem = { arange = { start = 0.0, stop = 55300.0, step = 25.0 } }
 
 [materials.vte2]
-label = "Vanadium ditelluride (1T''-VTe2)"
+label = "1T''-VTe2"
 profile = "standard"
 
 [materials.gep]
-label = "Germanium phosphide (GeP)"
+label = "GeP"
 profile = "standard"
 
 [materials.ges]
-label = "Germanium monosulfide (GeS)"
+label = "GeS"
 profile = "standard"
 
 [materials.gese]
-label = "Germanium monoselenide (GeSe)"
+label = "GeSe"
 profile = "standard"
 E_grid_line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
@@ -772,7 +772,7 @@ E_grid_line_by_energy = [
 E_grid_brem = { arange = { start = 0.0, stop = 51500.0, step = 25.0 } }
 
 [materials.gese2]
-label = "Germanium diselenide (beta-GeSe2)"
+label = "beta-GeSe2"
 profile = "standard"
 E_grid_line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 600.0, num = 198, endpoint = true } } },
@@ -788,7 +788,7 @@ E_grid_line_by_energy = [
 E_grid_brem = { arange = { start = 0.0, stop = 54900.0, step = 25.0 } }
 
 [materials.res2]
-label = "Distorted 1T-ReS2 (001)"
+label = "1T-ReS2 (001)"
 profile = "standard"
 E_grid_line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
@@ -804,7 +804,7 @@ E_grid_line_by_energy = [
 E_grid_brem = { arange = { start = 0.0, stop = 38100.0, step = 25.0 } }
 
 [materials.rese2]
-label = "Distorted 1T-ReSe2 (001)"
+label = "1T-ReSe2 (001)"
 profile = "standard"
 
 [materials.2h_tas2]
@@ -840,7 +840,7 @@ E_grid_line_by_energy = [
 E_grid_brem = { arange = { start = 0.0, stop = 39000.0, step = 25.0 } }
 
 [materials.tate2]
-label = "Ambient distorted TaTe2 (001)"
+label = "TaTe2 (001)"
 profile = "standard"
 E_grid_line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 700.0, num = 231, endpoint = true } } },
@@ -856,7 +856,7 @@ E_grid_line_by_energy = [
 E_grid_brem = { arange = { start = 0.0, stop = 48800.0, step = 25.0 } }
 
 [materials.fete]
-label = "Idealized stoichiometric beta-FeTe (001)"
+label = "beta-FeTe (001)"
 profile = "standard"
 E_grid_line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 800.0, num = 264, endpoint = true } } },
@@ -952,7 +952,7 @@ label = "1T-TiSe2 (001)"
 profile = "standard"
 
 [materials.black_phosphorus]
-label = "black phosphorus (020)"
+label = "BP (020)"
 profile = "standard"
 E_grid_line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 900.0, num = 298, endpoint = true } } },

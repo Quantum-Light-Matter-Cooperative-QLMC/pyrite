@@ -9869,7 +9869,7 @@
       }
     },
     "pds2": {
-      "label": "Palladium disulfide (PdS2)",
+      "label": "PdS2",
       "profile": "standard",
       "crystal_key": "pds2",
       "substrate": null,
@@ -10061,7 +10061,7 @@
       }
     },
     "ptbi2": {
-      "label": "Trigonal beta-PtBi2 (001)",
+      "label": "beta-PtBi2 (001)",
       "profile": "standard",
       "crystal_key": "ptbi2",
       "substrate": null,
@@ -10541,7 +10541,7 @@
       }
     },
     "nbte2": {
-      "label": "Niobium ditelluride (NbTe2)",
+      "label": "NbTe2",
       "profile": "standard",
       "crystal_key": "nbte2",
       "substrate": null,
@@ -10829,7 +10829,7 @@
       }
     },
     "vte2": {
-      "label": "Vanadium ditelluride (1T''-VTe2)",
+      "label": "1T''-VTe2",
       "profile": "standard",
       "crystal_key": "vte2",
       "substrate": null,
@@ -10925,7 +10925,7 @@
       }
     },
     "gep": {
-      "label": "Germanium phosphide (GeP)",
+      "label": "GeP",
       "profile": "standard",
       "crystal_key": "gep",
       "substrate": null,
@@ -11021,7 +11021,7 @@
       }
     },
     "ges": {
-      "label": "Germanium monosulfide (GeS)",
+      "label": "GeS",
       "profile": "standard",
       "crystal_key": "ges",
       "substrate": null,
@@ -11117,7 +11117,7 @@
       }
     },
     "gese": {
-      "label": "Germanium monoselenide (GeSe)",
+      "label": "GeSe",
       "profile": "standard",
       "crystal_key": "gese",
       "substrate": null,
@@ -11213,7 +11213,7 @@
       }
     },
     "gese2": {
-      "label": "Germanium diselenide (beta-GeSe2)",
+      "label": "beta-GeSe2",
       "profile": "standard",
       "crystal_key": "gese2",
       "substrate": null,
@@ -11309,7 +11309,7 @@
       }
     },
     "res2": {
-      "label": "Distorted 1T-ReS2 (001)",
+      "label": "1T-ReS2 (001)",
       "profile": "standard",
       "crystal_key": "res2",
       "substrate": null,
@@ -11405,7 +11405,7 @@
       }
     },
     "rese2": {
-      "label": "Distorted 1T-ReSe2 (001)",
+      "label": "1T-ReSe2 (001)",
       "profile": "standard",
       "crystal_key": "rese2",
       "substrate": null,
@@ -11693,7 +11693,7 @@
       }
     },
     "tate2": {
-      "label": "Ambient distorted TaTe2 (001)",
+      "label": "TaTe2 (001)",
       "profile": "standard",
       "crystal_key": "tate2",
       "substrate": null,
@@ -11789,7 +11789,7 @@
       }
     },
     "fete": {
-      "label": "Idealized stoichiometric beta-FeTe (001)",
+      "label": "beta-FeTe (001)",
       "profile": "standard",
       "crystal_key": "fete",
       "substrate": null,
@@ -12653,7 +12653,7 @@
       }
     },
     "black_phosphorus": {
-      "label": "black phosphorus (020)",
+      "label": "BP (020)",
       "profile": "standard",
       "crystal_key": "black_phosphorus",
       "substrate": null,

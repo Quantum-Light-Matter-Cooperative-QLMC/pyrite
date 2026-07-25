@@ -94,7 +94,7 @@ FETE_SITES = {
             91.102,
             {"Fe": 2, "Te": 2},
             FETE_SITES,
-            "Idealized stoichiometric beta-FeTe (001)",
+            "beta-FeTe (001)",
         ),
         (
             "wte2",

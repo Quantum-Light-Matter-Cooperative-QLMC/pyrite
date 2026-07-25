@@ -521,7 +521,7 @@ def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcog
         ("tise2", "1T-TiSe2 (001)", (0, 0, 1), [(0, 0, 1), (0, 0, -1)], {"Ti": 1, "Se": 2}),
         (
             "black_phosphorus",
-            "black phosphorus (020)",
+            "BP (020)",
             (0, 1, 0),
             [(0, 2, 0), (0, -2, 0)],
             {"P": 1},
