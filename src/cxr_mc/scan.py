@@ -387,9 +387,14 @@ def _run_material(args, material, max_seconds=None):
         )
     n = sum(len(v) for v in results.values())
     if complete:
-        print(f"done -> {args.checkpoint_dir}/{stem}.pkl ({n} records)")
+        print(
+            f"{_cli_core.paint('done', 'done')} -> {args.checkpoint_dir}/{stem}.pkl ({n} records)"
+        )
     else:
-        print(f"paused (budget) -> {args.checkpoint_dir}/{stem}.pkl ({n} records)")
+        print(
+            f"{_cli_core.paint('paused', 'warning')} (budget) -> "
+            f"{args.checkpoint_dir}/{stem}.pkl ({n} records)"
+        )
     return complete
 
 

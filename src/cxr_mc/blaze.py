@@ -331,9 +331,9 @@ def run(args):
 
     n = sum(len(v) for v in results.values())
     if complete:
-        print(f"done -> {ckpt} ({n} records)")
+        print(f"{_cli_core.paint('done', 'done')} -> {ckpt} ({n} records)")
     else:
-        print(f"paused (budget) -> {ckpt} ({n} records)")
+        print(f"{_cli_core.paint('paused', 'warning')} (budget) -> {ckpt} ({n} records)")
     if not complete:
         raise SystemExit(75)  # EX_TEMPFAIL: budget hit, work remains
 

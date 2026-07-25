@@ -20,7 +20,7 @@ def _run(args: SimpleNamespace) -> None:
 
     source = str(path) if path is not None else "bundled catalog"
     print(
-        f"valid material catalog: {source} "
+        f"{_cli_core.paint('valid', 'done')} material catalog: {source} "
         f"({len(catalog.materials)} materials, {len(catalog.crystals)} crystals, "
         f"{len(catalog.media)} media)"
     )

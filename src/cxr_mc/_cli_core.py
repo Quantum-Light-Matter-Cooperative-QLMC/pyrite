@@ -5,11 +5,80 @@ from __future__ import annotations
 import importlib
 import json
 import math
+import os
+import sys
 from collections.abc import Mapping, Sequence
+from contextvars import ContextVar
 from types import SimpleNamespace
 from typing import Any
 
 import click
+
+_COLOR_MODE: ContextVar[str] = ContextVar("cxr_cli_color_mode", default="auto")
+
+COLORS = {
+    "active": (92, 207, 230),
+    "done": (170, 217, 76),
+    "warning": (255, 213, 128),
+    "failed": (240, 113, 120),
+    "inactive": (127, 140, 152),
+}
+
+
+def _auto_color_enabled(stream) -> bool:
+    if os.environ.get("NO_COLOR") is not None or os.environ.get("TERM") == "dumb":
+        return False
+    isatty = getattr(stream, "isatty", None)
+    return callable(isatty) and isatty()
+
+
+def color_enabled(stream=None) -> bool:
+    """Return effective human-output color policy for ``stream``."""
+    stream = sys.stdout if stream is None else stream
+    mode = _COLOR_MODE.get()
+    if mode == "always":
+        return True
+    if mode == "never":
+        return False
+    return _auto_color_enabled(stream)
+
+
+def paint(text: object, role: str, *, stream=None, enabled: bool | None = None) -> str:
+    """Add redundant semantic color without changing plain-text content."""
+    value = str(text)
+    if enabled is None:
+        enabled = color_enabled(stream)
+    if not enabled:
+        return value
+    red, green, blue = COLORS[role]
+    return f"\033[38;2;{red};{green};{blue}m{value}\033[0m"
+
+
+def _set_color(ctx: click.Context, _param: click.Parameter, value: str) -> str:
+    token = _COLOR_MODE.set(value)
+    ctx.call_on_close(lambda: _COLOR_MODE.reset(token))
+    if value == "always":
+        ctx.color = True
+    elif value == "never" or (
+        value == "auto"
+        and (os.environ.get("NO_COLOR") is not None or os.environ.get("TERM") == "dumb")
+    ):
+        ctx.color = False
+    return value
+
+
+def color_option(function):
+    """Add root color policy without leaking ANSI into default piped output."""
+    return click.option(
+        "--color",
+        type=click.Choice(("auto", "always", "never"), case_sensitive=False),
+        default="auto",
+        show_default=True,
+        is_eager=True,
+        expose_value=False,
+        callback=_set_color,
+        help="Color human output: auto for terminals, always, or never.",
+    )(function)
 
 
 class CLIError(click.ClickException):
@@ -64,8 +133,20 @@ class LazyGroup(click.Group):
                 continue
             rows.append((name, command.get_short_help_str()))
         if rows:
-            with formatter.section("Commands"):
+            with formatter.section(paint("Commands", "active")):
                 formatter.write_dl(rows)
+
+    def format_options(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
+        """Render root option heading with same terminal-safe accent."""
+        rows = [
+            record
+            for parameter in self.get_params(ctx)
+            if (record := parameter.get_help_record(ctx)) is not None
+        ]
+        if rows:
+            with formatter.section(paint("Options", "active")):
+                formatter.write_dl(rows)
+        self.format_commands(ctx, formatter)
 
 
 class FiniteRange(click.ParamType):
@@ -207,6 +288,7 @@ def invoke_legacy(function, /, **values):
 
 def run(command: click.Command, argv: Sequence[str] | None = None, *, prog_name: str) -> Any:
     """Invoke Click without framework-owned exits; preserve cxr exit contract."""
+    token = _COLOR_MODE.set("auto")
     try:
         return command.main(
             args=None if argv is None else list(argv),
@@ -214,10 +296,28 @@ def run(command: click.Command, argv: Sequence[str] | None = None, *, prog_name:
             standalone_mode=False,
         )
     except click.Abort:
-        emit_diagnostic("Aborted!")
+        click.echo(
+            paint("Aborted!", "warning", stream=sys.stderr),
+            err=True,
+            color=color_enabled(sys.stderr),
+        )
         return 130
     except click.ClickException as exc:
-        exc.show()
+        stream = click.get_text_stream("stderr")
+        context = getattr(exc, "ctx", None)
+        color = (
+            context.color
+            if context is not None and context.color is not None
+            else color_enabled(stream)
+        )
+        if isinstance(exc, click.UsageError) and context is not None:
+            help_names = context.command.get_help_option_names(context)
+            hint = ""
+            if help_names:
+                hint = f"Try '{context.command_path} {max(help_names, key=len)}' for help.\n"
+            click.echo(f"{context.get_usage()}\n{hint}", file=stream, color=color)
+        label = paint("Error:", "failed", stream=stream, enabled=bool(color))
+        click.echo(f"{label} {exc.format_message()}", file=stream, color=color)
         return exc.exit_code
     except Exception as exc:
         if (
@@ -227,3 +327,5 @@ def run(command: click.Command, argv: Sequence[str] | None = None, *, prog_name:
             emit_diagnostic(str(exc))
             return 1
         raise
+    finally:
+        _COLOR_MODE.reset(token)

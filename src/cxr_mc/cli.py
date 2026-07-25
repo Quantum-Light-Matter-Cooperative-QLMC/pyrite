@@ -7,7 +7,7 @@ from collections.abc import Sequence
 import click
 
 from . import __version__
-from ._cli_core import LazyGroup, run
+from ._cli_core import LazyGroup, color_option, run
 
 _COMMANDS = {
     "scan": "cxr_mc.scan.command",
@@ -54,6 +54,7 @@ _COMMAND_HELP = {
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 @click.version_option(__version__, prog_name="cxr-mc", message="cxr-mc %(version)s")
+@color_option
 def command() -> None:
     """Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.
 

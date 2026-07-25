@@ -78,8 +78,10 @@ Usage: cxr [OPTIONS] COMMAND [ARGS]...
     cxr remote start mose2 --dry-run
 
 Options:
-  --version   Show the version and exit.
-  -h, --help  Show this message and exit.
+  --version                    Show the version and exit.
+  --color [auto|always|never]  Color human output: auto for terminals, always, or never.
+                               [default: auto]
+  -h, --help                   Show this message and exit.
 
 Commands:
   scan          Run one material's MC sweep and write a checkpoint.

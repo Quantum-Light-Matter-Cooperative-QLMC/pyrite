@@ -3,23 +3,17 @@
 import base64
 import json
 import math
-import os
 import re
 import sys
 import textwrap
 import unicodedata
 
+from .. import _cli_core
 from ..materials import CATALOG
 
 _SHELL_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
-_STATE_COLORS = {
-    "active": (92, 207, 230),
-    "done": (170, 217, 76),
-    "warning": (255, 213, 128),
-    "failed": (240, 113, 120),
-    "inactive": (127, 140, 152),
-}
+_STATE_COLORS = _cli_core.COLORS
 # Glyph carried beside every progress track so state is never color-alone
 # (colorblind / NO_COLOR / piped output all still read the state).
 _STATE_GLYPHS = {"done": "✓", "failed": "×", "paused": "Ⅱ"}
@@ -79,10 +73,7 @@ def _format_table(headers, rows, *, indent=""):
 
 def _style_states(text):
     """Add redundant state color only for an interactive color-capable terminal."""
-    if os.environ.get("NO_COLOR") is not None or os.environ.get("TERM") == "dumb":
-        return text
-    isatty = getattr(sys.stdout, "isatty", None)
-    if not callable(isatty) or not isatty():
+    if not _color_enabled():
         return text
     groups = {
         "active": ("RUNNING", "PENDING", "QUEUED", "SUBMITTED"),
@@ -91,11 +82,10 @@ def _style_states(text):
         "failed": ("FAILED", "CANCELLED"),
     }
     for group, words in groups.items():
-        red, green, blue = _STATE_COLORS[group]
         pattern = rf"\b({'|'.join(words)})\b"
         text = re.sub(
             pattern,
-            rf"\033[38;2;{red};{green};{blue}m\1\033[0m",
+            lambda match, role=group: _paint(match.group(0), role),
             text,
             flags=re.IGNORECASE,
         )
@@ -103,17 +93,11 @@ def _style_states(text):
 
 
 def _color_enabled():
-    if os.environ.get("NO_COLOR") is not None or os.environ.get("TERM") == "dumb":
-        return False
-    isatty = getattr(sys.stdout, "isatty", None)
-    return callable(isatty) and isatty()
+    return _cli_core.color_enabled(sys.stdout)
 
 
 def _paint(text, group):
-    if not _color_enabled():
-        return text
-    red, green, blue = _STATE_COLORS[group]
-    return f"\033[38;2;{red};{green};{blue}m{text}\033[0m"
+    return _cli_core.paint(text, group, stream=sys.stdout)
 
 
 def _format_fields(rows, *, indent="  "):
