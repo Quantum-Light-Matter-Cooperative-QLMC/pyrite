@@ -13,6 +13,19 @@
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "f=.venv/Scripts/python.exe; [ -x \"$f\" ] || f=.venv/bin/python; \"$f\" .claude/hooks/guard_local_sweep.py",
+            "statusMessage": "Checking for local sweep"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
