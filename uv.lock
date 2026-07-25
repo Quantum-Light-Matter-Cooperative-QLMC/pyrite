@@ -505,6 +505,7 @@ source = { editable = "." }
 dependencies = [
     { name = "altair" },
     { name = "anywidget" },
+    { name = "click" },
     { name = "crystals" },
     { name = "cupy-cuda13x", extra = ["ctk"] },
     { name = "datashader" },
@@ -546,6 +547,7 @@ docs = [
 requires-dist = [
     { name = "altair", specifier = ">=6.2.2" },
     { name = "anywidget", specifier = ">=0.9" },
+    { name = "click", specifier = ">=8.4.1" },
     { name = "crystals", specifier = ">=1.7,<2" },
     { name = "cupy-cuda13x", extras = ["ctk"], specifier = ">=14.1.1" },
     { name = "datashader", specifier = ">=0.19.1" },

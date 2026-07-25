@@ -6,8 +6,8 @@ audit matrices unless changed code invalidates them. Full file is large; only su
 ## Handoff — 2026-07-25
 
 Stopping point: P0 tasks 1–7 complete. Task 17 was pulled forward after task 2
-and is also complete. P1 task 8 is complete; resume at task 9, **Build Click
-core**.
+and is also complete. P1 tasks 8–9 are complete; resume at task 10, **Migrate
+local commands**.
 
 Completed behavior:
 
@@ -30,6 +30,10 @@ Completed behavior:
   root/nested command nodes with options, defaults, exact help, dispatch, mutual
   exclusions, and explicit P0 correction markers. Every help path plus root
   version/usage stream and exit behavior has focused regression coverage.
+- Click 8.4 is now a direct dependency. Shared migration core provides lazy
+  command imports, positive/nonnegative numeric and beam-axis parameter types,
+  stable result/diagnostic/JSON output, runtime/resumable errors, interruption
+  exit 130, and `CliRunner` test helpers.
 
 Verification:
 
@@ -47,8 +51,8 @@ Handoff notes:
 
 - Preserve all current uncommitted P0 changes; no commits were created.
 - Preserve `scripts/freeze_cli_contract.py`, `tests/test_cli_contract.py`, and
-  `tests/data/cli_contract.json` during task 9; adapt snapshot plumbing only when
-  Click replaces argparse.
+  `tests/data/cli_contract.json` during local-command migration; adapt snapshot
+  plumbing only when Click replaces argparse.
 
 ## Decisions
 
@@ -154,7 +158,7 @@ One task per agent. Run tasks sharing line-grid or remote owners sequentially.
 
 8. **DONE — Freeze current contract** — snapshot command tree, options, defaults, help,
    dispatch, exits, and streams. Mark intentional changes from this plan.
-9. **Build Click core** — dependency, lazy `click.Group`, shared decorators,
+9. **DONE — Build Click core** — dependency, lazy `click.Group`, shared decorators,
    parameter types, output/error helpers, and test utilities.
 10. **Migrate local commands** — scan, blaze, analyze, check, export, slim,
     rebrem, reline, archive, restore, archives, union, check-config.
