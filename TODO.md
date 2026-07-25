@@ -41,9 +41,10 @@ Item generation:
 ## P2 - medium-priority
 
 1. **Add inv. lattice vector arrow(s) of interest to 3D Crystal Visualizer**
-2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-3. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment. Design: [`docs/cstool-nebula-evaluation.md`](docs/cstool-nebula-evaluation.md).
-4. **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
+2. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`.
+3. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+4. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment. Design: [`docs/cstool-nebula-evaluation.md`](docs/cstool-nebula-evaluation.md).
+5. **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
 
 ## P3 - lower / exploratory
 
