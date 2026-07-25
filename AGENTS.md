@@ -90,8 +90,8 @@ Agents prefer these commands always.
 - Don't duplicate README or TODO content here.
 - Read `docs/repo_map.md`, then use Tokensave for indexed code search,
   dependency/caller analysis, impact, and affected tests.
-- Use Serena for symbol-precise navigation, references, renames, and LSP
-  diagnostics when its language server is healthy.
+- Use Tokensave for symbol-precise navigation too: callers/callees, impact,
+  and reference lookups; fall back to `rg` for exact text.
 - Query `.tokensave/tokensave.db` for structural questions unsupported by the
   Tokensave tools. Use direct source reads or `rg` for exact text, non-code,
   generated files, or unindexed details.
@@ -107,3 +107,5 @@ New/edited physics needs derivation docstring:
   - `Validation: <id>` marker
   - row in validation ledger.
 Verify physics with fresh context, never one that wrote it; only human marks claim `signed-off`.
+
+@RTK.md
