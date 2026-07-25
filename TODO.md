@@ -21,17 +21,12 @@ Item generation:
 1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
 2. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
 3. **Checkpoint rework** split up material pickles into individual line and brem pickles, with each mat having a subdir in ./checkpoints/
-4. **>user< Multiple sweep types and related changes.** Different setups for different purposes, with configs for each independently adjustable:
-   1. Full sweep uses current default settings -- fine steps, wide ranges, large Ne's, many angles/thicknesses swept over, lower threhold for included lattice vectors, etc
-   2. Survey sweep (placeholder/provisional name, give some options) -- wider step, narrower ranges, smaller Ne's, etc.
-      1. Survey sweeps have a high likelihood to proliferate many checkpoints or datasets with slightly varied parameter sets. This seemingly won't be well tolerated by the current system of checkpoint management. Evaluate alternative methods, provide options
-   3. These should generally support `reline`/`rebrem`. We should maybe rename/slightly rework `reline` and `rebrem` commands (split to separate TODO line item?) to support more general use for when users just want to see line or brem data alone without calculating the other
-   4) add flags to `rebrem` and `reline` that let you set new default values for each step, start, and/or stop, for `--all` or for the full set of provided `<mats>` (all mats provided would get same new defaults)
-   5) Confirm that if user types `cxr pull --brem-only <mat1> <mat2>`, it will pull brem-only for BOTH materials (or full set of materials). Same with `--line-only` and related cmd's (options should generally apply to all provided mats across all repo cmds unless explicitly denoted otherwise)
-5. **>user< Add NIST brem background dataset comparison/subtraction, as is done in Zhai et. al.**
-6. **>user< Create citation ledger/document to cite all major literature used in development**. Will require agents to evaluate literature sources. Should be tied deeply to validation ledger.
-7.  **>user< Confirm no more placeholder debye-waller factors.** Ensure all are literature-supported. Also, confirm no crystals have significant anisotropy in Debye-Waller (currently only single scalar value supported for each mat)
-8. **>user< Fix remote (GPU?) OOM bug on `rebrem`.** Seen multiple times when running `cxr remote rebrem --all --ne-brem 500 --step 20`. Failed on multiple different materials multiple times (check remote logs, should have notes). Rerunning those mats generally led to success
+4. **>user< Named sweep profiles and dataset identity.** Define independently configurable `full` (current production defaults) and provisional `survey` (coarser grids, narrower ranges, lower electron counts, and reduced angle/thickness/reflection sets) profiles; include profile plus resolved-parameter provenance in dataset identity, and design variant storage/archive handling with the checkpoint rework. Naming alternatives: `preview` or `coarse`.
+5. **>user< Persistent component-recompute defaults and batch parity.** Extend existing line-only `reline` and brem-only `rebrem` commands with profile-aware start/stop/step/electron-count defaults shared across explicit material lists or `--all`; keep current names unless a unified component interface adds clear value, and add explicit multi-material partial-pull regression tests (`--brem-only`/`--line-only` already apply to the full material list).
+6. **>user< Zhai/NIST DTSA-II bremsstrahlung validation and subtraction.** Add versioned external-background fixtures, normalization/provenance documentation, model comparison, and experimental fit/subtraction in the validation path; reuse existing `load_external_brem` ingestion instead of treating DTSA-II as one canonical NIST dataset.
+7. **>user< Literature provenance ledger.** Create a canonical bibliography with stable source IDs for major physics and data claims, audit primary-source/license quality, and link validation-ledger rows plus in-code `Validation: <id>` markers without duplicating derivations.
+8. **>user< Debye-Waller provenance and anisotropy audit.** Replace placeholder or reused `B_ang2` values with temperature/phase-specific primary-source values, record provenance in the validation/literature ledgers, and assess atom-specific or tensor `U` requirements before extending the scalar catalog schema.
+9. **>user< `rebrem` GPU-memory regression.** Reproduce and measure `cxr remote rebrem --all --ne-brem 500 --step 20`; remote logs show VRAM accumulation after hundreds of records and current `_brem_for_case` bypasses the normal inter-case CuPy-pool release, so add a failing cadence regression, bounded-memory fix, and remote benchmark while preserving resumability.
 
 ### Gated
 
@@ -52,4 +47,4 @@ Item generation:
 
 ## P3 - lower / exploratory
 
-1. **>user< Git history cleanup.** Evaluate squashing commits in history (currently still a 1-user repo, soon to be more).
+1. **>user< Pre-collaboration Git history cleanup.** Inventory published refs, choose a squash boundary and future commit policy, tag/back up current history, then coordinate any one-time force-push and reclone before additional contributors begin work.
