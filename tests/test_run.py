@@ -19,6 +19,8 @@ from cxr_mc.run import (
     _checkpoint_save,
     _load_checkpoint_cached,
     _manifest_save,
+    _material_analysis_cache,
+    cached_material_analysis,
     cases_from_results,
     checkpoint_manifest,
     checkpoint_path_for,
@@ -37,8 +39,10 @@ from cxr_mc.run import (
 @pytest.fixture(autouse=True)
 def _clear_checkpoint_cache():
     _load_checkpoint_cached.cache_clear()
+    _material_analysis_cache.clear()
     yield
     _load_checkpoint_cached.cache_clear()
+    _material_analysis_cache.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -131,9 +135,7 @@ def test_brem_for_case_forwards_finite_footprint(monkeypatch):
         return {"transport": True}
 
     monkeypatch.setattr(runner, "simulate_trajectories", _transport)
-    monkeypatch.setattr(
-        runner, "_brem_wide_from_segments", lambda *args, **kwargs: np.array([0.0])
-    )
+    monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *args, **kwargs: np.array([0.0]))
 
     runner._brem_for_case(case, np.array([100.0]))
 
@@ -364,6 +366,35 @@ def test_load_checkpoint_cache_hit_is_silent(tmp_path, capsys):
     capsys.readouterr()  # discard the first (real) load's print
     load_checkpoint("hopg", checkpoint_dir=str(tmp_path))
     assert capsys.readouterr().out == ""
+
+
+def test_cached_material_analysis_survives_process_cache_reset(tmp_path, monkeypatch):
+    """Small analysis results persist after module-memory state disappears."""
+    checkpoint = tmp_path / "hopg.pkl"
+    with open(checkpoint, "wb") as f:
+        pickle.dump({"cfg": {30.0: {"value": 7}}}, f)
+
+    first = cached_material_analysis(
+        "hopg",
+        lambda results: results["cfg"][30.0]["value"],
+        ("quality_peak", None, 0.5),
+        checkpoint_dir=str(tmp_path),
+    )
+    assert first == 7
+
+    _material_analysis_cache.clear()  # model app exit + fresh process
+    monkeypatch.setattr(
+        "cxr_mc.run.load_checkpoint",
+        lambda *args, **kwargs: pytest.fail("persistent cache should avoid checkpoint reload"),
+    )
+
+    second = cached_material_analysis(
+        "hopg",
+        lambda results: results["cfg"][30.0]["value"],
+        ("quality_peak", None, 0.5),
+        checkpoint_dir=str(tmp_path),
+    )
+    assert second == 7
 
 
 # ---------------------------------------------------------------------------

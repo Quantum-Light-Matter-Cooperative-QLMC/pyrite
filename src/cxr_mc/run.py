@@ -25,8 +25,10 @@ montecarlo.run_cases.
 """
 
 import functools
+import hashlib
 import json
 import os
+import pickle
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -118,33 +120,58 @@ def load_checkpoint(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
 
 
 _material_analysis_cache = {}
+_MATERIAL_ANALYSIS_CACHE_VERSION = 1
+
+
+def _material_analysis_cache_path(path, key):
+    """Stable disk-cache path for one checkpoint analysis."""
+    payload = pickle.dumps((_MATERIAL_ANALYSIS_CACHE_VERSION, key), protocol=5)
+    digest = hashlib.sha256(payload).hexdigest()[:20]
+    return Path(path).parent / ".analysis-cache" / f"{Path(path).stem}-{digest}.pkl"
 
 
 def cached_material_analysis(material, analyze, key, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
-    """Cache ``analyze(load_checkpoint(material))`` per material, keyed on the
-    checkpoint's ``(path, mtime)`` plus caller-supplied ``key`` (e.g. the
-    selection parameters distinguishing what ``analyze`` computed).
+    """Persist ``analyze(load_checkpoint(material))`` per material, keyed on the
+    checkpoint's ``(resolved path, mtime_ns, size)`` plus caller-supplied ``key``
+    (e.g. selection parameters distinguishing what ``analyze`` computed).
 
     Distinct from :func:`_load_checkpoint_cached`, which memoizes the raw
     unpickle itself with ``maxsize=4`` -- fine for a user paging through 1-2
     materials at a time, but a cross-material comparison that touches every
     catalog material thrashes it, forcing a full 140-225 MB gzip re-unpickle
     of every material on each re-render. This cache instead stores
-    ``analyze``'s (small) return value with no size cap, so once a material's
-    checkpoint has been analyzed for a given ``key`` the pickle is never
-    touched again on that ``key`` -- even after it falls out of the small
-    unpickle cache -- until the checkpoint's mtime changes (a re-run scan).
+    ``analyze``'s small return value both in memory and under
+    ``checkpoints/.analysis-cache/``. Thus app restarts and eviction from the
+    small unpickle cache do not touch the large checkpoint again. Rewriting or
+    replacing the checkpoint invalidates the persistent entry automatically.
 
     Returns ``None`` if no checkpoint exists for ``material``, without
     calling ``analyze``."""
     path = checkpoint_path_for(material, checkpoint_dir)
     if not os.path.exists(path):
         return None
-    cache_key = (path, os.path.getmtime(path), key)
+    stat = os.stat(path)
+    checkpoint_key = (str(Path(path).resolve()), stat.st_mtime_ns, stat.st_size)
+    cache_key = (*checkpoint_key, key)
     if cache_key in _material_analysis_cache:
         return _material_analysis_cache[cache_key]
+
+    disk_path = _material_analysis_cache_path(path, key)
+    try:
+        cached = _checkpoint_io.load(disk_path)
+        if cached["checkpoint"] == checkpoint_key:
+            value = cached["value"]
+            _material_analysis_cache[cache_key] = value
+            return value
+    except (FileNotFoundError, EOFError, OSError, KeyError, TypeError, pickle.UnpicklingError):
+        pass
+
     value = analyze(load_checkpoint(material, checkpoint_dir))
     _material_analysis_cache[cache_key] = value
+    disk_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = disk_path.with_name(f".{disk_path.name}.{os.getpid()}.tmp")
+    _checkpoint_io.dump({"checkpoint": checkpoint_key, "value": value}, tmp)
+    os.replace(tmp, disk_path)
     return value
 
 
