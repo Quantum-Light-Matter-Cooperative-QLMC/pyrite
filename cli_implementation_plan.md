@@ -3,6 +3,53 @@
 Source evidence: `cli_audit_progress.md`. General audit is complete; do not repeat
 audit matrices unless changed code invalidates them. Full file is large; only surgical reads of it.
 
+## Handoff — 2026-07-25
+
+Stopping point: P0 tasks 1–7 complete. Task 17 was pulled forward after task 2
+and is also complete. P1 task 8 is complete; resume at task 9, **Build Click
+core**.
+
+Completed behavior:
+
+- Installed and forward-tested `cli-ui-ux` user-wide for Codex and Claude Code;
+  added canonical project skill plus synchronized Claude mirror. `AGENTS.md`
+  requires it for every CLI change.
+- Centralized validation/rendering now covers remote host, directory, executable,
+  SSH/SCP shell words, Bash payloads, and SBATCH directives.
+- Line-grid submit forwards geometry/default flags through remote slices; writes
+  validate before replacement, reject invalid domains, and roll back catalog and
+  provenance together.
+- Line-grid defaults/show/derive semantics match decisions below, including real
+  `--brem-step` output and stale-golden stderr warning with successful mutation.
+- Follow-log failures and interrupts propagate; pull aggregates partial failures;
+  public dataset/output/metadata inputs validate.
+- `regen-golden` is source-checkout-only with precise installed-wheel failure.
+- Remote jobs/status/attach presentation sanitizes controls and uses versioned
+  base64 framing instead of `@@`; raw log commands remain raw.
+- Post-P0 argparse contract is frozen in `tests/data/cli_contract.json`: 51
+  root/nested command nodes with options, defaults, exact help, dispatch, mutual
+  exclusions, and explicit P0 correction markers. Every help path plus root
+  version/usage stream and exit behavior has focused regression coverage.
+
+Verification:
+
+- Combined remote + line-grid integration suite: `308 passed`.
+- Full `scripts/dev.py verify`: lint, typecheck, and skill-mirror checks passed.
+  Tests reached `1282 passed, 22 skipped`; two failures are outside CLI-touched
+  code: CuPy-to-NumPy conversion in
+  `test_brem_groove_gain_matches_beer_lambert_escape` and a `1.19e-7` numerical
+  tolerance miss in
+  `test_finite_side_exit_layered_absorption_stays_in_emission_layer`.
+- First sandboxed full run had one forkserver `PermissionError`; escalated rerun
+  cleared that infrastructure failure and exposed only the two failures above.
+
+Handoff notes:
+
+- Preserve all current uncommitted P0 changes; no commits were created.
+- Preserve `scripts/freeze_cli_contract.py`, `tests/test_cli_contract.py`, and
+  `tests/data/cli_contract.json` during task 9; adapt snapshot plumbing only when
+  Click replaces argparse.
+
 ## Decisions
 
 - Execute full queue in phases. Verify P0-P1 before P2-P3.
@@ -85,27 +132,27 @@ One task per agent. Run tasks sharing line-grid or remote owners sequentially.
 
 ### P0: skill, security, correctness
 
-1. **Create `cli-ui-ux` skill** — install user-wide for Codex and Claude Code;
+1. **DONE — Create `cli-ui-ux` skill** — installed user-wide for Codex and Claude Code;
    enforce from repository instructions. Cover naming, help, prompts, streams,
    exits, progress, TTY/Unicode, JSON/NDJSON, completion, accessibility,
    destructive actions, tests, and compatibility. Use `skill-creator`; validate
    and forward-test it.
-2. **Harden remote config** — central validation/rendering for `HOST`,
+2. **DONE — Harden remote config** — central validation/rendering for `HOST`,
    `REMOTE_DIR`, and `REMOTE_UV`; hostile SSH/SCP/Bash/SBATCH tests.
-3. **Forward line-grid submit flags** — carry all accepted geometry/default flags
+3. **DONE — Forward line-grid submit flags** — carry all accepted geometry/default flags
    through CLI, `job.start()`, slice payload, and derive command.
-4. **Make line-grid writes safe** — validate proposed catalog before replacement;
+4. **DONE — Make line-grid writes safe** — validate proposed catalog before replacement;
    validate numeric domains; failed writes leave catalog/provenance unchanged.
-5. **Fix line-grid semantics** — reject defaults values without `--set`; fail
+5. **DONE — Fix line-grid semantics** — reject defaults values without `--set`; fail
    unknown-material show; apply `--brem-step` to output; warn on stale golden.
-6. **Propagate remote failures** — follow-log status and interrupt 130; aggregate
+6. **DONE — Propagate remote failures** — follow-log status and interrupt 130; aggregate
    pull failure; validate dataset/output names/metadata.
-7. **Fix `regen-golden`** — require source checkout with precise installed-wheel
+7. **DONE — Fix `regen-golden`** — require source checkout with precise installed-wheel
    error; test source and isolated wheel.
 
 ### P1: Click migration
 
-8. **Freeze current contract** — snapshot command tree, options, defaults, help,
+8. **DONE — Freeze current contract** — snapshot command tree, options, defaults, help,
    dispatch, exits, and streams. Mark intentional changes from this plan.
 9. **Build Click core** — dependency, lazy `click.Group`, shared decorators,
    parameter types, output/error helpers, and test utilities.
@@ -130,7 +177,7 @@ One task per agent. Run tasks sharing line-grid or remote owners sequentially.
 
 ### P3: presentation and automation
 
-17. **Sanitize remote presentation** — status/jobs/attach controls and framing.
+17. **DONE — Sanitize remote presentation** — status/jobs/attach controls and framing.
 18. **Add read-only JSON** — remote jobs/status, line-grid defaults/show, archives.
 19. **Add operation JSON** — scan/blaze/rebrem/reline and remote pull.
 

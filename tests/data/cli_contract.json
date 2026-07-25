@@ -1,0 +1,3445 @@
+{
+  "intentional_p0_corrections": [
+    {
+      "contract": "Reject unsafe host, remote directory, executable, SSH/SCP word, Bash payload, and SBATCH directive inputs before crossing process boundaries.",
+      "id": "remote-input-validation",
+      "paths": [
+        "remote"
+      ]
+    },
+    {
+      "contract": "Forward tilts, azimuths, thickness, and set-default through every remote slice.",
+      "id": "line-grid-submit-forwarding",
+      "paths": [
+        "line-grid submit"
+      ]
+    },
+    {
+      "contract": "Validate proposed catalog and provenance before atomic replacement; failed writes leave both unchanged.",
+      "id": "line-grid-atomic-validation",
+      "paths": [
+        "line-grid apply",
+        "line-grid set",
+        "line-grid set-brem"
+      ]
+    },
+    {
+      "contract": "Value flags require --set; numeric domains are validated; zero is preserved only where documented.",
+      "id": "line-grid-defaults-semantics",
+      "paths": [
+        "line-grid defaults"
+      ]
+    },
+    {
+      "contract": "--brem-step controls derived bremsstrahlung grid spacing.",
+      "id": "line-grid-brem-step",
+      "paths": [
+        "line-grid derive"
+      ]
+    },
+    {
+      "contract": "Stale material-catalog golden emits stderr warning after successful mutation.",
+      "id": "line-grid-stale-golden",
+      "paths": [
+        "line-grid apply",
+        "line-grid set",
+        "line-grid set-brem"
+      ]
+    },
+    {
+      "contract": "Follow-log failures are nonzero, interruption is 130, and partial pull failures remain failures even when some items succeed.",
+      "id": "remote-failure-exits",
+      "paths": [
+        "remote logs",
+        "remote pull"
+      ]
+    },
+    {
+      "contract": "Command succeeds only from source checkout and fails clearly from installed wheel.",
+      "id": "regen-golden-source-only",
+      "paths": [
+        "line-grid regen-golden"
+      ]
+    },
+    {
+      "contract": "Human presentation sanitizes controls and machine framing uses versioned base64 fields.",
+      "id": "remote-presentation-safety",
+      "paths": [
+        "remote attach",
+        "remote jobs",
+        "remote status"
+      ]
+    }
+  ],
+  "root": {
+    "actions": [
+      {
+        "action": "_VersionAction",
+        "choices": null,
+        "const": null,
+        "default": "<SUPPRESS>",
+        "dest": "version",
+        "help": "show program's version number and exit",
+        "metavar": null,
+        "nargs": 0,
+        "option_strings": [
+          "--version"
+        ],
+        "required": false,
+        "type": null
+      }
+    ],
+    "description": "Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.",
+    "dispatch": null,
+    "epilog": null,
+    "help": "usage: cxr [-h] [--version]\n           {scan,blaze,export,analyze,slim,rebrem,reline,archive,restore,archives,union,remote,line-grid,check,check-config} ...\n\nCoherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.\n\npositional arguments:\n  {scan,blaze,export,analyze,slim,rebrem,reline,archive,restore,archives,union,remote,line-grid,check,check-config}\n    scan                run one material's MC sweep -> checkpoint\n    blaze               run one material's blazed-crystal MC sweep -> _blazed\n                        checkpoint\n    export              render notebooks/analysis_app.py ->\n                        results/<stem>.html\n    analyze             launch notebooks/analysis_app.py (marimo run/edit)\n    slim                shrink a checkpoint pickle for transfer\n    rebrem              recompute ONLY the brem background of existing\n                        checkpoints (new Ne_brem / grid spacing); line spectra\n                        untouched\n    reline              recompute ONLY the line spectra of existing\n                        checkpoints (new line grid / Ne); brem untouched\n    archive             copy an active checkpoint to the long-term shelf\n    restore             copy an archived checkpoint back to the active slot\n    archives            list the long-term shelf\n    union               merge an archived checkpoint into the active slot\n    remote              [dev] push code + run/manage MC sweeps on a remote GPU\n                        box over ssh\n    line-grid           derive/apply per-material line-grid bounds (local or\n                        on qlmc)\n    check               launch notebooks/validation_app.py (marimo run/edit),\n                        or --export its figures\n    check-config        validate the bundled material catalog or an explicit\n                        full catalog TOML\n\noptions:\n  -h, --help            show this help message and exit\n  --version             show program's version number and exit\n",
+    "mutually_exclusive_groups": [],
+    "path": "",
+    "prog": "cxr",
+    "subcommands": [
+      {
+        "actions": [
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "material",
+            "help": "crystal key, e.g. mose2 / hopg / silicon / ptse2",
+            "metavar": null,
+            "nargs": "?",
+            "option_strings": [],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "all",
+            "help": "run every material in mats_to_sim.toml",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "-a",
+              "--all"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "workers",
+            "help": "run_cases max_workers (default auto; 0 = serial, no transport pool)",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--workers"
+            ],
+            "required": false,
+            "type": "builtins.int"
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "quick",
+            "help": "tiny grid (5 polar tilts x 2 azimuths x 2 energies) for a smoke test",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--quick"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "n_families",
+            "help": "override the number of dominant reflection families (crystallography.dominant_reflections; default is the material's Sweep default)",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--n-families"
+            ],
+            "required": false,
+            "type": "builtins.int"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "beam_uvw",
+            "help": "override the beam zone axis [uvw] (default: the catalog crystal's beam_uvw)",
+            "metavar": [
+              "H",
+              "K",
+              "L"
+            ],
+            "nargs": 3,
+            "option_strings": [
+              "--beam-uvw"
+            ],
+            "required": false,
+            "type": "builtins.int"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": "checkpoints",
+            "dest": "checkpoint_dir",
+            "help": null,
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--checkpoint-dir"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "max_minutes",
+            "help": "soft wall-clock budget; exit 75 if work remains (chained remote slices)",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--max-minutes"
+            ],
+            "required": false,
+            "type": "builtins.float"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "progress_file",
+            "help": "<SUPPRESS>",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--progress-file"
+            ],
+            "required": false,
+            "type": "pathlib.Path"
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "no_progress",
+            "help": "<SUPPRESS>",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--no-progress"
+            ],
+            "required": false,
+            "type": null
+          }
+        ],
+        "description": null,
+        "dispatch": "cxr_mc.scan.run",
+        "epilog": null,
+        "help": "usage: cxr scan [-h] [-a] [--workers WORKERS] [--quick]\n                [--n-families N_FAMILIES] [--beam-uvw H K L]\n                [--checkpoint-dir CHECKPOINT_DIR] [--max-minutes MAX_MINUTES]\n                [material]\n\npositional arguments:\n  material              crystal key, e.g. mose2 / hopg / silicon / ptse2\n\noptions:\n  -h, --help            show this help message and exit\n  -a, --all             run every material in mats_to_sim.toml\n  --workers WORKERS     run_cases max_workers (default auto; 0 = serial, no\n                        transport pool)\n  --quick               tiny grid (5 polar tilts x 2 azimuths x 2 energies)\n                        for a smoke test\n  --n-families N_FAMILIES\n                        override the number of dominant reflection families\n                        (crystallography.dominant_reflections; default is the\n                        material's Sweep default)\n  --beam-uvw H K L      override the beam zone axis [uvw] (default: the\n                        catalog crystal's beam_uvw)\n  --checkpoint-dir CHECKPOINT_DIR\n  --max-minutes MAX_MINUTES\n                        soft wall-clock budget; exit 75 if work remains\n                        (chained remote slices)\n",
+        "mutually_exclusive_groups": [],
+        "path": "scan",
+        "prog": "cxr scan",
+        "subcommands": [],
+        "subparsers_required": null
+      },
+      {
+        "actions": [
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "material",
+            "help": "catalog crystal key, e.g. hopg",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [],
+            "required": true,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "energy",
+            "help": "beam energies in keV (one or more)",
+            "metavar": "E",
+            "nargs": "+",
+            "option_strings": [
+              "--energy"
+            ],
+            "required": true,
+            "type": "builtins.float"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "spacing",
+            "help": "groove spacing(s) in meters (one, or one per --energy)",
+            "metavar": "S",
+            "nargs": "+",
+            "option_strings": [
+              "--spacing"
+            ],
+            "required": true,
+            "type": "builtins.float"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "angles",
+            "help": "polar tilt_deg values (default: the material's std catalog grid)",
+            "metavar": "A",
+            "nargs": "+",
+            "option_strings": [
+              "--angles"
+            ],
+            "required": false,
+            "type": "builtins.float"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "workers",
+            "help": "run_cases max_workers (default auto; 0 = serial, no transport pool)",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--workers"
+            ],
+            "required": false,
+            "type": "builtins.int"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": "checkpoints",
+            "dest": "checkpoint_dir",
+            "help": null,
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--checkpoint-dir"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "max_minutes",
+            "help": "soft wall-clock budget; exit 75 if work remains (chained remote slices)",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--max-minutes"
+            ],
+            "required": false,
+            "type": "builtins.float"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "progress_file",
+            "help": "<SUPPRESS>",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--progress-file"
+            ],
+            "required": false,
+            "type": "pathlib.Path"
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "no_progress",
+            "help": "<SUPPRESS>",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--no-progress"
+            ],
+            "required": false,
+            "type": null
+          }
+        ],
+        "description": null,
+        "dispatch": "cxr_mc.blaze.run",
+        "epilog": null,
+        "help": "usage: cxr blaze [-h] --energy E [E ...] --spacing S [S ...]\n                 [--angles A [A ...]] [--workers WORKERS]\n                 [--checkpoint-dir CHECKPOINT_DIR] [--max-minutes MAX_MINUTES]\n                 material\n\npositional arguments:\n  material              catalog crystal key, e.g. hopg\n\noptions:\n  -h, --help            show this help message and exit\n  --energy E [E ...]    beam energies in keV (one or more)\n  --spacing S [S ...]   groove spacing(s) in meters (one, or one per --energy)\n  --angles A [A ...]    polar tilt_deg values (default: the material's std\n                        catalog grid)\n  --workers WORKERS     run_cases max_workers (default auto; 0 = serial, no\n                        transport pool)\n  --checkpoint-dir CHECKPOINT_DIR\n  --max-minutes MAX_MINUTES\n                        soft wall-clock budget; exit 75 if work remains\n                        (chained remote slices)\n",
+        "mutually_exclusive_groups": [],
+        "path": "blaze",
+        "prog": "cxr blaze",
+        "subcommands": [],
+        "subparsers_required": null
+      },
+      {
+        "actions": [
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "stem",
+            "help": "output filename stem (default: cxr_analysis_<date>)",
+            "metavar": null,
+            "nargs": "?",
+            "option_strings": [],
+            "required": false,
+            "type": null
+          }
+        ],
+        "description": null,
+        "dispatch": "cxr_mc.export.add_subparser.<locals>.<lambda>",
+        "epilog": null,
+        "help": "usage: cxr export [-h] [stem]\n\npositional arguments:\n  stem        output filename stem (default: cxr_analysis_<date>)\n\noptions:\n  -h, --help  show this help message and exit\n",
+        "mutually_exclusive_groups": [],
+        "path": "export",
+        "prog": "cxr export",
+        "subcommands": [],
+        "subparsers_required": null
+      },
+      {
+        "actions": [
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "material",
+            "help": "initial dropdown material (transient; default: persisted default, else hopg)",
+            "metavar": null,
+            "nargs": "?",
+            "option_strings": [],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "default",
+            "help": "also persist <material> as the new default for future no-argument runs",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "-d",
+              "--default"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "watch",
+            "help": "pass marimo's --watch",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--watch"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "smoke",
+            "help": "execute the app once headlessly and exit",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--smoke"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "edit",
+            "help": "use `marimo edit` instead of `marimo run`",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--edit"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "acp",
+            "help": "start local Claude and Codex ACP bridges",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--acp"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "tunnel",
+            "help": "use a fixed port for SSH tunneling",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--tunnel"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "no_token",
+            "help": "pass marimo's --no-token (disable auth token)",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--no-token"
+            ],
+            "required": false,
+            "type": null
+          }
+        ],
+        "description": null,
+        "dispatch": "cxr_mc.analyze._cli",
+        "epilog": null,
+        "help": "usage: cxr analyze [-h] [-d] [--watch] [--smoke] [--edit] [--acp] [--tunnel]\n                   [--no-token]\n                   [material]\n\npositional arguments:\n  material       initial dropdown material (transient; default: persisted\n                 default, else hopg)\n\noptions:\n  -h, --help     show this help message and exit\n  -d, --default  also persist <material> as the new default for future no-\n                 argument runs\n  --watch        pass marimo's --watch\n  --smoke        execute the app once headlessly and exit\n  --edit         use `marimo edit` instead of `marimo run`\n  --acp          start local Claude and Codex ACP bridges\n  --tunnel       use a fixed port for SSH tunneling\n  --no-token     pass marimo's --no-token (disable auth token)\n",
+        "mutually_exclusive_groups": [],
+        "path": "analyze",
+        "prog": "cxr analyze",
+        "subcommands": [],
+        "subparsers_required": null
+      },
+      {
+        "actions": [
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "checkpoint",
+            "help": "path to checkpoints/<material>.pkl",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [],
+            "required": true,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "out",
+            "help": "output path (default: <stem>.slim.pkl)",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "-o",
+              "--out"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "grid",
+            "help": "keep only the material's CURRENT-grid configs (material inferred from the checkpoint stem); drops configs left over from earlier grids",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--grid"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "drop_wide_brem",
+            "help": "drop the full-range brem arrays (brem_wide, E_grid_brem) -- the largest fields",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--drop-wide-brem"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "downcast",
+            "help": "store spectral arrays as float32 (halves their bytes)",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--downcast"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "const": null,
+            "default": 6,
+            "dest": "compresslevel",
+            "help": "gzip level for the output pickle (default: 6, matches a live sweep's checkpoint writes); 9 trades CPU for a smaller file, e.g. for a `cxr remote pull` transfer",
+            "metavar": "1-9",
+            "nargs": null,
+            "option_strings": [
+              "--compresslevel"
+            ],
+            "required": false,
+            "type": "builtins.int"
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "brem_only",
+            "help": "keep only the brem arrays (brem_wide/brem/E_grid_brem) per record",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--brem-only"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "line_only",
+            "help": "keep only the line arrays (spec/E_grid) per record",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--line-only"
+            ],
+            "required": false,
+            "type": null
+          }
+        ],
+        "description": null,
+        "dispatch": "cxr_mc.slim._cli",
+        "epilog": null,
+        "help": "usage: cxr slim [-h] [-o OUT] [--grid] [--drop-wide-brem] [--downcast]\n                [--compresslevel 1-9] [--brem-only | --line-only]\n                checkpoint\n\npositional arguments:\n  checkpoint           path to checkpoints/<material>.pkl\n\noptions:\n  -h, --help           show this help message and exit\n  -o, --out OUT        output path (default: <stem>.slim.pkl)\n  --grid               keep only the material's CURRENT-grid configs (material\n                       inferred from the checkpoint stem); drops configs left\n                       over from earlier grids\n  --drop-wide-brem     drop the full-range brem arrays (brem_wide,\n                       E_grid_brem) -- the largest fields\n  --downcast           store spectral arrays as float32 (halves their bytes)\n  --compresslevel 1-9  gzip level for the output pickle (default: 6, matches a\n                       live sweep's checkpoint writes); 9 trades CPU for a\n                       smaller file, e.g. for a `cxr remote pull` transfer\n  --brem-only          keep only the brem arrays (brem_wide/brem/E_grid_brem)\n                       per record\n  --line-only          keep only the line arrays (spec/E_grid) per record\n",
+        "mutually_exclusive_groups": [
+          {
+            "destinations": [
+              "brem_only",
+              "line_only"
+            ],
+            "required": false
+          }
+        ],
+        "path": "slim",
+        "prog": "cxr slim",
+        "subcommands": [],
+        "subparsers_required": null
+      },
+      {
+        "actions": [
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "material",
+            "help": "material stems (checkpoints/<material>.pkl); or use -a/--all",
+            "metavar": null,
+            "nargs": "*",
+            "option_strings": [],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "all",
+            "help": "recompute every *.pkl in the checkpoint dir",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "-a",
+              "--all"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "ne_brem",
+            "help": "new brem electron count (noise ~ 1/sqrt(Ne_brem); sweep default 100)",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--ne-brem"
+            ],
+            "required": false,
+            "type": "builtins.int"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "step",
+            "help": "new uniform wide-brem grid spacing [eV] (sweep default 50); grid is rebuilt from each record's low cutoff up to its beam energy",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--step"
+            ],
+            "required": false,
+            "type": "builtins.float"
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "redo_all",
+            "help": "recompute every record even if already at the target parameters (default skips those, making interrupted runs resumable)",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--redo-all"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": "checkpoints",
+            "dest": "checkpoint_dir",
+            "help": null,
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--checkpoint-dir"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "progress_file",
+            "help": "<SUPPRESS>",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--progress-file"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "max_minutes",
+            "help": "<SUPPRESS>",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--max-minutes"
+            ],
+            "required": false,
+            "type": "builtins.float"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": 100,
+            "dest": "save_every",
+            "help": "re-pickle the checkpoint every N repaired records (crash-safe)",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--save-every"
+            ],
+            "required": false,
+            "type": "builtins.int"
+          }
+        ],
+        "description": null,
+        "dispatch": "cxr_mc.rebrem._cli",
+        "epilog": null,
+        "help": "usage: cxr rebrem [-h] [-a] [--ne-brem NE_BREM] [--step STEP] [--redo-all]\n                  [--checkpoint-dir CHECKPOINT_DIR] [--save-every SAVE_EVERY]\n                  [material ...]\n\npositional arguments:\n  material              material stems (checkpoints/<material>.pkl); or use\n                        -a/--all\n\noptions:\n  -h, --help            show this help message and exit\n  -a, --all             recompute every *.pkl in the checkpoint dir\n  --ne-brem NE_BREM     new brem electron count (noise ~ 1/sqrt(Ne_brem);\n                        sweep default 100)\n  --step STEP           new uniform wide-brem grid spacing [eV] (sweep default\n                        50); grid is rebuilt from each record's low cutoff up\n                        to its beam energy\n  --redo-all            recompute every record even if already at the target\n                        parameters (default skips those, making interrupted\n                        runs resumable)\n  --checkpoint-dir CHECKPOINT_DIR\n  --save-every SAVE_EVERY\n                        re-pickle the checkpoint every N repaired records\n                        (crash-safe)\n",
+        "mutually_exclusive_groups": [],
+        "path": "rebrem",
+        "prog": "cxr rebrem",
+        "subcommands": [],
+        "subparsers_required": null
+      },
+      {
+        "actions": [
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "material",
+            "help": "material stems (checkpoints/<material>.pkl); or -a/--all",
+            "metavar": null,
+            "nargs": "*",
+            "option_strings": [],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "all",
+            "help": "recompute every *.pkl in the checkpoint dir",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "-a",
+              "--all"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "line_ne",
+            "help": "new line electron count (sweep default per material)",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--line-ne"
+            ],
+            "required": false,
+            "type": "builtins.int"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "line_step",
+            "help": "explicit uniform line-grid spacing [eV]; default rebuilds each record's grid from the material's current E_grid_line_by_energy config",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--line-step"
+            ],
+            "required": false,
+            "type": "builtins.float"
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "redo_all",
+            "help": "recompute every record even if already at target",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--redo-all"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": "checkpoints",
+            "dest": "checkpoint_dir",
+            "help": null,
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--checkpoint-dir"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "progress_file",
+            "help": "<SUPPRESS>",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--progress-file"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "max_minutes",
+            "help": "<SUPPRESS>",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--max-minutes"
+            ],
+            "required": false,
+            "type": "builtins.float"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": 100,
+            "dest": "save_every",
+            "help": "re-pickle every N relined records (crash-safe)",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--save-every"
+            ],
+            "required": false,
+            "type": "builtins.int"
+          }
+        ],
+        "description": null,
+        "dispatch": "cxr_mc.reline._cli",
+        "epilog": null,
+        "help": "usage: cxr reline [-h] [-a] [--line-ne LINE_NE] [--line-step LINE_STEP]\n                  [--redo-all] [--checkpoint-dir CHECKPOINT_DIR]\n                  [--save-every SAVE_EVERY]\n                  [material ...]\n\npositional arguments:\n  material              material stems (checkpoints/<material>.pkl); or\n                        -a/--all\n\noptions:\n  -h, --help            show this help message and exit\n  -a, --all             recompute every *.pkl in the checkpoint dir\n  --line-ne LINE_NE     new line electron count (sweep default per material)\n  --line-step LINE_STEP\n                        explicit uniform line-grid spacing [eV]; default\n                        rebuilds each record's grid from the material's\n                        current E_grid_line_by_energy config\n  --redo-all            recompute every record even if already at target\n  --checkpoint-dir CHECKPOINT_DIR\n  --save-every SAVE_EVERY\n                        re-pickle every N relined records (crash-safe)\n",
+        "mutually_exclusive_groups": [],
+        "path": "reline",
+        "prog": "cxr reline",
+        "subcommands": [],
+        "subparsers_required": null
+      },
+      {
+        "actions": [
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "stem",
+            "help": "active checkpoint stem, e.g. hopg",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [],
+            "required": true,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "label",
+            "help": "archive label (default: <stem>-<date>)",
+            "metavar": null,
+            "nargs": "?",
+            "option_strings": [],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "force",
+            "help": "overwrite an existing archive label",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--force"
+            ],
+            "required": false,
+            "type": null
+          }
+        ],
+        "description": null,
+        "dispatch": "cxr_mc.archive._cli_archive",
+        "epilog": null,
+        "help": "usage: cxr archive [-h] [--force] stem [label]\n\npositional arguments:\n  stem        active checkpoint stem, e.g. hopg\n  label       archive label (default: <stem>-<date>)\n\noptions:\n  -h, --help  show this help message and exit\n  --force     overwrite an existing archive label\n",
+        "mutually_exclusive_groups": [],
+        "path": "archive",
+        "prog": "cxr archive",
+        "subcommands": [],
+        "subparsers_required": null
+      },
+      {
+        "actions": [
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "label",
+            "help": "archive label to restore",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [],
+            "required": true,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "stem",
+            "help": "active stem (default: inferred)",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--as"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "force",
+            "help": "overwrite an existing active checkpoint",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--force"
+            ],
+            "required": false,
+            "type": null
+          }
+        ],
+        "description": null,
+        "dispatch": "cxr_mc.archive._cli_restore",
+        "epilog": null,
+        "help": "usage: cxr restore [-h] [--as STEM] [--force] label\n\npositional arguments:\n  label       archive label to restore\n\noptions:\n  -h, --help  show this help message and exit\n  --as STEM   active stem (default: inferred)\n  --force     overwrite an existing active checkpoint\n",
+        "mutually_exclusive_groups": [],
+        "path": "restore",
+        "prog": "cxr restore",
+        "subcommands": [],
+        "subparsers_required": null
+      },
+      {
+        "actions": [],
+        "description": null,
+        "dispatch": "cxr_mc.archive._cli_archives",
+        "epilog": null,
+        "help": "usage: cxr archives [-h]\n\noptions:\n  -h, --help  show this help message and exit\n",
+        "mutually_exclusive_groups": [],
+        "path": "archives",
+        "prog": "cxr archives",
+        "subcommands": [],
+        "subparsers_required": null
+      },
+      {
+        "actions": [
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "stem",
+            "help": "active checkpoint stem, e.g. hopg",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [],
+            "required": true,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "label",
+            "help": "archive label to union in",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [],
+            "required": true,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "no_archive",
+            "help": "skip archiving the live checkpoint before mutating it (default: archive first)",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--no-archive"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "delete_archive",
+            "help": "delete the source archive after a successful union (default: leave it intact)",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--delete-archive"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "force",
+            "help": "overwrite an existing pre-union archive label",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--force"
+            ],
+            "required": false,
+            "type": null
+          }
+        ],
+        "description": null,
+        "dispatch": "cxr_mc.archive._cli_union",
+        "epilog": null,
+        "help": "usage: cxr union [-h] [--no-archive] [--delete-archive] [--force] stem label\n\npositional arguments:\n  stem              active checkpoint stem, e.g. hopg\n  label             archive label to union in\n\noptions:\n  -h, --help        show this help message and exit\n  --no-archive      skip archiving the live checkpoint before mutating it\n                    (default: archive first)\n  --delete-archive  delete the source archive after a successful union\n                    (default: leave it intact)\n  --force           overwrite an existing pre-union archive label\n",
+        "mutually_exclusive_groups": [],
+        "path": "union",
+        "prog": "cxr union",
+        "subcommands": [],
+        "subparsers_required": null
+      },
+      {
+        "actions": [],
+        "description": null,
+        "dispatch": null,
+        "epilog": null,
+        "help": "usage: cxr remote [-h]\n                  {scan,rebrem,reline,start,attach,jobs,status,logs,stop,reap,pull,clear,sync,check} ...\n\npositional arguments:\n  {scan,rebrem,reline,start,attach,jobs,status,logs,stop,reap,pull,clear,sync,check}\n    scan                sync code, submit sweep(s), wait, and pull checkpoints\n    rebrem              recompute brem-only in the box's checkpoints (GPU),\n                        follow, and pull them back\n    reline              recompute line-only in the box's checkpoints (GPU),\n                        follow, and pull them back\n    start               sync code and submit a SLURM queue of materials\n                        (survives disconnect)\n    attach              live-track a job: status report, refreshed in place\n                        (Ctrl-C disconnects; default: latest)\n    jobs                list jobs with SLURM IDs, materials, and last events\n    status              show one job; -v allocation, -vv case progress and\n                        recent log\n    logs                show a job's diagnostic log (default: latest)\n    stop                cancel active SLURM job(s) by material, or every live\n                        job\n    reap                release checkpoint reservations orphaned by hard-\n                        killed jobs (dry preview unless --yes)\n    pull                fetch one or more existing checkpoints from the box\n    clear               delete a material's accumulated checkpoints on the\n                        box, or --all\n    sync                push the current code to the box only\n    check               run the Zhai reproduction + supplementary MC on the\n                        box, pull caches back\n\noptions:\n  -h, --help            show this help message and exit\n",
+        "mutually_exclusive_groups": [],
+        "path": "remote",
+        "prog": "cxr remote",
+        "subcommands": [
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "material",
+                "help": null,
+                "metavar": null,
+                "nargs": "?",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "all",
+                "help": "run every material in mats_to_sim.toml",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "-a",
+                  "--all"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "quick",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--quick"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "workers",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--workers"
+                ],
+                "required": false,
+                "type": "builtins.int"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": [
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "const": null,
+                "default": null,
+                "dest": "parallel_materials",
+                "help": "simultaneous material scans in one GPU allocation; only with --chunk-minutes 0, which defaults it to 2 (max: 4)",
+                "metavar": "N",
+                "nargs": null,
+                "option_strings": [
+                  "--parallel-materials"
+                ],
+                "required": false,
+                "type": "builtins.int"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": 10.0,
+                "dest": "chunk_minutes",
+                "help": "length of each self-resubmitting SLURM slice in minutes; 0 = one whole-box monolithic run (default: 10.0)",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--chunk-minutes"
+                ],
+                "required": false,
+                "type": "builtins.float"
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "no_sync",
+                "help": "skip the code upload",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--no-sync"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "grid",
+                "help": "grid-filter the checkpoint on the box before pulling",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--grid"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "drop_wide_brem",
+                "help": "with --grid: drop wide-brem too",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--drop-wide-brem"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "downcast",
+                "help": "with --grid: downcast to float32 too",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--downcast"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_scan]",
+            "epilog": null,
+            "help": "usage: cxr remote scan [-h] [-a] [--quick] [--workers WORKERS]\n                       [--parallel-materials N]\n                       [--chunk-minutes CHUNK_MINUTES] [--no-sync] [--grid]\n                       [--drop-wide-brem] [--downcast]\n                       [material]\n\npositional arguments:\n  material\n\noptions:\n  -h, --help            show this help message and exit\n  -a, --all             run every material in mats_to_sim.toml\n  --quick\n  --workers WORKERS\n  --parallel-materials N\n                        simultaneous material scans in one GPU allocation;\n                        only with --chunk-minutes 0, which defaults it to 2\n                        (max: 4)\n  --chunk-minutes CHUNK_MINUTES\n                        length of each self-resubmitting SLURM slice in\n                        minutes; 0 = one whole-box monolithic run (default:\n                        10.0)\n  --no-sync             skip the code upload\n  --grid                grid-filter the checkpoint on the box before pulling\n  --drop-wide-brem      with --grid: drop wide-brem too\n  --downcast            with --grid: downcast to float32 too\n",
+            "mutually_exclusive_groups": [],
+            "path": "remote scan",
+            "prog": "cxr remote scan",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "material",
+                "help": "one or more crystal keys",
+                "metavar": null,
+                "nargs": "*",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "all",
+                "help": "every material in mats_to_sim.toml",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "-a",
+                  "--all"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "ne_brem",
+                "help": "new brem electron count (noise ~ 1/sqrt(Ne_brem); sweep default 100)",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--ne-brem"
+                ],
+                "required": false,
+                "type": "builtins.int"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "step",
+                "help": "new uniform wide-brem grid spacing [eV] (sweep default 50)",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--step"
+                ],
+                "required": false,
+                "type": "builtins.float"
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "redo_all",
+                "help": "recompute every record even if already at the target parameters",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--redo-all"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": 10.0,
+                "dest": "chunk_minutes",
+                "help": "length of each self-resubmitting SLURM slice in minutes; 0 = one whole-box monolithic run (default: 10.0)",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--chunk-minutes"
+                ],
+                "required": false,
+                "type": "builtins.float"
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "no_sync",
+                "help": "skip the code upload",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--no-sync"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "dry_run",
+                "help": "print the SLURM batch script + submission command, don't ssh",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--dry-run"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_rebrem]",
+            "epilog": null,
+            "help": "usage: cxr remote rebrem [-h] [-a] [--ne-brem NE_BREM] [--step STEP]\n                         [--redo-all] [--chunk-minutes CHUNK_MINUTES]\n                         [--no-sync] [--dry-run]\n                         [material ...]\n\npositional arguments:\n  material              one or more crystal keys\n\noptions:\n  -h, --help            show this help message and exit\n  -a, --all             every material in mats_to_sim.toml\n  --ne-brem NE_BREM     new brem electron count (noise ~ 1/sqrt(Ne_brem);\n                        sweep default 100)\n  --step STEP           new uniform wide-brem grid spacing [eV] (sweep default\n                        50)\n  --redo-all            recompute every record even if already at the target\n                        parameters\n  --chunk-minutes CHUNK_MINUTES\n                        length of each self-resubmitting SLURM slice in\n                        minutes; 0 = one whole-box monolithic run (default:\n                        10.0)\n  --no-sync             skip the code upload\n  --dry-run             print the SLURM batch script + submission command,\n                        don't ssh\n",
+            "mutually_exclusive_groups": [],
+            "path": "remote rebrem",
+            "prog": "cxr remote rebrem",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "material",
+                "help": "one or more crystal keys",
+                "metavar": null,
+                "nargs": "*",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "all",
+                "help": "every material in mats_to_sim.toml",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "-a",
+                  "--all"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "line_ne",
+                "help": "new line electron count",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--line-ne"
+                ],
+                "required": false,
+                "type": "builtins.int"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "line_step",
+                "help": "explicit uniform line-grid spacing [eV] (default: from config)",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--line-step"
+                ],
+                "required": false,
+                "type": "builtins.float"
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "redo_all",
+                "help": "recompute every record even if already at target",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--redo-all"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": 10.0,
+                "dest": "chunk_minutes",
+                "help": "length of each self-resubmitting SLURM slice in minutes; 0 = one whole-box monolithic run (default: 10.0)",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--chunk-minutes"
+                ],
+                "required": false,
+                "type": "builtins.float"
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "no_sync",
+                "help": "skip the code upload",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--no-sync"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "dry_run",
+                "help": "print the SLURM batch script + submission command, don't ssh",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--dry-run"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_reline]",
+            "epilog": null,
+            "help": "usage: cxr remote reline [-h] [-a] [--line-ne LINE_NE] [--line-step LINE_STEP]\n                         [--redo-all] [--chunk-minutes CHUNK_MINUTES]\n                         [--no-sync] [--dry-run]\n                         [material ...]\n\npositional arguments:\n  material              one or more crystal keys\n\noptions:\n  -h, --help            show this help message and exit\n  -a, --all             every material in mats_to_sim.toml\n  --line-ne LINE_NE     new line electron count\n  --line-step LINE_STEP\n                        explicit uniform line-grid spacing [eV] (default: from\n                        config)\n  --redo-all            recompute every record even if already at target\n  --chunk-minutes CHUNK_MINUTES\n                        length of each self-resubmitting SLURM slice in\n                        minutes; 0 = one whole-box monolithic run (default:\n                        10.0)\n  --no-sync             skip the code upload\n  --dry-run             print the SLURM batch script + submission command,\n                        don't ssh\n",
+            "mutually_exclusive_groups": [],
+            "path": "remote reline",
+            "prog": "cxr remote reline",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "materials",
+                "help": "one or more crystal keys",
+                "metavar": null,
+                "nargs": "*",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "all",
+                "help": "queue every material in mats_to_sim.toml",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "-a",
+                  "--all"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "quick",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--quick"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "workers",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--workers"
+                ],
+                "required": false,
+                "type": "builtins.int"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": [
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "const": null,
+                "default": null,
+                "dest": "parallel_materials",
+                "help": "simultaneous material scans in one GPU allocation; only with --chunk-minutes 0, which defaults it to 2 (max: 4)",
+                "metavar": "N",
+                "nargs": null,
+                "option_strings": [
+                  "--parallel-materials"
+                ],
+                "required": false,
+                "type": "builtins.int"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": 10.0,
+                "dest": "chunk_minutes",
+                "help": "length of each self-resubmitting SLURM slice in minutes; 0 = one whole-box monolithic run (default: 10.0)",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--chunk-minutes"
+                ],
+                "required": false,
+                "type": "builtins.float"
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "no_sync",
+                "help": "skip the code upload",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--no-sync"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "dry_run",
+                "help": "print the SLURM batch script + submission command, don't ssh",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--dry-run"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "follow",
+                "help": "track the job live after launching (Ctrl-C disconnects; job keeps running)",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--follow",
+                  "-f"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_start]",
+            "epilog": null,
+            "help": "usage: cxr remote start [-h] [-a] [--quick] [--workers WORKERS]\n                        [--parallel-materials N]\n                        [--chunk-minutes CHUNK_MINUTES] [--no-sync]\n                        [--dry-run] [--follow]\n                        [materials ...]\n\npositional arguments:\n  materials             one or more crystal keys\n\noptions:\n  -h, --help            show this help message and exit\n  -a, --all             queue every material in mats_to_sim.toml\n  --quick\n  --workers WORKERS\n  --parallel-materials N\n                        simultaneous material scans in one GPU allocation;\n                        only with --chunk-minutes 0, which defaults it to 2\n                        (max: 4)\n  --chunk-minutes CHUNK_MINUTES\n                        length of each self-resubmitting SLURM slice in\n                        minutes; 0 = one whole-box monolithic run (default:\n                        10.0)\n  --no-sync             skip the code upload\n  --dry-run             print the SLURM batch script + submission command,\n                        don't ssh\n  --follow, -f          track the job live after launching (Ctrl-C\n                        disconnects; job keeps running)\n",
+            "mutually_exclusive_groups": [],
+            "path": "remote start",
+            "prog": "cxr remote start",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "jobid",
+                "help": null,
+                "metavar": null,
+                "nargs": "?",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_CountAction",
+                "choices": null,
+                "const": null,
+                "default": 0,
+                "dest": "verbose",
+                "help": "add SLURM allocation detail; repeat for the recent log tail (mirrors status)",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "-v",
+                  "--verbose"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_attach]",
+            "epilog": null,
+            "help": "usage: cxr remote attach [-h] [-v] [jobid]\n\npositional arguments:\n  jobid\n\noptions:\n  -h, --help     show this help message and exit\n  -v, --verbose  add SLURM allocation detail; repeat for the recent log tail\n                 (mirrors status)\n",
+            "mutually_exclusive_groups": [],
+            "path": "remote attach",
+            "prog": "cxr remote attach",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [],
+            "description": null,
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_jobs]",
+            "epilog": null,
+            "help": "usage: cxr remote jobs [-h]\n\noptions:\n  -h, --help  show this help message and exit\n",
+            "mutually_exclusive_groups": [],
+            "path": "remote jobs",
+            "prog": "cxr remote jobs",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "jobid",
+                "help": null,
+                "metavar": null,
+                "nargs": "?",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_CountAction",
+                "choices": null,
+                "const": null,
+                "default": 0,
+                "dest": "verbose",
+                "help": "add SLURM allocation detail; repeat for case progress and recent log",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "-v",
+                  "--verbose"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_status]",
+            "epilog": null,
+            "help": "usage: cxr remote status [-h] [-v] [jobid]\n\npositional arguments:\n  jobid\n\noptions:\n  -h, --help     show this help message and exit\n  -v, --verbose  add SLURM allocation detail; repeat for case progress and\n                 recent log\n",
+            "mutually_exclusive_groups": [],
+            "path": "remote status",
+            "prog": "cxr remote status",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "jobid",
+                "help": null,
+                "metavar": null,
+                "nargs": "?",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "follow",
+                "help": "stream live; Ctrl-C disconnects without stopping the job",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--follow",
+                  "-f"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_logs]",
+            "epilog": null,
+            "help": "usage: cxr remote logs [-h] [--follow] [jobid]\n\npositional arguments:\n  jobid\n\noptions:\n  -h, --help    show this help message and exit\n  --follow, -f  stream live; Ctrl-C disconnects without stopping the job\n",
+            "mutually_exclusive_groups": [],
+            "path": "remote logs",
+            "prog": "cxr remote logs",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "materials",
+                "help": "material name(s) owned by live jobs",
+                "metavar": null,
+                "nargs": "*",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "all",
+                "help": "stop every live job",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "-a",
+                  "--all"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": "cancel active SLURM job(s) by material, or every live job",
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_stop]",
+            "epilog": null,
+            "help": "usage: cxr remote stop [-h] [-a] [materials ...]\n\ncancel active SLURM job(s) by material, or every live job\n\npositional arguments:\n  materials   material name(s) owned by live jobs\n\noptions:\n  -h, --help  show this help message and exit\n  -a, --all   stop every live job\n",
+            "mutually_exclusive_groups": [],
+            "path": "remote stop",
+            "prog": "cxr remote stop",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": 5.0,
+                "dest": "min_age_minutes",
+                "help": "only reap reservations whose newest lock is older than this, guarding the reserve-before-submit window (default: 5.0)",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--min-age-minutes"
+                ],
+                "required": false,
+                "type": "builtins.float"
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "yes",
+                "help": "actually release (default: dry preview only)",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--yes"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": "release checkpoint reservations orphaned by hard-killed jobs whose owning SLURM allocation is gone (dry preview unless --yes)",
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_reap]",
+            "epilog": null,
+            "help": "usage: cxr remote reap [-h] [--min-age-minutes MIN_AGE_MINUTES] [--yes]\n\nrelease checkpoint reservations orphaned by hard-killed jobs whose owning\nSLURM allocation is gone (dry preview unless --yes)\n\noptions:\n  -h, --help            show this help message and exit\n  --min-age-minutes MIN_AGE_MINUTES\n                        only reap reservations whose newest lock is older than\n                        this, guarding the reserve-before-submit window\n                        (default: 5.0)\n  --yes                 actually release (default: dry preview only)\n",
+            "mutually_exclusive_groups": [],
+            "path": "remote reap",
+            "prog": "cxr remote reap",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "material",
+                "help": "checkpoint stem(s), e.g. mose2 mose2_quick",
+                "metavar": null,
+                "nargs": "*",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "all",
+                "help": "pull every material in mats_to_sim.toml",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "-a",
+                  "--all"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "full",
+                "help": "pull the full, un-filtered checkpoint instead of the default grid-filtered pull",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "-f",
+                  "--full"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "drop_wide_brem",
+                "help": "with grid pull: drop wide-brem too",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--drop-wide-brem"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "downcast",
+                "help": "with grid pull: downcast to float32 too",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--downcast"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "level9",
+                "help": "recompress on the box at gzip level 9 before transfer (lossless, just smaller/slower than the level-6 default a live sweep writes at)",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--level9"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "no_sync",
+                "help": "with grid pull: skip the pre-pull code sync",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--no-sync"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "brem_only",
+                "help": "merge ONLY the brem arrays into the local pickle (keep local line spectra)",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--brem-only"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "line_only",
+                "help": "merge ONLY the line spectra into the local pickle (keep local brem)",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--line-only"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "force",
+                "help": "with --brem-only/--line-only: insert records absent locally (default: skip + warn)",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--force"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_pull]",
+            "epilog": null,
+            "help": "usage: cxr remote pull [-h] [-a] [-f] [--drop-wide-brem] [--downcast]\n                       [--level9] [--no-sync] [--brem-only | --line-only]\n                       [--force]\n                       [material ...]\n\npositional arguments:\n  material          checkpoint stem(s), e.g. mose2 mose2_quick\n\noptions:\n  -h, --help        show this help message and exit\n  -a, --all         pull every material in mats_to_sim.toml\n  -f, --full        pull the full, un-filtered checkpoint instead of the\n                    default grid-filtered pull\n  --drop-wide-brem  with grid pull: drop wide-brem too\n  --downcast        with grid pull: downcast to float32 too\n  --level9          recompress on the box at gzip level 9 before transfer\n                    (lossless, just smaller/slower than the level-6 default a\n                    live sweep writes at)\n  --no-sync         with grid pull: skip the pre-pull code sync\n  --brem-only       merge ONLY the brem arrays into the local pickle (keep\n                    local line spectra)\n  --line-only       merge ONLY the line spectra into the local pickle (keep\n                    local brem)\n  --force           with --brem-only/--line-only: insert records absent\n                    locally (default: skip + warn)\n",
+            "mutually_exclusive_groups": [
+              {
+                "destinations": [
+                  "brem_only",
+                  "line_only"
+                ],
+                "required": false
+              }
+            ],
+            "path": "remote pull",
+            "prog": "cxr remote pull",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "materials",
+                "help": "crystal key(s); clears both <material>.pkl and <material>_quick.pkl for each",
+                "metavar": "material",
+                "nargs": "*",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "all_checkpoints",
+                "help": "empty the entire checkpoints/ directory (mutually exclusive with a material)",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--all"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "yes",
+                "help": "actually delete (default: dry preview only)",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--yes"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_clear]",
+            "epilog": null,
+            "help": "usage: cxr remote clear [-h] [--all] [--yes] [material ...]\n\npositional arguments:\n  material    crystal key(s); clears both <material>.pkl and\n              <material>_quick.pkl for each\n\noptions:\n  -h, --help  show this help message and exit\n  --all       empty the entire checkpoints/ directory (mutually exclusive with\n              a material)\n  --yes       actually delete (default: dry preview only)\n",
+            "mutually_exclusive_groups": [],
+            "path": "remote clear",
+            "prog": "cxr remote clear",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [],
+            "description": null,
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_sync]",
+            "epilog": null,
+            "help": "usage: cxr remote sync [-h]\n\noptions:\n  -h, --help  show this help message and exit\n",
+            "mutually_exclusive_groups": [],
+            "path": "remote sync",
+            "prog": "cxr remote sync",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": 20000,
+                "dest": "ne",
+                "help": "Fig.1c anchor line electrons per energy",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--ne"
+                ],
+                "required": false,
+                "type": "builtins.int"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": 200,
+                "dest": "ne_brem",
+                "help": "Fig.1c anchor bremsstrahlung electrons per energy",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--ne-brem"
+                ],
+                "required": false,
+                "type": "builtins.int"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": 200,
+                "dest": "ne_supp",
+                "help": "supplementary electrons per polar-tilt spectrum",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--ne-supp"
+                ],
+                "required": false,
+                "type": "builtins.int"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": 0.0,
+                "dest": "tmd_azimuth",
+                "help": "exploratory azimuth for TMD studies whose azimuth is unreported",
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--tmd-azimuth"
+                ],
+                "required": false,
+                "type": "builtins.float"
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "refresh",
+                "help": "recompute even if a matching cache exists",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--refresh"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "no_sync",
+                "help": "skip the code upload",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--no-sync"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "detached",
+                "help": "launch as a DETACHED job (survives disconnect)",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--detached",
+                  "-d"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "follow",
+                "help": "with --detached: track the job live after launching",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--follow",
+                  "-f"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "pull",
+                "help": "skip the run; just fetch existing zhai cache files",
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--pull"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc._remote.cli._dispatch.<locals>._run_cli[cxr_mc._remote.cli._cli_check]",
+            "epilog": null,
+            "help": "usage: cxr remote check [-h] [--ne NE] [--ne-brem NE_BREM] [--ne-supp NE_SUPP]\n                        [--tmd-azimuth TMD_AZIMUTH] [--refresh] [--no-sync]\n                        [--detached | --pull] [--follow]\n\noptions:\n  -h, --help            show this help message and exit\n  --ne NE               Fig.1c anchor line electrons per energy\n  --ne-brem NE_BREM     Fig.1c anchor bremsstrahlung electrons per energy\n  --ne-supp NE_SUPP     supplementary electrons per polar-tilt spectrum\n  --tmd-azimuth TMD_AZIMUTH\n                        exploratory azimuth for TMD studies whose azimuth is\n                        unreported\n  --refresh             recompute even if a matching cache exists\n  --no-sync             skip the code upload\n  --detached, -d        launch as a DETACHED job (survives disconnect)\n  --follow, -f          with --detached: track the job live after launching\n  --pull                skip the run; just fetch existing zhai cache files\n",
+            "mutually_exclusive_groups": [
+              {
+                "destinations": [
+                  "detached",
+                  "pull"
+                ],
+                "required": false
+              }
+            ],
+            "path": "remote check",
+            "prog": "cxr remote check",
+            "subcommands": [],
+            "subparsers_required": null
+          }
+        ],
+        "subparsers_required": true
+      },
+      {
+        "actions": [],
+        "description": null,
+        "dispatch": null,
+        "epilog": null,
+        "help": "usage: cxr line-grid [-h]\n                     {derive,submit,status,attach,logs,stop,apply,set,set-brem,defaults,show,regen-golden} ...\n\npositional arguments:\n  {derive,submit,status,attach,logs,stop,apply,set,set-brem,defaults,show,regen-golden}\n\noptions:\n  -h, --help            show this help message and exit\n",
+        "mutually_exclusive_groups": [],
+        "path": "line-grid",
+        "prog": "cxr line-grid",
+        "subcommands": [
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "materials",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--materials"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "energies",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--energies"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "tilts",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--tilts"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "azimuths",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--azimuths"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "thickness",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--thickness"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "set_default",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--set-default"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "brem_step",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--brem-step"
+                ],
+                "required": false,
+                "type": "cxr_mc.line_grid._positive_float"
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc.line_grid._cli_derive",
+            "epilog": null,
+            "help": "usage: cxr line-grid derive [-h] [--materials MATERIALS] [--energies ENERGIES]\n                            [--tilts TILTS] [--azimuths AZIMUTHS]\n                            [--thickness THICKNESS] [--set-default]\n                            [--brem-step BREM_STEP]\n\noptions:\n  -h, --help            show this help message and exit\n  --materials MATERIALS\n  --energies ENERGIES\n  --tilts TILTS\n  --azimuths AZIMUTHS\n  --thickness THICKNESS\n  --set-default\n  --brem-step BREM_STEP\n",
+            "mutually_exclusive_groups": [],
+            "path": "line-grid derive",
+            "prog": "cxr line-grid derive",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "materials",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--materials"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "energies",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--energies"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "tilts",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--tilts"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "azimuths",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--azimuths"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "thickness",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--thickness"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "set_default",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--set-default"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": 10.0,
+                "dest": "slice_minutes",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--slice-minutes"
+                ],
+                "required": false,
+                "type": "builtins.float"
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "no_sync",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--no-sync"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "dry_run",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--dry-run"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc.line_grid._cli_submit",
+            "epilog": null,
+            "help": "usage: cxr line-grid submit [-h] [--materials MATERIALS] [--energies ENERGIES]\n                            [--tilts TILTS] [--azimuths AZIMUTHS]\n                            [--thickness THICKNESS] [--set-default]\n                            [--slice-minutes SLICE_MINUTES] [--no-sync]\n                            [--dry-run]\n\noptions:\n  -h, --help            show this help message and exit\n  --materials MATERIALS\n  --energies ENERGIES\n  --tilts TILTS\n  --azimuths AZIMUTHS\n  --thickness THICKNESS\n  --set-default\n  --slice-minutes SLICE_MINUTES\n  --no-sync\n  --dry-run\n",
+            "mutually_exclusive_groups": [],
+            "path": "line-grid submit",
+            "prog": "cxr line-grid submit",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "jobid",
+                "help": null,
+                "metavar": null,
+                "nargs": "?",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_CountAction",
+                "choices": null,
+                "const": null,
+                "default": 0,
+                "dest": "verbose",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "-v",
+                  "--verbose"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc.line_grid._cli_status",
+            "epilog": null,
+            "help": "usage: cxr line-grid status [-h] [-v] [jobid]\n\npositional arguments:\n  jobid\n\noptions:\n  -h, --help     show this help message and exit\n  -v, --verbose\n",
+            "mutually_exclusive_groups": [],
+            "path": "line-grid status",
+            "prog": "cxr line-grid status",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "jobid",
+                "help": null,
+                "metavar": null,
+                "nargs": "?",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc.line_grid._cli_attach",
+            "epilog": null,
+            "help": "usage: cxr line-grid attach [-h] [jobid]\n\npositional arguments:\n  jobid\n\noptions:\n  -h, --help  show this help message and exit\n",
+            "mutually_exclusive_groups": [],
+            "path": "line-grid attach",
+            "prog": "cxr line-grid attach",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "jobid",
+                "help": null,
+                "metavar": null,
+                "nargs": "?",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "follow",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "-f",
+                  "--follow"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc.line_grid._cli_logs",
+            "epilog": null,
+            "help": "usage: cxr line-grid logs [-h] [-f] [jobid]\n\npositional arguments:\n  jobid\n\noptions:\n  -h, --help    show this help message and exit\n  -f, --follow\n",
+            "mutually_exclusive_groups": [],
+            "path": "line-grid logs",
+            "prog": "cxr line-grid logs",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "jobid",
+                "help": null,
+                "metavar": null,
+                "nargs": "?",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc.line_grid._cli_stop",
+            "epilog": null,
+            "help": "usage: cxr line-grid stop [-h] [jobid]\n\npositional arguments:\n  jobid\n\noptions:\n  -h, --help  show this help message and exit\n",
+            "mutually_exclusive_groups": [],
+            "path": "line-grid stop",
+            "prog": "cxr line-grid stop",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "json",
+                "help": null,
+                "metavar": null,
+                "nargs": "?",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "materials",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--materials"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "pull",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--pull"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "force",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--force"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "regen_golden",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--regen-golden"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "dry_run",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--dry-run"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc.line_grid._cli_apply",
+            "epilog": null,
+            "help": "usage: cxr line-grid apply [-h] [--materials MATERIALS] [--pull] [--force]\n                           [--regen-golden] [--dry-run]\n                           [json]\n\npositional arguments:\n  json\n\noptions:\n  -h, --help            show this help message and exit\n  --materials MATERIALS\n  --pull\n  --force\n  --regen-golden\n  --dry-run\n",
+            "mutually_exclusive_groups": [],
+            "path": "line-grid apply",
+            "prog": "cxr line-grid apply",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "material",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [],
+                "required": true,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "energy",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--energy"
+                ],
+                "required": true,
+                "type": "cxr_mc.line_grid._positive_float"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "stop",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--stop"
+                ],
+                "required": true,
+                "type": "cxr_mc.line_grid._positive_float"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "num",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--num"
+                ],
+                "required": false,
+                "type": "cxr_mc.line_grid._positive_int"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "start",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--start"
+                ],
+                "required": false,
+                "type": "cxr_mc.line_grid._positive_float"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "note",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--note"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc.line_grid._cli_set",
+            "epilog": null,
+            "help": "usage: cxr line-grid set [-h] --energy ENERGY --stop STOP [--num NUM]\n                         [--start START] [--note NOTE]\n                         material\n\npositional arguments:\n  material\n\noptions:\n  -h, --help       show this help message and exit\n  --energy ENERGY\n  --stop STOP\n  --num NUM\n  --start START\n  --note NOTE\n",
+            "mutually_exclusive_groups": [],
+            "path": "line-grid set",
+            "prog": "cxr line-grid set",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "material",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [],
+                "required": true,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "stop",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--stop"
+                ],
+                "required": true,
+                "type": "cxr_mc.line_grid._positive_float"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "step",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--step"
+                ],
+                "required": false,
+                "type": "cxr_mc.line_grid._positive_float"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "note",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--note"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc.line_grid._cli_set_brem",
+            "epilog": null,
+            "help": "usage: cxr line-grid set-brem [-h] --stop STOP [--step STEP] [--note NOTE]\n                              material\n\npositional arguments:\n  material\n\noptions:\n  -h, --help   show this help message and exit\n  --stop STOP\n  --step STEP\n  --note NOTE\n",
+            "mutually_exclusive_groups": [],
+            "path": "line-grid set-brem",
+            "prog": "cxr line-grid set-brem",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "set",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--set"
+                ],
+                "required": false,
+                "type": null
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "tilts",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--tilts"
+                ],
+                "required": false,
+                "type": "cxr_mc.line_grid._domain_csv.<locals>.parse"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "azimuths",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--azimuths"
+                ],
+                "required": false,
+                "type": "cxr_mc.line_grid._domain_csv.<locals>.parse"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "thickness",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--thickness"
+                ],
+                "required": false,
+                "type": "cxr_mc.line_grid._positive_csv.<locals>.parse"
+              },
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "brem_step",
+                "help": null,
+                "metavar": null,
+                "nargs": null,
+                "option_strings": [
+                  "--brem-step"
+                ],
+                "required": false,
+                "type": "cxr_mc.line_grid._positive_float"
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc.line_grid._cli_defaults",
+            "epilog": null,
+            "help": "usage: cxr line-grid defaults [-h] [--set] [--tilts TILTS]\n                              [--azimuths AZIMUTHS] [--thickness THICKNESS]\n                              [--brem-step BREM_STEP]\n\noptions:\n  -h, --help            show this help message and exit\n  --set\n  --tilts TILTS\n  --azimuths AZIMUTHS\n  --thickness THICKNESS\n  --brem-step BREM_STEP\n",
+            "mutually_exclusive_groups": [],
+            "path": "line-grid defaults",
+            "prog": "cxr line-grid defaults",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreAction",
+                "choices": null,
+                "const": null,
+                "default": null,
+                "dest": "material",
+                "help": null,
+                "metavar": null,
+                "nargs": "?",
+                "option_strings": [],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc.line_grid._cli_show",
+            "epilog": null,
+            "help": "usage: cxr line-grid show [-h] [material]\n\npositional arguments:\n  material\n\noptions:\n  -h, --help  show this help message and exit\n",
+            "mutually_exclusive_groups": [],
+            "path": "line-grid show",
+            "prog": "cxr line-grid show",
+            "subcommands": [],
+            "subparsers_required": null
+          },
+          {
+            "actions": [
+              {
+                "action": "_StoreTrueAction",
+                "choices": null,
+                "const": true,
+                "default": false,
+                "dest": "check",
+                "help": null,
+                "metavar": null,
+                "nargs": 0,
+                "option_strings": [
+                  "--check"
+                ],
+                "required": false,
+                "type": null
+              }
+            ],
+            "description": null,
+            "dispatch": "cxr_mc.line_grid._cli_regen_golden",
+            "epilog": null,
+            "help": "usage: cxr line-grid regen-golden [-h] [--check]\n\noptions:\n  -h, --help  show this help message and exit\n  --check\n",
+            "mutually_exclusive_groups": [],
+            "path": "line-grid regen-golden",
+            "prog": "cxr line-grid regen-golden",
+            "subcommands": [],
+            "subparsers_required": null
+          }
+        ],
+        "subparsers_required": true
+      },
+      {
+        "actions": [
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "watch",
+            "help": "pass marimo's --watch",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--watch"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "edit",
+            "help": "use `marimo edit` instead of `marimo run`",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--edit"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "acp",
+            "help": "start local Claude and Codex ACP bridges",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--acp"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "tunnel",
+            "help": "use a fixed port for SSH tunneling",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--tunnel"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreTrueAction",
+            "choices": null,
+            "const": true,
+            "default": false,
+            "dest": "export",
+            "help": "skip marimo; render the full Zhai figure set from cache to --outdir",
+            "metavar": null,
+            "nargs": 0,
+            "option_strings": [
+              "--export"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": "figures",
+            "dest": "outdir",
+            "help": "with --export: output directory",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--outdir"
+            ],
+            "required": false,
+            "type": null
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": 20000,
+            "dest": "ne",
+            "help": "with --export: Fig.1c line electrons",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--ne"
+            ],
+            "required": false,
+            "type": "builtins.int"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": 200,
+            "dest": "ne_brem",
+            "help": "with --export: Fig.1c brem electrons",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--ne-brem"
+            ],
+            "required": false,
+            "type": "builtins.int"
+          },
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": 200,
+            "dest": "ne_supp",
+            "help": "with --export: supplementary electrons",
+            "metavar": null,
+            "nargs": null,
+            "option_strings": [
+              "--ne-supp"
+            ],
+            "required": false,
+            "type": "builtins.int"
+          }
+        ],
+        "description": null,
+        "dispatch": "cxr_mc.check._cli",
+        "epilog": null,
+        "help": "usage: cxr check [-h] [--watch] [--edit] [--acp] [--tunnel] [--export]\n                 [--outdir OUTDIR] [--ne NE] [--ne-brem NE_BREM]\n                 [--ne-supp NE_SUPP]\n\noptions:\n  -h, --help         show this help message and exit\n  --watch            pass marimo's --watch\n  --edit             use `marimo edit` instead of `marimo run`\n  --acp              start local Claude and Codex ACP bridges\n  --tunnel           use a fixed port for SSH tunneling\n  --export           skip marimo; render the full Zhai figure set from cache\n                     to --outdir\n  --outdir OUTDIR    with --export: output directory\n  --ne NE            with --export: Fig.1c line electrons\n  --ne-brem NE_BREM  with --export: Fig.1c brem electrons\n  --ne-supp NE_SUPP  with --export: supplementary electrons\n",
+        "mutually_exclusive_groups": [],
+        "path": "check",
+        "prog": "cxr check",
+        "subcommands": [],
+        "subparsers_required": null
+      },
+      {
+        "actions": [
+          {
+            "action": "_StoreAction",
+            "choices": null,
+            "const": null,
+            "default": null,
+            "dest": "manifest",
+            "help": "full material catalog TOML (default: reload the bundled catalog)",
+            "metavar": null,
+            "nargs": "?",
+            "option_strings": [],
+            "required": false,
+            "type": null
+          }
+        ],
+        "description": null,
+        "dispatch": "cxr_mc.check_config._run",
+        "epilog": null,
+        "help": "usage: cxr check-config [-h] [manifest]\n\npositional arguments:\n  manifest    full material catalog TOML (default: reload the bundled catalog)\n\noptions:\n  -h, --help  show this help message and exit\n",
+        "mutually_exclusive_groups": [],
+        "path": "check-config",
+        "prog": "cxr check-config",
+        "subcommands": [],
+        "subparsers_required": null
+      }
+    ],
+    "subparsers_required": true
+  },
+  "schema_version": 1
+}
