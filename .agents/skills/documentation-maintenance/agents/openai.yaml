@@ -1,0 +1,4 @@
+interface:
+  display_name: "Documentation Maintenance"
+  short_description: "Keep cxr-mc docs accurate and synchronized"
+  default_prompt: "Use $documentation-maintenance to update and verify documentation affected by this change."
