@@ -578,6 +578,14 @@ def repair_brem_wide(
         r["brem_wide"] = brem_wide
         r["E_grid_brem"] = E_brem
         r["brem"] = np.interp(np.asarray(r["E_grid"], float), E_brem, brem_wide)
+        # Return this record's GPU scratch on the SAME A2 cadence the live sweep
+        # uses in _spectrum_case. _brem_for_case runs the full transport+spectrum
+        # path in-process, so without this the CuPy reserved pool grows and
+        # fragments record-over-record until a long `cxr rebrem` fills the card
+        # (Task 8). Guarded like the live path; skipped cases never reach here, so
+        # resumability (deadline break, save_cb, skip-at-target) is untouched.
+        if runner._GPU:
+            runner._maybe_free_pool()
         done = k
         if on_progress is not None:
             on_progress(k, len(todo), n_skipped)

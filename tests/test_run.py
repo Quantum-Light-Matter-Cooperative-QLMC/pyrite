@@ -839,6 +839,73 @@ def test_repair_brem_wide_delegates_stacked_case_to_runner(monkeypatch):
     assert np.allclose(record["brem_wide"], 0.002)  # repaired in place
 
 
+def test_repair_brem_wide_frees_gpu_pool_per_record(monkeypatch):
+    """rebrem's repair loop must hand the CuPy pool back to the card between
+    records, the SAME way the live sweep's _spectrum_case does -- else the
+    reserved pool grows and fragments across hundreds of records until VRAM
+    fills (Task 8 GPU-memory regression). One guarded free per repaired record."""
+    Eb = np.arange(0.0, 500.0, 50.0)
+
+    def _stale(cfg, e0):
+        return dict(
+            E_grid=np.arange(100.0, 200.0, 10.0),
+            spec=np.ones(10),
+            brem=np.ones(10) * 0.01,
+            E_grid_brem=Eb,
+            brem_wide=np.full_like(Eb, np.nan),  # nonfinite -> selected for repair
+            eta=0.05,
+            scale=1.0,
+            case=_fake_case(cfg, e0),
+        )
+
+    results = {
+        "cfg_a": {30.0: _stale("cfg_a", 30.0), 40.0: _stale("cfg_a", 40.0)},
+        "cfg_b": {50.0: _stale("cfg_b", 50.0)},
+    }
+    # keep the repair off the GPU: dummy brem, no real transport/spectrum.
+    monkeypatch.setattr(
+        "cxr_mc.montecarlo._brem_for_case",
+        lambda c, E_brem: np.full(np.asarray(E_brem, float).shape, 0.002),
+    )
+    # pretend a live GPU so the guarded inter-case cadence path executes, and
+    # count how often the pool is released instead of touching CuPy.
+    monkeypatch.setattr(runner, "_GPU", True)
+    freed = {"n": 0}
+    monkeypatch.setattr(runner, "_maybe_free_pool", lambda: freed.__setitem__("n", freed["n"] + 1))
+
+    n = repair_brem_wide(results, only_nonfinite=True, progress=False)
+    assert n == 3  # every stale record repaired
+    assert freed["n"] == 3  # ...and the pool released once per repaired record
+
+
+def test_repair_brem_wide_skips_pool_free_off_gpu(monkeypatch):
+    """CPU-default path (runner._GPU False) must NOT touch the pool -- the free
+    is guarded, so the byte-identical local repair never calls into CuPy."""
+    Eb = np.arange(0.0, 500.0, 50.0)
+    record = dict(
+        E_grid=np.arange(100.0, 200.0, 10.0),
+        spec=np.ones(10),
+        brem=np.ones(10) * 0.01,
+        E_grid_brem=Eb,
+        brem_wide=np.full_like(Eb, np.nan),
+        eta=0.05,
+        scale=1.0,
+        case=_fake_case("cfg_a", 30.0),
+    )
+    monkeypatch.setattr(
+        "cxr_mc.montecarlo._brem_for_case",
+        lambda c, E_brem: np.full(np.asarray(E_brem, float).shape, 0.002),
+    )
+    monkeypatch.setattr(runner, "_GPU", False)
+
+    def _boom():
+        raise AssertionError("pool free must not run off-GPU")
+
+    monkeypatch.setattr(runner, "_maybe_free_pool", _boom)
+    n = repair_brem_wide({"cfg_a": {30.0: record}}, only_nonfinite=True, progress=False)
+    assert n == 1
+
+
 def test_lines_for_case_matches_spectrum_case_single_slab():
     import numpy as np
 
