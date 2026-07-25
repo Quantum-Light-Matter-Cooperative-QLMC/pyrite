@@ -158,7 +158,7 @@ coverage energy, or `coverage_energy` would truncate.
 
 Each of the 4 `[materials.X]` blocks gains, from the report:
 
-```toml
+```text
 E_grid_line_by_energy = [
   { energy_keV = 30.0,  grid = { linspace = { start = <profile start>, stop = <bespoke>, num = <bespoke>, endpoint = true } } },
   ... 7 rows ...

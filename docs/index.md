@@ -3,15 +3,17 @@
 Coherent X-ray radiation — parametric X-ray radiation (PXR) plus coherent
 bremsstrahlung — from table-top electron beams in crystals.
 
-This site renders the **design notes** and the **API reference**. For the
-scientific overview, installation, materials, detectors, and the validation
-story, see the [project README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc#readme).
+This site renders current CLI and API references, user guides, validation
+records, and dated design history. For the scientific overview, installation,
+materials, detectors, and validation story, see the
+[project README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc#readme).
 
 ```{toctree}
 :caption: Guides
 :maxdepth: 1
 
 running-on-a-cluster
+cli-reference
 ```
 
 ```{toctree}
@@ -32,6 +34,7 @@ channeling-radiation-physics
 
 nonrelativistic-pxr-cbs-material-survey
 parameter-space-sampling-review
+crystal-db-comparison
 ```
 
 ```{toctree}
@@ -67,6 +70,7 @@ superpowers/plans/*
 :glob:
 
 superpowers/specs/*
+superpowers/README
 ```
 
 ```{toctree}

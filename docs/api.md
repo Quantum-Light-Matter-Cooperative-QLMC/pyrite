@@ -20,17 +20,22 @@ registries.
    cxr_mc.materials
    cxr_mc.analyze
    cxr_mc.archive
+   cxr_mc.blaze
    cxr_mc.check
    cxr_mc.check_config
    cxr_mc.config
    cxr_mc.detectors
+   cxr_mc.line_grid
    cxr_mc.montecarlo
    cxr_mc.plots
    cxr_mc.results
    cxr_mc.run
    cxr_mc.remote
+   cxr_mc.rebrem
+   cxr_mc.reline
    cxr_mc.slim
    cxr_mc.sweep
+   cxr_mc.validation_oracles
    cxr_mc.cli
    cxr_mc.scan
    cxr_mc.export

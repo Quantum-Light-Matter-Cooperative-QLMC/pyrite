@@ -79,7 +79,7 @@ scripts/export_pdf.py  legacy-named shim → cxr_mc.export (analysis app → sta
 src/cxr_mc/     importable package: physics modules + the cxr CLI entry point
 src/cxr_mc/data/  materials.toml, cifs/, atomic_scattering_factors/, mott_transport_cross_sections/, *_qe.csv
 checks/            validation scripts + notebooks (Feranchuk anchor, Zhai Fig 1c, kinematic audit)
-docs/              design notes & decision records (deferred features, library choices)
+docs/              documentation site: guides, validation records, API and CLI references, design history
 checkpoints/       per-material results pickles (gitignored)
 results/           exported static HTML and figures (generated artifacts gitignored)
 ```
@@ -162,9 +162,9 @@ structured so a GPU build is a base-image swap (see its header comment).
 
 ## Quickstart
 
-The workflow is **two marimo apps that share the immutable material catalog** — edit a
+The workflow is **three marimo apps that share the immutable material catalog** — edit a
 material's thickness / energies / tilts / energy grids in
-`src/cxr_mc/data/materials.toml` once and both apps pick it up.
+`src/cxr_mc/data/materials.toml` once and all three apps pick it up.
 
 1. **`notebooks/scan_app.py`** (the runner): choose a material, then
    `material_sweep(MATERIAL)` → `build_cases` → `run_sweep`, which writes
@@ -172,6 +172,8 @@ material's thickness / energies / tilts / energy grids in
 2. **`notebooks/analysis_app.py`** (the viz): choose the same material, `load_checkpoint`,
    `cases_from_results`, then `browse` / heatmaps / Eagle XO / Timepix /
    penetration figures. No sweeps run here.
+3. **`notebooks/validation_app.py`** (the checks): inspect literature anchors,
+   validation studies, and cached validation figures without changing sweep results.
 
 `COLLAPSE_AZIMUTH=True` (in `config.py`) keeps only the best azimuth per
 (tilt, energy).
@@ -370,11 +372,12 @@ numbers:
   orientation average (`mosaic_route="mc"`) are implemented and cross-checked against each
   other (`checks/mosaic_mc_check.py`), but **neither is yet validated against a measured HOPG
   rocking-curve / line-width dataset** — [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
-- **Detector solid angle** is treated as a single observation direction `n̂` with a flat Ω
-  flux scale and an analytic Gaussian polar-aperture broadening (`aperture_fwhm_eV`),
-  exactly as the source papers do. A first-principles integral over the detector face is
-  unimplemented; it matters for the wide SEM/TEM detectors (≈12–17°), not the small Timepix
-  Ω — [`docs/detector-solid-angle.md`](docs/detector-solid-angle.md).
+- **Detector solid angle** defaults to a single observation direction `n̂` with a flat Ω
+  flux scale and analytic Gaussian polar-aperture broadening (`aperture_fwhm_eV`), exactly
+  as the source papers do. `detector_directions` plus `mc_spectrum_solid_angle` provide a
+  validated opt-in face integral for wide-detector studies, but it is not wired into the
+  checkpoint/plot pipeline; the default remains appropriate for the small Timepix Ω —
+  [`docs/detector-solid-angle.md`](docs/detector-solid-angle.md).
 - **Atomic data** is sourced from **xraydb** (Waasmaier–Kirfel `f0` + Chantler/FFAST
   `f', f''`); the migration from the legacy Henke/CXRO + Cromer–Mann tables was adopted and
   re-validated against the Feranchuk/Zhai anchors —

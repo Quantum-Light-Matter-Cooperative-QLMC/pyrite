@@ -60,7 +60,7 @@ verified with mocked `run_cases`. OUT of scope for this branch:
   `<json_out>.<m>.json` + phase sidecar `<json_out>.<m>.json.phase.json`.
   (Reuse the proven resume/phase machinery verbatim per material.)
 - Combined output JSON shape (written once every material complete):
-  ```json
+  ```text
   { "hopg":   {"line_rows": [<7 rows>],
                "brem": {"stop_eV": <float>, "raw_eV": <float>, "step_eV": 25.0}},
     "diamond": {...}, "wse2": {...}, "mose2": {...} }

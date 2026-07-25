@@ -152,7 +152,7 @@ by text scan, find the managed assignment within, replace its span with freshly
 emitted text. Emitted rows keep the existing **one-inline-table-per-line**
 format for clean diffs:
 
-```toml
+```text
   { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 3000.0, num = 998, endpoint = true } }, source = "derived job 458 (2026-07-22)" },
 ```
 
