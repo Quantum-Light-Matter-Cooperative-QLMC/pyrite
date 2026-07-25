@@ -230,17 +230,11 @@ def _trajectory_data(
         end_xyz=(r + 0.5 * L[:, None] * v) / u,
         # Groove-gap flights remain diagnostic-only: they do not radiate and
         # therefore must never be appended to E/start_xyz/end_xyz.
-        vacuum_start_xyz=np.asarray(
-            segs.get("vacuum_start_ang", np.empty((0, 3))), dtype=float
-        )
+        vacuum_start_xyz=np.asarray(segs.get("vacuum_start_ang", np.empty((0, 3))), dtype=float)
         / u,
-        vacuum_end_xyz=np.asarray(
-            segs.get("vacuum_end_ang", np.empty((0, 3))), dtype=float
-        )
-        / u,
+        vacuum_end_xyz=np.asarray(segs.get("vacuum_end_ang", np.empty((0, 3))), dtype=float) / u,
         vacuum_E=np.asarray(segs.get("vacuum_E_keV", np.empty(0)), dtype=float),
-        vacuum_t_fs=np.asarray(segs.get("vacuum_t_ang", np.empty(0)), dtype=float)
-        / C_ANG_PER_FS,
+        vacuum_t_fs=np.asarray(segs.get("vacuum_t_ang", np.empty(0)), dtype=float) / C_ANG_PER_FS,
         vacuum_elec_id=np.asarray(
             segs.get("vacuum_elec_id", np.empty(0, dtype=np.int64)), dtype=np.int64
         ),

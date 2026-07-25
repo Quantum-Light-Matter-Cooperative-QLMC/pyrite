@@ -176,12 +176,8 @@ def test_track_vertices_3d_reveal_until_fs_none_is_unfiltered():
 
 def _synthetic_vacuum_data():
     return {
-        "vacuum_start_xyz": np.array(
-            [[0.0, 0.0, 0.0], [1.0, 1.0, 1.0], [2.0, 2.0, 2.0]]
-        ),
-        "vacuum_end_xyz": np.array(
-            [[0.5, 0.5, 0.5], [1.5, 1.5, 1.5], [2.5, 2.5, 2.5]]
-        ),
+        "vacuum_start_xyz": np.array([[0.0, 0.0, 0.0], [1.0, 1.0, 1.0], [2.0, 2.0, 2.0]]),
+        "vacuum_end_xyz": np.array([[0.5, 0.5, 0.5], [1.5, 1.5, 1.5], [2.5, 2.5, 2.5]]),
         "vacuum_E": np.array([30.0, 20.0, 10.0]),
         "vacuum_t_fs": np.array([0.0, 1.0, 4.0]),
         "vacuum_elec_id": np.array([0, 0, 1], dtype=np.int64),
@@ -198,9 +194,7 @@ def test_plotly_vacuum_trace_is_faint_turbo_colored_and_reveal_gated():
     assert trace.opacity == 0.4
     assert trace.line.width == 3
     expected_scale = plotly_colors.get_colorscale("Turbo")
-    assert [entry[1] for entry in trace.line.colorscale] == [
-        entry[1] for entry in expected_scale
-    ]
+    assert [entry[1] for entry in trace.line.colorscale] == [entry[1] for entry in expected_scale]
     np.testing.assert_allclose(
         [entry[0] for entry in trace.line.colorscale],
         [entry[0] for entry in expected_scale],

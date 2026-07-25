@@ -195,11 +195,7 @@ def vacuum_legs_trace(
     vertex_id[0::3], vertex_id[1::3] = elec_id, elec_id
     xyz = _rotate(xyz, R)
     custom = np.column_stack((vertex_energy, vertex_time, vertex_id))
-    color_max = (
-        float(cmax)
-        if cmax is not None
-        else (float(np.max(energy)) if energy.size else 1.0)
-    )
+    color_max = float(cmax) if cmax is not None else (float(np.max(energy)) if energy.size else 1.0)
     return go.Scatter3d(
         x=xyz[:, 0],
         y=xyz[:, 1],

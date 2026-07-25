@@ -36,9 +36,7 @@ def test_matplotlib_vacuum_legs_are_separate_faint_energy_collection():
         )
 
         vacuum_collections = [
-            collection
-            for collection in ax.collections
-            if isinstance(collection, LineCollection)
+            collection for collection in ax.collections if isinstance(collection, LineCollection)
         ]
         assert len(vacuum_collections) == 1
         vacuum = vacuum_collections[0]

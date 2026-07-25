@@ -53,9 +53,7 @@ def test_skill_validation_rejects_malformed_required_frontmatter(
         dev_module.validate_skill_file(path)
 
 
-def test_skill_validation_requires_name_to_match_directory(
-    dev_module, tmp_path: Path
-) -> None:
+def test_skill_validation_requires_name_to_match_directory(dev_module, tmp_path: Path) -> None:
     path = write_skill(tmp_path, "sample")
     path.write_text(path.read_text().replace("name: sample", "name: other"))
 
@@ -105,9 +103,7 @@ def test_check_skills_rejects_mirror_drift(
         dev_module.check_skill_trees(canonical, mirror)
 
 
-def test_sync_skills_replaces_stale_mirror_with_regular_files(
-    dev_module, tmp_path: Path
-) -> None:
+def test_sync_skills_replaces_stale_mirror_with_regular_files(dev_module, tmp_path: Path) -> None:
     canonical = tmp_path / "canonical"
     mirror = tmp_path / "mirror"
     source = write_skill(canonical, "sample")
@@ -140,9 +136,7 @@ def test_sync_skills_preserves_mirror_when_canonical_skill_is_invalid(
 
 
 def test_repository_skills_are_valid_and_exactly_mirrored(dev_module) -> None:
-    dev_module.check_skill_trees(
-        dev_module.AGENT_SKILLS_DIR, dev_module.CLAUDE_SKILLS_DIR
-    )
+    dev_module.check_skill_trees(dev_module.AGENT_SKILLS_DIR, dev_module.CLAUDE_SKILLS_DIR)
 
 
 def test_claude_project_memory_imports_shared_instructions() -> None:

@@ -113,9 +113,7 @@ def test_finite_side_exit_layered_absorption_stays_in_emission_layer():
         composition=carbon,
     )
     reference_line = mc_spectrum(segments, np.arange(700.0, 1500.0), **line_kw)
-    layered_line = mc_spectrum(
-        segments, np.arange(700.0, 1500.0), layers=layers, **line_kw
-    )
+    layered_line = mc_spectrum(segments, np.arange(700.0, 1500.0), layers=layers, **line_kw)
     np.testing.assert_allclose(layered_line, reference_line)
 
     brem_kw = dict(composition=carbon, n_hat=n_hat)

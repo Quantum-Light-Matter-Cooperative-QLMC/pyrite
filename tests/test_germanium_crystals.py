@@ -65,7 +65,9 @@ def test_germanium_family_structures_and_surface_couplings(
     spec = CATALOG.crystal(key)
     info = CRYSTALS[key]
 
-    actual_lattice = tuple(info["lattice"][name] for name in ("a", "b", "c", "alpha", "beta", "gamma"))
+    actual_lattice = tuple(
+        info["lattice"][name] for name in ("a", "b", "c", "alpha", "beta", "gamma")
+    )
     assert actual_lattice == pytest.approx(lattice, abs=1e-8)
     assert info["V_cell"] == pytest.approx(volume, abs=0.06)
     assert Counter(element for element, _ in info["basis"]) == counts

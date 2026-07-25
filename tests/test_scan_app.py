@@ -34,7 +34,10 @@ def test_scan_execution_is_downstream_of_explicit_button_value() -> None:
         cell
         for cell in tree.body
         if isinstance(cell, ast.FunctionDef)
-        and any(isinstance(node, ast.Call) and getattr(node.func, "id", None) == "run_sweep" for node in ast.walk(cell))
+        and any(
+            isinstance(node, ast.Call) and getattr(node.func, "id", None) == "run_sweep"
+            for node in ast.walk(cell)
+        )
     )
 
     assert "run_scan_ui" in {arg.arg for arg in run_cell.args.args}

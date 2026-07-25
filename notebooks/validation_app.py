@@ -107,7 +107,9 @@ def _(mo, page_title, status_badge, style_sheet):
             mo.hstack(
                 [
                     status_badge(mo, "Ready"),
-                    mo.md("**Evidence summary:** actions remain idle until their run button is pressed."),
+                    mo.md(
+                        "**Evidence summary:** actions remain idle until their run button is pressed."
+                    ),
                 ],
                 justify="start",
             ),
@@ -331,9 +333,7 @@ def _(check_authorities, check_reports, mo):
             f"```text\n{report['output']}\n```"
         )
     if check_reports is None:
-        anchors_results = mo.callout(
-            "Select checks above, then run them when ready.", kind="info"
-        )
+        anchors_results = mo.callout("Select checks above, then run them when ready.", kind="info")
     elif not check_reports:
         anchors_results = mo.callout("Select at least one check.", kind="warn")
     else:

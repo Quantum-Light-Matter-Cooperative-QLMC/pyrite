@@ -96,19 +96,15 @@ from cxr_mc.materials.crystal import CRYSTALS, U_g, chi_g, structure_factor
         ),
     ],
 )
-def test_pd_pt_structures_match_sources(
-    key, lattice, volume, counts, expected_sites, label
-):
+def test_pd_pt_structures_match_sources(key, lattice, volume, counts, expected_sites, label):
     """Pin the selected phases, source cells, and representative basis sites."""
     info = CRYSTALS[key]
 
     actual_lattice = tuple(
-        info["lattice"][name]
-        for name in ("a", "b", "c", "alpha", "beta", "gamma")
+        info["lattice"][name] for name in ("a", "b", "c", "alpha", "beta", "gamma")
     )
     actual_sites = {
-        (element, tuple(float(value) for value in position))
-        for element, position in info["basis"]
+        (element, tuple(float(value) for value in position)) for element, position in info["basis"]
     }
     assert actual_lattice == pytest.approx(lattice, abs=1e-8)
     assert info["V_cell"] == pytest.approx(volume, abs=0.06)
@@ -117,8 +113,7 @@ def test_pd_pt_structures_match_sources(
     assert len(actual_sites) == len(expected_sites)
     for expected_element, expected_position in expected_sites:
         assert any(
-            element == expected_element
-            and position == pytest.approx(expected_position, abs=1e-8)
+            element == expected_element and position == pytest.approx(expected_position, abs=1e-8)
             for element, position in actual_sites
         )
     assert CATALOG.material(key).label == label
@@ -134,9 +129,7 @@ def test_pd_pt_structures_match_sources(
         ("ptte2", (0, 0, 1), (0, 0, 1)),
     ],
 )
-def test_pd_pt_basal_surface_contracts_have_usable_couplings(
-    key, surface_hkl, reflection
-):
+def test_pd_pt_basal_surface_contracts_have_usable_couplings(key, surface_hkl, reflection):
     """The pinned reciprocal vector must be parallel to the cleavage surface."""
     spec = CATALOG.crystal(key)
 

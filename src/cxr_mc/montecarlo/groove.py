@@ -83,9 +83,7 @@ def blazed_groove_spec(spacing_ang, theta_obs_rad, tilt_polar_rad, tilt_azim_rad
     )
 
 
-def surface_depth_ang(
-    x: float | np.ndarray, spec: GrooveSpec
-) -> float | np.ndarray:
+def surface_depth_ang(x: float | np.ndarray, spec: GrooveSpec) -> float | np.ndarray:
     """
     Sawtooth entrance-surface depth [Ang] at lateral coordinate ``x`` [Ang].
 
@@ -125,9 +123,7 @@ def in_material(
     Validation: blazed-groove-geometry
     """
     p = np.asarray(position, dtype=float)
-    inside = (p[..., 2] >= surface_depth_ang(p[..., 0], spec)) & (
-        p[..., 2] <= thickness_ang
-    )
+    inside = (p[..., 2] >= surface_depth_ang(p[..., 0], spec)) & (p[..., 2] <= thickness_ang)
     if width_ang is not None:
         inside &= np.abs(p[..., 0]) <= width_ang / 2
     if height_ang is not None:

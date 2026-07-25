@@ -90,9 +90,7 @@ def _march_transition(position, direction, spec, transition, ds=2.5e-5):
     for _ in range(400_000):
         hi = lo + ds
         after = inside(hi)
-        matched = (before and not after) if transition == "exit" else (
-            not before and after
-        )
+        matched = (before and not after) if transition == "exit" else (not before and after)
         if matched:
             for _ in range(48):
                 mid = 0.5 * (lo + hi)
@@ -108,9 +106,7 @@ def _march_transition(position, direction, spec, transition, ds=2.5e-5):
 
 def test_surface_depth_matches_both_analytic_facets():
     x = np.array([0.0, SPEC.depth_ang * np.tan(TP), SPEC.spacing_ang])
-    np.testing.assert_allclose(
-        surface_depth_ang(x, SPEC), [0.0, SPEC.depth_ang, 0.0]
-    )
+    np.testing.assert_allclose(surface_depth_ang(x, SPEC), [0.0, SPEC.depth_ang, 0.0])
 
 
 def test_material_predicate_includes_surface_and_excludes_groove_void():
@@ -212,12 +208,7 @@ def test_escape_matches_ray_march():
     inside = z >= _z_surf(x, MARCH_SPEC) + 1e-6
     x, z = x[inside], z[inside]
     L = escape_distance_ang(x, z, MARCH_SPEC)
-    ref = np.array(
-        [
-            _march_escape(xi, zi, MARCH_SPEC)
-            for xi, zi in zip(x, z, strict=False)
-        ]
-    )
+    ref = np.array([_march_escape(xi, zi, MARCH_SPEC) for xi, zi in zip(x, z, strict=False)])
     np.testing.assert_allclose(
         L,
         ref,
@@ -412,9 +403,7 @@ def test_permanent_surface_exit_counts_backscatter(monkeypatch):
     monkeypatch.setattr(
         _transport_module,
         "first_surface_event",
-        lambda _p, _d, _spec, transition=None: (
-            0.5 if transition == "exit" else np.inf
-        ),
+        lambda _p, _d, _spec, transition=None: 0.5 if transition == "exit" else np.inf,
     )
 
     out = _one_electron_transport()
@@ -450,9 +439,7 @@ def test_surface_event_exhaustion_raises_instead_of_classifying_survivor_stopped
     monkeypatch.setattr(
         _transport_module,
         "first_surface_event",
-        lambda _p, _d, _spec, transition=None: (
-            0.5 if transition == "exit" else 1.0
-        ),
+        lambda _p, _d, _spec, transition=None: 0.5 if transition == "exit" else 1.0,
     )
 
     with pytest.raises(RuntimeError, match="grooved surface event limit exhausted"):
@@ -490,14 +477,10 @@ def test_repeated_zero_length_surface_events_raise(monkeypatch):
     monkeypatch.setattr(
         _transport_module,
         "first_surface_event",
-        lambda _p, _d, _spec, transition=None: (
-            0.5e-6 if transition == "exit" else 1.0
-        ),
+        lambda _p, _d, _spec, transition=None: 0.5e-6 if transition == "exit" else 1.0,
     )
 
-    with pytest.raises(
-        RuntimeError, match="repeated zero-length grooved surface events"
-    ):
+    with pytest.raises(RuntimeError, match="repeated zero-length grooved surface events"):
         _one_electron_transport(max_steps=2)
 
 
@@ -534,9 +517,7 @@ def test_finite_side_exit_before_reentry_records_no_vacuum_leg(monkeypatch):
     monkeypatch.setattr(
         _transport_module,
         "first_surface_event",
-        lambda _p, _d, _spec, transition=None: (
-            0.5 if transition == "exit" else 1.0
-        ),
+        lambda _p, _d, _spec, transition=None: 0.5 if transition == "exit" else 1.0,
     )
 
     out = _one_electron_transport(

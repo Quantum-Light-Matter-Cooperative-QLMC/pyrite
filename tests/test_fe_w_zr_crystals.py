@@ -155,9 +155,7 @@ def test_fe_w_zr_structures_match_source_cells_and_full_bases(
         ("zrte5", (0, 1, 0), (0, 2, 0)),
     ],
 )
-def test_fe_w_zr_surface_contracts_have_finite_nonzero_couplings(
-    key, surface_hkl, reflection
-):
+def test_fe_w_zr_surface_contracts_have_finite_nonzero_couplings(key, surface_hkl, reflection):
     """Pinned harmonics remain parallel to each cleavage plane and usable."""
     spec = CATALOG.crystal(key)
     assert spec.surface_hkl == surface_hkl

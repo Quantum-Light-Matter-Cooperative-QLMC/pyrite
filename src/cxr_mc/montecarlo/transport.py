@@ -447,9 +447,7 @@ def simulate_trajectories(
         [],
     )
     vac_start, vac_end, vac_E, vac_t0, vac_id = [], [], [], [], []
-    zero_surface_events = (
-        np.zeros(Ne, dtype=np.int16) if groove is not None else None
-    )
+    zero_surface_events = np.zeros(Ne, dtype=np.int16) if groove is not None else None
     material_steps = np.zeros(Ne, dtype=np.int32) if groove is not None else None
     surface_events = np.zeros(Ne, dtype=np.int32) if groove is not None else None
     lockstep_step = 0
@@ -650,9 +648,7 @@ def simulate_trajectories(
                     assert surface_events is not None
                     surface_events[re_global] += 1
                     if np.any(surface_events[re_global] > max_steps):
-                        raise RuntimeError(
-                            "grooved surface event limit exhausted"
-                        )
+                        raise RuntimeError("grooved surface event limit exhausted")
 
                 permanent = ~reentered & ~exit_side[surf_local]
                 exit_top[surf_local[permanent]] = True

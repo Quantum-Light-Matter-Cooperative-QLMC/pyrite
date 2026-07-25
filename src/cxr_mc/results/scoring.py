@@ -18,7 +18,14 @@ from .selection import records
 # Modes for ranking a record by its line_metrics, shared by every "pick the best
 # case" path (the heatmap cell reduction, plot_metric_vs, the top-N browser), so
 # they all agree on what "best" means.
-SELECTION_MODES = ("peak", "line_flux", "coherent_flux", "line_brem_ratio", "quality_peak", "quality_line")
+SELECTION_MODES = (
+    "peak",
+    "line_flux",
+    "coherent_flux",
+    "line_brem_ratio",
+    "quality_peak",
+    "quality_line",
+)
 
 
 def selection_score(m, mode="quality_peak"):

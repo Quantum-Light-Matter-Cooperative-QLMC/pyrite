@@ -57,10 +57,7 @@ def main(argv: list[str] | None = None) -> int:
         print("[smoke] FAIL: plot_best_spectra returned None")
         return 4
     figure.savefig(matplotlib_png, dpi=110, bbox_inches="tight")
-    print(
-        f"[smoke] wrote {matplotlib_png} "
-        f"({matplotlib_png.stat().st_size} bytes)"
-    )
+    print(f"[smoke] wrote {matplotlib_png} ({matplotlib_png.stat().st_size} bytes)")
 
     ranking = top_geometries(filtered, settings, top_n=10, select="quality_peak")
     print(f"[smoke] top geometries ({len(ranking)} rows):")
