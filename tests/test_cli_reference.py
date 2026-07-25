@@ -28,6 +28,9 @@ def test_checked_cli_reference_is_current():
         check=False,
     )
     assert completed.returncode == 0, completed.stderr
+    reference = REFERENCE.read_text(encoding="utf-8")
+    root_help = reference.split("## `cxr`", 1)[1].split("## `cxr ", 1)[0]
+    assert "-h, --help" in root_help
 
 
 def test_help_documents_examples_units_side_effects_and_incompatibilities():

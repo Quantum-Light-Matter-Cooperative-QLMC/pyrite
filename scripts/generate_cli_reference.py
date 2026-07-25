@@ -21,12 +21,16 @@ def _context(
     name: str,
     parent: click.Context | None = None,
 ) -> click.Context:
+    settings = dict(current.context_settings or {})
+    settings.update(
+        terminal_width=88,
+        max_content_width=88,
+    )
     return click.Context(
         current,
         info_name=name,
         parent=parent,
-        terminal_width=88,
-        max_content_width=88,
+        **settings,
     )
 
 

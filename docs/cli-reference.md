@@ -78,8 +78,8 @@ Usage: cxr [OPTIONS] COMMAND [ARGS]...
     cxr remote start mose2 --dry-run
 
 Options:
-  --version  Show the version and exit.
-  --help     Show this message and exit.
+  --version   Show the version and exit.
+  -h, --help  Show this message and exit.
 
 Commands:
   scan          Run one material's MC sweep and write a checkpoint.
@@ -120,7 +120,7 @@ Options:
                          checkpoints]
   --max-minutes MINUTES  Soft wall-clock budget in minutes; exit 75 if resumable work
                          remains.
-  --help                 Show this message and exit.
+  -h, --help             Show this message and exit.
 ```
 
 ## `cxr blaze`
@@ -143,7 +143,7 @@ Options:
                          checkpoints]
   --max-minutes MINUTES  Soft wall-clock budget in minutes; exit 75 if resumable work
                          remains.
-  --help                 Show this message and exit.
+  -h, --help             Show this message and exit.
 ```
 
 ## `cxr export`
@@ -156,7 +156,7 @@ Usage: cxr export [OPTIONS] [STEM]
   Writes results/<stem>.html; STEM defaults to analysis.
 
 Options:
-  --help  Show this message and exit.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr analyze`
@@ -177,7 +177,7 @@ Options:
   --acp          Start local Claude and Codex ACP bridges.
   --tunnel       Bind fixed port for SSH tunneling.
   --no-token     Disable marimo auth token.
-  --help         Show this message and exit.
+  -h, --help     Show this message and exit.
 ```
 
 ## `cxr slim`
@@ -198,7 +198,7 @@ Options:
   --compresslevel 1-9  [default: 6; 1<=x<=9]
   --brem-only          Keep only brem arrays; mutually exclusive with --line-only.
   --line-only          Keep only line arrays; mutually exclusive with --brem-only.
-  --help               Show this message and exit.
+  -h, --help           Show this message and exit.
 ```
 
 ## `cxr rebrem`
@@ -221,7 +221,7 @@ Options:
                         checkpoints]
   --save-every N        Atomically save after every N recomputed records.  [default:
                         100]
-  --help                Show this message and exit.
+  -h, --help            Show this message and exit.
 ```
 
 ## `cxr reline`
@@ -243,7 +243,7 @@ Options:
                         checkpoints]
   --save-every N        Atomically save after every N recomputed records.  [default:
                         100]
-  --help                Show this message and exit.
+  -h, --help            Show this message and exit.
 ```
 
 ## `cxr archive`
@@ -257,8 +257,8 @@ Usage: cxr archive [OPTIONS] STEM [LABEL]
   preserved unless --force.
 
 Options:
-  --force  Overwrite existing archive label.
-  --help   Show this message and exit.
+  --force     Overwrite existing archive label.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr restore`
@@ -272,9 +272,9 @@ Usage: cxr restore [OPTIONS] LABEL
   checkpoints are preserved unless --force.
 
 Options:
-  --as TEXT  Active stem (default: inferred).
-  --force    Overwrite existing active checkpoint.
-  --help     Show this message and exit.
+  --as TEXT   Active stem (default: inferred).
+  --force     Overwrite existing active checkpoint.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr archives`
@@ -285,7 +285,7 @@ Usage: cxr archives [OPTIONS]
   List long-term checkpoint shelf.
 
 Options:
-  --help  Show this message and exit.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr union`
@@ -302,7 +302,7 @@ Options:
   --no-archive      Skip pre-union backup of live checkpoint.
   --delete-archive  Delete source archive after successful union.
   --force           Overwrite existing pre-union archive label.
-  --help            Show this message and exit.
+  -h, --help        Show this message and exit.
 ```
 
 ## `cxr remote`
@@ -322,7 +322,7 @@ Usage: cxr remote [OPTIONS] COMMAND [ARGS]...
     cxr remote status -vv
 
 Options:
-  --help  Show this message and exit.
+  -h, --help  Show this message and exit.
 
 Commands:
   attach  Live-track a remote job; defaults to latest.
@@ -350,7 +350,7 @@ Usage: cxr remote attach [OPTIONS] [JOBID]
 
 Options:
   -v, --verbose  Add allocation detail; repeat for recent logs.
-  --help         Show this message and exit.
+  -h, --help     Show this message and exit.
 ```
 
 ## `cxr remote check`
@@ -371,7 +371,7 @@ Options:
   -f, --follow          Track detached job; requires --detached.
   --pull                Only fetch existing Zhai caches; mutually exclusive with
                         --detached.
-  --help                Show this message and exit.
+  -h, --help            Show this message and exit.
 ```
 
 ## `cxr remote clear`
@@ -382,9 +382,9 @@ Usage: cxr remote clear [OPTIONS] [MATERIAL]...
   Delete remote checkpoints; preview unless --yes.
 
 Options:
-  --all   Empty remote checkpoints directory; takes no material arguments.
-  --yes   Delete exact previewed targets; otherwise preview.
-  --help  Show this message and exit.
+  --all       Empty remote checkpoints directory; takes no material arguments.
+  --yes       Delete exact previewed targets; otherwise preview.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr remote jobs`
@@ -395,7 +395,7 @@ Usage: cxr remote jobs [OPTIONS]
   List jobs with SLURM IDs, materials, and last events.
 
 Options:
-  --help  Show this message and exit.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr remote logs`
@@ -407,7 +407,7 @@ Usage: cxr remote logs [OPTIONS] [JOBID]
 
 Options:
   -f, --follow  Stream live; Ctrl-C disconnects viewer.
-  --help        Show this message and exit.
+  -h, --help    Show this message and exit.
 ```
 
 ## `cxr remote pull`
@@ -428,7 +428,7 @@ Options:
   --line-only       Merge only line spectra locally; mutually exclusive with --brem-
                     only.
   --force           With partial merge, insert records absent locally.
-  --help            Show this message and exit.
+  -h, --help        Show this message and exit.
 ```
 
 ## `cxr remote reap`
@@ -441,7 +441,7 @@ Usage: cxr remote reap [OPTIONS]
 Options:
   --min-age-minutes NUMBER  Only reap locks at least this old.  [default: 5.0]
   --yes                     Release reservations; otherwise preview.
-  --help                    Show this message and exit.
+  -h, --help                Show this message and exit.
 ```
 
 ## `cxr remote rebrem`
@@ -460,7 +460,7 @@ Options:
                           job.  [default: 10.0]
   --ne-brem NUMBER        New brem electron count.
   --step NUMBER           Wide-brem grid spacing in eV.
-  --help                  Show this message and exit.
+  -h, --help              Show this message and exit.
 ```
 
 ## `cxr remote reline`
@@ -479,7 +479,7 @@ Options:
                           job.  [default: 10.0]
   --line-ne NUMBER        New line electron count.
   --line-step NUMBER      Explicit uniform line-grid spacing in eV.
-  --help                  Show this message and exit.
+  -h, --help              Show this message and exit.
 ```
 
 ## `cxr remote scan`
@@ -502,7 +502,7 @@ Options:
                           --quick.
   --drop-wide-brem        With --grid, drop wide-brem.
   --downcast              With --grid, downcast to float32.
-  --help                  Show this message and exit.
+  -h, --help              Show this message and exit.
 ```
 
 ## `cxr remote start`
@@ -523,7 +523,7 @@ Options:
   --no-sync               Skip code upload.
   --dry-run               Print submission preview; do not connect.
   -f, --follow            Track job after launch.
-  --help                  Show this message and exit.
+  -h, --help              Show this message and exit.
 ```
 
 ## `cxr remote status`
@@ -535,7 +535,7 @@ Usage: cxr remote status [OPTIONS] [JOBID]
 
 Options:
   -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
-  --help         Show this message and exit.
+  -h, --help     Show this message and exit.
 ```
 
 ## `cxr remote stop`
@@ -546,8 +546,8 @@ Usage: cxr remote stop [OPTIONS] [MATERIAL]...
   Cancel active SLURM job(s) by material, or every live job.
 
 Options:
-  -a, --all  Stop every live job.
-  --help     Show this message and exit.
+  -a, --all   Stop every live job.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr remote sync`
@@ -558,7 +558,7 @@ Usage: cxr remote sync [OPTIONS]
   Push current code to remote box.
 
 Options:
-  --help  Show this message and exit.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr line-grid`
@@ -577,7 +577,7 @@ Usage: cxr line-grid [OPTIONS] COMMAND [ARGS]...
     cxr line-grid show mose2
 
 Options:
-  --help  Show this message and exit.
+  -h, --help  Show this message and exit.
 
 Commands:
   apply         Apply derived bounds to material catalog.
@@ -613,7 +613,7 @@ Options:
   --force              Replace manually overridden rows; otherwise preserve them.
   --regen-golden       Regenerate checked catalog snapshot after successful write.
   --dry-run            Print proposed diff; write nothing.
-  --help               Show this message and exit.
+  -h, --help           Show this message and exit.
 ```
 
 ## `cxr line-grid attach`
@@ -624,7 +624,7 @@ Usage: cxr line-grid attach [OPTIONS] [JOBID]
   Attach to line-grid job progress. JOBID defaults to latest recorded job.
 
 Options:
-  --help  Show this message and exit.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr line-grid defaults`
@@ -640,7 +640,7 @@ Options:
   --azimuths DEG,...        Persistent azimuths in degrees [0, 360].
   --thickness ANGSTROM,...  Persistent positive crystal thicknesses in angstrom.
   --brem-step EV            Persistent positive bremsstrahlung spacing in eV.
-  --help                    Show this message and exit.
+  -h, --help                Show this message and exit.
 ```
 
 ## `cxr line-grid derive`
@@ -662,7 +662,7 @@ Options:
                             defaults.
   --brem-step EV            Bremsstrahlung grid spacing in eV; overrides persistent
                             default.
-  --help                    Show this message and exit.
+  -h, --help                Show this message and exit.
 ```
 
 ## `cxr line-grid logs`
@@ -674,7 +674,7 @@ Usage: cxr line-grid logs [OPTIONS] [JOBID]
 
 Options:
   -f, --follow  Stream live; Ctrl-C disconnects viewer without stopping job.
-  --help        Show this message and exit.
+  -h, --help    Show this message and exit.
 ```
 
 ## `cxr line-grid regen-golden`
@@ -687,8 +687,8 @@ Usage: cxr line-grid regen-golden [OPTIONS]
   Requires source checkout because installed wheels do not contain test data.
 
 Options:
-  --check  Check snapshot for drift; do not write (exit 1 when stale).
-  --help   Show this message and exit.
+  --check     Check snapshot for drift; do not write (exit 1 when stale).
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr line-grid set`
@@ -704,7 +704,7 @@ Options:
   --num N       Grid point count; preserve current value if omitted.
   --start EV    Line-grid lower bound in eV; preserve current value if omitted.
   --note TEXT   Provenance note stored with manual override.
-  --help        Show this message and exit.
+  -h, --help    Show this message and exit.
 ```
 
 ## `cxr line-grid set-brem`
@@ -718,7 +718,7 @@ Options:
   --stop EV    Bremsstrahlung grid upper bound in eV.  [required]
   --step EV    Grid spacing in eV; preserve current value if omitted.
   --note TEXT  Provenance note stored with manual override.
-  --help       Show this message and exit.
+  -h, --help   Show this message and exit.
 ```
 
 ## `cxr line-grid show`
@@ -729,7 +729,7 @@ Usage: cxr line-grid show [OPTIONS] [MATERIAL]
   Show configured line grids.
 
 Options:
-  --help  Show this message and exit.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr line-grid status`
@@ -741,7 +741,7 @@ Usage: cxr line-grid status [OPTIONS] [JOBID]
 
 Options:
   -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
-  --help         Show this message and exit.
+  -h, --help     Show this message and exit.
 ```
 
 ## `cxr line-grid stop`
@@ -752,7 +752,7 @@ Usage: cxr line-grid stop [OPTIONS] [JOBID]
   Stop one line-grid job. JOBID defaults to latest recorded job.
 
 Options:
-  --help  Show this message and exit.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr line-grid submit`
@@ -777,7 +777,7 @@ Options:
   --no-sync                 Skip code upload before submission.
   --dry-run                 Print batch script and submission command; do not connect or
                             submit.
-  --help                    Show this message and exit.
+  -h, --help                Show this message and exit.
 ```
 
 ## `cxr check`
@@ -802,7 +802,7 @@ Options:
                     [default: 200]
   --ne-supp NUMBER  With --export, supplementary electrons per polar-tilt spectrum.
                     [default: 200]
-  --help            Show this message and exit.
+  -h, --help        Show this message and exit.
 ```
 
 ## `cxr check-config`
@@ -816,5 +816,5 @@ Usage: cxr check-config [OPTIONS] [MANIFEST]
   access, or GPU probe.
 
 Options:
-  --help  Show this message and exit.
+  -h, --help  Show this message and exit.
 ```
