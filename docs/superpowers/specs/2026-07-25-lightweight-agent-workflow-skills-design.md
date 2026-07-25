@@ -24,7 +24,8 @@ Update only these cxr-mc skills when a small handoff improves composition:
 - `regression-testing` points implementation work to `implementing-changes`.
 - `run-cxr-mc` points completion checks to `verifying-changes`.
 
-Planning remains explicit-only through `AGENTS.md`; no repo planning adapter.
+Planning remains governed by the personal skill plus `AGENTS.md`; no repo
+planning adapter.
 
 ## Behavior
 
@@ -36,10 +37,12 @@ after diagnosis unless user also requested a fix.
 
 ### Planning changes
 
-Trigger only when user explicitly requests a plan, design, specification, or
-implementation outline. Inspect relevant context, identify decisions and
-risks, then produce a concise actionable plan. Do not create files or begin
-implementation unless requested.
+Trigger when user explicitly requests a plan, design, specification, or
+implementation outline. Also trigger at agent discretion for large or complex
+changes spanning multiple steps, files, subsystems, or independently
+delegatable tasks. Inspect relevant context, identify decisions and risks, then
+produce a concise actionable plan. For discretionary planning, use the
+lightest useful plan; do not require a separate specification or design file.
 
 ### Implementing changes
 
@@ -48,12 +51,19 @@ unrelated work, choose proportionate tests, keep edits surgical, and continue
 through verification. Tests-first is preferred when it materially proves new
 behavior; it is not universal ceremony.
 
+Use subagents when delegation would reduce primary-context use, parallelize
+independent work, or provide valuable fresh-context review. Choose subagent
+model and reasoning effort according to task scope, complexity, and risk.
+Delegation remains discretionary, not a required phase.
+
 ### Verifying changes
 
 Trigger before claiming changed work complete or fixed. Run fresh checks
-proportional to risk, inspect scoped diffs, and test real runtime behavior when
-static checks cannot establish the outcome. Report exact checks and remaining
-limits.
+proportional to risk and change type. Agent chooses among focused tests, lint,
+type checks, runtime probes, full lint, and full verification. Documentation-only
+or similarly inert changes may need no automated checks. Inspect scoped diffs,
+test real runtime behavior when static checks cannot establish the outcome,
+and report exact checks plus remaining limits.
 
 ## Portability
 
@@ -74,7 +84,8 @@ Each personal `SKILL.md`:
 - states one core principle;
 - defines a short workflow and stop condition;
 - includes a compact quick-reference table or checklist;
-- avoids mandatory subagents, worktrees, commits, design docs, and TDD;
+- keeps subagents, worktrees, commits, design docs, and TDD conditional on
+  task needs;
 - defers project-specific commands and safety rules to applicable instruction
   files and domain skills.
 
@@ -100,10 +111,15 @@ After all skills:
 ## Success criteria
 
 - Ordinary questions do not trigger workflow ceremony.
-- Explicit planning remains planning-only.
+- Explicit plan requests and agent-identified complex changes receive
+  proportionate planning.
 - Requested changes proceed directly through implementation and proportionate
   verification.
+- Subagents are used when their context savings, parallelism, or independence
+  justify coordination cost; model and effort match delegated scope.
 - Diagnosis requests do not silently mutate code.
 - Completion claims cite fresh evidence.
+- Verification depth matches change risk; inert documentation changes need no
+  automatic lint or test ritual.
 - cxr-mc domain skills remain authoritative for physics, notebooks, remote GPU
   work, performance, and runtime smoke testing.
