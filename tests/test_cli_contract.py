@@ -21,6 +21,23 @@ def _help_cases(node):
 
 
 _FROZEN = json.loads(CONTRACT.read_text(encoding="utf-8"))
+_HIDDEN_COMPATIBILITY_PATHS = {
+    ("slim",),
+    ("rebrem",),
+    ("reline",),
+    ("archive",),
+    ("restore",),
+    ("archives",),
+    ("union",),
+    ("check",),
+    ("check-config",),
+    ("remote", "start"),
+    ("remote", "check"),
+    ("line-grid", "status"),
+    ("line-grid", "attach"),
+    ("line-grid", "logs"),
+    ("line-grid", "stop"),
+}
 
 
 def _run(*argv: str) -> subprocess.CompletedProcess[str]:
@@ -70,7 +87,10 @@ def test_click_tree_preserves_frozen_command_and_option_names():
         for option in _node_options(node):
             assert option in completed.stdout
         for child in node["subcommands"]:
-            assert child["path"].split()[-1] in completed.stdout
+            child_name = child["path"].split()[-1]
+            child_path = tuple(child["path"].split())
+            if child_path not in _HIDDEN_COMPATIBILITY_PATHS:
+                assert child_name in completed.stdout
             check(child)
 
     check(_FROZEN["root"])

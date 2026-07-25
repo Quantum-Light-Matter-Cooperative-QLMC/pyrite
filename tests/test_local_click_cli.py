@@ -100,6 +100,20 @@ def test_blaze_preserves_one_flag_many_values_syntax(monkeypatch):
     assert seen["workers"] == 0
 
 
+def test_blaze_short_help_after_variadic_value_remains_eager():
+    result = invoke(blaze.command, ["hopg", "--energy", "30", "-h"])
+
+    assert_clean_result(result)
+    assert result.stdout.startswith("Usage:")
+
+
+def test_blaze_unknown_option_after_variadic_value_is_not_swallowed():
+    result = invoke(blaze.command, ["hopg", "--energy", "30", "--unknown"])
+
+    assert result.exit_code == 2
+    assert "No such option '--unknown'" in result.stderr
+
+
 @pytest.mark.parametrize(
     ("module", "command", "handler", "argv", "expected"),
     [
@@ -227,6 +241,25 @@ def test_slim_dataset_modes_are_mutually_exclusive():
     assert result.exit_code == 2
     assert result.stdout == ""
     assert "mutually exclusive" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("command", "argv", "message"),
+    [
+        (scan.command, [], "needs a material"),
+        (scan.command, ["hopg", "--all"], "--all does not take"),
+        (rebrem.command, [], "needs material"),
+        (reline.command, ["hopg", "--all"], "--all does not take"),
+        (analyze.command, ["--default"], "--default requires MATERIAL"),
+        (scan.command, ["not-a-material"], "not a configured material"),
+    ],
+)
+def test_local_selection_errors_fail_at_click_boundary(command, argv, message):
+    result = invoke(command, argv)
+
+    assert result.exit_code == 2
+    assert result.stdout == ""
+    assert message in result.stderr
 
 
 def test_standalone_click_usage_error_preserves_exit_and_streams():

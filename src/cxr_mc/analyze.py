@@ -39,7 +39,6 @@ import click
 
 from . import _cli_completion, _cli_core
 from ._acp import running_acp
-from .materials import CATALOG
 
 NOTEBOOK = "notebooks/analysis_app.py"
 TUNNEL_PORT = 2718
@@ -72,6 +71,9 @@ def material_menu(
     (case-insensitive), so the dropdown surfaces ready-to-browse materials
     first instead of raw catalog order.
     """
+    if materials is None or labels is None:
+        from .materials import CATALOG
+
     materials = CATALOG.material_keys if materials is None else materials
     labels = (
         {material: CATALOG.material(material).label for material in materials}
@@ -223,9 +225,6 @@ def _launch(
 def _cli(args):
     if args.default and args.material is None:
         raise SystemExit("cxr analyze -d/--default: no material given to persist")
-    if args.material is not None and args.material not in CATALOG.materials:
-        valid = ", ".join(CATALOG.material_keys)
-        raise SystemExit(f"cxr analyze: unknown material {args.material!r}; valid: {valid}")
 
     if args.default:
         set_default_material(args.material)
@@ -251,7 +250,12 @@ def _cli(args):
         "stores it for later no-argument launches."
     ),
 )
-@click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
+@click.argument(
+    "material",
+    required=False,
+    type=_cli_completion.MATERIAL,
+    shell_complete=_cli_completion.complete_material,
+)
 @click.option(
     "-d",
     "--default",
@@ -266,6 +270,8 @@ def _cli(args):
 @click.option("--tunnel", is_flag=True, help="Bind fixed port for SSH tunneling.")
 @click.option("--no-token", is_flag=True, help="Disable marimo auth token.")
 def command(material, persist_default, watch, smoke, edit, acp, tunnel, no_token):
+    if persist_default and material is None:
+        raise click.UsageError("--default requires MATERIAL")
     return _cli_core.invoke_legacy(
         _cli,
         material=material,

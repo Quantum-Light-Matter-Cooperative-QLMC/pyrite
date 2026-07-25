@@ -161,10 +161,14 @@ def test_local_commands_wire_material_checkpoint_archive_and_choice_completion()
 def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
     from cxr_mc._remote import cli
 
-    for name in ("scan", "start", "pull", "rebrem", "reline"):
+    for name in ("scan", "submit", "start", "rebrem", "reline"):
         command = cli.command.commands[name]
-        parameter = "materials" if name == "start" else "material"
+        parameter = "materials" if name in {"submit", "start"} else "material"
         assert _callback(command, parameter) is _cli_completion.complete_material
+    assert (
+        _callback(cli.command.commands["pull"], "material")
+        is _cli_completion.complete_remote_checkpoint_stem
+    )
     for name in ("attach", "status", "logs"):
         assert _callback(cli.command.commands[name], "jobid") is _cli_completion.complete_job_id
     for name in ("scan", "start"):
@@ -180,6 +184,12 @@ def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
     )
 
 
+def test_remote_checkpoint_completion_includes_variant_stems():
+    values = _values(_cli_completion.complete_remote_checkpoint_stem(None, None, "hopg"))
+
+    assert values == ["hopg", "hopg_blazed", "hopg_quick"]
+
+
 def test_line_grid_wires_safe_completion_but_not_stop_target():
     from cxr_mc.line_grid import command
 
@@ -189,6 +199,7 @@ def test_line_grid_wires_safe_completion_but_not_stop_target():
         )
     for name in ("set", "set-brem", "show"):
         assert _callback(command.commands[name], "material") is _cli_completion.complete_material
+    job = command.commands["job"]
     for name in ("attach", "status", "logs"):
-        assert _callback(command.commands[name], "jobid") is _cli_completion.complete_job_id
-    assert _callback(command.commands["stop"], "jobid") is None
+        assert _callback(job.commands[name], "jobid") is _cli_completion.complete_job_id
+    assert _callback(job.commands["stop"], "jobid") is None

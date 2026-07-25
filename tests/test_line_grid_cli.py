@@ -9,6 +9,7 @@ from tests.cli_helpers import assert_clean_result, invoke
 CLICK_COMMANDS = (
     "derive",
     "submit",
+    "job",
     "status",
     "attach",
     "logs",
@@ -26,7 +27,14 @@ def test_click_group_exposes_full_line_grid_tree():
     assert tuple(line_grid.command.commands) == CLICK_COMMANDS
 
 
-@pytest.mark.parametrize("path", [(), *((name,) for name in CLICK_COMMANDS)])
+@pytest.mark.parametrize(
+    "path",
+    [
+        (),
+        *((name,) for name in CLICK_COMMANDS),
+        *((("job", name)) for name in ("status", "attach", "logs", "stop")),
+    ],
+)
 def test_click_help_paths_are_clean(path):
     result = invoke(line_grid.command, [*path, "--help"])
 
@@ -59,17 +67,35 @@ def test_click_status_delegates_with_detail(monkeypatch):
         lambda jobid=None, detail=0: seen.update(jobid=jobid, detail=detail),
     )
 
-    result = invoke(line_grid.command, ["status", "job7", "-vv"])
+    result = invoke(line_grid.command, ["job", "status", "job7", "-vv"])
 
     assert_clean_result(result)
     assert seen == {"jobid": "job7", "detail": 2}
+
+
+def test_click_status_json_reuses_remote_machine_contract(monkeypatch):
+    seen = {}
+
+    def status(args):
+        seen.update(vars(args))
+        line_grid.emit_json_result(
+            line_grid.cli_json.JsonResult("cxr.remote.status", {"job": {"job_id": args.jobid}})
+        )
+
+    monkeypatch.setattr(line_grid.remote, "_cli_status", status)
+
+    result = invoke(line_grid.command, ["job", "status", "job7", "--json"])
+
+    assert_clean_result(result)
+    assert '"schema":"cxr.remote.status"' in result.stdout
+    assert seen == {"jobid": "job7", "verbose": 0, "json_output": True}
 
 
 @pytest.mark.parametrize("status", [1, 75, 130])
 def test_click_follow_logs_propagates_remote_exit_status(monkeypatch, status):
     monkeypatch.setattr(line_grid.remote, "tail_logs", lambda _jobid, _follow: status)
 
-    result = invoke(line_grid.command, ["logs", "--follow"])
+    result = invoke(line_grid.command, ["job", "logs", "--follow"])
 
     assert_clean_result(result, exit_code=status)
 
@@ -210,15 +236,42 @@ def test_pull_combined_quotes_remote_scp_path(monkeypatch):
     assert calls == [["scp", "qlmc:'/srv/cxr data/bounds-result.json'", "bounds-result.json"]]
 
 
-def test_click_stop_falls_back_to_latest_jobid(monkeypatch):
+def test_click_stop_requires_explicit_target():
+    result = invoke(line_grid.command, ["job", "stop"])
+
+    assert result.exit_code == 2
+    assert "needs JOBID, or use --latest" in result.stderr
+
+
+def test_click_stop_previews_latest_and_yes_cancels(monkeypatch):
     seen = {}
     monkeypatch.setattr(line_grid.remote, "_latest_jobid", lambda: "job9")
     monkeypatch.setattr(line_grid.remote, "_stop_jobid", lambda jobid: seen.update(jobid=jobid))
 
-    result = invoke(line_grid.command, ["stop"])
+    preview = invoke(line_grid.command, ["job", "stop", "--latest"])
+    confirmed = invoke(line_grid.command, ["job", "stop", "--latest", "--yes"])
 
-    assert_clean_result(result)
+    assert_clean_result(
+        preview,
+        stdout="would cancel remote job: job9\nre-run with --yes to cancel\n",
+    )
+    assert_clean_result(confirmed)
     assert seen == {"jobid": "job9"}
+
+
+def test_hidden_line_grid_job_aliases_remain_callable():
+    root_help = invoke(line_grid.command, ["--help"])
+    command_lines = {
+        line.split()[0]
+        for line in root_help.stdout.splitlines()
+        if line.startswith("  ") and line.strip() and not line.lstrip().startswith("-")
+    }
+    assert "job" in command_lines
+    assert command_lines.isdisjoint({"status", "attach", "logs", "stop"})
+
+    for alias in ("status", "attach", "logs", "stop"):
+        result = invoke(line_grid.command, [alias, "--help"])
+        assert_clean_result(result)
 
 
 def test_click_regen_golden_delegates_check(monkeypatch):

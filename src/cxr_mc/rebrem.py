@@ -258,6 +258,10 @@ def command(
     save_every,
     json_output,
 ):
+    if all_ and materials:
+        raise click.UsageError("rebrem --all does not take material names")
+    if not all_ and not materials:
+        raise click.UsageError("rebrem needs material name(s), or use --all")
     handler = _cli_json if json_output else _cli
     return _cli_core.invoke_legacy(
         handler,

@@ -10,7 +10,6 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-from ..materials import CATALOG
 from . import config, presentation
 
 _TRACE_ARG_LIMIT = 100
@@ -77,6 +76,8 @@ def _check_shell_tokens(tokens):
 
 def _check_materials(materials):
     """Validate runnable material keys for remote scan/start operations."""
+    from ..materials import CATALOG
+
     _check_shell_tokens(materials)
     unknown = [material for material in materials if material not in CATALOG.materials]
     if unknown:

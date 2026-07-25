@@ -38,3 +38,53 @@ def test_root_unknown_command_is_usage_error(capsys):
     assert captured.out == ""
     assert "No such command 'not-a-command'" in captured.err
     assert "Traceback" not in captured.err
+
+
+def test_root_help_prefers_grouped_checkpoint_commands(capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--help"])
+
+    assert exc.value.code == 0
+    lines = capsys.readouterr().out.splitlines()
+    command_lines = {
+        line.split()[0]
+        for line in lines
+        if line.startswith("  ") and line.strip() and not line.lstrip().startswith("-")
+    }
+    assert "checkpoint" in command_lines
+    assert {"catalog", "validate"}.issubset(command_lines)
+    assert command_lines.isdisjoint(
+        {
+            "slim",
+            "rebrem",
+            "reline",
+            "archive",
+            "restore",
+            "archives",
+            "union",
+            "check",
+            "check-config",
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "alias",
+    (
+        "slim",
+        "rebrem",
+        "reline",
+        "archive",
+        "restore",
+        "archives",
+        "union",
+        "check",
+        "check-config",
+    ),
+)
+def test_hidden_checkpoint_aliases_remain_callable(alias, capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main([alias, "--help"])
+
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.startswith(f"Usage: cxr {alias} ")

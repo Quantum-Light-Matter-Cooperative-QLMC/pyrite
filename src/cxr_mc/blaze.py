@@ -36,15 +36,46 @@ from pathlib import Path
 import click
 
 from . import _cli_completion, _cli_core, cli_json
-from .config import (
-    default_settings,
-    format_penetration_watchdog_summary,
-    gate_cases_by_penetration,
-    material_sweep,
-)
-from .run import run_sweep
-from .scan import _write_progress_record, validate_materials
-from .sweep import build_cases
+
+# Lazy runtime bindings keep command help light and focused tests patchable.
+default_settings = None
+format_penetration_watchdog_summary = None
+gate_cases_by_penetration = None
+material_sweep = None
+run_sweep = None
+build_cases = None
+_write_progress_record = None
+validate_materials = None
+
+
+def _load_runtime() -> None:
+    global default_settings
+    global format_penetration_watchdog_summary
+    global gate_cases_by_penetration
+    global material_sweep
+    global run_sweep
+    global build_cases
+    global _write_progress_record
+    global validate_materials
+
+    from . import config as config_module
+    from . import run as run_module
+    from . import scan as scan_module
+    from . import sweep as sweep_module
+
+    default_settings = default_settings or config_module.default_settings
+    format_penetration_watchdog_summary = (
+        format_penetration_watchdog_summary
+        or config_module.format_penetration_watchdog_summary
+    )
+    gate_cases_by_penetration = (
+        gate_cases_by_penetration or config_module.gate_cases_by_penetration
+    )
+    material_sweep = material_sweep or config_module.material_sweep
+    run_sweep = run_sweep or run_module.run_sweep
+    build_cases = build_cases or sweep_module.build_cases
+    _write_progress_record = _write_progress_record or scan_module._write_progress_record
+    validate_materials = validate_materials or scan_module.validate_materials
 
 
 def _pair_energies_and_spacings(energies, spacings):
@@ -94,8 +125,18 @@ class _BlazeCommand(click.Command):
                 continue
             values = [first] if separator else []
             index += 1
-            while index < len(args) and args[index] not in self._option_names:
-                values.append(args[index])
+            while index < len(args):
+                candidate = args[index]
+                try:
+                    float(candidate)
+                    numeric = True
+                except ValueError:
+                    numeric = False
+                if candidate in self._option_names or (
+                    candidate.startswith("-") and not numeric
+                ):
+                    break
+                values.append(candidate)
                 index += 1
             if not values:
                 normalized.append(option)
@@ -111,13 +152,18 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
 @click.command(
     "blaze",
     cls=_BlazeCommand,
+    context_settings={"help_option_names": ["-h", "--help"]},
     help=(
         "Run one material's blazed-crystal MC sweep and write its checkpoint.\n\n"
         "Writes checkpoints/<material>_blazed.pkl, separate from flat-face scan "
         "checkpoints. Repeat --energy/--spacing/--angles for multiple values."
     ),
 )
-@click.argument("material", shell_complete=_cli_completion.complete_material)
+@click.argument(
+    "material",
+    type=_cli_completion.MATERIAL,
+    shell_complete=_cli_completion.complete_material,
+)
 @click.option(
     "--energy",
     "energies",
@@ -229,6 +275,17 @@ def _run_json(args):
 
 
 def run(args):
+    _load_runtime()
+    assert default_settings is not None
+    assert format_penetration_watchdog_summary is not None
+    assert gate_cases_by_penetration is not None
+    assert material_sweep is not None
+    assert run_sweep is not None
+    assert build_cases is not None
+    assert _write_progress_record is not None
+    assert validate_materials is not None
+    write_progress_record = _write_progress_record
+
     validate_materials([args.material])
     spacings_ang = [spacing_m * 1e10 for spacing_m in args.spacing]
     pairs = _pair_energies_and_spacings(args.energy, spacings_ang)
@@ -284,7 +341,7 @@ def run(args):
             completed_new_cases=completed_new_cases,
         )
         if progress_file is not None:
-            _write_progress_record(
+            write_progress_record(
                 progress_file,
                 material=args.material,
                 state="running",
@@ -292,7 +349,7 @@ def run(args):
             )
 
     if progress_file is not None:
-        _write_progress_record(
+        write_progress_record(
             progress_file,
             material=args.material,
             state="running",
@@ -314,7 +371,7 @@ def run(args):
         complete = True if result is None else bool(result)
     except BaseException:
         if progress_file is not None:
-            _write_progress_record(
+            write_progress_record(
                 progress_file,
                 material=args.material,
                 state="failed",
@@ -322,7 +379,7 @@ def run(args):
             )
         raise
     if progress_file is not None:
-        _write_progress_record(
+        write_progress_record(
             progress_file,
             material=args.material,
             state="done" if complete else "paused",

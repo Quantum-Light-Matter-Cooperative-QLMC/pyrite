@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import math
 import tomllib
+from copy import copy
 from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
 
 import click
 
@@ -257,7 +259,7 @@ def submit_command(
     )
 
 
-@command.command("status")
+@click.command("status")
 @click.argument(
     "jobid",
     required=False,
@@ -270,13 +272,24 @@ def submit_command(
     count=True,
     help="Add allocation detail; repeat for case progress and recent logs.",
 )
-def status_command(jobid, verbose):
+@click.option(
+    "--json",
+    "json_output",
+    is_flag=True,
+    help="Emit one versioned JSON object on stdout.",
+)
+def status_command(jobid, verbose, json_output):
     """Show line-grid job status. JOBID defaults to latest recorded job."""
+    if json_output:
+        return _invoke_callback(
+            remote._cli_status,
+            SimpleNamespace(jobid=jobid, verbose=verbose, json_output=True),
+        )
     remote.job_status(jobid, detail=verbose)
     return 0
 
 
-@command.command("attach")
+@click.command("attach")
 @click.argument(
     "jobid",
     required=False,
@@ -289,7 +302,7 @@ def attach_command(jobid):
     return 0
 
 
-@command.command("logs")
+@click.command("logs")
 @click.argument(
     "jobid",
     required=False,
@@ -307,15 +320,40 @@ def logs_command(jobid, follow):
     return _invoke_callback(remote.tail_logs, jobid, follow)
 
 
-@command.command("stop")
+@click.command("stop")
 @click.argument("jobid", required=False, metavar="[JOBID]")
-def stop_command(jobid):
-    """Stop one line-grid job. JOBID defaults to latest recorded job."""
+@click.option("--latest", is_flag=True, help="Target latest recorded job instead of JOBID.")
+@click.option("--yes", is_flag=True, help="Cancel exact previewed job; otherwise preview.")
+def stop_command(jobid, latest, yes):
+    """Preview or stop one line-grid job."""
+    if jobid and latest:
+        raise click.UsageError("stop takes JOBID or --latest, not both")
+    if not jobid and not latest:
+        raise click.UsageError("stop needs JOBID, or use --latest")
     resolved_jobid = jobid or remote._latest_jobid()
     if not resolved_jobid:
         raise CLIError("no jobs to stop")
+    if not yes:
+        emit_result(f"would cancel remote job: {resolved_jobid}")
+        emit_result("re-run with --yes to cancel")
+        return 0
     remote._stop_jobid(resolved_jobid)
     return 0
+
+
+@click.group("job", no_args_is_help=True)
+def job_command():
+    """Inspect, follow, or stop remote line-grid jobs."""
+
+
+for _job_child in (status_command, attach_command, logs_command, stop_command):
+    job_command.add_command(_job_child)
+command.add_command(job_command)
+
+for _legacy_job_child in (status_command, attach_command, logs_command, stop_command):
+    _alias = copy(_legacy_job_child)
+    _alias.hidden = True
+    command.add_command(_alias)
 
 
 @command.command("apply")

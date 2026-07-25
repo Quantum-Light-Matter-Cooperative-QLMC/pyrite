@@ -30,20 +30,44 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import click
-import numpy as np
 
 from . import _cli_completion, _cli_core, cli_json
-from .config import (
-    default_settings,
-    format_penetration_watchdog_summary,
-    gate_cases_by_penetration,
-    material_sweep,
-)
-from .materials import CATALOG
-from .run import run_sweep
-from .sweep import build_cases
 
 MATS_FILE = Path("mats_to_sim.toml")
+
+# Lazy runtime bindings keep help fast while preserving monkeypatchable module
+# seams used by focused driver tests.
+default_settings = None
+format_penetration_watchdog_summary = None
+gate_cases_by_penetration = None
+material_sweep = None
+run_sweep = None
+build_cases = None
+
+
+def _load_runtime() -> None:
+    global default_settings
+    global format_penetration_watchdog_summary
+    global gate_cases_by_penetration
+    global material_sweep
+    global run_sweep
+    global build_cases
+
+    from . import config as config_module
+    from . import run as run_module
+    from . import sweep as sweep_module
+
+    default_settings = default_settings or config_module.default_settings
+    format_penetration_watchdog_summary = (
+        format_penetration_watchdog_summary
+        or config_module.format_penetration_watchdog_summary
+    )
+    gate_cases_by_penetration = (
+        gate_cases_by_penetration or config_module.gate_cases_by_penetration
+    )
+    material_sweep = material_sweep or config_module.material_sweep
+    run_sweep = run_sweep or run_module.run_sweep
+    build_cases = build_cases or sweep_module.build_cases
 
 
 def load_all_materials(path: Path | None = None) -> list[str]:
@@ -70,7 +94,8 @@ def load_all_materials(path: Path | None = None) -> list[str]:
     )
     if duplicates:
         raise SystemExit(f"duplicate material(s) in {path}: {', '.join(duplicates)}")
-    unknown = [material for material in materials if material not in CATALOG.materials]
+    valid_materials = set(_cli_completion._material_keys())
+    unknown = [material for material in materials if material not in valid_materials]
     if unknown:
         raise SystemExit(f"unknown material(s) in {path}: {', '.join(unknown)}")
     return materials
@@ -78,10 +103,10 @@ def load_all_materials(path: Path | None = None) -> list[str]:
 
 def validate_materials(materials: list[str]) -> None:
     """Reject runnable selections that are absent from the material catalog."""
-    unknown = [material for material in materials if material not in CATALOG.materials]
+    valid_materials = _cli_completion._material_keys()
+    unknown = [material for material in materials if material not in valid_materials]
     if unknown:
-        valid = ", ".join(CATALOG.material_keys)
-        raise SystemExit(f"unknown material(s): {', '.join(unknown)}; valid: {valid}")
+        raise SystemExit(f"unknown material(s): {', '.join(unknown)}")
 
 
 def _beam_uvw(ctx, param, value):
@@ -98,7 +123,12 @@ def _beam_uvw(ctx, param, value):
         "CHECKPOINTS and writes <material>.pkl (or <material>_quick.pkl)."
     ),
 )
-@click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
+@click.argument(
+    "material",
+    required=False,
+    type=_cli_completion.MATERIAL,
+    shell_complete=_cli_completion.complete_material,
+)
 @click.option(
     "-a",
     "--all",
@@ -163,6 +193,10 @@ def command(
     json_output,
 ):
     """Click entry point for the staged root migration."""
+    if all_ and material is not None:
+        raise click.UsageError("scan --all does not take a material name")
+    if not all_ and material is None:
+        raise click.UsageError("scan needs a material name, or use --all")
     if not json_output:
         return _cli_core.invoke_legacy(
             run,
@@ -271,6 +305,16 @@ def _run_json(args):
 
 
 def _run_material(args, material, max_seconds=None):
+    import numpy as np
+
+    _load_runtime()
+    assert default_settings is not None
+    assert format_penetration_watchdog_summary is not None
+    assert gate_cases_by_penetration is not None
+    assert material_sweep is not None
+    assert run_sweep is not None
+    assert build_cases is not None
+
     settings = default_settings()
     overrides = {}
     if args.quick:

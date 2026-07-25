@@ -36,7 +36,7 @@ def test_checked_cli_reference_is_current():
 def test_help_documents_examples_units_side_effects_and_incompatibilities():
     runner = CliRunner()
     cases = {
-        (): ("Examples:", "cxr remote start"),
+        (): ("Examples:", "cxr remote submit"),
         ("scan",): ("minutes", "writes <material>.pkl"),
         ("remote",): ("CXR_REMOTE_HOST", "Examples:"),
         ("remote", "scan"): ("incompatible with --grid", "0 runs serially"),
@@ -44,7 +44,7 @@ def test_help_documents_examples_units_side_effects_and_incompatibilities():
         ("line-grid",): ("persistent defaults", "Examples:"),
         ("line-grid", "derive"): ("keV", "angstrom", "spacing in eV"),
         ("line-grid", "apply"): ("precedence", "write nothing"),
-        ("line-grid", "status"): ("latest recorded job", "repeat"),
+        ("line-grid", "job", "status"): ("latest recorded job", "repeat"),
     }
     for path, expected in cases.items():
         result = runner.invoke(command, [*path, "--help"])

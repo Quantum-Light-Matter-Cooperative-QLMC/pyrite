@@ -16,6 +16,7 @@ from collections.abc import Callable, Iterable, Sequence
 from functools import lru_cache
 from pathlib import Path
 
+import click
 from click.shell_completion import CompletionItem
 
 from . import DATA_DIR
@@ -29,6 +30,26 @@ _DEFAULT_CHECKPOINT_ROOT = Path("checkpoints")
 _ARCHIVE_CHECKPOINT_ROOT = Path(__file__).resolve().parents[2] / "checkpoints"
 
 Completion = Callable[[object, object, str], list[CompletionItem]]
+
+
+class MaterialKey(click.ParamType):
+    """Offline material-catalog key validated without scientific imports."""
+
+    name = "material"
+
+    def convert(self, value, param, ctx):
+        key = str(value)
+        keys = _material_keys()
+        if key not in keys:
+            self.fail(
+                f"{key!r} is not a configured material; choose one shown by shell completion",
+                param,
+                ctx,
+            )
+        return key
+
+
+MATERIAL = MaterialKey()
 
 
 def _items(values: Iterable[str], incomplete: str) -> list[CompletionItem]:
@@ -69,6 +90,24 @@ def complete_material_csv(ctx: object, param: object, incomplete: str) -> list[C
         CompletionItem(f"{rendered_prefix}{item.value}")
         for item in _items((key for key in _material_keys() if key not in selected), fragment)
     ]
+
+
+def complete_remote_checkpoint_stem(
+    ctx: object,
+    param: object,
+    incomplete: str,
+) -> list[CompletionItem]:
+    """Complete predictable remote checkpoint stems without network access."""
+    del ctx, param
+    keys = _material_keys()
+    return _items(
+        (
+            stem
+            for key in keys
+            for stem in (key, f"{key}_quick", f"{key}_blazed")
+        ),
+        incomplete,
+    )
 
 
 def _safe_file_stems(directory: Path, *, suffix: str = ".pkl") -> list[str]:
