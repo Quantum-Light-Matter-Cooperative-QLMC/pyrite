@@ -83,6 +83,30 @@ def test_debye_waller_in_unit_interval(g):
     assert 0.0 < w <= 1.0
 
 
+def test_debye_waller_pinned_value():
+    # Validation: structure-factor. W = B (g/4pi)^2; at g=4pi, B=1 -> W=1 -> exp(-1).
+    assert debye_waller(4.0 * np.pi, 1.0) == pytest.approx(np.exp(-1.0), rel=1e-12)
+
+
+@pytest.mark.parametrize("hkl", [(2, 2, 2), (2, 0, 0)])
+def test_diamond_structure_factor_extinct(hkl):
+    # Validation: structure-factor. Two-atom diamond basis (000),(1/4,1/4,1/4):
+    # phase = exp(i pi (h+k+l)/2); for h+k+l = 2 (mod 4) the identical-atom sum
+    # cancels exactly, so (222) and (200) are systematically absent.
+    S, g = structure_factor("diamond", hkl, 8000.0)
+
+    assert g > 0 and abs(S) < 1e-6
+
+
+@pytest.mark.parametrize("hkl", [(1, 1, 1), (2, 2, 0), (3, 1, 1), (4, 0, 0)])
+def test_diamond_structure_factor_allowed(hkl):
+    # Validation: structure-factor. Diamond all-odd or h+k+l = 4n reflections
+    # are allowed and carry finite intensity.
+    S, _ = structure_factor("diamond", hkl, 8000.0)
+
+    assert abs(S) > 1.0
+
+
 def test_hbn_structure_sane():
     # Bulk h-BN a=2.504 A, c=6.661 A: V = (sqrt(3)/2) a^2 c ~= 36.2 A^3.
     # The conventional P6_3/mmc cell has 2 BN formula units.

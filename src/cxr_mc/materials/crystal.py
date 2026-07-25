@@ -178,7 +178,10 @@ def g_mag(d_ang):
 def debye_waller(g_invang, B_ang2):
     """Amplitude Debye-Waller factor exp(-W), W = B (sin(theta)/lambda)^2
     = B (g/4pi)^2, for a tabulated B-factor [Angstrom^2] (B = 8 pi^2 <u_x^2>).
-    Intensities carry exp(-2W) = the square of this."""
+    Intensities carry exp(-2W) = the square of this.
+
+    Validation: structure-factor
+    """
     s = g_invang / (4.0 * np.pi)
     return np.exp(-B_ang2 * s**2)
 
@@ -208,6 +211,8 @@ def structure_factor(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
     S(g) = sum_i F_i(g) exp(i g . R_i) exp(-W_i), Eq. (3).
     Returns complex S(g) and |g| [1/Angstrom].
     F_i is f0 (non-resonant) unless use_henke, then f0+f' (+ i f'').
+
+    Validation: structure-factor
     """
     info = CRYSTALS[crystal]
     hkl = np.asarray(hkl, dtype=float)
@@ -253,6 +258,8 @@ def U_g(crystal, hkl, photon_E_eV, B_ang2=0.0, use_henke=False):
         e U_g / V = 4 pi e^2 sum_i exp(i g Ri) (Z_i - F_i)/g^2 exp(-W) / V
     with e^2 = alpha hbar c = 14.3996 eV*Angstrom (Gaussian). Returned in eV;
     divide by m_e c^2 to get the dimensionless e U_g / (m V) of Eq. (14).
+
+    Validation: cbs-amplitude
     """
     info = CRYSTALS[crystal]
     hkl = np.asarray(hkl, dtype=float)

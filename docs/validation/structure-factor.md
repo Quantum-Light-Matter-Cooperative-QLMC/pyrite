@@ -292,3 +292,40 @@ formula) and the absent in-code `Validation: structure-factor` marker on
 
 **Verdict of this pass:** `rederived` (independent derivation matches the code).
 Promotion of the ledger row and any `signed-off` remain human decisions.
+
+---
+
+## 8. Third independent verifier pass (2026-07-25)
+
+A third fresh-context verifier re-derived from standard kinematical
+crystallography and the module's documented `|g| = 2π/d` convention, applied
+cheap filters, then read the live `crystal.py` bodies and ran an own numeric
+probe (independent of the section-4 and section-7 numbers).
+
+**Live code re-read.** `_reciprocal_basis` builds `B = 2π·[cross]/V`
+(`b_i·a_j = 2π δ_ij`, verified 2π convention); `reciprocal_g_vector`/`g_mag`
+document `|g| = 2π/d`. `debye_waller`: `s = g/(4π); exp(−B s²)`. `structure_factor`:
+`phase = exp(1j·2π·hkl·R)`, accumulates `F·phase·dwf` with one scalar `dwf` per
+atom. Bodies are unchanged from the snippets diffed in sections 2 and 7.
+
+**Own numerics (this pass).**
+- `debye_waller(B=0.5)` at `g∈{0,1,3,2π}` reproduces `exp(−B g²/16π²)` to 10
+  digits; the `factor4` candidate diverges (`g=2π`: 0.88250 vs 0.00719).
+- Silicon (diamond) at 8 keV: `(222)`, `(200)` extinct to machine zero;
+  `(111)`, `(220)`, `(311)`, `(400)` allowed. An independent hand-built 8-atom
+  diamond basis reproduces the identical geometric-factor extinction pattern
+  (`|geom|` = 5.66, 0, 8.0, 0 for `(111)`,`(222)`,`(400)`,`(200)`), confirming the
+  phase sign/convention without any implementation helper.
+- `S(000) = 113.98 + 2.67j ≈ 8·Z_Si = 112` (excess/imag = Si anomalous `f'+if''`).
+
+**Concurrence.** Both flagged traps handled correctly (`B = 8π²⟨u_g²⟩`, not the
+3-D total; `16π²`, not `4`, given `g=2π/d`); single amplitude DW factor per atom;
+`+i` phase convention verified via selection rules. No divergent term. The two
+standing non-defects are unchanged: single scalar `B_ang2` shared across basis
+atoms (documented isotropic single-B approximation, consistent with the handed-in
+single-`B` formula) and the absent in-code `Validation: structure-factor` marker
+on `structure_factor`/`debye_waller`.
+
+**Verdict of this pass:** `rederived` (independent derivation matches the code).
+This is now a third concurring independent pass. Promotion of the ledger row and
+`signed-off` remain human decisions.

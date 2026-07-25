@@ -593,6 +593,8 @@ def _brem_dsigma_dk(Z, T_keV, k_eV):
     with p in units of m_e c. Broadcasts T_keV (segments) against k_eV
     (spectral grid); zero where k >= T. Adequate for Z <~ 30 and
     T <~ 100 keV; swap in Seltzer-Berger tables for better accuracy.
+
+    Validation: brem-spectrum
     """
     mc2 = 510.99895  # keV
     T_i = xp.asarray(T_keV, dtype=REAL)[:, None]
@@ -683,7 +685,7 @@ def mc_brem_spectrum(
     Limiting case: ``groove=None`` retains the original flat/prism path
     bit-for-bit; vanishing groove depth tends to the flat entrance-face path.
 
-    Validation: finite-transverse-crystal, blazed-groove-geometry
+    Validation: brem-spectrum, finite-transverse-crystal, blazed-groove-geometry
     """
     comp = _normalize_composition(element, n_atoms_per_ang3, composition)
     thickness = segments["thickness_ang"]
