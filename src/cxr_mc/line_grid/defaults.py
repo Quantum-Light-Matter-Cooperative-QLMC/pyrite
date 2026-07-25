@@ -8,6 +8,7 @@ today's behavior -- so a missing file reproduces current output exactly.
 
 from __future__ import annotations
 
+import math
 import os
 import tempfile
 import tomllib
@@ -48,6 +49,51 @@ def _emit(values: dict) -> str:
     return "\n".join(lines)
 
 
+def _validate_number_list(values, key: str, predicate, domain: str) -> list[float | int]:
+    validated = []
+    for index, value in enumerate(values):
+        if isinstance(value, bool):
+            raise ValueError(f"{key}[{index}] must satisfy {domain}")
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"{key}[{index}] must satisfy {domain}") from exc
+        if not math.isfinite(number) or not predicate(number):
+            raise ValueError(f"{key}[{index}] must satisfy {domain}")
+        validated.append(value if type(value) in (int, float) else number)
+    return validated
+
+
+def _validated(values: dict) -> dict:
+    out = dict(values)
+    out["tilts"] = _validate_number_list(
+        values["tilts"], "tilts", lambda value: 0 <= value < 90, "0 <= value < 90"
+    )
+    out["azimuths"] = _validate_number_list(
+        values["azimuths"],
+        "azimuths",
+        lambda value: 0 <= value <= 360,
+        "0 <= value <= 360",
+    )
+    out["thickness_ang"] = _validate_number_list(
+        values["thickness_ang"], "thickness_ang", lambda value: value > 0, "value > 0"
+    )
+    out["energies"] = _validate_number_list(
+        values["energies"], "energies", lambda value: value > 0, "value > 0"
+    )
+    brem_step = values["brem_step_ev"]
+    if isinstance(brem_step, bool):
+        raise ValueError("brem_step_ev must be a finite positive number")
+    try:
+        brem_step = float(brem_step)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("brem_step_ev must be a finite positive number") from exc
+    if not math.isfinite(brem_step) or brem_step <= 0:
+        raise ValueError("brem_step_ev must be a finite positive number")
+    out["brem_step_ev"] = brem_step
+    return out
+
+
 def update_defaults(**changes) -> dict:
     values = load_defaults()
     for key, val in changes.items():
@@ -56,6 +102,7 @@ def update_defaults(**changes) -> dict:
         if key not in FALLBACK:
             raise KeyError(f"unknown default {key!r}")
         values[key] = val
+    values = _validated(values)
     text = _emit(values)
     DEFAULTS_PATH.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=str(DEFAULTS_PATH.parent), suffix=".tmp")

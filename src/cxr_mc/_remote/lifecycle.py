@@ -2,6 +2,7 @@
 
 import math
 import subprocess
+import sys
 import uuid
 from pathlib import Path
 
@@ -96,7 +97,7 @@ def clear_remote(materials, yes=False):
     # status, which would make _ssh_capture abort the whole clear
     pkl_names = " ".join(f"{stem}.pkl" for stem in stems)
     listing = (
-        f"cd {config.REMOTE_DIR}/checkpoints 2>/dev/null || exit 0; "
+        f"cd {config.shell_remote_path('checkpoints')} 2>/dev/null || exit 0; "
         f'for f in {pkl_names}; do [ -f "$f" ] && echo "$f" || true; done'
     )
     existing = transport._ssh_capture(listing).split()
@@ -145,7 +146,7 @@ def clear_all_remote(yes=False):
     # list first (dry preview), then delete only under --yes. `|| true` keeps a
     # missing checkpoints/ dir or a find failure from becoming ssh's exit status.
     listing = (
-        f"cd {config.REMOTE_DIR}/checkpoints 2>/dev/null || exit 0; "
+        f"cd {config.shell_remote_path('checkpoints')} 2>/dev/null || exit 0; "
         r'find . -type f -name "*.pkl" 2>/dev/null | sed "s|^\./||" | sort || true'
     )
     existing = transport._ssh_capture(listing).split()
@@ -158,7 +159,7 @@ def clear_all_remote(yes=False):
             print(f"  checkpoints/{f}")
         return
     transport._ssh_capture(
-        f"cd {config.REMOTE_DIR}/checkpoints 2>/dev/null || exit 0; "
+        f"cd {config.shell_remote_path('checkpoints')} 2>/dev/null || exit 0; "
         r'find . -type f -name "*.pkl" -delete'
     )
     print(f"cleared on the box: {len(existing)} checkpoint file(s) under checkpoints/")
@@ -192,7 +193,7 @@ def start_queue(
     if not dry_run:
         _refuse_if_busy(materials, quick)
     jobid = scripts._new_jobid()
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     stems = scripts._stems(materials, quick)
     if chunked:
         parallel_materials = None
@@ -217,9 +218,9 @@ def start_queue(
 
     if dry_run:
         print(f"# job {jobid}: {' '.join(materials)}{' (quick)' if quick else ''}")
-        print(f"# --- ssh {config.HOST}: {upload} <<\n")
+        print(f"# --- ssh {config.remote_host()}: {upload} <<\n")
         print(script)
-        print(f"# --- ssh {config.HOST}: {submit}")
+        print(f"# --- ssh {config.remote_host()}: {submit}")
         return jobid
 
     if not no_sync:
@@ -235,7 +236,7 @@ def start_queue(
         + presentation._format_fields(
             [
                 ("SLURM", scheduler_id),
-                ("Host", config.HOST),
+                ("Host", config.remote_host()),
                 ("Materials", ", ".join(materials)),
                 (
                     "Mode",
@@ -268,7 +269,7 @@ def start_zhai_queue(
     if not dry_run:
         _refuse_if_busy([config.ZHAI_STEM], False)
     jobid = scripts._new_jobid()
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     stems = [config.ZHAI_STEM]
     payload = scripts._zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh)
     script = scripts._slurm_batch_script(
@@ -281,9 +282,9 @@ def start_zhai_queue(
 
     if dry_run:
         print(f"# zhai job {jobid}: ne={ne} ne_brem={ne_brem} ne_supp={ne_supp}")
-        print(f"# --- ssh {config.HOST}: {upload} <<\n")
+        print(f"# --- ssh {config.remote_host()}: {upload} <<\n")
         print(script)
-        print(f"# --- ssh {config.HOST}: {submit}")
+        print(f"# --- ssh {config.remote_host()}: {submit}")
         return jobid
 
     if not no_sync:
@@ -296,7 +297,7 @@ def start_zhai_queue(
         + presentation._format_fields(
             [
                 ("SLURM", scheduler_id),
-                ("Host", config.HOST),
+                ("Host", config.remote_host()),
                 ("Workload", "Zhai reproduction"),
                 ("Attach", f"cxr remote attach {jobid}"),
                 ("Status", f"cxr remote status {jobid} -vv"),
@@ -330,7 +331,7 @@ def start_rebrem_queue(
     if not dry_run:
         _refuse_if_busy(materials, False)
     jobid = scripts._new_jobid()
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     stems = list(materials)
     chunked = chunk_minutes > 0
     if chunked:
@@ -358,9 +359,9 @@ def start_rebrem_queue(
             f"# rebrem job {jobid}: {' '.join(materials)} "
             f"ne_brem={ne_brem} step={brem_step_eV} redo_all={redo_all}"
         )
-        print(f"# --- ssh {config.HOST}: {upload} <<\n")
+        print(f"# --- ssh {config.remote_host()}: {upload} <<\n")
         print(script)
-        print(f"# --- ssh {config.HOST}: {submit}")
+        print(f"# --- ssh {config.remote_host()}: {submit}")
         return jobid
 
     if not no_sync:
@@ -373,7 +374,7 @@ def start_rebrem_queue(
         + presentation._format_fields(
             [
                 ("SLURM", scheduler_id),
-                ("Host", config.HOST),
+                ("Host", config.remote_host()),
                 ("Materials", ", ".join(materials)),
                 (
                     "Mode",
@@ -414,7 +415,7 @@ def start_reline_queue(
     if not dry_run:
         _refuse_if_busy(materials, False)
     jobid = scripts._new_jobid()
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     stems = list(materials)
     chunked = chunk_minutes > 0
     if chunked:
@@ -442,9 +443,9 @@ def start_reline_queue(
             f"# reline job {jobid}: {' '.join(materials)} "
             f"line_ne={line_ne} line_step={line_step_eV} redo_all={redo_all}"
         )
-        print(f"# --- ssh {config.HOST}: {upload} <<\n")
+        print(f"# --- ssh {config.remote_host()}: {upload} <<\n")
         print(script)
-        print(f"# --- ssh {config.HOST}: {submit}")
+        print(f"# --- ssh {config.remote_host()}: {submit}")
         return jobid
 
     if not no_sync:
@@ -457,7 +458,7 @@ def start_reline_queue(
         + presentation._format_fields(
             [
                 ("SLURM", scheduler_id),
-                ("Host", config.HOST),
+                ("Host", config.remote_host()),
                 ("Materials", ", ".join(materials)),
                 (
                     "Mode",
@@ -480,17 +481,27 @@ def start_reline_queue(
 def _stage_job_script(jobid: str, stems: list[str], upload: str, script: str) -> None:
     """Reserve stems and upload a batch script, releasing on upload failure."""
     transport._run(
-        ["ssh", "-n", config.HOST, scripts._reserve_checkpoint_stems_command(jobid, stems)]
+        [
+            "ssh",
+            "-n",
+            config.remote_host(),
+            scripts._reserve_checkpoint_stems_command(jobid, stems),
+        ]
     )
     try:
         subprocess.run(
-            ["ssh", config.HOST, upload],
+            ["ssh", config.remote_host(), upload],
             input=script.replace("\r\n", "\n").encode(),
             check=True,
         )
     except BaseException:
         transport._run(
-            ["ssh", "-n", config.HOST, scripts._release_checkpoint_stems_command(jobid, stems)]
+            [
+                "ssh",
+                "-n",
+                config.remote_host(),
+                scripts._release_checkpoint_stems_command(jobid, stems),
+            ]
         )
         raise
 
@@ -498,9 +509,9 @@ def _stage_job_script(jobid: str, stems: list[str], upload: str, script: str) ->
 def _submission_outcome(jobid: str) -> str:
     """Classify a submission whose SSH response was lost, conservatively."""
     transport._check_shell_tokens([jobid])
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.shell_remote_path(config.JOBS_SUBDIR, jobid)
     remote = (
-        f'D="{jobdir}"; '
+        f"D={jobdir}; "
         '[ -d "$D" ] || { echo missing; exit 0; }; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
         "case \"$SID\" in *[!0-9]*|'') ;; *) echo submitted; exit 0 ;; esac; "
@@ -521,7 +532,12 @@ def _release_if_submission_definitely_failed(jobid: str, stems: list[str]) -> No
         return
     if definitely_failed:
         transport._run(
-            ["ssh", "-n", config.HOST, scripts._release_checkpoint_stems_command(jobid, stems)]
+            [
+                "ssh",
+                "-n",
+                config.remote_host(),
+                scripts._release_checkpoint_stems_command(jobid, stems),
+            ]
         )
 
 
@@ -551,7 +567,7 @@ def _stop_jobid(jobid):
     # was already past its scan loop and about to resubmit, the next slice's
     # STOP check still terminates the chain instead of re-queueing it.
     remote = (
-        f'D="{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"; '
+        f"D={config.shell_remote_path(config.JOBS_SUBDIR, jobid)}; "
         ': > "$D/STOP"; '
         f"scancel {scheduler_id} || exit $?; "
         f'echo "cancelling [{scheduler_id}] $(date -Is)" > "$D/state"; '
@@ -562,7 +578,7 @@ def _stop_jobid(jobid):
         f'echo "cancelled [{scheduler_id}] $(date -Is)" > "$D/state"; '
         f'echo "cancelled SLURM job {scheduler_id} for job {jobid}"'
     )
-    transport._run(["ssh", "-n", config.HOST, remote])
+    transport._run(["ssh", "-n", config.remote_host(), remote])
 
 
 def stop_jobs(materials=None, all_jobs=False):
@@ -630,7 +646,7 @@ def reap_reservations(min_age_minutes=5.0, yes=False):
         print("re-run with --yes to release them")
         return
     for jobid in sorted(orphans):
-        transport._run(["ssh", "-n", config.HOST, scripts._reap_job_command(jobid)])
+        transport._run(["ssh", "-n", config.remote_host(), scripts._reap_job_command(jobid)])
     print(f"reaped {len(orphans)} orphaned job(s)")
 
 
@@ -656,12 +672,18 @@ def pull(
     ``no_sync``) so the box rebuilds the grid from the same ``config.py`` the
     laptop has, and has the ``--compresslevel`` flag at all -- closing sync
     drift. With neither flag this is the plain whole-file scp."""
+    if dataset not in (None, "brem", "line"):
+        raise ValueError("dataset must be None, 'brem', or 'line'")
+    stems = list(stems)
+    if not stems:
+        raise ValueError("stems must contain at least one checkpoint stem")
     transport._check_shell_tokens(stems)
     dest = config.LOCAL_ROOT / "checkpoints"
     dest.mkdir(exist_ok=True)
     use_slim = grid or level9
     if use_slim and not no_sync:
         transport.sync_code()  # box must rebuild the grid from the same config.py
+    failed = []
     for stem in stems:
         local = dest / f"{stem}.pkl"
         try:
@@ -673,25 +695,33 @@ def pull(
                 if not no_sync:
                     transport.sync_code()  # box projects with the same key groups
                 remote_tmp = f"/tmp/{stem}.{dataset}.pkl"
-                ckpt = f"{config.REMOTE_DIR}/checkpoints/{stem}.pkl"
+                ckpt = config.remote_path("checkpoints", f"{stem}.pkl")
                 try:
                     transport._run(
                         [
                             "ssh",
                             "-n",
-                            config.HOST,
-                            f"cd {config.REMOTE_DIR} && {config.REMOTE_UV} run --no-sync cxr slim "
-                            f"{ckpt} --{dataset}-only -o {remote_tmp}",
+                            config.remote_host(),
+                            f"cd {config.shell_remote_dir()} && "
+                            f"{config.shell_remote_uv()} run --no-sync cxr slim "
+                            f"{config.shell_arg(ckpt)} --{dataset}-only "
+                            f"-o {config.shell_arg(remote_tmp)}",
                         ]
                     )
                     incoming_local = dest / f".{stem}.{dataset}.incoming.pkl"
-                    transport._run(["scp", f"{config.HOST}:{remote_tmp}", str(incoming_local)])
+                    transport._run(["scp", config.scp_remote_path(remote_tmp), str(incoming_local)])
                 finally:
-                    transport._run(["ssh", "-n", config.HOST, f"rm -f {remote_tmp}"])
+                    transport._run(
+                        [
+                            "ssh",
+                            "-n",
+                            config.remote_host(),
+                            f"rm -f {config.shell_arg(remote_tmp)}",
+                        ]
+                    )
                 if not local.exists():
-                    print(f"warning: no local checkpoints/{stem}.pkl to merge into; skipping")
                     incoming_local.unlink(missing_ok=True)
-                    continue
+                    raise FileNotFoundError(f"no local checkpoints/{stem}.pkl to merge into")
                 archive.archive_checkpoint(stem, force=True)  # undoable via cxr restore
                 base = _checkpoint_io.load(str(local))
                 incoming = _checkpoint_io.load(str(incoming_local))
@@ -715,15 +745,17 @@ def pull(
                 if level9:
                     flags += " --compresslevel 9"
                 remote_tmp = f"/tmp/{stem}.grid.pkl" if grid else f"/tmp/{stem}.slim.pkl"
-                ckpt = f"{config.REMOTE_DIR}/checkpoints/{stem}.pkl"
+                ckpt = config.remote_path("checkpoints", f"{stem}.pkl")
                 try:
                     transport._run(
                         [
                             "ssh",
                             "-n",
-                            config.HOST,
-                            f"cd {config.REMOTE_DIR} && {config.REMOTE_UV} run --no-sync cxr slim "
-                            f"{ckpt}{flags} -o {remote_tmp}",
+                            config.remote_host(),
+                            f"cd {config.shell_remote_dir()} && "
+                            f"{config.shell_remote_uv()} run --no-sync cxr slim "
+                            f"{config.shell_arg(ckpt)}{flags} "
+                            f"-o {config.shell_arg(remote_tmp)}",
                         ]
                     )
                     if (
@@ -731,31 +763,64 @@ def pull(
                     ) and digest == transport._local_sha256(local):
                         print(f"already current -> checkpoints/{stem}.pkl")
                     else:
-                        transport._run(["scp", f"{config.HOST}:{remote_tmp}", str(local)])
+                        transport._run(["scp", config.scp_remote_path(remote_tmp), str(local)])
                         label = "+".join(
                             filter(None, ["grid" if grid else "", "level9" if level9 else ""])
                         )
                         print(f"pulled ({label}) -> checkpoints/{stem}.pkl")
                 finally:
-                    transport._run(["ssh", "-n", config.HOST, f"rm -f {remote_tmp}"])
+                    transport._run(
+                        [
+                            "ssh",
+                            "-n",
+                            config.remote_host(),
+                            f"rm -f {config.shell_arg(remote_tmp)}",
+                        ]
+                    )
             else:
-                ckpt = f"{config.REMOTE_DIR}/checkpoints/{stem}.pkl"
-                remote_tmp = f"{config.REMOTE_DIR}/checkpoints/.{stem}.pull.{uuid.uuid4().hex}.pkl"
+                ckpt = config.remote_path("checkpoints", f"{stem}.pkl")
+                remote_tmp = config.remote_path(
+                    "checkpoints", f".{stem}.pull.{uuid.uuid4().hex}.pkl"
+                )
                 try:
                     # Checkpoint writers publish with os.replace; a sibling hard link
                     # freezes the exact inode that both the digest and scp will read.
-                    transport._run(["ssh", "-n", config.HOST, f"ln {ckpt} {remote_tmp}"])
+                    transport._run(
+                        [
+                            "ssh",
+                            "-n",
+                            config.remote_host(),
+                            f"ln {config.shell_arg(ckpt)} {config.shell_arg(remote_tmp)}",
+                        ]
+                    )
                     if (
                         digest := transport._remote_sha256(remote_tmp)
                     ) and digest == transport._local_sha256(local):
                         print(f"already current -> checkpoints/{stem}.pkl")
                     else:
-                        transport._run(["scp", f"{config.HOST}:{remote_tmp}", str(local)])
+                        transport._run(["scp", config.scp_remote_path(remote_tmp), str(local)])
                         print(f"pulled -> checkpoints/{stem}.pkl")
                 finally:
-                    transport._run(["ssh", "-n", config.HOST, f"rm -f {remote_tmp}"])
-        except (OSError, subprocess.CalledProcessError, SystemExit):
-            print(f"warning: could not pull checkpoint {stem!r}; continuing")
+                    transport._run(
+                        [
+                            "ssh",
+                            "-n",
+                            config.remote_host(),
+                            f"rm -f {config.shell_arg(remote_tmp)}",
+                        ]
+                    )
+        except (Exception, SystemExit) as exc:
+            failed.append(stem)
+            detail = str(exc) or type(exc).__name__
+            print(
+                f"warning: could not pull checkpoint {stem!r}: {detail}; continuing",
+                file=sys.stderr,
+            )
+    if failed:
+        raise SystemExit(
+            f"remote pull failed for {len(failed)} of {len(stems)} requested "
+            f"checkpoint(s): {', '.join(failed)}"
+        )
 
 
 def pull_zhai_cache():
@@ -765,10 +830,11 @@ def pull_zhai_cache():
     Lists remote filenames first (like clear_remote's listing step) rather
     than `scp -r`, which double-nests the directory when the local destination
     already exists -- listing + per-file scp is unambiguous either way."""
-    remote_dir = f"{config.REMOTE_DIR}/checkpoints/zhai_reproduction"
+    remote_dir = config.remote_path("checkpoints", "zhai_reproduction")
+    remote_dir_word = config.shell_arg(remote_dir)
     listing = (
-        f'[ -d "{remote_dir}" ] || exit 0; '
-        f'find "{remote_dir}" -maxdepth 1 -type f -name "*.pkl" -printf "%f\\n"'
+        f"[ -d {remote_dir_word} ] || exit 0; "
+        f"find {remote_dir_word} -maxdepth 1 -type f -name '*.pkl' -printf '%f\\n'"
     )
     names = [Path(p).name for p in transport._ssh_capture(listing).split()]
     if not names:
@@ -777,5 +843,5 @@ def pull_zhai_cache():
     dest = config.LOCAL_ROOT / "checkpoints" / "zhai_reproduction"
     dest.mkdir(parents=True, exist_ok=True)
     for name in names:
-        transport._run(["scp", f"{config.HOST}:{remote_dir}/{name}", str(dest / name)])
+        transport._run(["scp", config.scp_remote_path(f"{remote_dir}/{name}"), str(dest / name)])
     print(f"pulled -> checkpoints/zhai_reproduction/ ({len(names)} cache files)")

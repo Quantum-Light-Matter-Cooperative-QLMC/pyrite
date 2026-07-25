@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import argparse
 import math
+import re
 import shlex
+import unicodedata
 from datetime import date
 
 from cxr_mc import remote
@@ -29,6 +31,38 @@ DEFAULT_BREM_GRID_STOP = 40_000.0
 # The line-grid eval targets the four standard-profile crystals (issue_notes.md
 # #1). Overridable via --materials so other catalog keys can be scanned.
 DEFAULT_MATERIALS = "hopg,diamond,wse2,mose2"
+_REMOTE_OUTPUT_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\.json")
+
+
+def _reject_controls(field, value):
+    if value is None:
+        return
+    if not isinstance(value, str):
+        raise SystemExit(f"{field} must be text")
+    if any(unicodedata.category(char) == "Cc" for char in value):
+        raise SystemExit(f"{field} must not contain control characters")
+
+
+def _validate_remote_output_name(value):
+    _reject_controls("--json-out", value)
+    if not _REMOTE_OUTPUT_RE.fullmatch(value):
+        raise SystemExit(
+            "--json-out must be a .json basename using letters, digits, '.', '_' or '-'"
+        )
+
+
+def _validate_remote_fields(
+    *, json_out, energies, materials, tilts=None, azimuths=None, thickness=None
+):
+    _validate_remote_output_name(json_out)
+    for field, value in (
+        ("--energies", energies),
+        ("--materials", materials),
+        ("--tilts", tilts),
+        ("--azimuths", azimuths),
+        ("--thickness", thickness),
+    ):
+        _reject_controls(field, value)
 
 
 def _slice_payload(
@@ -40,27 +74,47 @@ def _slice_payload(
     grid_stop,
     brem_grid_stop=DEFAULT_BREM_GRID_STOP,
     materials=DEFAULT_MATERIALS,
+    tilts=None,
+    azimuths=None,
+    thickness=None,
+    set_default=False,
 ):
     """Build one resumable slice payload using remote.py's chain contract."""
-    jobdir = f"{remote.REMOTE_DIR}/{remote.JOBS_SUBDIR}/{jobid}"
-    command = " ".join(
-        [
-            "CXR_MC_FREE_EVERY=40",
-            "CXR_MC_FREE_WATERMARK_MB=15000",
-            "CXR_MC_TIMING=1",
-            shlex.quote(remote.REMOTE_UV),
-            "run --no-sync python -m cxr_mc.line_grid.derive",
-            f"--grid-stop {grid_stop:g}",
-            f"--brem-grid-stop {brem_grid_stop:g}",
-            f"--energies {shlex.quote(energies)}",
-            "--coarse-engine auto",
-            f"--json-out {shlex.quote(json_out)}",
-            f"--max-minutes {slice_minutes:g}",
-            f"--materials {shlex.quote(materials)}",
-        ]
+    _validate_remote_fields(
+        json_out=json_out,
+        energies=energies,
+        materials=materials,
+        tilts=tilts,
+        azimuths=azimuths,
+        thickness=thickness,
     )
-    return f'''JOBDIR="{jobdir}"
-cd "{remote.REMOTE_DIR}" || exit 1
+    jobdir = remote.remote_path(remote.JOBS_SUBDIR, jobid)
+    command_parts = [
+        "CXR_MC_FREE_EVERY=40",
+        "CXR_MC_FREE_WATERMARK_MB=15000",
+        "CXR_MC_TIMING=1",
+        remote.shell_remote_uv(),
+        "run --no-sync python -m cxr_mc.line_grid.derive",
+        f"--grid-stop {grid_stop:g}",
+        f"--brem-grid-stop {brem_grid_stop:g}",
+        f"--energies {shlex.quote(energies)}",
+        "--coarse-engine auto",
+        f"--json-out {shlex.quote(json_out)}",
+        f"--max-minutes {slice_minutes:g}",
+        f"--materials {shlex.quote(materials)}",
+    ]
+    for flag, value in (
+        ("tilts", tilts),
+        ("azimuths", azimuths),
+        ("thickness", thickness),
+    ):
+        if value:
+            command_parts.append(f"--{flag} {shlex.quote(value)}")
+    if set_default:
+        command_parts.append("--set-default")
+    command = " ".join(command_parts)
+    return f"""JOBDIR={remote.shell_word(jobdir)}
+cd {remote.shell_remote_dir()} || exit 1
 [ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
 echo "running line-grid bounds $(date -Is)" > "$JOBDIR/state"
 rc=0
@@ -80,7 +134,7 @@ SID=$(sbatch --parsable --nice=10000 "$JOBDIR/run.sh") || {{ echo "FAILED (slice
 SID=${{SID%%;*}}
 case "$SID" in ''|*[!0-9]*) echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1 ;; esac
 printf 'slurm_job_id: %s\n' "$SID" >> "$JOBDIR/meta"
-'''
+"""
 
 
 def _job_script(
@@ -92,6 +146,10 @@ def _job_script(
     grid_stop,
     brem_grid_stop=DEFAULT_BREM_GRID_STOP,
     materials=DEFAULT_MATERIALS,
+    tilts=None,
+    azimuths=None,
+    thickness=None,
+    set_default=False,
 ):
     payload = _slice_payload(
         jobid,
@@ -101,6 +159,10 @@ def _job_script(
         grid_stop=grid_stop,
         brem_grid_stop=brem_grid_stop,
         materials=materials,
+        tilts=tilts,
+        azimuths=azimuths,
+        thickness=thickness,
+        set_default=set_default,
     )
     time_limit = str(max(1, math.ceil(slice_minutes * 3)))
     return remote._slurm_batch_script(
@@ -121,6 +183,12 @@ def _metadata(
     brem_grid_stop=DEFAULT_BREM_GRID_STOP,
     materials=DEFAULT_MATERIALS,
 ):
+    _reject_controls("jobid", jobid)
+    _validate_remote_fields(
+        json_out=json_out,
+        energies=energies,
+        materials=materials,
+    )
     return "\n".join(
         [
             f"job: {jobid}",
@@ -145,6 +213,10 @@ def start(
     grid_stop=DEFAULT_GRID_STOP,
     brem_grid_stop=DEFAULT_BREM_GRID_STOP,
     materials=DEFAULT_MATERIALS,
+    tilts=None,
+    azimuths=None,
+    thickness=None,
+    set_default=False,
     no_sync=False,
     dry_run=False,
 ):
@@ -152,7 +224,7 @@ def start(
     if slice_minutes <= 0:
         raise SystemExit("--slice-minutes must be positive")
     jobid = remote._new_jobid()
-    jobdir = f"{remote.REMOTE_DIR}/{remote.JOBS_SUBDIR}/{jobid}"
+    jobdir = remote.remote_path(remote.JOBS_SUBDIR, jobid)
     script = _job_script(
         jobid,
         slice_minutes=slice_minutes,
@@ -161,6 +233,10 @@ def start(
         grid_stop=grid_stop,
         brem_grid_stop=brem_grid_stop,
         materials=materials,
+        tilts=tilts,
+        azimuths=azimuths,
+        thickness=thickness,
+        set_default=set_default,
     )
     metadata = _metadata(
         jobid,
@@ -195,6 +271,10 @@ def build_parser():
     start_parser.add_argument("--grid-stop", type=float, default=DEFAULT_GRID_STOP)
     start_parser.add_argument("--brem-grid-stop", type=float, default=DEFAULT_BREM_GRID_STOP)
     start_parser.add_argument("--materials", default=DEFAULT_MATERIALS)
+    start_parser.add_argument("--tilts", default=None)
+    start_parser.add_argument("--azimuths", default=None)
+    start_parser.add_argument("--thickness", default=None)
+    start_parser.add_argument("--set-default", action="store_true")
     start_parser.add_argument("--no-sync", action="store_true")
     start_parser.add_argument("--dry-run", action="store_true")
     for command in ("status", "attach", "stop"):
@@ -213,6 +293,10 @@ def main(argv=None):
             grid_stop=args.grid_stop,
             brem_grid_stop=args.brem_grid_stop,
             materials=args.materials,
+            tilts=args.tilts,
+            azimuths=args.azimuths,
+            thickness=args.thickness,
+            set_default=args.set_default,
             no_sync=args.no_sync,
             dry_run=args.dry_run,
         )

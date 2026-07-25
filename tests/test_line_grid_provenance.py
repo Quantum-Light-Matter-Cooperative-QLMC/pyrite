@@ -1,3 +1,5 @@
+import pytest
+
 import cxr_mc.line_grid.provenance as p
 
 
@@ -15,3 +17,24 @@ def test_set_and_read_roundtrip(tmp_path, monkeypatch):
     assert p.get_line("hopg", 60.0)["note"] == "widened for detector X"
     assert p.is_manual_brem("hopg") is False
     assert p.get_brem("hopg")["source"].startswith("derived job 458")
+
+
+def test_quotes_roundtrip_without_corrupting_toml(tmp_path, monkeypatch):
+    monkeypatch.setattr(p, "PROVENANCE_PATH", tmp_path / "prov.toml")
+
+    p.set_line("hopg", 60.0, "manual", note='detector "X" path')
+
+    assert p.get_line("hopg", 60.0)["note"] == 'detector "X" path'
+
+
+@pytest.mark.parametrize(("field", "value"), [("source", "manual\nforged"), ("note", "bad\x1b")])
+def test_persisted_provenance_rejects_controls(tmp_path, monkeypatch, field, value):
+    path = tmp_path / "prov.toml"
+    monkeypatch.setattr(p, "PROVENANCE_PATH", path)
+    kwargs = {"source": "manual", "note": None}
+    kwargs[field] = value
+
+    with pytest.raises(ValueError, match=f"{field}.*control"):
+        p.set_line("hopg", 60.0, **kwargs)
+
+    assert not path.exists()

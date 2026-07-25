@@ -102,6 +102,14 @@ RESERVATIONS_SUBDIR = config.RESERVATIONS_SUBDIR
 ZHAI_STEM = config.ZHAI_STEM
 SYNC_PATHS = config.SYNC_PATHS
 TEXT_EXTS = config.TEXT_EXTS
+remote_host = config.remote_host
+remote_dir = config.remote_dir
+remote_uv = config.remote_uv
+remote_path = config.remote_path
+shell_word = config.shell_word
+shell_remote_dir = config.shell_remote_dir
+shell_remote_uv = config.shell_remote_uv
+scp_remote_path = config.scp_remote_path
 
 # --- from transport ---------------------------------------------------
 _run = transport._run

@@ -1,3 +1,5 @@
+import pytest
+
 import cxr_mc.line_grid.defaults as d
 
 
@@ -17,3 +19,25 @@ def test_update_is_partial_merge_and_roundtrips(tmp_path, monkeypatch):
     assert got["thickness_ang"] == [5.0e6, 1.0e7]
     assert got["brem_step_ev"] == 25.0  # None ignored -> fallback kept
     assert got["materials"] == d.FALLBACK["materials"]  # untouched key preserved
+
+
+@pytest.mark.parametrize(
+    ("changes", "match"),
+    [
+        ({"tilts": [-0.1]}, "tilts"),
+        ({"tilts": [90.0]}, "tilts"),
+        ({"azimuths": [360.1]}, "azimuths"),
+        ({"thickness_ang": [0.0]}, "thickness_ang"),
+        ({"energies": [float("inf")]}, "energies"),
+        ({"brem_step_ev": 0.0}, "brem_step_ev"),
+    ],
+)
+def test_invalid_defaults_leave_file_unchanged(tmp_path, monkeypatch, changes, match):
+    path = tmp_path / "defaults.toml"
+    path.write_text("# existing defaults\n")
+    monkeypatch.setattr(d, "DEFAULTS_PATH", path)
+
+    with pytest.raises(ValueError, match=match):
+        d.update_defaults(**changes)
+
+    assert path.read_text() == "# existing defaults\n"

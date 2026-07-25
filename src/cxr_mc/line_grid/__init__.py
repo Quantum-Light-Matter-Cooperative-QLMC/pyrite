@@ -9,8 +9,9 @@ modules. Heavy modules (``derive``, ``golden``) import lazily inside handlers so
 
 from __future__ import annotations
 
+import argparse
+import math
 from datetime import date
-from pathlib import Path
 
 from cxr_mc import remote
 from cxr_mc.line_grid import apply, defaults, job
@@ -18,6 +19,55 @@ from cxr_mc.line_grid import apply, defaults, job
 
 def _floats(s):
     return [float(x) for x in s.split(",")] if s else None
+
+
+def _positive_float(value):
+    parsed = float(value)
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a finite positive number")
+    return parsed
+
+
+def _positive_int(value):
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
+def _domain_csv(name, lower, upper, *, upper_inclusive):
+    def parse(value):
+        try:
+            values = _floats(value)
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(f"{name} must be comma-separated numbers") from exc
+        if values is None:
+            return []
+        for item in values:
+            upper_ok = item <= upper if upper_inclusive else item < upper
+            if not math.isfinite(item) or item < lower or not upper_ok:
+                relation = "<=" if upper_inclusive else "<"
+                raise argparse.ArgumentTypeError(
+                    f"{name} values must satisfy {lower:g} <= value {relation} {upper:g}"
+                )
+        return values
+
+    return parse
+
+
+def _positive_csv(name):
+    def parse(value):
+        try:
+            values = _floats(value)
+        except ValueError as exc:
+            raise argparse.ArgumentTypeError(f"{name} must be comma-separated numbers") from exc
+        if values is None:
+            raise argparse.ArgumentTypeError(f"{name} requires at least one value")
+        if any(not math.isfinite(item) or item <= 0 for item in values):
+            raise argparse.ArgumentTypeError(f"{name} values must be finite and positive")
+        return values
+
+    return parse
 
 
 # --- local derive / remote submit ------------------------------------------
@@ -29,6 +79,8 @@ def _derive_argv(args):
         val = getattr(args, flag)
         if val:
             argv += [f"--{flag}", val]
+    if getattr(args, "brem_step", None) is not None:
+        argv += ["--brem-step", str(args.brem_step)]
     if args.set_default:
         argv.append("--set-default")
     return argv
@@ -44,6 +96,10 @@ def _cli_submit(args):
     job.start(
         materials=args.materials or job.DEFAULT_MATERIALS,
         energies=args.energies or job.DEFAULT_ENERGIES,
+        tilts=args.tilts,
+        azimuths=args.azimuths,
+        thickness=args.thickness,
+        set_default=args.set_default,
         slice_minutes=args.slice_minutes,
         no_sync=args.no_sync,
         dry_run=args.dry_run,
@@ -65,8 +121,7 @@ def _cli_attach(args):
 
 
 def _cli_logs(args):
-    remote.tail_logs(args.jobid, args.follow)
-    return 0
+    return remote.tail_logs(args.jobid, args.follow)
 
 
 def _cli_stop(args):
@@ -83,8 +138,10 @@ def _cli_stop(args):
 def _pull_combined(json_name=None):
     """scp the combined derivation JSON back from the remote box; return local path."""
     name = json_name or job.DEFAULT_JSON_OUT
-    local = Path(name).name
-    remote._run(["scp", f"{remote.HOST}:{remote.REMOTE_DIR}/{name}", local])
+    job._validate_remote_output_name(name)
+    local = name
+    remote_path = remote.remote_path(name)
+    remote._run(["scp", remote.scp_remote_path(remote_path), local])
     return local
 
 
@@ -120,11 +177,23 @@ def _cli_set_brem(args):
 
 
 def _cli_defaults(args):
+    supplied = [
+        flag
+        for flag, value in (
+            ("--tilts", args.tilts),
+            ("--azimuths", args.azimuths),
+            ("--thickness", args.thickness),
+            ("--brem-step", args.brem_step),
+        )
+        if value is not None
+    ]
+    if supplied and not args.set:
+        args.parser.error(f"{', '.join(supplied)} require --set")
     if args.set:
         defaults.update_defaults(
-            tilts=_floats(args.tilts),
-            azimuths=_floats(args.azimuths),
-            thickness_ang=_floats(args.thickness),
+            tilts=args.tilts,
+            azimuths=args.azimuths,
+            thickness_ang=args.thickness,
             brem_step_ev=args.brem_step,
         )
     for key, val in defaults.load_defaults().items():
@@ -133,7 +202,11 @@ def _cli_defaults(args):
 
 
 def _cli_show(args):
-    print(apply.show(args.material))
+    try:
+        result = apply.show(args.material)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from None
+    print(result)
     return 0
 
 
@@ -166,6 +239,7 @@ def add_subparser(sub):
             p.add_argument("--dry-run", action="store_true")
             p.set_defaults(func=_cli_submit)
         else:
+            p.add_argument("--brem-step", type=_positive_float, default=None)
             p.set_defaults(func=_cli_derive)
 
     st = g.add_parser("status")
@@ -197,27 +271,27 @@ def add_subparser(sub):
 
     se = g.add_parser("set")
     se.add_argument("material")
-    se.add_argument("--energy", type=float, required=True)
-    se.add_argument("--stop", type=float, required=True)
-    se.add_argument("--num", type=int, default=None)
-    se.add_argument("--start", type=float, default=None)
+    se.add_argument("--energy", type=_positive_float, required=True)
+    se.add_argument("--stop", type=_positive_float, required=True)
+    se.add_argument("--num", type=_positive_int, default=None)
+    se.add_argument("--start", type=_positive_float, default=None)
     se.add_argument("--note", default=None)
     se.set_defaults(func=_cli_set)
 
     sb = g.add_parser("set-brem")
     sb.add_argument("material")
-    sb.add_argument("--stop", type=float, required=True)
-    sb.add_argument("--step", type=float, default=None)
+    sb.add_argument("--stop", type=_positive_float, required=True)
+    sb.add_argument("--step", type=_positive_float, default=None)
     sb.add_argument("--note", default=None)
     sb.set_defaults(func=_cli_set_brem)
 
     df = g.add_parser("defaults")
     df.add_argument("--set", action="store_true")
-    df.add_argument("--tilts", default=None)
-    df.add_argument("--azimuths", default=None)
-    df.add_argument("--thickness", default=None)
-    df.add_argument("--brem-step", type=float, default=None)
-    df.set_defaults(func=_cli_defaults)
+    df.add_argument("--tilts", type=_domain_csv("tilt", 0, 90, upper_inclusive=False))
+    df.add_argument("--azimuths", type=_domain_csv("azimuth", 0, 360, upper_inclusive=True))
+    df.add_argument("--thickness", type=_positive_csv("thickness"))
+    df.add_argument("--brem-step", type=_positive_float, default=None)
+    df.set_defaults(func=_cli_defaults, parser=df)
 
     sh = g.add_parser("show")
     sh.add_argument("material", nargs="?", default=None)

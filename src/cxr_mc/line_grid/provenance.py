@@ -7,9 +7,11 @@ why, keyed material -> channel -> energy. Used for sticky-manual protection in
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import tomllib
+import unicodedata
 from pathlib import Path
 
 PROVENANCE_PATH = Path(__file__).resolve().parent.parent / "data" / "line_grid_provenance.toml"
@@ -45,6 +47,13 @@ def is_manual_brem(material) -> bool:
 
 
 def _record(source, note):
+    for field, value in (("source", source), ("note", note)):
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise ValueError(f"{field} must be text")
+        if any(unicodedata.category(char) == "Cc" for char in value):
+            raise ValueError(f"{field} must not contain control characters")
     rec = {"source": source}
     if note:
         rec["note"] = note
@@ -69,9 +78,9 @@ def _emit(data: dict) -> str:
 
     def block(header, rec):
         lines.append(f"[{header}]")
-        lines.append(f'source = "{rec["source"]}"')
+        lines.append(f"source = {json.dumps(rec['source'], ensure_ascii=False)}")
         if "note" in rec:
-            lines.append(f'note = "{rec["note"]}"')
+            lines.append(f"note = {json.dumps(rec['note'], ensure_ascii=False)}")
         lines.append("")
 
     for material in sorted(data):

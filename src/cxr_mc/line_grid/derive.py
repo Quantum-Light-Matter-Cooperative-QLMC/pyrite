@@ -416,7 +416,7 @@ def derive_bounds(
     return rows, complete
 
 
-def _brem_grid_for_rows(rows):
+def _brem_grid_for_rows(rows, step_eV=WIDE_BREM_STEP_EV):
     """Collapse a material's per-energy line-grid rows into ONE bespoke brem
     grid descriptor.
 
@@ -426,13 +426,14 @@ def _brem_grid_for_rows(rows):
     +5%-margined, 100 eV-rounded coverage energy) and the unmargined
     ``brem_raw_eV`` that produced it.
 
-    Returns ``{"stop_eV": float, "raw_eV": float, "step_eV": WIDE_BREM_STEP_EV}``.
+    ``step_eV`` controls downstream production-grid spacing; diagnostic
+    bremsstrahlung sampling remains independently fixed by ``WIDE_BREM_STEP_EV``.
     """
     driver = max(rows, key=lambda row: row["brem_stop_eV"])
     return {
         "stop_eV": driver["brem_stop_eV"],
         "raw_eV": driver["brem_raw_eV"],
-        "step_eV": WIDE_BREM_STEP_EV,
+        "step_eV": float(step_eV),
     }
 
 
@@ -522,6 +523,7 @@ def derive_all_materials(
     tilts=None,
     azimuths=None,
     thicknesses=None,
+    brem_step_eV=WIDE_BREM_STEP_EV,
 ):
     """Derive a bespoke per-material line grid + brem grid for each material,
     running the per-energy derivation independently per material (Approach A:
@@ -561,7 +563,10 @@ def derive_all_materials(
             thicknesses=thicknesses,
         )
         if rows:
-            combined[material] = {"line_rows": rows, "brem": _brem_grid_for_rows(rows)}
+            combined[material] = {
+                "line_rows": rows,
+                "brem": _brem_grid_for_rows(rows, brem_step_eV),
+            }
         if not material_complete:
             complete = False
             break
@@ -690,6 +695,9 @@ def main(argv=None):
     tilts = _floats(args.tilts) or (persisted["tilts"] or None)
     azimuths = _floats(args.azimuths) or (persisted["azimuths"] or None)
     thicknesses = _floats(args.thickness) or (persisted["thickness_ang"] or None)
+    brem_step_eV = (
+        float(args.brem_step) if args.brem_step is not None else persisted["brem_step_ev"]
+    )
     global WIDE_GRID_EV, WIDE_BREM_EV
     WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, args.grid_stop, args.grid_step)
     WIDE_BREM_EV = np.arange(0.0, args.brem_grid_stop, WIDE_BREM_STEP_EV)
@@ -721,6 +729,7 @@ def main(argv=None):
         tilts=tilts,
         azimuths=azimuths,
         thicknesses=thicknesses,
+        brem_step_eV=brem_step_eV,
     )
     for material in materials:
         entry = combined.get(material)

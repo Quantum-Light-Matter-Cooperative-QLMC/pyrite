@@ -5,16 +5,18 @@ byte-for-byte: per-material `E_grid_line_by_energy` block, per-material
 `E_grid_brem` line, and `[profiles.standard] energy_keV` values. No TOML writer
 dependency -- blocks are located by text scan and replaced with hand-emitted text
 matching the existing one-inline-table-per-line format. Provenance/sticky-manual
-comes from cxr_mc.line_grid.provenance; the catalog is reloaded post-write to
-validate.
+comes from cxr_mc.line_grid.provenance; candidate catalogs are fully validated
+before replacement.
 """
 
 from __future__ import annotations
 
 import difflib
 import json
+import math
 import os
 import re
+import sys
 import tempfile
 import tomllib
 from pathlib import Path
@@ -29,6 +31,61 @@ _MATERIALS_TOML = Path(__file__).resolve().parent.parent / "data" / "materials.t
 def _line_start_eV(energy_keV: float) -> float:
     # Matches the existing catalog convention: 10 eV floor at <=60 keV, 50 eV above.
     return 10.0 if float(energy_keV) <= 60.0 else 50.0
+
+
+def _positive_float(value, field: str) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field} must be a finite positive number") from exc
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise ValueError(f"{field} must be a finite positive number")
+    return parsed
+
+
+def _positive_int(value, field: str) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"{field} must be a positive integer")
+    try:
+        parsed = int(value)
+        numeric = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{field} must be a positive integer") from exc
+    if not math.isfinite(numeric) or numeric != parsed or parsed <= 0:
+        raise ValueError(f"{field} must be a positive integer")
+    return parsed
+
+
+def _validated_line_row(row, *, field: str) -> dict:
+    energy = _positive_float(row["energy_keV"], f"{field}.energy_keV")
+    start = _positive_float(row.get("start_eV", _line_start_eV(energy)), f"{field}.start_eV")
+    stop = _positive_float(row["stop_eV"], f"{field}.stop_eV")
+    num = _positive_int(row["num"], f"{field}.num")
+    if stop <= start:
+        raise ValueError(f"{field}.stop_eV must be greater than start_eV")
+    return {"energy_keV": energy, "start_eV": start, "stop_eV": stop, "num": num}
+
+
+def _validated_brem(brem, *, field: str) -> dict:
+    return {
+        **brem,
+        "stop_eV": _positive_float(brem["stop_eV"], f"{field}.stop_eV"),
+        "step_eV": _positive_float(brem["step_eV"], f"{field}.step_eV"),
+    }
+
+
+def _validated_combined(combined) -> dict:
+    validated = {}
+    for material, entry in combined.items():
+        validated[material] = {
+            **entry,
+            "line_rows": [
+                _validated_line_row(row, field=f"{material}.line_rows[{index}]")
+                for index, row in enumerate(entry["line_rows"])
+            ],
+            "brem": _validated_brem(entry["brem"], field=f"{material}.brem"),
+        }
+    return validated
 
 
 def _fnum(v) -> str:
@@ -147,6 +204,7 @@ def _insert_energies(text, energies) -> str:
 
 
 def apply_bounds(toml_text, combined, *, force=False, provenance_mod=_provenance):
+    combined = _validated_combined(combined)
     text = toml_text
     skipped = []
     all_energies = set()
@@ -177,6 +235,34 @@ def _atomic_write(path, text):
         raise
 
 
+def _validate_catalog_text(path, text):
+    """Validate candidate catalog from a temporary file, without replacing live data."""
+    path = Path(path)
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".toml.tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(text)
+        load_material_catalog(Path(tmp))
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
+def _snapshot(path):
+    path = Path(path)
+    return path.read_text() if path.exists() else None
+
+
+def _restore(path, text):
+    path = Path(path)
+    if text is None:
+        path.unlink(missing_ok=True)
+    else:
+        _atomic_write(path, text)
+
+
 def _print_diff(original, new_text):
     diff = difflib.unified_diff(
         original.splitlines(True),
@@ -185,6 +271,14 @@ def _print_diff(original, new_text):
         "materials.toml (proposed)",
     )
     print("".join(diff))
+
+
+def _warn_stale_golden():
+    print(
+        "warning: material catalog changed; golden is now stale; "
+        "run `cxr line-grid regen-golden`",
+        file=sys.stderr,
+    )
 
 
 def apply_file(
@@ -203,62 +297,92 @@ def apply_file(
         combined = {m: v for m, v in combined.items() if m in wanted}
     original = Path(_MATERIALS_TOML).read_text()
     new_text, skipped = apply_bounds(original, combined, force=force)
-    tomllib.loads(new_text)  # validate structure before touching disk
+    _validate_catalog_text(_MATERIALS_TOML, new_text)
     if dry_run:
         _print_diff(original, new_text)
         return
+    provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
     _atomic_write(_MATERIALS_TOML, new_text)
 
-    load_material_catalog(Path(_MATERIALS_TOML))
-    source = f"derived job {slurm_id} ({date})"
-    for material, entry in combined.items():
-        for row in entry["line_rows"]:
-            e = float(row["energy_keV"])
-            if force or not _provenance.is_manual_line(material, e):
-                _provenance.set_line(material, e, source)
-        if force or not _provenance.is_manual_brem(material):
-            _provenance.set_brem(material, source)
+    try:
+        source = f"derived job {slurm_id} ({date})"
+        for material, entry in combined.items():
+            for row in entry["line_rows"]:
+                e = float(row["energy_keV"])
+                if force or not _provenance.is_manual_line(material, e):
+                    _provenance.set_line(material, e, source)
+            if force or not _provenance.is_manual_brem(material):
+                _provenance.set_brem(material, source)
+    except BaseException:
+        _atomic_write(_MATERIALS_TOML, original)
+        _restore(_provenance.PROVENANCE_PATH, provenance_original)
+        raise
     if skipped:
         print(
             f"[line-grid apply] kept manual overrides: {', '.join(skipped)} "
             "(use --force to replace)"
         )
+    if regen_golden:
+        print("[line-grid apply] regenerating golden")
     else:
-        print(
-            "[line-grid apply] golden is now stale; run `cxr line-grid regen-golden`"
-            if not regen_golden
-            else "[line-grid apply] regenerating golden"
-        )
+        _warn_stale_golden()
 
 
 def set_line_grid(material, energy, stop_eV, *, num=None, start_eV=None, note=None):
-    e = float(energy)
-    start = float(start_eV) if start_eV is not None else _line_start_eV(e)
-    n = int(num) if num is not None else spacing_num(start, float(stop_eV), 3.0)
-    row = {"energy_keV": e, "start_eV": start, "stop_eV": float(stop_eV), "num": n}
+    e = _positive_float(energy, "energy")
+    start = _positive_float(start_eV, "start") if start_eV is not None else _line_start_eV(e)
+    stop = _positive_float(stop_eV, "stop")
+    if stop <= start:
+        raise ValueError("stop must be greater than start")
+    n = (
+        _positive_int(num, "num")
+        if num is not None
+        else _positive_int(spacing_num(start, stop, 3.0), "num")
+    )
+    row = {"energy_keV": e, "start_eV": start, "stop_eV": stop, "num": n}
     original = Path(_MATERIALS_TOML).read_text()
     new_text, _ = _merge_line_rows(original, material, [row], True, _provenance)
-    tomllib.loads(new_text)
+    _validate_catalog_text(_MATERIALS_TOML, new_text)
+    provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
     _atomic_write(_MATERIALS_TOML, new_text)
-    _provenance.set_line(material, e, "manual", note=note)
+    try:
+        _provenance.set_line(material, e, "manual", note=note)
+    except BaseException:
+        _atomic_write(_MATERIALS_TOML, original)
+        _restore(_provenance.PROVENANCE_PATH, provenance_original)
+        raise
+    _warn_stale_golden()
 
 
 def set_brem_grid(material, stop_eV, *, step_eV=None, note=None):
     from cxr_mc.line_grid.defaults import load_defaults
 
-    step = float(step_eV) if step_eV is not None else float(load_defaults()["brem_step_ev"])
+    stop = _positive_float(stop_eV, "stop")
+    step = _positive_float(
+        step_eV if step_eV is not None else load_defaults()["brem_step_ev"],
+        "step",
+    )
     original = Path(_MATERIALS_TOML).read_text()
     new_text, _ = _merge_brem(
-        original, material, {"stop_eV": float(stop_eV), "step_eV": step}, True, _provenance
+        original, material, {"stop_eV": stop, "step_eV": step}, True, _provenance
     )
-    tomllib.loads(new_text)
+    _validate_catalog_text(_MATERIALS_TOML, new_text)
+    provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
     _atomic_write(_MATERIALS_TOML, new_text)
-    _provenance.set_brem(material, "manual", note=note)
+    try:
+        _provenance.set_brem(material, "manual", note=note)
+    except BaseException:
+        _atomic_write(_MATERIALS_TOML, original)
+        _restore(_provenance.PROVENANCE_PATH, provenance_original)
+        raise
+    _warn_stale_golden()
 
 
 def show(material=None) -> str:
     original = tomllib.loads(Path(_MATERIALS_TOML).read_text())
     mats = original["materials"]
+    if material is not None and material not in mats:
+        raise ValueError(f"unknown material: {material}")
     keys = [material] if material else list(mats)
     out = []
     for key in keys:

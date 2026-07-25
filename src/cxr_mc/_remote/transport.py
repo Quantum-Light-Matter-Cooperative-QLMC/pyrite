@@ -34,7 +34,7 @@ def _ssh_capture(remote_cmd):
     `jobs`, and `logs` would crash mid-read. `errors="replace"` keeps any stray
     non-UTF-8 byte from aborting the whole command."""
     r = subprocess.run(
-        ["ssh", "-n", config.HOST, remote_cmd],
+        ["ssh", "-n", config.remote_host(), remote_cmd],
         capture_output=True,
         encoding="utf-8",
         errors="replace",
@@ -58,7 +58,7 @@ def _local_sha256(path: Path) -> str | None:
 
 def _remote_sha256(path: str) -> str:
     """Return the SHA-256 digest of one remote checkpoint artifact."""
-    output = _ssh_capture(f"sha256sum {path}").strip()
+    output = _ssh_capture(f"sha256sum {config.shell_arg(path)}").strip()
     match = re.fullmatch(r"([0-9a-fA-F]{64})\s+\S+", output)
     if match is None:
         raise SystemExit(f"invalid sha256sum output for remote artifact {path!r}")
@@ -124,7 +124,7 @@ def sync_code():
                             _add_to_tar(t, f, arc)
                 else:
                     _add_to_tar(t, local, p)
-        _run(["scp", tarpath, f"{config.HOST}:/tmp/cxr_code.tgz"])
+        _run(["scp", tarpath, config.scp_remote_path("/tmp/cxr_code.tgz")])
     # -n: redirect ssh's stdin from null. Without it, ssh.exe inherits the
     # interactive console stdin and its stdin-forwarding thread never sees EOF,
     # so the client hangs after the remote command (tar) has already exited.
@@ -132,7 +132,8 @@ def sync_code():
         [
             "ssh",
             "-n",
-            config.HOST,
-            f"mkdir -p {config.REMOTE_DIR} && cd {config.REMOTE_DIR} && tar xzf /tmp/cxr_code.tgz && rm -f /tmp/cxr_code.tgz",
+            config.remote_host(),
+            f"mkdir -p {config.shell_remote_dir()} && cd {config.shell_remote_dir()} "
+            "&& tar xzf /tmp/cxr_code.tgz && rm -f /tmp/cxr_code.tgz",
         ]
     )

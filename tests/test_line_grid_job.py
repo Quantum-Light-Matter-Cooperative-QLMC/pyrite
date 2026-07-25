@@ -1,5 +1,8 @@
 import os
+import shlex
 import subprocess
+
+import pytest
 
 from cxr_mc.line_grid import job
 
@@ -42,6 +45,51 @@ def test_batch_script_uses_three_times_slice_budget_backstop():
     subprocess.run(["bash", "-n"], input=script, text=True, check=True)
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "/tmp/result.json",
+        "../result.json",
+        "nested/result.json",
+        "result.txt",
+        "result\nforged.json",
+    ],
+)
+def test_remote_json_output_is_constrained_to_json_basename(name):
+    with pytest.raises(SystemExit, match="--json-out"):
+        job._slice_payload(
+            "20260719-120000-deadbeef",
+            slice_minutes=10.0,
+            json_out=name,
+            energies="30",
+            grid_stop=20_000.0,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("jobid", "job\nkind: forged"),
+        ("energies", "30\nmaterials: forged"),
+        ("materials", "hopg\x1b[31m"),
+    ],
+)
+def test_metadata_rejects_control_characters(field, value):
+    kwargs = dict(
+        jobid="20260719-120000-deadbeef",
+        slice_minutes=10.0,
+        json_out="result.json",
+        energies="30",
+        grid_stop=20_000.0,
+        materials="hopg",
+    )
+    kwargs[field] = value
+
+    label = field if field == "jobid" else f"--{field}"
+    with pytest.raises(SystemExit, match=f"{label}.*control"):
+        job._metadata(**kwargs)
+
+
 def test_batch_script_records_signal_termination(tmp_path, monkeypatch):
     monkeypatch.setattr(job.remote.config, "REMOTE_DIR", str(tmp_path))
     jobid = "20260719-120000-deadbeef"
@@ -77,6 +125,24 @@ def test_start_submits_slice_zero_with_nice(monkeypatch):
     assert calls[-1][1] == {"nice": True}
 
 
+def test_start_dry_run_threads_geometry_and_set_default(monkeypatch, capsys):
+    monkeypatch.setattr(job.remote, "_new_jobid", lambda: "20260719-120000-deadbeef")
+
+    job.start(
+        tilts="0,1.5",
+        azimuths="45,90",
+        thickness="1000,2000",
+        set_default=True,
+        dry_run=True,
+    )
+
+    script = capsys.readouterr().out
+    assert "--tilts 0,1.5" in script
+    assert "--azimuths 45,90" in script
+    assert "--thickness 1000,2000" in script
+    assert "--set-default" in script
+
+
 def _run_payload(tmp_path, monkeypatch, analysis_exit):
     remote_root = tmp_path / "remote"
     jobid = "20260719-120000-deadbeef"
@@ -89,8 +155,8 @@ def _run_payload(tmp_path, monkeypatch, analysis_exit):
     fake_sbatch = tmp_path / "sbatch"
     fake_sbatch.write_text("#!/bin/sh\nexit 1\n")
     fake_sbatch.chmod(0o755)
-    monkeypatch.setattr(job.remote, "REMOTE_DIR", str(remote_root))
-    monkeypatch.setattr(job.remote, "REMOTE_UV", str(fake_uv))
+    monkeypatch.setattr(job.remote.config, "REMOTE_DIR", str(remote_root))
+    monkeypatch.setattr(job.remote.config, "REMOTE_UV", str(fake_uv))
     payload = job._slice_payload(
         jobid,
         slice_minutes=1.0,
@@ -130,6 +196,76 @@ def test_slice_payload_threads_brem_grid_stop():
     )
     assert "--brem-grid-stop 40000" in shell
     assert "--energies 30,50,100,150,200,250,300" in shell
+
+
+def test_slice_payload_threads_geometry_and_set_default_to_derive():
+    shell = job._slice_payload(
+        "20260720-000000-abcdef01",
+        slice_minutes=10.0,
+        json_out="bounds.json",
+        energies="100,200",
+        grid_stop=20000.0,
+        materials="diamond,wse2",
+        tilts="0,1.5; printf injected",
+        azimuths="45,90",
+        thickness="1000,2000",
+        set_default=True,
+    )
+
+    derive_command = next(
+        line for line in shell.splitlines() if "python -m cxr_mc.line_grid.derive" in line
+    )
+    argv = shlex.split(derive_command)
+    assert argv[argv.index("--tilts") + 1] == "0,1.5; printf injected"
+    assert argv[argv.index("--azimuths") + 1] == "45,90"
+    assert argv[argv.index("--thickness") + 1] == "1000,2000"
+    assert "--set-default" in argv
+
+
+def test_slice_payload_omits_unset_geometry_and_set_default():
+    shell = job._slice_payload(
+        "20260720-000000-abcdef01",
+        slice_minutes=10.0,
+        json_out="bounds.json",
+        energies="100,200",
+        grid_stop=20000.0,
+    )
+
+    derive_command = next(
+        line for line in shell.splitlines() if "python -m cxr_mc.line_grid.derive" in line
+    )
+    assert "--tilts" not in derive_command
+    assert "--azimuths" not in derive_command
+    assert "--thickness" not in derive_command
+    assert "--set-default" not in derive_command
+
+
+def test_slice_payload_quotes_hostile_remote_dir(monkeypatch):
+    monkeypatch.setattr(job.remote.config, "REMOTE_DIR", '/safe"; SENTINEL_LINE_GRID; #')
+
+    shell = job._slice_payload(
+        "j",
+        slice_minutes=10.0,
+        json_out="bounds.json",
+        energies="100",
+        grid_stop=20000.0,
+    )
+
+    assert '\\"; SENTINEL_LINE_GRID' in shell
+    subprocess.run(["bash", "-n"], input=shell, text=True, check=True)
+
+
+def test_slice_payload_rejects_remote_uv_program_text(monkeypatch):
+    monkeypatch.setattr(job.remote.config, "REMOTE_UV", "uv; SENTINEL_LINE_GRID #")
+
+    with pytest.raises(SystemExit, match="CXR_REMOTE_UV"):
+        job._slice_payload(
+            "j",
+            slice_minutes=10.0,
+            json_out="bounds.json",
+            energies="100",
+            grid_stop=20000.0,
+        )
 
 
 def test_metadata_records_brem_grid_stop():

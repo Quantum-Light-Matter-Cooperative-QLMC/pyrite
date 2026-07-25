@@ -47,12 +47,12 @@ def _queue_script(
     if workers is not None:
         flags += f" --workers {workers}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
-    return f"""JOBDIR="{jobdir}"
-cd "{config.REMOTE_DIR}" || exit 1
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
+    return f"""JOBDIR={config.shell_word(jobdir)}
+cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 mats=({mats})
 total=${{#mats[@]}}
 parallel_materials={parallel_materials}
@@ -65,7 +65,7 @@ run_material() {{
   echo "running $m [$i/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$i" "$total" "$m" "$(date -Is)" \
 >> "$JOBDIR/log"
-  if ! {config.REMOTE_UV} run --no-sync python scan.py "$m"{flags} \
+  if ! {config.shell_remote_uv()} run --no-sync python scan.py "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: scan failed for $m; continuing" >> "$JOBDIR/log"
@@ -115,13 +115,13 @@ def _chunked_queue_script(jobid, materials, quick, workers, chunk_minutes):
     if workers is not None:
         flags += f" --workers {workers}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
-    return f"""JOBDIR="{jobdir}"
-cd "{config.REMOTE_DIR}" || exit 1
+    return f"""JOBDIR={config.shell_word(jobdir)}
+cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
@@ -138,7 +138,7 @@ for m in "${{mats[@]}}"; do
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.REMOTE_UV} run --no-sync python scan.py "$m"{flags} --max-minutes "$remaining_min" \
+  {config.shell_remote_uv()} run --no-sync python scan.py "$m"{flags} --max-minutes "$remaining_min" \
     --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
@@ -182,14 +182,14 @@ def _zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh):
 
 def _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     """CXR payload for one Zhai reproduction inside a SLURM allocation."""
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     flags = _zhai_flags(ne, ne_brem, ne_supp, tmd_azimuth, refresh)
-    return f"""JOBDIR="{jobdir}"
-cd "{config.REMOTE_DIR}" || exit 1
+    return f"""JOBDIR={config.shell_word(jobdir)}
+cd {config.shell_remote_dir()} || exit 1
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 echo "running zhai reproduction since $(date -Is)" > "$JOBDIR/state"
-if ! {config.REMOTE_UV} run --no-sync python reproduce_zhai.py{flags} >> "$JOBDIR/log" 2>&1
+if ! {config.shell_remote_uv()} run --no-sync python reproduce_zhai.py{flags} >> "$JOBDIR/log" 2>&1
 then
   echo "FAILED $(date -Is)" > "$JOBDIR/state"
   exit 1
@@ -220,12 +220,12 @@ def _rebrem_queue_script(jobid, materials, ne_brem, brem_step_eV, redo_all):
     post-attach pull unchanged."""
     flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
-    return f"""JOBDIR="{jobdir}"
-cd "{config.REMOTE_DIR}" || exit 1
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
+    return f"""JOBDIR={config.shell_word(jobdir)}
+cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 mats=({mats})
 total=${{#mats[@]}}
 n=0
@@ -234,7 +234,7 @@ for m in "${{mats[@]}}"; do
   n=$((n + 1))
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
-  if ! {config.REMOTE_UV} run --no-sync cxr rebrem "$m"{flags} \
+  if ! {config.shell_remote_uv()} run --no-sync cxr rebrem "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: rebrem failed for $m; continuing" >> "$JOBDIR/log"
@@ -265,13 +265,13 @@ def _rebrem_chunked_queue_script(jobid, materials, ne_brem, brem_step_eV, redo_a
     """
     flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
-    return f"""JOBDIR="{jobdir}"
-cd "{config.REMOTE_DIR}" || exit 1
+    return f"""JOBDIR={config.shell_word(jobdir)}
+cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
@@ -288,7 +288,7 @@ for m in "${{mats[@]}}"; do
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.REMOTE_UV} run --no-sync cxr rebrem "$m"{flags} --max-minutes "$remaining_min" \
+  {config.shell_remote_uv()} run --no-sync cxr rebrem "$m"{flags} --max-minutes "$remaining_min" \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
@@ -361,12 +361,12 @@ def _reline_queue_script(jobid, materials, line_ne, line_step_eV, redo_all):
     drives the post-attach pull unchanged."""
     flags = _reline_flags(line_ne, line_step_eV, redo_all)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
-    return f"""JOBDIR="{jobdir}"
-cd "{config.REMOTE_DIR}" || exit 1
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
+    return f"""JOBDIR={config.shell_word(jobdir)}
+cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 mats=({mats})
 total=${{#mats[@]}}
 n=0
@@ -375,7 +375,7 @@ for m in "${{mats[@]}}"; do
   n=$((n + 1))
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
-  if ! {config.REMOTE_UV} run --no-sync cxr reline "$m"{flags} \
+  if ! {config.shell_remote_uv()} run --no-sync cxr reline "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: reline failed for $m; continuing" >> "$JOBDIR/log"
@@ -406,13 +406,13 @@ def _reline_chunked_queue_script(jobid, materials, line_ne, line_step_eV, redo_a
     """
     flags = _reline_flags(line_ne, line_step_eV, redo_all)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
-    return f"""JOBDIR="{jobdir}"
-cd "{config.REMOTE_DIR}" || exit 1
+    return f"""JOBDIR={config.shell_word(jobdir)}
+cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.REMOTE_UV} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
@@ -429,7 +429,7 @@ for m in "${{mats[@]}}"; do
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.REMOTE_UV} run --no-sync cxr reline "$m"{flags} --max-minutes "$remaining_min" \
+  {config.shell_remote_uv()} run --no-sync cxr reline "$m"{flags} --max-minutes "$remaining_min" \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
@@ -482,7 +482,7 @@ def _reline_queue_metadata(jobid, materials, line_ne, line_step_eV, redo_all):
 
 
 def _reservation_root() -> str:
-    return f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{config.RESERVATIONS_SUBDIR}"
+    return config.remote_path(config.JOBS_SUBDIR, config.RESERVATIONS_SUBDIR)
 
 
 def _release_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
@@ -493,7 +493,7 @@ def _release_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
         f'if [ "$(cat "$R/{stem}/jobid" 2>/dev/null)" = "$J" ]; then rm -rf "$R/{stem}"; fi'
         for stem in stems
     )
-    command = f'R="{reservations}"; J="{jobid}"'
+    command = f"R={config.shell_word(reservations)}; J={config.shell_word(jobid)}"
     return f"{command}; {releases}" if releases else command
 
 
@@ -501,7 +501,7 @@ def _release_job_reservations_command(jobid: str) -> str:
     """Return a remote command that releases every reservation owned by a job."""
     transport._check_shell_tokens([jobid])
     return (
-        f'R="{_reservation_root()}"; J="{jobid}"; '
+        f"R={config.shell_word(_reservation_root())}; J={config.shell_word(jobid)}; "
         'for d in "$R"/*; do [ -d "$d" ] || continue; '
         '[ "$(cat "$d/jobid" 2>/dev/null)" = "$J" ] && rm -rf "$d"; done'
     )
@@ -516,7 +516,7 @@ def _reserve_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
     transport._check_shell_tokens([jobid, *stems])
     reservations = _reservation_root()
     stem_words = " ".join(stems)
-    return f'''R="{reservations}"; J="{jobid}"; mkdir -p "$R"; claimed=""; \
+    return f"""R={config.shell_word(reservations)}; J={config.shell_word(jobid)}; mkdir -p "$R"; claimed=""; \
 for stem in {stem_words}; do \
   if mkdir "$R/$stem" 2>/dev/null; then \
     printf '%s\\n' "$J" > "$R/$stem/jobid"; claimed="$claimed $stem"; \
@@ -528,7 +528,7 @@ for stem in {stem_words}; do \
     echo "refusing to stage job $J: checkpoint $stem is reserved by ${{owner:-another staging job}}" >&2; \
     exit 17; \
   fi; \
-done'''
+done"""
 
 
 def _slurm_batch_script(
@@ -542,7 +542,8 @@ def _slurm_batch_script(
     """Wrap a CXR queue payload in the lab box's one-GPU SLURM profile."""
     reservation_stems = reservation_stems or []
     transport._check_shell_tokens([jobid, *reservation_stems])
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
+    sbatch_jobdir = config.sbatch_remote_path(config.JOBS_SUBDIR, jobid)
     reservations = _reservation_root()
     release_lines = (
         "\n  ".join(
@@ -558,16 +559,16 @@ def _slurm_batch_script(
 #SBATCH --ntasks-per-node={config.SLURM_GPUS}
 #SBATCH --gres=gpu:{config.SLURM_GPUS}
 #SBATCH --time={time_limit}
-#SBATCH --output={jobdir}/slurm-%j.out
-#SBATCH --error={jobdir}/slurm-%j.err
+#SBATCH --output={sbatch_jobdir}/slurm-%j.out
+#SBATCH --error={sbatch_jobdir}/slurm-%j.err
 
 set -u
 module purge 2>/dev/null || true
 module load cuda openmpi hdf5 2>/dev/null || true
 
-JOBDIR="{jobdir}"
-JOBID="{jobid}"
-RESERVATIONS="{reservations}"
+JOBDIR={config.shell_word(jobdir)}
+JOBID={config.shell_word(jobid)}
+RESERVATIONS={config.shell_word(reservations)}
 release_reservations() {{
   {release_lines}
 }}
@@ -615,12 +616,14 @@ def _submit_slurm_command(
     """Return the remote submission protocol for an already-written batch script."""
     reservation_stems = reservation_stems or []
     transport._check_shell_tokens([jobid, *reservation_stems])
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
+    jobdir_word = config.shell_single_word(jobdir)
+    run_script_word = config.shell_single_word(f"{jobdir}/run.sh")
     release = _release_checkpoint_stems_command(jobid, reservation_stems)
     sbatch = "sbatch --parsable --nice=10000" if nice else "sbatch --parsable"
-    return f"""D='{jobdir}'; \
+    return f"""D={jobdir_word}; \
 echo "queued $(date -Is)" > "$D/state"; \
-SID=$({sbatch} '{jobdir}/run.sh') || {{ \
+SID=$({sbatch} {run_script_word}) || {{ \
   echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; {release}; exit 1; \
 }}; \
 SID=${{SID%%;*}}; \
@@ -672,9 +675,12 @@ def _zhai_queue_metadata(jobid, ne, ne_brem, ne_supp):
 
 def _write_job_script_command(jobdir, metadata):
     """Exclusively create a job directory, then receive its script on stdin."""
+    jobdir_word = config.shell_single_word(jobdir)
+    run_script_word = config.shell_single_word(f"{jobdir}/run.sh")
+    metadata_word = config.shell_single_word(f"{jobdir}/meta")
     return (
-        f"mkdir '{jobdir}' && cat > '{jobdir}/run.sh' && "
-        f"printf %s {shlex.quote(metadata)} > '{jobdir}/meta'"
+        f"mkdir {jobdir_word} && cat > {run_script_word} && "
+        f"printf %s {shlex.quote(metadata)} > {metadata_word}"
     )
 
 
@@ -708,7 +714,7 @@ def _clear_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
         f'if [ "$(cat "$R/{stem}/jobid" 2>/dev/null)" = "$J" ]; then rm -rf "$R/{stem}"; fi;'
         for stem in stems
     )
-    return f'''R="{reservations}"; J="{jobid}"; C="{config.REMOTE_DIR}/checkpoints"; \
+    return f"""R={config.shell_word(reservations)}; J={config.shell_word(jobid)}; C={config.shell_remote_path("checkpoints")}; \
 mkdir -p "$R" || exit $?; \
 release() {{ {releases} }}; trap release EXIT; \
 for stem in {stem_words}; do \
@@ -717,14 +723,15 @@ for stem in {stem_words}; do \
 done; \
 cd "$C" 2>/dev/null || exit 0; \
 for stem in {stem_words}; do f="$stem.pkl"; [ -f "$f" ] || continue; rm -f "$f" || exit $?; \
-  printf 'CLEARED\\t%s\\n' "$f"; done'''
+  printf 'CLEARED\\t%s\\n' "$f"; done"""
 
 
 def _reap_job_command(jobid: str) -> str:
     """Remote command: release a job's reservations, then stamp its state terminal."""
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     release = _release_job_reservations_command(jobid)
-    return f'{release}; echo "reaped (orphan reservations released) $(date -Is)" > "{jobdir}/state"'
+    state_path = config.shell_word(f"{jobdir}/state")
+    return f'{release}; echo "reaped (orphan reservations released) $(date -Is)" > {state_path}'
 
 
 def _recorded_job_dirs_command() -> str:

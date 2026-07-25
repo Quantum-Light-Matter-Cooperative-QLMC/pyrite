@@ -1,7 +1,9 @@
 """Environment + configuration constants for the remote job subsystem."""
 
 import os
-from pathlib import Path
+import re
+import shlex
+from pathlib import Path, PurePosixPath
 
 HOST = os.environ.get("CXR_REMOTE_HOST", "qlmc")
 REMOTE_DIR = os.environ.get("CXR_REMOTE_DIR", "/home/aamador/dev/cxr-mc")
@@ -45,3 +47,115 @@ SYNC_PATHS = [
 # the laptop is Windows so its working files are CRLF, and shipping those over the
 # box's LF checkout dirties `git status` there even though content is identical.
 TEXT_EXTS = {".py", ".toml", ".cfg", ".ini", ".txt", ".md", ".csv"}
+
+
+_HOST_ALIAS_RE = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?")
+_EXECUTABLE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*")
+_ABS_EXECUTABLE_RE = re.compile(r"/[A-Za-z0-9._+/-]+")
+
+
+def _reject_controls(field: str, value: str) -> None:
+    if any(ord(char) < 32 or ord(char) == 127 for char in value):
+        raise SystemExit(
+            f"invalid {field}={value!r}: control characters are not allowed; "
+            f"set {field} to one printable value"
+        )
+
+
+def remote_host() -> str:
+    """Return validated SSH-config host alias."""
+    value = HOST
+    if not isinstance(value, str) or _HOST_ALIAS_RE.fullmatch(value) is None:
+        raise SystemExit(
+            f"invalid CXR_REMOTE_HOST={value!r}: expected host alias containing only "
+            "letters, digits, dots, underscores, or hyphens, without a leading dash"
+        )
+    return value
+
+
+def remote_dir() -> str:
+    """Return validated absolute POSIX checkout path."""
+    value = REMOTE_DIR
+    if not isinstance(value, str):
+        raise SystemExit(f"invalid CXR_REMOTE_DIR={value!r}: expected absolute POSIX path")
+    _reject_controls("CXR_REMOTE_DIR", value)
+    if not value or not PurePosixPath(value).is_absolute():
+        raise SystemExit(
+            f"invalid CXR_REMOTE_DIR={value!r}: expected absolute POSIX path "
+            "(for example /home/user/dev/cxr-mc)"
+        )
+    return value
+
+
+def remote_uv() -> str:
+    """Return validated executable name or absolute POSIX executable path."""
+    value = REMOTE_UV
+    if not isinstance(value, str):
+        raise SystemExit(
+            f"invalid CXR_REMOTE_UV={value!r}: expected executable name or absolute POSIX path"
+        )
+    _reject_controls("CXR_REMOTE_UV", value)
+    if not value or (
+        _ABS_EXECUTABLE_RE.fullmatch(value) is None and _EXECUTABLE_RE.fullmatch(value) is None
+    ):
+        raise SystemExit(
+            f"invalid CXR_REMOTE_UV={value!r}: expected executable name such as 'uv' "
+            "or absolute POSIX path, not shell program text"
+        )
+    return value
+
+
+def remote_path(*parts: str) -> str:
+    """Build raw remote path from validated checkout root and trusted components."""
+    root = remote_dir().rstrip("/") or "/"
+    suffix = "/".join(part.strip("/") for part in parts)
+    return f"{root}/{suffix}" if suffix and root != "/" else f"{root}{suffix}"
+
+
+def shell_word(value: str) -> str:
+    """Render one value as one POSIX shell word."""
+    escaped = value.replace("\\", "\\\\")
+    for char in ('"', "$", "`"):
+        escaped = escaped.replace(char, f"\\{char}")
+    return f'"{escaped}"'
+
+
+def shell_single_word(value: str) -> str:
+    """Render one value as one single-quoted POSIX shell word."""
+    return "'" + value.replace("'", "'\"'\"'") + "'"
+
+
+def shell_arg(value: str) -> str:
+    """Render shell argument, adding quoting only when syntax requires it."""
+    return shlex.quote(value)
+
+
+def shell_remote_dir() -> str:
+    return shell_word(remote_dir())
+
+
+def shell_remote_uv() -> str:
+    return shell_word(remote_uv())
+
+
+def shell_remote_path(*parts: str) -> str:
+    return shell_word(remote_path(*parts))
+
+
+def sbatch_remote_path(*parts: str) -> str:
+    """Render path for one unquoted ``#SBATCH`` directive value."""
+    value = remote_path(*parts)
+    if any(char.isspace() for char in value) or "#" in value:
+        raise SystemExit(
+            f"invalid CXR_REMOTE_DIR={REMOTE_DIR!r}: SLURM output paths cannot contain "
+            "whitespace or '#'; choose a checkout path safe for #SBATCH directives"
+        )
+    return value
+
+
+def scp_remote_path(path: str) -> str:
+    """Render validated host plus one quoted remote path for SCP argv."""
+    _reject_controls("remote SCP path", path)
+    if not PurePosixPath(path).is_absolute():
+        raise SystemExit(f"invalid remote SCP path={path!r}: expected absolute POSIX path")
+    return f"{remote_host()}:{shell_arg(path)}"

@@ -18,6 +18,7 @@ from __future__ import annotations
 import difflib
 import hashlib
 import json
+import sys
 import tomllib
 from pathlib import Path
 
@@ -30,6 +31,11 @@ GOLDEN_PATH = (
     Path(__file__).resolve().parents[3] / "tests" / "data" / "material_catalog_golden.json"
 )
 _MATERIALS_TOML = Path(__file__).resolve().parent.parent / "data" / "materials.toml"
+_SOURCE_CHECKOUT_ERROR = (
+    "error: `cxr line-grid regen-golden` is source-checkout-only; installed wheels "
+    "do not contain tests/data/material_catalog_golden.json. Run it from an editable "
+    "cxr-mc source checkout."
+)
 
 _PROVENANCE = {
     "source_commit": "df1478945a1bf52b8870a3c411a35edd55ec7d65",
@@ -40,6 +46,20 @@ _PROVENANCE = {
 # matches tests/test_material_catalog.py::test_catalog_matches_serialized_physics_for_every_crystal.
 _PHYSICS_N_FAMILIES = 2
 _PHYSICS_E_REF_EV = 1000.0
+
+
+def _is_source_checkout() -> bool:
+    """Return whether this module resolves from this repository's ``src`` tree."""
+    module_path = Path(__file__).resolve()
+    try:
+        root = module_path.parents[3]
+    except IndexError:
+        return False
+    return (
+        module_path.parents[1] == (root / "src" / "cxr_mc").resolve()
+        and (root / "pyproject.toml").is_file()
+        and (root / "tests" / "data").is_dir()
+    )
 
 
 def _fingerprint(values) -> dict:
@@ -181,6 +201,10 @@ def build_golden() -> dict:
 
 def regen(check=False) -> int:
     """Write the golden, or (check) diff-only and return nonzero on drift."""
+    if not _is_source_checkout():
+        print(_SOURCE_CHECKOUT_ERROR, file=sys.stderr)
+        return 1
+
     # NOT sort_keys: the catalog golden test asserts E_grid_line_by_energy keys in
     # numeric insertion order (30,40,...300); lexical sort would put "100.0" first.
     # build_golden() emits every dict in a deterministic, catalog-driven order.

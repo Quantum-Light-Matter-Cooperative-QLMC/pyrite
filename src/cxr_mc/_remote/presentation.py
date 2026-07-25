@@ -1,11 +1,13 @@
 """Formatting and progress rendering for :mod:`cxr_mc.remote`."""
 
+import base64
 import json
 import math
 import os
 import re
 import sys
 import textwrap
+import unicodedata
 
 from ..materials import CATALOG
 
@@ -26,6 +28,34 @@ _TQDM_FRAME_RE = re.compile(
     r"(?P<percent>\d{1,3})%\|.*?\s(?P<completed>\d+)/(?P<total>\d+)\s+"
     r"\[(?P<timing>[^\]]*)\]"
 )
+_FRAME_PREFIX = "CXR_REMOTE_V1"
+_FRAME_SECTIONS = frozenset({"JOB", "META", "STATE", "SQUEUE", "PROGRESS", "LOG"})
+
+
+def _sanitize_terminal(value, *, multiline=False):
+    """Render untrusted remote text without terminal-control effects."""
+    clean = []
+    for character in str(value):
+        if character == "\n" and multiline:
+            clean.append(character)
+        elif character in "\r\n\t":
+            clean.append(" ")
+        elif unicodedata.category(character) in {"Cc", "Cf", "Cs"}:
+            clean.append("?")
+        else:
+            clean.append(character)
+    return "".join(clean)
+
+
+def _encode_sections(sections):
+    """Encode sections using same unambiguous wire format as remote shell."""
+    records = []
+    for name, payload in sections.items():
+        if name not in _FRAME_SECTIONS:
+            raise ValueError(f"unknown status section: {name}")
+        encoded = base64.b64encode(str(payload).encode()).decode("ascii")
+        records.append(f"{_FRAME_PREFIX}\t{name}\t{encoded}")
+    return "\n".join(records)
 
 
 def _format_table(headers, rows, *, indent=""):
@@ -121,7 +151,7 @@ def _metadata_fields(metadata):
     for line in metadata.splitlines():
         key, separator, value = line.partition(": ")
         if separator:
-            fields[key] = value
+            fields[_sanitize_terminal(key)] = _sanitize_terminal(value)
     return fields
 
 
@@ -343,20 +373,25 @@ def _clean_recent_log(log, *, limit=12):
     ]
     if not diagnostics:
         return "  (no recent diagnostic messages)"
-    return "\n".join(diagnostics[-limit:])
+    return _sanitize_terminal("\n".join(diagnostics[-limit:]), multiline=True)
 
 
 def _marked_sections(output):
-    """Split an internal marker stream returned by one remote round trip."""
+    """Decode versioned base64 sections from one remote round trip."""
     sections = {}
-    current = None
     for line in output.splitlines():
-        if line.startswith("@@"):
-            current = line[2:]
-            sections.setdefault(current, [])
-        elif current is not None:
-            sections[current].append(line)
-    return {key: "\n".join(lines).strip() for key, lines in sections.items()}
+        prefix, separator, remainder = line.partition("\t")
+        if prefix != _FRAME_PREFIX or not separator:
+            continue
+        name, separator, encoded = remainder.partition("\t")
+        if name not in _FRAME_SECTIONS or not separator:
+            continue
+        try:
+            payload = base64.b64decode(encoded, validate=True).decode("utf-8", errors="replace")
+        except (ValueError, UnicodeError):
+            continue
+        sections[name] = payload.strip()
+    return sections
 
 
 def _scheduler_fields(payload):
@@ -364,7 +399,7 @@ def _scheduler_fields(payload):
     for item in payload.split("|"):
         key, separator, value = item.partition("=")
         if separator:
-            fields[key] = value
+            fields[_sanitize_terminal(key)] = _sanitize_terminal(value)
     return fields
 
 
@@ -372,7 +407,8 @@ def _format_job_status(sections, detail):
     metadata = sections.get("META", "")
     fields = _metadata_fields(metadata)
     scheduler = _scheduler_fields(sections.get("SQUEUE", ""))
-    jobid = sections.get("JOB") or fields.get("job", "?")
+    jobid = _sanitize_terminal(sections.get("JOB") or fields.get("job", "?"))
+    state_text = _sanitize_terminal(sections.get("STATE") or "(no state yet)", multiline=True)
     kind = fields.get("kind", "material-sweep")
     diagnostic = kind == "line-grid-bounds"
     materials = fields.get("materials", "-").split()
@@ -383,7 +419,7 @@ def _format_job_status(sections, detail):
     # still only pulled (and legacy-parsed) at -vv.
     records = {} if diagnostic else _parse_progress_records(sections.get("PROGRESS", ""))
     rows = [
-        ("State", sections.get("STATE") or "(no state yet)"),
+        ("State", state_text),
         ("SLURM", f"{scheduler_id} · {scheduler_state}"),
     ]
     if diagnostic:
@@ -414,9 +450,7 @@ def _format_job_status(sections, detail):
     if not diagnostic:
         progress = _format_case_progress(records, materials)
         if not records and detail >= 2:
-            progress = (
-                _legacy_progress(sections.get("LOG", ""), sections.get("STATE", "")) or progress
-            )
+            progress = _legacy_progress(sections.get("LOG", ""), state_text) or progress
         output.extend(["", "CASE PROGRESS", progress])
     if detail >= 1:
         allocation = [

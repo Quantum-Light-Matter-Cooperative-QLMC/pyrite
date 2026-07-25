@@ -220,7 +220,7 @@ def _cli_status(args):
 
 
 def _cli_logs(args):
-    viewer.tail_logs(args.jobid, args.follow)
+    return viewer.tail_logs(args.jobid, args.follow)
 
 
 def _cli_stop(args):

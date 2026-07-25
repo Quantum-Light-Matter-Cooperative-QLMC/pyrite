@@ -12,10 +12,10 @@ def _completed_materials(jobid, materials):
     checkpoint were available to pull.
     """
     transport._check_shell_tokens([jobid, *materials])
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.shell_remote_path(config.JOBS_SUBDIR, jobid)
     completed = set(
         transport._ssh_capture(
-            f'D="{jobdir}"; sed -n "s/^completed: //p" "$D/log" 2>/dev/null'
+            f'D={jobdir}; sed -n "s/^completed: //p" "$D/log" 2>/dev/null'
         ).split()
     )
     return [material for material in materials if material in completed]
@@ -28,7 +28,8 @@ def _live_jobs():
     non-live: PID liveness is not a safe fallback for scheduler-managed work.
     """
     remote = (
-        f'JOBS="{config.REMOTE_DIR}/{config.JOBS_SUBDIR}"; [ -d "$JOBS" ] || exit 0; '
+        f"JOBS={config.shell_remote_path(config.JOBS_SUBDIR)}; "
+        '[ -d "$JOBS" ] || exit 0; '
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$d/meta" 2>/dev/null | tail -1); '
         "case \"$SID\" in ''|*[!0-9]*) continue ;; esac; "
@@ -57,7 +58,7 @@ def _reservation_holders(stems: list[str]) -> list[tuple[str, str]]:
     """
     transport._check_shell_tokens(stems)
     remote = (
-        f'R="{scripts._reservation_root()}"; [ -d "$R" ] || exit 0; '
+        f'R={config.shell_word(scripts._reservation_root())}; [ -d "$R" ] || exit 0; '
         f"for stem in {' '.join(stems)}; do "
         '[ -d "$R/$stem" ] || continue; '
         'OWNER=$(cat "$R/$stem/jobid" 2>/dev/null) || OWNER="unknown"; '
@@ -74,9 +75,9 @@ def _reservation_holders(stems: list[str]) -> list[tuple[str, str]]:
 def _slurm_job_id(jobid: str) -> str | None:
     """Return a queue's recorded numeric scheduler ID, if it has one."""
     transport._check_shell_tokens([jobid])
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.shell_remote_path(config.JOBS_SUBDIR, jobid)
     scheduler_id = transport._ssh_capture(
-        f'D="{jobdir}"; sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1'
+        f'D={jobdir}; sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1'
     ).strip()
     return scheduler_id if scheduler_id.isdigit() else None
 
@@ -94,16 +95,16 @@ def _slurm_state(slurm_job_id: str) -> str | None:
 def _job_state(jobid: str) -> str:
     """Return a job's persisted terminal/progress state without inferring liveness."""
     transport._check_shell_tokens([jobid])
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
-    return transport._ssh_capture(f'cat "{jobdir}/state" 2>/dev/null').strip()
+    state_path = config.shell_remote_path(config.JOBS_SUBDIR, jobid, "state")
+    return transport._ssh_capture(f"cat {state_path} 2>/dev/null").strip()
 
 
 def _job_metadata(jobid: str) -> str:
     """Return the persisted queue metadata for attach-mode selection."""
     transport._check_shell_tokens([jobid])
-    jobdir = f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/{jobid}"
+    jobdir = config.shell_remote_path(config.JOBS_SUBDIR, jobid)
     return transport._ssh_capture(
-        f'D="{jobdir}"; [ -d "$D" ] || {{ echo "no such job: {jobid}" >&2; exit 1; }}; '
+        f'D={jobdir}; [ -d "$D" ] || {{ echo "no such job: {jobid}" >&2; exit 1; }}; '
         'cat "$D/meta" 2>/dev/null'
     )
 
@@ -121,7 +122,7 @@ def _reservation_ledger() -> tuple[int, list[tuple[str, str, int]]]:
     caller -- keeping the staging-race guard immune to client/host clock skew.
     """
     remote = (
-        f'R="{scripts._reservation_root()}"; [ -d "$R" ] || exit 0; '
+        f'R={config.shell_word(scripts._reservation_root())}; [ -d "$R" ] || exit 0; '
         'printf "NOW\\t%s\\n" "$(date +%s)"; '
         'for d in "$R"/*/; do [ -d "$d" ] || continue; '
         's=$(basename "$d"); '
@@ -187,6 +188,7 @@ def _orphaned_reservation_jobs(
 def _latest_jobid():
     """The most recent job id on the box (job dirs are timestamp-named), or None."""
     out = transport._ssh_capture(
-        f'JOBS="{config.REMOTE_DIR}/{config.JOBS_SUBDIR}"; {scripts._recorded_job_dirs_command()} | tail -1'
+        f"JOBS={config.shell_remote_path(config.JOBS_SUBDIR)}; "
+        f"{scripts._recorded_job_dirs_command()} | tail -1"
     ).strip()
     return out or None

@@ -12,7 +12,7 @@ from . import config, presentation, scripts, state, transport
 def list_jobs():
     """Print every submitted job with identifying metadata, oldest first."""
     remote = (
-        f'JOBS="{config.REMOTE_DIR}/{config.JOBS_SUBDIR}"; '
+        f"JOBS={config.shell_remote_path(config.JOBS_SUBDIR)}; "
         '[ -d "$JOBS" ] || exit 0; '
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
         '[ -f "$d/meta" ] || continue; '
@@ -29,10 +29,16 @@ def list_jobs():
         if len(fields) != 5:
             continue
         jobid, scheduler_id, quick, materials, state_ = fields
+        jobid, scheduler_id, quick, materials, state_ = (
+            presentation._sanitize_terminal(value) for value in fields
+        )
         mode = "quick" if quick == "True" else "standard" if quick == "False" else "?"
         rows.append((jobid, scheduler_id, mode, materials.replace(" ", ", "), state_))
     if not rows:
-        print(f"No remote jobs on {config.HOST}. Start one with `cxr remote start <materials>`.")
+        print(
+            f"No remote jobs on {config.remote_host()}. "
+            "Start one with `cxr remote start <materials>`."
+        )
         return
     print(
         presentation._style_states(
@@ -56,19 +62,23 @@ def _status_remote_command(job_assign, detail):
         else 'printf "job_id=%s|state=%s\\n" "$SID" "$STATE"; '
     )
     progress = (
-        'echo "@@PROGRESS"; for f in "$D"/progress/*.json; do '
+        '{ for f in "$D"/progress/*.json; do '
         '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done; '
+        "} | emit PROGRESS; "
     )
-    log = 'echo "@@LOG"; tail -c 32768 "$D/log" 2>/dev/null; ' if detail >= 2 else ""
+    log = '{ tail -c 32768 "$D/log" 2>/dev/null; } | emit LOG; ' if detail >= 2 else ""
     return (
-        f'JOBS="{config.REMOTE_DIR}/{config.JOBS_SUBDIR}"; {job_assign}; '
+        "set -o pipefail; "
+        "emit() { printf 'CXR_REMOTE_V1\\t%s\\t' \"$1\"; "
+        "base64 | tr -d '\\n'; printf '\\n'; }; "
+        f"JOBS={config.shell_remote_path(config.JOBS_SUBDIR)}; {job_assign}; "
         'D="$JOBS/$JOB"; '
         'if [ -z "$JOB" ] || [ ! -d "$D" ]; then echo "no such job: ${JOB:-<none>}"; '
         "exit 1; fi; "
-        'echo "@@JOB"; printf "%s\\n" "$JOB"; '
-        'echo "@@META"; cat "$D/meta" 2>/dev/null; '
-        'echo "@@STATE"; cat "$D/state" 2>/dev/null; '
-        'echo "@@SQUEUE"; '
+        '{ printf "%s\\n" "$JOB"; } | emit JOB; '
+        '{ cat "$D/meta" 2>/dev/null; } | emit META; '
+        '{ cat "$D/state" 2>/dev/null; } | emit STATE; '
+        "{ "
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
         'case "$SID" in \'\'|*[!0-9]*) echo "job_id=-|state=NOT_QUEUED" ;; '
         "*) "
@@ -76,6 +86,7 @@ def _status_remote_command(job_assign, detail):
         + 'if [ -n "$STATE" ]; then '
         + slurm_detail
         + 'else printf "job_id=%s|state=NOT_QUEUED\\n" "$SID"; fi ;; esac; '
+        + "} | emit SQUEUE || exit $?; "
         + progress
         + log
     )
@@ -88,7 +99,7 @@ def job_status(jobid=None, detail=0):
     output = transport._ssh_capture(_status_remote_command(scripts._job_assign(jobid), detail))
     sections = presentation._marked_sections(output)
     if not sections:
-        print(output, end="")
+        print(presentation._sanitize_terminal(output, multiline=True), end="")
         return
     print(presentation._style_states(presentation._format_job_status(sections, detail)))
 
@@ -97,27 +108,31 @@ def tail_logs(jobid=None, follow=False):
     """Tail a job's log. With --follow, stream live (blocks until Ctrl-C)."""
     tail = "tail -f" if follow else "tail -n 60"
     remote = (
-        f'JOBS="{config.REMOTE_DIR}/{config.JOBS_SUBDIR}"; {scripts._job_assign(jobid)}; '
+        f"JOBS={config.shell_remote_path(config.JOBS_SUBDIR)}; "
+        f"{scripts._job_assign(jobid)}; "
         'D="$JOBS/$JOB"; '
         'if [ -z "$JOB" ] || [ ! -d "$D" ]; then echo "no such job: ${JOB:-<none>}"; '
         "exit 1; fi; "
-        f'printf "LOG %s · {config.HOST}\\n\\n" "$JOB"; '
+        f'printf "LOG %s · {config.remote_host()}\\n\\n" "$JOB"; '
         f'{tail} "$D/log"'
     )
     if follow:
         try:
             # Close stdin so Windows OpenSSH cannot hang on console forwarding,
             # while stdout/stderr still inherit for live streaming and Ctrl-C.
-            subprocess.run(["ssh", "-n", config.HOST, remote])
+            result = subprocess.run(["ssh", "-n", config.remote_host(), remote])
         except KeyboardInterrupt:
-            print("\n(stopped following; the job is unaffected)")
+            print("\n(stopped following; the job is unaffected)", file=sys.stderr)
+            return 130
+        return 0 if result.returncode == 0 else 1
     else:
         print(transport._ssh_capture(remote), end="")
+        return 0
 
 
 def _disconnect_hint(jobid):
     print(
-        f"\n\nVIEWER DISCONNECTED · job {jobid} keeps running on {config.HOST}\n"
+        f"\n\nVIEWER DISCONNECTED · job {jobid} keeps running on {config.remote_host()}\n"
         f"  Reconnect  cxr remote attach {jobid}\n"
         f"  Status     cxr remote status {jobid} -vv\n"
         "  Stop       cxr remote stop <material>"
@@ -152,7 +167,8 @@ def _render_frame(frame, *, tty):
 def _attach_header(refresh):
     """One-line banner above each live frame; the counter proves it's polling."""
     return presentation._paint(
-        f"ATTACHED · {config.HOST} · refresh {refresh} · Ctrl-C detaches (job keeps running)",
+        f"ATTACHED · {config.remote_host()} · refresh {refresh} · "
+        "Ctrl-C detaches (job keeps running)",
         "inactive",
     )
 
@@ -180,9 +196,9 @@ def _live_status(jobid, detail):
             output = transport._ssh_capture(remote)
             sections = presentation._marked_sections(output)
             if not sections:
-                print(output, end="")
+                print(presentation._sanitize_terminal(output, multiline=True), end="")
                 return False
-            state_ = sections.get("STATE", "")
+            state_ = presentation._sanitize_terminal(sections.get("STATE", ""), multiline=True)
             scheduler = presentation._scheduler_fields(sections.get("SQUEUE", ""))
             live = scheduler.get("state", "") not in ("", "NOT_QUEUED")
             frame = (

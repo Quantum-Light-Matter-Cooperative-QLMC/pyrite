@@ -101,6 +101,7 @@ Agents prefer these commands always.
 - Use Context7 only for current external-library documentation, never as a
   repository source. Headroom manages context/model transport; RTK filters
   shell output. Neither replaces repository navigation or verification.
+- Every CLI change: invoke `cli-ui-ux` for design, implementation, and tests.
 - Personal workflow: `investigating-changes` diagnoses; `planning-changes`
   handles explicit/complex plans; `implementing-changes` edits;
   `verifying-changes` gates completion claims.

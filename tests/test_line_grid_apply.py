@@ -1,6 +1,8 @@
 import json as _json
 import tomllib
 
+import pytest
+
 from cxr_mc.line_grid import apply
 
 BASE_TOML = """schema_version = 1
@@ -102,7 +104,9 @@ def test_apply_inserts_new_line_and_brem_blocks_when_absent():
     tomllib.loads(new_text)  # still valid TOML
 
 
-def test_apply_file_writes_stamps_provenance_and_validates(tmp_path, monkeypatch):
+def test_apply_file_writes_stamps_provenance_and_validates(
+    tmp_path, monkeypatch, capsys
+):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
     json_path = tmp_path / "combined.json"
@@ -121,9 +125,90 @@ def test_apply_file_writes_stamps_provenance_and_validates(tmp_path, monkeypatch
     apply.apply_file(json_path, slurm_id="458", date="2026-07-22")
     assert "stop = 2700.0, num = 897" in toml_path.read_text()
     assert ("hopg", 30.0, "derived job 458 (2026-07-22)") in stamped
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == (
+        "warning: material catalog changed; golden is now stale; "
+        "run `cxr line-grid regen-golden`\n"
+    )
 
 
-def test_set_line_grid_stamps_manual_and_autocomputes_num(tmp_path, monkeypatch):
+def test_apply_validation_failure_leaves_catalog_and_provenance_unchanged(tmp_path, monkeypatch):
+    toml_path = tmp_path / "materials.toml"
+    provenance_path = tmp_path / "line_grid_provenance.toml"
+    json_path = tmp_path / "combined.json"
+    toml_path.write_text(BASE_TOML)
+    provenance_path.write_text("# existing provenance\n")
+    json_path.write_text(_json.dumps(COMBINED))
+    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply._provenance, "PROVENANCE_PATH", provenance_path)
+    monkeypatch.setattr(
+        apply,
+        "load_material_catalog",
+        lambda path: (_ for _ in ()).throw(ValueError("invalid candidate")),
+    )
+
+    with pytest.raises(ValueError, match="invalid candidate"):
+        apply.apply_file(json_path, slurm_id="458", date="2026-07-22")
+
+    assert toml_path.read_text() == BASE_TOML
+    assert provenance_path.read_text() == "# existing provenance\n"
+
+
+def test_apply_provenance_failure_rolls_back_both_files(tmp_path, monkeypatch):
+    toml_path = tmp_path / "materials.toml"
+    provenance_path = tmp_path / "line_grid_provenance.toml"
+    json_path = tmp_path / "combined.json"
+    toml_path.write_text(BASE_TOML)
+    provenance_path.write_text("# existing provenance\n")
+    json_path.write_text(_json.dumps(COMBINED))
+    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply._provenance, "PROVENANCE_PATH", provenance_path)
+    monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
+    monkeypatch.setattr(apply._provenance, "is_manual_line", lambda *args: False)
+    monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args: False)
+    monkeypatch.setattr(
+        apply._provenance,
+        "set_line",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("provenance write failed")),
+    )
+
+    with pytest.raises(OSError, match="provenance write failed"):
+        apply.apply_file(json_path)
+
+    assert toml_path.read_text() == BASE_TOML
+    assert provenance_path.read_text() == "# existing provenance\n"
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "match"),
+    [
+        ("energy_keV", 0.0, "energy_keV"),
+        ("start_eV", float("nan"), "start_eV"),
+        ("stop_eV", -1.0, "stop_eV"),
+        ("num", 0, "num"),
+    ],
+)
+def test_apply_rejects_invalid_line_domains_before_write(
+    tmp_path, monkeypatch, field, value, match
+):
+    toml_path = tmp_path / "materials.toml"
+    json_path = tmp_path / "combined.json"
+    combined = _json.loads(_json.dumps(COMBINED))
+    combined["hopg"]["line_rows"][0][field] = value
+    toml_path.write_text(BASE_TOML)
+    json_path.write_text(_json.dumps(combined))
+    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+
+    with pytest.raises(ValueError, match=match):
+        apply.apply_file(json_path)
+
+    assert toml_path.read_text() == BASE_TOML
+
+
+def test_set_line_grid_stamps_manual_and_autocomputes_num(
+    tmp_path, monkeypatch, capsys
+):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
     monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
@@ -135,7 +220,41 @@ def test_set_line_grid_stamps_manual_and_autocomputes_num(tmp_path, monkeypatch)
     )
     monkeypatch.setattr(apply._provenance, "is_manual_line", lambda *a: False)
     monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *a: False)
+    monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
     apply.set_line_grid("hopg", 30.0, 3000.0, note="widen tail")
     text = toml_path.read_text()
     assert "stop = 3000.0" in text
     assert calls == [("hopg", 30.0, "manual", "widen tail")]
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "golden is now stale" in captured.err
+
+
+def test_set_line_grid_rejects_invalid_domain_without_writes(tmp_path, monkeypatch):
+    toml_path = tmp_path / "materials.toml"
+    provenance_path = tmp_path / "line_grid_provenance.toml"
+    toml_path.write_text(BASE_TOML)
+    provenance_path.write_text("# existing provenance\n")
+    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply._provenance, "PROVENANCE_PATH", provenance_path)
+
+    with pytest.raises(ValueError, match="stop must be greater than start"):
+        apply.set_line_grid("hopg", 30.0, 5.0)
+
+    assert toml_path.read_text() == BASE_TOML
+    assert provenance_path.read_text() == "# existing provenance\n"
+
+
+def test_set_brem_rejects_invalid_step_without_writes(tmp_path, monkeypatch):
+    toml_path = tmp_path / "materials.toml"
+    provenance_path = tmp_path / "line_grid_provenance.toml"
+    toml_path.write_text(BASE_TOML)
+    provenance_path.write_text("# existing provenance\n")
+    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply._provenance, "PROVENANCE_PATH", provenance_path)
+
+    with pytest.raises(ValueError, match="step"):
+        apply.set_brem_grid("hopg", 140000.0, step_eV=0)
+
+    assert toml_path.read_text() == BASE_TOML
+    assert provenance_path.read_text() == "# existing provenance\n"

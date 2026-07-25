@@ -299,14 +299,16 @@ def test_derive_all_materials_produces_independent_per_material_output(monkeypat
     monkeypatch.setattr(
         analyze,
         "_brem_grid_for_rows",
-        lambda rows: {
+        lambda rows, step_eV: {
             "stop_eV": max(r["brem_stop_eV"] for r in rows),
             "raw_eV": 0.0,
-            "step_eV": 25.0,
+            "step_eV": step_eV,
         },
     )
 
-    combined, complete = analyze.derive_all_materials(["hopg", "diamond"], [100.0, 200.0])
+    combined, complete = analyze.derive_all_materials(
+        ["hopg", "diamond"], [100.0, 200.0], brem_step_eV=12.5
+    )
 
     assert complete is True
     assert set(combined) == {"hopg", "diamond"}
@@ -316,6 +318,7 @@ def test_derive_all_materials_produces_independent_per_material_output(monkeypat
         "diamond",
     ]
     assert combined["hopg"]["brem"]["stop_eV"] == 200.0 * 100.0
+    assert combined["hopg"]["brem"]["step_eV"] == 12.5
 
 
 def test_derive_all_materials_skips_material_with_complete_checkpoint(monkeypatch, tmp_path):
@@ -334,7 +337,7 @@ def test_derive_all_materials_skips_material_with_complete_checkpoint(monkeypatc
     monkeypatch.setattr(
         analyze,
         "_brem_grid_for_rows",
-        lambda rows: {"stop_eV": 0.0, "raw_eV": 0.0, "step_eV": 25.0},
+        lambda rows, step_eV: {"stop_eV": 0.0, "raw_eV": 0.0, "step_eV": step_eV},
     )
     json_out = str(tmp_path / "bounds.json")
     seeded = [{"energy_keV": 200.0, "raw_eV": 1.0, "brem_stop_eV": 1.0}]
@@ -362,3 +365,11 @@ def test_brem_grid_for_rows_covers_worst_energy_brem_stop():
     assert grid["stop_eV"] == 12000.0
     assert grid["raw_eV"] == 11500.0
     assert grid["step_eV"] == analyze.WIDE_BREM_STEP_EV
+
+
+def test_brem_grid_for_rows_uses_requested_output_step():
+    rows = [{"brem_stop_eV": 12000.0, "brem_raw_eV": 11500.0}]
+
+    grid = analyze._brem_grid_for_rows(rows, step_eV=12.5)
+
+    assert grid == {"stop_eV": 12000.0, "raw_eV": 11500.0, "step_eV": 12.5}

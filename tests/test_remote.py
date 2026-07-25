@@ -15,7 +15,16 @@ from types import SimpleNamespace
 import pytest
 
 from cxr_mc import remote
-from cxr_mc._remote import cli, config, lifecycle, scripts, state, transport, viewer  # noqa: F401
+from cxr_mc._remote import (  # noqa: F401
+    cli,
+    config,
+    lifecycle,
+    presentation,
+    scripts,
+    state,
+    transport,
+    viewer,
+)
 
 
 def test_check_materials_accepts_crystal_keys():
@@ -35,6 +44,182 @@ def test_check_materials_rejects_injection(bad):
 
 def test_check_shell_tokens_preserves_checkpoint_and_synthetic_stems():
     remote._check_shell_tokens(["mose2_quick", "zhai", "20260101-000000"])
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "-oProxyCommand=touch-/tmp/pwn",
+        "user@host",
+        "host name",
+        "host;touch",
+        "host\nother",
+        "",
+    ],
+)
+def test_remote_host_rejects_ssh_option_and_shell_syntax_before_subprocess(monkeypatch, value):
+    monkeypatch.setattr(config, "HOST", value)
+    monkeypatch.setattr(
+        transport.subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail("invalid host must not reach ssh"),
+    )
+
+    with pytest.raises(SystemExit, match="CXR_REMOTE_HOST"):
+        transport._ssh_capture(":")
+
+
+def test_sync_rejects_hostile_scp_host_before_transport(monkeypatch):
+    monkeypatch.setattr(config, "HOST", "-oProxyCommand=touch-/tmp/pwn")
+    monkeypatch.setattr(config, "SYNC_PATHS", [])
+    monkeypatch.setattr(
+        transport,
+        "_run",
+        lambda *_args, **_kwargs: pytest.fail("invalid host must not reach scp"),
+    )
+
+    with pytest.raises(SystemExit, match="CXR_REMOTE_HOST"):
+        transport.sync_code()
+
+
+@pytest.mark.parametrize("value", ["relative/path", "/safe\ninjected", "/safe\0injected", ""])
+def test_remote_dir_rejects_nonabsolute_and_control_values(monkeypatch, value):
+    monkeypatch.setattr(config, "REMOTE_DIR", value)
+
+    with pytest.raises(SystemExit, match="CXR_REMOTE_DIR"):
+        remote._queue_script("j", ["hopg"], quick=False, workers=None)
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        pytest.param(
+            lambda: remote._queue_script("j", ["hopg"], False, None), id="scan-monolithic"
+        ),
+        pytest.param(
+            lambda: remote._chunked_queue_script("j", ["hopg"], False, None, 10),
+            id="scan-chunked",
+        ),
+        pytest.param(lambda: remote._zhai_queue_script("j", 1, 1, 1, 0, False), id="zhai"),
+        pytest.param(
+            lambda: remote._rebrem_queue_script("j", ["hopg"], None, None, False),
+            id="rebrem-monolithic",
+        ),
+        pytest.param(
+            lambda: remote._rebrem_chunked_queue_script("j", ["hopg"], None, None, False, 10),
+            id="rebrem-chunked",
+        ),
+        pytest.param(
+            lambda: scripts._reline_queue_script("j", ["hopg"], None, None, False),
+            id="reline-monolithic",
+        ),
+        pytest.param(
+            lambda: scripts._reline_chunked_queue_script("j", ["hopg"], None, None, False, 10),
+            id="reline-chunked",
+        ),
+    ],
+)
+def test_every_generated_bash_payload_quotes_hostile_remote_dir(monkeypatch, build):
+    hostile = '/safe"; SENTINEL_REMOTE_DIR; #'
+    monkeypatch.setattr(config, "REMOTE_DIR", hostile)
+
+    script = build()
+
+    expected_jobdir = config.shell_word(config.remote_path(config.JOBS_SUBDIR, "j"))
+    assert f"JOBDIR={expected_jobdir}" in script
+    syntax = subprocess.run(["bash", "-n"], input=script, capture_output=True, text=True)
+    assert syntax.returncode == 0, syntax.stderr
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        pytest.param(
+            lambda: scripts._release_checkpoint_stems_command("j", ["hopg"]),
+            id="release-stems",
+        ),
+        pytest.param(lambda: scripts._release_job_reservations_command("j"), id="release-job"),
+        pytest.param(
+            lambda: scripts._reserve_checkpoint_stems_command("j", ["hopg"]),
+            id="reserve",
+        ),
+        pytest.param(lambda: scripts._submit_slurm_command("j", ["hopg"]), id="submit"),
+        pytest.param(
+            lambda: scripts._write_job_script_command(
+                config.remote_path(config.JOBS_SUBDIR, "j"), "job: j\n"
+            ),
+            id="upload",
+        ),
+        pytest.param(
+            lambda: scripts._clear_checkpoint_stems_command("j", ["hopg"]),
+            id="clear",
+        ),
+        pytest.param(lambda: scripts._reap_job_command("j"), id="reap"),
+        pytest.param(lambda: viewer._status_remote_command('JOB="j"', 0), id="status"),
+    ],
+)
+def test_every_remote_bash_command_family_quotes_hostile_remote_dir(monkeypatch, build):
+    hostile = '/safe"; SENTINEL_REMOTE_DIR; #'
+    monkeypatch.setattr(config, "REMOTE_DIR", hostile)
+
+    command = build()
+
+    assert '\\"; SENTINEL_REMOTE_DIR' in command or "'/safe\"; SENTINEL_REMOTE_DIR" in command
+    syntax = subprocess.run(["bash", "-n", "-c", command], capture_output=True, text=True)
+    assert syntax.returncode == 0, syntax.stderr
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        pytest.param(
+            lambda: remote._queue_script("j", ["hopg"], False, None), id="scan-monolithic"
+        ),
+        pytest.param(
+            lambda: remote._chunked_queue_script("j", ["hopg"], False, None, 10),
+            id="scan-chunked",
+        ),
+        pytest.param(lambda: remote._zhai_queue_script("j", 1, 1, 1, 0, False), id="zhai"),
+        pytest.param(
+            lambda: remote._rebrem_queue_script("j", ["hopg"], None, None, False),
+            id="rebrem-monolithic",
+        ),
+        pytest.param(
+            lambda: remote._rebrem_chunked_queue_script("j", ["hopg"], None, None, False, 10),
+            id="rebrem-chunked",
+        ),
+        pytest.param(
+            lambda: scripts._reline_queue_script("j", ["hopg"], None, None, False),
+            id="reline-monolithic",
+        ),
+        pytest.param(
+            lambda: scripts._reline_chunked_queue_script("j", ["hopg"], None, None, False, 10),
+            id="reline-chunked",
+        ),
+    ],
+)
+def test_every_generated_bash_payload_rejects_remote_uv_program_text(monkeypatch, build):
+    monkeypatch.setattr(config, "REMOTE_UV", "uv; SENTINEL_REMOTE_UV #")
+
+    with pytest.raises(SystemExit, match="CXR_REMOTE_UV"):
+        build()
+
+
+@pytest.mark.parametrize("value", ["/safe path", "/safe#comment"])
+def test_sbatch_rejects_remote_dir_unsupported_by_directives(monkeypatch, value):
+    monkeypatch.setattr(config, "REMOTE_DIR", value)
+
+    with pytest.raises(SystemExit, match="SBATCH"):
+        remote._slurm_batch_script("j", ":", job_name="cxr-j")
+
+
+def test_scp_remote_path_quotes_hostile_but_valid_posix_path(monkeypatch):
+    monkeypatch.setattr(config, "HOST", "qlmc")
+    path = "/srv/cxr data/$(touch SENTINEL)"
+
+    rendered = config.scp_remote_path(path)
+
+    assert rendered == "qlmc:'/srv/cxr data/$(touch SENTINEL)'"
 
 
 def test_queue_script_has_per_material_scan_calls():
@@ -571,10 +756,14 @@ def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, ca
         "_ssh_capture",
         lambda command: (
             commands.append(command)
-            or (
-                "@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nquick: False\n"
-                "chunk_minutes: 10\nslurm_job_id: 48291\n@@STATE\nrunning hopg\n"
-                "@@SQUEUE\njob_id=48291|state=RUNNING\n"
+            or presentation._encode_sections(
+                {
+                    "JOB": "j",
+                    "META": "job: j\nmaterials: hopg\nquick: False\n"
+                    "chunk_minutes: 10\nslurm_job_id: 48291",
+                    "STATE": "running hopg",
+                    "SQUEUE": "job_id=48291|state=RUNNING",
+                }
             )
         ),
     )
@@ -591,6 +780,82 @@ def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, ca
     assert "/pid" not in commands[0]
 
 
+def test_status_framing_keeps_marker_like_payload_inside_original_section():
+    payload = "running\n@@META\njob: forged\nCXR_REMOTE_V1\tJOB\tZm9yZ2Vk"
+    wire = presentation._encode_sections({"STATE": payload, "JOB": "real"})
+
+    sections = remote._marked_sections(wire)
+
+    assert sections == {"STATE": payload, "JOB": "real"}
+
+
+@pytest.mark.skipif(
+    shutil.which("bash") is None or shutil.which("base64") is None,
+    reason="bash and base64 required",
+)
+def test_status_shell_framing_round_trip_resists_payload_markers(monkeypatch, tmp_path):
+    job = tmp_path / "jobs" / "j"
+    (job / "progress").mkdir(parents=True)
+    (job / "meta").write_text("job: j\nmaterials: hopg\n")
+    hostile = "@@META\nCXR_REMOTE_V1\tJOB\tZm9yZ2Vk\nstate"
+    (job / "state").write_text(hostile)
+    (job / "log").write_text("log\n@@STATE\nforged")
+    monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
+
+    result = subprocess.run(
+        ["bash", "-c", viewer._status_remote_command('JOB="j"', 2)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    sections = remote._marked_sections(result.stdout)
+    assert sections["JOB"] == "j"
+    assert sections["STATE"] == hostile
+    assert sections["LOG"] == "log\n@@STATE\nforged"
+
+
+def test_job_status_sanitizes_hostile_remote_fields(monkeypatch, capsys):
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: presentation._encode_sections(
+            {
+                "JOB": "j\x1b[2J",
+                "META": "job: j\nmaterials: ho\u202epg\nslurm_job_id: 48291",
+                "STATE": "running\x9b2J hopg",
+                "SQUEUE": "job_id=48291|state=RUNNING|reason=\x1b[31mforged",
+                "LOG": "diagnostic\x1b[Hline",
+            }
+        ),
+    )
+
+    remote.job_status("j", detail=2)
+
+    output = capsys.readouterr().out
+    assert "\x1b" not in output
+    assert "\x9b" not in output
+    assert "\u202e" not in output
+    assert "j?[2J" in output
+    assert "diagnostic?[Hline" in output
+
+
+def test_list_jobs_sanitizes_hostile_remote_fields(monkeypatch, capsys):
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: "j\x1b[2J\t48291\tFalse\thopg\tRUNNING\u202e forged\n",
+    )
+
+    remote.list_jobs()
+
+    output = capsys.readouterr().out
+    assert "\x1b" not in output
+    assert "\u202e" not in output
+    assert "j?[2J" in output
+    assert "RUNNING? forged" in output
+
+
 def test_job_status_verbose_adds_scheduler_allocation_fields(monkeypatch, capsys):
     commands = []
     monkeypatch.setattr(
@@ -598,11 +863,14 @@ def test_job_status_verbose_adds_scheduler_allocation_fields(monkeypatch, capsys
         "_ssh_capture",
         lambda command: (
             commands.append(command)
-            or (
-                "@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nworkers: None\n"
-                "slurm_job_id: 48291\n@@STATE\nrunning hopg\n@@SQUEUE\n"
-                "job_id=48291|state=RUNNING|name=cxr-j|partition=gpu|elapsed=1:02|"
-                "left=UNLIMITED|nodes=1|reason=None\n"
+            or presentation._encode_sections(
+                {
+                    "JOB": "j",
+                    "META": "job: j\nmaterials: hopg\nworkers: None\nslurm_job_id: 48291",
+                    "STATE": "running hopg",
+                    "SQUEUE": "job_id=48291|state=RUNNING|name=cxr-j|partition=gpu|"
+                    "elapsed=1:02|left=UNLIMITED|nodes=1|reason=None",
+                }
             )
         ),
     )
@@ -625,12 +893,16 @@ def test_job_status_double_verbose_renders_case_progress(monkeypatch, capsys):
         "_ssh_capture",
         lambda command: (
             commands.append(command)
-            or (
-                "@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nslurm_job_id: 48291\n"
-                "@@STATE\nrunning hopg\n@@SQUEUE\njob_id=48291|state=RUNNING\n@@PROGRESS\n"
-                '{"material":"hopg","total_cases":5,"cached_cases":1,'
-                '"completed_new_cases":2,"state":"running"}\n'
-                "@@LOG\nlast log line\n"
+            or presentation._encode_sections(
+                {
+                    "JOB": "j",
+                    "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
+                    "STATE": "running hopg",
+                    "SQUEUE": "job_id=48291|state=RUNNING",
+                    "PROGRESS": '{"material":"hopg","total_cases":5,"cached_cases":1,'
+                    '"completed_new_cases":2,"state":"running"}',
+                    "LOG": "last log line",
+                }
             )
         ),
     )
@@ -663,10 +935,15 @@ def test_status_collapses_legacy_tqdm_history_to_latest_material_bar(monkeypatch
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _command: (
-            "@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nslurm_job_id: 48291\n"
-            "@@STATE\nrunning hopg [1/1]\n@@SQUEUE\njob_id=48291|state=RUNNING\n"
-            f"@@PROGRESS\n@@LOG\n{legacy_log}"
+        lambda _command: presentation._encode_sections(
+            {
+                "JOB": "j",
+                "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
+                "STATE": "running hopg [1/1]",
+                "SQUEUE": "job_id=48291|state=RUNNING",
+                "PROGRESS": "",
+                "LOG": legacy_log,
+            }
         ),
     )
 
@@ -700,12 +977,16 @@ def test_line_grid_bounds_status_uses_diagnostic_metadata(monkeypatch, capsys):
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _command: (
-            "@@JOB\nj\n@@META\njob: j\nkind: line-grid-bounds\n"
-            "slice_minutes: 10\nenergies: 200,250,300\nslurm_job_id: 227\n"
-            "@@STATE\nFAILED (signal TERM) now\n"
-            "@@SQUEUE\njob_id=227|state=NOT_QUEUED\n@@PROGRESS\n@@LOG\n"
-            "cases: 40%|████      | 2/5 [17:31<26:18, 526.18s/it]\r"
+        lambda _command: presentation._encode_sections(
+            {
+                "JOB": "j",
+                "META": "job: j\nkind: line-grid-bounds\nslice_minutes: 10\n"
+                "energies: 200,250,300\nslurm_job_id: 227",
+                "STATE": "FAILED (signal TERM) now",
+                "SQUEUE": "job_id=227|state=NOT_QUEUED",
+                "PROGRESS": "",
+                "LOG": "cases: 40%|████      | 2/5 [17:31<26:18, 526.18s/it]\r",
+            }
         ),
     )
 
@@ -733,10 +1014,14 @@ def test_status_cli_repeats_verbose_for_case_progress(monkeypatch):
 def _status_output(state, *, squeue_state="RUNNING", sid="48291", progress=""):
     """Fake one round-trip of the shared status command (the marked sections
     _format_job_status / the attach loop read)."""
-    return (
-        f"@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nslurm_job_id: {sid}\n"
-        f"@@STATE\n{state}\n@@SQUEUE\njob_id={sid}|state={squeue_state}\n"
-        f"@@PROGRESS\n{progress}\n"
+    return presentation._encode_sections(
+        {
+            "JOB": "j",
+            "META": f"job: j\nmaterials: hopg\nslurm_job_id: {sid}",
+            "STATE": state,
+            "SQUEUE": f"job_id={sid}|state={squeue_state}",
+            "PROGRESS": progress,
+        }
     )
 
 
@@ -767,6 +1052,20 @@ def test_attach_redraws_the_status_report_until_terminal(monkeypatch, capsys):
     assert "3/4" in out
     assert "JOB 20260101-000000 · FINISHED" in out
     assert "done [1/1] now" in out
+
+
+def test_attach_sanitizes_hostile_state(monkeypatch, capsys):
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: _status_output("done\x1b[2J hopg [1/1] now", squeue_state="NOT_QUEUED"),
+    )
+
+    assert remote.attach("20260101-000000") is True
+
+    output = capsys.readouterr().out
+    assert "\x1b" not in output
+    assert "done?[2J hopg [1/1] now" in output
 
 
 def test_attach_omits_log_tail_at_base_verbosity_but_still_fetches_progress(monkeypatch):
@@ -978,11 +1277,15 @@ def test_status_renders_progress_bars_at_base_verbosity(monkeypatch, capsys):
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda _cmd: (
-            "@@JOB\nj\n@@META\njob: j\nmaterials: hopg\nslurm_job_id: 48291\n"
-            "@@STATE\nrunning hopg\n@@SQUEUE\njob_id=48291|state=RUNNING\n@@PROGRESS\n"
-            '{"material":"hopg","total_cases":5,"cached_cases":1,'
-            '"completed_new_cases":2,"state":"running"}\n'
+        lambda _cmd: presentation._encode_sections(
+            {
+                "JOB": "j",
+                "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
+                "STATE": "running hopg",
+                "SQUEUE": "job_id=48291|state=RUNNING",
+                "PROGRESS": '{"material":"hopg","total_cases":5,"cached_cases":1,'
+                '"completed_new_cases":2,"state":"running"}',
+            }
         ),
     )
 
@@ -1126,13 +1429,46 @@ def test_stop_help_describes_slurm_cancellation(capsys):
 
 def test_follow_logs_use_stdin_closed_ssh(monkeypatch):
     runs = []
-    monkeypatch.setattr(transport.subprocess, "run", lambda cmd: runs.append(cmd))
+    monkeypatch.setattr(
+        transport.subprocess,
+        "run",
+        lambda cmd: runs.append(cmd) or subprocess.CompletedProcess(cmd, 0),
+    )
 
-    remote.tail_logs("20260101-000000", follow=True)
+    assert remote.tail_logs("20260101-000000", follow=True) == 0
 
     assert len(runs) == 1
     assert runs[0][:3] == ["ssh", "-n", remote.HOST]
     assert len(runs[0]) == 4
+
+
+def test_follow_logs_propagates_ssh_failure(monkeypatch):
+    monkeypatch.setattr(
+        transport.subprocess,
+        "run",
+        lambda cmd: subprocess.CompletedProcess(cmd, 255),
+    )
+
+    assert remote.tail_logs("20260101-000000", follow=True) == 1
+
+
+def test_follow_logs_maps_interrupt_to_130_and_stderr(monkeypatch, capsys):
+    def interrupt(_cmd):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(transport.subprocess, "run", interrupt)
+
+    assert remote.tail_logs("20260101-000000", follow=True) == 130
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "job is unaffected" in captured.err
+
+
+@pytest.mark.parametrize("status", [1, 130])
+def test_follow_logs_status_propagates_through_remote_cli(monkeypatch, status):
+    monkeypatch.setattr(viewer, "tail_logs", lambda _jobid, _follow: status)
+
+    assert remote.main(["logs", "--follow"]) == status
 
 
 def test_stems_quick_suffix():
@@ -1756,10 +2092,11 @@ def test_pull_warns_and_continues_when_one_checkpoint_is_missing(monkeypatch, ca
     monkeypatch.setattr(transport, "_remote_sha256", lambda _path: "remote")
     monkeypatch.setattr(transport, "_local_sha256", lambda _path: "local")
 
-    remote.pull(["hopg", "missing"], no_sync=True)
+    with pytest.raises(SystemExit, match="1 of 2 requested.*missing"):
+        remote.pull(["hopg", "missing"], no_sync=True)
 
     assert any("hopg.pkl" in " ".join(cmd) for cmd in calls)
-    assert "warning: could not pull checkpoint 'missing'" in capsys.readouterr().out
+    assert "warning: could not pull checkpoint 'missing'" in capsys.readouterr().err
 
 
 def test_pull_skips_scp_when_remote_artifact_matches_local(monkeypatch, tmp_path, capsys):
@@ -1789,12 +2126,13 @@ def test_full_pull_warns_without_scp_when_remote_checksum_fails(monkeypatch, tmp
     )
     monkeypatch.setattr(transport, "_run", lambda command, **_kw: calls.append(command))
 
-    remote.pull(["hopg"], no_sync=True)
+    with pytest.raises(SystemExit, match="1 of 1 requested.*hopg"):
+        remote.pull(["hopg"], no_sync=True)
 
     assert len(commands) == 1
     assert commands[0].startswith(f"sha256sum {remote.REMOTE_DIR}/checkpoints/.hopg.pull.")
     assert not any(command[0] == "scp" for command in calls)
-    assert "warning: could not pull checkpoint 'hopg'" in capsys.readouterr().out
+    assert "warning: could not pull checkpoint 'hopg'" in capsys.readouterr().err
 
 
 def test_full_pull_transfers_stable_snapshot_once_when_artifacts_differ(monkeypatch, tmp_path):
@@ -1848,10 +2186,11 @@ def test_grid_pull_removes_temp_when_checksum_fails(monkeypatch, tmp_path, capsy
     )
     monkeypatch.setattr(transport, "_run", lambda command, **_kw: calls.append(command))
 
-    remote.pull(["hopg"], grid=True, no_sync=True)
+    with pytest.raises(SystemExit, match="1 of 1 requested.*hopg"):
+        remote.pull(["hopg"], grid=True, no_sync=True)
 
     assert ["ssh", "-n", remote.HOST, "rm -f /tmp/hopg.grid.pkl"] in calls
-    assert "warning: could not pull checkpoint 'hopg'" in capsys.readouterr().out
+    assert "warning: could not pull checkpoint 'hopg'" in capsys.readouterr().err
 
 
 def test_level9_pull_uses_slim_path_and_distinct_temp_artifact(monkeypatch, tmp_path, capsys):
@@ -1905,10 +2244,11 @@ def test_grid_pull_removes_temp_when_slim_fails(monkeypatch, tmp_path, capsys):
 
     monkeypatch.setattr(transport, "_run", run)
 
-    remote.pull(["hopg"], grid=True, no_sync=True)
+    with pytest.raises(SystemExit, match="1 of 1 requested.*hopg"):
+        remote.pull(["hopg"], grid=True, no_sync=True)
 
     assert ["ssh", "-n", remote.HOST, "rm -f /tmp/hopg.grid.pkl"] in calls
-    assert "warning: could not pull checkpoint 'hopg'" in capsys.readouterr().out
+    assert "warning: could not pull checkpoint 'hopg'" in capsys.readouterr().err
 
 
 def test_remote_start_all_uses_toml_manifest(monkeypatch, tmp_path):
@@ -2640,3 +2980,37 @@ def test_pull_dataset_merges_and_archives(monkeypatch, tmp_path):
     merged = _checkpoint_io.load(str(ckpt))["n"][30.0]
     assert np.all(merged["spec"] == 7.0)  # line overwritten
     assert archived == ["mos2"]  # archived before merge
+
+
+@pytest.mark.parametrize("dataset", ["spec", "", "BREM", 1])
+def test_pull_rejects_invalid_public_dataset_before_side_effects(monkeypatch, tmp_path, dataset):
+    monkeypatch.setattr(lifecycle.config, "LOCAL_ROOT", tmp_path / "must-not-exist")
+    monkeypatch.setattr(
+        lifecycle.transport,
+        "_run",
+        lambda *_args, **_kwargs: pytest.fail("invalid dataset must not reach transport"),
+    )
+
+    with pytest.raises(ValueError, match="dataset must be"):
+        lifecycle.pull(["mos2"], dataset=dataset)
+
+    assert not lifecycle.config.LOCAL_ROOT.exists()
+
+
+def test_pull_keeps_successes_but_exits_nonzero_on_any_failure(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(lifecycle.config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(lifecycle.transport, "_remote_sha256", lambda _path: "same")
+    monkeypatch.setattr(lifecycle.transport, "_local_sha256", lambda _path: "same")
+
+    def fake_run(command):
+        if command[0] == "ssh" and command[-1].startswith("ln ") and "bad.pkl" in command[-1]:
+            raise OSError("transport down")
+
+    monkeypatch.setattr(lifecycle.transport, "_run", fake_run)
+
+    with pytest.raises(SystemExit, match="1 of 2 requested.*bad"):
+        lifecycle.pull(["good", "bad"], no_sync=True)
+
+    captured = capsys.readouterr()
+    assert "already current -> checkpoints/good.pkl" in captured.out
+    assert "could not pull checkpoint 'bad': transport down" in captured.err
