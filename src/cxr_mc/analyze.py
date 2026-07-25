@@ -37,7 +37,7 @@ from typing import TypedDict
 
 import click
 
-from . import _cli_core
+from . import _cli_completion, _cli_core
 from ._acp import running_acp
 from .materials import CATALOG
 
@@ -251,7 +251,7 @@ def _cli(args):
         "stores it for later no-argument launches."
     ),
 )
-@click.argument("material", required=False)
+@click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
 @click.option(
     "-d",
     "--default",

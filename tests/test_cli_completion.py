@@ -61,7 +61,7 @@ def test_archive_label_completion_reads_only_archive_shelf(tmp_path):
     _cli_completion._ARCHIVE_CHECKPOINT_ROOT = tmp_path
     try:
         labels = _values(_cli_completion.complete_archive_label(None, None, "good"))
-        stems = _values(_cli_completion.complete_checkpoint_stem(None, None, "act"))
+        stems = _values(_cli_completion.complete_archive_stem(None, None, "act"))
     finally:
         _cli_completion._ARCHIVE_CHECKPOINT_ROOT = old_root
 
@@ -128,3 +128,67 @@ def test_remote_lookup_is_noninteractive_and_bounded(monkeypatch):
 def test_choice_completer_returns_prefix_matches():
     complete = _cli_completion.choice_completer(range(1, 10))
     assert _values(complete(None, None, "1")) == ["1"]
+
+
+def _parameter(command, name):
+    return next(param for param in command.params if param.name == name)
+
+
+def _callback(command, name):
+    return _parameter(command, name)._custom_shell_complete
+
+
+def test_local_commands_wire_material_checkpoint_archive_and_choice_completion():
+    from cxr_mc import analyze, archive, blaze, rebrem, reline, scan, slim
+
+    for command in (scan.command, blaze.command, analyze.command):
+        assert _callback(command, "material") is _cli_completion.complete_material
+    for command in (rebrem.command, reline.command):
+        assert _callback(command, "materials") is _cli_completion.complete_checkpoint_stem
+
+    assert _callback(slim.command, "checkpoint") is _cli_completion.complete_checkpoint
+    assert _values(_parameter(slim.command, "compresslevel").shell_complete(None, "")) == [
+        str(value) for value in range(1, 10)
+    ]
+
+    assert _callback(archive.archive_command, "stem") is _cli_completion.complete_archive_stem
+    assert _callback(archive.archive_command, "label") is None
+    assert _callback(archive.restore_command, "label") is _cli_completion.complete_archive_label
+    assert _callback(archive.union_command, "stem") is _cli_completion.complete_archive_stem
+    assert _callback(archive.union_command, "label") is _cli_completion.complete_archive_label
+
+
+def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
+    from cxr_mc._remote import cli
+
+    for name in ("scan", "start", "pull", "rebrem", "reline"):
+        command = cli.command.commands[name]
+        parameter = "materials" if name == "start" else "material"
+        assert _callback(command, parameter) is _cli_completion.complete_material
+    for name in ("attach", "status", "logs"):
+        assert _callback(cli.command.commands[name], "jobid") is _cli_completion.complete_job_id
+    for name in ("scan", "start"):
+        values = _parameter(cli.command.commands[name], "parallel_materials").shell_complete(
+            None, ""
+        )
+        assert _values(values) == ["1", "2", "3", "4"]
+
+    assert _callback(cli.command.commands["stop"], "materials") is None
+    assert _callback(cli.command.commands["clear"], "materials") is None
+    assert all(
+        param._custom_shell_complete is None for param in cli.command.commands["reap"].params
+    )
+
+
+def test_line_grid_wires_safe_completion_but_not_stop_target():
+    from cxr_mc.line_grid import command
+
+    for name in ("derive", "submit", "apply"):
+        assert (
+            _callback(command.commands[name], "materials") is _cli_completion.complete_material_csv
+        )
+    for name in ("set", "set-brem", "show"):
+        assert _callback(command.commands[name], "material") is _cli_completion.complete_material
+    for name in ("attach", "status", "logs"):
+        assert _callback(command.commands[name], "jobid") is _cli_completion.complete_job_id
+    assert _callback(command.commands["stop"], "jobid") is None

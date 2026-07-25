@@ -30,7 +30,7 @@ from pathlib import Path
 import click
 import numpy as np
 
-from . import _cli_core
+from . import _cli_completion, _cli_core
 from .config import (
     default_settings,
     format_penetration_watchdog_summary,
@@ -96,7 +96,7 @@ def _beam_uvw(ctx, param, value):
         "CHECKPOINTS and writes <material>.pkl (or <material>_quick.pkl)."
     ),
 )
-@click.argument("material", required=False)
+@click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
 @click.option(
     "-a",
     "--all",

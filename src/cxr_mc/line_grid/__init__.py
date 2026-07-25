@@ -14,7 +14,7 @@ from datetime import date
 
 import click
 
-from cxr_mc import remote
+from cxr_mc import _cli_completion, remote
 from cxr_mc._cli_core import (
     POSITIVE_FLOAT,
     POSITIVE_INT,
@@ -156,6 +156,7 @@ def _derive_options(function):
         "--materials",
         metavar="KEY,...",
         help="Material keys; comma-separated. Omit to use persistent defaults.",
+        shell_complete=_cli_completion.complete_material_csv,
     )(function)
 
 
@@ -254,7 +255,12 @@ def submit_command(
 
 
 @command.command("status")
-@click.argument("jobid", required=False, metavar="[JOBID]")
+@click.argument(
+    "jobid",
+    required=False,
+    metavar="[JOBID]",
+    shell_complete=_cli_completion.complete_job_id,
+)
 @click.option(
     "-v",
     "--verbose",
@@ -268,7 +274,12 @@ def status_command(jobid, verbose):
 
 
 @command.command("attach")
-@click.argument("jobid", required=False, metavar="[JOBID]")
+@click.argument(
+    "jobid",
+    required=False,
+    metavar="[JOBID]",
+    shell_complete=_cli_completion.complete_job_id,
+)
 def attach_command(jobid):
     """Attach to line-grid job progress. JOBID defaults to latest recorded job."""
     remote.attach(jobid)
@@ -276,7 +287,12 @@ def attach_command(jobid):
 
 
 @command.command("logs")
-@click.argument("jobid", required=False, metavar="[JOBID]")
+@click.argument(
+    "jobid",
+    required=False,
+    metavar="[JOBID]",
+    shell_complete=_cli_completion.complete_job_id,
+)
 @click.option(
     "-f",
     "--follow",
@@ -301,7 +317,12 @@ def stop_command(jobid):
 
 @command.command("apply")
 @click.argument("json_path", required=False, metavar="JSON")
-@click.option("--materials", metavar="KEY,...", help="Apply only listed material keys.")
+@click.option(
+    "--materials",
+    metavar="KEY,...",
+    help="Apply only listed material keys.",
+    shell_complete=_cli_completion.complete_material_csv,
+)
 @click.option(
     "--pull",
     is_flag=True,
@@ -349,7 +370,7 @@ def apply_command(json_path, materials, pull, force, regen_golden, dry_run):
 
 
 @command.command("set")
-@click.argument("material")
+@click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
     "--energy", type=POSITIVE_FLOAT, required=True, metavar="KEV", help="Beam energy in keV."
 )
@@ -379,7 +400,7 @@ def set_command(material, energy, stop, num, start, note):
 
 
 @command.command("set-brem")
-@click.argument("material")
+@click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
     "--stop",
     type=POSITIVE_FLOAT,
@@ -458,7 +479,11 @@ def defaults_command(set_values, tilts, azimuths, thickness, brem_step):
 
 
 @command.command("show")
-@click.argument("material", required=False)
+@click.argument(
+    "material",
+    required=False,
+    shell_complete=_cli_completion.complete_material,
+)
 def show_command(material):
     """Show configured line grids."""
     try:

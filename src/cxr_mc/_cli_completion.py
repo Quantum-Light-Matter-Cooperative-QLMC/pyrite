@@ -101,7 +101,13 @@ def _checkpoint_root(ctx: object) -> Path:
 
 
 def complete_checkpoint_stem(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
-    """Complete archive-command stems, without the ``.pkl`` suffix."""
+    """Complete active checkpoint stems, honoring ``--checkpoint-dir``."""
+    del param
+    return _items(_safe_file_stems(_checkpoint_root(ctx)), incomplete)
+
+
+def complete_archive_stem(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
+    """Complete repo-anchored active stems used by archive commands."""
     del ctx, param
     return _items(_safe_file_stems(_ARCHIVE_CHECKPOINT_ROOT), incomplete)
 
@@ -196,6 +202,7 @@ def choice_completer(values: Iterable[object]) -> Completion:
 __all__ = [
     "choice_completer",
     "complete_archive_label",
+    "complete_archive_stem",
     "complete_checkpoint",
     "complete_checkpoint_stem",
     "complete_job_id",

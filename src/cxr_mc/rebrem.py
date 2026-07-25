@@ -25,7 +25,7 @@ from pathlib import Path
 
 import click
 
-from . import _cli_core
+from . import _cli_completion, _cli_core
 
 
 def rebrem_checkpoints(
@@ -141,7 +141,11 @@ def _cli(args):
         "and skips records already at target unless --redo-all."
     ),
 )
-@click.argument("materials", nargs=-1)
+@click.argument(
+    "materials",
+    nargs=-1,
+    shell_complete=_cli_completion.complete_checkpoint_stem,
+)
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
 @click.option(
     "--ne-brem",

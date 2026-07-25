@@ -19,7 +19,7 @@ import os
 
 import click
 
-from . import _checkpoint_io, _cli_core
+from . import _checkpoint_io, _cli_completion, _cli_core
 from .results import slim_results
 
 
@@ -125,7 +125,7 @@ def _cli(args):
         "--line-only are mutually exclusive."
     ),
 )
-@click.argument("checkpoint")
+@click.argument("checkpoint", shell_complete=_cli_completion.complete_checkpoint)
 @click.option("-o", "--out", default=None, help="Output path (default: <stem>.slim.pkl).")
 @click.option("--grid", is_flag=True, help="Keep only material's current-grid configs.")
 @click.option("--drop-wide-brem", is_flag=True, help="Drop full-range brem arrays.")
@@ -136,6 +136,7 @@ def _cli(args):
     default=6,
     show_default=True,
     metavar="1-9",
+    shell_complete=_cli_completion.choice_completer(range(1, 10)),
 )
 @click.option(
     "--brem-only",

@@ -30,7 +30,7 @@ from pathlib import Path
 
 import click
 
-from . import _checkpoint_io, _cli_core
+from . import _checkpoint_io, _cli_completion, _cli_core
 
 # Anchored to the repo root (src/cxr_mc/archive.py -> parents[2] = repo root), the
 # same dir run.load_checkpoint reads, so `cxr archive` works from any cwd. Computed
@@ -267,7 +267,7 @@ def _cli_union(args):
         "labels are preserved unless --force."
     ),
 )
-@click.argument("stem")
+@click.argument("stem", shell_complete=_cli_completion.complete_archive_stem)
 @click.argument("label", required=False)
 @click.option("--force", is_flag=True, help="Overwrite existing archive label.")
 def archive_command(stem, label, force):
@@ -282,7 +282,7 @@ def archive_command(stem, label, force):
         "active checkpoints are preserved unless --force."
     ),
 )
-@click.argument("label")
+@click.argument("label", shell_complete=_cli_completion.complete_archive_label)
 @click.option("--as", "stem", default=None, help="Active stem (default: inferred).")
 @click.option("--force", is_flag=True, help="Overwrite existing active checkpoint.")
 def restore_command(label, stem, force):
@@ -302,8 +302,8 @@ def archives_command():
         "is retained and live checkpoint is backed up by default."
     ),
 )
-@click.argument("stem")
-@click.argument("label")
+@click.argument("stem", shell_complete=_cli_completion.complete_archive_stem)
+@click.argument("label", shell_complete=_cli_completion.complete_archive_label)
 @click.option(
     "--no-archive",
     is_flag=True,

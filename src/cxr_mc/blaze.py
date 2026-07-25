@@ -32,7 +32,7 @@ from pathlib import Path
 
 import click
 
-from . import _cli_core
+from . import _cli_completion, _cli_core
 from .config import (
     default_settings,
     format_penetration_watchdog_summary,
@@ -113,7 +113,7 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
         "checkpoints. Repeat --energy/--spacing/--angles for multiple values."
     ),
 )
-@click.argument("material")
+@click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
     "--energy",
     "energies",

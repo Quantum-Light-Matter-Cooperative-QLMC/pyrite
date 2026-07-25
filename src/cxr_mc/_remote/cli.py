@@ -4,6 +4,7 @@ import sys
 
 import click
 
+from .. import _cli_completion
 from .._cli_core import (
     FINITE_FLOAT,
     NONNEGATIVE_FLOAT,
@@ -337,7 +338,12 @@ def command():
 
 
 @command.command("scan", help="Sync code, submit sweep(s), wait, and pull checkpoints.")
-@click.argument("material", required=False, metavar="[MATERIAL]")
+@click.argument(
+    "material",
+    required=False,
+    metavar="[MATERIAL]",
+    shell_complete=_cli_completion.complete_material,
+)
 @click.option("-a", "--all", "all_", is_flag=True, help="Run every material in mats_to_sim.toml.")
 @click.option(
     "--quick",
@@ -356,6 +362,7 @@ def command():
     default=None,
     metavar="N",
     help="Simultaneous scans in one allocation; requires --chunk-minutes 0.",
+    shell_complete=_cli_completion.choice_completer(range(1, config.MAX_PARALLEL_MATERIALS + 1)),
 )
 @click.option(
     "--chunk-minutes",
@@ -432,7 +439,12 @@ def _recompute_options(function):
     function = click.option(
         "-a", "--all", "all_", is_flag=True, help="Use every material in mats_to_sim.toml."
     )(function)
-    return click.argument("material", nargs=-1, metavar="[MATERIAL]...")(function)
+    return click.argument(
+        "material",
+        nargs=-1,
+        metavar="[MATERIAL]...",
+        shell_complete=_cli_completion.complete_material,
+    )(function)
 
 
 @command.command(
@@ -511,7 +523,12 @@ def reline_command(
 
 
 @command.command("start", help="Sync code and submit a detached SLURM material queue.")
-@click.argument("materials", nargs=-1, metavar="[MATERIAL]...")
+@click.argument(
+    "materials",
+    nargs=-1,
+    metavar="[MATERIAL]...",
+    shell_complete=_cli_completion.complete_material,
+)
 @click.option("-a", "--all", "all_", is_flag=True, help="Queue every configured material.")
 @click.option("--quick", is_flag=True, help="Use tiny smoke-test grid.")
 @click.option(
@@ -526,6 +543,7 @@ def reline_command(
     default=None,
     metavar="N",
     help="Simultaneous scans in one allocation; requires --chunk-minutes 0.",
+    shell_complete=_cli_completion.choice_completer(range(1, config.MAX_PARALLEL_MATERIALS + 1)),
 )
 @click.option(
     "--chunk-minutes",
@@ -570,7 +588,12 @@ def start_command(
 
 
 @command.command("attach", help="Live-track a remote job; defaults to latest.")
-@click.argument("jobid", required=False, metavar="[JOBID]")
+@click.argument(
+    "jobid",
+    required=False,
+    metavar="[JOBID]",
+    shell_complete=_cli_completion.complete_job_id,
+)
 @click.option(
     "-v",
     "--verbose",
@@ -587,7 +610,12 @@ def jobs_command():
 
 
 @command.command("status", help="Show one job; use -v for allocation and -vv for logs.")
-@click.argument("jobid", required=False, metavar="[JOBID]")
+@click.argument(
+    "jobid",
+    required=False,
+    metavar="[JOBID]",
+    shell_complete=_cli_completion.complete_job_id,
+)
 @click.option(
     "-v",
     "--verbose",
@@ -599,7 +627,12 @@ def status_command(jobid, verbose):
 
 
 @command.command("logs", help="Show a job diagnostic log; defaults to latest.")
-@click.argument("jobid", required=False, metavar="[JOBID]")
+@click.argument(
+    "jobid",
+    required=False,
+    metavar="[JOBID]",
+    shell_complete=_cli_completion.complete_job_id,
+)
 @click.option("-f", "--follow", is_flag=True, help="Stream live; Ctrl-C disconnects viewer.")
 def logs_command(jobid, follow):
     return _invoke_click(_cli_logs, _click_args("logs", jobid=jobid, follow=follow))
@@ -639,7 +672,12 @@ def reap_command(min_age_minutes, yes):
 
 
 @command.command("pull", help="Fetch existing checkpoints from remote box.")
-@click.argument("material", nargs=-1, metavar="[STEM]...")
+@click.argument(
+    "material",
+    nargs=-1,
+    metavar="[STEM]...",
+    shell_complete=_cli_completion.complete_material,
+)
 @click.option("-a", "--all", "all_", is_flag=True, help="Pull every configured material.")
 @click.option(
     "-f",
