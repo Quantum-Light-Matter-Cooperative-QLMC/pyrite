@@ -71,7 +71,7 @@ delta-function of the closed-form theory.
 ## Repository layout
 
 ```
-notebooks/scan_app.py     RUNNER:  pick material → Sweep → run_sweep → checkpoints/<material>.pkl
+notebooks/scan_app.py     RUNNER:  pick material → Sweep → run_sweep → checkpoints/<material>/{line,brem}.pkl
 notebooks/analysis_app.py VIZ:     load that checkpoint → all figures (no sweeps here)
 notebooks/validation_app.py CHECK: literature anchors and validation studies
 scan.py            root shim → cxr_mc.scan (guarded; python scan.py, or cxr scan)
@@ -168,7 +168,7 @@ material's thickness / energies / tilts / energy grids in
 
 1. **`notebooks/scan_app.py`** (the runner): choose a material, then
    `material_sweep(MATERIAL)` → `build_cases` → `run_sweep`, which writes
-   `checkpoints/<material>.pkl` and streams the per-tilt statistics tables live.
+   `checkpoints/<material>/{line,brem}.pkl` and streams per-tilt statistics tables live.
 2. **`notebooks/analysis_app.py`** (the viz): choose the same material, `load_checkpoint`,
    `cases_from_results`, then `browse` / heatmaps / Eagle XO / Timepix /
    penetration figures. No sweeps run here.
@@ -190,7 +190,7 @@ uv run python scan.py <material> [--quick]       # identical, via the root shim
 
 ### Running on a cluster
 
-`cxr scan` is headless and writes a single `checkpoints/<material>.pkl`, so it
+`cxr scan` is headless and writes `checkpoints/<material>/{line,brem}.pkl`, so it
 drops into any batch scheduler — install once, then submit one job per material.
 See [`docs/running-on-a-cluster.md`](docs/running-on-a-cluster.md) for a SLURM
 `sbatch` template (including a job-array sweep over several materials). Pull the

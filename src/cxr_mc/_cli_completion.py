@@ -94,6 +94,29 @@ def _safe_file_stems(directory: Path, *, suffix: str = ".pkl") -> list[str]:
     return values
 
 
+def _safe_checkpoint_stems(directory: Path) -> list[str]:
+    """Return bounded component-directory and legacy checkpoint stems."""
+    values = _safe_file_stems(directory)
+    try:
+        entries = os.scandir(directory)
+    except OSError:
+        return values
+    try:
+        with entries:
+            for entry in entries:
+                if len(values) >= MAX_LOCAL_CANDIDATES:
+                    break
+                if (
+                    entry.is_dir(follow_symlinks=False)
+                    and _SAFE_TOKEN_RE.fullmatch(entry.name)
+                    and (Path(entry.path) / "line.pkl").is_file()
+                ):
+                    values.append(entry.name)
+    except OSError:
+        pass
+    return values
+
+
 def _checkpoint_root(ctx: object) -> Path:
     params = getattr(ctx, "params", {})
     configured = params.get("checkpoint_dir") if isinstance(params, dict) else None
@@ -103,13 +126,13 @@ def _checkpoint_root(ctx: object) -> Path:
 def complete_checkpoint_stem(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
     """Complete active checkpoint stems, honoring ``--checkpoint-dir``."""
     del param
-    return _items(_safe_file_stems(_checkpoint_root(ctx)), incomplete)
+    return _items(_safe_checkpoint_stems(_checkpoint_root(ctx)), incomplete)
 
 
 def complete_archive_stem(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
     """Complete repo-anchored active stems used by archive commands."""
     del ctx, param
-    return _items(_safe_file_stems(_ARCHIVE_CHECKPOINT_ROOT), incomplete)
+    return _items(_safe_checkpoint_stems(_ARCHIVE_CHECKPOINT_ROOT), incomplete)
 
 
 def complete_checkpoint(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
@@ -125,8 +148,12 @@ def complete_checkpoint(ctx: object, param: object, incomplete: str) -> list[Com
         prefix = typed.name
         rendered_parent = f"{directory}{os.sep}"
     return [
-        CompletionItem(f"{rendered_parent}{stem}.pkl")
-        for stem in sorted(set(_safe_file_stems(directory)))
+        CompletionItem(
+            f"{rendered_parent}{stem}"
+            if (directory / stem).is_dir()
+            else f"{rendered_parent}{stem}.pkl"
+        )
+        for stem in sorted(set(_safe_checkpoint_stems(directory)))
         if stem.startswith(prefix)
     ]
 

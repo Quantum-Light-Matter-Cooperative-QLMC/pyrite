@@ -1,7 +1,7 @@
 # Running on a cluster (SLURM)
 
 `cxr scan` is a headless entry point: it runs one material's Monte-Carlo sweep and
-writes a single `checkpoints/<material>.pkl`. That makes it a clean fit for any
+writes `checkpoints/<material>/{line,brem}.pkl`. That makes it a clean fit for any
 batch scheduler without requiring the optional lab-box helper described below.
 Install the package once on the cluster, submit one job per material, then pull
 the checkpoints back and do interactive analysis or static-HTML export locally.
@@ -43,7 +43,7 @@ module load cuda/13.x            # <-- match the cupy-cuda13x wheel (omit for CP
 cd "$SLURM_SUBMIT_DIR"
 
 MATERIAL="${1:?usage: sbatch run_cxr.sh <material>}"
-uv run cxr scan "$MATERIAL"      # -> checkpoints/<material>.pkl
+uv run cxr scan "$MATERIAL"      # -> checkpoints/<material>/{line,brem}.pkl
 ```
 
 On a GPU node one main-process CUDA context handles spectrum/bremsstrahlung while

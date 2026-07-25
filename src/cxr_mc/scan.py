@@ -249,7 +249,7 @@ def _run_json(args):
             errors[material] = "resumable work remains"
             resumable = True
     checkpoints = [
-        os.path.join(args.checkpoint_dir, f"{material}{'_quick' if args.quick else ''}.pkl")
+        os.path.join(args.checkpoint_dir, f"{material}{'_quick' if args.quick else ''}")
         for material in [*completed, *failed]
     ]
     result = cli_json.operation_summary(
@@ -310,7 +310,7 @@ def _run_material(args, material, max_seconds=None):
     # A --quick smoke test writes to its OWN checkpoint (<material>_quick.pkl), so
     # its coarse off-grid points never contaminate the real per-material sweep.
     stem = f"{material}_quick" if args.quick else material
-    ckpt = os.path.join(args.checkpoint_dir, f"{stem}.pkl")
+    ckpt = os.path.join(args.checkpoint_dir, stem)
     results = {}
     progress_file = getattr(args, "progress_file", None)
     latest_progress = {
@@ -387,13 +387,11 @@ def _run_material(args, material, max_seconds=None):
         )
     n = sum(len(v) for v in results.values())
     if complete:
-        print(
-            f"{_cli_core.paint('done', 'done')} -> {args.checkpoint_dir}/{stem}.pkl ({n} records)"
-        )
+        print(f"{_cli_core.paint('done', 'done')} -> {args.checkpoint_dir}/{stem}/ ({n} records)")
     else:
         print(
             f"{_cli_core.paint('paused', 'warning')} (budget) -> "
-            f"{args.checkpoint_dir}/{stem}.pkl ({n} records)"
+            f"{args.checkpoint_dir}/{stem}/ ({n} records)"
         )
     return complete
 

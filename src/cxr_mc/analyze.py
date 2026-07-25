@@ -37,7 +37,7 @@ from typing import TypedDict
 
 import click
 
-from . import _cli_completion, _cli_core
+from . import _checkpoint_store, _cli_completion, _cli_core
 from ._acp import running_acp
 from .materials import CATALOG
 
@@ -78,7 +78,7 @@ def material_menu(
         if labels is None
         else labels
     )
-    available = {path.stem for path in Path(checkpoint_dir).glob("*.pkl") if path.stem in materials}
+    available = set(_checkpoint_store.discover(checkpoint_dir)) & set(materials)
     rows: list[MaterialMenuRow] = [
         {
             "value": material,
@@ -117,7 +117,7 @@ def face_menu(material: str, checkpoint_dir: Path | str) -> tuple[MaterialMenuRo
     direct ``<stem>.pkl`` child of ``checkpoint_dir``. Flat is listed first
     (preferred default via :func:`select_initial_material` semantics).
     """
-    available = {path.stem for path in Path(checkpoint_dir).glob("*.pkl")}
+    available = set(_checkpoint_store.discover(checkpoint_dir))
     return tuple(
         {
             "value": face,

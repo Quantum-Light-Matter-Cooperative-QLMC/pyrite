@@ -51,7 +51,7 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 - **`cxr check-config [catalog]`** → `check_config:_run`: validate bundled
   offline catalog or explicit complete catalog without starting simulation.
 - **`cxr scan <material>`** → `scan:main` → `run.run_sweep` → write
-  `checkpoints/<material>.pkl`. Root shim: `scan.py`.
+  `checkpoints/<material>/{line,brem}.pkl`. Root shim: `scan.py`.
 - **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
   `notebooks/analysis_app.py` (all figures, Altair + matplotlib, lazy tabbed
   layout), `notebooks/validation_app.py` (validation-study interface). Scan
@@ -64,13 +64,13 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   box: submit, attach/status/logs, pull, stop, validation jobs.
 - **`cxr export [stem]`** → `export:main`: `marimo export html` of analysis
   app → `results/<stem>.html`.
-- **`cxr slim <checkpoint> [--grid]`** → `slim:slim_checkpoint` →
+- **`cxr slim <checkpoint-dir> [--grid]`** → `slim:slim_checkpoint` →
   `results.slim_results`: shrink checkpoint pickle for transfer (drop
   wide-brem / float32 / filter configs; `--grid` keep only material's
   current-grid configs).
 - **`cxr archive`/`restore`/`archives`/`union`** → `archive:*`: local
-  checkpoint shelf — copy active slot `checkpoints/<stem>.pkl` to/from
-  long-term `checkpoints/archive/<label>.pkl`; `union` merge shelved
+  checkpoint shelf — copy active slot `checkpoints/<stem>/` to/from
+  long-term `checkpoints/archive/<label>/`; `union` merge shelved
   checkpoint back into active slot for same material.
 - **Sweep worker**: `montecarlo.run_case` (module-level so it pickle into
   `run_cases` process pool).
@@ -188,10 +188,18 @@ scan grids project from immutable `materials.CATALOG`.
   `sweep` (`Sweep`).
 
 ### `run.py`
-Checkpointed, resumable sweep driver plus checkpoint loaders/repair.
+Checkpointed, resumable sweep driver plus component checkpoint loaders/repair.
 - Public: `run_sweep`, `load_checkpoint`, `checkpoint_path_for`,
   `cases_from_results`, `repair_brem_wide`, `repair_checkpoint`.
 - Deps: `montecarlo` (`run_cases`), `results` (`store_result`).
+
+### `_checkpoint_store.py`
+Component storage adapter: active datasets live under
+`checkpoints/<stem>/{line,brem}.pkl`, merge transparently into historical
+in-memory result records, and migrate legacy `checkpoints/<stem>.pkl` stores on
+next save.
+- Internal: `discover`, `load`, `save`, `signature`, component/path helpers.
+- Deps: `_checkpoint_io`, NumPy.
 
 ### `scan.py`
 Headless sweep entry: parse args → build cases → `run_sweep` → checkpoint.
@@ -386,8 +394,8 @@ keep only material's current-grid configs).
 
 ### `archive.py`
 `cxr archive`/`restore`/`archives`/`union` subcommands — durable local
-checkpoint shelf. Copy active slot `checkpoints/<stem>.pkl` to/from
-long-term `checkpoints/archive/<label>.pkl` (atomic temp+replace, `--force`
+checkpoint shelf. Copy active slot `checkpoints/<stem>/` to/from
+long-term `checkpoints/archive/<label>/` (atomic temp+replace, `--force`
 overwrite guards, label↔stem date-stamp inference). `union` merge archived
 checkpoint into active slot for SAME material (compared via each store's
 `case["crystal"]`), live win on any overlapping (config name, E0) point;

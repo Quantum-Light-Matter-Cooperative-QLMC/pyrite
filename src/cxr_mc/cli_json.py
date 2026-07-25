@@ -384,7 +384,23 @@ def archives(root: str | os.PathLike[str], *, loader: Any) -> JsonResult:
     archive_dir = Path(root) / "archive"
     items: list[dict[str, object]] = []
     errors: list[dict[str, object]] = []
-    paths = sorted(archive_dir.glob("*.pkl")) if archive_dir.is_dir() else []
+    paths = (
+        sorted(
+            [*archive_dir.glob("*.pkl")],
+            key=lambda path: path.stem,
+        )
+        + sorted(
+            [
+                path
+                for path in archive_dir.iterdir()
+                if path.is_dir() and (path / "line.pkl").is_file()
+            ],
+            key=lambda path: path.name,
+        )
+        if archive_dir.is_dir()
+        else []
+    )
+    paths.sort(key=lambda path: path.stem if path.is_file() else path.name)
     for path in paths:
         item_error: str | None = None
         record_count: int | None = None
@@ -395,12 +411,23 @@ def archives(root: str | os.PathLike[str], *, loader: Any) -> JsonResult:
             record_count = sum(len(records) for records in store.values())
         except Exception as exc:
             item_error = _text(exc)
-            errors.append(_error("unreadable_archive", item_error, item=path.stem))
+            errors.append(
+                _error(
+                    "unreadable_archive",
+                    item_error,
+                    item=path.stem if path.is_file() else path.name,
+                )
+            )
+        size = (
+            sum(item.stat().st_size for item in path.glob("*.pkl"))
+            if path.is_dir()
+            else path.stat().st_size
+        )
         items.append(
             {
-                "label": _text(path.stem),
+                "label": _text(path.stem if path.is_file() else path.name),
                 "path": str(path),
-                "bytes": path.stat().st_size,
+                "bytes": size,
                 "record_count": record_count,
                 "readable": item_error is None,
                 "error": item_error,

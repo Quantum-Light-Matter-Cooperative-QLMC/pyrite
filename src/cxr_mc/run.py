@@ -33,7 +33,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-from . import _checkpoint_io
+from . import _checkpoint_io, _checkpoint_store
 from ._energy_grid import decode_energy_grid
 from .montecarlo import run_cases, runner
 from .results import records, store_result, sweep_values
@@ -44,14 +44,17 @@ _DEFAULT_CHECKPOINT_DIR = str(Path(__file__).resolve().parents[2] / "checkpoints
 
 
 def checkpoint_path_for(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
-    """Path to the per-material results checkpoint run_sweep writes."""
-    return os.path.join(checkpoint_dir, f"{material}.pkl")
+    """Path to the per-material component checkpoint directory."""
+    return os.path.join(checkpoint_dir, material)
 
 
 def _manifest_path_for(checkpoint_path):
-    """Sidecar manifest path for a checkpoint pickle: same stem, ``.meta.json``
-    suffix (``checkpoints/<material>.pkl`` -> ``checkpoints/<material>.meta.json``).
-    See :func:`checkpoint_manifest`."""
+    """Manifest path for a component directory or legacy checkpoint pickle."""
+    if not str(checkpoint_path).endswith(".pkl"):
+        legacy = Path(checkpoint_path).with_suffix(".pkl")
+        if legacy.is_file() and not (Path(checkpoint_path) / "line.pkl").is_file():
+            return str(legacy.with_suffix(".meta.json"))
+        return os.path.join(checkpoint_path, "meta.json")
     base, _ = os.path.splitext(checkpoint_path)
     return f"{base}.meta.json"
 
@@ -75,8 +78,45 @@ def _checkpoint_save(checkpoint_path, results):
     os.replace(tmp, checkpoint_path)
 
 
+def _checkpoint_exists(checkpoint_path):
+    path = Path(checkpoint_path)
+    if path.suffix == ".pkl":
+        return path.is_file()
+    return (path / "line.pkl").is_file() or path.with_suffix(".pkl").is_file()
+
+
+def _checkpoint_load(checkpoint_path):
+    path = Path(checkpoint_path)
+    if path.suffix == ".pkl":
+        return _checkpoint_io.load(str(path))
+    if not (path / "line.pkl").is_file() and path.with_suffix(".pkl").is_file():
+        return _checkpoint_io.load(str(path.with_suffix(".pkl")))
+    return _checkpoint_store.load(path.name, path.parent)
+
+
+def _checkpoint_components_save(checkpoint_path, results, *, components=("line", "brem")):
+    """Save component directory, retaining explicit legacy-file compatibility."""
+    path = Path(checkpoint_path)
+    if path.suffix == ".pkl":
+        _checkpoint_save(str(path), results)
+        return
+    _checkpoint_store.save(path.name, path.parent, results, components=components)
+
+
+def _checkpoint_signature(checkpoint_path):
+    path = Path(checkpoint_path)
+    if path.suffix == ".pkl":
+        stat = path.stat()
+        return ((str(path.resolve()), stat.st_mtime_ns, stat.st_size),)
+    if not (path / "line.pkl").is_file() and path.with_suffix(".pkl").is_file():
+        legacy = path.with_suffix(".pkl")
+        stat = legacy.stat()
+        return ((str(legacy.resolve()), stat.st_mtime_ns, stat.st_size),)
+    return _checkpoint_store.signature(path.name, path.parent)
+
+
 @functools.lru_cache(maxsize=4)
-def _load_checkpoint_cached(path, mtime):
+def _load_checkpoint_cached(path, signature):
     """The actual gunzip+unpickle behind :func:`load_checkpoint`, memoized
     module-globally on ``(path, mtime)`` (``functools.lru_cache(maxsize=4)``).
 
@@ -89,9 +129,9 @@ def _load_checkpoint_cached(path, mtime):
     records" print lives here rather than in ``load_checkpoint`` so cache hits
     stay silent.
     """
-    results = _checkpoint_io.load(path)
+    results = _checkpoint_load(path)
     n = sum(len(v) for v in results.values())
-    material = Path(path).stem
+    material = Path(path).stem if str(path).endswith(".pkl") else Path(path).name
     print(f"loaded {n} {material} records from {path}")
     return results
 
@@ -113,10 +153,10 @@ def load_checkpoint(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
     when only the checkpoint's energies/record count/sweep values are needed --
     it avoids the unpickle entirely on the common path."""
     path = checkpoint_path_for(material, checkpoint_dir)
-    if not os.path.exists(path):
+    if not _checkpoint_exists(path):
         print(f"no checkpoint at {path} -- run `cxr scan {material}` first")
         return {}
-    return _load_checkpoint_cached(path, os.path.getmtime(path))
+    return _load_checkpoint_cached(path, _checkpoint_signature(path))
 
 
 _material_analysis_cache = {}
@@ -148,10 +188,9 @@ def cached_material_analysis(material, analyze, key, checkpoint_dir=_DEFAULT_CHE
     Returns ``None`` if no checkpoint exists for ``material``, without
     calling ``analyze``."""
     path = checkpoint_path_for(material, checkpoint_dir)
-    if not os.path.exists(path):
+    if not _checkpoint_exists(path):
         return None
-    stat = os.stat(path)
-    checkpoint_key = (str(Path(path).resolve()), stat.st_mtime_ns, stat.st_size)
+    checkpoint_key = _checkpoint_signature(path)
     cache_key = (*checkpoint_key, key)
     if cache_key in _material_analysis_cache:
         return _material_analysis_cache[cache_key]
@@ -235,10 +274,11 @@ def checkpoint_manifest(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
          "sweep": {field: [values, ...]}}
     """
     path = checkpoint_path_for(material, checkpoint_dir)
-    if not os.path.exists(path):
+    if not _checkpoint_exists(path):
         return None
     manifest_path = _manifest_path_for(path)
-    if os.path.exists(manifest_path) and os.path.getmtime(manifest_path) >= os.path.getmtime(path):
+    newest_component = max(item[1] for item in _checkpoint_signature(path))
+    if os.path.exists(manifest_path) and os.stat(manifest_path).st_mtime_ns >= newest_component:
         with open(manifest_path) as f:
             return json.load(f)
     results = load_checkpoint(material, checkpoint_dir)
@@ -351,11 +391,11 @@ def run_sweep(
         :func:`checkpoint_manifest` never serves a stale energy/record-count
         summary after a fresh save."""
         subset = {n: results[n] for n in results if _crystal_of(results[n]) == material}
-        _checkpoint_save(checkpoint_path, subset)
+        _checkpoint_components_save(checkpoint_path, subset)
         _manifest_save(checkpoint_path, subset)
 
-    if resume and os.path.exists(checkpoint_path):
-        loaded = _checkpoint_io.load(checkpoint_path)
+    if resume and _checkpoint_exists(checkpoint_path):
+        loaded = _checkpoint_load(checkpoint_path)
         results.update(loaded)
         print(
             f"resumed {sum(len(v) for v in loaded.values())} {material} cases from {checkpoint_path}"
@@ -611,13 +651,13 @@ def repair_checkpoint(checkpoint_path, save_every=100, max_seconds=None, status=
     :func:`repair_brem_wide`. ``max_seconds``/``status`` thread the
     chunked-resubmission deadline through. Returns the repaired ``results`` dict
     (also usable directly in the notebook)."""
-    if not os.path.exists(checkpoint_path):
+    if not _checkpoint_exists(checkpoint_path):
         print(f"no such checkpoint: {checkpoint_path}")
         return {}
-    results = _checkpoint_io.load(checkpoint_path)
+    results = _checkpoint_load(checkpoint_path)
 
     def save_cb(results):  # atomic; resumable on crash; keeps the sidecar manifest in step
-        _checkpoint_save(checkpoint_path, results)
+        _checkpoint_components_save(checkpoint_path, results, components=("brem",))
         _manifest_save(checkpoint_path, results)
 
     n = repair_brem_wide(
@@ -766,13 +806,13 @@ def reline_checkpoint(
     saving every ``save_every`` records. Mirror of :func:`repair_checkpoint`.
     ``max_seconds``/``status`` thread the chunked-resubmission deadline through
     to :func:`repair_line_spec`."""
-    if not os.path.exists(checkpoint_path):
+    if not _checkpoint_exists(checkpoint_path):
         print(f"no such checkpoint: {checkpoint_path}")
         return {}
-    results = _checkpoint_io.load(checkpoint_path)
+    results = _checkpoint_load(checkpoint_path)
 
     def save_cb(results):
-        _checkpoint_save(checkpoint_path, results)
+        _checkpoint_components_save(checkpoint_path, results, components=("line",))
         _manifest_save(checkpoint_path, results)
 
     n = repair_line_spec(

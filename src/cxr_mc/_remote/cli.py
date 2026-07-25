@@ -138,7 +138,7 @@ def _cli_scan(args):
     )
     for stem in stems:
         print(
-            f"\ndone. checkpoints/{stem}.pkl is local; run `cxr analyze {stem}` "
+            f"\ndone. checkpoints/{stem}/ is local; run `cxr analyze {stem}` "
             f"(or run `cxr export`) -- visualization and static-HTML export "
             "stay local."
         )
@@ -240,7 +240,7 @@ def _cli_pull_json(args):
         materials,
         completed,
         failed_materials=failed,
-        checkpoints=[config.LOCAL_ROOT / "checkpoints" / f"{item}.pkl" for item in materials],
+        checkpoints=[config.LOCAL_ROOT / "checkpoints" / item for item in materials],
         elapsed_seconds=time.monotonic() - started,
         material_errors=errors,
     )

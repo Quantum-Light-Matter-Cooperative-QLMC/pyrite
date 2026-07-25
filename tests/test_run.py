@@ -251,8 +251,7 @@ def test_brem_wide_from_segments_forwards_groove_to_brem(monkeypatch):
 
 def test_checkpoint_path_for_includes_material_and_dir():
     p = checkpoint_path_for("hopg", checkpoint_dir="ckpts")
-    assert "hopg" in p
-    assert "ckpts" in p
+    assert Path(p) == Path("ckpts/hopg")
 
 
 # ---------------------------------------------------------------------------
@@ -499,7 +498,7 @@ def test_run_sweep_writes_manifest_alongside_checkpoint(tmp_path, monkeypatch):
     ]
     run_sweep(cases, {}, checkpoint_dir=str(tmp_path), progress=False)
 
-    meta_path = tmp_path / "hopg.meta.json"
+    meta_path = tmp_path / "hopg" / "meta.json"
     assert meta_path.exists()
     with open(meta_path) as f:
         manifest = json.load(f)
@@ -547,10 +546,66 @@ def test_run_sweep_stores_all_cases(tmp_path, monkeypatch):
 def test_run_sweep_writes_checkpoint(tmp_path, monkeypatch):
     monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
     run_sweep([_fake_case("cfg_a", 30.0)], {}, checkpoint_dir=str(tmp_path), progress=False)
-    ckpt = tmp_path / "hopg.pkl"
-    assert ckpt.exists()
-    saved = _checkpoint_io.load(str(ckpt))
+    ckpt = tmp_path / "hopg"
+    assert (ckpt / "line.pkl").exists()
+    assert (ckpt / "brem.pkl").exists()
+    saved = load_checkpoint("hopg", checkpoint_dir=str(tmp_path))
     assert "cfg_a" in saved
+
+
+def test_run_sweep_splits_line_and_brem_fields(tmp_path, monkeypatch):
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    run_sweep([_fake_case("cfg_a", 30.0)], {}, checkpoint_dir=str(tmp_path), progress=False)
+
+    line = _checkpoint_io.load(str(tmp_path / "hopg" / "line.pkl"))
+    brem = _checkpoint_io.load(str(tmp_path / "hopg" / "brem.pkl"))
+    line_record = line["cfg_a"][30.0]
+    brem_record = brem["cfg_a"][30.0]
+    assert "spec" in line_record and "brem_wide" not in line_record
+    assert "brem_wide" in brem_record and "spec" not in brem_record
+
+
+def test_legacy_checkpoint_migrates_to_components_on_save(tmp_path, monkeypatch):
+    existing = {"cfg_a": {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])}}}
+    with open(tmp_path / "hopg.pkl", "wb") as f:
+        pickle.dump(existing, f)
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+
+    run_sweep(
+        [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 30.0)],
+        {},
+        checkpoint_dir=str(tmp_path),
+        resume=True,
+        progress=False,
+    )
+
+    assert (tmp_path / "hopg" / "line.pkl").is_file()
+    assert set(load_checkpoint("hopg", checkpoint_dir=str(tmp_path))) == {"cfg_a", "cfg_b"}
+
+
+def test_partial_component_save_fully_migrates_legacy_checkpoint(tmp_path):
+    from cxr_mc import _checkpoint_store
+
+    record = {
+        "case": _fake_case("cfg_a", 30.0),
+        "E_grid": np.array([1.0, 2.0]),
+        "spec": np.array([3.0, 4.0]),
+        "E_grid_brem": np.array([1.0, 2.0]),
+        "brem_wide": np.array([5.0, 6.0]),
+        "brem": np.array([5.0, 6.0]),
+    }
+    legacy = {"cfg_a": {30.0: record}}
+    with open(tmp_path / "hopg.pkl", "wb") as f:
+        pickle.dump(legacy, f)
+
+    record["brem_wide"] = np.array([7.0, 8.0])
+    _checkpoint_store.save("hopg", tmp_path, legacy, components=("brem",))
+
+    assert (tmp_path / "hopg" / "line.pkl").is_file()
+    assert (tmp_path / "hopg" / "brem.pkl").is_file()
+    loaded = _checkpoint_store.load("hopg", tmp_path)
+    assert np.array_equal(loaded["cfg_a"][30.0]["spec"], np.array([3.0, 4.0]))
+    assert np.array_equal(loaded["cfg_a"][30.0]["brem_wide"], np.array([7.0, 8.0]))
 
 
 def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
@@ -1031,7 +1086,7 @@ def test_rebrem_checkpoints_enumerates_pkls_and_passes_params(monkeypatch, tmp_p
     rebrem_checkpoints(
         materials=["MoS2"], checkpoint_dir=str(tmp_path), ne_brem=1000, redo_all=True
     )
-    assert [Path(p).name for p, _ in calls] == ["MoS2.pkl"]
+    assert [Path(p).name for p, _ in calls] == ["MoS2"]
     assert calls[0][1]["only_nonfinite"] is False
 
 

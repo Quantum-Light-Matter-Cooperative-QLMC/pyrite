@@ -6,7 +6,7 @@ import pickle
 
 import pytest
 
-from cxr_mc import _checkpoint_io, archive
+from cxr_mc import _checkpoint_io, _checkpoint_store, archive
 
 
 def _write(path, payload):
@@ -67,6 +67,22 @@ def test_roundtrip_preserves_contents(tmp_path):
     archive.restore_checkpoint("snap", "hopg", root=str(tmp_path))
     with open(tmp_path / "hopg.pkl", "rb") as f:
         assert set(pickle.load(f)) == set(payload)
+
+
+def test_component_checkpoint_archive_restore_roundtrip(tmp_path):
+    payload = _material_store("hopg", ["cfgA", "cfgB"])
+    _checkpoint_store.save("hopg", tmp_path, payload)
+
+    archive.archive_checkpoint("hopg", "snap", root=str(tmp_path))
+    assert (tmp_path / "archive" / "snap" / "line.pkl").is_file()
+    assert (tmp_path / "archive" / "snap" / "brem.pkl").is_file()
+
+    for path in (tmp_path / "hopg").iterdir():
+        path.unlink()
+    (tmp_path / "hopg").rmdir()
+    archive.restore_checkpoint("snap", "hopg", root=str(tmp_path))
+
+    assert set(_checkpoint_store.load("hopg", tmp_path)) == {"cfgA", "cfgB"}
 
 
 def test_restore_infers_stem_from_dated_label(tmp_path):

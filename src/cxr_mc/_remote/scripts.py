@@ -722,7 +722,9 @@ for stem in {stem_words}; do \
   else printf 'RESERVED\\t%s\\n' "$stem"; exit 0; fi; \
 done; \
 cd "$C" 2>/dev/null || exit 0; \
-for stem in {stem_words}; do f="$stem.pkl"; [ -f "$f" ] || continue; rm -f "$f" || exit $?; \
+for stem in {stem_words}; do \
+  if [ -d "$stem" ]; then rm -rf -- "$stem" || exit $?; printf 'CLEARED\\t%s/\\n' "$stem"; fi; \
+  f="$stem.pkl"; [ -f "$f" ] || continue; rm -f "$f" || exit $?; \
   printf 'CLEARED\\t%s\\n' "$f"; done"""
 
 

@@ -95,10 +95,14 @@ def clear_remote(materials, yes=False):
     # which stems actually exist on the box; the `|| true` keeps a missing last
     # stem's failed `[ -f ]` from becoming the loop's -- and hence ssh's -- exit
     # status, which would make _ssh_capture abort the whole clear
-    pkl_names = " ".join(f"{stem}.pkl" for stem in stems)
+    stem_names = " ".join(stems)
+    legacy_names = " ".join(f"{stem}.pkl" for stem in stems)
     listing = (
         f"cd {config.shell_remote_path('checkpoints')} 2>/dev/null || exit 0; "
-        f'for f in {pkl_names}; do [ -f "$f" ] && echo "$f" || true; done'
+        f": legacy-candidates {legacy_names}; "
+        f"for stem in {stem_names}; do "
+        '[ -f "$stem/line.pkl" ] && echo "$stem/" || true; '
+        '[ -f "$stem.pkl" ] && echo "$stem.pkl" || true; done'
     )
     existing = transport._ssh_capture(listing).split()
     if not existing:
@@ -681,138 +685,70 @@ def pull(
     transport._check_shell_tokens(stems)
     dest = config.LOCAL_ROOT / "checkpoints"
     dest.mkdir(exist_ok=True)
-    use_slim = grid or level9
+    use_slim = True  # component directories are projected to one transfer pickle
     if use_slim and not no_sync:
         transport.sync_code()  # box must rebuild the grid from the same config.py
     failed = []
     completed = []
     failure_errors = {}
     for stem in stems:
-        local = dest / f"{stem}.pkl"
+        local = dest / stem
         try:
-            if dataset is not None:
-                from .. import _checkpoint_io
-                from ..results import merge_dataset
-                from ..run import _checkpoint_save, _manifest_save
+            from .. import _checkpoint_io, _checkpoint_store
+            from ..results import merge_dataset
+            from ..run import _manifest_save
 
-                if not no_sync:
-                    transport.sync_code()  # box projects with the same key groups
-                remote_tmp = f"/tmp/{stem}.{dataset}.pkl"
-                ckpt = config.remote_path("checkpoints", f"{stem}.pkl")
-                try:
-                    transport._run(
-                        [
-                            "ssh",
-                            "-n",
-                            config.remote_host(),
-                            f"cd {config.shell_remote_dir()} && "
-                            f"{config.shell_remote_uv()} run --no-sync cxr slim "
-                            f"{config.shell_arg(ckpt)} --{dataset}-only "
-                            f"-o {config.shell_arg(remote_tmp)}",
-                        ]
-                    )
-                    incoming_local = dest / f".{stem}.{dataset}.incoming.pkl"
-                    transport._run(["scp", config.scp_remote_path(remote_tmp), str(incoming_local)])
-                finally:
-                    transport._run(
-                        [
-                            "ssh",
-                            "-n",
-                            config.remote_host(),
-                            f"rm -f {config.shell_arg(remote_tmp)}",
-                        ]
-                    )
-                if not local.exists():
-                    incoming_local.unlink(missing_ok=True)
-                    raise FileNotFoundError(f"no local checkpoints/{stem}.pkl to merge into")
-                archive.archive_checkpoint(stem, force=True)  # undoable via cxr restore
-                base = _checkpoint_io.load(str(local))
-                incoming = _checkpoint_io.load(str(incoming_local))
-                incoming_local.unlink(missing_ok=True)
+            flags = ""
+            if grid:
+                flags += " --grid"
+            if drop_wide_brem:
+                flags += " --drop-wide-brem"
+            if downcast:
+                flags += " --downcast"
+            if level9:
+                flags += " --compresslevel 9"
+            if dataset is not None:
+                flags += f" --{dataset}-only"
+            remote_tmp = f"/tmp/{stem}.{dataset or 'full'}.{uuid.uuid4().hex}.pkl"
+            ckpt = config.remote_path("checkpoints", stem)
+            incoming_local = dest / f".{stem}.incoming.pkl"
+            try:
+                transport._run(
+                    [
+                        "ssh",
+                        "-n",
+                        config.remote_host(),
+                        f"cd {config.shell_remote_dir()} && "
+                        f"{config.shell_remote_uv()} run --no-sync cxr slim "
+                        f"{config.shell_arg(ckpt)}{flags} "
+                        f"-o {config.shell_arg(remote_tmp)}",
+                    ]
+                )
+                transport._run(["scp", config.scp_remote_path(remote_tmp), str(incoming_local)])
+            finally:
+                transport._run(
+                    ["ssh", "-n", config.remote_host(), f"rm -f {config.shell_arg(remote_tmp)}"]
+                )
+
+            incoming = _checkpoint_io.load(str(incoming_local))
+            incoming_local.unlink(missing_ok=True)
+            if dataset is not None:
+                if not _checkpoint_store.checkpoint_exists(stem, dest):
+                    raise FileNotFoundError(f"no local checkpoints/{stem}/ to merge into")
+                archive.archive_checkpoint(stem, force=True)
+                base = _checkpoint_store.load(stem, dest)
                 n_merged, n_skipped = merge_dataset(base, incoming, dataset, force=force)
-                _checkpoint_save(str(local), base)
+                _checkpoint_store.save(stem, dest, base, components=(dataset,))
                 _manifest_save(str(local), base)
                 print(
-                    f"merged {dataset} ({n_merged} rec, skipped {n_skipped}) "
-                    f"-> checkpoints/{stem}.pkl"
+                    f"merged {dataset} ({n_merged} rec, skipped {n_skipped}) -> checkpoints/{stem}/"
                 )
-                completed.append(stem)
-                continue
-            if use_slim:
-                flags = ""
-                if grid:
-                    flags += " --grid"
-                if drop_wide_brem:
-                    flags += " --drop-wide-brem"
-                if downcast:
-                    flags += " --downcast"
-                if level9:
-                    flags += " --compresslevel 9"
-                remote_tmp = f"/tmp/{stem}.grid.pkl" if grid else f"/tmp/{stem}.slim.pkl"
-                ckpt = config.remote_path("checkpoints", f"{stem}.pkl")
-                try:
-                    transport._run(
-                        [
-                            "ssh",
-                            "-n",
-                            config.remote_host(),
-                            f"cd {config.shell_remote_dir()} && "
-                            f"{config.shell_remote_uv()} run --no-sync cxr slim "
-                            f"{config.shell_arg(ckpt)}{flags} "
-                            f"-o {config.shell_arg(remote_tmp)}",
-                        ]
-                    )
-                    if (
-                        digest := transport._remote_sha256(remote_tmp)
-                    ) and digest == transport._local_sha256(local):
-                        print(f"already current -> checkpoints/{stem}.pkl")
-                    else:
-                        transport._run(["scp", config.scp_remote_path(remote_tmp), str(local)])
-                        label = "+".join(
-                            filter(None, ["grid" if grid else "", "level9" if level9 else ""])
-                        )
-                        print(f"pulled ({label}) -> checkpoints/{stem}.pkl")
-                finally:
-                    transport._run(
-                        [
-                            "ssh",
-                            "-n",
-                            config.remote_host(),
-                            f"rm -f {config.shell_arg(remote_tmp)}",
-                        ]
-                    )
             else:
-                ckpt = config.remote_path("checkpoints", f"{stem}.pkl")
-                remote_tmp = config.remote_path(
-                    "checkpoints", f".{stem}.pull.{uuid.uuid4().hex}.pkl"
-                )
-                try:
-                    # Checkpoint writers publish with os.replace; a sibling hard link
-                    # freezes the exact inode that both the digest and scp will read.
-                    transport._run(
-                        [
-                            "ssh",
-                            "-n",
-                            config.remote_host(),
-                            f"ln {config.shell_arg(ckpt)} {config.shell_arg(remote_tmp)}",
-                        ]
-                    )
-                    if (
-                        digest := transport._remote_sha256(remote_tmp)
-                    ) and digest == transport._local_sha256(local):
-                        print(f"already current -> checkpoints/{stem}.pkl")
-                    else:
-                        transport._run(["scp", config.scp_remote_path(remote_tmp), str(local)])
-                        print(f"pulled -> checkpoints/{stem}.pkl")
-                finally:
-                    transport._run(
-                        [
-                            "ssh",
-                            "-n",
-                            config.remote_host(),
-                            f"rm -f {config.shell_arg(remote_tmp)}",
-                        ]
-                    )
+                _checkpoint_store.save(stem, dest, incoming)
+                _manifest_save(str(local), incoming)
+                label = "+".join(filter(None, ["grid" if grid else "", "level9" if level9 else ""]))
+                detail = f" ({label})" if label else ""
+                print(f"pulled{detail} -> checkpoints/{stem}/")
             completed.append(stem)
         except (Exception, SystemExit) as exc:
             failed.append(stem)

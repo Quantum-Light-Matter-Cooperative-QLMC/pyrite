@@ -198,7 +198,7 @@ def command(
 def _run_json(args):
     started = time.monotonic()
     material = args.material
-    checkpoint = os.path.join(args.checkpoint_dir, f"{material}_blazed.pkl")
+    checkpoint = os.path.join(args.checkpoint_dir, f"{material}_blazed")
     completed = []
     failed = []
     errors = {}
@@ -266,7 +266,7 @@ def run(args):
     # Explicit path so the blazed sweep NEVER shares (or clobbers/resumes) the
     # flat-face checkpoint -- see the "Checkpoint" section of the design doc.
     stem = f"{args.material}_blazed"
-    ckpt = os.path.join(args.checkpoint_dir, f"{stem}.pkl")
+    ckpt = os.path.join(args.checkpoint_dir, stem)
     results = {}
     max_seconds = None if args.max_minutes is None else args.max_minutes * 60.0
 

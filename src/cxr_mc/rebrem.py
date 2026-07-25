@@ -27,7 +27,7 @@ from pathlib import Path
 
 import click
 
-from . import _cli_completion, _cli_core, cli_json
+from . import _checkpoint_store, _cli_completion, _cli_core, cli_json
 
 
 def rebrem_checkpoints(
@@ -63,7 +63,10 @@ def rebrem_checkpoints(
     if materials:
         paths = [checkpoint_path_for(m, str(ckpt_dir)) for m in materials]
     else:
-        paths = sorted(str(p) for p in ckpt_dir.glob("*.pkl") if not p.name.endswith(".slim.pkl"))
+        paths = [
+            checkpoint_path_for(stem, str(ckpt_dir))
+            for stem in _checkpoint_store.discover(ckpt_dir)
+        ]
         if not paths:
             print(f"no checkpoints in {ckpt_dir}")
             return {}
@@ -73,7 +76,7 @@ def rebrem_checkpoints(
     incomplete = False
     out = {}
     for path in paths:
-        stem = Path(path).stem
+        stem = Path(path).stem if str(path).endswith(".pkl") else Path(path).name
         print(f"== {stem} ==")
         kw = {}
         if progress_file is not None:
@@ -151,11 +154,7 @@ def _cli_json(args):
     if args.material:
         requested = list(args.material)
     else:
-        requested = sorted(
-            path.stem
-            for path in Path(args.checkpoint_dir).glob("*.pkl")
-            if not path.name.endswith(".slim.pkl")
-        )
+        requested = _checkpoint_store.discover(args.checkpoint_dir)
     statuses = {}
     caught = None
     try:
@@ -191,7 +190,7 @@ def _cli_json(args):
         requested,
         completed,
         failed_materials=failed,
-        checkpoints=[Path(args.checkpoint_dir) / f"{material}.pkl" for material in requested],
+        checkpoints=[Path(args.checkpoint_dir) / material for material in requested],
         elapsed_seconds=time.monotonic() - started,
         resumable=resumable,
         material_errors=errors,
@@ -233,7 +232,7 @@ def _cli_json(args):
     default="checkpoints",
     show_default=True,
     metavar="DIR",
-    help="Directory containing checkpoint pickles to update.",
+    help="Root containing component checkpoint directories to update.",
 )
 @click.option("--progress-file", default=None, hidden=True)
 @click.option("--max-minutes", type=_cli_core.POSITIVE_FLOAT, default=None, hidden=True)

@@ -137,9 +137,9 @@ def test_checkpoint_targets_blazed_stem_not_flat_face(monkeypatch):
     )
     path = captured["checkpoint_path"]
     assert path is not None
-    assert path.endswith(f"{MATERIAL}_blazed.pkl")
-    assert not path.endswith(f"/{MATERIAL}.pkl")
-    assert path != f"checkpoints/{MATERIAL}.pkl"
+    assert path.endswith(f"{MATERIAL}_blazed")
+    assert not path.endswith(f"/{MATERIAL}")
+    assert path != f"checkpoints/{MATERIAL}"
 
 
 # 6. Name encodes spacing -------------------------------------------------------

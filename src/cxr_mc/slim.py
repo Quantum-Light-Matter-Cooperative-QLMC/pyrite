@@ -19,7 +19,7 @@ import os
 
 import click
 
-from . import _checkpoint_io, _cli_completion, _cli_core
+from . import _checkpoint_io, _checkpoint_store, _cli_completion, _cli_core
 from .results import slim_results
 
 
@@ -28,7 +28,7 @@ def _material_from_stem(in_path):
     stem (basename without ``.pkl``). ``--quick`` grids are defined inline in
     ``scan.py`` and are not reproducible from ``material_sweep(material)`` alone,
     so a ``_quick`` stem is rejected with a clear error."""
-    stem = os.path.splitext(os.path.basename(in_path))[0]
+    stem = os.path.splitext(os.path.basename(os.path.normpath(in_path)))[0]
     if stem.endswith("_quick"):
         raise SystemExit(
             f"quick grids aren't grid-filterable: {os.path.basename(in_path)} is a "
@@ -78,7 +78,19 @@ def slim_checkpoint(
     # validate the stem before loading: the load is the expensive step, and a bad
     # --grid stem should fail in milliseconds, not after a gigabyte unpickle
     material = _material_from_stem(in_path) if grid else None
-    results = _checkpoint_io.load(in_path)
+    if os.path.isdir(in_path):
+        path = os.path.normpath(in_path)
+        results = _checkpoint_store.load(os.path.basename(path), os.path.dirname(path))
+        input_paths = [
+            _checkpoint_store.component_path(
+                os.path.basename(path), component, os.path.dirname(path)
+            )
+            for component in _checkpoint_store.COMPONENTS
+        ]
+        before = sum(item.stat().st_size for item in input_paths if item.is_file())
+    else:
+        results = _checkpoint_io.load(in_path)
+        before = os.path.getsize(in_path)
     if dataset is not None:
         from .results import project_dataset
 
@@ -87,12 +99,15 @@ def slim_checkpoint(
         results, grid=material, drop_wide_brem=drop_wide_brem, downcast=downcast, **constraints
     )
     if out_path is None:
-        root, ext = os.path.splitext(in_path)
-        out_path = f"{root}.slim{ext or '.pkl'}"
+        if os.path.isdir(in_path):
+            out_path = f"{os.path.normpath(in_path)}.slim.pkl"
+        else:
+            root, ext = os.path.splitext(in_path)
+            out_path = f"{root}.slim{ext or '.pkl'}"
     tmp = out_path + ".tmp"
     _checkpoint_io.dump(slim, tmp, compresslevel=compresslevel)
     os.replace(tmp, out_path)  # atomic: never leave a half-written pickle
-    before, after = os.path.getsize(in_path), os.path.getsize(out_path)
+    after = os.path.getsize(out_path)
     n_in = sum(len(v) for v in results.values())
     n_out = sum(len(v) for v in slim.values())
     print(
@@ -120,13 +135,14 @@ def _cli(args):
 @click.command(
     "slim",
     help=(
-        "Shrink a checkpoint pickle for transfer.\n\n"
-        "Writes a new file; input checkpoint is never modified. --brem-only and "
+        "Shrink a checkpoint dataset for transfer.\n\n"
+        "Accepts a component checkpoint directory or legacy pickle and writes one "
+        "transfer pickle; input is never modified. --brem-only and "
         "--line-only are mutually exclusive."
     ),
 )
 @click.argument("checkpoint", shell_complete=_cli_completion.complete_checkpoint)
-@click.option("-o", "--out", default=None, help="Output path (default: <stem>.slim.pkl).")
+@click.option("-o", "--out", default=None, help="Transfer pickle path (default: <stem>.slim.pkl).")
 @click.option("--grid", is_flag=True, help="Keep only material's current-grid configs.")
 @click.option("--drop-wide-brem", is_flag=True, help="Drop full-range brem arrays.")
 @click.option("--downcast", is_flag=True, help="Store spectral arrays as float32.")

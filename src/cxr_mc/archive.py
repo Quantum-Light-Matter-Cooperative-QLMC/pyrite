@@ -30,7 +30,7 @@ from pathlib import Path
 
 import click
 
-from . import _checkpoint_io, _cli_completion, _cli_core, cli_json
+from . import _checkpoint_io, _checkpoint_store, _cli_completion, _cli_core, cli_json
 
 # Anchored to the repo root (src/cxr_mc/archive.py -> parents[2] = repo root), the
 # same dir run.load_checkpoint reads, so `cxr archive` works from any cwd. Computed
@@ -65,20 +65,51 @@ def _atomic_copy(src, dst):
     os.replace(tmp, dst)
 
 
+def _active_paths(stem, root):
+    directory = Path(root) / stem
+    if (directory / "line.pkl").is_file():
+        return directory, True
+    legacy = Path(root) / f"{stem}.pkl"
+    return legacy, False
+
+
+def _archive_paths(label, root):
+    directory = Path(_archive_dir(root)) / label
+    if (directory / "line.pkl").is_file():
+        return directory, True
+    legacy = Path(_archive_dir(root)) / f"{label}.pkl"
+    return legacy, False
+
+
+def _atomic_copytree(src, dst):
+    os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
+    tmp = f"{dst}.tmp"
+    if os.path.exists(tmp):
+        shutil.rmtree(tmp)
+    shutil.copytree(src, tmp)
+    if os.path.exists(dst):
+        shutil.rmtree(dst)
+    os.replace(tmp, dst)
+
+
 def archive_checkpoint(stem, label=None, *, force=False, root=DEFAULT_ROOT):
     """Copy the active slot ``<root>/<stem>.pkl`` to ``<root>/archive/<label>.pkl``.
     ``label`` defaults to ``<stem>-<YYYYMMDD>``. Refuses to overwrite an existing
     label without ``force``. Returns the archive path."""
-    src = os.path.join(root, f"{stem}.pkl")
-    if not os.path.isfile(src):
+    src, is_directory = _active_paths(stem, root)
+    if not src.exists():
         raise SystemExit(f"no such active checkpoint: {src}")
     label = label or _default_label(stem)
-    dst = os.path.join(_archive_dir(root), f"{label}.pkl")
+    dst = Path(_archive_dir(root)) / (label if is_directory else f"{label}.pkl")
     if os.path.exists(dst) and not force:
         raise SystemExit(f"archive already exists: {dst} (pass --force to overwrite)")
-    _atomic_copy(src, dst)
-    print(f"archived checkpoints/{stem}.pkl -> {ARCHIVE_SUBDIR}/{label}.pkl")
-    return dst
+    if is_directory:
+        _atomic_copytree(str(src), str(dst))
+    else:
+        _atomic_copy(str(src), str(dst))
+    suffix = "" if is_directory else ".pkl"
+    print(f"archived checkpoints/{stem}{suffix} -> {ARCHIVE_SUBDIR}/{label}{suffix}")
+    return str(dst)
 
 
 def restore_checkpoint(label, stem=None, *, force=False, root=DEFAULT_ROOT):
@@ -86,16 +117,20 @@ def restore_checkpoint(label, stem=None, *, force=False, root=DEFAULT_ROOT):
     ``<root>/<stem>.pkl``. ``stem`` defaults to the label with a trailing
     ``-<YYYYMMDD>`` stripped. Refuses to overwrite an existing active slot without
     ``force``. Returns the active-slot path."""
-    src = os.path.join(_archive_dir(root), f"{label}.pkl")
-    if not os.path.isfile(src):
+    src, is_directory = _archive_paths(label, root)
+    if not src.exists():
         raise SystemExit(f"no such archive: {src}")
     stem = stem or _stem_from_label(label)
-    dst = os.path.join(root, f"{stem}.pkl")
+    dst = Path(root) / (stem if is_directory else f"{stem}.pkl")
     if os.path.exists(dst) and not force:
         raise SystemExit(f"active checkpoint already exists: {dst} (pass --force to overwrite)")
-    _atomic_copy(src, dst)
-    print(f"restored {ARCHIVE_SUBDIR}/{label}.pkl -> checkpoints/{stem}.pkl")
-    return dst
+    if is_directory:
+        _atomic_copytree(str(src), str(dst))
+    else:
+        _atomic_copy(str(src), str(dst))
+    suffix = "" if is_directory else ".pkl"
+    print(f"restored {ARCHIVE_SUBDIR}/{label}{suffix} -> checkpoints/{stem}{suffix}")
+    return str(dst)
 
 
 def _record_count(path):
@@ -105,7 +140,12 @@ def _record_count(path):
     plain-pickle archives -- the shelf can hold either, since ``archive``/
     ``restore`` just copy whatever bytes the active slot already has."""
     try:
-        results = _checkpoint_io.load(path)
+        path = Path(path)
+        results = (
+            _checkpoint_store.load(path.name, path.parent)
+            if path.is_dir()
+            else _checkpoint_io.load(str(path))
+        )
         return sum(len(v) for v in results.values())
     except Exception:
         return None
@@ -118,13 +158,24 @@ def list_archives(root=DEFAULT_ROOT):
     if not os.path.isdir(adir):
         print("(no archives)")
         return []
-    labels = sorted(f[:-4] for f in os.listdir(adir) if f.endswith(".pkl"))
+    labels = sorted(
+        {
+            entry.name
+            for entry in Path(adir).iterdir()
+            if entry.is_dir() and (entry / "line.pkl").is_file()
+        }
+        | {entry.stem for entry in Path(adir).glob("*.pkl")}
+    )
     if not labels:
         print("(no archives)")
         return []
     for label in labels:
-        path = os.path.join(adir, f"{label}.pkl")
-        mb = os.path.getsize(path) / 1e6
+        path, is_directory = _archive_paths(label, root)
+        mb = (
+            sum(item.stat().st_size for item in path.glob("*.pkl")) / 1e6
+            if is_directory
+            else path.stat().st_size / 1e6
+        )
         n = _record_count(path)
         n_str = "?" if n is None else str(n)
         print(f"  {label:<32}  {mb:7.1f} MB  {n_str:>6} records")
@@ -185,15 +236,17 @@ def union_checkpoint(
     by default). Pass ``pre_archive=False`` to union same-day round-trips like
     this, or archive the live checkpoint under an explicit label first.
     """
-    live_path = os.path.join(root, f"{stem}.pkl")
-    if not os.path.isfile(live_path):
+    live_path, live_is_directory = _active_paths(stem, root)
+    if not live_path.exists():
         raise SystemExit(f"no such active checkpoint: {live_path}")
-    archive_path = os.path.join(_archive_dir(root), f"{label}.pkl")
-    if not os.path.isfile(archive_path):
+    archive_path, archive_is_directory = _archive_paths(label, root)
+    if not archive_path.exists():
         raise SystemExit(f"no such archive: {archive_path}")
 
     if pre_archive:
-        pre_archive_dst = os.path.join(_archive_dir(root), f"{_default_label(stem)}.pkl")
+        pre_archive_dst = Path(_archive_dir(root)) / (
+            _default_label(stem) if live_is_directory else f"{_default_label(stem)}.pkl"
+        )
         if os.path.abspath(pre_archive_dst) == os.path.abspath(archive_path):
             raise SystemExit(
                 f"refusing to union: the pre-union backup would write to "
@@ -203,8 +256,16 @@ def union_checkpoint(
                 f"checkpoint under a different label first"
             )
 
-    live = _checkpoint_io.load(live_path)
-    archived = _checkpoint_io.load(archive_path)
+    live = (
+        _checkpoint_store.load(live_path.name, live_path.parent)
+        if live_is_directory
+        else _checkpoint_io.load(str(live_path))
+    )
+    archived = (
+        _checkpoint_store.load(archive_path.name, archive_path.parent)
+        if archive_is_directory
+        else _checkpoint_io.load(str(archive_path))
+    )
     live_material = _material_of(live)
     archived_material = _material_of(archived)
     if (
@@ -221,12 +282,15 @@ def union_checkpoint(
         archive_checkpoint(stem, force=force, root=root)
 
     merged = _union_results(live, archived)
-    tmp = live_path + ".tmp"
-    _checkpoint_io.dump(merged, tmp)
-    os.replace(tmp, live_path)
+    if live_is_directory:
+        _checkpoint_store.save(stem, root, merged)
+    else:
+        tmp = f"{live_path}.tmp"
+        _checkpoint_io.dump(merged, tmp)
+        os.replace(tmp, live_path)
 
     if delete_archive:
-        os.remove(archive_path)
+        shutil.rmtree(archive_path) if archive_is_directory else os.remove(archive_path)
 
     n_before = sum(len(v) for v in live.values())
     n_after = sum(len(v) for v in merged.values())
@@ -234,7 +298,7 @@ def union_checkpoint(
         f"unioned {ARCHIVE_SUBDIR}/{label}.pkl into checkpoints/{stem}.pkl "
         f"({n_before} -> {n_after} records)"
     )
-    return live_path
+    return str(live_path)
 
 
 def _cli_archive(args):
@@ -247,7 +311,16 @@ def _cli_restore(args):
 
 def _cli_archives(args):
     if getattr(args, "json_output", False):
-        result = cli_json.archives(DEFAULT_ROOT, loader=_checkpoint_io.load)
+
+        def _loader(path):
+            path = Path(path)
+            return (
+                _checkpoint_store.load(path.name, path.parent)
+                if path.is_dir()
+                else _checkpoint_io.load(str(path))
+            )
+
+        result = cli_json.archives(DEFAULT_ROOT, loader=_loader)
         _cli_core.emit_json_result(result)
         return
     list_archives()

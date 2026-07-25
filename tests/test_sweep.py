@@ -714,7 +714,7 @@ def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
     )
     scan.run(args)
     assert seen["path"] is not None
-    assert seen["path"].endswith("mos2-on-sio2-si.pkl")
+    assert seen["path"].endswith("mos2-on-sio2-si")
 
 
 def test_run_material_applies_penetration_watchdog(monkeypatch, tmp_path):
@@ -1010,7 +1010,7 @@ def test_scan_all_runs_every_material_in_toml_manifest(monkeypatch, tmp_path):
         )
     )
 
-    assert seen == [str(tmp_path / "hopg_quick.pkl"), str(tmp_path / "hbn_quick.pkl")]
+    assert seen == [str(tmp_path / "hopg_quick"), str(tmp_path / "hbn_quick")]
 
 
 def test_scan_all_rejects_unknown_manifest_material_before_running(monkeypatch, tmp_path):
