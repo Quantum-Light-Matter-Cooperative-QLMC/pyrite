@@ -33,6 +33,10 @@ FROZEN_EXPORTS = frozenset(
         "_WIDE_BREM_FIELDS",
         "_grid_names",
         "slim_results",
+        "project_dataset",
+        "merge_dataset",
+        "LINE_RECORD_KEYS",
+        "BREM_RECORD_KEYS",
         "_peak",
         "best_azimuth",
         # metrics

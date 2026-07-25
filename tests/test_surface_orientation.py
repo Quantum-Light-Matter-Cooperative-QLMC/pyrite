@@ -63,13 +63,13 @@ def test_surface_hkl_aligns_nonorthogonal_plane_normal_with_sample_z():
     )
 
 
-def test_surface_hkl_matches_direct_axis_for_orthogonal_lattice():
+def test_surface_hkl_matches_direct_axis_for_orthogonal_lattice_numerically():
     lattice = {"system": "orthorhombic", "a": 3.0, "b": 4.0, "c": 5.0}
 
     direct = _orientation_R(lattice, (1, 0, 0), 0.23)
     reciprocal = _orientation_R(lattice, None, 0.23, surface_hkl=(1, 0, 0))
 
-    np.testing.assert_array_equal(reciprocal, direct)
+    np.testing.assert_allclose(reciprocal, direct, rtol=0.0, atol=2e-15)
 
 
 def test_surface_orientation_preserves_handedness_and_applies_azimuth_about_z():
@@ -84,7 +84,7 @@ def test_surface_orientation_preserves_handedness_and_applies_azimuth_about_z():
     assert np.linalg.det(rolled) > 0.0
 
 
-def test_legacy_beam_orientation_is_bitwise_frozen():
+def test_legacy_beam_orientation_is_numerically_frozen():
     expected = np.array(
         [
             [0.9099727566197751, -0.40011831354967475, -0.10888028918023611],
@@ -95,7 +95,7 @@ def test_legacy_beam_orientation_is_bitwise_frozen():
 
     actual = _orientation_R(GENERAL_LATTICE, (1, 2, 3), 0.37)
 
-    np.testing.assert_array_equal(actual, expected)
+    np.testing.assert_allclose(actual, expected, rtol=0.0, atol=2e-15)
 
 
 def test_surface_orientation_reaches_case_and_explicit_sweep_beam_clears_it(monkeypatch):

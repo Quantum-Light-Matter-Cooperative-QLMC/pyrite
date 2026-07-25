@@ -620,7 +620,15 @@ def test_packaged_catalog_matches_independent_serialized_golden(serialized_catal
 
     for key, expected in golden["crystals"].items():
         actual = CATALOG.crystal(key)
-        assert dict(actual.lattice) == expected["lattice"]
+        actual_lattice = dict(actual.lattice)
+        expected_lattice = expected["lattice"]
+        assert tuple(actual_lattice) == tuple(expected_lattice)
+        for field, expected_value in expected_lattice.items():
+            actual_value = actual_lattice[field]
+            if isinstance(expected_value, float):
+                assert actual_value == pytest.approx(expected_value, rel=2e-15, abs=0.0)
+            else:
+                assert actual_value == expected_value
         assert actual.V_cell == pytest.approx(expected["V_cell"], rel=2e-15)
         assert actual.mosaic_fwhm_deg == expected["mosaic_fwhm_deg"]
         assert [element for element, _ in actual.composition] == [

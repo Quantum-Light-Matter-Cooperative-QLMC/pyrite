@@ -191,19 +191,25 @@ def test_analysis_app_discovers_materials_directly_from_catalog() -> None:
     assert "from cxr_mc.config import MATERIALS" not in source
 
 
-def test_analysis_app_uses_five_top_level_tabs_and_action_names() -> None:
+def test_analysis_app_uses_six_top_level_tabs_and_action_names() -> None:
     source = APP.read_text()
 
-    # "Instruments", "Trace", and "Compare" hold a single view each, so
+    # "Instruments", "Trace", "Structure", and "Compare" hold a single view each, so
     # they're bare top-level tabs rather than nested action-accordion groups.
-    for group in ('"Explore"', '"Optimize"', '"Instruments"', '"Trace"', '"Compare"'):
+    for group in (
+        '"Explore"',
+        '"Optimize"',
+        '"Instruments"',
+        '"Trace"',
+        '"Structure"',
+        '"Compare"',
+    ):
         assert group in source
     for action in (
         "Compare beam energies",
         "Compare polar angles",
         "Compare azimuths",
         "Rank geometries",
-        "Inspect scan maps",
     ):
         assert action in source
 

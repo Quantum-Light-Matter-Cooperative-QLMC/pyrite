@@ -2312,6 +2312,7 @@ def _(
             ],
             justify="start",
             gap=1.5,
+            wrap=True,
         )
         return mo.vstack([_md, _controls, _fig])
 
