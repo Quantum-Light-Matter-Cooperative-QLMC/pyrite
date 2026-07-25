@@ -13,9 +13,14 @@ from pathlib import Path
 from ..materials import CATALOG
 from . import config, presentation
 
+_TRACE_ARG_LIMIT = 100
+
 
 def _run(cmd, **kw):
-    print("+", " ".join(cmd), flush=True)
+    parts = [
+        a if len(a) <= _TRACE_ARG_LIMIT else a[:_TRACE_ARG_LIMIT] + "...<truncated>" for a in cmd
+    ]
+    print("+", " ".join(parts), flush=True)
     subprocess.run(cmd, check=True, **kw)
 
 
