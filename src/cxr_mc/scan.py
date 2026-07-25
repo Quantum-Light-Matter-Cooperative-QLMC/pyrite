@@ -21,15 +21,16 @@ surfaces as a forkserver ConnectionResetError). Inside the guard the re-import i
 a harmless no-op.
 """
 
-import argparse
 import json
 import os
 import time
 import tomllib
 from pathlib import Path
 
+import click
 import numpy as np
 
+from . import _cli_core
 from .config import (
     default_settings,
     format_penetration_watchdog_summary,
@@ -81,53 +82,72 @@ def validate_materials(materials: list[str]) -> None:
         raise SystemExit(f"unknown material(s): {', '.join(unknown)}; valid: {valid}")
 
 
-def _build_parser(ap):
-    ap.add_argument("material", nargs="?", help="crystal key, e.g. mose2 / hopg / silicon / ptse2")
-    ap.add_argument(
-        "-a", "--all", action="store_true", help="run every material in mats_to_sim.toml"
-    )
-    ap.add_argument(
-        "--workers",
-        type=int,
-        default=None,
-        help="run_cases max_workers (default auto; 0 = serial, no transport pool)",
-    )
-    ap.add_argument(
-        "--quick",
-        action="store_true",
-        help="tiny grid (5 polar tilts x 2 azimuths x 2 energies) for a smoke test",
-    )
-    ap.add_argument(
-        "--n-families",
-        type=int,
-        default=None,
-        help="override the number of dominant reflection families "
-        "(crystallography.dominant_reflections; default is the material's Sweep default)",
-    )
-    ap.add_argument(
-        "--beam-uvw",
-        type=int,
-        nargs=3,
-        metavar=("H", "K", "L"),
-        default=None,
-        help="override the beam zone axis [uvw] (default: the catalog crystal's beam_uvw)",
-    )
-    ap.add_argument("--checkpoint-dir", default="checkpoints")
-    ap.add_argument(
-        "--max-minutes",
-        type=float,
-        default=None,
-        help="soft wall-clock budget; exit 75 if work remains (chained remote slices)",
-    )
-    ap.add_argument("--progress-file", type=Path, help=argparse.SUPPRESS)
-    ap.add_argument("--no-progress", action="store_true", help=argparse.SUPPRESS)
-    ap.set_defaults(func=run)
-    return ap
+def _beam_uvw(ctx, param, value):
+    if value is None:
+        return None
+    return _cli_core.BEAM_UVW.convert(value, param, ctx)
 
 
-def add_subparser(sub):
-    """Register the ``scan`` subcommand on an argparse subparsers object."""
-    return _build_parser(sub.add_parser("scan", help="run one material's MC sweep -> checkpoint"))
+@click.command("scan", help="Run one material's MC sweep and write its checkpoint.")
+@click.argument("material", required=False)
+@click.option("-a", "--all", "all_", is_flag=True, help="Run every material in mats_to_sim.toml.")
+@click.option(
+    "--workers",
+    type=_cli_core.NONNEGATIVE_INT,
+    default=None,
+    help="run_cases max_workers (default auto; 0 = serial, no transport pool).",
+)
+@click.option("--quick", is_flag=True, help="Use tiny smoke-test grid.")
+@click.option(
+    "--n-families",
+    type=_cli_core.POSITIVE_INT,
+    default=None,
+    help="Override dominant reflection-family count.",
+)
+@click.option(
+    "--beam-uvw",
+    type=int,
+    nargs=3,
+    callback=_beam_uvw,
+    default=None,
+    metavar="H K L",
+    help="Override beam zone axis [uvw].",
+)
+@click.option("--checkpoint-dir", default="checkpoints", show_default=True)
+@click.option(
+    "--max-minutes",
+    type=_cli_core.POSITIVE_FLOAT,
+    default=None,
+    help="Soft wall-clock budget; exit 75 if work remains.",
+)
+@click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
+@click.option("--no-progress", is_flag=True, hidden=True)
+def command(
+    material,
+    all_,
+    workers,
+    quick,
+    n_families,
+    beam_uvw,
+    checkpoint_dir,
+    max_minutes,
+    progress_file,
+    no_progress,
+):
+    """Click entry point for the staged root migration."""
+    return _cli_core.invoke_legacy(
+        run,
+        material=material,
+        all=all_,
+        workers=workers,
+        quick=quick,
+        n_families=n_families,
+        beam_uvw=beam_uvw,
+        checkpoint_dir=checkpoint_dir,
+        max_minutes=max_minutes,
+        progress_file=progress_file,
+        no_progress=no_progress,
+    )
 
 
 def run(args):
@@ -310,11 +330,8 @@ def _write_progress_record(
 
 
 def main(argv=None):
-    ap = _build_parser(
-        argparse.ArgumentParser(prog="scan.py", description="headless CXR scan runner")
-    )
-    run(ap.parse_args(argv))
+    return _cli_core.run(command, argv, prog_name="scan.py")
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

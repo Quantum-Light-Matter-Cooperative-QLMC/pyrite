@@ -20,9 +20,12 @@ crashed/OOM'd run just resumes on re-invocation; ``--redo-all`` forces a full
 recompute (e.g. same parameters, new physics).
 """
 
-import argparse
 import time
 from pathlib import Path
+
+import click
+
+from . import _cli_core
 
 
 def rebrem_checkpoints(
@@ -130,53 +133,36 @@ def _cli(args):
     )
 
 
-def add_subparser(sub):
-    """Register the ``rebrem`` subcommand on an argparse subparsers object."""
-    ap = sub.add_parser(
-        "rebrem",
-        help="recompute ONLY the brem background of existing checkpoints "
-        "(new Ne_brem / grid spacing); line spectra untouched",
+@click.command("rebrem", help="Recompute only brem backgrounds in existing checkpoints.")
+@click.argument("materials", nargs=-1)
+@click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
+@click.option("--ne-brem", type=_cli_core.POSITIVE_INT, default=None)
+@click.option("--step", type=_cli_core.POSITIVE_FLOAT, default=None)
+@click.option("--redo-all", is_flag=True, help="Recompute records already at target.")
+@click.option("--checkpoint-dir", default="checkpoints", show_default=True)
+@click.option("--progress-file", default=None, hidden=True)
+@click.option("--max-minutes", type=_cli_core.POSITIVE_FLOAT, default=None, hidden=True)
+@click.option("--save-every", type=_cli_core.POSITIVE_INT, default=100, show_default=True)
+def command(
+    materials,
+    all_,
+    ne_brem,
+    step,
+    redo_all,
+    checkpoint_dir,
+    progress_file,
+    max_minutes,
+    save_every,
+):
+    return _cli_core.invoke_legacy(
+        _cli,
+        material=list(materials),
+        all=all_,
+        ne_brem=ne_brem,
+        step=step,
+        redo_all=redo_all,
+        checkpoint_dir=checkpoint_dir,
+        progress_file=progress_file,
+        max_minutes=max_minutes,
+        save_every=save_every,
     )
-    ap.add_argument(
-        "material",
-        nargs="*",
-        help="material stems (checkpoints/<material>.pkl); or use -a/--all",
-    )
-    ap.add_argument(
-        "-a",
-        "--all",
-        action="store_true",
-        help="recompute every *.pkl in the checkpoint dir",
-    )
-    ap.add_argument(
-        "--ne-brem",
-        type=int,
-        default=None,
-        help="new brem electron count (noise ~ 1/sqrt(Ne_brem); sweep default 100)",
-    )
-    ap.add_argument(
-        "--step",
-        type=float,
-        default=None,
-        help="new uniform wide-brem grid spacing [eV] (sweep default 50); grid is "
-        "rebuilt from each record's low cutoff up to its beam energy",
-    )
-    ap.add_argument(
-        "--redo-all",
-        action="store_true",
-        help="recompute every record even if already at the target parameters "
-        "(default skips those, making interrupted runs resumable)",
-    )
-    ap.add_argument("--checkpoint-dir", default="checkpoints")
-    # remote-runner plumbing (cxr remote rebrem): atomic JSON progress record
-    # for the status/attach dashboard; requires exactly one material
-    ap.add_argument("--progress-file", default=None, help=argparse.SUPPRESS)
-    ap.add_argument("--max-minutes", type=float, default=None, help=argparse.SUPPRESS)
-    ap.add_argument(
-        "--save-every",
-        type=int,
-        default=100,
-        help="re-pickle the checkpoint every N repaired records (crash-safe)",
-    )
-    ap.set_defaults(func=_cli)
-    return ap

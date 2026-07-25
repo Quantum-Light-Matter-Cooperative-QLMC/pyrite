@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
+from types import SimpleNamespace
 
+import click
+
+from . import _cli_core
 from .materials import MaterialConfigError, load_material_catalog
 
 
-def _run(args: argparse.Namespace) -> None:
+def _run(args: SimpleNamespace) -> None:
     path = Path(args.manifest) if args.manifest is not None else None
     try:
         catalog = load_material_catalog(path)
@@ -23,19 +26,13 @@ def _run(args: argparse.Namespace) -> None:
     )
 
 
-def add_subparser(sub):
-    """Register the ``check-config`` subcommand."""
-    parser = sub.add_parser(
-        "check-config",
-        help="validate the bundled material catalog or an explicit full catalog TOML",
-    )
-    parser.add_argument(
-        "manifest",
-        nargs="?",
-        help="full material catalog TOML (default: reload the bundled catalog)",
-    )
-    parser.set_defaults(func=_run)
-    return parser
+@click.command(
+    "check-config",
+    help="Validate bundled material catalog or an explicit full catalog TOML.",
+)
+@click.argument("manifest", required=False, type=click.Path(path_type=Path))
+def command(manifest):
+    return _cli_core.invoke_legacy(_run, manifest=manifest)
 
 
-__all__ = ["add_subparser"]
+__all__ = ["command"]

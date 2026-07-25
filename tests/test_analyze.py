@@ -7,6 +7,7 @@ the CLI arg handling directly, without spawning marimo."""
 import sys
 
 import pytest
+from click.testing import CliRunner
 
 from cxr_mc import analyze
 from cxr_mc.materials import CATALOG
@@ -206,27 +207,24 @@ def test_default_material_empty_file_returns_none(tmp_path, monkeypatch):
 # --- CLI arg parsing / errors --------------------------------------------
 
 
-def _parse(argv):
-    import argparse
-
-    ap = argparse.ArgumentParser()
-    sub = ap.add_subparsers(dest="command", required=True)
-    analyze.add_subparser(sub)
-    return ap.parse_args(argv)
+def _invoke(argv=()):
+    return CliRunner().invoke(analyze.command, list(argv), catch_exceptions=False)
 
 
 def test_default_flag_without_material_errors(tmp_path, monkeypatch):
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
-    args = _parse(["analyze", "-d"])
-    with pytest.raises(SystemExit, match="no material given to persist"):
-        args.func(args)
+    result = _invoke(["-d"])
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "no material given to persist" in result.stderr
 
 
 def test_unknown_material_errors(tmp_path, monkeypatch):
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
-    args = _parse(["analyze", "not-a-real-material"])
-    with pytest.raises(SystemExit, match="unknown material"):
-        args.func(args)
+    result = _invoke(["not-a-real-material"])
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "unknown material" in result.stderr
 
 
 def test_default_flag_persists_and_launches(tmp_path, monkeypatch):
@@ -237,8 +235,9 @@ def test_default_flag_persists_and_launches(tmp_path, monkeypatch):
         "_launch",
         lambda material, **kw: launched.update(material=material, **kw),
     )
-    args = _parse(["analyze", "-d", "wse2"])
-    args.func(args)
+    result = _invoke(["-d", "wse2"])
+    assert result.exit_code == 0
+    assert result.stderr == ""
     assert analyze.get_default_material() == "wse2"
     assert launched == {"material": "wse2", "edit": False, "watch": False}
 
@@ -252,8 +251,9 @@ def test_no_args_uses_persisted_default(tmp_path, monkeypatch):
         "_launch",
         lambda material, **kw: launched.update(material=material, **kw),
     )
-    args = _parse(["analyze"])
-    args.func(args)
+    result = _invoke()
+    assert result.exit_code == 0
+    assert result.stderr == ""
     assert launched == {"material": "hbn", "edit": False, "watch": False}
 
 
@@ -266,8 +266,9 @@ def test_acp_flag_starts_analysis_with_bridge_lifecycle(tmp_path, monkeypatch):
         lambda material, **kw: launched.update(material=material, **kw),
     )
 
-    args = _parse(["analyze", "--acp"])
-    args.func(args)
+    result = _invoke(["--acp"])
+    assert result.exit_code == 0
+    assert result.stderr == ""
 
     assert launched == {"material": "hopg", "edit": False, "watch": False, "acp": True}
 
@@ -275,8 +276,9 @@ def test_acp_flag_starts_analysis_with_bridge_lifecycle(tmp_path, monkeypatch):
 def test_material_arg_is_transient_does_not_persist(tmp_path, monkeypatch):
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
     monkeypatch.setattr(analyze, "_launch", lambda material, **kw: None)
-    args = _parse(["analyze", "wse2"])
-    args.func(args)
+    result = _invoke(["wse2"])
+    assert result.exit_code == 0
+    assert result.stderr == ""
     assert analyze.get_default_material() is None  # not persisted, no -d
 
 
@@ -293,8 +295,10 @@ def test_command_run_default():
 
 
 def test_headless_flag_is_not_supported():
-    with pytest.raises(SystemExit):
-        _parse(["analyze", "--headless"])
+    result = _invoke(["--headless"])
+    assert result.exit_code == 2
+    assert result.stdout == ""
+    assert "No such option '--headless'" in result.stderr
 
 
 def test_smoke_command_executes_analysis_app_to_a_temporary_html_file(tmp_path):
@@ -339,8 +343,9 @@ def test_tunnel_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
     monkeypatch.setattr(
         analyze, "_launch", lambda material, **kw: launched.update(material=material, **kw)
     )
-    args = _parse(["analyze", "--tunnel"])
-    args.func(args)
+    result = _invoke(["--tunnel"])
+    assert result.exit_code == 0
+    assert result.stderr == ""
     assert launched == {"material": "hopg", "edit": False, "watch": False, "tunnel": True}
 
 
@@ -367,8 +372,9 @@ def test_no_token_flag_forwards_to_analysis_launch(monkeypatch, tmp_path):
     monkeypatch.setattr(
         analyze, "_launch", lambda material, **kw: launched.update(material=material, **kw)
     )
-    args = _parse(["analyze", "--no-token"])
-    args.func(args)
+    result = _invoke(["--no-token"])
+    assert result.exit_code == 0
+    assert result.stderr == ""
     assert launched == {
         "material": "hopg",
         "edit": False,

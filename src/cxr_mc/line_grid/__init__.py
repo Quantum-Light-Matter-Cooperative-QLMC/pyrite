@@ -9,11 +9,19 @@ modules. Heavy modules (``derive``, ``golden``) import lazily inside handlers so
 
 from __future__ import annotations
 
-import argparse
 import math
 from datetime import date
 
+import click
+
 from cxr_mc import remote
+from cxr_mc._cli_core import (
+    POSITIVE_FLOAT,
+    POSITIVE_INT,
+    CLIError,
+    emit_result,
+    invoke_legacy,
+)
 from cxr_mc.line_grid import apply, defaults, job
 
 
@@ -21,118 +29,66 @@ def _floats(s):
     return [float(x) for x in s.split(",")] if s else None
 
 
-def _positive_float(value):
-    parsed = float(value)
-    if not math.isfinite(parsed) or parsed <= 0:
-        raise argparse.ArgumentTypeError("must be a finite positive number")
-    return parsed
+class _CSV(click.ParamType):
+    """Comma-separated finite floats with an optional numeric domain."""
 
+    name = "numbers"
 
-def _positive_int(value):
-    parsed = int(value)
-    if parsed <= 0:
-        raise argparse.ArgumentTypeError("must be a positive integer")
-    return parsed
+    def __init__(
+        self,
+        label,
+        *,
+        lower=None,
+        lower_open=False,
+        upper=None,
+        upper_inclusive=True,
+        preserve_text=False,
+    ):
+        self.label = label
+        self.lower = lower
+        self.lower_open = lower_open
+        self.upper = upper
+        self.upper_inclusive = upper_inclusive
+        self.preserve_text = preserve_text
 
-
-def _domain_csv(name, lower, upper, *, upper_inclusive):
-    def parse(value):
+    def convert(self, value, param, ctx):
         try:
             values = _floats(value)
-        except ValueError as exc:
-            raise argparse.ArgumentTypeError(f"{name} must be comma-separated numbers") from exc
-        if values is None:
-            return []
+        except (TypeError, ValueError):
+            self.fail(f"{self.label} must be comma-separated numbers", param, ctx)
+        if not values:
+            self.fail(f"{self.label} requires at least one value", param, ctx)
         for item in values:
-            upper_ok = item <= upper if upper_inclusive else item < upper
-            if not math.isfinite(item) or item < lower or not upper_ok:
-                relation = "<=" if upper_inclusive else "<"
-                raise argparse.ArgumentTypeError(
-                    f"{name} values must satisfy {lower:g} <= value {relation} {upper:g}"
-                )
-        return values
+            if not math.isfinite(item):
+                self.fail(f"{self.label} values must be finite", param, ctx)
+            if self.lower is not None:
+                lower_ok = item > self.lower if self.lower_open else item >= self.lower
+                if not lower_ok:
+                    self._fail_domain(param, ctx)
+            if self.upper is not None:
+                upper_ok = item <= self.upper if self.upper_inclusive else item < self.upper
+                if not upper_ok:
+                    self._fail_domain(param, ctx)
+        return value if self.preserve_text else values
 
-    return parse
-
-
-def _positive_csv(name):
-    def parse(value):
-        try:
-            values = _floats(value)
-        except ValueError as exc:
-            raise argparse.ArgumentTypeError(f"{name} must be comma-separated numbers") from exc
-        if values is None:
-            raise argparse.ArgumentTypeError(f"{name} requires at least one value")
-        if any(not math.isfinite(item) or item <= 0 for item in values):
-            raise argparse.ArgumentTypeError(f"{name} values must be finite and positive")
-        return values
-
-    return parse
+    def _fail_domain(self, param, ctx):
+        if self.lower == 0 and self.lower_open and self.upper is None:
+            self.fail(f"{self.label} values must be finite and positive", param, ctx)
+        relation = "<=" if self.upper_inclusive else "<"
+        self.fail(
+            f"{self.label} values must satisfy {self.lower:g} <= value {relation} {self.upper:g}",
+            param,
+            ctx,
+        )
 
 
-# --- local derive / remote submit ------------------------------------------
-
-
-def _derive_argv(args):
-    argv = []
-    for flag in ("materials", "energies", "tilts", "azimuths", "thickness"):
-        val = getattr(args, flag)
-        if val:
-            argv += [f"--{flag}", val]
-    if getattr(args, "brem_step", None) is not None:
-        argv += ["--brem-step", str(args.brem_step)]
-    if args.set_default:
-        argv.append("--set-default")
-    return argv
-
-
-def _cli_derive(args):
-    from cxr_mc.line_grid import derive
-
-    return derive.main(_derive_argv(args))
-
-
-def _cli_submit(args):
-    job.start(
-        materials=args.materials or job.DEFAULT_MATERIALS,
-        energies=args.energies or job.DEFAULT_ENERGIES,
-        tilts=args.tilts,
-        azimuths=args.azimuths,
-        thickness=args.thickness,
-        set_default=args.set_default,
-        slice_minutes=args.slice_minutes,
-        no_sync=args.no_sync,
-        dry_run=args.dry_run,
-    )
-    return 0
-
-
-# --- job management (delegated to remote for parity) -----------------------
-
-
-def _cli_status(args):
-    remote.job_status(args.jobid, detail=args.verbose)
-    return 0
-
-
-def _cli_attach(args):
-    remote.attach(args.jobid)
-    return 0
-
-
-def _cli_logs(args):
-    return remote.tail_logs(args.jobid, args.follow)
-
-
-def _cli_stop(args):
-    jobid = args.jobid or remote._latest_jobid()
-    if not jobid:
-        raise SystemExit("no jobs to stop")
-    remote._stop_jobid(jobid)
-    return 0
-
-
-# --- apply / set / defaults / show / regen ---------------------------------
+_ENERGY_CSV_TEXT = _CSV("energy", lower=0, lower_open=True, preserve_text=True)
+_THICKNESS_CSV_TEXT = _CSV("thickness", lower=0, lower_open=True, preserve_text=True)
+_TILT_CSV_TEXT = _CSV("tilt", lower=0, upper=90, upper_inclusive=False, preserve_text=True)
+_AZIMUTH_CSV_TEXT = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True, preserve_text=True)
+_TILT_CSV = _CSV("tilt", lower=0, upper=90, upper_inclusive=False)
+_AZIMUTH_CSV = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True)
+_THICKNESS_CSV = _CSV("thickness", lower=0, lower_open=True)
 
 
 def _pull_combined(json_name=None):
@@ -145,160 +101,248 @@ def _pull_combined(json_name=None):
     return local
 
 
-def _cli_apply(args):
-    path = _pull_combined() if args.pull else args.json
-    if not path:
-        raise SystemExit("no JSON: pass a path or --pull")
-    apply.apply_file(
-        path,
-        materials=args.materials,
-        force=args.force,
-        dry_run=args.dry_run,
-        date=str(date.today()),
-        regen_golden=args.regen_golden,
+# --- Click wiring -----------------------------------------------------------
+
+
+def _raise_for_status(status):
+    """Preserve nonzero legacy statuses under Click's standalone runner."""
+    if isinstance(status, int) and not isinstance(status, bool) and status:
+        raise click.exceptions.Exit(status)
+    return status
+
+
+def _invoke_callback(function, /, *args, **kwargs):
+    """Route legacy exits through shared stderr/status compatibility."""
+    status = invoke_legacy(lambda _namespace: function(*args, **kwargs))
+    return _raise_for_status(status)
+
+
+def _expected_failure(exc):
+    message = exc.args[0] if isinstance(exc, KeyError) and exc.args else str(exc)
+    raise CLIError(str(message)) from None
+
+
+def _derive_options(function):
+    function = click.option("--set-default", is_flag=True)(function)
+    function = click.option("--thickness", type=_THICKNESS_CSV_TEXT)(function)
+    function = click.option("--azimuths", type=_AZIMUTH_CSV_TEXT)(function)
+    function = click.option("--tilts", type=_TILT_CSV_TEXT)(function)
+    function = click.option("--energies", type=_ENERGY_CSV_TEXT)(function)
+    return click.option("--materials")(function)
+
+
+@click.group(name="line-grid")
+def command():
+    """Derive and manage per-material line-grid bounds."""
+
+
+@command.command("derive")
+@_derive_options
+@click.option("--brem-step", type=POSITIVE_FLOAT)
+def derive_command(
+    materials,
+    energies,
+    tilts,
+    azimuths,
+    thickness,
+    set_default,
+    brem_step,
+):
+    """Derive line-grid bounds locally."""
+    from cxr_mc.line_grid import derive
+
+    argv = []
+    for flag, value in (
+        ("materials", materials),
+        ("energies", energies),
+        ("tilts", tilts),
+        ("azimuths", azimuths),
+        ("thickness", thickness),
+    ):
+        if value:
+            argv.extend((f"--{flag}", value))
+    if brem_step is not None:
+        argv.extend(("--brem-step", str(brem_step)))
+    if set_default:
+        argv.append("--set-default")
+    return _invoke_callback(derive.main, argv)
+
+
+@command.command("submit")
+@_derive_options
+@click.option("--slice-minutes", type=POSITIVE_FLOAT, default=job.DEFAULT_SLICE_MINUTES)
+@click.option("--no-sync", is_flag=True)
+@click.option("--dry-run", is_flag=True)
+def submit_command(
+    materials,
+    energies,
+    tilts,
+    azimuths,
+    thickness,
+    set_default,
+    slice_minutes,
+    no_sync,
+    dry_run,
+):
+    """Submit sliced line-grid derivation remotely."""
+    return _invoke_callback(
+        job.start,
+        materials=materials or job.DEFAULT_MATERIALS,
+        energies=energies or job.DEFAULT_ENERGIES,
+        tilts=tilts,
+        azimuths=azimuths,
+        thickness=thickness,
+        set_default=set_default,
+        slice_minutes=slice_minutes,
+        no_sync=no_sync,
+        dry_run=dry_run,
     )
-    if args.regen_golden and not args.dry_run:
+
+
+@command.command("status")
+@click.argument("jobid", required=False)
+@click.option("-v", "--verbose", count=True)
+def status_command(jobid, verbose):
+    """Show line-grid job status."""
+    remote.job_status(jobid, detail=verbose)
+    return 0
+
+
+@command.command("attach")
+@click.argument("jobid", required=False)
+def attach_command(jobid):
+    """Attach to line-grid job progress."""
+    remote.attach(jobid)
+    return 0
+
+
+@command.command("logs")
+@click.argument("jobid", required=False)
+@click.option("-f", "--follow", is_flag=True)
+def logs_command(jobid, follow):
+    """Print or follow line-grid job logs."""
+    return _invoke_callback(remote.tail_logs, jobid, follow)
+
+
+@command.command("stop")
+@click.argument("jobid", required=False)
+def stop_command(jobid):
+    """Stop one line-grid job."""
+    resolved_jobid = jobid or remote._latest_jobid()
+    if not resolved_jobid:
+        raise CLIError("no jobs to stop")
+    remote._stop_jobid(resolved_jobid)
+    return 0
+
+
+@command.command("apply")
+@click.argument("json_path", required=False, metavar="JSON")
+@click.option("--materials")
+@click.option("--pull", is_flag=True)
+@click.option("--force", is_flag=True)
+@click.option("--regen-golden", is_flag=True)
+@click.option("--dry-run", is_flag=True)
+def apply_command(json_path, materials, pull, force, regen_golden, dry_run):
+    """Apply derived bounds to material catalog."""
+    path = _pull_combined() if pull else json_path
+    if not path:
+        raise click.UsageError("no JSON: pass a path or --pull")
+    try:
+        apply.apply_file(
+            path,
+            materials=materials,
+            force=force,
+            dry_run=dry_run,
+            date=str(date.today()),
+            regen_golden=regen_golden,
+        )
+    except (KeyError, ValueError, OSError) as exc:
+        _expected_failure(exc)
+    if regen_golden and not dry_run:
         from cxr_mc.line_grid import golden
 
         golden.regen()
     return 0
 
 
-def _cli_set(args):
-    apply.set_line_grid(
-        args.material, args.energy, args.stop, num=args.num, start_eV=args.start, note=args.note
-    )
+@command.command("set")
+@click.argument("material")
+@click.option("--energy", type=POSITIVE_FLOAT, required=True)
+@click.option("--stop", type=POSITIVE_FLOAT, required=True)
+@click.option("--num", type=POSITIVE_INT)
+@click.option("--start", type=POSITIVE_FLOAT)
+@click.option("--note")
+def set_command(material, energy, stop, num, start, note):
+    """Set one material line-grid row."""
+    try:
+        apply.set_line_grid(material, energy, stop, num=num, start_eV=start, note=note)
+    except (KeyError, ValueError, OSError) as exc:
+        _expected_failure(exc)
     return 0
 
 
-def _cli_set_brem(args):
-    apply.set_brem_grid(args.material, args.stop, step_eV=args.step, note=args.note)
+@command.command("set-brem")
+@click.argument("material")
+@click.option("--stop", type=POSITIVE_FLOAT, required=True)
+@click.option("--step", type=POSITIVE_FLOAT)
+@click.option("--note")
+def set_brem_command(material, stop, step, note):
+    """Set one material bremsstrahlung grid."""
+    try:
+        apply.set_brem_grid(material, stop, step_eV=step, note=note)
+    except (KeyError, ValueError, OSError) as exc:
+        _expected_failure(exc)
     return 0
 
 
-def _cli_defaults(args):
+@command.command("defaults")
+@click.option("--set", "set_values", is_flag=True)
+@click.option("--tilts", type=_TILT_CSV)
+@click.option("--azimuths", type=_AZIMUTH_CSV)
+@click.option("--thickness", type=_THICKNESS_CSV)
+@click.option("--brem-step", type=POSITIVE_FLOAT)
+def defaults_command(set_values, tilts, azimuths, thickness, brem_step):
+    """Show or update persistent derivation defaults."""
     supplied = [
         flag
         for flag, value in (
-            ("--tilts", args.tilts),
-            ("--azimuths", args.azimuths),
-            ("--thickness", args.thickness),
-            ("--brem-step", args.brem_step),
+            ("--tilts", tilts),
+            ("--azimuths", azimuths),
+            ("--thickness", thickness),
+            ("--brem-step", brem_step),
         )
         if value is not None
     ]
-    if supplied and not args.set:
-        args.parser.error(f"{', '.join(supplied)} require --set")
-    if args.set:
+    if supplied and not set_values:
+        raise click.UsageError(f"{', '.join(supplied)} require --set")
+    if set_values:
         defaults.update_defaults(
-            tilts=args.tilts,
-            azimuths=args.azimuths,
-            thickness_ang=args.thickness,
-            brem_step_ev=args.brem_step,
+            tilts=tilts,
+            azimuths=azimuths,
+            thickness_ang=thickness,
+            brem_step_ev=brem_step,
         )
-    for key, val in defaults.load_defaults().items():
-        print(f"{key} = {val}")
+    for key, value in defaults.load_defaults().items():
+        emit_result(f"{key} = {value}")
     return 0
 
 
-def _cli_show(args):
+@command.command("show")
+@click.argument("material", required=False)
+def show_command(material):
+    """Show configured line grids."""
     try:
-        result = apply.show(args.material)
+        result = apply.show(material)
     except ValueError as exc:
-        raise SystemExit(str(exc)) from None
-    print(result)
+        raise CLIError(str(exc)) from None
+    emit_result(result)
     return 0
 
 
-def _cli_regen_golden(args):
+@command.command("regen-golden")
+@click.option("--check", is_flag=True)
+def regen_golden_command(check):
+    """Regenerate or check material-catalog golden snapshot."""
     from cxr_mc.line_grid import golden
 
-    return golden.regen(check=args.check)
-
-
-# --- parser wiring ----------------------------------------------------------
-
-
-def add_subparser(sub):
-    ap = sub.add_parser(
-        "line-grid", help="derive/apply per-material line-grid bounds (local or on qlmc)"
-    )
-    g = ap.add_subparsers(dest="lg_command", required=True)
-
-    for name in ("derive", "submit"):
-        p = g.add_parser(name)
-        p.add_argument("--materials", default=None)
-        p.add_argument("--energies", default=None)
-        p.add_argument("--tilts", default=None)
-        p.add_argument("--azimuths", default=None)
-        p.add_argument("--thickness", default=None)
-        p.add_argument("--set-default", action="store_true")
-        if name == "submit":
-            p.add_argument("--slice-minutes", type=float, default=job.DEFAULT_SLICE_MINUTES)
-            p.add_argument("--no-sync", action="store_true")
-            p.add_argument("--dry-run", action="store_true")
-            p.set_defaults(func=_cli_submit)
-        else:
-            p.add_argument("--brem-step", type=_positive_float, default=None)
-            p.set_defaults(func=_cli_derive)
-
-    st = g.add_parser("status")
-    st.add_argument("jobid", nargs="?", default=None)
-    st.add_argument("-v", "--verbose", action="count", default=0)
-    st.set_defaults(func=_cli_status)
-
-    at = g.add_parser("attach")
-    at.add_argument("jobid", nargs="?", default=None)
-    at.set_defaults(func=_cli_attach)
-
-    lg = g.add_parser("logs")
-    lg.add_argument("jobid", nargs="?", default=None)
-    lg.add_argument("-f", "--follow", action="store_true")
-    lg.set_defaults(func=_cli_logs)
-
-    sp = g.add_parser("stop")
-    sp.add_argument("jobid", nargs="?", default=None)
-    sp.set_defaults(func=_cli_stop)
-
-    ap_apply = g.add_parser("apply")
-    ap_apply.add_argument("json", nargs="?", default=None)
-    ap_apply.add_argument("--materials", default=None)
-    ap_apply.add_argument("--pull", action="store_true")
-    ap_apply.add_argument("--force", action="store_true")
-    ap_apply.add_argument("--regen-golden", action="store_true")
-    ap_apply.add_argument("--dry-run", action="store_true")
-    ap_apply.set_defaults(func=_cli_apply)
-
-    se = g.add_parser("set")
-    se.add_argument("material")
-    se.add_argument("--energy", type=_positive_float, required=True)
-    se.add_argument("--stop", type=_positive_float, required=True)
-    se.add_argument("--num", type=_positive_int, default=None)
-    se.add_argument("--start", type=_positive_float, default=None)
-    se.add_argument("--note", default=None)
-    se.set_defaults(func=_cli_set)
-
-    sb = g.add_parser("set-brem")
-    sb.add_argument("material")
-    sb.add_argument("--stop", type=_positive_float, required=True)
-    sb.add_argument("--step", type=_positive_float, default=None)
-    sb.add_argument("--note", default=None)
-    sb.set_defaults(func=_cli_set_brem)
-
-    df = g.add_parser("defaults")
-    df.add_argument("--set", action="store_true")
-    df.add_argument("--tilts", type=_domain_csv("tilt", 0, 90, upper_inclusive=False))
-    df.add_argument("--azimuths", type=_domain_csv("azimuth", 0, 360, upper_inclusive=True))
-    df.add_argument("--thickness", type=_positive_csv("thickness"))
-    df.add_argument("--brem-step", type=_positive_float, default=None)
-    df.set_defaults(func=_cli_defaults, parser=df)
-
-    sh = g.add_parser("show")
-    sh.add_argument("material", nargs="?", default=None)
-    sh.set_defaults(func=_cli_show)
-
-    rg = g.add_parser("regen-golden")
-    rg.add_argument("--check", action="store_true")
-    rg.set_defaults(func=_cli_regen_golden)
-
-    return ap
+    return _invoke_callback(golden.regen, check=check)

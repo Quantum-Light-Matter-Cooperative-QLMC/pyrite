@@ -22,14 +22,15 @@ not in ``cxr_mc.remote``. The shelf stores whatever the active slot holds at the
 time, typically the grid-filtered view.
 """
 
-import argparse
 import datetime
 import os
 import re
 import shutil
 from pathlib import Path
 
-from . import _checkpoint_io
+import click
+
+from . import _checkpoint_io, _cli_core
 
 # Anchored to the repo root (src/cxr_mc/archive.py -> parents[2] = repo root), the
 # same dir run.load_checkpoint reads, so `cxr archive` works from any cwd. Computed
@@ -258,49 +259,64 @@ def _cli_union(args):
     )
 
 
-def add_subparser(sub):
-    """Register the ``archive`` / ``restore`` / ``archives`` / ``union`` subcommands
-    on an argparse subparsers object."""
-    ap = sub.add_parser("archive", help="copy an active checkpoint to the long-term shelf")
-    ap.add_argument("stem", help="active checkpoint stem, e.g. hopg")
-    ap.add_argument("label", nargs="?", default=None, help="archive label (default: <stem>-<date>)")
-    ap.add_argument("--force", action="store_true", help="overwrite an existing archive label")
-    ap.set_defaults(func=_cli_archive)
+@click.command("archive", help="Copy an active checkpoint to long-term shelf.")
+@click.argument("stem")
+@click.argument("label", required=False)
+@click.option("--force", is_flag=True, help="Overwrite existing archive label.")
+def archive_command(stem, label, force):
+    return _cli_core.invoke_legacy(_cli_archive, stem=stem, label=label, force=force)
 
-    rp = sub.add_parser("restore", help="copy an archived checkpoint back to the active slot")
-    rp.add_argument("label", help="archive label to restore")
-    rp.add_argument("--as", dest="stem", default=None, help="active stem (default: inferred)")
-    rp.add_argument("--force", action="store_true", help="overwrite an existing active checkpoint")
-    rp.set_defaults(func=_cli_restore)
 
-    lp = sub.add_parser("archives", help="list the long-term shelf")
-    lp.set_defaults(func=_cli_archives)
+@click.command("restore", help="Copy an archived checkpoint back to active slot.")
+@click.argument("label")
+@click.option("--as", "stem", default=None, help="Active stem (default: inferred).")
+@click.option("--force", is_flag=True, help="Overwrite existing active checkpoint.")
+def restore_command(label, stem, force):
+    return _cli_core.invoke_legacy(_cli_restore, label=label, stem=stem, force=force)
 
-    up = sub.add_parser("union", help="merge an archived checkpoint into the active slot")
-    up.add_argument("stem", help="active checkpoint stem, e.g. hopg")
-    up.add_argument("label", help="archive label to union in")
-    up.add_argument(
-        "--no-archive",
-        action="store_true",
-        help="skip archiving the live checkpoint before mutating it (default: archive first)",
+
+@click.command("archives", help="List long-term checkpoint shelf.")
+def archives_command():
+    return _cli_core.invoke_legacy(_cli_archives)
+
+
+@click.command("union", help="Merge an archived checkpoint into active slot.")
+@click.argument("stem")
+@click.argument("label")
+@click.option(
+    "--no-archive",
+    is_flag=True,
+    help="Skip pre-union backup of live checkpoint.",
+)
+@click.option(
+    "--delete-archive",
+    is_flag=True,
+    help="Delete source archive after successful union.",
+)
+@click.option("--force", is_flag=True, help="Overwrite existing pre-union archive label.")
+def union_command(stem, label, no_archive, delete_archive, force):
+    return _cli_core.invoke_legacy(
+        _cli_union,
+        stem=stem,
+        label=label,
+        no_archive=no_archive,
+        delete_archive=delete_archive,
+        force=force,
     )
-    up.add_argument(
-        "--delete-archive",
-        action="store_true",
-        help="delete the source archive after a successful union (default: leave it intact)",
-    )
-    up.add_argument(
-        "--force", action="store_true", help="overwrite an existing pre-union archive label"
-    )
-    up.set_defaults(func=_cli_union)
+
+
+@click.group("cxr-archive")
+def standalone_command():
+    """Manage local checkpoint archive shelf."""
+
+
+for _command in (archive_command, restore_command, archives_command, union_command):
+    standalone_command.add_command(_command)
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="cxr-archive", description="local checkpoint archive shelf")
-    add_subparser(ap.add_subparsers(dest="command", required=True))
-    args = ap.parse_args(argv)
-    return args.func(args)
+    return _cli_core.run(standalone_command, argv, prog_name="cxr-archive")
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

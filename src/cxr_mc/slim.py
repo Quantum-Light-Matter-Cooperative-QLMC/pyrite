@@ -15,10 +15,11 @@ Value-based config filtering (keep only some tilts/energies) is available
 programmatically via ``results.slim_results(..., tilt_deg=..., E0_keV=...)``.
 """
 
-import argparse
 import os
 
-from . import _checkpoint_io
+import click
+
+from . import _checkpoint_io, _cli_core
 from .results import slim_results
 
 
@@ -116,60 +117,49 @@ def _cli(args):
     )
 
 
-def add_subparser(sub):
-    """Register the ``slim`` subcommand on an argparse subparsers object."""
-    ap = sub.add_parser("slim", help="shrink a checkpoint pickle for transfer")
-    ap.add_argument("checkpoint", help="path to checkpoints/<material>.pkl")
-    ap.add_argument("-o", "--out", default=None, help="output path (default: <stem>.slim.pkl)")
-    ap.add_argument(
-        "--grid",
-        action="store_true",
-        help="keep only the material's CURRENT-grid configs (material inferred from "
-        "the checkpoint stem); drops configs left over from earlier grids",
+@click.command("slim", help="Shrink a checkpoint pickle for transfer.")
+@click.argument("checkpoint")
+@click.option("-o", "--out", default=None, help="Output path (default: <stem>.slim.pkl).")
+@click.option("--grid", is_flag=True, help="Keep only current-grid configs.")
+@click.option("--drop-wide-brem", is_flag=True, help="Drop full-range brem arrays.")
+@click.option("--downcast", is_flag=True, help="Store spectral arrays as float32.")
+@click.option(
+    "--compresslevel",
+    type=click.IntRange(1, 9),
+    default=6,
+    show_default=True,
+    metavar="1-9",
+)
+@click.option("--brem-only", is_flag=True, help="Keep only brem arrays.")
+@click.option("--line-only", is_flag=True, help="Keep only line arrays.")
+def command(
+    checkpoint,
+    out,
+    grid,
+    drop_wide_brem,
+    downcast,
+    compresslevel,
+    brem_only,
+    line_only,
+):
+    if brem_only and line_only:
+        raise click.UsageError("--brem-only and --line-only are mutually exclusive")
+    return _cli_core.invoke_legacy(
+        _cli,
+        checkpoint=checkpoint,
+        out=out,
+        grid=grid,
+        drop_wide_brem=drop_wide_brem,
+        downcast=downcast,
+        compresslevel=compresslevel,
+        brem_only=brem_only,
+        line_only=line_only,
     )
-    ap.add_argument(
-        "--drop-wide-brem",
-        action="store_true",
-        help="drop the full-range brem arrays (brem_wide, E_grid_brem) -- the largest fields",
-    )
-    ap.add_argument(
-        "--downcast",
-        action="store_true",
-        help="store spectral arrays as float32 (halves their bytes)",
-    )
-    ap.add_argument(
-        "--compresslevel",
-        type=int,
-        default=6,
-        choices=range(1, 10),
-        metavar="1-9",
-        help="gzip level for the output pickle (default: 6, matches a live sweep's "
-        "checkpoint writes); 9 trades CPU for a smaller file, e.g. for a `cxr "
-        "remote pull` transfer",
-    )
-    grp = ap.add_mutually_exclusive_group()
-    grp.add_argument(
-        "--brem-only",
-        action="store_true",
-        help="keep only the brem arrays (brem_wide/brem/E_grid_brem) per record",
-    )
-    grp.add_argument(
-        "--line-only",
-        action="store_true",
-        help="keep only the line arrays (spec/E_grid) per record",
-    )
-    ap.set_defaults(func=_cli)
-    return ap
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(
-        prog="cxr-slim", description="shrink a checkpoint pickle for transfer"
-    )
-    add_subparser(ap.add_subparsers(dest="command", required=True))
-    args = ap.parse_args(argv)
-    return args.func(args)
+    return _cli_core.run(command, argv, prog_name="cxr-slim")
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

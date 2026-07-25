@@ -16,6 +16,10 @@ import datetime
 import subprocess
 import sys
 
+import click
+
+from . import _cli_core
+
 NOTEBOOK = "notebooks/analysis_app.py"
 
 
@@ -44,23 +48,15 @@ def _export(stem=None):
     subprocess.run(_command(stem), check=True)
 
 
-def add_subparser(sub):
-    """Register the ``export`` subcommand on an argparse subparsers object."""
-    ap = sub.add_parser("export", help=f"render {NOTEBOOK} -> results/<stem>.html")
-    ap.add_argument(
-        "stem",
-        nargs="?",
-        default=None,
-        help="output filename stem (default: cxr_analysis_<date>)",
-    )
-    ap.set_defaults(func=lambda args: _export(args.stem))
-    return ap
+@click.command("export", help=f"Render {NOTEBOOK} to results/<stem>.html.")
+@click.argument("stem", required=False)
+def command(stem):
+    _export(stem)
 
 
 def main(argv=None):
-    argv = sys.argv[1:] if argv is None else list(argv)
-    _export(argv[0] if argv else None)
+    return _cli_core.run(command, argv, prog_name="cxr-export")
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

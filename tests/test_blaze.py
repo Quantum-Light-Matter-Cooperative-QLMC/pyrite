@@ -3,10 +3,8 @@ pairing, forced groove geometry, checkpoint naming, and the `build_cases`
 groove-tag guard (see
 docs/superpowers/specs/2026-07-23-cxr-blaze-grooved-sweep-design.md)."""
 
-import argparse
-
 import numpy as np
-import pytest
+from click.testing import CliRunner
 
 from cxr_mc import blaze
 from cxr_mc.config import material_sweep
@@ -16,10 +14,8 @@ from cxr_mc.sweep import Sweep, build_cases, fmt_thickness
 MATERIAL = "hopg"  # std tilt_deg grid [5,15,30,45,60,75,85] is groove-legal
 
 
-def _parse(argv):
-    ap = argparse.ArgumentParser()
-    blaze._build_parser(ap)
-    return ap.parse_args(argv)
+def _invoke(argv):
+    return CliRunner().invoke(blaze.command, argv, catch_exceptions=False)
 
 
 def _run_and_capture(monkeypatch, argv):
@@ -37,7 +33,9 @@ def _run_and_capture(monkeypatch, argv):
 
     monkeypatch.setattr(blaze, "gate_cases_by_penetration", fake_gate)
     monkeypatch.setattr(blaze, "run_sweep", fake_run_sweep)
-    blaze.run(_parse(argv))
+    result = _invoke(argv)
+    assert result.exit_code == 0
+    assert result.stderr == ""
     return captured
 
 
@@ -45,13 +43,15 @@ def _run_and_capture(monkeypatch, argv):
 
 
 def test_energy_required():
-    with pytest.raises(SystemExit):
-        _parse([MATERIAL, "--spacing", "2e-6"])
+    result = _invoke([MATERIAL, "--spacing", "2e-6"])
+    assert result.exit_code == 2
+    assert "Missing option '--energy'" in result.stderr
 
 
 def test_spacing_required():
-    with pytest.raises(SystemExit):
-        _parse([MATERIAL, "--energy", "30"])
+    result = _invoke([MATERIAL, "--energy", "30"])
+    assert result.exit_code == 2
+    assert "Missing option '--spacing'" in result.stderr
 
 
 def test_spacing_meters_converted_to_angstrom(monkeypatch):
@@ -86,11 +86,11 @@ def test_pairing_single_spacing_broadcasts(monkeypatch):
 def test_pairing_length_mismatch_raises(monkeypatch):
     monkeypatch.setattr(blaze, "gate_cases_by_penetration", lambda cases, **kw: (cases, []))
     monkeypatch.setattr(blaze, "run_sweep", lambda *a, **kw: None)
-    args = _parse(
+    result = _invoke(
         [MATERIAL, "--energy", "30", "50", "60", "--spacing", "2e-6", "3e-6", "--angles", "25"]
     )
-    with pytest.raises(SystemExit):
-        blaze.run(args)
+    assert result.exit_code == 1
+    assert "--energy takes 3 value(s) but --spacing takes 2" in result.stderr
 
 
 # 3. Forced groove geometry ---------------------------------------------------

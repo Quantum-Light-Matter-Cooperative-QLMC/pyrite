@@ -5,9 +5,8 @@ audit matrices unless changed code invalidates them. Full file is large; only su
 
 ## Handoff — 2026-07-25
 
-Stopping point: P0 tasks 1–7 complete. Task 17 was pulled forward after task 2
-and is also complete. P1 tasks 8–9 are complete; resume at task 10, **Migrate
-local commands**.
+Stopping point: P0 and P1 tasks 1–13 complete. Task 17 was pulled forward after
+task 2 and is also complete. Resume with parallel tasks 14, 16, and 18.
 
 Completed behavior:
 
@@ -34,6 +33,12 @@ Completed behavior:
   command imports, positive/nonnegative numeric and beam-axis parameter types,
   stable result/diagnostic/JSON output, runtime/resumable errors, interruption
   exit 130, and `CliRunner` test helpers.
+- Root and all command families now use Click. Root help uses summary metadata
+  without importing simulation command modules. Obsolete argparse wiring is
+  removed; only required standalone line-grid derive/job parsers remain.
+- P1 compatibility tests cover all 42 frozen help paths, command/option names,
+  dispatch/defaults, usage/runtime/resumable/interruption exits, stdout/stderr,
+  numeric boundaries, and hostile input.
 
 Verification:
 
@@ -51,8 +56,7 @@ Handoff notes:
 
 - Preserve all current uncommitted P0 changes; no commits were created.
 - Preserve `scripts/freeze_cli_contract.py`, `tests/test_cli_contract.py`, and
-  `tests/data/cli_contract.json` during local-command migration; adapt snapshot
-  plumbing only when Click replaces argparse.
+  `tests/data/cli_contract.json` as pre-migration compatibility evidence.
 
 ## Decisions
 
@@ -160,13 +164,13 @@ One task per agent. Run tasks sharing line-grid or remote owners sequentially.
    dispatch, exits, and streams. Mark intentional changes from this plan.
 9. **DONE — Build Click core** — dependency, lazy `click.Group`, shared decorators,
    parameter types, output/error helpers, and test utilities.
-10. **Migrate local commands** — scan, blaze, analyze, check, export, slim,
+10. **DONE — Migrate local commands** — scan, blaze, analyze, check, export, slim,
     rebrem, reline, archive, restore, archives, union, check-config.
-11. **Migrate remote commands** — full remote group; preserve previews,
+11. **DONE — Migrate remote commands** — full remote group; preserve previews,
     reservations, liveness checks, and resumable behavior.
-12. **Migrate line-grid commands** — full group; preserve P0 corrections and
+12. **DONE — Migrate line-grid commands** — full group; preserve P0 corrections and
     required standalone-module entry points.
-13. **Cut over** — switch root entry point implementation, remove obsolete
+13. **DONE — Cut over** — switch root entry point implementation, remove obsolete
     argparse builders, enforce exit/stream contract, pass full tree tests.
 
 ### P2: discoverability

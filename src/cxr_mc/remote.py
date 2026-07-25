@@ -193,6 +193,7 @@ _live_status = viewer._live_status
 attach = viewer.attach
 
 # --- from cli ---------------------------------------------------------
+command = cli.command
 remote_scan = cli.remote_scan
 remote_check = cli.remote_check
 _ensure_utf8_stdio = cli._ensure_utf8_stdio
@@ -211,8 +212,6 @@ _cli_reap = cli._cli_reap
 _cli_clear = cli._cli_clear
 _cli_sync = cli._cli_sync
 _cli_check = cli._cli_check
-_build_remote_parser = cli._build_remote_parser
-add_subparser = cli.add_subparser
 main = cli.main
 
 # --- from presentation ------------------------------------------------

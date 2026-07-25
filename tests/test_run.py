@@ -12,6 +12,7 @@ from typing import Any
 
 import numpy as np
 import pytest
+from click.testing import CliRunner
 
 from cxr_mc import _checkpoint_io
 from cxr_mc.montecarlo import runner
@@ -969,28 +970,55 @@ def test_rebrem_checkpoints_enumerates_pkls_and_passes_params(monkeypatch, tmp_p
 
 def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
     """`cxr rebrem` refuses no-selection and materials+--all; accepts either alone."""
-    import argparse
-
     from cxr_mc import rebrem
 
-    ap = argparse.ArgumentParser()
-    rebrem.add_subparser(ap.add_subparsers(dest="command"))
     seen: list[Any] = []
     monkeypatch.setattr(rebrem, "rebrem_checkpoints", lambda **kw: seen.append(kw) or {})
+    runner = CliRunner()
 
-    with pytest.raises(SystemExit):
-        args = ap.parse_args(["rebrem", "--ne-brem", "1000"])  # neither
-        args.func(args)
-    with pytest.raises(SystemExit):
-        args = ap.parse_args(["rebrem", "MoS2", "--all"])  # both
-        args.func(args)
+    neither = runner.invoke(rebrem.command, ["--ne-brem", "1000"], catch_exceptions=False)
+    both = runner.invoke(rebrem.command, ["MoS2", "--all"], catch_exceptions=False)
+    assert neither.exit_code == 1
+    assert both.exit_code == 1
+    assert "exactly one of the two" in neither.stderr
+    assert "exactly one of the two" in both.stderr
     assert seen == []
 
-    args = ap.parse_args(["rebrem", "MoS2"])
-    args.func(args)
+    material = runner.invoke(rebrem.command, ["MoS2"], catch_exceptions=False)
+    assert material.exit_code == 0
+    assert material.stderr == ""
     assert seen[-1]["materials"] == ["MoS2"]
-    args = ap.parse_args(["rebrem", "-a"])
-    args.func(args)
+
+    all_materials = runner.invoke(rebrem.command, ["-a"], catch_exceptions=False)
+    assert all_materials.exit_code == 0
+    assert all_materials.stderr == ""
+    assert seen[-1]["materials"] is None
+
+
+def test_reline_cli_requires_materials_xor_all(monkeypatch):
+    """`cxr reline` preserves rebrem's exclusive material-selection contract."""
+    from cxr_mc import reline
+
+    seen: list[Any] = []
+    monkeypatch.setattr(reline, "reline_checkpoints", lambda **kw: seen.append(kw) or {})
+    runner = CliRunner()
+
+    neither = runner.invoke(reline.command, [], catch_exceptions=False)
+    both = runner.invoke(reline.command, ["MoS2", "--all"], catch_exceptions=False)
+    assert neither.exit_code == 1
+    assert both.exit_code == 1
+    assert "exactly one of the two" in neither.stderr
+    assert "exactly one of the two" in both.stderr
+    assert seen == []
+
+    material = runner.invoke(reline.command, ["MoS2"], catch_exceptions=False)
+    assert material.exit_code == 0
+    assert material.stderr == ""
+    assert seen[-1]["materials"] == ["MoS2"]
+
+    all_materials = runner.invoke(reline.command, ["-a"], catch_exceptions=False)
+    assert all_materials.exit_code == 0
+    assert all_materials.stderr == ""
     assert seen[-1]["materials"] is None
 
 

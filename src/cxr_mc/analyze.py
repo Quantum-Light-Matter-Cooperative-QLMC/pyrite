@@ -27,7 +27,6 @@ both.
     cxr analyze --no-token         # pass marimo's --no-token (disable auth token)
 """
 
-import argparse
 import os
 import subprocess
 import sys
@@ -36,6 +35,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import TypedDict
 
+import click
+
+from . import _cli_core
 from ._acp import running_acp
 from .materials import CATALOG
 
@@ -241,39 +243,38 @@ def _cli(args):
     _launch(material, **launch_args)
 
 
-def add_subparser(sub):
-    """Register the ``analyze`` subcommand on an argparse subparsers object."""
-    ap = sub.add_parser("analyze", help=f"launch {NOTEBOOK} (marimo run/edit)")
-    ap.add_argument(
-        "material",
-        nargs="?",
-        default=None,
-        help="initial dropdown material (transient; default: persisted default, else hopg)",
+@click.command("analyze", help=f"Launch {NOTEBOOK} with marimo run or edit.")
+@click.argument("material", required=False)
+@click.option(
+    "-d",
+    "--default",
+    "persist_default",
+    is_flag=True,
+    help="Persist MATERIAL as default for future no-argument runs.",
+)
+@click.option("--watch", is_flag=True, help="Pass marimo's --watch.")
+@click.option("--smoke", is_flag=True, help="Execute app once headlessly and exit.")
+@click.option("--edit", is_flag=True, help="Use `marimo edit` instead of `marimo run`.")
+@click.option("--acp", is_flag=True, help="Start local Claude and Codex ACP bridges.")
+@click.option("--tunnel", is_flag=True, help="Use fixed port for SSH tunneling.")
+@click.option("--no-token", is_flag=True, help="Pass marimo's --no-token.")
+def command(material, persist_default, watch, smoke, edit, acp, tunnel, no_token):
+    return _cli_core.invoke_legacy(
+        _cli,
+        material=material,
+        default=persist_default,
+        watch=watch,
+        smoke=smoke,
+        edit=edit,
+        acp=acp,
+        tunnel=tunnel,
+        no_token=no_token,
     )
-    ap.add_argument(
-        "-d",
-        "--default",
-        action="store_true",
-        help="also persist <material> as the new default for future no-argument runs",
-    )
-    ap.add_argument("--watch", action="store_true", help="pass marimo's --watch")
-    ap.add_argument("--smoke", action="store_true", help="execute the app once headlessly and exit")
-    ap.add_argument("--edit", action="store_true", help="use `marimo edit` instead of `marimo run`")
-    ap.add_argument("--acp", action="store_true", help="start local Claude and Codex ACP bridges")
-    ap.add_argument("--tunnel", action="store_true", help="use a fixed port for SSH tunneling")
-    ap.add_argument(
-        "--no-token", action="store_true", help="pass marimo's --no-token (disable auth token)"
-    )
-    ap.set_defaults(func=_cli)
-    return ap
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="cxr-analyze", description="launch the analysis app")
-    add_subparser(ap.add_subparsers(dest="command", required=True))
-    args = ap.parse_args(argv)
-    return args.func(args)
+    return _cli_core.run(command, argv, prog_name="cxr-analyze")
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

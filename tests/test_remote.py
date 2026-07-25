@@ -546,10 +546,9 @@ def test_cli_start_chunk_flags(monkeypatch, capsys):
     remote.main(
         ["start", "hopg", "--dry-run", "--chunk-minutes", "0", "--parallel-materials", "3"]
     )  # legal: monolithic
-    with pytest.raises(SystemExit):
-        remote.main(
-            ["start", "hopg", "--dry-run", "--parallel-materials", "3"]
-        )  # illegal: chunked default
+    assert (
+        remote.main(["start", "hopg", "--dry-run", "--parallel-materials", "3"]) == 2
+    )  # illegal: chunked default
 
 
 def test_start_writes_static_metadata_before_sbatch(monkeypatch):
@@ -1419,8 +1418,7 @@ def test_stop_jobid_rejects_legacy_job_without_scheduler_id(monkeypatch):
 
 
 def test_stop_help_describes_slurm_cancellation(capsys):
-    with pytest.raises(SystemExit):
-        remote.main(["stop", "--help"])
+    assert remote.main(["stop", "--help"]) == 0
 
     help_text = capsys.readouterr().out
     assert "cancel active SLURM job" in help_text
@@ -2044,8 +2042,7 @@ def test_scan_rejects_quick_plus_grid_before_any_work(monkeypatch):
     monkeypatch.setattr(
         cli, "remote_scan", lambda *a, **kw: pytest.fail("must reject before scanning")
     )
-    with pytest.raises(SystemExit, match="grid"):
-        remote.main(["scan", "hopg", "--quick", "--grid"])
+    assert remote.main(["scan", "hopg", "--quick", "--grid"]) == 2
 
 
 # ---- pull defaults to --grid; -f/--full opts into the plain whole-file pull -----
@@ -2306,8 +2303,7 @@ def test_remote_start_rejects_parallel_materials_above_four(monkeypatch):
         lifecycle, "start_queue", lambda *_args, **_kwargs: pytest.fail("must reject before start")
     )
 
-    with pytest.raises(SystemExit):
-        remote.main(["start", "hopg", "--parallel-materials", "5", "--dry-run"])
+    assert remote.main(["start", "hopg", "--parallel-materials", "5", "--dry-run"]) == 2
 
 
 def test_start_queue_rejects_parallel_materials_above_four():
@@ -2415,8 +2411,7 @@ def test_remote_scan_rejects_unknown_before_busy_or_sync(monkeypatch):
     )
     monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must validate before syncing"))
 
-    with pytest.raises(SystemExit, match="unknown material"):
-        remote.main(["scan", "not_in_catalog"])
+    assert remote.main(["scan", "not_in_catalog"]) == 1
 
 
 def test_remote_start_accepts_hyphenated_catalog_material(capsys):
@@ -2431,8 +2426,7 @@ def test_remote_start_rejects_unknown_before_busy_or_sync(monkeypatch):
     )
     monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must validate before syncing"))
 
-    with pytest.raises(SystemExit, match="unknown material"):
-        remote.main(["start", "not_in_catalog"])
+    assert remote.main(["start", "not_in_catalog"]) == 1
 
 
 def test_pull_validates_safe_stems_without_requiring_catalog_membership(monkeypatch, tmp_path):
@@ -2656,10 +2650,8 @@ def test_check_cli_foreground_calls_remote_check(monkeypatch):
 def test_check_cli_rejects_follow_without_detached(monkeypatch, capsys):
     monkeypatch.setattr(cli, "remote_check", lambda **kw: pytest.fail("must reject before running"))
 
-    with pytest.raises(SystemExit) as excinfo:
-        remote.main(["check", "--follow"])
+    assert remote.main(["check", "--follow"]) == 2
 
-    assert excinfo.value.code == 2
     assert "--follow requires --detached" in capsys.readouterr().err
 
 
@@ -2669,11 +2661,9 @@ def test_check_cli_rejects_pull_with_detached(monkeypatch, capsys, args):
         lifecycle, "pull_zhai_cache", lambda: pytest.fail("must reject before pulling")
     )
 
-    with pytest.raises(SystemExit) as excinfo:
-        remote.main(["check", *args])
+    assert remote.main(["check", *args]) == 2
 
-    assert excinfo.value.code == 2
-    assert "not allowed with argument --pull" in capsys.readouterr().err
+    assert "--pull and --detached are mutually exclusive" in capsys.readouterr().err
 
 
 def test_sync_paths_ship_checks_and_zhai_shim():

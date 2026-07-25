@@ -14,7 +14,6 @@ resolve or persist.
                                     # (see `cxr remote check`) to figures/
 """
 
-import argparse
 import json
 import os
 import re
@@ -23,6 +22,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+import click
+
+from . import _cli_core
 from ._acp import running_acp
 from .remote import HOST as REMOTE_HOST
 
@@ -218,36 +220,34 @@ def _cli(args):
     _launch(**launch_args)
 
 
-def add_subparser(sub):
-    """Register the ``check`` subcommand on an argparse subparsers object."""
-    ap = sub.add_parser(
-        "check", help=f"launch {NOTEBOOK} (marimo run/edit), or --export its figures"
+@click.command("check", help=f"Launch {NOTEBOOK}, or export its cached validation figures.")
+@click.option("--watch", is_flag=True, help="Pass marimo's --watch.")
+@click.option("--edit", is_flag=True, help="Use `marimo edit` instead of `marimo run`.")
+@click.option("--acp", is_flag=True, help="Start local Claude and Codex ACP bridges.")
+@click.option("--tunnel", is_flag=True, help="Use fixed port for SSH tunneling.")
+@click.option("--export", "export_", is_flag=True, help="Render cached figures instead of marimo.")
+@click.option("--outdir", default="figures", show_default=True)
+@click.option("--ne", type=_cli_core.POSITIVE_INT, default=20_000, show_default=True)
+@click.option("--ne-brem", type=_cli_core.POSITIVE_INT, default=200, show_default=True)
+@click.option("--ne-supp", type=_cli_core.POSITIVE_INT, default=200, show_default=True)
+def command(watch, edit, acp, tunnel, export_, outdir, ne, ne_brem, ne_supp):
+    return _cli_core.invoke_legacy(
+        _cli,
+        watch=watch,
+        edit=edit,
+        acp=acp,
+        tunnel=tunnel,
+        export=export_,
+        outdir=outdir,
+        ne=ne,
+        ne_brem=ne_brem,
+        ne_supp=ne_supp,
     )
-    ap.add_argument("--watch", action="store_true", help="pass marimo's --watch")
-    ap.add_argument("--edit", action="store_true", help="use `marimo edit` instead of `marimo run`")
-    ap.add_argument("--acp", action="store_true", help="start local Claude and Codex ACP bridges")
-    ap.add_argument("--tunnel", action="store_true", help="use a fixed port for SSH tunneling")
-    ap.add_argument(
-        "--export",
-        action="store_true",
-        help="skip marimo; render the full Zhai figure set from cache to --outdir",
-    )
-    ap.add_argument("--outdir", default="figures", help="with --export: output directory")
-    ap.add_argument("--ne", type=int, default=20_000, help="with --export: Fig.1c line electrons")
-    ap.add_argument("--ne-brem", type=int, default=200, help="with --export: Fig.1c brem electrons")
-    ap.add_argument(
-        "--ne-supp", type=int, default=200, help="with --export: supplementary electrons"
-    )
-    ap.set_defaults(func=_cli)
-    return ap
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="cxr-check", description="launch the validation app")
-    add_subparser(ap.add_subparsers(dest="command", required=True))
-    args = ap.parse_args(argv)
-    return args.func(args)
+    return _cli_core.run(command, argv, prog_name="cxr-check")
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

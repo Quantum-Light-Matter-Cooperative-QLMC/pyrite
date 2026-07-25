@@ -15,9 +15,12 @@ by hand over ssh. Records already at the target grid + Ne are skipped, so a
 crashed/OOM run resumes; ``--redo-all`` forces a full recompute.
 """
 
-import argparse
 import time
 from pathlib import Path
+
+import click
+
+from . import _cli_core
 
 
 def reline_checkpoints(
@@ -123,40 +126,36 @@ def _cli(args):
     )
 
 
-def add_subparser(sub):
-    """Register the ``reline`` subcommand on an argparse subparsers object."""
-    ap = sub.add_parser(
-        "reline",
-        help="recompute ONLY the line spectra of existing checkpoints "
-        "(new line grid / Ne); brem untouched",
+@click.command("reline", help="Recompute only line spectra in existing checkpoints.")
+@click.argument("materials", nargs=-1)
+@click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
+@click.option("--line-ne", type=_cli_core.POSITIVE_INT, default=None)
+@click.option("--line-step", type=_cli_core.POSITIVE_FLOAT, default=None)
+@click.option("--redo-all", is_flag=True, help="Recompute records already at target.")
+@click.option("--checkpoint-dir", default="checkpoints", show_default=True)
+@click.option("--progress-file", default=None, hidden=True)
+@click.option("--max-minutes", type=_cli_core.POSITIVE_FLOAT, default=None, hidden=True)
+@click.option("--save-every", type=_cli_core.POSITIVE_INT, default=100, show_default=True)
+def command(
+    materials,
+    all_,
+    line_ne,
+    line_step,
+    redo_all,
+    checkpoint_dir,
+    progress_file,
+    max_minutes,
+    save_every,
+):
+    return _cli_core.invoke_legacy(
+        _cli,
+        material=list(materials),
+        all=all_,
+        line_ne=line_ne,
+        line_step=line_step,
+        redo_all=redo_all,
+        checkpoint_dir=checkpoint_dir,
+        progress_file=progress_file,
+        max_minutes=max_minutes,
+        save_every=save_every,
     )
-    ap.add_argument(
-        "material", nargs="*", help="material stems (checkpoints/<material>.pkl); or -a/--all"
-    )
-    ap.add_argument(
-        "-a", "--all", action="store_true", help="recompute every *.pkl in the checkpoint dir"
-    )
-    ap.add_argument(
-        "--line-ne",
-        type=int,
-        default=None,
-        help="new line electron count (sweep default per material)",
-    )
-    ap.add_argument(
-        "--line-step",
-        type=float,
-        default=None,
-        help="explicit uniform line-grid spacing [eV]; default rebuilds each "
-        "record's grid from the material's current E_grid_line_by_energy config",
-    )
-    ap.add_argument(
-        "--redo-all", action="store_true", help="recompute every record even if already at target"
-    )
-    ap.add_argument("--checkpoint-dir", default="checkpoints")
-    ap.add_argument("--progress-file", default=None, help=argparse.SUPPRESS)
-    ap.add_argument("--max-minutes", type=float, default=None, help=argparse.SUPPRESS)
-    ap.add_argument(
-        "--save-every", type=int, default=100, help="re-pickle every N relined records (crash-safe)"
-    )
-    ap.set_defaults(func=_cli)
-    return ap

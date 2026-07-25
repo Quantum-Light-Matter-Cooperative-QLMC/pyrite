@@ -1,77 +1,69 @@
-"""``cxr`` command-line entry point.
+"""``cxr`` Click command-line entry point."""
 
-A single console script with subcommands, wired in pyproject.toml as
-``cxr = "cxr_mc.cli:main"``:
+from __future__ import annotations
 
-    cxr scan <material> [--quick] [--workers N]   # run a sweep -> checkpoint
-    cxr blaze <material> --energy E --spacing S   # grooved-crystal sweep -> _grooved checkpoint
-    cxr export [stem]                             # analysis app -> results/<stem>.html
-    cxr analyze [-d/--default] [<material>] [--watch] [--edit]  # launch the analysis app
-    cxr check [--watch] [--edit]                  # launch the validation app
-    cxr check-config [manifest]                    # validate a full material catalog
-    cxr slim <checkpoint> [--grid] [--drop-wide-brem] [--downcast]  # shrink a pkl for transfer
-    cxr rebrem (<material> ... | -a/--all) [--ne-brem N] [--step EV]  # recompute brem-only in checkpoints
-    cxr archive <stem> [label]                    # copy active checkpoint to the shelf
-    cxr restore <label> [--as <stem>]             # copy a shelved checkpoint back
-    cxr archives                                  # list the shelf
-    cxr union <stem> <label>                      # merge a shelved checkpoint into active
-    cxr remote <subcommand> ...                   # [dev, optional] run sweeps on a remote GPU box
-"""
+from collections.abc import Sequence
 
-import argparse
-import sys
+import click
 
 from . import __version__
-from .materials import MaterialConfigError
+from ._cli_core import LazyGroup, run
+
+_COMMANDS = {
+    "scan": "cxr_mc.scan.command",
+    "blaze": "cxr_mc.blaze.command",
+    "export": "cxr_mc.export.command",
+    "analyze": "cxr_mc.analyze.command",
+    "slim": "cxr_mc.slim.command",
+    "rebrem": "cxr_mc.rebrem.command",
+    "reline": "cxr_mc.reline.command",
+    "archive": "cxr_mc.archive.archive_command",
+    "restore": "cxr_mc.archive.restore_command",
+    "archives": "cxr_mc.archive.archives_command",
+    "union": "cxr_mc.archive.union_command",
+    "remote": "cxr_mc.remote.command",
+    "line-grid": "cxr_mc.line_grid.command",
+    "check": "cxr_mc.check.command",
+    "check-config": "cxr_mc.check_config.command",
+}
+
+_COMMAND_HELP = {
+    "scan": "Run one material's MC sweep and write a checkpoint.",
+    "blaze": "Run a grooved-crystal sweep and write a checkpoint.",
+    "export": "Export the analysis app as static HTML.",
+    "analyze": "Launch the analysis app.",
+    "slim": "Shrink a checkpoint for transfer.",
+    "rebrem": "Recompute bremsstrahlung arrays in local checkpoints.",
+    "reline": "Recompute line spectra in local checkpoints.",
+    "archive": "Copy an active checkpoint to the archive shelf.",
+    "restore": "Restore a shelved checkpoint to an active slot.",
+    "archives": "List checkpoint archives.",
+    "union": "Merge a shelved checkpoint into an active slot.",
+    "remote": "Run and manage MC sweeps on a remote GPU host.",
+    "line-grid": "Derive, submit, inspect, and apply line-energy grids.",
+    "check": "Launch validation or export cached validation figures.",
+    "check-config": "Validate a material catalog without starting simulation.",
+}
 
 
-def main(argv=None):
-    raw_argv = list(sys.argv[1:] if argv is None else argv)
-    ap = argparse.ArgumentParser(
-        prog="cxr",
-        description="Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.",
-    )
-    ap.add_argument("--version", action="version", version=f"cxr-mc {__version__}")
-    sub = ap.add_subparsers(dest="command", required=True)
-    try:
-        if raw_argv[:1] == ["check-config"]:
-            from . import check_config
+@click.command(
+    cls=LazyGroup,
+    lazy_commands=_COMMANDS,
+    lazy_help=_COMMAND_HELP,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+@click.version_option(__version__, prog_name="cxr-mc", message="cxr-mc %(version)s")
+def command() -> None:
+    """Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit."""
 
-            check_config.add_subparser(sub)
-        else:
-            from . import (
-                analyze,
-                archive,
-                blaze,
-                check,
-                check_config,
-                export,
-                line_grid,
-                rebrem,
-                reline,
-                remote,
-                scan,
-                slim,
-            )
 
-            scan.add_subparser(sub)
-            blaze.add_subparser(sub)
-            export.add_subparser(sub)
-            analyze.add_subparser(sub)
-            slim.add_subparser(sub)
-            rebrem.add_subparser(sub)
-            reline.add_subparser(sub)
-            archive.add_subparser(sub)
-            remote.add_subparser(sub)
-            line_grid.add_subparser(sub)
-            check.add_subparser(sub)
-            check_config.add_subparser(sub)
-
-        args = ap.parse_args(raw_argv)
-        return args.func(args)
-    except MaterialConfigError as exc:
-        raise SystemExit(str(exc)) from None
+def main(argv: Sequence[str] | None = None):
+    """Run ``cxr`` while preserving project exit-code and stream contracts."""
+    result = run(command, argv, prog_name="cxr")
+    if isinstance(result, int):
+        raise SystemExit(result)
+    return result
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

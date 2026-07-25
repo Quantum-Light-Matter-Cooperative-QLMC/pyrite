@@ -1,21 +1,22 @@
 """``scan.py --max-minutes`` budget: exit 75 on incomplete work, paused progress state."""
 
-import argparse
 import json
 
-import pytest
+from click.testing import CliRunner
 
 from cxr_mc import scan
 
 
-def _args(material, max_minutes, progress_file=None):
-    ap = scan._build_parser(argparse.ArgumentParser())
+def _invoke(material=None, max_minutes=None, progress_file=None, *extra):
     argv = [material]
+    if material is None:
+        argv = []
     if max_minutes is not None:
         argv += ["--max-minutes", str(max_minutes)]
     if progress_file is not None:
         argv += ["--progress-file", str(progress_file)]
-    return ap.parse_args(argv)
+    argv += list(extra)
+    return CliRunner().invoke(scan.command, argv, catch_exceptions=False)
 
 
 def _fake_cases():
@@ -42,29 +43,29 @@ def _stub_cases(monkeypatch):
 def test_scan_budget_incomplete_exits_75(monkeypatch, tmp_path):
     monkeypatch.setattr(scan, "run_sweep", lambda *a, **kw: False)
     _stub_cases(monkeypatch)
-    args = _args("hopg", 5.0)
-    args.checkpoint_dir = str(tmp_path)
-    with pytest.raises(SystemExit) as exc:
-        scan.run(args)
-    assert exc.value.code == 75
+    result = _invoke("hopg", 5.0, None, "--checkpoint-dir", str(tmp_path))
+    assert result.exit_code == 75
 
 
 def test_scan_budget_complete_exits_normally(monkeypatch, tmp_path):
     monkeypatch.setattr(scan, "run_sweep", lambda *a, **kw: True)
     _stub_cases(monkeypatch)
-    args = _args("hopg", 5.0)
-    args.checkpoint_dir = str(tmp_path)
-    scan.run(args)  # no SystemExit
+    result = _invoke("hopg", 5.0, None, "--checkpoint-dir", str(tmp_path))
+    assert result.exit_code == 0
 
 
 def test_scan_budget_writes_paused_progress_state(monkeypatch, tmp_path):
     monkeypatch.setattr(scan, "run_sweep", lambda *a, **kw: False)
     _stub_cases(monkeypatch)
     progress = tmp_path / "hopg.json"
-    args = _args("hopg", 5.0, progress_file=progress)
-    args.checkpoint_dir = str(tmp_path)
-    with pytest.raises(SystemExit):
-        scan.run(args)
+    result = _invoke(
+        "hopg",
+        5.0,
+        progress,
+        "--checkpoint-dir",
+        str(tmp_path),
+    )
+    assert result.exit_code == 75
     record = json.loads(progress.read_text())
     assert record["state"] == "paused"
 
@@ -78,9 +79,8 @@ def test_scan_no_max_minutes_passes_none_max_seconds(monkeypatch, tmp_path):
 
     monkeypatch.setattr(scan, "run_sweep", _fake_run_sweep)
     _stub_cases(monkeypatch)
-    args = _args("hopg", None)
-    args.checkpoint_dir = str(tmp_path)
-    scan.run(args)
+    result = _invoke("hopg", None, None, "--checkpoint-dir", str(tmp_path))
+    assert result.exit_code == 0
     assert captured["max_seconds"] is None
 
 
@@ -104,10 +104,15 @@ def test_scan_all_threads_one_deadline_across_materials(monkeypatch, tmp_path):
     monkeypatch.setattr(scan, "load_all_materials", lambda *a, **kw: ["hopg", "hbn", "mose2"])
     _stub_cases(monkeypatch)
 
-    ap = scan._build_parser(argparse.ArgumentParser())
-    args = ap.parse_args(["--all", "--max-minutes", "5"])
-    args.checkpoint_dir = str(tmp_path)
-    scan.run(args)  # all complete -> no SystemExit
+    result = _invoke(
+        None,
+        5.0,
+        None,
+        "--all",
+        "--checkpoint-dir",
+        str(tmp_path),
+    )
+    assert result.exit_code == 0
 
     assert seen == [300.0, 100.0, 0.0]
     assert seen[1] <= seen[0]  # the second material only gets what's left

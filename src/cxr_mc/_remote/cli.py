@@ -1,8 +1,18 @@
-"""Argparse wiring, CLI handlers, and scan/check compat orchestrators."""
+"""Click command group, compatibility wiring, and remote orchestrators."""
 
-import argparse
 import sys
 
+import click
+
+from .._cli_core import (
+    FINITE_FLOAT,
+    NONNEGATIVE_FLOAT,
+    NONNEGATIVE_INT,
+    POSITIVE_FLOAT,
+    POSITIVE_INT,
+    invoke_legacy,
+    run,
+)
 from ..scan import load_all_materials
 from . import config, lifecycle, scripts, state, transport, viewer
 
@@ -274,353 +284,442 @@ def _cli_check(args):
     )
 
 
-def _build_remote_parser(ap):
-    """Add every ``remote`` subcommand (scan/pull/start/attach/jobs/status/logs/
-    stop/clear/sync) to ``ap``'s own subparsers. Nested one level under a
-    ``remote`` group -- rather than flat alongside ``cxr scan`` etc -- because
-    several of these names (``scan`` in particular) collide with top-level cxr
-    subcommands that mean something different (a local sweep vs this
-    sync+run-on-the-box+pull)."""
-    sub = ap.add_subparsers(dest="remote_command", required=True)
+class _ClickParser:
+    """Parser-error compatibility for reused orchestration handlers."""
 
-    s = sub.add_parser("scan", help="sync code, submit sweep(s), wait, and pull checkpoints")
-    s.add_argument("material", nargs="?")
-    s.add_argument(
-        "-a", "--all", action="store_true", help="run every material in mats_to_sim.toml"
+    @staticmethod
+    def error(message):
+        raise click.UsageError(message)
+
+
+def _click_args(command_name, **values):
+    """Build handler namespace for Click orchestration callbacks."""
+    values["remote_command"] = command_name
+    values["_clear_parser"] = _ClickParser
+    values["_check_parser"] = _ClickParser
+    return values
+
+
+def _invoke_click(handler, args):
+    """Translate legacy runtime exits and returned statuses to Click contract."""
+    _ensure_utf8_stdio()
+    status = invoke_legacy(handler, **args)
+    if isinstance(status, int) and not isinstance(status, bool) and status:
+        raise click.exceptions.Exit(status)
+    return status
+
+
+def _reject_all_with_values(command_name, all_, values):
+    if all_ and values:
+        raise click.UsageError(f"{command_name} --all does not take material names")
+    if not all_ and not values:
+        raise click.UsageError(f"{command_name} needs material name(s), or use --all")
+
+
+@click.group(
+    "remote",
+    help="[dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.",
+)
+def command():
+    """Push code and run or manage MC sweeps on a remote GPU box."""
+    _ensure_utf8_stdio()
+
+
+@command.command("scan", help="Sync code, submit sweep(s), wait, and pull checkpoints.")
+@click.argument("material", required=False)
+@click.option("-a", "--all", "all_", is_flag=True, help="Run every material in mats_to_sim.toml.")
+@click.option("--quick", is_flag=True)
+@click.option("--workers", type=NONNEGATIVE_INT, default=None)
+@click.option(
+    "--parallel-materials",
+    type=click.IntRange(1, config.MAX_PARALLEL_MATERIALS),
+    default=None,
+    metavar="N",
+    help="Simultaneous scans in one allocation; requires --chunk-minutes 0.",
+)
+@click.option(
+    "--chunk-minutes",
+    type=NONNEGATIVE_FLOAT,
+    default=10.0,
+    show_default=True,
+    help="Self-resubmitting SLURM slice length; 0 runs one monolithic job.",
+)
+@click.option("--no-sync", is_flag=True, help="Skip code upload.")
+@click.option("--grid", is_flag=True, help="Grid-filter checkpoint before pulling.")
+@click.option("--drop-wide-brem", is_flag=True, help="With --grid, drop wide-brem.")
+@click.option("--downcast", is_flag=True, help="With --grid, downcast to float32.")
+def scan_command(
+    material,
+    all_,
+    quick,
+    workers,
+    parallel_materials,
+    chunk_minutes,
+    no_sync,
+    grid,
+    drop_wide_brem,
+    downcast,
+):
+    values = [material] if material else []
+    _reject_all_with_values("scan", all_, values)
+    if quick and grid:
+        raise click.UsageError(
+            "scan --quick --grid: quick checkpoints aren't grid-filterable; drop --grid"
+        )
+    if parallel_materials is not None and chunk_minutes != 0:
+        raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
+    return _invoke_click(
+        _cli_scan,
+        _click_args(
+            "scan",
+            material=material,
+            all=all_,
+            quick=quick,
+            workers=workers,
+            parallel_materials=parallel_materials,
+            chunk_minutes=chunk_minutes,
+            no_sync=no_sync,
+            grid=grid,
+            drop_wide_brem=drop_wide_brem,
+            downcast=downcast,
+        ),
     )
-    s.add_argument("--quick", action="store_true")
-    s.add_argument("--workers", type=int, default=None)
-    s.add_argument(
-        "--parallel-materials",
-        type=int,
-        choices=range(1, config.MAX_PARALLEL_MATERIALS + 1),
-        default=None,
-        metavar="N",
-        help="simultaneous material scans in one GPU allocation; only with "
-        "--chunk-minutes 0, which defaults it to 2 (max: 4)",
-    )
-    s.add_argument(
+
+
+def _recompute_options(function):
+    function = click.option(
         "--chunk-minutes",
-        type=float,
+        type=NONNEGATIVE_FLOAT,
         default=10.0,
-        help="length of each self-resubmitting SLURM slice in minutes; "
-        "0 = one whole-box monolithic run (default: 10.0)",
-    )
-    s.add_argument("--no-sync", action="store_true", help="skip the code upload")
-    s.add_argument(
-        "--grid", action="store_true", help="grid-filter the checkpoint on the box before pulling"
-    )
-    s.add_argument("--drop-wide-brem", action="store_true", help="with --grid: drop wide-brem too")
-    s.add_argument("--downcast", action="store_true", help="with --grid: downcast to float32 too")
-    s.set_defaults(func=_dispatch(_cli_scan))
-
-    rb = sub.add_parser(
-        "rebrem",
-        help="recompute brem-only in the box's checkpoints (GPU), follow, and pull them back",
-    )
-    rb.add_argument("material", nargs="*", help="one or more crystal keys")
-    rb.add_argument("-a", "--all", action="store_true", help="every material in mats_to_sim.toml")
-    rb.add_argument(
-        "--ne-brem",
-        type=int,
-        default=None,
-        help="new brem electron count (noise ~ 1/sqrt(Ne_brem); sweep default 100)",
-    )
-    rb.add_argument(
-        "--step",
-        type=float,
-        default=None,
-        help="new uniform wide-brem grid spacing [eV] (sweep default 50)",
-    )
-    rb.add_argument(
+        show_default=True,
+        help="Self-resubmitting SLURM slice length; 0 runs one monolithic job.",
+    )(function)
+    function = click.option("--no-sync", is_flag=True, help="Skip code upload.")(function)
+    function = click.option(
+        "--dry-run",
+        is_flag=True,
+        help="Print batch script and submission command; do not connect.",
+    )(function)
+    function = click.option(
         "--redo-all",
-        action="store_true",
-        help="recompute every record even if already at the target parameters",
-    )
-    rb.add_argument(
-        "--chunk-minutes",
-        type=float,
-        default=10.0,
-        help="length of each self-resubmitting SLURM slice in minutes; "
-        "0 = one whole-box monolithic run (default: 10.0)",
-    )
-    rb.add_argument("--no-sync", action="store_true", help="skip the code upload")
-    rb.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="print the SLURM batch script + submission command, don't ssh",
-    )
-    rb.set_defaults(func=_dispatch(_cli_rebrem))
-
-    rl = sub.add_parser(
-        "reline",
-        help="recompute line-only in the box's checkpoints (GPU), follow, and pull them back",
-    )
-    rl.add_argument("material", nargs="*", help="one or more crystal keys")
-    rl.add_argument("-a", "--all", action="store_true", help="every material in mats_to_sim.toml")
-    rl.add_argument("--line-ne", type=int, default=None, help="new line electron count")
-    rl.add_argument(
-        "--line-step",
-        type=float,
-        default=None,
-        help="explicit uniform line-grid spacing [eV] (default: from config)",
-    )
-    rl.add_argument(
-        "--redo-all",
-        action="store_true",
-        help="recompute every record even if already at target",
-    )
-    rl.add_argument(
-        "--chunk-minutes",
-        type=float,
-        default=10.0,
-        help="length of each self-resubmitting SLURM slice in minutes; "
-        "0 = one whole-box monolithic run (default: 10.0)",
-    )
-    rl.add_argument("--no-sync", action="store_true", help="skip the code upload")
-    rl.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="print the SLURM batch script + submission command, don't ssh",
-    )
-    rl.set_defaults(func=_dispatch(_cli_reline))
-
-    st = sub.add_parser(
-        "start",
-        help="sync code and submit a SLURM queue of materials (survives disconnect)",
-    )
-    st.add_argument("materials", nargs="*", help="one or more crystal keys")
-    st.add_argument(
-        "-a", "--all", action="store_true", help="queue every material in mats_to_sim.toml"
-    )
-    st.add_argument("--quick", action="store_true")
-    st.add_argument("--workers", type=int, default=None)
-    st.add_argument(
-        "--parallel-materials",
-        type=int,
-        choices=range(1, config.MAX_PARALLEL_MATERIALS + 1),
-        default=None,
-        metavar="N",
-        help="simultaneous material scans in one GPU allocation; only with "
-        "--chunk-minutes 0, which defaults it to 2 (max: 4)",
-    )
-    st.add_argument(
-        "--chunk-minutes",
-        type=float,
-        default=10.0,
-        help="length of each self-resubmitting SLURM slice in minutes; "
-        "0 = one whole-box monolithic run (default: 10.0)",
-    )
-    st.add_argument("--no-sync", action="store_true", help="skip the code upload")
-    st.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="print the SLURM batch script + submission command, don't ssh",
-    )
-    st.add_argument(
-        "--follow",
-        "-f",
-        action="store_true",
-        help="track the job live after launching (Ctrl-C disconnects; job keeps running)",
-    )
-    st.set_defaults(func=_dispatch(_cli_start))
-
-    at = sub.add_parser(
-        "attach",
-        help="live-track a job: status report, refreshed in place (Ctrl-C disconnects; default: latest)",
-    )
-    at.add_argument("jobid", nargs="?", default=None)
-    at.add_argument(
-        "-v",
-        "--verbose",
-        action="count",
-        default=0,
-        help="add SLURM allocation detail; repeat for the recent log tail (mirrors status)",
-    )
-    at.set_defaults(func=_dispatch(_cli_attach))
-
-    jb = sub.add_parser("jobs", help="list jobs with SLURM IDs, materials, and last events")
-    jb.set_defaults(func=_dispatch(_cli_jobs))
-
-    js = sub.add_parser(
-        "status", help="show one job; -v allocation, -vv case progress and recent log"
-    )
-    js.add_argument("jobid", nargs="?", default=None)
-    js.add_argument(
-        "-v",
-        "--verbose",
-        action="count",
-        default=0,
-        help="add SLURM allocation detail; repeat for case progress and recent log",
-    )
-    js.set_defaults(func=_dispatch(_cli_status))
-
-    lg = sub.add_parser("logs", help="show a job's diagnostic log (default: latest)")
-    lg.add_argument("jobid", nargs="?", default=None)
-    lg.add_argument(
-        "--follow",
-        "-f",
-        action="store_true",
-        help="stream live; Ctrl-C disconnects without stopping the job",
-    )
-    lg.set_defaults(func=_dispatch(_cli_logs))
-
-    sp = sub.add_parser(
-        "stop",
-        help="cancel active SLURM job(s) by material, or every live job",
-        description="cancel active SLURM job(s) by material, or every live job",
-    )
-    sp.add_argument("materials", nargs="*", help="material name(s) owned by live jobs")
-    sp.add_argument("-a", "--all", action="store_true", help="stop every live job")
-    sp.set_defaults(func=_dispatch(_cli_stop))
-
-    rp = sub.add_parser(
-        "reap",
-        help="release checkpoint reservations orphaned by hard-killed jobs (dry preview unless --yes)",
-        description="release checkpoint reservations orphaned by hard-killed jobs "
-        "whose owning SLURM allocation is gone (dry preview unless --yes)",
-    )
-    rp.add_argument(
-        "--min-age-minutes",
-        type=float,
-        default=5.0,
-        help="only reap reservations whose newest lock is older than this, guarding "
-        "the reserve-before-submit window (default: 5.0)",
-    )
-    rp.add_argument(
-        "--yes", action="store_true", help="actually release (default: dry preview only)"
-    )
-    rp.set_defaults(func=_dispatch(_cli_reap))
-
-    p = sub.add_parser("pull", help="fetch one or more existing checkpoints from the box")
-    p.add_argument("material", nargs="*", help="checkpoint stem(s), e.g. mose2 mose2_quick")
-    p.add_argument(
-        "-a", "--all", action="store_true", help="pull every material in mats_to_sim.toml"
-    )
-    p.add_argument(
-        "-f",
-        "--full",
-        action="store_true",
-        help="pull the full, un-filtered checkpoint instead of the default grid-filtered pull",
-    )
-    p.add_argument(
-        "--drop-wide-brem", action="store_true", help="with grid pull: drop wide-brem too"
-    )
-    p.add_argument(
-        "--downcast", action="store_true", help="with grid pull: downcast to float32 too"
-    )
-    p.add_argument(
-        "--level9",
-        action="store_true",
-        help="recompress on the box at gzip level 9 before transfer (lossless, "
-        "just smaller/slower than the level-6 default a live sweep writes at)",
-    )
-    p.add_argument(
-        "--no-sync", action="store_true", help="with grid pull: skip the pre-pull code sync"
-    )
-    grp = p.add_mutually_exclusive_group()
-    grp.add_argument(
-        "--brem-only",
-        action="store_true",
-        help="merge ONLY the brem arrays into the local pickle (keep local line spectra)",
-    )
-    grp.add_argument(
-        "--line-only",
-        action="store_true",
-        help="merge ONLY the line spectra into the local pickle (keep local brem)",
-    )
-    p.add_argument(
-        "--force",
-        action="store_true",
-        help="with --brem-only/--line-only: insert records absent locally (default: skip + warn)",
-    )
-    p.set_defaults(func=_dispatch(_cli_pull))
-
-    c = sub.add_parser(
-        "clear", help="delete a material's accumulated checkpoints on the box, or --all"
-    )
-    c.add_argument(
-        "materials",
-        nargs="*",
-        metavar="material",
-        help="crystal key(s); clears both <material>.pkl and <material>_quick.pkl for each",
-    )
-    c.add_argument(
-        "--all",
-        dest="all_checkpoints",
-        action="store_true",
-        help="empty the entire checkpoints/ directory (mutually exclusive with a material)",
-    )
-    c.add_argument("--yes", action="store_true", help="actually delete (default: dry preview only)")
-    c.set_defaults(func=_dispatch(_cli_clear), _clear_parser=c)
-
-    sy = sub.add_parser("sync", help="push the current code to the box only")
-    sy.set_defaults(func=_dispatch(_cli_sync))
-
-    ck = sub.add_parser(
-        "check",
-        help="run the Zhai reproduction + supplementary MC on the box, pull caches back",
-    )
-    ck.add_argument(
-        "--ne", type=int, default=20_000, help="Fig.1c anchor line electrons per energy"
-    )
-    ck.add_argument(
-        "--ne-brem", default=200, type=int, help="Fig.1c anchor bremsstrahlung electrons per energy"
-    )
-    ck.add_argument(
-        "--ne-supp", type=int, default=200, help="supplementary electrons per polar-tilt spectrum"
-    )
-    ck.add_argument(
-        "--tmd-azimuth",
-        type=float,
-        default=0.0,
-        help="exploratory azimuth for TMD studies whose azimuth is unreported",
-    )
-    ck.add_argument(
-        "--refresh", action="store_true", help="recompute even if a matching cache exists"
-    )
-    ck.add_argument("--no-sync", action="store_true", help="skip the code upload")
-    mode = ck.add_mutually_exclusive_group()
-    mode.add_argument(
-        "--detached",
-        "-d",
-        action="store_true",
-        help="launch as a DETACHED job (survives disconnect)",
-    )
-    ck.add_argument(
-        "--follow",
-        "-f",
-        action="store_true",
-        help="with --detached: track the job live after launching",
-    )
-    mode.add_argument(
-        "--pull", action="store_true", help="skip the run; just fetch existing zhai cache files"
-    )
-    ck.set_defaults(func=_dispatch(_cli_check), _check_parser=ck)
-
-    return ap
+        is_flag=True,
+        help="Recompute every record even when already at target.",
+    )(function)
+    function = click.option(
+        "-a", "--all", "all_", is_flag=True, help="Use every material in mats_to_sim.toml."
+    )(function)
+    return click.argument("material", nargs=-1)(function)
 
 
-def add_subparser(sub):
-    """Register the ``remote`` subcommand group on an argparse subparsers
-    object. Everything under it (``cxr remote scan|pull|start|attach|jobs|
-    status|logs|stop|clear|sync``) is optional -- it only works with an ssh host
-    configured to run sweeps on (default 'qlmc', see CXR_REMOTE_HOST)."""
-    ap = sub.add_parser(
-        "remote", help="[dev] push code + run/manage MC sweeps on a remote GPU box over ssh"
+@command.command(
+    "rebrem",
+    help="Recompute brem-only remotely, follow, and pull completed checkpoints.",
+)
+@_recompute_options
+@click.option("--ne-brem", type=POSITIVE_INT, default=None, help="New brem electron count.")
+@click.option("--step", type=POSITIVE_FLOAT, default=None, help="Wide-brem grid spacing in eV.")
+def rebrem_command(
+    material,
+    all_,
+    redo_all,
+    dry_run,
+    no_sync,
+    chunk_minutes,
+    ne_brem,
+    step,
+):
+    materials = list(material)
+    _reject_all_with_values("rebrem", all_, materials)
+    return _invoke_click(
+        _cli_rebrem,
+        _click_args(
+            "rebrem",
+            material=materials,
+            all=all_,
+            ne_brem=ne_brem,
+            step=step,
+            redo_all=redo_all,
+            chunk_minutes=chunk_minutes,
+            no_sync=no_sync,
+            dry_run=dry_run,
+        ),
     )
-    return _build_remote_parser(ap)
+
+
+@command.command(
+    "reline",
+    help="Recompute line-only remotely, follow, and pull completed checkpoints.",
+)
+@_recompute_options
+@click.option("--line-ne", type=POSITIVE_INT, default=None, help="New line electron count.")
+@click.option(
+    "--line-step",
+    type=POSITIVE_FLOAT,
+    default=None,
+    help="Explicit uniform line-grid spacing in eV.",
+)
+def reline_command(
+    material,
+    all_,
+    redo_all,
+    dry_run,
+    no_sync,
+    chunk_minutes,
+    line_ne,
+    line_step,
+):
+    materials = list(material)
+    _reject_all_with_values("reline", all_, materials)
+    return _invoke_click(
+        _cli_reline,
+        _click_args(
+            "reline",
+            material=materials,
+            all=all_,
+            line_ne=line_ne,
+            line_step=line_step,
+            redo_all=redo_all,
+            chunk_minutes=chunk_minutes,
+            no_sync=no_sync,
+            dry_run=dry_run,
+        ),
+    )
+
+
+@command.command("start", help="Sync code and submit a detached SLURM material queue.")
+@click.argument("materials", nargs=-1)
+@click.option("-a", "--all", "all_", is_flag=True, help="Queue every configured material.")
+@click.option("--quick", is_flag=True)
+@click.option("--workers", type=NONNEGATIVE_INT, default=None)
+@click.option(
+    "--parallel-materials",
+    type=click.IntRange(1, config.MAX_PARALLEL_MATERIALS),
+    default=None,
+    metavar="N",
+    help="Simultaneous scans in one allocation; requires --chunk-minutes 0.",
+)
+@click.option(
+    "--chunk-minutes",
+    type=NONNEGATIVE_FLOAT,
+    default=10.0,
+    show_default=True,
+    help="Self-resubmitting SLURM slice length; 0 runs one monolithic job.",
+)
+@click.option("--no-sync", is_flag=True, help="Skip code upload.")
+@click.option("--dry-run", is_flag=True, help="Print submission preview; do not connect.")
+@click.option("-f", "--follow", is_flag=True, help="Track job after launch.")
+def start_command(
+    materials,
+    all_,
+    quick,
+    workers,
+    parallel_materials,
+    chunk_minutes,
+    no_sync,
+    dry_run,
+    follow,
+):
+    materials = list(materials)
+    _reject_all_with_values("start", all_, materials)
+    if parallel_materials is not None and chunk_minutes != 0:
+        raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
+    return _invoke_click(
+        _cli_start,
+        _click_args(
+            "start",
+            materials=materials,
+            all=all_,
+            quick=quick,
+            workers=workers,
+            parallel_materials=parallel_materials,
+            chunk_minutes=chunk_minutes,
+            no_sync=no_sync,
+            dry_run=dry_run,
+            follow=follow,
+        ),
+    )
+
+
+@command.command("attach", help="Live-track a remote job; defaults to latest.")
+@click.argument("jobid", required=False)
+@click.option(
+    "-v",
+    "--verbose",
+    count=True,
+    help="Add allocation detail; repeat for recent logs.",
+)
+def attach_command(jobid, verbose):
+    return _invoke_click(_cli_attach, _click_args("attach", jobid=jobid, verbose=verbose))
+
+
+@command.command("jobs", help="List jobs with SLURM IDs, materials, and last events.")
+def jobs_command():
+    return _invoke_click(_cli_jobs, _click_args("jobs"))
+
+
+@command.command("status", help="Show one job; use -v for allocation and -vv for logs.")
+@click.argument("jobid", required=False)
+@click.option(
+    "-v",
+    "--verbose",
+    count=True,
+    help="Add allocation detail; repeat for case progress and recent logs.",
+)
+def status_command(jobid, verbose):
+    return _invoke_click(_cli_status, _click_args("status", jobid=jobid, verbose=verbose))
+
+
+@command.command("logs", help="Show a job diagnostic log; defaults to latest.")
+@click.argument("jobid", required=False)
+@click.option("-f", "--follow", is_flag=True, help="Stream live; Ctrl-C disconnects viewer.")
+def logs_command(jobid, follow):
+    return _invoke_click(_cli_logs, _click_args("logs", jobid=jobid, follow=follow))
+
+
+@command.command("stop", help="cancel active SLURM job(s) by material, or every live job")
+@click.argument("materials", nargs=-1)
+@click.option("-a", "--all", "all_", is_flag=True, help="Stop every live job.")
+def stop_command(materials, all_):
+    if all_ and materials:
+        raise click.UsageError("stop --all does not take material names")
+    if not all_ and not materials:
+        raise click.UsageError("stop needs material name(s), or use --all")
+    return _invoke_click(
+        _cli_stop,
+        _click_args("stop", materials=list(materials), all=all_),
+    )
+
+
+@command.command(
+    "reap",
+    help="Release orphaned checkpoint reservations; preview unless --yes.",
+)
+@click.option(
+    "--min-age-minutes",
+    type=NONNEGATIVE_FLOAT,
+    default=5.0,
+    show_default=True,
+    help="Only reap locks at least this old.",
+)
+@click.option("--yes", is_flag=True, help="Release reservations; otherwise preview.")
+def reap_command(min_age_minutes, yes):
+    return _invoke_click(
+        _cli_reap,
+        _click_args("reap", min_age_minutes=min_age_minutes, yes=yes),
+    )
+
+
+@command.command("pull", help="Fetch existing checkpoints from remote box.")
+@click.argument("material", nargs=-1)
+@click.option("-a", "--all", "all_", is_flag=True, help="Pull every configured material.")
+@click.option("-f", "--full", "full_", is_flag=True, help="Pull full unfiltered checkpoint.")
+@click.option("--drop-wide-brem", is_flag=True, help="With grid pull, drop wide-brem.")
+@click.option("--downcast", is_flag=True, help="With grid pull, downcast to float32.")
+@click.option("--level9", is_flag=True, help="Recompress remotely at gzip level 9.")
+@click.option("--no-sync", is_flag=True, help="With grid pull, skip code sync.")
+@click.option("--brem-only", is_flag=True, help="Merge only brem arrays locally.")
+@click.option("--line-only", is_flag=True, help="Merge only line spectra locally.")
+@click.option("--force", is_flag=True, help="Insert dataset records absent locally.")
+def pull_command(
+    material,
+    all_,
+    full_,
+    drop_wide_brem,
+    downcast,
+    level9,
+    no_sync,
+    brem_only,
+    line_only,
+    force,
+):
+    materials = list(material)
+    _reject_all_with_values("pull", all_, materials)
+    if brem_only and line_only:
+        raise click.UsageError("--brem-only and --line-only are mutually exclusive")
+    return _invoke_click(
+        _cli_pull,
+        _click_args(
+            "pull",
+            material=materials,
+            all=all_,
+            full=full_,
+            drop_wide_brem=drop_wide_brem,
+            downcast=downcast,
+            level9=level9,
+            no_sync=no_sync,
+            brem_only=brem_only,
+            line_only=line_only,
+            force=force,
+        ),
+    )
+
+
+@command.command("clear", help="Delete remote checkpoints; preview unless --yes.")
+@click.argument("materials", nargs=-1, metavar="[MATERIAL]...")
+@click.option("--all", "all_checkpoints", is_flag=True, help="Empty remote checkpoints directory.")
+@click.option("--yes", is_flag=True, help="Delete; otherwise preview.")
+def clear_command(materials, all_checkpoints, yes):
+    if all_checkpoints and materials:
+        raise click.UsageError("clear --all takes no material argument")
+    if not all_checkpoints and not materials:
+        raise click.UsageError("clear needs material(s), or --all")
+    return _invoke_click(
+        _cli_clear,
+        _click_args(
+            "clear",
+            materials=list(materials),
+            all_checkpoints=all_checkpoints,
+            yes=yes,
+        ),
+    )
+
+
+@command.command("sync", help="Push current code to remote box.")
+def sync_command():
+    return _invoke_click(_cli_sync, _click_args("sync"))
+
+
+@command.command("check", help="Run Zhai reproduction remotely or pull existing caches.")
+@click.option("--ne", type=POSITIVE_INT, default=20_000, show_default=True)
+@click.option("--ne-brem", type=POSITIVE_INT, default=200, show_default=True)
+@click.option("--ne-supp", type=POSITIVE_INT, default=200, show_default=True)
+@click.option(
+    "--tmd-azimuth",
+    type=FINITE_FLOAT,
+    default=0.0,
+    show_default=True,
+    help="Exploratory TMD azimuth.",
+)
+@click.option("--refresh", is_flag=True, help="Recompute matching cache.")
+@click.option("--no-sync", is_flag=True, help="Skip code upload.")
+@click.option("-d", "--detached", is_flag=True, help="Launch detached.")
+@click.option("-f", "--follow", is_flag=True, help="Track detached job.")
+@click.option("--pull", is_flag=True, help="Only fetch existing Zhai caches.")
+def check_command(ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, detached, follow, pull):
+    if follow and not detached:
+        raise click.UsageError("--follow requires --detached")
+    if pull and detached:
+        raise click.UsageError("--pull and --detached are mutually exclusive")
+    return _invoke_click(
+        _cli_check,
+        _click_args(
+            "check",
+            ne=ne,
+            ne_brem=ne_brem,
+            ne_supp=ne_supp,
+            tmd_azimuth=tmd_azimuth,
+            refresh=refresh,
+            no_sync=no_sync,
+            detached=detached,
+            follow=follow,
+            pull=pull,
+        ),
+    )
 
 
 def main(argv=None):
-    ap = _build_remote_parser(
-        argparse.ArgumentParser(
-            prog="cxr-remote", description="push code + run/manage MC sweeps on a remote GPU box"
-        )
-    )
-    args = ap.parse_args(argv)
-    return args.func(args)
+    return run(command, argv, prog_name="cxr-remote")
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
