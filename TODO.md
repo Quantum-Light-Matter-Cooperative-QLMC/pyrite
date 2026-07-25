@@ -2,7 +2,7 @@
 
 Items live on `feature/...` / `bugfix/...` / `docs/...` branches, not `main`, till done.
 In-progress detail live on branch (or design doc);
-`main` keep one-line summary + pointer, enforced by /docs:todo-sync.
+`main` keep one-line summary + pointer, enforced by /todo-sync.
 Priority weigh value-to-goal (line-flux / enhancement predictions + publication validation story) vs effort and risk.
 
 Item generation:
