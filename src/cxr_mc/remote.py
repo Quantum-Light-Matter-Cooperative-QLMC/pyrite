@@ -20,6 +20,8 @@ One-shot (submit, wait for SLURM, then pull):
     cxr remote scan mose2 --no-sync     # skip the code upload (code unchanged)
     cxr remote pull mose2 wse2          # fetch existing checkpoints (grid-filtered)
     cxr remote pull mose2 --full        # fetch the full, un-filtered checkpoint
+    cxr remote rebrem mose2 --ne-brem 1000   # brem-only recompute of the box's
+                                             # checkpoints (GPU), follow, pull back
     cxr remote sync                     # only push the current code
     cxr remote check [--ne N] [--ne-brem N] [--ne-supp N] [--refresh]
                      [--detached [--follow]] [--pull]
@@ -189,6 +191,7 @@ _ensure_utf8_stdio = cli._ensure_utf8_stdio
 _dispatch = cli._dispatch
 _selected_materials = cli._selected_materials
 _cli_scan = cli._cli_scan
+_cli_rebrem = cli._cli_rebrem
 _cli_pull = cli._cli_pull
 _cli_start = cli._cli_start
 _cli_attach = cli._cli_attach
