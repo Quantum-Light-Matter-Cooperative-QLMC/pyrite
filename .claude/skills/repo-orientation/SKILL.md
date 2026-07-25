@@ -40,6 +40,9 @@ context/model transport; RTK filters shell output. Neither is a code index.
 
 Troubleshooting: `rtk serena project health-check`
 
+For failures, regressions, uncertain ownership, or diagnosis, compose with
+`investigating-changes`; this skill supplies cxr-mc navigation.
+
 ## Before Changing Code
 
 1. Find the smallest file that owns the behavior.

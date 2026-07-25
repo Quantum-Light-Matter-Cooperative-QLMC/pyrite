@@ -26,6 +26,9 @@ Read `docs/repo_map.md` before explore source files.
 
 - `TODO.md` on `main` contains full triaged list of tasks + top-level summaries
 - `TODO.md` on branches contains details scoped to their specific task; see `TODO.md` for conventions.
+- Work addressing/changing tracked item: inspect active-branch + `main` TODO
+  entries before completion. Use `todo-sync` for cross-branch reconciliation.
+  Cheap subagent may inventory read-only; one writer edits TODO.
 
 ## Canonical commands
 
@@ -98,8 +101,11 @@ Agents prefer these commands always.
 - Use Context7 only for current external-library documentation, never as a
   repository source. Headroom manages context/model transport; RTK filters
   shell output. Neither replaces repository navigation or verification.
-- Treat plugin workflows as optional helpers. Repo safety, physics-validation,
-  remote-compute, and verification rules remain authoritative.
+- Personal workflow: `investigating-changes` diagnoses; `planning-changes`
+  handles explicit/complex plans; `implementing-changes` edits;
+  `verifying-changes` gates completion claims.
+- Keep workflow proportionate; repo safety, physics-validation, remote-compute,
+  and domain-skill rules stay authoritative.
 - Keep changes surgical, verify with smallest useful command.
 
 New/edited physics needs derivation docstring:

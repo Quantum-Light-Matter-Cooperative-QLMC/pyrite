@@ -12,6 +12,9 @@ cxr-mc has three user-facing surfaces:
   `notebooks/validation_app.py`: marimo applications.
 - `src/cxr_mc/`: the importable physics and plotting library.
 
+Before runtime-facing completion claims, compose with `verifying-changes`;
+this skill supplies cxr-mc runtime probes and commands.
+
 ## Fast path
 
 Use the headless smoke harness against an existing checkpoint. It follows the

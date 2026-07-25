@@ -8,6 +8,10 @@ description: Use when designing fast regression tests for numerical, stochastic,
 Freeze the smallest externally meaningful behavior that would have caught the
 regression.
 
+For implementation requests, compose with `implementing-changes`.
+`regression-testing` owns test design; `implementing-changes` owns
+edit/verification flow.
+
 ## Test design
 
 1. Reproduce the failure with a focused test before changing implementation.

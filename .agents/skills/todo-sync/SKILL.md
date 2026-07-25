@@ -1,28 +1,35 @@
 ---
 name: todo-sync
-description: Use when reconciling TODO.md between main and active cxr-mc task branches, especially when branches may already be checked out in linked worktrees.
+description: Use when work addresses/changes TODO items or reconciling TODO.md between main and active cxr-mc branches, especially across linked worktrees.
 ---
 
 # TODO Sync
 
-Treat `main:TODO.md` and its header convention as authoritative. Preserve other
-people's working trees and edit only `TODO.md`.
+Treat `main:TODO.md` + its header convention as authoritative. Preserve others'
+working trees; edit only `TODO.md`.
 
 ## Workflow
 
-1. Require a clean starting tree; never stash or discard unrelated work.
-2. Read `main:TODO.md`, remove merged items, and keep each surviving main item to
-   one summary line with its branch or design-document pointer.
-3. For each item marked `>user<`, preserve its full text while no task branch
-   exists; fold it into the branch TODO during steps 1-2, then remove the marker
-   and replace the main entry with a one-line summary once the branch exists.
-4. Run `git worktree list --porcelain` before touching any task branch.
-5. If a branch is already in a linked worktree, edit it there. Otherwise switch
-   only from a clean main checkout.
-6. Keep each task branch's `TODO.md` scoped to that branch, preserving the richer
-   current details and repairing stale paths or names.
-7. Commit doc-only changes separately per branch. Do not push. Return the main
+1. Work addressing/changing tracked item: inspect active-branch `TODO.md` +
+   `main:TODO.md` before completion. Remove completed detail; update/remove main
+   summary based on remaining work.
+2. Require clean starting tree for cross-branch edits; never stash/discard
+   unrelated work.
+3. Read `main:TODO.md`; remove merged items. Keep each surviving main item to
+   one summary line with branch or design-document pointer.
+4. Preserve full text for items marked `>user<` while no task branch exists.
+   During reconciliation, fold text into branch TODO, remove marker, then
+   replace main entry with one-line summary once branch exists.
+5. Run `git worktree list --porcelain` before touching any task branch.
+6. If branch already has linked worktree, edit there. Otherwise switch only
+   from clean main checkout.
+7. Keep each task branch's `TODO.md` branch-scoped; preserve richer current
+   details and repair stale paths/names.
+8. Commit doc-only changes separately per branch. Do not push. Return the main
    checkout to `main` and report commit ids plus ahead-of-origin counts.
+
+Large read-only inventory: cheap fresh subagent may inspect branches/worktrees.
+Keep one explicit `TODO.md` writer; no parallel edits.
 
 ## Stop conditions
 
