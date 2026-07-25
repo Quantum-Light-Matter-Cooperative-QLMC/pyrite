@@ -16,12 +16,14 @@ import sys
 # (an editable ``uv sync`` also puts it on the path).
 sys.path.insert(0, os.path.abspath("../src"))
 
+from cxr_mc import __version__
+
 # -- Project -----------------------------------------------------------------
 project = "cxr-mc"
 author = "Alex Amador"
 copyright = "2026, Alex Amador"
-release = "0.1.0"
-version = "0.1.0"
+release = __version__
+version = __version__
 
 # -- Extensions --------------------------------------------------------------
 extensions = [

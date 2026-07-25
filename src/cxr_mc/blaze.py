@@ -107,7 +107,11 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
 @click.command(
     "blaze",
     cls=_BlazeCommand,
-    help="Run one material's blazed-crystal MC sweep and write its checkpoint.",
+    help=(
+        "Run one material's blazed-crystal MC sweep and write its checkpoint.\n\n"
+        "Writes checkpoints/<material>_blazed.pkl, separate from flat-face scan "
+        "checkpoints. Repeat --energy/--spacing/--angles for multiple values."
+    ),
 )
 @click.argument("material")
 @click.option(
@@ -142,12 +146,19 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
     default=None,
     help="run_cases max_workers (default auto; 0 = serial).",
 )
-@click.option("--checkpoint-dir", default="checkpoints", show_default=True)
+@click.option(
+    "--checkpoint-dir",
+    default="checkpoints",
+    show_default=True,
+    metavar="DIR",
+    help="Read and write blazed checkpoint pickles in DIR.",
+)
 @click.option(
     "--max-minutes",
     type=_cli_core.POSITIVE_FLOAT,
     default=None,
-    help="Soft wall-clock budget; exit 75 if work remains.",
+    metavar="MINUTES",
+    help="Soft wall-clock budget in minutes; exit 75 if resumable work remains.",
 )
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option("--no-progress", is_flag=True, hidden=True)

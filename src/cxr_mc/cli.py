@@ -50,11 +50,22 @@ _COMMAND_HELP = {
     cls=LazyGroup,
     lazy_commands=_COMMANDS,
     lazy_help=_COMMAND_HELP,
+    no_args_is_help=False,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 @click.version_option(__version__, prog_name="cxr-mc", message="cxr-mc %(version)s")
 def command() -> None:
-    """Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit."""
+    """Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.
+
+    Run ``cxr COMMAND --help`` for command options, units, defaults, and side
+    effects.
+
+    \b
+    Examples:
+      cxr scan mose2 --quick
+      cxr analyze mose2
+      cxr remote start mose2 --dry-run
+    """
 
 
 def main(argv: Sequence[str] | None = None):

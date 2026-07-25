@@ -220,16 +220,47 @@ def _cli(args):
     _launch(**launch_args)
 
 
-@click.command("check", help=f"Launch {NOTEBOOK}, or export its cached validation figures.")
+@click.command(
+    "check",
+    help=(
+        f"Launch {NOTEBOOK}, or export its cached validation figures.\n\n"
+        "--export skips marimo and writes figures to --outdir. Electron-count "
+        "options affect export mode only."
+    ),
+)
 @click.option("--watch", is_flag=True, help="Pass marimo's --watch.")
 @click.option("--edit", is_flag=True, help="Use `marimo edit` instead of `marimo run`.")
 @click.option("--acp", is_flag=True, help="Start local Claude and Codex ACP bridges.")
 @click.option("--tunnel", is_flag=True, help="Use fixed port for SSH tunneling.")
 @click.option("--export", "export_", is_flag=True, help="Render cached figures instead of marimo.")
-@click.option("--outdir", default="figures", show_default=True)
-@click.option("--ne", type=_cli_core.POSITIVE_INT, default=20_000, show_default=True)
-@click.option("--ne-brem", type=_cli_core.POSITIVE_INT, default=200, show_default=True)
-@click.option("--ne-supp", type=_cli_core.POSITIVE_INT, default=200, show_default=True)
+@click.option(
+    "--outdir",
+    default="figures",
+    show_default=True,
+    metavar="DIR",
+    help="With --export, output directory.",
+)
+@click.option(
+    "--ne",
+    type=_cli_core.POSITIVE_INT,
+    default=20_000,
+    show_default=True,
+    help="With --export, Fig. 1c line electrons per energy.",
+)
+@click.option(
+    "--ne-brem",
+    type=_cli_core.POSITIVE_INT,
+    default=200,
+    show_default=True,
+    help="With --export, Fig. 1c bremsstrahlung electrons per energy.",
+)
+@click.option(
+    "--ne-supp",
+    type=_cli_core.POSITIVE_INT,
+    default=200,
+    show_default=True,
+    help="With --export, supplementary electrons per polar-tilt spectrum.",
+)
 def command(watch, edit, acp, tunnel, export_, outdir, ne, ne_brem, ne_supp):
     return _cli_core.invoke_legacy(
         _cli,

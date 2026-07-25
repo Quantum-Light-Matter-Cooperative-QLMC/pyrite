@@ -44,8 +44,10 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 ## Entry points
 
 - **`cxr` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
-  dispatch `scan`, `export`, `analyze`, `slim`, `archive`, `restore`,
-  `archives`, `union`, `remote`, `check`, `check-config`.
+  lazy Click dispatch for `scan`, `blaze`, `export`, `analyze`, `slim`,
+  `rebrem`, `reline`, `archive`, `restore`, `archives`, `union`, `remote`,
+  `line-grid`, `check`, `check-config`. Checked user-facing inventory:
+  [`docs/cli-reference.md`](cli-reference.md).
 - **`cxr check-config [catalog]`** → `check_config:_run`: validate bundled
   offline catalog or explicit complete catalog without starting simulation.
 - **`cxr scan <material>`** → `scan:main` → `run.run_sweep` → write
@@ -325,8 +327,9 @@ wired into pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
 ### `cli.py`
 `cxr` console-script dispatcher.
 - Public: `main`.
-- Deps: `analyze`, `archive`, `blaze`, `check`, `check_config`, `export`,
-  `remote`, `scan`, `slim`, `__version__`.
+- Deps (lazy command imports): `analyze`, `archive`, `blaze`, `check`,
+  `check_config`, `export`, `line_grid`, `rebrem`, `reline`, `remote`, `scan`,
+  `slim`; eager lightweight deps: `_cli_core`, `__version__`.
 
 ### `analyze.py`
 `cxr analyze` launcher for `notebooks/analysis_app.py`: persisted
@@ -334,7 +337,7 @@ initial-material selection, smoke execution, edit/watch mode, ACP bridges,
 SSH-tunnel-friendly fixed-port launch.
 - Public: `material_menu`, `select_initial_material`, `face_menu`,
   `checkpoint_stem`, `initial_material`, `get_default_material`,
-  `set_default_material`, `add_subparser`, `main`. `face_menu`/`checkpoint_stem`
+  `set_default_material`, `command`, `main`. `face_menu`/`checkpoint_stem`
   back the app's flat/blazed **Face** dropdown (blazed loads
   `<material>_blazed.pkl` from `cxr blaze`).
 

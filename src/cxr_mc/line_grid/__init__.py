@@ -123,22 +123,65 @@ def _expected_failure(exc):
 
 
 def _derive_options(function):
-    function = click.option("--set-default", is_flag=True)(function)
-    function = click.option("--thickness", type=_THICKNESS_CSV_TEXT)(function)
-    function = click.option("--azimuths", type=_AZIMUTH_CSV_TEXT)(function)
-    function = click.option("--tilts", type=_TILT_CSV_TEXT)(function)
-    function = click.option("--energies", type=_ENERGY_CSV_TEXT)(function)
-    return click.option("--materials")(function)
+    function = click.option(
+        "--set-default",
+        is_flag=True,
+        help="Persist supplied geometry, energies, and materials as future defaults.",
+    )(function)
+    function = click.option(
+        "--thickness",
+        type=_THICKNESS_CSV_TEXT,
+        metavar="ANGSTROM,...",
+        help="Crystal thicknesses in angstrom; comma-separated and positive.",
+    )(function)
+    function = click.option(
+        "--azimuths",
+        type=_AZIMUTH_CSV_TEXT,
+        metavar="DEG,...",
+        help="Azimuths in degrees [0, 360]; comma-separated.",
+    )(function)
+    function = click.option(
+        "--tilts",
+        type=_TILT_CSV_TEXT,
+        metavar="DEG,...",
+        help="Polar tilts in degrees [0, 90); comma-separated.",
+    )(function)
+    function = click.option(
+        "--energies",
+        type=_ENERGY_CSV_TEXT,
+        metavar="KEV,...",
+        help="Beam energies in keV; comma-separated and positive.",
+    )(function)
+    return click.option(
+        "--materials",
+        metavar="KEY,...",
+        help="Material keys; comma-separated. Omit to use persistent defaults.",
+    )(function)
 
 
-@click.group(name="line-grid")
+@click.group(name="line-grid", no_args_is_help=False)
 def command():
-    """Derive and manage per-material line-grid bounds."""
+    """Derive and manage per-material line-grid bounds.
+
+    Geometry flags override persistent defaults for one run. Use ``--set-default``
+    to persist supplied values.
+
+    \b
+    Examples:
+      cxr line-grid derive --materials mose2,wse2 --energies 30,60
+      cxr line-grid submit --materials mose2 --dry-run
+      cxr line-grid show mose2
+    """
 
 
 @command.command("derive")
 @_derive_options
-@click.option("--brem-step", type=POSITIVE_FLOAT)
+@click.option(
+    "--brem-step",
+    type=POSITIVE_FLOAT,
+    metavar="EV",
+    help="Bremsstrahlung grid spacing in eV; overrides persistent default.",
+)
 def derive_command(
     materials,
     energies,
@@ -170,9 +213,20 @@ def derive_command(
 
 @command.command("submit")
 @_derive_options
-@click.option("--slice-minutes", type=POSITIVE_FLOAT, default=job.DEFAULT_SLICE_MINUTES)
-@click.option("--no-sync", is_flag=True)
-@click.option("--dry-run", is_flag=True)
+@click.option(
+    "--slice-minutes",
+    type=POSITIVE_FLOAT,
+    default=job.DEFAULT_SLICE_MINUTES,
+    show_default=True,
+    metavar="MINUTES",
+    help="Maximum duration of each self-resubmitting remote slice.",
+)
+@click.option("--no-sync", is_flag=True, help="Skip code upload before submission.")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Print batch script and submission command; do not connect or submit.",
+)
 def submit_command(
     materials,
     energies,
@@ -200,34 +254,44 @@ def submit_command(
 
 
 @command.command("status")
-@click.argument("jobid", required=False)
-@click.option("-v", "--verbose", count=True)
+@click.argument("jobid", required=False, metavar="[JOBID]")
+@click.option(
+    "-v",
+    "--verbose",
+    count=True,
+    help="Add allocation detail; repeat for case progress and recent logs.",
+)
 def status_command(jobid, verbose):
-    """Show line-grid job status."""
+    """Show line-grid job status. JOBID defaults to latest recorded job."""
     remote.job_status(jobid, detail=verbose)
     return 0
 
 
 @command.command("attach")
-@click.argument("jobid", required=False)
+@click.argument("jobid", required=False, metavar="[JOBID]")
 def attach_command(jobid):
-    """Attach to line-grid job progress."""
+    """Attach to line-grid job progress. JOBID defaults to latest recorded job."""
     remote.attach(jobid)
     return 0
 
 
 @command.command("logs")
-@click.argument("jobid", required=False)
-@click.option("-f", "--follow", is_flag=True)
+@click.argument("jobid", required=False, metavar="[JOBID]")
+@click.option(
+    "-f",
+    "--follow",
+    is_flag=True,
+    help="Stream live; Ctrl-C disconnects viewer without stopping job.",
+)
 def logs_command(jobid, follow):
-    """Print or follow line-grid job logs."""
+    """Print or follow line-grid job logs. JOBID defaults to latest recorded job."""
     return _invoke_callback(remote.tail_logs, jobid, follow)
 
 
 @command.command("stop")
-@click.argument("jobid", required=False)
+@click.argument("jobid", required=False, metavar="[JOBID]")
 def stop_command(jobid):
-    """Stop one line-grid job."""
+    """Stop one line-grid job. JOBID defaults to latest recorded job."""
     resolved_jobid = jobid or remote._latest_jobid()
     if not resolved_jobid:
         raise CLIError("no jobs to stop")
@@ -237,13 +301,32 @@ def stop_command(jobid):
 
 @command.command("apply")
 @click.argument("json_path", required=False, metavar="JSON")
-@click.option("--materials")
-@click.option("--pull", is_flag=True)
-@click.option("--force", is_flag=True)
-@click.option("--regen-golden", is_flag=True)
-@click.option("--dry-run", is_flag=True)
+@click.option("--materials", metavar="KEY,...", help="Apply only listed material keys.")
+@click.option(
+    "--pull",
+    is_flag=True,
+    help="Fetch default combined JSON from remote host; takes precedence over JSON.",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Replace manually overridden rows; otherwise preserve them.",
+)
+@click.option(
+    "--regen-golden",
+    is_flag=True,
+    help="Regenerate checked catalog snapshot after successful write.",
+)
+@click.option("--dry-run", is_flag=True, help="Print proposed diff; write nothing.")
 def apply_command(json_path, materials, pull, force, regen_golden, dry_run):
-    """Apply derived bounds to material catalog."""
+    """Apply derived bounds to material catalog.
+
+    Writes packaged ``materials.toml`` and provenance atomically after validation.
+
+    \b
+    Example:
+      cxr line-grid apply combined_line_grid_bounds.json --materials mose2,wse2
+    """
     path = _pull_combined() if pull else json_path
     if not path:
         raise click.UsageError("no JSON: pass a path or --pull")
@@ -267,13 +350,27 @@ def apply_command(json_path, materials, pull, force, regen_golden, dry_run):
 
 @command.command("set")
 @click.argument("material")
-@click.option("--energy", type=POSITIVE_FLOAT, required=True)
-@click.option("--stop", type=POSITIVE_FLOAT, required=True)
-@click.option("--num", type=POSITIVE_INT)
-@click.option("--start", type=POSITIVE_FLOAT)
-@click.option("--note")
+@click.option(
+    "--energy", type=POSITIVE_FLOAT, required=True, metavar="KEV", help="Beam energy in keV."
+)
+@click.option(
+    "--stop", type=POSITIVE_FLOAT, required=True, metavar="EV", help="Line-grid upper bound in eV."
+)
+@click.option(
+    "--num",
+    type=POSITIVE_INT,
+    metavar="N",
+    help="Grid point count; preserve current value if omitted.",
+)
+@click.option(
+    "--start",
+    type=POSITIVE_FLOAT,
+    metavar="EV",
+    help="Line-grid lower bound in eV; preserve current value if omitted.",
+)
+@click.option("--note", help="Provenance note stored with manual override.")
 def set_command(material, energy, stop, num, start, note):
-    """Set one material line-grid row."""
+    """Set one material line-grid row and mark it as a manual override."""
     try:
         apply.set_line_grid(material, energy, stop, num=num, start_eV=start, note=note)
     except (KeyError, ValueError, OSError) as exc:
@@ -283,11 +380,22 @@ def set_command(material, energy, stop, num, start, note):
 
 @command.command("set-brem")
 @click.argument("material")
-@click.option("--stop", type=POSITIVE_FLOAT, required=True)
-@click.option("--step", type=POSITIVE_FLOAT)
-@click.option("--note")
+@click.option(
+    "--stop",
+    type=POSITIVE_FLOAT,
+    required=True,
+    metavar="EV",
+    help="Bremsstrahlung grid upper bound in eV.",
+)
+@click.option(
+    "--step",
+    type=POSITIVE_FLOAT,
+    metavar="EV",
+    help="Grid spacing in eV; preserve current value if omitted.",
+)
+@click.option("--note", help="Provenance note stored with manual override.")
 def set_brem_command(material, stop, step, note):
-    """Set one material bremsstrahlung grid."""
+    """Set one material bremsstrahlung grid and mark it as a manual override."""
     try:
         apply.set_brem_grid(material, stop, step_eV=step, note=note)
     except (KeyError, ValueError, OSError) as exc:
@@ -296,11 +404,33 @@ def set_brem_command(material, stop, step, note):
 
 
 @command.command("defaults")
-@click.option("--set", "set_values", is_flag=True)
-@click.option("--tilts", type=_TILT_CSV)
-@click.option("--azimuths", type=_AZIMUTH_CSV)
-@click.option("--thickness", type=_THICKNESS_CSV)
-@click.option("--brem-step", type=POSITIVE_FLOAT)
+@click.option(
+    "--set",
+    "set_values",
+    is_flag=True,
+    help="Persist supplied values; otherwise only show defaults.",
+)
+@click.option(
+    "--tilts", type=_TILT_CSV, metavar="DEG,...", help="Persistent polar tilts in degrees [0, 90)."
+)
+@click.option(
+    "--azimuths",
+    type=_AZIMUTH_CSV,
+    metavar="DEG,...",
+    help="Persistent azimuths in degrees [0, 360].",
+)
+@click.option(
+    "--thickness",
+    type=_THICKNESS_CSV,
+    metavar="ANGSTROM,...",
+    help="Persistent positive crystal thicknesses in angstrom.",
+)
+@click.option(
+    "--brem-step",
+    type=POSITIVE_FLOAT,
+    metavar="EV",
+    help="Persistent positive bremsstrahlung spacing in eV.",
+)
 def defaults_command(set_values, tilts, azimuths, thickness, brem_step):
     """Show or update persistent derivation defaults."""
     supplied = [
@@ -340,9 +470,16 @@ def show_command(material):
 
 
 @command.command("regen-golden")
-@click.option("--check", is_flag=True)
+@click.option(
+    "--check",
+    is_flag=True,
+    help="Check snapshot for drift; do not write (exit 1 when stale).",
+)
 def regen_golden_command(check):
-    """Regenerate or check material-catalog golden snapshot."""
+    """Regenerate or check material-catalog golden snapshot.
+
+    Requires source checkout because installed wheels do not contain test data.
+    """
     from cxr_mc.line_grid import golden
 
     return _invoke_callback(golden.regen, check=check)

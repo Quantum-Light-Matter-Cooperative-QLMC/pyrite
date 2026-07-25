@@ -175,9 +175,9 @@ One task per agent. Run tasks sharing line-grid or remote owners sequentially.
 
 ### P2: discoverability
 
-14. **Complete Click help** — summaries, units, defaults, mutation and precedence
+14. **DONE — Complete Click help** — summaries, units, defaults, mutation and precedence
     rules, incompatibilities, latest-job semantics, examples, startup benchmark.
-15. **Generate CLI reference** — checked command tree, docs links, cluster
+15. **DONE — Generate CLI reference** — checked command tree, docs links, cluster
     defaults, repo-map inventory, historical-doc labels, single-source version.
 16. **Add Click completion** — materials, comma-separated materials, checkpoints,
     archive labels, job IDs, and choices. Network lookup bounded, silent, and

@@ -318,7 +318,18 @@ def _reject_all_with_values(command_name, all_, values):
 
 @click.group(
     "remote",
-    help="[dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.",
+    help=(
+        "[dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n"
+        "Host, remote directory, and executable come from CXR_REMOTE_HOST, "
+        "CXR_REMOTE_DIR, and CXR_REMOTE_UV. Command-line options take precedence "
+        "over workflow defaults where offered.\n\n"
+        "\b\n"
+        "Examples:\n"
+        "  cxr remote start hopg --dry-run\n"
+        "  cxr remote scan hopg\n"
+        "  cxr remote status -vv"
+    ),
+    no_args_is_help=False,
 )
 def command():
     """Push code and run or manage MC sweeps on a remote GPU box."""
@@ -326,10 +337,19 @@ def command():
 
 
 @command.command("scan", help="Sync code, submit sweep(s), wait, and pull checkpoints.")
-@click.argument("material", required=False)
+@click.argument("material", required=False, metavar="[MATERIAL]")
 @click.option("-a", "--all", "all_", is_flag=True, help="Run every material in mats_to_sim.toml.")
-@click.option("--quick", is_flag=True)
-@click.option("--workers", type=NONNEGATIVE_INT, default=None)
+@click.option(
+    "--quick",
+    is_flag=True,
+    help="Use tiny smoke-test grid; incompatible with --grid.",
+)
+@click.option(
+    "--workers",
+    type=NONNEGATIVE_INT,
+    default=None,
+    help="Transport workers (default: auto; 0 runs serially).",
+)
 @click.option(
     "--parallel-materials",
     type=click.IntRange(1, config.MAX_PARALLEL_MATERIALS),
@@ -345,7 +365,11 @@ def command():
     help="Self-resubmitting SLURM slice length; 0 runs one monolithic job.",
 )
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
-@click.option("--grid", is_flag=True, help="Grid-filter checkpoint before pulling.")
+@click.option(
+    "--grid",
+    is_flag=True,
+    help="Grid-filter checkpoint before pulling; incompatible with --quick.",
+)
 @click.option("--drop-wide-brem", is_flag=True, help="With --grid, drop wide-brem.")
 @click.option("--downcast", is_flag=True, help="With --grid, downcast to float32.")
 def scan_command(
@@ -408,7 +432,7 @@ def _recompute_options(function):
     function = click.option(
         "-a", "--all", "all_", is_flag=True, help="Use every material in mats_to_sim.toml."
     )(function)
-    return click.argument("material", nargs=-1)(function)
+    return click.argument("material", nargs=-1, metavar="[MATERIAL]...")(function)
 
 
 @command.command(
@@ -487,10 +511,15 @@ def reline_command(
 
 
 @command.command("start", help="Sync code and submit a detached SLURM material queue.")
-@click.argument("materials", nargs=-1)
+@click.argument("materials", nargs=-1, metavar="[MATERIAL]...")
 @click.option("-a", "--all", "all_", is_flag=True, help="Queue every configured material.")
-@click.option("--quick", is_flag=True)
-@click.option("--workers", type=NONNEGATIVE_INT, default=None)
+@click.option("--quick", is_flag=True, help="Use tiny smoke-test grid.")
+@click.option(
+    "--workers",
+    type=NONNEGATIVE_INT,
+    default=None,
+    help="Transport workers (default: auto; 0 runs serially).",
+)
 @click.option(
     "--parallel-materials",
     type=click.IntRange(1, config.MAX_PARALLEL_MATERIALS),
@@ -541,7 +570,7 @@ def start_command(
 
 
 @command.command("attach", help="Live-track a remote job; defaults to latest.")
-@click.argument("jobid", required=False)
+@click.argument("jobid", required=False, metavar="[JOBID]")
 @click.option(
     "-v",
     "--verbose",
@@ -558,7 +587,7 @@ def jobs_command():
 
 
 @command.command("status", help="Show one job; use -v for allocation and -vv for logs.")
-@click.argument("jobid", required=False)
+@click.argument("jobid", required=False, metavar="[JOBID]")
 @click.option(
     "-v",
     "--verbose",
@@ -570,14 +599,14 @@ def status_command(jobid, verbose):
 
 
 @command.command("logs", help="Show a job diagnostic log; defaults to latest.")
-@click.argument("jobid", required=False)
+@click.argument("jobid", required=False, metavar="[JOBID]")
 @click.option("-f", "--follow", is_flag=True, help="Stream live; Ctrl-C disconnects viewer.")
 def logs_command(jobid, follow):
     return _invoke_click(_cli_logs, _click_args("logs", jobid=jobid, follow=follow))
 
 
-@command.command("stop", help="cancel active SLURM job(s) by material, or every live job")
-@click.argument("materials", nargs=-1)
+@command.command("stop", help="Cancel active SLURM job(s) by material, or every live job.")
+@click.argument("materials", nargs=-1, metavar="[MATERIAL]...")
 @click.option("-a", "--all", "all_", is_flag=True, help="Stop every live job.")
 def stop_command(materials, all_):
     if all_ and materials:
@@ -610,16 +639,34 @@ def reap_command(min_age_minutes, yes):
 
 
 @command.command("pull", help="Fetch existing checkpoints from remote box.")
-@click.argument("material", nargs=-1)
+@click.argument("material", nargs=-1, metavar="[STEM]...")
 @click.option("-a", "--all", "all_", is_flag=True, help="Pull every configured material.")
-@click.option("-f", "--full", "full_", is_flag=True, help="Pull full unfiltered checkpoint.")
+@click.option(
+    "-f",
+    "--full",
+    "full_",
+    is_flag=True,
+    help="Pull full unfiltered checkpoint (default: grid-filtered).",
+)
 @click.option("--drop-wide-brem", is_flag=True, help="With grid pull, drop wide-brem.")
 @click.option("--downcast", is_flag=True, help="With grid pull, downcast to float32.")
 @click.option("--level9", is_flag=True, help="Recompress remotely at gzip level 9.")
 @click.option("--no-sync", is_flag=True, help="With grid pull, skip code sync.")
-@click.option("--brem-only", is_flag=True, help="Merge only brem arrays locally.")
-@click.option("--line-only", is_flag=True, help="Merge only line spectra locally.")
-@click.option("--force", is_flag=True, help="Insert dataset records absent locally.")
+@click.option(
+    "--brem-only",
+    is_flag=True,
+    help="Merge only brem arrays locally; mutually exclusive with --line-only.",
+)
+@click.option(
+    "--line-only",
+    is_flag=True,
+    help="Merge only line spectra locally; mutually exclusive with --brem-only.",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="With partial merge, insert records absent locally.",
+)
 def pull_command(
     material,
     all_,
@@ -656,8 +703,13 @@ def pull_command(
 
 @command.command("clear", help="Delete remote checkpoints; preview unless --yes.")
 @click.argument("materials", nargs=-1, metavar="[MATERIAL]...")
-@click.option("--all", "all_checkpoints", is_flag=True, help="Empty remote checkpoints directory.")
-@click.option("--yes", is_flag=True, help="Delete; otherwise preview.")
+@click.option(
+    "--all",
+    "all_checkpoints",
+    is_flag=True,
+    help="Empty remote checkpoints directory; takes no material arguments.",
+)
+@click.option("--yes", is_flag=True, help="Delete exact previewed targets; otherwise preview.")
 def clear_command(materials, all_checkpoints, yes):
     if all_checkpoints and materials:
         raise click.UsageError("clear --all takes no material argument")
@@ -680,21 +732,53 @@ def sync_command():
 
 
 @command.command("check", help="Run Zhai reproduction remotely or pull existing caches.")
-@click.option("--ne", type=POSITIVE_INT, default=20_000, show_default=True)
-@click.option("--ne-brem", type=POSITIVE_INT, default=200, show_default=True)
-@click.option("--ne-supp", type=POSITIVE_INT, default=200, show_default=True)
+@click.option(
+    "--ne",
+    type=POSITIVE_INT,
+    default=20_000,
+    show_default=True,
+    help="Fig. 1c line electrons per energy.",
+)
+@click.option(
+    "--ne-brem",
+    type=POSITIVE_INT,
+    default=200,
+    show_default=True,
+    help="Fig. 1c bremsstrahlung electrons per energy.",
+)
+@click.option(
+    "--ne-supp",
+    type=POSITIVE_INT,
+    default=200,
+    show_default=True,
+    help="Supplementary electrons per polar-tilt spectrum.",
+)
 @click.option(
     "--tmd-azimuth",
     type=FINITE_FLOAT,
     default=0.0,
     show_default=True,
-    help="Exploratory TMD azimuth.",
+    help="Exploratory TMD azimuth in degrees.",
 )
 @click.option("--refresh", is_flag=True, help="Recompute matching cache.")
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
-@click.option("-d", "--detached", is_flag=True, help="Launch detached.")
-@click.option("-f", "--follow", is_flag=True, help="Track detached job.")
-@click.option("--pull", is_flag=True, help="Only fetch existing Zhai caches.")
+@click.option(
+    "-d",
+    "--detached",
+    is_flag=True,
+    help="Launch detached; mutually exclusive with --pull.",
+)
+@click.option(
+    "-f",
+    "--follow",
+    is_flag=True,
+    help="Track detached job; requires --detached.",
+)
+@click.option(
+    "--pull",
+    is_flag=True,
+    help="Only fetch existing Zhai caches; mutually exclusive with --detached.",
+)
 def check_command(ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, detached, follow, pull):
     if follow and not detached:
         raise click.UsageError("--follow requires --detached")

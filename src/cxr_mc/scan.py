@@ -88,21 +88,38 @@ def _beam_uvw(ctx, param, value):
     return _cli_core.BEAM_UVW.convert(value, param, ctx)
 
 
-@click.command("scan", help="Run one material's MC sweep and write its checkpoint.")
+@click.command(
+    "scan",
+    help=(
+        "Run one material's MC sweep and write its checkpoint.\n\n"
+        "Pass MATERIAL or --all, never both. Resumes compatible checkpoints in "
+        "CHECKPOINTS and writes <material>.pkl (or <material>_quick.pkl)."
+    ),
+)
 @click.argument("material", required=False)
-@click.option("-a", "--all", "all_", is_flag=True, help="Run every material in mats_to_sim.toml.")
+@click.option(
+    "-a",
+    "--all",
+    "all_",
+    is_flag=True,
+    help="Run every material in mats_to_sim.toml; takes no MATERIAL.",
+)
 @click.option(
     "--workers",
     type=_cli_core.NONNEGATIVE_INT,
     default=None,
     help="run_cases max_workers (default auto; 0 = serial, no transport pool).",
 )
-@click.option("--quick", is_flag=True, help="Use tiny smoke-test grid.")
+@click.option(
+    "--quick",
+    is_flag=True,
+    help="Use tiny smoke-test grid and write <material>_quick.pkl.",
+)
 @click.option(
     "--n-families",
     type=_cli_core.POSITIVE_INT,
     default=None,
-    help="Override dominant reflection-family count.",
+    help="Override positive dominant reflection-family count.",
 )
 @click.option(
     "--beam-uvw",
@@ -111,14 +128,21 @@ def _beam_uvw(ctx, param, value):
     callback=_beam_uvw,
     default=None,
     metavar="H K L",
-    help="Override beam zone axis [uvw].",
+    help="Override nonzero integer beam zone axis [uvw].",
 )
-@click.option("--checkpoint-dir", default="checkpoints", show_default=True)
+@click.option(
+    "--checkpoint-dir",
+    default="checkpoints",
+    show_default=True,
+    metavar="DIR",
+    help="Read and write checkpoint pickles in DIR.",
+)
 @click.option(
     "--max-minutes",
     type=_cli_core.POSITIVE_FLOAT,
     default=None,
-    help="Soft wall-clock budget; exit 75 if work remains.",
+    metavar="MINUTES",
+    help="Soft wall-clock budget in minutes; exit 75 if resumable work remains.",
 )
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option("--no-progress", is_flag=True, hidden=True)

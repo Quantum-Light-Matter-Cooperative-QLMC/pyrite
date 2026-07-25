@@ -102,8 +102,11 @@ all interactive visualization and static-HTML export stay on your workstation.
 
 `cxr remote` syncs the current working tree to the configured lab host and
 submits every CXR compute run through SLURM. Its fixed lab allocation requests
-the `gpu` partition, one node, one task, one GPU (`--gres=gpu:1`), and unlimited
-wall time. The generated batch job starts with `module purge`, then loads
+the `gpu` partition, one node, one task, and one GPU (`--gres=gpu:1`). Default
+`--chunk-minutes 10` runs one material at a time in bounded, self-resubmitting
+slices. `--chunk-minutes 0` selects a monolithic `UNLIMITED` allocation; only
+that mode accepts `--parallel-materials`, defaults to two concurrent materials,
+and caps concurrency at four. The generated batch job starts with `module purge`, then loads
 `cuda`, `openmpi`, and `hdf5`; it uses the synced project's configured `uv`
 environment, not the WarpX-specific `jrozells` Conda environment.
 
@@ -116,9 +119,8 @@ cxr remote start hopg --dry-run
 
 `cxr remote scan hopg` syncs, submits, follows the SLURM job, and pulls the
 checkpoint. `cxr remote start hopg wse2` syncs, submits, and returns immediately.
-Multi-material runs start two material scans concurrently by default; use
-`--parallel-materials 3` for workloads measured to fit concurrently, `1` for
-serial execution, or at most `4`. Use `cxr remote status`, `cxr remote logs --follow`,
+Use `--chunk-minutes 0 --parallel-materials 3` only for workloads measured to
+fit concurrently. Use `cxr remote status`, `cxr remote logs --follow`,
 or `cxr remote attach` to monitor the allocation. `attach` shows an independent
 case-progress bar for each material; `logs --follow` shows the raw shared job log.
 `cxr remote stop ...` cancels an active allocation with `scancel`. `cxr remote

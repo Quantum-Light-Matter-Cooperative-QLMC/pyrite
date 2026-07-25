@@ -259,7 +259,14 @@ def _cli_union(args):
     )
 
 
-@click.command("archive", help="Copy an active checkpoint to long-term shelf.")
+@click.command(
+    "archive",
+    help=(
+        "Copy an active checkpoint to long-term shelf.\n\n"
+        "LABEL defaults to a date-stamped label inferred from STEM. Existing "
+        "labels are preserved unless --force."
+    ),
+)
 @click.argument("stem")
 @click.argument("label", required=False)
 @click.option("--force", is_flag=True, help="Overwrite existing archive label.")
@@ -267,7 +274,14 @@ def archive_command(stem, label, force):
     return _cli_core.invoke_legacy(_cli_archive, stem=stem, label=label, force=force)
 
 
-@click.command("restore", help="Copy an archived checkpoint back to active slot.")
+@click.command(
+    "restore",
+    help=(
+        "Copy an archived checkpoint back to active slot.\n\n"
+        "Active stem is inferred from LABEL unless --as is supplied. Existing "
+        "active checkpoints are preserved unless --force."
+    ),
+)
 @click.argument("label")
 @click.option("--as", "stem", default=None, help="Active stem (default: inferred).")
 @click.option("--force", is_flag=True, help="Overwrite existing active checkpoint.")
@@ -280,7 +294,14 @@ def archives_command():
     return _cli_core.invoke_legacy(_cli_archives)
 
 
-@click.command("union", help="Merge an archived checkpoint into active slot.")
+@click.command(
+    "union",
+    help=(
+        "Merge an archived checkpoint into active slot.\n\n"
+        "Requires matching materials. Live records win overlaps; source archive "
+        "is retained and live checkpoint is backed up by default."
+    ),
+)
 @click.argument("stem")
 @click.argument("label")
 @click.option(

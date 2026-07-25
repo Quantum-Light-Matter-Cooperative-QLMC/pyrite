@@ -117,10 +117,17 @@ def _cli(args):
     )
 
 
-@click.command("slim", help="Shrink a checkpoint pickle for transfer.")
+@click.command(
+    "slim",
+    help=(
+        "Shrink a checkpoint pickle for transfer.\n\n"
+        "Writes a new file; input checkpoint is never modified. --brem-only and "
+        "--line-only are mutually exclusive."
+    ),
+)
 @click.argument("checkpoint")
 @click.option("-o", "--out", default=None, help="Output path (default: <stem>.slim.pkl).")
-@click.option("--grid", is_flag=True, help="Keep only current-grid configs.")
+@click.option("--grid", is_flag=True, help="Keep only material's current-grid configs.")
 @click.option("--drop-wide-brem", is_flag=True, help="Drop full-range brem arrays.")
 @click.option("--downcast", is_flag=True, help="Store spectral arrays as float32.")
 @click.option(
@@ -130,8 +137,16 @@ def _cli(args):
     show_default=True,
     metavar="1-9",
 )
-@click.option("--brem-only", is_flag=True, help="Keep only brem arrays.")
-@click.option("--line-only", is_flag=True, help="Keep only line arrays.")
+@click.option(
+    "--brem-only",
+    is_flag=True,
+    help="Keep only brem arrays; mutually exclusive with --line-only.",
+)
+@click.option(
+    "--line-only",
+    is_flag=True,
+    help="Keep only line arrays; mutually exclusive with --brem-only.",
+)
 def command(
     checkpoint,
     out,

@@ -126,16 +126,48 @@ def _cli(args):
     )
 
 
-@click.command("reline", help="Recompute only line spectra in existing checkpoints.")
+@click.command(
+    "reline",
+    help=(
+        "Recompute only line spectra in existing checkpoints.\n\n"
+        "Pass MATERIALS or --all, never both. Updates checkpoint files in place "
+        "and skips records already at target unless --redo-all."
+    ),
+)
 @click.argument("materials", nargs=-1)
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
-@click.option("--line-ne", type=_cli_core.POSITIVE_INT, default=None)
-@click.option("--line-step", type=_cli_core.POSITIVE_FLOAT, default=None)
+@click.option(
+    "--line-ne",
+    type=_cli_core.POSITIVE_INT,
+    default=None,
+    metavar="N",
+    help="Line-spectrum electron count; omit to use checkpoint settings.",
+)
+@click.option(
+    "--line-step",
+    type=_cli_core.POSITIVE_FLOAT,
+    default=None,
+    metavar="EV",
+    help="Uniform line-grid spacing in eV; omit to use material grid.",
+)
 @click.option("--redo-all", is_flag=True, help="Recompute records already at target.")
-@click.option("--checkpoint-dir", default="checkpoints", show_default=True)
+@click.option(
+    "--checkpoint-dir",
+    default="checkpoints",
+    show_default=True,
+    metavar="DIR",
+    help="Directory containing checkpoint pickles to update.",
+)
 @click.option("--progress-file", default=None, hidden=True)
 @click.option("--max-minutes", type=_cli_core.POSITIVE_FLOAT, default=None, hidden=True)
-@click.option("--save-every", type=_cli_core.POSITIVE_INT, default=100, show_default=True)
+@click.option(
+    "--save-every",
+    type=_cli_core.POSITIVE_INT,
+    default=100,
+    show_default=True,
+    metavar="N",
+    help="Atomically save after every N recomputed records.",
+)
 def command(
     materials,
     all_,

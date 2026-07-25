@@ -28,7 +28,11 @@ def _run(args: SimpleNamespace) -> None:
 
 @click.command(
     "check-config",
-    help="Validate bundled material catalog or an explicit full catalog TOML.",
+    help=(
+        "Validate bundled material catalog or an explicit full catalog TOML.\n\n"
+        "With no MANIFEST, reloads packaged materials.toml. Performs no simulation, "
+        "network access, or GPU probe."
+    ),
 )
 @click.argument("manifest", required=False, type=click.Path(path_type=Path))
 def command(manifest):

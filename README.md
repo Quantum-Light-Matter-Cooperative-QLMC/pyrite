@@ -120,7 +120,9 @@ uv sync          # .venv + locked deps + an editable install of cxr_mc (the cxr 
 Run anything with `uv run …` (or activate `.venv`). Note that a bare `python` on
 your PATH will **not** have the dependencies — always use `uv run python …`.
 `uv sync` installs the package, so `import cxr_mc` works with no path hacks and
-the `cxr` console script is on the venv PATH (`uv run cxr --help`).
+the `cxr` console script is on the venv PATH (`uv run cxr --help`). See the
+checked [CLI reference](docs/cli-reference.md) for every command, option, unit,
+default, and side effect.
 
 Run `uv sync` again after pulling or switching to a branch that changes
 `pyproject.toml` or `uv.lock`. The CIF catalog requires the locked `crystals`

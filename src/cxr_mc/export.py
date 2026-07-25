@@ -48,7 +48,13 @@ def _export(stem=None):
     subprocess.run(_command(stem), check=True)
 
 
-@click.command("export", help=f"Render {NOTEBOOK} to results/<stem>.html.")
+@click.command(
+    "export",
+    help=(
+        f"Render {NOTEBOOK} to static HTML.\n\n"
+        "Writes results/<stem>.html; STEM defaults to analysis."
+    ),
+)
 @click.argument("stem", required=False)
 def command(stem):
     _export(stem)

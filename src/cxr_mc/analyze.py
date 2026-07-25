@@ -243,7 +243,14 @@ def _cli(args):
     _launch(material, **launch_args)
 
 
-@click.command("analyze", help=f"Launch {NOTEBOOK} with marimo run or edit.")
+@click.command(
+    "analyze",
+    help=(
+        f"Launch {NOTEBOOK} with marimo run or edit.\n\n"
+        "MATERIAL overrides the persisted default for this run. --persist-default "
+        "stores it for later no-argument launches."
+    ),
+)
 @click.argument("material", required=False)
 @click.option(
     "-d",
@@ -252,12 +259,12 @@ def _cli(args):
     is_flag=True,
     help="Persist MATERIAL as default for future no-argument runs.",
 )
-@click.option("--watch", is_flag=True, help="Pass marimo's --watch.")
+@click.option("--watch", is_flag=True, help="Reload app when source files change.")
 @click.option("--smoke", is_flag=True, help="Execute app once headlessly and exit.")
 @click.option("--edit", is_flag=True, help="Use `marimo edit` instead of `marimo run`.")
 @click.option("--acp", is_flag=True, help="Start local Claude and Codex ACP bridges.")
-@click.option("--tunnel", is_flag=True, help="Use fixed port for SSH tunneling.")
-@click.option("--no-token", is_flag=True, help="Pass marimo's --no-token.")
+@click.option("--tunnel", is_flag=True, help="Bind fixed port for SSH tunneling.")
+@click.option("--no-token", is_flag=True, help="Disable marimo auth token.")
 def command(material, persist_default, watch, smoke, edit, acp, tunnel, no_token):
     return _cli_core.invoke_legacy(
         _cli,
