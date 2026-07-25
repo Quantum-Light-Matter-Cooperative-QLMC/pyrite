@@ -2,11 +2,11 @@
 
 Date: 2026-07-25  
 Branch: `user-wip`  
-Current implementation commit: `99637a7`
+Feature implementation commit: `66ddbb4`
 
 ## Status
 
-Tasks 1–13 and 17 in `cli_implementation_plan.md` are complete.
+Tasks 1–19 in `cli_implementation_plan.md` are complete.
 
 Current `cxr` entry point uses Click. Local, remote, and line-grid command
 families are migrated. Obsolete argparse command-tree wiring is removed. Only
@@ -15,7 +15,7 @@ required standalone parsers remain in:
 - `src/cxr_mc/line_grid/derive.py`
 - `src/cxr_mc/line_grid/job.py`
 
-Resume with tasks 14, 16, and 18 in parallel.
+CLI migration is complete. No remaining task in this handoff.
 
 ## Completed work
 
@@ -31,15 +31,11 @@ Resume with tasks 14, 16, and 18 in parallel.
 ### P1 Click migration
 
 - Direct Click 8.4 dependency and shared core in `src/cxr_mc/_cli_core.py`.
-- Lazy root group in `src/cxr_mc/cli.py`.
-- Root `--help` renders command summaries without importing simulation modules.
-- Shared finite/positive/nonnegative numeric types, beam-axis validation,
-  output helpers, JSON envelope helper, legacy callback adapter, and exit mapping.
-- Migrated all local commands.
-- Migrated all 14 remote subcommands.
-- Migrated all 12 line-grid subcommands.
-- Removed obsolete argparse builders and converted parser-specific tests to
-  `CliRunner`.
+- Lazy root group; root help avoids simulation-module imports.
+- Shared numeric/beam validation, output helpers, JSON envelopes, legacy
+  callback adapter, and exit mapping.
+- Migrated every local, remote, and line-grid command.
+- Removed obsolete argparse builders and updated parser-specific tests.
 
 Public exit contract:
 
@@ -51,9 +47,28 @@ Public exit contract:
 
 Human results use stdout. Diagnostics and usage failures use stderr.
 
+### P2 discoverability
+
+- Complete help across all command paths: units, defaults, mutations,
+  precedence, incompatibilities, latest-job semantics, and examples.
+- Warm root-help median enforced below 200 ms.
+- Checked generated reference in `docs/cli-reference.md`.
+- Offline material, CSV-material, checkpoint, archive, job-ID, and finite-choice
+  completion.
+- Remote completion is bounded, prompt-free, failure-silent, and excluded from
+  destructive target selection.
+
+### P3 automation
+
+- Read-only JSON for remote jobs/status, line-grid defaults/show, and archives.
+- Operation JSON for scan, blaze, rebrem, reline, and remote pull.
+- Exactly one versioned envelope on stdout; partial failures retain successful
+  results and return nonzero.
+- Resumable operation summaries preserve exit 75.
+
 ## Compatibility evidence
 
-`tests/data/cli_contract.json` is immutable post-P0 argparse baseline:
+`tests/data/cli_contract.json` remains immutable post-P0 argparse evidence:
 
 - 42 root/nested help paths
 - command and option names
@@ -61,75 +76,28 @@ Human results use stdout. Diagnostics and usage failures use stderr.
 - mutual exclusions
 - nine explicit P0 correction markers
 
-`tests/test_cli_contract.py` checks Click tree against baseline command and option
-names and executes every frozen help path.
+Do not regenerate it with `scripts/freeze_cli_contract.py --write`; that script
+captures argparse and predates cutover. `scripts/generate_cli_reference.py`
+owns current Click reference generation.
 
-Do not regenerate baseline with current
-`scripts/freeze_cli_contract.py --write`. Script captures argparse and predates
-cutover. Task 15 should either adapt it into Click reference generation or
-retire it while preserving JSON baseline.
+## Verification
 
-## Verification completed
+- Discoverability/reference gate passed.
+- Completion tests: 16 passed; affected CLI suites passed.
+- JSON/CLI/reference gate: 223 passed.
+- JSON owner compatibility gate: 452 passed.
+- Final stale-parser compatibility + JSON/reference gate: 96 passed.
+- Lint, typecheck, generated-reference check, and `git diff --check` passed.
+- Sandboxed full verification reached `1507 passed, 22 skipped`; only failure
+  was sandbox forkserver socket creation (`PermissionError`).
+- Unsandboxed full verification reached `1506 passed, 22 skipped`; two known
+  failures outside CLI-touched code were confirmed:
+  - CuPy-to-NumPy conversion in
+    `test_brem_groove_gain_matches_beer_lambert_escape`.
+  - `1.191e-7` tolerance miss in
+    `test_finite_side_exit_layered_absorption_stays_in_emission_layer`.
 
-- Local migration focused suite: 150 passed.
-- Remote migration focused suite: 266 passed.
-- Line-grid migration focused suite: 142 passed.
-- Independent boundary review fixes: 343 passed.
-- Final remote/line-grid argparse cleanup: 311 passed.
-- Combined P1 CLI gate passed across root/core/contract/local/remote/line-grid
-  and affected legacy suites.
-- Full lint passed.
-- Full typecheck passed.
-- `git diff --check` passed.
-
-Full repository verification has not been rerun after Click cutover.
-
-Last pre-cutover full verification reached `1282 passed, 22 skipped` with two
-known failures outside CLI-touched code:
-
-- CuPy-to-NumPy conversion in
-  `test_brem_groove_gain_matches_beer_lambert_escape`.
-- `1.19e-7` tolerance miss in
-  `test_finite_side_exit_layered_absorption_stays_in_emission_layer`.
-
-Treat those as pre-existing until current full verification confirms otherwise.
-
-## Remaining tasks
-
-### Parallel after task 13
-
-14. Complete Click help:
-   summaries, units, defaults, side effects, precedence, incompatibilities,
-   examples, and root startup benchmark below 200 ms warm median.
-
-16. Add Click completion:
-   materials, comma-separated materials, checkpoints, archive labels, job IDs,
-   and choices. Keep dynamic completion bounded, silent, and side-effect free.
-
-18. Add read-only JSON:
-   remote jobs/status, line-grid defaults/show, and archives. Emit exactly one
-   versioned envelope on stdout with no progress, warnings, prompts, or ANSI.
-
-### Dependencies
-
-15. Generate checked CLI reference after task 14.
-
-19. Add operation JSON after task 18:
-   scan, blaze, rebrem, reline, and remote pull.
-
-Then run full `scripts/dev.py verify`.
-
-## Suggested ownership
-
-- Agent A: task 14, then task 15.
-- Agent B: task 16.
-- Agent C: task 18, then task 19.
-- Integrator: compatibility review, startup benchmark, combined tests, full
-  verification, plan update, and commits.
-
-Keep command-family ownership disjoint. Shared edits to `_cli_core.py`,
-`cli.py`, generated reference files, and `cli_implementation_plan.md` belong to
-integrator unless coordinated explicitly.
+Both reproduce the pre-cutover handoff failures and remain out of CLI scope.
 
 ## Commands
 
@@ -146,3 +114,9 @@ rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py verify
 - `d4bb8fd` — `test(cli): freeze post-P0 argparse contract`
 - `ed3fdf1` — `feat(cli): add Click migration core`
 - `99637a7` — `feat(cli): migrate command tree to Click`
+- `3524883` — `docs(cli): complete help and checked reference`
+- `e0ddcb2` — `fix(cli): preserve live help context in reference`
+- `5c949b7` — `feat(cli): add safe completion providers`
+- `ddbaf6d` — `feat(cli): wire safe shell completion`
+- `7629edc` — `feat(cli): add structured JSON adapters`
+- `66ddbb4` — `feat(cli): wire structured JSON output`

@@ -179,7 +179,7 @@ One task per agent. Run tasks sharing line-grid or remote owners sequentially.
     rules, incompatibilities, latest-job semantics, examples, startup benchmark.
 15. **DONE — Generate CLI reference** — checked command tree, docs links, cluster
     defaults, repo-map inventory, historical-doc labels, single-source version.
-16. **Add Click completion** — materials, comma-separated materials, checkpoints,
+16. **DONE — Add Click completion** — materials, comma-separated materials, checkpoints,
     archive labels, job IDs, and choices. Network lookup bounded, silent, and
     empty on failure. Never complete destructive clear/reap paths.
 

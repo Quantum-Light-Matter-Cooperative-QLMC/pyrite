@@ -132,7 +132,7 @@ def test_tunnel_flag_forwards_to_validation_launch(monkeypatch):
     calls = []
     monkeypatch.setattr(check, "_launch", lambda **kw: calls.append(kw))
 
-    check.main(["check", "--tunnel"])
+    check.main(["--tunnel"])
 
     assert calls == [{"edit": False, "watch": False, "tunnel": True}]
 
@@ -151,7 +151,7 @@ def test_export_cli_calls_export_all_figures_and_skips_marimo(monkeypatch, tmp_p
         check, "_launch", lambda **kw: pytest.fail("--export must not launch marimo")
     )
 
-    check.main(["check", "--export", "--outdir", str(tmp_path), "--ne", "11"])
+    check.main(["--export", "--outdir", str(tmp_path), "--ne", "11"])
 
     assert calls == [(str(tmp_path), 11, 200, 200)]
 
@@ -170,7 +170,7 @@ def test_export_tunnel_cli_calls_export_all_figures_and_skips_marimo(monkeypatch
         check, "_launch", lambda **kw: pytest.fail("--export --tunnel must not launch marimo")
     )
 
-    check.main(["check", "--export", "--tunnel", "--outdir", str(tmp_path), "--ne", "11"])
+    check.main(["--export", "--tunnel", "--outdir", str(tmp_path), "--ne", "11"])
 
     assert calls == [(str(tmp_path), 11, 200, 200)]
 
@@ -179,7 +179,7 @@ def test_default_cli_launches_marimo_not_export(monkeypatch):
     calls = []
     monkeypatch.setattr(check, "_launch", lambda **kw: calls.append(kw))
 
-    check.main(["check"])
+    check.main([])
 
     assert calls == [{"edit": False, "watch": False}]
 
@@ -188,7 +188,7 @@ def test_acp_flag_starts_validation_with_bridge_lifecycle(monkeypatch):
     calls = []
     monkeypatch.setattr(check, "_launch", lambda **kw: calls.append(kw))
 
-    check.main(["check", "--acp"])
+    check.main(["--acp"])
 
     assert calls == [{"edit": False, "watch": False, "acp": True}]
 

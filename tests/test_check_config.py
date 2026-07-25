@@ -31,10 +31,13 @@ def test_check_config_reports_custom_catalog_errors_as_clean_cli_errors(
     invalid = tmp_path / "invalid-materials.toml"
     invalid.write_text('materials = ["hopg"]\n')
 
-    with pytest.raises(SystemExit, match="invalid material catalog"):
+    with pytest.raises(SystemExit) as exc:
         cli.main(["check-config", str(invalid)])
 
-    assert "Traceback" not in capsys.readouterr().err
+    assert exc.value.code == 1
+    stderr = capsys.readouterr().err
+    assert "invalid material catalog" in stderr
+    assert "Traceback" not in stderr
 
 
 def test_check_config_reports_malformed_bundled_catalog_without_import_traceback(
