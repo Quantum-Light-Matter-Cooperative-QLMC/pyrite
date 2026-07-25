@@ -1,7 +1,6 @@
 ---
 name: regen-golden
 description: Use when data/materials.toml or materials/catalog.py changed and the material-catalog golden snapshot must be regenerated and re-verified.
-disable-model-invocation: true
 ---
 
 # Regenerate Material Catalog Golden
@@ -12,8 +11,8 @@ on-disk catalog, then prove the golden test is green again. Run after any edit t
 substrate/stack fields, crystal/material entries) -- the on-edit hook warns when
 those files change; this skill is the fix.
 
-User-invoked only (`/regen-golden`); it rewrites a committed fixture, so never
-fire it as a side effect of unrelated work.
+Invoke as a normal completion step after an authorized edit to those catalog
+sources. Do not run for unrelated work or merely to silence unexplained drift.
 
 ## Steps
 
