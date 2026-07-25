@@ -10,15 +10,18 @@ modules. Heavy modules (``derive``, ``golden``) import lazily inside handlers so
 from __future__ import annotations
 
 import math
+import tomllib
 from datetime import date
+from pathlib import Path
 
 import click
 
-from cxr_mc import _cli_completion, remote
+from cxr_mc import _cli_completion, cli_json, remote
 from cxr_mc._cli_core import (
     POSITIVE_FLOAT,
     POSITIVE_INT,
     CLIError,
+    emit_json_result,
     emit_result,
     invoke_legacy,
 )
@@ -426,6 +429,12 @@ def set_brem_command(material, stop, step, note):
 
 @command.command("defaults")
 @click.option(
+    "--json",
+    "json_output",
+    is_flag=True,
+    help="Emit one versioned JSON object on stdout (show mode only).",
+)
+@click.option(
     "--set",
     "set_values",
     is_flag=True,
@@ -452,7 +461,7 @@ def set_brem_command(material, stop, step, note):
     metavar="EV",
     help="Persistent positive bremsstrahlung spacing in eV.",
 )
-def defaults_command(set_values, tilts, azimuths, thickness, brem_step):
+def defaults_command(json_output, set_values, tilts, azimuths, thickness, brem_step):
     """Show or update persistent derivation defaults."""
     supplied = [
         flag
@@ -466,6 +475,8 @@ def defaults_command(set_values, tilts, azimuths, thickness, brem_step):
     ]
     if supplied and not set_values:
         raise click.UsageError(f"{', '.join(supplied)} require --set")
+    if json_output and set_values:
+        raise click.UsageError("--json is read-only and cannot be combined with --set")
     if set_values:
         defaults.update_defaults(
             tilts=tilts,
@@ -473,19 +484,44 @@ def defaults_command(set_values, tilts, azimuths, thickness, brem_step):
             thickness_ang=thickness,
             brem_step_ev=brem_step,
         )
-    for key, value in defaults.load_defaults().items():
+    if json_output:
+        try:
+            values = defaults.load_defaults()
+            source = "persisted" if defaults.DEFAULTS_PATH.exists() else "fallback"
+            result = cli_json.line_grid_defaults(values, source=source)
+        except (OSError, TypeError, ValueError) as exc:
+            result = cli_json.failure("cxr.line-grid.defaults", {}, str(exc))
+        emit_json_result(result)
+        return 0
+    values = defaults.load_defaults()
+    for key, value in values.items():
         emit_result(f"{key} = {value}")
     return 0
 
 
 @command.command("show")
+@click.option(
+    "--json",
+    "json_output",
+    is_flag=True,
+    help="Emit one versioned JSON object on stdout.",
+)
 @click.argument(
     "material",
     required=False,
     shell_complete=_cli_completion.complete_material,
 )
-def show_command(material):
+def show_command(json_output, material):
     """Show configured line grids."""
+    if json_output:
+        try:
+            with Path(apply._MATERIALS_TOML).open("rb") as stream:
+                materials = tomllib.load(stream)["materials"]
+            result = cli_json.line_grid_show(materials, apply._provenance.load(), selected=material)
+        except (KeyError, OSError, TypeError, ValueError) as exc:
+            result = cli_json.failure("cxr.line-grid.show", {"materials": []}, str(exc))
+        emit_json_result(result)
+        return 0
     try:
         result = apply.show(material)
     except ValueError as exc:

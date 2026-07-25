@@ -1140,7 +1140,7 @@ def test_implicit_job_selection_excludes_checkpoint_reservations(monkeypatch, tm
     result = subprocess.run(["bash", "-c", list_command], capture_output=True, text=True)
 
     assert result.returncode == 0, result.stderr
-    assert result.stdout == "20260715-113910-b0240c4f\t48291\t?\t-\trunning \n"
+    assert result.stdout == "20260715-113910-b0240c4f\t48291\t?\tscan\t-\trunning \n"
     assert all('[ -f "$d/meta" ] || continue' in command for command in commands)
 
 

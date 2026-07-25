@@ -186,8 +186,8 @@ One task per agent. Run tasks sharing line-grid or remote owners sequentially.
 ### P3: presentation and automation
 
 17. **DONE — Sanitize remote presentation** — status/jobs/attach controls and framing.
-18. **Add read-only JSON** — remote jobs/status, line-grid defaults/show, archives.
-19. **Add operation JSON** — scan/blaze/rebrem/reline and remote pull.
+18. **DONE — Add read-only JSON** — remote jobs/status, line-grid defaults/show, archives.
+19. **DONE — Add operation JSON** — scan/blaze/rebrem/reline and remote pull.
 
 ## Dispatch
 

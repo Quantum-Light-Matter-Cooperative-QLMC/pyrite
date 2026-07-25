@@ -21,16 +21,18 @@ surfaces as a forkserver ConnectionResetError). Inside the guard the re-import i
 a harmless no-op.
 """
 
+import io
 import json
 import os
 import time
 import tomllib
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import click
 import numpy as np
 
-from . import _cli_completion, _cli_core
+from . import _cli_completion, _cli_core, cli_json
 from .config import (
     default_settings,
     format_penetration_watchdog_summary,
@@ -146,6 +148,7 @@ def _beam_uvw(ctx, param, value):
 )
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option("--no-progress", is_flag=True, hidden=True)
+@_cli_core.json_option
 def command(
     material,
     all_,
@@ -157,10 +160,25 @@ def command(
     max_minutes,
     progress_file,
     no_progress,
+    json_output,
 ):
     """Click entry point for the staged root migration."""
+    if not json_output:
+        return _cli_core.invoke_legacy(
+            run,
+            material=material,
+            all=all_,
+            workers=workers,
+            quick=quick,
+            n_families=n_families,
+            beam_uvw=beam_uvw,
+            checkpoint_dir=checkpoint_dir,
+            max_minutes=max_minutes,
+            progress_file=progress_file,
+            no_progress=no_progress,
+        )
     return _cli_core.invoke_legacy(
-        run,
+        _run_json,
         material=material,
         all=all_,
         workers=workers,
@@ -174,7 +192,7 @@ def command(
     )
 
 
-def run(args):
+def _selected(args):
     if getattr(args, "all", False):
         if args.material is not None:
             raise SystemExit("scan --all does not take a material name")
@@ -184,6 +202,11 @@ def run(args):
     else:
         raise SystemExit("scan needs a material name, or use --all")
     validate_materials(materials)
+    return materials
+
+
+def run(args):
+    materials = _selected(args)
     # One deadline spans the whole invocation (including --all): each material
     # below gets whatever's left of it, not a fresh --max-minutes apiece.
     deadline = None
@@ -196,6 +219,55 @@ def run(args):
             incomplete = True
     if incomplete:
         raise SystemExit(75)  # EX_TEMPFAIL: budget hit, work remains
+
+
+def _run_json(args):
+    """Run batch with machine-only output and retain partial material results."""
+    materials = _selected(args)
+    started = time.monotonic()
+    deadline = (
+        None if getattr(args, "max_minutes", None) is None else started + args.max_minutes * 60.0
+    )
+    completed = []
+    failed = []
+    errors = {}
+    resumable = False
+    args.no_progress = True
+    for material in materials:
+        remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+        try:
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                complete = _run_material(args, material, max_seconds=remaining)
+        except (Exception, SystemExit) as exc:
+            failed.append(material)
+            errors[material] = str(exc) or type(exc).__name__
+            continue
+        if complete:
+            completed.append(material)
+        else:
+            failed.append(material)
+            errors[material] = "resumable work remains"
+            resumable = True
+    checkpoints = [
+        os.path.join(args.checkpoint_dir, f"{material}{'_quick' if args.quick else ''}.pkl")
+        for material in [*completed, *failed]
+    ]
+    result = cli_json.operation_summary(
+        "scan",
+        materials,
+        completed,
+        failed_materials=failed,
+        checkpoints=checkpoints,
+        elapsed_seconds=time.monotonic() - started,
+        resumable=resumable,
+        material_errors=errors,
+    )
+    _cli_core.emit_json_result(
+        result,
+        failure_exit=75
+        if resumable and all(message == "resumable work remains" for message in errors.values())
+        else 1,
+    )
 
 
 def _run_material(args, material, max_seconds=None):

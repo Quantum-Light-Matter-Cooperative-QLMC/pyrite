@@ -20,12 +20,14 @@ crashed/OOM'd run just resumes on re-invocation; ``--redo-all`` forces a full
 recompute (e.g. same parameters, new physics).
 """
 
+import io
 import time
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import click
 
-from . import _cli_completion, _cli_core
+from . import _cli_completion, _cli_core, cli_json
 
 
 def rebrem_checkpoints(
@@ -37,6 +39,7 @@ def rebrem_checkpoints(
     save_every=100,
     progress_file=None,
     max_minutes=None,
+    summary_status=None,
 ):
     """Run :func:`cxr_mc.run.repair_checkpoint` with new brem parameters over one
     or more materials. ``materials=None`` sweeps every ``*.pkl`` in
@@ -101,10 +104,15 @@ def rebrem_checkpoints(
                 status=status,
                 **kw,
             )
-        except BaseException:
+        except BaseException as exc:
+            status["complete"] = False
+            status["error"] = str(exc) or type(exc).__name__
             if progress_file is not None:
                 _write_progress_record(progress_file, material=stem, state="failed", **latest)
             raise
+        finally:
+            if summary_status is not None:
+                summary_status[stem] = dict(status)
         if progress_file is not None:
             _write_progress_record(progress_file, material=stem, state="done", **latest)
         if not status.get("complete", True):
@@ -121,7 +129,7 @@ def _cli(args):
             "cxr rebrem: give one or more materials, or -a/--all for every checkpoint "
             "(exactly one of the two)"
         )
-    rebrem_checkpoints(
+    return rebrem_checkpoints(
         materials=args.material or None,
         checkpoint_dir=args.checkpoint_dir,
         ne_brem=args.ne_brem,
@@ -131,6 +139,64 @@ def _cli(args):
         progress_file=args.progress_file,
         max_minutes=args.max_minutes,
     )
+
+
+def _cli_json(args):
+    if bool(args.material) == bool(args.all):
+        raise SystemExit(
+            "cxr rebrem: give one or more materials, or -a/--all for every checkpoint "
+            "(exactly one of the two)"
+        )
+    started = time.monotonic()
+    if args.material:
+        requested = list(args.material)
+    else:
+        requested = sorted(
+            path.stem
+            for path in Path(args.checkpoint_dir).glob("*.pkl")
+            if not path.name.endswith(".slim.pkl")
+        )
+    statuses = {}
+    caught = None
+    try:
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            rebrem_checkpoints(
+                materials=args.material or None,
+                checkpoint_dir=args.checkpoint_dir,
+                ne_brem=args.ne_brem,
+                brem_step_eV=args.step,
+                redo_all=args.redo_all,
+                save_every=args.save_every,
+                progress_file=args.progress_file,
+                max_minutes=args.max_minutes,
+                summary_status=statuses,
+            )
+    except (Exception, SystemExit) as exc:
+        caught = exc
+    completed = [
+        material
+        for material in requested
+        if material in statuses and statuses[material].get("complete", True)
+    ]
+    failed = [material for material in requested if material not in completed]
+    resumable = isinstance(caught, SystemExit) and caught.code == 75
+    message = (
+        "resumable work remains"
+        if resumable
+        else (str(caught) or type(caught).__name__ if caught is not None else "operation failed")
+    )
+    errors = {material: message for material in failed}
+    result = cli_json.operation_summary(
+        "rebrem",
+        requested,
+        completed,
+        failed_materials=failed,
+        checkpoints=[Path(args.checkpoint_dir) / f"{material}.pkl" for material in requested],
+        elapsed_seconds=time.monotonic() - started,
+        resumable=resumable,
+        material_errors=errors,
+    )
+    _cli_core.emit_json_result(result, failure_exit=75 if resumable else 1)
 
 
 @click.command(
@@ -179,6 +245,7 @@ def _cli(args):
     metavar="N",
     help="Atomically save after every N recomputed records.",
 )
+@_cli_core.json_option
 def command(
     materials,
     all_,
@@ -189,9 +256,11 @@ def command(
     progress_file,
     max_minutes,
     save_every,
+    json_output,
 ):
+    handler = _cli_json if json_output else _cli
     return _cli_core.invoke_legacy(
-        _cli,
+        handler,
         material=list(materials),
         all=all_,
         ne_brem=ne_brem,
@@ -201,4 +270,5 @@ def command(
         progress_file=progress_file,
         max_minutes=max_minutes,
         save_every=save_every,
+        json_output=json_output,
     )

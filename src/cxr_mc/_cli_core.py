@@ -182,6 +182,13 @@ def emit_json(
     click.echo(json.dumps(envelope, separators=(",", ":"), sort_keys=True))
 
 
+def emit_json_result(result: Any, *, failure_exit: int = 1) -> None:
+    """Emit a ``cli_json.JsonResult`` and map structured failures to an exit."""
+    emit_json(result.schema, result.payload, errors=result.errors)
+    if result.errors:
+        raise click.exceptions.Exit(failure_exit)
+
+
 def invoke_legacy(function, /, **values):
     """Invoke a staged argparse handler under Click.
 

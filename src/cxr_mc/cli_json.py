@@ -87,6 +87,11 @@ class JsonResult:
         )
 
 
+def failure(schema: str, payload: Mapping[str, object], message: object) -> JsonResult:
+    """Build a schema-preserving runtime failure result."""
+    return JsonResult(schema, payload, (_error("runtime_error", message),))
+
+
 def _state_parts(value: object) -> tuple[str | None, str | None, bool]:
     event = _optional_text(value)
     if event is None:
@@ -96,17 +101,24 @@ def _state_parts(value: object) -> tuple[str | None, str | None, bool]:
 
 
 def remote_jobs(raw: str) -> JsonResult:
-    """Convert existing five-column remote jobs output to structured records."""
+    """Convert remote jobs output to structured records."""
     jobs: list[dict[str, object]] = []
     errors: list[dict[str, object]] = []
     for line_number, line in enumerate(raw.splitlines(), 1):
-        fields = line.split("\t", 4)
-        if len(fields) != 5:
+        fields = line.split("\t", 5)
+        if len(fields) == 5:
+            job_id, scheduler_id, quick, materials_text, event_text = fields
+            command = "scan" if quick in {"True", "False"} else None
+        elif len(fields) == 6:
+            job_id, scheduler_id, _quick, command_text, materials_text, event_text = fields
+            command = _optional_text(command_text)
+        else:
             errors.append(
-                _error("malformed_job", "expected five tab-separated fields", item=line_number)
+                _error(
+                    "malformed_job", "expected five or six tab-separated fields", item=line_number
+                )
             )
             continue
-        job_id, scheduler_id, quick, materials_text, event_text = fields
         job_id = _text(job_id)
         materials = [_text(item) for item in materials_text.split() if item != "-"]
         if not job_id or not _MATERIAL_RE.fullmatch(job_id):
@@ -123,17 +135,18 @@ def remote_jobs(raw: str) -> JsonResult:
             )
             materials = [item for item in materials if item not in invalid]
         state, last_event, terminal = _state_parts(event_text)
+        event_time = _utc_time(last_event.rsplit(maxsplit=1)[-1]) if last_event else None
         jobs.append(
             {
                 "job_id": job_id,
                 "scheduler_job_id": _optional_text(scheduler_id),
-                "command": None,
+                "command": command,
                 "materials": materials,
                 "state": state,
                 "terminal": terminal,
                 "submitted_at": None,
-                "started_at": None,
-                "finished_at": None,
+                "started_at": event_time if state == "running" else None,
+                "finished_at": event_time if terminal else None,
                 "last_event": last_event,
             }
         )
@@ -228,6 +241,7 @@ def remote_status(sections: Mapping[str, str]) -> JsonResult:
     scheduler_raw = _fields(sections.get("SQUEUE", ""), "|")
     job_id = _text(sections.get("JOB") or metadata.get("job") or "?")
     state, last_event, terminal = _state_parts(sections.get("STATE") or scheduler_raw.get("state"))
+    event_time = _utc_time(last_event.rsplit(maxsplit=1)[-1]) if last_event else None
     materials = [
         _text(item)
         for item in metadata.get("materials", "").split()
@@ -243,19 +257,19 @@ def remote_status(sections: Mapping[str, str]) -> JsonResult:
             "scheduler_job_id": _optional_text(
                 scheduler_raw.get("job_id") or metadata.get("slurm_job_id")
             ),
-            "command": _optional_text(metadata.get("kind")) or "scan",
+            "command": _optional_text(metadata.get("kind"))
+            or ("check" if "ne" in metadata else "scan"),
             "materials": materials,
             "state": state,
             "terminal": terminal,
             "submitted_at": _utc_time(metadata.get("submitted_at")),
-            "started_at": _utc_time(metadata.get("started_at")),
-            "finished_at": _utc_time(metadata.get("finished_at")),
+            "started_at": _utc_time(metadata.get("started_at") or metadata.get("started")),
+            "finished_at": _utc_time(metadata.get("finished_at"))
+            or (event_time if terminal else None),
             "last_event": last_event,
         },
         "scheduler": {
-            "job_id": _optional_text(
-                scheduler_raw.get("job_id") or metadata.get("slurm_job_id")
-            ),
+            "job_id": _optional_text(scheduler_raw.get("job_id") or metadata.get("slurm_job_id")),
             "state": _optional_text(scheduler_raw.get("state")),
             "partition": _optional_text(scheduler_raw.get("partition")),
             "elapsed_seconds": _duration_seconds(scheduler_raw.get("elapsed")),

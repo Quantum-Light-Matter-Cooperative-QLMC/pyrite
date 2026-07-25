@@ -30,7 +30,7 @@ from pathlib import Path
 
 import click
 
-from . import _checkpoint_io, _cli_completion, _cli_core
+from . import _checkpoint_io, _cli_completion, _cli_core, cli_json
 
 # Anchored to the repo root (src/cxr_mc/archive.py -> parents[2] = repo root), the
 # same dir run.load_checkpoint reads, so `cxr archive` works from any cwd. Computed
@@ -246,6 +246,10 @@ def _cli_restore(args):
 
 
 def _cli_archives(args):
+    if getattr(args, "json_output", False):
+        result = cli_json.archives(DEFAULT_ROOT, loader=_checkpoint_io.load)
+        _cli_core.emit_json_result(result)
+        return
     list_archives()
 
 
@@ -290,7 +294,10 @@ def restore_command(label, stem, force):
 
 
 @click.command("archives", help="List long-term checkpoint shelf.")
-def archives_command():
+@_cli_core.json_option
+def archives_command(json_output):
+    if json_output:
+        return _cli_core.invoke_legacy(_cli_archives, json_output=True)
     return _cli_core.invoke_legacy(_cli_archives)
 
 

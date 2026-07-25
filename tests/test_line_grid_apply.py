@@ -104,9 +104,7 @@ def test_apply_inserts_new_line_and_brem_blocks_when_absent():
     tomllib.loads(new_text)  # still valid TOML
 
 
-def test_apply_file_writes_stamps_provenance_and_validates(
-    tmp_path, monkeypatch, capsys
-):
+def test_apply_file_writes_stamps_provenance_and_validates(tmp_path, monkeypatch, capsys):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
     json_path = tmp_path / "combined.json"
@@ -128,8 +126,7 @@ def test_apply_file_writes_stamps_provenance_and_validates(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == (
-        "warning: material catalog changed; golden is now stale; "
-        "run `cxr line-grid regen-golden`\n"
+        "warning: material catalog changed; golden is now stale; run `cxr line-grid regen-golden`\n"
     )
 
 
@@ -206,9 +203,7 @@ def test_apply_rejects_invalid_line_domains_before_write(
     assert toml_path.read_text() == BASE_TOML
 
 
-def test_set_line_grid_stamps_manual_and_autocomputes_num(
-    tmp_path, monkeypatch, capsys
-):
+def test_set_line_grid_stamps_manual_and_autocomputes_num(tmp_path, monkeypatch, capsys):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)
     monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)

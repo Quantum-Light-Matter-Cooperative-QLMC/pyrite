@@ -659,6 +659,7 @@ def pull(
     no_sync=False,
     dataset=None,
     force=False,
+    summary=None,
 ):
     """Fetch checkpoints/<stem>.pkl back from the box for each stem (stem =
     material, or material_quick for a --quick run).
@@ -684,6 +685,8 @@ def pull(
     if use_slim and not no_sync:
         transport.sync_code()  # box must rebuild the grid from the same config.py
     failed = []
+    completed = []
+    failure_errors = {}
     for stem in stems:
         local = dest / f"{stem}.pkl"
         try:
@@ -733,6 +736,7 @@ def pull(
                     f"merged {dataset} ({n_merged} rec, skipped {n_skipped}) "
                     f"-> checkpoints/{stem}.pkl"
                 )
+                completed.append(stem)
                 continue
             if use_slim:
                 flags = ""
@@ -809,13 +813,17 @@ def pull(
                             f"rm -f {config.shell_arg(remote_tmp)}",
                         ]
                     )
+            completed.append(stem)
         except (Exception, SystemExit) as exc:
             failed.append(stem)
             detail = str(exc) or type(exc).__name__
+            failure_errors[stem] = detail
             print(
                 f"warning: could not pull checkpoint {stem!r}: {detail}; continuing",
                 file=sys.stderr,
             )
+    if summary is not None:
+        summary.update(completed=completed, failed=failed, errors=failure_errors)
     if failed:
         raise SystemExit(
             f"remote pull failed for {len(failed)} of {len(stems)} requested "

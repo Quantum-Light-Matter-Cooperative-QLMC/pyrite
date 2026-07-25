@@ -166,7 +166,9 @@ def test_click_apply_dispatches_with_pull_and_force(monkeypatch):
     ],
 )
 def test_click_apply_expected_failures_use_stderr(monkeypatch, error, message):
-    monkeypatch.setattr(line_grid.apply, "apply_file", lambda *_args, **_kwargs: (_ for _ in ()).throw(error))
+    monkeypatch.setattr(
+        line_grid.apply, "apply_file", lambda *_args, **_kwargs: (_ for _ in ()).throw(error)
+    )
 
     result = invoke(line_grid.command, ["apply", "bounds.json"])
 

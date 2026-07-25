@@ -115,8 +115,7 @@ def _qualname(value: object) -> str:
         targets = [
             cell.cell_contents
             for cell in closure
-            if isinstance(cell.cell_contents, Callable)
-            and cell.cell_contents is not value
+            if isinstance(cell.cell_contents, Callable) and cell.cell_contents is not value
         ]
         if targets:
             name += "[" + ",".join(_qualname(target) for target in targets) + "]"
@@ -167,11 +166,7 @@ def _parser_contract(
     path: tuple[str, ...] = (),
 ) -> dict[str, object]:
     subparsers_action = next(
-        (
-            action
-            for action in parser._actions
-            if isinstance(action, argparse._SubParsersAction)
-        ),
+        (action for action in parser._actions if isinstance(action, argparse._SubParsersAction)),
         None,
     )
     actions = [
@@ -242,9 +237,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     current = args.check.read_text(encoding="utf-8")
     if current != encoded:
-        parser.error(
-            f"CLI contract changed: regenerate with --write {args.check}"
-        )
+        parser.error(f"CLI contract changed: regenerate with --write {args.check}")
     return 0
 
 

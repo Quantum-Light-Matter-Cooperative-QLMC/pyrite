@@ -27,12 +27,15 @@ stylistic -- same process-pool re-import reason as ``scan.py``; see its
 module docstring.
 """
 
+import io
 import os
+import time
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 import click
 
-from . import _cli_completion, _cli_core
+from . import _cli_completion, _cli_core, cli_json
 from .config import (
     default_settings,
     format_penetration_watchdog_summary,
@@ -74,6 +77,7 @@ class _BlazeCommand(click.Command):
             "--max-minutes",
             "--progress-file",
             "--no-progress",
+            "--json",
             "--help",
         }
     )
@@ -162,6 +166,7 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
 )
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option("--no-progress", is_flag=True, hidden=True)
+@_cli_core.json_option
 def command(
     material,
     energies,
@@ -172,9 +177,11 @@ def command(
     max_minutes,
     progress_file,
     no_progress,
+    json_output,
 ):
+    handler = _run_json if json_output else run
     return _cli_core.invoke_legacy(
-        run,
+        handler,
         material=material,
         energy=list(energies),
         spacing=list(spacings),
@@ -184,7 +191,41 @@ def command(
         max_minutes=max_minutes,
         progress_file=progress_file,
         no_progress=no_progress,
+        json_output=json_output,
     )
+
+
+def _run_json(args):
+    started = time.monotonic()
+    material = args.material
+    checkpoint = os.path.join(args.checkpoint_dir, f"{material}_blazed.pkl")
+    completed = []
+    failed = []
+    errors = {}
+    resumable = False
+    args.no_progress = True
+    try:
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            run(args)
+        completed.append(material)
+    except SystemExit as exc:
+        failed.append(material)
+        resumable = exc.code == 75
+        errors[material] = "resumable work remains" if resumable else str(exc.code)
+    except Exception as exc:
+        failed.append(material)
+        errors[material] = str(exc) or type(exc).__name__
+    result = cli_json.operation_summary(
+        "blaze",
+        [material],
+        completed,
+        failed_materials=failed,
+        checkpoints=[checkpoint],
+        elapsed_seconds=time.monotonic() - started,
+        resumable=resumable,
+        material_errors=errors,
+    )
+    _cli_core.emit_json_result(result, failure_exit=75 if resumable else 1)
 
 
 def run(args):

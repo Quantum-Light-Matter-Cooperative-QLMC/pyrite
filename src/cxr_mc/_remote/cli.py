@@ -1,16 +1,20 @@
 """Click command group, compatibility wiring, and remote orchestrators."""
 
+import io
 import sys
+import time
+from contextlib import redirect_stderr, redirect_stdout
 
 import click
 
-from .. import _cli_completion
+from .. import _cli_completion, cli_json
 from .._cli_core import (
     FINITE_FLOAT,
     NONNEGATIVE_FLOAT,
     NONNEGATIVE_INT,
     POSITIVE_FLOAT,
     POSITIVE_INT,
+    emit_json_result,
     invoke_legacy,
     run,
 )
@@ -203,6 +207,46 @@ def _cli_pull(args):
     )
 
 
+def _cli_pull_json(args):
+    materials = _selected_materials(args, "material")
+    dataset = "brem" if args.brem_only else ("line" if args.line_only else None)
+    started = time.monotonic()
+    summary = {}
+    caught = None
+    try:
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            lifecycle.pull(
+                materials,
+                grid=(not args.full) and dataset is None,
+                drop_wide_brem=args.drop_wide_brem,
+                downcast=args.downcast,
+                level9=args.level9,
+                no_sync=args.no_sync,
+                dataset=dataset,
+                force=args.force,
+                summary=summary,
+            )
+    except (Exception, SystemExit) as exc:
+        caught = exc
+    completed = summary.get("completed", [])
+    failed = summary.get("failed", [item for item in materials if item not in completed])
+    errors = summary.get("errors", {})
+    if caught is not None:
+        detail = str(caught) or type(caught).__name__
+        for material in failed:
+            errors.setdefault(material, detail)
+    result = cli_json.operation_summary(
+        "remote-pull",
+        materials,
+        completed,
+        failed_materials=failed,
+        checkpoints=[config.LOCAL_ROOT / "checkpoints" / f"{item}.pkl" for item in materials],
+        elapsed_seconds=time.monotonic() - started,
+        material_errors=errors,
+    )
+    emit_json_result(result)
+
+
 def _cli_start(args):
     materials = _selected_materials(args, "materials")
     jobid = lifecycle.start_queue(
@@ -223,11 +267,28 @@ def _cli_attach(args):
 
 
 def _cli_jobs(args):
-    viewer.list_jobs()
+    if not args.json_output:
+        viewer.list_jobs()
+        return
+    try:
+        result = cli_json.remote_jobs(viewer.jobs_raw())
+    except (Exception, SystemExit) as exc:
+        result = cli_json.failure("cxr.remote.jobs", {"jobs": []}, str(exc))
+    emit_json_result(result)
 
 
 def _cli_status(args):
-    viewer.job_status(args.jobid, args.verbose)
+    if not args.json_output:
+        viewer.job_status(args.jobid, args.verbose)
+        return
+    try:
+        sections, output = viewer.status_sections(args.jobid, max(args.verbose, 2))
+        if not sections:
+            raise RuntimeError(output.strip() or "remote status response was malformed")
+        result = cli_json.remote_status(sections)
+    except (Exception, SystemExit) as exc:
+        result = cli_json.failure("cxr.remote.status", {}, str(exc))
+    emit_json_result(result)
 
 
 def _cli_logs(args):
@@ -605,8 +666,9 @@ def attach_command(jobid, verbose):
 
 
 @command.command("jobs", help="List jobs with SLURM IDs, materials, and last events.")
-def jobs_command():
-    return _invoke_click(_cli_jobs, _click_args("jobs"))
+@click.option("--json", "json_output", is_flag=True, help="Emit one versioned JSON object.")
+def jobs_command(json_output):
+    return _invoke_click(_cli_jobs, _click_args("jobs", json_output=json_output))
 
 
 @command.command("status", help="Show one job; use -v for allocation and -vv for logs.")
@@ -622,8 +684,12 @@ def jobs_command():
     count=True,
     help="Add allocation detail; repeat for case progress and recent logs.",
 )
-def status_command(jobid, verbose):
-    return _invoke_click(_cli_status, _click_args("status", jobid=jobid, verbose=verbose))
+@click.option("--json", "json_output", is_flag=True, help="Emit one versioned JSON object.")
+def status_command(jobid, verbose, json_output):
+    return _invoke_click(
+        _cli_status,
+        _click_args("status", jobid=jobid, verbose=verbose, json_output=json_output),
+    )
 
 
 @command.command("logs", help="Show a job diagnostic log; defaults to latest.")
@@ -638,7 +704,7 @@ def logs_command(jobid, follow):
     return _invoke_click(_cli_logs, _click_args("logs", jobid=jobid, follow=follow))
 
 
-@command.command("stop", help="Cancel active SLURM job(s) by material, or every live job.")
+@command.command("stop", help="cancel active SLURM job(s) by material, or every live job.")
 @click.argument("materials", nargs=-1, metavar="[MATERIAL]...")
 @click.option("-a", "--all", "all_", is_flag=True, help="Stop every live job.")
 def stop_command(materials, all_):
@@ -705,6 +771,7 @@ def reap_command(min_age_minutes, yes):
     is_flag=True,
     help="With partial merge, insert records absent locally.",
 )
+@click.option("--json", "json_output", is_flag=True, help="Emit one versioned JSON object.")
 def pull_command(
     material,
     all_,
@@ -716,13 +783,14 @@ def pull_command(
     brem_only,
     line_only,
     force,
+    json_output,
 ):
     materials = list(material)
     _reject_all_with_values("pull", all_, materials)
     if brem_only and line_only:
         raise click.UsageError("--brem-only and --line-only are mutually exclusive")
     return _invoke_click(
-        _cli_pull,
+        _cli_pull_json if json_output else _cli_pull,
         _click_args(
             "pull",
             material=materials,
@@ -735,6 +803,7 @@ def pull_command(
             brem_only=brem_only,
             line_only=line_only,
             force=force,
+            json_output=json_output,
         ),
     )
 

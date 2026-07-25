@@ -9,28 +9,42 @@ import tqdm  # noqa: F401 -- kept importable at module level for test monkeypatc
 from . import config, presentation, scripts, state, transport
 
 
-def list_jobs():
-    """Print every submitted job with identifying metadata, oldest first."""
-    remote = (
+def _jobs_remote_command():
+    return (
         f"JOBS={config.shell_remote_path(config.JOBS_SUBDIR)}; "
         '[ -d "$JOBS" ] || exit 0; '
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
         '[ -f "$d/meta" ] || continue; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$d/meta" 2>/dev/null | tail -1); '
         'Q=$(sed -n "s/^quick: //p" "$d/meta" 2>/dev/null | tail -1); '
+        'K=$(sed -n "s/^kind: //p" "$d/meta" 2>/dev/null | tail -1); '
+        '[ -n "$K" ] || { grep -q "^ne: " "$d/meta" 2>/dev/null && K=check || K=scan; }; '
         'M=$(sed -n "s/^materials: //p" "$d/meta" 2>/dev/null | tail -1); '
         'S=$(cat "$d/state" 2>/dev/null | tr "\\n\\t" "  "); '
-        'printf "%s\\t%s\\t%s\\t%s\\t%s\\n" "$(basename "$d")" '
-        '"${SID:--}" "${Q:-?}" "${M:--}" "${S:-(no state yet)}"; done'
+        'printf "%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n" "$(basename "$d")" '
+        '"${SID:--}" "${Q:-?}" "$K" "${M:--}" "${S:-(no state yet)}"; done'
     )
+
+
+def jobs_raw():
+    """Return machine-oriented job records without printing."""
+    return transport._ssh_capture(_jobs_remote_command())
+
+
+def list_jobs():
+    """Print every submitted job with identifying metadata, oldest first."""
     rows = []
-    for line in transport._ssh_capture(remote).splitlines():
-        fields = line.split("\t", 4)
-        if len(fields) != 5:
+    for line in jobs_raw().splitlines():
+        fields = line.split("\t", 5)
+        if len(fields) == 6:
+            jobid, scheduler_id, quick, _command, materials, state_ = fields
+        elif len(fields) == 5:
+            jobid, scheduler_id, quick, materials, state_ = fields
+        else:
             continue
-        jobid, scheduler_id, quick, materials, state_ = fields
         jobid, scheduler_id, quick, materials, state_ = (
-            presentation._sanitize_terminal(value) for value in fields
+            presentation._sanitize_terminal(value)
+            for value in (jobid, scheduler_id, quick, materials, state_)
         )
         mode = "quick" if quick == "True" else "standard" if quick == "False" else "?"
         rows.append((jobid, scheduler_id, mode, materials.replace(" ", ", "), state_))
@@ -92,12 +106,17 @@ def _status_remote_command(job_assign, detail):
     )
 
 
-def job_status(jobid=None, detail=0):
-    """Print one structured job report; verbosity adds allocation and log tail."""
+def status_sections(jobid=None, detail=0):
+    """Fetch and decode one status report without rendering it."""
     if detail < 0:
         raise ValueError("detail must be non-negative")
     output = transport._ssh_capture(_status_remote_command(scripts._job_assign(jobid), detail))
-    sections = presentation._marked_sections(output)
+    return presentation._marked_sections(output), output
+
+
+def job_status(jobid=None, detail=0):
+    """Print one structured job report; verbosity adds allocation and log tail."""
+    sections, output = status_sections(jobid, detail)
     if not sections:
         print(presentation._sanitize_terminal(output, multiline=True), end="")
         return

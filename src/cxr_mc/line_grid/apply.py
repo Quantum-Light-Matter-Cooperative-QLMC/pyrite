@@ -275,8 +275,7 @@ def _print_diff(original, new_text):
 
 def _warn_stale_golden():
     print(
-        "warning: material catalog changed; golden is now stale; "
-        "run `cxr line-grid regen-golden`",
+        "warning: material catalog changed; golden is now stale; run `cxr line-grid regen-golden`",
         file=sys.stderr,
     )
 

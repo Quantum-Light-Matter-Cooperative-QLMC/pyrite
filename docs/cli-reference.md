@@ -45,7 +45,7 @@ authoritative for this version.
   - `cxr remote scan` — Sync code, submit sweep(s), wait, and pull checkpoints.
   - `cxr remote start` — Sync code and submit a detached SLURM material queue.
   - `cxr remote status` — Show one job; use -v for allocation and -vv for logs.
-  - `cxr remote stop` — Cancel active SLURM job(s) by material, or every live job.
+  - `cxr remote stop` — cancel active SLURM job(s) by material, or every live job.
   - `cxr remote sync` — Push current code to remote box.
 - `cxr line-grid` — Derive and manage per-material line-grid bounds.
   - `cxr line-grid apply` — Apply derived bounds to material catalog.
@@ -120,6 +120,7 @@ Options:
                          checkpoints]
   --max-minutes MINUTES  Soft wall-clock budget in minutes; exit 75 if resumable work
                          remains.
+  --json                 Emit one versioned JSON object on stdout.
   -h, --help             Show this message and exit.
 ```
 
@@ -143,6 +144,7 @@ Options:
                          checkpoints]
   --max-minutes MINUTES  Soft wall-clock budget in minutes; exit 75 if resumable work
                          remains.
+  --json                 Emit one versioned JSON object on stdout.
   -h, --help             Show this message and exit.
 ```
 
@@ -221,6 +223,7 @@ Options:
                         checkpoints]
   --save-every N        Atomically save after every N recomputed records.  [default:
                         100]
+  --json                Emit one versioned JSON object on stdout.
   -h, --help            Show this message and exit.
 ```
 
@@ -243,6 +246,7 @@ Options:
                         checkpoints]
   --save-every N        Atomically save after every N recomputed records.  [default:
                         100]
+  --json                Emit one versioned JSON object on stdout.
   -h, --help            Show this message and exit.
 ```
 
@@ -285,6 +289,7 @@ Usage: cxr archives [OPTIONS]
   List long-term checkpoint shelf.
 
 Options:
+  --json      Emit one versioned JSON object on stdout.
   -h, --help  Show this message and exit.
 ```
 
@@ -337,7 +342,7 @@ Commands:
   scan    Sync code, submit sweep(s), wait, and pull checkpoints.
   start   Sync code and submit a detached SLURM material queue.
   status  Show one job; use -v for allocation and -vv for logs.
-  stop    Cancel active SLURM job(s) by material, or every live job.
+  stop    cancel active SLURM job(s) by material, or every live job.
   sync    Push current code to remote box.
 ```
 
@@ -395,6 +400,7 @@ Usage: cxr remote jobs [OPTIONS]
   List jobs with SLURM IDs, materials, and last events.
 
 Options:
+  --json      Emit one versioned JSON object.
   -h, --help  Show this message and exit.
 ```
 
@@ -428,6 +434,7 @@ Options:
   --line-only       Merge only line spectra locally; mutually exclusive with --brem-
                     only.
   --force           With partial merge, insert records absent locally.
+  --json            Emit one versioned JSON object.
   -h, --help        Show this message and exit.
 ```
 
@@ -535,6 +542,7 @@ Usage: cxr remote status [OPTIONS] [JOBID]
 
 Options:
   -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
+  --json         Emit one versioned JSON object.
   -h, --help     Show this message and exit.
 ```
 
@@ -543,7 +551,7 @@ Options:
 ```text
 Usage: cxr remote stop [OPTIONS] [MATERIAL]...
 
-  Cancel active SLURM job(s) by material, or every live job.
+  cancel active SLURM job(s) by material, or every live job.
 
 Options:
   -a, --all   Stop every live job.
@@ -635,6 +643,7 @@ Usage: cxr line-grid defaults [OPTIONS]
   Show or update persistent derivation defaults.
 
 Options:
+  --json                    Emit one versioned JSON object on stdout (show mode only).
   --set                     Persist supplied values; otherwise only show defaults.
   --tilts DEG,...           Persistent polar tilts in degrees [0, 90).
   --azimuths DEG,...        Persistent azimuths in degrees [0, 360].
@@ -729,6 +738,7 @@ Usage: cxr line-grid show [OPTIONS] [MATERIAL]
   Show configured line grids.
 
 Options:
+  --json      Emit one versioned JSON object on stdout.
   -h, --help  Show this message and exit.
 ```
 
