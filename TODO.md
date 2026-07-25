@@ -25,7 +25,7 @@ Item generation:
 5. **>user< Zhai/NIST DTSA-II bremsstrahlung validation and subtraction.** Add versioned external-background fixtures, normalization/provenance documentation, model comparison, and experimental fit/subtraction in the validation path; reuse existing `load_external_brem` ingestion instead of treating DTSA-II as one canonical NIST dataset.
 6. **>user< Literature provenance ledger.** Create a canonical bibliography with stable source IDs for major physics and data claims, audit primary-source/license quality, and link validation-ledger rows plus in-code `Validation: <id>` markers without duplicating derivations.
 7. **>user< Debye-Waller provenance and anisotropy audit.** Replace placeholder or reused `B_ang2` values with temperature/phase-specific primary-source values, record provenance in the validation/literature ledgers, and assess atom-specific or tensor `U` requirements before extending the scalar catalog schema.
-8. **>user< `rebrem` GPU-memory regression.** Reproduce and measure `cxr remote rebrem --all --ne-brem 500 --step 20`; remote logs show VRAM accumulation after hundreds of records and current `_brem_for_case` bypasses the normal inter-case CuPy-pool release, so add a failing cadence regression, bounded-memory fix, and remote benchmark while preserving resumability.
+8. **`rebrem` GPU-memory regression.** `repair_brem_wide` loop calls `_brem_for_case` direct and skips the live-sweep inter-case CuPy-pool release, so VRAM accumulates over hundreds of records; add cadence regression + bounded-memory fix, resumability preserved. → `bugfix/rebrem-gpu-memory`.
 
 ### Gated
 
