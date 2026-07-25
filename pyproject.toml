@@ -63,6 +63,9 @@ docs = [
 pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+    "online: test fetches from an external structure database (COD/MP); skipped unless CXR_ONLINE_TESTS=1",
+]
 
 [tool.marimo.runtime]
 watcher_on_save = "autorun"

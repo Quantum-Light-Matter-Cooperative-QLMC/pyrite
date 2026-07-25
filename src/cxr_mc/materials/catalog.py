@@ -7,6 +7,7 @@ scan and Monte Carlo drivers.
 from __future__ import annotations
 
 import logging
+import re
 import tomllib
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -72,6 +73,10 @@ class CrystalSpec:
     key: str
     cif: Path
     validation_id: str
+    full_name: str | None
+    phase: str | None
+    cod_id: int | None
+    mp_id: str | None
     B_ang2: float
     beam_uvw: tuple[int, int, int] | None
     E_grid: np.ndarray | None
@@ -312,6 +317,19 @@ def _parse_info(
         return None
 
 
+_MP_ID_RE = re.compile(r"^mp-\d+$")
+
+
+def _optional_text(value: object, path: str, errors: _Errors) -> str | None:
+    """Validate an optional metadata string: absent is fine, present must be nonempty."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        errors.add(path, "must be a nonempty string")
+        return None
+    return value.strip()
+
+
 def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
     table = _table(raw, "crystals", errors)
     if table is None:
@@ -320,6 +338,10 @@ def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
     allowed = {
         "cif",
         "validation_id",
+        "full_name",
+        "phase",
+        "cod_id",
+        "mp_id",
         "B_ang2",
         "beam_uvw",
         "surface_hkl",
@@ -343,6 +365,18 @@ def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
         if not isinstance(validation_id, str) or not validation_id.strip():
             errors.add(f"{path}.validation_id", "must be a nonempty string")
             validation_id = ""
+        full_name = _optional_text(row.get("full_name"), f"{path}.full_name", errors)
+        phase = _optional_text(row.get("phase"), f"{path}.phase", errors)
+        cod_id = row.get("cod_id")
+        if cod_id is not None and (
+            not isinstance(cod_id, int) or isinstance(cod_id, bool) or cod_id <= 0
+        ):
+            errors.add(f"{path}.cod_id", "must be a positive integer")
+            cod_id = None
+        mp_id = row.get("mp_id")
+        if mp_id is not None and (not isinstance(mp_id, str) or not _MP_ID_RE.match(mp_id)):
+            errors.add(f"{path}.mp_id", "must match 'mp-<digits>'")
+            mp_id = None
         B = _number(row.get("B_ang2"))
         if B is None or B < 0:
             errors.add(f"{path}.B_ang2", "must be finite and nonnegative")
@@ -406,6 +440,10 @@ def _parse_crystals(raw: object, errors: _Errors) -> dict[str, CrystalSpec]:
                 key=key,
                 cif=cif,
                 validation_id=str(validation_id),
+                full_name=full_name,
+                phase=phase,
+                cod_id=cod_id if isinstance(cod_id, int) and not isinstance(cod_id, bool) else None,
+                mp_id=mp_id if isinstance(mp_id, str) else None,
                 B_ang2=B,
                 beam_uvw=beam,
                 surface_hkl=surface,

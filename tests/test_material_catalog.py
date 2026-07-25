@@ -190,6 +190,66 @@ def test_bundled_crystal_validation_ids_are_ledgered():
     assert not missing, f"catalog validation IDs missing from ledger: {missing}"
 
 
+_ALLOWED_PHASES = frozenset({"1T", "1T'", "2H", "3R", "4H", "6H", "Td"})
+
+
+def test_every_bundled_crystal_has_a_full_name():
+    from cxr_mc.materials import CATALOG
+
+    missing = sorted(key for key, spec in CATALOG.crystals.items() if not spec.full_name)
+    assert not missing, f"crystals missing a full_name: {missing}"
+
+
+def test_bundled_crystal_phases_use_known_polytype_labels():
+    from cxr_mc.materials import CATALOG
+
+    bad = sorted(
+        (key, spec.phase)
+        for key, spec in CATALOG.crystals.items()
+        if spec.phase is not None and spec.phase not in _ALLOWED_PHASES
+    )
+    assert not bad, f"crystals with unrecognized phase labels: {bad}"
+
+
+def test_bundled_crystal_external_ids_are_well_formed():
+    from cxr_mc.materials import CATALOG
+
+    for key, spec in CATALOG.crystals.items():
+        if spec.cod_id is not None:
+            assert isinstance(spec.cod_id, int) and spec.cod_id > 0, key
+        if spec.mp_id is not None:
+            assert spec.mp_id.startswith("mp-"), key
+
+
+def test_same_named_polytypes_keep_separate_checkpoints():
+    """full_name is display-only. Polytypes that share a full_name (e.g. SiC 4H
+    vs 6H) must still map to distinct crystal keys and distinct per-material
+    checkpoint pickles -- otherwise a sweep over one polytype would clobber the
+    other's results, since run_sweep names the pickle for ``case['crystal']``."""
+    from cxr_mc.materials import CATALOG
+    from cxr_mc.run import checkpoint_path_for
+
+    # SiC polytypes: identical material name, different phase, different key.
+    assert CATALOG.crystal("4h_sic").full_name == CATALOG.crystal("6h_sic").full_name
+    assert CATALOG.crystal("4h_sic").phase != CATALOG.crystal("6h_sic").phase
+    assert checkpoint_path_for("4h_sic") != checkpoint_path_for("6h_sic")
+
+    # No two crystal keys collide on a checkpoint path, even where full_name repeats.
+    paths = [checkpoint_path_for(key) for key in CATALOG.crystals]
+    assert len(set(paths)) == len(paths)
+
+    # Any full_name shared by >1 crystal must still resolve to unique checkpoints.
+    from collections import defaultdict
+
+    by_name: dict[str, list[str]] = defaultdict(list)
+    for key, spec in CATALOG.crystals.items():
+        if spec.full_name:
+            by_name[spec.full_name].append(key)
+    for name, keys in by_name.items():
+        checkpoints = {checkpoint_path_for(key) for key in keys}
+        assert len(checkpoints) == len(keys), f"{name!r} polytypes share a checkpoint: {keys}"
+
+
 def test_packaged_catalog_exposes_frozen_ordered_public_api():
     from cxr_mc.materials import CATALOG, MaterialCatalog
 
