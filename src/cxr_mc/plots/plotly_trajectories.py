@@ -38,23 +38,15 @@ _GROOVE_MAX_PERIODS = 200
 # bundle has visible width at the fitted, sub-micron cascade scale.
 _ZOOM_BEAM_FWHM_MM = 1.0e-3
 
-# Playback frame count for the reveal-until-fs scrubber (Plotly's own
-# client-side frame animation -- see trajectory_volume_animation). Measured
-# against the representative Ne=250 thin-slab hopg fixture used in this
-# module's tests (~55k transport segments -- HOPG's short elastic mean free
-# path at 30 keV makes it segment-dense): each animation frame re-sends the
-# FULL revealed vertex set (Plotly frames replace a trace's arrays wholesale,
-# they do not append), so total payload grows ~linearly with frame count.
-# 60 frames serialized to ~518 MB; even with the frame-payload trims below
-# (float32 casts, no per-frame customdata), 60 frames stayed in the hundreds
-# of MB. 8 frames measured ~36 MB for that same Ne=250 case -- still over the
-# ~30 MB rule of thumb, but it is one payload delivered ONCE at tab load,
-# not the old per-tick websocket resend of a comparable-sized figure every
-# ~1 s during play; smaller Ne (the slider's lower half) comes in well under
-# 30 MB at this frame count. See trajectory_volume_animation's docstring.
-N_FRAMES = 8
-
 _IDENTITY_R = np.eye(3)
+
+# Zoomed-view camera eye. Direction matches the long-standing hand-tuned angle
+# (-0.8, 1.5, -0.4); norm is rescaled to 1.25 (down from that vector's own
+# ~1.75) so the fitted scene box from `_zoom_scene_ranges` fills the frame --
+# see docs/viewer-camera-animation-plan.md workstream 1. Plotly's own default
+# eye norm is 1.25*sqrt(3) ~= 2.17, for scale.
+_CAMERA_EYE_DIRECTION = np.array([-0.8, 1.5, -0.4])
+_CAMERA_EYE = tuple((_CAMERA_EYE_DIRECTION / np.linalg.norm(_CAMERA_EYE_DIRECTION) * 1.25).tolist())
 
 
 def _case_R(case):
@@ -116,7 +108,8 @@ def _tracks_trace(case, data, unit, *, R=_IDENTITY_R, reveal_until_fs=None):
     """Electron-track ``Scatter3d`` at one reveal cutoff (see
     :func:`track_vertices_3d`). Shared by the full-reveal figure
     (:func:`trajectory_volume_figure_from_data`) and by every animation frame
-    -- :func:`trajectory_volume_animation` calls this once per frame with a
+    -- the reveal-until-fs prerendered animation (see
+    :mod:`cxr_mc.plots.render_trajectories`) calls this once per frame with a
     different ``reveal_until_fs``, so the vertex-filtering logic lives in
     exactly one place.
 
@@ -250,6 +243,43 @@ def _display_extent(case, data, *, realistic):
         hix = hiy = hi
     span = max(hix - lox, hiy - loy, thick)
     return lox, hix, loy, hiy, thick, unit, span
+
+
+def _zoom_scene_ranges(lox, hix, loy, hiy, thick, span, R):
+    """Padded lab-frame axis ranges ``(x_range, y_range, z_range)`` fitted to
+    the display box, for the zoomed (``realistic=False``) scene.
+
+    The display box ``[lox, hix] x [loy, hiy] x [0, thick]`` is defined in the
+    SAMPLE frame; a tilted case rotates it into the lab frame via ``R``, so a
+    tilt can swing a corner outside an axis-aligned range computed from the
+    unrotated box alone. Ranges must instead be the min/max over all 8
+    ROTATED corners, or a tilted slab clips against its own axis range.
+    Padding: 8% of span on x/y, 15% on z (small upstream/downstream slivers
+    so the beam-entry stub and exit face read past the box edge)."""
+    corners = _rotate(
+        np.array(
+            [
+                [lox, loy, 0.0],
+                [hix, loy, 0.0],
+                [hix, hiy, 0.0],
+                [lox, hiy, 0.0],
+                [lox, loy, thick],
+                [hix, loy, thick],
+                [hix, hiy, thick],
+                [lox, hiy, thick],
+            ]
+        ),
+        R,
+    )
+    xmin, ymin, zmin = corners.min(axis=0)
+    xmax, ymax, zmax = corners.max(axis=0)
+    xy_pad = 0.08 * span
+    z_pad = 0.15 * span
+    return (
+        (xmin - xy_pad, xmax + xy_pad),
+        (ymin - xy_pad, ymax + xy_pad),
+        (zmin - z_pad, zmax + z_pad),
+    )
 
 
 def _crystal_mesh(lox, hix, loy, hiy, thick, *, R=_IDENTITY_R):
@@ -512,10 +542,9 @@ def _exit_paths_3d(
 
     Returns ``None`` when no electron exits through the top or bottom face,
     UNLESS ``empty_ok`` is set: then an EMPTY same-styled ``Scatter3d`` is
-    returned instead. This is for animation-frame construction only (see
-    :func:`trajectory_volume_animation`), where a Plotly frame must always be
-    able to update this trace's fixed index even when its own reveal cutoff
-    has not yet exposed any exit.
+    returned instead. This is for per-frame animation construction, where a
+    frame must always be able to update this trace's fixed index even when
+    its own reveal cutoff has not yet exposed any exit.
 
     Face membership uses the SAMPLE-frame ``z`` (true penetration depth)
     regardless of ``R``; ``R`` (default identity) only rotates the final
@@ -782,37 +811,63 @@ def trajectory_volume_figure_from_data(
         # reaching the animation slider (aspectmode="data" fits the cube by
         # width, not height); 560 tightens that gap.
         height=560,
-        scene={
-            "xaxis": {
-                "title": f"lab x, beam·detector plane ({unit})",
-                "gridcolor": _GRID,
-                "zeroline": False,
-            },
-            "yaxis": {
-                "title": f"lab y, out of plane ({unit})",
-                "gridcolor": _GRID,
-                "zeroline": False,
-            },
-            "zaxis": {
-                "title": f"lab z, beam axis ({unit})",
-                "gridcolor": _GRID,
-                "zeroline": False,
-            },
-            "aspectmode": "data",
-            "camera": {"eye": {"x": -0.8, "y": 1.5, "z": -0.4}},
-            "bgcolor": _FIELD,
-        },
+        scene=_scene_layout(lox, hix, loy, hiy, thick, span, R, unit, realistic=realistic),
         uirevision="penetration-volume",
     )
     return fig
 
 
-def frame_reveal_fs(frame_index, t_max, n_frames=N_FRAMES):
+def _scene_layout(lox, hix, loy, hiy, thick, span, R, unit, *, realistic):
+    """Build the ``scene`` layout dict for :func:`trajectory_volume_figure_from_data`.
+
+    ``realistic=True`` keeps the original auto-range behavior (``aspectmode
+    ="data"``, no explicit ranges) unchanged. ``realistic=False`` (zoomed)
+    instead fits explicit ranges to the display box (see
+    :func:`_zoom_scene_ranges`) and switches to ``aspectmode="manual"`` with
+    an ``aspectratio`` proportional to those range widths, normalized so the
+    largest axis is 1 -- ``"data"`` mode and explicit ranges interact poorly
+    in Plotly, so manual is the reliable way to reproduce ``"data"``
+    proportions while still respecting the fitted ranges."""
+    scene = {
+        "xaxis": {
+            "title": f"lab x, beam·detector plane ({unit})",
+            "gridcolor": _GRID,
+            "zeroline": False,
+        },
+        "yaxis": {
+            "title": f"lab y, out of plane ({unit})",
+            "gridcolor": _GRID,
+            "zeroline": False,
+        },
+        "zaxis": {
+            "title": f"lab z, beam axis ({unit})",
+            "gridcolor": _GRID,
+            "zeroline": False,
+        },
+        "aspectmode": "data",
+        "camera": {"eye": {"x": _CAMERA_EYE[0], "y": _CAMERA_EYE[1], "z": _CAMERA_EYE[2]}},
+        "bgcolor": _FIELD,
+    }
+    if not realistic:
+        x_range, y_range, z_range = _zoom_scene_ranges(lox, hix, loy, hiy, thick, span, R)
+        widths = np.array(
+            [x_range[1] - x_range[0], y_range[1] - y_range[0], z_range[1] - z_range[0]]
+        )
+        ratio = widths / widths.max()
+        scene["xaxis"]["range"] = x_range
+        scene["yaxis"]["range"] = y_range
+        scene["zaxis"]["range"] = z_range
+        scene["aspectmode"] = "manual"
+        scene["aspectratio"] = {"x": ratio[0], "y": ratio[1], "z": ratio[2]}
+    return scene
+
+
+def frame_reveal_fs(frame_index, t_max, n_frames=60):
     """Reveal cutoff [fs] for animation ``frame_index`` of ``n_frames``, linear
     from ``0`` (frame 0) to ``t_max`` (the last frame, ``n_frames - 1``). Pure --
     no marimo/plotly import -- so it is unit-testable and reusable by
-    :func:`trajectory_volume_animation` without dragging in UI or figure
-    state."""
+    :func:`cxr_mc.plots.render_trajectories.render_reveal_animation` without
+    dragging in UI or figure state."""
     return frame_index / (n_frames - 1) * t_max
 
 
@@ -839,7 +894,8 @@ def case_t_max(rec_or_case, *, Ne, seed, realistic=False, beam_fwhm_mm=None):
     derive a :func:`frame_reveal_fs` cutoff for every animation frame without
     re-running transport once per frame -- call this once per parameter set
     instead, and reuse the returned ``T_max`` across the whole
-    ``0..N_FRAMES-1`` scrub range. :func:`trajectory_volume_animation` instead
+    ``0..n_frames-1`` scrub range.
+    :func:`cxr_mc.plots.render_trajectories.render_reveal_animation` instead
     takes an already-transported ``data`` dict and calls
     :func:`dataset_t_max` on it directly, since its caller (the marimo
     penetration tab) already caches that dict.
@@ -854,204 +910,3 @@ def case_t_max(rec_or_case, *, Ne, seed, realistic=False, beam_fwhm_mm=None):
         )
     )
 
-
-def trajectory_volume_animation(
-    rec_or_case,
-    data,
-    *,
-    realistic=False,
-    beam_fwhm_mm=None,
-    speed=1.0,
-    n_frames=N_FRAMES,
-):
-    """Client-side playback figure: the full-reveal
-    :func:`trajectory_volume_figure_from_data` figure with ``n_frames`` Plotly
-    animation frames attached, one per :func:`frame_reveal_fs` cutoff.
-
-    Playback used to be SERVER-side: a marimo ``mo.state`` frame counter plus
-    an ``mo.ui.refresh`` tick reran the whole penetration-tab cell every tick,
-    rebuilding and re-serializing the entire figure over the websocket AND
-    recomputing the survival chart, once per second. Here the browser owns
-    playback entirely: after this one payload, Play/Pause/scrub need no
-    server round-trip, because Plotly's own animation engine walks
-    ``fig.frames`` client-side.
-
-    ``data`` must already be transported (see :func:`trajectory_volume_data`);
-    this function runs no Monte Carlo transport of its own. ``realistic`` and
-    ``beam_fwhm_mm`` must match the values ``data`` was transported with, same
-    contract as :func:`trajectory_volume_figure_from_data`.
-
-    PAYLOAD: only reveal-dependent traces -- "electron tracks"
-    (:func:`_tracks_trace`), "vacuum legs" when present, and "exit path"
-    (:func:`_exit_paths_3d`) when the full dataset has exits -- are re-sent per
-    frame, addressed by trace index via ``go.Frame(traces=...)``; crystal mesh,
-    plane outlines, beam footprint/incident-beam lines, and detector arrows are
-    static and built ONCE into the base figure, never repeated per frame.
-    Each frame trace additionally drops what it can of the PER-FRAME payload
-    itself (see :data:`N_FRAMES`'s comment for measured sizes): position and
-    per-vertex color are cast to ``float32`` (screen-scale coordinates do not
-    need float64 precision), and ``customdata`` (the hover-text source) is
-    omitted entirely from frame updates -- only the base (full-reveal) trace
-    carries it, so hover values may lag the visible reveal WHILE an animation
-    is actively playing/scrubbing, but are exact again at rest on any frame
-    reached by dragging the scrubber to its end, and always exact on the
-    initial (full-reveal) view. Static styling (colorscale/width/hovertemplate
-    /name/colorbar) is also omitted per frame; Plotly's frame update leaves
-    those untouched on the base trace.
-
-    Frame duration is ``base_ms / speed`` with ``base_ms`` chosen so the WHOLE
-    ``n_frames``-frame pass takes about the same ~60 s at 1x the old
-    server-side path gave (``base_ms = 60_000 / n_frames``, not the fixed
-    1000 ms/frame of the old 60-frame path -- :data:`N_FRAMES` shrank for
-    payload reasons, so the per-frame duration grows to keep the TOTAL
-    duration, and hence what "Speed" means, unchanged). ``scatter3d`` traces
-    need ``redraw: True`` on every animate step (2-D traces can transition
-    without one; 3-D scatter cannot), so both the Play button and the frame
-    slider set it.
-
-    CAVEAT: Plotly's built-in Play button does not loop -- there is no native
-    "repeat" mode -- reaching the last frame simply stops. The old Repeat
-    switch has no replacement here; re-drag the scrubber to frame 0 (or click
-    Play again after doing so) to replay.
-    """
-    case = _case_of(rec_or_case)
-    R = _case_R(case)
-    t_max = dataset_t_max(data)
-    cmax = float(case["E0_keV"])
-    _, _, _, _, _thick, _unit, span = _display_extent(case, data, realistic=realistic)
-    length = 0.28 * span
-
-    # Base figure = full reveal (reveal_until_fs=None), identical to what
-    # trajectory_volume_figure_from_data has always returned -- this is also
-    # exactly frame (n_frames - 1)'s content, so the slider's initial
-    # position (below) matches what is actually on screen before any frame
-    # is explicitly selected.
-    fig = trajectory_volume_figure_from_data(
-        rec_or_case, data, realistic=realistic, beam_fwhm_mm=beam_fwhm_mm, reveal_until_fs=None
-    )
-    trace_names = [trace.name for trace in fig.data]  # type: ignore[reportAttributeAccessIssue]
-    tracks_idx = trace_names.index("electron tracks")
-    vacuum_idx = trace_names.index("vacuum legs") if "vacuum legs" in trace_names else None
-    # Only allocate a per-frame exit-path update when the FULL dataset ever
-    # exits through a face at all; if it never does, no frame can either, and
-    # the trace (and its per-frame payload) is skipped entirely.
-    exit_idx = trace_names.index("exit path") if "exit path" in trace_names else None
-
-    def _f32(values):
-        """Frame-payload trim: float64 -> float32. Screen-scale coordinates
-        and a Turbo-colorscale energy value need nowhere near float64
-        precision; halves each frame's numeric payload (see N_FRAMES)."""
-        return np.asarray(values, dtype=np.float32)
-
-    frames = []
-    for k in range(n_frames):
-        cutoff = frame_reveal_fs(k, t_max, n_frames=n_frames)
-        xyz, energy, _elec_id = track_vertices_3d(data, t_fs=data["t_fs"], reveal_until_fs=cutoff)
-        xyz = _rotate(xyz, R)
-        # No customdata here (see docstring PAYLOAD note): only the base
-        # (full-reveal) trace carries hover data, trimming this frame to just
-        # the arrays that drive what is actually drawn.
-        frame_data = [
-            go.Scatter3d(
-                x=_f32(xyz[:, 0]),
-                y=_f32(xyz[:, 1]),
-                z=_f32(xyz[:, 2]),
-                line={"color": _f32(energy)},
-            )
-        ]
-        frame_traces = [tracks_idx]
-        if vacuum_idx is not None:
-            vacuum_trace = vacuum_legs_trace(
-                data,
-                reveal_until_fs=cutoff,
-                R=R,
-                unit=_unit,
-                cmax=cmax,
-            )
-            frame_data.append(
-                go.Scatter3d(
-                    x=_f32(vacuum_trace.x),
-                    y=_f32(vacuum_trace.y),
-                    z=_f32(vacuum_trace.z),
-                    line={"color": _f32(vacuum_trace.line.color)},  # type: ignore[reportAttributeAccessIssue]
-                )
-            )
-            frame_traces.append(vacuum_idx)
-        if exit_idx is not None:
-            # empty_ok=True: an early frame may reveal zero exits yet, but the
-            # trace index must still receive an update (an empty trace),
-            # otherwise it would keep showing the PREVIOUS (fuller) frame's
-            # dashes -- exits appearing before the track that produced them.
-            exit_trace = _exit_paths_3d(
-                data, length, R=R, cmax=cmax, reveal_until_fs=cutoff, empty_ok=True
-            )
-            assert exit_trace is not None  # empty_ok=True always yields a trace
-            frame_data.append(
-                go.Scatter3d(
-                    x=_f32(exit_trace.x),
-                    y=_f32(exit_trace.y),
-                    z=_f32(exit_trace.z),
-                    line={"color": _f32(exit_trace.line.color)},  # type: ignore[reportAttributeAccessIssue]
-                )
-            )
-            frame_traces.append(exit_idx)
-        frames.append(go.Frame(name=str(k), data=frame_data, traces=frame_traces))
-    fig.frames = frames
-
-    # base_ms recomputed (not the literal 1000 ms/frame the old 60-frame path
-    # used) so the TOTAL pass duration at 1x stays ~60 s regardless of
-    # n_frames -- see the docstring's Frame-duration paragraph.
-    base_ms = 60_000.0 / n_frames
-    duration = base_ms / float(speed) if speed > 0 else base_ms
-    animate_step = {
-        "frame": {"duration": 0, "redraw": True},
-        "mode": "immediate",
-        "transition": {"duration": 0},
-    }
-    fig.update_layout(
-        updatemenus=[
-            {
-                "type": "buttons",
-                "direction": "left",
-                "showactive": False,
-                "x": 1.0,
-                "y": 1.1,
-                "xanchor": "right",
-                "yanchor": "top",
-                "pad": {"t": 0, "r": 8},
-                "buttons": [
-                    {
-                        "label": "▶ Play",
-                        "method": "animate",
-                        "args": [
-                            None,
-                            {
-                                "frame": {"duration": duration, "redraw": True},
-                                "fromcurrent": True,
-                                "transition": {"duration": 0},
-                            },
-                        ],
-                    },
-                    {
-                        "label": "⏸ Pause",
-                        "method": "animate",
-                        "args": [[None], animate_step],
-                    },
-                ],
-            }
-        ],
-        sliders=[
-            {
-                "active": n_frames - 1,
-                "x": 0.02,
-                "y": -0.02,
-                "len": 0.92,
-                "currentvalue": {"prefix": "frame ", "visible": True},
-                "steps": [
-                    {"label": str(k), "method": "animate", "args": [[str(k)], animate_step]}
-                    for k in range(n_frames)
-                ],
-            }
-        ],
-    )
-    return fig

@@ -5,7 +5,6 @@ import plotly.graph_objects as go
 from plotly import colors as plotly_colors
 
 from cxr_mc.plots.plotly_trajectories import (
-    N_FRAMES,
     _exit_paths_3d,
     case_t_max,
     dataset_t_max,
@@ -60,7 +59,9 @@ def test_trajectory_volume_figure_contains_volume_tracks_and_direction_arrows():
     assert {trace.name for trace in fig.data} >= {"incident beam", "detector direction"}
     beam = next(trace for trace in fig.data if trace.name == "incident beam")
     assert beam.type == "scatter3d"
-    assert fig.layout.scene.aspectmode == "data"
+    # zoomed (realistic=False, the default) now fits explicit ranges -- see
+    # test_zoomed_figure_has_manual_aspect_and_finite_ranges_covering_rotated_box.
+    assert fig.layout.scene.aspectmode == "manual"
     fig.to_json()  # browser/export payload remains serializable
 
 
@@ -233,7 +234,8 @@ def test_trajectory_volume_figure_reveal_until_fs_reduces_track_vertices():
     case = _hopg_thin_slab_case()
     data = _trajectory_data(_case_of(case), 80, 0, beam_fwhm_mm=_ZOOM_BEAM_FWHM_MM)
     t_max = dataset_t_max(data)
-    cutoff = frame_reveal_fs(N_FRAMES // 2, t_max)
+    n_frames = 8
+    cutoff = frame_reveal_fs(n_frames // 2, t_max, n_frames=n_frames)
     assert 0.0 < cutoff < t_max  # midpoint strictly inside range, else test proves nothing
 
     fig_full = trajectory_volume_figure(case, Ne=80, seed=0)
@@ -248,9 +250,10 @@ def test_trajectory_volume_figure_reveal_until_fs_reduces_track_vertices():
 
 def test_frame_reveal_fs_endpoints_and_midpoint():
     t_max = 120.0
+    n_frames = 60  # frame_reveal_fs's own default
     assert frame_reveal_fs(0, t_max) == 0.0
-    assert frame_reveal_fs(N_FRAMES - 1, t_max) == t_max
-    mid = frame_reveal_fs((N_FRAMES - 1) // 2, t_max)
+    assert frame_reveal_fs(n_frames - 1, t_max) == t_max
+    mid = frame_reveal_fs((n_frames - 1) // 2, t_max)
     assert 0.0 < mid < t_max
 
 
@@ -285,8 +288,8 @@ def test_case_t_max_zero_safe_on_trivial_input():
 def test_exit_paths_3d_empty_ok_returns_empty_trace_instead_of_none():
     # A dataset with zero exits at this cutoff: the default (empty_ok=False)
     # keeps returning None (unchanged contract); empty_ok=True instead
-    # returns a same-styled, zero-length trace -- what trajectory_volume_
-    # animation needs so a frame can always update this trace's fixed index.
+    # returns a same-styled, zero-length trace -- what per-frame animation
+    # construction needs so a frame can always update this trace's fixed index.
     data = {
         "elec_id": np.array([0]),
         "start_xyz": np.array([[0.0, 0.0, 0.4]]),
@@ -304,89 +307,6 @@ def test_exit_paths_3d_empty_ok_returns_empty_trace_instead_of_none():
     assert empty.line.colorscale is not None  # still styled like a real exit-path trace
 
 
-def _hopg_thin_slab_data(Ne=80, seed=0):
-    from cxr_mc.plots.plotly_trajectories import trajectory_volume_data
-
-    return trajectory_volume_data(_hopg_thin_slab_case(), Ne=Ne, seed=seed)
-
-
-def test_trajectory_volume_animation_returns_expected_frame_count():
-    from cxr_mc.plots.plotly_trajectories import trajectory_volume_animation
-
-    case = _hopg_thin_slab_case()
-    data = _hopg_thin_slab_data()
-    fig = trajectory_volume_animation(case, data)
-
-    assert len(fig.frames) == N_FRAMES
-    assert [frame.name for frame in fig.frames] == [str(k) for k in range(N_FRAMES)]
-
-
-def test_trajectory_volume_animation_n_frames_override():
-    from cxr_mc.plots.plotly_trajectories import trajectory_volume_animation
-
-    case = _hopg_thin_slab_case()
-    data = _hopg_thin_slab_data()
-    fig = trajectory_volume_animation(case, data, n_frames=5)
-
-    assert len(fig.frames) == 5
-
-
-def test_trajectory_volume_animation_base_traces_match_full_reveal_figure():
-    # Base figure (before any frame is selected) must be the SAME full-reveal
-    # content trajectory_volume_figure_from_data has always produced -- the
-    # animation only ADDS frames + playback controls on top of it.
-    from cxr_mc.plots.plotly_trajectories import (
-        trajectory_volume_animation,
-        trajectory_volume_figure_from_data,
-    )
-
-    case = _hopg_thin_slab_case()
-    data = _hopg_thin_slab_data()
-    fig = trajectory_volume_animation(case, data)
-    full_fig = trajectory_volume_figure_from_data(case, data)
-
-    names = {trace.name for trace in fig.data}
-    assert names == {trace.name for trace in full_fig.data}
-    assert {"crystal volume", "electron tracks", "incident beam", "detector direction"} <= names
-
-    tracks = next(t for t in fig.data if t.name == "electron tracks")
-    full_tracks = next(t for t in full_fig.data if t.name == "electron tracks")
-    n_revealed = np.count_nonzero(np.isfinite(np.asarray(tracks.x, dtype=float)))
-    n_full = np.count_nonzero(np.isfinite(np.asarray(full_tracks.x, dtype=float)))
-    assert n_revealed == n_full
-
-
-def test_trajectory_volume_animation_frames_grow_monotonically_revealed():
-    from cxr_mc.plots.plotly_trajectories import trajectory_volume_animation
-
-    case = _hopg_thin_slab_case()
-    data = _hopg_thin_slab_data()
-    fig = trajectory_volume_animation(case, data)
-
-    def n_finite(frame):
-        return np.count_nonzero(np.isfinite(np.asarray(frame.data[0].x, dtype=float)))
-
-    counts = [n_finite(frame) for frame in fig.frames]
-    assert counts == sorted(counts)  # non-decreasing reveal across the pass
-    assert counts[0] < counts[-1]  # frame 0 reveals strictly less than the last frame
-    # frame trace omits per-frame customdata (only the base trace carries it,
-    # see trajectory_volume_animation's PAYLOAD note) -- confirms the trim.
-    assert fig.frames[0].data[0].customdata is None
-
-
-def test_trajectory_volume_animation_exit_path_traced_every_frame_when_present():
-    from cxr_mc.plots.plotly_trajectories import trajectory_volume_animation
-
-    case = _hopg_thin_slab_case()
-    data = _hopg_thin_slab_data()
-    fig = trajectory_volume_animation(case, data)
-
-    names = [trace.name for trace in fig.data]
-    assert "exit path" in names  # this fixture always has both exit kinds
-    exit_idx = names.index("exit path")
-    assert all(exit_idx in frame.traces for frame in fig.frames)
-
-
 def test_vacuum_trace_is_present_in_static_grooved_figure():
     from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure
 
@@ -396,59 +316,6 @@ def test_vacuum_trace_is_present_in_static_grooved_figure():
     assert len(traces) == 1
     assert traces[0].opacity == 0.4
     assert traces[0].line.width == 3
-
-
-def test_trajectory_volume_animation_updates_vacuum_trace_each_frame():
-    from cxr_mc.plots.plotly_trajectories import (
-        trajectory_volume_animation,
-        trajectory_volume_data,
-    )
-
-    case = _hopg_grooved_case()
-    data = trajectory_volume_data(case, Ne=40, seed=42)
-    fig = trajectory_volume_animation(case, data, n_frames=4)
-    names = [trace.name for trace in fig.data]
-    vacuum_idx = names.index("vacuum legs")
-
-    assert all(vacuum_idx in frame.traces for frame in fig.frames)
-    counts = []
-    for frame in fig.frames:
-        update = frame.data[list(frame.traces).index(vacuum_idx)]
-        counts.append(np.count_nonzero(np.isfinite(np.asarray(update.x, dtype=float))))
-    assert counts == sorted(counts)
-    assert counts[0] < counts[-1]
-
-
-def test_trajectory_volume_animation_updatemenus_and_slider_present():
-    from cxr_mc.plots.plotly_trajectories import trajectory_volume_animation
-
-    case = _hopg_thin_slab_case()
-    data = _hopg_thin_slab_data()
-    fig = trajectory_volume_animation(case, data)
-
-    assert fig.layout.updatemenus
-    labels = [button.label for button in fig.layout.updatemenus[0].buttons]
-    assert any("Play" in label for label in labels)
-    assert any("Pause" in label for label in labels)
-    for button in fig.layout.updatemenus[0].buttons:
-        assert button.args[1]["frame"]["redraw"] is True  # scatter3d needs redraw
-
-    assert fig.layout.sliders
-    assert len(fig.layout.sliders[0].steps) == N_FRAMES
-    fig.to_json()  # the whole animated payload remains serializable
-
-
-def test_trajectory_volume_animation_speed_scales_frame_duration():
-    from cxr_mc.plots.plotly_trajectories import trajectory_volume_animation
-
-    case = _hopg_thin_slab_case()
-    data = _hopg_thin_slab_data()
-    fig_1x = trajectory_volume_animation(case, data, speed=1.0)
-    fig_2x = trajectory_volume_animation(case, data, speed=2.0)
-
-    duration_1x = fig_1x.layout.updatemenus[0].buttons[0].args[1]["frame"]["duration"]
-    duration_2x = fig_2x.layout.updatemenus[0].buttons[0].args[1]["frame"]["duration"]
-    assert duration_2x == duration_1x / 2
 
 
 # ---- blazed groove profile (Task 6) ------------------------------------------
@@ -539,3 +406,85 @@ def test_grooved_trajectory_entries_land_on_relief_facets():
     assert np.all(entry_z < h + 1e-3)
     assert entry_z.max() > 0.1 * h  # on the facets, not the flat face
     assert np.unique(np.round(entry_z, 3)).size > 3  # multiple lateral phases
+
+
+# ---- camera fit (viewer-camera-animation-plan workstream 1) ------------------
+
+
+def test_zoomed_figure_has_manual_aspect_and_finite_ranges_covering_rotated_box():
+    from cxr_mc.plots.plotly_trajectories import (
+        _case_R,
+        _display_extent,
+        _zoom_scene_ranges,
+        trajectory_volume_data,
+        trajectory_volume_figure_from_data,
+    )
+    from cxr_mc.plots.trajectories import _case_of
+
+    # tilted case (tilt_deg=45) so rotation genuinely swings the box corners.
+    case = _hopg_grooved_case()
+    data = trajectory_volume_data(case, Ne=12, seed=0)
+    fig = trajectory_volume_figure_from_data(case, data, realistic=False)
+
+    scene = fig.layout.scene
+    x_range = scene.xaxis.range
+    y_range = scene.yaxis.range
+    z_range = scene.zaxis.range
+    assert all(np.isfinite(v) for v in x_range + y_range + z_range)
+
+    assert scene.aspectmode == "manual"
+    widths = np.array([x_range[1] - x_range[0], y_range[1] - y_range[0], z_range[1] - z_range[0]])
+    expected_ratio = widths / widths.max()
+    aspectratio = np.array([scene.aspectratio.x, scene.aspectratio.y, scene.aspectratio.z])
+    np.testing.assert_allclose(aspectratio, expected_ratio)
+    assert aspectratio.max() == 1.0
+
+    # rotated crystal-box corners must sit strictly inside the fitted ranges.
+    R = _case_R(_case_of(case))
+    lox, hix, loy, hiy, thick, _unit, span = _display_extent(_case_of(case), data, realistic=False)
+    xr, yr, zr = _zoom_scene_ranges(lox, hix, loy, hiy, thick, span, R)
+    corners = np.array([[x, y, z] for x in (lox, hix) for y in (loy, hiy) for z in (0.0, thick)])
+    rotated = corners @ R.T
+    assert np.all(rotated[:, 0] > xr[0]) and np.all(rotated[:, 0] < xr[1])
+    assert np.all(rotated[:, 1] > yr[0]) and np.all(rotated[:, 1] < yr[1])
+    assert np.all(rotated[:, 2] > zr[0]) and np.all(rotated[:, 2] < zr[1])
+    # and the figure's own scene ranges must match the helper's ranges.
+    np.testing.assert_allclose(x_range, xr)
+    np.testing.assert_allclose(y_range, yr)
+    np.testing.assert_allclose(z_range, zr)
+
+
+def test_realistic_figure_keeps_auto_range_data_aspect():
+    from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure
+
+    case = _hopg_thin_slab_case()
+    fig = trajectory_volume_figure(case, Ne=6, realistic=True)
+
+    scene = fig.layout.scene
+    assert scene.xaxis.range is None
+    assert scene.yaxis.range is None
+    assert scene.zaxis.range is None
+    assert scene.aspectmode == "data"
+
+
+def test_camera_eye_norm_and_direction():
+    from cxr_mc.plots.plotly_trajectories import _CAMERA_EYE
+
+    eye = np.asarray(_CAMERA_EYE, dtype=float)
+    assert np.isclose(np.linalg.norm(eye), 1.25)
+
+    direction = np.array([-0.8, 1.5, -0.4])
+    cos_angle = np.dot(eye, direction) / (np.linalg.norm(eye) * np.linalg.norm(direction))
+    assert np.isclose(cos_angle, 1.0)  # parallel, same sense
+
+
+def test_trajectory_volume_figure_uses_camera_eye_constant():
+    from cxr_mc.plots.plotly_trajectories import _CAMERA_EYE, trajectory_volume_figure
+
+    case = _hopg_thin_slab_case()
+    fig_zoom = trajectory_volume_figure(case, Ne=6, realistic=False)
+    fig_real = trajectory_volume_figure(case, Ne=6, realistic=True)
+
+    for fig in (fig_zoom, fig_real):
+        eye = fig.layout.scene.camera.eye
+        np.testing.assert_allclose([eye.x, eye.y, eye.z], _CAMERA_EYE)
