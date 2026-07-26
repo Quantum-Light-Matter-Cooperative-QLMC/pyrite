@@ -42,6 +42,9 @@ Item generation:
 3. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
 4. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
 5. **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
+6. **>user< Fix cached pull-in of pre-rendered animations in trace_app (add more buttons or something) -- maybe due to regenerate's changing random seed?**
+   1. Progress bar here shows up at the top of the marimo notebook instead of near the button that is pressed to start the render -- confusing
+   2. clip off the extra figure background & legend in the render, it is ugly. We just want the black grid space, with the colorbar and mat/config title info overlayed, but no background color. Saved render is also a bit pixelated, especially when opened in an mp4 viewer outside of the marimo app.
+   3. add button to open render saving dialogue (so user can promptly move it from the cache)
 
 ## P3 - lower / exploratory / small bugfixes
-1. >user< Fix some bonds not showing up in some 3D crystal structure plots (HfTe2 is one, I think?)
