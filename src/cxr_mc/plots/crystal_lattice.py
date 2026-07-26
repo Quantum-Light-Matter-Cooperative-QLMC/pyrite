@@ -97,10 +97,13 @@ _COVALENT_RADIUS: dict[str, float] = {
     "Zr": 1.75,
     "Nb": 1.64,
     "Mo": 1.54,
+    "V": 1.53,  # placeholder: bond visualization may be incorrect
     "Cd": 1.44,
     "In": 1.42,
     "Sn": 1.39,
     "Te": 1.38,
+    "Pd": 1.39,  # placeholder: bond visualization may be incorrect
+    "Pt": 1.36,  # placeholder: bond visualization may be incorrect
     "Cs": 2.44,
     "Ba": 2.15,
     "Ta": 1.70,
@@ -108,6 +111,7 @@ _COVALENT_RADIUS: dict[str, float] = {
     "Re": 1.51,
     "Pb": 1.46,
     "Bi": 1.48,
+    "Hf": 1.75,  # placeholder: bond visualization may be incorrect
 }
 _DEFAULT_COLOR = "#ff69b4"
 _DEFAULT_RADIUS = 0.75
