@@ -221,6 +221,9 @@ class Sweep:
     # fixed setup (single values) ------------------------------------------
     theta_obs_deg: float = 90.0
     n_families: int = 4
+    # Optional resolved-profile cap applied after catalog-pinned or dynamically
+    # selected reflections. None preserves the complete production set.
+    max_reflections: int | None = None
     # two independent photon-energy grids (None -> per-material defaults):
     #   E_grid_line : fine + NARROW; where the coherent lines are evaluated (the
     #       expensive sinc^2). Lines are kinematically capped at a few keV, so it
@@ -389,6 +392,8 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     point-source beam). Returns the ``cases`` list; preview it with
     :func:`geometry_table`."""
     cp = crystal_params(sweep.material, sweep.n_families)
+    if sweep.max_reflections is not None:
+        cp["hkl_list"] = cp["hkl_list"][: sweep.max_reflections]
     # line grid: fine + narrow (per-material default, per-energy mapping,
     # E_grid_line, or the deprecated e_grid_eV alias). brem grid: coarse + wide
     # -- each case spans up to that case's beam energy because brem cuts off at

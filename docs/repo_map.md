@@ -29,7 +29,8 @@ montecarlo                     (transport + radiation + detector helpers)
 sweep ─────────────┐
         │          │
 results ◄── montecarlo, sweep
-config  ◄── results, sweep
+profiles ◄── results, sweep
+config  ◄── profiles, results, sweep
 run     ◄── montecarlo, results
 scan    ◄── config, run, sweep
 plots   ◄── montecarlo, results, detectors.timepix_response, detectors.eaglexo_response
@@ -54,8 +55,9 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   hidden alias: `cxr check-config`.
 - **`cxr checkpoint ...`** → `checkpoint_cli:command`: grouped local checkpoint
   shrink, component recompute, archive, restore, list, and merge operations.
-- **`cxr scan <material>`** → `scan:main` → `run.run_sweep` → write
-  `checkpoints/<material>/{line,brem}.pkl`. Root shim: `scan.py`.
+- **`cxr scan <material> [--profile full|survey]`** → `scan:main` →
+  `run.run_sweep` → write canonical `checkpoints/<material>/{line,brem}.pkl`
+  or an identity-qualified variant directory. Root shim: `scan.py`.
 - **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
   `notebooks/analysis_app.py` (all figures, Altair + matplotlib, lazy tabbed
   layout), `notebooks/validation_app.py` (validation-study interface). Scan
@@ -191,7 +193,15 @@ scan grids project from immutable `materials.CATALOG`.
 - Public: `default_settings`, `material_grid`, `material_sweep`,
   `trajectory_sweep`; `MATERIALS` ordered tuple.
 - Deps: `materials` (`CATALOG`, `MaterialSpec`), `results` (`Settings`),
-  `sweep` (`Sweep`).
+  `profiles` (`get_profile`), `sweep` (`Sweep`).
+
+### `profiles.py`
+Named `full`/provisional `survey` policies, deterministic serialization of
+resolved settings and sweeps, SHA-256 dataset identity, and variant checkpoint
+stem selection.
+- Public: `SweepProfile`, `PROFILE_NAMES`, `get_profile`, `dataset_identity`,
+  `variant_stem`.
+- Deps: `results` (`Settings`), `sweep` (`Sweep`), NumPy.
 
 ### `run.py`
 Checkpointed, resumable sweep driver plus component checkpoint loaders/repair.
@@ -411,10 +421,12 @@ keep only material's current-grid configs).
 
 ### `archive.py`
 `cxr archive`/`restore`/`archives`/`union` subcommands — durable local
-checkpoint shelf. Copy active slot `checkpoints/<stem>/` to/from
+checkpoint shelf. Copy active slot `checkpoints/<stem>/` (including resolved
+dataset identity in `meta.json`) to/from
 long-term `checkpoints/archive/<label>/` (atomic temp+replace, `--force`
 overwrite guards, label↔stem date-stamp inference). `union` merge archived
-checkpoint into active slot for SAME material (compared via each store's
+checkpoint into active slot for same material and resolved dataset identity
+(compared via manifests when both have identity, then each store's
 `case["crystal"]`), live win on any overlapping (config name, E0) point;
 archive live checkpoint first by default (`--no-archive` to skip), leave
 source archive intact by default (`--delete-archive` to remove).

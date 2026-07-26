@@ -58,6 +58,7 @@ def test_start_click_defaults_and_zero_meanings(monkeypatch):
             ["hopg"],
             {
                 "quick": False,
+                "profile": "full",
                 "workers": 0,
                 "parallel_materials": None,
                 "chunk_minutes": 10.0,
@@ -113,6 +114,7 @@ def test_remote_numeric_domains_fail_at_click_boundary(argv, option):
         (["start"], "needs material"),
         (["start", "hopg", "--all"], "--all does not take"),
         (["scan", "hopg", "--quick", "--grid"], "drop --grid"),
+        (["scan", "hopg", "--quick", "--profile", "survey"], "cannot be combined"),
         (["pull", "hopg", "--brem-only", "--line-only"], "mutually exclusive"),
         (["stop"], "needs material"),
         (["clear"], "needs material"),

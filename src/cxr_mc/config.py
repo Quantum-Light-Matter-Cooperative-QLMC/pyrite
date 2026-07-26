@@ -20,11 +20,13 @@ detector/analysis knobs still live here.
 """
 
 from dataclasses import replace
+from typing import Any
 
 import numpy as np
 
 from .materials import CATALOG, MaterialSpec
 from .montecarlo import simulate_trajectories
+from .profiles import get_profile
 from .results import Settings
 from .sweep import Sweep
 
@@ -40,12 +42,12 @@ COLLAPSE_AZIMUTH = True
 PENETRATION_TILT_DEG = (0.0, 15.0, 45.0, 75.0)
 
 
-def default_settings():
+def default_settings(profile: str = "full"):
     """The analysis / detector / unit knobs shared by the runner and the plots.
     The runner uses n_electrons*; every notebook that plots must use the SAME
     detector flags (apply_detector_qe / brem_source) so the displayed spectra
     match what was simulated."""
-    return Settings(
+    settings = Settings(
         beam_current_na=5.0,
         n_electrons=300,  # transport electrons per line spectrum
         n_electrons_brem=150,  # transport electrons per background
@@ -55,6 +57,7 @@ def default_settings():
         convolve_with_det=False,
         brem_source="mc",  # "mc" | "external" | "none"
     )
+    return get_profile(profile).apply_settings(settings)
 
 
 def _material_spec(material: str) -> MaterialSpec:
@@ -86,7 +89,13 @@ def material_grid(material: str) -> dict[str, object]:
     return grid
 
 
-def material_sweep(material: str, *, theta_obs_deg=90.0, **overrides):
+def material_sweep(
+    material: str,
+    *,
+    profile="full",
+    theta_obs_deg=90.0,
+    **overrides: Any,
+):
     """The full parametric :class:`sweep.Sweep` for ``material`` (the geometry
     the runner scans and the viz notebook reduces). ``overrides`` replace any grid
     field, e.g. ``material_sweep("ptse2", thickness_ang=2e4)``. For a named-stack
@@ -107,6 +116,7 @@ def material_sweep(material: str, *, theta_obs_deg=90.0, **overrides):
         substrate=spec.substrate,
         stack=spec.stack or None,
     )
+    sweep = get_profile(profile).apply_sweep(sweep)
     return replace(sweep, **overrides) if overrides else sweep
 
 

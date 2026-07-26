@@ -23,6 +23,7 @@ time, typically the grid-filtered view.
 """
 
 import datetime
+import json
 import os
 import re
 import shutil
@@ -151,6 +152,20 @@ def _record_count(path):
         return None
 
 
+def _dataset_identity(path, is_directory):
+    """Read dataset identity from a component checkpoint manifest, if present."""
+    if not is_directory:
+        return None
+    manifest = Path(path) / "meta.json"
+    if not manifest.is_file():
+        return None
+    try:
+        with manifest.open() as handle:
+            return json.load(handle).get("dataset_identity")
+    except (OSError, ValueError, TypeError):
+        return None
+
+
 def list_archives(root=DEFAULT_ROOT):
     """Print the shelf: each label with its size (MB) and record count, sorted by
     label. Returns the list of labels."""
@@ -178,7 +193,9 @@ def list_archives(root=DEFAULT_ROOT):
         )
         n = _record_count(path)
         n_str = "?" if n is None else str(n)
-        print(f"  {label:<32}  {mb:7.1f} MB  {n_str:>6} records")
+        identity = _dataset_identity(path, is_directory)
+        profile = "" if identity is None else f"  {identity['profile']}"
+        print(f"  {label:<32}  {mb:7.1f} MB  {n_str:>6} records{profile}")
     return labels
 
 
@@ -266,6 +283,19 @@ def union_checkpoint(
         if archive_is_directory
         else _checkpoint_io.load(str(archive_path))
     )
+    live_identity = _dataset_identity(live_path, live_is_directory)
+    archived_identity = _dataset_identity(archive_path, archive_is_directory)
+    if (
+        live_identity is not None
+        and archived_identity is not None
+        and live_identity.get("parameter_sha256") != archived_identity.get("parameter_sha256")
+    ):
+        raise SystemExit(
+            "dataset identity mismatch: "
+            f"active {live_identity.get('profile')}:{live_identity.get('parameter_sha256', '')[:12]} "
+            f"!= archive {archived_identity.get('profile')}:"
+            f"{archived_identity.get('parameter_sha256', '')[:12]} -- refusing to union"
+        )
     live_material = _material_of(live)
     archived_material = _material_of(archived)
     if (

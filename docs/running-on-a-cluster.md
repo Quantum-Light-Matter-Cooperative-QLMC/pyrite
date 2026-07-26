@@ -44,6 +44,7 @@ cd "$SLURM_SUBMIT_DIR"
 
 MATERIAL="${1:?usage: sbatch run_cxr.sh <material>}"
 uv run cxr scan "$MATERIAL"      # -> checkpoints/<material>/{line,brem}.pkl
+uv run cxr scan "$MATERIAL" --profile survey  # reduced identity-qualified variant
 ```
 
 On a GPU node one main-process CUDA context handles spectrum/bremsstrahlung while

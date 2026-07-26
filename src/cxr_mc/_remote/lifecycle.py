@@ -177,6 +177,7 @@ def start_queue(
     dry_run=False,
     parallel_materials=None,
     chunk_minutes=10.0,
+    profile="full",
 ):
     """Submit a material queue to SLURM. Returns its job id.
 
@@ -198,16 +199,20 @@ def start_queue(
         _refuse_if_busy(materials, quick)
     jobid = scripts._new_jobid()
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
-    stems = scripts._stems(materials, quick)
+    stems = scripts._stems(materials, quick, profile)
     if chunked:
         parallel_materials = None
-        payload = scripts._chunked_queue_script(jobid, materials, quick, workers, chunk_minutes)
+        payload = scripts._chunked_queue_script(
+            jobid, materials, quick, workers, chunk_minutes, profile
+        )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
     else:
         parallel_materials = scripts._validate_parallel_materials(
             config.DEFAULT_PARALLEL_MATERIALS if parallel_materials is None else parallel_materials
         )
-        payload = scripts._queue_script(jobid, materials, quick, workers, parallel_materials)
+        payload = scripts._queue_script(
+            jobid, materials, quick, workers, parallel_materials, profile
+        )
         time_limit = config.SLURM_TIME
     script = scripts._slurm_batch_script(
         jobid, payload, job_name=f"cxr-{jobid}", reservation_stems=stems, time_limit=time_limit
@@ -215,7 +220,7 @@ def start_queue(
     upload = scripts._write_job_script_command(
         jobdir,
         scripts._queue_metadata(
-            jobid, materials, quick, workers, parallel_materials, chunk_minutes
+            jobid, materials, quick, workers, parallel_materials, chunk_minutes, profile
         ),
     )
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
@@ -246,7 +251,13 @@ def start_queue(
                     "Mode",
                     presentation._mode_summary(
                         scripts._queue_metadata(
-                            jobid, materials, quick, workers, parallel_materials, chunk_minutes
+                            jobid,
+                            materials,
+                            quick,
+                            workers,
+                            parallel_materials,
+                            chunk_minutes,
+                            profile,
                         )
                     ),
                 ),
@@ -702,6 +713,7 @@ def pull(
         local = dest / stem
         try:
             from .. import _checkpoint_io, _checkpoint_store
+            from ..profiles import identity_from_stem
             from ..results import merge_dataset
             from ..run import _manifest_save
 
@@ -746,13 +758,13 @@ def pull(
                 base = _checkpoint_store.load(stem, dest)
                 n_merged, n_skipped = merge_dataset(base, incoming, dataset, force=force)
                 _checkpoint_store.save(stem, dest, base, components=(dataset,))
-                _manifest_save(str(local), base)
+                _manifest_save(str(local), base, identity_from_stem(stem))
                 print(
                     f"merged {dataset} ({n_merged} rec, skipped {n_skipped}) -> checkpoints/{stem}/"
                 )
             else:
                 _checkpoint_store.save(stem, dest, incoming)
-                _manifest_save(str(local), incoming)
+                _manifest_save(str(local), incoming, identity_from_stem(stem))
                 label = "+".join(filter(None, ["grid" if grid else "", "level9" if level9 else ""]))
                 detail = f" ({label})" if label else ""
                 print(f"pulled{detail} -> checkpoints/{stem}/")

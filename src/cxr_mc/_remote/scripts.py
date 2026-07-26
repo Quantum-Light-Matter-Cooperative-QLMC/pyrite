@@ -8,10 +8,16 @@ from . import config, transport
 
 
 # ---- detached job queue -------------------------------------------------------
-def _stems(materials, quick):
+def _stems(materials, quick, profile="full"):
     """Checkpoint stems a queue produces (scan.py writes <material>_quick.pkl
     for --quick runs)."""
-    return [f"{m}_quick" if quick else m for m in materials]
+    if quick:
+        return [f"{m}_quick" for m in materials]
+    if profile == "full":
+        return list(materials)
+    from ..profiles import named_profile_stem
+
+    return [named_profile_stem(material, profile) for material in materials]
 
 
 def _new_jobid() -> str:
@@ -38,12 +44,15 @@ def _queue_script(
     quick,
     workers,
     parallel_materials=config.DEFAULT_PARALLEL_MATERIALS,
+    profile="full",
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
     parallel_materials = _validate_parallel_materials(parallel_materials)
     flags = ""
     if quick:
         flags += " --quick"
+    if profile != "full":
+        flags += f" --profile {profile}"
     if workers is not None:
         flags += f" --workers {workers}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
@@ -99,7 +108,7 @@ fi
 """
 
 
-def _chunked_queue_script(jobid, materials, quick, workers, chunk_minutes):
+def _chunked_queue_script(jobid, materials, quick, workers, chunk_minutes, profile="full"):
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
 
     Reused verbatim by every slice: it resumes from checkpoint, does about
@@ -112,6 +121,8 @@ def _chunked_queue_script(jobid, materials, quick, workers, chunk_minutes):
     flags = ""
     if quick:
         flags += " --quick"
+    if profile != "full":
+        flags += f" --profile {profile}"
     if workers is not None:
         flags += f" --workers {workers}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
@@ -642,6 +653,7 @@ def _queue_metadata(
     workers,
     parallel_materials: int | None = config.DEFAULT_PARALLEL_MATERIALS,
     chunk_minutes: float = 0,
+    profile: str = "full",
 ):
     """Static metadata persisted before a queue becomes visible to SLURM."""
     return "\n".join(
@@ -649,6 +661,7 @@ def _queue_metadata(
             f"job: {jobid}",
             f"materials: {' '.join(materials)}",
             f"quick: {bool(quick)}",
+            f"profile: {profile}",
             f"workers: {workers}",
             f"parallel_materials: {parallel_materials}",
             f"chunk_minutes: {chunk_minutes}",

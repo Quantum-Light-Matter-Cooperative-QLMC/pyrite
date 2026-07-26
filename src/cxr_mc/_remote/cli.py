@@ -24,14 +24,16 @@ from ..scan import load_all_materials
 from . import config, lifecycle, scripts, state, transport, viewer
 
 
-def remote_scan(material, quick=False, workers=None):
+def remote_scan(material, quick=False, workers=None, profile="full"):
     """Submit one material through SLURM and follow it to completion.
 
     This compatibility helper deliberately does not pull: callers that need a
     checkpoint can apply their own grid/trim policy after it returns.
     """
     transport._check_materials([material])
-    jobid = lifecycle.start_queue([material], quick=quick, workers=workers, chunk_minutes=0)
+    jobid = lifecycle.start_queue(
+        [material], quick=quick, workers=workers, chunk_minutes=0, profile=profile
+    )
     viewer.attach(jobid)
     return jobid
 
@@ -55,8 +57,7 @@ def remote_check(
     )
     if not viewer.attach(jobid):
         emit_diagnostic(
-            "Zhai job is still running or its viewer disconnected; "
-            "skipping automatic cache pull"
+            "Zhai job is still running or its viewer disconnected; skipping automatic cache pull"
         )
         return
     if not state._job_succeeded(jobid):
@@ -119,6 +120,7 @@ def _cli_scan(args):
     jobid = lifecycle.start_queue(
         materials,
         quick=args.quick,
+        profile=getattr(args, "profile", "full"),
         workers=args.workers,
         parallel_materials=getattr(args, "parallel_materials", None),
         chunk_minutes=getattr(args, "chunk_minutes", 10.0),
@@ -129,9 +131,11 @@ def _cli_scan(args):
         return
     completed = state._completed_materials(jobid, materials)
     if not completed:
-        emit_diagnostic("warning: the SLURM scan produced no successful checkpoints; nothing to pull")
+        emit_diagnostic(
+            "warning: the SLURM scan produced no successful checkpoints; nothing to pull"
+        )
         return
-    stems = scripts._stems(completed, args.quick)
+    stems = scripts._stems(completed, args.quick, getattr(args, "profile", "full"))
     # Code is already synced by the queue, so a grid pull skips its own sync;
     # preserve the requested grid/trim policy.
     lifecycle.pull(
@@ -265,6 +269,7 @@ def _cli_start(args):
     jobid = lifecycle.start_queue(
         materials,
         quick=args.quick,
+        profile=getattr(args, "profile", "full"),
         workers=args.workers,
         parallel_materials=args.parallel_materials,
         chunk_minutes=args.chunk_minutes,
@@ -420,6 +425,13 @@ def command():
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Run every material in mats_to_sim.toml.")
 @click.option(
+    "--profile",
+    type=click.Choice(("full", "survey")),
+    default="full",
+    show_default=True,
+    help="Named settings/grid policy. survey is provisional and reduced.",
+)
+@click.option(
     "--quick",
     is_flag=True,
     help="Use tiny smoke-test grid; incompatible with --grid.",
@@ -456,6 +468,7 @@ def command():
 def scan_command(
     material,
     all_,
+    profile,
     quick,
     workers,
     parallel_materials,
@@ -471,6 +484,8 @@ def scan_command(
         raise click.UsageError(
             "scan --quick --grid: quick checkpoints aren't grid-filterable; drop --grid"
         )
+    if quick and profile != "full":
+        raise click.UsageError("--quick cannot be combined with --profile survey")
     if parallel_materials is not None and chunk_minutes != 0:
         raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
     return _invoke_click(
@@ -479,6 +494,7 @@ def scan_command(
             "scan",
             material=material,
             all=all_,
+            profile=profile,
             quick=quick,
             workers=workers,
             parallel_materials=parallel_materials,
@@ -604,6 +620,13 @@ def reline_command(
     shell_complete=_cli_completion.complete_material,
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Queue every configured material.")
+@click.option(
+    "--profile",
+    type=click.Choice(("full", "survey")),
+    default="full",
+    show_default=True,
+    help="Named settings/grid policy. survey is provisional and reduced.",
+)
 @click.option("--quick", is_flag=True, help="Use tiny smoke-test grid.")
 @click.option(
     "--workers",
@@ -632,6 +655,7 @@ def reline_command(
 def start_command(
     materials,
     all_,
+    profile,
     quick,
     workers,
     parallel_materials,
@@ -644,12 +668,15 @@ def start_command(
     _reject_all_with_values("start", all_, materials)
     if parallel_materials is not None and chunk_minutes != 0:
         raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
+    if quick and profile != "full":
+        raise click.UsageError("--quick cannot be combined with --profile survey")
     return _invoke_click(
         _cli_start,
         _click_args(
             "start",
             materials=materials,
             all=all_,
+            profile=profile,
             quick=quick,
             workers=workers,
             parallel_materials=parallel_materials,

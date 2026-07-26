@@ -214,7 +214,7 @@ def cached_material_analysis(material, analyze, key, checkpoint_dir=_DEFAULT_CHE
     return value
 
 
-def _manifest_for(results):
+def _manifest_for(results, dataset_identity=None):
     """Build the sidecar manifest dict for a ``results`` store: distinct beam
     energies, total record count, and the swept case fields (see
     :func:`cxr_mc.results.sweep_values`). Numpy scalars are coerced to plain
@@ -227,14 +227,18 @@ def _manifest_for(results):
         for field, values in sweep.items()
     }
     energies = sorted(float(e) for e in sweep_json.get("E0_keV", []))
-    return {
+    manifest = {
+        "schema": "cxr.checkpoint-manifest.v2",
         "energies_keV": energies,
         "n_records": len(records(results)),
         "sweep": sweep_json,
     }
+    if dataset_identity is not None:
+        manifest["dataset_identity"] = dataset_identity
+    return manifest
 
 
-def _manifest_save(checkpoint_path, results):
+def _manifest_save(checkpoint_path, results, dataset_identity=None):
     """Atomically write/refresh the sidecar checkpoint manifest
     (``<material>.meta.json``) alongside a ``_checkpoint_save`` -- lets
     :func:`checkpoint_manifest` enumerate a checkpoint's energies/record
@@ -243,8 +247,14 @@ def _manifest_save(checkpoint_path, results):
     ``_checkpoint_save``: a sibling ``.<pid>.tmp`` then ``os.replace``, so a
     crash never leaves a half-written ``meta.json``. Returns the manifest dict
     written."""
-    manifest = _manifest_for(results)
     manifest_path = _manifest_path_for(checkpoint_path)
+    if dataset_identity is None and os.path.isfile(manifest_path):
+        try:
+            with open(manifest_path) as existing:
+                dataset_identity = json.load(existing).get("dataset_identity")
+        except (OSError, ValueError, TypeError):
+            pass
+    manifest = _manifest_for(results, dataset_identity)
     tmp = f"{manifest_path}.{os.getpid()}.tmp"
     with open(tmp, "w") as f:
         json.dump(manifest, f)
@@ -322,6 +332,7 @@ def run_sweep(
     on_case=None,
     max_seconds=None,
     time_fn=None,
+    dataset_identity=None,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
@@ -363,6 +374,9 @@ def run_sweep(
         resume filtering is per ``(name, E0_keV)`` (see checkpoint_path).
     time_fn : clock used for the deadline; defaults to ``time.monotonic``.
         Override for deterministic tests.
+    dataset_identity : optional JSON-serializable resolved-profile identity,
+        persisted in ``meta.json``. Variant-aware callers use this to prove
+        exactly which settings and sweep produced the component artifacts.
 
     Returns True iff every requested ``(name, E0_keV)`` pair ended up in
     ``results`` (i.e. the sweep ran to completion, budget or not); False if
@@ -392,9 +406,31 @@ def run_sweep(
         summary after a fresh save."""
         subset = {n: results[n] for n in results if _crystal_of(results[n]) == material}
         _checkpoint_components_save(checkpoint_path, subset)
-        _manifest_save(checkpoint_path, subset)
+        _manifest_save(checkpoint_path, subset, dataset_identity)
 
     if resume and _checkpoint_exists(checkpoint_path):
+        manifest_path = _manifest_path_for(checkpoint_path)
+        existing_identity = None
+        if os.path.isfile(manifest_path):
+            try:
+                with open(manifest_path) as handle:
+                    existing_identity = json.load(handle).get("dataset_identity")
+            except (OSError, ValueError, TypeError):
+                pass
+        if (
+            dataset_identity is not None
+            and existing_identity is not None
+            and dataset_identity.get("parameter_sha256")
+            != existing_identity.get("parameter_sha256")
+        ):
+            raise ValueError(
+                "checkpoint dataset identity mismatch: "
+                f"requested {dataset_identity.get('profile')}:"
+                f"{dataset_identity.get('parameter_sha256', '')[:12]}, existing "
+                f"{existing_identity.get('profile')}:"
+                f"{existing_identity.get('parameter_sha256', '')[:12]}; "
+                "archive or select a different variant before resuming"
+            )
         loaded = _checkpoint_load(checkpoint_path)
         results.update(loaded)
         print(

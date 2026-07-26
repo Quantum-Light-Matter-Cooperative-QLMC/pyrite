@@ -28,6 +28,7 @@ registries.
    cxr_mc.line_grid
    cxr_mc.montecarlo
    cxr_mc.plots
+   cxr_mc.profiles
    cxr_mc.results
    cxr_mc.run
    cxr_mc.remote

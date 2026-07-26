@@ -126,11 +126,15 @@ def test_slim_checkpoint_compresslevel_9_is_lossless_and_no_larger(tmp_path):
 
 
 # ---- grid filtering (checkpoint lifecycle: grid-filtered pull) ----------------
-def _grid_config_names(material="hopg"):
+def _grid_config_names(material="hopg", profile="full"):
     """The real current-grid config names for a material, straight from the same
     build_cases path slim_results(grid=) rebuilds."""
-    s = default_settings()
-    cases = build_cases(material_sweep(material), s.n_electrons, s.n_electrons_brem)
+    s = default_settings(profile)
+    cases = build_cases(
+        material_sweep(material, profile=profile),
+        s.n_electrons,
+        s.n_electrons_brem,
+    )
     return sorted({c["name"] for c in cases})
 
 
@@ -149,6 +153,20 @@ def test_grid_keeps_only_current_grid_names():
     slim = slim_results(res, grid="hopg")
     assert set(slim) == keep  # stale_* dropped, current grid kept
     assert set(res) == keep | {"stale_old_config_a", "stale_old_config_b"}  # input untouched
+
+
+def test_grid_accepts_survey_profile_selector_and_variant_stem():
+    from cxr_mc.profiles import named_profile_stem
+    from cxr_mc.slim import _grid_from_stem
+
+    keep = set(_grid_config_names("hopg", "survey")[:2])
+    res = {name: {30.0: _record(0.0, 30.0)} for name in keep}
+    res["stale_old_config"] = {30.0: _record(0.0, 30.0)}
+
+    slim = slim_results(res, grid=("hopg", "survey"))
+
+    assert set(slim) == keep
+    assert _grid_from_stem(named_profile_stem("hopg", "survey")) == ("hopg", "survey")
 
 
 def test_grid_is_lossless_per_record():

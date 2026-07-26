@@ -7,7 +7,8 @@ which drives this and pulls the checkpoint back so interactive analysis and
 static-HTML export can stay on the laptop.
 
     cxr scan mose2                # the full per-material grid (config)
-    cxr scan mose2 --quick        # tiny grid: smoke test / pipeline check
+    cxr scan mose2 --profile survey  # provisional reduced survey
+    cxr scan mose2 --quick           # tiny grid: smoke test / pipeline check
     cxr scan mose2 --workers 0    # serial (no transport worker pool)
 
 (equivalently ``python scan.py mose2`` via the root shim).
@@ -59,12 +60,9 @@ def _load_runtime() -> None:
 
     default_settings = default_settings or config_module.default_settings
     format_penetration_watchdog_summary = (
-        format_penetration_watchdog_summary
-        or config_module.format_penetration_watchdog_summary
+        format_penetration_watchdog_summary or config_module.format_penetration_watchdog_summary
     )
-    gate_cases_by_penetration = (
-        gate_cases_by_penetration or config_module.gate_cases_by_penetration
-    )
+    gate_cases_by_penetration = gate_cases_by_penetration or config_module.gate_cases_by_penetration
     material_sweep = material_sweep or config_module.material_sweep
     run_sweep = run_sweep or run_module.run_sweep
     build_cases = build_cases or sweep_module.build_cases
@@ -120,7 +118,8 @@ def _beam_uvw(ctx, param, value):
     help=(
         "Run one material's MC sweep and write its checkpoint.\n\n"
         "Pass MATERIAL or --all, never both. Resumes compatible checkpoints in "
-        "CHECKPOINTS and writes <material>.pkl (or <material>_quick.pkl)."
+        "CHECKPOINTS. Full writes <material>.pkl-compatible data in <material>/; "
+        "variants use identity-qualified stems."
     ),
 )
 @click.argument(
@@ -141,6 +140,13 @@ def _beam_uvw(ctx, param, value):
     type=_cli_core.NONNEGATIVE_INT,
     default=None,
     help="run_cases max_workers (default auto; 0 = serial, no transport pool).",
+)
+@click.option(
+    "--profile",
+    type=click.Choice(("full", "survey"), case_sensitive=True),
+    default="full",
+    show_default=True,
+    help="Named settings/grid policy. survey is provisional and reduced.",
 )
 @click.option(
     "--quick",
@@ -183,6 +189,7 @@ def command(
     material,
     all_,
     workers,
+    profile,
     quick,
     n_families,
     beam_uvw,
@@ -193,6 +200,8 @@ def command(
     json_output,
 ):
     """Click entry point for the staged root migration."""
+    if quick and profile != "full":
+        raise click.UsageError("--quick cannot be combined with --profile survey")
     if all_ and material is not None:
         raise click.UsageError("scan --all does not take a material name")
     if not all_ and material is None:
@@ -203,6 +212,7 @@ def command(
             material=material,
             all=all_,
             workers=workers,
+            profile=profile,
             quick=quick,
             n_families=n_families,
             beam_uvw=beam_uvw,
@@ -216,6 +226,7 @@ def command(
         material=material,
         all=all_,
         workers=workers,
+        profile=profile,
         quick=quick,
         n_families=n_families,
         beam_uvw=beam_uvw,
@@ -283,7 +294,7 @@ def _run_json(args):
             errors[material] = "resumable work remains"
             resumable = True
     checkpoints = [
-        os.path.join(args.checkpoint_dir, f"{material}{'_quick' if args.quick else ''}")
+        os.path.join(args.checkpoint_dir, _checkpoint_stem(args, material))
         for material in [*completed, *failed]
     ]
     result = cli_json.operation_summary(
@@ -304,20 +315,18 @@ def _run_json(args):
     )
 
 
-def _run_material(args, material, max_seconds=None):
+def _resolved_run(args, material):
+    """Resolve settings, sweep, identity, and collision-free checkpoint stem."""
     import numpy as np
 
     _load_runtime()
     assert default_settings is not None
-    assert format_penetration_watchdog_summary is not None
-    assert gate_cases_by_penetration is not None
     assert material_sweep is not None
-    assert run_sweep is not None
-    assert build_cases is not None
 
-    settings = default_settings()
+    profile = getattr(args, "profile", "full")
+    settings = default_settings() if profile == "full" else default_settings(profile)
     overrides = {}
-    if args.quick:
+    if getattr(args, "quick", False):
         overrides.update(
             # Start at 5 deg, not 0: tilt=0 is a banned emission geometry
             # (issue_notes.md #1), and build_cases rejects it.
@@ -325,11 +334,43 @@ def _run_material(args, material, max_seconds=None):
             tilt_azim_deg=np.array([10.0, 30.0]),
             energy_keV=[30, 50],
         )
-    if args.n_families is not None:
+    if getattr(args, "n_families", None) is not None:
         overrides["n_families"] = args.n_families
-    if args.beam_uvw is not None:
+    if getattr(args, "beam_uvw", None) is not None:
         overrides["beam_uvw"] = tuple(args.beam_uvw)
-    sweep = material_sweep(material, **overrides)
+    sweep = (
+        material_sweep(material, **overrides)
+        if profile == "full"
+        else material_sweep(material, profile=profile, **overrides)
+    )
+
+    from .profiles import dataset_identity, variant_stem
+
+    identity = dataset_identity(
+        material,
+        profile,
+        settings,
+        sweep,
+        variant="quick" if getattr(args, "quick", False) else None,
+    )
+    canonical_full = profile == "full" and not overrides and not getattr(args, "quick", False)
+    stem = variant_stem(identity, canonical_full=canonical_full)
+    return settings, sweep, identity, stem
+
+
+def _checkpoint_stem(args, material):
+    return _resolved_run(args, material)[3]
+
+
+def _run_material(args, material, max_seconds=None):
+    _load_runtime()
+    assert format_penetration_watchdog_summary is not None
+    assert gate_cases_by_penetration is not None
+    assert run_sweep is not None
+    assert build_cases is not None
+
+    settings, sweep, identity, stem = _resolved_run(args, material)
+    profile = identity["profile"]
 
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
     cases, dropped = gate_cases_by_penetration(cases)
@@ -338,7 +379,9 @@ def _run_material(args, material, max_seconds=None):
         print(summary)
     print(
         f"{material}: {len(cases)} cases across "
-        f"{len({c['name'] for c in cases})} configs" + (" (quick grid)" if args.quick else "")
+        f"{len({c['name'] for c in cases})} configs "
+        f"[profile={profile}, parameters={identity['parameter_sha256'][:12]}]"
+        + (" (quick grid)" if args.quick else "")
     )
     # read the RESOLVED orientation off the first case, not the Sweep request:
     # HOPG/h-BN hand-pin hkl_list and bypass dominant_reflections entirely, so
@@ -353,7 +396,6 @@ def _run_material(args, material, max_seconds=None):
     # stack (e.g. mos2-on-sio2-si) clobber/resume the plain film's checkpoint.
     # A --quick smoke test writes to its OWN checkpoint (<material>_quick.pkl), so
     # its coarse off-grid points never contaminate the real per-material sweep.
-    stem = f"{material}_quick" if args.quick else material
     ckpt = os.path.join(args.checkpoint_dir, stem)
     results = {}
     progress_file = getattr(args, "progress_file", None)
@@ -408,6 +450,7 @@ def _run_material(args, material, max_seconds=None):
             on_progress=_record_progress if progress_file is not None else None,
             on_case=_note_case if progress_file is not None else None,
             max_seconds=max_seconds,
+            dataset_identity=identity,
         )
         # run_sweep returns a bool (complete?). Only a bare None -- test doubles
         # that predate the budget feature and don't bother returning anything --
