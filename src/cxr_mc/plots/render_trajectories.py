@@ -22,7 +22,7 @@ from cxr_mc.plots.plotly_trajectories import (
     trajectory_volume_figure_from_data,
 )
 
-_RENDER_SALT = "v1"  # bump on any change to the cache-key inputs or render format
+_RENDER_SALT = "v2"  # bump on any change to the cache-key inputs or render format
 
 
 def render_reveal_animation(
@@ -36,6 +36,7 @@ def render_reveal_animation(
     fps=12,
     width=960,
     height=560,
+    scale=2,
     camera=None,
     progress_cb=None,
 ):
@@ -43,11 +44,17 @@ def render_reveal_animation(
 
     Per frame ``k`` in ``range(n_frames)``: derive a reveal cutoff via
     :func:`frame_reveal_fs` against :func:`dataset_t_max`, build the static
-    figure via :func:`trajectory_volume_figure_from_data`, pin the camera (if
-    ``camera`` given) via ``fig.update_layout(scene_camera=camera)``, and export
-    a PNG frame via kaleido. Frames are stitched into ``out_path``: ``.gif``
-    writes an animated GIF (no ffmpeg needed), any other suffix (default usage:
-    ``.mp4``) writes h264 video via ``imageio-ffmpeg``.
+    figure via :func:`trajectory_volume_figure_from_data`, strip render-only
+    chrome (legend, non-black paper/plot/scene background -- the interactive
+    tab keeps its own styling; only the exported frame is stripped down to
+    grid + colorbar + title on black), pin the camera (if ``camera`` given)
+    via ``fig.update_layout(scene_camera=camera)``, and export a PNG frame via
+    kaleido at ``scale``x ``width``/``height`` (kaleido's own supersampling
+    knob -- sharpens output in viewers that don't do their own upscaling,
+    e.g. an mp4 opened outside the marimo app). Frames are stitched into
+    ``out_path``: ``.gif`` writes an animated GIF (no ffmpeg needed), any
+    other suffix (default usage: ``.mp4``) writes h264 video via
+    ``imageio-ffmpeg``.
 
     ``progress_cb(k, n_frames)``, if given, is called once per frame after that
     frame's PNG has been rendered.
@@ -84,9 +91,16 @@ def render_reveal_animation(
             beam_fwhm_mm=beam_fwhm_mm,
             reveal_until_fs=cutoff,
         )
+        fig.update_layout(showlegend=False, paper_bgcolor="black", plot_bgcolor="black")
+        fig.update_scenes(
+            bgcolor="black",
+            xaxis_showbackground=False,
+            yaxis_showbackground=False,
+            zaxis_showbackground=False,
+        )
         if camera is not None:
             fig.update_layout(scene_camera=camera)
-        png_bytes = fig.to_image(format="png", width=width, height=height)
+        png_bytes = fig.to_image(format="png", width=width, height=height, scale=scale)
         frames.append(iio.imread(png_bytes, extension=".png"))
         if progress_cb is not None:
             progress_cb(k, n_frames)

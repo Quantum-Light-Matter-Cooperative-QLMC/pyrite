@@ -65,7 +65,18 @@ def test_penetration_view_offers_prerendered_render_button() -> None:
     # display is gated on the cached file existing, not on the transient
     # run_button value -- see the render block's comments in the app.
     assert 'src=_render_path.open("rb")' in source
-    assert "penetration_render_button_ui.value and not _render_path.exists()" in source
+    # The render itself runs in an EAGER cell outside the lazy tab body:
+    # marimo resets run_button.value to False when the click-triggered update
+    # completes, and lazy tab content evaluates afterwards, so an in-tab gate
+    # on the button value never fires. The eager cell gates on the button and
+    # hands the result to the tab via the render-status state.
+    assert "mo.stop(not penetration_render_button_ui.value)" in source
+    assert "get_penetration_render_status, set_penetration_render_status = mo.state(None)" in source
+    assert "set_penetration_render_status((_render_key, None))" in source
+    assert "set_penetration_render_status((_render_key, str(_exc)))" in source
+    # The tab body stores the case record alongside data so the eager cell
+    # can render without redoing transport.
+    assert "set_penetration_data((_data_key, _data, _nc))" in source
 
 
 def test_penetration_tab_wires_groove_control_to_trajectory_sweep() -> None:

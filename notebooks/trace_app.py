@@ -11,9 +11,18 @@ app = marimo.App(width="full")
 
 @app.cell
 def _():
+    import altair as alt
     import marimo as mo
     from _design import page_title, style_sheet
     from _widgets import MaterialSelect
+
+    # penetration_survival_chart / trajectory_chart can exceed Vega-Lite's
+    # default 5000-row cap; vegafusion (shipped with marimo[recommended])
+    # lifts it, falling back to disabling the cap outright.
+    try:
+        alt.data_transformers.enable("vegafusion")
+    except Exception:
+        alt.data_transformers.disable_max_rows()
 
     from cxr_mc.config import default_settings, trajectory_sweep
     from cxr_mc.materials import CATALOG
@@ -178,7 +187,6 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
         value=f"{_azim_values[0]:g} deg",
         label="",
     )
-
     return (
         penetration_azim_ui,
         penetration_energy_grid_ui,
@@ -222,7 +230,6 @@ def _(
         else penetration_tilt_manual_ui.value
     )
     penetration_azim_deg = penetration_azim_ui.value
-
     return (
         penetration_azim_deg,
         penetration_energy_keV,
@@ -251,6 +258,16 @@ def _(mo):
     # parameters (case, Ne, seed, realistic, beam_fwhm) haven't changed.
     get_penetration_data, set_penetration_data = mo.state(None)
     return get_penetration_data, set_penetration_data
+
+
+@app.cell
+def _(mo):
+    # Render-status handoff between the eager render cell (below the tabs)
+    # and the lazy tab body: (render_key, error_str_or_None). Setting it
+    # after a render completes reruns the tab so the freshly cached video
+    # appears without another click.
+    get_penetration_render_status, set_penetration_render_status = mo.state(None)
+    return get_penetration_render_status, set_penetration_render_status
 
 
 @app.cell
@@ -318,6 +335,7 @@ def _(
     build_cases,
     cached_render_path,
     get_penetration_data,
+    get_penetration_render_status,
     get_penetration_survival,
     mo,
     penetration_azim_deg,
@@ -342,9 +360,7 @@ def _(
     penetration_tilt_grid_ui,
     penetration_tilt_manual_ui,
     penetration_tilt_source_ui,
-    prune_render_cache,
     render_cache_key,
-    render_reveal_animation,
     set_penetration_data,
     set_penetration_survival,
     settings,
@@ -419,7 +435,7 @@ def _(
         if _cached_survival is not None and _cached_survival[0] == _survival_key:
             _survival = _cached_survival[1]
         else:
-            _survival = penetration_survival_chart(_traj, Ne=500, tilt=_angle, width=700)
+            _survival = penetration_survival_chart(_traj, Ne=500, tilt=_angle, width=420)
             set_penetration_survival((_survival_key, _survival))
 
         _seed = int(penetration_regen_ui.value)
@@ -449,7 +465,10 @@ def _(
             _data = trajectory_volume_data(
                 _nc, Ne=_Ne, seed=_seed, realistic=_realistic, beam_fwhm_mm=_beam_fwhm
             )
-            set_penetration_data((_data_key, _data))
+            # _nc rides along so the eager render cell (below the tabs) can
+            # feed the SAME case + data to render_reveal_animation without
+            # redoing transport.
+            set_penetration_data((_data_key, _data, _nc))
 
         # Static full-reveal figure (orbit/hover intact); the old interactive
         # Plotly frame animation is gone -- see docs/viewer-camera-animation-plan.md
@@ -490,39 +509,20 @@ def _(
             None,
         )
         _render_path = cached_render_path(_render_key, ".mp4")
-        # Render on click only when this parameter set has no cached file yet;
-        # DISPLAY is gated on the file existing, not on the button's value --
-        # run_button.value resets to False after the triggered run, so gating
-        # the video on it made the player vanish on the next reactive rerun.
+        # This lazy tab body CANNOT run the render itself: marimo resets
+        # run_button.value to False when the click-triggered update completes,
+        # and lazy tab content is evaluated afterwards in a separate request,
+        # so the value is always False here. The render happens in the eager
+        # cell below the tabs; this body only DISPLAYS -- video gated on the
+        # cached file existing, errors relayed via penetration_render_status.
+        _render_status = get_penetration_render_status()
         _render_error = None
-        if penetration_render_button_ui.value and not _render_path.exists():
-            try:
-                # ~3 s/frame through kaleido at this figure size, measured on
-                # the Ne=50 hopg case -- surface the wait up front so a
-                # multi-minute blocking render doesn't read as a dead button.
-                with mo.status.progress_bar(
-                    total=_n_frames,
-                    title="Rendering animation",
-                    subtitle=f"{_n_frames} frames, ~3 s each offscreen",
-                ) as _bar:
-
-                    def _render_progress_cb(_k, _n, _bar=_bar):
-                        _bar.update()
-
-                    render_reveal_animation(
-                        _nc,
-                        _data,
-                        _render_path,
-                        realistic=_realistic,
-                        beam_fwhm_mm=_beam_fwhm,
-                        n_frames=_n_frames,
-                        fps=12,
-                        camera=None,
-                        progress_cb=_render_progress_cb,
-                    )
-                prune_render_cache()
-            except RuntimeError as _exc:
-                _render_error = mo.callout(mo.md(str(_exc)), kind="warn")
+        if (
+            _render_status is not None
+            and _render_status[0] == _render_key
+            and _render_status[1] is not None
+        ):
+            _render_error = mo.callout(mo.md(_render_status[1]), kind="warn")
         if _render_error is not None:
             _render_block = _render_error
         elif _render_path.exists():
@@ -532,6 +532,7 @@ def _(
                 src=_render_path.open("rb"),
                 controls=True,
                 loop=True,
+                width=900,
                 autoplay=True,
                 muted=True,
             )
@@ -541,6 +542,23 @@ def _(
                 f"(~{max(1, round(_n_frames * 3 / 60))} min offscreen render; "
                 f"cached per parameter set afterwards).*"
             )
+
+        # Cache lives under ~/.cache/cxr-mc/viewer-renders, easy to forget
+        # about; a download button lets the user pull a render straight to
+        # their own filesystem without knowing that path.
+        _save_row = mo.hstack(
+            [
+                mo.download(
+                    data=lambda p=_render_path: p.read_bytes(),
+                    filename=f"{_nc['name'].split()[0]}_{_render_key[:8]}.mp4",
+                    label="Save render to disk",
+                    mimetype="video/mp4",
+                    disabled=not _render_path.exists(),
+                )
+            ],
+            justify="start",
+            wrap=True,
+        )
 
         def _row_label(text):
             return mo.md(text).style({"min-width": "9rem", "display": "inline-block"})
@@ -672,7 +690,11 @@ def _(
                     mo.hstack([penetration_regen_ui], justify="end", wrap=True),
                 ]
             ),
-            *(p for p in (_volume, _render_controls, _render_block, _bottom_row) if p is not None),
+            *(
+                p
+                for p in (_volume, _render_controls, _render_block, _save_row, _bottom_row)
+                if p is not None
+            ),
         ]
         return mo.vstack(_parts)
 
@@ -770,6 +792,83 @@ def _(MATERIAL, crystal_tab, mo, penetration_tab):
             lazy=True,
         )
     view
+    return
+
+
+@app.cell
+def _(
+    cached_render_path,
+    get_penetration_data,
+    mo,
+    penetration_render_button_ui,
+    penetration_render_frames_ui,
+    prune_render_cache,
+    render_cache_key,
+    render_reveal_animation,
+    set_penetration_render_status,
+):
+    # EAGER render cell -- must live outside the lazy tab body. marimo resets
+    # run_button.value to False as soon as the click-triggered update
+    # completes, and lazy tab content re-evaluates afterwards in a separate
+    # request, so a render gated on the button INSIDE the tab never fires.
+    # This cell reruns synchronously on click (it references the button), does
+    # the blocking kaleido/ffmpeg render with a visible progress bar (shown
+    # here, just below the tabs -- close to the button that triggered it, in
+    # the "Trace" tab above), then flips penetration_render_status so the tab
+    # body reruns and picks up the cached video file.
+    mo.stop(not penetration_render_button_ui.value)
+    _cached = get_penetration_data()
+    mo.stop(
+        _cached is None,
+        mo.md("*Open the Trace tab once before rendering (no transported data yet).*"),
+    )
+    _data_key, _data, _nc = _cached
+    _n_frames = int(penetration_render_frames_ui.value)
+    # Same key recipe as the tab body: _data_key is (name, E0, tilt, azim,
+    # groove, Ne, seed, realistic, beam_fwhm).
+    _render_key = render_cache_key(
+        _data_key[0],
+        _data_key[1:5],
+        _data_key[5],
+        _data_key[6],
+        _data_key[7],
+        _data_key[8],
+        _n_frames,
+        12,
+        None,
+    )
+    _render_path = cached_render_path(_render_key, ".mp4")
+    if not _render_path.exists():
+        try:
+            # ~3 s/frame through kaleido at this figure size, measured on the
+            # Ne=50 hopg case -- surface the wait up front so a multi-minute
+            # blocking render doesn't read as a dead button.
+            with mo.status.progress_bar(
+                total=_n_frames,
+                title="Rendering animation",
+                subtitle=f"{_n_frames} frames, ~3 s each offscreen",
+            ) as _bar:
+
+                def _render_progress_cb(_k, _n, _bar=_bar):
+                    _bar.update()
+
+                render_reveal_animation(
+                    _nc,
+                    _data,
+                    _render_path,
+                    realistic=_data_key[7],
+                    beam_fwhm_mm=_data_key[8],
+                    n_frames=_n_frames,
+                    fps=12,
+                    camera=None,
+                    progress_cb=_render_progress_cb,
+                )
+            prune_render_cache()
+            set_penetration_render_status((_render_key, None))
+        except RuntimeError as _exc:
+            set_penetration_render_status((_render_key, str(_exc)))
+    else:
+        set_penetration_render_status((_render_key, None))
     return
 
 
