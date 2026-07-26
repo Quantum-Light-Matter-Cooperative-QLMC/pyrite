@@ -35,6 +35,7 @@ channeling-radiation-physics
 nonrelativistic-pxr-cbs-material-survey
 parameter-space-sampling-review
 crystal-db-comparison
+debye-waller-audit
 ```
 
 ```{toctree}

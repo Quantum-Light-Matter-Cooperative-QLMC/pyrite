@@ -17,6 +17,7 @@ Guides, references, validation records, and historical design notes. They comple
 | [multilayer-materials.md](multilayer-materials.md) | Film-on-substrate stacks: absorption, radiation, transport | implemented |
 | [atomic-data-sources.md](atomic-data-sources.md) | Atomic scattering data supplied by xraydb | adopted |
 | [crystal-db-comparison.md](crystal-db-comparison.md) | Offline external-database lattice cross-check | implemented |
+| [debye-waller-audit.md](debye-waller-audit.md) | Thermal-displacement provenance and scalar/tensor model scope | in progress |
 | [superpowers/README.md](superpowers/README.md) | Dated implementation plans and design specifications | historical |
 
 `superpowers/` records describe decisions at their authoring dates; use the CLI and API
