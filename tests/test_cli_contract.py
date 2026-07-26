@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner, Result
 
 from cxr_mc import cli
 
@@ -40,13 +39,18 @@ _HIDDEN_COMPATIBILITY_PATHS = {
 }
 
 
-def _run(*argv: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [sys.executable, "-m", "cxr_mc.cli", *argv],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+class _EntryPoint:
+    """Adapts ``cli.main``'s argv contract to ``CliRunner.invoke``."""
+
+    name = "cxr"
+
+    def main(self, args=None, prog_name=None, **extra):
+        del prog_name, extra
+        return cli.main(list(args or ()))
+
+
+def _run(*argv: str) -> Result:
+    return CliRunner().invoke(_EntryPoint(), list(argv))
 
 
 def _node_options(node):
@@ -83,7 +87,7 @@ def test_click_tree_preserves_frozen_command_and_option_names():
     def check(node):
         path = tuple(node["path"].split())
         completed = _run(*path, "--help")
-        assert completed.returncode == 0
+        assert completed.exit_code == 0
         for option in _node_options(node):
             assert option in completed.stdout
         for child in node["subcommands"]:
@@ -98,7 +102,7 @@ def test_click_tree_preserves_frozen_command_and_option_names():
 
 def test_version_uses_stdout():
     completed = _run("--version")
-    assert completed.returncode == 0
+    assert completed.exit_code == 0
     assert completed.stdout.startswith("cxr-mc ")
     assert completed.stdout.endswith("\n")
     assert completed.stderr == ""
@@ -115,7 +119,7 @@ def test_version_uses_stdout():
 )
 def test_usage_errors_use_stderr_and_exit_two(argv, diagnostic):
     completed = _run(*argv)
-    assert completed.returncode == 2
+    assert completed.exit_code == 2
     assert completed.stdout == ""
     assert completed.stderr.startswith("Usage: ")
     assert diagnostic in completed.stderr
