@@ -19,9 +19,9 @@ Item generation:
 ### Active
 
 1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-3. **>user< Named sweep profiles and dataset identity.** Define independently configurable `full` (current production defaults) and provisional `survey` (coarser grids, narrower ranges, lower electron counts, and reduced angle/thickness/reflection sets) profiles; include profile plus resolved-parameter provenance in dataset identity, and design variant storage/archive handling with the checkpoint rework. Naming alternatives: `preview` or `coarse`.
-4. **>user< Persistent component-recompute defaults and batch parity.** Extend existing line-only `reline` and brem-only `rebrem` commands with profile-aware start/stop/step/electron-count defaults shared across explicit material lists or `--all`; keep current names unless a unified component interface adds clear value, and add explicit multi-material partial-pull regression tests (`--brem-only`/`--line-only` already apply to the full material list).
-5. **>user< Zhai/NIST DTSA-II bremsstrahlung validation and subtraction.** Add versioned external-background fixtures, normalization/provenance documentation, model comparison, and experimental fit/subtraction in the validation path; reuse existing `load_external_brem` ingestion instead of treating DTSA-II as one canonical NIST dataset.
+3. **Named sweep profiles and dataset identity.** Add `full`/`survey` profiles, provenance-aware dataset identity, and checkpoint variant handling. → `feature/sweep-profiles`
+4. **Persistent component-recompute defaults and batch parity.** Add profile-aware `reline`/`rebrem` defaults and multi-material partial-pull coverage. → `feature/recompute-defaults`
+5. **Zhai/NIST DTSA-II bremsstrahlung validation and subtraction.** Add versioned external-background validation, comparison, fitting, and subtraction. → `feature/dtsa-brem-validation`
 7. **Debye-Waller provenance and anisotropy audit.** Continue replacing placeholder or reused `B_ang2` values with primary-source values and resolve per-site/tensor model needs. → `feature/debye-waller-audit`; audit: [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md).
 8. **GPU-memory follow-up.** Benchmark remote `rebrem --all --ne-brem 500 --step 20` for bounded CuPy reserved-pool memory; assess analogous `reline` cleanup separately.
 
