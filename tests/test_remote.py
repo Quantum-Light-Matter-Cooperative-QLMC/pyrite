@@ -1516,23 +1516,27 @@ def test_stop_rejects_bad_material_before_live_job_lookup(monkeypatch):
 def test_stop_cli_accepts_materials(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        lifecycle, "stop_jobs", lambda materials, all_jobs: calls.append((materials, all_jobs))
+        lifecycle,
+        "stop_jobs",
+        lambda materials, all_jobs, *, yes: calls.append((materials, all_jobs, yes)),
     )
 
-    remote.main(["stop", "hopg", "mose2"])
+    remote.main(["stop", "hopg", "mose2", "--yes"])
 
-    assert calls == [(["hopg", "mose2"], False)]
+    assert calls == [(["hopg", "mose2"], False, True)]
 
 
 def test_stop_cli_accepts_all(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        lifecycle, "stop_jobs", lambda materials, all_jobs: calls.append((materials, all_jobs))
+        lifecycle,
+        "stop_jobs",
+        lambda materials, all_jobs, *, yes: calls.append((materials, all_jobs, yes)),
     )
 
-    remote.main(["stop", "--all"])
+    remote.main(["stop", "--all", "--yes"])
 
-    assert calls == [([], True)]
+    assert calls == [([], True, True)]
 
 
 # ---- clear <material> (checkpoint lifecycle, component 3) ----------------------

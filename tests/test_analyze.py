@@ -214,17 +214,17 @@ def _invoke(argv=()):
 def test_default_flag_without_material_errors(tmp_path, monkeypatch):
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
     result = _invoke(["-d"])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert result.stdout == ""
-    assert "no material given to persist" in result.stderr
+    assert "--default requires MATERIAL" in result.stderr
 
 
 def test_unknown_material_errors(tmp_path, monkeypatch):
     monkeypatch.setattr(analyze, "_DEFAULT_FILE", tmp_path / ".cxr-analyze-default")
     result = _invoke(["not-a-real-material"])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert result.stdout == ""
-    assert "unknown material" in result.stderr
+    assert "not a configured material" in result.stderr
 
 
 def test_default_flag_persists_and_launches(tmp_path, monkeypatch):

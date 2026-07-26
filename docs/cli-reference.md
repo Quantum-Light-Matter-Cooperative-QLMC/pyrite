@@ -15,6 +15,28 @@ self-resubmitting slices. `--chunk-minutes 0` selects one monolithic
 accepts at most four. `CXR_REMOTE_HOST`, `CXR_REMOTE_DIR`, and
 `CXR_REMOTE_UV` override configured connection values.
 
+Checkpoint operations use the grouped `cxr checkpoint ...` paths. Legacy
+top-level `slim`, `rebrem`, `reline`, `archive`, `restore`, `archives`,
+and `union` paths remain callable compatibility aliases but are hidden
+from root help.
+
+Validation uses `cxr validate`, `cxr catalog validate`, and
+`cxr remote validate`. Legacy `check`, `check-config`, and remote
+`check` paths remain hidden compatibility aliases. Remote detached
+submission uses `cxr remote submit`; legacy `start` remains an alias.
+Line-grid job lifecycle uses `cxr line-grid job ...`; legacy flat job
+verbs remain aliases.
+
+Automation contract: usage errors exit 2; runtime failures exit 1;
+interrupted viewers exit 130; resumable compute exits 75. Diagnostics,
+warnings, prompts, and progress use stderr. `--json` emits one UTF-8
+object plus newline with `schema`, `schema_version`, `ok`, `payload`,
+and `errors` fields and no human prose on stdout.
+
+Destructive remote stop commands preview exact job targets by default.
+Pass `--yes` to perform cancellation; `cxr line-grid stop` additionally
+requires JOBID or explicit `--latest`.
+
 Files under `docs/superpowers/plans/` and `docs/superpowers/specs/` are
 historical design records, not current CLI reference. Commands below are
 authoritative for this version.
@@ -25,16 +47,20 @@ authoritative for this version.
 - `cxr blaze` — Run one material's blazed-crystal MC sweep and write its checkpoint.
 - `cxr export` — Render notebooks/analysis_app.py to static HTML.
 - `cxr analyze` — Launch notebooks/analysis_app.py with marimo run or edit.
-- `cxr slim` — Shrink a checkpoint pickle for transfer.
-- `cxr rebrem` — Recompute only brem backgrounds in existing checkpoints.
-- `cxr reline` — Recompute only line spectra in existing checkpoints.
-- `cxr archive` — Copy an active checkpoint to long-term shelf.
-- `cxr restore` — Copy an archived checkpoint back to active slot.
-- `cxr archives` — List long-term checkpoint shelf.
-- `cxr union` — Merge an archived checkpoint into active slot.
+- `cxr validate` — Launch notebooks/validation_app.py, or export its cached validation figures.
+- `cxr catalog` — Inspect and validate material-catalog configuration.
+  - `cxr catalog validate` — Validate bundled material catalog or an explicit full catalog TOML.
+- `cxr checkpoint` — Inspect, transform, recompute, and archive local checkpoints.
+  - `cxr checkpoint slim` — Shrink a checkpoint dataset for transfer.
+  - `cxr checkpoint recompute` — Recompute one checkpoint dataset without changing the other.
+    - `cxr checkpoint recompute brem` — Recompute only brem backgrounds in existing checkpoints.
+    - `cxr checkpoint recompute line` — Recompute only line spectra in existing checkpoints.
+  - `cxr checkpoint archive` — Copy an active checkpoint to long-term shelf.
+  - `cxr checkpoint restore` — Copy an archived checkpoint back to active slot.
+  - `cxr checkpoint list` — List long-term checkpoint shelf.
+  - `cxr checkpoint merge` — Merge an archived checkpoint into active slot.
 - `cxr remote` — [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.
   - `cxr remote attach` — Live-track a remote job; defaults to latest.
-  - `cxr remote check` — Run Zhai reproduction remotely or pull existing caches.
   - `cxr remote clear` — Delete remote checkpoints; preview unless --yes.
   - `cxr remote jobs` — List jobs with SLURM IDs, materials, and last events.
   - `cxr remote logs` — Show a job diagnostic log; defaults to latest.
@@ -43,25 +69,25 @@ authoritative for this version.
   - `cxr remote rebrem` — Recompute brem-only remotely, follow, and pull completed checkpoints.
   - `cxr remote reline` — Recompute line-only remotely, follow, and pull completed checkpoints.
   - `cxr remote scan` — Sync code, submit sweep(s), wait, and pull checkpoints.
-  - `cxr remote start` — Sync code and submit a detached SLURM material queue.
   - `cxr remote status` — Show one job; use -v for allocation and -vv for logs.
   - `cxr remote stop` — cancel active SLURM job(s) by material, or every live job.
+  - `cxr remote submit` — Sync code and submit a detached SLURM material queue.
   - `cxr remote sync` — Push current code to remote box.
+  - `cxr remote validate` — Run Zhai reproduction remotely or pull existing caches.
 - `cxr line-grid` — Derive and manage per-material line-grid bounds.
   - `cxr line-grid apply` — Apply derived bounds to material catalog.
-  - `cxr line-grid attach` — Attach to line-grid job progress.
   - `cxr line-grid defaults` — Show or update persistent derivation defaults.
   - `cxr line-grid derive` — Derive line-grid bounds locally.
-  - `cxr line-grid logs` — Print or follow line-grid job logs.
+  - `cxr line-grid job` — Inspect, follow, or stop remote line-grid jobs.
+    - `cxr line-grid job attach` — Attach to line-grid job progress.
+    - `cxr line-grid job logs` — Print or follow line-grid job logs.
+    - `cxr line-grid job status` — Show line-grid job status.
+    - `cxr line-grid job stop` — Preview or stop one line-grid job.
   - `cxr line-grid regen-golden` — Regenerate or check material-catalog golden snapshot.
   - `cxr line-grid set` — Set one material line-grid row and mark it as a manual override.
   - `cxr line-grid set-brem` — Set one material bremsstrahlung grid and mark it as a manual override.
   - `cxr line-grid show` — Show configured line grids.
-  - `cxr line-grid status` — Show line-grid job status.
-  - `cxr line-grid stop` — Stop one line-grid job.
   - `cxr line-grid submit` — Submit sliced line-grid derivation remotely.
-- `cxr check` — Launch notebooks/validation_app.py, or export its cached validation figures.
-- `cxr check-config` — Validate bundled material catalog or an explicit full catalog TOML.
 
 ## `cxr`
 
@@ -75,7 +101,7 @@ Usage: cxr [OPTIONS] COMMAND [ARGS]...
   Examples:
     cxr scan mose2 --quick
     cxr analyze mose2
-    cxr remote start mose2 --dry-run
+    cxr remote submit mose2 --dry-run
 
 Options:
   --version                    Show the version and exit.
@@ -84,21 +110,15 @@ Options:
   -h, --help                   Show this message and exit.
 
 Commands:
-  scan          Run one material's MC sweep and write a checkpoint.
-  blaze         Run a grooved-crystal sweep and write a checkpoint.
-  export        Export the analysis app as static HTML.
-  analyze       Launch the analysis app.
-  slim          Shrink a checkpoint for transfer.
-  rebrem        Recompute bremsstrahlung arrays in local checkpoints.
-  reline        Recompute line spectra in local checkpoints.
-  archive       Copy an active checkpoint to the archive shelf.
-  restore       Restore a shelved checkpoint to an active slot.
-  archives      List checkpoint archives.
-  union         Merge a shelved checkpoint into an active slot.
-  remote        Run and manage MC sweeps on a remote GPU host.
-  line-grid     Derive, submit, inspect, and apply line-energy grids.
-  check         Launch validation or export cached validation figures.
-  check-config  Validate a material catalog without starting simulation.
+  scan        Run one material's MC sweep and write a checkpoint.
+  blaze       Run a grooved-crystal sweep and write a checkpoint.
+  export      Export the analysis app as static HTML.
+  analyze     Launch the analysis app.
+  validate    Launch validation or export cached validation figures.
+  catalog     Inspect and validate material-catalog configuration.
+  checkpoint  Inspect, transform, recompute, and archive checkpoints.
+  remote      Run and manage MC sweeps on a remote GPU host.
+  line-grid   Derive, submit, inspect, and apply line-energy grids.
 ```
 
 ## `cxr scan`
@@ -184,18 +204,102 @@ Options:
   -h, --help     Show this message and exit.
 ```
 
-## `cxr slim`
+## `cxr validate`
 
 ```text
-Usage: cxr slim [OPTIONS] CHECKPOINT
+Usage: cxr validate [OPTIONS]
 
-  Shrink a checkpoint pickle for transfer.
+  Launch notebooks/validation_app.py, or export its cached validation figures.
 
-  Writes a new file; input checkpoint is never modified. --brem-only and --line-only are
-  mutually exclusive.
+  --export skips marimo and writes figures to --outdir. Electron-count options affect
+  export mode only.
 
 Options:
-  -o, --out TEXT       Output path (default: <stem>.slim.pkl).
+  --watch           Pass marimo's --watch.
+  --edit            Use `marimo edit` instead of `marimo run`.
+  --acp             Start local Claude and Codex ACP bridges.
+  --tunnel          Use fixed port for SSH tunneling.
+  --export          Render cached figures instead of marimo.
+  --outdir DIR      With --export, output directory.  [default: figures]
+  --ne NUMBER       With --export, Fig. 1c line electrons per energy.  [default: 20000]
+  --ne-brem NUMBER  With --export, Fig. 1c bremsstrahlung electrons per energy.
+                    [default: 200]
+  --ne-supp NUMBER  With --export, supplementary electrons per polar-tilt spectrum.
+                    [default: 200]
+  -h, --help        Show this message and exit.
+```
+
+## `cxr catalog`
+
+```text
+Usage: cxr catalog [OPTIONS] COMMAND [ARGS]...
+
+  Inspect and validate material-catalog configuration.
+
+  Example:
+    cxr catalog validate
+    cxr catalog validate path/to/materials.toml
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  validate  Validate a material catalog without starting simulation.
+```
+
+## `cxr catalog validate`
+
+```text
+Usage: cxr catalog validate [OPTIONS] [MANIFEST]
+
+  Validate bundled material catalog or an explicit full catalog TOML.
+
+  With no MANIFEST, reloads packaged materials.toml. Performs no simulation, network
+  access, or GPU probe.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
+## `cxr checkpoint`
+
+```text
+Usage: cxr checkpoint [OPTIONS] COMMAND [ARGS]...
+
+  Inspect, transform, recompute, and archive local checkpoints.
+
+  Existing top-level paths such as ``cxr slim`` and ``cxr archive`` remain compatibility
+  aliases.
+
+  Examples:
+    cxr checkpoint list
+    cxr checkpoint archive hopg keeper
+    cxr checkpoint recompute line hopg
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  slim       Shrink one checkpoint for transfer.
+  recompute  Recompute selected checkpoint datasets.
+  archive    Copy an active checkpoint to long-term shelf.
+  restore    Copy a shelved checkpoint back to active slot.
+  list       List long-term checkpoint shelf.
+  merge      Merge a shelved checkpoint into active slot.
+```
+
+## `cxr checkpoint slim`
+
+```text
+Usage: cxr checkpoint slim [OPTIONS] CHECKPOINT
+
+  Shrink a checkpoint dataset for transfer.
+
+  Accepts a component checkpoint directory or legacy pickle and writes one transfer
+  pickle; input is never modified. --brem-only and --line-only are mutually exclusive.
+
+Options:
+  -o, --out TEXT       Transfer pickle path (default: <stem>.slim.pkl).
   --grid               Keep only material's current-grid configs.
   --drop-wide-brem     Drop full-range brem arrays.
   --downcast           Store spectral arrays as float32.
@@ -205,10 +309,25 @@ Options:
   -h, --help           Show this message and exit.
 ```
 
-## `cxr rebrem`
+## `cxr checkpoint recompute`
 
 ```text
-Usage: cxr rebrem [OPTIONS] [MATERIALS]...
+Usage: cxr checkpoint recompute [OPTIONS] COMMAND [ARGS]...
+
+  Recompute one checkpoint dataset without changing the other.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  brem  Recompute bremsstrahlung backgrounds.
+  line  Recompute line spectra.
+```
+
+## `cxr checkpoint recompute brem`
+
+```text
+Usage: cxr checkpoint recompute brem [OPTIONS] [MATERIALS]...
 
   Recompute only brem backgrounds in existing checkpoints.
 
@@ -221,18 +340,18 @@ Options:
   --step EV             Wide-bremsstrahlung grid spacing in eV; omit to use checkpoint
                         settings.
   --redo-all            Recompute records already at target.
-  --checkpoint-dir DIR  Directory containing checkpoint pickles to update.  [default:
-                        checkpoints]
+  --checkpoint-dir DIR  Root containing component checkpoint directories to update.
+                        [default: checkpoints]
   --save-every N        Atomically save after every N recomputed records.  [default:
                         100]
   --json                Emit one versioned JSON object on stdout.
   -h, --help            Show this message and exit.
 ```
 
-## `cxr reline`
+## `cxr checkpoint recompute line`
 
 ```text
-Usage: cxr reline [OPTIONS] [MATERIALS]...
+Usage: cxr checkpoint recompute line [OPTIONS] [MATERIALS]...
 
   Recompute only line spectra in existing checkpoints.
 
@@ -244,18 +363,18 @@ Options:
   --line-ne N           Line-spectrum electron count; omit to use checkpoint settings.
   --line-step EV        Uniform line-grid spacing in eV; omit to use material grid.
   --redo-all            Recompute records already at target.
-  --checkpoint-dir DIR  Directory containing checkpoint pickles to update.  [default:
-                        checkpoints]
+  --checkpoint-dir DIR  Root containing component checkpoint directories to update.
+                        [default: checkpoints]
   --save-every N        Atomically save after every N recomputed records.  [default:
                         100]
   --json                Emit one versioned JSON object on stdout.
   -h, --help            Show this message and exit.
 ```
 
-## `cxr archive`
+## `cxr checkpoint archive`
 
 ```text
-Usage: cxr archive [OPTIONS] STEM [LABEL]
+Usage: cxr checkpoint archive [OPTIONS] STEM [LABEL]
 
   Copy an active checkpoint to long-term shelf.
 
@@ -267,10 +386,10 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `cxr restore`
+## `cxr checkpoint restore`
 
 ```text
-Usage: cxr restore [OPTIONS] LABEL
+Usage: cxr checkpoint restore [OPTIONS] LABEL
 
   Copy an archived checkpoint back to active slot.
 
@@ -283,10 +402,10 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `cxr archives`
+## `cxr checkpoint list`
 
 ```text
-Usage: cxr archives [OPTIONS]
+Usage: cxr checkpoint list [OPTIONS]
 
   List long-term checkpoint shelf.
 
@@ -295,10 +414,10 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `cxr union`
+## `cxr checkpoint merge`
 
 ```text
-Usage: cxr union [OPTIONS] STEM LABEL
+Usage: cxr checkpoint merge [OPTIONS] STEM LABEL
 
   Merge an archived checkpoint into active slot.
 
@@ -324,7 +443,7 @@ Usage: cxr remote [OPTIONS] COMMAND [ARGS]...
   offered.
 
   Examples:
-    cxr remote start hopg --dry-run
+    cxr remote submit hopg --dry-run
     cxr remote scan hopg
     cxr remote status -vv
 
@@ -332,20 +451,20 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  attach  Live-track a remote job; defaults to latest.
-  check   Run Zhai reproduction remotely or pull existing caches.
-  clear   Delete remote checkpoints; preview unless --yes.
-  jobs    List jobs with SLURM IDs, materials, and last events.
-  logs    Show a job diagnostic log; defaults to latest.
-  pull    Fetch existing checkpoints from remote box.
-  reap    Release orphaned checkpoint reservations; preview unless --yes.
-  rebrem  Recompute brem-only remotely, follow, and pull completed checkpoints.
-  reline  Recompute line-only remotely, follow, and pull completed checkpoints.
-  scan    Sync code, submit sweep(s), wait, and pull checkpoints.
-  start   Sync code and submit a detached SLURM material queue.
-  status  Show one job; use -v for allocation and -vv for logs.
-  stop    cancel active SLURM job(s) by material, or every live job.
-  sync    Push current code to remote box.
+  attach    Live-track a remote job; defaults to latest.
+  clear     Delete remote checkpoints; preview unless --yes.
+  jobs      List jobs with SLURM IDs, materials, and last events.
+  logs      Show a job diagnostic log; defaults to latest.
+  pull      Fetch existing checkpoints from remote box.
+  reap      Release orphaned checkpoint reservations; preview unless --yes.
+  rebrem    Recompute brem-only remotely, follow, and pull completed checkpoints.
+  reline    Recompute line-only remotely, follow, and pull completed checkpoints.
+  scan      Sync code, submit sweep(s), wait, and pull checkpoints.
+  status    Show one job; use -v for allocation and -vv for logs.
+  stop      cancel active SLURM job(s) by material, or every live job.
+  submit    Sync code and submit a detached SLURM material queue.
+  sync      Push current code to remote box.
+  validate  Run Zhai reproduction remotely or pull existing caches.
 ```
 
 ## `cxr remote attach`
@@ -358,27 +477,6 @@ Usage: cxr remote attach [OPTIONS] [JOBID]
 Options:
   -v, --verbose  Add allocation detail; repeat for recent logs.
   -h, --help     Show this message and exit.
-```
-
-## `cxr remote check`
-
-```text
-Usage: cxr remote check [OPTIONS]
-
-  Run Zhai reproduction remotely or pull existing caches.
-
-Options:
-  --ne NUMBER           Fig. 1c line electrons per energy.  [default: 20000]
-  --ne-brem NUMBER      Fig. 1c bremsstrahlung electrons per energy.  [default: 200]
-  --ne-supp NUMBER      Supplementary electrons per polar-tilt spectrum.  [default: 200]
-  --tmd-azimuth NUMBER  Exploratory TMD azimuth in degrees.  [default: 0.0]
-  --refresh             Recompute matching cache.
-  --no-sync             Skip code upload.
-  -d, --detached        Launch detached; mutually exclusive with --pull.
-  -f, --follow          Track detached job; requires --detached.
-  --pull                Only fetch existing Zhai caches; mutually exclusive with
-                        --detached.
-  -h, --help            Show this message and exit.
 ```
 
 ## `cxr remote clear`
@@ -514,27 +612,6 @@ Options:
   -h, --help              Show this message and exit.
 ```
 
-## `cxr remote start`
-
-```text
-Usage: cxr remote start [OPTIONS] [MATERIAL]...
-
-  Sync code and submit a detached SLURM material queue.
-
-Options:
-  -a, --all               Queue every configured material.
-  --quick                 Use tiny smoke-test grid.
-  --workers NUMBER        Transport workers (default: auto; 0 runs serially).
-  --parallel-materials N  Simultaneous scans in one allocation; requires --chunk-minutes
-                          0.  [1<=x<=4]
-  --chunk-minutes NUMBER  Self-resubmitting SLURM slice length; 0 runs one monolithic
-                          job.  [default: 10.0]
-  --no-sync               Skip code upload.
-  --dry-run               Print submission preview; do not connect.
-  -f, --follow            Track job after launch.
-  -h, --help              Show this message and exit.
-```
-
 ## `cxr remote status`
 
 ```text
@@ -557,7 +634,29 @@ Usage: cxr remote stop [OPTIONS] [MATERIAL]...
 
 Options:
   -a, --all   Stop every live job.
+  --yes       Cancel exact previewed jobs; otherwise preview.
   -h, --help  Show this message and exit.
+```
+
+## `cxr remote submit`
+
+```text
+Usage: cxr remote submit [OPTIONS] [MATERIAL]...
+
+  Sync code and submit a detached SLURM material queue.
+
+Options:
+  -a, --all               Queue every configured material.
+  --quick                 Use tiny smoke-test grid.
+  --workers NUMBER        Transport workers (default: auto; 0 runs serially).
+  --parallel-materials N  Simultaneous scans in one allocation; requires --chunk-minutes
+                          0.  [1<=x<=4]
+  --chunk-minutes NUMBER  Self-resubmitting SLURM slice length; 0 runs one monolithic
+                          job.  [default: 10.0]
+  --no-sync               Skip code upload.
+  --dry-run               Print submission preview; do not connect.
+  -f, --follow            Track job after launch.
+  -h, --help              Show this message and exit.
 ```
 
 ## `cxr remote sync`
@@ -569,6 +668,27 @@ Usage: cxr remote sync [OPTIONS]
 
 Options:
   -h, --help  Show this message and exit.
+```
+
+## `cxr remote validate`
+
+```text
+Usage: cxr remote validate [OPTIONS]
+
+  Run Zhai reproduction remotely or pull existing caches.
+
+Options:
+  --ne NUMBER           Fig. 1c line electrons per energy.  [default: 20000]
+  --ne-brem NUMBER      Fig. 1c bremsstrahlung electrons per energy.  [default: 200]
+  --ne-supp NUMBER      Supplementary electrons per polar-tilt spectrum.  [default: 200]
+  --tmd-azimuth NUMBER  Exploratory TMD azimuth in degrees.  [default: 0.0]
+  --refresh             Recompute matching cache.
+  --no-sync             Skip code upload.
+  -d, --detached        Launch detached; mutually exclusive with --pull.
+  -f, --follow          Track detached job; requires --detached.
+  --pull                Only fetch existing Zhai caches; mutually exclusive with
+                        --detached.
+  -h, --help            Show this message and exit.
 ```
 
 ## `cxr line-grid`
@@ -591,16 +711,13 @@ Options:
 
 Commands:
   apply         Apply derived bounds to material catalog.
-  attach        Attach to line-grid job progress.
   defaults      Show or update persistent derivation defaults.
   derive        Derive line-grid bounds locally.
-  logs          Print or follow line-grid job logs.
+  job           Inspect, follow, or stop remote line-grid jobs.
   regen-golden  Regenerate or check material-catalog golden snapshot.
   set           Set one material line-grid row and mark it as a manual override.
   set-brem      Set one material bremsstrahlung grid and mark it as a manual override.
   show          Show configured line grids.
-  status        Show line-grid job status.
-  stop          Stop one line-grid job.
   submit        Submit sliced line-grid derivation remotely.
 ```
 
@@ -624,17 +741,6 @@ Options:
   --regen-golden       Regenerate checked catalog snapshot after successful write.
   --dry-run            Print proposed diff; write nothing.
   -h, --help           Show this message and exit.
-```
-
-## `cxr line-grid attach`
-
-```text
-Usage: cxr line-grid attach [OPTIONS] [JOBID]
-
-  Attach to line-grid job progress. JOBID defaults to latest recorded job.
-
-Options:
-  -h, --help  Show this message and exit.
 ```
 
 ## `cxr line-grid defaults`
@@ -676,16 +782,70 @@ Options:
   -h, --help                Show this message and exit.
 ```
 
-## `cxr line-grid logs`
+## `cxr line-grid job`
 
 ```text
-Usage: cxr line-grid logs [OPTIONS] [JOBID]
+Usage: cxr line-grid job [OPTIONS] COMMAND [ARGS]...
+
+  Inspect, follow, or stop remote line-grid jobs.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  attach  Attach to line-grid job progress.
+  logs    Print or follow line-grid job logs.
+  status  Show line-grid job status.
+  stop    Preview or stop one line-grid job.
+```
+
+## `cxr line-grid job attach`
+
+```text
+Usage: cxr line-grid job attach [OPTIONS] [JOBID]
+
+  Attach to line-grid job progress. JOBID defaults to latest recorded job.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
+## `cxr line-grid job logs`
+
+```text
+Usage: cxr line-grid job logs [OPTIONS] [JOBID]
 
   Print or follow line-grid job logs. JOBID defaults to latest recorded job.
 
 Options:
   -f, --follow  Stream live; Ctrl-C disconnects viewer without stopping job.
   -h, --help    Show this message and exit.
+```
+
+## `cxr line-grid job status`
+
+```text
+Usage: cxr line-grid job status [OPTIONS] [JOBID]
+
+  Show line-grid job status. JOBID defaults to latest recorded job.
+
+Options:
+  -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
+  --json         Emit one versioned JSON object on stdout.
+  -h, --help     Show this message and exit.
+```
+
+## `cxr line-grid job stop`
+
+```text
+Usage: cxr line-grid job stop [OPTIONS] [JOBID]
+
+  Preview or stop one line-grid job.
+
+Options:
+  --latest    Target latest recorded job instead of JOBID.
+  --yes       Cancel exact previewed job; otherwise preview.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr line-grid regen-golden`
@@ -744,29 +904,6 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `cxr line-grid status`
-
-```text
-Usage: cxr line-grid status [OPTIONS] [JOBID]
-
-  Show line-grid job status. JOBID defaults to latest recorded job.
-
-Options:
-  -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
-  -h, --help     Show this message and exit.
-```
-
-## `cxr line-grid stop`
-
-```text
-Usage: cxr line-grid stop [OPTIONS] [JOBID]
-
-  Stop one line-grid job. JOBID defaults to latest recorded job.
-
-Options:
-  -h, --help  Show this message and exit.
-```
-
 ## `cxr line-grid submit`
 
 ```text
@@ -790,43 +927,4 @@ Options:
   --dry-run                 Print batch script and submission command; do not connect or
                             submit.
   -h, --help                Show this message and exit.
-```
-
-## `cxr check`
-
-```text
-Usage: cxr check [OPTIONS]
-
-  Launch notebooks/validation_app.py, or export its cached validation figures.
-
-  --export skips marimo and writes figures to --outdir. Electron-count options affect
-  export mode only.
-
-Options:
-  --watch           Pass marimo's --watch.
-  --edit            Use `marimo edit` instead of `marimo run`.
-  --acp             Start local Claude and Codex ACP bridges.
-  --tunnel          Use fixed port for SSH tunneling.
-  --export          Render cached figures instead of marimo.
-  --outdir DIR      With --export, output directory.  [default: figures]
-  --ne NUMBER       With --export, Fig. 1c line electrons per energy.  [default: 20000]
-  --ne-brem NUMBER  With --export, Fig. 1c bremsstrahlung electrons per energy.
-                    [default: 200]
-  --ne-supp NUMBER  With --export, supplementary electrons per polar-tilt spectrum.
-                    [default: 200]
-  -h, --help        Show this message and exit.
-```
-
-## `cxr check-config`
-
-```text
-Usage: cxr check-config [OPTIONS] [MANIFEST]
-
-  Validate bundled material catalog or an explicit full catalog TOML.
-
-  With no MANIFEST, reloads packaged materials.toml. Performs no simulation, network
-  access, or GPU probe.
-
-Options:
-  -h, --help  Show this message and exit.
 ```

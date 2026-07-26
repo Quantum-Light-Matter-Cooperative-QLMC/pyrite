@@ -22,7 +22,7 @@ def import_without_crystals(name, *args, **kwargs):
 
 builtins.__import__ = import_without_crystals
 from cxr_mc import cli
-cli.main(["analyze"])
+cli.main(["scan", "hopg", "--quick"])
 """
 
     result = subprocess.run(
@@ -30,6 +30,7 @@ cli.main(["analyze"])
         capture_output=True,
         text=True,
         check=False,
+        timeout=10,
     )
 
     assert result.returncode != 0
@@ -45,6 +46,7 @@ def test_root_scan_shim_reports_missing_crystals_without_traceback() -> None:
     script = rf"""
 import builtins
 import runpy
+import sys
 
 real_import = builtins.__import__
 
@@ -54,6 +56,7 @@ def import_without_crystals(name, *args, **kwargs):
     return real_import(name, *args, **kwargs)
 
 builtins.__import__ = import_without_crystals
+sys.argv = [{str(root_scan)!r}, "hopg", "--quick"]
 runpy.run_path({str(root_scan)!r}, run_name="__main__")
 """
 
@@ -62,6 +65,7 @@ runpy.run_path({str(root_scan)!r}, run_name="__main__")
         capture_output=True,
         text=True,
         check=False,
+        timeout=10,
     )
 
     assert result.returncode != 0

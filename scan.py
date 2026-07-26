@@ -20,4 +20,4 @@ except MaterialConfigError as exc:
     raise SystemExit(str(exc)) from None
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -44,12 +44,16 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 ## Entry points
 
 - **`cxr` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
-  lazy Click dispatch for `scan`, `blaze`, `export`, `analyze`, `slim`,
-  `rebrem`, `reline`, `archive`, `restore`, `archives`, `union`, `remote`,
-  `line-grid`, `check`, `check-config`. Checked user-facing inventory:
+  lazy Click dispatch for `scan`, `blaze`, `export`, `analyze`, `validate`,
+  `catalog`, `checkpoint`, `remote`, and `line-grid`. Older flat checkpoint
+  verbs, `check`, and `check-config` remain hidden compatibility aliases.
+  Checked user-facing inventory:
   [`docs/cli-reference.md`](cli-reference.md).
-- **`cxr check-config [catalog]`** → `check_config:_run`: validate bundled
-  offline catalog or explicit complete catalog without starting simulation.
+- **`cxr catalog validate [catalog]`** → `check_config:_run`: validate bundled
+  offline catalog or explicit complete catalog without starting simulation;
+  hidden alias: `cxr check-config`.
+- **`cxr checkpoint ...`** → `checkpoint_cli:command`: grouped local checkpoint
+  shrink, component recompute, archive, restore, list, and merge operations.
 - **`cxr scan <material>`** → `scan:main` → `run.run_sweep` → write
   `checkpoints/<material>/{line,brem}.pkl`. Root shim: `scan.py`.
 - **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
@@ -58,10 +62,12 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   and analysis apps read per-material grids in `config.py`.
 - **`cxr analyze [material]`** → `analyze:_cli`: launch or smoke-test analysis
   app with explicit or persisted initial material.
-- **`cxr check`** → `check:_cli`: launch validation app or export its
-  literature-validation figures from cached results.
+- **`cxr validate`** → `check:_cli`: launch validation app or export its
+  literature-validation figures from cached results; hidden alias: `cxr check`.
 - **`cxr remote ...`** → `remote:*`: optional SSH/SLURM lifecycle for lab GPU
-  box: submit, attach/status/logs, pull, stop, validation jobs.
+  box: submit, attach/status/logs, pull, stop, validation jobs. Canonical
+  detached submission and validation paths are `remote submit` and
+  `remote validate`; `start` and `check` remain hidden aliases.
 - **`cxr export [stem]`** → `export:main`: `marimo export html` of analysis
   app → `results/<stem>.html`.
 - **`cxr slim <checkpoint-dir> [--grid]`** → `slim:slim_checkpoint` →
@@ -335,9 +341,20 @@ wired into pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
 ### `cli.py`
 `cxr` console-script dispatcher.
 - Public: `main`.
-- Deps (lazy command imports): `analyze`, `archive`, `blaze`, `check`,
-  `check_config`, `export`, `line_grid`, `rebrem`, `reline`, `remote`, `scan`,
-  `slim`; eager lightweight deps: `_cli_core`, `__version__`.
+- Deps (lazy command imports): `analyze`, `blaze`, `catalog_cli`, `check`,
+  `checkpoint_cli`, `export`, `line_grid`, `remote`, `scan`; hidden
+  compatibility paths additionally dispatch to `archive`, `check_config`,
+  `rebrem`, `reline`, and `slim`. Eager lightweight deps: `_cli_core`,
+  `__version__`.
+
+### `checkpoint_cli.py`
+Canonical `cxr checkpoint` group. Lazily routes `slim`, component
+`recompute {brem,line}`, `archive`, `restore`, `list`, and `merge` to existing
+checkpoint handlers while root-level legacy paths remain hidden aliases.
+
+### `catalog_cli.py`
+Canonical `cxr catalog` group. Lazily routes `catalog validate` to
+`check_config.command` while `cxr check-config` remains a hidden alias.
 
 ### `analyze.py`
 `cxr analyze` launcher for `notebooks/analysis_app.py`: persisted

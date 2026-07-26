@@ -9,6 +9,7 @@ import os
 import sys
 from collections.abc import Mapping, Sequence
 from contextvars import ContextVar
+from copy import copy
 from types import SimpleNamespace
 from typing import Any
 
@@ -101,11 +102,13 @@ class LazyGroup(click.Group):
         *args,
         lazy_commands: Mapping[str, str] | None = None,
         lazy_help: Mapping[str, str] | None = None,
+        lazy_hidden: Sequence[str] = (),
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.lazy_commands = dict(lazy_commands or {})
         self.lazy_help = dict(lazy_help or {})
+        self.lazy_hidden = frozenset(lazy_hidden)
 
     def list_commands(self, ctx: click.Context) -> list[str]:
         eager = super().list_commands(ctx)
@@ -119,12 +122,17 @@ class LazyGroup(click.Group):
         command = getattr(importlib.import_module(module_name), object_name)
         if not isinstance(command, click.Command):
             raise CLIError(f"lazy command {cmd_name!r} resolved to non-command {import_path!r}")
+        if cmd_name in self.lazy_hidden:
+            command = copy(command)
+            command.hidden = True
         return command
 
     def format_commands(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         """Render root summaries without importing lazy command modules."""
         rows = []
         for name in self.list_commands(ctx):
+            if name in self.lazy_hidden:
+                continue
             if name in self.lazy_commands and name in self.lazy_help:
                 rows.append((name, self.lazy_help[name]))
                 continue

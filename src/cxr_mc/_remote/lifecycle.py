@@ -585,7 +585,7 @@ def _stop_jobid(jobid):
     transport._run(["ssh", "-n", config.remote_host(), remote])
 
 
-def stop_jobs(materials=None, all_jobs=False):
+def stop_jobs(materials=None, all_jobs=False, *, yes=True):
     """Stop live queue jobs by material name, or every live job with ``all_jobs``.
 
     Each material can only be owned by one live job because start/scan refuse
@@ -616,6 +616,13 @@ def stop_jobs(materials=None, all_jobs=False):
         if missing:
             raise SystemExit("no live job found for material(s): " + ", ".join(missing))
         jobids = sorted({jobid for jobid, _matched in matches})
+
+    if not yes:
+        print("would cancel remote job(s):")
+        for jobid in jobids:
+            print(f"  {jobid}")
+        print("re-run with --yes to cancel")
+        return
 
     for jobid in jobids:
         _stop_jobid(jobid)

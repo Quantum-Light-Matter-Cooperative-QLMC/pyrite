@@ -4,6 +4,7 @@ import io
 import sys
 import time
 from contextlib import redirect_stderr, redirect_stdout
+from copy import copy
 
 import click
 
@@ -14,6 +15,7 @@ from .._cli_core import (
     NONNEGATIVE_INT,
     POSITIVE_FLOAT,
     POSITIVE_INT,
+    emit_diagnostic,
     emit_json_result,
     invoke_legacy,
     run,
@@ -52,7 +54,10 @@ def remote_check(
         no_sync=no_sync,
     )
     if not viewer.attach(jobid):
-        print("Zhai job is still running or its viewer disconnected; skipping automatic cache pull")
+        emit_diagnostic(
+            "Zhai job is still running or its viewer disconnected; "
+            "skipping automatic cache pull"
+        )
         return
     if not state._job_succeeded(jobid):
         job_state = state._job_state(jobid) or "no terminal state recorded"
@@ -120,11 +125,11 @@ def _cli_scan(args):
         no_sync=args.no_sync,
     )
     if not viewer.attach(jobid):
-        print("scan is still running or its viewer disconnected; skipping automatic pull")
+        emit_diagnostic("scan is still running or its viewer disconnected; skipping automatic pull")
         return
     completed = state._completed_materials(jobid, materials)
     if not completed:
-        print("warning: the SLURM scan produced no successful checkpoints; nothing to pull")
+        emit_diagnostic("warning: the SLURM scan produced no successful checkpoints; nothing to pull")
         return
     stems = scripts._stems(completed, args.quick)
     # Code is already synced by the queue, so a grid pull skips its own sync;
@@ -159,11 +164,15 @@ def _cli_rebrem(args):
     if args.dry_run:
         return
     if not viewer.attach(jobid):
-        print("rebrem is still running or its viewer disconnected; skipping automatic pull")
+        emit_diagnostic(
+            "rebrem is still running or its viewer disconnected; skipping automatic pull"
+        )
         return
     completed = state._completed_materials(jobid, materials)
     if not completed:
-        print("warning: the SLURM rebrem updated no checkpoints successfully; nothing to pull")
+        emit_diagnostic(
+            "warning: the SLURM rebrem updated no checkpoints successfully; nothing to pull"
+        )
         return
     # merge ONLY the fresh brem into the local pickle, preserving any local line spectra
     lifecycle.pull(completed, dataset="brem")
@@ -184,11 +193,15 @@ def _cli_reline(args):
     if args.dry_run:
         return
     if not viewer.attach(jobid):
-        print("reline is still running or its viewer disconnected; skipping automatic pull")
+        emit_diagnostic(
+            "reline is still running or its viewer disconnected; skipping automatic pull"
+        )
         return
     completed = state._completed_materials(jobid, materials)
     if not completed:
-        print("warning: the SLURM reline updated no checkpoints successfully; nothing to pull")
+        emit_diagnostic(
+            "warning: the SLURM reline updated no checkpoints successfully; nothing to pull"
+        )
         return
     lifecycle.pull(completed, dataset="line")
 
@@ -296,7 +309,7 @@ def _cli_logs(args):
 
 
 def _cli_stop(args):
-    lifecycle.stop_jobs(args.materials, args.all)
+    lifecycle.stop_jobs(args.materials, args.all, yes=args.yes)
 
 
 def _cli_reap(args):
@@ -387,7 +400,7 @@ def _reject_all_with_values(command_name, all_, values):
         "over workflow defaults where offered.\n\n"
         "\b\n"
         "Examples:\n"
-        "  cxr remote start hopg --dry-run\n"
+        "  cxr remote submit hopg --dry-run\n"
         "  cxr remote scan hopg\n"
         "  cxr remote status -vv"
     ),
@@ -583,7 +596,7 @@ def reline_command(
     )
 
 
-@command.command("start", help="Sync code and submit a detached SLURM material queue.")
+@click.command("submit", help="Sync code and submit a detached SLURM material queue.")
 @click.argument(
     "materials",
     nargs=-1,
@@ -648,6 +661,13 @@ def start_command(
     )
 
 
+command.add_command(start_command)
+_start_alias = copy(start_command)
+_start_alias.name = "start"
+_start_alias.hidden = True
+command.add_command(_start_alias)
+
+
 @command.command("attach", help="Live-track a remote job; defaults to latest.")
 @click.argument(
     "jobid",
@@ -707,14 +727,15 @@ def logs_command(jobid, follow):
 @command.command("stop", help="cancel active SLURM job(s) by material, or every live job.")
 @click.argument("materials", nargs=-1, metavar="[MATERIAL]...")
 @click.option("-a", "--all", "all_", is_flag=True, help="Stop every live job.")
-def stop_command(materials, all_):
+@click.option("--yes", is_flag=True, help="Cancel exact previewed jobs; otherwise preview.")
+def stop_command(materials, all_, yes):
     if all_ and materials:
         raise click.UsageError("stop --all does not take material names")
     if not all_ and not materials:
         raise click.UsageError("stop needs material name(s), or use --all")
     return _invoke_click(
         _cli_stop,
-        _click_args("stop", materials=list(materials), all=all_),
+        _click_args("stop", materials=list(materials), all=all_, yes=yes),
     )
 
 
@@ -742,7 +763,7 @@ def reap_command(min_age_minutes, yes):
     "material",
     nargs=-1,
     metavar="[STEM]...",
-    shell_complete=_cli_completion.complete_material,
+    shell_complete=_cli_completion.complete_remote_checkpoint_stem,
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Pull every configured material.")
 @click.option(
@@ -838,7 +859,7 @@ def sync_command():
     return _invoke_click(_cli_sync, _click_args("sync"))
 
 
-@command.command("check", help="Run Zhai reproduction remotely or pull existing caches.")
+@click.command("validate", help="Run Zhai reproduction remotely or pull existing caches.")
 @click.option(
     "--ne",
     type=POSITIVE_INT,
@@ -906,6 +927,13 @@ def check_command(ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, detached,
             pull=pull,
         ),
     )
+
+
+command.add_command(check_command)
+_check_alias = copy(check_command)
+_check_alias.name = "check"
+_check_alias.hidden = True
+command.add_command(_check_alias)
 
 
 def main(argv=None):

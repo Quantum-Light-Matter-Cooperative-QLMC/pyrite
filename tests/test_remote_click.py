@@ -13,6 +13,7 @@ REMOTE_COMMANDS = (
     "scan",
     "rebrem",
     "reline",
+    "submit",
     "start",
     "attach",
     "jobs",
@@ -23,6 +24,7 @@ REMOTE_COMMANDS = (
     "pull",
     "clear",
     "sync",
+    "validate",
     "check",
 )
 
@@ -48,7 +50,7 @@ def test_start_click_defaults_and_zero_meanings(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "job",
     )
 
-    result = invoke(remote.command, ["start", "hopg", "--workers", "0"])
+    result = invoke(remote.command, ["submit", "hopg", "--workers", "0"])
 
     assert_clean_result(result)
     assert calls == [
@@ -64,6 +66,21 @@ def test_start_click_defaults_and_zero_meanings(monkeypatch):
             },
         )
     ]
+
+
+def test_hidden_remote_aliases_remain_callable():
+    for alias in ("start", "check"):
+        result = invoke(remote.command, [alias, "--help"])
+        assert_clean_result(result)
+
+    root_help = invoke(remote.command, ["--help"])
+    command_lines = {
+        line.split()[0]
+        for line in root_help.stdout.splitlines()
+        if line.startswith("  ") and line.strip() and not line.lstrip().startswith("-")
+    }
+    assert {"submit", "validate"}.issubset(command_lines)
+    assert command_lines.isdisjoint({"start", "check"})
 
 
 @pytest.mark.parametrize(
@@ -126,3 +143,19 @@ def test_remote_click_preserves_resumable_exit(monkeypatch):
     result = invoke(remote.command, ["jobs"])
 
     assert_clean_result(result, exit_code=75)
+
+
+def test_stop_previews_by_default_and_yes_executes(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "stop_jobs",
+        lambda materials, all_jobs, *, yes: calls.append((materials, all_jobs, yes)),
+    )
+
+    preview = invoke(remote.command, ["stop", "hopg"])
+    confirmed = invoke(remote.command, ["stop", "hopg", "--yes"])
+
+    assert_clean_result(preview)
+    assert_clean_result(confirmed)
+    assert calls == [(["hopg"], False, False), (["hopg"], False, True)]

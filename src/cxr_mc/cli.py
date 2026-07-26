@@ -14,6 +14,9 @@ _COMMANDS = {
     "blaze": "cxr_mc.blaze.command",
     "export": "cxr_mc.export.command",
     "analyze": "cxr_mc.analyze.command",
+    "validate": "cxr_mc.check.command",
+    "catalog": "cxr_mc.catalog_cli.command",
+    "checkpoint": "cxr_mc.checkpoint_cli.command",
     "slim": "cxr_mc.slim.command",
     "rebrem": "cxr_mc.rebrem.command",
     "reline": "cxr_mc.reline.command",
@@ -32,6 +35,9 @@ _COMMAND_HELP = {
     "blaze": "Run a grooved-crystal sweep and write a checkpoint.",
     "export": "Export the analysis app as static HTML.",
     "analyze": "Launch the analysis app.",
+    "validate": "Launch validation or export cached validation figures.",
+    "catalog": "Inspect and validate material-catalog configuration.",
+    "checkpoint": "Inspect, transform, recompute, and archive checkpoints.",
     "slim": "Shrink a checkpoint for transfer.",
     "rebrem": "Recompute bremsstrahlung arrays in local checkpoints.",
     "reline": "Recompute line spectra in local checkpoints.",
@@ -50,6 +56,17 @@ _COMMAND_HELP = {
     cls=LazyGroup,
     lazy_commands=_COMMANDS,
     lazy_help=_COMMAND_HELP,
+    lazy_hidden={
+        "slim",
+        "rebrem",
+        "reline",
+        "archive",
+        "restore",
+        "archives",
+        "union",
+        "check",
+        "check-config",
+    },
     no_args_is_help=False,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
@@ -65,7 +82,7 @@ def command() -> None:
     Examples:
       cxr scan mose2 --quick
       cxr analyze mose2
-      cxr remote start mose2 --dry-run
+      cxr remote submit mose2 --dry-run
     """
 
 

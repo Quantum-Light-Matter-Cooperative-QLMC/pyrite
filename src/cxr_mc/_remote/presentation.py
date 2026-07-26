@@ -9,7 +9,6 @@ import textwrap
 import unicodedata
 
 from .. import _cli_core
-from ..materials import CATALOG
 
 _SHELL_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
@@ -178,6 +177,8 @@ def _mode_summary(metadata):
 
 
 def _material_label(material):
+    from ..materials import CATALOG
+
     spec = CATALOG.materials.get(material)
     return spec.label if spec is not None else material
 

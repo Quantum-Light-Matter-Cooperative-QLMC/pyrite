@@ -1,4 +1,4 @@
-"""``cxr check`` -- launch the marimo validation app (``notebooks/validation_app.py``),
+"""``cxr validate`` -- launch the marimo validation app (``notebooks/validation_app.py``),
 or render its figures in batch from cache.
 
 Unlike ``cxr analyze``, this command takes no material argument -- the
@@ -6,10 +6,10 @@ validation app reproduces fixed literature figures (e.g. Zhai et al.) rather
 than sweeping a chosen material, so there's no initial-material selection to
 resolve or persist.
 
-    cxr check                      # `marimo run` the validation app
-    cxr check --watch              # add marimo's --watch
-    cxr check --edit               # `marimo edit` instead of `marimo run`
-    cxr check --export             # skip marimo; render the full Zhai figure
+    cxr validate                   # `marimo run` the validation app
+    cxr validate --watch           # add marimo's --watch
+    cxr validate --edit            # `marimo edit` instead of `marimo run`
+    cxr validate --export          # skip marimo; render the full Zhai figure
                                     # set from checkpoints/zhai_reproduction/
                                     # (see `cxr remote check`) to figures/
 """
@@ -26,7 +26,7 @@ import click
 
 from . import _cli_core
 from ._acp import running_acp
-from .remote import HOST as REMOTE_HOST
+from ._remote.config import HOST as REMOTE_HOST
 
 NOTEBOOK = "notebooks/validation_app.py"
 TUNNEL_PORT = 2718

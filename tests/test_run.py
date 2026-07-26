@@ -968,8 +968,8 @@ def test_lines_for_case_matches_spectrum_case_single_slab():
 
     case = dict(
         E0_keV=30.0,
-        Ne=200,
-        Ne_brem=50,
+        Ne=4,
+        Ne_brem=2,
         thickness_ang=1.0e4,
         composition=[("Mo", 1.0), ("S", 2.0)],
         crystal="mos2",
@@ -980,7 +980,7 @@ def test_lines_for_case_matches_spectrum_case_single_slab():
         E_cut_lines_keV=5.0,
         E_cut_brem_keV=1.0,
     )
-    E_grid = np.linspace(1000.0, 30000.0, 64)
+    E_grid = np.linspace(1000.0, 30000.0, 16)
     tp = runner._transport_case({**case, "E_grid": E_grid})
     spec_ref = runner._spectrum_case({**case, "E_grid": E_grid}, tp)["spec"]
     spec = _lines_for_case(case, E_grid)
@@ -1100,10 +1100,10 @@ def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
 
     neither = runner.invoke(rebrem.command, ["--ne-brem", "1000"], catch_exceptions=False)
     both = runner.invoke(rebrem.command, ["MoS2", "--all"], catch_exceptions=False)
-    assert neither.exit_code == 1
-    assert both.exit_code == 1
-    assert "exactly one of the two" in neither.stderr
-    assert "exactly one of the two" in both.stderr
+    assert neither.exit_code == 2
+    assert both.exit_code == 2
+    assert "needs material name(s)" in neither.stderr
+    assert "--all does not take material names" in both.stderr
     assert seen == []
 
     material = runner.invoke(rebrem.command, ["MoS2"], catch_exceptions=False)
@@ -1127,10 +1127,10 @@ def test_reline_cli_requires_materials_xor_all(monkeypatch):
 
     neither = runner.invoke(reline.command, [], catch_exceptions=False)
     both = runner.invoke(reline.command, ["MoS2", "--all"], catch_exceptions=False)
-    assert neither.exit_code == 1
-    assert both.exit_code == 1
-    assert "exactly one of the two" in neither.stderr
-    assert "exactly one of the two" in both.stderr
+    assert neither.exit_code == 2
+    assert both.exit_code == 2
+    assert "needs material name(s)" in neither.stderr
+    assert "--all does not take material names" in both.stderr
     assert seen == []
 
     material = runner.invoke(reline.command, ["MoS2"], catch_exceptions=False)

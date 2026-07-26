@@ -23,7 +23,6 @@ from pathlib import Path
 
 from cxr_mc.line_grid import provenance as _provenance
 from cxr_mc.line_grid.bounds import spacing_num
-from cxr_mc.materials import load_material_catalog
 
 _MATERIALS_TOML = Path(__file__).resolve().parent.parent / "data" / "materials.toml"
 
@@ -237,6 +236,8 @@ def _atomic_write(path, text):
 
 def _validate_catalog_text(path, text):
     """Validate candidate catalog from a temporary file, without replacing live data."""
+    from cxr_mc.materials import load_material_catalog
+
     path = Path(path)
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".toml.tmp")
     try:

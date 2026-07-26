@@ -48,6 +48,8 @@ def _walk(
                 raise RuntimeError(
                     f"command disappeared while generating reference: {' '.join(path)} {name}"
                 )
+            if child.hidden:
+                continue
             yield from _walk(child, (*path, name), ctx)
 
 
@@ -70,6 +72,28 @@ def build_reference() -> str:
         "`UNLIMITED` allocation; that mode defaults to two parallel materials and",
         "accepts at most four. `CXR_REMOTE_HOST`, `CXR_REMOTE_DIR`, and",
         "`CXR_REMOTE_UV` override configured connection values.",
+        "",
+        "Checkpoint operations use the grouped `cxr checkpoint ...` paths. Legacy",
+        "top-level `slim`, `rebrem`, `reline`, `archive`, `restore`, `archives`,",
+        "and `union` paths remain callable compatibility aliases but are hidden",
+        "from root help.",
+        "",
+        "Validation uses `cxr validate`, `cxr catalog validate`, and",
+        "`cxr remote validate`. Legacy `check`, `check-config`, and remote",
+        "`check` paths remain hidden compatibility aliases. Remote detached",
+        "submission uses `cxr remote submit`; legacy `start` remains an alias.",
+        "Line-grid job lifecycle uses `cxr line-grid job ...`; legacy flat job",
+        "verbs remain aliases.",
+        "",
+        "Automation contract: usage errors exit 2; runtime failures exit 1;",
+        "interrupted viewers exit 130; resumable compute exits 75. Diagnostics,",
+        "warnings, prompts, and progress use stderr. `--json` emits one UTF-8",
+        "object plus newline with `schema`, `schema_version`, `ok`, `payload`,",
+        "and `errors` fields and no human prose on stdout.",
+        "",
+        "Destructive remote stop commands preview exact job targets by default.",
+        "Pass `--yes` to perform cancellation; `cxr line-grid stop` additionally",
+        "requires JOBID or explicit `--latest`.",
         "",
         "Files under `docs/superpowers/plans/` and `docs/superpowers/specs/` are",
         "historical design records, not current CLI reference. Commands below are",
