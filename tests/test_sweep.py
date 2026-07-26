@@ -23,9 +23,12 @@ from cxr_mc.sweep import (
     MATERIAL_LABELS,
     Sweep,
     build_cases,
+    case_cost,
     crystal_params,
     fmt_thickness,
     geometry_table,
+    scan_grid_rows,
+    sweep_cost_weights,
 )
 
 ALL = [
@@ -1091,3 +1094,81 @@ def test_scan_rejects_explicit_unknown_material_before_building(monkeypatch, tmp
                 checkpoint_dir=str(tmp_path),
             )
         )
+
+
+# ---- compute-cost proxy (progress weighting; instrumentation) ----------------
+def _hopg_cases(**kw):
+    """Flat-face HOPG cases at a legal groove-free tilt for the cost tests."""
+    return build_cases(Sweep(material="hopg", tilt_deg=5.0, tilt_azim_deg=180.0, **kw))
+
+
+def test_case_cost_is_positive_and_deterministic():
+    (case,) = _hopg_cases(thickness_ang=2e4, energy_keV=60.0)
+    assert case_cost(case) > 0.0
+    assert case_cost(case) == case_cost(case)  # pure fn of the case dict
+
+
+def test_case_cost_rises_with_beam_energy_for_a_thick_slab():
+    # A thick slab stops the beam inside it, so the CSDA path length (segment
+    # count) grows with E0 -- the very term the flat "N of M" bar ignores.
+    cases = _hopg_cases(thickness_ang=1e7, energy_keV=[30.0, 60.0, 100.0, 200.0])
+    costs = [case_cost(c) for c in cases]
+    assert all(lo < hi for lo, hi in zip(costs[:-1], costs[1:], strict=True))
+
+
+def test_case_cost_walks_a_multilayer_stack():
+    # Adding a substrate lets electrons keep depositing past the film, so the
+    # stacked case must cost strictly more than the free-standing film.
+    (film,) = _hopg_cases(thickness_ang=2e4, energy_keV=60.0)
+    (stacked,) = build_cases(
+        Sweep(
+            material="hopg",
+            tilt_deg=5.0,
+            tilt_azim_deg=180.0,
+            thickness_ang=2e4,
+            energy_keV=60.0,
+            substrate="silicon",
+        )
+    )
+    assert stacked.get("abs_layers") is not None
+    assert case_cost(stacked) > case_cost(film)
+
+
+def test_sweep_cost_weights_match_case_cost_and_sum_to_total():
+    cases = _hopg_cases(thickness_ang=2e4, energy_keV=[30.0, 60.0])
+    weights, total = sweep_cost_weights(cases)
+    assert set(weights) == {(c["name"], c["E0_keV"]) for c in cases}
+    for c in cases:
+        assert weights[(c["name"], c["E0_keV"])] == case_cost(c)
+    assert total == pytest.approx(sum(weights.values()))
+
+
+def test_scan_grid_rows_aggregate_state_fractions_by_tilt():
+    cases = build_cases(
+        Sweep(
+            material="hopg",
+            tilt_deg=[5.0, 15.0],
+            tilt_azim_deg=180.0,
+            thickness_ang=2e4,
+            energy_keV=[30.0, 60.0],
+        )
+    )
+    cached = {(cases[0]["name"], cases[0]["E0_keV"])}
+    energies, rows = scan_grid_rows(cases, cached=cached)
+    assert energies == [30.0, 60.0]
+    assert [r["label"] for r in rows] == ["5°", "15°"]
+    # every requested (tilt, E0) slot is populated (no None) for this dense grid
+    assert all(cell is not None for r in rows for cell in r["cells"])
+    # the one cached pair shows up as a nonzero cached fraction; nothing excluded
+    total_cached = sum(cell["cached"] for r in rows for cell in r["cells"])
+    assert total_cached > 0.0
+    assert all(cell["excluded"] == 0.0 for r in rows for cell in r["cells"])
+
+
+def test_scan_grid_rows_mark_excluded_and_empty_slots():
+    cases = _hopg_cases(thickness_ang=2e4, energy_keV=[30.0, 60.0])
+    dropped = [cases[0]]  # pretend the 30 keV case was penetration-excluded
+    energies, rows = scan_grid_rows(cases, excluded=dropped)
+    (row,) = rows  # single tilt
+    excluded_at_30 = row["cells"][energies.index(cases[0]["E0_keV"])]["excluded"]
+    assert excluded_at_30 == pytest.approx(1.0)

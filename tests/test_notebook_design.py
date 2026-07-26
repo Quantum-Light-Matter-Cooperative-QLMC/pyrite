@@ -48,6 +48,45 @@ def test_context_value_names_missing_state(value) -> None:
     assert _design._display(value) == "not selected"
 
 
+class _FakeMo:
+    """Minimal stand-in for the marimo module: only ``mo.Html`` is exercised."""
+
+    class Html:
+        def __init__(self, html: str) -> None:
+            self.text = html
+
+
+def test_scan_grid_renders_export_safe_state_matrix() -> None:
+    energies = [30.0, 60.0]
+    rows = [
+        {
+            "label": "5°",
+            "cells": [
+                {"cached": 1.0, "weight": 1.0},  # fully done, heaviest cell
+                {"excluded": 1.0, "weight": 0.4},  # penetration-excluded
+            ],
+        },
+        {"label": "15°", "cells": [None, {"running": 0.5, "weight": 0.2}]},
+    ]
+    html = _design.scan_grid(_FakeMo, energies, rows).text
+
+    # structure: a cell per (row, energy) plus the state + legend vocabulary
+    assert html.count("cxr-grid__cell") == 4
+    for state in ("cached", "excluded", "running"):
+        assert f"cxr-grid__seg--{state}" in html
+    assert "Penetration-excluded" in html and "Remaining" in html
+    # cost sizing: the unit-weight cell fills the marker, the light cell shrinks
+    assert "width:100%" in html
+    # export safety: no network dependencies leak into the notebook HTML
+    assert "https://" not in html and "http://" not in html
+
+
+def test_scan_grid_states_map_to_palette_tokens() -> None:
+    assert set(_design.SCAN_GRID_STATES) == {"cached", "done", "running", "excluded"}
+    # every stacked state (plus the empty "remaining" track) has a legend entry
+    assert {*_design.SCAN_GRID_STATES, "remaining"} <= set(_design._SCAN_GRID_LEGEND)
+
+
 def test_core_package_does_not_import_notebook_design() -> None:
     root = Path(__file__).parents[1] / "src" / "cxr_mc"
     assert all("notebooks._design" not in path.read_text() for path in root.rglob("*.py"))
