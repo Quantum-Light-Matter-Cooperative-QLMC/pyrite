@@ -6,10 +6,12 @@ exception is the clear-listing regression test, which executes the box-side
 shell snippet under a local bash (skipped when bash is unavailable)."""
 
 import argparse
+import io
 import json
 import os
 import shutil
 import subprocess
+import tarfile
 from types import SimpleNamespace
 
 import pytest
@@ -82,6 +84,50 @@ def test_sync_rejects_hostile_scp_host_before_transport(monkeypatch):
         transport.sync_code()
 
 
+def test_sync_excludes_generated_caches(monkeypatch, tmp_path):
+    source = tmp_path / "src"
+    (source / "pkg" / "__pycache__").mkdir(parents=True)
+    (source / "pkg" / ".pytest_cache").mkdir()
+    (source / "pkg" / "module.py").write_text("VALUE = 1\n")
+    (source / "pkg" / "__pycache__" / "module.pyc").write_bytes(b"bytecode")
+    (source / "pkg" / ".pytest_cache" / "state").write_text("generated")
+    archived = []
+
+    def inspect_transfer(command, **_kwargs):
+        if command[0] == "scp":
+            with tarfile.open(command[1], "r:gz") as archive:
+                archived.extend(archive.getnames())
+
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(config, "SYNC_PATHS", ["src"])
+    monkeypatch.setattr(transport, "_run", inspect_transfer)
+
+    transport.sync_code()
+
+    assert archived == ["src/pkg/module.py"]
+
+
+def test_ssh_download_streams_bytes_and_removes_partial_failure(monkeypatch, tmp_path):
+    destination = tmp_path / "incoming.pkl"
+
+    def succeed(command, **kwargs):
+        assert command[:3] == ["ssh", "-n", remote.HOST]
+        kwargs["stdout"].write(b"payload")
+
+    monkeypatch.setattr(transport, "_run", succeed)
+    transport._ssh_download("cat artifact", destination)
+    assert destination.read_bytes() == b"payload"
+
+    def fail(_command, **kwargs):
+        kwargs["stdout"].write(b"partial")
+        raise subprocess.CalledProcessError(7, "ssh")
+
+    monkeypatch.setattr(transport, "_run", fail)
+    with pytest.raises(subprocess.CalledProcessError):
+        transport._ssh_download("cat artifact", destination)
+    assert not destination.exists()
+
+
 @pytest.mark.parametrize("value", ["relative/path", "/safe\ninjected", "/safe\0injected", ""])
 def test_remote_dir_rejects_nonabsolute_and_control_values(monkeypatch, value):
     monkeypatch.setattr(config, "REMOTE_DIR", value)
@@ -127,6 +173,7 @@ def test_every_generated_bash_payload_quotes_hostile_remote_dir(monkeypatch, bui
 
     expected_jobdir = config.shell_word(config.remote_path(config.JOBS_SUBDIR, "j"))
     assert f"JOBDIR={expected_jobdir}" in script
+    assert "timing: uv sync %d.%03d s" in script
     syntax = subprocess.run(["bash", "-n"], input=script, capture_output=True, text=True)
     assert syntax.returncode == 0, syntax.stderr
 
@@ -243,6 +290,24 @@ def test_queue_script_accepts_three_parallel_materials():
 
     assert "parallel_materials=3" in script
     assert "wait -n" in script
+
+
+def test_queue_script_records_uv_sync_timing_and_preserves_failure_state(monkeypatch, tmp_path):
+    bash = _bash_or_skip(tmp_path)
+    jobdir = tmp_path / "jobs" / "j"
+    jobdir.mkdir(parents=True)
+    fake_uv = tmp_path / "uv"
+    fake_uv.write_text("#!/bin/sh\nexit 7\n")
+    fake_uv.chmod(0o755)
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(config, "REMOTE_UV", fake_uv.as_posix())
+    script = remote._queue_script("j", ["hopg"], quick=False, workers=None)
+
+    result = subprocess.run([bash, "-c", script], capture_output=True, text=True)
+
+    assert result.returncode != 0
+    assert (jobdir / "state").read_text().startswith("FAILED (uv sync)")
+    assert "timing: uv sync " in (jobdir / "log").read_text()
 
 
 def test_queue_script_no_flags_when_unset():
@@ -743,7 +808,7 @@ def test_live_jobs_queries_squeue_for_recorded_scheduler_ids(monkeypatch):
     assert "/pid" not in commands[0]
 
 
-def test_live_jobs_skips_retired_scheduler_ids_without_masking_other_query_failures(monkeypatch):
+def test_live_jobs_batches_scheduler_query_and_fails_closed(monkeypatch):
     commands = []
     monkeypatch.setattr(
         transport, "_ssh_capture", lambda command: commands.append(command) or "j\tFalse\thopg\n"
@@ -751,9 +816,46 @@ def test_live_jobs_skips_retired_scheduler_ids_without_masking_other_query_failu
 
     remote._live_jobs()
 
-    assert "STATE=$(squeue -h -j $SID -o '%T' 2>&1)" in commands[0]
-    assert '*"Invalid job id specified"*) continue' in commands[0]
-    assert 'echo "could not query SLURM job $SID" >&2; exit "$STATUS"' in commands[0]
+    assert commands[0].count("squeue ") == 1
+    assert "squeue -h -u \"$USER\" -o '%i'" in commands[0]
+    assert 'case "$LIVE" in *" $SID "*)' in commands[0]
+    assert 'echo "could not query SLURM jobs" >&2' in commands[0]
+
+
+def test_live_jobs_joins_one_scheduler_snapshot_against_job_history(monkeypatch, tmp_path):
+    bash = _bash_or_skip(tmp_path)
+    jobs = tmp_path / "jobs"
+    for jobid, scheduler_id, material in (
+        ("old", "11", "hopg"),
+        ("live", "12", "hbn"),
+    ):
+        jobdir = jobs / jobid
+        jobdir.mkdir(parents=True)
+        (jobdir / "meta").write_text(
+            f"slurm_job_id: {scheduler_id}\nquick: False\nmaterials: {material}\n"
+        )
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    calls = tmp_path / "squeue-calls"
+    squeue = bin_dir / "squeue"
+    squeue.write_text(f"#!/bin/sh\necho called >> '{calls}'\necho 12\n")
+    squeue.chmod(0o755)
+
+    def run_remote(command):
+        result = subprocess.run(
+            [bash, "-c", command],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}"},
+        )
+        assert result.returncode == 0, result.stderr
+        return result.stdout
+
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setattr(transport, "_ssh_capture", run_remote)
+
+    assert remote._live_jobs() == [("live", False, ["hbn"])]
+    assert calls.read_text().splitlines() == ["called"]
 
 
 def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, capsys):
@@ -1047,8 +1149,7 @@ def test_attach_redraws_the_status_report_until_terminal(monkeypatch, capsys):
             _status_output("done [1/1] now", squeue_state="NOT_QUEUED", progress=done),
         ]
     )
-    monkeypatch.setattr(transport, "_ssh_capture", lambda _cmd: next(outputs))
-    monkeypatch.setattr(viewer.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(viewer, "_status_stream", lambda _cmd: outputs)
 
     assert remote.attach("20260101-000000") is True
 
@@ -1063,9 +1164,11 @@ def test_attach_redraws_the_status_report_until_terminal(monkeypatch, capsys):
 
 def test_attach_sanitizes_hostile_state(monkeypatch, capsys):
     monkeypatch.setattr(
-        transport,
-        "_ssh_capture",
-        lambda _command: _status_output("done\x1b[2J hopg [1/1] now", squeue_state="NOT_QUEUED"),
+        viewer,
+        "_status_stream",
+        lambda _command: iter(
+            [_status_output("done\x1b[2J hopg [1/1] now", squeue_state="NOT_QUEUED")]
+        ),
     )
 
     assert remote.attach("20260101-000000") is True
@@ -1078,9 +1181,11 @@ def test_attach_sanitizes_hostile_state(monkeypatch, capsys):
 def test_attach_omits_log_tail_at_base_verbosity_but_still_fetches_progress(monkeypatch):
     commands = []
     monkeypatch.setattr(
-        transport,
-        "_ssh_capture",
-        lambda cmd: commands.append(cmd) or _status_output("done now", squeue_state="NOT_QUEUED"),
+        viewer,
+        "_status_stream",
+        lambda cmd: (
+            commands.append(cmd) or iter([_status_output("done now", squeue_state="NOT_QUEUED")])
+        ),
     )
 
     remote.attach("20260101-000000")
@@ -1092,9 +1197,11 @@ def test_attach_omits_log_tail_at_base_verbosity_but_still_fetches_progress(monk
 def test_attach_forwards_double_verbose_to_the_status_command(monkeypatch):
     commands = []
     monkeypatch.setattr(
-        transport,
-        "_ssh_capture",
-        lambda cmd: commands.append(cmd) or _status_output("done now", squeue_state="NOT_QUEUED"),
+        viewer,
+        "_status_stream",
+        lambda cmd: (
+            commands.append(cmd) or iter([_status_output("done now", squeue_state="NOT_QUEUED")])
+        ),
     )
 
     remote.attach("20260101-000000", detail=2)
@@ -1106,12 +1213,12 @@ def test_attach_forwards_double_verbose_to_the_status_command(monkeypatch):
 
 
 def test_attach_watchdog_exits_on_a_stalled_chain(monkeypatch, capsys):
+    output = _status_output("queued slice 2 now", squeue_state="NOT_QUEUED")
     monkeypatch.setattr(
-        transport,
-        "_ssh_capture",
-        lambda _cmd: _status_output("queued slice 2 now", squeue_state="NOT_QUEUED"),
+        viewer,
+        "_status_stream",
+        lambda _cmd: iter([output] * viewer._POLL_GRACE_POLLS),
     )
-    monkeypatch.setattr(viewer.time, "sleep", lambda _s: None)
 
     assert remote.attach("20260101-000000") is False
     assert "CHAIN STALLED" in capsys.readouterr().out
@@ -1190,13 +1297,66 @@ def test_logs_identify_resolved_job_and_host(monkeypatch, capsys):
 
 def test_attach_returns_false_when_the_viewer_is_interrupted(monkeypatch, capsys):
     monkeypatch.setattr(
-        transport,
-        "_ssh_capture",
+        viewer,
+        "_status_stream",
         lambda _cmd: (_ for _ in ()).throw(KeyboardInterrupt),
     )
 
     assert remote.attach("20260101-000000") is False
     assert "VIEWER DISCONNECTED" in capsys.readouterr().out
+
+
+def test_status_stream_uses_one_ssh_process_for_multiple_frames(monkeypatch):
+    processes = []
+
+    class FakeProcess:
+        def __init__(self):
+            self.stdout = io.StringIO(
+                f"first\n{viewer._STATUS_FRAME_END}\nsecond\n{viewer._STATUS_FRAME_END}\n"
+            )
+            self.terminated = False
+
+        def poll(self):
+            return 0 if self.terminated else None
+
+        def terminate(self):
+            self.terminated = True
+
+        def wait(self, timeout=None):
+            self.terminated = True
+            return 0
+
+        def kill(self):
+            self.terminated = True
+
+    def popen(command, **kwargs):
+        process = FakeProcess()
+        processes.append((command, kwargs, process))
+        return process
+
+    monkeypatch.setattr(viewer.subprocess, "Popen", popen)
+    stream = viewer._status_stream("printf snapshot")
+
+    assert next(stream) == "first\n"
+    assert next(stream) == "second\n"
+    stream.close()
+
+    assert len(processes) == 1
+    command, kwargs, process = processes[0]
+    assert command[:3] == ["ssh", "-n", remote.HOST]
+    assert "while :; do printf snapshot" in command[3]
+    assert "sleep 2" in command[3]
+    assert kwargs["stdout"] is subprocess.PIPE
+    assert process.terminated
+
+
+def test_status_stream_composes_as_valid_bash():
+    snapshot = viewer._status_remote_command('JOB="j"', 2)
+    command = viewer._status_stream_command(snapshot)
+
+    syntax = subprocess.run(["bash", "-n", "-c", command], capture_output=True, text=True)
+
+    assert syntax.returncode == 0, syntax.stderr
 
 
 def test_parse_progress_records_ignores_malformed_snapshots():
@@ -2288,17 +2448,14 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
     }
     transfer = tmp_path / "transfer.pkl"
     _checkpoint_io.dump(payload, str(transfer))
-    calls = []
+    transfers = []
 
-    def fake_run(command, **_kw):
-        calls.append(command)
-        if command[0] == "scp":
-            import shutil
-
-            shutil.copyfile(transfer, command[-1])
+    def fake_download(command, destination):
+        transfers.append((command, destination))
+        shutil.copyfile(transfer, destination)
 
     monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
-    monkeypatch.setattr(transport, "_run", fake_run)
+    monkeypatch.setattr(transport, "_ssh_download", fake_download)
 
     remote.pull(["hopg"], grid=True, level9=True, no_sync=True)
 
@@ -2306,9 +2463,16 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
     assert (tmp_path / "checkpoints" / "hopg" / "brem.pkl").is_file()
     loaded = _checkpoint_store.load("hopg", tmp_path / "checkpoints")
     assert np.array_equal(loaded["cfg"][30.0]["spec"], np.array([3.0, 4.0]))
-    slim_call = next(" ".join(command) for command in calls if "cxr slim" in " ".join(command))
-    assert "/checkpoints/hopg" in slim_call
-    assert "--grid" in slim_call and "--compresslevel 9" in slim_call
+    assert len(transfers) == 1
+    transfer_command, destination = transfers[0]
+    assert "/checkpoints/hopg" in transfer_command
+    assert "--grid" in transfer_command and "--compresslevel 9" in transfer_command
+    assert "trap cleanup EXIT" in transfer_command
+    assert "trap 'exit 143' TERM" in transfer_command
+    assert '1>&2 && cat "$T"' in transfer_command
+    assert destination == tmp_path / "checkpoints" / ".hopg.incoming.pkl"
+    syntax = subprocess.run(["bash", "-n", "-c", transfer_command], capture_output=True, text=True)
+    assert syntax.returncode == 0, syntax.stderr
 
 
 def test_remote_start_all_uses_toml_manifest(monkeypatch, tmp_path):
@@ -3034,14 +3198,11 @@ def test_pull_dataset_merges_and_archives(monkeypatch, tmp_path):
         lifecycle.archive, "archive_checkpoint", lambda stem, **kw: archived.append(stem)
     )
 
-    # stub the box round-trip: ssh slim (no-op), scp copies our remote_tmp into place
-    def fake_run(cmd):
-        if cmd[0] == "scp":
-            import shutil
+    # Stub the one-session box round-trip into the incoming transfer file.
+    def fake_download(_command, destination):
+        shutil.copy(remote_tmp, destination)
 
-            shutil.copy(remote_tmp, cmd[-1])
-
-    monkeypatch.setattr(lifecycle.transport, "_run", fake_run)
+    monkeypatch.setattr(lifecycle.transport, "_ssh_download", fake_download)
 
     lifecycle.pull(["mos2"], dataset="line")
 

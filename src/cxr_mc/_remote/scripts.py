@@ -38,6 +38,20 @@ def _validate_parallel_materials(parallel_materials):
     return parallel_materials
 
 
+def _uv_sync_block() -> str:
+    """Bash that records dependency-sync wall time without changing exit semantics."""
+    return f"""uv_sync_start_ns=$(date +%s%N)
+uv_sync_rc=0
+{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
+uv_sync_elapsed_ms=$((($(date +%s%N) - uv_sync_start_ns) / 1000000))
+printf 'timing: uv sync %d.%03d s\\n' \
+  "$((uv_sync_elapsed_ms / 1000))" "$((uv_sync_elapsed_ms % 1000))" >> "$JOBDIR/log"
+if [ "$uv_sync_rc" -ne 0 ]; then
+  echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"
+  exit 1
+fi"""
+
+
 def _queue_script(
     jobid,
     materials,
@@ -61,7 +75,7 @@ def _queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{_uv_sync_block()}
 mats=({mats})
 total=${{#mats[@]}}
 parallel_materials={parallel_materials}
@@ -132,7 +146,7 @@ def _chunked_queue_script(jobid, materials, quick, workers, chunk_minutes, profi
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{_uv_sync_block()}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
@@ -198,7 +212,7 @@ def _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     return f"""JOBDIR={config.shell_word(jobdir)}
 cd {config.shell_remote_dir()} || exit 1
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{_uv_sync_block()}
 echo "running zhai reproduction since $(date -Is)" > "$JOBDIR/state"
 if ! {config.shell_remote_uv()} run --no-sync python reproduce_zhai.py{flags} >> "$JOBDIR/log" 2>&1
 then
@@ -256,7 +270,7 @@ def _rebrem_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{_uv_sync_block()}
 mats=({mats})
 total=${{#mats[@]}}
 n=0
@@ -312,7 +326,7 @@ def _rebrem_chunked_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{_uv_sync_block()}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
@@ -439,7 +453,7 @@ def _reline_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{_uv_sync_block()}
 mats=({mats})
 total=${{#mats[@]}}
 n=0
@@ -495,7 +509,7 @@ def _reline_chunked_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || {{ echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{_uv_sync_block()}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}

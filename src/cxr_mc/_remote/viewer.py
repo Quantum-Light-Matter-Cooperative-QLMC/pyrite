@@ -2,7 +2,6 @@
 
 import subprocess
 import sys
-import time
 
 import tqdm  # noqa: F401 -- kept importable at module level for test monkeypatching
 
@@ -158,6 +157,50 @@ def _disconnect_hint(jobid):
     )
 
 
+_STATUS_FRAME_END = "CXR_REMOTE_FRAME_END"
+
+
+def _status_stream_command(remote: str) -> str:
+    """Wrap one status snapshot in a framed two-second remote polling loop."""
+    snapshot = remote.rstrip().removesuffix(";")
+    return f"while :; do {snapshot}; printf '{_STATUS_FRAME_END}\\n'; sleep 2; done"
+
+
+def _status_stream(remote: str):
+    """Yield status snapshots over one persistent SSH connection."""
+    stream_command = _status_stream_command(remote)
+    process = subprocess.Popen(
+        ["ssh", "-n", config.remote_host(), stream_command],
+        stdout=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+    )
+    lines: list[str] = []
+    try:
+        if process.stdout is None:
+            raise RuntimeError("ssh status stream has no stdout")
+        for line in process.stdout:
+            if line.rstrip("\r\n") == _STATUS_FRAME_END:
+                yield "".join(lines)
+                lines.clear()
+            else:
+                lines.append(line)
+        returncode = process.wait()
+        raise SystemExit(f"ssh status stream ended (exit {returncode})")
+    finally:
+        if process.stdout is not None:
+            process.stdout.close()
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+
+
 # How many consecutive not-live polls the attach viewers tolerate before the
 # chain is declared broken: ~30 s at the 2 s poll, covering normal inter-slice
 # SLURM latency (a slice exits, the queued next slice has not started yet)
@@ -209,10 +252,11 @@ def _live_status(jobid, detail):
     missed = 0
     state_ = ""
     broken = False
+    stream = None
     try:
-        while True:
+        stream = _status_stream(remote)
+        for output in stream:
             refresh += 1
-            output = transport._ssh_capture(remote)
             sections = presentation._marked_sections(output)
             if not sections:
                 print(presentation._sanitize_terminal(output, multiline=True), end="")
@@ -232,10 +276,13 @@ def _live_status(jobid, detail):
             if missed >= _POLL_GRACE_POLLS:
                 broken = True
                 break
-            time.sleep(2)
     except KeyboardInterrupt:
         _disconnect_hint(jobid)
         return False
+    finally:
+        close = getattr(stream, "close", None)
+        if close is not None:
+            close()
     if broken:
         print(
             f"\nJOB {jobid} · CHAIN STALLED\n"

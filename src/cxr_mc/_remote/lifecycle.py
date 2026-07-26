@@ -764,11 +764,11 @@ def pull(
     ``cxr slim``: ``grid`` filters to just the material's current grid (plus the
     optional byte trimmers), ``level9`` recompresses at gzip level 9 instead of
     the level-6 default a live sweep writes at -- lossless, just smaller for the
-    wire. Either way the result lands in a box temp, gets scp'd into the local
-    active slot, and the temp is deleted. ``sync_code()`` runs first (unless
-    ``no_sync``) so the box rebuilds the grid from the same ``config.py`` the
-    laptop has, and has the ``--compresslevel`` flag at all -- closing sync
-    drift. With neither flag this is the plain whole-file scp."""
+    wire. One SSH session creates a box temp, streams it into the local active
+    slot, and removes the temp with a remote EXIT trap. ``sync_code()`` runs
+    first (unless ``no_sync``) so the box rebuilds the grid from the same
+    ``config.py`` the laptop has, and has the ``--compresslevel`` flag at all
+    -- closing sync drift."""
     if dataset not in (None, "brem", "line"):
         raise ValueError("dataset must be None, 'brem', or 'line'")
     stems = list(stems)
@@ -805,23 +805,15 @@ def pull(
             remote_tmp = f"/tmp/{stem}.{dataset or 'full'}.{uuid.uuid4().hex}.pkl"
             ckpt = config.remote_path("checkpoints", stem)
             incoming_local = dest / f".{stem}.incoming.pkl"
-            try:
-                transport._run(
-                    [
-                        "ssh",
-                        "-n",
-                        config.remote_host(),
-                        f"cd {config.shell_remote_dir()} && "
-                        f"{config.shell_remote_uv()} run --no-sync cxr slim "
-                        f"{config.shell_arg(ckpt)}{flags} "
-                        f"-o {config.shell_arg(remote_tmp)}",
-                    ]
-                )
-                transport._run(["scp", config.scp_remote_path(remote_tmp), str(incoming_local)])
-            finally:
-                transport._run(
-                    ["ssh", "-n", config.remote_host(), f"rm -f {config.shell_arg(remote_tmp)}"]
-                )
+            remote_transfer = (
+                f"T={config.shell_word(remote_tmp)}; "
+                'cleanup() { rm -f -- "$T"; }; trap cleanup EXIT; '
+                "trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM; "
+                f"cd {config.shell_remote_dir()} && "
+                f"{config.shell_remote_uv()} run --no-sync cxr slim "
+                f'{config.shell_arg(ckpt)}{flags} -o "$T" 1>&2 && cat "$T"'
+            )
+            transport._ssh_download(remote_transfer, incoming_local)
 
             incoming = _checkpoint_io.load(str(incoming_local))
             incoming_local.unlink(missing_ok=True)

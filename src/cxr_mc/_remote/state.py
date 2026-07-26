@@ -26,18 +26,27 @@ def _live_jobs():
 
     Legacy job directories without a recorded scheduler ID are deliberately
     non-live: PID liveness is not a safe fallback for scheduler-managed work.
+    Query SLURM once, then join live scheduler IDs against recorded metadata so
+    accumulated job history does not cause one ``squeue`` process per job.
     """
     remote = (
         f"JOBS={config.shell_remote_path(config.JOBS_SUBDIR)}; "
         '[ -d "$JOBS" ] || exit 0; '
+        "LIVE=$(squeue -h -u \"$USER\" -o '%i' 2>&1); STATUS=$?; "
+        'if [ "$STATUS" -ne 0 ]; then '
+        'echo "could not query SLURM jobs" >&2; printf "%s\\n" "$LIVE" >&2; '
+        'exit "$STATUS"; fi; '
+        'LIVE=" $(printf "%s\\n" "$LIVE" | tr "\\n" " ") "; '
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
-        'SID=$(sed -n "s/^slurm_job_id: //p" "$d/meta" 2>/dev/null | tail -1); '
+        '[ -f "$d/meta" ] || continue; SID=; q=; m=; '
+        'while IFS= read -r line; do case "$line" in '
+        '"slurm_job_id: "*) SID=${line#*: } ;; '
+        '"quick: "*) q=${line#*: } ;; '
+        '"materials: "*) m=${line#*: } ;; esac; done < "$d/meta"; '
         "case \"$SID\" in ''|*[!0-9]*) continue ;; esac; "
-        + scripts._squeue_state_command("$SID", retired="continue")
-        + '[ -n "$STATE" ] || continue; '
-        'q=$(sed -n "s/^quick: //p" "$d/meta" 2>/dev/null); '
-        'm=$(sed -n "s/^materials: //p" "$d/meta" 2>/dev/null); '
-        'printf "%s\\t%s\\t%s\\n" "$(basename "$d")" "$q" "$m"; done'
+        'case "$LIVE" in *" $SID "*) ;; *) continue ;; esac; '
+        "jobid=${d%/}; jobid=${jobid##*/}; "
+        'printf "%s\\t%s\\t%s\\n" "$jobid" "$q" "$m"; done'
     )
     jobs = []
     for line in transport._ssh_capture(remote).splitlines():

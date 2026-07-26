@@ -13,6 +13,14 @@ from pathlib import Path
 from . import config, presentation
 
 _TRACE_ARG_LIMIT = 100
+_SYNC_EXCLUDED_DIRS = {
+    "__pycache__",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+}
+_SYNC_EXCLUDED_SUFFIXES = {".pyc", ".pyo"}
 
 
 def _run(cmd, **kw):
@@ -42,6 +50,17 @@ def _ssh_capture(remote_cmd):
         sys.stderr.write(r.stderr)
         raise SystemExit(f"ssh command failed (exit {r.returncode})")
     return r.stdout
+
+
+def _ssh_download(remote_cmd: str, destination: Path) -> None:
+    """Stream one remote command's stdout directly into a local file."""
+    destination = Path(destination)
+    try:
+        with destination.open("wb") as output:
+            _run(["ssh", "-n", config.remote_host(), remote_cmd], stdout=output)
+    except BaseException:
+        destination.unlink(missing_ok=True)
+        raise
 
 
 def _local_sha256(path: Path) -> str | None:
@@ -101,9 +120,18 @@ def _add_to_tar(tar, local, arcname):
         tar.add(local, arcname=arcname)
 
 
+def _sync_ignored(path: Path) -> bool:
+    """Whether a generated local artifact must stay out of code-sync archives."""
+    return (
+        any(part in _SYNC_EXCLUDED_DIRS for part in path.parts)
+        or path.suffix.lower() in _SYNC_EXCLUDED_SUFFIXES
+    )
+
+
 def sync_code():
     """Tar SYNC_PATHS up (CRLF->LF normalized for text, via _add_to_tar) and
-    extract them over the repo on the box.
+    extract them over the repo on the box. Generated interpreter/tool caches
+    are excluded: they are host-specific, unnecessary, and expensive to gzip.
 
     Normalizing line endings here keeps the edit-locally / run-remotely loop --
     it ships the current WORKING tree (no commit required) yet stays LF-clean, so
@@ -120,8 +148,9 @@ def sync_code():
                     continue
                 if local.is_dir():
                     for f in sorted(local.rglob("*")):
-                        if f.is_file():
-                            arc = (Path(p) / f.relative_to(local)).as_posix()
+                        relative = f.relative_to(local)
+                        if f.is_file() and not _sync_ignored(relative):
+                            arc = (Path(p) / relative).as_posix()
                             _add_to_tar(t, f, arc)
                 else:
                     _add_to_tar(t, local, p)

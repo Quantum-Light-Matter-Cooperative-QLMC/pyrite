@@ -412,11 +412,16 @@ and clear, remote validation jobs.
   (acyclic: `config` ◄ `transport` ◄ `scripts` ◄ `state` ◄ `lifecycle`/`viewer`
   ◄ `cli`; plus `presentation`):
   - `config.py` — env-driven hosts/paths/SLURM constants.
-  - `transport.py` — ssh/scp primitives, hashing, code-tar sync, material checks.
-  - `scripts.py` — pure SLURM/shell string + command builders, job-id minting.
-  - `state.py` — read-only job/reservation state queries over ssh.
-  - `lifecycle.py` — submit/stage/stop/clear/pull job lifecycle.
-  - `viewer.py` — live attach/status/logs rendering.
+  - `transport.py` — ssh/scp primitives, streamed downloads, hashing,
+    generated-cache-filtered code-tar sync, material checks.
+  - `scripts.py` — pure SLURM/shell string + command builders, job-id minting,
+    per-allocation dependency-sync timing.
+  - `state.py` — read-only job/reservation state queries over ssh; live-job
+    discovery joins metadata against one scheduler snapshot.
+  - `lifecycle.py` — submit/stage/stop/clear/pull job lifecycle; checkpoint pulls
+    slim, stream, and clean up through one SSH session per stem.
+  - `viewer.py` — live attach/status/logs rendering; attach reuses one framed
+    SSH stream across refreshes.
   - `cli.py` — argparse wiring and subcommand dispatch.
   Names re-export as import-time snapshots; internal cross-module calls resolve
   through the owning submodule, so tests patch the owner (e.g.
