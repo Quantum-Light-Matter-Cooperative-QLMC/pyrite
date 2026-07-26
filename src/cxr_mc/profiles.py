@@ -248,6 +248,37 @@ def named_profile_stem(material: str, profile: str = "full") -> str:
     )
 
 
+def high_energy_floor_identity(
+    material: str, floor_kev: float, profile: str = "full"
+) -> dict[str, Any]:
+    """Resolve identity for a material/profile pair with its energy_keV grid
+    floored at ``floor_kev`` (mats_to_sim.toml's ``high_energy_materials``
+    convention -- see ``scan._resolved_run``). Mirrors ``named_profile_identity``
+    but for the filtered grid, so remote job orchestration (``_remote/scripts.py``
+    ``_stems``) can predict the same non-canonical stem the runner will write."""
+    # Local import avoids config -> profiles -> config import cycle.
+    from .config import default_settings, material_sweep
+
+    sweep = material_sweep(material, profile=profile)
+    energies = np.asarray(sweep.energy_keV, dtype=float)
+    kept = energies[energies >= floor_kev]
+    if kept.size == 0:
+        raise SystemExit(
+            f"{material}: no energies >= {floor_kev} keV in its grid (high-energy "
+            "floor); lower --high-energy-min-kev or drop this material"
+        )
+    sweep = replace(sweep, energy_keV=kept)
+    return dataset_identity(material, profile, default_settings(profile), sweep)
+
+
+def high_energy_floor_stem(material: str, floor_kev: float, profile: str = "full") -> str:
+    """Checkpoint stem for a high-energy-floored material/profile pair."""
+    return variant_stem(
+        high_energy_floor_identity(material, floor_kev, profile),
+        canonical_full=False,
+    )
+
+
 _VARIANT_STEM_RE = re.compile(
     r"^(?P<material>.+)--(?P<profile>full|survey)-(?P<digest>[0-9a-f]{12})$"
 )

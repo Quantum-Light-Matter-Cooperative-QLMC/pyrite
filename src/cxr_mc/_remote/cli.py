@@ -20,7 +20,7 @@ from .._cli_core import (
     invoke_legacy,
     run,
 )
-from ..scan import load_all_materials
+from ..scan import DEFAULT_HIGH_ENERGY_MIN_KEV, load_all_materials, load_manifest_groups
 from . import config, lifecycle, scripts, state, transport, viewer
 
 
@@ -105,6 +105,57 @@ def _selected_materials(args, attribute):
     if explicit:
         return explicit if isinstance(explicit, list) else [explicit]
     raise SystemExit(f"{args.remote_command} needs material name(s), or use --all")
+
+
+def _start_selected(args):
+    """Resolve ``start``/``submit``'s materials plus a resolved high-energy
+    floor, mirroring ``scan._selected``. Unlike ``scan.py``'s per-material
+    floor map, a queue shares one flags string across every material in the
+    batch, so this returns a single floor (or ``None``); ``--high-energy-min-kev``
+    is a no-op for any queued material outside ``high_energy_materials``, so
+    it is safe to forward blindly."""
+    explicit = list(getattr(args, "materials", None) or [])
+    all_ = getattr(args, "all", False)
+    actually_all = getattr(args, "actually_all", False)
+    high_energy_min_kev = None
+    if all_ or actually_all:
+        if explicit:
+            raise SystemExit(f"{args.remote_command} --all/-A does not take material names")
+        groups = load_manifest_groups(config.MATS_FILE)
+        if actually_all:
+            materials = list(
+                dict.fromkeys(
+                    [
+                        *groups["materials"],
+                        *groups["no_verified_dw"],
+                        *groups["high_energy_materials"],
+                        *groups["materials_to_leave_out"],
+                    ]
+                )
+            )
+            has_high_energy = bool(groups["high_energy_materials"])
+        else:
+            materials = list(groups["materials"])
+            if getattr(args, "include_unverified_dw", False):
+                materials += groups["no_verified_dw"]
+            has_high_energy = False
+            if getattr(args, "include_high_energy", False):
+                materials += groups["high_energy_materials"]
+                has_high_energy = True
+            materials = list(dict.fromkeys(materials))
+        if has_high_energy:
+            floor = getattr(args, "high_energy_min_kev", None)
+            high_energy_min_kev = DEFAULT_HIGH_ENERGY_MIN_KEV if floor is None else floor
+    elif explicit:
+        materials = explicit
+        floor = getattr(args, "high_energy_min_kev", None)
+        if floor is not None:
+            tagged = set(load_manifest_groups(config.MATS_FILE)["high_energy_materials"])
+            if tagged.intersection(materials):
+                high_energy_min_kev = floor
+    else:
+        raise SystemExit(f"{args.remote_command} needs material name(s), or use --all/-A")
+    return materials, high_energy_min_kev
 
 
 def _cli_scan(args):
@@ -271,7 +322,7 @@ def _cli_pull_json(args):
 
 
 def _cli_start(args):
-    materials = _selected_materials(args, "materials")
+    materials, high_energy_min_kev = _start_selected(args)
     jobid = lifecycle.start_queue(
         materials,
         quick=args.quick,
@@ -281,6 +332,7 @@ def _cli_start(args):
         chunk_minutes=args.chunk_minutes,
         no_sync=args.no_sync,
         dry_run=args.dry_run,
+        high_energy_min_kev=high_energy_min_kev,
     )
     if args.follow and not args.dry_run:
         viewer.attach(jobid)
@@ -659,7 +711,46 @@ def reline_command(
     metavar="[MATERIAL]...",
     shell_complete=_cli_completion.complete_material,
 )
-@click.option("-a", "--all", "all_", is_flag=True, help="Queue every configured material.")
+@click.option(
+    "-a", "--all", "all_", is_flag=True, help="Queue mats_to_sim.toml's verified `materials` list."
+)
+@click.option(
+    "-A",
+    "--actually-all",
+    "actually_all",
+    is_flag=True,
+    help=(
+        "Queue every material in mats_to_sim.toml -- materials, no_verified_dw, "
+        "high_energy_materials, and materials_to_leave_out combined. Not "
+        "combined with --all/--include-unverified-dw/--include-high-energy or "
+        "explicit materials."
+    ),
+)
+@click.option(
+    "--include-unverified-dw",
+    is_flag=True,
+    help="With --all, also queue mats_to_sim.toml's no_verified_dw materials.",
+)
+@click.option(
+    "--include-high-energy",
+    is_flag=True,
+    help=(
+        "With --all, also queue mats_to_sim.toml's high_energy_materials, "
+        "filtered to --high-energy-min-kev and above."
+    ),
+)
+@click.option(
+    "--high-energy-min-kev",
+    type=POSITIVE_FLOAT,
+    default=None,
+    metavar="KEV",
+    help=(
+        "Energy floor applied to any queued high_energy_materials member "
+        "[default: 150.0 when selected via --include-high-energy/-A]. With "
+        "explicit MATERIAL(s), applies only to those that are themselves "
+        "high_energy_materials entries; a no-op on every other material."
+    ),
+)
 @click.option(
     "--profile",
     type=click.Choice(("full", "survey")),
@@ -695,6 +786,10 @@ def reline_command(
 def start_command(
     materials,
     all_,
+    actually_all,
+    include_unverified_dw,
+    include_high_energy,
+    high_energy_min_kev,
     profile,
     quick,
     workers,
@@ -705,7 +800,20 @@ def start_command(
     follow,
 ):
     materials = list(materials)
-    _reject_all_with_values("start", all_, materials)
+    if actually_all and materials:
+        raise click.UsageError("start -A/--actually-all does not take material names")
+    if actually_all and all_:
+        raise click.UsageError("start -A/--actually-all already includes --all; drop --all")
+    if actually_all and include_unverified_dw:
+        raise click.UsageError("start -A/--actually-all already includes --include-unverified-dw")
+    if actually_all and include_high_energy:
+        raise click.UsageError("start -A/--actually-all already includes --include-high-energy")
+    if include_unverified_dw and not all_:
+        raise click.UsageError("--include-unverified-dw requires --all")
+    if include_high_energy and not all_:
+        raise click.UsageError("--include-high-energy requires --all")
+    if not actually_all:
+        _reject_all_with_values("start", all_, materials)
     if parallel_materials is not None and chunk_minutes != 0:
         raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
     if quick and profile != "full":
@@ -716,6 +824,10 @@ def start_command(
             "start",
             materials=materials,
             all=all_,
+            actually_all=actually_all,
+            include_unverified_dw=include_unverified_dw,
+            include_high_energy=include_high_energy,
+            high_energy_min_kev=high_energy_min_kev,
             profile=profile,
             quick=quick,
             workers=workers,

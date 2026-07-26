@@ -126,25 +126,45 @@ Usage: cxr scan [OPTIONS] [MATERIAL]
 
   Run one material's MC sweep and write its checkpoint.
 
-  Pass MATERIAL or --all, never both. Resumes compatible checkpoints in CHECKPOINTS.
-  Full writes <material>.pkl-compatible data in <material>/; variants use identity-
-  qualified stems.
+  Pass MATERIAL, --all, or -A/--actually-all, never more than one. --all runs the
+  verified `materials` list, optionally widened with --include-unverified-dw and/or
+  --include-high-energy (floored at --high-energy-min-kev, default 150). -A runs every
+  material in mats_to_sim.toml, no exceptions.
+
+  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-compatible
+  data in <material>/; variants use identity-qualified stems.
 
 Options:
-  -a, --all                Run every material in mats_to_sim.toml; takes no MATERIAL.
-  --workers NUMBER         run_cases max_workers (default auto; 0 = serial, no transport
-                           pool).
-  --profile [full|survey]  Named settings/grid policy. survey is provisional and
-                           reduced.  [default: full]
-  --quick                  Use tiny smoke-test grid and write <material>_quick.pkl.
-  --n-families NUMBER      Override positive dominant reflection-family count.
-  --beam-uvw H K L         Override nonzero integer beam zone axis [uvw].
-  --checkpoint-dir DIR     Read and write checkpoint pickles in DIR.  [default:
-                           checkpoints]
-  --max-minutes MINUTES    Soft wall-clock budget in minutes; exit 75 if resumable work
-                           remains.
-  --json                   Emit one versioned JSON object on stdout.
-  -h, --help               Show this message and exit.
+  -a, --all                  Run mats_to_sim.toml's verified `materials` list; takes no
+                             MATERIAL.
+  -A, --actually-all         Run every material in mats_to_sim.toml -- materials,
+                             no_verified_dw, high_energy_materials, and
+                             materials_to_leave_out combined; takes no MATERIAL. Not
+                             combined with --all/--include-unverified-dw/--include-high-
+                             energy.
+  --include-unverified-dw    With --all, also run mats_to_sim.toml's no_verified_dw
+                             materials.
+  --include-high-energy      With --all, also run mats_to_sim.toml's
+                             high_energy_materials, filtered to --high-energy-min-kev
+                             and above.
+  --high-energy-min-kev KEV  Energy floor applied to any selected high_energy_materials
+                             member [default: 150.0 when selected via --include-high-
+                             energy/-A]. With an explicit MATERIAL, applies only if that
+                             material is itself a high_energy_materials entry; a no-op
+                             on every other material.
+  --workers NUMBER           run_cases max_workers (default auto; 0 = serial, no
+                             transport pool).
+  --profile [full|survey]    Named settings/grid policy. survey is provisional and
+                             reduced.  [default: full]
+  --quick                    Use tiny smoke-test grid and write <material>_quick.pkl.
+  --n-families NUMBER        Override positive dominant reflection-family count.
+  --beam-uvw H K L           Override nonzero integer beam zone axis [uvw].
+  --checkpoint-dir DIR       Read and write checkpoint pickles in DIR.  [default:
+                             checkpoints]
+  --max-minutes MINUTES      Soft wall-clock budget in minutes; exit 75 if resumable
+                             work remains.
+  --json                     Emit one versioned JSON object on stdout.
+  -h, --help                 Show this message and exit.
 ```
 
 ## `cxr blaze`
@@ -666,19 +686,34 @@ Usage: cxr remote submit [OPTIONS] [MATERIAL]...
   Sync code and submit a detached SLURM material queue.
 
 Options:
-  -a, --all                Queue every configured material.
-  --profile [full|survey]  Named settings/grid policy. survey is provisional and
-                           reduced.  [default: full]
-  --quick                  Use tiny smoke-test grid.
-  --workers NUMBER         Transport workers (default: auto; 0 runs serially).
-  --parallel-materials N   Simultaneous scans in one allocation; requires --chunk-
-                           minutes 0.  [1<=x<=4]
-  --chunk-minutes NUMBER   Self-resubmitting SLURM slice length; 0 runs one monolithic
-                           job.  [default: 10.0]
-  --no-sync                Skip code upload.
-  --dry-run                Print submission preview; do not connect.
-  -f, --follow             Track job after launch.
-  -h, --help               Show this message and exit.
+  -a, --all                  Queue mats_to_sim.toml's verified `materials` list.
+  -A, --actually-all         Queue every material in mats_to_sim.toml -- materials,
+                             no_verified_dw, high_energy_materials, and
+                             materials_to_leave_out combined. Not combined with
+                             --all/--include-unverified-dw/--include-high-energy or
+                             explicit materials.
+  --include-unverified-dw    With --all, also queue mats_to_sim.toml's no_verified_dw
+                             materials.
+  --include-high-energy      With --all, also queue mats_to_sim.toml's
+                             high_energy_materials, filtered to --high-energy-min-kev
+                             and above.
+  --high-energy-min-kev KEV  Energy floor applied to any queued high_energy_materials
+                             member [default: 150.0 when selected via --include-high-
+                             energy/-A]. With explicit MATERIAL(s), applies only to
+                             those that are themselves high_energy_materials entries; a
+                             no-op on every other material.
+  --profile [full|survey]    Named settings/grid policy. survey is provisional and
+                             reduced.  [default: full]
+  --quick                    Use tiny smoke-test grid.
+  --workers NUMBER           Transport workers (default: auto; 0 runs serially).
+  --parallel-materials N     Simultaneous scans in one allocation; requires --chunk-
+                             minutes 0.  [1<=x<=4]
+  --chunk-minutes NUMBER     Self-resubmitting SLURM slice length; 0 runs one monolithic
+                             job.  [default: 10.0]
+  --no-sync                  Skip code upload.
+  --dry-run                  Print submission preview; do not connect.
+  -f, --follow               Track job after launch.
+  -h, --help                 Show this message and exit.
 ```
 
 ## `cxr remote sync`

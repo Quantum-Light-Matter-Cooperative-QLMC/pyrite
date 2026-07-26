@@ -64,6 +64,7 @@ def test_start_click_defaults_and_zero_meanings(monkeypatch):
                 "chunk_minutes": 10.0,
                 "no_sync": False,
                 "dry_run": False,
+                "high_energy_min_kev": None,
             },
         )
     ]

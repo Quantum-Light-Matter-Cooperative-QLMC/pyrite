@@ -624,6 +624,67 @@ def test_cli_start_chunk_flags(monkeypatch, capsys):
     )  # illegal: chunked default
 
 
+@pytest.mark.parametrize(
+    ("argv", "message"),
+    [
+        (["start", "hopg", "-A", "--dry-run"], "-A/--actually-all does not take"),
+        (["start", "-A", "--all", "--dry-run"], "already includes --all"),
+        (
+            ["start", "-A", "--include-unverified-dw", "--dry-run"],
+            "already includes --include-unverified-dw",
+        ),
+        (
+            ["start", "-A", "--include-high-energy", "--dry-run"],
+            "already includes --include-high-energy",
+        ),
+        (
+            ["start", "--include-unverified-dw", "--dry-run"],
+            "--include-unverified-dw requires --all",
+        ),
+        (["start", "--include-high-energy", "--dry-run"], "--include-high-energy requires --all"),
+    ],
+)
+def test_start_selection_flag_usage_errors(argv, message, capsys):
+    assert remote.main(argv) == 2
+    assert message in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("argv", "expected_len"),
+    [
+        (["start", "--all", "--dry-run"], 21),
+        (["start", "--all", "--include-unverified-dw", "--dry-run"], 30),
+        (["start", "--all", "--include-high-energy", "--dry-run"], 25),
+        (["start", "-A", "--dry-run"], 46),
+    ],
+)
+def test_start_selection_flags_resolve_expected_material_counts(argv, expected_len, capsys):
+    remote.main(argv)
+    first_line = capsys.readouterr().out.splitlines()[0]
+    materials = first_line.split(":", 1)[1].strip().split()
+    assert len(materials) == expected_len
+    assert len(materials) == len(set(materials))
+
+
+def test_start_include_high_energy_floors_flags_and_stems(capsys):
+    remote.main(["start", "--all", "--include-high-energy", "--dry-run"])
+    out = capsys.readouterr().out
+    scan_lines = [line for line in out.splitlines() if "_entry.scan" in line]
+    assert scan_lines and all("--high-energy-min-kev 150.0" in line for line in scan_lines)
+    assert "RESERVATIONS/hopg/jobid" in out  # untagged material: canonical stem
+    assert "RESERVATIONS/tise2/jobid" not in out  # tagged: floored, non-canonical stem
+    assert any(line.startswith('  if [ "$(cat "$RESERVATIONS/tise2--') for line in out.splitlines())
+
+
+def test_start_direct_material_floor_is_no_op_unless_high_energy_tagged(capsys):
+    remote.main(["start", "tise2", "hopg", "--high-energy-min-kev", "200", "--dry-run"])
+    out = capsys.readouterr().out
+    scan_lines = [line for line in out.splitlines() if "_entry.scan" in line]
+    assert scan_lines and all("--high-energy-min-kev 200.0" in line for line in scan_lines)
+    assert "RESERVATIONS/hopg/jobid" in out
+    assert any(line.startswith('  if [ "$(cat "$RESERVATIONS/tise2--') for line in out.splitlines())
+
+
 def test_start_writes_static_metadata_before_sbatch(monkeypatch):
     uploads = []
     submissions = []

@@ -64,6 +64,10 @@ def test_scan_click_dispatches_defaults_and_zero_workers(monkeypatch):
     assert seen == {
         "material": "hopg",
         "all": False,
+        "actually_all": False,
+        "include_unverified_dw": False,
+        "include_high_energy": False,
+        "high_energy_min_kev": None,
         "workers": 0,
         "profile": "full",
         "quick": False,
@@ -260,6 +264,16 @@ def test_slim_dataset_modes_are_mutually_exclusive():
     [
         (scan.command, [], "needs a material"),
         (scan.command, ["hopg", "--all"], "--all does not take"),
+        (scan.command, ["hopg", "-A"], "-A/--actually-all does not take"),
+        (scan.command, ["--all", "-A"], "already includes --all"),
+        (
+            scan.command,
+            ["-A", "--include-unverified-dw"],
+            "already includes --include-unverified-dw",
+        ),
+        (scan.command, ["-A", "--include-high-energy"], "already includes --include-high-energy"),
+        (scan.command, ["--include-unverified-dw"], "--include-unverified-dw requires --all"),
+        (scan.command, ["--include-high-energy"], "--include-high-energy requires --all"),
         (rebrem.command, [], "needs material"),
         (reline.command, ["hopg", "--all"], "--all does not take"),
         (analyze.command, ["--default"], "--default requires MATERIAL"),
@@ -272,6 +286,88 @@ def test_local_selection_errors_fail_at_click_boundary(command, argv, message):
     assert result.exit_code == 2
     assert result.stdout == ""
     assert message in result.stderr
+
+
+def test_scan_all_include_flags_dispatch(monkeypatch):
+    seen = _capture(monkeypatch, scan, "run")
+    result = invoke(
+        scan.command,
+        [
+            "--all",
+            "--include-unverified-dw",
+            "--include-high-energy",
+            "--high-energy-min-kev",
+            "200",
+        ],
+    )
+    assert_clean_result(result)
+    assert seen["all"] is True
+    assert seen["include_unverified_dw"] is True
+    assert seen["include_high_energy"] is True
+    assert seen["high_energy_min_kev"] == 200.0
+
+
+def test_scan_actually_all_dispatch(monkeypatch):
+    seen = _capture(monkeypatch, scan, "run")
+    result = invoke(scan.command, ["-A"])
+    assert_clean_result(result)
+    assert seen["actually_all"] is True
+    assert seen["all"] is False
+
+
+@pytest.mark.parametrize(
+    ("argv", "expected_len"),
+    [
+        (["--all"], 21),
+        (["--all", "--include-unverified-dw"], 30),
+        (["--all", "--include-high-energy"], 25),
+        (["--all", "--include-unverified-dw", "--include-high-energy"], 34),
+        (["-A"], 46),
+    ],
+)
+def test_scan_selection_flags_resolve_expected_material_counts(monkeypatch, argv, expected_len):
+    seen = {}
+
+    def fake_run(args):
+        seen["materials"] = scan._selected(args)
+
+    monkeypatch.setattr(scan, "run", fake_run)
+    result = invoke(scan.command, argv)
+    assert_clean_result(result)
+    assert len(seen["materials"]) == expected_len
+    assert len(seen["materials"]) == len(set(seen["materials"]))
+
+
+def test_scan_include_high_energy_floors_energy_grid(monkeypatch):
+    seen = {}
+
+    def fake_run(args):
+        scan._selected(args)
+        seen["floor_map"] = args.high_energy_floor_map
+
+    monkeypatch.setattr(scan, "run", fake_run)
+    result = invoke(scan.command, ["--all", "--include-high-energy"])
+    assert_clean_result(result)
+    assert set(seen["floor_map"]) == {"tise2", "gep", "ges", "rese2"}
+    assert all(value == 150.0 for value in seen["floor_map"].values())
+
+
+def test_scan_direct_material_ignores_floor_unless_high_energy_tagged(monkeypatch):
+    seen = {}
+
+    def fake_run(args):
+        seen["materials"] = scan._selected(args)
+        seen["floor_map"] = dict(args.high_energy_floor_map)
+
+    monkeypatch.setattr(scan, "run", fake_run)
+
+    tagged = invoke(scan.command, ["tise2", "--high-energy-min-kev", "200"])
+    assert_clean_result(tagged)
+    assert seen["floor_map"] == {"tise2": 200.0}
+
+    untagged = invoke(scan.command, ["hopg", "--high-energy-min-kev", "200"])
+    assert_clean_result(untagged)
+    assert seen["floor_map"] == {}
 
 
 def test_standalone_click_usage_error_preserves_exit_and_streams():

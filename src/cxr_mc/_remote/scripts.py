@@ -8,16 +8,32 @@ from . import config, transport
 
 
 # ---- detached job queue -------------------------------------------------------
-def _stems(materials, quick, profile="full"):
+def _stems(materials, quick, profile="full", high_energy_min_kev=None):
     """Checkpoint stems a queue produces (the scan runner writes
-    <material>_quick.pkl for --quick runs)."""
+    <material>_quick.pkl for --quick runs). ``high_energy_min_kev`` predicts the
+    non-canonical stem for any material in mats_to_sim.toml's
+    high_energy_materials list (a no-op stem-wise for every other material)."""
     if quick:
         return [f"{m}_quick" for m in materials]
-    if profile == "full":
-        return list(materials)
-    from ..profiles import named_profile_stem
+    if high_energy_min_kev is None:
+        if profile == "full":
+            return list(materials)
+        from ..profiles import named_profile_stem
 
-    return [named_profile_stem(material, profile) for material in materials]
+        return [named_profile_stem(material, profile) for material in materials]
+    from ..profiles import high_energy_floor_stem, named_profile_stem
+    from ..scan import load_manifest_groups
+
+    tagged = set(load_manifest_groups(config.MATS_FILE).get("high_energy_materials", []))
+    stems = []
+    for material in materials:
+        if material in tagged:
+            stems.append(high_energy_floor_stem(material, high_energy_min_kev, profile))
+        elif profile == "full":
+            stems.append(material)
+        else:
+            stems.append(named_profile_stem(material, profile))
+    return stems
 
 
 def _new_jobid() -> str:
@@ -59,6 +75,7 @@ def _queue_script(
     workers,
     parallel_materials=config.DEFAULT_PARALLEL_MATERIALS,
     profile="full",
+    high_energy_min_kev=None,
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
     parallel_materials = _validate_parallel_materials(parallel_materials)
@@ -69,6 +86,8 @@ def _queue_script(
         flags += f" --profile {profile}"
     if workers is not None:
         flags += f" --workers {workers}"
+    if high_energy_min_kev is not None:
+        flags += f" --high-energy-min-kev {high_energy_min_kev}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -122,7 +141,9 @@ fi
 """
 
 
-def _chunked_queue_script(jobid, materials, quick, workers, chunk_minutes, profile="full"):
+def _chunked_queue_script(
+    jobid, materials, quick, workers, chunk_minutes, profile="full", high_energy_min_kev=None
+):
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
 
     Reused verbatim by every slice: it resumes from checkpoint, does about
@@ -139,6 +160,8 @@ def _chunked_queue_script(jobid, materials, quick, workers, chunk_minutes, profi
         flags += f" --profile {profile}"
     if workers is not None:
         flags += f" --workers {workers}"
+    if high_energy_min_kev is not None:
+        flags += f" --high-energy-min-kev {high_energy_min_kev}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
@@ -752,6 +775,7 @@ def _queue_metadata(
     parallel_materials: int | None = config.DEFAULT_PARALLEL_MATERIALS,
     chunk_minutes: float = 0,
     profile: str = "full",
+    high_energy_min_kev: float | None = None,
 ):
     """Static metadata persisted before a queue becomes visible to SLURM."""
     return "\n".join(
@@ -763,6 +787,7 @@ def _queue_metadata(
             f"workers: {workers}",
             f"parallel_materials: {parallel_materials}",
             f"chunk_minutes: {chunk_minutes}",
+            f"high_energy_min_kev: {high_energy_min_kev}",
             "progress_dashboard: True",
             "",
         ]

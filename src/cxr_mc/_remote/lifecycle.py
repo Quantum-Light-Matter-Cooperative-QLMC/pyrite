@@ -178,6 +178,7 @@ def start_queue(
     parallel_materials=None,
     chunk_minutes=10.0,
     profile="full",
+    high_energy_min_kev=None,
 ):
     """Submit a material queue to SLURM. Returns its job id.
 
@@ -187,6 +188,11 @@ def start_queue(
     users of the single-GPU box get priority at every slice boundary. Pass
     ``chunk_minutes=0`` for the original monolithic allocation, which is the
     only mode that accepts ``parallel_materials``.
+
+    ``high_energy_min_kev`` forwards ``--high-energy-min-kev`` to every
+    material's remote ``cxr scan`` invocation; it is a no-op there for any
+    material outside mats_to_sim.toml's ``high_energy_materials``, so one
+    shared value is safe across a mixed batch.
     """
     transport._check_materials(materials)
     chunked = chunk_minutes > 0
@@ -199,11 +205,11 @@ def start_queue(
         _refuse_if_busy(materials, quick)
     jobid = scripts._new_jobid()
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
-    stems = scripts._stems(materials, quick, profile)
+    stems = scripts._stems(materials, quick, profile, high_energy_min_kev)
     if chunked:
         parallel_materials = None
         payload = scripts._chunked_queue_script(
-            jobid, materials, quick, workers, chunk_minutes, profile
+            jobid, materials, quick, workers, chunk_minutes, profile, high_energy_min_kev
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
     else:
@@ -211,7 +217,7 @@ def start_queue(
             config.DEFAULT_PARALLEL_MATERIALS if parallel_materials is None else parallel_materials
         )
         payload = scripts._queue_script(
-            jobid, materials, quick, workers, parallel_materials, profile
+            jobid, materials, quick, workers, parallel_materials, profile, high_energy_min_kev
         )
         time_limit = config.SLURM_TIME
     script = scripts._slurm_batch_script(
@@ -220,7 +226,14 @@ def start_queue(
     upload = scripts._write_job_script_command(
         jobdir,
         scripts._queue_metadata(
-            jobid, materials, quick, workers, parallel_materials, chunk_minutes, profile
+            jobid,
+            materials,
+            quick,
+            workers,
+            parallel_materials,
+            chunk_minutes,
+            profile,
+            high_energy_min_kev,
         ),
     )
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)

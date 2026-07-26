@@ -173,17 +173,19 @@ def _mode_summary(metadata):
     if "quick" not in fields:
         return "unspecified"
     speed = "quick" if fields.get("quick") == "True" else "standard"
+    floor = fields.get("high_energy_min_kev")
+    floor_suffix = f" · high-energy floor {floor} keV" if floor not in (None, "None") else ""
     if "chunk_minutes" not in fields and "parallel_materials" not in fields:
-        return speed
+        return speed + floor_suffix
     try:
         chunk_minutes = float(fields.get("chunk_minutes", "0"))
     except ValueError:
         chunk_minutes = 0
     if chunk_minutes > 0:
-        return f"{speed} · chunked into {chunk_minutes:g} min slices"
+        return f"{speed} · chunked into {chunk_minutes:g} min slices{floor_suffix}"
     parallel = fields.get("parallel_materials")
     suffix = f" · {parallel} materials at once" if parallel not in {None, "None"} else ""
-    return f"{speed} · monolithic{suffix}"
+    return f"{speed} · monolithic{suffix}{floor_suffix}"
 
 
 def _material_label(material):
