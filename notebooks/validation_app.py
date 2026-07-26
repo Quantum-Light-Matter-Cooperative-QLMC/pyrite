@@ -30,13 +30,25 @@ def _():
     import anchor_figures as af
 
     def run_checks(filenames, force_cpu):
-        """Run selected standalone checks and retain their complete console reports."""
+        """Run selected standalone checks and retain their complete console reports.
+
+        The Dans_Diffraction oracle is a non-default `uv` dependency group, so
+        its check always launches through `uv run --group oracle`: that syncs
+        the pinned dependency into the shared venv on demand, regardless of
+        whether a plain `uv sync`/`uv run` (which does not include optional
+        groups) most recently stripped it back out.
+        """
         reports = []
         for filename in filenames:
             path = checks_dir / filename
+            interpreter = (
+                ["uv", "run", "--group", "oracle", "python"]
+                if filename == "dans_diffraction_oracle.py"
+                else [sys.executable]
+            )
             if force_cpu:
                 command = [
-                    sys.executable,
+                    *interpreter,
                     "-c",
                     (
                         "import pathlib,runpy,sys;"
@@ -47,7 +59,7 @@ def _():
                     str(path),
                 ]
             else:
-                command = [sys.executable, str(path)]
+                command = [*interpreter, str(path)]
             started = time.perf_counter()
             completed = subprocess.run(
                 command,

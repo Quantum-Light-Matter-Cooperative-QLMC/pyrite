@@ -924,7 +924,7 @@ def figure_spectra(anchor: ZhaiAnchor, model: dict, reference: dict | None = Non
             ax.plot(
                 anchor.E_grid,
                 model["film"]["spec_det"] * scale,
-                "k-",
+                "c-",
                 lw=1.0,
                 label=f"{model['film']['E0_keV']:g} keV, 29 nm film",
             )
@@ -1013,7 +1013,7 @@ def figure_enhancement(anchor: ZhaiAnchor, model: dict):
 
     fig, ax = plt.subplots(figsize=(7, 5))
     ax.plot(anchor.E_grid, bulk, color="C0", label=f"{E0:g} keV, 1 mm bulk")
-    ax.plot(anchor.E_grid, film, color="k", label=f"{E0:g} keV, 29 nm film")
+    ax.plot(anchor.E_grid, film, color="C1", label=f"{E0:g} keV, 29 nm film")
     ax.axvline(E_line, color="C3", ls=":", lw=1.2, alpha=0.7, label="Eq.(10) line energy")
     ax.set_xlabel("Photon energy (eV)")
     ax.set_ylabel("Intensity (Phs/eV/s/nA)")
