@@ -29,7 +29,10 @@ def reline_checkpoints(
     materials=None,
     checkpoint_dir="checkpoints",
     line_ne=None,
+    line_start_eV=None,
+    line_stop_eV=None,
     line_step_eV=None,
+    profile=None,
     from_config=True,
     redo_all=False,
     save_every=100,
@@ -69,6 +72,11 @@ def reline_checkpoints(
     for path in paths:
         stem = Path(path).stem if str(path).endswith(".pkl") else Path(path).name
         print(f"== {stem} ==")
+        resolved_ne = line_ne
+        if profile is not None and resolved_ne is None:
+            from .recompute_defaults import settings
+
+            resolved_ne = settings(profile).n_electrons
         kw = {}
         if progress_file is not None:
             from .scan import _write_progress_record
@@ -87,17 +95,26 @@ def reline_checkpoints(
             _write_progress_record(progress_file, material=stem, state="running", **latest)
         max_seconds = None if deadline is None else max(0.0, deadline - time.monotonic())
         status = {}
+        recompute_options = {
+            "line_ne": resolved_ne,
+            "line_step_eV": line_step_eV,
+            "from_config": from_config,
+            "redo_all": redo_all,
+        }
+        if line_start_eV is not None:
+            recompute_options["line_start_eV"] = line_start_eV
+        if line_stop_eV is not None:
+            recompute_options["line_stop_eV"] = line_stop_eV
+        if profile is not None:
+            recompute_options["profile"] = profile
         try:
             out[stem] = reline_checkpoint(
                 path,
                 material=stem,
                 save_every=save_every,
-                line_ne=line_ne,
-                line_step_eV=line_step_eV,
-                from_config=from_config,
-                redo_all=redo_all,
                 max_seconds=max_seconds,
                 status=status,
+                **recompute_options,
                 **kw,
             )
         except BaseException as exc:
@@ -129,7 +146,10 @@ def _cli(args):
         materials=args.material or None,
         checkpoint_dir=args.checkpoint_dir,
         line_ne=args.line_ne,
+        line_start_eV=getattr(args, "start", None),
+        line_stop_eV=getattr(args, "stop", None),
         line_step_eV=args.line_step,
+        profile=getattr(args, "profile", None),
         redo_all=args.redo_all,
         save_every=args.save_every,
         progress_file=args.progress_file,
@@ -156,7 +176,10 @@ def _cli_json(args):
                 materials=args.material or None,
                 checkpoint_dir=args.checkpoint_dir,
                 line_ne=args.line_ne,
+                line_start_eV=getattr(args, "start", None),
+                line_stop_eV=getattr(args, "stop", None),
                 line_step_eV=args.line_step,
+                profile=getattr(args, "profile", None),
                 redo_all=args.redo_all,
                 save_every=args.save_every,
                 progress_file=args.progress_file,
@@ -206,18 +229,39 @@ def _cli_json(args):
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
 @click.option(
+    "--profile",
+    type=click.Choice(("full", "survey")),
+    default="full",
+    show_default=True,
+    help="Named sweep profile supplying omitted grid and electron defaults.",
+)
+@click.option(
     "--line-ne",
     type=_cli_core.POSITIVE_INT,
     default=None,
     metavar="N",
-    help="Line-spectrum electron count; omit to use checkpoint settings.",
+    help="Line-spectrum electron count; overrides profile default.",
+)
+@click.option(
+    "--start",
+    type=_cli_core.NONNEGATIVE_FLOAT,
+    default=None,
+    metavar="EV",
+    help="Line-grid lower bound in eV; overrides profile.",
+)
+@click.option(
+    "--stop",
+    type=_cli_core.POSITIVE_FLOAT,
+    default=None,
+    metavar="EV",
+    help="Line-grid exclusive upper bound in eV; overrides profile.",
 )
 @click.option(
     "--line-step",
     type=_cli_core.POSITIVE_FLOAT,
     default=None,
     metavar="EV",
-    help="Uniform line-grid spacing in eV; omit to use material grid.",
+    help="Uniform line-grid spacing in eV; overrides profile grid.",
 )
 @click.option("--redo-all", is_flag=True, help="Recompute records already at target.")
 @click.option(
@@ -241,7 +285,10 @@ def _cli_json(args):
 def command(
     materials,
     all_,
+    profile,
     line_ne,
+    start,
+    stop,
     line_step,
     redo_all,
     checkpoint_dir,
@@ -254,12 +301,17 @@ def command(
         raise click.UsageError("reline --all does not take material names")
     if not all_ and not materials:
         raise click.UsageError("reline needs material name(s), or use --all")
+    if start is not None and stop is not None and stop <= start:
+        raise click.UsageError("reline --stop must be greater than --start")
     handler = _cli_json if json_output else _cli
     return _cli_core.invoke_legacy(
         handler,
         material=list(materials),
         all=all_,
+        profile=profile,
         line_ne=line_ne,
+        start=start,
+        stop=stop,
         line_step=line_step,
         redo_all=redo_all,
         checkpoint_dir=checkpoint_dir,

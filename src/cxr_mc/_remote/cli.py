@@ -158,7 +158,10 @@ def _cli_rebrem(args):
     materials = _selected_materials(args, "material")
     jobid = lifecycle.start_rebrem_queue(
         materials,
+        profile=getattr(args, "profile", "full"),
         ne_brem=args.ne_brem,
+        brem_start_eV=getattr(args, "start", None),
+        brem_stop_eV=getattr(args, "stop", None),
         brem_step_eV=args.step,
         redo_all=args.redo_all,
         no_sync=args.no_sync,
@@ -187,7 +190,10 @@ def _cli_reline(args):
     materials = _selected_materials(args, "material")
     jobid = lifecycle.start_reline_queue(
         materials,
+        profile=getattr(args, "profile", "full"),
         line_ne=args.line_ne,
+        line_start_eV=getattr(args, "start", None),
+        line_stop_eV=getattr(args, "stop", None),
         line_step_eV=args.line_step,
         redo_all=args.redo_all,
         no_sync=args.no_sync,
@@ -542,27 +548,44 @@ def _recompute_options(function):
     help="Recompute brem-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
+@click.option(
+    "--profile",
+    type=click.Choice(("full", "survey")),
+    default="full",
+    show_default=True,
+    help="Named sweep profile supplying omitted grid and electron defaults.",
+)
 @click.option("--ne-brem", type=POSITIVE_INT, default=None, help="New brem electron count.")
+@click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Brem lower bound in eV.")
+@click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Brem exclusive upper bound in eV.")
 @click.option("--step", type=POSITIVE_FLOAT, default=None, help="Wide-brem grid spacing in eV.")
 def rebrem_command(
     material,
     all_,
+    profile,
     redo_all,
     dry_run,
     no_sync,
     chunk_minutes,
     ne_brem,
+    start,
+    stop,
     step,
 ):
     materials = list(material)
     _reject_all_with_values("rebrem", all_, materials)
+    if start is not None and stop is not None and stop <= start:
+        raise click.UsageError("rebrem --stop must be greater than --start")
     return _invoke_click(
         _cli_rebrem,
         _click_args(
             "rebrem",
             material=materials,
             all=all_,
+            profile=profile,
             ne_brem=ne_brem,
+            start=start,
+            stop=stop,
             step=step,
             redo_all=redo_all,
             chunk_minutes=chunk_minutes,
@@ -577,7 +600,16 @@ def rebrem_command(
     help="Recompute line-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
+@click.option(
+    "--profile",
+    type=click.Choice(("full", "survey")),
+    default="full",
+    show_default=True,
+    help="Named sweep profile supplying omitted grid and electron defaults.",
+)
 @click.option("--line-ne", type=POSITIVE_INT, default=None, help="New line electron count.")
+@click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Line lower bound in eV.")
+@click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Line exclusive upper bound in eV.")
 @click.option(
     "--line-step",
     type=POSITIVE_FLOAT,
@@ -587,22 +619,30 @@ def rebrem_command(
 def reline_command(
     material,
     all_,
+    profile,
     redo_all,
     dry_run,
     no_sync,
     chunk_minutes,
     line_ne,
+    start,
+    stop,
     line_step,
 ):
     materials = list(material)
     _reject_all_with_values("reline", all_, materials)
+    if start is not None and stop is not None and stop <= start:
+        raise click.UsageError("reline --stop must be greater than --start")
     return _invoke_click(
         _cli_reline,
         _click_args(
             "reline",
             material=materials,
             all=all_,
+            profile=profile,
             line_ne=line_ne,
+            start=start,
+            stop=stop,
             line_step=line_step,
             redo_all=redo_all,
             chunk_minutes=chunk_minutes,
