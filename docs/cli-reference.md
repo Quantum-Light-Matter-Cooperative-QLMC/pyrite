@@ -45,6 +45,7 @@ Commands below are authoritative for this version.
 - `cxr blaze` — Run one material's blazed-crystal MC sweep and write its checkpoint.
 - `cxr export` — Render notebooks/analysis_app.py to static HTML.
 - `cxr analyze` — Launch notebooks/analysis_app.py with marimo run or edit.
+- `cxr viewer` — Launch notebooks/trace_app.py with marimo run or edit.
 - `cxr validate` — Launch notebooks/validation_app.py, or export its cached validation figures.
 - `cxr catalog` — Inspect and validate material-catalog configuration.
   - `cxr catalog validate` — Validate bundled material catalog or an explicit full catalog TOML.
@@ -112,6 +113,7 @@ Commands:
   blaze       Run a grooved-crystal sweep and write a checkpoint.
   export      Export the analysis app as static HTML.
   analyze     Launch the analysis app.
+  viewer      Launch the 3D trajectory visualization app.
   validate    Launch validation or export cached validation figures.
   catalog     Inspect and validate material-catalog configuration.
   checkpoint  Inspect, transform, recompute, and archive checkpoints.
@@ -210,6 +212,29 @@ Options:
 Usage: cxr analyze [OPTIONS] [MATERIAL]
 
   Launch notebooks/analysis_app.py with marimo run or edit.
+
+  MATERIAL overrides the persisted default for this run. --persist-default stores it for
+  later no-argument launches.
+
+Options:
+  -d, --default  Persist MATERIAL as default for future no-argument runs.
+  --watch        Reload app when source files change.
+  --smoke        Execute app once headlessly and exit.
+  --edit         Use `marimo edit` instead of `marimo run`.
+  --acp          Start local Claude and Codex ACP bridges.
+  --tunnel       Bind fixed port for SSH tunneling.
+  --no-token     Disable marimo auth token.
+  -h, --help     Show this message and exit.
+```
+
+## `cxr viewer`
+
+```text
+Usage: cxr viewer [OPTIONS] [MATERIAL]
+
+  Launch notebooks/trace_app.py with marimo run or edit.
+
+  3D trajectory and crystal structure visualization.
 
   MATERIAL overrides the persisted default for this run. --persist-default stores it for
   later no-argument launches.
