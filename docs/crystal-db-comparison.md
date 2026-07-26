@@ -1,10 +1,5 @@
 # Crystal database comparison — external-DB cross-check
 
-Scoped design note for `issue_notes.md` item #2: *"add tests comparing local
-database crystal parameters to external database (use `crystals` library methods
-with selectable database from their log — select most reputable/complete for
-default)."*
-
 ## Goal
 
 Guard the local crystal catalog against silent drift and transcription error by
@@ -29,21 +24,21 @@ databases don't ship isotropic B, so those still need a literature/temperature
 source and a separate check. The two notes look linked but aren't; treating this
 test as DW coverage would give a false sense of safety.
 
-## External database options (`crystals` methods)
+## External database options
 
 | Method | Database | Key needed | Verdict |
 |---|---|---|---|
 | `Crystal.from_database(name)` | 87 vendored builtins, mostly elements | no | **Unusable.** Overlaps our set only on `diamond` / `Si` / `SiC`; none of the ~40 layered TMDs are present. |
 | `Crystal.from_cod(num)` | Crystallography Open Database, per-ID | no | **Recommended default.** Live fetch verified; `from_cod(2004955)` (PdTe₂) reproduced local `(4.024, 4.024, 5.113, 90, 90, 120)` exactly. |
-| `Crystal.from_mp(query, api_key)` | Materials Project | **yes** | Secondary. DFT-relaxed cells carry a systematic ~1–2 % offset vs experiment; API key is a CI-secret burden. Use only for the MP-sourced entries. |
+| `mp_api.client.MPRester.get_structure_by_material_id(...)` | Materials Project | **yes** | Secondary. DFT relaxation, especially along layered c axes, can exceed 2%; use for MP-sourced entries, but keep geometry validation provenance-specific. |
 
 "Most reputable/complete default" → **COD**, with MP as fallback for entries
 whose provenance is an `mp-…` id.
 
-## Blocker: external IDs are only in free-text comments
+## Original blocker: external IDs were only in free-text comments
 
-`from_cod` needs a numeric COD id — **there is no formula search**. Today the ids
-live only in CIF header comments, not as structured fields:
+`from_cod` needs a numeric COD id — it has no formula-search mode. At design
+time, known ids lived only in CIF header comments, not as structured fields:
 
 - 16 CIFs cite a `COD …` id (e.g. `pdte2`, `fete`, `gese2`, `wte2`, `zrte3`, …)
 - 7 CIFs cite an `mp-…` id (`mose2`, `wse2`, `pts2`, `res2`, `pdse2`, `hfte2`, `gese2`)
@@ -72,15 +67,20 @@ guessed.
 
 ## Implementation (delivered)
 
-Built on branch `feat/crystal-db-crosscheck`.
+Implementation status: structure provenance, external identifiers, and
+cross-database validation recorded below.
 
 - **Structured ids + metadata.** Each `[crystals.*]` block gained optional
   `cod_id` / `mp_id`, plus a `full_name` and (for polytypic phases) `phase`
   field. All four surface on `CrystalSpec` (`materials/catalog.py`). Parser
   keeps them optional so inline test fixtures need no change; a shipped-catalog
-  test enforces `full_name` on every entry. Coverage: **15 COD + 7 MP = 22**
-  of 48 crystals carry an external id (the rest lack a machine-readable one —
-  research follow-up per the blocker above).
+  test enforces `full_name` on every entry. Coverage: **35 COD ids and 7 MP
+  ids across 39 of 48 crystals** (three entries carry both). Twenty COD records
+  were recovered or selected by matching composition, phase, provenance, and
+  all six lattice parameters within the COD tolerance, then re-fetched through
+  `Crystal.from_cod`. Nine entries remain
+  without a defensible match: `mote2_product`, `4h_sic`, `ptbi2`, `hfs2`,
+  `hfse2`, `zrse2`, `nbs2`, `nbse2`, and `zrte5`.
 - **Cache is lattice JSON, not CIF.** Deviation from step 2: the comparison is
   geometry-only, and `crystals.Crystal.to_cif` needs an spglib symmetry pass
   that fails on several low-symmetry layered cells (NbTe₂, VTe₂, ReSe₂, …).
@@ -89,10 +89,39 @@ Built on branch `feat/crystal-db-crosscheck`.
   offline by construction. Basis diff is deferred (would need the full CIF).
 - **Tolerances** as specified: `1e-2 Å` / `0.1°` for COD; `2 %` relative
   length / `1°` angle for MP.
-- **Regeneration.** `scripts/refresh_external_cif.py` re-fetches and rewrites
-  the JSON. The `@pytest.mark.online` test in
-  `tests/test_crystal_external_db.py` diffs local vs a live fetch; both are
-  gated on `CXR_ONLINE_TESTS=1` and skip MP entries when `MP_API_KEY` is unset.
+- **MP live audit.** With `mp-api` 0.46.4 against MP database 2026.04.13,
+  all seven pinned MP ids resolve. None of their current final relaxed cells
+  satisfy the 2% full-cell tolerance. Searching each record's pre-relaxation
+  structures recovers an exact match for `hfte2`; `gese2`, `mose2`, `pdse2`,
+  `pts2`, `res2`, and `wse2` still exceed tolerance. Their ids remain valid
+  provenance pointers, but those six are not geometry-validated.
+- **Provenance resolution for MP mismatches.**
+  - `mose2`: retained Bronsema's 1986 single-crystal refinement
+    (doi:10.1002/zaac.19865400904), which exactly supplies the local
+    `a=3.289`, `c=12.927` A and Se `z=0.6210`; MP is only a pointer.
+  - `pdse2`: replaced the coarse 1957/MP geometry with Soulard et al.'s 2004
+    room-temperature single-crystal refinement, COD 4310736
+    (doi:10.1021/ic0352396).
+  - `pts2`: replaced the JARVIS/MP relaxation with Furuseth et al.'s 1965
+    experimental redetermination, COD 1537200.
+  - `wse2`: pinned Schutte et al.'s 1987 single-crystal refinement,
+    COD 9012193 (doi:10.1016/0022-4596(87)90057-0); local geometry already
+    matched it.
+  - `res2`: Lamfers et al.'s 1996 doubled-cell single-crystal refinement
+    (doi:10.1016/0925-8388(96)02313-4) is more authoritative than the bundled
+    MP relaxation, but neither COD nor another openly licensed source provides
+    its full fractional basis. The local internally consistent MP structure is
+    retained; mixing Lamfers lattice constants with MP coordinates would not
+    reproduce either structure.
+  - `gese2`: deferred at user request. Current MP data do not reproduce the
+    historical experimental initial cell or its documented setting transform,
+    so geometry validation fails. Local source remains Dittmar & Schaefer
+    (1976), doi:10.1107/S0567740876008704.
+- **Regeneration.** `scripts/refresh_external_cif.py` re-fetches COD and
+  rewrites the JSON. The `@pytest.mark.online` test in
+  `tests/test_crystal_external_db.py` diffs local vs a live fetch and is gated
+  on `CXR_ONLINE_TESTS=1`. The MP audit above used the official `mp-api`
+  client separately; integrating it into the optional test remains follow-up.
 - Item #1 (Debye–Waller) untouched, as required.
 
 ## Out of scope
