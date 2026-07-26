@@ -57,7 +57,7 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   shrink, component recompute, archive, restore, list, and merge operations.
 - **`cxr scan <material> [--profile full|survey]`** → `scan:main` →
   `run.run_sweep` → write canonical `checkpoints/<material>/{line,brem}.pkl`
-  or an identity-qualified variant directory. Root shim: `scan.py`.
+  or an identity-qualified variant directory. Box shim: `python -m cxr_mc._entry.scan`.
 - **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
   `notebooks/analysis_app.py` (all figures, Altair + matplotlib, lazy tabbed
   layout), `notebooks/validation_app.py` (validation-study interface). Scan

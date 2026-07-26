@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
@@ -41,9 +40,8 @@ cli.main(["scan", "hopg", "--quick"])
     assert "Traceback" not in result.stderr
 
 
-def test_root_scan_shim_reports_missing_crystals_without_traceback() -> None:
-    root_scan = Path(__file__).parents[1] / "scan.py"
-    script = rf"""
+def test_scan_entry_shim_reports_missing_crystals_without_traceback() -> None:
+    script = r"""
 import builtins
 import runpy
 import sys
@@ -56,8 +54,8 @@ def import_without_crystals(name, *args, **kwargs):
     return real_import(name, *args, **kwargs)
 
 builtins.__import__ = import_without_crystals
-sys.argv = [{str(root_scan)!r}, "hopg", "--quick"]
-runpy.run_path({str(root_scan)!r}, run_name="__main__")
+sys.argv = ["cxr_mc._entry.scan", "hopg", "--quick"]
+runpy.run_module("cxr_mc._entry.scan", run_name="__main__")
 """
 
     result = subprocess.run(

@@ -1,15 +1,11 @@
-"""Tests for the reproduce_zhai.py root shim (the box-invokable entry point
-for cxr remote check) -- argument parsing and CLI wiring only; the actual MC
-work is reproduce_all, tested in tests/test_anchor_figures.py."""
+"""Tests for the cxr_mc._entry.reproduce_zhai shim (the box-invokable entry
+point for cxr remote check, run as ``python -m cxr_mc._entry.reproduce_zhai``)
+-- argument parsing and CLI wiring only; the actual MC work is reproduce_all,
+tested in tests/test_anchor_figures.py."""
 
-import sys
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parent.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-
-import reproduce_zhai  # noqa: E402
+from cxr_mc._entry import reproduce_zhai
 
 
 def test_cli_defaults_match_app_defaults(monkeypatch):

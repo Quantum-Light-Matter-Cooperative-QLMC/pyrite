@@ -30,12 +30,11 @@ RESERVATIONS_SUBDIR = "reservations"
 ZHAI_STEM = "zhai"
 
 # what `sync` ships up: the code that changes (the src/ package now also carries
-# data/, so it travels too), plus the root scan.py shim the box invokes and
-# pyproject.toml. Not checkpoints/ (the output we pull back the other way).
+# data/, so it travels too, and the box invokes its entry shims via
+# `python -m cxr_mc._entry.<name>`), plus checks/ and pyproject.toml. Not
+# checkpoints/ (the output we pull back the other way).
 SYNC_PATHS = [
     "src",
-    "scan.py",
-    "reproduce_zhai.py",
     "checks",
     "pyproject.toml",
     "uv.lock",

@@ -9,8 +9,8 @@ from . import config, transport
 
 # ---- detached job queue -------------------------------------------------------
 def _stems(materials, quick, profile="full"):
-    """Checkpoint stems a queue produces (scan.py writes <material>_quick.pkl
-    for --quick runs)."""
+    """Checkpoint stems a queue produces (the scan runner writes
+    <material>_quick.pkl for --quick runs)."""
     if quick:
         return [f"{m}_quick" for m in materials]
     if profile == "full":
@@ -88,7 +88,7 @@ run_material() {{
   echo "running $m [$i/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$i" "$total" "$m" "$(date -Is)" \
 >> "$JOBDIR/log"
-  if ! {config.shell_remote_uv()} run --no-sync python scan.py "$m"{flags} \
+  if ! {config.shell_remote_uv()} run --no-sync python -m cxr_mc._entry.scan "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: scan failed for $m; continuing" >> "$JOBDIR/log"
@@ -126,7 +126,7 @@ def _chunked_queue_script(jobid, materials, quick, workers, chunk_minutes, profi
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
 
     Reused verbatim by every slice: it resumes from checkpoint, does about
-    chunk_minutes of work via scan.py --max-minutes, and either terminates the
+    chunk_minutes of work via the scan runner's --max-minutes, and either terminates the
     chain (all materials completed:/failed:) or hands off: write the
     'queued slice' state FIRST, then sbatch fail-closed, then append the SID.
     State-first ordering keeps the EXIT trap from releasing reservations while
@@ -163,7 +163,7 @@ for m in "${{mats[@]}}"; do
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.shell_remote_uv()} run --no-sync python scan.py "$m"{flags} --max-minutes "$remaining_min" \
+  {config.shell_remote_uv()} run --no-sync python -m cxr_mc._entry.scan "$m"{flags} --max-minutes "$remaining_min" \
     --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
@@ -214,7 +214,7 @@ cd {config.shell_remote_dir()} || exit 1
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
 {_uv_sync_block()}
 echo "running zhai reproduction since $(date -Is)" > "$JOBDIR/state"
-if ! {config.shell_remote_uv()} run --no-sync python reproduce_zhai.py{flags} >> "$JOBDIR/log" 2>&1
+if ! {config.shell_remote_uv()} run --no-sync python -m cxr_mc._entry.reproduce_zhai{flags} >> "$JOBDIR/log" 2>&1
 then
   echo "FAILED $(date -Is)" > "$JOBDIR/state"
   exit 1

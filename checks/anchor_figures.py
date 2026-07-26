@@ -718,7 +718,7 @@ def reproduce_all(
 
     No figures -- this only leaves correct, hash-addressed .pkl files on disk
     under ``cache_dir`` (default checkpoints/zhai_reproduction/). This is the
-    GPU-box-runnable unit behind ``reproduce_zhai.py`` / ``cxr remote check``.
+    GPU-box-runnable unit behind ``cxr_mc._entry.reproduce_zhai`` / ``cxr remote check``.
 
     Returns [(label, path, cache_hit)] for the Fig.1c anchor plus every
     supplementary (study, thickness) pair.

@@ -271,7 +271,7 @@ def test_scp_remote_path_quotes_hostile_but_valid_posix_path(monkeypatch):
 
 def test_queue_script_has_per_material_scan_calls():
     s = remote._queue_script("20260101-000000", ["mose2", "wse2"], quick=True, workers=8)
-    assert "scan.py" in s
+    assert "python -m cxr_mc._entry.scan" in s
     assert "--quick" in s and "--workers 8" in s
     assert "mose2" in s and "wse2" in s
     assert "20260101-000000" in s  # job id is embedded
@@ -2708,7 +2708,7 @@ def test_zhai_queue_script_has_ne_flags_and_meta():
         tmd_azimuth=35.0,
         refresh=True,
     )
-    assert "reproduce_zhai.py" in s
+    assert "python -m cxr_mc._entry.reproduce_zhai" in s
     assert "--ne 11" in s and "--ne-brem 3" in s and "--ne-supp 5" in s and "--refresh" in s
     assert "--tmd-azimuth 35.0" in s
     assert "20260101-000000" in s
@@ -2738,7 +2738,7 @@ def test_zhai_start_dry_run_prints_without_ssh_or_sync(monkeypatch, capsys):
     jobid = remote.start_zhai_queue(dry_run=True)
 
     out = capsys.readouterr().out
-    assert jobid in out and "reproduce_zhai.py" in out
+    assert jobid in out and "python -m cxr_mc._entry.reproduce_zhai" in out
 
 
 def test_remote_check_refuses_when_a_zhai_job_is_already_live(monkeypatch):
@@ -2908,8 +2908,13 @@ def test_check_cli_rejects_pull_with_detached(monkeypatch, capsys, args):
     assert "--pull and --detached are mutually exclusive" in capsys.readouterr().err
 
 
-def test_sync_paths_ship_checks_and_zhai_shim():
+def test_sync_paths_ship_checks_and_entry_shims():
+    # The entry shims live under src/cxr_mc/_entry/ now, so they travel via "src";
+    # checks/ still ships the real reproduce_all logic.
     assert "checks" in remote.SYNC_PATHS
+    assert "src" in remote.SYNC_PATHS
+    assert "scan.py" not in remote.SYNC_PATHS
+    assert "reproduce_zhai.py" not in remote.SYNC_PATHS
 
 
 def test_stop_writes_stop_sentinel_before_scancel(monkeypatch):
@@ -2920,7 +2925,6 @@ def test_stop_writes_stop_sentinel_before_scancel(monkeypatch):
     remote._stop_jobid("20260717-abc")
     (cmd,) = commands
     assert cmd.index("STOP") < cmd.index("scancel")
-    assert "reproduce_zhai.py" in remote.SYNC_PATHS
 
 
 def test_is_reapable_only_when_dead_and_past_guard():

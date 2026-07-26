@@ -74,9 +74,9 @@ delta-function of the closed-form theory.
 notebooks/scan_app.py     RUNNER:  pick material → Sweep → run_sweep → checkpoints/<material>/{line,brem}.pkl
 notebooks/analysis_app.py VIZ:     load that checkpoint → all figures (no sweeps here)
 notebooks/validation_app.py CHECK: literature anchors and validation studies
-scan.py            root shim → cxr_mc.scan (guarded; python scan.py, or cxr scan)
 scripts/export_pdf.py  legacy-named shim → cxr_mc.export (analysis app → static HTML)
 src/cxr_mc/     importable package: physics modules + the cxr CLI entry point
+src/cxr_mc/_entry/  box-invokable `python -m` shims (scan, reproduce_zhai); guarded, thin
 src/cxr_mc/data/  materials.toml, cifs/, atomic_scattering_factors/, mott_transport_cross_sections/, *_qe.csv
 checks/            validation scripts + notebooks (Feranchuk anchor, Zhai Fig 1c, kinematic audit)
 docs/              documentation site: guides, validation records, API and CLI references, design history
@@ -182,7 +182,7 @@ material's thickness / energies / tilts / energy grids in
 
 ```bash
 cxr scan <material> [--quick] [--workers N]      # installed console script
-uv run python scan.py <material> [--quick]       # identical, via the root shim
+uv run python -m cxr_mc._entry.scan <material> [--quick]  # identical, via the module shim
 ```
 
 `--quick` runs a tiny smoke-test grid into an isolated `<material>_quick.pkl`.
@@ -410,7 +410,7 @@ numbers:
   `ProcessPoolExecutor`; the workers re-import the entry module (`spawn` on
   Windows, `forkserver` on Linux as of Python 3.14). Any script that drives a
   sweep must be guarded with `if __name__ == "__main__":` or it relaunches itself
-  recursively. Notebooks are guarded-equivalent; `scan.py` is guarded.
+  recursively. Notebooks are guarded-equivalent; `cxr_mc._entry.scan` is guarded.
 - **GPU spectrum, pipelined CPU transport.** With CuPy active, one main-process
   CUDA context handles spectrum/bremsstrahlung work while a process pool prepares
   electron transport. `max_workers=0` forces fully serial execution. Full-case

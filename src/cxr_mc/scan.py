@@ -11,7 +11,7 @@ static-HTML export can stay on the laptop.
     cxr scan mose2 --quick           # tiny grid: smoke test / pipeline check
     cxr scan mose2 --workers 0    # serial (no transport worker pool)
 
-(equivalently ``python scan.py mose2`` via the root shim).
+(equivalently ``python -m cxr_mc._entry.scan mose2`` via the module shim).
 
 The ``if __name__ == "__main__"`` guard on the entry point is REQUIRED, not
 stylistic: run_cases farms the electron transport out to a process pool, and the
@@ -516,7 +516,7 @@ def _write_progress_record(
 
 
 def main(argv=None):
-    return _cli_core.run(command, argv, prog_name="scan.py")
+    return _cli_core.run(command, argv, prog_name="cxr scan")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""``scan.py --max-minutes`` budget: exit 75 on incomplete work, paused progress state."""
+"""``cxr scan --max-minutes`` budget: exit 75 on incomplete work, paused progress state."""
 
 import json
 

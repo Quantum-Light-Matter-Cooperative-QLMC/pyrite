@@ -91,7 +91,7 @@ all interactive visualization and static-HTML export stay on your workstation.
 
 ## Notes
 
-- **`__main__` guard:** `cxr scan` (and the `python scan.py` shim) are properly
+- **`__main__` guard:** `cxr scan` (and the `python -m cxr_mc._entry.scan` shim) are properly
   guarded, so the `spawn` / `forkserver` transport workers are safe. Don't wrap the
   sweep in an unguarded `python -c "…"`.
 - **`--quick`** runs a tiny smoke grid into `<material>_quick.pkl` — use it to
