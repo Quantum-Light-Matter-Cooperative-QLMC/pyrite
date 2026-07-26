@@ -33,6 +33,16 @@ dependencies = [
     "ty>=0.0.63",
 ]
 
+[project.optional-dependencies]
+# Offscreen prerendered viewer-animation path (src/cxr_mc/plots/render_trajectories.py).
+# Not a default dependency -- keeps `uv sync` lean; install with
+# `uv sync --extra viz-render`.
+viz-render = [
+    "kaleido",
+    "imageio",
+    "imageio-ffmpeg",
+]
+
 [project.scripts]
 cxr = "cxr_mc.cli:main"
 
