@@ -108,6 +108,7 @@ Agents prefer these commands always.
 - Keep workflow proportionate; repo safety, physics-validation, remote-compute,
   and domain-skill rules stay authoritative.
 - Keep changes surgical, verify with smallest useful command.
+- Add import same edit as its first usage, never earlier. Unused import between edits: lint/format autostrip, next edit re-add, loop repeat.
 
 New/edited physics needs derivation docstring:
   - source eq; assumptions; limiting case
