@@ -2,23 +2,16 @@
 materials = [
     "hopg",
     "hbn",
-    "hfs2",
-    "hfse2",
     "hfte2",
     "mos2",
-    "mose2",
     "mote2",
-    "nbs2",
-    "nbse2",
     "nbte2",
     "pds2",
     "pdse2",
     "pdte2",
-    "ptbi2",
     "pts2",
     "ptse2",
     "ptte2",
-    "res2",
     "2h_tas2",
     "2h_tase2",
     "tate2",
@@ -27,8 +20,23 @@ materials = [
     "ws2",
     "wse2",
     "wte2",
-    "zrse2",
     "zrte3",
+]
+
+# Materials whose crystal geometry has no confirmed cod_id/mp_id match against
+# an external database (COD/Materials Project) -- see
+# docs/crystal-db-comparison.md "no defensible match" / unresolved-MP-mismatch
+# lists. Note: that cross-check covers lattice geometry only, not the
+# Debye-Waller B_ang2 value itself (docs/debye-waller-audit.md is separate).
+no_verified_dw = [
+    "hfs2",
+    "hfse2",
+    "mose2",
+    "nbs2",
+    "nbse2",
+    "ptbi2",
+    "res2",
+    "zrse2",
     "zrte5",
 ]
 
