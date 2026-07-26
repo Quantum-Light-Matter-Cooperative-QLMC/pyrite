@@ -550,6 +550,10 @@ def test_export_all_figures_writes_expected_files(tmp_path, monkeypatch):
     monkeypatch.setattr(af, "model_spectra", fake_model_spectra)
     monkeypatch.setattr(af, "model_coherent_spectra", fake_coherent)
     monkeypatch.setattr(matplotlib, "use", lambda backend: backend_calls.append(backend))
+    monkeypatch.setattr(
+        "matplotlib.figure.Figure.savefig",
+        lambda _figure, path, **_kwargs: Path(path).touch(),
+    )
 
     outdir = tmp_path / "figures"
     written = af.export_all_figures(

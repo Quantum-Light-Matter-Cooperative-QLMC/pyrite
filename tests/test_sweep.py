@@ -707,14 +707,14 @@ def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
     args = argparse.Namespace(
         material="mos2-on-sio2-si",
         workers=0,
-        quick=False,
+        quick=True,
         n_families=None,
         beam_uvw=None,
         checkpoint_dir=str(tmp_path),
     )
     scan.run(args)
     assert seen["path"] is not None
-    assert seen["path"].endswith("mos2-on-sio2-si.pkl")
+    assert seen["path"].endswith("mos2-on-sio2-si_quick.pkl")
 
 
 def test_run_material_applies_penetration_watchdog(monkeypatch, tmp_path):
@@ -907,7 +907,7 @@ def test_scan_progress_record_tracks_running_and_done(monkeypatch, tmp_path):
     monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
     args = argparse.Namespace(
         workers=0,
-        quick=False,
+        quick=True,
         n_families=None,
         beam_uvw=None,
         checkpoint_dir=str(tmp_path),
@@ -936,7 +936,7 @@ def test_scan_progress_record_tracks_failure(monkeypatch, tmp_path):
     monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
     args = argparse.Namespace(
         workers=0,
-        quick=False,
+        quick=True,
         n_families=None,
         beam_uvw=None,
         checkpoint_dir=str(tmp_path),
