@@ -2,6 +2,7 @@
 cxr archive / restore / archives / union. Pure local file ops on a temp
 checkpoints/ tree -- no ssh, CPU-only, fast."""
 
+import json
 import pickle
 
 import pytest
@@ -177,6 +178,32 @@ def test_union_refuses_material_mismatch(tmp_path):
     # refused before any mutation: the active slot is untouched
     live = _checkpoint_io.load(str(tmp_path / "hopg.pkl"))
     assert set(live) == {"cfgA"}
+
+
+def test_union_refuses_resolved_dataset_identity_mismatch(tmp_path):
+    live = _material_store("hopg", ["cfgA"])
+    incoming = _material_store("hopg", ["cfgB"])
+    _checkpoint_store.save("hopg", tmp_path, live)
+    _checkpoint_store.save("snap", tmp_path / "archive", incoming)
+    for path, profile, digest in (
+        (tmp_path / "hopg" / "meta.json", "full", "a" * 64),
+        (tmp_path / "archive" / "snap" / "meta.json", "survey", "b" * 64),
+    ):
+        path.write_text(
+            json.dumps(
+                {
+                    "dataset_identity": {
+                        "profile": profile,
+                        "parameter_sha256": digest,
+                    }
+                }
+            )
+        )
+
+    with pytest.raises(SystemExit, match="dataset identity mismatch"):
+        archive.union_checkpoint("hopg", "snap", pre_archive=False, root=str(tmp_path))
+
+    assert set(_checkpoint_store.load("hopg", tmp_path)) == {"cfgA"}
 
 
 def test_union_live_wins_on_collision(tmp_path):

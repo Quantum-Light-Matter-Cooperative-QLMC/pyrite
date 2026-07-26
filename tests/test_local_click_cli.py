@@ -65,6 +65,7 @@ def test_scan_click_dispatches_defaults_and_zero_workers(monkeypatch):
         "material": "hopg",
         "all": False,
         "workers": 0,
+        "profile": "full",
         "quick": False,
         "n_families": None,
         "beam_uvw": (1, 0, -1),
@@ -73,6 +74,17 @@ def test_scan_click_dispatches_defaults_and_zero_workers(monkeypatch):
         "progress_file": None,
         "no_progress": False,
     }
+
+
+def test_scan_profile_dispatch_and_quick_conflict(monkeypatch):
+    seen = _capture(monkeypatch, scan, "run")
+    result = invoke(scan.command, ["hopg", "--profile", "survey"])
+    assert_clean_result(result)
+    assert seen["profile"] == "survey"
+
+    conflict = invoke(scan.command, ["hopg", "--profile", "survey", "--quick"])
+    assert conflict.exit_code == 2
+    assert "cannot be combined" in conflict.stderr
 
 
 def test_blaze_preserves_one_flag_many_values_syntax(monkeypatch):

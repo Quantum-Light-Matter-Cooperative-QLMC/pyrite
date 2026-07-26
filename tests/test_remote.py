@@ -250,6 +250,14 @@ def test_queue_script_no_flags_when_unset():
     assert "--quick" not in s and "--workers" not in s
 
 
+def test_queue_script_and_stem_resolve_survey_profile():
+    from cxr_mc.profiles import named_profile_stem
+
+    script = remote._queue_script("j", ["mos2"], quick=False, workers=None, profile="survey")
+    assert "--profile survey" in script
+    assert remote._stems(["mos2"], False, "survey") == [named_profile_stem("mos2", "survey")]
+
+
 def test_queue_script_warns_and_continues_after_a_material_fails():
     script = remote._queue_script("j", ["hopg", "hbn"], quick=False, workers=None)
 
@@ -2378,6 +2386,20 @@ def test_remote_scan_forwards_parallel_materials(monkeypatch):
     remote.main(["scan", "hopg", "--parallel-materials", "3", "--chunk-minutes", "0", "--no-sync"])
 
     assert calls[0][1]["parallel_materials"] == 3
+
+
+def test_remote_scan_forwards_survey_profile(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "start_queue",
+        lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
+    )
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
+
+    remote.main(["scan", "hopg", "--profile", "survey", "--no-sync"])
+
+    assert calls[0][1]["profile"] == "survey"
 
 
 def test_remote_scan_submits_then_attaches_and_pulls(monkeypatch):

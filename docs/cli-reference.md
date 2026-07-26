@@ -128,22 +128,25 @@ Usage: cxr scan [OPTIONS] [MATERIAL]
 
   Run one material's MC sweep and write its checkpoint.
 
-  Pass MATERIAL or --all, never both. Resumes compatible checkpoints in CHECKPOINTS and
-  writes <material>.pkl (or <material>_quick.pkl).
+  Pass MATERIAL or --all, never both. Resumes compatible checkpoints in CHECKPOINTS.
+  Full writes <material>.pkl-compatible data in <material>/; variants use identity-
+  qualified stems.
 
 Options:
-  -a, --all              Run every material in mats_to_sim.toml; takes no MATERIAL.
-  --workers NUMBER       run_cases max_workers (default auto; 0 = serial, no transport
-                         pool).
-  --quick                Use tiny smoke-test grid and write <material>_quick.pkl.
-  --n-families NUMBER    Override positive dominant reflection-family count.
-  --beam-uvw H K L       Override nonzero integer beam zone axis [uvw].
-  --checkpoint-dir DIR   Read and write checkpoint pickles in DIR.  [default:
-                         checkpoints]
-  --max-minutes MINUTES  Soft wall-clock budget in minutes; exit 75 if resumable work
-                         remains.
-  --json                 Emit one versioned JSON object on stdout.
-  -h, --help             Show this message and exit.
+  -a, --all                Run every material in mats_to_sim.toml; takes no MATERIAL.
+  --workers NUMBER         run_cases max_workers (default auto; 0 = serial, no transport
+                           pool).
+  --profile [full|survey]  Named settings/grid policy. survey is provisional and
+                           reduced.  [default: full]
+  --quick                  Use tiny smoke-test grid and write <material>_quick.pkl.
+  --n-families NUMBER      Override positive dominant reflection-family count.
+  --beam-uvw H K L         Override nonzero integer beam zone axis [uvw].
+  --checkpoint-dir DIR     Read and write checkpoint pickles in DIR.  [default:
+                           checkpoints]
+  --max-minutes MINUTES    Soft wall-clock budget in minutes; exit 75 if resumable work
+                           remains.
+  --json                   Emit one versioned JSON object on stdout.
+  -h, --help               Show this message and exit.
 ```
 
 ## `cxr blaze`
@@ -597,19 +600,21 @@ Usage: cxr remote scan [OPTIONS] [MATERIAL]
   Sync code, submit sweep(s), wait, and pull checkpoints.
 
 Options:
-  -a, --all               Run every material in mats_to_sim.toml.
-  --quick                 Use tiny smoke-test grid; incompatible with --grid.
-  --workers NUMBER        Transport workers (default: auto; 0 runs serially).
-  --parallel-materials N  Simultaneous scans in one allocation; requires --chunk-minutes
-                          0.  [1<=x<=4]
-  --chunk-minutes NUMBER  Self-resubmitting SLURM slice length; 0 runs one monolithic
-                          job.  [default: 10.0]
-  --no-sync               Skip code upload.
-  --grid                  Grid-filter checkpoint before pulling; incompatible with
-                          --quick.
-  --drop-wide-brem        With --grid, drop wide-brem.
-  --downcast              With --grid, downcast to float32.
-  -h, --help              Show this message and exit.
+  -a, --all                Run every material in mats_to_sim.toml.
+  --profile [full|survey]  Named settings/grid policy. survey is provisional and
+                           reduced.  [default: full]
+  --quick                  Use tiny smoke-test grid; incompatible with --grid.
+  --workers NUMBER         Transport workers (default: auto; 0 runs serially).
+  --parallel-materials N   Simultaneous scans in one allocation; requires --chunk-
+                           minutes 0.  [1<=x<=4]
+  --chunk-minutes NUMBER   Self-resubmitting SLURM slice length; 0 runs one monolithic
+                           job.  [default: 10.0]
+  --no-sync                Skip code upload.
+  --grid                   Grid-filter checkpoint before pulling; incompatible with
+                           --quick.
+  --drop-wide-brem         With --grid, drop wide-brem.
+  --downcast               With --grid, downcast to float32.
+  -h, --help               Show this message and exit.
 ```
 
 ## `cxr remote status`
@@ -646,17 +651,19 @@ Usage: cxr remote submit [OPTIONS] [MATERIAL]...
   Sync code and submit a detached SLURM material queue.
 
 Options:
-  -a, --all               Queue every configured material.
-  --quick                 Use tiny smoke-test grid.
-  --workers NUMBER        Transport workers (default: auto; 0 runs serially).
-  --parallel-materials N  Simultaneous scans in one allocation; requires --chunk-minutes
-                          0.  [1<=x<=4]
-  --chunk-minutes NUMBER  Self-resubmitting SLURM slice length; 0 runs one monolithic
-                          job.  [default: 10.0]
-  --no-sync               Skip code upload.
-  --dry-run               Print submission preview; do not connect.
-  -f, --follow            Track job after launch.
-  -h, --help              Show this message and exit.
+  -a, --all                Queue every configured material.
+  --profile [full|survey]  Named settings/grid policy. survey is provisional and
+                           reduced.  [default: full]
+  --quick                  Use tiny smoke-test grid.
+  --workers NUMBER         Transport workers (default: auto; 0 runs serially).
+  --parallel-materials N   Simultaneous scans in one allocation; requires --chunk-
+                           minutes 0.  [1<=x<=4]
+  --chunk-minutes NUMBER   Self-resubmitting SLURM slice length; 0 runs one monolithic
+                           job.  [default: 10.0]
+  --no-sync                Skip code upload.
+  --dry-run                Print submission preview; do not connect.
+  -f, --follow             Track job after launch.
+  -h, --help               Show this message and exit.
 ```
 
 ## `cxr remote sync`

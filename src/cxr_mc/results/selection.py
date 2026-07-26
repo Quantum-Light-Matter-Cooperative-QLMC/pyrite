@@ -250,7 +250,7 @@ def merge_dataset(local, incoming, dataset, force=False):
     return n_merged, n_skipped
 
 
-def _grid_names(material):
+def _grid_names(material, profile="full"):
     """Config names in the CURRENT grid for ``material`` -- exactly the set
     ``config.material_sweep(material)`` -> ``sweep.build_cases`` produces now.
     A stale config is any name NOT in this set.
@@ -263,8 +263,8 @@ def _grid_names(material):
     from ..config import default_settings, material_sweep
     from ..sweep import build_cases
 
-    settings = default_settings()
-    sweep = material_sweep(material)
+    settings = default_settings(profile)
+    sweep = material_sweep(material, profile=profile)
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
     return {c["name"] for c in cases}
 
@@ -305,7 +305,10 @@ def slim_results(
     ``cxr slim``.
     """
     if grid is not None:
-        names = _grid_names(grid)
+        if isinstance(grid, tuple):
+            names = _grid_names(*grid)
+        else:
+            names = _grid_names(grid)
         results = {n: by_E for n, by_E in results.items() if n in names}
     base = select_results(results, **constraints) if constraints else results
     drop = set(_WIDE_BREM_FIELDS) if (fields is None and drop_wide_brem) else set()

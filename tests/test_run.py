@@ -507,6 +507,64 @@ def test_run_sweep_writes_manifest_alongside_checkpoint(tmp_path, monkeypatch):
     assert manifest["sweep"]["crystal"] == ["hopg"]
 
 
+def test_run_sweep_persists_dataset_identity_in_manifest(tmp_path, monkeypatch):
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    identity = {
+        "schema": "cxr.dataset-identity.v1",
+        "material": "hopg",
+        "profile": "survey",
+        "parameter_sha256": "a" * 64,
+        "resolved_parameters": {"settings": {}, "sweep": {}},
+    }
+    run_sweep(
+        [_fake_case("cfg_a", 30.0)],
+        {},
+        checkpoint_dir=str(tmp_path),
+        progress=False,
+        dataset_identity=identity,
+    )
+
+    manifest = json.loads((tmp_path / "hopg" / "meta.json").read_text())
+    assert manifest["schema"] == "cxr.checkpoint-manifest.v2"
+    assert manifest["dataset_identity"] == identity
+
+
+def test_manifest_refresh_preserves_existing_dataset_identity(tmp_path):
+    identity = {"profile": "survey", "parameter_sha256": "a" * 64}
+    results = {"cfg": {30.0: {"case": _fake_case("cfg", 30.0)}}}
+    checkpoint = tmp_path / "hopg"
+    checkpoint.mkdir()
+
+    _manifest_save(str(checkpoint), results, identity)
+    refreshed = _manifest_save(str(checkpoint), results)
+
+    assert refreshed["dataset_identity"] == identity
+
+
+def test_run_sweep_refuses_resume_across_dataset_identities(tmp_path, monkeypatch):
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    case = _fake_case("cfg", 30.0)
+    checkpoint = tmp_path / "hopg"
+    old = {"profile": "full", "parameter_sha256": "a" * 64}
+    new = {"profile": "full", "parameter_sha256": "b" * 64}
+    run_sweep(
+        [case],
+        {},
+        checkpoint_path=str(checkpoint),
+        progress=False,
+        dataset_identity=old,
+    )
+
+    with pytest.raises(ValueError, match="dataset identity mismatch"):
+        run_sweep(
+            [case],
+            {},
+            checkpoint_path=str(checkpoint),
+            progress=False,
+            dataset_identity=new,
+        )
+
+
 # ---------------------------------------------------------------------------
 # cases_from_results
 # ---------------------------------------------------------------------------

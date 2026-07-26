@@ -46,6 +46,21 @@ def _material_from_stem(in_path):
     return stem
 
 
+def _grid_from_stem(in_path):
+    """Return material/profile selector for canonical or named-profile stem."""
+    stem = os.path.splitext(os.path.basename(os.path.normpath(in_path)))[0]
+    if "--" not in stem:
+        return _material_from_stem(in_path)
+    from .profiles import identity_from_stem
+
+    identity = identity_from_stem(stem)
+    if identity is None:
+        raise SystemExit(
+            f"--grid: cannot resolve named-profile identity from checkpoint stem {stem!r}"
+        )
+    return identity["material"], identity["profile"]
+
+
 def _pct_smaller(before, after):
     """Integer percent saved by the slim. int(round(...)) rather than an f-string
     ':.0f', which renders a tiny negative pct (slim output a hair larger than the
@@ -77,7 +92,7 @@ def slim_checkpoint(
     straight to ``slim_results``. Returns the slim results dict."""
     # validate the stem before loading: the load is the expensive step, and a bad
     # --grid stem should fail in milliseconds, not after a gigabyte unpickle
-    material = _material_from_stem(in_path) if grid else None
+    material = _grid_from_stem(in_path) if grid else None
     if os.path.isdir(in_path):
         path = os.path.normpath(in_path)
         results = _checkpoint_store.load(os.path.basename(path), os.path.dirname(path))
