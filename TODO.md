@@ -14,13 +14,13 @@ Item generation:
 
 **NOTE:** User wrote item straight into `TODO.md` (denoted >user<)? Fold into branch (steps 1-2), then drop >user< & slim to one-line summary on `main` once branch exist.
 
-## P1 - top-priority/high-value
+## P1 - top-priority / high-value
 
 ### Active
 
 1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-7. **Debye-Waller provenance and anisotropy audit.** Continue replacing placeholder or reused `B_ang2` values with primary-source values and resolve per-site/tensor model needs. → `feature/debye-waller-audit`; audit: [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md).
-8. **GPU-memory follow-up.** Benchmark remote `rebrem --all --ne-brem 500 --step 20` for bounded CuPy reserved-pool memory; assess analogous `reline` cleanup separately.
+2. **Debye-Waller provenance and anisotropy audit.** Continue replacing placeholder or reused `B_ang2` values with primary-source values and resolve per-site/tensor model needs. → `feature/debye-waller-audit`; audit: [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md).
+3. **GPU-memory follow-up.** Benchmark remote `rebrem --all --ne-brem 500 --step 20` for bounded CuPy reserved-pool memory; assess analogous `reline` cleanup separately.
 
 ### Gated
 
@@ -42,5 +42,3 @@ Item generation:
 6. **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
 
 ## P3 - lower / exploratory
-
-1. **>user< Pre-collaboration Git history cleanup.** Inventory published refs, choose a squash boundary and future commit policy, tag/back up current history, then coordinate any one-time force-push and reclone before additional contributors begin work.

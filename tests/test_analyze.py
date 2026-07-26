@@ -108,6 +108,49 @@ def test_checkpoint_stem_flat_is_material_blazed_is_suffixed():
 
 
 @pytest.mark.parametrize(
+    ("helper", "run_name", "args"),
+    [
+        (analyze.load_analysis_checkpoint, "load_checkpoint", ()),
+        (analyze.analysis_checkpoint_manifest, "checkpoint_manifest", ()),
+        (analyze.cached_analysis, "cached_material_analysis", (lambda value: value, "key")),
+    ],
+)
+def test_analysis_reads_skip_partially_pulled_pickle(
+    helper, run_name, args, monkeypatch, capsys, tmp_path
+):
+    from cxr_mc import run
+
+    def incomplete(*_args):
+        raise EOFError("Compressed file ended before the end-of-stream marker")
+
+    monkeypatch.setattr(run, run_name, incomplete)
+
+    assert helper("hopg", *args, checkpoint_dir=tmp_path) is None
+    assert "temporarily unreadable" in capsys.readouterr().err
+
+
+def test_analysis_read_preserves_complete_checkpoint(monkeypatch, tmp_path):
+    from cxr_mc import run
+
+    expected = {"hopg": {30.0: {"case": {}}}}
+    monkeypatch.setattr(run, "load_checkpoint", lambda material, root: (material, root, expected))
+
+    assert analyze.load_analysis_checkpoint("hopg", tmp_path) == ("hopg", tmp_path, expected)
+
+
+def test_load_analysis_checkpoint_skips_truncated_gzip(tmp_path, capsys):
+    from cxr_mc import _checkpoint_io
+
+    checkpoint = tmp_path / "hopg.pkl"
+    _checkpoint_io.dump({"hopg": {}}, str(checkpoint))
+    payload = checkpoint.read_bytes()
+    checkpoint.write_bytes(payload[: len(payload) // 2])
+
+    assert analyze.load_analysis_checkpoint("hopg", tmp_path) is None
+    assert "retry after the pull finishes" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
     ("present", "flat_disabled", "blazed_disabled"),
     [
         ((), True, True),  # neither checkpoint

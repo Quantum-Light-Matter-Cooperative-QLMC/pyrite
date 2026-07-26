@@ -57,6 +57,7 @@ def _():
     except Exception:
         alt.data_transformers.disable_max_rows()
 
+    from cxr_mc.analyze import load_analysis_checkpoint
     from cxr_mc.config import default_settings, trajectory_sweep
     from cxr_mc.materials import CATALOG
     from cxr_mc.plots import (
@@ -95,7 +96,7 @@ def _():
         thicknesses_by_energy,
         top_geometries,
     )
-    from cxr_mc.run import cases_from_results, load_checkpoint
+    from cxr_mc.run import cases_from_results
     from cxr_mc.sweep import build_cases, fmt_thickness
 
     return (
@@ -112,7 +113,7 @@ def _():
         filter_results,
         fmt_thickness,
         heatmap_select_chart,
-        load_checkpoint,
+        load_analysis_checkpoint,
         metric_vs_chart,
         mo,
         page_title,
@@ -209,7 +210,7 @@ def _(
     default_settings,
     face_ui,
     filter_results,
-    load_checkpoint,
+    load_analysis_checkpoint,
     material_ui,
 ):
     from cxr_mc.analyze import checkpoint_stem
@@ -221,7 +222,11 @@ def _(
     # blazed -> <material>_blazed.pkl). MATERIAL stays the catalog key
     # everywhere else (labels, CATALOG.material(MATERIAL), manifest lookups).
     _stem = checkpoint_stem(MATERIAL, FACE) if MATERIAL is not None and FACE is not None else None
-    _results = load_checkpoint(_stem) if _stem is not None else {}
+    _loaded = load_analysis_checkpoint(_stem) if _stem is not None else None
+    if _loaded is None:
+        MATERIAL = None
+        FACE = None
+    _results = _loaded or {}
     cases = cases_from_results(_results)  # rebuild the case list from the records
     res = filter_results(_results, cases)  # all loaded cases for this material
 
@@ -2150,11 +2155,11 @@ def _(CATALOG, mo):
     # read from each material's checkpoint manifest, not load_checkpoint,
     # which would unpickle every material's checkpoint (140-225 MB gzip each)
     # just to enumerate beam energies.
-    from cxr_mc.run import checkpoint_manifest
+    from cxr_mc.analyze import analysis_checkpoint_manifest
 
     _energies = set()
     for _material_key in CATALOG.material_keys:
-        _manifest = checkpoint_manifest(_material_key)
+        _manifest = analysis_checkpoint_manifest(_material_key)
         if _manifest:
             _energies.update(_manifest["energies_keV"])
     cross_material_energy_options = {f"{energy:g} keV": energy for energy in sorted(_energies)} or {
@@ -2162,7 +2167,7 @@ def _(CATALOG, mo):
     }
     compare_all_beam_energies_ui = mo.ui.checkbox(value=True, label="Compare all beam energies")
     return (
-        checkpoint_manifest,
+        analysis_checkpoint_manifest,
         compare_all_beam_energies_ui,
         cross_material_energy_options,
     )
@@ -2182,15 +2187,15 @@ def _(compare_all_beam_energies_ui, cross_material_energy_options, mo):
 @app.cell
 def _(
     CATALOG,
-    checkpoint_manifest,
+    analysis_checkpoint_manifest,
     compare_all_beam_energies_ui,
     cross_material_energy_ui,
     mo,
     settings,
 ):
+    from cxr_mc.analyze import cached_analysis
     from cxr_mc.plots import material_comparison_point
     from cxr_mc.plots.altair_spectra import material_comparison_chart
-    from cxr_mc.run import cached_material_analysis
 
     def cross_material_tab():
         _md = mo.md(
@@ -2212,14 +2217,14 @@ def _(
         _n_with_data = sum(
             1
             for _material_key in CATALOG.material_keys
-            if (checkpoint_manifest(_material_key) or {}).get("n_records", 0) > 0
+            if (analysis_checkpoint_manifest(_material_key) or {}).get("n_records", 0) > 0
         )
 
         def _comparison(select):
             _pts = []
             _dropped = []
             for _material_key in CATALOG.material_keys:
-                _point = cached_material_analysis(
+                _point = cached_analysis(
                     _material_key,
                     lambda _results: material_comparison_point(
                         _results,

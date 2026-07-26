@@ -27,10 +27,13 @@ both.
     cxr analyze --no-token         # pass marimo's --no-token (disable auth token)
 """
 
+import gzip
 import os
+import pickle
 import subprocess
 import sys
 import tempfile
+import zlib
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TypedDict
@@ -108,6 +111,57 @@ def checkpoint_stem(material: str, face: str) -> str:
     ``.pkl`` -- no change to ``load_checkpoint`` / ``checkpoint_path_for`` needed.
     """
     return material if face == "flat" else f"{material}_blazed"
+
+
+def _read_checkpoint_or_none(material: str, read):
+    """Return one analysis read, or ``None`` while its pickle is incomplete.
+
+    A pull that writes into an active checkpoint path can briefly expose a
+    truncated gzip/pickle. Analysis is read-only, so treating that interval as
+    unavailable is safe; simulation resume paths continue to fail closed.
+    """
+    try:
+        return read()
+    except (
+        EOFError,
+        FileNotFoundError,
+        gzip.BadGzipFile,
+        pickle.UnpicklingError,
+        zlib.error,
+    ) as exc:
+        print(
+            f"checkpoint {material!r} is temporarily unreadable; "
+            f"skipping it; retry after the pull finishes ({exc})",
+            file=sys.stderr,
+        )
+        return None
+
+
+def load_analysis_checkpoint(material: str, checkpoint_dir: Path | str | None = None):
+    """Load a checkpoint for analysis, tolerating an in-progress transfer."""
+    from .run import _DEFAULT_CHECKPOINT_DIR, load_checkpoint
+
+    root = _DEFAULT_CHECKPOINT_DIR if checkpoint_dir is None else checkpoint_dir
+    return _read_checkpoint_or_none(material, lambda: load_checkpoint(material, root))
+
+
+def analysis_checkpoint_manifest(material: str, checkpoint_dir: Path | str | None = None):
+    """Read/backfill an analysis manifest, skipping an in-progress transfer."""
+    from .run import _DEFAULT_CHECKPOINT_DIR, checkpoint_manifest
+
+    root = _DEFAULT_CHECKPOINT_DIR if checkpoint_dir is None else checkpoint_dir
+    return _read_checkpoint_or_none(material, lambda: checkpoint_manifest(material, root))
+
+
+def cached_analysis(material: str, analyze, key, checkpoint_dir: Path | str | None = None):
+    """Run cached cross-material analysis unless its checkpoint is mid-transfer."""
+    from .run import _DEFAULT_CHECKPOINT_DIR, cached_material_analysis
+
+    root = _DEFAULT_CHECKPOINT_DIR if checkpoint_dir is None else checkpoint_dir
+    return _read_checkpoint_or_none(
+        material,
+        lambda: cached_material_analysis(material, analyze, key, root),
+    )
 
 
 def face_menu(material: str, checkpoint_dir: Path | str) -> tuple[MaterialMenuRow, ...]:

@@ -101,11 +101,7 @@ def complete_remote_checkpoint_stem(
     del ctx, param
     keys = _material_keys()
     return _items(
-        (
-            stem
-            for key in keys
-            for stem in (key, f"{key}_quick", f"{key}_blazed")
-        ),
+        (stem for key in keys for stem in (key, f"{key}_quick", f"{key}_blazed")),
         incomplete,
     )
 

@@ -35,7 +35,8 @@ def test_no_checkpoint_state_displays_without_analysis_tabs() -> None:
         if isinstance(cell, ast.FunctionDef)
         and any(
             isinstance(node, ast.Constant)
-            and node.value == "**No checkpoint data available.** Run `cxr scan <material>` to create one."
+            and node.value
+            == "**No checkpoint data available.** Run `cxr scan <material>` to create one."
             for node in ast.walk(cell)
         )
     )
@@ -46,9 +47,21 @@ def test_no_checkpoint_state_displays_without_analysis_tabs() -> None:
         and isinstance(node.left, ast.Name)
         and node.left.id == "MATERIAL"
         and any(isinstance(op, ast.Is) for op in node.ops)
-        and any(isinstance(value, ast.Constant) and value.value is None for value in node.comparators)
+        and any(
+            isinstance(value, ast.Constant) and value.value is None for value in node.comparators
+        )
         for node in ast.walk(display_cell)
     )
+
+
+def test_in_progress_checkpoint_uses_analysis_safe_reads() -> None:
+    source = APP.read_text()
+
+    assert "from cxr_mc.analyze import load_analysis_checkpoint" in source
+    assert "_loaded = load_analysis_checkpoint(_stem)" in source
+    assert "if _loaded is None:" in source
+    assert "from cxr_mc.analyze import analysis_checkpoint_manifest" in source
+    assert "from cxr_mc.analyze import cached_analysis" in source
 
 
 def test_crystal_view_defaults_to_one_ranked_reciprocal_vector() -> None:

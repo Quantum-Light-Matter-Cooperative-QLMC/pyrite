@@ -65,12 +65,9 @@ def _load_runtime() -> None:
 
     default_settings = default_settings or config_module.default_settings
     format_penetration_watchdog_summary = (
-        format_penetration_watchdog_summary
-        or config_module.format_penetration_watchdog_summary
+        format_penetration_watchdog_summary or config_module.format_penetration_watchdog_summary
     )
-    gate_cases_by_penetration = (
-        gate_cases_by_penetration or config_module.gate_cases_by_penetration
-    )
+    gate_cases_by_penetration = gate_cases_by_penetration or config_module.gate_cases_by_penetration
     material_sweep = material_sweep or config_module.material_sweep
     run_sweep = run_sweep or run_module.run_sweep
     build_cases = build_cases or sweep_module.build_cases
@@ -132,9 +129,7 @@ class _BlazeCommand(click.Command):
                     numeric = True
                 except ValueError:
                     numeric = False
-                if candidate in self._option_names or (
-                    candidate.startswith("-") and not numeric
-                ):
+                if candidate in self._option_names or (candidate.startswith("-") and not numeric):
                     break
                 values.append(candidate)
                 index += 1

@@ -193,14 +193,10 @@ def dataset_identity(
             "crystal": crystallography["crystal"],
             "hkl_list": _jsonable(reflections),
             "beam_uvw": _jsonable(
-                sweep.beam_uvw
-                if sweep.beam_uvw is not None
-                else crystallography["beam_uvw"]
+                sweep.beam_uvw if sweep.beam_uvw is not None else crystallography["beam_uvw"]
             ),
             "surface_hkl": _jsonable(
-                None
-                if sweep.beam_uvw is not None
-                else crystallography["surface_hkl"]
+                None if sweep.beam_uvw is not None else crystallography["surface_hkl"]
             ),
         },
     }
