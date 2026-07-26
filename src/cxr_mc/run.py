@@ -505,7 +505,10 @@ def repair_brem_wide(
     save_every=0,
     save_cb=None,
     ne_brem=None,
+    brem_start_eV=None,
+    brem_stop_eV=None,
     brem_step_eV=None,
+    profile=None,
     on_progress=None,
     max_seconds=None,
     status=None,
@@ -562,7 +565,9 @@ def repair_brem_wide(
 
     from .montecarlo import _brem_for_case
 
-    retune = ne_brem is not None or brem_step_eV is not None
+    retune = any(
+        value is not None for value in (ne_brem, brem_start_eV, brem_stop_eV, brem_step_eV, profile)
+    )
     todo = []
     n_skipped = 0
     for name in results:
@@ -575,10 +580,38 @@ def repair_brem_wide(
                     c = r["case"]
                     if ne_brem is not None and int(c.get("Ne_brem", -1)) != int(ne_brem):
                         at_target = False
-                    if brem_step_eV is not None:
+                    if profile is not None and c.get("brem_profile") != profile:
+                        at_target = False
+                    if any(
+                        value is not None for value in (brem_start_eV, brem_stop_eV, brem_step_eV)
+                    ):
                         g = _stored_brem_grid(r)
-                        if g.size < 2 or not np.isclose(g[1] - g[0], float(brem_step_eV)):
-                            at_target = False
+                        if (
+                            brem_start_eV is None
+                            and brem_stop_eV is None
+                            and brem_step_eV is not None
+                        ):
+                            if g.size < 2 or not np.isclose(g[1] - g[0], float(brem_step_eV)):
+                                at_target = False
+                        else:
+                            stored_step = float(g[1] - g[0]) if g.size >= 2 else None
+                            step = float(brem_step_eV) if brem_step_eV is not None else stored_step
+                            start = (
+                                float(brem_start_eV)
+                                if brem_start_eV is not None
+                                else (float(g[0]) if g.size else None)
+                            )
+                            stop = (
+                                float(brem_stop_eV)
+                                if brem_stop_eV is not None
+                                else (float(c["E0_keV"]) * 1e3 + step if step is not None else None)
+                            )
+                            if start is None or stop is None or step is None:
+                                at_target = False
+                            else:
+                                target = np.arange(start, stop, step)
+                                if g.shape != target.shape or not np.allclose(g, target):
+                                    at_target = False
                 if at_target:
                     n_skipped += 1
                     continue
@@ -606,10 +639,19 @@ def repair_brem_wide(
         c = r["case"]
         if ne_brem is not None:
             c["Ne_brem"] = int(ne_brem)
-        if brem_step_eV is not None:
-            step_b = float(brem_step_eV)
-            start = float(_stored_brem_grid(r)[0])
-            stop = float(c["E0_keV"]) * 1e3 + step_b  # sweep-convention stop (build_cases)
+        if profile is not None:
+            c["brem_profile"] = profile
+        if any(value is not None for value in (brem_start_eV, brem_stop_eV, brem_step_eV)):
+            stored = _stored_brem_grid(r)
+            step_b = (
+                float(brem_step_eV) if brem_step_eV is not None else float(stored[1] - stored[0])
+            )
+            start = float(brem_start_eV) if brem_start_eV is not None else float(stored[0])
+            stop = (
+                float(brem_stop_eV)
+                if brem_stop_eV is not None
+                else float(c["E0_keV"]) * 1e3 + step_b
+            )
             E_brem = np.arange(start, stop, step_b)
             c["E_grid_brem"] = (start, stop, step_b)
         else:
@@ -672,7 +714,14 @@ def repair_checkpoint(checkpoint_path, save_every=100, max_seconds=None, status=
     return results
 
 
-def _target_line_grid(sweep, r, line_step_eV, from_config):
+def _target_line_grid(
+    sweep,
+    r,
+    line_step_eV,
+    from_config,
+    line_start_eV=None,
+    line_stop_eV=None,
+):
     """The line grid a reline should land on for record ``r``.
 
     ``line_step_eV`` -> uniform grid at that spacing over the record's current
@@ -682,13 +731,22 @@ def _target_line_grid(sweep, r, line_step_eV, from_config):
     import numpy as np
 
     eg = np.asarray(r["E_grid"], float)
-    if line_step_eV is not None:
-        return np.arange(eg[0], eg[-1] + float(line_step_eV), float(line_step_eV))
     if from_config and sweep is not None:
         from .sweep import _line_grid_for_energy
 
-        return np.asarray(_line_grid_for_energy(sweep, eg, float(r["case"]["E0_keV"])), float)
-    return eg
+        base = np.asarray(_line_grid_for_energy(sweep, eg, float(r["case"]["E0_keV"])), float)
+    else:
+        base = eg
+    if any(value is not None for value in (line_start_eV, line_stop_eV, line_step_eV)):
+        from .recompute_defaults import uniform_bounds
+
+        start, stop, step = uniform_bounds(base)
+        return np.arange(
+            start if line_start_eV is None else float(line_start_eV),
+            stop if line_stop_eV is None else float(line_stop_eV),
+            step if line_step_eV is None else float(line_step_eV),
+        )
+    return base
 
 
 def repair_line_spec(
@@ -696,7 +754,10 @@ def repair_line_spec(
     material,
     only_stale=True,
     line_ne=None,
+    line_start_eV=None,
+    line_stop_eV=None,
     line_step_eV=None,
+    profile=None,
     from_config=True,
     redo_all=False,
     save_every=0,
@@ -735,11 +796,16 @@ def repair_line_spec(
     import numpy as np
 
     sweep = None
-    if from_config and line_step_eV is None:
-        from .config import material_sweep
-
+    if from_config:
         try:
-            sweep = material_sweep(material)
+            if profile is None:
+                from .config import material_sweep
+
+                sweep = material_sweep(material)
+            else:
+                from .recompute_defaults import sweep as profile_sweep
+
+                sweep = profile_sweep(material, profile)
         except Exception:
             sweep = None  # unknown/derived stem -> fall back to each record's grid
 
@@ -747,13 +813,21 @@ def repair_line_spec(
     n_skipped = 0
     for name in results:
         for r in results[name].values():
-            target = _target_line_grid(sweep, r, line_step_eV, from_config)
+            target = _target_line_grid(
+                sweep,
+                r,
+                line_step_eV,
+                from_config,
+                line_start_eV,
+                line_stop_eV,
+            )
             eg = np.asarray(r["E_grid"], float)
             spec = r.get("spec")
             finite = spec is not None and np.isfinite(np.asarray(spec)).all()
             grid_ok = eg.shape == target.shape and np.allclose(eg, target)
             ne_ok = line_ne is None or int(r["case"].get("Ne", -1)) == int(line_ne)
-            at_target = finite and grid_ok and ne_ok
+            profile_ok = profile is None or r["case"].get("line_profile") == profile
+            at_target = finite and grid_ok and ne_ok and profile_ok
             if only_stale and not redo_all and at_target:
                 n_skipped += 1
                 continue
@@ -777,6 +851,8 @@ def repair_line_spec(
         c = r["case"]
         if line_ne is not None:
             c["Ne"] = int(line_ne)
+        if profile is not None:
+            c["line_profile"] = profile
         r["spec"] = runner._lines_for_case(c, target)
         r["E_grid"] = target
         c["E_grid_line"] = (float(target[0]), float(target[-1]), len(target))

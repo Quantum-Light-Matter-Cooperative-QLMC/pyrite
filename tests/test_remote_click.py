@@ -128,6 +128,29 @@ def test_remote_incompatible_click_inputs_are_usage_errors(argv, message):
     assert message in result.stderr
 
 
+@pytest.mark.parametrize(
+    ("flag", "dataset"),
+    [("--brem-only", "brem"), ("--line-only", "line")],
+)
+def test_partial_pull_all_forwards_full_material_list(monkeypatch, tmp_path, flag, dataset):
+    manifest = tmp_path / "materials.txt"
+    manifest.write_text('materials = ["hopg", "hbn", "mos2"]\n')
+    monkeypatch.setattr(remote.config, "MATS_FILE", manifest)
+    seen = {}
+    monkeypatch.setattr(
+        lifecycle,
+        "pull",
+        lambda materials, **kwargs: seen.update(materials=materials, kwargs=kwargs),
+    )
+
+    result = invoke(remote.command, ["pull", "--all", flag])
+
+    assert_clean_result(result)
+    assert seen["materials"] == ["hopg", "hbn", "mos2"]
+    assert seen["kwargs"]["dataset"] == dataset
+    assert seen["kwargs"]["grid"] is False
+
+
 @pytest.mark.parametrize("status", [1, 130])
 def test_logs_click_propagates_follow_status(monkeypatch, status):
     monkeypatch.setattr(viewer, "tail_logs", lambda _jobid, _follow: status)

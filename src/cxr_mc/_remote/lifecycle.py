@@ -321,6 +321,9 @@ def start_rebrem_queue(
     no_sync=False,
     dry_run=False,
     chunk_minutes=10.0,
+    profile="full",
+    brem_start_eV=None,
+    brem_stop_eV=None,
 ):
     """Submit a brem-only checkpoint recompute (``cxr rebrem``) to SLURM.
 
@@ -340,11 +343,28 @@ def start_rebrem_queue(
     chunked = chunk_minutes > 0
     if chunked:
         payload = scripts._rebrem_chunked_queue_script(
-            jobid, materials, ne_brem, brem_step_eV, redo_all, chunk_minutes
+            jobid,
+            materials,
+            ne_brem,
+            brem_step_eV,
+            redo_all,
+            chunk_minutes,
+            profile,
+            brem_start_eV,
+            brem_stop_eV,
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
     else:
-        payload = scripts._rebrem_queue_script(jobid, materials, ne_brem, brem_step_eV, redo_all)
+        payload = scripts._rebrem_queue_script(
+            jobid,
+            materials,
+            ne_brem,
+            brem_step_eV,
+            redo_all,
+            profile,
+            brem_start_eV,
+            brem_stop_eV,
+        )
         time_limit = config.SLURM_TIME
     script = scripts._slurm_batch_script(
         jobid,
@@ -354,7 +374,17 @@ def start_rebrem_queue(
         time_limit=time_limit,
     )
     upload = scripts._write_job_script_command(
-        jobdir, scripts._rebrem_queue_metadata(jobid, materials, ne_brem, brem_step_eV, redo_all)
+        jobdir,
+        scripts._rebrem_queue_metadata(
+            jobid,
+            materials,
+            ne_brem,
+            brem_step_eV,
+            redo_all,
+            profile,
+            brem_start_eV,
+            brem_stop_eV,
+        ),
     )
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
 
@@ -384,7 +414,14 @@ def start_rebrem_queue(
                     "Mode",
                     presentation._mode_summary(
                         scripts._rebrem_queue_metadata(
-                            jobid, materials, ne_brem, brem_step_eV, redo_all
+                            jobid,
+                            materials,
+                            ne_brem,
+                            brem_step_eV,
+                            redo_all,
+                            profile,
+                            brem_start_eV,
+                            brem_stop_eV,
                         )
                     ),
                 ),
@@ -406,6 +443,9 @@ def start_reline_queue(
     no_sync=False,
     dry_run=False,
     chunk_minutes=10.0,
+    profile="full",
+    line_start_eV=None,
+    line_stop_eV=None,
 ):
     """Submit a line-only checkpoint recompute (``cxr reline``) to SLURM.
 
@@ -424,11 +464,28 @@ def start_reline_queue(
     chunked = chunk_minutes > 0
     if chunked:
         payload = scripts._reline_chunked_queue_script(
-            jobid, materials, line_ne, line_step_eV, redo_all, chunk_minutes
+            jobid,
+            materials,
+            line_ne,
+            line_step_eV,
+            redo_all,
+            chunk_minutes,
+            profile,
+            line_start_eV,
+            line_stop_eV,
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
     else:
-        payload = scripts._reline_queue_script(jobid, materials, line_ne, line_step_eV, redo_all)
+        payload = scripts._reline_queue_script(
+            jobid,
+            materials,
+            line_ne,
+            line_step_eV,
+            redo_all,
+            profile,
+            line_start_eV,
+            line_stop_eV,
+        )
         time_limit = config.SLURM_TIME
     script = scripts._slurm_batch_script(
         jobid,
@@ -438,7 +495,17 @@ def start_reline_queue(
         time_limit=time_limit,
     )
     upload = scripts._write_job_script_command(
-        jobdir, scripts._reline_queue_metadata(jobid, materials, line_ne, line_step_eV, redo_all)
+        jobdir,
+        scripts._reline_queue_metadata(
+            jobid,
+            materials,
+            line_ne,
+            line_step_eV,
+            redo_all,
+            profile,
+            line_start_eV,
+            line_stop_eV,
+        ),
     )
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
 
@@ -468,7 +535,14 @@ def start_reline_queue(
                     "Mode",
                     presentation._mode_summary(
                         scripts._reline_queue_metadata(
-                            jobid, materials, line_ne, line_step_eV, redo_all
+                            jobid,
+                            materials,
+                            line_ne,
+                            line_step_eV,
+                            redo_all,
+                            profile,
+                            line_start_eV,
+                            line_stop_eV,
                         )
                     ),
                 ),

@@ -34,7 +34,10 @@ def rebrem_checkpoints(
     materials=None,
     checkpoint_dir="checkpoints",
     ne_brem=None,
+    brem_start_eV=None,
+    brem_stop_eV=None,
     brem_step_eV=None,
+    profile=None,
     redo_all=False,
     save_every=100,
     progress_file=None,
@@ -78,6 +81,29 @@ def rebrem_checkpoints(
     for path in paths:
         stem = Path(path).stem if str(path).endswith(".pkl") else Path(path).name
         print(f"== {stem} ==")
+        resolved_ne = ne_brem
+        resolved_start = brem_start_eV
+        resolved_step = brem_step_eV
+        if profile is not None:
+            from .recompute_defaults import settings, sweep, uniform_bounds
+
+            profile_settings = settings(profile)
+            if resolved_ne is None:
+                resolved_ne = profile_settings.n_electrons_brem
+            try:
+                profile_sweep = sweep(stem, profile)
+                profile_start, _profile_stop, profile_step = uniform_bounds(
+                    profile_sweep.E_grid_brem
+                )
+            except (KeyError, TypeError, ValueError):
+                # Derived stems (for example ``*_blazed``) have no catalog row.
+                # Keep their stored grid while still applying profile Ne/provenance.
+                pass
+            else:
+                if resolved_start is None:
+                    resolved_start = profile_start
+                if resolved_step is None:
+                    resolved_step = profile_step
         kw = {}
         if progress_file is not None:
             from .scan import _write_progress_record
@@ -101,8 +127,11 @@ def rebrem_checkpoints(
                 path,
                 save_every=save_every,
                 only_nonfinite=not redo_all,
-                ne_brem=ne_brem,
-                brem_step_eV=brem_step_eV,
+                ne_brem=resolved_ne,
+                brem_start_eV=resolved_start,
+                brem_stop_eV=brem_stop_eV,
+                brem_step_eV=resolved_step,
+                profile=profile,
                 max_seconds=max_seconds,
                 status=status,
                 **kw,
@@ -136,7 +165,10 @@ def _cli(args):
         materials=args.material or None,
         checkpoint_dir=args.checkpoint_dir,
         ne_brem=args.ne_brem,
+        brem_start_eV=getattr(args, "start", None),
+        brem_stop_eV=getattr(args, "stop", None),
         brem_step_eV=args.step,
+        profile=getattr(args, "profile", None),
         redo_all=args.redo_all,
         save_every=args.save_every,
         progress_file=args.progress_file,
@@ -163,7 +195,10 @@ def _cli_json(args):
                 materials=args.material or None,
                 checkpoint_dir=args.checkpoint_dir,
                 ne_brem=args.ne_brem,
+                brem_start_eV=getattr(args, "start", None),
+                brem_stop_eV=getattr(args, "stop", None),
                 brem_step_eV=args.step,
+                profile=getattr(args, "profile", None),
                 redo_all=args.redo_all,
                 save_every=args.save_every,
                 progress_file=args.progress_file,
@@ -213,18 +248,39 @@ def _cli_json(args):
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
 @click.option(
+    "--profile",
+    type=click.Choice(("full", "survey")),
+    default="full",
+    show_default=True,
+    help="Named sweep profile supplying omitted grid and electron defaults.",
+)
+@click.option(
     "--ne-brem",
     type=_cli_core.POSITIVE_INT,
     default=None,
     metavar="N",
-    help="Bremsstrahlung electron count; omit to use checkpoint settings.",
+    help="Bremsstrahlung electron count; overrides profile default.",
+)
+@click.option(
+    "--start",
+    type=_cli_core.NONNEGATIVE_FLOAT,
+    default=None,
+    metavar="EV",
+    help="Wide-bremsstrahlung lower bound in eV; overrides profile.",
+)
+@click.option(
+    "--stop",
+    type=_cli_core.POSITIVE_FLOAT,
+    default=None,
+    metavar="EV",
+    help="Wide-bremsstrahlung exclusive upper bound in eV; default follows beam energy.",
 )
 @click.option(
     "--step",
     type=_cli_core.POSITIVE_FLOAT,
     default=None,
     metavar="EV",
-    help="Wide-bremsstrahlung grid spacing in eV; omit to use checkpoint settings.",
+    help="Wide-bremsstrahlung grid spacing in eV; overrides profile default.",
 )
 @click.option("--redo-all", is_flag=True, help="Recompute records already at target.")
 @click.option(
@@ -248,7 +304,10 @@ def _cli_json(args):
 def command(
     materials,
     all_,
+    profile,
     ne_brem,
+    start,
+    stop,
     step,
     redo_all,
     checkpoint_dir,
@@ -261,12 +320,17 @@ def command(
         raise click.UsageError("rebrem --all does not take material names")
     if not all_ and not materials:
         raise click.UsageError("rebrem needs material name(s), or use --all")
+    if start is not None and stop is not None and stop <= start:
+        raise click.UsageError("rebrem --stop must be greater than --start")
     handler = _cli_json if json_output else _cli
     return _cli_core.invoke_legacy(
         handler,
         material=list(materials),
         all=all_,
+        profile=profile,
         ne_brem=ne_brem,
+        start=start,
+        stop=stop,
         step=step,
         redo_all=redo_all,
         checkpoint_dir=checkpoint_dir,

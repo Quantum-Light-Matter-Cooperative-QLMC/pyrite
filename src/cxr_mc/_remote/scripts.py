@@ -198,18 +198,38 @@ echo "done $(date -Is)" > "$JOBDIR/state"
 """
 
 
-def _rebrem_flags(ne_brem, brem_step_eV, redo_all):
-    flags = ""
+def _rebrem_flags(
+    ne_brem,
+    brem_step_eV,
+    redo_all,
+    profile="full",
+    brem_start_eV=None,
+    brem_stop_eV=None,
+):
+    flags = f" --profile {profile}"
     if ne_brem is not None:
         flags += f" --ne-brem {int(ne_brem)}"
     if brem_step_eV is not None:
         flags += f" --step {float(brem_step_eV):g}"
+    if brem_start_eV is not None:
+        flags += f" --start {float(brem_start_eV):g}"
+    if brem_stop_eV is not None:
+        flags += f" --stop {float(brem_stop_eV):g}"
     if redo_all:
         flags += " --redo-all"
     return flags
 
 
-def _rebrem_queue_script(jobid, materials, ne_brem, brem_step_eV, redo_all):
+def _rebrem_queue_script(
+    jobid,
+    materials,
+    ne_brem,
+    brem_step_eV,
+    redo_all,
+    profile="full",
+    brem_start_eV=None,
+    brem_stop_eV=None,
+):
     """CXR payload for a brem-only checkpoint recompute in a SLURM allocation.
 
     One sequential ``cxr rebrem`` per material (brem is cheap; no in-allocation
@@ -218,7 +238,7 @@ def _rebrem_queue_script(jobid, materials, ne_brem, brem_step_eV, redo_all):
     the shared case-progress dashboard. The ``completed:``/``failed:`` log
     markers match the scan queue's so ``state._completed_materials`` drives the
     post-attach pull unchanged."""
-    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all)
+    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all, profile, brem_start_eV, brem_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -253,7 +273,17 @@ fi
 """
 
 
-def _rebrem_chunked_queue_script(jobid, materials, ne_brem, brem_step_eV, redo_all, chunk_minutes):
+def _rebrem_chunked_queue_script(
+    jobid,
+    materials,
+    ne_brem,
+    brem_step_eV,
+    redo_all,
+    chunk_minutes,
+    profile="full",
+    brem_start_eV=None,
+    brem_stop_eV=None,
+):
     """One SLURM slice of a self-resubmitting brem-only recompute chain.
 
     Mirror of ``_reline_chunked_queue_script`` for ``cxr rebrem``: each slice
@@ -263,7 +293,7 @@ def _rebrem_chunked_queue_script(jobid, materials, ne_brem, brem_step_eV, redo_a
     contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave
     unresolved (a later slice finishes it), else -> ``failed:``.
     """
-    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all)
+    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all, profile, brem_start_eV, brem_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
@@ -323,7 +353,16 @@ printf 'slurm_job_id: %s\\n' "$SID" >> "$JOBDIR/meta"
 """
 
 
-def _rebrem_queue_metadata(jobid, materials, ne_brem, brem_step_eV, redo_all):
+def _rebrem_queue_metadata(
+    jobid,
+    materials,
+    ne_brem,
+    brem_step_eV,
+    redo_all,
+    profile="full",
+    brem_start_eV=None,
+    brem_stop_eV=None,
+):
     """Static metadata persisted before a rebrem queue is submitted. ``kind:
     rebrem`` keys the Mode line in status/attach; ``materials``/``quick`` keep
     the shared _live_jobs/_refuse_if_busy/jobs-listing plumbing working."""
@@ -333,7 +372,10 @@ def _rebrem_queue_metadata(jobid, materials, ne_brem, brem_step_eV, redo_all):
             f"materials: {' '.join(materials)}",
             "quick: False",
             "kind: rebrem",
+            f"profile: {profile}",
             f"ne_brem: {ne_brem}",
+            f"brem_start_eV: {brem_start_eV}",
+            f"brem_stop_eV: {brem_stop_eV}",
             f"brem_step_eV: {brem_step_eV}",
             f"redo_all: {bool(redo_all)}",
             "progress_dashboard: True",
@@ -342,24 +384,44 @@ def _rebrem_queue_metadata(jobid, materials, ne_brem, brem_step_eV, redo_all):
     )
 
 
-def _reline_flags(line_ne, line_step_eV, redo_all):
-    flags = ""
+def _reline_flags(
+    line_ne,
+    line_step_eV,
+    redo_all,
+    profile="full",
+    line_start_eV=None,
+    line_stop_eV=None,
+):
+    flags = f" --profile {profile}"
     if line_ne is not None:
         flags += f" --line-ne {int(line_ne)}"
     if line_step_eV is not None:
         flags += f" --line-step {float(line_step_eV):g}"
+    if line_start_eV is not None:
+        flags += f" --start {float(line_start_eV):g}"
+    if line_stop_eV is not None:
+        flags += f" --stop {float(line_stop_eV):g}"
     if redo_all:
         flags += " --redo-all"
     return flags
 
 
-def _reline_queue_script(jobid, materials, line_ne, line_step_eV, redo_all):
+def _reline_queue_script(
+    jobid,
+    materials,
+    line_ne,
+    line_step_eV,
+    redo_all,
+    profile="full",
+    line_start_eV=None,
+    line_stop_eV=None,
+):
     """CXR payload for a line-only checkpoint recompute (``cxr reline``) in a
     SLURM allocation. One sequential reline per material; each writes the same
     per-material JSON progress record a scan/rebrem does, and the
     ``completed:``/``failed:`` markers match so ``state._completed_materials``
     drives the post-attach pull unchanged."""
-    flags = _reline_flags(line_ne, line_step_eV, redo_all)
+    flags = _reline_flags(line_ne, line_step_eV, redo_all, profile, line_start_eV, line_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -394,7 +456,17 @@ fi
 """
 
 
-def _reline_chunked_queue_script(jobid, materials, line_ne, line_step_eV, redo_all, chunk_minutes):
+def _reline_chunked_queue_script(
+    jobid,
+    materials,
+    line_ne,
+    line_step_eV,
+    redo_all,
+    chunk_minutes,
+    profile="full",
+    line_start_eV=None,
+    line_stop_eV=None,
+):
     """One SLURM slice of a self-resubmitting line-only recompute chain.
 
     Mirror of ``_chunked_queue_script`` for ``cxr reline``: each slice resumes
@@ -404,7 +476,7 @@ def _reline_chunked_queue_script(jobid, materials, line_ne, line_step_eV, redo_a
     contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave
     unresolved (a later slice finishes it), else -> ``failed:``.
     """
-    flags = _reline_flags(line_ne, line_step_eV, redo_all)
+    flags = _reline_flags(line_ne, line_step_eV, redo_all, profile, line_start_eV, line_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
@@ -464,7 +536,16 @@ printf 'slurm_job_id: %s\\n' "$SID" >> "$JOBDIR/meta"
 """
 
 
-def _reline_queue_metadata(jobid, materials, line_ne, line_step_eV, redo_all):
+def _reline_queue_metadata(
+    jobid,
+    materials,
+    line_ne,
+    line_step_eV,
+    redo_all,
+    profile="full",
+    line_start_eV=None,
+    line_stop_eV=None,
+):
     """Static metadata for a reline queue. ``kind: reline`` keys the Mode line."""
     return "\n".join(
         [
@@ -472,7 +553,10 @@ def _reline_queue_metadata(jobid, materials, line_ne, line_step_eV, redo_all):
             f"materials: {' '.join(materials)}",
             "quick: False",
             "kind: reline",
+            f"profile: {profile}",
             f"line_ne: {line_ne}",
+            f"line_start_eV: {line_start_eV}",
+            f"line_stop_eV: {line_stop_eV}",
             f"line_step_eV: {line_step_eV}",
             f"redo_all: {bool(redo_all)}",
             "progress_dashboard: True",

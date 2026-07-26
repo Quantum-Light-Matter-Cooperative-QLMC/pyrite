@@ -142,8 +142,13 @@ def _mode_summary(metadata):
     fields = _metadata_fields(metadata)
     if fields.get("kind") == "rebrem":
         parts = ["brem-only recompute"]
+        if fields.get("profile"):
+            parts.append(f"profile={fields['profile']}")
         if fields.get("ne_brem") not in (None, "None"):
             parts.append(f"Ne_brem={fields['ne_brem']}")
+        bounds = [fields.get("brem_start_eV"), fields.get("brem_stop_eV")]
+        if any(value not in (None, "None") for value in bounds):
+            parts.append(f"range {bounds[0]}:{bounds[1]} eV")
         if fields.get("brem_step_eV") not in (None, "None"):
             parts.append(f"step {fields['brem_step_eV']} eV")
         if fields.get("redo_all") == "True":
@@ -151,8 +156,13 @@ def _mode_summary(metadata):
         return " · ".join(parts)
     if fields.get("kind") == "reline":
         parts = ["line-only recompute"]
+        if fields.get("profile"):
+            parts.append(f"profile={fields['profile']}")
         if fields.get("line_ne") not in (None, "None"):
             parts.append(f"Ne_line={fields['line_ne']}")
+        bounds = [fields.get("line_start_eV"), fields.get("line_stop_eV")]
+        if any(value not in (None, "None") for value in bounds):
+            parts.append(f"range {bounds[0]}:{bounds[1]} eV")
         if fields.get("line_step_eV") not in (None, "None"):
             parts.append(f"step {fields['line_step_eV']} eV")
         if fields.get("redo_all") == "True":

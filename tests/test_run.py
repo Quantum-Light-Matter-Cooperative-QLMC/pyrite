@@ -1058,6 +1058,30 @@ def test_repair_brem_wide_retunes_finite_record_and_persists_params(monkeypatch)
     assert repair_brem_wide(results, progress=False, ne_brem=1000, brem_step_eV=25.0) == 0
 
 
+def test_repair_brem_wide_persists_profile_and_explicit_bounds(monkeypatch):
+    record = _finite_record(_fake_case("cfg_a", 30.0))
+    monkeypatch.setattr(
+        "cxr_mc.montecarlo._brem_for_case",
+        lambda _case, grid: np.ones(np.asarray(grid).shape),
+    )
+
+    n = repair_brem_wide(
+        {"cfg_a": {30.0: record}},
+        progress=False,
+        ne_brem=30,
+        brem_start_eV=100.0,
+        brem_stop_eV=500.0,
+        brem_step_eV=100.0,
+        profile="survey",
+    )
+
+    assert n == 1
+    np.testing.assert_array_equal(record["E_grid_brem"], [100.0, 200.0, 300.0, 400.0])
+    assert record["case"]["E_grid_brem"] == (100.0, 500.0, 100.0)
+    assert record["case"]["Ne_brem"] == 30
+    assert record["case"]["brem_profile"] == "survey"
+
+
 def test_repair_brem_wide_retune_skips_record_already_at_target():
     record = _finite_record(_fake_case("cfg_a", 30.0))
     n = repair_brem_wide({"cfg_a": {30.0: record}}, progress=False, ne_brem=5, brem_step_eV=50.0)
@@ -1088,6 +1112,27 @@ def test_rebrem_checkpoints_enumerates_pkls_and_passes_params(monkeypatch, tmp_p
     )
     assert [Path(p).name for p, _ in calls] == ["MoS2"]
     assert calls[0][1]["only_nonfinite"] is False
+
+
+def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatch, tmp_path):
+    from cxr_mc import rebrem
+
+    for material in ("hopg", "hbn"):
+        (tmp_path / f"{material}.pkl").write_bytes(b"")
+    calls = []
+    monkeypatch.setattr(
+        "cxr_mc.run.repair_checkpoint",
+        lambda path, **kwargs: calls.append((Path(path).name, kwargs)) or {},
+    )
+
+    rebrem.rebrem_checkpoints(materials=["hopg", "hbn"], checkpoint_dir=tmp_path, profile="survey")
+    explicit = calls.copy()
+    calls.clear()
+    rebrem.rebrem_checkpoints(checkpoint_dir=tmp_path, profile="survey")
+
+    assert {name: kwargs for name, kwargs in calls} == {name: kwargs for name, kwargs in explicit}
+    assert {kwargs["ne_brem"] for _, kwargs in calls} == {30}
+    assert {kwargs["profile"] for _, kwargs in calls} == {"survey"}
 
 
 def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
@@ -1287,6 +1332,32 @@ def test_repair_line_spec_rewrites_spec_and_reinterp_brem_keeps_brem_wide(monkey
     np.testing.assert_allclose(r["brem"], np.interp(r["E_grid"], r["E_grid_brem"], r["brem_wide"]))
 
 
+def test_repair_line_spec_persists_profile_and_explicit_bounds(monkeypatch):
+    from cxr_mc import run
+
+    monkeypatch.setattr(
+        run.runner, "_lines_for_case", lambda _case, grid: np.ones(np.asarray(grid).shape)
+    )
+    results = {"mos2@30": {30.0: _line_record()}}
+    record = results["mos2@30"][30.0]
+
+    n = run.repair_line_spec(
+        results,
+        material="mos2",
+        line_ne=60,
+        line_start_eV=500.0,
+        line_stop_eV=1100.0,
+        line_step_eV=200.0,
+        profile="survey",
+        from_config=False,
+    )
+
+    assert n == 1
+    np.testing.assert_array_equal(record["E_grid"], [500.0, 700.0, 900.0])
+    assert record["case"]["Ne"] == 60
+    assert record["case"]["line_profile"] == "survey"
+
+
 def test_repair_line_spec_skips_at_target(monkeypatch):
     import numpy as np
 
@@ -1354,3 +1425,24 @@ def test_reline_checkpoints_forwards_flags(monkeypatch, tmp_path):
             },
         )
     ]
+
+
+def test_reline_profile_defaults_match_for_explicit_materials_and_all(monkeypatch, tmp_path):
+    from cxr_mc import reline
+
+    for material in ("hopg", "hbn"):
+        (tmp_path / f"{material}.pkl").write_bytes(b"")
+    calls = []
+    monkeypatch.setattr(
+        "cxr_mc.run.reline_checkpoint",
+        lambda path, material, **kwargs: calls.append((material, kwargs)) or {},
+    )
+
+    reline.reline_checkpoints(materials=["hopg", "hbn"], checkpoint_dir=tmp_path, profile="survey")
+    explicit = calls.copy()
+    calls.clear()
+    reline.reline_checkpoints(checkpoint_dir=tmp_path, profile="survey")
+
+    assert {name: kwargs for name, kwargs in calls} == {name: kwargs for name, kwargs in explicit}
+    assert {kwargs["line_ne"] for _, kwargs in calls} == {60}
+    assert {kwargs["profile"] for _, kwargs in calls} == {"survey"}

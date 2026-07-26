@@ -352,6 +352,11 @@ Canonical `cxr checkpoint` group. Lazily routes `slim`, component
 `recompute {brem,line}`, `archive`, `restore`, `list`, and `merge` to existing
 checkpoint handlers while root-level legacy paths remain hidden aliases.
 
+### `recompute_defaults.py`
+Profile-aware line/bremsstrahlung recompute defaults shared by local, grouped,
+and remote command paths. Resolves profile settings and material photon grids;
+keeps a compatibility fallback for branches predating named sweep profiles.
+
 ### `catalog_cli.py`
 Canonical `cxr catalog` group. Lazily routes `catalog validate` to
 `check_config.command` while `cxr check-config` remains a hidden alias.
