@@ -197,6 +197,17 @@ def test_material_menu_uses_checkpoint_helper_and_custom_select() -> None:
     assert "MaterialSelect" in source
 
 
+def test_material_and_face_select_labels_render_bold() -> None:
+    source = APP.read_text()
+
+    assert 'const labelText = document.createElement("strong");' in source
+    assert 'labelText.textContent = model.get("label");' in source
+    assert 'label="Material"' in source
+    assert 'label="Face"' in source
+    assert 'label="**Material**"' not in source
+    assert 'label="**Face**"' not in source
+
+
 def test_material_menu_cell_owns_checkpoint_directory_dependency() -> None:
     tree = ast.parse(APP.read_text())
 

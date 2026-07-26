@@ -21,7 +21,9 @@ def _():
         _esm = r"""
         function render({ model, el }) {
           const label = document.createElement("label");
-          label.textContent = model.get("label");
+          const labelText = document.createElement("strong");
+          labelText.textContent = model.get("label");
+          label.appendChild(labelText);
           const select = document.createElement("select");
           select.setAttribute("aria-label", model.get("label"));
           for (const row of model.get("options")) {
@@ -169,7 +171,7 @@ def _(MaterialSelect, mo):
         MaterialSelect(
             options=list(material_options),
             value=initial_selection,
-            label="**Material**",
+            label="Material",
             disabled=initial_selection is None,
         )
     )
@@ -193,7 +195,7 @@ def _(MaterialSelect, material_ui, mo):
         MaterialSelect(
             options=list(face_options),
             value=initial_face,
-            label="**Face**",
+            label="Face",
             disabled=initial_face is None,
         )
     )
