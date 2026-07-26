@@ -25,6 +25,7 @@ from cxr_mc.line_grid import provenance as _provenance
 from cxr_mc.line_grid.bounds import spacing_num
 
 _MATERIALS_TOML = Path(__file__).resolve().parent.parent / "data" / "materials.toml"
+load_material_catalog = None
 
 
 def _line_start_eV(energy_keV: float) -> float:
@@ -236,14 +237,16 @@ def _atomic_write(path, text):
 
 def _validate_catalog_text(path, text):
     """Validate candidate catalog from a temporary file, without replacing live data."""
-    from cxr_mc.materials import load_material_catalog
+    loader = load_material_catalog
+    if loader is None:
+        from cxr_mc.materials import load_material_catalog as loader
 
     path = Path(path)
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), suffix=".toml.tmp")
     try:
         with os.fdopen(fd, "w") as f:
             f.write(text)
-        load_material_catalog(Path(tmp))
+        loader(Path(tmp))
     finally:
         try:
             os.remove(tmp)

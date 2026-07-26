@@ -114,14 +114,16 @@ def test_finite_side_exit_layered_absorption_stays_in_emission_layer():
     )
     reference_line = mc_spectrum(segments, np.arange(700.0, 1500.0), **line_kw)
     layered_line = mc_spectrum(segments, np.arange(700.0, 1500.0), layers=layers, **line_kw)
-    np.testing.assert_allclose(layered_line, reference_line)
+    # GPU spectra accumulate in float32, so equivalent absorption paths can
+    # differ by slightly more than NumPy's default 1e-7 relative tolerance.
+    np.testing.assert_allclose(layered_line, reference_line, rtol=2e-7)
 
     brem_kw = dict(composition=carbon, n_hat=n_hat)
     reference_brem = mc_brem_spectrum(segments, np.arange(700.0, 5000.0, 50.0), **brem_kw)
     layered_brem = mc_brem_spectrum(
         segments, np.arange(700.0, 5000.0, 50.0), layers=layers, **brem_kw
     )
-    np.testing.assert_allclose(layered_brem, reference_brem)
+    np.testing.assert_allclose(layered_brem, reference_brem, rtol=2e-7)
 
 
 def test_all_none_footprint_retains_z_only_spectrum_results():

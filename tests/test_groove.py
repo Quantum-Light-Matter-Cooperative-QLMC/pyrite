@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 
 from cxr_mc.materials.attenuation import _mu_total_inv_ang
+from cxr_mc.montecarlo import _to_cpu
+from cxr_mc.montecarlo._backend import REAL
 from cxr_mc.montecarlo.geometry import X_MAX, Z_MAX
 from cxr_mc.montecarlo.groove import (
     blazed_groove_spec,
@@ -40,6 +42,7 @@ MARCH_SPEC = blazed_groove_spec(
     tilt_azim_rad=np.pi,
 )
 _transport_module = importlib.import_module("cxr_mc.montecarlo.transport")
+_SPECTRUM_RTOL = max(2e-12, 3.0 * float(np.finfo(REAL).eps))
 
 
 def _z_surf(x, spec):
@@ -644,10 +647,12 @@ def _independent_brem_with_escape(segments, grid, escape_ang, *, composition):
     path_cm = segments["L_ang"] * 1e-8
     for element, number_density in composition:
         dsigma = np.asarray(
-            _brem_dsigma_dk(
-                TRANSPORT_ELEMENTS[element]["Z"],
-                segments["E_keV"],
-                grid,
+            _to_cpu(
+                _brem_dsigma_dk(
+                    TRANSPORT_ELEMENTS[element]["Z"],
+                    segments["E_keV"],
+                    grid,
+                )
             )
         )
         spectrum += (number_density * 1e24 * path_cm) @ (dsigma * transmission)
@@ -679,7 +684,7 @@ def test_brem_groove_gain_matches_beer_lambert_escape():
         composition=composition,
     )
 
-    np.testing.assert_allclose(grooved, expected, rtol=2e-12)
+    np.testing.assert_allclose(grooved, expected, rtol=_SPECTRUM_RTOL)
     assert np.all(grooved >= flat)
 
 

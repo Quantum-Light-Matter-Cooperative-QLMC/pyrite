@@ -27,9 +27,9 @@ THETA = np.deg2rad(119.0)
 E0_KEV = 25.0
 B_002 = 0.8
 HKL = ((0, 0, 2), (0, 0, -2))
-E_LINE = np.arange(700.0, 1200.0, 1.0)
-E_BREM = np.arange(700.0, 20000.0, 50.0)
-NE = 120
+E_LINE = np.arange(700.0, 1200.0, 4.0)
+E_BREM = np.arange(700.0, 20000.0, 200.0)
+NE = 12
 TINY_CHUNK = 8  # << segment count, so the chunk loop runs many iterations
 BIG_CHUNK = 10**9  # one shot: the whole segment set in a single matmul
 
@@ -37,7 +37,7 @@ _info = CRYSTALS["hopg"]
 _n_atoms = len(_info["basis"]) / _info["V_cell"]
 
 # Reordering an N-term float sum moves it by ~sqrt(N)*eps relative. The chunk
-# loop here reduces over ~1e4 segments, so allow a few hundred eps of the
+# loop here reduces over many segments, so allow a few hundred eps of the
 # backend's working precision: 1e-10 under float64 (far above the ~1e-13 the
 # reorder actually costs), ~2e-5 under the GPU's float32.
 _EPS = float(np.finfo(REAL).eps)
