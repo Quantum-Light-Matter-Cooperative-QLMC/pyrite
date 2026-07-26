@@ -23,8 +23,14 @@ def _():
     )
     from cxr_mc.plots.crystal_lattice import crystal_lattice_figure
     from cxr_mc.plots.plotly_trajectories import (
-        trajectory_volume_animation,
         trajectory_volume_data,
+        trajectory_volume_figure_from_data,
+    )
+    from cxr_mc.plots.render_trajectories import (
+        cached_render_path,
+        prune_render_cache,
+        render_cache_key,
+        render_reveal_animation,
     )
     from cxr_mc.sweep import build_cases, fmt_thickness
 
@@ -32,17 +38,21 @@ def _():
         CATALOG,
         MaterialSelect,
         build_cases,
+        cached_render_path,
         crystal_lattice_figure,
         default_settings,
         fmt_thickness,
         mo,
         page_title,
         penetration_survival_chart,
+        prune_render_cache,
+        render_cache_key,
+        render_reveal_animation,
         style_sheet,
         trajectory_chart,
         trajectory_sweep,
-        trajectory_volume_animation,
         trajectory_volume_data,
+        trajectory_volume_figure_from_data,
     )
 
 
@@ -231,13 +241,11 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    # Transported-dataset cache. Playback is now client-side (Plotly's own
-    # frame animation inside the figure -- see trajectory_volume_animation),
-    # so nothing here needs to WRITE this back reactively the way the old
-    # frame counter did; this cache exists purely to avoid re-running Monte
-    # Carlo transport when an UNRELATED control (e.g. a different tab) reruns
-    # this cell but the transport parameters (case, Ne, seed, realistic,
-    # beam_fwhm) haven't changed.
+    # Transported-dataset cache. The penetration figure is a static full-reveal
+    # view (orbit/hover via Plotly, no client-side playback); this cache exists
+    # purely to avoid re-running Monte Carlo transport when an UNRELATED
+    # control (e.g. a different tab) reruns this cell but the transport
+    # parameters (case, Ne, seed, realistic, beam_fwhm) haven't changed.
     get_penetration_data, set_penetration_data = mo.state(None)
     return get_penetration_data, set_penetration_data
 
@@ -287,22 +295,25 @@ def _(mo):
 
 @app.cell
 def _(mo):
-    # Speed now drives the animation FIGURE's own frame duration
-    # (trajectory_volume_animation's base_ms / speed), not a server-side
-    # mo.ui.refresh tick -- Play/Pause/scrub all live inside the Plotly figure
-    # itself now, so the old Play switch, Repeat switch, and refresh-ticker
-    # cell are gone; see the animation builder's docstring for the duration
-    # mapping and the loop-doesn't-exist caveat that replaces Repeat.
-    penetration_speed_ui = mo.ui.slider(
-        start=0.25, stop=4, value=1, step=0.25, label="Speed (×)", show_value=True
+    # Prerendered animation controls (workstream 2 of
+    # docs/viewer-camera-animation-plan.md): the interactive Plotly frame
+    # animation is gone -- the tab shows a static full-reveal figure plus an
+    # explicit Render button that produces a smooth, looping fixed-camera
+    # video via cxr_mc.plots.render_trajectories.render_reveal_animation.
+    # Rendering is a blocking multi-second-to-minutes kaleido/ffmpeg job, so
+    # it stays opt-in behind a button rather than running on every rerun.
+    penetration_render_frames_ui = mo.ui.slider(
+        start=24, stop=120, value=60, step=12, label="Render frames", show_value=True
     )
-    return (penetration_speed_ui,)
+    penetration_render_button_ui = mo.ui.run_button(label="Render animation")
+    return penetration_render_button_ui, penetration_render_frames_ui
 
 
 @app.cell
 def _(
     MATERIAL,
     build_cases,
+    cached_render_path,
     get_penetration_data,
     get_penetration_survival,
     mo,
@@ -317,7 +328,8 @@ def _(
     penetration_ne_ui,
     penetration_realistic_ui,
     penetration_regen_ui,
-    penetration_speed_ui,
+    penetration_render_button_ui,
+    penetration_render_frames_ui,
     penetration_survival_chart,
     penetration_thickness_ang,
     penetration_thickness_grid_ui,
@@ -327,13 +339,16 @@ def _(
     penetration_tilt_grid_ui,
     penetration_tilt_manual_ui,
     penetration_tilt_source_ui,
+    prune_render_cache,
+    render_cache_key,
+    render_reveal_animation,
     set_penetration_data,
     set_penetration_survival,
     settings,
     trajectory_chart,
     trajectory_sweep,
-    trajectory_volume_animation,
     trajectory_volume_data,
+    trajectory_volume_figure_from_data,
 ):
     def penetration_tab():
         _angle = penetration_tilt_deg
@@ -410,10 +425,9 @@ def _(
         _realistic = penetration_realistic_ui.value
 
         # The transported dataset depends only on (case, Ne, seed, realistic,
-        # beam_fwhm) -- NOT on playback state (playback is now client-side, see
-        # trajectory_volume_animation). Cache the whole `data` dict in mo.state
-        # keyed on that tuple so Monte Carlo transport runs once per parameter
-        # set, not once per rerun of an unrelated control.
+        # beam_fwhm). Cache the whole `data` dict in mo.state keyed on that
+        # tuple so Monte Carlo transport runs once per parameter set, not once
+        # per rerun of an unrelated control.
         _data_key = (
             _nc["name"],
             _nc["E0_keV"],
@@ -434,23 +448,96 @@ def _(
             )
             set_penetration_data((_data_key, _data))
 
-        # Playback (Play/Pause, frame scrubbing) is native Plotly animation
-        # running entirely in the browser -- see trajectory_volume_animation's
-        # docstring. The Speed slider maps to the figure's own frame duration;
-        # changing it rebuilds the figure once, server-side, same as any other
-        # control here.
-        _volume = trajectory_volume_animation(
-            _nc,
-            _data,
-            realistic=_realistic,
-            beam_fwhm_mm=_beam_fwhm,
-            speed=float(penetration_speed_ui.value),
+        # Static full-reveal figure (orbit/hover intact); the old interactive
+        # Plotly frame animation is gone -- see docs/viewer-camera-animation-plan.md
+        # workstream 2. Smooth playback now comes from the Render button below,
+        # which prerenders a fixed-camera video via render_reveal_animation.
+        _volume = trajectory_volume_figure_from_data(
+            _nc, _data, realistic=_realistic, beam_fwhm_mm=_beam_fwhm, reveal_until_fs=None
         )
         # Full-row plot now that the 2D cross-section moved down beside the
         # survival chart; widened past Plotly's 700 default now the colorbar
         # (restored below) has room without cramping the scene.
         if _volume is not None:
             _volume.update_layout(width=900)
+
+        # Render button: prerender a smooth, looping fixed-camera video of the
+        # SAME reveal sequence the old client-side animation played, offscreen
+        # via kaleido + ffmpeg (see cxr_mc.plots.render_trajectories). Cached
+        # under ~/.cache/cxr-mc/viewer-renders keyed on every parameter the
+        # render depends on, so an unchanged parameter set short-circuits to
+        # the existing file instead of re-rendering.
+        _render_controls = mo.hstack(
+            [penetration_render_frames_ui, penetration_render_button_ui],
+            justify="start",
+            align="center",
+            gap=1,
+            wrap=True,
+        )
+        _n_frames = int(penetration_render_frames_ui.value)
+        _render_key = render_cache_key(
+            _nc["name"],
+            _data_key[1:5],
+            _Ne,
+            _seed,
+            _realistic,
+            _beam_fwhm,
+            _n_frames,
+            12,
+            None,
+        )
+        _render_path = cached_render_path(_render_key, ".mp4")
+        # Render on click only when this parameter set has no cached file yet;
+        # DISPLAY is gated on the file existing, not on the button's value --
+        # run_button.value resets to False after the triggered run, so gating
+        # the video on it made the player vanish on the next reactive rerun.
+        _render_error = None
+        if penetration_render_button_ui.value and not _render_path.exists():
+            try:
+                # ~3 s/frame through kaleido at this figure size, measured on
+                # the Ne=50 hopg case -- surface the wait up front so a
+                # multi-minute blocking render doesn't read as a dead button.
+                with mo.status.progress_bar(
+                    total=_n_frames,
+                    title="Rendering animation",
+                    subtitle=f"{_n_frames} frames, ~3 s each offscreen",
+                ) as _bar:
+
+                    def _render_progress_cb(_k, _n, _bar=_bar):
+                        _bar.update()
+
+                    render_reveal_animation(
+                        _nc,
+                        _data,
+                        _render_path,
+                        realistic=_realistic,
+                        beam_fwhm_mm=_beam_fwhm,
+                        n_frames=_n_frames,
+                        fps=12,
+                        camera=None,
+                        progress_cb=_render_progress_cb,
+                    )
+                prune_render_cache()
+            except RuntimeError as _exc:
+                _render_error = mo.callout(mo.md(str(_exc)), kind="warn")
+        if _render_error is not None:
+            _render_block = _render_error
+        elif _render_path.exists():
+            # File handle (not str path) so marimo serves the bytes itself
+            # instead of pointing the browser at a local filesystem path.
+            _render_block = mo.video(
+                src=_render_path.open("rb"),
+                controls=True,
+                loop=True,
+                autoplay=True,
+                muted=True,
+            )
+        else:
+            _render_block = mo.md(
+                f"*Click **Render animation** for smooth playback "
+                f"(~{max(1, round(_n_frames * 3 / 60))} min offscreen render; "
+                f"cached per parameter set afterwards).*"
+            )
 
         def _row_label(text):
             return mo.md(text).style({"min-width": "9rem", "display": "inline-block"})
@@ -538,25 +625,17 @@ def _(
                     ),
                     mo.hstack(
                         [
-                            mo.hstack(
-                                [
-                                    _row_label("**Polar tilt**"),
-                                    penetration_tilt_source_ui,
-                                    (
-                                        penetration_tilt_grid_ui
-                                        if penetration_tilt_source_ui.value == "grid"
-                                        else penetration_tilt_manual_ui
-                                    ),
-                                ],
-                                justify="start",
-                                align="center",
-                                gap=1,
-                                wrap=True,
+                            _row_label("**Polar tilt**"),
+                            penetration_tilt_source_ui,
+                            (
+                                penetration_tilt_grid_ui
+                                if penetration_tilt_source_ui.value == "grid"
+                                else penetration_tilt_manual_ui
                             ),
-                            penetration_speed_ui,
                         ],
-                        justify="space-between",
+                        justify="start",
                         align="center",
+                        gap=1,
                         wrap=True,
                     ),
                     mo.hstack(
@@ -590,7 +669,7 @@ def _(
                     mo.hstack([penetration_regen_ui], justify="end", wrap=True),
                 ]
             ),
-            *(p for p in (_volume, _bottom_row) if p is not None),
+            *(p for p in (_volume, _render_controls, _render_block, _bottom_row) if p is not None),
         ]
         return mo.vstack(_parts)
 

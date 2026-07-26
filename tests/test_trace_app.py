@@ -23,24 +23,49 @@ def test_crystal_view_defaults_to_one_ranked_reciprocal_vector() -> None:
     assert "n_reciprocal_vectors=crystal_reciprocal_ui.value" in source
 
 
-def test_penetration_view_uses_interactive_3d_volume_as_primary_track_plot() -> None:
+def test_penetration_view_uses_static_volume_figure_as_primary_track_plot() -> None:
     source = APP.read_text()
 
     assert "from cxr_mc.plots.plotly_trajectories import (" in source
-    assert "trajectory_volume_animation," in source
     assert "trajectory_volume_data," in source
+    assert "trajectory_volume_figure_from_data," in source
+    assert "trajectory_volume_animation" not in source
     # Playback controls drive the transport data (Ne/seed/realistic/beam_fwhm);
-    # Play/Pause/scrub is native Plotly animation in the browser from there.
+    # the volume figure itself is a static full reveal.
     assert "_data = trajectory_volume_data(" in source
     for arg in ("Ne=_Ne", "seed=_seed", "realistic=_realistic", "beam_fwhm_mm=_beam_fwhm"):
         assert arg in source
-    assert "_volume = trajectory_volume_animation(" in source
-    for arg in ("_nc,", "_data,", "realistic=_realistic,", "beam_fwhm_mm=_beam_fwhm,", "speed="):
+    assert "_volume = trajectory_volume_figure_from_data(" in source
+    for arg in ("_nc,", "_data,", "realistic=_realistic,", "reveal_until_fs=None"):
         assert arg in source
     # The 2D cross-section renders eagerly beside the survival chart (no lazy
     # accordion wrapper -- see the rail-free declutter).
     assert "_cross_section_chart = trajectory_chart(_nc, Ne=40, width=420)" in source
     assert "lateral extent is fitted to the tracks" in source
+
+
+def test_penetration_view_offers_prerendered_render_button() -> None:
+    source = APP.read_text()
+
+    assert "from cxr_mc.plots.render_trajectories import (" in source
+    for name in (
+        "cached_render_path,",
+        "prune_render_cache,",
+        "render_cache_key,",
+        "render_reveal_animation,",
+    ):
+        assert name in source
+    assert "penetration_render_frames_ui = mo.ui.slider(" in source
+    assert "start=24, stop=120, value=60, step=12" in source
+    assert 'penetration_render_button_ui = mo.ui.run_button(label="Render animation")' in source
+    assert "penetration_speed_ui" not in source
+    assert "render_reveal_animation(" in source
+    assert "mo.status.progress_bar(" in source
+    # Video is served as bytes (file handle, not a local path string) and its
+    # display is gated on the cached file existing, not on the transient
+    # run_button value -- see the render block's comments in the app.
+    assert 'src=_render_path.open("rb")' in source
+    assert "penetration_render_button_ui.value and not _render_path.exists()" in source
 
 
 def test_penetration_tab_wires_groove_control_to_trajectory_sweep() -> None:
