@@ -16,6 +16,7 @@ from cxr_mc import (
     reline,
     scan,
     slim,
+    viewer,
 )
 from tests.cli_helpers import assert_clean_result, invoke
 
@@ -23,6 +24,7 @@ LOCAL_COMMANDS = [
     scan.command,
     blaze.command,
     analyze.command,
+    viewer.command,
     check.command,
     export.command,
     slim.command,
