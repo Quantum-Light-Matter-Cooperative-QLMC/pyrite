@@ -413,10 +413,18 @@ def _(
 def _(CATALOG, MATERIAL, fmt_thickness, mo):
     # The penetration figures run transport directly, so use the selected
     # material's configured scan grids instead of requiring a checkpoint.
-    _scan = CATALOG.material(MATERIAL).scan
-    _energy_values = tuple(float(value) for value in _scan.energy_keV)
-    _thickness_values = tuple(float(value) for value in _scan.thickness_ang)
-    _tilt_values = tuple(float(value) for value in _scan.tilt_deg)
+    # With no local checkpoints, MATERIAL is None. Keep this control cell valid
+    # with inert values; the final display cell shows the empty-state callout
+    # instead of exposing the analysis tabs.
+    if MATERIAL is None:
+        _energy_values = (1.0,)
+        _thickness_values = (10.0,)
+        _tilt_values = (0.0,)
+    else:
+        _scan = CATALOG.material(MATERIAL).scan
+        _energy_values = tuple(float(value) for value in _scan.energy_keV)
+        _thickness_values = tuple(float(value) for value in _scan.thickness_ang)
+        _tilt_values = tuple(float(value) for value in _scan.tilt_deg)
 
     _source_options = {"Presets": "grid", "Custom": "manual"}
     penetration_energy_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")
@@ -2260,12 +2268,14 @@ def _(mo):
     crystal_nc_ui = mo.ui.slider(1, 3, value=2, step=1, label="cells c")
     crystal_bonds_ui = mo.ui.switch(value=False, label="show bonds")
     crystal_layers_ui = mo.ui.switch(value=False, label="color by layer")
+    crystal_reciprocal_ui = mo.ui.slider(1, 8, value=1, step=1, label="reciprocal vectors")
     return (
         crystal_bonds_ui,
         crystal_layers_ui,
         crystal_na_ui,
         crystal_nb_ui,
         crystal_nc_ui,
+        crystal_reciprocal_ui,
     )
 
 
@@ -2279,6 +2289,7 @@ def _(
     crystal_na_ui,
     crystal_nb_ui,
     crystal_nc_ui,
+    crystal_reciprocal_ui,
     mo,
 ):
     def crystal_tab():
@@ -2286,8 +2297,8 @@ def _(
             "### Crystal structure\n"
             "Ball-and-stick view of the selected material's unit cell tiled over "
             "a few cells. Spheres are element-colored (sized by covalent radius); "
-            "toggle bonds and per-layer coloring below. Geometry only -- no "
-            "scattering physics."
+            "arrows show strongest reciprocal-lattice families in descending "
+            "strength. Adjust cell tiling, bonds, coloring, and arrow count below."
         )
         if MATERIAL is None:
             return mo.vstack([_md, mo.md("_Select a material to view its lattice._")])
@@ -2300,6 +2311,7 @@ def _(
             label=_material.label,
             show_bonds=crystal_bonds_ui.value,
             color_by="layer" if crystal_layers_ui.value else "element",
+            n_reciprocal_vectors=crystal_reciprocal_ui.value,
         )
         _fig.update_layout(height=680)
         _controls = mo.hstack(
@@ -2309,6 +2321,7 @@ def _(
                 crystal_nc_ui,
                 crystal_bonds_ui,
                 crystal_layers_ui,
+                crystal_reciprocal_ui,
             ],
             justify="start",
             gap=1.5,
@@ -2321,6 +2334,7 @@ def _(
 
 @app.cell
 def _(
+    MATERIAL,
     azim_compare_tab,
     crystal_tab,
     cross_material_tab,
@@ -2334,34 +2348,40 @@ def _(
 ):
     # Every top-level tab holds exactly one view, so each is a bare tab body
     # rather than a nested action-accordion group.
-    mo.ui.tabs(
-        {
-            "Explore": lambda: mo.accordion(
-                {
-                    "Compare beam energies": spectra_tab,
-                    "Compare polar angles": polar_compare_tab,
-                    "Compare azimuths": azim_compare_tab,
-                },
-                lazy=True,
-                multiple=True,
-            ),
-            "Optimize": lambda: mo.vstack(
-                [
-                    scans_tab(),
-                    mo.accordion(
-                        {"Rank geometries": rankings_tab},
-                        lazy=True,
-                        multiple=True,
-                    ),
-                ]
-            ),
-            "Instruments": detectors_tab,
-            "Trace": penetration_tab,
-            "Structure": crystal_tab,
-            "Compare": cross_material_tab,
-        },
-        lazy=True,
-    )
+    if MATERIAL is None:
+        mo.callout(
+            mo.md("**No checkpoint data available.** Run `cxr scan <material>` to create one."),
+            kind="info",
+        )
+    else:
+        mo.ui.tabs(
+            {
+                "Explore": lambda: mo.accordion(
+                    {
+                        "Compare beam energies": spectra_tab,
+                        "Compare polar angles": polar_compare_tab,
+                        "Compare azimuths": azim_compare_tab,
+                    },
+                    lazy=True,
+                    multiple=True,
+                ),
+                "Optimize": lambda: mo.vstack(
+                    [
+                        scans_tab(),
+                        mo.accordion(
+                            {"Rank geometries": rankings_tab},
+                            lazy=True,
+                            multiple=True,
+                        ),
+                    ]
+                ),
+                "Instruments": detectors_tab,
+                "Trace": penetration_tab,
+                "Structure": crystal_tab,
+                "Compare": cross_material_tab,
+            },
+            lazy=True,
+        )
     return
 
 

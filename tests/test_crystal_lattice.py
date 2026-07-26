@@ -11,6 +11,7 @@ import pytest
 from cxr_mc.materials import CATALOG
 from cxr_mc.materials.crystal import _direct_lattice_vectors
 from cxr_mc.plots.crystal_lattice import (
+    _reciprocal_vector_data,
     crystal_atom_sites,
     crystal_bonds,
     crystal_lattice_figure,
@@ -55,9 +56,26 @@ def test_figure_atom_count_and_traces(spec):
     fig = crystal_lattice_figure(spec, 2, 2, 2)
     assert isinstance(fig, go.Figure)
     # One line trace for cell edges + one marker trace per distinct element.
-    marker_traces = [t for t in fig.data if t.mode == "markers"]
+    marker_traces = [t for t in fig.data if getattr(t, "mode", None) == "markers"]
     assert len(marker_traces) == len(set(elements))
     assert sum(len(t.x) for t in marker_traces) == len(elements)
+    reciprocal = [t for t in fig.data if t.type == "cone"]
+    assert len(reciprocal) == 1
+    assert len(reciprocal[0].x) == 1
+
+
+def test_reciprocal_vector_count_and_ranking_are_stable(spec):
+    first_hkl, first_vector = _reciprocal_vector_data(spec, 1)
+    hkls, vectors = _reciprocal_vector_data(spec, 4)
+
+    assert hkls.shape == vectors.shape == (4, 3)
+    np.testing.assert_array_equal(hkls[:1], first_hkl)
+    np.testing.assert_allclose(vectors[:1], first_vector)
+
+
+def test_reciprocal_vectors_can_be_hidden(spec):
+    fig = crystal_lattice_figure(spec, n_reciprocal_vectors=0)
+    assert not any(trace.type == "cone" for trace in fig.data)
 
 
 def test_bonds_are_symmetric_index_pairs_within_range(spec):
@@ -80,7 +98,7 @@ def test_bonds_scale_with_tolerance(spec):
 
 def test_show_bonds_adds_line_trace(spec):
     fig = crystal_lattice_figure(spec, 2, 2, 2, show_bonds=True)
-    line_traces = [t for t in fig.data if t.mode == "lines"]
+    line_traces = [t for t in fig.data if getattr(t, "mode", None) == "lines"]
     # Cell edges + bonds are both line traces; without bonds there is only one.
     assert len(line_traces) == 2
     assert any(t.name == "bonds" for t in line_traces)
@@ -89,7 +107,7 @@ def test_show_bonds_adds_line_trace(spec):
 def test_layer_coloring_uses_single_marker_trace(spec):
     elements, _ = crystal_atom_sites(spec, 2, 2, 2)
     fig = crystal_lattice_figure(spec, 2, 2, 2, color_by="layer")
-    marker_traces = [t for t in fig.data if t.mode == "markers"]
+    marker_traces = [t for t in fig.data if getattr(t, "mode", None) == "markers"]
     assert len(marker_traces) == 1
     assert len(marker_traces[0].x) == len(elements)
 

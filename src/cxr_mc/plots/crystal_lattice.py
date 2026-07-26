@@ -4,8 +4,7 @@ plots.crystal_lattice
 Structural 3D ball-and-stick view of a material's crystal: tile the CIF-derived
 fractional basis over a few unit cells, map fractional -> Cartesian through the
 direct lattice vectors, and render atoms as element-colored spheres with the
-unit-cell edges overlaid. This is a visualization aid only -- it draws geometry
-straight from the catalog and computes no X-ray scattering physics.
+unit-cell edges and strongest reciprocal-lattice vectors overlaid.
 """
 
 from __future__ import annotations
@@ -15,7 +14,11 @@ from collections.abc import Sequence
 import numpy as np
 import plotly.graph_objects as go
 
-from cxr_mc.materials.crystal import _direct_lattice_vectors
+from cxr_mc.materials.crystal import (
+    _direct_lattice_vectors,
+    dominant_reflections,
+    reciprocal_g_vector,
+)
 
 # CPK-style colors (hex) and covalent radii [Angstrom] for the elements the
 # catalog uses. Anything unlisted falls back to _DEFAULT_* so the viewer never
@@ -124,6 +127,74 @@ def _cell_matrix(spec) -> np.ndarray:
     """(3, 3) matrix whose ROWS are the direct lattice vectors a1, a2, a3."""
     a1, a2, a3 = _direct_lattice_vectors(spec.lattice)
     return np.stack([a1, a2, a3], axis=0)
+
+
+def _reciprocal_vector_data(spec, n_vectors: int) -> tuple[np.ndarray, np.ndarray]:
+    """Ranked family representatives and reciprocal vectors [1/Angstrom]."""
+    if n_vectors <= 0 or not getattr(spec, "key", None):
+        return np.zeros((0, 3), dtype=int), np.zeros((0, 3), dtype=float)
+    hkls = dominant_reflections(
+        spec.key,
+        n_families=int(n_vectors),
+        B_ang2=spec.B_ang2,
+        representatives_only=True,
+    )
+    hkl_array = np.asarray(hkls, dtype=int).reshape(-1, 3)
+    vectors = np.asarray(
+        [reciprocal_g_vector(hkl, spec.lattice)[0] for hkl in hkl_array],
+        dtype=float,
+    ).reshape(-1, 3)
+    return hkl_array, vectors
+
+
+def _reciprocal_vector_trace(
+    spec,
+    n_a: int,
+    n_b: int,
+    n_c: int,
+    n_vectors: int,
+) -> go.Cone | None:
+    """Cone trace for strongest reciprocal-vector family representatives."""
+    hkls, vectors = _reciprocal_vector_data(spec, n_vectors)
+    if len(hkls) == 0:
+        return None
+
+    cell = _cell_matrix(spec)
+    center = np.array([n_a, n_b, n_c], dtype=float) @ cell / 2.0
+    scene_extent = max(np.linalg.norm(np.array([n_a, n_b, n_c]) @ cell), 1.0)
+    vectors = vectors * (0.38 * scene_extent / np.linalg.norm(vectors, axis=1).max())
+    origins = np.repeat(center[None, :], len(vectors), axis=0)
+    ranks = np.arange(1, len(vectors) + 1)
+    labels = np.array(
+        [f"({h_idx} {k_idx} {l_idx})" for h_idx, k_idx, l_idx in hkls],
+        dtype=object,
+    )
+    magnitudes = np.linalg.norm(
+        [reciprocal_g_vector(hkl, spec.lattice)[0] for hkl in hkls],
+        axis=1,
+    )
+    return go.Cone(
+        x=origins[:, 0],
+        y=origins[:, 1],
+        z=origins[:, 2],
+        u=vectors[:, 0],
+        v=vectors[:, 1],
+        w=vectors[:, 2],
+        anchor="tail",
+        sizemode="absolute",
+        sizeref=0.11 * scene_extent,
+        colorscale="Plasma_r",
+        cmin=1,
+        cmax=max(len(vectors), 2),
+        showscale=False,
+        name="reciprocal vectors",
+        showlegend=True,
+        customdata=np.column_stack([labels, ranks, magnitudes]),
+        hovertemplate=(
+            "g %{customdata[0]} · strength rank %{customdata[1]}"
+            "<br>|g|=%{customdata[2]:.3f} Å⁻¹<extra></extra>"
+        ),
+    )
 
 
 def crystal_atom_sites(
@@ -252,6 +323,7 @@ def crystal_lattice_figure(
     show_bonds: bool = False,
     color_by: str = "element",
     bond_tol: float = 1.2,
+    n_reciprocal_vectors: int = 1,
 ) -> go.Figure:
     """3D ball-and-stick figure of ``spec``'s structure over the tiled cells.
 
@@ -265,12 +337,17 @@ def crystal_lattice_figure(
     continuous colorbar, which reveals the layering of stacked solids. When
     ``show_bonds`` is set, near-neighbor pairs (within ``bond_tol`` * summed
     covalent radii) are joined by gray sticks. The unit-cell edges are drawn as
-    thin gray lines and equal data aspect keeps bond angles undistorted.
-    Structural only -- no physics.
+    thin gray lines. ``n_reciprocal_vectors`` overlays that many strongest
+    reflection-family representatives as arrows, ordered by the same structural
+    strength metric used by :func:`dominant_reflections`; one dominant arrow is
+    shown by default. Equal data aspect keeps bond angles undistorted.
     """
     elements, coords = crystal_atom_sites(spec, n_a, n_b, n_c)
     fig = go.Figure()
     fig.add_trace(_cell_edge_trace(spec, n_a, n_b, n_c))
+    reciprocal_trace = _reciprocal_vector_trace(spec, n_a, n_b, n_c, n_reciprocal_vectors)
+    if reciprocal_trace is not None:
+        fig.add_trace(reciprocal_trace)
 
     if show_bonds:
         fig.add_trace(_bond_trace(coords, crystal_bonds(elements, coords, tol=bond_tol)))

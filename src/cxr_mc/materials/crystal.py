@@ -382,6 +382,7 @@ def dominant_reflections(
     B_ang2=0.0,
     use_henke=False,
     g_max_invang=8.0,
+    representatives_only=False,
 ):
     """
     Automatically select the strongest reflection FAMILIES of a crystal,
@@ -395,6 +396,8 @@ def dominant_reflections(
     equivalent members are grouped by identical (|g|, metric) -- no explicit
     space-group code needed -- and ALL members of the top n_families are
     returned as a sorted list of (h, k, l) tuples (including Friedel mates).
+    Set ``representatives_only`` to return one deterministic member per ranked
+    family, useful when each family should appear once in a visualization.
 
     NOTE: this ranks by the crystal STRUCTURE only. Texture constraints are
     yours to impose -- e.g. HOPG must be restricted to (00l) by hand, since
@@ -434,5 +437,6 @@ def dominant_reflections(
     for (_, m), members in ranked[:n_families]:
         if m < 1e-9 * ranked[0][0][1]:
             break  # forbidden/negligible families
-        out.extend(sorted(members))
+        ordered = sorted(members)
+        out.extend([ordered[-1]] if representatives_only else ordered)
     return out

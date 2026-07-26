@@ -21,8 +21,24 @@ def _attribute_path(node: ast.AST) -> tuple[str, ...]:
 def test_penetration_controls_read_the_active_material_scan() -> None:
     source = APP.read_text()
 
+    assert "if MATERIAL is None:" in source
     assert "def _(CATALOG, MATERIAL, fmt_thickness, mo):" in source
     assert "_scan = CATALOG.material(MATERIAL).scan" in source
+
+
+def test_no_checkpoint_state_displays_without_analysis_tabs() -> None:
+    source = APP.read_text()
+
+    assert "**No checkpoint data available.**" in source
+    assert "if MATERIAL is None:" in source
+    assert '"MATERIAL",' in source
+
+
+def test_crystal_view_defaults_to_one_ranked_reciprocal_vector() -> None:
+    source = APP.read_text()
+
+    assert '1, 8, value=1, step=1, label="reciprocal vectors"' in source
+    assert "n_reciprocal_vectors=crystal_reciprocal_ui.value" in source
 
 
 def test_penetration_view_uses_interactive_3d_volume_as_primary_track_plot() -> None:

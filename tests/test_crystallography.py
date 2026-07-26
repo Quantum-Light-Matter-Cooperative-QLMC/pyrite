@@ -261,6 +261,13 @@ def test_dominant_reflections_nonempty_triples():
     assert len(refl) > 0 and all(len(h) == 3 for h in refl)
 
 
+def test_dominant_reflection_representatives_return_one_per_family():
+    representatives = dominant_reflections("silicon", n_families=4, representatives_only=True)
+
+    assert len(representatives) == 4
+    assert all(len(hkl) == 3 for hkl in representatives)
+
+
 def test_mote2_structure_sane():
     # Bulk 2H-MoTe2 a=3.517 A, c=13.96 A: V = (sqrt(3)/2) a^2 c ~= 149.5 A^3.
     # 2 f.u. (2 Mo + 4 Te) per cell.
@@ -421,9 +428,7 @@ def test_pts2_structure_and_basal_couplings_are_sane():
 
     assert info["lattice"]["a"] == pytest.approx(3.5432)
     assert info["lattice"]["c"] == pytest.approx(5.0388)
-    assert info["V_cell"] == pytest.approx(
-        np.sqrt(3.0) * 3.5432**2 * 5.0388 / 2.0, abs=0.1
-    )
+    assert info["V_cell"] == pytest.approx(np.sqrt(3.0) * 3.5432**2 * 5.0388 / 2.0, abs=0.1)
     assert len(info["basis"]) == 3
     assert sum(element == "Pt" for element, _ in info["basis"]) == 1
     assert sum(element == "S" for element, _ in info["basis"]) == 2
