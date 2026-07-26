@@ -17,7 +17,7 @@ are swallowed (exit 0) so a formatting hiccup never blocks an edit.
 Also warns (never blocks) when an edit touches the material-catalog source of
 truth (`data/materials.toml`, `materials/catalog.py`) whose serialized snapshot
 `tests/data/material_catalog_golden.json` must be regenerated with
-`cxr line-grid regen-golden` (or the /regen-golden skill) or the catalog golden
+`cxr energy-grid regen-golden` (or the /regen-golden skill) or the catalog golden
 test drifts red.
 """
 
@@ -68,7 +68,7 @@ def _warn_golden_stale(target: Path) -> None:
     if any(posix.endswith(src) for src in _GOLDEN_SOURCES):
         sys.stderr.write(
             f"[golden] edited {target.name}: regenerate the catalog snapshot with "
-            "`cxr line-grid regen-golden` (or /regen-golden) or "
+            "`cxr energy-grid regen-golden` (or /regen-golden) or "
             "tests/data/material_catalog_golden.json drifts red.\n"
         )
 

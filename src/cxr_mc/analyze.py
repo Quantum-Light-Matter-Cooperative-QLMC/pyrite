@@ -40,8 +40,10 @@ from typing import TypedDict
 
 import click
 
-from . import _checkpoint_store, _cli_completion, _cli_core
+from . import _checkpoint_store
 from ._acp import running_acp
+from .cli import _completion as _cli_completion
+from .cli import _core as _cli_core
 
 NOTEBOOK = "notebooks/analysis_app.py"
 TUNNEL_PORT = 2718

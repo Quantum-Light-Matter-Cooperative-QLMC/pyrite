@@ -1,4 +1,4 @@
-"""Tool-owned source/note store for cxr line-grid bounds (NOT the catalog).
+"""Tool-owned source/note store for cxr energy-grid bounds (NOT the catalog).
 
 materials.toml holds pure grid values; this sidecar records who set each grid and
 why, keyed material -> channel -> energy. Used for sticky-manual protection in
@@ -74,7 +74,7 @@ def set_brem(material, source, note=None):
 
 
 def _emit(data: dict) -> str:
-    lines = ["# managed by cxr line-grid; do not hand-edit", ""]
+    lines = ["# managed by cxr energy-grid; do not hand-edit", ""]
 
     def block(header, rec):
         lines.append(f"[{header}]")

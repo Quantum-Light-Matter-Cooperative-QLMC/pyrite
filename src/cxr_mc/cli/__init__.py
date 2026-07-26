@@ -6,8 +6,8 @@ from collections.abc import Sequence
 
 import click
 
-from . import __version__
-from ._cli_core import LazyGroup, color_option, run
+from .. import __version__
+from ._core import LazyGroup, color_option, run
 
 _COMMANDS = {
     "scan": "cxr_mc.scan.command",
@@ -16,8 +16,8 @@ _COMMANDS = {
     "analyze": "cxr_mc.analyze.command",
     "viewer": "cxr_mc.viewer.command",
     "validate": "cxr_mc.check.command",
-    "catalog": "cxr_mc.catalog_cli.command",
-    "checkpoint": "cxr_mc.checkpoint_cli.command",
+    "catalog": "cxr_mc.cli.catalog.command",
+    "checkpoint": "cxr_mc.cli.checkpoint.command",
     "slim": "cxr_mc.slim.command",
     "rebrem": "cxr_mc.rebrem.command",
     "reline": "cxr_mc.reline.command",
@@ -26,7 +26,8 @@ _COMMANDS = {
     "archives": "cxr_mc.archive.archives_command",
     "union": "cxr_mc.archive.union_command",
     "remote": "cxr_mc.remote.command",
-    "line-grid": "cxr_mc.line_grid.command",
+    "energy-grid": "cxr_mc.cli.energy_grid.command",
+    "sweep": "cxr_mc.cli.sweep.command",
     "check": "cxr_mc.check.command",
     "check-config": "cxr_mc.check_config.command",
 }
@@ -48,7 +49,8 @@ _COMMAND_HELP = {
     "archives": "List checkpoint archives.",
     "union": "Merge a shelved checkpoint into an active slot.",
     "remote": "Run and manage MC sweeps on a remote GPU host.",
-    "line-grid": "Derive, submit, inspect, and apply line-energy grids.",
+    "energy-grid": "Derive, submit, inspect, and apply photon-energy grids.",
+    "sweep": "Show and edit scan parameter-range sweeps.",
     "check": "Launch validation or export cached validation figures.",
     "check-config": "Validate a material catalog without starting simulation.",
 }

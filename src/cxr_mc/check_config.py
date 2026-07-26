@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import click
 
-from . import _cli_core
+from .cli import _core as _cli_core
 from .materials import MaterialConfigError, load_material_catalog
 
 

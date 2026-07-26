@@ -256,8 +256,8 @@ def start(
     remote._stage_job_script(jobid, [], upload, script)
     scheduler_id = remote._submit_staged_job(jobid, [], nice=True)
     print(f"submitted SLURM job {scheduler_id} as {jobid}")
-    print(f"status: cxr line-grid status {jobid}")
-    print(f"attach: cxr line-grid attach {jobid}")
+    print(f"status: cxr energy-grid job status {jobid}")
+    print(f"attach: cxr energy-grid job attach {jobid}")
     return jobid
 
 

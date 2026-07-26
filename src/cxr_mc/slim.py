@@ -19,7 +19,9 @@ import os
 
 import click
 
-from . import _checkpoint_io, _checkpoint_store, _cli_completion, _cli_core
+from . import _checkpoint_io, _checkpoint_store
+from .cli import _completion as _cli_completion
+from .cli import _core as _cli_core
 from .results import slim_results
 
 

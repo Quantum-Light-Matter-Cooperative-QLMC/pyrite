@@ -46,5 +46,13 @@ Item generation:
    1. Progress bar here shows up at the top of the marimo notebook instead of near the button that is pressed to start the render -- confusing
    2. clip off the extra figure background & legend in the render, it is ugly. We just want the black grid space, with the colorbar and mat/config title info overlayed, but no background color. Saved render is also a bit pixelated, especially when opened in an mp4 viewer outside of the marimo app.
    3. add button to open render saving dialogue (so user can promptly move it from the cache)
+7. **>user< CLI rework: `line-grid` → `energy-grid` + new `cxr sweep`.** Disentangle line-grid / brem-grid / derivation-geometry / scan-parameter-sweep settings; add read-write `cxr sweep` (default `[profiles.*]` + per-material scan ranges). Design: [`docs/cli-energy-grid-sweep-rework-plan.md`](docs/cli-energy-grid-sweep-rework-plan.md).
+   1. Deferred within that rework: rename catalog `[profiles.*]` TOML table (scan-grid defaults) to `[scan_defaults.*]` to end the name clash with `profiles.py` `SweepProfile` (full/survey). Schema change — see P3.
 
 ## P3 - lower / exploratory / small bugfixes
+
+1. **Rename catalog `[profiles.*]` TOML table → `[scan_defaults.*]`.** The scan-grid
+   defaults table clashes name-wise with `profiles.py` `SweepProfile` (full/survey),
+   two unrelated "profile" concepts. Catalog-schema change (materials.toml,
+   `_parse_profiles`/`_parse_materials`, golden, docs). Blocked-by / folds into P2.7
+   (`cxr sweep` rework). Design: [`docs/cli-energy-grid-sweep-rework-plan.md`](docs/cli-energy-grid-sweep-rework-plan.md).

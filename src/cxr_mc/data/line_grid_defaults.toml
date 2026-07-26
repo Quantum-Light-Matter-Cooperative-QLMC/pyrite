@@ -1,4 +1,4 @@
-# managed by `cxr line-grid defaults --set`; edit via CLI, not by hand
+# managed by `cxr energy-grid defaults --set`; edit via CLI, not by hand
 
 tilts = []
 azimuths = []

@@ -279,7 +279,7 @@ def _print_diff(original, new_text):
 
 def _warn_stale_golden():
     print(
-        "warning: material catalog changed; golden is now stale; run `cxr line-grid regen-golden`",
+        "warning: material catalog changed; golden is now stale; run `cxr energy-grid regen-golden`",
         file=sys.stderr,
     )
 
@@ -381,30 +381,44 @@ def set_brem_grid(material, stop_eV, *, step_eV=None, note=None):
     _warn_stale_golden()
 
 
-def show(material=None) -> str:
+def show(material=None, band=None) -> str:
+    """Render configured energy grids, every block headed by its band.
+
+    ``band`` filters the output: ``"line"`` shows only line grids, ``"brem"``
+    only bremsstrahlung, ``None`` (default) shows both side by side.
+    """
     original = tomllib.loads(Path(_MATERIALS_TOML).read_text())
     mats = original["materials"]
     if material is not None and material not in mats:
         raise ValueError(f"unknown material: {material}")
     keys = [material] if material else list(mats)
+    show_line = band in (None, "line")
+    show_brem = band in (None, "brem")
     out = []
     for key in keys:
         block = mats.get(key, {})
-        rows = block.get("E_grid_line_by_energy", [])
         out.append(f"=== {key} ===")
-        for item in rows:
-            e = float(item["energy_keV"])
-            g = item["grid"]["linspace"]
-            rec = _provenance.get_line(key, e)
-            tag = (
-                f"manual: {rec.get('note', '')}"
-                if rec and rec["source"] == "manual"
-                else (rec["source"] if rec else "derived")
-            )
-            out.append(f"  {e:>6g} keV  stop={g['stop']:>8g}  num={g['num']:>5}  [{tag}]")
-        brem = block.get("E_grid_brem", {}).get("arange")
-        if brem:
-            rec = _provenance.get_brem(key)
-            tag = rec["source"] if rec else "derived"
-            out.append(f"  brem stop={brem['stop']:g} step={brem['step']:g}  [{tag}]")
+        if show_line:
+            for item in block.get("E_grid_line_by_energy", []):
+                e = float(item["energy_keV"])
+                g = item["grid"]["linspace"]
+                rec = _provenance.get_line(key, e)
+                tag = (
+                    f"manual: {rec.get('note', '')}"
+                    if rec and rec["source"] == "manual"
+                    else (rec["source"] if rec else "derived")
+                )
+                out.append(
+                    f"  line grid @ {e:g} keV: [{g['start']:g}, {g['stop']:g}] eV"
+                    f" x {g['num']} pts  [{tag}]"
+                )
+        if show_brem:
+            brem = block.get("E_grid_brem", {}).get("arange")
+            if brem:
+                rec = _provenance.get_brem(key)
+                tag = rec["source"] if rec else "derived"
+                out.append(
+                    f"  brem grid: [{brem['start']:g}, {brem['stop']:g}] eV"
+                    f" step {brem['step']:g}  [{tag}]"
+                )
     return "\n".join(out)

@@ -126,7 +126,7 @@ def test_apply_file_writes_stamps_provenance_and_validates(tmp_path, monkeypatch
     captured = capsys.readouterr()
     assert captured.out == ""
     assert captured.err == (
-        "warning: material catalog changed; golden is now stale; run `cxr line-grid regen-golden`\n"
+        "warning: material catalog changed; golden is now stale; run `cxr energy-grid regen-golden`\n"
     )
 
 

@@ -1,15 +1,14 @@
-"""`cxr line-grid` command group.
+"""`cxr energy-grid` command group.
 
 Job verbs (``status``/``attach``/``logs``/``stop``) delegate to ``cxr_mc.remote``
 for output byte-identical to ``cxr remote``; ``derive``/``submit``/``apply``/
-``set``/``set-brem``/``defaults``/``show``/``regen-golden`` call the package
+``line set``/``brem set``/``defaults``/``show``/``regen-golden`` call the package
 modules. Heavy modules (``derive``, ``golden``) import lazily inside handlers so
 ``cxr`` startup stays cheap.
 """
 
 from __future__ import annotations
 
-import math
 import tomllib
 from copy import copy
 from datetime import date
@@ -18,82 +17,25 @@ from types import SimpleNamespace
 
 import click
 
-from cxr_mc import _cli_completion, cli_json, remote
-from cxr_mc._cli_core import (
+from cxr_mc import remote
+from cxr_mc.cli import _completion as _cli_completion
+from cxr_mc.cli import json as cli_json
+from cxr_mc.cli._core import (
+    AZIMUTH_CSV,
+    AZIMUTH_CSV_TEXT,
+    ENERGY_CSV_TEXT,
     POSITIVE_FLOAT,
     POSITIVE_INT,
+    THICKNESS_CSV,
+    THICKNESS_CSV_TEXT,
+    TILT_CSV,
+    TILT_CSV_TEXT,
     CLIError,
     emit_json_result,
     emit_result,
     invoke_legacy,
 )
 from cxr_mc.line_grid import apply, defaults, job
-
-
-def _floats(s):
-    return [float(x) for x in s.split(",")] if s else None
-
-
-class _CSV(click.ParamType):
-    """Comma-separated finite floats with an optional numeric domain."""
-
-    name = "numbers"
-
-    def __init__(
-        self,
-        label,
-        *,
-        lower=None,
-        lower_open=False,
-        upper=None,
-        upper_inclusive=True,
-        preserve_text=False,
-    ):
-        self.label = label
-        self.lower = lower
-        self.lower_open = lower_open
-        self.upper = upper
-        self.upper_inclusive = upper_inclusive
-        self.preserve_text = preserve_text
-
-    def convert(self, value, param, ctx):
-        try:
-            values = _floats(value)
-        except (TypeError, ValueError):
-            self.fail(f"{self.label} must be comma-separated numbers", param, ctx)
-        if not values:
-            self.fail(f"{self.label} requires at least one value", param, ctx)
-        for item in values:
-            if not math.isfinite(item):
-                self.fail(f"{self.label} values must be finite", param, ctx)
-            if self.lower is not None:
-                lower_ok = item > self.lower if self.lower_open else item >= self.lower
-                if not lower_ok:
-                    self._fail_domain(param, ctx)
-            if self.upper is not None:
-                upper_ok = item <= self.upper if self.upper_inclusive else item < self.upper
-                if not upper_ok:
-                    self._fail_domain(param, ctx)
-        return value if self.preserve_text else values
-
-    def _fail_domain(self, param, ctx):
-        if self.lower == 0 and self.lower_open and self.upper is None:
-            self.fail(f"{self.label} values must be finite and positive", param, ctx)
-        relation = "<=" if self.upper_inclusive else "<"
-        self.fail(
-            f"{self.label} values must satisfy {self.lower:g} <= value {relation} {self.upper:g}",
-            param,
-            ctx,
-        )
-
-
-_ENERGY_CSV_TEXT = _CSV("energy", lower=0, lower_open=True, preserve_text=True)
-_THICKNESS_CSV_TEXT = _CSV("thickness", lower=0, lower_open=True, preserve_text=True)
-_TILT_CSV_TEXT = _CSV("tilt", lower=0, upper=90, upper_inclusive=False, preserve_text=True)
-_AZIMUTH_CSV_TEXT = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True, preserve_text=True)
-_TILT_CSV = _CSV("tilt", lower=0, upper=90, upper_inclusive=False)
-_AZIMUTH_CSV = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True)
-_THICKNESS_CSV = _CSV("thickness", lower=0, lower_open=True)
 
 
 def _pull_combined(json_name=None):
@@ -135,25 +77,25 @@ def _derive_options(function):
     )(function)
     function = click.option(
         "--thickness",
-        type=_THICKNESS_CSV_TEXT,
+        type=THICKNESS_CSV_TEXT,
         metavar="ANGSTROM,...",
         help="Crystal thicknesses in angstrom; comma-separated and positive.",
     )(function)
     function = click.option(
         "--azimuths",
-        type=_AZIMUTH_CSV_TEXT,
+        type=AZIMUTH_CSV_TEXT,
         metavar="DEG,...",
         help="Azimuths in degrees [0, 360]; comma-separated.",
     )(function)
     function = click.option(
         "--tilts",
-        type=_TILT_CSV_TEXT,
+        type=TILT_CSV_TEXT,
         metavar="DEG,...",
         help="Polar tilts in degrees [0, 90); comma-separated.",
     )(function)
     function = click.option(
         "--energies",
-        type=_ENERGY_CSV_TEXT,
+        type=ENERGY_CSV_TEXT,
         metavar="KEV,...",
         help="Beam energies in keV; comma-separated and positive.",
     )(function)
@@ -165,19 +107,29 @@ def _derive_options(function):
     )(function)
 
 
-@click.group(name="line-grid", no_args_is_help=False)
+@click.group(name="energy-grid", no_args_is_help=False)
 def command():
-    """Derive and manage per-material line-grid bounds.
+    """Derive and manage per-material photon-energy grids.
 
-    Geometry flags override persistent defaults for one run. Use ``--set-default``
-    to persist supplied values.
+    Derivation geometry differs from physical scan ranges; use ``cxr sweep`` for
+    scan ranges. Geometry flags override persistent defaults for one run.
 
     \b
     Examples:
-      cxr line-grid derive --materials mose2,wse2 --energies 30,60
-      cxr line-grid submit --materials mose2 --dry-run
-      cxr line-grid show mose2
+      cxr energy-grid derive --materials mose2,wse2 --energies 30,60
+      cxr energy-grid submit --materials mose2 --dry-run
+      cxr energy-grid show mose2
     """
+
+
+@command.group("line", no_args_is_help=True)
+def line_command():
+    """Inspect or manually set coherent line-energy grids."""
+
+
+@command.group("brem", no_args_is_help=True)
+def brem_command():
+    """Inspect or manually set bremsstrahlung energy grids."""
 
 
 @command.command("derive")
@@ -186,7 +138,7 @@ def command():
     "--brem-step",
     type=POSITIVE_FLOAT,
     metavar="EV",
-    help="Bremsstrahlung grid spacing in eV; overrides persistent default.",
+    help="Derivation bremsstrahlung spacing in eV; overrides persistent default.",
 )
 def derive_command(
     materials,
@@ -197,7 +149,7 @@ def derive_command(
     set_default,
     brem_step,
 ):
-    """Derive line-grid bounds locally."""
+    """Derive energy-grid bounds locally."""
     from cxr_mc.line_grid import derive
 
     argv = []
@@ -244,7 +196,7 @@ def submit_command(
     no_sync,
     dry_run,
 ):
-    """Submit sliced line-grid derivation remotely."""
+    """Submit sliced energy-grid derivation remotely."""
     return _invoke_callback(
         job.start,
         materials=materials or job.DEFAULT_MATERIALS,
@@ -279,7 +231,7 @@ def submit_command(
     help="Emit one versioned JSON object on stdout.",
 )
 def status_command(jobid, verbose, json_output):
-    """Show line-grid job status. JOBID defaults to latest recorded job."""
+    """Show energy-grid job status. JOBID defaults to latest recorded job."""
     if json_output:
         return _invoke_callback(
             remote._cli_status,
@@ -297,7 +249,7 @@ def status_command(jobid, verbose, json_output):
     shell_complete=_cli_completion.complete_job_id,
 )
 def attach_command(jobid):
-    """Attach to line-grid job progress. JOBID defaults to latest recorded job."""
+    """Attach to energy-grid job progress. JOBID defaults to latest recorded job."""
     remote.attach(jobid)
     return 0
 
@@ -316,7 +268,7 @@ def attach_command(jobid):
     help="Stream live; Ctrl-C disconnects viewer without stopping job.",
 )
 def logs_command(jobid, follow):
-    """Print or follow line-grid job logs. JOBID defaults to latest recorded job."""
+    """Print or follow energy-grid job logs. JOBID defaults to latest recorded job."""
     return _invoke_callback(remote.tail_logs, jobid, follow)
 
 
@@ -325,7 +277,7 @@ def logs_command(jobid, follow):
 @click.option("--latest", is_flag=True, help="Target latest recorded job instead of JOBID.")
 @click.option("--yes", is_flag=True, help="Cancel exact previewed job; otherwise preview.")
 def stop_command(jobid, latest, yes):
-    """Preview or stop one line-grid job."""
+    """Preview or stop one energy-grid job."""
     if jobid and latest:
         raise click.UsageError("stop takes JOBID or --latest, not both")
     if not jobid and not latest:
@@ -343,7 +295,7 @@ def stop_command(jobid, latest, yes):
 
 @click.group("job", no_args_is_help=True)
 def job_command():
-    """Inspect, follow, or stop remote line-grid jobs."""
+    """Inspect, follow, or stop remote energy-grid jobs."""
 
 
 for _job_child in (status_command, attach_command, logs_command, stop_command):
@@ -387,7 +339,7 @@ def apply_command(json_path, materials, pull, force, regen_golden, dry_run):
 
     \b
     Example:
-      cxr line-grid apply combined_line_grid_bounds.json --materials mose2,wse2
+      cxr energy-grid apply combined_line_grid_bounds.json --materials mose2,wse2
     """
     path = _pull_combined() if pull else json_path
     if not path:
@@ -410,7 +362,7 @@ def apply_command(json_path, materials, pull, force, regen_golden, dry_run):
     return 0
 
 
-@command.command("set")
+@line_command.command("set")
 @click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
     "--energy", type=POSITIVE_FLOAT, required=True, metavar="KEV", help="Beam energy in keV."
@@ -440,7 +392,7 @@ def set_command(material, energy, stop, num, start, note):
     return 0
 
 
-@command.command("set-brem")
+@brem_command.command("set")
 @click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
     "--stop",
@@ -479,17 +431,20 @@ def set_brem_command(material, stop, step, note):
     help="Persist supplied values; otherwise only show defaults.",
 )
 @click.option(
-    "--tilts", type=_TILT_CSV, metavar="DEG,...", help="Persistent polar tilts in degrees [0, 90)."
+    "--tilts",
+    type=TILT_CSV,
+    metavar="DEG,...",
+    help="Persistent derivation polar tilts in degrees [0, 90).",
 )
 @click.option(
     "--azimuths",
-    type=_AZIMUTH_CSV,
+    type=AZIMUTH_CSV,
     metavar="DEG,...",
     help="Persistent azimuths in degrees [0, 360].",
 )
 @click.option(
     "--thickness",
-    type=_THICKNESS_CSV,
+    type=THICKNESS_CSV,
     metavar="ANGSTROM,...",
     help="Persistent positive crystal thicknesses in angstrom.",
 )
@@ -497,7 +452,7 @@ def set_brem_command(material, stop, step, note):
     "--brem-step",
     type=POSITIVE_FLOAT,
     metavar="EV",
-    help="Persistent positive bremsstrahlung spacing in eV.",
+    help="Persistent derivation bremsstrahlung spacing in eV.",
 )
 def defaults_command(json_output, set_values, tilts, azimuths, thickness, brem_step):
     """Show or update persistent derivation defaults."""
@@ -528,7 +483,7 @@ def defaults_command(json_output, set_values, tilts, azimuths, thickness, brem_s
             source = "persisted" if defaults.DEFAULTS_PATH.exists() else "fallback"
             result = cli_json.line_grid_defaults(values, source=source)
         except (OSError, TypeError, ValueError) as exc:
-            result = cli_json.failure("cxr.line-grid.defaults", {}, str(exc))
+            result = cli_json.failure("cxr.energy-grid.defaults", {}, str(exc))
         emit_json_result(result)
         return 0
     values = defaults.load_defaults()
@@ -537,35 +492,55 @@ def defaults_command(json_output, set_values, tilts, azimuths, thickness, brem_s
     return 0
 
 
-@command.command("show")
-@click.option(
-    "--json",
-    "json_output",
-    is_flag=True,
-    help="Emit one versioned JSON object on stdout.",
-)
-@click.argument(
-    "material",
-    required=False,
-    shell_complete=_cli_completion.complete_material,
-)
-def show_command(json_output, material):
-    """Show configured line grids."""
+def _show(json_output, material, *, band=None):
+    """Show configured energy grids, optionally scoped to one band."""
     if json_output:
         try:
             with Path(apply._MATERIALS_TOML).open("rb") as stream:
                 materials = tomllib.load(stream)["materials"]
-            result = cli_json.line_grid_show(materials, apply._provenance.load(), selected=material)
+            result = cli_json.line_grid_show(
+                materials, apply._provenance.load(), selected=material, band=band
+            )
         except (KeyError, OSError, TypeError, ValueError) as exc:
-            result = cli_json.failure("cxr.line-grid.show", {"materials": []}, str(exc))
+            result = cli_json.failure("cxr.energy-grid.show", {"materials": []}, str(exc))
         emit_json_result(result)
         return 0
     try:
-        result = apply.show(material)
+        result = apply.show(material, band=band)
     except ValueError as exc:
         raise CLIError(str(exc)) from None
     emit_result(result)
     return 0
+
+
+@command.command("show")
+@click.option(
+    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
+)
+@click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
+def show_command(json_output, material):
+    """Show line and bremsstrahlung grids together."""
+    return _show(json_output, material)
+
+
+@line_command.command("show")
+@click.option(
+    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
+)
+@click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
+def line_show_command(json_output, material):
+    """Show coherent line-energy grids."""
+    return _show(json_output, material, band="line")
+
+
+@brem_command.command("show")
+@click.option(
+    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
+)
+@click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
+def brem_show_command(json_output, material):
+    """Show bremsstrahlung energy grids."""
+    return _show(json_output, material, band="brem")
 
 
 @command.command("regen-golden")

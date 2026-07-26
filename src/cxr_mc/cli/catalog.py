@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import click
 
-from ._cli_core import LazyGroup, run
+from ._core import LazyGroup, run
 
 _COMMANDS = {
     "validate": "cxr_mc.check_config.command",

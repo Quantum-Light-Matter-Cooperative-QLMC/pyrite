@@ -304,7 +304,7 @@ def line_grid_defaults(values: Mapping[str, Any], *, source: str) -> JsonResult:
         "materials": [_text(value) for value in values.get("materials", [])],
         "source": _text(source),
     }
-    return JsonResult("cxr.line-grid.defaults", payload)
+    return JsonResult("cxr.energy-grid.defaults", payload)
 
 
 def line_grid_show(
@@ -312,8 +312,15 @@ def line_grid_show(
     provenance: Mapping[str, Any],
     *,
     selected: str | None = None,
+    band: str | None = None,
 ) -> JsonResult:
-    """Build structured line and bremsstrahlung grids from decoded TOML maps."""
+    """Build structured line and bremsstrahlung grids from decoded TOML maps.
+
+    ``band`` filters the emitted grids: ``"line"`` omits ``brem_grid``,
+    ``"brem"`` omits ``line_grids``, ``None`` (default) keeps both.
+    """
+    show_line = band in (None, "line")
+    show_brem = band in (None, "brem")
     errors: list[dict[str, object]] = []
     output: list[dict[str, object]] = []
     keys = [selected] if selected is not None else list(materials)
@@ -334,7 +341,7 @@ def line_grid_show(
         if not isinstance(line_provenance, Mapping):
             line_provenance = {}
         lines: list[dict[str, object]] = []
-        for row in block.get("E_grid_line_by_energy", []):
+        for row in block.get("E_grid_line_by_energy", []) if show_line else []:
             try:
                 energy = float(row["energy_keV"])
                 grid = row["grid"]["linspace"]
@@ -356,7 +363,7 @@ def line_grid_show(
                 errors.append(_error("invalid_line_grid", str(exc), item=material))
         brem_output: dict[str, object] | None = None
         try:
-            brem = block.get("E_grid_brem", {}).get("arange")
+            brem = block.get("E_grid_brem", {}).get("arange") if show_brem else None
             if brem is not None:
                 brem_output = {
                     "kind": "arange",
@@ -368,7 +375,7 @@ def line_grid_show(
         except (KeyError, TypeError, ValueError) as exc:
             errors.append(_error("invalid_brem_grid", str(exc), item=material))
         output.append({"material": _text(material), "line_grids": lines, "brem_grid": brem_output})
-    return JsonResult("cxr.line-grid.show", {"materials": output}, tuple(errors))
+    return JsonResult("cxr.energy-grid.show", {"materials": output}, tuple(errors))
 
 
 def _provenance_record(value: object) -> dict[str, str | None]:

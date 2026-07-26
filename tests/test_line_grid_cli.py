@@ -15,8 +15,8 @@ CLICK_COMMANDS = (
     "logs",
     "stop",
     "apply",
-    "set",
-    "set-brem",
+    "line",
+    "brem",
     "defaults",
     "show",
     "regen-golden",
@@ -24,7 +24,21 @@ CLICK_COMMANDS = (
 
 
 def test_click_group_exposes_full_line_grid_tree():
-    assert tuple(line_grid.command.commands) == CLICK_COMMANDS
+    assert tuple(line_grid.command.commands) == (
+        "line",
+        "brem",
+        "derive",
+        "submit",
+        "job",
+        "status",
+        "attach",
+        "logs",
+        "stop",
+        "apply",
+        "defaults",
+        "show",
+        "regen-golden",
+    )
 
 
 @pytest.mark.parametrize(
@@ -33,6 +47,7 @@ def test_click_group_exposes_full_line_grid_tree():
         (),
         *((name,) for name in CLICK_COMMANDS),
         *((("job", name)) for name in ("status", "attach", "logs", "stop")),
+        *(((band, name)) for band in ("line", "brem") for name in ("set", "show")),
     ],
 )
 def test_click_help_paths_are_clean(path):
@@ -204,16 +219,16 @@ def test_click_apply_expected_failures_use_stderr(monkeypatch, error, message):
     assert "Traceback" not in result.output
 
 
-@pytest.mark.parametrize("command_name", ["set", "set-brem"])
+@pytest.mark.parametrize("command_name", ["line", "brem"])
 def test_click_set_expected_domain_failure_uses_stderr(monkeypatch, command_name):
-    target = "set_line_grid" if command_name == "set" else "set_brem_grid"
+    target = "set_line_grid" if command_name == "line" else "set_brem_grid"
     monkeypatch.setattr(
         line_grid.apply,
         target,
         lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("unknown material")),
     )
-    argv = [command_name, "bad", "--stop", "100"]
-    if command_name == "set":
+    argv = [command_name, "set", "bad", "--stop", "100"]
+    if command_name == "line":
         argv.extend(("--energy", "50"))
 
     result = invoke(line_grid.command, argv)
@@ -304,10 +319,10 @@ def test_click_regen_golden_preserves_nonzero_status(monkeypatch, status):
 @pytest.mark.parametrize(
     "argv",
     [
-        ["set", "hopg", "--energy", "0", "--stop", "3000"],
-        ["set", "hopg", "--energy", "30", "--stop", "-1"],
-        ["set", "hopg", "--energy", "30", "--stop", "3000", "--num", "0"],
-        ["set-brem", "hopg", "--stop", "1000", "--step", "0"],
+        ["line", "set", "hopg", "--energy", "0", "--stop", "3000"],
+        ["line", "set", "hopg", "--energy", "30", "--stop", "-1"],
+        ["line", "set", "hopg", "--energy", "30", "--stop", "3000", "--num", "0"],
+        ["brem", "set", "hopg", "--stop", "1000", "--step", "0"],
         ["defaults", "--set", "--tilts", "90"],
         ["defaults", "--set", "--azimuths", "361"],
         ["defaults", "--set", "--thickness", "0"],
@@ -332,12 +347,12 @@ def test_click_numeric_domains_fail_at_boundary(argv):
     ("argv", "exit_code", "stderr_text"),
     [
         (
-            ["line-grid", "defaults", "--tilts", "5"],
+            ["energy-grid", "defaults", "--tilts", "5"],
             2,
             "--tilts require --set",
         ),
         (
-            ["line-grid", "show", "not-a-material"],
+            ["energy-grid", "show", "not-a-material"],
             1,
             "unknown material: not-a-material",
         ),

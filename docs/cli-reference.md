@@ -24,7 +24,7 @@ Validation uses `cxr validate`, `cxr catalog validate`, and
 `cxr remote validate`. Legacy `check`, `check-config`, and remote
 `check` paths remain hidden compatibility aliases. Remote detached
 submission uses `cxr remote submit`; legacy `start` remains an alias.
-Line-grid job lifecycle uses `cxr line-grid job ...`; legacy flat job
+Energy-grid job lifecycle uses `cxr energy-grid job ...`; legacy flat job
 verbs remain aliases.
 
 Automation contract: usage errors exit 2; runtime failures exit 1;
@@ -34,7 +34,7 @@ object plus newline with `schema`, `schema_version`, `ok`, `payload`,
 and `errors` fields and no human prose on stdout.
 
 Destructive remote stop commands preview exact job targets by default.
-Pass `--yes` to perform cancellation; `cxr line-grid stop` additionally
+Pass `--yes` to perform cancellation; `cxr energy-grid stop` additionally
 requires JOBID or explicit `--latest`.
 
 Commands below are authoritative for this version.
@@ -73,20 +73,27 @@ Commands below are authoritative for this version.
   - `cxr remote submit` — Sync code and submit a detached SLURM material queue.
   - `cxr remote sync` — Push current code to remote box.
   - `cxr remote validate` — Run Zhai reproduction remotely or pull existing caches.
-- `cxr line-grid` — Derive and manage per-material line-grid bounds.
-  - `cxr line-grid apply` — Apply derived bounds to material catalog.
-  - `cxr line-grid defaults` — Show or update persistent derivation defaults.
-  - `cxr line-grid derive` — Derive line-grid bounds locally.
-  - `cxr line-grid job` — Inspect, follow, or stop remote line-grid jobs.
-    - `cxr line-grid job attach` — Attach to line-grid job progress.
-    - `cxr line-grid job logs` — Print or follow line-grid job logs.
-    - `cxr line-grid job status` — Show line-grid job status.
-    - `cxr line-grid job stop` — Preview or stop one line-grid job.
-  - `cxr line-grid regen-golden` — Regenerate or check material-catalog golden snapshot.
-  - `cxr line-grid set` — Set one material line-grid row and mark it as a manual override.
-  - `cxr line-grid set-brem` — Set one material bremsstrahlung grid and mark it as a manual override.
-  - `cxr line-grid show` — Show configured line grids.
-  - `cxr line-grid submit` — Submit sliced line-grid derivation remotely.
+- `cxr energy-grid` — Derive and manage per-material photon-energy grids.
+  - `cxr energy-grid apply` — Apply derived bounds to material catalog.
+  - `cxr energy-grid brem` — Inspect or manually set bremsstrahlung energy grids.
+    - `cxr energy-grid brem set` — Set one material bremsstrahlung grid and mark it as a manual override.
+    - `cxr energy-grid brem show` — Show bremsstrahlung energy grids.
+  - `cxr energy-grid defaults` — Show or update persistent derivation defaults.
+  - `cxr energy-grid derive` — Derive energy-grid bounds locally.
+  - `cxr energy-grid job` — Inspect, follow, or stop remote energy-grid jobs.
+    - `cxr energy-grid job attach` — Attach to energy-grid job progress.
+    - `cxr energy-grid job logs` — Print or follow energy-grid job logs.
+    - `cxr energy-grid job status` — Show energy-grid job status.
+    - `cxr energy-grid job stop` — Preview or stop one energy-grid job.
+  - `cxr energy-grid line` — Inspect or manually set coherent line-energy grids.
+    - `cxr energy-grid line set` — Set one material line-grid row and mark it as a manual override.
+    - `cxr energy-grid line show` — Show coherent line-energy grids.
+  - `cxr energy-grid regen-golden` — Regenerate or check material-catalog golden snapshot.
+  - `cxr energy-grid show` — Show line and bremsstrahlung grids together.
+  - `cxr energy-grid submit` — Submit sliced energy-grid derivation remotely.
+- `cxr sweep` — Show and edit physical scan parameter-range sweeps.
+  - `cxr sweep set` — Set default ranges or per-material overrides without touching energy grids.
+  - `cxr sweep show` — Show defaults, overrides, or one material's effective scan ranges.
 
 ## `cxr`
 
@@ -109,16 +116,17 @@ Options:
   -h, --help                   Show this message and exit.
 
 Commands:
-  scan        Run one material's MC sweep and write a checkpoint.
-  blaze       Run a grooved-crystal sweep and write a checkpoint.
-  export      Export the analysis app as static HTML.
-  analyze     Launch the analysis app.
-  viewer      Launch the 3D trajectory visualization app.
-  validate    Launch validation or export cached validation figures.
-  catalog     Inspect and validate material-catalog configuration.
-  checkpoint  Inspect, transform, recompute, and archive checkpoints.
-  remote      Run and manage MC sweeps on a remote GPU host.
-  line-grid   Derive, submit, inspect, and apply line-energy grids.
+  scan         Run one material's MC sweep and write a checkpoint.
+  blaze        Run a grooved-crystal sweep and write a checkpoint.
+  export       Export the analysis app as static HTML.
+  analyze      Launch the analysis app.
+  viewer       Launch the 3D trajectory visualization app.
+  validate     Launch validation or export cached validation figures.
+  catalog      Inspect and validate material-catalog configuration.
+  checkpoint   Inspect, transform, recompute, and archive checkpoints.
+  remote       Run and manage MC sweeps on a remote GPU host.
+  energy-grid  Derive, submit, inspect, and apply photon-energy grids.
+  sweep        Show and edit scan parameter-range sweeps.
 ```
 
 ## `cxr scan`
@@ -773,47 +781,47 @@ Options:
   -h, --help            Show this message and exit.
 ```
 
-## `cxr line-grid`
+## `cxr energy-grid`
 
 ```text
-Usage: cxr line-grid [OPTIONS] COMMAND [ARGS]...
+Usage: cxr energy-grid [OPTIONS] COMMAND [ARGS]...
 
-  Derive and manage per-material line-grid bounds.
+  Derive and manage per-material photon-energy grids.
 
-  Geometry flags override persistent defaults for one run. Use ``--set-default`` to
-  persist supplied values.
+  Derivation geometry differs from physical scan ranges; use ``cxr sweep`` for scan
+  ranges. Geometry flags override persistent defaults for one run.
 
   Examples:
-    cxr line-grid derive --materials mose2,wse2 --energies 30,60
-    cxr line-grid submit --materials mose2 --dry-run
-    cxr line-grid show mose2
+    cxr energy-grid derive --materials mose2,wse2 --energies 30,60
+    cxr energy-grid submit --materials mose2 --dry-run
+    cxr energy-grid show mose2
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
   apply         Apply derived bounds to material catalog.
+  brem          Inspect or manually set bremsstrahlung energy grids.
   defaults      Show or update persistent derivation defaults.
-  derive        Derive line-grid bounds locally.
-  job           Inspect, follow, or stop remote line-grid jobs.
+  derive        Derive energy-grid bounds locally.
+  job           Inspect, follow, or stop remote energy-grid jobs.
+  line          Inspect or manually set coherent line-energy grids.
   regen-golden  Regenerate or check material-catalog golden snapshot.
-  set           Set one material line-grid row and mark it as a manual override.
-  set-brem      Set one material bremsstrahlung grid and mark it as a manual override.
-  show          Show configured line grids.
-  submit        Submit sliced line-grid derivation remotely.
+  show          Show line and bremsstrahlung grids together.
+  submit        Submit sliced energy-grid derivation remotely.
 ```
 
-## `cxr line-grid apply`
+## `cxr energy-grid apply`
 
 ```text
-Usage: cxr line-grid apply [OPTIONS] JSON
+Usage: cxr energy-grid apply [OPTIONS] JSON
 
   Apply derived bounds to material catalog.
 
   Writes packaged ``materials.toml`` and provenance atomically after validation.
 
   Example:
-    cxr line-grid apply combined_line_grid_bounds.json --materials mose2,wse2
+    cxr energy-grid apply combined_line_grid_bounds.json --materials mose2,wse2
 
 Options:
   --materials KEY,...  Apply only listed material keys.
@@ -825,29 +833,70 @@ Options:
   -h, --help           Show this message and exit.
 ```
 
-## `cxr line-grid defaults`
+## `cxr energy-grid brem`
 
 ```text
-Usage: cxr line-grid defaults [OPTIONS]
+Usage: cxr energy-grid brem [OPTIONS] COMMAND [ARGS]...
+
+  Inspect or manually set bremsstrahlung energy grids.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  set   Set one material bremsstrahlung grid and mark it as a manual override.
+  show  Show bremsstrahlung energy grids.
+```
+
+## `cxr energy-grid brem set`
+
+```text
+Usage: cxr energy-grid brem set [OPTIONS] MATERIAL
+
+  Set one material bremsstrahlung grid and mark it as a manual override.
+
+Options:
+  --stop EV    Bremsstrahlung grid upper bound in eV.  [required]
+  --step EV    Grid spacing in eV; preserve current value if omitted.
+  --note TEXT  Provenance note stored with manual override.
+  -h, --help   Show this message and exit.
+```
+
+## `cxr energy-grid brem show`
+
+```text
+Usage: cxr energy-grid brem show [OPTIONS] [MATERIAL]
+
+  Show bremsstrahlung energy grids.
+
+Options:
+  --json      Emit one versioned JSON object on stdout.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr energy-grid defaults`
+
+```text
+Usage: cxr energy-grid defaults [OPTIONS]
 
   Show or update persistent derivation defaults.
 
 Options:
   --json                    Emit one versioned JSON object on stdout (show mode only).
   --set                     Persist supplied values; otherwise only show defaults.
-  --tilts DEG,...           Persistent polar tilts in degrees [0, 90).
+  --tilts DEG,...           Persistent derivation polar tilts in degrees [0, 90).
   --azimuths DEG,...        Persistent azimuths in degrees [0, 360].
   --thickness ANGSTROM,...  Persistent positive crystal thicknesses in angstrom.
-  --brem-step EV            Persistent positive bremsstrahlung spacing in eV.
+  --brem-step EV            Persistent derivation bremsstrahlung spacing in eV.
   -h, --help                Show this message and exit.
 ```
 
-## `cxr line-grid derive`
+## `cxr energy-grid derive`
 
 ```text
-Usage: cxr line-grid derive [OPTIONS]
+Usage: cxr energy-grid derive [OPTIONS]
 
-  Derive line-grid bounds locally.
+  Derive energy-grid bounds locally.
 
 Options:
   --materials KEY,...       Material keys; comma-separated. Omit to use persistent
@@ -859,57 +908,57 @@ Options:
                             positive.
   --set-default             Persist supplied geometry, energies, and materials as future
                             defaults.
-  --brem-step EV            Bremsstrahlung grid spacing in eV; overrides persistent
-                            default.
+  --brem-step EV            Derivation bremsstrahlung spacing in eV; overrides
+                            persistent default.
   -h, --help                Show this message and exit.
 ```
 
-## `cxr line-grid job`
+## `cxr energy-grid job`
 
 ```text
-Usage: cxr line-grid job [OPTIONS] COMMAND [ARGS]...
+Usage: cxr energy-grid job [OPTIONS] COMMAND [ARGS]...
 
-  Inspect, follow, or stop remote line-grid jobs.
+  Inspect, follow, or stop remote energy-grid jobs.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  attach  Attach to line-grid job progress.
-  logs    Print or follow line-grid job logs.
-  status  Show line-grid job status.
-  stop    Preview or stop one line-grid job.
+  attach  Attach to energy-grid job progress.
+  logs    Print or follow energy-grid job logs.
+  status  Show energy-grid job status.
+  stop    Preview or stop one energy-grid job.
 ```
 
-## `cxr line-grid job attach`
+## `cxr energy-grid job attach`
 
 ```text
-Usage: cxr line-grid job attach [OPTIONS] [JOBID]
+Usage: cxr energy-grid job attach [OPTIONS] [JOBID]
 
-  Attach to line-grid job progress. JOBID defaults to latest recorded job.
+  Attach to energy-grid job progress. JOBID defaults to latest recorded job.
 
 Options:
   -h, --help  Show this message and exit.
 ```
 
-## `cxr line-grid job logs`
+## `cxr energy-grid job logs`
 
 ```text
-Usage: cxr line-grid job logs [OPTIONS] [JOBID]
+Usage: cxr energy-grid job logs [OPTIONS] [JOBID]
 
-  Print or follow line-grid job logs. JOBID defaults to latest recorded job.
+  Print or follow energy-grid job logs. JOBID defaults to latest recorded job.
 
 Options:
   -f, --follow  Stream live; Ctrl-C disconnects viewer without stopping job.
   -h, --help    Show this message and exit.
 ```
 
-## `cxr line-grid job status`
+## `cxr energy-grid job status`
 
 ```text
-Usage: cxr line-grid job status [OPTIONS] [JOBID]
+Usage: cxr energy-grid job status [OPTIONS] [JOBID]
 
-  Show line-grid job status. JOBID defaults to latest recorded job.
+  Show energy-grid job status. JOBID defaults to latest recorded job.
 
 Options:
   -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
@@ -917,12 +966,12 @@ Options:
   -h, --help     Show this message and exit.
 ```
 
-## `cxr line-grid job stop`
+## `cxr energy-grid job stop`
 
 ```text
-Usage: cxr line-grid job stop [OPTIONS] [JOBID]
+Usage: cxr energy-grid job stop [OPTIONS] [JOBID]
 
-  Preview or stop one line-grid job.
+  Preview or stop one energy-grid job.
 
 Options:
   --latest    Target latest recorded job instead of JOBID.
@@ -930,24 +979,25 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `cxr line-grid regen-golden`
+## `cxr energy-grid line`
 
 ```text
-Usage: cxr line-grid regen-golden [OPTIONS]
+Usage: cxr energy-grid line [OPTIONS] COMMAND [ARGS]...
 
-  Regenerate or check material-catalog golden snapshot.
-
-  Requires source checkout because installed wheels do not contain test data.
+  Inspect or manually set coherent line-energy grids.
 
 Options:
-  --check     Check snapshot for drift; do not write (exit 1 when stale).
   -h, --help  Show this message and exit.
+
+Commands:
+  set   Set one material line-grid row and mark it as a manual override.
+  show  Show coherent line-energy grids.
 ```
 
-## `cxr line-grid set`
+## `cxr energy-grid line set`
 
 ```text
-Usage: cxr line-grid set [OPTIONS] MATERIAL
+Usage: cxr energy-grid line set [OPTIONS] MATERIAL
 
   Set one material line-grid row and mark it as a manual override.
 
@@ -960,38 +1010,50 @@ Options:
   -h, --help    Show this message and exit.
 ```
 
-## `cxr line-grid set-brem`
+## `cxr energy-grid line show`
 
 ```text
-Usage: cxr line-grid set-brem [OPTIONS] MATERIAL
+Usage: cxr energy-grid line show [OPTIONS] [MATERIAL]
 
-  Set one material bremsstrahlung grid and mark it as a manual override.
-
-Options:
-  --stop EV    Bremsstrahlung grid upper bound in eV.  [required]
-  --step EV    Grid spacing in eV; preserve current value if omitted.
-  --note TEXT  Provenance note stored with manual override.
-  -h, --help   Show this message and exit.
-```
-
-## `cxr line-grid show`
-
-```text
-Usage: cxr line-grid show [OPTIONS] [MATERIAL]
-
-  Show configured line grids.
+  Show coherent line-energy grids.
 
 Options:
   --json      Emit one versioned JSON object on stdout.
   -h, --help  Show this message and exit.
 ```
 
-## `cxr line-grid submit`
+## `cxr energy-grid regen-golden`
 
 ```text
-Usage: cxr line-grid submit [OPTIONS]
+Usage: cxr energy-grid regen-golden [OPTIONS]
 
-  Submit sliced line-grid derivation remotely.
+  Regenerate or check material-catalog golden snapshot.
+
+  Requires source checkout because installed wheels do not contain test data.
+
+Options:
+  --check     Check snapshot for drift; do not write (exit 1 when stale).
+  -h, --help  Show this message and exit.
+```
+
+## `cxr energy-grid show`
+
+```text
+Usage: cxr energy-grid show [OPTIONS] [MATERIAL]
+
+  Show line and bremsstrahlung grids together.
+
+Options:
+  --json      Emit one versioned JSON object on stdout.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr energy-grid submit`
+
+```text
+Usage: cxr energy-grid submit [OPTIONS]
+
+  Submit sliced energy-grid derivation remotely.
 
 Options:
   --materials KEY,...       Material keys; comma-separated. Omit to use persistent
@@ -1009,4 +1071,54 @@ Options:
   --dry-run                 Print batch script and submission command; do not connect or
                             submit.
   -h, --help                Show this message and exit.
+```
+
+## `cxr sweep`
+
+```text
+Usage: cxr sweep [OPTIONS] COMMAND [ARGS]...
+
+  Show and edit physical scan parameter-range sweeps.
+
+  Operates on catalog ``[profiles.*]`` scan defaults and per-material overrides, not
+  ``SweepProfile`` full/survey reduction policies.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  set   Set default ranges or per-material overrides without touching energy grids.
+  show  Show defaults, overrides, or one material's effective scan ranges.
+```
+
+## `cxr sweep set`
+
+```text
+Usage: cxr sweep set [OPTIONS] [MATERIAL]
+
+  Set default ranges or per-material overrides without touching energy grids.
+
+Options:
+  --profile NAME                  Edit this default profile; defaults to standard
+                                  without MATERIAL.
+  --thickness ANGSTROM,...        Crystal thicknesses in angstrom.
+  --energy KEV,...                Beam energies in keV.
+  --polar DEG,...                 Polar tilts in degrees [0, 90).
+  --azimuth DEG,...               Azimuth tilts in degrees [0, 360].
+  --reset [thickness|energy|polar|azimuth|all]
+                                  Remove one override; repeat, or use --reset all.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `cxr sweep show`
+
+```text
+Usage: cxr sweep show [OPTIONS] [MATERIAL]
+
+  Show defaults, overrides, or one material's effective scan ranges.
+
+Options:
+  --json      Emit one versioned JSON object on stdout.
+  -h, --help  Show this message and exit.
 ```

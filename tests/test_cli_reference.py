@@ -41,10 +41,10 @@ def test_help_documents_examples_units_side_effects_and_incompatibilities():
         ("remote",): ("CXR_REMOTE_HOST", "Examples:"),
         ("remote", "scan"): ("incompatible with --grid", "0 runs serially"),
         ("remote", "pull"): ("mutually exclusive", "grid-filtered"),
-        ("line-grid",): ("persistent defaults", "Examples:"),
-        ("line-grid", "derive"): ("keV", "angstrom", "spacing in eV"),
-        ("line-grid", "apply"): ("precedence", "write nothing"),
-        ("line-grid", "job", "status"): ("latest recorded job", "repeat"),
+        ("energy-grid",): ("cxr sweep", "Examples:"),
+        ("energy-grid", "derive"): ("keV", "angstrom", "spacing in eV"),
+        ("energy-grid", "apply"): ("precedence", "write nothing"),
+        ("energy-grid", "job", "status"): ("latest recorded job", "repeat"),
     }
     for path, expected in cases.items():
         result = runner.invoke(command, [*path, "--help"])

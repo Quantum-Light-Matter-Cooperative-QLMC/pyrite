@@ -29,7 +29,7 @@ sources. Do not run for unrelated work or merely to silence unexplained drift.
 2. **Regenerate** (independent re-serialization from the live catalog):
 
    ```bash
-   rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr line-grid regen-golden
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr energy-grid regen-golden
    ```
 
 3. **Verify green** -- the catalog golden test plus the independence guard:

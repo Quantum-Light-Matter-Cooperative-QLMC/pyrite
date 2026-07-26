@@ -18,7 +18,7 @@ import sys
 
 import click
 
-from . import _cli_core
+from .cli import _core as _cli_core
 
 NOTEBOOK = "notebooks/analysis_app.py"
 

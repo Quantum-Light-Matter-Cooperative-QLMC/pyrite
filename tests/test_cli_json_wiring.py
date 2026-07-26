@@ -111,7 +111,7 @@ def test_line_grid_defaults_json_is_read_only(monkeypatch, tmp_path):
 
     document = _document(invoke(line_grid.command, ["defaults", "--json"]))
 
-    assert document["schema"] == "cxr.line-grid.defaults"
+    assert document["schema"] == "cxr.energy-grid.defaults"
     assert document["payload"]["source"] == "persisted"
     result = invoke(line_grid.command, ["defaults", "--set", "--json"])
     assert result.exit_code == 2
@@ -134,7 +134,7 @@ E_grid_brem = { arange = { start = 0, stop = 10, step = 1 } }
 
     document = _document(invoke(line_grid.command, ["show", "hopg", "--json"]))
 
-    assert document["schema"] == "cxr.line-grid.show"
+    assert document["schema"] == "cxr.energy-grid.show"
     material = document["payload"]["materials"][0]
     assert material["line_grids"][0]["grid"]["points"] == 3
     assert material["brem_grid"]["step_eV"] == 1.0

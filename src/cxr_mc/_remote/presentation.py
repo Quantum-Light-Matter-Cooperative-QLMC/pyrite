@@ -8,7 +8,7 @@ import sys
 import textwrap
 import unicodedata
 
-from .. import _cli_core
+from ..cli import _core as _cli_core
 
 _SHELL_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 

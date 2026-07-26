@@ -35,8 +35,9 @@ from pathlib import Path
 
 import click
 
-from . import _cli_completion, _cli_core
 from ._acp import running_acp
+from .cli import _completion as _cli_completion
+from .cli import _core as _cli_core
 
 NOTEBOOK = "notebooks/trace_app.py"
 TUNNEL_PORT = 2719

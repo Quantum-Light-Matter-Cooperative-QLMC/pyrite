@@ -46,14 +46,14 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 
 - **`cxr` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
   lazy Click dispatch for `scan`, `blaze`, `export`, `analyze`, `validate`,
-  `catalog`, `checkpoint`, `remote`, and `line-grid`. Older flat checkpoint
+  `catalog`, `checkpoint`, `remote`, `energy-grid`, and `sweep`. Older flat checkpoint
   verbs, `check`, and `check-config` remain hidden compatibility aliases.
   Checked user-facing inventory:
   [`docs/cli-reference.md`](cli-reference.md).
 - **`cxr catalog validate [catalog]`** → `check_config:_run`: validate bundled
   offline catalog or explicit complete catalog without starting simulation;
   hidden alias: `cxr check-config`.
-- **`cxr checkpoint ...`** → `checkpoint_cli:command`: grouped local checkpoint
+- **`cxr checkpoint ...`** → `cli.checkpoint:command`: grouped local checkpoint
   shrink, component recompute, archive, restore, list, and merge operations.
 - **`cxr scan <material> [--profile full|survey]`** → `scan:main` →
   `run.run_sweep` → write canonical `checkpoints/<material>/{line,brem}.pkl`
@@ -362,16 +362,21 @@ wired into pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
 
 ## CLI & packaging
 
-### `cli.py`
-`cxr` console-script dispatcher.
+### `cli/`
+`cxr` console-script dispatcher and CLI-specific helpers/groups.
 - Public: `main`.
-- Deps (lazy command imports): `analyze`, `blaze`, `catalog_cli`, `check`,
-  `checkpoint_cli`, `export`, `line_grid`, `remote`, `scan`; hidden
+- Deps (lazy command imports): `analyze`, `blaze`, `catalog`, `check`,
+  `checkpoint`, `energy_grid`, `export`, `remote`, `scan`, `sweep`; hidden
   compatibility paths additionally dispatch to `archive`, `check_config`,
-  `rebrem`, `reline`, and `slim`. Eager lightweight deps: `_cli_core`,
+  `rebrem`, `reline`, and `slim`. Eager lightweight deps: `cli._core`,
   `__version__`.
 
-### `checkpoint_cli.py`
+### `cli/energy_grid.py`, `cli/sweep.py`
+Thin CLI command modules. `energy_grid` registers the domain-owned
+`line_grid` implementation; `sweep` owns catalog scan-range presentation and
+validated, atomic TOML edits.
+
+### `cli/checkpoint.py`
 Canonical `cxr checkpoint` group. Lazily routes `slim`, component
 `recompute {brem,line}`, `archive`, `restore`, `list`, and `merge` to existing
 checkpoint handlers while root-level legacy paths remain hidden aliases.
@@ -381,7 +386,7 @@ Profile-aware line/bremsstrahlung recompute defaults shared by local, grouped,
 and remote command paths. Resolves profile settings and material photon grids;
 keeps a compatibility fallback for branches predating named sweep profiles.
 
-### `catalog_cli.py`
+### `cli/catalog.py`
 Canonical `cxr catalog` group. Lazily routes `catalog validate` to
 `check_config.command` while `cxr check-config` remains a hidden alias.
 

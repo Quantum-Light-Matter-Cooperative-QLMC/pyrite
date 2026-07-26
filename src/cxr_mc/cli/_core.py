@@ -227,12 +227,81 @@ class BeamUVW(click.ParamType):
         return beam
 
 
+def _floats(text):
+    return [float(item) for item in text.split(",")] if text else None
+
+
+class _CSV(click.ParamType):
+    """Comma-separated finite floats with an optional numeric domain."""
+
+    name = "numbers"
+
+    def __init__(
+        self,
+        label,
+        *,
+        lower=None,
+        lower_open=False,
+        upper=None,
+        upper_inclusive=True,
+        preserve_text=False,
+    ):
+        self.label = label
+        self.lower = lower
+        self.lower_open = lower_open
+        self.upper = upper
+        self.upper_inclusive = upper_inclusive
+        self.preserve_text = preserve_text
+
+    def convert(self, value, param, ctx):
+        try:
+            values = _floats(value)
+        except (TypeError, ValueError):
+            self.fail(f"{self.label} must be comma-separated numbers", param, ctx)
+        if not values:
+            self.fail(f"{self.label} requires at least one value", param, ctx)
+        for item in values:
+            if not math.isfinite(item):
+                self.fail(f"{self.label} values must be finite", param, ctx)
+            if self.lower is not None:
+                lower_ok = item > self.lower if self.lower_open else item >= self.lower
+                if not lower_ok:
+                    self._fail_domain(param, ctx)
+            if self.upper is not None:
+                upper_ok = item <= self.upper if self.upper_inclusive else item < self.upper
+                if not upper_ok:
+                    self._fail_domain(param, ctx)
+        return value if self.preserve_text else values
+
+    def _fail_domain(self, param, ctx):
+        if self.lower == 0 and self.lower_open and self.upper is None:
+            self.fail(f"{self.label} values must be finite and positive", param, ctx)
+        relation = "<=" if self.upper_inclusive else "<"
+        self.fail(
+            f"{self.label} values must satisfy {self.lower:g} <= value {relation} {self.upper:g}",
+            param,
+            ctx,
+        )
+
+
 POSITIVE_INT = FiniteRange(integer=True, minimum=0, minimum_open=True)
 NONNEGATIVE_INT = FiniteRange(integer=True, minimum=0, minimum_open=False)
 POSITIVE_FLOAT = FiniteRange(integer=False, minimum=0.0, minimum_open=True)
 NONNEGATIVE_FLOAT = FiniteRange(integer=False, minimum=0.0, minimum_open=False)
 FINITE_FLOAT = FiniteFloat()
 BEAM_UVW = BeamUVW()
+
+# Shared geometry CSV param types. ``_TEXT`` variants preserve the raw string for
+# argv relaying (``energy-grid derive``/``submit``); the plain variants return the
+# parsed float list for direct catalog writes (``sweep set``, ``energy-grid defaults``).
+ENERGY_CSV = _CSV("energy", lower=0, lower_open=True)
+ENERGY_CSV_TEXT = _CSV("energy", lower=0, lower_open=True, preserve_text=True)
+THICKNESS_CSV = _CSV("thickness", lower=0, lower_open=True)
+THICKNESS_CSV_TEXT = _CSV("thickness", lower=0, lower_open=True, preserve_text=True)
+TILT_CSV = _CSV("tilt", lower=0, upper=90, upper_inclusive=False)
+TILT_CSV_TEXT = _CSV("tilt", lower=0, upper=90, upper_inclusive=False, preserve_text=True)
+AZIMUTH_CSV = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True)
+AZIMUTH_CSV_TEXT = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True, preserve_text=True)
 
 
 def json_option(function):

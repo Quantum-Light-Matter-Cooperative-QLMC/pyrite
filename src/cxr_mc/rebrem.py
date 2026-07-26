@@ -27,7 +27,10 @@ from pathlib import Path
 
 import click
 
-from . import _checkpoint_store, _cli_completion, _cli_core, cli_json
+from . import _checkpoint_store
+from .cli import _completion as _cli_completion
+from .cli import _core as _cli_core
+from .cli import json as cli_json
 
 
 def rebrem_checkpoints(

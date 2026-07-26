@@ -7,7 +7,7 @@ import click
 import pytest
 from click.testing import CliRunner
 
-from cxr_mc import _cli_core
+from cxr_mc.cli import _core as _cli_core
 from tests.cli_helpers import assert_clean_result, invoke
 
 

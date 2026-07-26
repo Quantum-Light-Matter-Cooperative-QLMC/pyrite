@@ -31,7 +31,10 @@ from pathlib import Path
 
 import click
 
-from . import _checkpoint_io, _checkpoint_store, _cli_completion, _cli_core, cli_json
+from . import _checkpoint_io, _checkpoint_store
+from .cli import _completion as _cli_completion
+from .cli import _core as _cli_core
+from .cli import json as cli_json
 
 # Anchored to the repo root (src/cxr_mc/archive.py -> parents[2] = repo root), the
 # same dir run.load_checkpoint reads, so `cxr archive` works from any cwd. Computed

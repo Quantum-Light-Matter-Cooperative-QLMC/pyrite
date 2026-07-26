@@ -19,7 +19,7 @@ from pathlib import Path
 import click
 from click.shell_completion import CompletionItem
 
-from . import DATA_DIR
+from .. import DATA_DIR
 
 MAX_LOCAL_CANDIDATES = 200
 MAX_REMOTE_CANDIDATES = 100
@@ -202,7 +202,7 @@ def complete_archive_label(ctx: object, param: object, incomplete: str) -> list[
 
 def _query_remote_job_ids() -> Sequence[str]:
     """Read recent remote job-directory names with bounded, prompt-free SSH."""
-    from ._remote import config
+    from .._remote import config
 
     jobs_dir = config.remote_path(config.JOBS_SUBDIR)
     remote_command = (

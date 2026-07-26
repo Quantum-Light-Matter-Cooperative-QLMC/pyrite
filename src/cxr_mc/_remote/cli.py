@@ -8,8 +8,9 @@ from copy import copy
 
 import click
 
-from .. import _cli_completion, cli_json
-from .._cli_core import (
+from ..cli import _completion as _cli_completion
+from ..cli import json as cli_json
+from ..cli._core import (
     FINITE_FLOAT,
     NONNEGATIVE_FLOAT,
     NONNEGATIVE_INT,

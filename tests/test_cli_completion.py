@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from cxr_mc import _cli_completion
+from cxr_mc.cli import _completion as _cli_completion
 
 
 def _values(items):
@@ -197,8 +197,14 @@ def test_line_grid_wires_safe_completion_but_not_stop_target():
         assert (
             _callback(command.commands[name], "materials") is _cli_completion.complete_material_csv
         )
-    for name in ("set", "set-brem", "show"):
+    for name in ("show",):
         assert _callback(command.commands[name], "material") is _cli_completion.complete_material
+    for band in ("line", "brem"):
+        for name in ("set", "show"):
+            assert (
+                _callback(command.commands[band].commands[name], "material")
+                is _cli_completion.complete_material
+            )
     job = command.commands["job"]
     for name in ("attach", "status", "logs"):
         assert _callback(job.commands[name], "jobid") is _cli_completion.complete_job_id

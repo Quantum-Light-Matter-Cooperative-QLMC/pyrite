@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import click
 
-from ._cli_core import LazyGroup, run
+from ._core import LazyGroup, run
 
 _COMMANDS = {
     "slim": "cxr_mc.slim.command",
-    "recompute": "cxr_mc.checkpoint_cli.recompute_command",
+    "recompute": "cxr_mc.cli.checkpoint.recompute_command",
     "archive": "cxr_mc.archive.archive_command",
     "restore": "cxr_mc.archive.restore_command",
     "list": "cxr_mc.archive.archives_command",

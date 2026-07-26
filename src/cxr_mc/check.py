@@ -24,9 +24,9 @@ from pathlib import Path
 
 import click
 
-from . import _cli_core
 from ._acp import running_acp
 from ._remote.config import HOST as REMOTE_HOST
+from .cli import _core as _cli_core
 
 NOTEBOOK = "notebooks/validation_app.py"
 TUNNEL_PORT = 2718

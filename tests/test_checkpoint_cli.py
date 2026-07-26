@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import click
 
-from cxr_mc import archive, checkpoint_cli, reline
+from cxr_mc import archive, reline
+from cxr_mc.cli import checkpoint as checkpoint_cli
 from cxr_mc.cli import command as root_command
 from tests.cli_helpers import assert_clean_result, invoke
 
