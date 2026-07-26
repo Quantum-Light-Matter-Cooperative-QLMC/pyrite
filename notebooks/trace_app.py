@@ -549,7 +549,7 @@ def _(
         _save_row = mo.hstack(
             [
                 mo.download(
-                    data=lambda p=_render_path: p.read_bytes(),
+                    data=_render_path.read_bytes,
                     filename=f"{_nc['name'].split()[0]}_{_render_key[:8]}.mp4",
                     label="Save render to disk",
                     mimetype="video/mp4",
