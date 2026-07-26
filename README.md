@@ -72,7 +72,8 @@ delta-function of the closed-form theory.
 
 ```
 notebooks/scan_app.py     RUNNER:  pick material → Sweep → run_sweep → checkpoints/<material>/{line,brem}.pkl
-notebooks/analysis_app.py VIZ:     load that checkpoint → all figures (no sweeps here)
+notebooks/analysis_app.py VIZ:     load that checkpoint → 2D analysis figures (no sweeps here)
+notebooks/trace_app.py    3D:      trajectory animation + crystal lattice, straight from the catalog (no checkpoint)
 notebooks/validation_app.py CHECK: literature anchors and validation studies
 scripts/export_pdf.py  legacy-named shim → cxr_mc.export (analysis app → static HTML)
 src/cxr_mc/     importable package: physics modules + the cxr CLI entry point
@@ -162,17 +163,20 @@ structured so a GPU build is a base-image swap (see its header comment).
 
 ## Quickstart
 
-The workflow is **three marimo apps that share the immutable material catalog** — edit a
+The workflow is **four marimo apps that share the immutable material catalog** — edit a
 material's thickness / energies / tilts / energy grids in
-`src/cxr_mc/data/materials.toml` once and all three apps pick it up.
+`src/cxr_mc/data/materials.toml` once and all four apps pick it up.
 
 1. **`notebooks/scan_app.py`** (the runner): choose a material, then
    `material_sweep(MATERIAL)` → `build_cases` → `run_sweep`, which writes
    `checkpoints/<material>/{line,brem}.pkl` and streams per-tilt statistics tables live.
 2. **`notebooks/analysis_app.py`** (the viz): choose the same material, `load_checkpoint`,
-   `cases_from_results`, then `browse` / heatmaps / Eagle XO / Timepix /
-   penetration figures. No sweeps run here.
-3. **`notebooks/validation_app.py`** (the checks): inspect literature anchors,
+   `cases_from_results`, then `browse` / heatmaps / Eagle XO / Timepix figures.
+   No sweeps run here.
+3. **`notebooks/trace_app.py`** (the 3D viewer): interactive electron-trajectory
+   animation and crystal-lattice view, running transport directly from the
+   catalog's scan grids — needs no checkpoint.
+4. **`notebooks/validation_app.py`** (the checks): inspect literature anchors,
    validation studies, and cached validation figures without changing sweep results.
 
 `COLLAPSE_AZIMUTH=True` (in `config.py`) keeps only the best azimuth per

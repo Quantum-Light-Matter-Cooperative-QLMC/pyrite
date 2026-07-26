@@ -43,4 +43,5 @@ Item generation:
 4. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
 5. **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
 
-## P3 - lower / exploratory
+## P3 - lower / exploratory / small bugfixes
+1. >user< Fix some bonds not showing up in some 3D crystal structure plots (HfTe2 is one, I think?)
