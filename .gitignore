@@ -244,9 +244,6 @@ __marimo__/
 zhai_fig1c_analog.png
 *.png
 
-# Monte Carlo run checkpoints (the chunked-run cell pickles results here)
-*.pkl
-zhai_run_checkpoint.pkl
 
 # remote.py detached-job bookkeeping (created on the GPU box under <repo>/jobs/)
 jobs/
@@ -267,5 +264,8 @@ utils/
 
 sgconfig.yml
 *.local.md
-checkpoints/*.meta.json
+checkpoints/*.pkl
+checkpoints/**/*.pkl
+checkpoints/**/*.tmp
+checkpoints/**/*meta.json
 RTK.md
