@@ -37,9 +37,7 @@ Destructive remote stop commands preview exact job targets by default.
 Pass `--yes` to perform cancellation; `cxr line-grid stop` additionally
 requires JOBID or explicit `--latest`.
 
-Files under `docs/superpowers/plans/` and `docs/superpowers/specs/` are
-historical design records, not current CLI reference. Commands below are
-authoritative for this version.
+Commands below are authoritative for this version.
 
 ## Command tree
 

@@ -237,8 +237,7 @@ Headless blazed-crystal (sawtooth entrance face) sweep entry: `cxr blaze <materi
 parse args → build cases → `run_sweep` → checkpoint structure, but forces v1
 groove geometry (`theta_obs=90`, `tilt_azim=180`, no substrate/stack/footprint)
 per (energy, spacing) pair and writes to a dedicated
-`checkpoints/<material>_blazed.pkl`, never the flat-face `<material>.pkl`. See
-`docs/superpowers/specs/2026-07-23-cxr-blaze-grooved-sweep-design.md`.
+`checkpoints/<material>_blazed.pkl`, never the flat-face `<material>.pkl`.
 - Public: `main`, `run`, `add_subparser`.
 - Deps: `config`, `run`, `scan` (`validate_materials`, `_write_progress_record`), `sweep`.
 

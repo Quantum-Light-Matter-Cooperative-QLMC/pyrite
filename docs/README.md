@@ -1,6 +1,6 @@
 # Documentation map
 
-Guides, references, validation records, and historical design notes. They complement:
+Guides, references, and validation records. They complement:
 
 - [`../README.md`](../README.md) — user-facing overview, physics, install, validation.
 - [`../docs/repo_map.md`](repo_map.md) — canonical package ownership and dependency map.
@@ -20,7 +20,3 @@ Guides, references, validation records, and historical design notes. They comple
 | [atomic-data-sources.md](atomic-data-sources.md) | Atomic scattering data supplied by xraydb | adopted |
 | [crystal-db-comparison.md](crystal-db-comparison.md) | Offline external-database lattice cross-check | implemented |
 | [debye-waller-audit.md](debye-waller-audit.md) | Thermal-displacement provenance and scalar/tensor model scope | in progress |
-| [superpowers/README.md](superpowers/README.md) | Dated implementation plans and design specifications | historical |
-
-`superpowers/` records describe decisions at their authoring dates; use the CLI and API
-references for current behavior.

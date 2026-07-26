@@ -6,9 +6,7 @@
   `src/cxr_mc/montecarlo/transport.py::simulate_trajectories`;
   `src/cxr_mc/montecarlo/spectrum.py::{mc_spectrum,mc_brem_spectrum}`
 - **Source**: elementary periodic ray–plane intersection (no literature
-  equation); original plan
-  `docs/superpowers/plans/2026-07-23-blazed-groove-geometry.md`; correction
-  design `docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md`
+  equation)
 - **Verifier**: independent fresh context (did not write the implementation),
   2026-07-24. Sections 1--3 were derived **before** reading implementation
   bodies (only the ledger row, module/function derivation docstrings, and
