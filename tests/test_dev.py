@@ -125,8 +125,8 @@ def test_smoke_forwards_material_and_output_directory(dev_module, monkeypatch) -
     ]
 
 
-def test_repo_map_groups_vendor_specific_directories_as_agent_tooling(dev_module, capsys) -> None:
+def test_repo_map_groups_present_vendor_directories_as_agent_tooling(dev_module, capsys) -> None:
     dev_module.cmd_repo_map(Namespace())
 
     output = capsys.readouterr().out
-    assert "Agent tooling:\n  .agents/\n  .claude/\n  .codex/" in output
+    assert "Agent tooling:\n  .agents/\n  .claude/\n\nCanonical commands:" in output
