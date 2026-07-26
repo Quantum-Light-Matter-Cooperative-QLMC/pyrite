@@ -12,7 +12,11 @@ from types import SimpleNamespace
 import altair as alt
 import numpy as np
 
-from cxr_mc.plots.altair_spectra import compare_spectrum_chart, spectrum_chart
+from cxr_mc.plots.altair_spectra import (
+    compare_spectrum_chart,
+    multi_case_spectrum_chart,
+    spectrum_chart,
+)
 
 
 def _dataset(spec):
@@ -220,3 +224,102 @@ def test_compare_chart_matches_spectrum_chart_for_hue_E0_single_tilt():
     assert set(orig_map) == set(cmp_map)
     for key, val in orig_map.items():
         assert val == cmp_map[key]
+
+
+# ---- multi_case_spectrum_chart tests -----------------------------------------------
+def test_multi_case_chart_none_on_empty():
+    """Empty cases list returns None, matching compare_spectrum_chart behavior."""
+    assert multi_case_spectrum_chart([], _settings()) is None
+
+
+def test_multi_case_chart_single_case():
+    """Single (record, label) tuple produces exactly one label in the dataset."""
+    cases = [(_record(30.0, 20.0, 0.0), "HOPG - 30 keV")]
+    chart = multi_case_spectrum_chart(cases, _settings())
+    assert isinstance(chart, alt.LayerChart)
+    spec = chart.to_dict()
+    df = _dataset(spec)
+    labels = {row["label"] for row in df}
+    assert labels == {"HOPG - 30 keV"}
+
+
+def test_multi_case_chart_distinct_labels_survive_duplicate_fields():
+    """Core regression: two entries with identical case fields but different
+    labels must BOTH survive as distinct lines (no collapse to strongest peak).
+    This is the anti-collapse behavior that distinguishes multi_case_spectrum_chart
+    from compare_spectrum_chart."""
+    cases = [
+        (_record(30.0, 20.0, 0.0, peak_center=2500.0), "copy A"),
+        (_record(30.0, 20.0, 0.0, peak_center=2500.0), "copy B"),
+    ]
+    chart = multi_case_spectrum_chart(cases, _settings())
+    spec = chart.to_dict()
+    df = _dataset(spec)
+    labels = {row["label"] for row in df}
+    assert labels == {"copy A", "copy B"}
+
+
+def test_multi_case_chart_color_field_is_label():
+    """Color encoding must be literally the 'label' field (the passed label string),
+    NOT any case field like tilt_deg or E0_keV."""
+    cases = [
+        (_record(30.0, 20.0, 0.0), "HOPG - 30 keV"),
+        (_record(60.0, 20.0, 0.0), "HOPG - 60 keV"),
+    ]
+    chart = multi_case_spectrum_chart(cases, _settings())
+    spec = chart.to_dict()
+    enc = spec["layer"][0]["encoding"]
+    assert enc["color"]["field"] == "label"
+    assert enc["color"]["title"] == "case"
+
+
+def test_multi_case_chart_brem_layer_toggle():
+    """include_brem=True produces 2 layers (total + brem);
+    include_brem=False produces 1 layer (total only)."""
+    cases = [(_record(30.0, 20.0, 0.0), "HOPG - 30 keV")]
+
+    chart_with_brem = multi_case_spectrum_chart(cases, _settings(), include_brem=True)
+    spec_with = chart_with_brem.to_dict()
+    assert len(spec_with["layer"]) == 2
+
+    chart_no_brem = multi_case_spectrum_chart(cases, _settings(), include_brem=False)
+    spec_no = chart_no_brem.to_dict()
+    assert len(spec_no["layer"]) == 1
+
+
+def test_multi_case_chart_broadband_wide_brem_tail():
+    """band='broad' with wide_brem records extends energies past the narrow
+    1000-5000 eV band, reaching up to beam energy (30 keV for the test record)."""
+    cases = [
+        (_record(30.0, 20.0, 0.0, wide_brem=True), "HOPG - 30 keV broad"),
+        (_record(30.0, 40.0, 0.0, wide_brem=True), "HOPG - 40 deg broad"),
+    ]
+    chart = multi_case_spectrum_chart(cases, _settings(), band="broad")
+    spec = chart.to_dict()
+    df = _dataset(spec)
+    tail = [row for row in df if row["component"] == "total" and row["energy_eV"] > 5000.0]
+
+    assert tail
+    assert max(row["energy_eV"] for row in df) == 30000.0
+    assert {row["label"] for row in tail} == {"HOPG - 30 keV broad", "HOPG - 40 deg broad"}
+
+
+def test_multi_case_chart_mixed_material_labels():
+    """Different material names and labels in a case basket must render without error,
+    with each label surviving as a distinct line (multi_case_spectrum_chart does not
+    enforce material consistency, only reads case fields for physics calculations)."""
+    rec_hopg = _record(30.0, 20.0, 0.0)
+    rec_hopg["case"]["name"] = "HOPG bulk"
+    rec_sic = _record(30.0, 20.0, 0.0, peak_center=3000.0)
+    rec_sic["case"]["name"] = "SiC bulk"
+    rec_sic["spec"] = rec_sic["spec"] * 1.5  # Boost SiC's peak to make it visually distinct
+
+    cases = [
+        (rec_hopg, "HOPG - 30 keV"),
+        (rec_sic, "SiC - 30 keV"),
+    ]
+    chart = multi_case_spectrum_chart(cases, _settings())
+    spec = chart.to_dict()
+    df = _dataset(spec)
+    labels = {row["label"] for row in df}
+    assert labels == {"HOPG - 30 keV", "SiC - 30 keV"}

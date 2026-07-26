@@ -39,6 +39,9 @@ FROZEN_EXPORTS = frozenset(
         "BREM_RECORD_KEYS",
         "_peak",
         "best_azimuth",
+        "case_label",
+        "case_table_rows",
+        "slim_case_record",
         # metrics
         "_find_peaks_props",
         "line_index",

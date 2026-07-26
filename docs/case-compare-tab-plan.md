@@ -1,6 +1,28 @@
 # Plan: "Compare any cases" tab in `analysis_app.py`
 
-Status: **planned, not implemented** (2026-07-26).
+Status: **partially implemented** (2026-07-26). Steps 1-3 done, lint/tests/
+`marimo check` green. Step 4 (metrics panel) and step 5 (docs/TODO/verify)
+NOT started.
+
+## WIP handoff
+
+Done: `selection.py` (`case_label`, `case_table_rows`, `slim_case_record`),
+`altair_spectra.py` (`multi_case_spectrum_chart` + `_multi_case_frame`),
+exports synced (`results/__init__.py`, `test_results_exports.py`), tests
+green (`test_results_selection.py` 14, `test_altair_spectra_compare.py` 17
+incl. `multi_case_spectrum_chart` cases). Notebook wiring in
+`notebooks/analysis_app.py`: basket state cell (`mo.state`), picker cell
+(`case_picker_ui`), add/remove/clear button cells, narrow+broad spectral
+control cells (mirroring `polar_compare_tab`), and `case_compare_tab()`
+registered in the `Explore` accordion as "Compare any cases". `uvx marimo
+check` clean; `test_analysis_app.py` 14 pass (the remove-select widget needed
+its own cell, split from the buttons that read its `.value` — a cell can't
+both create a `mo.ui` widget and read its own `.value`, per
+`test_all_ui_values_are_read_downstream_of_creation`). `dev.py lint` clean.
+
+Next: step 4 (per-basket-entry metrics table: peak flux, line flux,
+prominence, line-to-brem ratio) then step 5 (docs/TODO/verify). See
+"Implementation order" below.
 
 ## Goal
 

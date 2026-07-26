@@ -13,7 +13,12 @@ physics and units are identical -- only the renderer differs. The matplotlib
 re-exported from ``cxr_mc.plots`` (that package has a frozen export-set guard);
 import them from the submodule:
 
-    from cxr_mc.plots.altair_spectra import spectrum_chart, compare_spectrum_chart, material_comparison_chart
+    from cxr_mc.plots.altair_spectra import (
+        spectrum_chart,
+        compare_spectrum_chart,
+        multi_case_spectrum_chart,
+        material_comparison_chart,
+    )
 
 Functions return :class:`altair.Chart` objects, which render directly in marimo
 and Jupyter.
@@ -434,6 +439,83 @@ def compare_spectrum_chart(
             )
         )
     return alt.layer(*layers).properties(width=width, height=height, title=title).interactive()
+
+
+def _multi_case_frame(cases, settings, *, include_brem=True, band="narrow", max_points=None):
+    """Tidy long-form spectrum table, ONE row per (case-basket entry, energy-grid
+    point, component) -- the case-basket counterpart of :func:`_compare_frame`
+    with its best-peak collapse removed: every ``(record, label)`` pair in
+    ``cases`` keeps its own line, even when two entries share every case field
+    :func:`_compare_frame` would hue by (the whole point of a hand-picked
+    basket, where the user already chose both on purpose)."""
+    _validate_band(band)
+    frames = []
+    for r, label in cases:
+        frames.extend(
+            _record_frame(r, settings, include_brem=include_brem, meta={"label": str(label)})
+        )
+    columns = ["energy_eV", "intensity", "label", "component"]
+    if not frames:
+        return pd.DataFrame(columns=columns)
+    return _decimate_frame(pd.concat(frames, ignore_index=True), max_points)
+
+
+def multi_case_spectrum_chart(
+    cases,
+    settings,
+    *,
+    include_brem=True,
+    x_domain=None,
+    x_type="linear",
+    y_type="linear",
+    band="narrow",
+    max_points=5000,
+    width=720,
+    height=360,
+):
+    """Interactive Altair line chart overlaying an explicit, hand-picked list of
+    ``(record, label)`` pairs -- the cross-material "case basket" comparison
+    tab. Unlike :func:`compare_spectrum_chart`, this never collapses entries
+    that share a hue-able case field to a single strongest-peak line: every
+    entry in ``cases`` draws, colored by its own ``label`` (see
+    :func:`cxr_mc.results.selection.case_label`), so two basket entries that
+    happen to share every case field both survive. ``include_brem``,
+    ``x_domain``, ``x_type``/``y_type``, ``band``, and ``max_points`` match
+    :func:`compare_spectrum_chart`. Returns ``None`` when ``cases`` is empty.
+    """
+    if not cases:
+        return None
+    df = _multi_case_frame(
+        cases, settings, include_brem=include_brem, band=band, max_points=max_points
+    )
+    if df.empty:
+        return None
+
+    x_scale = _scale(x_type, x_domain)
+    y_scale = (
+        _log_y_scale(_windowed_frame(df, x_domain))
+        if y_type == "log"
+        else _linear_y_scale(df, x_domain)
+    )
+
+    base = alt.Chart(df).encode(
+        x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
+        y=alt.Y("intensity:Q", title="Intensity (Phs/eV/s/nA)", scale=y_scale),
+        color=alt.Color("label:N", title="case"),
+        tooltip=["label:N", "energy_eV:Q", "intensity:Q", "component:N"],
+    )
+    layers = [base.transform_filter(alt.datum.component == "total").mark_line(strokeWidth=1.4)]
+    if include_brem:
+        layers.append(
+            base.transform_filter(alt.datum.component == "brem").mark_line(
+                strokeWidth=0.7, strokeDash=[4, 3], opacity=0.7
+            )
+        )
+    return (
+        alt.layer(*layers)
+        .properties(width=width, height=height, title="Case comparison")
+        .interactive()
+    )
 
 
 _COMPARISON_SELECTION_TITLES = {

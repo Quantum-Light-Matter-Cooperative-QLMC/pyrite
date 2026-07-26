@@ -14,6 +14,8 @@ flux), collapsing hundreds of azimuth runs to one row/curve each.
 
 import numpy as np
 
+from ..sweep import fmt_thickness
+
 
 # ---- record selection --------------------------------------------------------
 def records(results, names=None):
@@ -354,3 +356,86 @@ def best_azimuth(recs):
         groups.setdefault(key, []).append(r)
     best = [max(g, key=_peak) for g in groups.values()]
     return sorted(best, key=lambda r: (r["case"]["tilt_deg"], r["case"]["E0_keV"]))
+
+
+# ---- cross-material case basket ----------------------------------------------
+# Case fields case_label() may show/elide (E0_keV is always shown, so it's not
+# in this set); the same fields case_table_rows() surfaces for the picker.
+_LABEL_FIELDS = ("thickness_ang", "tilt_deg", "tilt_azim_deg")
+
+# Record keys a basket entry needs to be plottable by
+# ``plots.altair_spectra._record_frame`` / ``metrics.line_metrics`` -- the same
+# spectral-array set ``slim_results`` trims to, minus ``E_pk``/``hit_frac``/
+# ``eta`` which neither consumer reads.
+_BASKET_RECORD_FIELDS = ("E_grid", "spec", "brem", "E_grid_brem", "brem_wide", "fwhm", "scale")
+
+
+def case_label(case, *, material_label=None, face=None, varying=None):
+    """Human-readable case-identity label for the cross-material case basket,
+    e.g. ``"HOPG - 100 keV - 5um - tilt -80deg - az 120deg"``.
+
+    ``material_label`` and the beam energy are always shown when present;
+    ``varying`` (a set/container of field names, typically the keys of
+    :func:`sweep_values` run over just the basket's cases) restricts the rest
+    of :data:`_LABEL_FIELDS` to only those that actually differ across the
+    basket, so a basket that's all one thickness doesn't repeat it on every
+    line. ``varying=None`` (the default) shows every field -- the right choice
+    for a single, standalone label. ``face="blazed"`` appends a trailing
+    ``(blazed)`` marker (mirrors the checkpoint-stem convention in
+    :func:`cxr_mc.analyze.face_stem`); any other face is unmarked.
+    """
+    parts = []
+    if material_label:
+        parts.append(str(material_label))
+    if case.get("E0_keV") is not None:
+        parts.append(f"{case['E0_keV']:g} keV")
+
+    def _shown(field):
+        return varying is None or field in varying
+
+    if _shown("thickness_ang") and case.get("thickness_ang") is not None:
+        parts.append(fmt_thickness(case["thickness_ang"]))
+    if _shown("tilt_deg") and case.get("tilt_deg") is not None:
+        parts.append(f"tilt {case['tilt_deg']:g}deg")
+    if _shown("tilt_azim_deg") and case.get("tilt_azim_deg") is not None:
+        parts.append(f"az {case['tilt_azim_deg']:g}deg")
+    label = " - ".join(parts)
+    return f"{label} (blazed)" if face == "blazed" else label
+
+
+def case_table_rows(results):
+    """One plain dict per record in ``results``, for the case-picker table that
+    feeds the "Add to comparison" basket flow. Carries the record's own
+    ``(name, E0_keV)`` primary key (so a selected row maps straight back to
+    ``results[name][E0]``) plus the case-varying columns and a cheap peak-flux
+    metric -- no heavy per-row analysis. Row order matches :func:`records`."""
+    rows = []
+    for r in records(results):
+        case = r["case"]
+        rows.append(
+            {
+                "name": case["name"],
+                "E0_keV": case["E0_keV"],
+                "thickness": fmt_thickness(case["thickness_ang"]),
+                "thickness_ang": case["thickness_ang"],
+                "tilt_deg": case["tilt_deg"],
+                "tilt_azim_deg": case["tilt_azim_deg"],
+                "peak_flux": _peak(r),
+            }
+        )
+    return rows
+
+
+def slim_case_record(record, *, material, label, face="flat"):
+    """Standalone, basket-sized copy of one checkpoint ``record``: just the
+    spectral arrays :func:`cxr_mc.plots.altair_spectra._record_frame` and
+    :func:`cxr_mc.results.metrics.line_metrics` need
+    (:data:`_BASKET_RECORD_FIELDS`), plus a ``case`` dict tagged with the
+    basket-only identity fields (``material``, ``face``, ``label``) a bare
+    checkpoint record has no slot for. Everything else (``eta``, ``hit_frac``,
+    ``E_pk``, ...) is dropped, so a dozen basket entries from a dozen
+    checkpoints stay kB-sized rather than carrying each source record's full
+    footprint. Never mutates ``record``."""
+    slim = {k: record[k] for k in _BASKET_RECORD_FIELDS if k in record}
+    slim["case"] = {**record["case"], "material": material, "face": face, "label": label}
+    return slim

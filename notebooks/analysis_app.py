@@ -38,7 +38,11 @@ def _():
         eaglexo_detected_chart,
         timepix_detected_chart,
     )
-    from cxr_mc.plots.altair_spectra import compare_spectrum_chart, spectrum_chart
+    from cxr_mc.plots.altair_spectra import (
+        compare_spectrum_chart,
+        multi_case_spectrum_chart,
+        spectrum_chart,
+    )
     from cxr_mc.plots.altair_sweeps import (
         heatmap_select_chart,
         metric_vs_chart,
@@ -46,10 +50,13 @@ def _():
     )
     from cxr_mc.plots.sweeps import _HEATMAP_QUANTITIES as HEATMAP_QUANTITIES
     from cxr_mc.results import (
+        case_label,
+        case_table_rows,
         filter_results,
         records,
         select_results,
         select_thickness,
+        slim_case_record,
         sweep_values,
         thicknesses_by_energy,
         top_geometries,
@@ -61,6 +68,8 @@ def _():
         CATALOG,
         HEATMAP_QUANTITIES,
         MaterialSelect,
+        case_label,
+        case_table_rows,
         cases_from_results,
         compare_spectrum_chart,
         default_settings,
@@ -72,6 +81,7 @@ def _():
         load_analysis_checkpoint,
         metric_vs_chart,
         mo,
+        multi_case_spectrum_chart,
         page_title,
         plot_best_spectra,
         plot_eaglexo_charge_map,
@@ -81,6 +91,7 @@ def _():
         scan_charts,
         select_results,
         select_thickness,
+        slim_case_record,
         spectrum_chart,
         style_sheet,
         sweep_values,
@@ -1282,6 +1293,287 @@ def _(
 
 
 @app.cell
+def _(mo):
+    # Case-comparison basket -- lives outside the `res`-derived reactivity
+    # graph the other compare tabs sit in, so it survives switching
+    # material/face above: picking cases from several checkpoints in a row
+    # accumulates them instead of resetting.
+    get_case_basket, set_case_basket = mo.state([])
+    return get_case_basket, set_case_basket
+
+
+@app.cell
+def _(case_table_rows, mo, res):
+    # Case picker over the RAW `res` (mirrors the polar/azim tabs above):
+    # thickness is a selectable dimension here, so the top-of-notebook
+    # thickness pin must not apply underneath it.
+    case_picker_ui = mo.ui.table(
+        case_table_rows(res), selection="multi", label="cases in this checkpoint"
+    )
+    return (case_picker_ui,)
+
+
+@app.cell
+def _(
+    FACE,
+    MATERIAL,
+    case_label,
+    case_picker_ui,
+    mo,
+    res,
+    set_case_basket,
+    slim_case_record,
+    sweep_values,
+):
+    _CASE_BASKET_CAP = 12
+
+    def _add_selected_cases(n):
+        _selected = case_picker_ui.value
+        if _selected:
+            _varying = set(sweep_values(res))
+            _new = []
+            for _row in _selected:
+                _record = res[_row["name"]][_row["E0_keV"]]
+                _label = case_label(
+                    _record["case"], material_label=MATERIAL, face=FACE, varying=_varying
+                )
+                _new.append(slim_case_record(_record, material=MATERIAL, label=_label, face=FACE))
+            set_case_basket(lambda old: (old + _new)[-_CASE_BASKET_CAP:])
+        return n + 1
+
+    case_basket_add_ui = mo.ui.button(
+        value=0, on_click=_add_selected_cases, label="Add selected cases"
+    )
+    return (case_basket_add_ui,)
+
+
+@app.cell
+def _(get_case_basket, mo):
+    # Index-keyed (not label-keyed) so two basket entries that happen to
+    # render the same label stay individually removable. Own cell, separate
+    # from the buttons that read `.value` below -- a cell may not both create
+    # a mo.ui widget and read its own `.value` (see
+    # test_all_ui_values_are_read_downstream_of_creation).
+    _basket_options = {
+        f"{i}: {entry['case']['label']}": i for i, entry in enumerate(get_case_basket())
+    }
+    case_basket_remove_select_ui = mo.ui.multiselect(_basket_options, label="remove from basket")
+    return (case_basket_remove_select_ui,)
+
+
+@app.cell
+def _(case_basket_remove_select_ui, mo, set_case_basket):
+    def _remove_selected(n):
+        _drop = set(case_basket_remove_select_ui.value)
+        if _drop:
+            set_case_basket(lambda old: [e for i, e in enumerate(old) if i not in _drop])
+        return n + 1
+
+    case_basket_remove_ui = mo.ui.button(
+        value=0, on_click=_remove_selected, label="Remove selected"
+    )
+
+    def _clear_basket(n):
+        set_case_basket(lambda old: [])
+        return n + 1
+
+    case_basket_clear_ui = mo.ui.button(value=0, on_click=_clear_basket, label="Clear basket")
+    return case_basket_clear_ui, case_basket_remove_ui
+
+
+@app.cell
+def _(mo):
+    # Case-comparison spectral controls -- own widget instances, independent
+    # of the polar/azim tabs' equivalents above.
+    case_brem_ui = mo.ui.checkbox(value=True, label="show brem background")
+    case_auto_ui = mo.ui.switch(value=True, label="Auto narrow domain")
+    case_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV)")
+    case_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV)")
+    case_xlog_ui = mo.ui.switch(value=False, label="narrow log x")
+    case_ylog_ui = mo.ui.switch(value=False, label="narrow log y")
+
+    case_broad_auto_ui = mo.ui.switch(value=True, label="Auto broad domain")
+    case_broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV)")
+    case_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV)")
+    case_broad_xlog_ui = mo.ui.switch(value=False, label="broad log x")
+    case_broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
+    return (
+        case_auto_ui,
+        case_brem_ui,
+        case_broad_auto_ui,
+        case_broad_xlog_ui,
+        case_broad_xmax_ui,
+        case_broad_xmin_ui,
+        case_broad_ylog_ui,
+        case_xlog_ui,
+        case_xmax_ui,
+        case_xmin_ui,
+        case_ylog_ui,
+    )
+
+
+@app.cell
+def _(
+    case_auto_ui,
+    case_broad_auto_ui,
+    case_broad_xmax_ui,
+    case_broad_xmin_ui,
+    case_xmax_ui,
+    case_xmin_ui,
+):
+    def _domain(auto, xmin, xmax):
+        if auto:
+            return None
+        return (xmin, xmax)
+
+    case_x_domain = _domain(case_auto_ui.value, case_xmin_ui.value, case_xmax_ui.value)
+    case_broad_x_domain = _domain(
+        case_broad_auto_ui.value, case_broad_xmin_ui.value, case_broad_xmax_ui.value
+    )
+    return case_broad_x_domain, case_x_domain
+
+
+@app.cell
+def _(
+    case_auto_ui,
+    case_basket_add_ui,
+    case_basket_clear_ui,
+    case_basket_remove_select_ui,
+    case_basket_remove_ui,
+    case_brem_ui,
+    case_broad_auto_ui,
+    case_broad_x_domain,
+    case_broad_xlog_ui,
+    case_broad_xmax_ui,
+    case_broad_xmin_ui,
+    case_broad_ylog_ui,
+    case_picker_ui,
+    case_x_domain,
+    case_xlog_ui,
+    case_xmax_ui,
+    case_xmin_ui,
+    case_ylog_ui,
+    get_case_basket,
+    mo,
+    multi_case_spectrum_chart,
+    settings,
+):
+    _CASE_BASKET_CAP = 12
+
+    def case_compare_tab():
+        # Cross-material "case basket": user hand-picks individual cases from
+        # whichever checkpoint is loaded above and overlays them, unlike the
+        # single-swept-dimension polar/azim tabs. See
+        # docs/case-compare-tab-plan.md.
+        _basket = get_case_basket()
+        _picker_block = mo.vstack(
+            [
+                mo.md(
+                    "Pick cases from the checkpoint currently loaded above, then add them "
+                    "to the comparison basket. Switch material/face and add more to compare "
+                    "across materials — the basket persists."
+                ),
+                case_picker_ui,
+                case_basket_add_ui,
+                mo.hstack(
+                    [case_basket_remove_select_ui, case_basket_remove_ui, case_basket_clear_ui],
+                    wrap=True,
+                ),
+            ]
+        )
+        if not _basket:
+            return mo.vstack(
+                [_picker_block, mo.md("*Add 2+ cases from the picker above to compare.*")]
+            )
+
+        _cases = [(entry, entry["case"]["label"]) for entry in _basket]
+        _spectral_controls = mo.vstack(
+            [
+                case_brem_ui,
+                mo.accordion(
+                    {
+                        "Axes and scaling": mo.vstack(
+                            [
+                                mo.hstack(
+                                    [
+                                        case_auto_ui,
+                                        case_xmin_ui,
+                                        case_xmax_ui,
+                                        case_xlog_ui,
+                                        case_ylog_ui,
+                                    ],
+                                    wrap=True,
+                                ),
+                                mo.hstack(
+                                    [
+                                        case_broad_auto_ui,
+                                        case_broad_xmin_ui,
+                                        case_broad_xmax_ui,
+                                        case_broad_xlog_ui,
+                                        case_broad_ylog_ui,
+                                    ],
+                                    wrap=True,
+                                ),
+                            ]
+                        )
+                    }
+                ),
+            ]
+        )
+
+        def _narrow_chart_item():
+            _chart = multi_case_spectrum_chart(
+                _cases,
+                settings,
+                include_brem=case_brem_ui.value,
+                x_domain=case_x_domain,
+                x_type="log" if case_xlog_ui.value else "linear",
+                y_type="log" if case_ylog_ui.value else "linear",
+                band="narrow",
+            )
+            return _chart if _chart is not None else mo.md("*No narrowband spectra in the basket.*")
+
+        def _broad_chart_item():
+            _chart = multi_case_spectrum_chart(
+                _cases,
+                settings,
+                include_brem=case_brem_ui.value,
+                x_domain=case_broad_x_domain,
+                x_type="log" if case_broad_xlog_ui.value else "linear",
+                y_type="log" if case_broad_ylog_ui.value else "linear",
+                band="broad",
+            )
+            return _chart if _chart is not None else mo.md("*No broadband spectra in the basket.*")
+
+        _basket_rows = [
+            {"label": entry["case"]["label"], "material": entry["case"]["material"]}
+            for entry in _basket
+        ]
+        _cap_note = (
+            mo.md(f"*Basket capped at {_CASE_BASKET_CAP} entries — oldest drop as you add more.*")
+            if len(_basket) >= _CASE_BASKET_CAP
+            else None
+        )
+        _parts = [_picker_block]
+        if _cap_note is not None:
+            _parts.append(_cap_note)
+        _parts.extend(
+            [
+                mo.md("**Basket contents**"),
+                mo.ui.table(_basket_rows, selection=None),
+                _spectral_controls,
+                mo.md("**Narrowband**"),
+                mo.lazy(_narrow_chart_item, show_loading_indicator=True),
+                mo.md("**Broadband**"),
+                mo.lazy(_broad_chart_item, show_loading_indicator=True),
+            ]
+        )
+        return mo.vstack(_parts)
+
+    return (case_compare_tab,)
+
+
+@app.cell
 def _(
     HEATMAP_QUANTITIES,
     cases,
@@ -1722,6 +2014,7 @@ def _(
 def _(
     MATERIAL,
     azim_compare_tab,
+    case_compare_tab,
     cross_material_tab,
     detectors_tab,
     mo,
@@ -1745,6 +2038,7 @@ def _(
                         "Compare beam energies": spectra_tab,
                         "Compare polar angles": polar_compare_tab,
                         "Compare azimuths": azim_compare_tab,
+                        "Compare any cases": case_compare_tab,
                     },
                     lazy=True,
                     multiple=True,
