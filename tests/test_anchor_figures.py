@@ -194,6 +194,28 @@ def test_figure_spectra_with_reference_overlay(anchor):
     assert len(fig.axes[2].collections) >= 1
 
 
+def test_zhai_background_validation_fits_subtracts_and_compares(anchor):
+    model = _synthetic_model(anchor)
+    validation = af.zhai_background_validation(anchor, model)
+
+    assert validation["fit"].n_points > 40
+    assert 0.95 < validation["fit"].scale < 1.10
+    assert validation["subtracted"].max() > 0.8
+    assert validation["comparison"].n_points > 300
+    assert np.isfinite(validation["comparison"].integrated_ratio)
+
+
+def test_figure_background_validation_smoke(anchor):
+    from matplotlib.figure import Figure
+
+    model = _synthetic_model(anchor)
+    validation = af.zhai_background_validation(anchor, model)
+    fig = af.figure_background_validation(validation, anchor, model)
+
+    assert isinstance(fig, Figure)
+    assert len(fig.axes) == 2
+
+
 def test_figure_enhancement_smoke(anchor):
     from matplotlib.figure import Figure
 
