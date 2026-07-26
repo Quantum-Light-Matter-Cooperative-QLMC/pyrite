@@ -36,6 +36,7 @@ registries.
    cxr_mc.slim
    cxr_mc.sweep
    cxr_mc.validation_oracles
+   cxr_mc.validation_background
    cxr_mc.cli
    cxr_mc.scan
    cxr_mc.export

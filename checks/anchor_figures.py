@@ -74,9 +74,16 @@ from cxr_mc.montecarlo import (  # noqa: E402
 )
 from cxr_mc.montecarlo.geometry import tilted_geometry  # noqa: E402
 from cxr_mc.sweep import crystal_params  # noqa: E402
+from cxr_mc.validation_background import (  # noqa: E402
+    compare_external_background,
+    subtract_external_background,
+)
 
 GRAPHITE_B_002 = 0.8  # graphite c-axis Debye-Waller B-factor [Ang^2], approx (Zhai SI)
 _ZHAI_CACHE_SCHEMA = 3  # v3: Table 4 orientation is keyed by sample thickness
+_EXTERNAL_BREM_V1 = _HERE / "reference_data" / "external_brem" / "v1"
+_ZHAI_FIG3B_BREM = _EXTERNAL_BREM_V1 / "zhai_fig3b_25kev_1mm_brem.csv"
+_ZHAI_FIG3B_EXPERIMENT = _EXTERNAL_BREM_V1 / "zhai_fig3b_25kev_1mm_experiment.csv"
 
 
 @dataclass(frozen=True)
@@ -783,6 +790,98 @@ def _match_series(reference: dict, E0_keV: float) -> str | None:
             except ValueError:
                 continue
     return None
+
+
+def zhai_background_validation(anchor: ZhaiAnchor, model: dict | None = None) -> dict:
+    """Fit/subtract deposited Zhai Fig. 3b background and compare model if supplied.
+
+    Figure 3b reports 25 keV electrons on 1 mm HOPG.  The sideband definition
+    excludes 900--1040 eV, which contains the broadened coherent peak.  Fixture
+    provenance and normalization are versioned beside the data.
+    """
+    data = np.genfromtxt(
+        _ZHAI_FIG3B_EXPERIMENT,
+        delimiter=",",
+        names=True,
+        comments="#",
+        skip_header=5,
+    )
+    energy = data["energy_eV"]
+    intensity = data["intensity_Phs_per_eV_s_nA"]
+    sigma = data["sigma_Phs_per_eV_s_nA"]
+    sidebands = (energy < 900.0) | (energy > 1040.0)
+    residual, fitted_background, fit = subtract_external_background(
+        energy,
+        intensity,
+        _ZHAI_FIG3B_BREM,
+        sigma=sigma,
+        fit_mask=sidebands,
+    )
+    result = {
+        "energy_eV": energy,
+        "intensity": intensity,
+        "sigma": sigma,
+        "sidebands": sidebands,
+        "fitted_background": fitted_background,
+        "subtracted": residual,
+        "fit": fit,
+        "comparison": None,
+    }
+    if model is not None:
+        scale = anchor.domega_sr * anchor.per_nA
+        background = model[25.0]["brem_det"] * scale
+        overlap = (anchor.E_grid >= energy.min()) & (anchor.E_grid <= energy.max())
+        result["comparison"] = compare_external_background(
+            anchor.E_grid,
+            background,
+            _ZHAI_FIG3B_BREM,
+            comparison_mask=overlap,
+        )
+    return result
+
+
+def figure_background_validation(validation: dict, anchor: ZhaiAnchor, model: dict | None = None):
+    """Plot deposited experiment, fitted DTSA-II background, and subtraction."""
+    import matplotlib.pyplot as plt
+
+    energy = validation["energy_eV"]
+    fig, (ax_total, ax_sub) = plt.subplots(2, 1, figsize=(9, 8), sharex=True)
+    ax_total.errorbar(
+        energy,
+        validation["intensity"],
+        yerr=validation["sigma"],
+        fmt="o",
+        ms=3,
+        alpha=0.65,
+        label="Zhai deposited experiment",
+    )
+    ax_total.plot(
+        energy,
+        validation["fitted_background"],
+        "--",
+        label=f"deposited external brem × {validation['fit'].scale:.4f}",
+    )
+    if model is not None:
+        scale = anchor.domega_sr * anchor.per_nA
+        ax_total.plot(
+            anchor.E_grid,
+            model[25.0]["brem_det"] * scale,
+            ":",
+            label="cxr-mc Born+Elwert brem",
+        )
+    ax_total.set_ylabel("Detected intensity (Phs/eV/s/nA)")
+    ax_total.set_title("Zhai Fig. 3b: external-background fit")
+    ax_total.legend()
+
+    ax_sub.axhline(0.0, color="0.5", lw=0.8)
+    ax_sub.plot(energy, validation["subtracted"], "o-", ms=3)
+    ax_sub.axvspan(900.0, 1040.0, color="C1", alpha=0.12, label="excluded peak window")
+    ax_sub.set_xlabel("Photon energy (eV)")
+    ax_sub.set_ylabel("Brem-subtracted intensity")
+    ax_sub.set_title("Experimental residual after weighted sideband fit")
+    ax_sub.legend()
+    fig.tight_layout()
+    return fig
 
 
 # ---- figures -----------------------------------------------------------------

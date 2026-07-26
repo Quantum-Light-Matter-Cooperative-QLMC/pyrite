@@ -138,6 +138,15 @@ physics stay in `materials/crystal.py`.
 - Deps: `materials.crystal`; imports `Dans_Diffraction` lazy, only when check
   ask.
 
+### `validation_background.py`
+Analysis-only external bremsstrahlung comparison, weighted sideband
+normalization, and experimental subtraction. External spectra stay in detected
+units and enter through `montecarlo.load_external_brem`.
+- Public: `BackgroundFit`, `BackgroundComparison`,
+  `fit_external_background`, `subtract_external_background`,
+  `compare_external_background`.
+- Deps: `montecarlo`, NumPy.
+
 ### `materials/atomic.py`
 Atomic scattering factors (Z, f0, f′, f″) from **xraydb** for any element — no
 hand-maintained table.

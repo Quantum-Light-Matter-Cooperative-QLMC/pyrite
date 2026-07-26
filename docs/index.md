@@ -22,6 +22,7 @@ cli-reference
 
 crystal-mosaicity
 detector-solid-angle
+external-bremsstrahlung-validation
 multilayer-materials
 atomic-data-sources
 relativistic-electron-transport

@@ -467,6 +467,37 @@ def _(
         def enhancement_tab():
             return af.figure_enhancement(anchor, zhai_model)
 
+        def background_tab():
+            background = af.zhai_background_validation(anchor, zhai_model)
+            fit = background["fit"]
+            comparison = background["comparison"]
+            summary = mo.ui.table(
+                [
+                    {
+                        "External scale": fit.scale,
+                        "Scale uncertainty": fit.scale_std,
+                        "Reduced chi-square": fit.reduced_chi2,
+                        "Sideband points": fit.n_points,
+                        "cxr / external integrated brem": comparison.integrated_ratio,
+                        "Normalized RMSE": comparison.normalized_rmse,
+                        "Shape correlation": comparison.correlation,
+                    }
+                ],
+                selection=None,
+                label="Background validation metrics",
+            )
+            return mo.vstack(
+                [
+                    mo.md(
+                        "Deposited DR-NTU V1 Figure 3b data; weighted scale fit uses "
+                        "sidebands outside 900–1040 eV. DTSA-II identifies Zhai's "
+                        "simulation software, not a canonical NIST spectrum."
+                    ),
+                    summary,
+                    af.figure_background_validation(background, anchor, zhai_model),
+                ]
+            )
+
         reproductions_results = mo.vstack(
             [
                 mo.callout(
@@ -478,6 +509,7 @@ def _(
                 mo.ui.tabs(
                     {
                         "Fig. 1c spectra": spectra_tab,
+                        "External brem + subtraction": background_tab,
                         "Absolute-flux anchor": flux_tab,
                         "Bulk vs 29 nm film": enhancement_tab,
                     },
