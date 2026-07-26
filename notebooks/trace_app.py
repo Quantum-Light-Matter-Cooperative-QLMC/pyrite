@@ -137,16 +137,19 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
     )
 
     penetration_thickness_source_ui = mo.ui.dropdown(_source_options, value="Presets", label="")
+    _default_thickness = 40000.0
+    if _default_thickness not in _thickness_values:
+        _default_thickness = _thickness_values[0]
     penetration_thickness_grid_ui = mo.ui.dropdown(
         {fmt_thickness(value): value for value in _thickness_values},
-        value=fmt_thickness(_thickness_values[0]),
+        value=fmt_thickness(_default_thickness),
         label="",
     )
     penetration_thickness_manual_ui = mo.ui.number(
         start=0.001,
         stop=10000.0,
         step=0.001,
-        value=min(max(_thickness_values[0] / 1e4, 0.001), 10000.0),
+        value=min(max(_default_thickness / 1e4, 4.0), 10000.0),
         label="(µm)",
     )
 
