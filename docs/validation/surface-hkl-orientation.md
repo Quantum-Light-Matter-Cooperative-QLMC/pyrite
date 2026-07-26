@@ -1,5 +1,14 @@
 # Independent validation: `surface-hkl-orientation`
 
+## Fresh re-review (2026-07-25)
+
+A new pre-implementation derivation reproduced the reciprocal normal
+`g_hkl = 2 pi A^-T h`, proper minimal rotation, and composition
+`R = Rz(phi) R0` below without a divergent factor, sign, transpose, or
+convention. Focused current-tree verification passed:
+`tests/test_surface_orientation.py` plus the catalog golden, `11 passed`.
+Verdict remains `rederived`; human ledger update still pending.
+
 ## Scope and pre-implementation record
 
 This derivation was written before inspecting the body of
