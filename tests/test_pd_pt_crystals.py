@@ -120,16 +120,16 @@ def test_pd_pt_structures_match_sources(key, lattice, volume, counts, expected_s
 
 
 @pytest.mark.parametrize(
-    ("key", "surface_hkl", "reflection"),
+    ("key", "surface_hkl", "reflection", "B_ang2"),
     [
-        ("pds2", (0, 0, 1), (0, 0, 2)),
-        ("pdte2", (0, 0, 1), (0, 0, 1)),
-        ("ptbi2", (0, 0, 1), (0, 0, 1)),
-        ("pts2", (0, 0, 1), (0, 0, 1)),
-        ("ptte2", (0, 0, 1), (0, 0, 1)),
+        ("pds2", (0, 0, 1), (0, 0, 2), 0.6),
+        ("pdte2", (0, 0, 1), (0, 0, 1), 0.61),
+        ("ptbi2", (0, 0, 1), (0, 0, 1), 0.6),
+        ("pts2", (0, 0, 1), (0, 0, 1), 0.6),
+        ("ptte2", (0, 0, 1), (0, 0, 1), 0.6),
     ],
 )
-def test_pd_pt_basal_surface_contracts_have_usable_couplings(key, surface_hkl, reflection):
+def test_pd_pt_basal_surface_contracts_have_usable_couplings(key, surface_hkl, reflection, B_ang2):
     """The pinned reciprocal vector must be parallel to the cleavage surface."""
     spec = CATALOG.crystal(key)
 
@@ -137,7 +137,7 @@ def test_pd_pt_basal_surface_contracts_have_usable_couplings(key, surface_hkl, r
     assert spec.beam_uvw is None
     assert spec.hkl_families == (reflection,)
     assert spec.hkl_list == (reflection, tuple(-index for index in reflection))
-    assert spec.B_ang2 == pytest.approx(0.6)
+    assert spec.B_ang2 == pytest.approx(B_ang2)
     assert spec.hkl_reason
 
     structure, g = structure_factor(key, reflection, 1500.0, B_ang2=spec.B_ang2)

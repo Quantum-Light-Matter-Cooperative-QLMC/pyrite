@@ -542,6 +542,9 @@ docs = [
     { name = "myst-parser" },
     { name = "sphinx" },
 ]
+oracle = [
+    { name = "dans-diffraction" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -584,6 +587,7 @@ docs = [
     { name = "myst-parser", specifier = ">=4.0" },
     { name = "sphinx", specifier = ">=8.2" },
 ]
+oracle = [{ name = "dans-diffraction", specifier = "==3.4.0" }]
 
 [[package]]
 name = "cycler"
@@ -592,6 +596,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a9/95/a3dbbb5028f35eafb79008e7522a75244477d2838f38cbb722248dabc2a8/cycler-0.12.1.tar.gz", hash = "sha256:88bb128f02ba341da8ef447245a9e138fae777f6a23943da4540077d3601eb1c", size = 7615, upload-time = "2023-10-07T05:32:18.335Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e7/05/c19819d5e3d95294a6f5947fb9b9629efb316b96de511b418c53d245aae6/cycler-0.12.1-py3-none-any.whl", hash = "sha256:85cef7cff222d8644161529808465972e51340599459b8ac3ccbac5a854e0d30", size = 8321, upload-time = "2023-10-07T05:32:16.783Z" },
+]
+
+[[package]]
+name = "dans-diffraction"
+version = "3.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/97/c1/23a07e0bb8edeaa50f85a5399dd10e7b002d5bab90a1cfc41461eb229825/dans_diffraction-3.4.0.tar.gz", hash = "sha256:d808af4db4dcc30ec0a6d10d7566cafd9a0c22913456e369166d9a267236ded7", size = 3605391, upload-time = "2025-09-15T20:09:06.203Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bb/92/b7bbffc01432c63ea79295686b42a4959dacb298e6f39a95029600acb73b/dans_diffraction-3.4.0-py3-none-any.whl", hash = "sha256:d19a522b37655970dfa9f0eaa1abbea6a20643c9b5473cb613d80d5362180746", size = 3698901, upload-time = "2025-09-15T20:09:03.806Z" },
 ]
 
 [[package]]

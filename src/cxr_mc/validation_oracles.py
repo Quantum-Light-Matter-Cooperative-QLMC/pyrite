@@ -95,6 +95,45 @@ class StructureFactorMagnitudeComparison:
     relative_delta: float
 
 
+@dataclass(frozen=True)
+class DansOracleTolerances:
+    """Numerical acceptance limits for the pinned ``Dans_Diffraction`` check.
+
+    Geometry limits cover roundoff in two implementations of the same lattice
+    algebra. The non-resonant limit compares the same Waasmaier--Kirfel tables.
+    The dispersive limit is intentionally wider because cxr-mc uses
+    Chantler/FFAST while ``Dans_Diffraction`` uses independent Henke/CXRO data.
+    """
+
+    lattice_length_abs_ang: float = 1e-10
+    lattice_angle_abs_deg: float = 1e-10
+    volume_abs_ang3: float = 1e-9
+    geometry_relative: float = 1e-12
+    nonresonant_structure_factor_relative: float = 1e-12
+    dispersive_structure_factor_relative: float = 0.10
+
+
+DEFAULT_DANS_TOLERANCES = DansOracleTolerances()
+
+
+@dataclass(frozen=True)
+class DansOracleValidationReport:
+    """Thresholded result for one crystal and one scattering-factor policy."""
+
+    crystal: str
+    use_henke: bool
+    lattice: LatticeComparison
+    geometry: tuple[ReflectionGeometryComparison, ...]
+    structure_factors: tuple[StructureFactorMagnitudeComparison, ...]
+    failures: tuple[str, ...]
+
+    @property
+    def passed(self) -> bool:
+        """Whether every comparison is finite and within its stated limit."""
+
+        return not self.failures
+
+
 def load_dans_crystal_from_cif(cif_path: str | Path) -> _DansCrystalLike:
     """Load a ``Dans_Diffraction.Crystal`` from a CIF path.
 
@@ -212,6 +251,7 @@ def compare_structure_factor_magnitudes(
         scattering_type=scattering_type,
         energy_kev=energy_kev,
         int_hkl=True,
+        use_waaskirf=True,
         output=False,
     )
     kwargs: dict[str, Any] = {"scattering_type": scattering_type, "int_hkl": True}
@@ -244,6 +284,97 @@ def compare_structure_factor_magnitudes(
             )
         )
     return results
+
+
+def validate_dans_crystal(
+    crystal: str,
+    hkls: Sequence[Sequence[int]],
+    photon_energies_eV: Sequence[float],
+    *,
+    use_henke: bool,
+    tolerances: DansOracleTolerances | None = None,
+) -> DansOracleValidationReport:
+    """Run thresholded lattice, reciprocal-geometry, and ``|F_hkl|²`` checks.
+
+    ``use_henke=False`` compares non-resonant Waasmaier--Kirfel factors.
+    ``use_henke=True`` compares cxr-mc's Chantler/FFAST corrections with
+    ``Dans_Diffraction``'s independent Henke/CXRO corrections. Consequently the
+    two modes use different structure-factor tolerances.
+
+    Assumptions and units match this module's top-level validation contract.
+    The missing-backend limit raises :class:`DansDiffractionUnavailableError`
+    rather than silently passing.
+
+    Validation: dans-diffraction-oracle
+    """
+
+    limits = tolerances or DEFAULT_DANS_TOLERANCES
+    oracle = build_dans_crystal_from_cxr(crystal)
+    lattice = compare_lattice(crystal, oracle)
+    geometry = tuple(compare_reflection_geometry(crystal, oracle, hkls))
+    structure_factors = tuple(
+        comparison
+        for photon_E_eV in photon_energies_eV
+        for comparison in compare_structure_factor_magnitudes(
+            crystal,
+            oracle,
+            hkls,
+            photon_E_eV,
+            use_henke=use_henke,
+        )
+    )
+
+    failures: list[str] = []
+    for name, delta, limit in (
+        *(
+            (
+                f"lattice length {axis}",
+                abs(lattice.lattice_delta[index]),
+                limits.lattice_length_abs_ang,
+            )
+            for index, axis in enumerate(("a", "b", "c"))
+        ),
+        *(
+            (
+                f"lattice angle {axis}",
+                abs(lattice.lattice_delta[index + 3]),
+                limits.lattice_angle_abs_deg,
+            )
+            for index, axis in enumerate(("alpha", "beta", "gamma"))
+        ),
+        ("cell volume", abs(lattice.volume_delta_ang3), limits.volume_abs_ang3),
+    ):
+        _append_failure(failures, name, delta, limit)
+
+    for comparison in geometry:
+        _append_failure(
+            failures,
+            f"{crystal} {comparison.hkl} reciprocal geometry",
+            comparison.relative_delta,
+            limits.geometry_relative,
+        )
+
+    sf_limit = (
+        limits.dispersive_structure_factor_relative
+        if use_henke
+        else limits.nonresonant_structure_factor_relative
+    )
+    for comparison in structure_factors:
+        _append_failure(
+            failures,
+            f"{crystal} {comparison.hkl} |F|^2 at {comparison.photon_E_eV:g} eV",
+            comparison.relative_delta,
+            sf_limit,
+        )
+
+    return DansOracleValidationReport(
+        crystal=crystal,
+        use_henke=use_henke,
+        lattice=lattice,
+        geometry=geometry,
+        structure_factors=structure_factors,
+        failures=tuple(failures),
+    )
 
 
 def _dans_crystal_class() -> Any:
@@ -322,3 +453,8 @@ def _hkl_tuple(hkl: np.ndarray) -> tuple[int, int, int]:
 def _relative_delta(a: float, b: float) -> float:
     scale = max(abs(a), abs(b), np.finfo(float).tiny)
     return abs(a - b) / scale
+
+
+def _append_failure(failures: list[str], name: str, value: float, limit: float) -> None:
+    if not np.isfinite(value) or value > limit:
+        failures.append(f"{name}: {value:.6e} > {limit:.6e}")

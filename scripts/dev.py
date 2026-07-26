@@ -105,7 +105,7 @@ def cmd_repo_map(_: argparse.Namespace) -> None:
         else:
             print(rel)
     print("Agent tooling:")
-    for rel in [".agents", ".claude", ".codex"]:
+    for rel in [".agents", ".claude"]:
         if (ROOT / rel).exists():
             print(f"  {rel}/")
     print()

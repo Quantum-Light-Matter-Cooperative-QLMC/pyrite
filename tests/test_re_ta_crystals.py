@@ -166,23 +166,23 @@ def test_re_ta_structures_match_source_cells_and_full_bases(
 
 
 @pytest.mark.parametrize(
-    ("key", "reflection"),
+    ("key", "reflection", "B_ang2"),
     [
-        ("res2", (0, 0, 2)),
-        ("rese2", (0, 0, 1)),
-        ("2h_tas2", (0, 0, 2)),
-        ("2h_tase2", (0, 0, 2)),
-        ("tate2", (0, 0, 1)),
+        ("res2", (0, 0, 2), 0.6),
+        ("rese2", (0, 0, 1), 0.6),
+        ("2h_tas2", (0, 0, 2), 0.53),
+        ("2h_tase2", (0, 0, 2), 0.6),
+        ("tate2", (0, 0, 1), 0.6),
     ],
 )
-def test_re_ta_surface_contracts_have_finite_nonzero_couplings(key, reflection):
+def test_re_ta_surface_contracts_have_finite_nonzero_couplings(key, reflection, B_ang2):
     """The pinned harmonic must be parallel to (001) and usable by transport."""
     spec = CATALOG.crystal(key)
     assert spec.surface_hkl == (0, 0, 1)
     assert spec.beam_uvw is None
     assert spec.hkl_families == (reflection,)
     assert spec.hkl_list == (reflection, tuple(-index for index in reflection))
-    assert spec.B_ang2 == pytest.approx(0.6)
+    assert spec.B_ang2 == pytest.approx(B_ang2)
     assert spec.hkl_reason
 
     structure, g = structure_factor(key, reflection, 1500.0, B_ang2=spec.B_ang2)

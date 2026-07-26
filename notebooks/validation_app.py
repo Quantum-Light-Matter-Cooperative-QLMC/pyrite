@@ -231,8 +231,8 @@ def _(mo):
           kinematic validity regime.
         - The applicability audit intentionally emits warnings for recoil and long
           coherent lengths. Those warnings are results, not test failures.
-        - The optional Dans_Diffraction oracle exits cleanly when the package is absent;
-          read its report to distinguish a real comparison from a skip.
+        - The pinned Dans_Diffraction oracle is thresholded and fail-closed;
+          launch with `uv run --group oracle` or its report is marked **Skipped**.
         """),
         kind="warn",
     )
@@ -305,18 +305,18 @@ def _(check_authorities, check_reports, mo):
     for report in check_reports or []:
         name = report["filename"]
         authority = check_authorities[name]
-        if report["returncode"] != 0:
+        if authority == "Optional oracle" and "result: skip" in report["output"].lower():
+            state = "Skipped"
+            next_action = "Run under `uv run --group oracle` to install the pinned dependency."
+        elif report["returncode"] != 0:
             state = "Failed"
             next_action = "Inspect full report and fix failure."
         elif authority == "Diagnostic":
             state = "Completed—interpret"
             next_action = "Interpret output against method and source assumptions."
-        elif authority == "Optional oracle" and "skip" in report["output"].lower():
-            state = "Skipped"
-            next_action = "Install optional dependency to run oracle."
         elif authority == "Optional oracle":
-            state = "Completed—interpret"
-            next_action = "Review independent comparison output."
+            state = "Passed"
+            next_action = "Review report and retain it with validation evidence."
         else:
             state = "Passed"
             next_action = "No action required."

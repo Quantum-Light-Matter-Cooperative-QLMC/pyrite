@@ -53,6 +53,13 @@ class FakeCrystal:
         self.atom_kwargs = kwargs
 
 
+class OffsetGeometryCrystal(FakeCrystal):
+    def __init__(self):
+        super().__init__("silicon")
+        original_qmag = self.Cell.Qmag
+        self.Cell.Qmag = lambda hkls: 1.01 * original_qmag(hkls)
+
+
 def test_compare_lattice_matches_internal_cell():
     comparison = vo.compare_lattice("silicon", FakeCrystal())
 
@@ -82,6 +89,7 @@ def test_compare_structure_factor_magnitudes_uses_intensity_safe_quantity():
         "scattering_type": "xray",
         "energy_kev": 8.0,
         "int_hkl": True,
+        "use_waaskirf": True,
         "output": False,
     }
 
@@ -119,3 +127,50 @@ def test_missing_dans_diffraction_raises_clear_optional_dependency_error(monkeyp
 
     with pytest.raises(vo.DansDiffractionUnavailableError, match="optional 'Dans-Diffraction'"):
         vo.load_dans_crystal_from_cif("missing.cif")
+
+
+def test_validate_dans_crystal_fails_closed_on_out_of_tolerance_geometry(monkeypatch):
+    monkeypatch.setattr(vo, "build_dans_crystal_from_cxr", lambda _crystal: OffsetGeometryCrystal())
+
+    report = vo.validate_dans_crystal(
+        "silicon",
+        [(1, 1, 1)],
+        [8000.0],
+        use_henke=False,
+    )
+
+    assert not report.passed
+    assert report.failures == (
+        "silicon (1, 1, 1) reciprocal geometry: 9.900990e-03 > 1.000000e-12",
+    )
+
+
+@pytest.mark.oracle
+def test_real_dans_diffraction_backend_stays_within_documented_tolerances():
+    pytest.importorskip("Dans_Diffraction")
+
+    cases = {
+        "silicon": [(1, 1, 1), (2, 2, 0), (4, 0, 0)],
+        "sapphire": [(0, 0, 6), (1, 1, 0), (1, 0, 4)],
+        "mote2_product": [(0, 0, 2), (1, 0, 0), (1, 0, 3)],
+    }
+    reports = [
+        vo.validate_dans_crystal(
+            crystal,
+            hkls,
+            [1000.0, 2000.0, 3000.0, 8000.0],
+            use_henke=True,
+        )
+        for crystal, hkls in cases.items()
+    ]
+    reports.append(
+        vo.validate_dans_crystal(
+            "sapphire",
+            cases["sapphire"],
+            [8000.0],
+            use_henke=False,
+        )
+    )
+
+    failures = [failure for report in reports for failure in report.failures]
+    assert not failures, "\n".join(failures)

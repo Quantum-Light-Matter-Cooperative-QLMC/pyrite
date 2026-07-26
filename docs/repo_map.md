@@ -131,12 +131,14 @@ optical constants — physics data layer under Monte Carlo.
 
 ### `validation_oracles.py`
 Optional validation-only adapters for external crystallography/scattering
-comparators. First backend build or load `Dans_Diffraction` crystals, compare
-lattice parameters, reciprocal-vector magnitudes, `|F_hkl|²`; production
-physics stay in `materials/crystal.py`.
+comparators. Pinned `Dans_Diffraction` 3.4 backend builds or loads crystals,
+compares lattice parameters, reciprocal-vector magnitudes, and `|F_hkl|²`,
+then applies fail-closed geometry/non-resonant/dispersive thresholds;
+production physics stay in `materials/crystal.py`.
 - Public: `build_dans_crystal_from_cxr`, `load_dans_crystal_from_cif`,
   `compare_lattice`, `compare_reflection_geometry`,
-  `compare_structure_factor_magnitudes`; comparison dataclasses.
+  `compare_structure_factor_magnitudes`, `validate_dans_crystal`; comparison,
+  tolerance, and report dataclasses.
 - Deps: `materials.crystal`; imports `Dans_Diffraction` lazy, only when check
   ask.
 

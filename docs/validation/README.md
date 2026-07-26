@@ -17,6 +17,21 @@ Agreement with Zhai/Feranchuk is necessary but not sufficient — it can hide **
 - **Re-derivation write-ups** — `docs/validation/<id>.md` holds each independent derivation, its diff against the implementation, and the adjudication. This is the audit trail and the seed of the paper's validation appendix.
 - **Anchors** — regression tests (mostly under `checks/`) that pin a claim to a reference value with a tolerance.
 
+### Optional external crystallography oracle
+
+Run the pinned, validation-only `Dans_Diffraction` backend with:
+
+```bash
+uv run --group oracle python checks/dans_diffraction_oracle.py
+```
+
+The program returns nonzero for a missing backend, non-finite result, or
+threshold violation. It tightly compares shared Waasmaier–Kirfel
+non-resonant factors and separately bounds Chantler/FFAST versus independent
+Henke/CXRO dispersive factors at 1, 2, 3, and 8 keV. This external comparison
+is implementation evidence; it does not replace fresh-context re-derivation
+or human sign-off.
+
 ## Status lifecycle
 
 ```

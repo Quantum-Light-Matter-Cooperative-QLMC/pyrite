@@ -270,6 +270,15 @@ def test_validation_diagnostic_success_requires_interpretation():
     assert 'marker = "✓"' not in source
 
 
+def test_validation_oracle_distinguishes_missing_dependency_from_failed_comparison():
+    source = (Path(__file__).resolve().parents[1] / check.NOTEBOOK).read_text(encoding="utf-8")
+
+    skip_branch = 'authority == "Optional oracle" and "result: skip"'
+    assert skip_branch in source
+    assert source.index(skip_branch) < source.index('report["returncode"] != 0')
+    assert "uv run --group oracle" in source
+
+
 def test_repository_default_save_names_mutated_setting_and_file():
     source = (Path(__file__).resolve().parents[1] / check.NOTEBOOK).read_text(encoding="utf-8")
 
