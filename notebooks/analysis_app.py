@@ -2349,12 +2349,12 @@ def _(
     # Every top-level tab holds exactly one view, so each is a bare tab body
     # rather than a nested action-accordion group.
     if MATERIAL is None:
-        mo.callout(
+        view = mo.callout(
             mo.md("**No checkpoint data available.** Run `cxr scan <material>` to create one."),
             kind="info",
         )
     else:
-        mo.ui.tabs(
+        view = mo.ui.tabs(
             {
                 "Explore": lambda: mo.accordion(
                     {
@@ -2382,6 +2382,7 @@ def _(
             },
             lazy=True,
         )
+    view
     return
 
 

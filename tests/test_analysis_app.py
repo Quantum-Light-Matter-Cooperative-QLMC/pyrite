@@ -28,10 +28,27 @@ def test_penetration_controls_read_the_active_material_scan() -> None:
 
 def test_no_checkpoint_state_displays_without_analysis_tabs() -> None:
     source = APP.read_text()
+    tree = ast.parse(source)
+    display_cell = next(
+        cell
+        for cell in tree.body
+        if isinstance(cell, ast.FunctionDef)
+        and any(
+            isinstance(node, ast.Constant)
+            and node.value == "**No checkpoint data available.** Run `cxr scan <material>` to create one."
+            for node in ast.walk(cell)
+        )
+    )
 
-    assert "**No checkpoint data available.**" in source
-    assert "if MATERIAL is None:" in source
-    assert '"MATERIAL",' in source
+    assert any(arg.arg == "MATERIAL" for arg in display_cell.args.args)
+    assert any(
+        isinstance(node, ast.Compare)
+        and isinstance(node.left, ast.Name)
+        and node.left.id == "MATERIAL"
+        and any(isinstance(op, ast.Is) for op in node.ops)
+        and any(isinstance(value, ast.Constant) and value.value is None for value in node.comparators)
+        for node in ast.walk(display_cell)
+    )
 
 
 def test_crystal_view_defaults_to_one_ranked_reciprocal_vector() -> None:
