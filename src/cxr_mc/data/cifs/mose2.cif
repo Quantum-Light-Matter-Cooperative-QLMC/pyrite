@@ -2,11 +2,13 @@ data_mose2
 # Phase identity: cxr-mc crystal catalog entry [mose2].
 # Bundled full-basis P1 CIF used by the declarative material catalog.
 # Catalog provenance and assumptions:
-# 2H-MoSe2 (P6_3/mmc): Mo on Wyckoff 2c (1/3,2/3,1/4) -- symmetry-fixed; Se on
-# 4f with the single free parameter z = 0.621 (standard setting, paired with
-# the Mo at z = 3/4), i.e. Se offset delta = |0.75 - 0.621| = 0.129 from its
-# Mo plane. Consistent with the refined Mo-Se bond length 2.53 A
-# (Materials Project mp-1634): sqrt((a/sqrt(3))^2 + (0.129 c)^2) = 2.53 A.
+# 2H-MoSe2 (P6_3/mmc): Bronsema, Z. Anorg. Allg. Chem. 540/541, 15--17
+# (1986), doi:10.1002/zaac.19865400904. The single-crystal refinement gives
+# a=3.289(1), c=12.927(4) A and Se 4f z=0.6210(3). Mo occupies symmetry-fixed
+# Wyckoff 2c (1/3,2/3,1/4); the P1 basis below expands those reported sites.
+# The Se offset delta = |0.75 - 0.621| = 0.129 from its Mo plane gives the
+# refined Mo-Se bond length 2.53 A:
+# sqrt((a/sqrt(3))^2 + (0.129 c)^2) = 2.53 A.
 # (The previous basis used delta = 0.121 from a misread of the 4f convention.)
 _symmetry_space_group_name_H-M 'P 1'
 _symmetry_Int_Tables_number 1
@@ -29,4 +31,3 @@ Se2 Se 0.6666666666666667 0.3333333333333333 0.121 1.0
 Mo2 Mo 0.6666666666666667 0.3333333333333333 0.75 1.0
 Se3 Se 0.3333333333333333 0.6666666666666667 0.879 1.0
 Se4 Se 0.3333333333333333 0.6666666666666667 0.621 1.0
-
