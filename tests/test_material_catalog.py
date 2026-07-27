@@ -39,21 +39,27 @@ composition = {{ Si = 0.02205, O = 0.04410 }}
 """
 
 
-PER_BEAM_ENTRIES = """{ energy_keV = 25.0, grid = { linspace = { start = 10.0, stop = 58.0, num = 17, endpoint = true } } },
-  { energy_keV = 30.0, grid = { values = [20.0, 23.0, 26.0] } }"""
+PER_BEAM_ENTRIES = (
+    "{ energy_keV = 25.0, grid = { linspace = { start = 10.0, stop = 58.0, num = 17, "
+    'endpoint = true } }, source = "derived" },\n'
+    '  { energy_keV = 30.0, grid = { values = [20.0, 23.0, 26.0] }, source = "derived" }'
+)
+
+_NO_FLAT_LINE_GRID = "E_grid_line = { arange = { start = 50.0, stop = 60.0, step = 2.0 } }\n"
 
 
-def _catalog_with_per_beam_line_grids() -> str:
-    return _minimal_catalog(
+def _catalog_with_per_beam_line_grids(*, entries: str = PER_BEAM_ENTRIES) -> str:
+    """A catalog where material "sample" resolves its line grid from its own
+    ``[energy_grids.sample]`` store entry (decision 3,
+    docs/cli-energy-grid-sweep-rework-plan.md), not a profile-level grid."""
+    base = _minimal_catalog(
         material_rows="""
 [materials.sample]
 label = "sample"
 crystal = "mos2"
 """
-    ).replace(
-        "E_grid_line = { arange = { start = 50.0, stop = 60.0, step = 2.0 } }",
-        f"E_grid_line_by_energy = [\n  {PER_BEAM_ENTRIES},\n]",
-    )
+    ).replace(_NO_FLAT_LINE_GRID, "")
+    return base + f"\n[energy_grids.sample]\nline_by_energy = [\n  {entries},\n]\n"
 
 
 def test_per_beam_line_grids_are_exact_read_only_and_projected(tmp_path, monkeypatch):
@@ -97,27 +103,25 @@ def test_fixed_material_line_grid_overrides_profile_mapping(tmp_path):
 
 
 def test_material_scan_overrides_apply_bespoke_line_and_brem_grids(tmp_path):
-    # The key enabling fact for bespoke per-material grids: a [materials.X] block
-    # may override BOTH E_grid_line_by_energy and E_grid_brem on top of its
-    # profile, and the resolved ScanSpec carries the material's own values -- no
-    # catalog schema change is needed to give each material a bespoke grid.
+    # A material's own [energy_grids.<material>] entry is authoritative and
+    # replaces the shared default wholesale (decision 3); its E_grid_brem
+    # override still lives under [profiles.standard.overrides.<material>], a
+    # separate axis untouched by the line-grid store.
     from cxr_mc.materials import load_material_catalog
 
     material_line = (
-        "{ energy_keV = 25.0, grid = { values = [11.0, 14.0] } },\n  "
-        "{ energy_keV = 30.0, grid = { values = [40.0, 44.0] } }"
+        '{ energy_keV = 25.0, grid = { values = [11.0, 14.0] }, source = "derived" },\n  '
+        '{ energy_keV = 30.0, grid = { values = [40.0, 44.0] }, source = "derived" }'
     )
     text = (
-        _catalog_with_per_beam_line_grids()
+        _catalog_with_per_beam_line_grids(entries=material_line)
         + "\n[profiles.standard.overrides.sample]\n"
-        + f"E_grid_line_by_energy = [\n  {material_line},\n]\n"
         + "E_grid_brem = { values = [7.0, 8.0, 9.0] }\n"
     )
     scan = load_material_catalog(_write_catalog(tmp_path, text)).material("sample").scan
 
     # brem override wins over the profile's E_grid_brem = 0.0
     np.testing.assert_array_equal(scan.E_grid_brem, [7.0, 8.0, 9.0])
-    # line-by-energy override wins over the profile's per-beam mapping
     np.testing.assert_array_equal(scan.E_grid_line_by_energy[25.0], [11.0, 14.0])
     np.testing.assert_array_equal(scan.E_grid_line_by_energy[30.0], [40.0, 44.0])
 
@@ -127,15 +131,9 @@ def test_material_scan_overrides_apply_bespoke_line_and_brem_grids(tmp_path):
     [
         (
             "{ energy_keV = 25.0, grid = 50.0 },\n  { energy_keV = 25.0, grid = 60.0 }",
-            "E_grid_line_by_energy[1].energy_keV",
+            "energy_grids.sample.line_by_energy[1].energy_keV",
         ),
-        ("{ energy_keV = 25.0, grid = 50.0 }", "E_grid_line_by_energy"),
-        (
-            "{ energy_keV = 25.0, grid = 50.0 },\n  "
-            "{ energy_keV = 30.0, grid = 60.0 },\n  "
-            "{ energy_keV = 40.0, grid = 70.0 }",
-            "E_grid_line_by_energy[2].energy_keV",
-        ),
+        ("{ energy_keV = 25.0, grid = 50.0 }", "materials.sample.scan"),
     ],
 )
 def test_per_beam_line_grid_keys_match_beam_energies(tmp_path, replacement, error_path):
@@ -151,9 +149,9 @@ def test_per_beam_line_grid_duplicate_is_reported_after_invalid_grid(tmp_path):
     from cxr_mc.materials import MaterialConfigError, load_material_catalog
 
     replacement = (
-        "{ energy_keV = 25.0, grid = { values = [] } },\n  "
-        "{ energy_keV = 25.0, grid = 60.0 },\n  "
-        "{ energy_keV = 30.0, grid = 70.0 }"
+        '{ energy_keV = 25.0, grid = { values = [] }, source = "derived" },\n  '
+        '{ energy_keV = 25.0, grid = 60.0, source = "derived" },\n  '
+        '{ energy_keV = 30.0, grid = 70.0, source = "derived" }'
     )
     text = _catalog_with_per_beam_line_grids().replace(PER_BEAM_ENTRIES, replacement)
 
@@ -161,90 +159,80 @@ def test_per_beam_line_grid_duplicate_is_reported_after_invalid_grid(tmp_path):
         load_material_catalog(_write_catalog(tmp_path, text))
 
     assert any(
-        "E_grid_line_by_energy[0].grid: grid must be nonempty" in error
+        "energy_grids.sample.line_by_energy[0].grid: grid must be nonempty" in error
         for error in caught.value.errors
     )
     assert any(
-        "E_grid_line_by_energy[1].energy_keV: duplicates beam energy 25" in error
+        "energy_grids.sample.line_by_energy[1].energy_keV: duplicates beam energy 25" in error
         for error in caught.value.errors
     )
 
 
-def _catalog_with_two_profiles(
-    *, custom_line_entries: str, standard_line_entries: str = PER_BEAM_ENTRIES
-) -> str:
-    """Two profiles sharing energy_keV = [25.0, 30.0]; ``standard`` is the
-    line-grid source profile the P0.3 interim fallback (subitem 5,
-    docs/cli-energy-grid-sweep-rework-plan.md) consults."""
-    return f"""
-schema_version = 1
-[profiles.standard]
-thickness_ang = {{ logspace = {{ start = 2.0, stop = 3.0, num = 2 }} }}
-energy_keV = {{ values = [25.0, 30.0] }}
-tilt_deg = {{ linspace = {{ start = 0.0, stop = 80.0, num = 3, endpoint = false }} }}
-tilt_azim_deg = 0.0
-E_grid_line_by_energy = [
-  {standard_line_entries},
-]
-E_grid_brem = 0.0
-[profiles.custom]
-thickness_ang = {{ logspace = {{ start = 2.0, stop = 3.0, num = 2 }} }}
-energy_keV = {{ values = [25.0, 30.0] }}
-tilt_deg = {{ linspace = {{ start = 0.0, stop = 80.0, num = 3, endpoint = false }} }}
-tilt_azim_deg = 0.0
-E_grid_line_by_energy = [
-  {custom_line_entries},
-]
-E_grid_brem = 0.0
-[crystals.mos2]
-cif = "cifs/mos2.cif"
-validation_id = "test-fixture"
-B_ang2 = 0.6
-beam_uvw = [0, 0, 2]
-layers_per_cell = 2
-E_grid = {{ values = [100.0, 200.0] }}
-[media.sio2]
-composition = {{ Si = 0.02205, O = 0.04410 }}
+def test_energy_grids_row_requires_a_valid_source(tmp_path):
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    replacement = PER_BEAM_ENTRIES.replace('source = "derived"', 'source = "bogus"', 1)
+    text = _catalog_with_per_beam_line_grids().replace(PER_BEAM_ENTRIES, replacement)
+
+    with pytest.raises(
+        MaterialConfigError, match=r"energy_grids\.sample\.line_by_energy\[0\]\.source"
+    ):
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+
+def test_energy_grids_store_may_hold_more_energies_than_a_material_needs(tmp_path):
+    """Decision 3: the shared store may be a superset of what any one
+    profile currently needs -- pruning a profile's energy_keV must never
+    force deleting store rows. An unused row is simply not an error."""
+    from cxr_mc.materials import load_material_catalog
+
+    extra = (
+        PER_BEAM_ENTRIES
+        + ',\n  { energy_keV = 40.0, grid = { values = [1.0, 2.0] }, source = "derived" }'
+    )
+    text = _catalog_with_per_beam_line_grids(entries=extra)
+    scan = load_material_catalog(_write_catalog(tmp_path, text)).material("sample").scan
+
+    assert tuple(scan.E_grid_line_by_energy) == (25.0, 30.0)
+
+
+def _catalog_with_default_store_only(*, entries: str = PER_BEAM_ENTRIES) -> str:
+    """Material "sample" has no ``[energy_grids.sample]`` entry of its own; it
+    resolves against the shared default keyed by its profile's name
+    (``standard`` in Phase 1) -- the fallback ~30 bundled materials.toml
+    materials that never diverged from the profile's own derived bounds use."""
+    base = _minimal_catalog(
+        material_rows="""
 [materials.sample]
 label = "sample"
 crystal = "mos2"
 """
+    ).replace(_NO_FLAT_LINE_GRID, "")
+    return base + f"\n[energy_grids.standard]\nline_by_energy = [\n  {entries},\n]\n"
 
 
-def test_profile_missing_line_grid_row_falls_back_to_standard_profile(tmp_path):
-    """P0.3 interim fix (docs/cli-energy-grid-sweep-rework-plan.md subitem 5):
-    a non-standard profile ("custom") missing a locally configured line-grid
-    row for one of its beam energies doesn't reject the catalog when
-    ``standard`` already has a derived grid for that energy. Materials always
-    resolve against ``standard`` (Phase 1 schema inversion, decision 2); this
-    guards ``custom``'s own definition, e.g. future ``cxr profile`` campaigns
-    that reuse beam energies already derived under ``standard``, pending the
-    Phase 1.3 shared derived-grid store."""
+def test_material_without_own_store_entry_falls_back_to_shared_default(tmp_path):
     from cxr_mc.materials import load_material_catalog
 
-    only_25 = (
-        "{ energy_keV = 25.0, grid = "
-        "{ linspace = { start = 10.0, stop = 58.0, num = 17, endpoint = true } } }"
+    scan = (
+        load_material_catalog(_write_catalog(tmp_path, _catalog_with_default_store_only()))
+        .material("sample")
+        .scan
     )
-    text = _catalog_with_two_profiles(custom_line_entries=only_25)
-
-    # Loads without raising: "custom" is missing a 30 keV row, but "standard"
-    # already covers it, so the P0.3 fallback suppresses the error.
-    load_material_catalog(_write_catalog(tmp_path, text))
+    assert tuple(scan.E_grid_line_by_energy) == (25.0, 30.0)
+    np.testing.assert_array_equal(scan.E_grid_line_by_energy[25.0], np.linspace(10.0, 58.0, 17))
 
 
-def test_profile_missing_line_grid_row_still_errors_without_standard_coverage(tmp_path):
-    """Regression guard: the P0.3 fallback doesn't blanket-suppress the
-    missing-row check when standard itself also lacks the energy."""
+def test_missing_beam_energy_errors_without_default_store_coverage(tmp_path):
     from cxr_mc.materials import MaterialConfigError, load_material_catalog
 
-    only_25 = "{ energy_keV = 25.0, grid = { values = [1.0, 2.0] } }"
-    text = _catalog_with_two_profiles(custom_line_entries=only_25, standard_line_entries=only_25)
+    only_25 = '{ energy_keV = 25.0, grid = { values = [1.0, 2.0] }, source = "derived" }'
+    text = _catalog_with_default_store_only(entries=only_25)
 
     with pytest.raises(MaterialConfigError) as caught:
         load_material_catalog(_write_catalog(tmp_path, text))
 
-    assert any("missing beam energies" in error for error in caught.value.errors)
+    assert any("requires E_grid_line" in error for error in caught.value.errors)
 
 
 def test_bundled_crystal_validation_ids_are_ledgered():

@@ -392,6 +392,69 @@ def set_command(material, energy, stop, num, start, note):
     return 0
 
 
+@line_command.command("delete")
+@click.argument("material", shell_complete=_cli_completion.complete_material)
+@click.option(
+    "--energy",
+    "energies",
+    type=POSITIVE_FLOAT,
+    metavar="KEV",
+    multiple=True,
+    required=True,
+    help="Beam energy in keV; repeat for multiple rows.",
+)
+@click.option("-y", "--yes", "yes", is_flag=True, help="Skip the confirmation prompt.")
+@click.option("--dry-run", is_flag=True, help="Print proposed diff; delete nothing.")
+@click.option(
+    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
+)
+def delete_command(material, energies, yes, dry_run, json_output):
+    """Delete MATERIAL's derived or manual line-grid rows; irreversible.
+
+    The only way to remove bounds from the shared per-material derived-grid
+    store -- editing a profile's energies never deletes them. Refuses (as a
+    catalog validation failure) when a beam energy is still required by a
+    profile's ``energy_keV`` grid.
+
+    \b
+    Example:
+      cxr energy-grid line delete wse2 --energy 30 --energy 40
+    """
+    if dry_run and json_output:
+        raise click.UsageError("--dry-run and --json cannot be combined")
+    if json_output and not yes:
+        raise click.UsageError("--json requires --yes; prompts are disabled in machine-output mode")
+    if dry_run:
+        try:
+            apply.delete_line_grid(material, energies, dry_run=True)
+        except (KeyError, ValueError, OSError) as exc:
+            _expected_failure(exc)
+        return 0
+    if not yes:
+        energy_list = ", ".join(f"{e:g}" for e in energies)
+        click.confirm(
+            f"delete {len(energies)} line-grid row(s) for {material} at {energy_list} keV? "
+            "this cannot be undone",
+            err=True,
+            abort=True,
+        )
+    try:
+        deleted = apply.delete_line_grid(material, energies)
+    except (KeyError, ValueError, OSError) as exc:
+        _expected_failure(exc)
+    if json_output:
+        emit_json_result(
+            cli_json.JsonResult(
+                "cxr.energy-grid.line-delete",
+                {"material": material, "deleted_energies_keV": deleted},
+            )
+        )
+        return 0
+    emit_result(f"deleted {material}: {', '.join(f'{e:g}' for e in deleted)} keV")
+    apply._warn_stale_golden()
+    return 0
+
+
 @brem_command.command("set")
 @click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
@@ -497,9 +560,17 @@ def _show(json_output, material, *, band=None):
     if json_output:
         try:
             with Path(apply._MATERIALS_TOML).open("rb") as stream:
-                materials = tomllib.load(stream)["materials"]
+                raw = tomllib.load(stream)
+            materials = raw["materials"]
+            energy_grids = raw.get("energy_grids", {})
+            brem_by_material = {key: apply.effective_brem(raw, key) for key in materials}
             result = cli_json.line_grid_show(
-                materials, apply._provenance.load(), selected=material, band=band
+                materials,
+                energy_grids,
+                brem_by_material,
+                apply._provenance.load(),
+                selected=material,
+                band=band,
             )
         except (KeyError, OSError, TypeError, ValueError) as exc:
             result = cli_json.failure("cxr.energy-grid.show", {"materials": []}, str(exc))

@@ -1,8 +1,6 @@
 # CLI energy-grid / sweep / profile rework — triaged plan
 
-Status: approved direction (2026-07-26). Replaces the lost original plan doc;
-incorporates the audit of TODO P1 #1 subitems 1–15 and the four decisions
-conferred with the user.
+Status: approved direction (2026-07-26).
 
 ## Background (previously approved, partially landed)
 
@@ -50,16 +48,6 @@ conferred with the user.
 
 ## Phases
 
-### Phase 0 — independent bugfixes (no schema change)
-
-- **P0.1** Rework pending `sweep.py` diff per decision 4; commit.
-- **P0.2** Fix `cxr remote pull` for survey checkpoints (subitem 13): pull
-  currently misses `<material>--survey-<hash>/` identity dirs; resolve via
-  the existing identity regex + checkpoint `meta.json`.
-- **P0.3** Interim fix for the 150 keV error (subitem 5): when validating
-  requested energies, consult the standard/source profile grid rows before
-  erroring. (Structurally fixed by Phase 1; this unblocks use now.)
-
 ### Phase 1 — schema centerpiece
 
 - **P1.1** Rename `full`/`survey` → `--fidelity` across `scan.py`,
@@ -79,7 +67,7 @@ conferred with the user.
 
 ### Phase 2 — CLI surface (`cxr profile` group)
 
-- **P2.1** New `cxr profile` verb group (subitem 10), retiring
+- **P2.1** New `cxr profile` verb group, retiring
   `cxr sweep set --profile`:
   - `list`, `show NAME` (`cxr profile NAME` aliases show), `create NAME`,
     `set NAME [ranges]`, `add NAME --energy 75 ...` /
@@ -89,14 +77,13 @@ conferred with the user.
     (`add-material` / `remove-material` or `--materials`).
   - Explicit `create` required — `set` on unknown name errors with
     suggestions (fixes silent-create footgun).
-  - Shell completion for profile names everywhere `NAME` appears
-    (subitem 4).
+  - Shell completion for profile names everywhere `NAME` appears.
 - **P2.2** Range syntax `start:stop:step`, stop-inclusive, mixable with CSV
-  (`--energy 30,50:100:25`) on all range options (subitem 2).
+  (`--energy 30,50:100:25`) on all range options.
 - **P2.3** `cxr energy-grid set MATERIAL --energy E --stop S ...` manual
-  bound escape hatch, stored `source = "manual"` (subitem 6).
+  bound escape hatch, stored `source = "manual"`.
 - **P2.4** `--ne-line` / `--ne-brem` as profile settings, single-value grids,
-  sweepable (subitem 12). Collapses these out of fidelity policy over time.
+  sweepable. Collapses these out of fidelity policy over time.
 - **P2.5** Every command runs through the `cli-ui-ux` skill for design,
   implementation, tests.
 
@@ -114,44 +101,21 @@ conferred with the user.
   swap need mostly dissolves under the inverted schema — running a profile
   *is* the selection.)
 
-## Subitem → plan mapping
-
-| Subitem | Disposition |
-| --- | --- |
-| 1 (scan_defaults rename) | Dropped; superseded by fidelity rename (P1.1) |
-| 2 (start:stop:step) | P2.2 |
-| 3 (bounds immortal) | P1.3 |
-| 4 (tabcomplete) | P2.1 |
-| 5 (150 keV bug) | P0.3 interim, P1.3 structural |
-| 6 (force-set bounds) | P2.3 |
-| 7 (remote submit profiles) | P3.1 |
-| 8 (incremental add) | P2.1 |
-| 9 (delete profiles) | P2.1 |
-| 10 (`cxr profile` group) | P2.1 |
-| 11 (en-masse transient) | P3.3 (mostly dissolved by inversion) |
-| 12 (ne-line/ne-brem) | P2.4 |
-| 13 (pull survey broken) | P0.2 |
-| 14 (pull by profile) | P3.2 |
-| 15 (inversion) | P1.2 (centerpiece) |
-
-
 ---
 Handoff — feature/cli-profile-rework
 
 Landed (committed, verified: lint clean, affected tests green)
 
-- ae39abb Phase 0 — P0.1 sweep set -y/--yes + overwrite confirm + input= test support; P0.2 remote pull resolves <material>--survey-<hash>/ dirs; P0.3 interim standard-profile fallback for the load-time "missing beam energies" error.
 - 160c55e Phase 1.1 — --profile full|survey → --fidelity full|survey (scan + remote scan/rebrem/reline/submit + checkpoint recompute); legacy --profile = hidden deprecated alias that warns + forwards; both flags = UsageError. Dirname format / dataset_identity / profiles.py untouched.
 - 793a951 — venv/hook bootstrap (your authorized infra change; keep).
 
 Landed since handoff
 - 5891fbf Phase 1.2 schema inversion — [materials.*] now identity-only (profile field removed); [profiles.NAME] + [profiles.NAME.overrides.MATERIAL]; 36 per-material overrides migrated into [profiles.standard.overrides.*]; cxr sweep show/set retargeted. DEVIATION: kept single active profile "standard"; true multi-profile materials=[...] membership/selection DEFERRED to Phase 2/3. Tests 1725 pass / 41 skip / 1 baseline fail. Typecheck clean at the 5 baseline diagnostics (IDE may show stale catalog.py ty errors from the interrupted mid-edit state — ignore; committed tree is clean).
+- (uncommitted, this session) Phase 1.3 shared derived-grid store — new top-level `[energy_grids.<material>]` per decision 3, `line_by_energy = [{ energy_keV, grid, source }]`; materials.toml data migration (33 rows out of `[profiles.standard.overrides.*]`, plus the profile-default 9 rows into `[energy_grids.standard]`, a sentinel bucket keyed by profile name that materials without their own entry fall back to — all-or-nothing per material, matching pre-1.3 override semantics) landed as uncommitted WIP before this session started; this session wrote the code side. catalog.py/_catalog_decode.py: `_parse_energy_grids` parses the store; `E_grid_line_by_energy` removed from `_SCAN_KEYS` (profiles/overrides no longer carry it, only `E_grid_line` remains as the flat-grid escape hatch); `_scan()` resolves a material's per-energy grid from `energy_grids.get(key, energy_grids.get("standard"))`, coverage-checked against the material's effective `energy_keV`; extra store rows beyond what's needed are NOT an error (decision 3: store may be a superset). DELETED the P0.3 fallback_energies/`_line_energy_set` plumbing entirely — structural fix supersedes it, subitem 5 done. `cxr energy-grid` (line_grid/apply.py) rewritten from regex text-surgery onto tomlkit (format-preserving, matching sweep.py's existing pattern) — the old regex code targeted `[materials.<material>]` for both line and brem, which was already stale/broken against the Phase 1.2 schema (brem lives under `[profiles.standard.overrides.<material>]`); fixed as part of this rewrite. Line-grid provenance (`source`) now lives inline per-row in the catalog, not in `line_grid_provenance.toml`; that sidecar is now brem-only plus optional line-grid notes. New `cxr energy-grid line delete MATERIAL --energy E [--energy E ...]` verb (designed via cli-ui-ux skill): only sanctioned way to remove store rows; confirms unless `-y`/`--dry-run`; `--json` requires `-y` (no prompts in machine mode); safety enforced by pre-write catalog validation alone (deleting a row a live profile still needs fails validation, no separate reference check). `cli/json.py::line_grid_show` and `line_grid/__init__.py::_show()` re-wired to the new store + a `apply.effective_brem()` helper (profiles.standard.overrides.MATERIAL, else profiles.standard default) instead of the broken `materials[material]` lookup. Migrated tests: test_material_catalog.py, test_line_grid_apply.py, test_cli_json.py, test_cli_json_wiring.py, test_line_grid_cli.py (delete verb). Golden (`regen-golden --check`) clean — migration is bit-for-bit numerically identical. cli-reference regenerated for the new delete verb. Tests 1739 pass / 41 skip / 2 baseline fail (both pre-existing, confirmed via git stash: test_line_grid_golden's installed-wheel check, test_agent_tooling's skills-mirror check against untracked `.agents/skills/cavecrew` etc. — unrelated to this branch). Typecheck clean at the 5 baseline diagnostics.
 
 Remaining (not started)
 
-- P1.3 shared per-material derived-grid store — DECIDED (user 2026-07-27): store = NEW top-level `[energy_grids.<material>]` section in materials.toml, `line_by_energy = [{ energy_keV, grid, source }]`, source="derived"|"manual". Same file/loader pattern. Profiles keep beam energies only. cxr energy-grid apply WRITES source="derived"; add explicit `cxr energy-grid` DELETE verb w/ confirmation (only way to delete bounds; profile edits must NOT). Migrate 33 E_grid_line_by_energy rows out of [profiles.standard.overrides.*] into [energy_grids.*]. DELETE the P0.3 fallback_energies plumbing in _catalog_decode.py::_line_grids_by_energy (~L153) once store resolves at load time. Pinned call sites (clean-grep, branch): catalog.py ~45,137,506,510,535,537,552-554,615,642-654; sweep.py ~237,372-380,414-416; config.py 82,114,181; recompute_defaults.py 52,67; profiles.py 86,122 (checkpoint fidelity — thread-through only, leave logic); run.py ~765,811 + cli/energy_grid.py (apply write path). Tests: test_line_grid_derive/golden/profiles/material_catalog/catalog_startup_errors/sweep. Regen goldens via regen-golden if serialization changes.
-- rtk GARBLE confirmed: `rg E_grid_line_by_energy src/cxr_mc/` renders toml hits as `n = [` (real: `E_grid_line_by_energy = [`). Use `grep -rn PATTERN --include=*.py`. Reported to user for rtk ignore-list.
-- P1.4 docs — docs/sweep-profiles.md fidelity rename, cli-reference regen, repo map.
+- P1.4 docs — docs/sweep-profiles.md fidelity rename, docs/repo_map.md; the cli-reference regen itself landed with P1.3's delete verb.
 - Phase 2 — cxr profile list|show|create|set|add|remove|delete group; start:stop:step (stop-inclusive, CSV-mixable) on range options; cxr energy-grid set MAT --energy E --stop S (source=manual); -l/--ne-line / -b/--ne-brem as profile settings.
 - Phase 3 — remote submit --profile = catalog names (orthogonal to --fidelity); remote pull MATERIAL@PROFILE selector via meta.json dataset_identity; scan --all --profile NAME.
 

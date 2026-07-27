@@ -23,9 +23,9 @@ from .. import DATA_DIR
 from ._catalog_decode import (
     LineGridByEnergy,
     _direction,
+    _energy_grid_rows,
     _Errors,
     _grid,
-    _line_grids_by_energy,
     _number,
     _readonly,
     _table,
@@ -42,7 +42,6 @@ _SCAN_KEYS = (
     "tilt_deg",
     "tilt_azim_deg",
     "E_grid_line",
-    "E_grid_line_by_energy",
     "E_grid_brem",
 )
 
@@ -497,44 +496,19 @@ def _validate_angle_grid(name: str, grid: np.ndarray, path: str, errors: _Errors
     return True
 
 
-def _line_energy_set(row: object) -> frozenset[float]:
-    """Beam energies with a configured line-grid row in a raw profile record.
-
-    P0.3 interim fix input (docs/cli-energy-grid-sweep-rework-plan.md decision
-    4, subitem 5): used as the ``standard`` source profile's fallback so
-    editing another profile's ``energy_keV`` doesn't require it to also carry
-    a local ``E_grid_line_by_energy`` row already derived under ``standard``.
-    """
-    if not isinstance(row, Mapping):
-        return frozenset()
-    entries = row.get("E_grid_line_by_energy")
-    if not isinstance(entries, list):
-        return frozenset()
-    energies: set[float] = set()
-    for item in entries:
-        if isinstance(item, Mapping):
-            value = _number(item.get("energy_keV"))
-            if value is not None and value > 0:
-                energies.add(value)
-    return frozenset(energies)
-
-
 def _scan(
     values: Mapping[str, object],
     path: str,
     crystal: CrystalSpec | None,
     errors: _Errors,
     *,
-    fallback_line_energies: frozenset[float] = frozenset(),
+    line_grid_store: LineGridByEnergy | None = None,
 ) -> ScanSpec | None:
     has_ang = "thickness_ang" in values
     has_layers = "thickness_layers" in values
     if has_ang == has_layers:
         errors.add(path, "requires exactly one of thickness_ang or thickness_layers")
     has_line = "E_grid_line" in values
-    has_line_by_energy = "E_grid_line_by_energy" in values
-    if has_line == has_line_by_energy:
-        errors.add(path, "requires exactly one of E_grid_line or E_grid_line_by_energy")
     grids: dict[str, np.ndarray | None] = {}
     for key in ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem"):
         if key not in values:
@@ -547,14 +521,25 @@ def _scan(
     else:
         grids["E_grid_line"] = None
     line_grids = None
-    if has_line_by_energy:
-        line_grids = _line_grids_by_energy(
-            values["E_grid_line_by_energy"],
-            grids.get("energy_keV"),
-            f"{path}.E_grid_line_by_energy",
-            errors,
-            fallback_energies=fallback_line_energies,
-        )
+    if not has_line:
+        energy_grid = grids.get("energy_keV")
+        if energy_grid is not None:
+            # dict preserves energy_keV's declared order (e.g. 30,40,...,300),
+            # not set-hash order: the golden snapshot and E_grid_line_by_energy
+            # consumers rely on that ordering.
+            configured = list(dict.fromkeys(float(value) for value in energy_grid))
+            available = set(line_grid_store) if line_grid_store else set()
+            missing = sorted(set(configured) - available)
+            if missing:
+                errors.add(
+                    path,
+                    "requires E_grid_line, or an energy_grids store entry covering "
+                    f"beam energies {missing}",
+                )
+            elif line_grid_store:
+                line_grids = MappingProxyType(
+                    {energy: line_grid_store[energy] for energy in configured}
+                )
     thickness = None
     layer_grid = None
     if has_ang:
@@ -594,7 +579,6 @@ def _scan(
         thickness is None
         or any(grids.get(key) is None for key in ordinary_required)
         or not line_valid
-        or has_line == has_line_by_energy
     ):
         return None
     energy_keV = grids["energy_keV"]
@@ -624,9 +608,10 @@ def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
     """Structurally validate ``[profiles.NAME.overrides.MATERIAL]`` tables.
 
     Only well-formedness is checked here (decodable grids, mutual exclusion
-    of thickness/line-grid alternatives). Full semantic validation -- merged
-    against the profile's own defaults, including line-grid energy coverage
-    -- happens per material in ``_parse_materials`` via ``_scan``.
+    of thickness alternatives). Full semantic validation -- merged against
+    the profile's own defaults, including line-grid energy coverage against
+    the shared ``[energy_grids.*]`` store -- happens per material in
+    ``_parse_materials`` via ``_scan``.
     """
     table = _table(raw, path, errors)
     if table is None:
@@ -639,21 +624,12 @@ def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
         errors.keys(row, material_path, set(_OVERRIDABLE_KEYS))
         if "thickness_ang" in row and "thickness_layers" in row:
             errors.add(material_path, "cannot set both thickness_ang and thickness_layers")
-        if "E_grid_line" in row and "E_grid_line_by_energy" in row:
-            errors.add(material_path, "cannot set both E_grid_line and E_grid_line_by_energy")
         for name in _OVERRIDABLE_KEYS:
-            if name == "E_grid_line_by_energy" or name not in row:
+            if name not in row:
                 continue
             grid = _grid(row[name], f"{material_path}.{name}", errors)
             if grid is not None:
                 _validate_angle_grid(name, grid, f"{material_path}.{name}", errors)
-        if "E_grid_line_by_energy" in row:
-            _line_grids_by_energy(
-                row["E_grid_line_by_energy"],
-                None,
-                f"{material_path}.E_grid_line_by_energy",
-                errors,
-            )
 
 
 def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
@@ -667,9 +643,6 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
     table = _table(raw, "profiles", errors)
     if table is None:
         return {}
-    # P0.3 interim fix (subitem 5): consult the standard/source profile's own
-    # derived line-grid rows before erroring on another profile's missing row.
-    standard_line_energies = _line_energy_set(table.get("standard"))
     out = {}
     for key, value in table.items():
         path = f"profiles.{key}"
@@ -681,30 +654,14 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         has_layers = "thickness_layers" in row
         if has_ang == has_layers:
             errors.add(path, "requires exactly one of thickness_ang or thickness_layers")
-        has_line = "E_grid_line" in row
-        has_line_by_energy = "E_grid_line_by_energy" in row
-        if has_line == has_line_by_energy:
-            errors.add(path, "requires exactly one of E_grid_line or E_grid_line_by_energy")
         for name in ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem"):
             if name not in row:
                 errors.add(f"{path}.{name}", "missing required key")
-        parsed_grids: dict[str, np.ndarray] = {}
         for name in _SCAN_KEYS:
-            if name == "E_grid_line_by_energy":
-                continue
             if name in row:
                 grid = _grid(row[name], f"{path}.{name}", errors)
                 if grid is not None:
-                    parsed_grids[name] = grid
                     _validate_angle_grid(name, grid, f"{path}.{name}", errors)
-        if has_line_by_energy:
-            _line_grids_by_energy(
-                row["E_grid_line_by_energy"],
-                parsed_grids.get("energy_keV"),
-                f"{path}.E_grid_line_by_energy",
-                errors,
-                fallback_energies=standard_line_energies,
-            )
         materials_list = row.get("materials")
         if materials_list is not None and (
             not isinstance(materials_list, list)
@@ -770,6 +727,7 @@ def _parse_materials(
     profiles: Mapping[str, Mapping[str, object]],
     crystals: Mapping[str, CrystalSpec],
     media: Mapping[str, MediumSpec],
+    energy_grids: Mapping[str, LineGridByEnergy],
     errors: _Errors,
 ) -> dict[str, MaterialSpec]:
     table = _table(raw, "materials", errors)
@@ -780,11 +738,13 @@ def _parse_materials(
     if not isinstance(standard, Mapping):
         errors.add("profiles.standard", "must be defined; materials resolve scan defaults from it")
         standard = {}
-    # P0.3 interim fix (subitem 5): a material's own line-grid rows never need
-    # to duplicate energies already derived under the standard profile.
-    standard_line_energies = _line_energy_set(standard)
     overrides_raw = standard.get("overrides")
     overrides = overrides_raw if isinstance(overrides_raw, Mapping) else {}
+    # A material without its own energy_grids.<key> row falls back to the
+    # store entry keyed by its resolving profile's name ("standard" in Phase
+    # 1): the shared default bounds any material may diverge from with a
+    # bespoke override, without duplicating rows across ~30 materials.
+    default_line_grids = energy_grids.get("standard")
     allowed = {"label", "crystal", "substrate", "stack"}
     for key, value in table.items():
         path = f"materials.{key}"
@@ -808,17 +768,13 @@ def _parse_materials(
         if "thickness_ang" in override or "thickness_layers" in override:
             values.pop("thickness_ang", None)
             values.pop("thickness_layers", None)
-        if "E_grid_line" in override:
-            values.pop("E_grid_line_by_energy", None)
-        elif "E_grid_line_by_energy" in override:
-            values.pop("E_grid_line", None)
         values.update({name: override[name] for name in _SCAN_KEYS if name in override})
         scan = _scan(
             values,
             f"{path}.scan",
             crystals.get(str(crystal_key)),
             errors,
-            fallback_line_energies=standard_line_energies,
+            line_grid_store=energy_grids.get(key, default_line_grids),
         )
         substrate = row.get("substrate")
         if substrate is not None and (
@@ -857,6 +813,9 @@ def _parse_materials(
                     errors.add(
                         f"profiles.{profile_key}.overrides.{material_key}", "unknown material"
                     )
+    for material_key in energy_grids:
+        if material_key not in table and material_key not in profiles:
+            errors.add(f"energy_grids.{material_key}", "unknown material")
     for key, material in out.items():
         unsupported = sorted(
             _material_elements(material, crystals, media) - set(TRANSPORT_ELEMENTS)
@@ -866,6 +825,34 @@ def _parse_materials(
                 f"materials.{key}",
                 f"runnable composition has unsupported transport elements {unsupported}",
             )
+    return out
+
+
+def _parse_energy_grids(raw: object, errors: _Errors) -> dict[str, LineGridByEnergy]:
+    """Parse the shared per-material derived-grid store: ``[energy_grids.*]``.
+
+    Decision 3 (docs/cli-energy-grid-sweep-rework-plan.md): line-grid bounds
+    live here, keyed by material, independent of any profile -- so profile
+    edits can never delete expensive Monte-Carlo-derived bounds; only an
+    explicit ``cxr energy-grid line delete`` can. Absent entirely means no
+    material has a store entry (materials must then set ``E_grid_line``).
+    """
+    table = _table(raw, "energy_grids", errors)
+    if table is None:
+        return {}
+    out: dict[str, LineGridByEnergy] = {}
+    for material_key, value in table.items():
+        path = f"energy_grids.{material_key}"
+        row = _table(value, path, errors)
+        if row is None:
+            continue
+        errors.keys(row, path, {"line_by_energy"})
+        if "line_by_energy" not in row:
+            errors.add(f"{path}.line_by_energy", "missing required key")
+            continue
+        rows = _energy_grid_rows(row["line_by_energy"], f"{path}.line_by_energy", errors)
+        if rows is not None:
+            out[material_key] = rows
     return out
 
 
@@ -894,7 +881,11 @@ def load_material_catalog(path: Path | None = None) -> MaterialCatalog:
         raise MaterialConfigError((f"{source}: {exc}",)) from exc
     if not isinstance(raw, Mapping):
         raise MaterialConfigError((f"{source}: root must be a table",))
-    errors.keys(raw, "catalog", {"schema_version", "profiles", "crystals", "media", "materials"})
+    errors.keys(
+        raw,
+        "catalog",
+        {"schema_version", "profiles", "crystals", "media", "materials", "energy_grids"},
+    )
     version = raw.get("schema_version")
     if type(version) is not int or version != 1:
         errors.add("schema_version", "must equal 1")
@@ -904,7 +895,10 @@ def load_material_catalog(path: Path | None = None) -> MaterialCatalog:
     profiles = _parse_profiles(raw.get("profiles"), errors)
     crystals = _parse_crystals(raw.get("crystals"), errors)
     media = _parse_media(raw.get("media"), errors)
-    materials = _parse_materials(raw.get("materials"), profiles, crystals, media, errors)
+    energy_grids = _parse_energy_grids(raw.get("energy_grids", {}), errors)
+    materials = _parse_materials(
+        raw.get("materials"), profiles, crystals, media, energy_grids, errors
+    )
     if errors.items:
         raise MaterialConfigError(errors.items)
     _warn_missing_mott(materials, crystals, media)

@@ -123,9 +123,13 @@ def test_line_grid_show_json_reads_catalog_and_provenance(monkeypatch, tmp_path)
     catalog.write_text(
         """
 [materials.hopg]
-E_grid_line_by_energy = [
-  { energy_keV = 30, grid = { linspace = { start = 1, stop = 2, num = 3 } } },
+
+[energy_grids.hopg]
+line_by_energy = [
+  { energy_keV = 30, grid = { linspace = { start = 1, stop = 2, num = 3 } }, source = "derived" },
 ]
+
+[profiles.standard]
 E_grid_brem = { arange = { start = 0, stop = 10, step = 1 } }
 """
     )

@@ -1,12 +1,15 @@
 """Surgical write-back of derived line-grid bounds into materials.toml.
 
-Owns exactly three regions and regenerates only those, preserving everything else
-byte-for-byte: per-material `E_grid_line_by_energy` block, per-material
-`E_grid_brem` line, and `[profiles.standard] energy_keV` values. No TOML writer
-dependency -- blocks are located by text scan and replaced with hand-emitted text
-matching the existing one-inline-table-per-line format. Provenance/sticky-manual
-comes from cxr_mc.line_grid.provenance; candidate catalogs are fully validated
-before replacement.
+Owns three regions and edits only those via tomlkit (format-preserving TOML),
+leaving everything else untouched: the shared per-material derived-grid store
+(``[energy_grids.<material>].line_by_energy``, decision 3,
+docs/cli-energy-grid-sweep-rework-plan.md), per-material ``E_grid_brem``
+(``[profiles.standard.overrides.<material>]``), and ``[profiles.standard]
+energy_keV``. Each line-grid row carries its own ``source``
+("derived"/"manual") provenance inline; ``cxr_mc.line_grid.provenance``
+remains the sidecar for optional notes and for bremsstrahlung's separate
+manual/derived tracking (brem bounds aren't governed by decision 3).
+Candidate catalogs are fully validated before replacement.
 """
 
 from __future__ import annotations
@@ -15,16 +18,18 @@ import difflib
 import json
 import math
 import os
-import re
 import sys
 import tempfile
 import tomllib
 from pathlib import Path
 
+import tomlkit
+
 from cxr_mc.line_grid import provenance as _provenance
 from cxr_mc.line_grid.bounds import spacing_num
 
 _MATERIALS_TOML = Path(__file__).resolve().parent.parent / "data" / "materials.toml"
+_DEFAULT_MATERIAL = "standard"
 load_material_catalog = None
 
 
@@ -88,135 +93,162 @@ def _validated_combined(combined) -> dict:
     return validated
 
 
-def _fnum(v) -> str:
-    """Render a float the way the catalog does -- always a decimal point (e.g.
-    ``2700.0``), never scientific notation for the eV/keV magnitudes in play."""
-    return repr(float(v))
+def _line_item(row: dict, source: str):
+    """One ``{ energy_keV, grid = { linspace = {...} }, source }`` inline row."""
+    energy = float(row["energy_keV"])
+    start = float(row.get("start_eV", _line_start_eV(energy)))
+    stop = float(row["stop_eV"])
+    num = int(row["num"])
+    linspace = tomlkit.inline_table()
+    linspace["start"] = start
+    linspace["stop"] = stop
+    linspace["num"] = num
+    linspace["endpoint"] = True
+    grid = tomlkit.inline_table()
+    grid["linspace"] = linspace
+    item = tomlkit.inline_table()
+    item["energy_keV"] = energy
+    item["grid"] = grid
+    item["source"] = source
+    return item
 
 
-def emit_line_block(rows) -> str:
-    lines = ["E_grid_line_by_energy = ["]
-    for row in sorted(rows, key=lambda r: float(r["energy_keV"])):
-        e = float(row["energy_keV"])
-        start = float(row.get("start_eV", _line_start_eV(e)))
-        stop = float(row["stop_eV"])
-        num = int(row["num"])
-        lines.append(
-            f"  {{ energy_keV = {_fnum(e)}, grid = {{ linspace = "
-            f"{{ start = {_fnum(start)}, stop = {_fnum(stop)}, num = {num:d}, "
-            f"endpoint = true }} }} }},"
-        )
-    lines.append("]")
-    return "\n".join(lines)
+def _line_by_energy_array(rows: dict):
+    array = tomlkit.array()
+    array.multiline(True)
+    for energy in sorted(rows):
+        array.append(rows[energy])
+    return array
 
 
-def emit_brem_line(stop_eV: float, step_eV: float) -> str:
-    return (
-        f"E_grid_brem = {{ arange = "
-        f"{{ start = 0.0, stop = {_fnum(stop_eV)}, step = {_fnum(step_eV)} }} }}"
-    )
-
-
-def _section_span(text: str, header: str) -> tuple[int, int]:
-    """[start, end) char span of a `[header]` section body (to next `[` or EOF)."""
-    m = re.search(rf"(?m)^\[{re.escape(header)}\]\s*$", text)
-    if not m:
-        raise KeyError(f"section [{header}] not found")
-    body_start = m.end()
-    nxt = re.search(r"(?m)^\[", text[body_start:])
-    body_end = body_start + nxt.start() if nxt else len(text)
-    return body_start, body_end
-
-
-def _replace_assignment(section_text: str, key: str, new_assignment: str) -> str:
-    """Replace `key = ...` (single line, or multi-line `[ ... ]` array) in a
-    section, or append it if the section doesn't have the key yet (e.g. a
-    material with no bespoke bounds derived so far)."""
-    # Multi-line array form: key = [ ... ] spanning lines.
-    array = re.search(rf"(?m)^{re.escape(key)}\s*=\s*\[.*?^\]", section_text, re.S)
-    if array:
-        return section_text[: array.start()] + new_assignment + section_text[array.end() :]
-    single = re.search(rf"(?m)^{re.escape(key)}\s*=.*$", section_text)
-    if single:
-        return section_text[: single.start()] + new_assignment + section_text[single.end() :]
-    stripped = section_text.rstrip("\n")
-    trailing = section_text[len(stripped) :] or "\n"
-    return stripped + "\n" + new_assignment + trailing
-
-
-def _parse_line_rows(section_body: str) -> dict:
-    wrapped = "[materials._tmp]\n" + section_body
-    parsed = tomllib.loads(wrapped)["materials"]["_tmp"].get("E_grid_line_by_energy", [])
+def _existing_line_rows(mat_table) -> dict:
     out = {}
-    for item in parsed:
-        e = float(item["energy_keV"])
-        g = item["grid"]["linspace"]
-        out[e] = {"energy_keV": e, "start_eV": g["start"], "stop_eV": g["stop"], "num": g["num"]}
+    for item in mat_table.get("line_by_energy", []):
+        energy = float(item["energy_keV"])
+        linspace = item["grid"]["linspace"]
+        out[energy] = {
+            "energy_keV": energy,
+            "start_eV": float(linspace["start"]),
+            "stop_eV": float(linspace["stop"]),
+            "num": int(linspace["num"]),
+            "source": item.get("source", "derived"),
+        }
     return out
 
 
-def _merge_line_rows(text, material, new_rows, force, provenance_mod):
-    header = f"materials.{material}"
-    body_start, body_end = _section_span(text, header)
-    body = text[body_start:body_end]
-    existing = _parse_line_rows(body)  # {energy: row-dict from current TOML}
+def _energy_grid_table(document, material: str):
+    """Return (creating if absent) ``[energy_grids.MATERIAL]``."""
+    root = document.get("energy_grids")
+    if root is None:
+        root = tomlkit.table()
+        document["energy_grids"] = root
+    table = root.get(material)
+    if table is None:
+        table = tomlkit.table()
+        root[material] = table
+    return table
+
+
+def _merge_line_rows(document, material: str, new_rows, force: bool, source: str) -> list[str]:
+    """Merge NEW_ROWS into ``energy_grids.MATERIAL.line_by_energy``, stamping SOURCE.
+
+    A row whose *current* stored ``source`` is ``"manual"`` is preserved
+    unless ``force``; the write itself is never consulted against a sidecar
+    for line-grid provenance -- that lives inline in the catalog (decision 3).
+    A material with no table of its own yet, but that resolves against the
+    shared default (``energy_grids.standard``), is seeded from it first so a
+    single-energy edit doesn't silently drop the material's other rows.
+    """
+    grids_root = document.get("energy_grids")
+    own_table = grids_root.get(material) if grids_root else None
+    if own_table is not None:
+        existing = _existing_line_rows(own_table)
+    elif grids_root is not None and material != _DEFAULT_MATERIAL:
+        default_table = grids_root.get(_DEFAULT_MATERIAL)
+        existing = _existing_line_rows(default_table) if default_table is not None else {}
+    else:
+        existing = {}
+    mat_table = _energy_grid_table(document, material)
     merged = dict(existing)
     skipped = []
     for row in new_rows:
-        e = float(row["energy_keV"])
-        if not force and provenance_mod.is_manual_line(material, e):
-            skipped.append(f"{material}:{e:g}")
+        energy = float(row["energy_keV"])
+        if not force and existing.get(energy, {}).get("source") == "manual":
+            skipped.append(f"{material}:{energy:g}")
             continue
-        merged[e] = {
-            "energy_keV": e,
-            "start_eV": row.get("start_eV", _line_start_eV(e)),
+        merged[energy] = {
+            "energy_keV": energy,
+            "start_eV": row.get("start_eV", _line_start_eV(energy)),
             "stop_eV": row["stop_eV"],
             "num": row["num"],
+            "source": source,
         }
-    block = emit_line_block(list(merged.values()))
-    new_body = _replace_assignment(body, "E_grid_line_by_energy", block)
-    return text[:body_start] + new_body + text[body_end:], skipped
+    items = {energy: _line_item(row, row["source"]) for energy, row in merged.items()}
+    mat_table["line_by_energy"] = _line_by_energy_array(items)
+    return skipped
 
 
-def _merge_brem(text, material, brem, force, provenance_mod):
+def _material_override_table(document, material: str):
+    """Return (creating if absent) ``[profiles.standard.overrides.MATERIAL]``."""
+    standard = document["profiles"]["standard"]
+    overrides = standard.get("overrides")
+    if overrides is None:
+        overrides = tomlkit.table()
+        standard["overrides"] = overrides
+    target = overrides.get(material)
+    if target is None:
+        target = tomlkit.table()
+        overrides[material] = target
+    return target
+
+
+def _merge_brem(document, material: str, brem, force: bool, provenance_mod) -> list[str]:
     if not force and provenance_mod.is_manual_brem(material):
-        return text, [f"{material}:brem"]
-    header = f"materials.{material}"
-    body_start, body_end = _section_span(text, header)
-    body = text[body_start:body_end]
-    new_body = _replace_assignment(
-        body, "E_grid_brem", emit_brem_line(brem["stop_eV"], brem["step_eV"])
-    )
-    return text[:body_start] + new_body + text[body_end:], []
+        return [f"{material}:brem"]
+    target = _material_override_table(document, material)
+    arange = tomlkit.inline_table()
+    arange["start"] = 0.0
+    arange["stop"] = float(brem["stop_eV"])
+    arange["step"] = float(brem["step_eV"])
+    item = tomlkit.inline_table()
+    item["arange"] = arange
+    target["E_grid_brem"] = item
+    return []
 
 
-def _insert_energies(text, energies) -> str:
-    body_start, body_end = _section_span(text, "profiles.standard")
-    body = text[body_start:body_end]
-    m = re.search(r"(?m)^energy_keV\s*=\s*\{\s*values\s*=\s*\[([^\]]*)\]\s*\}", body)
-    if not m:
-        return text
-    current = [float(x) for x in m.group(1).replace(" ", "").split(",") if x]
+def _insert_energies(document, energies) -> None:
+    standard = document["profiles"]["standard"]
+    energy_item = standard.get("energy_keV")
+    if energy_item is None or "values" not in energy_item:
+        return
+    current = [float(v) for v in energy_item["values"]]
     union = sorted(set(current) | {float(e) for e in energies})
-    rendered = ", ".join(_fnum(e) for e in union)
-    new_body = body[: m.start()] + f"energy_keV = {{ values = [{rendered}] }}" + body[m.end() :]
-    return text[:body_start] + new_body + text[body_end:]
+    energy_item["values"] = union
 
 
 def apply_bounds(toml_text, combined, *, force=False, provenance_mod=_provenance):
     combined = _validated_combined(combined)
-    text = toml_text
+    document = tomlkit.parse(toml_text)
     skipped = []
     all_energies = set()
     for material, entry in combined.items():
         rows = entry["line_rows"]
         all_energies.update(float(r["energy_keV"]) for r in rows)
-        text, sk = _merge_line_rows(text, material, rows, force, provenance_mod)
-        skipped.extend(sk)
-        text, skb = _merge_brem(text, material, entry["brem"], force, provenance_mod)
-        skipped.extend(skb)
-    text = _insert_energies(text, all_energies)
-    return text, skipped
+        skipped.extend(_merge_line_rows(document, material, rows, force, "derived"))
+        skipped.extend(_merge_brem(document, material, entry["brem"], force, provenance_mod))
+    _insert_energies(document, all_energies)
+    return tomlkit.dumps(document), skipped
+
+
+def effective_brem(raw: dict, material: str):
+    """Effective ``E_grid_brem`` arange for MATERIAL: its own
+    ``profiles.standard.overrides`` entry, else the ``profiles.standard`` default."""
+    standard = raw.get("profiles", {}).get("standard", {})
+    override = standard.get("overrides", {}).get(material, {})
+    brem = override.get("E_grid_brem") or standard.get("E_grid_brem")
+    if not isinstance(brem, dict):
+        return None
+    return brem.get("arange")
 
 
 def _atomic_write(path, text):
@@ -309,11 +341,7 @@ def apply_file(
 
     try:
         source = f"derived job {slurm_id} ({date})"
-        for material, entry in combined.items():
-            for row in entry["line_rows"]:
-                e = float(row["energy_keV"])
-                if force or not _provenance.is_manual_line(material, e):
-                    _provenance.set_line(material, e, source)
+        for material in combined:
             if force or not _provenance.is_manual_brem(material):
                 _provenance.set_brem(material, source)
     except BaseException:
@@ -344,7 +372,9 @@ def set_line_grid(material, energy, stop_eV, *, num=None, start_eV=None, note=No
     )
     row = {"energy_keV": e, "start_eV": start, "stop_eV": stop, "num": n}
     original = Path(_MATERIALS_TOML).read_text()
-    new_text, _ = _merge_line_rows(original, material, [row], True, _provenance)
+    document = tomlkit.parse(original)
+    _merge_line_rows(document, material, [row], True, "manual")
+    new_text = tomlkit.dumps(document)
     _validate_catalog_text(_MATERIALS_TOML, new_text)
     provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
     _atomic_write(_MATERIALS_TOML, new_text)
@@ -357,6 +387,42 @@ def set_line_grid(material, energy, stop_eV, *, num=None, start_eV=None, note=No
     _warn_stale_golden()
 
 
+def delete_line_grid(material, energies, *, dry_run=False) -> list[float]:
+    """Delete rows at ENERGIES from ``energy_grids.MATERIAL``; irreversible.
+
+    The only sanctioned way to remove derived/manual line-grid bounds
+    (decision 3, docs/cli-energy-grid-sweep-rework-plan.md): removes the
+    whole ``[energy_grids.MATERIAL]`` table once its last row goes, rather
+    than leaving an invalid empty array. Pre-write catalog validation blocks
+    deleting a row a live profile's ``energy_keV`` still needs -- no separate
+    reference check is required; the CLI surfaces that validation failure.
+    """
+    wanted = {_positive_float(e, "energy") for e in energies}
+    original = Path(_MATERIALS_TOML).read_text()
+    document = tomlkit.parse(original)
+    root = document.get("energy_grids", {})
+    mat_table = root.get(material)
+    if mat_table is None:
+        raise ValueError(f"no energy_grids entry for material: {material}")
+    existing = _existing_line_rows(mat_table)
+    missing = sorted(wanted - set(existing))
+    if missing:
+        raise ValueError(f"{material} has no line-grid row at {missing} keV")
+    remaining = {energy: row for energy, row in existing.items() if energy not in wanted}
+    if remaining:
+        items = {energy: _line_item(row, row["source"]) for energy, row in remaining.items()}
+        mat_table["line_by_energy"] = _line_by_energy_array(items)
+    else:
+        del root[material]
+    new_text = tomlkit.dumps(document)
+    _validate_catalog_text(_MATERIALS_TOML, new_text)
+    if dry_run:
+        _print_diff(original, new_text)
+        return sorted(wanted)
+    _atomic_write(_MATERIALS_TOML, new_text)
+    return sorted(wanted)
+
+
 def set_brem_grid(material, stop_eV, *, step_eV=None, note=None):
     from cxr_mc.line_grid.defaults import load_defaults
 
@@ -366,9 +432,9 @@ def set_brem_grid(material, stop_eV, *, step_eV=None, note=None):
         "step",
     )
     original = Path(_MATERIALS_TOML).read_text()
-    new_text, _ = _merge_brem(
-        original, material, {"stop_eV": stop, "step_eV": step}, True, _provenance
-    )
+    document = tomlkit.parse(original)
+    _merge_brem(document, material, {"stop_eV": stop, "step_eV": step}, True, _provenance)
+    new_text = tomlkit.dumps(document)
     _validate_catalog_text(_MATERIALS_TOML, new_text)
     provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
     _atomic_write(_MATERIALS_TOML, new_text)
@@ -387,33 +453,33 @@ def show(material=None, band=None) -> str:
     ``band`` filters the output: ``"line"`` shows only line grids, ``"brem"``
     only bremsstrahlung, ``None`` (default) shows both side by side.
     """
-    original = tomllib.loads(Path(_MATERIALS_TOML).read_text())
-    mats = original["materials"]
+    raw = tomllib.loads(Path(_MATERIALS_TOML).read_text())
+    mats = raw["materials"]
     if material is not None and material not in mats:
         raise ValueError(f"unknown material: {material}")
     keys = [material] if material else list(mats)
     show_line = band in (None, "line")
     show_brem = band in (None, "brem")
+    energy_grids = raw.get("energy_grids", {})
+    default_block = energy_grids.get(_DEFAULT_MATERIAL, {})
     out = []
     for key in keys:
-        block = mats.get(key, {})
         out.append(f"=== {key} ===")
         if show_line:
-            for item in block.get("E_grid_line_by_energy", []):
+            block = energy_grids.get(key, default_block)
+            for item in block.get("line_by_energy", []):
                 e = float(item["energy_keV"])
                 g = item["grid"]["linspace"]
-                rec = _provenance.get_line(key, e)
-                tag = (
-                    f"manual: {rec.get('note', '')}"
-                    if rec and rec["source"] == "manual"
-                    else (rec["source"] if rec else "derived")
-                )
+                source = item.get("source", "derived")
+                note_rec = _provenance.get_line(key, e)
+                note = note_rec.get("note") if note_rec else None
+                tag = f"manual: {note}" if source == "manual" and note else source
                 out.append(
                     f"  line grid @ {e:g} keV: [{g['start']:g}, {g['stop']:g}] eV"
                     f" x {g['num']} pts  [{tag}]"
                 )
         if show_brem:
-            brem = block.get("E_grid_brem", {}).get("arange")
+            brem = effective_brem(raw, key)
             if brem:
                 rec = _provenance.get_brem(key)
                 tag = rec["source"] if rec else "derived"

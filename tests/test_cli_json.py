@@ -93,9 +93,10 @@ def test_line_grid_defaults_encodes_units_and_source():
 
 
 def test_line_grid_show_has_grids_brem_and_provenance():
-    materials = {
+    materials = {"hopg": {}}
+    energy_grids = {
         "hopg": {
-            "E_grid_line_by_energy": [
+            "line_by_energy": [
                 {
                     "energy_keV": 30,
                     "grid": {
@@ -106,19 +107,20 @@ def test_line_grid_show_has_grids_brem_and_provenance():
                             "endpoint": True,
                         }
                     },
+                    "source": "manual",
                 }
             ],
-            "E_grid_brem": {"arange": {"start": 0, "stop": 30000, "step": 25}},
         }
     }
+    brem_by_material = {"hopg": {"start": 0, "stop": 30000, "step": 25}}
     provenance = {
         "hopg": {
-            "line": {"30": {"source": "manual", "note": "reviewed"}},
+            "line": {"30": {"note": "reviewed"}},
             "brem": {"source": "derived"},
         }
     }
 
-    result = cli_json.line_grid_show(materials, provenance)
+    result = cli_json.line_grid_show(materials, energy_grids, brem_by_material, provenance)
 
     item = result.payload["materials"][0]
     assert item["line_grids"][0]["grid"]["stop_eV"] == 2600.0
@@ -130,7 +132,7 @@ def test_line_grid_show_has_grids_brem_and_provenance():
 
 
 def test_line_grid_show_unknown_material_is_structured_failure():
-    result = cli_json.line_grid_show({}, {}, selected="ghost")
+    result = cli_json.line_grid_show({}, {}, {}, {}, selected="ghost")
 
     assert result.payload == {"materials": []}
     assert result.errors == (

@@ -86,6 +86,7 @@ Commands below are authoritative for this version.
     - `cxr energy-grid job status` — Show energy-grid job status.
     - `cxr energy-grid job stop` — Preview or stop one energy-grid job.
   - `cxr energy-grid line` — Inspect or manually set coherent line-energy grids.
+    - `cxr energy-grid line delete` — Delete MATERIAL's derived or manual line-grid rows; irreversible.
     - `cxr energy-grid line set` — Set one material line-grid row and mark it as a manual override.
     - `cxr energy-grid line show` — Show coherent line-energy grids.
   - `cxr energy-grid regen-golden` — Regenerate or check material-catalog golden snapshot.
@@ -990,8 +991,31 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  set   Set one material line-grid row and mark it as a manual override.
-  show  Show coherent line-energy grids.
+  delete  Delete MATERIAL's derived or manual line-grid rows; irreversible.
+  set     Set one material line-grid row and mark it as a manual override.
+  show    Show coherent line-energy grids.
+```
+
+## `cxr energy-grid line delete`
+
+```text
+Usage: cxr energy-grid line delete [OPTIONS] MATERIAL
+
+  Delete MATERIAL's derived or manual line-grid rows; irreversible.
+
+  The only way to remove bounds from the shared per-material derived-grid store --
+  editing a profile's energies never deletes them. Refuses (as a catalog validation
+  failure) when a beam energy is still required by a profile's ``energy_keV`` grid.
+
+  Example:
+    cxr energy-grid line delete wse2 --energy 30 --energy 40
+
+Options:
+  --energy KEV  Beam energy in keV; repeat for multiple rows.  [required]
+  -y, --yes     Skip the confirmation prompt.
+  --dry-run     Print proposed diff; delete nothing.
+  --json        Emit one versioned JSON object on stdout.
+  -h, --help    Show this message and exit.
 ```
 
 ## `cxr energy-grid line set`

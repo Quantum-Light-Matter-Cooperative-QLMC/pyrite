@@ -48,6 +48,7 @@ def test_click_group_exposes_full_line_grid_tree():
         *((name,) for name in CLICK_COMMANDS),
         *((("job", name)) for name in ("status", "attach", "logs", "stop")),
         *(((band, name)) for band in ("line", "brem") for name in ("set", "show")),
+        ("line", "delete"),
     ],
 )
 def test_click_help_paths_are_clean(path):
@@ -239,6 +240,121 @@ def test_click_set_expected_domain_failure_uses_stderr(monkeypatch, command_name
     assert "Traceback" not in result.output
 
 
+def test_click_line_delete_confirmed_deletes_and_warns_stale_golden(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        line_grid.apply,
+        "delete_line_grid",
+        lambda material, energies, **kw: (
+            seen.update(material=material, energies=list(energies)) or [30.0, 100.0]
+        ),
+    )
+
+    result = invoke(
+        line_grid.command,
+        ["line", "delete", "hopg", "--energy", "30", "--energy", "100"],
+        input="y\n",
+    )
+
+    assert result.exit_code == 0
+    assert seen == {"material": "hopg", "energies": [30.0, 100.0]}
+    assert "deleted hopg: 30, 100 keV" in result.stdout
+    assert "cannot be undone" in result.stderr
+    assert "golden is now stale" in result.stderr
+
+
+def test_click_line_delete_declined_confirmation_aborts(monkeypatch):
+    monkeypatch.setattr(
+        line_grid.apply,
+        "delete_line_grid",
+        lambda *_a, **_kw: pytest.fail("delete_line_grid must not run when declined"),
+    )
+
+    result = invoke(line_grid.command, ["line", "delete", "hopg", "--energy", "30"], input="n\n")
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert "Aborted" in result.stderr
+
+
+def test_click_line_delete_yes_skips_prompt(monkeypatch):
+    monkeypatch.setattr(
+        line_grid.apply, "delete_line_grid", lambda material, energies, **kw: [30.0]
+    )
+
+    result = invoke(line_grid.command, ["line", "delete", "hopg", "--energy", "30", "--yes"])
+
+    assert result.exit_code == 0
+    assert "deleted hopg: 30 keV" in result.stdout
+
+
+def test_click_line_delete_dry_run_skips_prompt_and_confirms_via_kwarg(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        line_grid.apply,
+        "delete_line_grid",
+        lambda material, energies, **kw: seen.update(kw) or [30.0],
+    )
+
+    result = invoke(line_grid.command, ["line", "delete", "hopg", "--energy", "30", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert result.stderr == ""
+    assert seen == {"dry_run": True}
+
+
+def test_click_line_delete_dry_run_and_json_conflict():
+    result = invoke(
+        line_grid.command, ["line", "delete", "hopg", "--energy", "30", "--dry-run", "--json"]
+    )
+
+    assert result.exit_code == 2
+    assert "--dry-run and --json cannot be combined" in result.stderr
+
+
+def test_click_line_delete_json_requires_yes():
+    result = invoke(line_grid.command, ["line", "delete", "hopg", "--energy", "30", "--json"])
+
+    assert result.exit_code == 2
+    assert "--json requires --yes" in result.stderr
+
+
+def test_click_line_delete_json_emits_one_envelope(monkeypatch):
+    monkeypatch.setattr(
+        line_grid.apply, "delete_line_grid", lambda material, energies, **kw: [30.0]
+    )
+
+    result = invoke(
+        line_grid.command, ["line", "delete", "hopg", "--energy", "30", "--yes", "--json"]
+    )
+
+    assert_clean_result(result)
+    assert result.stdout.count("\n") == 1
+    import json
+
+    document = json.loads(result.stdout)
+    assert document["schema"] == "cxr.energy-grid.line-delete"
+    assert document["payload"] == {"material": "hopg", "deleted_energies_keV": [30.0]}
+
+
+def test_click_line_delete_expected_failure_uses_stderr(monkeypatch):
+    monkeypatch.setattr(
+        line_grid.apply,
+        "delete_line_grid",
+        lambda *_a, **_kw: (_ for _ in ()).throw(
+            ValueError("no energy_grids entry for material: bad")
+        ),
+    )
+
+    result = invoke(line_grid.command, ["line", "delete", "bad", "--energy", "30", "--yes"])
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert result.stderr == "Error: no energy_grids entry for material: bad\n"
+    assert "Traceback" not in result.output
+
+
 def test_pull_combined_quotes_remote_scp_path(monkeypatch):
     calls = []
     monkeypatch.setattr(line_grid.remote.config, "HOST", "qlmc")
@@ -322,6 +438,7 @@ def test_click_regen_golden_preserves_nonzero_status(monkeypatch, status):
         ["line", "set", "hopg", "--energy", "0", "--stop", "3000"],
         ["line", "set", "hopg", "--energy", "30", "--stop", "-1"],
         ["line", "set", "hopg", "--energy", "30", "--stop", "3000", "--num", "0"],
+        ["line", "delete", "hopg", "--energy", "0"],
         ["brem", "set", "hopg", "--stop", "1000", "--step", "0"],
         ["defaults", "--set", "--tilts", "90"],
         ["defaults", "--set", "--azimuths", "361"],

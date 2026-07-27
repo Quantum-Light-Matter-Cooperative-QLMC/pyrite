@@ -150,34 +150,29 @@ def _grid(value: object, path: str, errors: _Errors) -> np.ndarray | None:
     return out
 
 
-def _line_grids_by_energy(
-    value: object,
-    energy_grid: np.ndarray | None,
-    path: str,
-    errors: _Errors,
-    *,
-    fallback_energies: frozenset[float] = frozenset(),
-) -> LineGridByEnergy | None:
-    """Decode a per-energy line-grid table, checking it covers ``energy_grid``.
+_SOURCE_KINDS = frozenset({"derived", "manual"})
 
-    ``fallback_energies`` is the P0.3 interim fix (subitem 5,
-    docs/cli-energy-grid-sweep-rework-plan.md): a beam energy missing a local
-    line-grid row is not an error if it's already covered there (typically the
-    ``standard`` source profile's own rows). The structural fix -- a shared
-    per-material derived-grid store profiles merely reference -- is Phase 1.
+
+def _energy_grid_rows(value: object, path: str, errors: _Errors) -> LineGridByEnergy | None:
+    """Decode one ``[energy_grids.<material>].line_by_energy`` array.
+
+    The shared per-material derived-grid store (docs/cli-energy-grid-sweep-rework-
+    plan.md decision 3): keyed by beam energy, each row carries its own
+    ``source`` ("derived"/"manual") provenance inline. Coverage against a
+    material's configured ``energy_keV`` is checked by the caller, which knows
+    the material's effective energy grid; this function only decodes rows.
     """
     if not isinstance(value, list) or not value:
         errors.add(path, "must be a nonempty array of line-grid entries")
         return None
     parsed: dict[float, np.ndarray] = {}
     seen_energies: set[float] = set()
-    energy_indexes: dict[float, int] = {}
     for index, item in enumerate(value):
         item_path = f"{path}[{index}]"
         row = _table(item, item_path, errors)
         if row is None:
             continue
-        errors.keys(row, item_path, {"energy_keV", "grid"})
+        errors.keys(row, item_path, {"energy_keV", "grid", "source"})
         energy = _number(row.get("energy_keV"))
         if energy is None or energy <= 0:
             errors.add(f"{item_path}.energy_keV", "must be finite and positive")
@@ -186,26 +181,15 @@ def _line_grids_by_energy(
             errors.add(f"{item_path}.energy_keV", f"duplicates beam energy {energy:g}")
             continue
         seen_energies.add(energy)
-        energy_indexes[energy] = index
+        source = row.get("source")
+        if source not in _SOURCE_KINDS:
+            errors.add(f"{item_path}.source", "must be 'derived' or 'manual'")
         grid = _grid(row.get("grid"), f"{item_path}.grid", errors)
         if grid is None or np.any(grid <= 0):
             if grid is not None:
                 errors.add(f"{item_path}.grid", "values must be positive")
             continue
         parsed[energy] = grid
-    if energy_grid is not None:
-        configured = set(float(value) for value in energy_grid)
-        mapped = set(parsed)
-        missing = sorted(configured - mapped - fallback_energies)
-        extra = sorted(mapped - configured)
-        if missing:
-            errors.add(path, f"missing beam energies {missing}")
-        for energy in extra:
-            index = energy_indexes[energy]
-            errors.add(
-                f"{path}[{index}].energy_keV",
-                f"is not configured in energy_keV: {energy:g}",
-            )
     return MappingProxyType(parsed) if parsed else None
 
 

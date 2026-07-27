@@ -309,6 +309,8 @@ def line_grid_defaults(values: Mapping[str, Any], *, source: str) -> JsonResult:
 
 def line_grid_show(
     materials: Mapping[str, Any],
+    energy_grids: Mapping[str, Any],
+    brem_by_material: Mapping[str, Any],
     provenance: Mapping[str, Any],
     *,
     selected: str | None = None,
@@ -316,8 +318,18 @@ def line_grid_show(
 ) -> JsonResult:
     """Build structured line and bremsstrahlung grids from decoded TOML maps.
 
-    ``band`` filters the emitted grids: ``"line"`` omits ``brem_grid``,
-    ``"brem"`` omits ``line_grids``, ``None`` (default) keeps both.
+    ``materials`` is the catalog's identity-only ``[materials.*]`` table (used
+    only to validate known keys); ``energy_grids`` is the shared per-material
+    derived-grid store (``[energy_grids.*]``, decision 3,
+    docs/cli-energy-grid-sweep-rework-plan.md) whose rows carry their own
+    ``source`` inline; ``brem_by_material`` is each material's already-resolved
+    effective ``E_grid_brem`` arange (:func:`cxr_mc.line_grid.apply.effective_brem`,
+    ``profiles.standard.overrides.MATERIAL`` or the ``profiles.standard``
+    default). ``provenance`` is the tool-owned sidecar, consulted only for
+    optional line-grid notes and for bremsstrahlung's separate manual/derived
+    tracking. ``band`` filters the emitted grids: ``"line"`` omits
+    ``brem_grid``, ``"brem"`` omits ``line_grids``, ``None`` (default) keeps
+    both.
     """
     show_line = band in (None, "line")
     show_brem = band in (None, "brem")
@@ -328,24 +340,23 @@ def line_grid_show(
         if material not in materials:
             errors.append(_error("unknown_material", "material is not configured", item=material))
             continue
-        block = materials[material]
-        if not isinstance(block, Mapping):
-            errors.append(
-                _error("invalid_material", "material entry is not an object", item=material)
-            )
-            continue
         material_provenance = provenance.get(material, {})
         if not isinstance(material_provenance, Mapping):
             material_provenance = {}
         line_provenance = material_provenance.get("line", {})
         if not isinstance(line_provenance, Mapping):
             line_provenance = {}
+        block = energy_grids.get(material, {})
+        if not isinstance(block, Mapping):
+            block = {}
         lines: list[dict[str, object]] = []
-        for row in block.get("E_grid_line_by_energy", []) if show_line else []:
+        for row in block.get("line_by_energy", []) if show_line else []:
             try:
                 energy = float(row["energy_keV"])
                 grid = row["grid"]["linspace"]
-                record = line_provenance.get(f"{energy:g}", {})
+                note_record = line_provenance.get(f"{energy:g}", {})
+                if not isinstance(note_record, Mapping):
+                    note_record = {}
                 lines.append(
                     {
                         "energy_keV": energy,
@@ -356,14 +367,17 @@ def line_grid_show(
                             "points": int(grid["num"]),
                             "endpoint": bool(grid.get("endpoint", True)),
                         },
-                        "provenance": _provenance_record(record),
+                        "provenance": {
+                            "source": _optional_text(row.get("source")) or "derived",
+                            "note": _optional_text(note_record.get("note")),
+                        },
                     }
                 )
             except (KeyError, TypeError, ValueError) as exc:
                 errors.append(_error("invalid_line_grid", str(exc), item=material))
         brem_output: dict[str, object] | None = None
         try:
-            brem = block.get("E_grid_brem", {}).get("arange") if show_brem else None
+            brem = brem_by_material.get(material) if show_brem else None
             if brem is not None:
                 brem_output = {
                     "kind": "arange",
