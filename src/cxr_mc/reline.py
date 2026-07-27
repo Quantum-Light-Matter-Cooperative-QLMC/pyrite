@@ -231,13 +231,7 @@ def _cli_json(args):
     shell_complete=_cli_completion.complete_checkpoint_stem,
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
-@click.option(
-    "--profile",
-    type=click.Choice(("full", "survey")),
-    default="full",
-    show_default=True,
-    help="Named sweep profile supplying omitted grid and electron defaults.",
-)
+@_cli_core.fidelity_option(help="Named sweep profile supplying omitted grid and electron defaults.")
 @click.option(
     "--line-ne",
     type=_cli_core.POSITIVE_INT,
@@ -288,7 +282,8 @@ def _cli_json(args):
 def command(
     materials,
     all_,
-    profile,
+    fidelity,
+    legacy_profile,
     line_ne,
     start,
     stop,
@@ -306,6 +301,7 @@ def command(
         raise click.UsageError("reline needs material name(s), or use --all")
     if start is not None and stop is not None and stop <= start:
         raise click.UsageError("reline --stop must be greater than --start")
+    profile = _cli_core.resolve_fidelity(fidelity, legacy_profile)
     handler = _cli_json if json_output else _cli
     return _cli_core.invoke_legacy(
         handler,

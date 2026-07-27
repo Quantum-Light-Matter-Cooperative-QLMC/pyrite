@@ -18,7 +18,9 @@ from ..cli._core import (
     POSITIVE_INT,
     emit_diagnostic,
     emit_json_result,
+    fidelity_option,
     invoke_legacy,
+    resolve_fidelity,
     run,
 )
 from ..scan import DEFAULT_HIGH_ENERGY_MIN_KEV, load_all_materials, load_manifest_groups
@@ -483,13 +485,7 @@ def command():
     shell_complete=_cli_completion.complete_material,
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Run every material in mats_to_sim.toml.")
-@click.option(
-    "--profile",
-    type=click.Choice(("full", "survey")),
-    default="full",
-    show_default=True,
-    help="Named settings/grid policy. survey is provisional and reduced.",
-)
+@fidelity_option(help="Named settings/grid policy. survey is provisional and reduced.")
 @click.option(
     "--quick",
     is_flag=True,
@@ -527,7 +523,8 @@ def command():
 def scan_command(
     material,
     all_,
-    profile,
+    fidelity,
+    legacy_profile,
     quick,
     workers,
     parallel_materials,
@@ -543,8 +540,9 @@ def scan_command(
         raise click.UsageError(
             "scan --quick --grid: quick checkpoints aren't grid-filterable; drop --grid"
         )
+    profile = resolve_fidelity(fidelity, legacy_profile)
     if quick and profile != "full":
-        raise click.UsageError("--quick cannot be combined with --profile survey")
+        raise click.UsageError("--quick cannot be combined with --fidelity survey")
     if parallel_materials is not None and chunk_minutes != 0:
         raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
     return _invoke_click(
@@ -601,13 +599,7 @@ def _recompute_options(function):
     help="Recompute brem-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
-@click.option(
-    "--profile",
-    type=click.Choice(("full", "survey")),
-    default="full",
-    show_default=True,
-    help="Named sweep profile supplying omitted grid and electron defaults.",
-)
+@fidelity_option(help="Named sweep profile supplying omitted grid and electron defaults.")
 @click.option("--ne-brem", type=POSITIVE_INT, default=None, help="New brem electron count.")
 @click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Brem lower bound in eV.")
 @click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Brem exclusive upper bound in eV.")
@@ -615,7 +607,8 @@ def _recompute_options(function):
 def rebrem_command(
     material,
     all_,
-    profile,
+    fidelity,
+    legacy_profile,
     redo_all,
     dry_run,
     no_sync,
@@ -629,6 +622,7 @@ def rebrem_command(
     _reject_all_with_values("rebrem", all_, materials)
     if start is not None and stop is not None and stop <= start:
         raise click.UsageError("rebrem --stop must be greater than --start")
+    profile = resolve_fidelity(fidelity, legacy_profile)
     return _invoke_click(
         _cli_rebrem,
         _click_args(
@@ -653,13 +647,7 @@ def rebrem_command(
     help="Recompute line-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
-@click.option(
-    "--profile",
-    type=click.Choice(("full", "survey")),
-    default="full",
-    show_default=True,
-    help="Named sweep profile supplying omitted grid and electron defaults.",
-)
+@fidelity_option(help="Named sweep profile supplying omitted grid and electron defaults.")
 @click.option("--line-ne", type=POSITIVE_INT, default=None, help="New line electron count.")
 @click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Line lower bound in eV.")
 @click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Line exclusive upper bound in eV.")
@@ -672,7 +660,8 @@ def rebrem_command(
 def reline_command(
     material,
     all_,
-    profile,
+    fidelity,
+    legacy_profile,
     redo_all,
     dry_run,
     no_sync,
@@ -686,6 +675,7 @@ def reline_command(
     _reject_all_with_values("reline", all_, materials)
     if start is not None and stop is not None and stop <= start:
         raise click.UsageError("reline --stop must be greater than --start")
+    profile = resolve_fidelity(fidelity, legacy_profile)
     return _invoke_click(
         _cli_reline,
         _click_args(
@@ -752,13 +742,7 @@ def reline_command(
         "high_energy_materials entries; a no-op on every other material."
     ),
 )
-@click.option(
-    "--profile",
-    type=click.Choice(("full", "survey")),
-    default="full",
-    show_default=True,
-    help="Named settings/grid policy. survey is provisional and reduced.",
-)
+@fidelity_option(help="Named settings/grid policy. survey is provisional and reduced.")
 @click.option("--quick", is_flag=True, help="Use tiny smoke-test grid.")
 @click.option(
     "--workers",
@@ -791,7 +775,8 @@ def start_command(
     include_unverified_dw,
     include_high_energy,
     high_energy_min_kev,
-    profile,
+    fidelity,
+    legacy_profile,
     quick,
     workers,
     parallel_materials,
@@ -817,8 +802,9 @@ def start_command(
         _reject_all_with_values("start", all_, materials)
     if parallel_materials is not None and chunk_minutes != 0:
         raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
+    profile = resolve_fidelity(fidelity, legacy_profile)
     if quick and profile != "full":
-        raise click.UsageError("--quick cannot be combined with --profile survey")
+        raise click.UsageError("--quick cannot be combined with --fidelity survey")
     return _invoke_click(
         _cli_start,
         _click_args(

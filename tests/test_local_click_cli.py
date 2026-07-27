@@ -82,15 +82,32 @@ def test_scan_click_dispatches_defaults_and_zero_workers(monkeypatch):
     }
 
 
-def test_scan_profile_dispatch_and_quick_conflict(monkeypatch):
+def test_scan_fidelity_dispatch_and_quick_conflict(monkeypatch):
     seen = _capture(monkeypatch, scan, "run")
-    result = invoke(scan.command, ["hopg", "--profile", "survey"])
+    result = invoke(scan.command, ["hopg", "--fidelity", "survey"])
     assert_clean_result(result)
     assert seen["profile"] == "survey"
 
-    conflict = invoke(scan.command, ["hopg", "--profile", "survey", "--quick"])
+    conflict = invoke(scan.command, ["hopg", "--fidelity", "survey", "--quick"])
     assert conflict.exit_code == 2
     assert "cannot be combined" in conflict.stderr
+
+
+def test_scan_legacy_profile_alias_warns_and_forwards(monkeypatch):
+    seen = _capture(monkeypatch, scan, "run")
+    result = invoke(scan.command, ["hopg", "--profile", "survey"])
+
+    assert result.exit_code == 0
+    assert seen["profile"] == "survey"
+    assert "deprecated" in result.stderr
+    assert "--fidelity" in result.stderr
+
+
+def test_scan_fidelity_and_legacy_profile_together_is_a_usage_error():
+    result = invoke(scan.command, ["hopg", "--fidelity", "full", "--profile", "full"])
+
+    assert result.exit_code == 2
+    assert "not both" in result.stderr
 
 
 def test_blaze_preserves_one_flag_many_values_syntax(monkeypatch):

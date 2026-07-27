@@ -93,7 +93,7 @@ def _queue_script(
     if quick:
         flags += " --quick"
     if profile != "full":
-        flags += f" --profile {profile}"
+        flags += f" --fidelity {profile}"
     if workers is not None:
         flags += f" --workers {workers}"
     if high_energy_min_kev is not None:
@@ -167,7 +167,7 @@ def _chunked_queue_script(
     if quick:
         flags += " --quick"
     if profile != "full":
-        flags += f" --profile {profile}"
+        flags += f" --fidelity {profile}"
     if workers is not None:
         flags += f" --workers {workers}"
     if high_energy_min_kev is not None:
@@ -264,7 +264,7 @@ def _rebrem_flags(
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
-    flags = f" --profile {profile}"
+    flags = f" --fidelity {profile}"
     if ne_brem is not None:
         flags += f" --ne-brem {int(ne_brem)}"
     if brem_step_eV is not None:
@@ -450,7 +450,7 @@ def _reline_flags(
     line_start_eV=None,
     line_stop_eV=None,
 ):
-    flags = f" --profile {profile}"
+    flags = f" --fidelity {profile}"
     if line_ne is not None:
         flags += f" --line-ne {int(line_ne)}"
     if line_step_eV is not None:

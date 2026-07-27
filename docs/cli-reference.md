@@ -164,7 +164,7 @@ Options:
                              on every other material.
   --workers NUMBER           run_cases max_workers (default auto; 0 = serial, no
                              transport pool).
-  --profile [full|survey]    Named settings/grid policy. survey is provisional and
+  --fidelity [full|survey]   Named settings/grid policy. survey is provisional and
                              reduced.  [default: full]
   --quick                    Use tiny smoke-test grid and write <material>_quick.pkl.
   --n-families NUMBER        Override positive dominant reflection-family count.
@@ -389,22 +389,22 @@ Usage: cxr checkpoint recompute brem [OPTIONS] [MATERIALS]...
   records already at target unless --redo-all.
 
 Options:
-  -a, --all                Recompute every checkpoint.
-  --profile [full|survey]  Named sweep profile supplying omitted grid and electron
-                           defaults.  [default: full]
-  --ne-brem N              Bremsstrahlung electron count; overrides profile default.
-  --start EV               Wide-bremsstrahlung lower bound in eV; overrides profile.
-  --stop EV                Wide-bremsstrahlung exclusive upper bound in eV; default
-                           follows beam energy.
-  --step EV                Wide-bremsstrahlung grid spacing in eV; overrides profile
-                           default.
-  --redo-all               Recompute records already at target.
-  --checkpoint-dir DIR     Root containing component checkpoint directories to update.
-                           [default: checkpoints]
-  --save-every N           Atomically save after every N recomputed records.  [default:
-                           100]
-  --json                   Emit one versioned JSON object on stdout.
-  -h, --help               Show this message and exit.
+  -a, --all                 Recompute every checkpoint.
+  --fidelity [full|survey]  Named sweep profile supplying omitted grid and electron
+                            defaults.  [default: full]
+  --ne-brem N               Bremsstrahlung electron count; overrides profile default.
+  --start EV                Wide-bremsstrahlung lower bound in eV; overrides profile.
+  --stop EV                 Wide-bremsstrahlung exclusive upper bound in eV; default
+                            follows beam energy.
+  --step EV                 Wide-bremsstrahlung grid spacing in eV; overrides profile
+                            default.
+  --redo-all                Recompute records already at target.
+  --checkpoint-dir DIR      Root containing component checkpoint directories to update.
+                            [default: checkpoints]
+  --save-every N            Atomically save after every N recomputed records.  [default:
+                            100]
+  --json                    Emit one versioned JSON object on stdout.
+  -h, --help                Show this message and exit.
 ```
 
 ## `cxr checkpoint recompute line`
@@ -418,20 +418,20 @@ Usage: cxr checkpoint recompute line [OPTIONS] [MATERIALS]...
   records already at target unless --redo-all.
 
 Options:
-  -a, --all                Recompute every checkpoint.
-  --profile [full|survey]  Named sweep profile supplying omitted grid and electron
-                           defaults.  [default: full]
-  --line-ne N              Line-spectrum electron count; overrides profile default.
-  --start EV               Line-grid lower bound in eV; overrides profile.
-  --stop EV                Line-grid exclusive upper bound in eV; overrides profile.
-  --line-step EV           Uniform line-grid spacing in eV; overrides profile grid.
-  --redo-all               Recompute records already at target.
-  --checkpoint-dir DIR     Root containing component checkpoint directories to update.
-                           [default: checkpoints]
-  --save-every N           Atomically save after every N recomputed records.  [default:
-                           100]
-  --json                   Emit one versioned JSON object on stdout.
-  -h, --help               Show this message and exit.
+  -a, --all                 Recompute every checkpoint.
+  --fidelity [full|survey]  Named sweep profile supplying omitted grid and electron
+                            defaults.  [default: full]
+  --line-ne N               Line-spectrum electron count; overrides profile default.
+  --start EV                Line-grid lower bound in eV; overrides profile.
+  --stop EV                 Line-grid exclusive upper bound in eV; overrides profile.
+  --line-step EV            Uniform line-grid spacing in eV; overrides profile grid.
+  --redo-all                Recompute records already at target.
+  --checkpoint-dir DIR      Root containing component checkpoint directories to update.
+                            [default: checkpoints]
+  --save-every N            Atomically save after every N recomputed records.  [default:
+                            100]
+  --json                    Emit one versioned JSON object on stdout.
+  -h, --help                Show this message and exit.
 ```
 
 ## `cxr checkpoint archive`
@@ -622,19 +622,19 @@ Usage: cxr remote rebrem [OPTIONS] [MATERIAL]...
   Recompute brem-only remotely, follow, and pull completed checkpoints.
 
 Options:
-  -a, --all                Use every material in mats_to_sim.toml.
-  --redo-all               Recompute every record even when already at target.
-  --dry-run                Print batch script and submission command; do not connect.
-  --no-sync                Skip code upload.
-  --chunk-minutes NUMBER   Self-resubmitting SLURM slice length; 0 runs one monolithic
-                           job.  [default: 10.0]
-  --profile [full|survey]  Named sweep profile supplying omitted grid and electron
-                           defaults.  [default: full]
-  --ne-brem NUMBER         New brem electron count.
-  --start NUMBER           Brem lower bound in eV.
-  --stop NUMBER            Brem exclusive upper bound in eV.
-  --step NUMBER            Wide-brem grid spacing in eV.
-  -h, --help               Show this message and exit.
+  -a, --all                 Use every material in mats_to_sim.toml.
+  --redo-all                Recompute every record even when already at target.
+  --dry-run                 Print batch script and submission command; do not connect.
+  --no-sync                 Skip code upload.
+  --chunk-minutes NUMBER    Self-resubmitting SLURM slice length; 0 runs one monolithic
+                            job.  [default: 10.0]
+  --fidelity [full|survey]  Named sweep profile supplying omitted grid and electron
+                            defaults.  [default: full]
+  --ne-brem NUMBER          New brem electron count.
+  --start NUMBER            Brem lower bound in eV.
+  --stop NUMBER             Brem exclusive upper bound in eV.
+  --step NUMBER             Wide-brem grid spacing in eV.
+  -h, --help                Show this message and exit.
 ```
 
 ## `cxr remote reline`
@@ -645,19 +645,19 @@ Usage: cxr remote reline [OPTIONS] [MATERIAL]...
   Recompute line-only remotely, follow, and pull completed checkpoints.
 
 Options:
-  -a, --all                Use every material in mats_to_sim.toml.
-  --redo-all               Recompute every record even when already at target.
-  --dry-run                Print batch script and submission command; do not connect.
-  --no-sync                Skip code upload.
-  --chunk-minutes NUMBER   Self-resubmitting SLURM slice length; 0 runs one monolithic
-                           job.  [default: 10.0]
-  --profile [full|survey]  Named sweep profile supplying omitted grid and electron
-                           defaults.  [default: full]
-  --line-ne NUMBER         New line electron count.
-  --start NUMBER           Line lower bound in eV.
-  --stop NUMBER            Line exclusive upper bound in eV.
-  --line-step NUMBER       Explicit uniform line-grid spacing in eV.
-  -h, --help               Show this message and exit.
+  -a, --all                 Use every material in mats_to_sim.toml.
+  --redo-all                Recompute every record even when already at target.
+  --dry-run                 Print batch script and submission command; do not connect.
+  --no-sync                 Skip code upload.
+  --chunk-minutes NUMBER    Self-resubmitting SLURM slice length; 0 runs one monolithic
+                            job.  [default: 10.0]
+  --fidelity [full|survey]  Named sweep profile supplying omitted grid and electron
+                            defaults.  [default: full]
+  --line-ne NUMBER          New line electron count.
+  --start NUMBER            Line lower bound in eV.
+  --stop NUMBER             Line exclusive upper bound in eV.
+  --line-step NUMBER        Explicit uniform line-grid spacing in eV.
+  -h, --help                Show this message and exit.
 ```
 
 ## `cxr remote scan`
@@ -668,21 +668,21 @@ Usage: cxr remote scan [OPTIONS] [MATERIAL]
   Sync code, submit sweep(s), wait, and pull checkpoints.
 
 Options:
-  -a, --all                Run every material in mats_to_sim.toml.
-  --profile [full|survey]  Named settings/grid policy. survey is provisional and
-                           reduced.  [default: full]
-  --quick                  Use tiny smoke-test grid; incompatible with --grid.
-  --workers NUMBER         Transport workers (default: auto; 0 runs serially).
-  --parallel-materials N   Simultaneous scans in one allocation; requires --chunk-
-                           minutes 0.  [1<=x<=4]
-  --chunk-minutes NUMBER   Self-resubmitting SLURM slice length; 0 runs one monolithic
-                           job.  [default: 10.0]
-  --no-sync                Skip code upload.
-  --grid                   Grid-filter checkpoint before pulling; incompatible with
-                           --quick.
-  --drop-wide-brem         With --grid, drop wide-brem.
-  --downcast               With --grid, downcast to float32.
-  -h, --help               Show this message and exit.
+  -a, --all                 Run every material in mats_to_sim.toml.
+  --fidelity [full|survey]  Named settings/grid policy. survey is provisional and
+                            reduced.  [default: full]
+  --quick                   Use tiny smoke-test grid; incompatible with --grid.
+  --workers NUMBER          Transport workers (default: auto; 0 runs serially).
+  --parallel-materials N    Simultaneous scans in one allocation; requires --chunk-
+                            minutes 0.  [1<=x<=4]
+  --chunk-minutes NUMBER    Self-resubmitting SLURM slice length; 0 runs one monolithic
+                            job.  [default: 10.0]
+  --no-sync                 Skip code upload.
+  --grid                    Grid-filter checkpoint before pulling; incompatible with
+                            --quick.
+  --drop-wide-brem          With --grid, drop wide-brem.
+  --downcast                With --grid, downcast to float32.
+  -h, --help                Show this message and exit.
 ```
 
 ## `cxr remote status`
@@ -735,7 +735,7 @@ Options:
                              energy/-A]. With explicit MATERIAL(s), applies only to
                              those that are themselves high_energy_materials entries; a
                              no-op on every other material.
-  --profile [full|survey]    Named settings/grid policy. survey is provisional and
+  --fidelity [full|survey]   Named settings/grid policy. survey is provisional and
                              reduced.  [default: full]
   --quick                    Use tiny smoke-test grid.
   --workers NUMBER           Transport workers (default: auto; 0 runs serially).

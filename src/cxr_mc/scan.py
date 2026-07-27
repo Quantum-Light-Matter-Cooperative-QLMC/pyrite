@@ -7,7 +7,7 @@ which drives this and pulls the checkpoint back so interactive analysis and
 static-HTML export can stay on the laptop.
 
     cxr scan mose2                # the full per-material grid (config)
-    cxr scan mose2 --profile survey  # provisional reduced survey
+    cxr scan mose2 --fidelity survey  # provisional reduced survey
     cxr scan mose2 --quick           # tiny grid: smoke test / pipeline check
     cxr scan mose2 --workers 0    # serial (no transport worker pool)
     cxr scan --all                # verified `materials` list only
@@ -217,13 +217,7 @@ def _beam_uvw(ctx, param, value):
     default=None,
     help="run_cases max_workers (default auto; 0 = serial, no transport pool).",
 )
-@click.option(
-    "--profile",
-    type=click.Choice(("full", "survey"), case_sensitive=True),
-    default="full",
-    show_default=True,
-    help="Named settings/grid policy. survey is provisional and reduced.",
-)
+@_cli_core.fidelity_option(help="Named settings/grid policy. survey is provisional and reduced.")
 @click.option(
     "--quick",
     is_flag=True,
@@ -269,7 +263,8 @@ def command(
     include_high_energy,
     high_energy_min_kev,
     workers,
-    profile,
+    fidelity,
+    legacy_profile,
     quick,
     n_families,
     beam_uvw,
@@ -280,8 +275,9 @@ def command(
     json_output,
 ):
     """Click entry point for the staged root migration."""
+    profile = _cli_core.resolve_fidelity(fidelity, legacy_profile)
     if quick and profile != "full":
-        raise click.UsageError("--quick cannot be combined with --profile survey")
+        raise click.UsageError("--quick cannot be combined with --fidelity survey")
     if actually_all and material is not None:
         raise click.UsageError("scan -A/--actually-all does not take a material name")
     if actually_all and all_:
