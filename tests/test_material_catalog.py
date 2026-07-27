@@ -19,7 +19,7 @@ def _write_catalog(tmp_path: Path, text: str) -> Path:
 def _minimal_catalog(*, crystal: str = "mos2", material_rows: str = "") -> str:
     return f"""
 schema_version = 1
-[profiles.base]
+[profiles.standard]
 thickness_ang = {{ logspace = {{ start = 2.0, stop = 3.0, num = 2 }} }}
 energy_keV = {{ values = [25.0, 30.0] }}
 tilt_deg = {{ linspace = {{ start = 0.0, stop = 80.0, num = 3, endpoint = false }} }}
@@ -48,7 +48,6 @@ def _catalog_with_per_beam_line_grids() -> str:
         material_rows="""
 [materials.sample]
 label = "sample"
-profile = "base"
 crystal = "mos2"
 """
     ).replace(
@@ -87,10 +86,10 @@ def test_per_beam_line_grids_are_exact_read_only_and_projected(tmp_path, monkeyp
 def test_fixed_material_line_grid_overrides_profile_mapping(tmp_path):
     from cxr_mc.materials import load_material_catalog
 
-    text = _catalog_with_per_beam_line_grids().replace(
-        'profile = "base"',
-        'profile = "base"\nE_grid_line = { values = [75.0, 78.0] }',
-        1,
+    text = (
+        _catalog_with_per_beam_line_grids()
+        + "\n[profiles.standard.overrides.sample]\n"
+        + "E_grid_line = { values = [75.0, 78.0] }\n"
     )
     scan = load_material_catalog(_write_catalog(tmp_path, text)).material("sample").scan
     np.testing.assert_array_equal(scan.E_grid_line, [75.0, 78.0])
@@ -108,12 +107,11 @@ def test_material_scan_overrides_apply_bespoke_line_and_brem_grids(tmp_path):
         "{ energy_keV = 25.0, grid = { values = [11.0, 14.0] } },\n  "
         "{ energy_keV = 30.0, grid = { values = [40.0, 44.0] } }"
     )
-    text = _catalog_with_per_beam_line_grids().replace(
-        'profile = "base"',
-        'profile = "base"\n'
-        f"E_grid_line_by_energy = [\n  {material_line},\n]\n"
-        "E_grid_brem = { values = [7.0, 8.0, 9.0] }",
-        1,
+    text = (
+        _catalog_with_per_beam_line_grids()
+        + "\n[profiles.standard.overrides.sample]\n"
+        + f"E_grid_line_by_energy = [\n  {material_line},\n]\n"
+        + "E_grid_brem = { values = [7.0, 8.0, 9.0] }\n"
     )
     scan = load_material_catalog(_write_catalog(tmp_path, text)).material("sample").scan
 
@@ -209,19 +207,19 @@ E_grid = {{ values = [100.0, 200.0] }}
 composition = {{ Si = 0.02205, O = 0.04410 }}
 [materials.sample]
 label = "sample"
-profile = "custom"
 crystal = "mos2"
 """
 
 
 def test_profile_missing_line_grid_row_falls_back_to_standard_profile(tmp_path):
     """P0.3 interim fix (docs/cli-energy-grid-sweep-rework-plan.md subitem 5):
-    a non-standard profile missing a locally configured line-grid row for one
-    of its beam energies doesn't reject the catalog when ``standard`` already
-    has a derived grid for that energy. This unblocks ``cxr sweep set
-    --profile NAME --energy ...`` edits; it doesn't conjure grid data, so the
-    resolved scan still lacks a row for the energy standard alone covers,
-    pending the Phase 1 shared derived-grid store."""
+    a non-standard profile ("custom") missing a locally configured line-grid
+    row for one of its beam energies doesn't reject the catalog when
+    ``standard`` already has a derived grid for that energy. Materials always
+    resolve against ``standard`` (Phase 1 schema inversion, decision 2); this
+    guards ``custom``'s own definition, e.g. future ``cxr profile`` campaigns
+    that reuse beam energies already derived under ``standard``, pending the
+    Phase 1.3 shared derived-grid store."""
     from cxr_mc.materials import load_material_catalog
 
     only_25 = (
@@ -230,10 +228,9 @@ def test_profile_missing_line_grid_row_falls_back_to_standard_profile(tmp_path):
     )
     text = _catalog_with_two_profiles(custom_line_entries=only_25)
 
-    catalog = load_material_catalog(_write_catalog(tmp_path, text))
-
-    scan = catalog.material("sample").scan
-    assert tuple(scan.E_grid_line_by_energy) == (25.0,)
+    # Loads without raising: "custom" is missing a 30 keV row, but "standard"
+    # already covers it, so the P0.3 fallback suppresses the error.
+    load_material_catalog(_write_catalog(tmp_path, text))
 
 
 def test_profile_missing_line_grid_row_still_errors_without_standard_coverage(tmp_path):
@@ -482,7 +479,7 @@ def test_grid_descriptor_types_are_strict_and_errors_are_wrapped(tmp_path, valid
     from cxr_mc.materials import MaterialConfigError, load_material_catalog
 
     text = _minimal_catalog().replace(valid, invalid)
-    with pytest.raises(MaterialConfigError, match="profiles.base"):
+    with pytest.raises(MaterialConfigError, match="profiles.standard"):
         load_material_catalog(_write_catalog(tmp_path, text))
 
 
@@ -501,7 +498,8 @@ def test_scan_angles_stay_in_physical_domains(tmp_path, field, value):
     material_rows = f"""
 [materials.mos2]
 label = "MoS2"
-profile = "base"
+
+[profiles.standard.overrides.mos2]
 {field} = {value}
 """
     with pytest.raises(MaterialConfigError, match=rf"materials\.mos2\.scan\.{field}"):
@@ -519,11 +517,12 @@ def test_grid_descriptors_profile_overrides_and_layer_count_conversion(tmp_path)
             material_rows="""
 [materials.sample]
 label = "sample"
-profile = "base"
 crystal = "mos2"
+stack = [{ material = "sio2", thickness_ang = 2850.0, azimuth_deg = 12.0 }]
+
+[profiles.standard.overrides.sample]
 thickness_layers = { values = [3, 4] }
 tilt_azim_deg = { logspace = { start = 0.0, stop = 2.0, num = 3, base = 2.0 } }
-stack = [{ material = "sio2", thickness_ang = 2850.0, azimuth_deg = 12.0 }]
 """,
         ),
     )
@@ -548,7 +547,6 @@ def test_catalog_scalar_and_logspace_energy_grids_reach_runner_exactly(tmp_path,
         material_rows="""
 [materials.sample]
 label = "sample"
-profile = "base"
 crystal = "mos2"
 """,
     )
@@ -591,7 +589,6 @@ def test_pinned_hkls_add_negatives_and_require_positive_representatives(tmp_path
         material_rows="""
 [materials.mos2]
 label = "MoS2"
-profile = "base"
 """,
     ).replace(
         "layers_per_cell = 2",
@@ -628,7 +625,6 @@ hkl_families = [[0, 0, 0]]
 [media.bad]
 composition = { Xe = -1.0 }
 [materials.bad]
-profile = "missing"
 crystal = "missing"
 substrate = "missing"
 stack = [{ material = "missing", thickness_ang = -2.0 }]
@@ -642,11 +638,11 @@ stack = [{ material = "missing", thickness_ang = -2.0 }]
         "schema_version",
         "catalog.surprise",
         "profiles.bad.thickness_ang",
+        "profiles.standard",
         "crystals.bad.cif",
         "crystals.bad.beam_uvw",
         "media.bad.composition.Xe",
         "materials.bad.label",
-        "materials.bad.profile",
         "materials.bad.crystal",
         "materials.bad.stack[0].material",
     ):
@@ -659,7 +655,6 @@ def test_crystal_requires_exactly_one_orientation(tmp_path):
     material = """
 [materials.mos2]
 label = "MoS2"
-profile = "base"
 """
     neither = _minimal_catalog(material_rows=material).replace("beam_uvw = [0, 0, 2]\n", "")
     with pytest.raises(
@@ -683,7 +678,6 @@ def test_crystal_accepts_reciprocal_surface_orientation(tmp_path):
         material_rows="""
 [materials.mos2]
 label = "MoS2"
-profile = "base"
 """,
     ).replace("beam_uvw = [0, 0, 2]", "surface_hkl = [2, 0, -1]")
     spec = load_material_catalog(_write_catalog(tmp_path, text)).crystal("mos2")
@@ -708,7 +702,6 @@ def test_runnable_crystal_must_use_supported_transport_elements(tmp_path):
         material_rows="""
 [materials.lif]
 label = "LiF"
-profile = "base"
 """,
     )
     with pytest.raises(MaterialConfigError, match="unsupported transport elements.*F.*Li"):
@@ -723,7 +716,6 @@ def test_missing_mott_tables_warn_without_rejecting_catalog(tmp_path, caplog):
         material_rows="""
 [materials.ws2]
 label = "WS2"
-profile = "base"
 """,
     )
     catalog = load_material_catalog(_write_catalog(tmp_path, text))
@@ -888,7 +880,6 @@ def test_resolved_stack_inherits_surface_and_direct_override_clears_it(tmp_path)
         material_rows="""
 [materials.sample]
 label = "sample"
-profile = "base"
 crystal = "mos2"
 stack = [
   { material = "mos2", thickness_ang = 10.0 },

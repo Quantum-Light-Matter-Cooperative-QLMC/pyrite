@@ -13,6 +13,7 @@ def test_show_material_json_reports_effective_ranges_and_sources():
     document = json.loads(result.stdout)
     assert document["schema"] == "cxr.sweep.show"
     assert document["payload"]["material"] == "hopg"
+    assert document["payload"]["profile"] == "standard"
     assert {row["name"] for row in document["payload"]["ranges"]} == {
         "thickness",
         "energy",
@@ -20,6 +21,69 @@ def test_show_material_json_reports_effective_ranges_and_sources():
         "azimuth",
     }
     assert all(not row["overridden"] for row in document["payload"]["ranges"])
+
+
+def test_show_no_material_json_reports_profiles_and_overriding_materials(monkeypatch, tmp_path):
+    catalog = tmp_path / "materials.toml"
+    catalog.write_text(
+        """[profiles.standard]
+thickness_ang = { values = [1000.0] }
+energy_keV = { values = [30.0] }
+tilt_deg = { values = [5.0] }
+tilt_azim_deg = { values = [95.0] }
+
+[profiles.standard.overrides.hopg]
+thickness_ang = { values = [2000.0] }
+
+[profiles.standard.overrides.diamond]
+E_grid_brem = { arange = { start = 0.0, stop = 1000.0, step = 10.0 } }
+
+[materials.hopg]
+
+[materials.mose2]
+
+[materials.diamond]
+"""
+    )
+    monkeypatch.setattr(sweep, "_MATERIALS_TOML", catalog)
+
+    result = invoke(sweep.command, ["show", "--json"])
+
+    assert_clean_result(result)
+    document = json.loads(result.stdout)
+    (profile,) = document["payload"]["profiles"]
+    assert profile["name"] == "standard"
+    assert profile["materials"] == [{"material": "hopg", "overrides": ["thickness"]}]
+    assert document["payload"]["inheriting_profiles"] == {"standard": 2}
+
+
+def test_show_no_material_text_lists_profile_defaults_overrides_and_inheritance(
+    monkeypatch, tmp_path
+):
+    catalog = tmp_path / "materials.toml"
+    catalog.write_text(
+        """[profiles.standard]
+thickness_ang = { values = [1000.0] }
+energy_keV = { values = [30.0] }
+tilt_deg = { values = [5.0] }
+tilt_azim_deg = { values = [95.0] }
+
+[profiles.standard.overrides.hopg]
+thickness_ang = { values = [2000.0] }
+
+[materials.hopg]
+
+[materials.mose2]
+"""
+    )
+    monkeypatch.setattr(sweep, "_MATERIALS_TOML", catalog)
+
+    result = invoke(sweep.command, ["show"])
+
+    assert_clean_result(result)
+    assert "[standard]" in result.stdout
+    assert "hopg: overrides thickness" in result.stdout
+    assert "1 materials inherit standard" in result.stdout
 
 
 def test_set_dry_run_preserves_catalog_and_energy_grid_siblings(monkeypatch, tmp_path):
@@ -30,9 +94,10 @@ energy_keV = { values = [30.0] }
 tilt_deg = { values = [5.0] }
 tilt_azim_deg = { values = [95.0] }
 
-[materials.hopg]
-profile = "standard"
+[profiles.standard.overrides.hopg]
 E_grid_brem = { arange = { start = 0.0, stop = 1000.0, step = 10.0 } }
+
+[materials.hopg]
 """
     catalog.write_text(original)
     monkeypatch.setattr(sweep, "_MATERIALS_TOML", catalog)
@@ -55,10 +120,11 @@ energy_keV = { values = [30.0] }
 tilt_deg = { values = [5.0] }
 tilt_azim_deg = { values = [95.0] }
 
-[materials.hopg]
-profile = "standard"
+[profiles.standard.overrides.hopg]
 thickness_ang = { values = [2000.0] }
 E_grid_brem = { arange = { start = 0.0, stop = 1000.0, step = 10.0 } }
+
+[materials.hopg]
 """
     )
     monkeypatch.setattr(sweep, "_MATERIALS_TOML", catalog)
@@ -93,9 +159,10 @@ energy_keV = { values = [30.0] }
 tilt_deg = { values = [5.0] }
 tilt_azim_deg = { values = [95.0] }
 
-[materials.hopg]
-profile = "standard"
+[profiles.standard.overrides.hopg]
 thickness_ang = { values = [2000.0] }
+
+[materials.hopg]
 """
     )
     return catalog
@@ -163,7 +230,6 @@ tilt_deg = { values = [5.0] }
 tilt_azim_deg = { values = [95.0] }
 
 [materials.hopg]
-profile = "standard"
 """
     )
     monkeypatch.setattr(sweep, "_MATERIALS_TOML", catalog)
@@ -175,3 +241,48 @@ profile = "standard"
 
     assert_clean_result(result, stdout="updated materials.hopg\n")
     assert "thickness_ang = {values = [3000.0]}" in catalog.read_text()
+
+
+def test_set_new_override_creates_overrides_table_when_absent(monkeypatch, tmp_path):
+    catalog = tmp_path / "materials.toml"
+    catalog.write_text(
+        """[profiles.standard]
+thickness_ang = { values = [1000.0] }
+energy_keV = { values = [30.0] }
+tilt_deg = { values = [5.0] }
+tilt_azim_deg = { values = [95.0] }
+
+[materials.hopg]
+
+[materials.mose2]
+"""
+    )
+    monkeypatch.setattr(sweep, "_MATERIALS_TOML", catalog)
+    monkeypatch.setattr(sweep, "_validate", lambda *_args: None)
+
+    result = invoke(sweep.command, ["set", "mose2", "--energy", "40"])
+
+    assert_clean_result(result, stdout="updated materials.mose2\n")
+    text = catalog.read_text()
+    assert "[profiles.standard.overrides.mose2]" in text
+    assert "energy_keV = {values = [40.0]}" in text
+
+
+def test_set_unknown_material_reports_error(monkeypatch, tmp_path):
+    catalog = tmp_path / "materials.toml"
+    catalog.write_text(
+        """[profiles.standard]
+thickness_ang = { values = [1000.0] }
+energy_keV = { values = [30.0] }
+tilt_deg = { values = [5.0] }
+tilt_azim_deg = { values = [95.0] }
+
+[materials.hopg]
+"""
+    )
+    monkeypatch.setattr(sweep, "_MATERIALS_TOML", catalog)
+
+    result = invoke(sweep.command, ["set", "unobtainium", "--thickness", "1000"])
+
+    assert result.exit_code == 1
+    assert "unknown material: unobtainium" in result.stderr

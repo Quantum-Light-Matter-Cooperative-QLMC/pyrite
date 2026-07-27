@@ -1099,7 +1099,9 @@ Usage: cxr sweep set [OPTIONS] [MATERIAL]
   Set default ranges or per-material overrides without touching energy grids.
 
   Replacing a value already set on PROFILE or MATERIAL prompts for confirmation unless
-  --yes is given; --dry-run never prompts.
+  --yes is given; --dry-run never prompts. Per-material overrides are stored under the
+  material's owning profile's ``overrides`` table
+  (``profiles.standard.overrides.MATERIAL`` in Phase 1).
 
 Options:
   --profile NAME                  Edit this default profile; defaults to standard

@@ -32,6 +32,12 @@ _RANGES = {
 }
 _RESET_CHOICES = click.Choice((*_RANGES, "all"), case_sensitive=False)
 
+#: The only catalog profile that materials resolve scan defaults/overrides
+#: from in Phase 1. True multi-profile material membership (a material
+#: listed under several ``[profiles.*]`` campaigns) lands in Phase 2/3; see
+#: docs/cli-energy-grid-sweep-rework-plan.md decision 2.
+_DEFAULT_PROFILE = "standard"
+
 
 def _range_values(row, key):
     value = row.get(key)
@@ -93,18 +99,42 @@ def _material_rows(document):
     return materials
 
 
+def _profile_overrides(profile):
+    overrides = profile.get("overrides", {})
+    if not isinstance(overrides, dict):
+        raise ValueError("profile overrides table must be a table")
+    return overrides
+
+
+def _material_override_table(profile, material):
+    """Return the writable ``[profiles.NAME.overrides.MATERIAL]`` table,
+    creating it (and the parent ``overrides`` table) if absent."""
+    overrides = profile.get("overrides")
+    if overrides is None:
+        overrides = tomlkit.table()
+        profile["overrides"] = overrides
+    elif not isinstance(overrides, dict):
+        raise ValueError("profile overrides table must be a table")
+    target = overrides.get(material)
+    if target is None:
+        target = tomlkit.table()
+        overrides[material] = target
+    elif not isinstance(target, dict):
+        raise ValueError(f"overrides.{material} must be a table")
+    return target
+
+
 def _effective_ranges(document, material):
     materials = _material_rows(document)
     if material not in materials:
         raise ValueError(f"unknown material: {material}")
-    row = materials[material]
-    profile_name = row.get("profile")
     profiles = _profile_rows(document)
-    if profile_name not in profiles:
-        raise ValueError(f"material {material} has unknown profile: {profile_name}")
-    profile = profiles[profile_name]
-    return profile_name, {
-        label: (_range_values(row if key in row else profile, key), key in row)
+    if _DEFAULT_PROFILE not in profiles:
+        raise ValueError(f"catalog is missing required profile: {_DEFAULT_PROFILE}")
+    profile = profiles[_DEFAULT_PROFILE]
+    override = _profile_overrides(profile).get(material, {})
+    return _DEFAULT_PROFILE, {
+        label: (_range_values(override if key in override else profile, key), key in override)
         for label, key in _RANGES.items()
     }
 
@@ -135,25 +165,33 @@ def _show_payload(document, material=None):
                     {"name": label, "catalog_key": key, "values": _range_values(row, key)}
                     for label, key in _RANGES.items()
                 ],
+                "materials": [
+                    {
+                        "material": mat_name,
+                        "overrides": [
+                            label for label, key in _RANGES.items() if key in mat_overrides
+                        ],
+                    }
+                    for mat_name, mat_overrides in _profile_overrides(row).items()
+                    if any(key in mat_overrides for key in _RANGES.values())
+                ],
             }
             for name, row in profiles.items()
         ],
-        "materials": [
-            {
-                "material": name,
-                "profile": row.get("profile"),
-                "overrides": [label for label, key in _RANGES.items() if key in row],
-            }
-            for name, row in materials.items()
-            if any(key in row for key in _RANGES.values())
-        ],
         "inheriting_profiles": {
+            # "materials" is the explicit membership list from decision 2;
+            # absent means every catalog material is in scope for this
+            # profile (an approximation of "all in-use materials" -- the
+            # mats_to_sim.toml-backed default membership lands in Phase 2/3).
             name: sum(
                 1
-                for row in materials.values()
-                if row.get("profile") == name and not any(key in row for key in _RANGES.values())
+                for candidate in row.get("materials", list(materials))
+                if not any(
+                    key in _profile_overrides(row).get(candidate, {})
+                    for key in _RANGES.values()
+                )
             )
-            for name in profiles
+            for name, row in profiles.items()
         },
     }
 
@@ -195,10 +233,8 @@ def show_command(material, json_output):
         emit_result(f"[{profile['name']}]")
         for row in profile["ranges"]:
             emit_result(f"  {row['name']}: [{_display(row['values'])}]")
-    for row in payload["materials"]:
-        emit_result(
-            f"{row['material']}: overrides {', '.join(row['overrides'])} ({row['profile']})"
-        )
+        for row in profile["materials"]:
+            emit_result(f"  {row['material']}: overrides {', '.join(row['overrides'])}")
     for profile, count in payload["inheriting_profiles"].items():
         emit_result(f"{count} materials inherit {profile}")
     return 0
@@ -235,7 +271,9 @@ def set_command(material, profile, thickness, energy, polar, azimuth, reset_keys
     """Set default ranges or per-material overrides without touching energy grids.
 
     Replacing a value already set on PROFILE or MATERIAL prompts for
-    confirmation unless --yes is given; --dry-run never prompts.
+    confirmation unless --yes is given; --dry-run never prompts. Per-material
+    overrides are stored under the material's owning profile's
+    ``overrides`` table (``profiles.standard.overrides.MATERIAL`` in Phase 1).
     """
     updates = {
         label: value
@@ -257,10 +295,19 @@ def set_command(material, profile, thickness, energy, polar, azimuth, reset_keys
     target_name = material or profile or "standard"
     try:
         original, document = _catalog_text()
-        table = _material_rows(document) if target_kind == "materials" else _profile_rows(document)
-        if target_name not in table:
-            raise ValueError(f"unknown {target_kind[:-1]}: {target_name}")
-        target = table[target_name]
+        if target_kind == "materials":
+            materials = _material_rows(document)
+            if target_name not in materials:
+                raise ValueError(f"unknown material: {target_name}")
+            profiles = _profile_rows(document)
+            if _DEFAULT_PROFILE not in profiles:
+                raise ValueError(f"catalog is missing required profile: {_DEFAULT_PROFILE}")
+            target = _material_override_table(profiles[_DEFAULT_PROFILE], target_name)
+        else:
+            profiles = _profile_rows(document)
+            if target_name not in profiles:
+                raise ValueError(f"unknown profile: {target_name}")
+            target = profiles[target_name]
         overwriting = [label for label in updates if _RANGES[label] in target]
     except (OSError, ValueError, tomlkit.exceptions.ParseError) as exc:
         raise CLIError(str(exc)) from None

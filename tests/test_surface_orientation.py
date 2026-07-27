@@ -229,7 +229,7 @@ def test_real_surface_catalog_case_changes_real_cpu_spectrum(tmp_path, monkeypat
 
     catalog_text = """
 schema_version = 1
-[profiles.base]
+[profiles.standard]
 thickness_ang = 100.0
 energy_keV = 30.0
 tilt_deg = 0.0
@@ -248,7 +248,6 @@ hkl_reason = "test surface-parallel reflection"
 composition = { Si = 0.02205, O = 0.04410 }
 [materials.sample]
 label = "surface sample"
-profile = "base"
 crystal = "mos2"
 """
     path = tmp_path / "materials.toml"

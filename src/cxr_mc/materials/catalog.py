@@ -155,6 +155,10 @@ class MaterialSpec:
 
     key: str
     label: str
+    #: Always ``"standard"``: materials resolve their scan defaults against
+    #: the ``standard`` profile plus its per-material override, if any (see
+    #: docs/cli-energy-grid-sweep-rework-plan.md decision 2). True
+    #: multi-profile membership/selection lands in Phase 2/3.
     profile: str
     crystal_key: str
     scan: ScanSpec
@@ -613,7 +617,53 @@ def _scan(
     )
 
 
+_OVERRIDABLE_KEYS = frozenset(_SCAN_KEYS)
+
+
+def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
+    """Structurally validate ``[profiles.NAME.overrides.MATERIAL]`` tables.
+
+    Only well-formedness is checked here (decodable grids, mutual exclusion
+    of thickness/line-grid alternatives). Full semantic validation -- merged
+    against the profile's own defaults, including line-grid energy coverage
+    -- happens per material in ``_parse_materials`` via ``_scan``.
+    """
+    table = _table(raw, path, errors)
+    if table is None:
+        return
+    for material_key, value in table.items():
+        material_path = f"{path}.{material_key}"
+        row = _table(value, material_path, errors)
+        if row is None:
+            continue
+        errors.keys(row, material_path, set(_OVERRIDABLE_KEYS))
+        if "thickness_ang" in row and "thickness_layers" in row:
+            errors.add(material_path, "cannot set both thickness_ang and thickness_layers")
+        if "E_grid_line" in row and "E_grid_line_by_energy" in row:
+            errors.add(material_path, "cannot set both E_grid_line and E_grid_line_by_energy")
+        for name in _OVERRIDABLE_KEYS:
+            if name == "E_grid_line_by_energy" or name not in row:
+                continue
+            grid = _grid(row[name], f"{material_path}.{name}", errors)
+            if grid is not None:
+                _validate_angle_grid(name, grid, f"{material_path}.{name}", errors)
+        if "E_grid_line_by_energy" in row:
+            _line_grids_by_energy(
+                row["E_grid_line_by_energy"],
+                None,
+                f"{material_path}.E_grid_line_by_energy",
+                errors,
+            )
+
+
 def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
+    """Parse ``[profiles.*]`` campaign rows.
+
+    Schema inversion (docs/cli-energy-grid-sweep-rework-plan.md decision 2):
+    a profile carries scan defaults plus an optional ``materials`` list
+    (absent means all in-use materials) and an optional ``overrides`` table
+    keyed by material, holding per-material deltas on the same scan keys.
+    """
     table = _table(raw, "profiles", errors)
     if table is None:
         return {}
@@ -626,7 +676,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         row = _table(value, path, errors)
         if row is None:
             continue
-        errors.keys(row, path, set(_SCAN_KEYS))
+        errors.keys(row, path, set(_SCAN_KEYS) | {"materials", "overrides"})
         has_ang = "thickness_ang" in row
         has_layers = "thickness_layers" in row
         if has_ang == has_layers:
@@ -655,6 +705,14 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 errors,
                 fallback_energies=standard_line_energies,
             )
+        materials_list = row.get("materials")
+        if materials_list is not None and (
+            not isinstance(materials_list, list)
+            or not all(isinstance(item, str) for item in materials_list)
+        ):
+            errors.add(f"{path}.materials", "must be an array of material keys")
+        if "overrides" in row:
+            _parse_profile_overrides(row["overrides"], f"{path}.overrides", errors)
         out[key] = row
     return out
 
@@ -718,12 +776,16 @@ def _parse_materials(
     if table is None:
         return {}
     out: dict[str, MaterialSpec] = {}
-    # P0.3 interim fix (subitem 5): same standard-profile fallback as
-    # _parse_profiles, so a material inheriting a non-standard profile's
-    # energy_keV doesn't re-trip the missing-line-grid-row check that profile
-    # validation already let through.
-    standard_line_energies = _line_energy_set(profiles.get("standard", {}))
-    allowed = {"label", "profile", "crystal", "substrate", "stack", *_SCAN_KEYS}
+    standard = profiles.get("standard")
+    if not isinstance(standard, Mapping):
+        errors.add("profiles.standard", "must be defined; materials resolve scan defaults from it")
+        standard = {}
+    # P0.3 interim fix (subitem 5): a material's own line-grid rows never need
+    # to duplicate energies already derived under the standard profile.
+    standard_line_energies = _line_energy_set(standard)
+    overrides_raw = standard.get("overrides")
+    overrides = overrides_raw if isinstance(overrides_raw, Mapping) else {}
+    allowed = {"label", "crystal", "substrate", "stack"}
     for key, value in table.items():
         path = f"materials.{key}"
         row = _table(value, path, errors)
@@ -734,23 +796,23 @@ def _parse_materials(
         if not isinstance(label, str) or not label.strip():
             errors.add(f"{path}.label", "must be a nonempty string")
             label = ""
-        profile = row.get("profile")
-        if not isinstance(profile, str) or profile not in profiles:
-            errors.add(f"{path}.profile", "must reference a profile")
-            profile = ""
         crystal_key = row.get("crystal", key)
         if not isinstance(crystal_key, str) or crystal_key not in crystals:
             errors.add(f"{path}.crystal", "must reference a crystal")
             crystal_key = ""
-        values = dict(profiles.get(str(profile), {}))
-        if "thickness_ang" in row or "thickness_layers" in row:
+        override_raw = overrides.get(key)
+        override: Mapping[str, object] = (
+            cast(Mapping[str, object], override_raw) if isinstance(override_raw, Mapping) else {}
+        )
+        values = {name: standard[name] for name in _SCAN_KEYS if name in standard}
+        if "thickness_ang" in override or "thickness_layers" in override:
             values.pop("thickness_ang", None)
             values.pop("thickness_layers", None)
-        if "E_grid_line" in row:
+        if "E_grid_line" in override:
             values.pop("E_grid_line_by_energy", None)
-        elif "E_grid_line_by_energy" in row:
+        elif "E_grid_line_by_energy" in override:
             values.pop("E_grid_line", None)
-        values.update({name: row[name] for name in _SCAN_KEYS if name in row})
+        values.update({name: override[name] for name in _SCAN_KEYS if name in override})
         scan = _scan(
             values,
             f"{path}.scan",
@@ -776,10 +838,25 @@ def _parse_materials(
                         layers.append(layer)
         if substrate is not None and "stack" in row:
             errors.add(path, "cannot define both substrate and stack")
-        if label and profile and crystal_key and scan is not None:
+        if label and crystal_key and scan is not None:
             out[key] = MaterialSpec(
-                key, label, profile, crystal_key, scan, substrate, tuple(layers)
+                key, label, "standard", crystal_key, scan, substrate, tuple(layers)
             )
+    for profile_key, profile_row in profiles.items():
+        materials_list = profile_row.get("materials")
+        if isinstance(materials_list, list):
+            for material_key in materials_list:
+                if isinstance(material_key, str) and material_key not in table:
+                    errors.add(
+                        f"profiles.{profile_key}.materials", f"unknown material {material_key!r}"
+                    )
+        profile_overrides = profile_row.get("overrides")
+        if isinstance(profile_overrides, Mapping):
+            for material_key in profile_overrides:
+                if material_key not in table:
+                    errors.add(
+                        f"profiles.{profile_key}.overrides.{material_key}", "unknown material"
+                    )
     for key, material in out.items():
         unsupported = sorted(
             _material_elements(material, crystals, media) - set(TRANSPORT_ELEMENTS)
