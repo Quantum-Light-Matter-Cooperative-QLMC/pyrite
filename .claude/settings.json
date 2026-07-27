@@ -20,7 +20,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "f=.venv/Scripts/python.exe; [ -x \"$f\" ] || f=.venv/bin/python; [ -x \"$f\" ] || rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv sync",
+            "command": "f=.venv/Scripts/python.exe; [ -x \"$f\" ] || f=.venv/bin/python; [ -x \"$f\" ] || rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv sync --all-groups --extra viz-render",
             "statusMessage": "Ensuring venv provisioned"
           }
         ]
