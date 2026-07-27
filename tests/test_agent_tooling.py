@@ -34,7 +34,7 @@ def write_skill(root: Path, name: str, description: str | None = None) -> Path:
 @pytest.mark.parametrize(
     ("content", "message"),
     [
-        ("# Missing frontmatter\n", "missing YAML frontmatter"),
+        ("# Missing or unterminated frontmatter\n", "missing or unterminated YAML frontmatter"),
         ("---\nname: sample\n---\n", "missing description"),
         (
             "---\nname: sample\ndescription: Does sample work.\n---\n",
@@ -129,7 +129,7 @@ def test_sync_skills_preserves_mirror_when_canonical_skill_is_invalid(
     existing = write_skill(mirror, "existing")
     before = existing.read_bytes()
 
-    with pytest.raises(dev_module.AgentToolingError, match="missing YAML frontmatter"):
+    with pytest.raises(dev_module.AgentToolingError, match="missing or unterminated YAML frontmatter"):
         dev_module.sync_skill_trees(canonical, mirror)
 
     assert existing.read_bytes() == before

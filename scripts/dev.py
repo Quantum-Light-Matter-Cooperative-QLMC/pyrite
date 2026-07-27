@@ -33,6 +33,8 @@ import sys
 import time
 from pathlib import Path
 
+import yaml
+
 from cxr_mc._acp import ACP_SERVERS, start_acp_servers, stop_acp_servers
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -182,27 +184,22 @@ def cmd_smoke(args: argparse.Namespace) -> None:
 
 def _frontmatter_fields(path: Path) -> dict[str, str]:
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        content = path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as exc:
         raise AgentToolingError(f"{path}: cannot read UTF-8 text: {exc}") from exc
-    if not lines or lines[0] != "---":
-        raise AgentToolingError(f"{path}: missing YAML frontmatter")
-    try:
-        end = lines.index("---", 1)
-    except ValueError as exc:
-        raise AgentToolingError(f"{path}: unterminated YAML frontmatter") from exc
 
-    fields: dict[str, str] = {}
-    for line in lines[1:end]:
-        key, separator, value = line.partition(":")
-        key = key.strip()
-        value = value.strip().strip("'\"")
-        if not separator or not key or not value:
-            raise AgentToolingError(f"{path}: malformed YAML frontmatter line {line!r}")
-        if key in fields:
-            raise AgentToolingError(f"{path}: duplicate frontmatter field {key!r}")
-        fields[key] = value
-    return fields
+    parts = content.split("---", 2)
+    if len(parts) < 3:
+        raise AgentToolingError(f"{path}: missing or unterminated YAML frontmatter")
+
+    frontmatter_text = parts[1]
+    try:
+        fields = yaml.safe_load(frontmatter_text)
+        if not isinstance(fields, dict):
+            raise ValueError("Frontmatter is not a dictionary")
+        return {str(k): str(v) for k, v in fields.items()}
+    except Exception as exc:
+        raise AgentToolingError(f"{path}: malformed YAML frontmatter: {exc}") from exc
 
 
 def validate_skill_file(path: Path) -> None:
