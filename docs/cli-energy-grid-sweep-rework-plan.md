@@ -133,3 +133,35 @@ conferred with the user.
 | 13 (pull survey broken) | P0.2 |
 | 14 (pull by profile) | P3.2 |
 | 15 (inversion) | P1.2 (centerpiece) |
+
+
+---
+Handoff — feature/cli-profile-rework
+
+Landed (committed, verified: lint clean, affected tests green)
+
+- ae39abb Phase 0 — P0.1 sweep set -y/--yes + overwrite confirm + input= test support; P0.2 remote pull resolves <material>--survey-<hash>/ dirs; P0.3 interim standard-profile fallback for the load-time "missing beam energies" error.
+- 160c55e Phase 1.1 — --profile full|survey → --fidelity full|survey (scan + remote scan/rebrem/reline/submit + checkpoint recompute); legacy --profile = hidden deprecated alias that warns + forwards; both flags = UsageError. Dirname format / dataset_identity / profiles.py untouched.
+- 793a951 — venv/hook bootstrap (your authorized infra change; keep).
+
+Remaining (not started)
+
+- P1.2 schema inversion — profiles reference materials (materials=[...], [profiles.NAME.overrides.MAT], drop [materials.*].profile). Rewrite materials/catalog.py + _catalog_decode.py parse, migrate on-disk materials.toml, regen goldens, retarget cxr sweep show/set.
+- P1.3 shared per-material derived-grid store — source="derived"|"manual" provenance; profiles carry beam energies only; cxr energy-grid apply writes the store; migrate existing E_grid_line_by_energy rows in. This removes the P0.3 fallback hack — delete it when 1.3 lands.
+- P1.4 docs — docs/sweep-profiles.md fidelity rename, cli-reference regen, repo map.
+- Phase 2 — cxr profile list|show|create|set|add|remove|delete group; start:stop:step (stop-inclusive, CSV-mixable) on range options; cxr energy-grid set MAT --energy E --stop S (source=manual); -l/--ne-line / -b/--ne-brem as profile settings.
+- Phase 3 — remote submit --profile = catalog names (orthogonal to --fidelity); remote pull MATERIAL@PROFILE selector via meta.json dataset_identity; scan --all --profile NAME.
+
+Gotchas / facts discovered (carry forward)
+
+- The plan's "pending sweep set diff" (Decision 4) never existed in the tree — no _reconcile_line_grids, no [profiles.test]. P0.1 was implemented fresh; ignore the "before commit" framing.
+- 150 keV error has two distinct origins: load-time _catalog_decode.py::_line_grids_by_energy missing = sorted(configured - mapped) (what P0.3 patched via a fallback_energies param threaded from the standard profile), vs. runtime sweep.py:382 _line_grid_for_energy "no E_grid_line configured for beam energy X keV" (untouched, fires only when MC cases build). P1.3 should make the load-time fallback obsolete.
+- Current pre-inversion schema: [profiles.standard] holds thickness/energy/tilt/azimuth + E_grid_line_by_energy + E_grid_brem; every [materials.NAME] has profile = "standard" (~24 materials, lines ~552+ in materials.toml).
+- Fidelity plumbing: cli/_core.py now exposes fidelity_option / resolve_fidelity; internal profile= strings still carry full/survey for dirname stability. profiles.py PROFILE_NAMES=("full","survey") + _VARIANT_STEM_RE unchanged — leave them.
+- CLI reference regens with scripts/generate_cli_reference.py --write (never hand-edit docs/cli-reference.md).
+- Every CLI change must route through the cli-ui-ux skill (design/impl/tests) per CLAUDE.md.
+
+Baseline noise (NOT regressions — ignore in all phases)
+
+- tests/test_line_grid_golden.py::test_installed_wheel_layout_fails_with_source_checkout_error fails on a clean tree (exit-code assertion).
+- ty check reports 5 pre-existing diagnostics: 3 tomlkit.exceptions submodule warnings in cli/sweep.py, 2 optional-dep unresolved-import (imageio.v3, kaleido) in plots/render_trajectories.py.
