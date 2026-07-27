@@ -32,55 +32,61 @@ Read `docs/repo_map.md` before explore source files.
 
 ## Canonical commands
 
-Run shell commands through `rtk`. For `uv`, always use the shared writable
-cache: `rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv ...`.
+This repo is `uv` managed.
 
-Run all tests:
+Run all (offline) tests:
 
 ```bash
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test
+uv run python scripts/dev.py test
 ```
 
 Run single test:
 
 ```bash
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test path/to/test.py -k test_name
+uv run python scripts/dev.py test path/to/test.py -k test_name
 ```
+
+Run all tests (including online/external resources):
+
+```bash
+CXR_ONLINE_TESTS=1 uv run python scripts/dev.py test
+```
+
 
 Lint:
 
 ```bash
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py lint
+uv run python scripts/dev.py lint
 ```
 
 Format:
 
 ```bash
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py format
+uv run python scripts/dev.py format
 ```
 
 Type check:
 
 ```bash
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py typecheck
+uv run python scripts/dev.py typecheck
 ```
 
 Notebook cleanup:
 
 ```bash
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py nbstrip
+uv run python scripts/dev.py nbstrip
 ```
 
 Run full verification:
 
 ```bash
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py verify
+uv run python scripts/dev.py verify
 ```
 
 Run all pre-commit hooks:
 
 ```bash
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py precommit
+uv run python scripts/dev.py precommit
 ```
 
 Agents prefer these commands always.

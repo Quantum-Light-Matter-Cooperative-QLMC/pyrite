@@ -134,3 +134,6 @@ ignore = [
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.uv]
+cache-dir = "/tmp/cxr-mc-uv-cache"
