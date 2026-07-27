@@ -1,6 +1,6 @@
-# Sweep profiles and dataset identity
+# Sweep fidelity and dataset identity
 
-`cxr scan` accepts two named, independently resolved policies:
+`cxr scan` accepts two named, independently resolved fidelity policies:
 
 - `full` preserves production behavior: catalog grids, 300 line electrons,
   150 bremsstrahlung electrons, and complete configured reflection sets.
@@ -12,8 +12,14 @@
 Run a survey with:
 
 ```bash
-cxr scan mose2 --profile survey
+cxr scan mose2 --fidelity survey
 ```
+
+The older `--profile full|survey` spelling still works but is deprecated and
+warns; it collided with the catalog `[profiles.*]` concept (named scan-default
+campaigns, see `docs/cli-energy-grid-sweep-rework-plan.md`), which keeps the
+word *profile*. Fidelity (`--fidelity`) selects the grid-reduction policy;
+catalog profiles select scan-parameter ranges.
 
 Python callers use `default_settings("survey")` and
 `material_sweep("mose2", profile="survey")`. `full` remains default for both.

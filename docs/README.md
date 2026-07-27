@@ -11,7 +11,7 @@ Guides, references, and validation records. They complement:
 | [cli-reference.md](cli-reference.md) | Generated reference for every current `cxr` command | authoritative |
 | [api.md](api.md) | Generated Python API reference | authoritative |
 | [running-on-a-cluster.md](running-on-a-cluster.md) | Headless `cxr scan` under SLURM (`sbatch` + job-array templates) | guide |
-| [sweep-profiles.md](sweep-profiles.md) | Named full/survey policies, resolved provenance, and variant checkpoint identity | guide |
+| [sweep-profiles.md](sweep-profiles.md) | Named full/survey fidelity policies, resolved provenance, and variant checkpoint identity | guide |
 | [physics-validation-ledger.md](physics-validation-ledger.md) | Physics claim status and evidence | living ledger |
 | [crystal-mosaicity.md](crystal-mosaicity.md) | Analytic mosaic broadening and exact orientation averaging | implemented |
 | [detector-solid-angle.md](detector-solid-angle.md) | Default single-direction treatment and opt-in face integral | opt-in integral implemented |

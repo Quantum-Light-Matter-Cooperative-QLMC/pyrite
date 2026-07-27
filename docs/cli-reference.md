@@ -93,8 +93,18 @@ Commands below are authoritative for this version.
   - `cxr energy-grid show` — Show line and bremsstrahlung grids together.
   - `cxr energy-grid submit` — Submit sliced energy-grid derivation remotely.
 - `cxr sweep` — Show and edit physical scan parameter-range sweeps.
-  - `cxr sweep set` — Set default ranges or per-material overrides without touching energy grids.
+  - `cxr sweep set` — Set per-material override ranges without touching energy grids.
   - `cxr sweep show` — Show defaults, overrides, or one material's effective scan ranges.
+- `cxr profile` — Manage catalog scan profiles (named campaign defaults).
+  - `cxr profile add` — Add values to an existing profile's grids (union, sorted, deduplicated).
+  - `cxr profile add-material` — Add materials to a profile's explicit membership list.
+  - `cxr profile create` — Create a new profile, cloning range defaults from --from (standard).
+  - `cxr profile delete` — Delete a profile; irreversible.
+  - `cxr profile list` — List catalog profiles with membership and override counts.
+  - `cxr profile remove` — Remove values from an existing profile's grids.
+  - `cxr profile remove-material` — Remove materials from a profile's explicit membership list.
+  - `cxr profile set` — Replace range grids or material membership on an existing profile.
+  - `cxr profile show` — Show one profile's ranges, material membership, and overrides.
 
 ## `cxr`
 
@@ -128,6 +138,7 @@ Commands:
   remote       Run and manage MC sweeps on a remote GPU host.
   energy-grid  Derive, submit, inspect, and apply photon-energy grids.
   sweep        Show and edit scan parameter-range sweeps.
+  profile      Manage catalog scan profiles (named campaign defaults).
 ```
 
 ## `cxr scan`
@@ -1105,35 +1116,42 @@ Usage: cxr sweep [OPTIONS] COMMAND [ARGS]...
   Show and edit physical scan parameter-range sweeps.
 
   Operates on catalog ``[profiles.*]`` scan defaults and per-material overrides, not
-  ``SweepProfile`` full/survey reduction policies.
+  ``SweepProfile`` full/survey reduction policies. Profile defaults and membership are
+  managed by ``cxr profile``.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  set   Set default ranges or per-material overrides without touching energy grids.
+  set   Set per-material override ranges without touching energy grids.
   show  Show defaults, overrides, or one material's effective scan ranges.
 ```
 
 ## `cxr sweep set`
 
 ```text
-Usage: cxr sweep set [OPTIONS] [MATERIAL]
+Usage: cxr sweep set [OPTIONS] MATERIAL
 
-  Set default ranges or per-material overrides without touching energy grids.
+  Set per-material override ranges without touching energy grids.
 
-  Replacing a value already set on PROFILE or MATERIAL prompts for confirmation unless
-  --yes is given; --dry-run never prompts. Per-material overrides are stored under the
-  material's owning profile's ``overrides`` table
-  (``profiles.standard.overrides.MATERIAL`` in Phase 1).
+  Replacing a value already set on MATERIAL prompts for confirmation unless --yes is
+  given; --dry-run never prompts. Overrides are stored under the material's owning
+  profile's ``overrides`` table (``profiles.standard.overrides.MATERIAL`` in Phase 1).
+  Profile defaults themselves are edited with ``cxr profile set``.
 
 Options:
-  --profile NAME                  Edit this default profile; defaults to standard
-                                  without MATERIAL.
-  --thickness ANGSTROM,...        Crystal thicknesses in angstrom.
-  --energy KEV,...                Beam energies in keV.
-  --polar DEG,...                 Polar tilts in degrees [0, 90).
-  --azimuth DEG,...               Azimuth tilts in degrees [0, 360].
+  --thickness ANGSTROM,... | START:STOP:STEP
+                                  Crystal thicknesses in angstrom; mixable with
+                                  start:stop:step ranges.
+  --energy KEV,... | START:STOP:STEP
+                                  Beam energies in keV; mixable with start:stop:step
+                                  ranges.
+  --polar DEG,... | START:STOP:STEP
+                                  Polar tilts in degrees [0, 90); mixable with
+                                  start:stop:step ranges.
+  --azimuth DEG,... | START:STOP:STEP
+                                  Azimuth tilts in degrees [0, 360]; mixable with
+                                  start:stop:step ranges.
   --reset [thickness|energy|polar|azimuth|all]
                                   Remove one override; repeat, or use --reset all.
   -y, --yes                       Skip the overwrite confirmation prompt.
@@ -1147,6 +1165,223 @@ Options:
 Usage: cxr sweep show [OPTIONS] [MATERIAL]
 
   Show defaults, overrides, or one material's effective scan ranges.
+
+Options:
+  --json      Emit one versioned JSON object on stdout.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr profile`
+
+```text
+Usage: cxr profile [OPTIONS] COMMAND [ARGS]...
+
+  Manage catalog scan profiles (named campaign defaults).
+
+  Profiles live in ``[profiles.*]`` and carry scan-parameter ranges plus optional
+  material membership and per-material overrides. Energy grids are managed separately by
+  ``cxr energy-grid``.
+
+  Examples:
+    cxr profile list
+    cxr profile show sub_100keV        (or: cxr profile sub_100keV)
+    cxr profile create sub_100keV --energy 30:100:10
+    cxr profile add sub_100keV --energy 75
+    cxr profile delete sub_100keV -y
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  add              Add values to an existing profile's grids (union, sorted,...
+  add-material     Add materials to a profile's explicit membership list.
+  create           Create a new profile, cloning range defaults from --from...
+  delete           Delete a profile; irreversible.
+  list             List catalog profiles with membership and override counts.
+  remove           Remove values from an existing profile's grids.
+  remove-material  Remove materials from a profile's explicit membership list.
+  set              Replace range grids or material membership on an existing profile.
+  show             Show one profile's ranges, material membership, and overrides.
+```
+
+## `cxr profile add`
+
+```text
+Usage: cxr profile add [OPTIONS] NAME
+
+  Add values to an existing profile's grids (union, sorted, deduplicated).
+
+  Incremental edit: ``cxr profile add sub_100keV --energy 75`` inserts 75 keV without
+  re-listing the grid. No prompt except on 'standard'.
+
+Options:
+  --thickness ANGSTROM,... | START:STOP:STEP
+                                  Crystal thicknesses in angstrom. Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --energy KEV,... | START:STOP:STEP
+                                  Beam energies in keV. Comma-separated, mixable with
+                                  start:stop:step ranges.
+  --polar DEG,... | START:STOP:STEP
+                                  Polar tilts in degrees [0, 90). Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --azimuth DEG,... | START:STOP:STEP
+                                  Azimuth tilts in degrees [0, 360]. Comma-separated,
+                                  mixable with start:stop:step ranges.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `cxr profile add-material`
+
+```text
+Usage: cxr profile add-material [OPTIONS] NAME MATERIALS...
+
+  Add materials to a profile's explicit membership list.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr profile create`
+
+```text
+Usage: cxr profile create [OPTIONS] NAME
+
+  Create a new profile, cloning range defaults from --from (standard).
+
+  Range options replace individual cloned grids. Overrides and material membership are
+  not cloned: the new profile starts with implicit all-in-use-materials membership and
+  no per-material overrides.
+
+Options:
+  --from SOURCE                   Clone range defaults from SOURCE profile; defaults to
+                                  standard.
+  --thickness ANGSTROM,... | START:STOP:STEP
+                                  Crystal thicknesses in angstrom. Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --energy KEV,... | START:STOP:STEP
+                                  Beam energies in keV. Comma-separated, mixable with
+                                  start:stop:step ranges.
+  --polar DEG,... | START:STOP:STEP
+                                  Polar tilts in degrees [0, 90). Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --azimuth DEG,... | START:STOP:STEP
+                                  Azimuth tilts in degrees [0, 360]. Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `cxr profile delete`
+
+```text
+Usage: cxr profile delete [OPTIONS] NAME
+
+  Delete a profile; irreversible. 'standard' cannot be deleted.
+
+  Blocked while the shared energy-grid store still references the profile (an
+  ``[energy_grids.NAME]`` fallback bucket); referents are listed.
+
+Options:
+  -y, --yes   Skip the confirmation prompt.
+  --dry-run   Print proposed TOML diff; delete nothing.
+  --json      Emit one versioned JSON object on stdout.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr profile list`
+
+```text
+Usage: cxr profile list [OPTIONS]
+
+  List catalog profiles with membership and override counts.
+
+Options:
+  --json      Emit one versioned JSON object on stdout.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr profile remove`
+
+```text
+Usage: cxr profile remove [OPTIONS] NAME
+
+  Remove values from an existing profile's grids.
+
+  Every listed value must be present; otherwise nothing is written. Catalog validation
+  rejects removals that would empty a required grid.
+
+Options:
+  --thickness ANGSTROM,... | START:STOP:STEP
+                                  Crystal thicknesses in angstrom. Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --energy KEV,... | START:STOP:STEP
+                                  Beam energies in keV. Comma-separated, mixable with
+                                  start:stop:step ranges.
+  --polar DEG,... | START:STOP:STEP
+                                  Polar tilts in degrees [0, 90). Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --azimuth DEG,... | START:STOP:STEP
+                                  Azimuth tilts in degrees [0, 360]. Comma-separated,
+                                  mixable with start:stop:step ranges.
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `cxr profile remove-material`
+
+```text
+Usage: cxr profile remove-material [OPTIONS] NAME MATERIALS...
+
+  Remove materials from a profile's explicit membership list.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr profile set`
+
+```text
+Usage: cxr profile set [OPTIONS] NAME
+
+  Replace range grids or material membership on an existing profile.
+
+  NAME must already exist (create it with ``cxr profile create``); unknown names error
+  with suggestions. Editing 'standard' prompts for confirmation unless --yes is given;
+  --dry-run never prompts.
+
+Options:
+  --thickness ANGSTROM,... | START:STOP:STEP
+                                  Crystal thicknesses in angstrom. Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --energy KEV,... | START:STOP:STEP
+                                  Beam energies in keV. Comma-separated, mixable with
+                                  start:stop:step ranges.
+  --polar DEG,... | START:STOP:STEP
+                                  Polar tilts in degrees [0, 90). Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --azimuth DEG,... | START:STOP:STEP
+                                  Azimuth tilts in degrees [0, 360]. Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --materials KEY,...             Replace explicit material membership (comma-separated
+                                  material keys).
+  -y, --yes                       Skip the 'standard' confirmation prompt.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `cxr profile show`
+
+```text
+Usage: cxr profile show [OPTIONS] NAME
+
+  Show one profile's ranges, material membership, and overrides.
 
 Options:
   --json      Emit one versioned JSON object on stdout.

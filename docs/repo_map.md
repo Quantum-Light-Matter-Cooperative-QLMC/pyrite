@@ -55,7 +55,7 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   hidden alias: `cxr check-config`.
 - **`cxr checkpoint ...`** → `cli.checkpoint:command`: grouped local checkpoint
   shrink, component recompute, archive, restore, list, and merge operations.
-- **`cxr scan <material> [--profile full|survey]`** → `scan:main` →
+- **`cxr scan <material> [--fidelity full|survey]`** → `scan:main` →
   `run.run_sweep` → write canonical `checkpoints/<material>/{line,brem}.pkl`
   or an identity-qualified variant directory. Box shim: `python -m cxr_mc._entry.scan`.
 - **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
