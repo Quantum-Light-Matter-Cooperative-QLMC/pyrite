@@ -8,6 +8,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import re
 from pathlib import Path
 
 import click
@@ -25,6 +26,7 @@ def _context(
     settings.update(
         terminal_width=88,
         max_content_width=88,
+        color=False,
     )
     return click.Context(
         current,
@@ -52,6 +54,7 @@ def _walk(
                 continue
             yield from _walk(child, (*path, name), ctx)
 
+ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
 def build_reference() -> str:
     nodes = list(_walk(command, ("cxr",)))
@@ -100,6 +103,27 @@ def build_reference() -> str:
         "## Command tree",
         "",
     ]
+
+    for path, current, ctx in nodes:
+        title = " ".join(path)
+        
+        # Get raw help text from Click or any styling wrapper
+        raw_help = current.get_help(ctx).rstrip()
+        
+        # Strip any stubborn ANSI codes out of the help text strings
+        clean_help = ANSI_ESCAPE.sub('', raw_help)
+        
+        lines.extend(
+            [
+                f"## `{title}`",
+                "",
+                "```text",
+                clean_help,  # <-- Use the cleaned text here
+                "```",
+                "",
+            ]
+        )
+    return "\n".join(lines)
     for path, current, _ctx in nodes:
         if len(path) == 1:
             continue

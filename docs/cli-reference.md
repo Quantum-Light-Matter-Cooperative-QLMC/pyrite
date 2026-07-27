@@ -41,71 +41,6 @@ Commands below are authoritative for this version.
 
 ## Command tree
 
-- `cxr scan` — Run one material's MC sweep and write its checkpoint.
-- `cxr blaze` — Run one material's blazed-crystal MC sweep and write its checkpoint.
-- `cxr export` — Render notebooks/analysis_app.py to static HTML.
-- `cxr analyze` — Launch notebooks/analysis_app.py with marimo run or edit.
-- `cxr viewer` — Launch notebooks/trace_app.py with marimo run or edit.
-- `cxr validate` — Launch notebooks/validation_app.py, or export its cached validation figures.
-- `cxr catalog` — Inspect and validate material-catalog configuration.
-  - `cxr catalog validate` — Validate bundled material catalog or an explicit full catalog TOML.
-- `cxr checkpoint` — Inspect, transform, recompute, and archive local checkpoints.
-  - `cxr checkpoint slim` — Shrink a checkpoint dataset for transfer.
-  - `cxr checkpoint recompute` — Recompute one checkpoint dataset without changing the other.
-    - `cxr checkpoint recompute brem` — Recompute only brem backgrounds in existing checkpoints.
-    - `cxr checkpoint recompute line` — Recompute only line spectra in existing checkpoints.
-  - `cxr checkpoint archive` — Copy an active checkpoint to long-term shelf.
-  - `cxr checkpoint restore` — Copy an archived checkpoint back to active slot.
-  - `cxr checkpoint list` — List long-term checkpoint shelf.
-  - `cxr checkpoint merge` — Merge an archived checkpoint into active slot.
-- `cxr remote` — [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.
-  - `cxr remote attach` — Live-track a remote job; defaults to latest.
-  - `cxr remote clear` — Delete remote checkpoints; preview unless --yes.
-  - `cxr remote jobs` — List jobs with SLURM IDs, materials, and last events.
-  - `cxr remote logs` — Show a job diagnostic log; defaults to latest.
-  - `cxr remote pull` — Fetch existing checkpoints from remote box.
-  - `cxr remote reap` — Release orphaned checkpoint reservations; preview unless --yes.
-  - `cxr remote rebrem` — Recompute brem-only remotely, follow, and pull completed checkpoints.
-  - `cxr remote reline` — Recompute line-only remotely, follow, and pull completed checkpoints.
-  - `cxr remote scan` — Sync code, submit sweep(s), wait, and pull checkpoints.
-  - `cxr remote status` — Show one job; use -v for allocation and -vv for logs.
-  - `cxr remote stop` — cancel active SLURM job(s) by material, or every live job.
-  - `cxr remote submit` — Sync code and submit a detached SLURM material queue.
-  - `cxr remote sync` — Push current code to remote box.
-  - `cxr remote validate` — Run Zhai reproduction remotely or pull existing caches.
-- `cxr energy-grid` — Derive and manage per-material photon-energy grids.
-  - `cxr energy-grid apply` — Apply derived bounds to material catalog.
-  - `cxr energy-grid brem` — Inspect or manually set bremsstrahlung energy grids.
-    - `cxr energy-grid brem set` — Set one material bremsstrahlung grid and mark it as a manual override.
-    - `cxr energy-grid brem show` — Show bremsstrahlung energy grids.
-  - `cxr energy-grid defaults` — Show or update persistent derivation defaults.
-  - `cxr energy-grid derive` — Derive energy-grid bounds locally.
-  - `cxr energy-grid job` — Inspect, follow, or stop remote energy-grid jobs.
-    - `cxr energy-grid job attach` — Attach to energy-grid job progress.
-    - `cxr energy-grid job logs` — Print or follow energy-grid job logs.
-    - `cxr energy-grid job status` — Show energy-grid job status.
-    - `cxr energy-grid job stop` — Preview or stop one energy-grid job.
-  - `cxr energy-grid line` — Inspect or manually set coherent line-energy grids.
-    - `cxr energy-grid line delete` — Delete MATERIAL's derived or manual line-grid rows; irreversible.
-    - `cxr energy-grid line set` — Set one material line-grid row and mark it as a manual override.
-    - `cxr energy-grid line show` — Show coherent line-energy grids.
-  - `cxr energy-grid regen-golden` — Regenerate or check material-catalog golden snapshot.
-  - `cxr energy-grid show` — Show line and bremsstrahlung grids together.
-  - `cxr energy-grid submit` — Submit sliced energy-grid derivation remotely.
-- `cxr sweep` — Show and edit physical scan parameter-range sweeps.
-  - `cxr sweep set` — Set per-material override ranges without touching energy grids.
-  - `cxr sweep show` — Show defaults, overrides, or one material's effective scan ranges.
-- `cxr profile` — Manage catalog scan profiles (named campaign defaults).
-  - `cxr profile add` — Add values to an existing profile's grids (union, sorted, deduplicated).
-  - `cxr profile add-material` — Add materials to a profile's explicit membership list.
-  - `cxr profile create` — Create a new profile, cloning range defaults from --from (standard).
-  - `cxr profile delete` — Delete a profile; irreversible.
-  - `cxr profile list` — List catalog profiles with membership and override counts.
-  - `cxr profile remove` — Remove values from an existing profile's grids.
-  - `cxr profile remove-material` — Remove materials from a profile's explicit membership list.
-  - `cxr profile set` — Replace range grids or material membership on an existing profile.
-  - `cxr profile show` — Show one profile's ranges, material membership, and overrides.
-
 ## `cxr`
 
 ```text
@@ -1271,6 +1206,10 @@ Options:
   --azimuth DEG,... | START:STOP:STEP
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges.
+  -l, --ne-line N,...             Line-spectrum transport electron counts; positive
+                                  integers.
+  -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
+                                  integers.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
 ```
@@ -1369,6 +1308,10 @@ Options:
   --azimuth DEG,... | START:STOP:STEP
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges.
+  -l, --ne-line N,...             Line-spectrum transport electron counts; positive
+                                  integers.
+  -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
+                                  integers.
   --materials KEY,...             Replace explicit material membership (comma-separated
                                   material keys).
   -y, --yes                       Skip the 'standard' confirmation prompt.

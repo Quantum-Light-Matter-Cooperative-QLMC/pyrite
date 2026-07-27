@@ -42,7 +42,7 @@ def test_build_golden_does_not_import_catalog_singleton():
         for alias in node.names
     }
     assert "CATALOG" not in imported_names
-
+    
 
 def test_installed_wheel_layout_fails_with_source_checkout_error(tmp_path):
     """Exercise CLI from isolated installed-package layout without repository tests."""
@@ -57,7 +57,7 @@ def test_installed_wheel_layout_fails_with_source_checkout_error(tmp_path):
             sys.executable,
             "-c",
             "from cxr_mc.cli import main; raise SystemExit(main())",
-            "line-grid",
+            "energy-grid",
             "regen-golden",
             "--check",
         ],

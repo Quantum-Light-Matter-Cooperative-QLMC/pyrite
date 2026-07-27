@@ -32,6 +32,19 @@ def test_material_completion_is_empty_when_catalog_read_fails(monkeypatch):
     _cli_completion._material_keys.cache_clear()
 
 
+def test_profile_completion_reads_offline_catalog():
+    values = _values(_cli_completion.complete_profile(None, None, "stan"))
+    assert values == ["standard"]
+
+
+def test_profile_completion_is_empty_when_catalog_read_fails(monkeypatch):
+    _cli_completion._profile_keys.cache_clear()
+    monkeypatch.setattr(_cli_completion, "DATA_DIR", Path("/missing"))
+    assert _cli_completion.complete_profile(None, None, "") == []
+    monkeypatch.undo()
+    _cli_completion._profile_keys.cache_clear()
+
+
 def test_checkpoint_completion_is_nonrecursive_and_excludes_unsafe_files(tmp_path):
     (tmp_path / "hopg.pkl").touch()
     (tmp_path / "not a candidate.pkl").touch()

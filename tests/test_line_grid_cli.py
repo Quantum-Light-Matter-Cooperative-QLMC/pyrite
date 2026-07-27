@@ -116,7 +116,7 @@ def test_click_follow_logs_propagates_remote_exit_status(monkeypatch, status):
     assert_clean_result(result, exit_code=status)
 
 
-def test_click_submit_forwards_geometry_and_set_default(monkeypatch):
+def test_click_submit_with_invalid_azimuths_fails(monkeypatch):
     seen = {}
     monkeypatch.setattr(line_grid.job, "start", lambda **kwargs: seen.update(kwargs))
 
@@ -138,11 +138,38 @@ def test_click_submit_forwards_geometry_and_set_default(monkeypatch):
         ],
     )
 
+    assert result.exit_code != 0
+    print(result.output)
+    assert "Invalid value for '--azimuths'" in result.output
+    assert seen == {}
+
+def test_click_submit_forwards_geometry_and_set_default(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(line_grid.job, "start", lambda **kwargs: seen.update(kwargs))
+
+    result = invoke(
+        line_grid.command,
+        [
+            "submit",
+            "--materials",
+            "diamond,wse2",
+            "--energies",
+            "100,200",
+            "--tilts",
+            "0,1.5",
+            "--azimuths",
+            "95,180,260",
+            "--thickness",
+            "1000,2000",
+            "--set-default",
+        ],
+    )
+
     assert_clean_result(result)
     assert seen["materials"] == "diamond,wse2"
     assert seen["energies"] == "100,200"
     assert seen["tilts"] == "0,1.5"
-    assert seen["azimuths"] == "45,90"
+    assert seen["azimuths"] == "95,180,260"
     assert seen["thickness"] == "1000,2000"
     assert seen["set_default"] is True
 
