@@ -211,6 +211,14 @@ class Sweep:
     energy_keV: ScalarOrSeq = (30.0, 45.0, 60.0)
     tilt_deg: ScalarOrSeq = 30.0
     tilt_azim_deg: ScalarOrSeq = 0.0
+    # Optional electron-count grids (catalog ``[profiles.*]`` settings,
+    # ``n_electrons`` / ``n_electrons_brem`` keys): None -> build_cases falls
+    # back to the caller's settings-level counts. Single values are typical;
+    # multiple values sweep transport statistics like any other grid, and the
+    # case name gains a ``ne=<line>/<brem>`` suffix so checkpoint resume
+    # (keyed on (name, E0_keV)) never conflates statistics variants.
+    n_electrons: ScalarOrSeq | None = None
+    n_electrons_brem: ScalarOrSeq | None = None
     groove_spacing_ang: float | None = None
     # Blazed sawtooth grooves on the beam-entrance face (docs/superpowers/
     # plans/2026-07-23-blazed-groove-geometry.md). Scalar, not sweepable in
@@ -390,8 +398,11 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     legacy infinite slab, otherwise both must be positive (default: a finite
     5x5 mm footprint). Each case also carries ``beam_fwhm_mm`` from the sweep
     (default: a 1 mm FWHM Gaussian beam spot; ``None`` recovers the legacy
-    point-source beam). Returns the ``cases`` list; preview it with
-    :func:`geometry_table`."""
+    point-source beam). Optional ``n_electrons`` / ``n_electrons_brem`` sweep
+    grids (catalog profile settings) cross electron-count statistics into the
+    product and suffix the case name with ``ne=<line>/<brem>``; ``None`` keeps
+    the scalar counts passed by the caller. Returns the ``cases`` list;
+    preview it with :func:`geometry_table`."""
     cp = crystal_params(sweep.material, sweep.n_families)
     if sweep.max_reflections is not None:
         cp["hkl_list"] = cp["hkl_list"][: sweep.max_reflections]
@@ -464,6 +475,23 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     azimuths = _quantized_angles(sweep.tilt_azim_deg)
     _reject_banned_angles(tilts, azimuths, allow_normal_incidence=sweep.allow_normal_incidence)
 
+    def _electron_counts(grid, fallback, label):
+        if grid is None:
+            return [int(fallback)]
+        raw = _seq(grid)
+        counts = [int(value) for value in raw]
+        if any(count <= 0 or count != value for count, value in zip(counts, raw)):
+            raise ValueError(f"{label} electron counts must be positive integers")
+        return counts
+
+    ne_pairs = list(
+        product(
+            _electron_counts(sweep.n_electrons, n_electrons, "n_electrons"),
+            _electron_counts(sweep.n_electrons_brem, n_electrons_brem, "n_electrons_brem"),
+        )
+    )
+    explicit_ne = sweep.n_electrons is not None or sweep.n_electrons_brem is not None
+
     # normalize the substrate sugar onto the general stack (mutually exclusive)
     stack = sweep.stack
     if sweep.substrate is not None:
@@ -505,53 +533,55 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
             name = f"{name} groove={sweep.groove_spacing_ang / 1e4:g}um"
         for i_e, E0 in enumerate(energies):
             line_case_grid = encode_energy_grid(line_grids[i_e])
-            cases.append(
-                dict(
-                    name=name,
-                    crystal=cp["crystal"],
-                    composition=cp["composition"],
-                    hkl_list=cp["hkl_list"],
-                    B_ang2=cp["B_ang2"],
-                    E0_keV=float(E0),
-                    thickness_ang=float(thickness),
-                    crystal_width_mm=None if width is None else float(width),
-                    crystal_height_mm=None if height is None else float(height),
-                    beam_fwhm_mm=(
-                        None if sweep.beam_fwhm_mm is None else float(sweep.beam_fwhm_mm)
-                    ),
-                    E_grid=line_case_grid,  # legacy key (== line grid)
-                    E_grid_line=line_case_grid,
-                    E_grid_brem=(
-                        (brem_case_grid[0], float(E0) * 1e3 + brem_case_grid[2], brem_case_grid[2])
-                        if isinstance(brem_case_grid, tuple)
-                        else brem_case_grid
-                    ),
-                    theta_obs_rad=np.deg2rad(sweep.theta_obs_deg),
-                    tilt_deg=float(tilt),
-                    tilt_azim_deg=float(azim),
-                    **(
-                        {"groove_spacing_ang": float(sweep.groove_spacing_ang)}
-                        if sweep.groove_spacing_ang is not None
-                        else {}
-                    ),
-                    beam_uvw=beam_uvw,
-                    surface_hkl=surface_hkl,
-                    mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")
-                    mosaic_mc_fwhm_rad=mosaic_mc_rad,  # exact MC route (None if route="analytic")
-                    mosaic_mc_nodes=sweep.mosaic_nodes,
-                    abs_layers=abs_layers,  # None -> single slab; else film-on-substrate stack
-                    layer_radiators=layer_radiators,  # per-layer coherent radiators (None -> slab)
-                    brem_file=None,
-                    Ne=n_electrons,
-                    Ne_brem=n_electrons_brem,
-                    seed=1000 * i_c + 10 * i_e + 1,
-                    spec_chunk=sweep.spec_chunk,  # GPU rows/matmul (None -> run_case default)
-                    brem_chunk=sweep.brem_chunk,
-                    # used downstream (detector model / unit scaling); ignored by run_case:
-                    dtheta_obs_rad=np.deg2rad(dtheta),
-                    domega_sr=domega,
+            for i_n, (ne_line, ne_brem) in enumerate(ne_pairs):
+                case_name = f"{name} ne={ne_line}/{ne_brem}" if explicit_ne else name
+                cases.append(
+                    dict(
+                        name=case_name,
+                        crystal=cp["crystal"],
+                        composition=cp["composition"],
+                        hkl_list=cp["hkl_list"],
+                        B_ang2=cp["B_ang2"],
+                        E0_keV=float(E0),
+                        thickness_ang=float(thickness),
+                        crystal_width_mm=None if width is None else float(width),
+                        crystal_height_mm=None if height is None else float(height),
+                        beam_fwhm_mm=(
+                            None if sweep.beam_fwhm_mm is None else float(sweep.beam_fwhm_mm)
+                        ),
+                        E_grid=line_case_grid,  # legacy key (== line grid)
+                        E_grid_line=line_case_grid,
+                        E_grid_brem=(
+                            (brem_case_grid[0], float(E0) * 1e3 + brem_case_grid[2], brem_case_grid[2])
+                            if isinstance(brem_case_grid, tuple)
+                            else brem_case_grid
+                        ),
+                        theta_obs_rad=np.deg2rad(sweep.theta_obs_deg),
+                        tilt_deg=float(tilt),
+                        tilt_azim_deg=float(azim),
+                        **(
+                            {"groove_spacing_ang": float(sweep.groove_spacing_ang)}
+                            if sweep.groove_spacing_ang is not None
+                            else {}
+                        ),
+                        beam_uvw=beam_uvw,
+                        surface_hkl=surface_hkl,
+                        mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")
+                        mosaic_mc_fwhm_rad=mosaic_mc_rad,  # exact MC route (None if route="analytic")
+                        mosaic_mc_nodes=sweep.mosaic_nodes,
+                        abs_layers=abs_layers,  # None -> single slab; else film-on-substrate stack
+                        layer_radiators=layer_radiators,  # per-layer coherent radiators (None -> slab)
+                        brem_file=None,
+                        Ne=ne_line,
+                        Ne_brem=ne_brem,
+                        seed=1000 * i_c + 10 * i_e + 1 + 100_000_000 * i_n,
+                        spec_chunk=sweep.spec_chunk,  # GPU rows/matmul (None -> run_case default)
+                        brem_chunk=sweep.brem_chunk,
+                        # used downstream (detector model / unit scaling); ignored by run_case:
+                        dtheta_obs_rad=np.deg2rad(dtheta),
+                        domega_sr=domega,
+                    )
                 )
-            )
     return cases
 
 

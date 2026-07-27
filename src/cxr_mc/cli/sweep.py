@@ -13,10 +13,10 @@ import tomlkit
 from cxr_mc.cli import _completion as _cli_completion
 from cxr_mc.cli import json as cli_json
 from cxr_mc.cli._core import (
-    AZIMUTH_CSV,
-    ENERGY_CSV,
-    THICKNESS_CSV,
-    TILT_CSV,
+    AZIMUTH_CSV_RANGE,
+    ENERGY_CSV_RANGE,
+    THICKNESS_CSV_RANGE,
+    TILT_CSV_RANGE,
     CLIError,
     emit_json_result,
     emit_result,
@@ -187,8 +187,7 @@ def _show_payload(document, material=None):
                 1
                 for candidate in row.get("materials", list(materials))
                 if not any(
-                    key in _profile_overrides(row).get(candidate, {})
-                    for key in _RANGES.values()
+                    key in _profile_overrides(row).get(candidate, {}) for key in _RANGES.values()
                 )
             )
             for name, row in profiles.items()
@@ -201,7 +200,8 @@ def command():
     """Show and edit physical scan parameter-range sweeps.
 
     Operates on catalog ``[profiles.*]`` scan defaults and per-material
-    overrides, not ``SweepProfile`` full/survey reduction policies.
+    overrides, not ``SweepProfile`` full/survey reduction policies. Profile
+    defaults and membership are managed by ``cxr profile``.
     """
 
 
@@ -241,22 +241,37 @@ def show_command(material, json_output):
 
 
 @command.command("set")
-@click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
+@click.argument("material", shell_complete=_cli_completion.complete_material)
 @click.option(
     "--profile",
+    "retired_profile",
     metavar="NAME",
-    help="Edit this default profile; defaults to standard without MATERIAL.",
+    hidden=True,
+    help="Retired; use 'cxr profile set NAME' instead.",
 )
 @click.option(
     "--thickness",
-    type=THICKNESS_CSV,
-    metavar="ANGSTROM,...",
-    help="Crystal thicknesses in angstrom.",
+    type=THICKNESS_CSV_RANGE,
+    metavar="ANGSTROM,... | START:STOP:STEP",
+    help="Crystal thicknesses in angstrom; mixable with start:stop:step ranges.",
 )
-@click.option("--energy", type=ENERGY_CSV, metavar="KEV,...", help="Beam energies in keV.")
-@click.option("--polar", type=TILT_CSV, metavar="DEG,...", help="Polar tilts in degrees [0, 90).")
 @click.option(
-    "--azimuth", type=AZIMUTH_CSV, metavar="DEG,...", help="Azimuth tilts in degrees [0, 360]."
+    "--energy",
+    type=ENERGY_CSV_RANGE,
+    metavar="KEV,... | START:STOP:STEP",
+    help="Beam energies in keV; mixable with start:stop:step ranges.",
+)
+@click.option(
+    "--polar",
+    type=TILT_CSV_RANGE,
+    metavar="DEG,... | START:STOP:STEP",
+    help="Polar tilts in degrees [0, 90); mixable with start:stop:step ranges.",
+)
+@click.option(
+    "--azimuth",
+    type=AZIMUTH_CSV_RANGE,
+    metavar="DEG,... | START:STOP:STEP",
+    help="Azimuth tilts in degrees [0, 360]; mixable with start:stop:step ranges.",
 )
 @click.option(
     "--reset",
@@ -267,14 +282,22 @@ def show_command(material, json_output):
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the overwrite confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def set_command(material, profile, thickness, energy, polar, azimuth, reset_keys, yes, dry_run):
-    """Set default ranges or per-material overrides without touching energy grids.
+def set_command(
+    material, retired_profile, thickness, energy, polar, azimuth, reset_keys, yes, dry_run
+):
+    """Set per-material override ranges without touching energy grids.
 
-    Replacing a value already set on PROFILE or MATERIAL prompts for
-    confirmation unless --yes is given; --dry-run never prompts. Per-material
-    overrides are stored under the material's owning profile's
-    ``overrides`` table (``profiles.standard.overrides.MATERIAL`` in Phase 1).
+    Replacing a value already set on MATERIAL prompts for confirmation unless
+    --yes is given; --dry-run never prompts. Overrides are stored under the
+    material's owning profile's ``overrides`` table
+    (``profiles.standard.overrides.MATERIAL`` in Phase 1). Profile defaults
+    themselves are edited with ``cxr profile set``.
     """
+    if retired_profile is not None:
+        raise click.UsageError(
+            "sweep set --profile is retired; edit profile defaults with "
+            f"'cxr profile set {retired_profile}'"
+        )
     updates = {
         label: value
         for label, value in {
@@ -285,29 +308,19 @@ def set_command(material, profile, thickness, energy, polar, azimuth, reset_keys
         }.items()
         if value is not None
     }
-    if material and profile:
-        raise click.UsageError("--profile and MATERIAL are mutually exclusive")
     if not updates and not reset_keys:
         raise click.UsageError("provide a range option or --reset")
-    if profile and reset_keys:
-        raise click.UsageError("--reset applies only to MATERIAL overrides")
-    target_kind = "materials" if material else "profiles"
-    target_name = material or profile or "standard"
+    target_kind = "materials"
+    target_name = material
     try:
         original, document = _catalog_text()
-        if target_kind == "materials":
-            materials = _material_rows(document)
-            if target_name not in materials:
-                raise ValueError(f"unknown material: {target_name}")
-            profiles = _profile_rows(document)
-            if _DEFAULT_PROFILE not in profiles:
-                raise ValueError(f"catalog is missing required profile: {_DEFAULT_PROFILE}")
-            target = _material_override_table(profiles[_DEFAULT_PROFILE], target_name)
-        else:
-            profiles = _profile_rows(document)
-            if target_name not in profiles:
-                raise ValueError(f"unknown profile: {target_name}")
-            target = profiles[target_name]
+        materials = _material_rows(document)
+        if target_name not in materials:
+            raise ValueError(f"unknown material: {target_name}")
+        profiles = _profile_rows(document)
+        if _DEFAULT_PROFILE not in profiles:
+            raise ValueError(f"catalog is missing required profile: {_DEFAULT_PROFILE}")
+        target = _material_override_table(profiles[_DEFAULT_PROFILE], target_name)
         overwriting = [label for label in updates if _RANGES[label] in target]
     except (OSError, ValueError, tomlkit.exceptions.ParseError) as exc:
         raise CLIError(str(exc)) from None

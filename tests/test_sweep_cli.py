@@ -138,16 +138,54 @@ E_grid_brem = { arange = { start = 0.0, stop = 1000.0, step = 10.0 } }
     assert "E_grid_brem" in text
 
 
-def test_set_rejects_profile_material_and_empty_updates():
-    conflict = invoke(
-        sweep.command, ["set", "hopg", "--profile", "standard", "--thickness", "1000"]
-    )
-    empty = invoke(sweep.command, ["set"])
+def test_set_retired_profile_option_points_to_cxr_profile():
+    retired = invoke(sweep.command, ["set", "hopg", "--profile", "standard", "--thickness", "1000"])
+    missing = invoke(sweep.command, ["set"])
+    empty = invoke(sweep.command, ["set", "hopg"])
 
-    assert conflict.exit_code == 2
-    assert "mutually exclusive" in conflict.stderr
+    assert retired.exit_code == 2
+    assert "sweep set --profile is retired" in retired.stderr
+    assert "cxr profile set standard" in retired.stderr
+    assert missing.exit_code == 2
+    assert "Missing argument 'MATERIAL'" in missing.stderr
     assert empty.exit_code == 2
     assert "provide a range option or --reset" in empty.stderr
+
+
+def test_set_accepts_stop_inclusive_range_syntax(monkeypatch, tmp_path):
+    catalog = tmp_path / "materials.toml"
+    catalog.write_text(
+        """[profiles.standard]
+thickness_ang = { values = [1000.0] }
+energy_keV = { values = [30.0] }
+tilt_deg = { values = [5.0] }
+tilt_azim_deg = { values = [95.0] }
+
+[materials.hopg]
+"""
+    )
+    monkeypatch.setattr(sweep, "_MATERIALS_TOML", catalog)
+    monkeypatch.setattr(sweep, "_validate", lambda *_args: None)
+
+    result = invoke(sweep.command, ["set", "hopg", "--energy", "30,50:100:25"])
+
+    assert_clean_result(result, stdout="updated materials.hopg\n")
+    assert "energy_keV = {values = [30.0, 50.0, 75.0, 100.0]}" in catalog.read_text()
+
+
+def test_set_rejects_degenerate_range_syntax(monkeypatch, tmp_path):
+    monkeypatch.setattr(sweep, "_MATERIALS_TOML", tmp_path / "materials.toml")
+
+    bad_step = invoke(sweep.command, ["set", "hopg", "--energy", "30:100:0"])
+    backwards = invoke(sweep.command, ["set", "hopg", "--energy", "100:30:10"])
+    malformed = invoke(sweep.command, ["set", "hopg", "--energy", "30:100"])
+
+    assert bad_step.exit_code == 2
+    assert "step must be nonzero" in bad_step.stderr
+    assert backwards.exit_code == 2
+    assert "step does not approach stop" in backwards.stderr
+    assert malformed.exit_code == 2
+    assert "must be start:stop:step" in malformed.stderr
 
 
 def _catalog_with_existing_thickness_override(tmp_path):
