@@ -74,6 +74,25 @@ def _material_keys() -> tuple[str, ...]:
     return tuple(key for key in materials if _SAFE_TOKEN_RE.fullmatch(key))
 
 
+@lru_cache(maxsize=1)
+def _profile_keys() -> tuple[str, ...]:
+    """Read catalog ``[profiles.*]`` keys without scientific imports."""
+    try:
+        with (DATA_DIR / "materials.toml").open("rb") as source:
+            profiles = tomllib.load(source).get("profiles", {})
+    except (OSError, tomllib.TOMLDecodeError):
+        return ()
+    if not isinstance(profiles, dict):
+        return ()
+    return tuple(key for key in profiles if _SAFE_TOKEN_RE.fullmatch(key))
+
+
+def complete_profile(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
+    """Complete one catalog ``[profiles.*]`` name."""
+    del ctx, param
+    return _items(_profile_keys(), incomplete)
+
+
 def complete_material(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
     """Complete one offline material-catalog key."""
     del ctx, param
@@ -270,4 +289,5 @@ __all__ = [
     "complete_job_id",
     "complete_material",
     "complete_material_csv",
+    "complete_profile",
 ]

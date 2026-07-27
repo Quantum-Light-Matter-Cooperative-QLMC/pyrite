@@ -231,6 +231,35 @@ def _floats(text):
     return [float(item) for item in text.split(",")] if text else None
 
 
+def _expand_range(token, label, param, ctx, fail):
+    """Expand one ``start:stop:step`` token; stop is an inclusive bound.
+
+    Values land on ``start + i*step`` while staying on the way to ``stop``
+    (MATLAB colon semantics): ``50:100:25`` gives 50, 75, 100; ``30:100:25``
+    gives 30, 55, 80 because 100 is not hit exactly.
+    """
+    parts = token.split(":")
+    if len(parts) != 3:
+        fail(f"{label} range {token!r} must be start:stop:step", param, ctx)
+    try:
+        start, stop, step = (float(part) for part in parts)
+    except ValueError:
+        fail(f"{label} range {token!r} must be numeric start:stop:step", param, ctx)
+    if not all(math.isfinite(item) for item in (start, stop, step)):
+        fail(f"{label} range {token!r} values must be finite", param, ctx)
+    if step == 0:
+        fail(f"{label} range {token!r} step must be nonzero", param, ctx)
+    span = stop - start
+    if span == 0:
+        return [start]
+    if span * step < 0:
+        fail(f"{label} range {token!r} step does not approach stop", param, ctx)
+    count = int(math.floor(span / step + 1e-9))
+    if count + 1 > 100000:
+        fail(f"{label} range {token!r} expands to more than 100000 values", param, ctx)
+    return [round(start + i * step, 9) for i in range(count + 1)]
+
+
 class _CSV(click.ParamType):
     """Comma-separated finite floats with an optional numeric domain."""
 
@@ -245,6 +274,7 @@ class _CSV(click.ParamType):
         upper=None,
         upper_inclusive=True,
         preserve_text=False,
+        ranges=False,
     ):
         self.label = label
         self.lower = lower
@@ -252,12 +282,24 @@ class _CSV(click.ParamType):
         self.upper = upper
         self.upper_inclusive = upper_inclusive
         self.preserve_text = preserve_text
+        self.ranges = ranges
 
     def convert(self, value, param, ctx):
-        try:
-            values = _floats(value)
-        except (TypeError, ValueError):
-            self.fail(f"{self.label} must be comma-separated numbers", param, ctx)
+        if self.ranges and value and ":" in value:
+            values = []
+            for token in value.split(","):
+                if ":" in token:
+                    values.extend(_expand_range(token, self.label, param, ctx, self.fail))
+                else:
+                    try:
+                        values.append(float(token))
+                    except (TypeError, ValueError):
+                        self.fail(f"{self.label} must be comma-separated numbers", param, ctx)
+        else:
+            try:
+                values = _floats(value)
+            except (TypeError, ValueError):
+                self.fail(f"{self.label} must be comma-separated numbers", param, ctx)
         if not values:
             self.fail(f"{self.label} requires at least one value", param, ctx)
         for item in values:
@@ -291,6 +333,27 @@ NONNEGATIVE_FLOAT = FiniteRange(integer=False, minimum=0.0, minimum_open=False)
 FINITE_FLOAT = FiniteFloat()
 BEAM_UVW = BeamUVW()
 
+
+class _IntCSV(click.ParamType):
+    """Comma-separated positive integers (e.g. electron-count grids)."""
+
+    name = "counts"
+
+    def __init__(self, label):
+        self.label = label
+
+    def convert(self, value, param, ctx):
+        try:
+            counts = [int(token) for token in str(value).split(",")]
+        except (TypeError, ValueError):
+            self.fail(f"{self.label} must be comma-separated positive integers", param, ctx)
+        if not counts or any(count <= 0 for count in counts):
+            self.fail(f"{self.label} must be comma-separated positive integers", param, ctx)
+        return counts
+
+
+COUNT_CSV = _IntCSV("counts")
+
 # Shared geometry CSV param types. ``_TEXT`` variants preserve the raw string for
 # argv relaying (``energy-grid derive``/``submit``); the plain variants return the
 # parsed float list for direct catalog writes (``sweep set``, ``energy-grid defaults``).
@@ -302,6 +365,15 @@ TILT_CSV = _CSV("tilt", lower=0, upper=90, upper_inclusive=False)
 TILT_CSV_TEXT = _CSV("tilt", lower=0, upper=90, upper_inclusive=False, preserve_text=True)
 AZIMUTH_CSV = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True)
 AZIMUTH_CSV_TEXT = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True, preserve_text=True)
+
+# Range-capable variants for direct catalog writes (``sweep set``, ``cxr
+# profile``): additionally accept ``start:stop:step`` tokens (stop-inclusive
+# bound), mixable with plain CSV values. The ``_TEXT`` relay variants stay
+# colon-free because they forward argv to legacy argparse handlers.
+ENERGY_CSV_RANGE = _CSV("energy", lower=0, lower_open=True, ranges=True)
+THICKNESS_CSV_RANGE = _CSV("thickness", lower=0, lower_open=True, ranges=True)
+TILT_CSV_RANGE = _CSV("tilt", lower=0, upper=90, upper_inclusive=False, ranges=True)
+AZIMUTH_CSV_RANGE = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True, ranges=True)
 
 
 def json_option(function):
