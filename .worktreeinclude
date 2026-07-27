@@ -1,5 +1,2 @@
-CC-Session-Logs/
-.codex/AGENTS.md
-.codex/environments/
 .vscode/settings.json
-.serena/
+.env
