@@ -200,6 +200,13 @@ def dataset_identity(
             ),
         },
     }
+    # Hash compatibility: the P2.4 electron-count sweep grids join the payload
+    # only when actually set, so pre-existing runs keep their historical
+    # parameter_sha256 (and therefore their checkpoint identity) bit-for-bit.
+    sweep_payload = resolved["sweep"]
+    for key in ("n_electrons", "n_electrons_brem"):
+        if sweep_payload.get(key) is None:
+            sweep_payload.pop(key, None)
     encoded = json.dumps(resolved, sort_keys=True, separators=(",", ":")).encode()
     return {
         "schema": DATASET_IDENTITY_SCHEMA,

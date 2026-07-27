@@ -43,6 +43,8 @@ _SCAN_KEYS = (
     "tilt_azim_deg",
     "E_grid_line",
     "E_grid_brem",
+    "n_electrons",
+    "n_electrons_brem",
 )
 
 
@@ -136,6 +138,11 @@ class ScanSpec:
     E_grid_line_by_energy: LineGridByEnergy | None
     E_grid_brem: np.ndarray
     thickness_layers: np.ndarray | None = None
+    #: Optional electron-count grids (profile settings): None -> the runner's
+    #: settings-level counts (fidelity policy) apply. Single values typical;
+    #: multiple values sweep transport statistics (see ``Sweep.n_electrons``).
+    n_electrons: np.ndarray | None = None
+    n_electrons_brem: np.ndarray | None = None
 
 
 @dataclass(frozen=True)
@@ -573,6 +580,15 @@ def _scan(
         grid = grids.get(key)
         if grid is not None and not _validate_angle_grid(key, grid, f"{path}.{key}", errors):
             grids[key] = None
+    electron_grids: dict[str, np.ndarray | None] = {}
+    for key in ("n_electrons", "n_electrons_brem"):
+        grid = None
+        if key in values:
+            grid = _grid(values[key], f"{path}.{key}", errors)
+            if grid is not None and (np.any(grid <= 0) or np.any(grid != np.floor(grid))):
+                errors.add(f"{path}.{key}", "values must be positive integers")
+                grid = None
+        electron_grids[key] = grid
     ordinary_required = ("energy_keV", "tilt_deg", "tilt_azim_deg", "E_grid_brem")
     line_valid = grids["E_grid_line"] is not None or line_grids is not None
     if (
@@ -598,6 +614,8 @@ def _scan(
         E_grid_line=grids["E_grid_line"],
         E_grid_line_by_energy=line_grids,
         E_grid_brem=E_grid_brem,
+        n_electrons=electron_grids["n_electrons"],
+        n_electrons_brem=electron_grids["n_electrons_brem"],
     )
 
 

@@ -113,6 +113,8 @@ def material_sweep(
         E_grid_line=scan.E_grid_line,
         E_grid_line_by_energy=scan.E_grid_line_by_energy,
         E_grid_brem=scan.E_grid_brem,
+        n_electrons=scan.n_electrons,
+        n_electrons_brem=scan.n_electrons_brem,
         substrate=spec.substrate,
         stack=spec.stack or None,
     )
