@@ -82,11 +82,11 @@ def _adaptive_chunk(nbins):
     return max(1000, min(adaptive_chunk_size, 100_000))
 
 
-# A2 (docs/acceleration-technique-evaluation.md): stretch the CuPy memory-pool
-# free cadence. free_all_blocks() forces a device sync + full realloc, so paying
-# it once per case is the conservative default; the spike frees less often and
-# leans on a reserved-pool watermark to stay bounded. Read once at import; the
-# GPU free path is driver-process only (workers run transport), so no locking.
+# Stretch the CuPy memory-pool free cadence. free_all_blocks() forces a device
+# sync + full realloc, so paying it once per case is the conservative default;
+# the spike frees less often and leans on a reserved-pool watermark to stay
+# bounded. Read once at import; the GPU free path is driver-process only
+# (workers run transport), so no locking.
 _FREE_EVERY = _env_chunk("CXR_MC_FREE_EVERY", 1)  # free the pool every N GPU cases (1 = per-case)
 # Per-worker host-RAM budget [MB] for the full-case CPU pool. Default is the
 # measured footprint from the 2026-07-18 OOM'd coarse run on qlmc: the killed
@@ -97,6 +97,16 @@ _FREE_WATERMARK_MB = _env_chunk(
 )  # ...or when reserved pool exceeds this; 0 = off
 _cases_since_free = 0  # GPU cases since the last free (module-global: single driver process)
 _pool_peak_bytes = 0  # high-water reserved pool size, for the A2 operational watermark check
+
+# Cap the CuPy default pool so an over-budget alloc raises a *catchable*
+# OutOfMemoryError before the driver hard-OOMs the process. Fraction of total
+# VRAM; <=0 disables the cap (no-op, original unbounded behaviour).
+_GPU_POOL_FRAC = float(os.environ.get("CXR_MC_GPU_POOL_FRAC", "0.85"))
+# How many times a single GPU case may halve its chunk and retry on OOM.
+_GPU_OOM_RETRIES = _env_chunk("CXR_MC_GPU_OOM_RETRIES", 3)
+# Catchable OOM type, empty tuple on a CPU box so `except _GPU_OOM` never fires
+_GPU_OOM = (cp.cuda.memory.OutOfMemoryError,) if cp is not None else ()
+_pool_limit_set = False
 
 
 def _should_free(cases_since, every, reserved_bytes, watermark_mb):
@@ -131,6 +141,20 @@ def _maybe_free_pool():
     if _should_free(_cases_since_free, _FREE_EVERY, reserved, _FREE_WATERMARK_MB):
         pool.free_all_blocks()
         _cases_since_free = 0
+
+
+def _ensure_pool_limit():
+    """Set the CuPy pool fraction cap once per driver process.
+
+    No-op on a CPU box or when cap is disabled (`_GPU_POOL_FRAC <= 0`).
+    Idempotent: safe to call on every case; the module flag means the actual
+    `set_limit` runs once. Makes an over-budget alloc raise a catchable
+    OutOfMemoryError before the driver's own hard-OOM."""
+    global _pool_limit_set
+    if _pool_limit_set or not _GPU or cp is None or _GPU_POOL_FRAC <= 0:
+        return
+    cp.get_default_memory_pool().set_limit(fraction=_GPU_POOL_FRAC)
+    _pool_limit_set = True
 
 
 class _TimingAgg:
@@ -536,6 +560,33 @@ def _lines_for_case(case, E_grid):
     return _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove)
 
 
+def _halve_case_chunks(case, tp):
+    """Halve this case's effective spec/brem chunk in place (retry)."""
+    spec_cur = case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(tp["E_grid"].size)
+    brem_cur = case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(tp["E_brem"].size)
+    case["spec_chunk"] = max(1000, spec_cur // 2)
+    case["brem_chunk"] = max(1000, brem_cur // 2)
+
+
+def _spectrum_case_retry(case, tp, max_retries=_GPU_OOM_RETRIES):
+    """Run the GPU phase, retrying on OOM with progressively halved chunks.
+
+    On a catchable OutOfMemoryError: free every pool block, halve the chunks on
+    a COPY of the case (the original stays pristine for run_sweeps's checkpoint /
+    a later reline), and retry. Re-raises after `max_retires` exhausted."""
+    work = case
+    for attempt in range(max_retries + 1):
+        try:
+            return _spectrum_case(work, tp)
+        except _GPU_OOM:
+            if attempt == max_retries:
+                raise
+            if cp is not None:
+                cp.get_default_memory_pool().free_all_blocks()
+            work = dict(case)
+            _halve_case_chunks(work, tp)
+
+
 def _spectrum_case(case, tp):
     """GPU phase of run_case: line spectrum + brem from the already-transported
     segments ``tp`` (from _transport_case). Runs in the main process, so only one
@@ -825,6 +876,7 @@ def run_cases(
         nw = _gpu_pipeline_workers(max_workers, n)
         if nw < 2:
             return _serial()
+        _ensure_pool_limit()
         _single_thread_blas()
         from concurrent.futures import ProcessPoolExecutor
 
@@ -844,7 +896,7 @@ def run_cases(
                 j = i + prefetch
                 if j < n and not stopped:
                     inflight[j] = ex.submit(_transport_case, cases[j])
-                out = _spectrum_case(cases[i], tp)  # GPU, THIS process only
+                out = _spectrum_case_retry(cases[i], tp)  # GPU, THIS process only
                 if timing is not None:
                     timing.collect(out)
                 results[i] = out
