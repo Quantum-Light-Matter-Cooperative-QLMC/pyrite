@@ -78,8 +78,3 @@ Authoritative plan with decisions and full subitem→phase mapping:
 3. Run-time `cxr scan --all --profile NAME` flag; never writes catalog; no
    hidden session state (en-masse transient swap mostly dissolves under
    inverted schema).
-
-## Dropped
-
-- Rename `[profiles.*]` → `[scan_defaults.*]` (former P3.1 on main):
-  superseded by fidelity rename — catalog keeps the word "profile".
