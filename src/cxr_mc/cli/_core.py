@@ -363,8 +363,8 @@ THICKNESS_CSV = _CSV("thickness", lower=0, lower_open=True)
 THICKNESS_CSV_TEXT = _CSV("thickness", lower=0, lower_open=True, preserve_text=True)
 TILT_CSV = _CSV("tilt", lower=0, upper=90, upper_inclusive=False)
 TILT_CSV_TEXT = _CSV("tilt", lower=0, upper=90, upper_inclusive=False, preserve_text=True)
-AZIMUTH_CSV = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True)
-AZIMUTH_CSV_TEXT = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True, preserve_text=True)
+AZIMUTH_CSV = _CSV("azimuth", lower=90, upper=270, lower_open=True, upper_inclusive=False)
+AZIMUTH_CSV_TEXT = _CSV("azimuth", lower=90, upper=270, lower_open=True, upper_inclusive=False, preserve_text=True)
 
 # Range-capable variants for direct catalog writes (``sweep set``, ``cxr
 # profile``): additionally accept ``start:stop:step`` tokens (stop-inclusive
@@ -373,7 +373,7 @@ AZIMUTH_CSV_TEXT = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True, pre
 ENERGY_CSV_RANGE = _CSV("energy", lower=0, lower_open=True, ranges=True)
 THICKNESS_CSV_RANGE = _CSV("thickness", lower=0, lower_open=True, ranges=True)
 TILT_CSV_RANGE = _CSV("tilt", lower=0, upper=90, upper_inclusive=False, ranges=True)
-AZIMUTH_CSV_RANGE = _CSV("azimuth", lower=0, upper=360, upper_inclusive=True, ranges=True)
+AZIMUTH_CSV_RANGE = _CSV("azimuth", lower=90, upper=270, lower_open=True, upper_inclusive=False, ranges=True)
 
 
 def json_option(function):
