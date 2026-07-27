@@ -229,9 +229,14 @@ def show_command(material, json_output):
     multiple=True,
     help="Remove one override; repeat, or use --reset all.",
 )
+@click.option("-y", "--yes", "yes", is_flag=True, help="Skip the overwrite confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def set_command(material, profile, thickness, energy, polar, azimuth, reset_keys, dry_run):
-    """Set default ranges or per-material overrides without touching energy grids."""
+def set_command(material, profile, thickness, energy, polar, azimuth, reset_keys, yes, dry_run):
+    """Set default ranges or per-material overrides without touching energy grids.
+
+    Replacing a value already set on PROFILE or MATERIAL prompts for
+    confirmation unless --yes is given; --dry-run never prompts.
+    """
     updates = {
         label: value
         for label, value in {
@@ -256,6 +261,16 @@ def set_command(material, profile, thickness, energy, polar, azimuth, reset_keys
         if target_name not in table:
             raise ValueError(f"unknown {target_kind[:-1]}: {target_name}")
         target = table[target_name]
+        overwriting = [label for label in updates if _RANGES[label] in target]
+    except (OSError, ValueError, tomlkit.exceptions.ParseError) as exc:
+        raise CLIError(str(exc)) from None
+    if overwriting and not yes and not dry_run:
+        click.confirm(
+            f"overwrite {', '.join(overwriting)} for {target_kind}.{target_name}?",
+            err=True,
+            abort=True,
+        )
+    try:
         for label, values in updates.items():
             target[_RANGES[label]] = _values_item(values)
         reset = set(reset_keys)

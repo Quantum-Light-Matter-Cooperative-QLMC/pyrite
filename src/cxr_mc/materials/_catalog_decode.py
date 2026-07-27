@@ -155,7 +155,17 @@ def _line_grids_by_energy(
     energy_grid: np.ndarray | None,
     path: str,
     errors: _Errors,
+    *,
+    fallback_energies: frozenset[float] = frozenset(),
 ) -> LineGridByEnergy | None:
+    """Decode a per-energy line-grid table, checking it covers ``energy_grid``.
+
+    ``fallback_energies`` is the P0.3 interim fix (subitem 5,
+    docs/cli-energy-grid-sweep-rework-plan.md): a beam energy missing a local
+    line-grid row is not an error if it's already covered there (typically the
+    ``standard`` source profile's own rows). The structural fix -- a shared
+    per-material derived-grid store profiles merely reference -- is Phase 1.
+    """
     if not isinstance(value, list) or not value:
         errors.add(path, "must be a nonempty array of line-grid entries")
         return None
@@ -186,7 +196,7 @@ def _line_grids_by_energy(
     if energy_grid is not None:
         configured = set(float(value) for value in energy_grid)
         mapped = set(parsed)
-        missing = sorted(configured - mapped)
+        missing = sorted(configured - mapped - fallback_energies)
         extra = sorted(mapped - configured)
         if missing:
             errors.add(path, f"missing beam energies {missing}")

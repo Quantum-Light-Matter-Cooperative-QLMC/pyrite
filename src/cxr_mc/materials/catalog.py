@@ -493,11 +493,35 @@ def _validate_angle_grid(name: str, grid: np.ndarray, path: str, errors: _Errors
     return True
 
 
+def _line_energy_set(row: object) -> frozenset[float]:
+    """Beam energies with a configured line-grid row in a raw profile record.
+
+    P0.3 interim fix input (docs/cli-energy-grid-sweep-rework-plan.md decision
+    4, subitem 5): used as the ``standard`` source profile's fallback so
+    editing another profile's ``energy_keV`` doesn't require it to also carry
+    a local ``E_grid_line_by_energy`` row already derived under ``standard``.
+    """
+    if not isinstance(row, Mapping):
+        return frozenset()
+    entries = row.get("E_grid_line_by_energy")
+    if not isinstance(entries, list):
+        return frozenset()
+    energies: set[float] = set()
+    for item in entries:
+        if isinstance(item, Mapping):
+            value = _number(item.get("energy_keV"))
+            if value is not None and value > 0:
+                energies.add(value)
+    return frozenset(energies)
+
+
 def _scan(
     values: Mapping[str, object],
     path: str,
     crystal: CrystalSpec | None,
     errors: _Errors,
+    *,
+    fallback_line_energies: frozenset[float] = frozenset(),
 ) -> ScanSpec | None:
     has_ang = "thickness_ang" in values
     has_layers = "thickness_layers" in values
@@ -525,6 +549,7 @@ def _scan(
             grids.get("energy_keV"),
             f"{path}.E_grid_line_by_energy",
             errors,
+            fallback_energies=fallback_line_energies,
         )
     thickness = None
     layer_grid = None
@@ -592,6 +617,9 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
     table = _table(raw, "profiles", errors)
     if table is None:
         return {}
+    # P0.3 interim fix (subitem 5): consult the standard/source profile's own
+    # derived line-grid rows before erroring on another profile's missing row.
+    standard_line_energies = _line_energy_set(table.get("standard"))
     out = {}
     for key, value in table.items():
         path = f"profiles.{key}"
@@ -625,6 +653,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 parsed_grids.get("energy_keV"),
                 f"{path}.E_grid_line_by_energy",
                 errors,
+                fallback_energies=standard_line_energies,
             )
         out[key] = row
     return out
@@ -689,6 +718,11 @@ def _parse_materials(
     if table is None:
         return {}
     out: dict[str, MaterialSpec] = {}
+    # P0.3 interim fix (subitem 5): same standard-profile fallback as
+    # _parse_profiles, so a material inheriting a non-standard profile's
+    # energy_keV doesn't re-trip the missing-line-grid-row check that profile
+    # validation already let through.
+    standard_line_energies = _line_energy_set(profiles.get("standard", {}))
     allowed = {"label", "profile", "crystal", "substrate", "stack", *_SCAN_KEYS}
     for key, value in table.items():
         path = f"materials.{key}"
@@ -717,7 +751,13 @@ def _parse_materials(
         elif "E_grid_line_by_energy" in row:
             values.pop("E_grid_line", None)
         values.update({name: row[name] for name in _SCAN_KEYS if name in row})
-        scan = _scan(values, f"{path}.scan", crystals.get(str(crystal_key)), errors)
+        scan = _scan(
+            values,
+            f"{path}.scan",
+            crystals.get(str(crystal_key)),
+            errors,
+            fallback_line_energies=standard_line_energies,
+        )
         substrate = row.get("substrate")
         if substrate is not None and (
             not isinstance(substrate, str) or substrate not in crystals and substrate not in media

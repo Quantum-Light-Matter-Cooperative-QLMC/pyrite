@@ -8,8 +8,8 @@ import click
 from click.testing import CliRunner, Result
 
 
-def invoke(command: click.Command, argv: Sequence[str] = ()) -> Result:
-    return CliRunner().invoke(command, list(argv), catch_exceptions=False)
+def invoke(command: click.Command, argv: Sequence[str] = (), *, input: str | None = None) -> Result:
+    return CliRunner().invoke(command, list(argv), input=input, catch_exceptions=False)
 
 
 def assert_clean_result(

@@ -1098,6 +1098,9 @@ Usage: cxr sweep set [OPTIONS] [MATERIAL]
 
   Set default ranges or per-material overrides without touching energy grids.
 
+  Replacing a value already set on PROFILE or MATERIAL prompts for confirmation unless
+  --yes is given; --dry-run never prompts.
+
 Options:
   --profile NAME                  Edit this default profile; defaults to standard
                                   without MATERIAL.
@@ -1107,6 +1110,7 @@ Options:
   --azimuth DEG,...               Azimuth tilts in degrees [0, 360].
   --reset [thickness|energy|polar|azimuth|all]
                                   Remove one override; repeat, or use --reset all.
+  -y, --yes                       Skip the overwrite confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
 ```

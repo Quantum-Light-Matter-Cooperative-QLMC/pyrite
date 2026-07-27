@@ -2336,6 +2336,7 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
 
     monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
     monkeypatch.setattr(transport, "_ssh_download", fake_download)
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "")  # no survey siblings
 
     remote.pull(["hopg"], grid=True, level9=True, no_sync=True)
 
@@ -2353,6 +2354,133 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
     assert destination == tmp_path / "checkpoints" / ".hopg.incoming.pkl"
     syntax = subprocess.run(["bash", "-n", "-c", transfer_command], capture_output=True, text=True)
     assert syntax.returncode == 0, syntax.stderr
+
+
+# ---- pull resolves identity-qualified survey checkpoints for a bare material ----
+def test_resolve_survey_stems_discovers_matching_survey_dir(monkeypatch, capsys):
+    from cxr_mc.profiles import named_profile_stem
+
+    survey_stem = named_profile_stem("hopg", "survey")
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: f"{survey_stem}\nhopg\nunrelated--full-{'b' * 12}\n",
+    )
+
+    resolved = lifecycle._resolve_survey_stems(["hopg"])
+
+    assert resolved == ["hopg", survey_stem]
+    assert "survey checkpoint" in capsys.readouterr().out
+
+
+def test_resolve_survey_stems_ignores_other_materials_and_profiles(monkeypatch):
+    other_material_survey = f"wse2--survey-{'c' * 12}"
+    same_material_full_variant = f"hopg--full-{'d' * 12}"
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: f"{other_material_survey}\n{same_material_full_variant}\n",
+    )
+
+    assert lifecycle._resolve_survey_stems(["hopg"]) == ["hopg"]
+
+
+def test_resolve_survey_stems_does_not_duplicate_an_explicitly_requested_stem(monkeypatch):
+    from cxr_mc.profiles import named_profile_stem
+
+    survey_stem = named_profile_stem("hopg", "survey")
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: f"{survey_stem}\n")
+
+    assert lifecycle._resolve_survey_stems(["hopg", survey_stem]) == ["hopg", survey_stem]
+
+
+def test_resolve_survey_stems_skips_quick_and_already_qualified_stems(monkeypatch):
+    monkeypatch.setattr(
+        transport, "_ssh_capture", lambda *_a: pytest.fail("must not list checkpoints/")
+    )
+
+    assert lifecycle._resolve_survey_stems(["hopg_quick"]) == ["hopg_quick"]
+    qualified = f"hopg--survey-{'a' * 12}"
+    assert lifecycle._resolve_survey_stems([qualified]) == [qualified]
+
+
+def test_pull_bare_material_also_pulls_matching_survey_checkpoint(monkeypatch, tmp_path, capsys):
+    import numpy as np
+
+    from cxr_mc import _checkpoint_io, _checkpoint_store
+    from cxr_mc.profiles import named_profile_stem
+
+    survey_stem = named_profile_stem("hopg", "survey")
+    payload = {
+        "cfg": {
+            30.0: {
+                "case": {"crystal": "hopg", "Ne_brem": 10},
+                "E_grid": np.array([1.0, 2.0]),
+                "spec": np.array([3.0, 4.0]),
+                "E_grid_brem": np.array([1.0, 2.0]),
+                "brem_wide": np.array([5.0, 6.0]),
+                "brem": np.array([5.0, 6.0]),
+            }
+        }
+    }
+    transfer = tmp_path / "transfer.pkl"
+    _checkpoint_io.dump(payload, str(transfer))
+
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: f"{survey_stem}\n")
+    transfers = []
+
+    def fake_download(command, destination):
+        transfers.append((command, destination))
+        shutil.copyfile(transfer, destination)
+
+    monkeypatch.setattr(transport, "_ssh_download", fake_download)
+
+    remote.pull(["hopg"], grid=True, no_sync=True)
+
+    assert len(transfers) == 2  # canonical stem + discovered survey variant
+    assert _checkpoint_store.checkpoint_exists("hopg", tmp_path / "checkpoints")
+    assert _checkpoint_store.checkpoint_exists(survey_stem, tmp_path / "checkpoints")
+    assert "also pulling identity-qualified survey checkpoint" in capsys.readouterr().out
+
+
+def test_pull_quick_stem_does_not_resolve_survey_siblings(monkeypatch, tmp_path):
+    import numpy as np
+
+    from cxr_mc import _checkpoint_io
+
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda *_a: pytest.fail("--quick pull must not list checkpoints/"),
+    )
+    payload = {"cfg": {30.0: {"case": {}, "E_grid": np.array([1.0]), "spec": np.array([1.0])}}}
+    transfer = tmp_path / "transfer.pkl"
+    _checkpoint_io.dump(payload, str(transfer))
+
+    def fake_download(_command, destination):
+        shutil.copyfile(transfer, destination)
+
+    monkeypatch.setattr(transport, "_ssh_download", fake_download)
+
+    remote.pull(["hopg_quick"], grid=False, no_sync=True)  # must not raise
+
+
+def test_pull_dataset_merge_skips_survey_discovery(monkeypatch, tmp_path):
+    def _boom(*_a, **_kw):
+        raise RuntimeError("stub -- dataset merge test does not need a real download")
+
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda *_a: pytest.fail("--brem-only pull must not list checkpoints/"),
+    )
+    monkeypatch.setattr(transport, "_ssh_download", _boom)
+
+    with pytest.raises(SystemExit, match="remote pull failed"):
+        lifecycle.pull(["hopg"], dataset="brem", no_sync=True)
 
 
 def test_remote_start_all_uses_toml_manifest(monkeypatch, tmp_path):

@@ -36,6 +36,16 @@ def _stems(materials, quick, profile="full", high_energy_min_kev=None):
     return stems
 
 
+def _list_checkpoint_dirs_command() -> str:
+    """Remote command: list immediate ``checkpoints/`` subdirectory names, one
+    per line. Used to discover identity-qualified variant checkpoints (for
+    example ``<material>--survey-<hash>/``) that a bare material name alone
+    cannot address, since their on-disk name carries a parameter digest a
+    caller cannot predict without recomputing the identity."""
+    ckpt = config.shell_arg(config.remote_path("checkpoints"))
+    return f"[ -d {ckpt} ] || exit 0; find {ckpt} -mindepth 1 -maxdepth 1 -type d -printf '%f\\n'"
+
+
 def _new_jobid() -> str:
     """Return a collision-resistant, shell-safe local job directory name."""
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")

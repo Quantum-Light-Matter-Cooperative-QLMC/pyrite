@@ -759,6 +759,40 @@ def reap_reservations(min_age_minutes=5.0, yes=False):
     print(f"reaped {len(orphans)} orphaned job(s)")
 
 
+def _resolve_survey_stems(stems):
+    """Expand bare canonical-material stems to also include any matching
+    identity-qualified survey checkpoint directories on the box
+    (``<material>--survey-<hash>/``), so ``cxr remote pull <material>`` finds
+    a survey checkpoint without the caller needing to know its hash suffix.
+
+    On-disk names stay hash-based -- this only discovers them, via one remote
+    listing of ``checkpoints/``, matched against the existing
+    ``profiles._VARIANT_STEM_RE``. Already-qualified stems (a stem that
+    already fullmatches that regex) and ``_quick`` stems pass through
+    unexpanded: a stem that already names an exact variant, or a quick smoke
+    checkpoint, never has a survey sibling worth auto-discovering."""
+    from ..profiles import _VARIANT_STEM_RE
+
+    bare = {
+        stem
+        for stem in stems
+        if not stem.endswith("_quick") and _VARIANT_STEM_RE.fullmatch(stem) is None
+    }
+    if not bare:
+        return list(stems)
+    names = transport._ssh_capture(scripts._list_checkpoint_dirs_command()).split()
+    resolved = list(stems)
+    for name in sorted(names):
+        match = _VARIANT_STEM_RE.fullmatch(name)
+        if match is None or match["profile"] != "survey" or match["material"] not in bare:
+            continue
+        if name in resolved:
+            continue
+        resolved.append(name)
+        print(f"also pulling identity-qualified survey checkpoint -> checkpoints/{name}/")
+    return resolved
+
+
 def pull(
     stems,
     grid=False,
@@ -772,6 +806,12 @@ def pull(
 ):
     """Fetch checkpoints/<stem>.pkl back from the box for each stem (stem =
     material, or material_quick for a --quick run).
+
+    A bare material stem also picks up any identity-qualified survey
+    checkpoint the box holds for it (``<material>--survey-<hash>/``, see
+    :func:`_resolve_survey_stems`) -- skipped for a ``dataset`` merge pull
+    (``--brem-only``/``--line-only``), since those require an existing local
+    checkpoint to merge into and a freshly discovered stem would not have one.
 
     With ``grid`` and/or ``level9``, prep on the box BEFORE the transfer via
     ``cxr slim``: ``grid`` filters to just the material's current grid (plus the
@@ -788,6 +828,9 @@ def pull(
     if not stems:
         raise ValueError("stems must contain at least one checkpoint stem")
     transport._check_shell_tokens(stems)
+    if dataset is None:
+        stems = _resolve_survey_stems(stems)
+        transport._check_shell_tokens(stems)
     dest = config.LOCAL_ROOT / "checkpoints"
     dest.mkdir(exist_ok=True)
     use_slim = True  # component directories are projected to one transfer pickle

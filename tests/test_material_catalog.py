@@ -172,6 +172,84 @@ def test_per_beam_line_grid_duplicate_is_reported_after_invalid_grid(tmp_path):
     )
 
 
+def _catalog_with_two_profiles(
+    *, custom_line_entries: str, standard_line_entries: str = PER_BEAM_ENTRIES
+) -> str:
+    """Two profiles sharing energy_keV = [25.0, 30.0]; ``standard`` is the
+    line-grid source profile the P0.3 interim fallback (subitem 5,
+    docs/cli-energy-grid-sweep-rework-plan.md) consults."""
+    return f"""
+schema_version = 1
+[profiles.standard]
+thickness_ang = {{ logspace = {{ start = 2.0, stop = 3.0, num = 2 }} }}
+energy_keV = {{ values = [25.0, 30.0] }}
+tilt_deg = {{ linspace = {{ start = 0.0, stop = 80.0, num = 3, endpoint = false }} }}
+tilt_azim_deg = 0.0
+E_grid_line_by_energy = [
+  {standard_line_entries},
+]
+E_grid_brem = 0.0
+[profiles.custom]
+thickness_ang = {{ logspace = {{ start = 2.0, stop = 3.0, num = 2 }} }}
+energy_keV = {{ values = [25.0, 30.0] }}
+tilt_deg = {{ linspace = {{ start = 0.0, stop = 80.0, num = 3, endpoint = false }} }}
+tilt_azim_deg = 0.0
+E_grid_line_by_energy = [
+  {custom_line_entries},
+]
+E_grid_brem = 0.0
+[crystals.mos2]
+cif = "cifs/mos2.cif"
+validation_id = "test-fixture"
+B_ang2 = 0.6
+beam_uvw = [0, 0, 2]
+layers_per_cell = 2
+E_grid = {{ values = [100.0, 200.0] }}
+[media.sio2]
+composition = {{ Si = 0.02205, O = 0.04410 }}
+[materials.sample]
+label = "sample"
+profile = "custom"
+crystal = "mos2"
+"""
+
+
+def test_profile_missing_line_grid_row_falls_back_to_standard_profile(tmp_path):
+    """P0.3 interim fix (docs/cli-energy-grid-sweep-rework-plan.md subitem 5):
+    a non-standard profile missing a locally configured line-grid row for one
+    of its beam energies doesn't reject the catalog when ``standard`` already
+    has a derived grid for that energy. This unblocks ``cxr sweep set
+    --profile NAME --energy ...`` edits; it doesn't conjure grid data, so the
+    resolved scan still lacks a row for the energy standard alone covers,
+    pending the Phase 1 shared derived-grid store."""
+    from cxr_mc.materials import load_material_catalog
+
+    only_25 = (
+        "{ energy_keV = 25.0, grid = "
+        "{ linspace = { start = 10.0, stop = 58.0, num = 17, endpoint = true } } }"
+    )
+    text = _catalog_with_two_profiles(custom_line_entries=only_25)
+
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
+
+    scan = catalog.material("sample").scan
+    assert tuple(scan.E_grid_line_by_energy) == (25.0,)
+
+
+def test_profile_missing_line_grid_row_still_errors_without_standard_coverage(tmp_path):
+    """Regression guard: the P0.3 fallback doesn't blanket-suppress the
+    missing-row check when standard itself also lacks the energy."""
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    only_25 = "{ energy_keV = 25.0, grid = { values = [1.0, 2.0] } }"
+    text = _catalog_with_two_profiles(custom_line_entries=only_25, standard_line_entries=only_25)
+
+    with pytest.raises(MaterialConfigError) as caught:
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+    assert any("missing beam energies" in error for error in caught.value.errors)
+
+
 def test_bundled_crystal_validation_ids_are_ledgered():
     from cxr_mc import DATA_DIR
 
