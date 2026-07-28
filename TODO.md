@@ -1,53 +1,17 @@
-# TODO / Backlog
+# TODO / Backlog — feature/energy-grid-cli
 
-Items live on `feature/...` / `bugfix/...` / `explore/...` branches, not `main`, till done.
-In-progress detail live on branch (or design doc);
-`main` keep one-line summary + pointer, enforced by /todo-sync.
-Priority weigh value-to-goal (line-flux / enhancement predictions + publication validation story) vs effort and risk.
+User-reported `cxr energy-grid` CLI problems, folded from a `>user<` item on
+`main` (2026-07-28, via `feature/cli-fixes` split). Original user text
+preserved verbatim; triage notes inline.
 
-Item generation:
-----------------
+## User text
 
-1. Create branch of relevant type, switch to it
-2. Overwrite branch TODO.md: 2-3 sentence problem summary + implementation path, scoped to item only. Publish to `origin`
-3. Switch to `main`, add 1-sentence item summary, triage into existing TODO.md items, push tightly scoped `docs(todo)` commit to main
+1. `cxr energy-grid` options are confused and need to be fixed. What does `defaults` apply to? `brem`, `line`, both, or is it just used for deriving the appropriate upper-bounds for each? What does `apply` do? I think this section needs to be reworked, or at a minimum, the help explanations made more detailed
+2. I think once values are set for `cxr energy-grid defaults`, they cannot be removed (even though when I started, the fields for `tilts` and `azimtuhs` were both empty--not sure what empty would mean here)
+3. How does the `fidelity` field contained in the backend code relate to this? Where does `full` vs `survey` come into play?
 
-**NOTE:** User wrote item straight into `TODO.md` (denoted >user<)? Fold into branch (steps 1-2), then drop >user< & slim to one-line summary on `main` once branch exist.
+## Triage / implementation path
 
-## P1 - top-priority / high-value
-
-### Active
-
-1. **`cxr energy-grid` CLI fixes.** Rework/document `defaults` + `apply` semantics, add unset path for stored defaults, explain backend `fidelity` (`full`/`survey`) mapping. → `feature/cli-fixes`.
-2. **`cxr remote` attach/progress UX.** Fix progress-bar labels + paused-state rendering, reconnect retry, submit/scan merge (`--headless`/`--no-pull`), `clear --profile`, evaluate `prune`, high-verbosity diagnostics. → `feature/cli-fixes`.
-3. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-4.  **Debye-Waller provenance and anisotropy audit.** Continue replacing placeholder or reused `B_ang2` values with primary-source values and resolve per-site/tensor model needs. → `feature/debye-waller-audit`; audit: [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md).
-   1. >user< Evaluate complexity/value of implementing full anisotropic/tensor-based Debye-Waller factors when available
-   2. >user< Evaluate worth in both implementing the approximate scalar Debye-Waller formula (compare output to known values for various anisotropic materials we have in our DB), and in attempting to implement a fully-fledged DFPT system.
-   3. >user< Take a crystal with a known DW factor, then manually change it up and down over a range of values that can reasonably be expected other crystals to have, and see how much it changes by -- if large, then its worth being careful here.
-5.  **GPU-memory follow-up.** Benchmark remote `rebrem --all --ne-brem 500 --step 20` for bounded CuPy reserved-pool memory; assess analogous `reline` cleanup separately.
-
-### Gated
-
-1. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
-
-### On-Hold
-
-1. **High-energy electron/channeling support.** Evaluate `Geant4` or similar for REGAE@DESY-scale beams (3–5 MeV, 50 fs, 100 fC, 200–300 µm target diameter), JungFrau detector ~0.5–4.5 m from interaction point. USER QUESTION: What is rep rate?
-2.  **Bent Crystals (After add channeling + relativistic electrons)**
-3.  **Superradiant PXR/CBS** need bunch length knowledge, coherent emission *across segments* (also needed by channeling radiation as in long-term features #1, #3)
-
-## P2 - medium-priority
-
-1. **Remote-job UX.** Profile-based job names + same-profile submit block, quieter submit pull suggestion, explicit-material-only stop list, faster `stop --all`, attach-time cancel key + compute-aware progress bars. → `feature/remote-ux`.
-2. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-3. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`.
-4. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-5. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
-6.  **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
-7.  **>user< Fix cached pull-in of pre-rendered animations in trace_app (add more buttons or something) -- maybe due to regenerate's changing random seed?**
-   1.  Progress bar here shows up at the top of the marimo notebook instead of near the button that is pressed to start the render -- confusing
-   2.  clip off the extra figure background & legend in the render, it is ugly. We just want the black grid space, with the colorbar and mat/config title info overlayed, but no background color. Saved render is also a bit pixelated, especially when opened in an mp4 viewer outside of the marimo app.
-   3.  add button to open render saving dialogue (so user can promptly move it from the cache)
-
-## P3 - lower / exploratory / small bugfixes
+- A1 (rework or document): audit `energy-grid` command group; decide whether `defaults` scopes to `brem`, `line`, or both, and whether it only derives upper bounds. If semantics are sound, expand `--help` text; if not, rework option structure. Breaking CLI change → follow `cli-ui-ux` skill + migration note.
+- A2 (bug): no way to unset/clear a stored `energy-grid defaults` value. Add reset/unset path (e.g. `--clear` per field or `defaults --reset`); define and document what empty `tilts`/`azimuths` means.
+- A3 (docs): explain mapping between backend `fidelity` field (`full` vs `survey`) and the energy-grid CLI surface.
