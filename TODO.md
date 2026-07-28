@@ -1,18 +1,35 @@
 # TODO / Backlog
 
-Items live on `feature/...` / `bugfix/...` / `explore/...` branches, not `main`, till done.
-In-progress detail live on branch (or design doc);
-`main` keep one-line summary + pointer, enforced by /todo-sync.
+Items live on `feature/...` / `bugfix/...` / `explore/...` / `docs/...` branches, not `main`, till done.
 Priority weigh value-to-goal (line-flux / enhancement predictions + publication validation story) vs effort and risk.
+
+**`TODO.md` is identical on every branch and on `main`** — the full triaged
+backlog, one summary line per item + a pointer. In-progress detail lives in
+`tasks/<branch-leaf>.md` (see [`tasks/README.md`](tasks/README.md)), **never in
+this file and never in `docs/`** (which is durable, science-facing repo
+documentation). Keeping branch `TODO.md` == `main:TODO.md` is what stops a
+fast-forward (branch→branch or `main`→branch) from silently clobbering the
+backlog: an ff moves the ref with no merge, so any divergent per-branch
+`TODO.md` gets overwritten. Reconciliation enforced by /todo-sync.
 
 Item generation:
 ----------------
 
-1. Create branch of relevant type, switch to it
-2. Overwrite branch TODO.md: 2-3 sentence problem summary + implementation path, scoped to item only. Publish to `origin`
-3. Switch to `main`, add 1-sentence item summary, triage into existing TODO.md items, push tightly scoped `docs(todo)` commit to main
+1. Create branch of relevant type, switch to it.
+2. Write `tasks/<branch-leaf>.md`: 2-3 sentence problem summary + implementation
+   path / checklist, scoped to the item only. Do **not** make branch `TODO.md`
+   diverge from `main`. Publish to `origin`.
+3. Add a 1-sentence item summary to `TODO.md` (branch and `main` stay identical),
+   pointer `→ feature/<branch>; tasks/<branch-leaf>.md`; triage into existing
+   items; push a tightly scoped `docs(todo)` commit.
+4. **On landing the branch into `main` (branch to be dropped):** promote any
+   durable design/physics from `tasks/<branch-leaf>.md` into a proper `docs/`
+   note, then `git rm tasks/<branch-leaf>.md`, and slim the `TODO.md` item to
+   reflect completion.
 
-**NOTE:** User wrote item straight into `TODO.md` (denoted >user<)? Fold into branch (steps 1-2), then drop >user< & slim to one-line summary on `main` once branch exist.
+**NOTE:** User wrote item straight into `TODO.md` (denoted >user<)? Fold into
+`tasks/<branch-leaf>.md` (steps 1-2), then drop >user< & slim to one-line
+summary once the branch exists.
 
 ## P1 - top-priority / high-value
 
@@ -25,6 +42,7 @@ Item generation:
    2. >user< Evaluate worth in both implementing the approximate scalar Debye-Waller formula (compare output to known values for various anisotropic materials we have in our DB), and in attempting to implement a fully-fledged DFPT system.
    3. >user< Take a crystal with a known DW factor, then manually change it up and down over a range of values that can reasonably be expected other crystals to have, and see how much it changes by -- if large, then its worth being careful here.
 4.  **GPU-memory follow-up.** Benchmark remote `rebrem --all --ne-brem 500 --step 20` for bounded CuPy reserved-pool memory; assess analogous `reline` cleanup separately.
+5.  **Discrete longitudinal bunch / beam phase space.** Gather all beam properties into one `BeamSpec` (energy, transverse size, longitudinal bunch, rep-rate/charge; future divergence + energy spread), initiate particles with a specified longitudinal distribution, expose standard beam metrics (emittance, Twiss, bunch length). Plumbing + metrics only; coherent emission deferred. Unblocks On-Hold #3 (superradiant PXR/CBS). → `feature/discrete-bunch-support`; [`tasks/discrete-bunch-support.md`](tasks/discrete-bunch-support.md).
 
 ### Gated
 
@@ -34,7 +52,7 @@ Item generation:
 
 1. **High-energy electron/channeling support.** Evaluate `Geant4` or similar for REGAE@DESY-scale beams (3–5 MeV, 50 fs, 100 fC, 200–300 µm target diameter), JungFrau detector ~0.5–4.5 m from interaction point. USER QUESTION: What is rep rate?
 2.  **Bent Crystals (After add channeling + relativistic electrons)**
-3.  **Superradiant PXR/CBS** need bunch length knowledge, coherent emission *across segments* (also needed by channeling radiation as in long-term features #1, #3)
+3.  **Superradiant PXR/CBS** need bunch length knowledge, coherent emission *across segments* (also needed by channeling radiation as in long-term features #1, #3). Bunch-length plumbing lands in P1-Active #5 (`feature/discrete-bunch-support`); this item is the coherent-sum follow-on.
 
 ## P2 - medium-priority
 

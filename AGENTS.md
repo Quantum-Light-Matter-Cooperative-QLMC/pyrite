@@ -24,11 +24,15 @@ Read `docs/repo_map.md` before explore source files.
 `docs/physics-validation-ledger.md` tracks which physics verified; `docs/validation/README.md` is method
 `TODO.md` contains task backlog
 
-- `TODO.md` on `main` contains full triaged list of tasks + top-level summaries
-- `TODO.md` on branches contains details scoped to their specific task; see `TODO.md` for conventions.
-- Work addressing/changing tracked item: inspect active-branch + `main` TODO
-  entries before completion. Use `todo-sync` for cross-branch reconciliation.
-  Cheap subagent may inventory read-only; one writer edits TODO.
+- `TODO.md` is **identical on every branch and on `main`**: the full triaged
+  backlog, one summary line per item + pointer. Branch-scoped detail lives in
+  `tasks/<branch-leaf>.md` (see `tasks/README.md`), never in `TODO.md` and never
+  in `docs/`. Keeping branch `TODO.md` == `main:TODO.md` prevents a
+  fast-forward from silently clobbering the backlog; see `TODO.md` header for the
+  full convention (incl. the merge-drop step for the `tasks/` file).
+- Work addressing/changing tracked item: inspect the `tasks/<branch>.md` detail +
+  the shared `TODO.md` before completion. Use `todo-sync` for cross-branch
+  reconciliation. Cheap subagent may inventory read-only; one writer edits TODO.
 
 ## Canonical commands
 
