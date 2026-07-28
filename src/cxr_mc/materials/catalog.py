@@ -190,6 +190,17 @@ class MaterialCatalog:
     #: Explicit ``profiles.NAME.materials`` membership lists, keyed by profile;
     #: profiles without a membership row are absent (all materials allowed).
     profile_memberships: Mapping[str, tuple[str, ...]] = MappingProxyType({})
+    #: Decoded ``[profiles.NAME.beam]`` distribution blocks (transverse size,
+    #: bunch length/shape/offsets, rep-rate, charge, reserved divergence/spread),
+    #: keyed by profile; profiles with no beam block are absent. Energy is NOT
+    #: here -- it stays the per-material ``ScanSpec.energy_keV`` scan grid.
+    profile_beams: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+
+    def profile_beam(self, name: str) -> Mapping[str, object] | None:
+        """Decoded ``[profiles.NAME.beam]`` distribution overrides, or ``None``
+        when the profile carries no beam block (the ``standard`` beam default
+        applies). Consumed by :func:`config.material_sweep` via ``beam_replace``."""
+        return self.profile_beams.get(name)
 
     def profile_materials(self, name: str) -> tuple[str, ...] | None:
         """Explicit ``profiles.NAME.materials`` membership, or ``None`` when the
@@ -661,6 +672,66 @@ def _parse_profile_overrides(raw: object, path: str, errors: _Errors) -> None:
                 _validate_angle_grid(name, grid, f"{material_path}.{name}", errors)
 
 
+# Beam *distribution* fields settable in a ``[profiles.NAME.beam]`` block. These
+# mirror the non-energy fields of ``sweep.BeamSpec`` (energy stays the per-material
+# ``ScanSpec.energy_keV`` scan grid -- decision 2); the isotropic aliases
+# ``transverse_fwhm_mm`` / ``beam_fwhm_mm`` route onto BOTH transverse planes via
+# ``sweep.beam_replace`` when the block is applied in ``config.material_sweep``.
+# Kept as local literals here to avoid a ``materials -> sweep`` import cycle.
+_BEAM_POSITIVE_KEYS = frozenset(
+    {
+        "transverse_fwhm_x_mm",
+        "transverse_fwhm_y_mm",
+        "transverse_fwhm_mm",
+        "beam_fwhm_mm",
+        "bunch_length_fs",
+        "rep_rate_hz",
+        "bunch_charge_pc",
+        "divergence_mrad",
+        "energy_spread_frac",
+    }
+)
+_BEAM_LONG_SHAPES = frozenset({"gaussian", "uniform"})
+_BEAM_KEYS = _BEAM_POSITIVE_KEYS | {"long_shape", "long_offsets_fs"}
+
+
+def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, object] | None:
+    """Structurally validate a ``[profiles.NAME.beam]`` distribution block.
+
+    Distribution fields only (transverse size, bunch length/shape/offsets,
+    rep-rate, charge, reserved divergence/spread) -- ``energy_keV`` is NOT
+    accepted (it stays the per-material scan grid, decision 2). Positive
+    magnitudes must be finite and ``> 0``; ``long_shape`` is one of
+    :data:`_BEAM_LONG_SHAPES`; ``long_offsets_fs`` is an array of finite numbers
+    (any sign) coerced to a tuple. Returns the cleaned mapping, or ``None`` when
+    the block is empty or fully rejected.
+    """
+    table = _table(raw, path, errors)
+    if table is None:
+        return None
+    errors.keys(table, path, set(_BEAM_KEYS))
+    out: dict[str, object] = {}
+    for key, value in table.items():
+        if key == "long_shape":
+            if not isinstance(value, str) or value not in _BEAM_LONG_SHAPES:
+                errors.add(f"{path}.long_shape", f"must be one of {sorted(_BEAM_LONG_SHAPES)}")
+            else:
+                out[key] = value
+        elif key == "long_offsets_fs":
+            offsets = [_number(item) for item in value] if isinstance(value, list) else None
+            if not offsets or any(item is None for item in offsets):
+                errors.add(f"{path}.long_offsets_fs", "must be a non-empty array of finite numbers")
+            else:
+                out[key] = tuple(offsets)
+        elif key in _BEAM_POSITIVE_KEYS:
+            number = _number(value)
+            if number is None or number <= 0:
+                errors.add(f"{path}.{key}", "must be a finite positive number")
+            else:
+                out[key] = number
+    return out or None
+
+
 def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
     """Parse ``[profiles.*]`` campaign rows.
 
@@ -678,7 +749,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         row = _table(value, path, errors)
         if row is None:
             continue
-        errors.keys(row, path, set(_SCAN_KEYS) | {"materials", "overrides"})
+        errors.keys(row, path, set(_SCAN_KEYS) | {"materials", "overrides", "beam"})
         has_ang = "thickness_ang" in row
         has_layers = "thickness_layers" in row
         if has_ang == has_layers:
@@ -699,7 +770,14 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
             errors.add(f"{path}.materials", "must be an array of material keys")
         if "overrides" in row:
             _parse_profile_overrides(row["overrides"], f"{path}.overrides", errors)
-        out[key] = row
+        row_out = dict(row)
+        if "beam" in row_out:
+            beam = _parse_profile_beam(row_out["beam"], f"{path}.beam", errors)
+            if beam is not None:
+                row_out["beam"] = beam
+            else:
+                del row_out["beam"]
+        out[key] = row_out
     return out
 
 
@@ -971,6 +1049,11 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("materials"), list)
     }
+    profile_beams = {
+        name: MappingProxyType(dict(cast("Mapping[str, object]", row["beam"])))
+        for name, row in profiles.items()
+        if isinstance(row.get("beam"), Mapping)
+    }
     return MaterialCatalog(
         schema_version=1,
         crystals=MappingProxyType(crystals),
@@ -979,6 +1062,7 @@ def _load_material_catalog_cached(
         material_keys=tuple(materials),
         profile_names=tuple(profiles),
         profile_memberships=MappingProxyType(profile_memberships),
+        profile_beams=MappingProxyType(profile_beams),
     )
 
 
