@@ -1181,11 +1181,18 @@ Options:
 ## `cxr profile add-material`
 
 ```text
-Usage: cxr profile add-material [OPTIONS] NAME MATERIALS...
+Usage: cxr profile add-material [OPTIONS] NAME [MATERIALS]...
 
   Add materials to a profile's explicit membership list.
 
+  With --all, seeds (or extends) membership with mats_to_sim.toml's verified `materials`
+  list -- the same base set `cxr scan --all` runs -- so a profile can start from the
+  standard list and be trimmed down with `cxr profile remove-material` instead of typing
+  every key by hand. --all also seeds an implicit all-in-use profile (one with no
+  `materials` row yet), which plain MATERIAL args cannot do.
+
 Options:
+  --all       Seed/extend membership with mats_to_sim.toml's verified `materials` list.
   -y, --yes   Skip the 'standard' confirmation prompt.
   --dry-run   Print proposed TOML diff; write nothing.
   -h, --help  Show this message and exit.

@@ -537,24 +537,53 @@ def _membership_target(document, name):
 
 @command.command("add-material")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
-@click.argument("materials", nargs=-1, required=True)
+@click.argument("materials", nargs=-1)
+@click.option(
+    "--all",
+    "all_materials",
+    is_flag=True,
+    help="Seed/extend membership with mats_to_sim.toml's verified `materials` list.",
+)
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def add_material_command(name, materials, yes, dry_run):
-    """Add materials to a profile's explicit membership list."""
+def add_material_command(name, materials, all_materials, yes, dry_run):
+    """Add materials to a profile's explicit membership list.
+
+    With --all, seeds (or extends) membership with mats_to_sim.toml's verified
+    `materials` list -- the same base set `cxr scan --all` runs -- so a
+    profile can start from the standard list and be trimmed down with
+    `cxr profile remove-material` instead of typing every key by hand. --all
+    also seeds an implicit all-in-use profile (one with no `materials` row
+    yet), which plain MATERIAL args cannot do.
+    """
+    if not materials and not all_materials:
+        raise click.UsageError("provide MATERIAL keys or --all")
     try:
         original, document = _sweep._catalog_text()
-        target, membership = _membership_target(document, name)
+        target = _existing_profile(document, name)
+        existing = target.get("materials")
+        if existing is None and not all_materials:
+            raise ValueError(
+                f"profile {name!r} has implicit all-in-use-materials membership; "
+                f"seed it with --all, or set an explicit list first with: "
+                f"cxr profile set {name} --materials KEY,..."
+            )
+        membership = list(existing) if isinstance(existing, list) else []
+        requested = list(materials)
+        if all_materials:
+            from cxr_mc.scan import load_all_materials
+
+            requested = [*requested, *load_all_materials()]
         known = _sweep._material_rows(document)
-        unknown = [key for key in materials if key not in known]
+        unknown = [key for key in requested if key not in known]
         if unknown:
             raise ValueError(f"unknown material: {', '.join(unknown)}")
-        added = [key for key in dict.fromkeys(materials) if key not in membership]
+        added = [key for key in dict.fromkeys(requested) if key not in membership]
         target["materials"] = [*membership, *added]
     except (OSError, ValueError, tomlkit.exceptions.ParseError) as exc:
         raise CLIError(str(exc)) from None
     _confirm_standard(name, "change material membership of", yes, dry_run)
-    skipped = sorted(set(materials) - set(added))
+    skipped = sorted(set(requested) - set(added))
     message = f"updated profile {name}: added {', '.join(added) or '(none)'}"
     if skipped:
         message += f"; already members: {', '.join(skipped)}"

@@ -308,6 +308,45 @@ def test_membership_verbs_reject_unknown_material(tmp_path, monkeypatch):
     assert "unknown material: unobtainium" in result.stderr
 
 
+def test_add_material_all_seeds_implicit_membership(tmp_path, monkeypatch):
+    """--all seeds an implicit all-in-use profile straight from mats_to_sim.toml's
+    verified list -- the escape hatch `test_membership_verbs_require_explicit_list`
+    otherwise requires (`cxr profile set NAME --materials KEY,...`, typed by hand)."""
+    from cxr_mc import scan
+
+    catalog = _catalog(tmp_path, monkeypatch)
+    monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg", "mose2"])
+
+    result = invoke(profile.command, ["add-material", "standard", "--all", "-y"])
+
+    assert_clean_result(result)
+    assert "added hopg, mose2" in result.stdout
+    assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
+
+
+def test_add_material_all_extends_and_skips_existing_members(tmp_path, monkeypatch):
+    from cxr_mc import scan
+
+    catalog = _catalog(tmp_path, monkeypatch)
+    monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg", "mose2"])
+
+    result = invoke(profile.command, ["add-material", "sub_100keV", "--all"])
+
+    assert_clean_result(result)
+    assert "added mose2" in result.stdout
+    assert "already members: hopg" in result.stdout
+    assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
+
+
+def test_add_material_requires_materials_or_all(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["add-material", "sub_100keV"])
+
+    assert result.exit_code == 2
+    assert "provide MATERIAL keys or --all" in result.stderr
+
+
 def test_dry_run_writes_nothing_and_never_prompts(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
     original = catalog.read_text()
