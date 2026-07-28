@@ -473,7 +473,7 @@ Commands:
   reline    Recompute line-only remotely, follow, and pull completed checkpoints.
   scan      Sync code, submit sweep(s), wait, and pull checkpoints.
   status    Show one job; use -v for allocation and -vv for logs.
-  stop      cancel active SLURM job(s) by material, or every live job.
+  stop      cancel active SLURM job(s) by material, profile, or every live job.
   submit    Sync code and submit a detached SLURM material queue.
   sync      Push current code to remote box.
   validate  Run Zhai reproduction remotely or pull existing caches.
@@ -543,6 +543,9 @@ Usage: cxr remote pull [OPTIONS] [STEM|MATERIAL@PROFILE]...
 
 Options:
   -a, --all         Pull every configured material.
+  --profile NAME    Pull each member material's checkpoint for this catalog profile
+                    (MATERIAL@PROFILE for every member; with explicit MATERIALs,
+                    qualifies just those). Mutually exclusive with --all.
   --hash HEXPREFIX  Pin one MATERIAL@PROFILE selector to a parameter-hash prefix.
   -f, --full        Pull full unfiltered checkpoint (default: grid-filtered).
   --drop-wide-brem  With grid pull, drop wide-brem.
@@ -659,12 +662,13 @@ Options:
 ```text
 Usage: cxr remote stop [OPTIONS] [MATERIAL]...
 
-  cancel active SLURM job(s) by material, or every live job.
+  cancel active SLURM job(s) by material, profile, or every live job.
 
 Options:
-  -a, --all   Stop every live job.
-  --yes       Cancel exact previewed jobs; otherwise preview.
-  -h, --help  Show this message and exit.
+  -a, --all       Stop every live job.
+  --profile NAME  Stop live job(s) submitted with this catalog profile.
+  --yes           Cancel exact previewed jobs; otherwise preview.
+  -h, --help      Show this message and exit.
 ```
 
 ## `cxr remote submit`

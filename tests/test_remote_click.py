@@ -304,7 +304,9 @@ def test_stop_previews_by_default_and_yes_executes(monkeypatch):
     monkeypatch.setattr(
         lifecycle,
         "stop_jobs",
-        lambda materials, all_jobs, *, yes: calls.append((materials, all_jobs, yes)),
+        lambda materials, all_jobs, *, yes, profile: calls.append(
+            (materials, all_jobs, yes, profile)
+        ),
     )
 
     preview = invoke(remote.command, ["stop", "hopg"])
@@ -312,4 +314,101 @@ def test_stop_previews_by_default_and_yes_executes(monkeypatch):
 
     assert_clean_result(preview)
     assert_clean_result(confirmed)
-    assert calls == [(["hopg"], False, False), (["hopg"], False, True)]
+    assert calls == [(["hopg"], False, False, None), (["hopg"], False, True, None)]
+
+
+def test_stop_profile_dispatches_and_rejects_combinations(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "stop_jobs",
+        lambda materials, all_jobs, *, yes, profile: calls.append(
+            (materials, all_jobs, yes, profile)
+        ),
+    )
+
+    ok = invoke(remote.command, ["stop", "--profile", "sub_100keV", "--yes"])
+    assert_clean_result(ok)
+    assert calls == [([], False, True, "sub_100keV")]
+
+    with_materials = invoke(remote.command, ["stop", "hopg", "--profile", "sub_100keV"])
+    assert with_materials.exit_code == 2
+    assert "--profile does not take material names or --all" in with_materials.stderr
+
+    with_all = invoke(remote.command, ["stop", "--all", "--profile", "sub_100keV"])
+    assert with_all.exit_code == 2
+
+    bare = invoke(remote.command, ["stop"])
+    assert bare.exit_code == 2
+    assert "--profile" in bare.stderr
+
+
+def test_pull_profile_expands_membership_to_qualified_selectors(monkeypatch):
+    import cxr_mc.materials as materials_pkg
+
+    class _FakeCatalog:
+        profile_names = ("standard", "sub_100keV")
+
+        def profile_materials(self, _name):
+            return ("hopg", "mose2")
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "pull",
+        lambda materials, **kwargs: calls.append((materials, kwargs)),
+    )
+
+    result = invoke(remote.command, ["pull", "--profile", "sub_100keV"])
+
+    assert_clean_result(result)
+    assert calls[0][0] == ["hopg@sub_100keV", "mose2@sub_100keV"]
+
+
+def test_pull_profile_qualifies_explicit_materials(monkeypatch):
+    import cxr_mc.materials as materials_pkg
+
+    class _FakeCatalog:
+        profile_names = ("standard", "sub_100keV")
+
+        def profile_materials(self, _name):
+            return ("hopg", "mose2")
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "pull",
+        lambda materials, **kwargs: calls.append((materials, kwargs)),
+    )
+
+    result = invoke(remote.command, ["pull", "hopg", "--profile", "sub_100keV"])
+
+    assert_clean_result(result)
+    assert calls[0][0] == ["hopg@sub_100keV"]
+
+    with_all = invoke(remote.command, ["pull", "--all", "--profile", "sub_100keV"])
+    assert with_all.exit_code == 2
+    assert "drop --all" in with_all.stderr
+
+    with_selector = invoke(remote.command, ["pull", "hopg@sub_100keV", "--profile", "sub_100keV"])
+    assert with_selector.exit_code == 2
+    assert "drop the @PROFILE selector" in with_selector.stderr
+
+
+def test_pull_profile_without_membership_needs_explicit_materials(monkeypatch):
+    import cxr_mc.materials as materials_pkg
+
+    class _FakeCatalog:
+        profile_names = ("standard", "sub_100keV")
+
+        def profile_materials(self, _name):
+            return None
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+
+    result = invoke(remote.command, ["pull", "--profile", "sub_100keV"])
+
+    assert result.exit_code == 2
+    assert "no explicit material membership" in result.stderr

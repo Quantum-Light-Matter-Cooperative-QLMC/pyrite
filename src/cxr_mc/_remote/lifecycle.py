@@ -274,6 +274,14 @@ def start_queue(
     _stage_job_script(jobid, stems, upload, script)
     scheduler_id = _submit_staged_job(jobid, stems, nice=chunked)
 
+    # A profile submit pulls by profile, not by a wall of hash-qualified stems
+    # nobody can type; pull --profile resolves each member's MATERIAL@PROFILE
+    # checkpoint remotely.
+    pull_hint = (
+        f"cxr remote pull --profile {catalog_profile}"
+        if catalog_profile != "standard"
+        else f"cxr remote pull {' '.join(stems)}"
+    )
     print(
         f"\nJOB {jobid} · SUBMITTED\n"
         + presentation._format_fields(
@@ -300,7 +308,7 @@ def start_queue(
                 ("Attach", f"cxr remote attach {jobid}"),
                 ("Status", f"cxr remote status {jobid} -vv"),
                 ("Logs", f"cxr remote logs {jobid} --follow"),
-                ("Pull", f"cxr remote pull {' '.join(stems)}  (after completion)"),
+                ("Pull", f"{pull_hint}  (after completion)"),
             ]
         )
     )
@@ -706,14 +714,27 @@ def _stop_jobid(jobid):
     transport._run(["ssh", "-n", config.remote_host(), remote])
 
 
-def stop_jobs(materials=None, all_jobs=False, *, yes=True):
-    """Stop live queue jobs by material name, or every live job with ``all_jobs``.
+def stop_jobs(materials=None, all_jobs=False, *, yes=True, profile=None):
+    """Stop live queue jobs by material name, by catalog profile, or every live
+    job with ``all_jobs``.
 
     Each material can only be owned by one live job because start/scan refuse
     checkpoint-stem collisions, so material names are the useful user-facing
-    handle and job ids stay an internal implementation detail.
+    handle and job ids stay an internal implementation detail. ``profile``
+    selects live jobs whose recorded ``catalog_profile`` metadata matches --
+    the handle for a profile-submitted batch, where listing every member
+    material would be unusable.
     """
-    if all_jobs:
+    if profile is not None:
+        if all_jobs or materials:
+            raise SystemExit("stop --profile does not take material names or --all")
+        transport._check_shell_tokens([profile])
+        live = state._live_jobs()
+        profiles = state._job_profiles([jobid for jobid, _quick, _mats in live])
+        jobids = sorted(jobid for jobid, _quick, _mats in live if profiles.get(jobid) == profile)
+        if not jobids:
+            raise SystemExit(f"no live job found for profile: {profile}")
+    elif all_jobs:
         if materials:
             raise SystemExit("stop --all does not take material names")
         live = state._live_jobs()

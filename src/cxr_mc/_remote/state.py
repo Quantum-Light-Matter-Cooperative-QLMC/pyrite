@@ -118,6 +118,28 @@ def _job_metadata(jobid: str) -> str:
     )
 
 
+def _job_profiles(jobids: list[str]) -> dict[str, str]:
+    """Return ``{jobid: catalog_profile}`` for the given jobs in one ssh round trip.
+
+    Jobs whose metadata predates the ``catalog_profile:`` line (or that ran the
+    default) report ``standard``."""
+    if not jobids:
+        return {}
+    transport._check_shell_tokens(jobids)
+    remote = (
+        f"JOBS={config.shell_remote_path(config.JOBS_SUBDIR)}; "
+        f"for j in {' '.join(jobids)}; do "
+        'p=$(sed -n "s/^catalog_profile: //p" "$JOBS/$j/meta" 2>/dev/null | tail -1); '
+        'printf "%s\\t%s\\n" "$j" "${p:-standard}"; done'
+    )
+    profiles = {}
+    for line in transport._ssh_capture(remote).splitlines():
+        jobid, separator, profile = line.partition("\t")
+        if separator:
+            profiles[jobid.strip()] = profile.strip()
+    return profiles
+
+
 def _job_succeeded(jobid: str) -> bool:
     """Whether the batch script recorded a successful terminal state."""
     return _job_state(jobid).startswith("done")

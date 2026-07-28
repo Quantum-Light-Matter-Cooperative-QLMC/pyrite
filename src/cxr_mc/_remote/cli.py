@@ -416,7 +416,7 @@ def _cli_logs(args):
 
 
 def _cli_stop(args):
-    lifecycle.stop_jobs(args.materials, args.all, yes=args.yes)
+    lifecycle.stop_jobs(args.materials, args.all, yes=args.yes, profile=args.catalog_profile)
 
 
 def _cli_reap(args):
@@ -954,18 +954,29 @@ def logs_command(jobid, follow):
     return _invoke_click(_cli_logs, _click_args("logs", jobid=jobid, follow=follow))
 
 
-@command.command("stop", help="cancel active SLURM job(s) by material, or every live job.")
+@command.command("stop", help="cancel active SLURM job(s) by material, profile, or every live job.")
 @click.argument("materials", nargs=-1, metavar="[MATERIAL]...")
 @click.option("-a", "--all", "all_", is_flag=True, help="Stop every live job.")
+@click.option(
+    "--profile",
+    "catalog_profile",
+    default=None,
+    metavar="NAME",
+    help="Stop live job(s) submitted with this catalog profile.",
+)
 @click.option("--yes", is_flag=True, help="Cancel exact previewed jobs; otherwise preview.")
-def stop_command(materials, all_, yes):
+def stop_command(materials, all_, catalog_profile, yes):
     if all_ and materials:
         raise click.UsageError("stop --all does not take material names")
-    if not all_ and not materials:
-        raise click.UsageError("stop needs material name(s), or use --all")
+    if catalog_profile is not None and (materials or all_):
+        raise click.UsageError("stop --profile does not take material names or --all")
+    if not all_ and not materials and catalog_profile is None:
+        raise click.UsageError("stop needs material name(s), --profile, or --all")
     return _invoke_click(
         _cli_stop,
-        _click_args("stop", materials=list(materials), all=all_, yes=yes),
+        _click_args(
+            "stop", materials=list(materials), all=all_, catalog_profile=catalog_profile, yes=yes
+        ),
     )
 
 
@@ -1007,6 +1018,17 @@ def reap_command(min_age_minutes, yes):
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Pull every configured material.")
 @click.option(
+    "--profile",
+    "catalog_profile",
+    default=None,
+    metavar="NAME",
+    help=(
+        "Pull each member material's checkpoint for this catalog profile "
+        "(MATERIAL@PROFILE for every member; with explicit MATERIALs, "
+        "qualifies just those). Mutually exclusive with --all."
+    ),
+)
+@click.option(
     "--hash",
     "hash_prefix",
     default=None,
@@ -1043,6 +1065,7 @@ def reap_command(min_age_minutes, yes):
 def pull_command(
     material,
     all_,
+    catalog_profile,
     hash_prefix,
     full_,
     drop_wide_brem,
@@ -1055,6 +1078,22 @@ def pull_command(
     json_output,
 ):
     materials = list(material)
+    if catalog_profile is not None:
+        if all_:
+            raise click.UsageError(
+                "pull --profile already selects the profile's materials; drop --all"
+            )
+        if any("@" in m for m in materials):
+            raise click.UsageError(
+                "--profile qualifies bare material names; drop the @PROFILE selector"
+            )
+        selected = materials or _profile_default_materials(catalog_profile)
+        if not selected:
+            raise click.UsageError(
+                f"profile {catalog_profile!r} has no explicit material membership; "
+                "name materials alongside --profile, or use --all"
+            )
+        materials = [f"{m}@{catalog_profile}" for m in selected]
     _reject_all_with_values("pull", all_, materials)
     if brem_only and line_only:
         raise click.UsageError("--brem-only and --line-only are mutually exclusive")

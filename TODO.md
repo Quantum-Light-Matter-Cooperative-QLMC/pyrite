@@ -13,13 +13,15 @@ skill.
    (e.g. `<profile>` or `<profile>-<n>`), block a second submit under the
    same profile while one is live (1 of a profile queued at a time; no
    name-conflict handling needed).
-2. **Submit pull-suggestion text-vomit.** `cxr remote submit --all --profile
-   sub_100keV` prints a 20-material `cxr remote pull <hash-stem> ...` line
-   nobody can type. Replace with the `MATERIAL@PROFILE` pull form (or a
-   per-profile/wildcard pull), wrapped/grouped output.
-3. **Stop lists only explicit materials.** `stop` should name specific mats
-   only when they were explicitly submitted as materials, not when they came
-   from `--all`/a profile.
+2. ~~**Submit pull-suggestion text-vomit.**~~ [DONE] `pull --profile NAME`
+   expands to each member's `MATERIAL@PROFILE` selector (explicit MATERIALs
+   qualified the same way; `--all` rejected); profile submits now print
+   `cxr remote pull --profile NAME (after completion)` instead of the
+   hash-stem wall.
+3. ~~**Stop lists only explicit materials.**~~ [DONE] `stop --profile NAME`
+   stops live jobs whose recorded `catalog_profile` metadata matches
+   (`state._job_profiles`); material names stay the handle only for
+   explicit-material submits.
 4. **Speed up `cxr remote stop --all --yes`.** 30+ s to quit jobs; likely
    serial SSH/scancel per job — batch or parallelize.
 5. **Cancel SLURM job while attached.** Keybinding in `cxr remote attach`

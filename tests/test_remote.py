@@ -797,6 +797,31 @@ def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
     assert "cxr remote status" in output
 
 
+def test_start_profile_submit_suggests_profile_pull_not_a_stem_wall(monkeypatch, capsys):
+    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(transport.subprocess, "run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(transport, "_run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "48291\n")
+
+    remote.start_queue(["hopg", "hbn", "mose2", "wse2"], no_sync=True, catalog_profile="sub_100keV")
+
+    output = capsys.readouterr().out
+    assert "cxr remote pull --profile sub_100keV" in output
+    assert "cxr remote pull hopg--" not in output  # no hash-stem wall
+
+
+def test_start_standard_submit_suggests_stem_pull(monkeypatch, capsys):
+    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(transport.subprocess, "run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(transport, "_run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "48291\n")
+
+    remote.start_queue(["hopg"], no_sync=True)
+
+    output = capsys.readouterr().out
+    assert "cxr remote pull hopg " in output
+
+
 def test_interrupted_job_upload_releases_its_checkpoint_reservations(monkeypatch):
     commands = []
     monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
@@ -1784,12 +1809,14 @@ def test_stop_cli_accepts_materials(monkeypatch):
     monkeypatch.setattr(
         lifecycle,
         "stop_jobs",
-        lambda materials, all_jobs, *, yes: calls.append((materials, all_jobs, yes)),
+        lambda materials, all_jobs, *, yes, profile: calls.append(
+            (materials, all_jobs, yes, profile)
+        ),
     )
 
     remote.main(["stop", "hopg", "mose2", "--yes"])
 
-    assert calls == [(["hopg", "mose2"], False, True)]
+    assert calls == [(["hopg", "mose2"], False, True, None)]
 
 
 def test_stop_cli_accepts_all(monkeypatch):
@@ -1797,12 +1824,67 @@ def test_stop_cli_accepts_all(monkeypatch):
     monkeypatch.setattr(
         lifecycle,
         "stop_jobs",
-        lambda materials, all_jobs, *, yes: calls.append((materials, all_jobs, yes)),
+        lambda materials, all_jobs, *, yes, profile: calls.append(
+            (materials, all_jobs, yes, profile)
+        ),
     )
 
     remote.main(["stop", "--all", "--yes"])
 
-    assert calls == [([], True, True)]
+    assert calls == [([], True, True, None)]
+
+
+def test_stop_profile_matches_live_job_metadata(monkeypatch):
+    stopped = []
+    monkeypatch.setattr(
+        state,
+        "_live_jobs",
+        lambda: [("job1", False, ["hopg"]), ("job2", False, ["mose2", "wse2"])],
+    )
+    monkeypatch.setattr(
+        state,
+        "_job_profiles",
+        lambda jobids: {"job1": "sub_100keV", "job2": "standard"},
+    )
+    monkeypatch.setattr(lifecycle, "_stop_jobid", stopped.append)
+
+    remote.stop_jobs(profile="sub_100keV")
+
+    assert stopped == ["job1"]
+
+
+def test_stop_profile_without_live_match_errors(monkeypatch):
+    monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", False, ["hopg"])])
+    monkeypatch.setattr(state, "_job_profiles", lambda jobids: {"job1": "standard"})
+
+    with pytest.raises(SystemExit, match="no live job found for profile"):
+        remote.stop_jobs(profile="sub_100keV")
+
+
+def test_stop_profile_rejects_materials_and_all(monkeypatch):
+    monkeypatch.setattr(
+        state,
+        "_live_jobs",
+        lambda: pytest.fail("must reject the combination before checking live jobs"),
+    )
+    with pytest.raises(SystemExit):
+        remote.stop_jobs(["hopg"], profile="sub_100keV")
+    with pytest.raises(SystemExit):
+        remote.stop_jobs(all_jobs=True, profile="sub_100keV")
+
+
+def test_job_profiles_parses_tab_separated_metadata(monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda command: seen.append(command) or "job1\tsub_100keV\njob2\tstandard\n",
+    )
+
+    profiles = state._job_profiles(["job1", "job2"])
+
+    assert profiles == {"job1": "sub_100keV", "job2": "standard"}
+    assert "catalog_profile" in seen[0]
 
 
 # ---- clear <material> (checkpoint lifecycle, component 3) ----------------------
