@@ -196,3 +196,59 @@ Still open / next:
   in this session's cleanup — re-add when wiring it through lifecycle.
 - `docs/cli-reference.md` regen via `scripts/generate_cli_reference.py
   --write PATH` once Phase 3 lands (never hand-edit).
+
+## WIP 2026-07-27 (Phase 3 landed, suite green, uncommitted)
+
+All three Phase 3 items implemented and tested; see `TODO.md`'s Phase 3
+section for the full landed-surface summary (catalog `profile_names`/
+`profile_memberships`/`profile_materials()`, `scan.validate_catalog_profile()`
+shared by local `scan --all/-A --profile` and remote `submit --profile`,
+`dataset_identity`/stem-prediction `catalog_profile` threading with
+standard-profile hash compatibility preserved, `_remote/scripts.py` emitting
+`--profile` in queue scripts, `_remote/lifecycle.resolve_profile_stem()` for
+`cxr remote pull MATERIAL@PROFILE` via remote `meta.json` inspection).
+
+Design decisions made while implementing (not previously pinned down):
+
+- `--all`/`-A` + `--profile NAME` where the profile has an explicit
+  `materials` membership list: silently **intersect** (narrow to members) —
+  a hard error would defeat the point of a broad `--all` sweep. An explicit
+  `MATERIAL --profile NAME` outside that membership is a hard usage error
+  instead (exit 2, lists members) since the user named it directly.
+- An intersection that leaves zero materials is a usage error (exit 2), not
+  a silent empty no-op.
+- `catalog_profile` joins `dataset_identity`'s hashed payload only when it is
+  not `"standard"` (mirrors the existing `n_electrons`/`n_electrons_brem`
+  hash-compatibility pattern) — every pre-existing standard-profile
+  checkpoint keeps its historical `parameter_sha256` and stem bit-for-bit.
+  A non-standard catalog profile is therefore never `canonical_full`, even
+  at fidelity `full` — the bare `<material>` stem stays reserved for
+  `standard` so a differently profiled full run can't collide with it
+  on disk.
+- `cxr remote pull MATERIAL@PROFILE` resolution: on-disk stems never encode
+  the catalog profile (only `<material>--<fidelity>-<hash>`), so resolution
+  lists `checkpoints/` once, then reads each `<material>`-matching
+  candidate's `meta.json` over its own ssh round trip (rare enough per
+  material that this isn't worth a bulk remote-side JSON-parsing script).
+  Newest `mtime` wins by default and prints the alternate hashes found;
+  `--hash HEXPREFIX` pins one and requires exactly one `@`-qualified
+  selector in the pull request.
+- `@` is split out of `stems` before `transport._check_shell_tokens` (not a
+  safe interpolation token); only the resolved on-disk stem ever reaches a
+  remote command.
+
+Verified: ruff clean on `src/`, `tests/`, `scripts/`; `ty check` at the
+pre-existing 15-diagnostic baseline (zero added); full suite
+**1773 passed / 39 skipped**, zero regressions; `docs/cli-reference.md`
+regenerated via `scripts/generate_cli_reference.py --write`.
+
+Not done / explicitly out of scope for this pass:
+
+- `cxr remote scan` (the immediate-attach convenience wrapper, distinct from
+  `submit`) was not given a `--profile` option — the Phase 3 design block
+  only asked for `submit`.
+- `rebrem`/`reline` were not threaded with `catalog_profile` — out of the
+  design block's scope; their existing `--fidelity` handling is untouched.
+- `_refuse_if_busy`'s collision-stem prediction ignores `fidelity` already
+  (pre-existing gap, unrelated to this change) and was left as-is rather
+  than also threading `catalog_profile` through it.

@@ -143,6 +143,7 @@ def test_click_submit_with_invalid_azimuths_fails(monkeypatch):
     assert "Invalid value for '--azimuths'" in result.output
     assert seen == {}
 
+
 def test_click_submit_forwards_geometry_and_set_default(monkeypatch):
     seen = {}
     monkeypatch.setattr(line_grid.job, "start", lambda **kwargs: seen.update(kwargs))

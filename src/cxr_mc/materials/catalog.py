@@ -191,6 +191,13 @@ class MaterialCatalog:
     #: profiles without a membership row are absent (all materials allowed).
     profile_memberships: Mapping[str, tuple[str, ...]] = MappingProxyType({})
 
+    def profile_materials(self, name: str) -> tuple[str, ...] | None:
+        """Explicit ``profiles.NAME.materials`` membership, or ``None`` when the
+        profile has no membership row (every in-use material is allowed)."""
+        if name not in self.profile_names:
+            raise KeyError(f"unknown profile {name!r}; have {list(self.profile_names)}")
+        return self.profile_memberships.get(name)
+
     def crystal(self, key: str) -> CrystalSpec:
         """Return a crystal by key."""
         try:
@@ -900,6 +907,7 @@ def _warn_missing_mott(materials: Mapping[str, MaterialSpec], crystals, media) -
                 element,
             )
 
+
 def load_material_catalog(
     path: Path | None = None,
     *,
@@ -958,13 +966,21 @@ def _load_material_catalog_cached(
     if errors.items:
         raise MaterialConfigError(errors.items)
     _warn_missing_mott(materials, crystals, media)
+    profile_memberships = {
+        name: tuple(cast("list[str]", row["materials"]))
+        for name, row in profiles.items()
+        if isinstance(row.get("materials"), list)
+    }
     return MaterialCatalog(
         schema_version=1,
         crystals=MappingProxyType(crystals),
         media=MappingProxyType(media),
         materials=MappingProxyType(materials),
         material_keys=tuple(materials),
+        profile_names=tuple(profiles),
+        profile_memberships=MappingProxyType(profile_memberships),
     )
+
 
 _DEFAULT_CATALOG: MaterialCatalog | None = None
 _DEFAULT_CATALOG_LOCK = Lock()

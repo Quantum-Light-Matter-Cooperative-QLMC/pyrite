@@ -129,7 +129,9 @@ def test_sync_skills_preserves_mirror_when_canonical_skill_is_invalid(
     existing = write_skill(mirror, "existing")
     before = existing.read_bytes()
 
-    with pytest.raises(dev_module.AgentToolingError, match="missing or unterminated YAML frontmatter"):
+    with pytest.raises(
+        dev_module.AgentToolingError, match="missing or unterminated YAML frontmatter"
+    ):
         dev_module.sync_skill_trees(canonical, mirror)
 
     assert existing.read_bytes() == before

@@ -531,12 +531,19 @@ Options:
 ## `cxr remote pull`
 
 ```text
-Usage: cxr remote pull [OPTIONS] [STEM]...
+Usage: cxr remote pull [OPTIONS] [STEM|MATERIAL@PROFILE]...
 
   Fetch existing checkpoints from remote box.
 
+  STEM is usually a bare material name, but MATERIAL@PROFILE selects the checkpoint the
+  box produced for that catalog profile (--profile on `cxr remote submit`) -- on-disk
+  names never carry the profile, so this reads each candidate's meta.json remotely and
+  pulls the newest match; --hash pins a specific parameter-hash prefix when more than
+  one exists.
+
 Options:
   -a, --all         Pull every configured material.
+  --hash HEXPREFIX  Pin one MATERIAL@PROFILE selector to a parameter-hash prefix.
   -f, --full        Pull full unfiltered checkpoint (default: grid-filtered).
   --drop-wide-brem  With grid pull, drop wide-brem.
   --downcast        With grid pull, downcast to float32.
@@ -686,6 +693,8 @@ Options:
                              no-op on every other material.
   --fidelity [full|survey]   Named settings/grid policy. survey is provisional and
                              reduced.  [default: full]
+  --profile TEXT             Catalog profile to run (e.g. standard, sub_100keV);
+                             orthogonal to --fidelity.  [default: standard]
   --quick                    Use tiny smoke-test grid.
   --workers NUMBER           Transport workers (default: auto; 0 runs serially).
   --parallel-materials N     Simultaneous scans in one allocation; requires --chunk-

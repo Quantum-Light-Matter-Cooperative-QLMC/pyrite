@@ -5,7 +5,13 @@ from dataclasses import replace
 import numpy as np
 
 from cxr_mc.config import default_settings, material_sweep
-from cxr_mc.profiles import FIDELITY_NAMES, dataset_identity, get_profile, variant_stem
+from cxr_mc.profiles import (
+    FIDELITY_NAMES,
+    dataset_identity,
+    get_profile,
+    named_profile_stem,
+    variant_stem,
+)
 from cxr_mc.sweep import build_cases
 
 
@@ -78,3 +84,40 @@ def test_variant_stem_preserves_canonical_full_and_isolates_variants():
     assert variant_stem(full, canonical_full=True) == "hopg"
     assert variant_stem(survey).startswith("hopg--survey-")
     assert variant_stem(full) != variant_stem(survey)
+
+
+def test_catalog_profile_leaves_standard_hash_bit_for_bit():
+    """Phase 3 decision 2: catalog_profile only joins the hashed payload when
+    it diverges from "standard", so every pre-existing standard-profile
+    identity keeps its historical parameter_sha256 (and checkpoint stem)."""
+    settings = default_settings()
+    sweep = material_sweep("hopg")
+    implicit = dataset_identity("hopg", "full", settings, sweep)
+    explicit = dataset_identity("hopg", "full", settings, sweep, catalog_profile="standard")
+
+    assert implicit["parameter_sha256"] == explicit["parameter_sha256"]
+    assert implicit["catalog_profile"] == "standard"
+    assert "catalog_profile" not in implicit["resolved_parameters"]
+
+
+def test_catalog_profile_changes_hash_and_stem_when_not_standard():
+    settings = default_settings()
+    sweep = material_sweep("hopg")
+    standard = dataset_identity("hopg", "full", settings, sweep, catalog_profile="standard")
+    other = dataset_identity("hopg", "full", settings, sweep, catalog_profile="sub_100keV")
+
+    assert other["catalog_profile"] == "sub_100keV"
+    assert other["resolved_parameters"]["catalog_profile"] == "sub_100keV"
+    assert other["parameter_sha256"] != standard["parameter_sha256"]
+    # variant_stem itself takes canonical_full as given; a non-standard
+    # catalog profile's dataset never sets canonical_full=True (callers,
+    # e.g. named_profile_stem/scan._resolved_run, withhold it) -- see
+    # test_named_profile_stem_default_catalog_profile_stays_canonical and
+    # tests/test_material_catalog.py for that end-to-end contract.
+    assert variant_stem(other) != "hopg"
+    assert variant_stem(other).startswith("hopg--full-")
+
+
+def test_named_profile_stem_default_catalog_profile_stays_canonical():
+    assert named_profile_stem("hopg", "full") == "hopg"
+    assert named_profile_stem("hopg", "full", catalog_profile="standard") == "hopg"

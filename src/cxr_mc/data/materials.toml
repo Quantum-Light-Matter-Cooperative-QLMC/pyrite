@@ -115,6 +115,7 @@ thickness_layers = { values = [3, 4, 5, 6] }
 [profiles.standard.overrides.sapphire]
 thickness_ang = 5000000.0
 
+
 [energy_grids.standard]
 line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } }, source = "derived" },

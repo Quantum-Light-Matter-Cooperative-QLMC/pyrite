@@ -235,6 +235,42 @@ def test_missing_beam_energy_errors_without_default_store_coverage(tmp_path):
     assert any("requires E_grid_line" in error for error in caught.value.errors)
 
 
+def _catalog_with_two_profiles(tmp_path: Path) -> Path:
+    """``narrowed`` restricts membership to "mos2"; ``standard`` (no
+    ``materials`` row) allows every in-use material -- Phase 3 scan/submit
+    ``--profile`` intersection semantics read this membership."""
+    text = _minimal_catalog(
+        material_rows="""
+[materials.mos2]
+label = "mos2"
+crystal = "mos2"
+
+[profiles.narrowed]
+thickness_ang = { logspace = { start = 2.0, stop = 3.0, num = 2 } }
+energy_keV = { values = [25.0, 30.0] }
+tilt_deg = { linspace = { start = 0.0, stop = 80.0, num = 3, endpoint = false } }
+tilt_azim_deg = 0.0
+E_grid_line = { arange = { start = 50.0, stop = 60.0, step = 2.0 } }
+E_grid_brem = 0.0
+materials = ["mos2"]
+"""
+    )
+    return _write_catalog(tmp_path, text)
+
+
+def test_profile_names_and_memberships_are_exposed(tmp_path):
+    from cxr_mc.materials import load_material_catalog
+
+    catalog = load_material_catalog(_catalog_with_two_profiles(tmp_path))
+
+    assert catalog.profile_names == ("standard", "narrowed")
+    assert catalog.profile_memberships == {"narrowed": ("mos2",)}
+    assert catalog.profile_materials("standard") is None
+    assert catalog.profile_materials("narrowed") == ("mos2",)
+    with pytest.raises(KeyError, match="unknown profile"):
+        catalog.profile_materials("bogus")
+
+
 def test_bundled_crystal_validation_ids_are_ledgered():
     from cxr_mc import DATA_DIR
 

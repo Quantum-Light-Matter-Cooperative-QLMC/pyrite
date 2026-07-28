@@ -94,7 +94,6 @@ def test_scan_fidelity_dispatch_and_quick_conflict(monkeypatch):
     assert "cannot be combined" in conflict.stderr
 
 
-
 def test_blaze_preserves_one_flag_many_values_syntax(monkeypatch):
     seen = _capture(monkeypatch, blaze, "run")
     result = invoke(
@@ -372,6 +371,57 @@ def test_scan_direct_material_ignores_floor_unless_high_energy_tagged(monkeypatc
     untagged = invoke(scan.command, ["hopg", "--high-energy-min-kev", "200"])
     assert_clean_result(untagged)
     assert seen["floor_map"] == {}
+
+
+class _FakeCatalog:
+    """Duck-typed stand-in for ``MaterialCatalog``'s profile surface --
+    ``validate_catalog_profile`` only ever touches ``profile_names`` and
+    ``profile_materials``."""
+
+    def __init__(self, profile_names, memberships):
+        self.profile_names = profile_names
+        self._memberships = memberships
+
+    def profile_materials(self, name):
+        if name not in self.profile_names:
+            raise KeyError(f"unknown profile {name!r}")
+        return self._memberships.get(name)
+
+
+def test_scan_unknown_profile_is_usage_error():
+    result = invoke(scan.command, ["hopg", "--profile", "bogus"])
+    assert result.exit_code == 2
+    assert "unknown profile 'bogus'" in result.stderr
+    assert "standard" in result.stderr
+
+
+def test_scan_all_profile_membership_silently_intersects(monkeypatch):
+    import cxr_mc.materials as materials_pkg
+
+    monkeypatch.setattr(
+        materials_pkg, "CATALOG", _FakeCatalog(("standard", "narrowed"), {"narrowed": ("hopg",)})
+    )
+    seen = {}
+
+    def fake_run(args):
+        seen["materials"] = scan._selected(args)
+
+    monkeypatch.setattr(scan, "run", fake_run)
+    result = invoke(scan.command, ["--all", "--profile", "narrowed"])
+    assert_clean_result(result)
+    assert seen["materials"] == ["hopg"]
+
+
+def test_scan_explicit_material_outside_profile_is_usage_error(monkeypatch):
+    import cxr_mc.materials as materials_pkg
+
+    monkeypatch.setattr(
+        materials_pkg, "CATALOG", _FakeCatalog(("standard", "narrowed"), {"narrowed": ("hopg",)})
+    )
+    result = invoke(scan.command, ["mos2", "--profile", "narrowed"])
+    assert result.exit_code == 2
+    assert "does not include" in result.stderr
+    assert "hopg" in result.stderr
 
 
 def test_standalone_click_usage_error_preserves_exit_and_streams():

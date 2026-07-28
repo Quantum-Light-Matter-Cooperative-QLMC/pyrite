@@ -909,4 +909,3 @@ def case_t_max(rec_or_case, *, Ne, seed, realistic=False, beam_fwhm_mm=None):
             rec_or_case, Ne=Ne, seed=seed, realistic=realistic, beam_fwhm_mm=beam_fwhm_mm
         )
     )
-

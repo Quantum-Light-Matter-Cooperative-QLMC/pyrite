@@ -344,6 +344,46 @@ def command(
 DEFAULT_HIGH_ENERGY_MIN_KEV = 150.0
 
 
+def validate_catalog_profile(
+    catalog_profile: str, materials: list[str], *, intersect: bool
+) -> list[str]:
+    """Validate ``--profile`` (catalog campaign name) against the material
+    catalog and reconcile it with an already-selected material list.
+
+    Unknown profile names are always a usage error listing what's available.
+    With ``intersect=True`` (``--all``/``-A``), a profile's explicit
+    ``materials`` membership list silently narrows the selection -- absent
+    membership means every candidate stays. With ``intersect=False`` (an
+    explicit MATERIAL/material list), any member outside the profile is a
+    hard usage error instead: the user named it, so silently dropping it
+    would be a surprise, not a convenience.
+    """
+    from .materials import CATALOG
+
+    if catalog_profile not in CATALOG.profile_names:
+        available = ", ".join(sorted(CATALOG.profile_names)) or "(none defined)"
+        raise click.UsageError(f"unknown profile {catalog_profile!r}; available: {available}")
+    membership = CATALOG.profile_materials(catalog_profile)
+    if membership is None:
+        return materials
+    allowed = set(membership)
+    if intersect:
+        narrowed = [m for m in materials if m in allowed]
+        if not narrowed:
+            raise click.UsageError(
+                f"profile {catalog_profile!r} shares no materials with this selection "
+                f"(members: {', '.join(membership)})"
+            )
+        return narrowed
+    non_members = [m for m in materials if m not in allowed]
+    if non_members:
+        raise click.UsageError(
+            f"profile {catalog_profile!r} does not include {', '.join(non_members)} "
+            f"(members: {', '.join(membership)})"
+        )
+    return materials
+
+
 def _selected(args):
     """Resolve MATERIAL/--all/-A plus the include-* flags into an ordered,
     deduplicated material list; also stashes ``args.high_energy_floor_map``
@@ -351,6 +391,7 @@ def _selected(args):
     materials' energy grids regardless of which flag pulled them in."""
     all_ = getattr(args, "all", False)
     actually_all = getattr(args, "actually_all", False)
+    catalog_profile = getattr(args, "catalog_profile", "standard")
     args.high_energy_floor_map = {}
     if all_ or actually_all:
         if args.material is not None:
@@ -377,12 +418,16 @@ def _selected(args):
                 materials += groups["high_energy_materials"]
                 high_energy_selected = set(groups["high_energy_materials"])
             materials = list(dict.fromkeys(materials))
+        materials = validate_catalog_profile(catalog_profile, materials, intersect=True)
+        allowed = set(materials)
+        high_energy_selected &= allowed
         if high_energy_selected:
             floor = getattr(args, "high_energy_min_kev", None)
             floor = DEFAULT_HIGH_ENERGY_MIN_KEV if floor is None else floor
             args.high_energy_floor_map = {m: floor for m in high_energy_selected}
     elif args.material is not None:
         materials = [args.material]
+        materials = validate_catalog_profile(catalog_profile, materials, intersect=False)
         # A direct MATERIAL invocation only applies the floor when the flag is
         # explicitly given (no surprise default) AND the material is itself a
         # high_energy_materials entry (a no-op otherwise) -- this is what lets
@@ -517,14 +562,21 @@ def _resolved_run(args, material):
 
     from .profiles import dataset_identity, variant_stem
 
+    catalog_profile = getattr(args, "catalog_profile", "standard")
     identity = dataset_identity(
         material,
         fidelity,
         settings,
         sweep,
         variant="quick" if getattr(args, "quick", False) else None,
+        catalog_profile=catalog_profile,
     )
-    canonical_full = fidelity == "full" and not overrides and not getattr(args, "quick", False)
+    canonical_full = (
+        fidelity == "full"
+        and not overrides
+        and not getattr(args, "quick", False)
+        and catalog_profile == "standard"
+    )
     stem = variant_stem(identity, canonical_full=canonical_full)
     return settings, sweep, identity, stem
 

@@ -364,7 +364,9 @@ THICKNESS_CSV_TEXT = _CSV("thickness", lower=0, lower_open=True, preserve_text=T
 TILT_CSV = _CSV("tilt", lower=0, upper=90, upper_inclusive=False)
 TILT_CSV_TEXT = _CSV("tilt", lower=0, upper=90, upper_inclusive=False, preserve_text=True)
 AZIMUTH_CSV = _CSV("azimuth", lower=90, upper=270, lower_open=True, upper_inclusive=False)
-AZIMUTH_CSV_TEXT = _CSV("azimuth", lower=90, upper=270, lower_open=True, upper_inclusive=False, preserve_text=True)
+AZIMUTH_CSV_TEXT = _CSV(
+    "azimuth", lower=90, upper=270, lower_open=True, upper_inclusive=False, preserve_text=True
+)
 
 # Range-capable variants for direct catalog writes (``sweep set``, ``cxr
 # profile``): additionally accept ``start:stop:step`` tokens (stop-inclusive
@@ -373,7 +375,9 @@ AZIMUTH_CSV_TEXT = _CSV("azimuth", lower=90, upper=270, lower_open=True, upper_i
 ENERGY_CSV_RANGE = _CSV("energy", lower=0, lower_open=True, ranges=True)
 THICKNESS_CSV_RANGE = _CSV("thickness", lower=0, lower_open=True, ranges=True)
 TILT_CSV_RANGE = _CSV("tilt", lower=0, upper=90, upper_inclusive=False, ranges=True)
-AZIMUTH_CSV_RANGE = _CSV("azimuth", lower=90, upper=270, lower_open=True, upper_inclusive=False, ranges=True)
+AZIMUTH_CSV_RANGE = _CSV(
+    "azimuth", lower=90, upper=270, lower_open=True, upper_inclusive=False, ranges=True
+)
 
 
 def json_option(function):
@@ -385,11 +389,14 @@ def json_option(function):
         help="Emit one versioned JSON object on stdout.",
     )(function)
 
+
 FIDELITY_CHOICES = click.Choice(("full", "survey"), case_sensitive=True)
 _DEFAULT_FIDELITY_HELP = "Named settings/grid-reduction policy. survey is provisional and reduced."
 
+
 def fidelity_option(*, help: str = _DEFAULT_FIDELITY_HELP):
     """Add ``--fidelity`` option to a Click command."""
+
     def decorator(function):
         return click.option(
             "--fidelity",
@@ -400,6 +407,7 @@ def fidelity_option(*, help: str = _DEFAULT_FIDELITY_HELP):
         )(function)
 
     return decorator
+
 
 def emit_result(message: str) -> None:
     click.echo(message)

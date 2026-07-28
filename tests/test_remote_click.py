@@ -65,6 +65,7 @@ def test_start_click_defaults_and_zero_meanings(monkeypatch):
                 "no_sync": False,
                 "dry_run": False,
                 "high_energy_min_kev": None,
+                "catalog_profile": "standard",
             },
         )
     ]
@@ -167,6 +168,47 @@ def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
     else:
         assert_clean_result(result)
     assert calls[0]["fidelity"] == "survey"
+
+
+def test_submit_profile_option_dispatches_catalog_profile(monkeypatch):
+    import cxr_mc.materials as materials_pkg
+
+    class _FakeCatalog:
+        profile_names = ("standard", "sub_100keV")
+
+        def profile_materials(self, _name):
+            return None  # no membership row -> every candidate stays
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "start_queue",
+        lambda materials, **kwargs: calls.append(kwargs) or "job",
+    )
+
+    result = invoke(remote.command, ["submit", "hopg", "--profile", "sub_100keV"])
+
+    assert_clean_result(result)
+    assert calls[0]["catalog_profile"] == "sub_100keV"
+
+
+def test_pull_hash_option_dispatches_and_requires_one_qualified_selector(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "pull",
+        lambda materials, **kwargs: calls.append((materials, kwargs)),
+    )
+
+    result = invoke(remote.command, ["pull", "hopg@sub_100keV", "--hash", "abc123"])
+    assert_clean_result(result)
+    assert calls[0][0] == ["hopg@sub_100keV"]
+    assert calls[0][1]["hash_prefix"] == "abc123"
+
+    ambiguous = invoke(remote.command, ["pull", "hopg", "wse2", "--hash", "abc123"])
+    assert ambiguous.exit_code == 2
+    assert "requires exactly one MATERIAL@PROFILE" in ambiguous.stderr
 
 
 @pytest.mark.parametrize(

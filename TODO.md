@@ -67,7 +67,7 @@ Authoritative plan with decisions and full subitem→phase mapping:
    sweepable by default.
 5. Every command through `cli-ui-ux` skill (design, implementation, tests).
 
-## Phase 3 — remote integration
+## Phase 3 — remote integration [DONE]
 
 1. `cxr remote submit --profile` accepts catalog profile names;
    `--fidelity full|survey` orthogonal. No auto-generated `survey` catalog
@@ -78,3 +78,19 @@ Authoritative plan with decisions and full subitem→phase mapping:
 3. Run-time `cxr scan --all --profile NAME` flag; never writes catalog; no
    hidden session state (en-masse transient swap mostly dissolves under
    inverted schema).
+
+Landed: `MaterialCatalog.profile_names`/`profile_memberships`/`profile_materials()`
+wired from `[profiles.*]`; `scan.validate_catalog_profile()` (shared by
+`scan._selected` and remote `_start_selected`) rejects an unknown `--profile`
+and either silently intersects `--all` selections against a profile's
+`materials` list or hard-errors an explicit non-member material.
+`dataset_identity()`/`named_profile_stem()`/`high_energy_floor_*` gained a
+`catalog_profile` kwarg (conditional hash key, `variant`-style — standard-profile
+hashes stay bit-for-bit identical); non-standard profiles are never canonical
+stems. `_remote/scripts.py` emits `--profile NAME` in queue scripts and
+predicts the matching qualified stem; `_remote/lifecycle.pull()` splits
+`MATERIAL@PROFILE` before the shell-token check and resolves it via
+`resolve_profile_stem()` (reads each candidate directory's remote `meta.json`,
+newest `mtime` wins, `--hash` pins one digest). Tests added across
+`test_material_catalog.py`, `test_profiles.py`, `test_local_click_cli.py`,
+`test_remote.py`, `test_remote_click.py`; full suite 1773 passed / 39 skipped.

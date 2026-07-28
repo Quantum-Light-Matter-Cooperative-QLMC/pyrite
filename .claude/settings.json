@@ -31,7 +31,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "f=.venv/Scripts/python.exe; [ -x \"$f\" ] || f=.venv/bin/python; [ -x \"$f\" ] || f=python3; \"$f\" .claude/hooks/guard_local_sweep.py",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && f=.venv/Scripts/python.exe; [ -x \"$f\" ] || f=.venv/bin/python; [ -x \"$f\" ] || f=python3; \"$f\" .claude/hooks/guard_local_sweep.py",
             "statusMessage": "Checking for local sweep"
           }
         ]
@@ -44,7 +44,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "f=.venv/Scripts/python.exe; [ -x \"$f\" ] || f=.venv/bin/python; [ -x \"$f\" ] || f=python3; \"$f\" .claude/hooks/on_edit.py 2>/dev/null || true",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && f=.venv/Scripts/python.exe; [ -x \"$f\" ] || f=.venv/bin/python; [ -x \"$f\" ] || f=python3; \"$f\" .claude/hooks/on_edit.py 2>/dev/null || true",
             "statusMessage": "Formatting edited file"
           }
         ]

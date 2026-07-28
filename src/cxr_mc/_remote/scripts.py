@@ -8,7 +8,7 @@ from . import config, transport
 
 
 # ---- detached job queue -------------------------------------------------------
-def _stems(materials, quick, fidelity="full", high_energy_min_kev=None):
+def _stems(materials, quick, fidelity="full", high_energy_min_kev=None, catalog_profile="standard"):
     """Checkpoint stems a queue produces (the scan runner writes
     <material>_quick.pkl for --quick runs). ``high_energy_min_kev`` predicts the
     non-canonical stem for any material in mats_to_sim.toml's
@@ -16,11 +16,14 @@ def _stems(materials, quick, fidelity="full", high_energy_min_kev=None):
     if quick:
         return [f"{m}_quick" for m in materials]
     if high_energy_min_kev is None:
-        if fidelity == "full":
+        if fidelity == "full" and catalog_profile == "standard":
             return list(materials)
         from ..profiles import named_profile_stem
 
-        return [named_profile_stem(material, fidelity) for material in materials]
+        return [
+            named_profile_stem(material, fidelity, catalog_profile=catalog_profile)
+            for material in materials
+        ]
     from ..profiles import high_energy_floor_stem, named_profile_stem
     from ..scan import load_manifest_groups
 
@@ -28,11 +31,15 @@ def _stems(materials, quick, fidelity="full", high_energy_min_kev=None):
     stems = []
     for material in materials:
         if material in tagged:
-            stems.append(high_energy_floor_stem(material, high_energy_min_kev, fidelity))
-        elif fidelity == "full":
+            stems.append(
+                high_energy_floor_stem(
+                    material, high_energy_min_kev, fidelity, catalog_profile=catalog_profile
+                )
+            )
+        elif fidelity == "full" and catalog_profile == "standard":
             stems.append(material)
         else:
-            stems.append(named_profile_stem(material, fidelity))
+            stems.append(named_profile_stem(material, fidelity, catalog_profile=catalog_profile))
     return stems
 
 
@@ -86,6 +93,7 @@ def _queue_script(
     parallel_materials=config.DEFAULT_PARALLEL_MATERIALS,
     fidelity="full",
     high_energy_min_kev=None,
+    catalog_profile="standard",
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
     parallel_materials = _validate_parallel_materials(parallel_materials)
@@ -98,6 +106,8 @@ def _queue_script(
         flags += f" --workers {workers}"
     if high_energy_min_kev is not None:
         flags += f" --high-energy-min-kev {high_energy_min_kev}"
+    if catalog_profile != "standard":
+        flags += f" --profile {catalog_profile}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -152,7 +162,14 @@ fi
 
 
 def _chunked_queue_script(
-    jobid, materials, quick, workers, chunk_minutes, fidelity="full", high_energy_min_kev=None
+    jobid,
+    materials,
+    quick,
+    workers,
+    chunk_minutes,
+    fidelity="full",
+    high_energy_min_kev=None,
+    catalog_profile="standard",
 ):
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
 
@@ -172,6 +189,8 @@ def _chunked_queue_script(
         flags += f" --workers {workers}"
     if high_energy_min_kev is not None:
         flags += f" --high-energy-min-kev {high_energy_min_kev}"
+    if catalog_profile != "standard":
+        flags += f" --profile {catalog_profile}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
@@ -786,6 +805,7 @@ def _queue_metadata(
     chunk_minutes: float = 0,
     fidelity: str = "full",
     high_energy_min_kev: float | None = None,
+    catalog_profile: str = "standard",
 ):
     """Static metadata persisted before a queue becomes visible to SLURM."""
     return "\n".join(
@@ -794,6 +814,7 @@ def _queue_metadata(
             f"materials: {' '.join(materials)}",
             f"quick: {bool(quick)}",
             f"fidelity: {fidelity}",
+            f"catalog_profile: {catalog_profile}",
             f"workers: {workers}",
             f"parallel_materials: {parallel_materials}",
             f"chunk_minutes: {chunk_minutes}",

@@ -552,7 +552,11 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
                         E_grid=line_case_grid,  # legacy key (== line grid)
                         E_grid_line=line_case_grid,
                         E_grid_brem=(
-                            (brem_case_grid[0], float(E0) * 1e3 + brem_case_grid[2], brem_case_grid[2])
+                            (
+                                brem_case_grid[0],
+                                float(E0) * 1e3 + brem_case_grid[2],
+                                brem_case_grid[2],
+                            )
                             if isinstance(brem_case_grid, tuple)
                             else brem_case_grid
                         ),

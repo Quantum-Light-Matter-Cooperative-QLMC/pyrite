@@ -1,5 +1,6 @@
 """Job lifecycle: submit, stop, clear, reap, pull."""
 
+import json
 import math
 import subprocess
 import sys
@@ -179,6 +180,7 @@ def start_queue(
     chunk_minutes=10.0,
     fidelity="full",
     high_energy_min_kev=None,
+    catalog_profile="standard",
 ):
     """Submit a material queue to SLURM. Returns its job id.
 
@@ -192,9 +194,13 @@ def start_queue(
     ``high_energy_min_kev`` forwards ``--high-energy-min-kev`` to every
     material's remote ``cxr scan`` invocation; it is a no-op there for any
     material outside mats_to_sim.toml's ``high_energy_materials``, so one
-    shared value is safe across a mixed batch.
+    shared value is safe across a mixed batch. ``catalog_profile`` forwards
+    ``--profile`` (catalog campaign name, orthogonal to ``fidelity``) the
+    same way -- the remote ``cxr scan`` re-validates it against the synced
+    catalog, so an unknown name still fails loudly on the box.
     """
     transport._check_materials(materials)
+    transport._check_shell_tokens([catalog_profile])
     chunked = chunk_minutes > 0
     if chunked and parallel_materials is not None:
         raise SystemExit(
@@ -205,11 +211,18 @@ def start_queue(
         _refuse_if_busy(materials, quick)
     jobid = scripts._new_jobid()
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
-    stems = scripts._stems(materials, quick, fidelity, high_energy_min_kev)
+    stems = scripts._stems(materials, quick, fidelity, high_energy_min_kev, catalog_profile)
     if chunked:
         parallel_materials = None
         payload = scripts._chunked_queue_script(
-            jobid, materials, quick, workers, chunk_minutes, fidelity, high_energy_min_kev
+            jobid,
+            materials,
+            quick,
+            workers,
+            chunk_minutes,
+            fidelity,
+            high_energy_min_kev,
+            catalog_profile,
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
     else:
@@ -217,7 +230,14 @@ def start_queue(
             config.DEFAULT_PARALLEL_MATERIALS if parallel_materials is None else parallel_materials
         )
         payload = scripts._queue_script(
-            jobid, materials, quick, workers, parallel_materials, fidelity, high_energy_min_kev
+            jobid,
+            materials,
+            quick,
+            workers,
+            parallel_materials,
+            fidelity,
+            high_energy_min_kev,
+            catalog_profile,
         )
         time_limit = config.SLURM_TIME
     script = scripts._slurm_batch_script(
@@ -234,6 +254,7 @@ def start_queue(
             chunk_minutes,
             fidelity,
             high_energy_min_kev,
+            catalog_profile,
         ),
     )
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
@@ -271,6 +292,8 @@ def start_queue(
                             parallel_materials,
                             chunk_minutes,
                             fidelity,
+                            high_energy_min_kev,
+                            catalog_profile,
                         )
                     ),
                 ),
@@ -793,6 +816,99 @@ def _resolve_survey_stems(stems):
     return resolved
 
 
+def _split_profile_selector(stem):
+    """Split a ``MATERIAL@PROFILE`` pull selector into ``(material, profile)``,
+    or ``None`` for a plain stem (no ``@``)."""
+    if "@" not in stem:
+        return None
+    material, _, profile = stem.partition("@")
+    if not material or not profile:
+        raise SystemExit(
+            f"invalid MATERIAL@PROFILE selector {stem!r}: expected both a material "
+            "and a profile name either side of '@'"
+        )
+    return material, profile
+
+
+def _remote_meta_json(stem):
+    """Fetch and parse one remote checkpoint's ``meta.json`` plus its mtime, or
+    ``None`` when the file is absent or unreadable. One ssh round trip: a
+    leading ``stat`` line disambiguates "missing" from "empty" without a
+    second connection."""
+    path = config.remote_path("checkpoints", stem, "meta.json")
+    path_q = config.shell_arg(path)
+    raw = transport._ssh_capture(f"[ -f {path_q} ] || exit 0; stat -c %Y {path_q}; cat {path_q}")
+    mtime_line, _, body = raw.partition("\n")
+    if not mtime_line.strip():
+        return None
+    try:
+        mtime = float(mtime_line)
+        meta = json.loads(body)
+    except (ValueError, TypeError, json.JSONDecodeError):
+        return None
+    return mtime, meta
+
+
+def _profile_pull_candidates(material):
+    """Every on-disk stem for MATERIAL: the bare canonical directory (if
+    present) plus every identity-qualified ``<material>--<fidelity>-<hash>``
+    variant -- the stem name alone never carries the catalog profile, so this
+    only narrows by material; :func:`resolve_profile_stem` reads each
+    candidate's meta.json to filter by profile."""
+    from ..profiles import _VARIANT_STEM_RE
+
+    names = set(transport._ssh_capture(scripts._list_checkpoint_dirs_command()).split())
+    candidates = [material] if material in names else []
+    for name in sorted(names):
+        match = _VARIANT_STEM_RE.fullmatch(name)
+        if match is not None and match["material"] == material and name not in candidates:
+            candidates.append(name)
+    return candidates
+
+
+def resolve_profile_stem(material, catalog_profile, *, hash_prefix=None):
+    """Resolve a ``MATERIAL@PROFILE`` pull selector to one exact on-disk
+    checkpoint stem.
+
+    Decision 3/Phase 3 design: on-disk stems stay hash-based and never encode
+    the catalog profile, so this reads each candidate directory's
+    ``meta.json`` -> ``dataset_identity.catalog_profile`` remotely (one ssh
+    round trip per candidate; materials rarely carry more than a handful of
+    variants). The newest match wins unless ``hash_prefix`` (``--hash``) pins
+    one; ties print every alternative hash so a caller can pin explicitly.
+    """
+    candidates = _profile_pull_candidates(material)
+    found = []
+    for stem in candidates:
+        fetched = _remote_meta_json(stem)
+        if fetched is None:
+            continue
+        mtime, meta = fetched
+        identity = meta.get("dataset_identity") or {}
+        profile = identity.get("catalog_profile") or "standard"
+        digest = str(identity.get("parameter_sha256", ""))
+        found.append((stem, profile, digest, mtime))
+    matches = [item for item in found if item[1] == catalog_profile]
+    if hash_prefix is not None:
+        matches = [item for item in matches if item[2].startswith(hash_prefix)]
+    if not matches:
+        available = sorted({f"{profile}:{digest[:12]}" for _, profile, digest, _ in found})
+        detail = f"; found on the box: {', '.join(available)}" if available else "; none found"
+        selector = f"{material}@{catalog_profile}"
+        if hash_prefix is not None:
+            selector += f" --hash {hash_prefix}"
+        raise SystemExit(f"no remote checkpoint matches {selector}{detail}")
+    matches.sort(key=lambda item: item[3], reverse=True)
+    if len(matches) > 1 and hash_prefix is None:
+        alternates = ", ".join(item[2][:12] for item in matches[1:])
+        print(
+            f"{material}@{catalog_profile}: {len(matches)} hashes found on the box; "
+            f"pulling newest ({matches[0][2][:12]}); pin another with "
+            f"--hash (alternates: {alternates})"
+        )
+    return matches[0][0]
+
+
 def pull(
     stems,
     grid=False,
@@ -803,6 +919,7 @@ def pull(
     dataset=None,
     force=False,
     summary=None,
+    hash_prefix=None,
 ):
     """Fetch checkpoints/<stem>.pkl back from the box for each stem (stem =
     material, or material_quick for a --quick run).
@@ -827,6 +944,23 @@ def pull(
     stems = list(stems)
     if not stems:
         raise ValueError("stems must contain at least one checkpoint stem")
+    # MATERIAL@PROFILE selectors split and resolve to an exact stem here,
+    # before the shell-token check below -- '@' is not a safe interpolation
+    # token, and only the resolved stem ever reaches a remote command.
+    selectors = [_split_profile_selector(stem) for stem in stems]
+    qualified = [selector for selector in selectors if selector is not None]
+    if hash_prefix is not None and len(qualified) != 1:
+        raise SystemExit("--hash requires exactly one MATERIAL@PROFILE selector to pull")
+    if qualified:
+        resolved_stems = []
+        for stem, selector in zip(stems, selectors, strict=True):
+            if selector is None:
+                resolved_stems.append(stem)
+                continue
+            material, profile = selector
+            transport._check_shell_tokens([material])
+            resolved_stems.append(resolve_profile_stem(material, profile, hash_prefix=hash_prefix))
+        stems = resolved_stems
     transport._check_shell_tokens(stems)
     if dataset is None:
         stems = _resolve_survey_stems(stems)

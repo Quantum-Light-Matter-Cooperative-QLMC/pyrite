@@ -61,7 +61,9 @@ def default_settings(fidelity: str = "full"):
 
 
 def _material_spec(material: str, catalog_profile: str = "standard") -> MaterialSpec:
-    catalog = CATALOG if catalog_profile == "standard" else load_material_catalog(profile=catalog_profile)
+    catalog = (
+        CATALOG if catalog_profile == "standard" else load_material_catalog(profile=catalog_profile)
+    )
     try:
         return catalog.material(material)
     except KeyError:
@@ -128,6 +130,7 @@ def material_sweep(
     )
     sweep = get_profile(fidelity).apply_sweep(sweep)
     return replace(sweep, **overrides) if overrides else sweep
+
 
 def trajectory_sweep(
     material: str,

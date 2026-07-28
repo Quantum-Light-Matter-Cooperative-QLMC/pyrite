@@ -34,7 +34,11 @@ def remote_scan(material, quick=False, workers=None, fidelity="full"):
     """
     transport._check_materials([material])
     jobid = lifecycle.start_queue(
-        [material], quick=quick, workers=workers, chunk_minutes=0, fidelity=fidelity,
+        [material],
+        quick=quick,
+        workers=workers,
+        chunk_minutes=0,
+        fidelity=fidelity,
     )
     viewer.attach(jobid)
     return jobid
@@ -116,9 +120,12 @@ def _start_selected(args):
     batch, so this returns a single floor (or ``None``); ``--high-energy-min-kev``
     is a no-op for any queued material outside ``high_energy_materials``, so
     it is safe to forward blindly."""
+    from ..scan import validate_catalog_profile
+
     explicit = list(getattr(args, "materials", None) or [])
     all_ = getattr(args, "all", False)
     actually_all = getattr(args, "actually_all", False)
+    catalog_profile = getattr(args, "catalog_profile", "standard")
     high_energy_min_kev = None
     if all_ or actually_all:
         if explicit:
@@ -135,21 +142,23 @@ def _start_selected(args):
                     ]
                 )
             )
-            has_high_energy = bool(groups["high_energy_materials"])
+            high_energy_selected = set(groups["high_energy_materials"])
         else:
             materials = list(groups["materials"])
             if getattr(args, "include_unverified_dw", False):
                 materials += groups["no_verified_dw"]
-            has_high_energy = False
+            high_energy_selected = set()
             if getattr(args, "include_high_energy", False):
                 materials += groups["high_energy_materials"]
-                has_high_energy = True
+                high_energy_selected = set(groups["high_energy_materials"])
             materials = list(dict.fromkeys(materials))
-        if has_high_energy:
+        materials = validate_catalog_profile(catalog_profile, materials, intersect=True)
+        high_energy_selected &= set(materials)
+        if high_energy_selected:
             floor = getattr(args, "high_energy_min_kev", None)
             high_energy_min_kev = DEFAULT_HIGH_ENERGY_MIN_KEV if floor is None else floor
     elif explicit:
-        materials = explicit
+        materials = validate_catalog_profile(catalog_profile, explicit, intersect=False)
         floor = getattr(args, "high_energy_min_kev", None)
         if floor is not None:
             tagged = set(load_manifest_groups(config.MATS_FILE)["high_energy_materials"])
@@ -280,6 +289,7 @@ def _cli_pull(args):
         no_sync=args.no_sync,
         dataset=dataset,
         force=args.force,
+        hash_prefix=getattr(args, "hash_prefix", None),
     )
 
 
@@ -301,6 +311,7 @@ def _cli_pull_json(args):
                 dataset=dataset,
                 force=args.force,
                 summary=summary,
+                hash_prefix=getattr(args, "hash_prefix", None),
             )
     except (Exception, SystemExit) as exc:
         caught = exc
@@ -335,6 +346,7 @@ def _cli_start(args):
         no_sync=args.no_sync,
         dry_run=args.dry_run,
         high_energy_min_kev=high_energy_min_kev,
+        catalog_profile=getattr(args, "catalog_profile", "standard"),
     )
     if args.follow and not args.dry_run:
         viewer.attach(jobid)
@@ -736,6 +748,13 @@ def reline_command(
     ),
 )
 @fidelity_option(help="Named settings/grid policy. survey is provisional and reduced.")
+@click.option(
+    "--profile",
+    "catalog_profile",
+    default="standard",
+    show_default=True,
+    help="Catalog profile to run (e.g. standard, sub_100keV); orthogonal to --fidelity.",
+)
 @click.option("--quick", is_flag=True, help="Use tiny smoke-test grid.")
 @click.option(
     "--workers",
@@ -761,7 +780,6 @@ def reline_command(
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
 @click.option("--dry-run", is_flag=True, help="Print submission preview; do not connect.")
 @click.option("-f", "--follow", is_flag=True, help="Track job after launch.")
-
 def start_command(
     materials,
     all_,
@@ -770,6 +788,7 @@ def start_command(
     include_high_energy,
     high_energy_min_kev,
     fidelity,
+    catalog_profile,
     quick,
     workers,
     parallel_materials,
@@ -808,6 +827,7 @@ def start_command(
             include_high_energy=include_high_energy,
             high_energy_min_kev=high_energy_min_kev,
             fidelity=fidelity,
+            catalog_profile=catalog_profile,
             quick=quick,
             workers=workers,
             parallel_materials=parallel_materials,
@@ -916,14 +936,31 @@ def reap_command(min_age_minutes, yes):
     )
 
 
-@command.command("pull", help="Fetch existing checkpoints from remote box.")
+@command.command(
+    "pull",
+    help=(
+        "Fetch existing checkpoints from remote box.\n\n"
+        "STEM is usually a bare material name, but MATERIAL@PROFILE selects the "
+        "checkpoint the box produced for that catalog profile (--profile on "
+        "`cxr remote submit`) -- on-disk names never carry the profile, so this "
+        "reads each candidate's meta.json remotely and pulls the newest match; "
+        "--hash pins a specific parameter-hash prefix when more than one exists."
+    ),
+)
 @click.argument(
     "material",
     nargs=-1,
-    metavar="[STEM]...",
+    metavar="[STEM|MATERIAL@PROFILE]...",
     shell_complete=_cli_completion.complete_remote_checkpoint_stem,
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Pull every configured material.")
+@click.option(
+    "--hash",
+    "hash_prefix",
+    default=None,
+    metavar="HEXPREFIX",
+    help="Pin one MATERIAL@PROFILE selector to a parameter-hash prefix.",
+)
 @click.option(
     "-f",
     "--full",
@@ -954,6 +991,7 @@ def reap_command(min_age_minutes, yes):
 def pull_command(
     material,
     all_,
+    hash_prefix,
     full_,
     drop_wide_brem,
     downcast,
@@ -968,12 +1006,15 @@ def pull_command(
     _reject_all_with_values("pull", all_, materials)
     if brem_only and line_only:
         raise click.UsageError("--brem-only and --line-only are mutually exclusive")
+    if hash_prefix is not None and sum("@" in m for m in materials) != 1:
+        raise click.UsageError("--hash requires exactly one MATERIAL@PROFILE selector to pull")
     return _invoke_click(
         _cli_pull_json if json_output else _cli_pull,
         _click_args(
             "pull",
             material=materials,
             all=all_,
+            hash_prefix=hash_prefix,
             full=full_,
             drop_wide_brem=drop_wide_brem,
             downcast=downcast,

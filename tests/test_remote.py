@@ -313,6 +313,42 @@ def test_queue_script_records_uv_sync_timing_and_preserves_failure_state(monkeyp
 def test_queue_script_no_flags_when_unset():
     s = remote._queue_script("j", ["mos2"], quick=False, workers=None)
     assert "--quick" not in s and "--workers" not in s
+    assert "--profile" not in s
+
+
+def test_queue_script_emits_profile_flag_when_not_standard():
+    script = scripts._queue_script("j", ["mos2"], False, None, catalog_profile="sub_100keV")
+    assert "--profile sub_100keV" in script
+
+    chunked = scripts._chunked_queue_script(
+        "j", ["mos2"], False, None, 10, catalog_profile="sub_100keV"
+    )
+    assert "--profile sub_100keV" in chunked
+
+
+def test_queue_metadata_records_catalog_profile():
+    default = scripts._queue_metadata("j", ["mos2"], False, None)
+    assert "catalog_profile: standard" in default
+
+    custom = scripts._queue_metadata("j", ["mos2"], False, None, catalog_profile="sub_100keV")
+    assert "catalog_profile: sub_100keV" in custom
+
+
+def test_stems_predicts_qualified_stem_for_non_standard_catalog_profile(monkeypatch):
+    import cxr_mc.profiles as profiles_module
+
+    assert scripts._stems(["mos2"], False) == ["mos2"]
+
+    calls = []
+
+    def fake_named_profile_stem(material, fidelity, *, catalog_profile="standard"):
+        calls.append((material, fidelity, catalog_profile))
+        return f"{material}--{fidelity}-qualified"
+
+    monkeypatch.setattr(profiles_module, "named_profile_stem", fake_named_profile_stem)
+
+    assert scripts._stems(["mos2"], False, catalog_profile="sub_100keV") == ["mos2--full-qualified"]
+    assert calls == [("mos2", "full", "sub_100keV")]
 
 
 def test_queue_script_and_stem_resolve_survey_profile():
@@ -2404,6 +2440,125 @@ def test_resolve_survey_stems_skips_quick_and_already_qualified_stems(monkeypatc
     assert lifecycle._resolve_survey_stems([qualified]) == [qualified]
 
 
+# ---- pull MATERIAL@PROFILE selector (Phase 3 decision 3/design) -----------
+def test_split_profile_selector_parses_and_rejects_empty_halves():
+    assert lifecycle._split_profile_selector("hopg") is None
+    assert lifecycle._split_profile_selector("hopg@sub_100keV") == ("hopg", "sub_100keV")
+    with pytest.raises(SystemExit, match="invalid MATERIAL@PROFILE"):
+        lifecycle._split_profile_selector("hopg@")
+    with pytest.raises(SystemExit, match="invalid MATERIAL@PROFILE"):
+        lifecycle._split_profile_selector("@sub_100keV")
+
+
+def _fake_remote_catalog(listing, meta_by_stem):
+    """Route ``transport._ssh_capture`` calls: the checkpoint-dir listing
+    command returns ``listing`` verbatim; any other command is treated as a
+    ``[ -f ... ] ... stat ... cat ...`` meta.json fetch and matched by which
+    stem's path it names."""
+
+    def fake(command):
+        if command.startswith("[ -d "):
+            return listing
+        for stem, (mtime, meta) in meta_by_stem.items():
+            if f"checkpoints/{stem}/meta.json" in command:
+                return f"{mtime}\n{json.dumps(meta)}"
+        return ""
+
+    return fake
+
+
+def test_resolve_profile_stem_picks_newest_and_reports_alternates(monkeypatch, capsys):
+    a = f"hopg--full-{'a' * 12}"
+    b = f"hopg--full-{'b' * 12}"
+    meta = {
+        "hopg": (
+            50,
+            {"dataset_identity": {"catalog_profile": "standard", "parameter_sha256": "c" * 64}},
+        ),
+        a: (
+            100,
+            {"dataset_identity": {"catalog_profile": "sub_100keV", "parameter_sha256": "a" * 64}},
+        ),
+        b: (
+            200,
+            {"dataset_identity": {"catalog_profile": "sub_100keV", "parameter_sha256": "b" * 64}},
+        ),
+    }
+    monkeypatch.setattr(transport, "_ssh_capture", _fake_remote_catalog(f"hopg\n{a}\n{b}\n", meta))
+
+    stem = lifecycle.resolve_profile_stem("hopg", "sub_100keV")
+
+    assert stem == b  # newest mtime (200) wins
+    out = capsys.readouterr().out
+    assert "2 hashes found" in out
+    assert ("a" * 12) in out
+
+
+def test_resolve_profile_stem_hash_prefix_pins_one(monkeypatch):
+    a = f"hopg--full-{'a' * 12}"
+    b = f"hopg--full-{'b' * 12}"
+    meta = {
+        a: (
+            100,
+            {"dataset_identity": {"catalog_profile": "sub_100keV", "parameter_sha256": "a" * 64}},
+        ),
+        b: (
+            200,
+            {"dataset_identity": {"catalog_profile": "sub_100keV", "parameter_sha256": "b" * 64}},
+        ),
+    }
+    monkeypatch.setattr(transport, "_ssh_capture", _fake_remote_catalog(f"{a}\n{b}\n", meta))
+
+    assert lifecycle.resolve_profile_stem("hopg", "sub_100keV", hash_prefix="a" * 12) == a
+
+
+def test_resolve_profile_stem_raises_with_no_match(monkeypatch):
+    monkeypatch.setattr(transport, "_ssh_capture", _fake_remote_catalog("hopg\n", {}))
+
+    with pytest.raises(SystemExit, match=r"no remote checkpoint matches hopg@sub_100keV"):
+        lifecycle.resolve_profile_stem("hopg", "sub_100keV")
+
+
+def test_pull_hash_requires_exactly_one_qualified_selector(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must validate before syncing"))
+
+    with pytest.raises(SystemExit, match="--hash requires exactly one MATERIAL@PROFILE"):
+        remote.pull(["hopg@standard", "wse2@standard"], grid=True, hash_prefix="a" * 12)
+
+
+def test_pull_resolves_profile_selector_to_the_predicted_stem(monkeypatch, tmp_path):
+    import numpy as np
+
+    from cxr_mc import _checkpoint_io, _checkpoint_store
+
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    resolved = []
+
+    def fake_resolve(material, profile, **kwargs):
+        resolved.append((material, profile, kwargs.get("hash_prefix")))
+        return "hopg"
+
+    monkeypatch.setattr(lifecycle, "resolve_profile_stem", fake_resolve)
+    monkeypatch.setattr(transport, "sync_code", lambda: None)
+    # resolves to bare "hopg" -- also triggers _resolve_survey_stems' listing;
+    # empty means no sibling survey checkpoint to also pull.
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "")
+    payload = {"cfg": {30.0: {"case": {}, "E_grid": np.array([1.0]), "spec": np.array([1.0])}}}
+    transfer = tmp_path / "transfer.pkl"
+    _checkpoint_io.dump(payload, str(transfer))
+
+    def fake_download(_command, destination):
+        shutil.copyfile(transfer, destination)
+
+    monkeypatch.setattr(transport, "_ssh_download", fake_download)
+
+    remote.pull(["hopg@sub_100keV"], grid=True, no_sync=True)
+
+    assert resolved == [("hopg", "sub_100keV", None)]
+    assert _checkpoint_store.checkpoint_exists("hopg", tmp_path / "checkpoints")
+
+
 def test_pull_bare_material_also_pulls_matching_survey_checkpoint(monkeypatch, tmp_path, capsys):
     import numpy as np
 
@@ -2558,6 +2713,7 @@ def test_remote_scan_forwards_parallel_materials(monkeypatch):
     remote.main(["scan", "hopg", "--parallel-materials", "3", "--chunk-minutes", "0", "--no-sync"])
 
     assert calls[0][1]["parallel_materials"] == 3
+
 
 def test_remote_scan_submits_then_attaches_and_pulls(monkeypatch):
     events = []
