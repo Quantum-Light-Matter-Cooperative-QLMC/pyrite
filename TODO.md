@@ -1,60 +1,51 @@
-# TODO — feature/remote-ux
+# TODO / Backlog
 
-Remote-job UX fixes around `cxr remote submit/stop/attach`: profile-aware job
-naming, quieter submit output, faster/safer stop, and attach-time job control
-plus compute-aware progress. Items drafted by user in the cli-profile-rework
-worktree TODO (2026-07-28); every CLI change goes through the `cli-ui-ux`
-skill.
+Items live on `feature/...` / `bugfix/...` / `docs/...` branches, not `main`, till done.
+In-progress detail live on branch (or design doc);
+`main` keep one-line summary + pointer, enforced by /todo-sync.
+Priority weigh value-to-goal (line-flux / enhancement predictions + publication validation story) vs effort and risk.
 
-## Items
+Item generation:
+----------------
 
-1. ~~**Profile-based job names + same-profile submit block.**~~ [DONE]
-   Profile submits name the job `NAME` (first free `NAME-N` once a finished
-   run holds the bare name; `state._profile_jobdirs`); a submit under a
-   profile with a live job is refused with attach/stop guidance
-   (`lifecycle._refuse_if_profile_live`). Standard/explicit-material submits
-   keep timestamp ids.
-2. ~~**Submit pull-suggestion text-vomit.**~~ [DONE] `pull --profile NAME`
-   expands to each member's `MATERIAL@PROFILE` selector (explicit MATERIALs
-   qualified the same way; `--all` rejected); profile submits now print
-   `cxr remote pull --profile NAME (after completion)` instead of the
-   hash-stem wall.
-3. ~~**Stop lists only explicit materials.**~~ [DONE] `stop --profile NAME`
-   stops live jobs whose recorded `catalog_profile` metadata matches
-   (`state._job_profiles`); material names stay the handle only for
-   explicit-material submits.
-4. ~~**Speed up `cxr remote stop --all --yes`.**~~ [DONE] one batched
-   `scripts._scancel_jobs_command`: all STOP sentinels first, single scancel,
-   one shared squeue poll, per-job release + terminal state; skips jobs with
-   no scheduler id. Single-job callers keep `_stop_jobid`.
-5. ~~**Cancel SLURM job while attached.**~~ [DONE] `viewer._KeyListener`:
-   background nonblocking single-keypress capture, POSIX `termios`/`tty`
-   cbreak + `select`, Windows `msvcrt` (picked via `try: import msvcrt` /
-   `except ImportError`, not a `sys.platform` literal check, so static
-   analysis doesn't flag the POSIX branch unreachable). Cancelling needs TWO
-   different keys -- `x` arms, `y` confirms within `_CANCEL_ARM_SECONDS`
-   (6s); any other key or a lapsed window disarms silently. Confirmed cancel
-   calls `lifecycle._stop_jobid`; a no-op (no hint shown) when stdin isn't a
-   tty. `_live_status` return value unchanged (False on cancel, same as
-   disconnect/stall) so scan/check auto-pull logic didn't need touching.
-6. ~~**Compute-aware progress in attach.**~~ [DONE] `sweep.case_cost` now
-   threads through `run_sweep(case_cost_fn=..., on_cost=...)` (run.py) ->
-   `scan._run_material` -> the progress JSON's new `done_cost`/`total_cost`
-   fields (scan.py's `_write_progress_record`, additive/optional so
-   rebrem/reline/blaze keep writing the old shape). `presentation.py`'s
-   `_overall_progress_line(..., use_cost=True)` and `_format_job_status`
-   render ONE compute-weighted bar at base verbosity when cost data exists
-   (falls back to the legacy case-count bar otherwise, byte-identical to
-   before), both bars side by side under `-v/-vv`.
+1. Create branch of relevant type, switch to it
+2. Overwrite branch TODO.md: 2-3 sentence problem summary + implementation path, scoped to item only. Publish to `origin`
+3. Switch to `main`, add 1-sentence item summary, triage into existing TODO.md items, push tightly scoped `docs(todo)` commit to main
 
-## Landed alongside
+**NOTE:** User wrote item straight into `TODO.md` (denoted >user<)? Fold into branch (steps 1-2), then drop >user< & slim to one-line summary on `main` once branch exist.
 
-- `sub_100keV` ships an explicit materials membership (seeded
-  `add-material --all`), so `submit --profile sub_100keV` needs no
-  MATERIAL/--all; `add-material` gained `-a` short flag. `profile create`
-  already clones standard's beam-energy defaults.
+## P1 - top-priority / high-value
 
-## Order
+### Active
 
-3 → 2 → 1 (submit/stop/naming cluster), then 4, then 5/6 (attach cluster).
-All six items done.
+1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
+2.  **Debye-Waller provenance and anisotropy audit.** Continue replacing placeholder or reused `B_ang2` values with primary-source values and resolve per-site/tensor model needs. → `feature/debye-waller-audit`; audit: [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md).
+   1. >user< Evaluate complexity/value of implementing full anisotropic/tensor-based Debye-Waller factors when available
+   2. >user< Evaluate worth in both implementing the approximate scalar Debye-Waller formula (compare output to known values for various anisotropic materials we have in our DB), and in attempting to implement a fully-fledged DFPT system.
+   3. >user< Take a crystal with a known DW factor, then manually change it up and down over a range of values that can reasonably be expected other crystals to have, and see how much it changes by -- if large, then its worth being careful here.
+3.  **GPU-memory follow-up.** Benchmark remote `rebrem --all --ne-brem 500 --step 20` for bounded CuPy reserved-pool memory; assess analogous `reline` cleanup separately.
+
+### Gated
+
+1. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
+
+### On-Hold
+
+1. **High-energy electron/channeling support.** Evaluate `Geant4` or similar for REGAE@DESY-scale beams (3–5 MeV, 50 fs, 100 fC, 200–300 µm target diameter), JungFrau detector ~0.5–4.5 m from interaction point. USER QUESTION: What is rep rate?
+2.  **Bent Crystals (After add channeling + relativistic electrons)**
+3.  **Superradiant PXR/CBS** need bunch length knowledge, coherent emission *across segments* (also needed by channeling radiation as in long-term features #1, #3)
+
+## P2 - medium-priority
+
+1. **Remote-job UX.** Profile-based job names + same-profile submit block, quieter submit pull suggestion, explicit-material-only stop list, faster `stop --all`, attach-time cancel key + compute-aware progress bars. → `feature/remote-ux`.
+2. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+3. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`.
+4. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+5. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
+6.  **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
+7.  **>user< Fix cached pull-in of pre-rendered animations in trace_app (add more buttons or something) -- maybe due to regenerate's changing random seed?**
+   1.  Progress bar here shows up at the top of the marimo notebook instead of near the button that is pressed to start the render -- confusing
+   2.  clip off the extra figure background & legend in the render, it is ugly. We just want the black grid space, with the colorbar and mat/config title info overlayed, but no background color. Saved render is also a bit pixelated, especially when opened in an mp4 viewer outside of the marimo app.
+   3.  add button to open render saving dialogue (so user can promptly move it from the cache)
+
+## P3 - lower / exploratory / small bugfixes
