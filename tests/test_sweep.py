@@ -20,6 +20,7 @@ from cxr_mc.materials import (
 )
 from cxr_mc.montecarlo import runner
 from cxr_mc.sweep import (
+    BeamSpec,
     MATERIAL_LABELS,
     Sweep,
     build_cases,
@@ -90,7 +91,7 @@ def test_real_manifest_materials_are_unique_and_buildable():
     assert all(key in CATALOG.materials for key in materials)
 
     for key in materials:
-        sweep = Sweep(material=key, thickness_ang=100.0, energy_keV=30.0, tilt_deg=5.0)
+        sweep = Sweep(material=key, thickness_ang=100.0, beam=BeamSpec(energy_keV=30.0), tilt_deg=5.0)
         cases = build_cases(sweep)
         assert cases, f"{key} produced no cases"
 
@@ -99,7 +100,7 @@ def test_build_cases_is_cartesian_product():
     sw = Sweep(
         material="mose2",
         thickness_ang=1e4,
-        energy_keV=[30, 45],
+        beam=BeamSpec(energy_keV=[30, 45]),
         tilt_deg=[30, 10],
         tilt_azim_deg=[45],
         E_grid_line=np.arange(50.0, 100.0, 5.0),
@@ -133,7 +134,7 @@ def test_build_cases_selects_and_encodes_line_grid_for_each_beam_energy():
         Sweep(
             material="mose2",
             thickness_ang=100.0,
-            energy_keV=[30.0, 50.0],
+            beam=BeamSpec(energy_keV=[30.0, 50.0]),
             tilt_deg=5.0,
             E_grid_line_by_energy=grids,
             E_grid_brem=75.0,
@@ -151,7 +152,7 @@ def test_catalog_line_grid_is_selected_for_each_standard_beam_energy():
     sweep = material_sweep("mose2")
     cases = build_cases(sweep)
 
-    assert {case["E0_keV"] for case in cases} == set(sweep.energy_keV)
+    assert {case["E0_keV"] for case in cases} == set(sweep.beam.energy_keV)
     for case in cases:
         expected = CATALOG.material("mose2").scan.E_grid_line_by_energy[case["E0_keV"]]
         np.testing.assert_array_equal(decode_energy_grid(case["E_grid_line"]), expected)
@@ -162,7 +163,7 @@ def test_fixed_line_grid_takes_precedence_over_per_beam_mapping():
     cases = build_cases(
         Sweep(
             material="mose2",
-            energy_keV=[30.0, 50.0],
+            beam=BeamSpec(energy_keV=[30.0, 50.0]),
             E_grid_line=fixed,
             E_grid_line_by_energy={30.0: np.array([10.0]), 50.0: np.array([20.0])},
         )
@@ -176,7 +177,7 @@ def test_deprecated_line_grid_alias_takes_precedence_over_per_beam_mapping():
     cases = build_cases(
         Sweep(
             material="mose2",
-            energy_keV=[30.0, 50.0],
+            beam=BeamSpec(energy_keV=[30.0, 50.0]),
             e_grid_eV=fixed,
             E_grid_line_by_energy={30.0: np.array([10.0]), 50.0: np.array([20.0])},
         )
@@ -190,7 +191,7 @@ def test_missing_per_beam_line_grid_fails_before_cases_are_built():
         build_cases(
             Sweep(
                 material="mose2",
-                energy_keV=[30.0, 50.0],
+                beam=BeamSpec(energy_keV=[30.0, 50.0]),
                 E_grid_line_by_energy={30.0: np.array([10.0])},
             )
         )
@@ -201,7 +202,7 @@ def test_empty_per_beam_line_grid_fails_with_selected_energy():
         build_cases(
             Sweep(
                 material="mose2",
-                energy_keV=30.0,
+                beam=BeamSpec(energy_keV=30.0),
                 E_grid_line_by_energy={},
             )
         )
@@ -211,7 +212,7 @@ def test_implicit_brem_grid_starts_at_lowest_per_beam_line_grid_start():
     cases = build_cases(
         Sweep(
             material="mose2",
-            energy_keV=[30.0, 50.0],
+            beam=BeamSpec(energy_keV=[30.0, 50.0]),
             E_grid_line_by_energy={
                 30.0: np.array([25.0, 50.0]),
                 50.0: np.array([10.0, 50.0]),
@@ -226,7 +227,7 @@ def test_build_cases_quantizes_angles_symmetrically_and_removes_duplicates():
     cases = build_cases(
         Sweep(
             material="mose2",
-            energy_keV=30.0,
+            beam=BeamSpec(energy_keV=30.0),
             thickness_ang=100.0,
             tilt_deg=[1.24, 1.26, 1.25, 1.24],
             tilt_azim_deg=[-1.24, -1.26, -1.25, -1.24],
@@ -273,7 +274,7 @@ def test_build_cases_and_runner_preserve_exact_nonuniform_and_scalar_energy_grid
         Sweep(
             material="mose2",
             thickness_ang=100.0,
-            energy_keV=30.0,
+            beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
             E_grid_line=line_grid,
             E_grid_brem=brem_grid,
@@ -297,7 +298,7 @@ def test_build_cases_keeps_legacy_triples_for_uniform_energy_grids():
         Sweep(
             material="mose2",
             thickness_ang=100.0,
-            energy_keV=30.0,
+            beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
             E_grid_line=np.arange(50.0, 100.0, 5.0),
             E_grid_brem=np.arange(0.0, 1000.0, 100.0),
@@ -315,7 +316,7 @@ def test_uniform_linspace_endpoint_grid_roundtrips_through_legacy_triple(monkeyp
         Sweep(
             material="mose2",
             thickness_ang=100.0,
-            energy_keV=30.0,
+            beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
             E_grid_line=line_grid,
             E_grid_brem=75.0,
@@ -346,7 +347,7 @@ def test_scalar_constant_and_near_uniform_energy_grids_stay_exact(monkeypatch, l
         Sweep(
             material="mose2",
             thickness_ang=100.0,
-            energy_keV=[30.0, 40.0],
+            beam=BeamSpec(energy_keV=[30.0, 40.0]),
             tilt_deg=5.0,
             E_grid_line=line_grid,
             E_grid_brem=75.0,
@@ -373,7 +374,7 @@ def test_build_cases_sweeps_rectangular_footprints_and_labels_them():
         Sweep(
             material="mose2",
             thickness_ang=100.0,
-            energy_keV=30.0,
+            beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
             crystal_width_mm=[0.1, 0.2],
             crystal_height_mm=[0.3, 0.4],
@@ -418,7 +419,7 @@ def test_build_cases_preserves_legacy_name_for_explicit_none_footprint():
         Sweep(
             material="mose2",
             thickness_ang=100.0,
-            energy_keV=30.0,
+            beam=BeamSpec(energy_keV=30.0),
             tilt_deg=5.0,
             crystal_width_mm=None,
             crystal_height_mm=None,
@@ -435,7 +436,7 @@ def test_build_cases_defaults_to_finite_footprint_and_beam_spot():
     finite 5x5 mm crystal footprint and a 1 mm FWHM Gaussian beam spot, so
     default sweeps transport a physically finite beam into a physically finite
     crystal rather than the legacy point-beam / laterally-infinite slab."""
-    case = build_cases(Sweep(material="mose2", thickness_ang=100.0, energy_keV=30.0, tilt_deg=5.0))[
+    case = build_cases(Sweep(material="mose2", thickness_ang=100.0, beam=BeamSpec(energy_keV=30.0), tilt_deg=5.0))[
         0
     ]
 
@@ -449,7 +450,7 @@ def test_brem_grid_upper_limit_tracks_case_beam_energy():
     sw = Sweep(
         material="mose2",
         thickness_ang=1e4,
-        energy_keV=[25, 35],
+        beam=BeamSpec(energy_keV=[25, 35]),
         tilt_deg=[10],
         tilt_azim_deg=[0],
         E_grid_line=np.arange(50.0, 100.0, 5.0),
@@ -504,7 +505,7 @@ def test_niobium_dichalcogenide_registered_and_runnable(material, label, chalcog
     sweep = Sweep(
         material=material,
         thickness_ang=100.0,
-        energy_keV=30.0,
+        beam=BeamSpec(energy_keV=30.0),
         tilt_deg=30.0,
         tilt_azim_deg=0.0,
         E_grid_line=np.arange(500.0, 520.0, 5.0),
@@ -567,7 +568,7 @@ def test_oriented_materials_are_registered_as_symmetric_cuts(
     sweep = Sweep(
         material=material,
         thickness_ang=100.0,
-        energy_keV=30.0,
+        beam=BeamSpec(energy_keV=30.0),
         tilt_deg=30.0,
         tilt_azim_deg=0.0,
         E_grid_line=np.arange(500.0, 520.0, 5.0),
@@ -677,7 +678,7 @@ def test_named_stack_registered():
 
 def test_trajectory_sweep_uses_penetration_angle_set():
     sweep = trajectory_sweep("hopg")
-    assert sweep.energy_keV == [30, 50]
+    assert sweep.beam.energy_keV == [30, 50]
     cases = build_cases(sweep, 10, 5)
 
     assert tuple(sweep.tilt_deg) == PENETRATION_TILT_DEG
@@ -759,7 +760,7 @@ def test_build_cases_carries_groove_spacing():
         tilt_azim_deg=180.0,
         groove_spacing_ang=2.0e4,
         thickness_ang=2.0e5,
-        energy_keV=100.0,
+        beam=BeamSpec(energy_keV=100.0),
         crystal_width_mm=None,
         crystal_height_mm=None,
     )
@@ -768,7 +769,7 @@ def test_build_cases_carries_groove_spacing():
 
 
 def test_build_cases_omits_groove_spacing_when_unset():
-    cases = build_cases(Sweep(material="hopg", thickness_ang=100.0, energy_keV=30.0, tilt_deg=5.0))
+    cases = build_cases(Sweep(material="hopg", thickness_ang=100.0, beam=BeamSpec(energy_keV=30.0), tilt_deg=5.0))
     assert "groove_spacing_ang" not in cases[0]
 
 
@@ -1103,7 +1104,7 @@ def _hopg_cases(**kw):
 
 
 def test_case_cost_is_positive_and_deterministic():
-    (case,) = _hopg_cases(thickness_ang=2e4, energy_keV=60.0)
+    (case,) = _hopg_cases(thickness_ang=2e4, beam=BeamSpec(energy_keV=60.0))
     assert case_cost(case) > 0.0
     assert case_cost(case) == case_cost(case)  # pure fn of the case dict
 
@@ -1111,7 +1112,7 @@ def test_case_cost_is_positive_and_deterministic():
 def test_case_cost_rises_with_beam_energy_for_a_thick_slab():
     # A thick slab stops the beam inside it, so the CSDA path length (segment
     # count) grows with E0 -- the very term the flat "N of M" bar ignores.
-    cases = _hopg_cases(thickness_ang=1e7, energy_keV=[30.0, 60.0, 100.0, 200.0])
+    cases = _hopg_cases(thickness_ang=1e7, beam=BeamSpec(energy_keV=[30.0, 60.0, 100.0, 200.0]))
     costs = [case_cost(c) for c in cases]
     assert all(lo < hi for lo, hi in zip(costs[:-1], costs[1:], strict=True))
 
@@ -1119,14 +1120,14 @@ def test_case_cost_rises_with_beam_energy_for_a_thick_slab():
 def test_case_cost_walks_a_multilayer_stack():
     # Adding a substrate lets electrons keep depositing past the film, so the
     # stacked case must cost strictly more than the free-standing film.
-    (film,) = _hopg_cases(thickness_ang=2e4, energy_keV=60.0)
+    (film,) = _hopg_cases(thickness_ang=2e4, beam=BeamSpec(energy_keV=60.0))
     (stacked,) = build_cases(
         Sweep(
             material="hopg",
             tilt_deg=5.0,
             tilt_azim_deg=180.0,
             thickness_ang=2e4,
-            energy_keV=60.0,
+            beam=BeamSpec(energy_keV=60.0),
             substrate="silicon",
         )
     )
@@ -1135,7 +1136,7 @@ def test_case_cost_walks_a_multilayer_stack():
 
 
 def test_sweep_cost_weights_match_case_cost_and_sum_to_total():
-    cases = _hopg_cases(thickness_ang=2e4, energy_keV=[30.0, 60.0])
+    cases = _hopg_cases(thickness_ang=2e4, beam=BeamSpec(energy_keV=[30.0, 60.0]))
     weights, total = sweep_cost_weights(cases)
     assert set(weights) == {(c["name"], c["E0_keV"]) for c in cases}
     for c in cases:
@@ -1150,7 +1151,7 @@ def test_scan_grid_rows_aggregate_state_fractions_by_tilt():
             tilt_deg=[5.0, 15.0],
             tilt_azim_deg=180.0,
             thickness_ang=2e4,
-            energy_keV=[30.0, 60.0],
+            beam=BeamSpec(energy_keV=[30.0, 60.0]),
         )
     )
     cached = {(cases[0]["name"], cases[0]["E0_keV"])}
@@ -1166,7 +1167,7 @@ def test_scan_grid_rows_aggregate_state_fractions_by_tilt():
 
 
 def test_scan_grid_rows_mark_excluded_and_empty_slots():
-    cases = _hopg_cases(thickness_ang=2e4, energy_keV=[30.0, 60.0])
+    cases = _hopg_cases(thickness_ang=2e4, beam=BeamSpec(energy_keV=[30.0, 60.0]))
     dropped = [cases[0]]  # pretend the 30 keV case was penetration-excluded
     energies, rows = scan_grid_rows(cases, excluded=dropped)
     (row,) = rows  # single tilt

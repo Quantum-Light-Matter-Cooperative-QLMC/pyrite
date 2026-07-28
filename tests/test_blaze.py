@@ -9,7 +9,7 @@ from click.testing import CliRunner
 from cxr_mc import blaze
 from cxr_mc.config import material_sweep
 from cxr_mc.materials import CATALOG
-from cxr_mc.sweep import Sweep, build_cases, fmt_thickness
+from cxr_mc.sweep import BeamSpec, Sweep, build_cases, fmt_thickness
 
 MATERIAL = "hopg"  # std tilt_deg grid [5,15,30,45,60,75,85] is groove-legal
 
@@ -164,7 +164,7 @@ def test_flat_build_cases_name_unchanged():
     sweep = Sweep(
         material=MATERIAL,
         thickness_ang=1.0e4,
-        energy_keV=30.0,
+        beam=BeamSpec(energy_keV=30.0),
         tilt_deg=45.0,
         tilt_azim_deg=180.0,
         crystal_width_mm=None,

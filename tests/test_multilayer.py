@@ -18,6 +18,7 @@ from cxr_mc.montecarlo import (
     simulate_trajectories,
 )
 from cxr_mc.sweep import (
+    BeamSpec,
     LayerSpec,
     Sweep,
     build_cases,
@@ -160,14 +161,14 @@ def test_transport_backscatter_increases_with_substrate_Z():
 
 
 def test_build_cases_attaches_abs_layers_only_with_substrate():
-    plain = build_cases(Sweep(material="mose2", tilt_deg=30.0, energy_keV=30.0))
+    plain = build_cases(Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0)))
     assert all(c["abs_layers"] is None for c in plain)
 
     stacked = build_cases(
         Sweep(
             material="mose2",
             tilt_deg=30.0,
-            energy_keV=30.0,
+            beam=BeamSpec(energy_keV=30.0),
             substrate="sio2",
             substrate_thickness_ang=1e6,
         )
@@ -202,11 +203,11 @@ def test_substrate_radiator_crystalline_vs_amorphous():
 
 def test_build_cases_layer_radiators_match_stack():
     # no substrate -> single slab, no per-layer radiators
-    plain = build_cases(Sweep(material="mose2", tilt_deg=30.0, energy_keV=30.0))
+    plain = build_cases(Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0)))
     assert all(c["layer_radiators"] is None for c in plain)
 
     # amorphous substrate -> [film radiator, None] (substrate adds no lines)
-    amorph = build_cases(Sweep(material="mose2", tilt_deg=30.0, energy_keV=30.0, substrate="sio2"))[
+    amorph = build_cases(Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0), substrate="sio2"))[
         0
     ]
     film, sub = amorph["layer_radiators"]
@@ -219,7 +220,7 @@ def test_build_cases_layer_radiators_match_stack():
 
     # crystalline substrate -> [film radiator, substrate radiator]
     cryst = build_cases(
-        Sweep(material="mose2", tilt_deg=30.0, energy_keV=30.0, substrate="sapphire")
+        Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0), substrate="sapphire")
     )[0]
     assert cryst["layer_radiators"][1]["crystal"] == "sapphire"
     assert len(cryst["layer_radiators"]) == len(cryst["abs_layers"]) == 2
@@ -265,7 +266,7 @@ def test_build_cases_stack_three_layers():
         material="mos2",
         thickness_ang=100.0,
         tilt_deg=30.0,
-        energy_keV=30.0,
+        beam=BeamSpec(energy_keV=30.0),
         stack=(
             LayerSpec("sio2", 900.0),
             LayerSpec("silicon", 5e6, azimuth_deg=15.0),
@@ -283,7 +284,7 @@ def test_build_cases_stack_three_layers():
 
 
 def test_build_cases_substrate_sugar_matches_single_layer_stack():
-    kw: dict[str, Any] = dict(material="mose2", tilt_deg=30.0, energy_keV=30.0)
+    kw: dict[str, Any] = dict(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0))
     a = build_cases(Sweep(**kw, substrate="sapphire", substrate_thickness_ang=1e6))[0]
     b = build_cases(Sweep(**kw, stack=(LayerSpec("sapphire", 1e6),)))[0]
     assert a["abs_layers"] == b["abs_layers"]
@@ -297,7 +298,7 @@ def test_build_cases_rejects_substrate_plus_stack():
             Sweep(
                 material="mose2",
                 tilt_deg=30.0,
-                energy_keV=30.0,
+                beam=BeamSpec(energy_keV=30.0),
                 substrate="sio2",
                 stack=(LayerSpec("silicon", 5e6),),
             )

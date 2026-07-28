@@ -16,7 +16,7 @@ from cxr_mc.montecarlo import (
     mc_spectrum,
     simulate_trajectories,
 )
-from cxr_mc.sweep import crystal_params
+from cxr_mc.sweep import BeamSpec, crystal_params
 
 
 def test_normalize_requires_material():
@@ -528,7 +528,7 @@ def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
     sweep = Sweep(
         material="hopg",
         thickness_ang=1e4,
-        energy_keV=30,
+        beam=BeamSpec(energy_keV=30),
         tilt_deg=30.0,
         E_grid_line=np.arange(50.0, 300.0, 5.0),
         E_grid_brem=np.arange(0.0, 1000.0, 100.0),
