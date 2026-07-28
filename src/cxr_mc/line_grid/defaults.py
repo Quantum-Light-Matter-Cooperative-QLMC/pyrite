@@ -117,3 +117,20 @@ def update_defaults(**changes) -> dict:
             pass
         raise
     return values
+
+
+def reset_defaults(*keys: str) -> dict:
+    """Reset selected defaults, or every field when no keys are supplied.
+
+    Angle fallbacks are empty lists by design: they mean use each material's
+    catalog-profile angles. Other fields return to their built-in values.
+    """
+    selected = keys or tuple(FALLBACK)
+    unknown = [key for key in selected if key not in FALLBACK]
+    if unknown:
+        raise KeyError(f"unknown default {unknown[0]!r}")
+    changes = {
+        key: list(FALLBACK[key]) if isinstance(FALLBACK[key], list) else FALLBACK[key]
+        for key in selected
+    }
+    return update_defaults(**changes)

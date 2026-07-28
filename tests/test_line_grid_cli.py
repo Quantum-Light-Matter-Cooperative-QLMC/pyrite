@@ -175,6 +175,26 @@ def test_click_submit_forwards_geometry_and_set_default(monkeypatch):
     assert seen["set_default"] is True
 
 
+def test_click_submit_uses_persistent_materials_and_energies(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(line_grid.job, "start", lambda **kwargs: seen.update(kwargs))
+    monkeypatch.setattr(
+        line_grid.defaults,
+        "load_defaults",
+        lambda: {
+            **line_grid.defaults.FALLBACK,
+            "materials": ["wse2", "mose2"],
+            "energies": [40.0, 60.0],
+        },
+    )
+
+    result = invoke(line_grid.command, ["submit", "--dry-run"])
+
+    assert_clean_result(result)
+    assert seen["materials"] == "wse2,mose2"
+    assert seen["energies"] == "40,60"
+
+
 def test_click_submit_routes_legacy_message_to_stderr(monkeypatch):
     monkeypatch.setattr(
         line_grid.job,
@@ -458,6 +478,68 @@ def test_click_regen_golden_preserves_nonzero_status(monkeypatch, status):
     result = invoke(line_grid.command, ["regen-golden"])
 
     assert_clean_result(result, exit_code=status)
+
+
+def test_click_defaults_clear_fields(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        line_grid.defaults,
+        "reset_defaults",
+        lambda *keys: seen.update(keys=keys) or line_grid.defaults.FALLBACK,
+    )
+
+    result = invoke(
+        line_grid.command,
+        ["defaults", "--clear", "tilts", "--clear", "brem-step"],
+    )
+
+    assert_clean_result(result)
+    assert seen["keys"] == ("tilts", "brem_step_ev")
+
+
+def test_click_defaults_reset_all(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        line_grid.defaults,
+        "reset_defaults",
+        lambda *keys: seen.update(keys=keys) or line_grid.defaults.FALLBACK,
+    )
+
+    result = invoke(line_grid.command, ["defaults", "--reset"])
+
+    assert_clean_result(result)
+    assert seen["keys"] == ()
+
+
+def test_click_defaults_explains_empty_angles(monkeypatch):
+    monkeypatch.setattr(
+        line_grid.defaults,
+        "load_defaults",
+        lambda: {**line_grid.defaults.FALLBACK, "tilts": [], "azimuths": []},
+    )
+
+    result = invoke(line_grid.command, ["defaults"])
+
+    assert_clean_result(result)
+    assert "inherit each material's catalog-profile polar tilts" in result.stdout
+    assert "inherit each material's catalog-profile azimuths" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["defaults", "--set"],
+        ["defaults", "--set", "--tilts", "5", "--clear", "azimuths"],
+        ["defaults", "--reset", "--clear", "tilts"],
+        ["defaults", "--json", "--reset"],
+    ],
+)
+def test_click_defaults_rejects_ambiguous_mutations(argv):
+    result = invoke(line_grid.command, argv)
+
+    assert result.exit_code == 2
+    assert result.stdout == ""
+    assert "Error:" in result.stderr
 
 
 @pytest.mark.parametrize(
