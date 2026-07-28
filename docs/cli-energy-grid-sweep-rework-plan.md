@@ -109,9 +109,23 @@ Landed (committed, verified: lint clean, affected tests green)
 
 Remaining (not started)
 
-- P1.4 docs — docs/sweep-profiles.md fidelity rename, docs/repo_map.md; the cli-reference regen itself landed with P1.3's delete verb.
-- Phase 2 — cxr profile list|show|create|set|add|remove|delete group; start:stop:step (stop-inclusive, CSV-mixable) on range options; cxr energy-grid set MAT --energy E --stop S (source=manual); -l/--ne-line / -b/--ne-brem as profile settings.
 - Phase 3 — remote submit --profile = catalog names (orthogonal to --fidelity); remote pull MATERIAL@PROFILE selector via meta.json dataset_identity; scan --all --profile NAME.
+
+## WIP 2026-07-27 (Phase 2 done, Phase 3 designed, not started)
+
+Phase 1.4 + Phase 2 committed (52689f6..c5937b4 + 8037421 tilt-range fix, 2dbff7b test fixes). Phase 3 design settled:
+
+- `--profile` reclaimed for catalog profile names on `scan`/`submit`; hidden legacy fidelity alias in `fidelity_option` (cli/_core.py) dropped (unreleased shim).
+- Seam: `load_material_catalog(path, *, profile="standard")`; `_parse_materials` parametrized; `config.material_sweep(..., catalog_profile=)`; cache keyed (path, profile).
+- `dataset_identity` gains conditional `catalog_profile` key only when != standard (hashes for standard stay bit-identical; pattern like `variant`).
+- Stems stay hash-based; bare `<material>` canonical stem only for standard profile. `_VARIANT_STEM_RE` untouched.
+- `scan --all --profile NAME`: intersect in-use list with `profiles.NAME.materials` when present; explicit non-member material → exit 2; unknown profile → exit 2 + available names.
+- Submit: `--profile NAME` threaded lifecycle → scripts emit ` --profile NAME` when != standard (remote runs synced scan.py); metadata line added.
+- Pull (part B): MATERIAL@PROFILE resolves via remote meta.json dataset_identity; newest hash wins, `--hash` pins, `--hash` needs listing; split before `_check_shell_tokens` (@ not in safe-token set).
+
+Exploration facts (verified, from subagent reports): remote CLI all in `src/cxr_mc/_remote/cli.py` (submit=`start_command` :698, pull :927); fidelity emitted by `_remote/scripts.py` `_chunked_queue_script`/`_queue_script` only when != full; pull ignores remote meta.json today (dirname regex only, survey-only discovery `lifecycle._resolve_survey_stems` :762); scan.py `_resolved_run` :459 uses `config.material_sweep` via singleton `materials.CATALOG`; catalog `_parse_materials` :743 hardcodes standard, `load_material_catalog` :891 no profile param. Tests to update: legacy-alias tests in test_remote_click.py + test_local_click_cli.py; contract json regen via scripts/freeze_cli_contract.py; cli-reference regen.
+
+Baseline failures to ignore: line_grid_golden wheel-layout, agent-tooling skill mirror, one crystals-library API failure (user-reported, pre-existing).
 
 Gotchas / facts discovered (carry forward)
 
@@ -125,3 +139,60 @@ Baseline noise (NOT regressions — ignore in all phases)
 
 - tests/test_line_grid_golden.py::test_installed_wheel_layout_fails_with_source_checkout_error fails on a clean tree (exit-code assertion).
 - ty check reports 5 pre-existing diagnostics: 3 tomlkit.exceptions submodule warnings in cli/sweep.py, 2 optional-dep unresolved-import (imageio.v3, kaleido) in plots/render_trajectories.py.
+
+## WIP 2026-07-28 (test-suite debug session — suite green again, uncommitted)
+
+Session goal was debugging the 24 failing tests, all fallout of the
+half-finished P1.1 `profile` → `fidelity` rename plus one cache regression.
+Fixes committed (see below; tree was 98b2758 + 23 dirty files incl. prior
+Phase-3-seam WIP, which committed alongside since hunks entangled).
+
+Root causes fixed (all verified: full suite **1755 passed / 39 skipped**,
+ruff clean on src/tests/scripts, ty at baseline):
+
+- `profiles.py:290` `_VARIANT_STEM_RE` group renamed `profile` → `fidelity`;
+  callers (`profiles.py:298`, `_remote/lifecycle.py:787`) already read
+  `match["fidelity"]` — was IndexError, root of the remote/scan_budget/
+  sweep/slim KeyError clusters.
+- `scan.py:544`, `slim.py:63` — `identity["profile"]` →
+  `identity["fidelity"]` (dict renamed in `dataset_identity`, readers
+  missed).
+- `_remote/cli.py` (5 sites) + `rebrem.py:174,204` + `reline.py:155,185` —
+  `_cli_*` handlers read `getattr(args, "profile", ...)` but the click layer
+  passes `fidelity=` into the namespace; `--fidelity survey` silently
+  dispatched as `full`. Changed to `getattr(args, "fidelity", ...)`.
+- `reline.py` — `reline_checkpoints(profile=)` renamed to `fidelity=` to
+  match `rebrem_checkpoints`; inner `recompute_options["profile"]` key kept
+  (feeds `repair_checkpoint`, whose API is unchanged).
+- `catalog.py` — the new `lru_cache` on `load_material_catalog` keyed on
+  path only, so tests rewriting the same `materials.toml` path got a stale
+  catalog (and cross-test pollution made
+  `test_transitive_module_not_found...` order-dependent). Split into a
+  stat-keyed wrapper (mtime_ns + size in the cache key) calling
+  `_load_material_catalog_cached`; exposed `cache_clear` via `setattr`
+  (ty rejects attribute assignment on functions);
+  `test_catalog_startup_errors.py` now clears before asserting.
+- Test-side updates where the rename was intended: `test_run.py`
+  rebrem/reline calls pass `fidelity=`; `test_local_click_cli.py` scan
+  expectation gains `catalog_profile: "standard"` (new intentional
+  `--profile` surface from Phase 3 seam work).
+- Lint: dropped unused `difflib` import (catalog.py), `zip(..., strict=True)`
+  (sweep.py:483).
+
+Baseline noise update (supersedes earlier note): ty now reports 16
+diagnostics — 15 pre-existing (`cli/profile.py` tomlkit warnings + one
+`invalid-argument-type` error at :271, `cli/sweep.py` tomlkit warnings) —
+my edits add zero. `scripts/dev.py lint` still fails on 14 pre-existing
+ruff errors in `.agents/.claude` caveman-skill scripts (not repo code;
+untouched).
+
+Still open / next:
+
+- Phase 3 implementation per the 2026-07-27 design block above: remote
+  submit `--profile` = catalog names, pull `MATERIAL@PROFILE` selector,
+  `scan --all --profile NAME` (partially present: scan already accepts
+  `--profile` → `catalog_profile`). Note: remote submit's dead
+  `--profile` placeholder flag (accepted, never forwarded) was removed
+  in this session's cleanup — re-add when wiring it through lifecycle.
+- `docs/cli-reference.md` regen via `scripts/generate_cli_reference.py
+  --write PATH` once Phase 3 lands (never hand-edit).
