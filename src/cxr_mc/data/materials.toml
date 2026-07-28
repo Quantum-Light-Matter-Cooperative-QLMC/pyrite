@@ -116,6 +116,13 @@ thickness_layers = { values = [3, 4, 5, 6] }
 thickness_ang = 5000000.0
 
 
+
+[profiles.sub_100keV]
+thickness_ang = {values = [1000.0, 5000.0, 10000.0, 40000.0, 100000.0, 200000.0, 500000.0, 1000000.0, 10000000.0]}
+energy_keV = {values = [30.0, 40.0, 50.0, 60.0, 100.0]}
+tilt_deg = {values = [5.0, 15.0, 30.0, 45.0, 60.0, 75.0, 85.0]}
+tilt_azim_deg = {values = [95.0, 105.0, 120.0, 135.0, 150.0, 165.0, 180.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
 [energy_grids.standard]
 line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } }, source = "derived" },
