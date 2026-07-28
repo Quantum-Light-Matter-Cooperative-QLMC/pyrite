@@ -552,7 +552,9 @@ def _resolved_run(args, material):
     floor = getattr(args, "high_energy_floor_map", None) or {}
     floor = floor.get(material)
     if floor is not None and not getattr(args, "quick", False):
-        energies = np.asarray(sweep.energy_keV, dtype=float)
+        from .sweep import beam_replace
+
+        energies = np.asarray(sweep.beam.energy_keV, dtype=float)
         kept = energies[energies >= floor]
         if kept.size == 0:
             raise SystemExit(
@@ -564,7 +566,7 @@ def _resolved_run(args, material):
         # not the plain canonical stem -- otherwise a floored tise2 checkpoint
         # would collide with an unfiltered tise2 full-grid checkpoint.
         overrides["energy_keV"] = kept
-        sweep = replace(sweep, energy_keV=kept)
+        sweep = replace(sweep, beam=beam_replace(sweep.beam, energy_keV=kept))
 
     from .profiles import dataset_identity, variant_stem
 

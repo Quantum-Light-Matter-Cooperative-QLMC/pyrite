@@ -19,6 +19,7 @@ detector/analysis knobs still live here.
   * :data:`COLLAPSE_AZIMUTH` -- keep only the best azimuth per (tilt, energy).
 """
 
+import dataclasses
 from dataclasses import replace
 from typing import Any
 
@@ -28,7 +29,14 @@ from .materials import CATALOG, MaterialSpec, load_material_catalog
 from .montecarlo import simulate_trajectories
 from .profiles import get_profile
 from .results import Settings
-from .sweep import Sweep
+from .sweep import BeamSpec, Sweep, beam_replace
+
+# Override keys that address the beam (BeamSpec) rather than the Sweep itself,
+# so ``material_sweep(..., energy_keV=[30, 60])`` and the legacy scalar-spot
+# ``beam_fwhm_mm=`` keep working after the beam moved onto ``Sweep.beam``.
+_BEAM_OVERRIDE_KEYS = frozenset(
+    {f.name for f in dataclasses.fields(BeamSpec)} | {"beam_fwhm_mm", "transverse_fwhm_mm"}
+)
 
 MATERIALS = CATALOG.material_keys
 
@@ -117,7 +125,7 @@ def material_sweep(
         material=spec.crystal_key,
         theta_obs_deg=theta_obs_deg,
         thickness_ang=scan.thickness_ang,
-        energy_keV=scan.energy_keV,
+        beam=BeamSpec(energy_keV=scan.energy_keV),
         tilt_deg=scan.tilt_deg,
         tilt_azim_deg=scan.tilt_azim_deg,
         E_grid_line=scan.E_grid_line,
@@ -129,7 +137,16 @@ def material_sweep(
         stack=spec.stack or None,
     )
     sweep = get_profile(fidelity).apply_sweep(sweep)
-    return replace(sweep, **overrides) if overrides else sweep
+    if not overrides:
+        return sweep
+    # Split beam-addressed overrides (energy_keV, spot/bunch fields) from
+    # Sweep-level ones so both keep working through the single **overrides API.
+    beam_over = {k: overrides.pop(k) for k in list(overrides) if k in _BEAM_OVERRIDE_KEYS}
+    if overrides:
+        sweep = replace(sweep, **overrides)
+    if beam_over:
+        sweep = replace(sweep, beam=beam_replace(sweep.beam, **beam_over))
+    return sweep
 
 
 def trajectory_sweep(
@@ -185,7 +202,7 @@ def trajectory_sweep(
     return Sweep(
         material=spec.crystal_key,  # named stacks: the film
         thickness_ang=thick,
-        energy_keV=list(energies),
+        beam=BeamSpec(energy_keV=list(energies)),
         tilt_deg=tilt_values,
         tilt_azim_deg=float(azim_deg),
         theta_obs_deg=90.0,

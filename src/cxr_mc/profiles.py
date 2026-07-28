@@ -20,7 +20,7 @@ from typing import Any
 import numpy as np
 
 from .results import Settings
-from .sweep import Sweep, crystal_params
+from .sweep import Sweep, beam_replace, crystal_params
 
 FIDELITY_NAMES = ("full", "survey")
 DATASET_IDENTITY_SCHEMA = "cxr.dataset-identity.v1"
@@ -81,7 +81,7 @@ class SweepProfile:
         """Return catalog sweep reduced according to this profile."""
         if self.name == "full":
             return sweep
-        energies = _centered_sample(sweep.energy_keV, self.max_energies)
+        energies = _centered_sample(sweep.beam.energy_keV, self.max_energies)
         energy_values = {float(value) for value in np.atleast_1d(energies)}
         by_energy = sweep.E_grid_line_by_energy
         if by_energy is not None:
@@ -112,7 +112,7 @@ class SweepProfile:
         )
         return replace(
             sweep,
-            energy_keV=energies,
+            beam=beam_replace(sweep.beam, energy_keV=energies),
             thickness_ang=_centered_sample(sweep.thickness_ang, self.max_thicknesses),
             tilt_deg=_centered_sample(sweep.tilt_deg, self.max_tilts),
             tilt_azim_deg=_centered_sample(sweep.tilt_azim_deg, self.max_azimuths),
@@ -205,6 +205,35 @@ def dataset_identity(
     # only when actually set, so pre-existing runs keep their historical
     # parameter_sha256 (and therefore their checkpoint identity) bit-for-bit.
     sweep_payload = resolved["sweep"]
+    # Flat legacy projection of the beam (decision 6). The beam lives on
+    # ``Sweep.beam`` in code, but the hashed payload keeps the HISTORICAL flat
+    # top-level keys -- ``energy_keV`` and ``beam_fwhm_mm`` at their old
+    # positions -- so every pre-existing ``parameter_sha256`` (and therefore its
+    # checkpoint stem) stays bit-for-bit. New beam fields (elliptical y, the
+    # longitudinal bunch, rep-rate/charge, future emittance) join the hash ONLY
+    # when they diverge from their inert defaults -- the same compatibility rule
+    # already used for ``n_electrons`` and ``catalog_profile`` below.
+    beam_payload = sweep_payload.pop("beam")
+    sweep_payload["energy_keV"] = beam_payload["energy_keV"]
+    fwhm_x = beam_payload["transverse_fwhm_x_mm"]
+    fwhm_y = beam_payload["transverse_fwhm_y_mm"]
+    sweep_payload["beam_fwhm_mm"] = fwhm_x  # legacy isotropic key == x-plane FWHM
+    if fwhm_y != fwhm_x:
+        sweep_payload["transverse_fwhm_y_mm"] = fwhm_y
+    if beam_payload["bunch_length_fs"] is not None:
+        sweep_payload["bunch_length_fs"] = beam_payload["bunch_length_fs"]
+    if beam_payload["long_shape"] != "gaussian":
+        sweep_payload["long_shape"] = beam_payload["long_shape"]
+    if beam_payload["long_offsets_fs"] is not None:
+        sweep_payload["long_offsets_fs"] = beam_payload["long_offsets_fs"]
+    if beam_payload["rep_rate_hz"] != 5000.0:
+        sweep_payload["rep_rate_hz"] = beam_payload["rep_rate_hz"]
+    if beam_payload["bunch_charge_pc"] != 1.0:
+        sweep_payload["bunch_charge_pc"] = beam_payload["bunch_charge_pc"]
+    if beam_payload["divergence_mrad"] is not None:
+        sweep_payload["divergence_mrad"] = beam_payload["divergence_mrad"]
+    if beam_payload["energy_spread_frac"] is not None:
+        sweep_payload["energy_spread_frac"] = beam_payload["energy_spread_frac"]
     for key in ("n_electrons", "n_electrons_brem"):
         if sweep_payload.get(key) is None:
             sweep_payload.pop(key, None)
@@ -279,14 +308,14 @@ def high_energy_floor_identity(
     from .config import default_settings, material_sweep
 
     sweep = material_sweep(material, fidelity=fidelity, catalog_profile=catalog_profile)
-    energies = np.asarray(sweep.energy_keV, dtype=float)
+    energies = np.asarray(sweep.beam.energy_keV, dtype=float)
     kept = energies[energies >= floor_kev]
     if kept.size == 0:
         raise SystemExit(
             f"{material}: no energies >= {floor_kev} keV in its grid (high-energy "
             "floor); lower --high-energy-min-kev or drop this material"
         )
-    sweep = replace(sweep, energy_keV=kept)
+    sweep = replace(sweep, beam=beam_replace(sweep.beam, energy_keV=kept))
     return dataset_identity(
         material, fidelity, default_settings(fidelity), sweep, catalog_profile=catalog_profile
     )

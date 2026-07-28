@@ -35,6 +35,65 @@ logger = logging.getLogger(__name__)
 MOTT_DIR = str(DATA_DIR / "mott_transport_cross_sections")
 A0_SQ_CM2 = 2.8002852e-17  # Bohr radius squared [cm^2] (NIST SRD 64 unit)
 
+# Speed of light in transport-clock units: the electron clock sum(L/beta) is in
+# Angstrom (c=1), so a longitudinal bunch length in fs converts via
+# c = 2997.924580 Ang/fs. Mirrors sweep.C_ANG_PER_FS / plots.trajectories
+# .C_ANG_PER_FS (same physical constant; defined locally to keep transport free
+# of a plots/sweep import cycle).
+C_ANG_PER_FS = 2997.924580
+
+
+def _sample_bunch_offsets(Ne, bunch_length_fs, long_shape, long_offsets_fs, seed):
+    """Per-electron longitudinal arrival offset ``Delta t`` [Angstrom, c=1],
+    centered on the bunch centroid (decision 3).
+
+    Source/convention: a longitudinal bunch is a distribution of electron
+    arrival TIMES; ``Delta t_e`` [fs] converts to the transport clock's Angstrom
+    units via ``c = 2997.924580 Ang/fs`` (:data:`C_ANG_PER_FS`). ``long_shape``
+    selects the sampling law about a zero centroid:
+
+    * ``"gaussian"`` -- ``Delta t ~ Normal(0, sigma)`` with RMS ``sigma =
+      bunch_length_fs`` (the RMS convention, NOT FWHM).
+    * ``"uniform"`` -- a flat-top of the SAME RMS: half-width ``sqrt(3)*sigma``.
+
+    ``long_offsets_fs`` supplies explicit per-particle offsets (measured /
+    arbitrary / microbunched profiles) and OVERRIDES ``long_shape`` /
+    ``bunch_length_fs``. The draw uses an independent RNG child stream
+    (``SeedSequence(seed).spawn(4)[3]`` -- the next index after ``beam_rng``'s
+    ``spawn(2)[1]`` and ``phase_rng``'s ``spawn(3)[2]``), so enabling the bunch
+    NEVER perturbs the main free-path / scattering draws.
+
+    Limiting case: ``bunch_length_fs=None`` and ``long_offsets_fs=None`` ->
+    all-zero (the legacy point bunch, bit-for-bit); ``bunch_length_fs -> 0``
+    recovers it continuously.
+
+    Validation: longitudinal-bunch-sampling
+    """
+    if long_offsets_fs is not None:
+        dt = np.asarray(long_offsets_fs, dtype=float)
+        if dt.size != Ne:
+            raise ValueError(
+                f"long_offsets_fs has {dt.size} entries but Ne={Ne}; supply one "
+                "explicit longitudinal offset per electron"
+            )
+        dt = dt * C_ANG_PER_FS
+    elif bunch_length_fs is not None:
+        sigma_ang = float(bunch_length_fs) * C_ANG_PER_FS
+        bunch_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(4)[3])
+        if long_shape == "gaussian":
+            dt = bunch_rng.normal(0.0, sigma_ang, size=Ne)
+        elif long_shape == "uniform":
+            half_width = np.sqrt(3.0) * sigma_ang  # flat-top of the same RMS
+            dt = bunch_rng.uniform(-half_width, half_width, size=Ne)
+        else:
+            raise ValueError(
+                f"long_shape must be 'gaussian' or 'uniform' (or supply "
+                f"long_offsets_fs), got {long_shape!r}"
+            )
+    else:
+        return np.zeros(Ne)
+    return dt - dt.mean()  # center on the bunch centroid (t=0 == centroid)
+
 
 def beta_from_keV(E_keV):
     g = 1.0 + E_keV / 510.99895
@@ -204,6 +263,10 @@ def simulate_trajectories(
     composition=None,
     layers=None,
     beam_fwhm_mm=None,
+    beam_fwhm_y_mm=None,
+    bunch_length_fs=None,
+    long_shape="gaussian",
+    long_offsets_fs=None,
     crystal_width_mm=None,
     crystal_height_mm=None,
     tilt_polar_rad=0.0,
@@ -276,6 +339,23 @@ def simulate_trajectories(
     the downstream six-face escape attenuation, so beam size can change the
     emitted radiation spectrum.
 
+    beam_fwhm_y_mm: optional y-plane spot FWHM [mm] for an ELLIPTICAL beam
+    (decision 8). None -> equals beam_fwhm_mm (isotropic), which draws
+    sigma_x == sigma_y and is bit-for-bit with the historical scalar-spot path.
+
+    bunch_length_fs, long_shape, long_offsets_fs: longitudinal bunch sampling.
+    Each electron gets an arrival offset ``Delta t`` [Angstrom, c=1] via
+    :func:`_sample_bunch_offsets` (RMS ``bunch_length_fs`` fs, Gaussian or
+    uniform ``long_shape``; ``long_offsets_fs`` supplies explicit per-particle
+    offsets and overrides both), centered on the bunch centroid. Returned as the
+    per-segment ``t0_ang`` (and ``vacuum_t0_ang``) array, kept SEPARATE from the
+    relative-age ``t_ang``/``clock``. Drawn from an independent RNG child
+    (``spawn(4)[3]``), so it never perturbs the transport draws; and because the
+    current spectrum sum is incoherent, a nonzero offset has ZERO effect on the
+    emitted spectrum today -- it is the input the future coherent form factor
+    consumes. bunch_length_fs=None and long_offsets_fs=None -> all-zero t0_ang
+    (the legacy point bunch, bit-for-bit).
+
     crystal_width_mm, crystal_height_mm: optional full transverse dimensions
     [mm] of a rectangular prism centered at the beam origin. Both must be
     supplied and strictly positive, or both omitted. Finite dimensions are
@@ -327,10 +407,12 @@ def simulate_trajectories(
 
     Returns dict of per-segment arrays:
       "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
-      "t_ang" (M,), "elec_id" (M,), "layer" (M,) [emitting layer index]
+      "t_ang" (M,), "t0_ang" (M,) [per-electron bunch offset], "elec_id" (M,),
+      "layer" (M,) [emitting layer index]
     non-radiating groove-gap flights:
       "vacuum_start_ang" (V,3), "vacuum_end_ang" (V,3),
-      "vacuum_E_keV" (V,), "vacuum_t_ang" (V,), "vacuum_elec_id" (V,)
+      "vacuum_E_keV" (V,), "vacuum_t_ang" (V,), "vacuum_t0_ang" (V,),
+      "vacuum_elec_id" (V,)
     and diagnostics: "n_backscattered", "n_transmitted", "n_side_exited",
     "n_missed", "n_stopped", "n_layers".
 
@@ -388,15 +470,25 @@ def simulate_trajectories(
 
     rng = np.random.default_rng(seed)
     pos = np.zeros((Ne, 3))
-    if beam_fwhm_mm:
+    if beam_fwhm_mm or beam_fwhm_y_mm:
         # independent child stream: does not consume from `rng`, so the main
         # transport draws (free path, scattering angle) are untouched -- see
         # the beam_fwhm_mm docstring paragraph above for the invariance this
         # buys.
         MM_TO_ANG = 1.0e7
-        sigma_ang = float(beam_fwhm_mm) * MM_TO_ANG / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+        fwhm_to_sigma = 1.0 / (2.0 * np.sqrt(2.0 * np.log(2.0)))
+        # Per-plane elliptical spot (decision 8). y defaults to x, so an
+        # isotropic beam draws sigma_x == sigma_y and stays bit-for-bit with the
+        # historical scalar-spot path: normal(0,1,(Ne,2)) scaled by a scalar sigma
+        # IS normal(0,sigma,(Ne,2)) element-for-element and consumes the stream
+        # identically.
+        fwhm_y = beam_fwhm_mm if beam_fwhm_y_mm is None else beam_fwhm_y_mm
+        sigma_x = float(beam_fwhm_mm or 0.0) * MM_TO_ANG * fwhm_to_sigma
+        sigma_y = float(fwhm_y or 0.0) * MM_TO_ANG * fwhm_to_sigma
         beam_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(2)[1])
-        offsets = beam_rng.normal(0.0, sigma_ang, size=(Ne, 2))
+        offsets = beam_rng.normal(0.0, 1.0, size=(Ne, 2))
+        offsets[:, 0] *= sigma_x
+        offsets[:, 1] *= sigma_y
         # Project the lab-frame Gaussian spot onto the tilted sample entrance
         # face (grazing-incidence footprint elongation). tilt=0 -> (u, v)
         # bit-for-bit, so the untilted beam draw is unchanged.
@@ -436,6 +528,11 @@ def simulate_trajectories(
     # START so a segment carries (depth, energy, age) -- consumed by the
     # penetration / electron-lifetime plots (-> fs via c = 2997.92 Ang/fs).
     clock = np.zeros(Ne)
+    # per-electron longitudinal bunch offset [Ang, c=1], kept SEPARATE from the
+    # relative-age clock: the coherent sum later reads absolute time
+    # t_abs = t_ang + t0_ang. None/None -> all-zero (point bunch, bit-for-bit),
+    # and nothing reads it in the incoherent spectrum today.
+    t0_electron = _sample_bunch_offsets(Ne, bunch_length_fs, long_shape, long_offsets_fs, seed)
 
     seg_mid, seg_dir, seg_len, seg_E, seg_t0, seg_id, seg_lay = (
         [],
@@ -728,6 +825,12 @@ def simulate_trajectories(
     vacuum_elec_id = (
         np.concatenate(vac_id).astype(np.int64) if vac_id else np.empty(0, dtype=np.int64)
     )
+    # Broadcast the per-electron bunch offset onto every segment / vacuum flight
+    # (constant per electron, like its identity), so a coherent sum can read
+    # t_abs = t_ang + t0_ang without re-deriving which electron emitted a
+    # segment. All-zero when no bunch was sampled (inert; nothing reads it yet).
+    t0_ang = t0_electron[elec_id] if elec_id.size else np.empty(0, dtype=float)
+    vacuum_t0_ang = t0_electron[vacuum_elec_id] if vacuum_elec_id.size else np.empty(0, dtype=float)
 
     return {
         "r_mid": r_mid,
@@ -735,12 +838,14 @@ def simulate_trajectories(
         "L_ang": L_ang,
         "E_keV": E_keV,
         "t_ang": t_ang,  # segment-start age sum(L/beta) [Ang, c=1]
+        "t0_ang": t0_ang,  # per-electron longitudinal bunch offset [Ang, c=1]
         "elec_id": elec_id,  # emitting electron index in [0, Ne)
         "layer": layer,  # emitting layer index in [0, n_layers)
         "vacuum_start_ang": vacuum_start_ang,
         "vacuum_end_ang": vacuum_end_ang,
         "vacuum_E_keV": vacuum_E_keV,
         "vacuum_t_ang": vacuum_t_ang,
+        "vacuum_t0_ang": vacuum_t0_ang,  # per-electron bunch offset [Ang, c=1]
         "vacuum_elec_id": vacuum_elec_id,
         "n_backscattered": n_back,
         "n_transmitted": n_trans,
