@@ -113,13 +113,33 @@ def _selected_materials(args, attribute):
     raise SystemExit(f"{args.remote_command} needs material name(s), or use --all")
 
 
+def _profile_default_materials(catalog_profile):
+    """A non-standard profile's explicit ``materials`` membership, or ``None``
+    when the profile has no membership row (implicit all-in-use -- the caller
+    falls through to requiring ``--all``/explicit materials, since there is no
+    narrower campaign list to default to). Also raises the usual
+    unknown-profile usage error via ``validate_catalog_profile`` -- an empty
+    material list never triggers its membership check, only its name check."""
+    from ..materials import CATALOG
+    from ..scan import validate_catalog_profile
+
+    validate_catalog_profile(catalog_profile, [], intersect=False)
+    return CATALOG.profile_materials(catalog_profile)
+
+
 def _start_selected(args):
     """Resolve ``start``/``submit``'s materials plus a resolved high-energy
     floor, mirroring ``scan._selected``. Unlike ``scan.py``'s per-material
     floor map, a queue shares one flags string across every material in the
     batch, so this returns a single floor (or ``None``); ``--high-energy-min-kev``
     is a no-op for any queued material outside ``high_energy_materials``, so
-    it is safe to forward blindly."""
+    it is safe to forward blindly.
+
+    With no MATERIAL/--all/-A and a ``--profile NAME`` that carries an
+    explicit material membership list, the profile's members are the
+    selection -- naming a campaign profile is enough information to know what
+    to run. A profile with no membership row (implicit all-in-use) still
+    requires ``--all``/explicit materials; there's no narrower list to guess."""
     from ..scan import validate_catalog_profile
 
     explicit = list(getattr(args, "materials", None) or [])
@@ -159,6 +179,16 @@ def _start_selected(args):
             high_energy_min_kev = DEFAULT_HIGH_ENERGY_MIN_KEV if floor is None else floor
     elif explicit:
         materials = validate_catalog_profile(catalog_profile, explicit, intersect=False)
+        floor = getattr(args, "high_energy_min_kev", None)
+        if floor is not None:
+            tagged = set(load_manifest_groups(config.MATS_FILE)["high_energy_materials"])
+            if tagged.intersection(materials):
+                high_energy_min_kev = floor
+    elif (
+        catalog_profile != "standard"
+        and (membership := _profile_default_materials(catalog_profile)) is not None
+    ):
+        materials = list(membership)
         floor = getattr(args, "high_energy_min_kev", None)
         if floor is not None:
             tagged = set(load_manifest_groups(config.MATS_FILE)["high_energy_materials"])
@@ -700,7 +730,16 @@ def reline_command(
     )
 
 
-@click.command("submit", help="Sync code and submit a detached SLURM material queue.")
+@click.command(
+    "submit",
+    help=(
+        "Sync code and submit a detached SLURM material queue.\n\n"
+        "MATERIAL/--all/-A may be omitted when --profile NAME names a profile "
+        "with an explicit `materials` membership list -- the profile's members "
+        "become the queue. A profile with no membership row (implicit "
+        "all-in-use) still needs --all/-A or an explicit MATERIAL."
+    ),
+)
 @click.argument(
     "materials",
     nargs=-1,
@@ -811,7 +850,20 @@ def start_command(
     if include_high_energy and not all_:
         raise click.UsageError("--include-high-energy requires --all")
     if not actually_all:
-        _reject_all_with_values("start", all_, materials)
+        if all_ and materials:
+            raise click.UsageError("start --all does not take material names")
+        if not all_ and not materials:
+            # A profile naming its own campaign materials is enough
+            # information to run bare `submit --profile NAME`; only fall back
+            # to requiring --all/explicit MATERIAL when it can't supply any
+            # (unknown name, or "standard"/implicit all-in-use membership).
+            profile_materials = (
+                None
+                if catalog_profile == "standard"
+                else _profile_default_materials(catalog_profile)
+            )
+            if profile_materials is None:
+                raise click.UsageError("start needs material name(s), or use --all")
     if parallel_materials is not None and chunk_minutes != 0:
         raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
     if quick and fidelity != "full":

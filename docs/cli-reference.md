@@ -674,6 +674,10 @@ Usage: cxr remote submit [OPTIONS] [MATERIAL]...
 
   Sync code and submit a detached SLURM material queue.
 
+  MATERIAL/--all/-A may be omitted when --profile NAME names a profile with an explicit
+  `materials` membership list -- the profile's members become the queue. A profile with
+  no membership row (implicit all-in-use) still needs --all/-A or an explicit MATERIAL.
+
 Options:
   -a, --all                  Queue mats_to_sim.toml's verified `materials` list.
   -A, --actually-all         Queue every material in mats_to_sim.toml -- materials,

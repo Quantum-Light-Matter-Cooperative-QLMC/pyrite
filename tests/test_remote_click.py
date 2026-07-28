@@ -193,6 +193,54 @@ def test_submit_profile_option_dispatches_catalog_profile(monkeypatch):
     assert calls[0]["catalog_profile"] == "sub_100keV"
 
 
+def test_submit_profile_with_membership_defaults_materials_when_none_given(monkeypatch):
+    """A profile naming its own campaign materials is enough to run `submit
+    --profile NAME` with no MATERIAL/--all -- naming it directly still works
+    too (see test_submit_profile_option_dispatches_catalog_profile)."""
+    import cxr_mc.materials as materials_pkg
+
+    class _FakeCatalog:
+        profile_names = ("standard", "sub_100keV")
+
+        def profile_materials(self, _name):
+            return ("hopg", "mose2")
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "start_queue",
+        lambda materials, **kwargs: calls.append((materials, kwargs)) or "job",
+    )
+
+    result = invoke(remote.command, ["submit", "--profile", "sub_100keV"])
+
+    assert_clean_result(result)
+    assert calls[0][0] == ["hopg", "mose2"]
+    assert calls[0][1]["catalog_profile"] == "sub_100keV"
+
+
+def test_submit_profile_without_membership_still_needs_material_or_all(monkeypatch):
+    """A profile with no explicit membership (implicit all-in-use) has no
+    narrower list to default to, so bare `submit --profile NAME` keeps
+    requiring --all/-A or an explicit MATERIAL -- unchanged from before."""
+    import cxr_mc.materials as materials_pkg
+
+    class _FakeCatalog:
+        profile_names = ("standard", "sub_100keV")
+
+        def profile_materials(self, _name):
+            return None
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+
+    result = invoke(remote.command, ["submit", "--profile", "sub_100keV"])
+
+    assert result.exit_code == 2
+    assert result.stdout == ""
+    assert "needs material name(s), or use --all" in result.stderr
+
+
 def test_pull_hash_option_dispatches_and_requires_one_qualified_selector(monkeypatch):
     calls = []
     monkeypatch.setattr(
