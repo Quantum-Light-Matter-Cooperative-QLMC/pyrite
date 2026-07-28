@@ -36,10 +36,11 @@ def _refuse_if_busy(materials, quick):
         )
 
 
-def clear_remote(materials, yes=False):
+def clear_remote(materials, yes=False, catalog_profile="standard"):
     """Delete one or more materials' accumulated checkpoints on the box: both
     ``checkpoints/<material>.pkl`` and ``checkpoints/<material>_quick.pkl`` for
-    each material.  Accepts a single crystal key or a list.
+    each standard-profile material, or current full/survey identity stems for
+    ``catalog_profile``. Accepts a single crystal key or a list.
 
     Refuses (before touching anything) if a live job or a pre-submission
     reservation protects any stem.  Without ``yes`` this is a safe dry preview:
@@ -48,13 +49,42 @@ def clear_remote(materials, yes=False):
     if isinstance(materials, str):
         materials = [materials]
     transport._check_materials(materials)  # interpolated into a remote shell command
-    label = ", ".join(materials)
-    wanted = {stem for m in materials for stem in (m, f"{m}_quick")}
-    busy = [
-        (jid, sorted(clash))
-        for jid, jquick, jmats in state._live_jobs()
-        if (clash := wanted.intersection(scripts._stems(jmats, jquick)))
-    ]
+    label = (
+        f"profile={catalog_profile}" if catalog_profile != "standard" else ", ".join(materials)
+    )
+    if catalog_profile != "standard":
+        stems = [
+            stem
+            for fidelity in ("full", "survey")
+            for stem in scripts._stems(
+                materials,
+                False,
+                fidelity,
+                catalog_profile=catalog_profile,
+            )
+        ]
+    else:
+        stems = [stem for m in materials for stem in (m, f"{m}_quick")]
+    wanted = set(stems)
+    live_jobs = state._live_jobs()
+    live_profiles = (
+        state._job_profiles([jobid for jobid, _quick, _materials in live_jobs])
+        if catalog_profile != "standard" and live_jobs
+        else {}
+    )
+    if catalog_profile != "standard":
+        busy = [
+            (jid, sorted(set(materials).intersection(jmats)))
+            for jid, _jquick, jmats in live_jobs
+            if live_profiles.get(jid) == catalog_profile
+            and set(materials).intersection(jmats)
+        ]
+    else:
+        busy = [
+            (jid, sorted(clash))
+            for jid, jquick, jmats in live_jobs
+            if (clash := wanted.intersection(scripts._stems(jmats, jquick)))
+        ]
     if busy:
         detail = "\n".join(f"  job {jid} is producing -> {', '.join(s)}" for jid, s in busy)
         raise SystemExit(
@@ -62,7 +92,6 @@ def clear_remote(materials, yes=False):
             f"checkpoints, and clearing it would race a running sweep.\n{detail}\n"
             "stop it (cxr remote stop <material>) first, or wait for it to finish."
         )
-    stems = [stem for m in materials for stem in (m, f"{m}_quick")]
     if yes:
         outcome = transport._ssh_capture(
             scripts._clear_checkpoint_stems_command(f"clear-{scripts._new_jobid()}", stems)

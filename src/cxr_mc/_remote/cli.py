@@ -378,8 +378,41 @@ def _cli_start(args):
         high_energy_min_kev=high_energy_min_kev,
         catalog_profile=getattr(args, "catalog_profile", "standard"),
     )
-    if args.follow and not args.dry_run:
-        viewer.attach(jobid)
+    if args.dry_run or args.headless:
+        return
+    if not viewer.attach(jobid):
+        emit_diagnostic(
+            "submit is still running or its viewer disconnected; skipping automatic pull"
+        )
+        return
+    if args.no_pull:
+        return
+    completed = state._completed_materials(jobid, materials)
+    if not completed:
+        emit_diagnostic(
+            "warning: the SLURM scan produced no successful checkpoints; nothing to pull"
+        )
+        return
+    stems = scripts._stems(
+        completed,
+        args.quick,
+        getattr(args, "fidelity", "full"),
+        high_energy_min_kev=high_energy_min_kev,
+        catalog_profile=getattr(args, "catalog_profile", "standard"),
+    )
+    lifecycle.pull(
+        stems,
+        grid=args.grid,
+        drop_wide_brem=args.drop_wide_brem,
+        downcast=args.downcast,
+        no_sync=True,
+    )
+    for stem in stems:
+        print(
+            f"\ndone. checkpoints/{stem}/ is local; run `cxr analyze {stem}` "
+            f"(or run `cxr export`) -- visualization and static-HTML export "
+            "stay local."
+        )
 
 
 def _cli_attach(args):
@@ -424,13 +457,27 @@ def _cli_reap(args):
 
 
 def _cli_clear(args):
+    if args.catalog_profile is not None:
+        if args.all_checkpoints or args.materials:
+            args._clear_parser.error("clear --profile takes no material arguments or --all")
+        membership = _profile_default_materials(args.catalog_profile)
+        if membership is None:
+            from ..materials import CATALOG
+
+            membership = CATALOG.material_keys
+        lifecycle.clear_remote(
+            list(membership),
+            args.yes,
+            catalog_profile=args.catalog_profile,
+        )
+        return
     if args.all_checkpoints:
         if args.materials:
             args._clear_parser.error("clear --all takes no material argument")
         lifecycle.clear_all_remote(args.yes)
         return
     if not args.materials:
-        args._clear_parser.error("clear needs material(s), or --all")
+        args._clear_parser.error("clear needs material(s), --profile, or --all")
     lifecycle.clear_remote(args.materials, args.yes)
 
 
@@ -518,7 +565,11 @@ def command():
     _ensure_utf8_stdio()
 
 
-@command.command("scan", help="Sync code, submit sweep(s), wait, and pull checkpoints.")
+@command.command(
+    "scan",
+    help="Deprecated alias for `cxr remote submit`.",
+    deprecated="Use 'cxr remote submit'.",
+)
 @click.argument(
     "material",
     required=False,
@@ -733,7 +784,9 @@ def reline_command(
 @click.command(
     "submit",
     help=(
-        "Sync code and submit a detached SLURM material queue.\n\n"
+        "Sync code, submit sweep(s), track progress, and pull checkpoints.\n\n"
+        "Use --headless to return after submission. Use --no-pull to track "
+        "through completion without automatically pulling checkpoints.\n\n"
         "MATERIAL/--all/-A may be omitted when --profile NAME names a profile "
         "with an explicit `materials` membership list -- the profile's members "
         "become the queue. A profile with no membership row (implicit "
@@ -821,7 +874,24 @@ def reline_command(
 )
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
 @click.option("--dry-run", is_flag=True, help="Print submission preview; do not connect.")
-@click.option("-f", "--follow", is_flag=True, help="Track job after launch.")
+@click.option(
+    "--headless",
+    is_flag=True,
+    help="Return after submission without attaching or pulling.",
+)
+@click.option(
+    "--no-pull",
+    is_flag=True,
+    help="Attach and track, but do not pull completed checkpoints.",
+)
+@click.option(
+    "--grid",
+    is_flag=True,
+    help="Grid-filter checkpoint before pulling; incompatible with --quick.",
+)
+@click.option("--drop-wide-brem", is_flag=True, help="With --grid, drop wide-brem.")
+@click.option("--downcast", is_flag=True, help="With --grid, downcast to float32.")
+@click.option("-f", "--follow", is_flag=True, hidden=True)
 def start_command(
     materials,
     all_,
@@ -837,6 +907,11 @@ def start_command(
     chunk_minutes,
     no_sync,
     dry_run,
+    headless,
+    no_pull,
+    grid,
+    drop_wide_brem,
+    downcast,
     follow,
 ):
     materials = list(materials)
@@ -871,6 +946,14 @@ def start_command(
         raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
     if quick and fidelity != "full":
         raise click.UsageError("--quick cannot be combined with --fidelity survey")
+    if quick and grid:
+        raise click.UsageError(
+            "submit --quick --grid: quick checkpoints aren't grid-filterable; drop --grid"
+        )
+    if headless and no_pull:
+        raise click.UsageError("--headless cannot be combined with --no-pull")
+    if headless and follow:
+        raise click.UsageError("--headless cannot be combined with --follow")
     return _invoke_click(
         _cli_start,
         _click_args(
@@ -889,6 +972,11 @@ def start_command(
             chunk_minutes=chunk_minutes,
             no_sync=no_sync,
             dry_run=dry_run,
+            headless=headless,
+            no_pull=no_pull,
+            grid=grid,
+            drop_wide_brem=drop_wide_brem,
+            downcast=downcast,
             follow=follow,
         ),
     )
@@ -1130,18 +1218,28 @@ def pull_command(
     is_flag=True,
     help="Empty remote checkpoints directory; takes no material arguments.",
 )
+@click.option(
+    "--profile",
+    "catalog_profile",
+    default=None,
+    metavar="NAME",
+    help="Clear checkpoints belonging to catalog profile NAME.",
+)
 @click.option("--yes", is_flag=True, help="Delete exact previewed targets; otherwise preview.")
-def clear_command(materials, all_checkpoints, yes):
+def clear_command(materials, all_checkpoints, catalog_profile, yes):
     if all_checkpoints and materials:
         raise click.UsageError("clear --all takes no material argument")
-    if not all_checkpoints and not materials:
-        raise click.UsageError("clear needs material(s), or --all")
+    if catalog_profile is not None and (all_checkpoints or materials):
+        raise click.UsageError("clear --profile takes no material arguments or --all")
+    if not all_checkpoints and not materials and catalog_profile is None:
+        raise click.UsageError("clear needs material(s), --profile, or --all")
     return _invoke_click(
         _cli_clear,
         _click_args(
             "clear",
             materials=list(materials),
             all_checkpoints=all_checkpoints,
+            catalog_profile=catalog_profile,
             yes=yes,
         ),
     )

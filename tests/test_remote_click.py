@@ -50,7 +50,7 @@ def test_start_click_defaults_and_zero_meanings(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "job",
     )
 
-    result = invoke(remote.command, ["submit", "hopg", "--workers", "0"])
+    result = invoke(remote.command, ["submit", "hopg", "--workers", "0", "--headless"])
 
     assert_clean_result(result)
     assert calls == [
@@ -152,13 +152,14 @@ def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
     monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
 
     # ``rebrem``/``reline`` support --dry-run, which returns before the
-    # (mocked, always-disconnected) viewer.attach call; ``scan`` has no
-    # --dry-run and always attaches, so a disconnected viewer is expected to
-    # print its "skipping automatic pull" diagnostic; ``submit`` only
-    # attaches with --follow (default off), so it stays clean either way.
+    # (mocked, always-disconnected) viewer.attach call; legacy ``scan`` always
+    # attaches. Canonical ``submit`` defaults to attach+pull, so use its
+    # explicit detached mode while this test isolates fidelity dispatch.
     argv = [command_name, "hopg", "--fidelity", "survey", "--no-sync"]
     if command_name in ("rebrem", "reline"):
         argv.append("--dry-run")
+    elif command_name == "submit":
+        argv.append("--headless")
 
     result = invoke(remote.command, argv)
 
@@ -187,7 +188,10 @@ def test_submit_profile_option_dispatches_catalog_profile(monkeypatch):
         lambda materials, **kwargs: calls.append(kwargs) or "job",
     )
 
-    result = invoke(remote.command, ["submit", "hopg", "--profile", "sub_100keV"])
+    result = invoke(
+        remote.command,
+        ["submit", "hopg", "--profile", "sub_100keV", "--headless"],
+    )
 
     assert_clean_result(result)
     assert calls[0]["catalog_profile"] == "sub_100keV"
@@ -213,7 +217,7 @@ def test_submit_profile_with_membership_defaults_materials_when_none_given(monke
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "job",
     )
 
-    result = invoke(remote.command, ["submit", "--profile", "sub_100keV"])
+    result = invoke(remote.command, ["submit", "--profile", "sub_100keV", "--headless"])
 
     assert_clean_result(result)
     assert calls[0][0] == ["hopg", "mose2"]

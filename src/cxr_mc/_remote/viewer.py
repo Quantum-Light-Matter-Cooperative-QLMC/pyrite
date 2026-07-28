@@ -83,6 +83,25 @@ def _status_remote_command(job_assign, detail):
         '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done; '
         "} | emit PROGRESS; "
     )
+    resources = (
+        "{ "
+        "if command -v top >/dev/null 2>&1; then "
+        "LC_ALL=C top -bn1 2>/dev/null | "
+        "awk '/Cpu\\(s\\)|^%Cpu/ {for (i=1;i<=NF;i++) if ($i ~ /^id/) "
+        "{printf \"cpu_percent=%.1f|\", 100-$(i-1); exit}}'; fi; "
+        "if command -v free >/dev/null 2>&1; then "
+        "free -b 2>/dev/null | awk '/^Mem:/ {printf "
+        "\"memory_used_bytes=%s|memory_total_bytes=%s|memory_percent=%.1f|\", "
+        "$3, $2, 100*$3/$2}'; fi; "
+        "if command -v nvidia-smi >/dev/null 2>&1; then "
+        "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total "
+        "--format=csv,noheader,nounits 2>/dev/null | "
+        "awk -F, 'NR==1 {printf \"gpu_percent=%.1f|vram_used_mib=%.0f|"
+        "vram_total_mib=%.0f|vram_percent=%.1f|\", $1, $2, $3, 100*$2/$3}'; fi; "
+        "} | emit RESOURCES; "
+        if detail >= 2
+        else ""
+    )
     log = '{ tail -c 32768 "$D/log" 2>/dev/null; } | emit LOG; ' if detail >= 2 else ""
     return (
         "set -o pipefail; "
@@ -105,6 +124,7 @@ def _status_remote_command(job_assign, detail):
         + 'else printf "job_id=%s|state=NOT_QUEUED\\n" "$SID"; fi ;; esac; '
         + "} | emit SQUEUE || exit $?; "
         + progress
+        + resources
         + log
     )
 
@@ -171,38 +191,54 @@ def _status_stream_command(remote: str) -> str:
 
 
 def _status_stream(remote: str):
-    """Yield status snapshots over one persistent SSH connection."""
+    """Yield snapshots, reconnecting twice after an SSH stream disconnect."""
     stream_command = _status_stream_command(remote)
-    process = subprocess.Popen(
-        ["ssh", "-n", config.remote_host(), stream_command],
-        stdout=subprocess.PIPE,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        bufsize=1,
+    reconnects = 2
+    last_error = "unknown error"
+    for attempt in range(reconnects + 1):
+        process = None
+        lines: list[str] = []
+        try:
+            process = subprocess.Popen(
+                ["ssh", "-n", config.remote_host(), stream_command],
+                stdout=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+            )
+            if process.stdout is None:
+                raise RuntimeError("ssh status stream has no stdout")
+            for line in process.stdout:
+                if line.rstrip("\r\n") == _STATUS_FRAME_END:
+                    yield "".join(lines)
+                    lines.clear()
+                else:
+                    lines.append(line)
+            last_error = f"exit {process.wait()}"
+        except OSError as error:
+            last_error = str(error)
+        finally:
+            if process is not None:
+                if process.stdout is not None:
+                    process.stdout.close()
+                if process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
+        if attempt < reconnects:
+            print(
+                f"ssh status stream disconnected ({last_error}); "
+                f"reconnecting {attempt + 1}/{reconnects}",
+                file=sys.stderr,
+            )
+    raise SystemExit(
+        f"ssh status stream disconnected after {reconnects} reconnect attempts ({last_error}); "
+        "remote job is unaffected"
     )
-    lines: list[str] = []
-    try:
-        if process.stdout is None:
-            raise RuntimeError("ssh status stream has no stdout")
-        for line in process.stdout:
-            if line.rstrip("\r\n") == _STATUS_FRAME_END:
-                yield "".join(lines)
-                lines.clear()
-            else:
-                lines.append(line)
-        returncode = process.wait()
-        raise SystemExit(f"ssh status stream ended (exit {returncode})")
-    finally:
-        if process.stdout is not None:
-            process.stdout.close()
-        if process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
 
 
 # How many consecutive not-live polls the attach viewers tolerate before the
@@ -235,6 +271,7 @@ def _render_frame(frame, *, tty):
 # 'x' arms, 'y' confirms within the window below; anything else (including a
 # repeated 'x') disarms silently. Checked once per ~2 s poll (see _KeyListener).
 _CANCEL_ARM_KEY = "x"
+_PULL_ARM_KEY = "p"
 _CANCEL_CONFIRM_KEY = "y"
 _CANCEL_ARM_SECONDS = 6.0
 
@@ -320,17 +357,44 @@ class _KeyListener:
 def _attach_header(refresh, *, armed=False, cancel_hint=True):
     """One-line banner above each live frame; the counter proves it's polling."""
     if armed:
+        action = "PULL" if armed == "pull" else "CANCEL"
         return presentation._paint(
             f"ATTACHED · {config.remote_host()} · refresh {refresh} · "
-            f"CANCEL ARMED -- press {_CANCEL_CONFIRM_KEY} to confirm, any other key aborts",
+            f"{action} ARMED -- press {_CANCEL_CONFIRM_KEY} to confirm, any other key aborts",
             "warning",
         )
-    hint = f" · {_CANCEL_ARM_KEY} cancels job (confirm)" if cancel_hint else ""
+    hint = (
+        f" · {_CANCEL_ARM_KEY} cancels job · {_PULL_ARM_KEY} pulls progress (confirm)"
+        if cancel_hint
+        else ""
+    )
     return presentation._paint(
         f"ATTACHED · {config.remote_host()} · refresh {refresh} · "
         f"Ctrl-C detaches (job keeps running){hint}",
         "inactive",
     )
+
+
+def _pull_attached_progress(jobid, sections):
+    """Pull checkpoint stems that have emitted progress for attached job."""
+    fields = presentation._metadata_fields(sections.get("META", ""))
+    records = presentation._parse_progress_records(sections.get("PROGRESS", ""))
+    materials = list(records)
+    if not materials:
+        raise SystemExit("no partial checkpoints have reported progress yet")
+    stems = scripts._stems(
+        materials,
+        fields.get("quick") == "True",
+        fields.get("fidelity", "full"),
+        high_energy_min_kev=(
+            float(fields["high_energy_min_kev"])
+            if fields.get("high_energy_min_kev") not in (None, "None")
+            else None
+        ),
+        catalog_profile=fields.get("catalog_profile", "standard"),
+    )
+    lifecycle.pull(stems, no_sync=True)
+    print(f"\nPARTIAL PULL COMPLETE · job {jobid} · {len(stems)} checkpoint(s)")
 
 
 def _live_status(jobid, detail):
@@ -354,9 +418,11 @@ def _live_status(jobid, detail):
     state_ = ""
     broken = False
     cancelled = False
+    pull_requested = False
     stream = None
     keys = _KeyListener()
     armed_until = None
+    armed_action = None
     try:
         stream = _status_stream(remote)
         for output in stream:
@@ -371,22 +437,42 @@ def _live_status(jobid, detail):
 
             if armed_until is not None and time.monotonic() >= armed_until:
                 armed_until = None  # confirm window lapsed; disarm silently
+                armed_action = None
             for key in keys.poll():
                 if armed_until is not None:
                     confirmed = key.lower() == _CANCEL_CONFIRM_KEY
                     armed_until = None
+                    action = armed_action
+                    armed_action = None
                     if confirmed:
-                        cancelled = True
-                        break
+                        if action == "cancel":
+                            cancelled = True
+                            break
+                        if action == "pull":
+                            pull_requested = True
                 elif key.lower() == _CANCEL_ARM_KEY:
                     armed_until = time.monotonic() + _CANCEL_ARM_SECONDS
+                    armed_action = "cancel"
+                elif key.lower() == _PULL_ARM_KEY:
+                    armed_until = time.monotonic() + _CANCEL_ARM_SECONDS
+                    armed_action = "pull"
 
             frame = (
-                _attach_header(refresh, armed=armed_until is not None, cancel_hint=keys.active)
+                _attach_header(
+                    refresh,
+                    armed=armed_action if armed_until is not None else False,
+                    cancel_hint=keys.active,
+                )
                 + "\n\n"
                 + presentation._style_states(presentation._format_job_status(sections, detail))
             )
             _render_frame(frame, tty=tty)
+            if pull_requested:
+                pull_requested = False
+                try:
+                    _pull_attached_progress(jobid, sections)
+                except (SystemExit, ValueError) as error:
+                    print(f"\nPARTIAL PULL FAILED · job {jobid}\n  {error}")
             if cancelled or _is_terminal_state(state_):
                 break
             missed = 0 if live else missed + 1

@@ -831,6 +831,55 @@ def test_submit_sub_100keV_uses_shipped_membership_without_material_args(capsys)
     assert "hopg" in out and "zrte3" in out
 
 
+def test_submit_defaults_to_attach_and_pull(monkeypatch):
+    events = []
+    monkeypatch.setattr(
+        lifecycle,
+        "start_queue",
+        lambda mats, **kwargs: events.append(("submit", mats, kwargs)) or "j",
+    )
+    monkeypatch.setattr(viewer, "attach", lambda jobid: events.append(("attach", jobid)) or True)
+    monkeypatch.setattr(state, "_completed_materials", lambda jobid, mats: list(mats))
+    monkeypatch.setattr(scripts, "_stems", lambda mats, *args, **kwargs: list(mats))
+    monkeypatch.setattr(
+        lifecycle, "pull", lambda stems, **kwargs: events.append(("pull", stems, kwargs))
+    )
+
+    remote.main(["submit", "hopg", "--no-sync"])
+
+    assert [event[0] for event in events] == ["submit", "attach", "pull"]
+    assert events[-1][2]["no_sync"] is True
+
+
+def test_submit_headless_skips_attach_and_pull(monkeypatch):
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: pytest.fail("must not attach"))
+    monkeypatch.setattr(lifecycle, "pull", lambda *_args, **_kwargs: pytest.fail("must not pull"))
+
+    remote.main(["submit", "hopg", "--headless", "--no-sync"])
+
+
+def test_submit_no_pull_still_attaches(monkeypatch):
+    attached = []
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda jobid: attached.append(jobid) or True)
+    monkeypatch.setattr(lifecycle, "pull", lambda *_args, **_kwargs: pytest.fail("must not pull"))
+
+    remote.main(["submit", "hopg", "--no-pull", "--no-sync"])
+
+    assert attached == ["j"]
+
+
+def test_submit_rejects_headless_with_no_pull(capsys):
+    assert remote.main(["submit", "hopg", "--headless", "--no-pull"]) == 2
+    assert "--headless cannot be combined with --no-pull" in capsys.readouterr().err
+
+
+def test_remote_scan_help_marks_command_deprecated(capsys):
+    assert remote.main(["scan", "--help"]) == 0
+    assert "Deprecated" in capsys.readouterr().out
+
+
 def _quiet_submission(monkeypatch):
     monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
     monkeypatch.setattr(transport.subprocess, "run", lambda *_args, **_kwargs: None)
@@ -1059,7 +1108,8 @@ def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, ca
 
     output = capsys.readouterr().out
     assert "JOB j" in output
-    assert "48291 · RUNNING" in output
+    assert "State      RUNNING" in output
+    assert output.count("State") == 1
     assert "hopg" in output
     assert "standard · chunked into 10 min slices" in output
     assert "squeue" in commands[0]
@@ -1188,6 +1238,12 @@ def test_job_status_double_verbose_renders_case_progress(monkeypatch, capsys):
                     "SQUEUE": "job_id=48291|state=RUNNING",
                     "PROGRESS": '{"material":"hopg","total_cases":5,"cached_cases":1,'
                     '"completed_new_cases":2,"state":"running"}',
+                    "RESOURCES": (
+                        "cpu_percent=25.0|memory_used_bytes=8589934592|"
+                        "memory_total_bytes=17179869184|memory_percent=50.0|"
+                        "gpu_percent=80.0|vram_used_mib=12000|"
+                        "vram_total_mib=24000|vram_percent=50.0"
+                    ),
                     "LOG": "last log line",
                 }
             )
@@ -1203,10 +1259,29 @@ def test_job_status_double_verbose_renders_case_progress(monkeypatch, capsys):
     assert "3/5" in output
     assert "60%" in output
     assert "RECENT LOG (diagnostics only)" in output
+    assert "COMPUTE USAGE" in output
+    assert "CPU" in output and "25.0%" in output
+    assert "Host memory" in output and "8.0/16.0 GiB" in output
+    assert "GPU" in output and "80.0%" in output
+    assert "GPU VRAM" in output and "12000/24000 MiB" in output
+    assert "COUPLING PROVENANCE" in output
+    assert "1 stored spectra; 2 cases recomputed χ_g/U_g" in output
     assert '{"material"' not in output
     assert "last log line" in output
     assert '"$D"/progress/*.json' in commands[0]
     assert 'tail -c 32768 "$D/log"' in commands[0]
+    assert "nvidia-smi --query-gpu" in commands[0]
+
+
+def test_status_resource_probes_are_highest_verbosity_only(monkeypatch):
+    commands = []
+    monkeypatch.setattr(transport, "_ssh_capture", lambda command: commands.append(command) or "")
+
+    remote.job_status("j", detail=1)
+
+    assert "nvidia-smi" not in commands[0]
+    assert "top -bn1" not in commands[0]
+    assert "free -b" not in commands[0]
 
 
 def test_status_collapses_legacy_tqdm_history_to_latest_material_bar(monkeypatch, capsys):
@@ -1511,6 +1586,7 @@ def test_key_listener_inactive_when_stdin_is_not_a_tty(monkeypatch):
 
 def test_attach_header_shows_cancel_hint_only_when_keys_are_active():
     assert f"{viewer._CANCEL_ARM_KEY} cancels job" in viewer._attach_header(1, cancel_hint=True)
+    assert f"{viewer._PULL_ARM_KEY} pulls progress" in viewer._attach_header(1, cancel_hint=True)
     assert "cancels job" not in viewer._attach_header(1, cancel_hint=False)
 
 
@@ -1518,6 +1594,73 @@ def test_attach_header_shows_armed_confirm_banner():
     header = viewer._attach_header(1, armed=True)
     assert "CANCEL ARMED" in header
     assert f"press {viewer._CANCEL_CONFIRM_KEY} to confirm" in header
+
+
+def test_attach_pull_keybinding_confirms_without_stopping_job(monkeypatch, capsys):
+    running = _status_output(
+        "running hopg [1/1] since now",
+        squeue_state="RUNNING",
+        progress=(
+            '{"material":"hopg","total_cases":4,"cached_cases":1,'
+            '"completed_new_cases":1,"state":"running"}'
+        ),
+    )
+    done = _status_output("done now", squeue_state="NOT_QUEUED")
+    monkeypatch.setattr(viewer, "_status_stream", lambda _cmd: iter([running, running, done]))
+    fake_keys = _FakeKeyListener([["p"], ["y"], []])
+    monkeypatch.setattr(viewer, "_KeyListener", lambda: fake_keys)
+    pulled = []
+    monkeypatch.setattr(
+        viewer,
+        "_pull_attached_progress",
+        lambda jobid, sections: pulled.append((jobid, sections)),
+    )
+    monkeypatch.setattr(
+        lifecycle, "_stop_jobid", lambda _jobid: pytest.fail("pull must not cancel job")
+    )
+
+    assert remote.attach("20260101-000000") is True
+
+    assert len(pulled) == 1
+    assert pulled[0][0] == "20260101-000000"
+    assert "PULL ARMED" in capsys.readouterr().out
+
+
+def test_pull_attached_progress_uses_reporting_profile_stems(monkeypatch):
+    sections = {
+        "META": (
+            "materials: hopg hbn\nquick: False\nfidelity: full\n"
+            "catalog_profile: sub_100keV"
+        ),
+        "PROGRESS": (
+            '{"material":"hopg","total_cases":4,"cached_cases":1,'
+            '"completed_new_cases":1,"state":"running"}'
+        ),
+    }
+    stem_calls = []
+    pulls = []
+    monkeypatch.setattr(
+        scripts,
+        "_stems",
+        lambda materials, quick, fidelity, **kwargs: (
+            stem_calls.append((materials, quick, fidelity, kwargs)) or ["hopg-profile"]
+        ),
+    )
+    monkeypatch.setattr(
+        lifecycle, "pull", lambda stems, **kwargs: pulls.append((stems, kwargs))
+    )
+
+    viewer._pull_attached_progress("j", sections)
+
+    assert stem_calls == [
+        (
+            ["hopg"],
+            False,
+            "full",
+            {"high_energy_min_kev": None, "catalog_profile": "sub_100keV"},
+        )
+    ]
+    assert pulls == [(["hopg-profile"], {"no_sync": True})]
 
 
 def test_attach_cancel_keybinding_confirms_and_scancels_the_job(monkeypatch, capsys):
@@ -1641,6 +1784,52 @@ def test_status_stream_uses_one_ssh_process_for_multiple_frames(monkeypatch):
     assert process.terminated
 
 
+def test_status_stream_reconnects_twice_before_disconnect(monkeypatch, capsys):
+    class FakeProcess:
+        def __init__(self, output, returncode):
+            self.stdout = io.StringIO(output)
+            self.returncode = returncode
+
+        def poll(self):
+            return self.returncode
+
+        def wait(self, timeout=None):
+            return self.returncode
+
+    processes = iter(
+        [
+            FakeProcess("", 255),
+            FakeProcess(f"recovered\n{viewer._STATUS_FRAME_END}\n", 0),
+        ]
+    )
+    monkeypatch.setattr(viewer.subprocess, "Popen", lambda *_args, **_kwargs: next(processes))
+    stream = viewer._status_stream("printf snapshot")
+
+    assert next(stream) == "recovered\n"
+    stream.close()
+
+    assert "reconnecting 1/2" in capsys.readouterr().err
+
+
+def test_status_stream_explains_disconnect_after_retries(monkeypatch, capsys):
+    class FakeProcess:
+        def __init__(self):
+            self.stdout = io.StringIO("")
+
+        def poll(self):
+            return 255
+
+        def wait(self, timeout=None):
+            return 255
+
+    monkeypatch.setattr(viewer.subprocess, "Popen", lambda *_args, **_kwargs: FakeProcess())
+
+    with pytest.raises(SystemExit, match="after 2 reconnect attempts.*job is unaffected"):
+        next(viewer._status_stream("printf snapshot"))
+
+    assert capsys.readouterr().err.count("reconnecting") == 2
+
+
 def test_status_stream_composes_as_valid_bash():
     snapshot = viewer._status_remote_command('JOB="j"', 2)
     command = viewer._status_stream_command(snapshot)
@@ -1700,7 +1889,7 @@ def test_overall_progress_line_sums_cases_and_counts_done_materials():
     assert "7/10 cases" in line  # 4 (hopg) + 3 (hbn)
     # material-weighted over the two started materials: (4/4 + 3/6) / 2 = 75%.
     assert " 75%" in line
-    assert "1/2 materials" in line  # only hopg is done
+    assert "materials" not in line
     assert "●" in line  # a still-running material keeps the aggregate active
 
 
@@ -1724,7 +1913,32 @@ def test_overall_progress_line_counts_unstarted_materials_in_the_denominator():
     assert line is not None
     # (4/4 + 2/4 + 0 + 0) / 4 = 37.5% -> 38%, not ~75%.
     assert " 38%" in line
-    assert "1/4 materials" in line
+    assert "6/16 cases" in line
+    assert "materials" not in line
+
+
+def test_compute_progress_reports_percentage_without_case_counts():
+    records = remote._parse_progress_records(
+        '{"material":"hopg","total_cases":4,"cached_cases":1,'
+        '"completed_new_cases":1,"state":"running",'
+        '"done_cost":25.0,"total_cost":100.0}'
+    )
+
+    line = remote._overall_progress_line(records, ["hopg"], use_cost=True)
+
+    assert " 25%" in line
+    assert "cases" not in line
+
+
+def test_paused_overall_progress_uses_warning_state():
+    records = remote._parse_progress_records(
+        '{"material":"hopg","total_cases":4,"cached_cases":1,'
+        '"completed_new_cases":1,"state":"running"}'
+    )
+
+    line = remote._overall_progress_line(records, ["hopg"], state_override="paused")
+
+    assert "Ⅱ" in line
 
 
 def test_overall_progress_line_is_none_without_records():
@@ -1794,9 +2008,9 @@ def test_overall_progress_line_use_cost_falls_back_to_cases_without_cost_data():
         '{"material":"hopg","total_cases":4,"cached_cases":2,'
         '"completed_new_cases":0,"state":"running"}'
     )
-    assert remote._overall_progress_line(
-        records, ["hopg"], use_cost=True
-    ) == remote._overall_progress_line(records, ["hopg"], use_cost=False)
+    line = remote._overall_progress_line(records, ["hopg"], use_cost=True)
+    assert " 50%" in line
+    assert "cases" not in line
 
 
 def test_status_shows_one_compute_bar_at_base_verbosity_when_cost_data_present(monkeypatch, capsys):
@@ -1849,6 +2063,38 @@ def test_status_shows_both_bars_at_verbose_when_cost_data_present(monkeypatch, c
     assert "Progress (cases)" in out
     assert " 30%" in out  # compute row
     assert " 60%" in out  # cases row (3/5)
+
+
+def test_status_pending_uses_one_state_and_pauses_job_progress(monkeypatch, capsys):
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _cmd: presentation._encode_sections(
+            {
+                "JOB": "j",
+                "META": (
+                    "job: j\nmaterials: hopg hbn\nslurm_job_id: 48291\n"
+                    "catalog_profile: sub_100keV\nquick: False"
+                ),
+                "STATE": "queued slice 2",
+                "SQUEUE": "job_id=48291|state=PENDING",
+                "PROGRESS": '{"material":"hopg","total_cases":4,"cached_cases":4,'
+                '"completed_new_cases":0,"state":"done"}',
+            }
+        ),
+    )
+
+    remote.job_status("j", 1)
+
+    out = capsys.readouterr().out
+    assert out.count("State") == 1
+    assert "State      PENDING" in out
+    assert "\n  SLURM state" not in out
+    assert "Ⅱ" in out
+    assert "Materials  1/2 complete" in out
+    assert "Profile    profile=sub_100keV" in out
+    assert "Mode       standard" in out
+    assert "standard · profile=" not in out
 
 
 def test_status_progress_row_unchanged_without_cost_data(monkeypatch, capsys):
@@ -2354,6 +2600,59 @@ def test_clear_multiple_materials_dry_preview_lists_each(monkeypatch, capsys):
     for name in ("hopg.pkl", "hopg_quick.pkl", "hbn.pkl", "hbn_quick.pkl"):
         assert name in listing
     assert "would delete" in capsys.readouterr().out
+
+
+def test_clear_profile_targets_only_profile_stems(monkeypatch, capsys):
+    _no_live_jobs(monkeypatch)
+    commands = []
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda command: commands.append(command)
+        or "hopg--profile-sub_100keV.pkl\nhbn--profile-sub_100keV.pkl\n",
+    )
+    monkeypatch.setattr(
+        scripts,
+        "_stems",
+        lambda materials, quick, fidelity, **kwargs: [
+            f"{material}--{fidelity}-profile-{kwargs['catalog_profile']}"
+            for material in materials
+        ],
+    )
+
+    remote.clear_remote(
+        ["hopg", "hbn"],
+        catalog_profile="sub_100keV",
+    )
+
+    listing = commands[-1]
+    assert "hopg--full-profile-sub_100keV" in listing
+    assert "hopg--survey-profile-sub_100keV" in listing
+    assert "hbn--full-profile-sub_100keV" in listing
+    assert "hbn--survey-profile-sub_100keV" in listing
+    assert "hopg_quick" not in listing
+    assert "would delete" in capsys.readouterr().out
+
+
+def test_clear_profile_cli_uses_profile_membership(monkeypatch):
+    calls = []
+    monkeypatch.setattr(cli, "_profile_default_materials", lambda profile: ("hopg", "hbn"))
+    monkeypatch.setattr(
+        lifecycle,
+        "clear_remote",
+        lambda materials, yes, **kwargs: calls.append((materials, yes, kwargs)),
+    )
+
+    remote.main(["clear", "--profile", "sub_100keV", "--yes"])
+
+    assert calls == [(["hopg", "hbn"], True, {"catalog_profile": "sub_100keV"})]
+
+
+def test_clear_profile_rejects_materials_and_all(capsys):
+    assert remote.main(["clear", "hopg", "--profile", "sub_100keV"]) == 2
+    assert "--profile takes no material" in capsys.readouterr().err
+    assert remote.main(["clear", "--all", "--profile", "sub_100keV"]) == 2
+    assert "--profile takes no material" in capsys.readouterr().err
 
 
 def test_clear_rejects_bad_material(monkeypatch):

@@ -22,7 +22,9 @@ _TQDM_FRAME_RE = re.compile(
     r"\[(?P<timing>[^\]]*)\]"
 )
 _FRAME_PREFIX = "CXR_REMOTE_V1"
-_FRAME_SECTIONS = frozenset({"JOB", "META", "STATE", "SQUEUE", "PROGRESS", "LOG"})
+_FRAME_SECTIONS = frozenset(
+    {"JOB", "META", "STATE", "SQUEUE", "PROGRESS", "RESOURCES", "LOG"}
+)
 
 
 def _sanitize_terminal(value, *, multiline=False):
@@ -75,9 +77,9 @@ def _style_states(text):
     if not _color_enabled():
         return text
     groups = {
-        "active": ("RUNNING", "PENDING", "QUEUED", "SUBMITTED"),
+        "active": ("RUNNING", "SUBMITTED"),
         "done": ("DONE", "FINISHED", "COMPLETED"),
-        "warning": ("PAUSED", "STALLED", "CANCELLING", "NOT_QUEUED"),
+        "warning": ("PAUSED", "PENDING", "QUEUED", "STALLED", "CANCELLING", "NOT_QUEUED"),
         "failed": ("FAILED", "CANCELLED"),
     }
     for group, words in groups.items():
@@ -112,7 +114,7 @@ def _format_fields(rows, *, indent="  "):
     return "\n".join(lines)
 
 
-def _format_material_roster(materials):
+def _format_material_roster(materials, *, include_count=True):
     """Compact, readable material list for the status header.
 
     A short roster stays on one line; a long one is summarized by count and
@@ -125,7 +127,8 @@ def _format_material_roster(materials):
     joined = ", ".join(materials)
     if len(materials) <= 6 and len(joined) <= 60:
         return joined
-    return f"{len(materials)} total\n{textwrap.fill(joined, width=60)}"
+    prefix = f"{len(materials)} total\n" if include_count else ""
+    return prefix + textwrap.fill(joined, width=60)
 
 
 def _metadata_fields(metadata):
@@ -142,8 +145,6 @@ def _mode_summary(metadata):
     fields = _metadata_fields(metadata)
     if fields.get("kind") == "rebrem":
         parts = ["brem-only recompute"]
-        if fields.get("profile"):
-            parts.append(f"profile={fields['profile']}")
         if fields.get("ne_brem") not in (None, "None"):
             parts.append(f"Ne_brem={fields['ne_brem']}")
         bounds = [fields.get("brem_start_eV"), fields.get("brem_stop_eV")]
@@ -156,8 +157,6 @@ def _mode_summary(metadata):
         return " · ".join(parts)
     if fields.get("kind") == "reline":
         parts = ["line-only recompute"]
-        if fields.get("profile"):
-            parts.append(f"profile={fields['profile']}")
         if fields.get("line_ne") not in (None, "None"):
             parts.append(f"Ne_line={fields['line_ne']}")
         bounds = [fields.get("line_start_eV"), fields.get("line_stop_eV")]
@@ -175,21 +174,27 @@ def _mode_summary(metadata):
     speed = "quick" if fields.get("quick") == "True" else "standard"
     floor = fields.get("high_energy_min_kev")
     floor_suffix = f" · high-energy floor {floor} keV" if floor not in (None, "None") else ""
-    catalog_profile = fields.get("catalog_profile")
-    profile_suffix = (
-        f" · profile={catalog_profile}" if catalog_profile not in (None, "None", "standard") else ""
-    )
     if "chunk_minutes" not in fields and "parallel_materials" not in fields:
-        return speed + floor_suffix + profile_suffix
+        return speed + floor_suffix
     try:
         chunk_minutes = float(fields.get("chunk_minutes", "0"))
     except ValueError:
         chunk_minutes = 0
     if chunk_minutes > 0:
-        return f"{speed} · chunked into {chunk_minutes:g} min slices{floor_suffix}{profile_suffix}"
+        return f"{speed} · chunked into {chunk_minutes:g} min slices{floor_suffix}"
     parallel = fields.get("parallel_materials")
     suffix = f" · {parallel} materials at once" if parallel not in {None, "None"} else ""
-    return f"{speed} · monolithic{suffix}{floor_suffix}{profile_suffix}"
+    return f"{speed} · monolithic{suffix}{floor_suffix}"
+
+
+def _profile_summary(fields):
+    """Standalone profile field for scan and component-recompute jobs."""
+    profile = fields.get("profile")
+    if profile in (None, "None"):
+        profile = fields.get("catalog_profile")
+    if profile in (None, "None"):
+        return None
+    return f"profile={profile}"
 
 
 def _material_label(material):
@@ -267,7 +272,7 @@ def _has_cost_data(records):
     )
 
 
-def _overall_progress_line(records, materials=(), *, use_cost=False):
+def _overall_progress_line(records, materials=(), *, use_cost=False, state_override=None):
     """One job-wide progress bar for the status header, shown at every level.
 
     ``materials`` is the full roster from job metadata. The bar is material-
@@ -280,13 +285,15 @@ def _overall_progress_line(records, materials=(), *, use_cost=False):
     ``use_cost`` weights each material's fraction by relative compute cost
     (``sweep.case_cost``, see :func:`_cost_progress`) instead of a flat case
     count -- a heavy high-energy case then moves the bar more than a cheap
-    low-energy one. The ``N/M cases`` trailer always reports raw case counts
-    regardless, since that's still the meaningful "how many done" figure.
+    low-energy one. Compute lines report percentage only; case lines report
+    job-wide completed/total case counts.
     """
     aggregate = _aggregate_progress(records)
     if aggregate is None:
         return None
-    completed, total, state = aggregate
+    completed, recorded_total, state = aggregate
+    if state_override is not None:
+        state = state_override
     roster = [material for material in materials if material and material != "-"]
     n_materials = len(roster) or len(records)
     frac_sum = 0.0
@@ -301,10 +308,12 @@ def _overall_progress_line(records, materials=(), *, use_cost=False):
     percent = round(100 * overall)
     glyph = _STATE_GLYPHS.get(state, "●")
     accent = _paint(f"{glyph} {_progress_track(percent, 100)}", _progress_group(state))
-    if n_materials <= 1:
-        return f"{accent}  {percent:>3}%  {completed}/{total} cases"
-    done = sum(1 for record in records.values() if record["state"] == "done")
-    return f"{accent}  {percent:>3}%  {completed}/{total} cases · {done}/{n_materials} materials"
+    if use_cost:
+        return f"{accent}  {percent:>3}%"
+    missing = max(0, n_materials - len(records))
+    typical_total = round(recorded_total / len(records)) if records else 0
+    job_total = recorded_total + missing * typical_total
+    return f"{accent}  {percent:>3}%  {completed}/{job_total} cases"
 
 
 def _format_now_testing(current):
@@ -348,6 +357,63 @@ def _format_case_progress(records, materials=()):
             f"  {labels[material]:<{label_width}}  {accent}  "
             f"{completed:>{len(str(total))}}/{total}  {percent:>3}%  {state:<7}  {tail}"
         )
+    return "\n".join(lines)
+
+
+def _format_compute_usage(payload):
+    """Render optional host/GPU utilization sampled by the remote status probe."""
+    fields = _scheduler_fields(payload)
+    specs = [
+        ("CPU", "cpu_percent", None, "active"),
+        ("Host memory", "memory_percent", ("memory_used_bytes", "memory_total_bytes"), "warning"),
+        ("GPU", "gpu_percent", None, "done"),
+        ("GPU VRAM", "vram_percent", ("vram_used_mib", "vram_total_mib"), "inactive"),
+    ]
+    lines = []
+    for label, percent_key, absolute_keys, color in specs:
+        try:
+            percent = min(100.0, max(0.0, float(fields[percent_key])))
+        except (KeyError, ValueError):
+            continue
+        suffix = ""
+        if absolute_keys is not None:
+            try:
+                used = float(fields[absolute_keys[0]])
+                total = float(fields[absolute_keys[1]])
+            except (KeyError, ValueError):
+                pass
+            else:
+                if percent_key == "memory_percent":
+                    used /= 1024**3
+                    total /= 1024**3
+                    suffix = f"  {used:.1f}/{total:.1f} GiB"
+                else:
+                    suffix = f"  {used:.0f}/{total:.0f} MiB"
+        track = _paint(_progress_track(round(percent), 100), color)
+        lines.append(f"  {label:<11} {track}  {percent:>5.1f}%{suffix}")
+    return "\n".join(lines) if lines else "  Resource metrics unavailable."
+
+
+def _format_coupling_provenance(records, materials=()):
+    """Explain checkpoint reuse versus χ_g/U_g recomputation per material."""
+    order = [material for material in materials if material in records]
+    order.extend(material for material in records if material not in order)
+    if not order:
+        return "  No case progress reported yet."
+    lines = []
+    for material in order:
+        record = records[material]
+        cached = record["cached_cases"]
+        recomputed = record["completed_new_cases"]
+        if cached and recomputed:
+            status = f"mixed: {cached} stored spectra; {recomputed} cases recomputed χ_g/U_g"
+        elif cached:
+            status = f"stored spectra reused for {cached} cases; χ_g/U_g not recomputed"
+        elif recomputed:
+            status = f"χ_g/U_g recomputed for {recomputed} cases"
+        else:
+            status = "waiting; no cached or recomputed cases yet"
+        lines.append(f"  {_material_label(material):<16} {status}")
     return "\n".join(lines)
 
 
@@ -448,13 +514,19 @@ def _format_job_status(sections, detail):
     materials = fields.get("materials", "-").split()
     scheduler_id = scheduler.get("job_id") or fields.get("slurm_job_id", "-")
     scheduler_state = scheduler.get("state", "NOT_QUEUED")
+    queued = scheduler_state.upper() == "PENDING" or state_text.lower().startswith("queued")
+    display_state = (
+        scheduler_state
+        if scheduler_state not in ("", "NOT_QUEUED")
+        else ("PENDING" if queued else state_text)
+    )
+    progress_state = "paused" if queued else None
     # Progress is fetched at every verbosity now, so the overall bar and the
     # per-material CASE PROGRESS block render at levels 0/1/2 alike; the log is
     # still only pulled (and legacy-parsed) at -vv.
     records = {} if diagnostic else _parse_progress_records(sections.get("PROGRESS", ""))
     rows = [
-        ("State", state_text),
-        ("SLURM", f"{scheduler_id} · {scheduler_state}"),
+        ("State", display_state),
     ]
     if diagnostic:
         slice_text = fields.get("slice_minutes", "-")
@@ -471,19 +543,32 @@ def _format_job_status(sections, detail):
             ]
         )
     else:
+        done_materials = sum(1 for record in records.values() if record["state"] == "done")
+        material_count = len([material for material in materials if material != "-"])
+        roster = _format_material_roster(materials, include_count=False)
+        material_summary = f"{done_materials}/{material_count} complete"
+        if roster != "-":
+            material_summary += f"\n{roster}"
         rows.extend(
             [
-                ("Materials", _format_material_roster(materials)),
+                ("Materials", material_summary),
                 ("Mode", _mode_summary(metadata)),
             ]
         )
+        profile = _profile_summary(fields)
+        if profile is not None:
+            rows.append(("Profile", profile))
         # Plain `attach`/`status` (detail 0) shows one bar -- compute-weighted
         # when the job's progress records carry cost data, else the legacy
         # case-count bar (unchanged for rebrem/reline/older jobs). -v/-vv show
         # both so a heavy-vs-cheap-case skew is visible alongside raw counts.
         if _has_cost_data(records):
-            overall_compute = _overall_progress_line(records, materials, use_cost=True)
-            overall_cases = _overall_progress_line(records, materials, use_cost=False)
+            overall_compute = _overall_progress_line(
+                records, materials, use_cost=True, state_override=progress_state
+            )
+            overall_cases = _overall_progress_line(
+                records, materials, use_cost=False, state_override=progress_state
+            )
             if detail >= 1:
                 if overall_compute is not None:
                     rows.append(("Progress (compute)", overall_compute))
@@ -492,7 +577,7 @@ def _format_job_status(sections, detail):
             elif overall_compute is not None:
                 rows.append(("Progress", overall_compute))
         else:
-            overall = _overall_progress_line(records, materials)
+            overall = _overall_progress_line(records, materials, state_override=progress_state)
             if overall is not None:
                 rows.append(("Progress", overall))
     output = [f"JOB {jobid}", _format_fields(rows)]
@@ -503,6 +588,7 @@ def _format_job_status(sections, detail):
         output.extend(["", "CASE PROGRESS", progress])
     if detail >= 1:
         allocation = [
+            ("SLURM job", scheduler_id),
             ("Partition", scheduler.get("partition", "-")),
             ("Elapsed", scheduler.get("elapsed", "-")),
             ("Remaining", scheduler.get("left", "-")),
@@ -512,6 +598,16 @@ def _format_job_status(sections, detail):
         ]
         output.extend(["", "ALLOCATION", _format_fields(allocation)])
     if detail >= 2:
+        output.extend(
+            [
+                "",
+                "COMPUTE USAGE",
+                _format_compute_usage(sections.get("RESOURCES", "")),
+                "",
+                "COUPLING PROVENANCE",
+                _format_coupling_provenance(records, materials),
+            ]
+        )
         output.extend(
             ["", "RECENT LOG (diagnostics only)", _clean_recent_log(sections.get("LOG", ""))]
         )

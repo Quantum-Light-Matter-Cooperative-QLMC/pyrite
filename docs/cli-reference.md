@@ -471,10 +471,11 @@ Commands:
   reap      Release orphaned checkpoint reservations; preview unless --yes.
   rebrem    Recompute brem-only remotely, follow, and pull completed checkpoints.
   reline    Recompute line-only remotely, follow, and pull completed checkpoints.
-  scan      Sync code, submit sweep(s), wait, and pull checkpoints.
+  scan      Deprecated alias for `cxr remote submit`. (DEPRECATED: Use 'cxr remote
+            submit'.)
   status    Show one job; use -v for allocation and -vv for logs.
   stop      cancel active SLURM job(s) by material, profile, or every live job.
-  submit    Sync code and submit a detached SLURM material queue.
+  submit    Sync code, submit sweep(s), track progress, and pull checkpoints.
   sync      Push current code to remote box.
   validate  Run Zhai reproduction remotely or pull existing caches.
 ```
@@ -499,9 +500,10 @@ Usage: cxr remote clear [OPTIONS] [MATERIAL]...
   Delete remote checkpoints; preview unless --yes.
 
 Options:
-  --all       Empty remote checkpoints directory; takes no material arguments.
-  --yes       Delete exact previewed targets; otherwise preview.
-  -h, --help  Show this message and exit.
+  --all           Empty remote checkpoints directory; takes no material arguments.
+  --profile NAME  Clear checkpoints belonging to catalog profile NAME.
+  --yes           Delete exact previewed targets; otherwise preview.
+  -h, --help      Show this message and exit.
 ```
 
 ## `cxr remote jobs`
@@ -624,7 +626,7 @@ Options:
 ```text
 Usage: cxr remote scan [OPTIONS] [MATERIAL]
 
-  Sync code, submit sweep(s), wait, and pull checkpoints.
+  Deprecated alias for `cxr remote submit`. (DEPRECATED: Use 'cxr remote submit'.)
 
 Options:
   -a, --all                 Run every material in mats_to_sim.toml.
@@ -676,7 +678,10 @@ Options:
 ```text
 Usage: cxr remote submit [OPTIONS] [MATERIAL]...
 
-  Sync code and submit a detached SLURM material queue.
+  Sync code, submit sweep(s), track progress, and pull checkpoints.
+
+  Use --headless to return after submission. Use --no-pull to track through completion
+  without automatically pulling checkpoints.
 
   MATERIAL/--all/-A may be omitted when --profile NAME names a profile with an explicit
   `materials` membership list -- the profile's members become the queue. A profile with
@@ -714,7 +719,12 @@ Options:
                              job.  [default: 10.0]
   --no-sync                  Skip code upload.
   --dry-run                  Print submission preview; do not connect.
-  -f, --follow               Track job after launch.
+  --headless                 Return after submission without attaching or pulling.
+  --no-pull                  Attach and track, but do not pull completed checkpoints.
+  --grid                     Grid-filter checkpoint before pulling; incompatible with
+                             --quick.
+  --drop-wide-brem           With --grid, drop wide-brem.
+  --downcast                 With --grid, downcast to float32.
   -h, --help                 Show this message and exit.
 ```
 
