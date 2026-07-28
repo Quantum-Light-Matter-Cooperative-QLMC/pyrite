@@ -701,9 +701,15 @@ def main(argv=None):
     global WIDE_GRID_EV, WIDE_BREM_EV
     WIDE_GRID_EV = np.arange(WIDE_GRID_START_EV, args.grid_stop, args.grid_step)
     WIDE_BREM_EV = np.arange(0.0, args.brem_grid_stop, WIDE_BREM_STEP_EV)
-    materials = args.materials.split(",") if args.materials else list(CATALOG.materials)
+    materials = (
+        args.materials.split(",")
+        if args.materials
+        else list(persisted["materials"] or CATALOG.materials)
+    )
     if args.energies:
         energies = [float(e) for e in args.energies.split(",")]
+    elif persisted["energies"]:
+        energies = [float(e) for e in persisted["energies"]]
     else:
         energies = [float(e) for e in CATALOG.material(materials[0]).scan.energy_keV]
     if args.set_default:

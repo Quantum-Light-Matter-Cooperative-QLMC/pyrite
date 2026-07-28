@@ -37,6 +37,15 @@ from cxr_mc.cli._core import (
 )
 from cxr_mc.line_grid import apply, defaults, job
 
+_DEFAULT_FIELD_KEYS = {
+    "tilts": "tilts",
+    "azimuths": "azimuths",
+    "thickness": "thickness_ang",
+    "brem-step": "brem_step_ev",
+    "energies": "energies",
+    "materials": "materials",
+}
+
 
 def _pull_combined(json_name=None):
     """scp the combined derivation JSON back from the remote box; return local path."""
@@ -111,8 +120,15 @@ def _derive_options(function):
 def command():
     """Derive and manage per-material photon-energy grids.
 
-    Derivation geometry differs from physical scan ranges; use ``cxr sweep`` for
-    scan ranges. Geometry flags override persistent defaults for one run.
+    ``derive`` and ``submit`` measure both coherent-line and bremsstrahlung
+    upper bounds. ``defaults`` controls that diagnostic derivation only;
+    ``apply`` writes validated bounds into the material catalog. Physical scan
+    ranges belong to ``cxr sweep``.
+
+    Scan ``--fidelity full|survey`` is separate. It controls later simulation
+    cost and grid reduction; it never changes derivation or applied full bounds.
+
+    Command-line derivation values override persistent defaults for one run.
 
     \b
     Examples:
@@ -149,7 +165,7 @@ def derive_command(
     set_default,
     brem_step,
 ):
-    """Derive energy-grid bounds locally."""
+    """Derive line and bremsstrahlung energy-grid bounds locally."""
     from cxr_mc.line_grid import derive
 
     argv = []
@@ -196,11 +212,16 @@ def submit_command(
     no_sync,
     dry_run,
 ):
-    """Submit sliced energy-grid derivation remotely."""
+    """Submit sliced line and bremsstrahlung bound derivation remotely."""
+    persisted = defaults.load_defaults()
     return _invoke_callback(
         job.start,
-        materials=materials or job.DEFAULT_MATERIALS,
-        energies=energies or job.DEFAULT_ENERGIES,
+        materials=materials
+        or ",".join(str(value) for value in persisted["materials"])
+        or job.DEFAULT_MATERIALS,
+        energies=energies
+        or ",".join(f"{float(value):g}" for value in persisted["energies"])
+        or job.DEFAULT_ENERGIES,
         tilts=tilts,
         azimuths=azimuths,
         thickness=thickness,
@@ -335,7 +356,14 @@ for _legacy_job_child in (status_command, attach_command, logs_command, stop_com
 def apply_command(json_path, materials, pull, force, regen_golden, dry_run):
     """Apply derived bounds to material catalog.
 
-    Writes packaged ``materials.toml`` and provenance atomically after validation.
+    Consumes combined JSON from ``derive``/``submit``. Writes line bounds into
+    the shared per-material grid store, bremsstrahlung bounds into standard
+    profile overrides, and adds derived beam energies to the standard profile.
+    Catalog and provenance writes are atomic and validated.
+
+    Manual line and bremsstrahlung overrides remain unchanged unless
+    ``--force`` is passed. This command does not run a scan and does not select
+    ``full`` or ``survey`` fidelity.
 
     \b
     Example:
@@ -494,6 +522,22 @@ def set_brem_command(material, stop, step, note):
     help="Persist supplied values; otherwise only show defaults.",
 )
 @click.option(
+    "--clear",
+    "clear_fields",
+    type=click.Choice(tuple(_DEFAULT_FIELD_KEYS), case_sensitive=True),
+    multiple=True,
+    metavar="FIELD",
+    help=(
+        "Reset one field to inherited/built-in behavior; repeatable. "
+        "Fields: tilts, azimuths, thickness, brem-step, energies, materials."
+    ),
+)
+@click.option(
+    "--reset",
+    is_flag=True,
+    help="Reset every persistent derivation field to inherited/built-in behavior.",
+)
+@click.option(
     "--tilts",
     type=TILT_CSV,
     metavar="DEG,...",
@@ -517,8 +561,26 @@ def set_brem_command(material, stop, step, note):
     metavar="EV",
     help="Persistent derivation bremsstrahlung spacing in eV.",
 )
-def defaults_command(json_output, set_values, tilts, azimuths, thickness, brem_step):
-    """Show or update persistent derivation defaults."""
+def defaults_command(
+    json_output,
+    set_values,
+    clear_fields,
+    reset,
+    tilts,
+    azimuths,
+    thickness,
+    brem_step,
+):
+    """Show, update, or clear persistent derivation inputs.
+
+    These values feed ``derive`` and ``submit`` when their matching options are
+    omitted. Geometry searches determine both line and bremsstrahlung upper
+    bounds; ``brem-step`` controls only applied bremsstrahlung spacing.
+
+    Empty ``tilts`` or ``azimuths`` mean inherit each material's catalog-profile
+    angles. These are not physical scan defaults and do not select scan
+    ``--fidelity full|survey``.
+    """
     supplied = [
         flag
         for flag, value in (
@@ -531,8 +593,13 @@ def defaults_command(json_output, set_values, tilts, azimuths, thickness, brem_s
     ]
     if supplied and not set_values:
         raise click.UsageError(f"{', '.join(supplied)} require --set")
-    if json_output and set_values:
-        raise click.UsageError("--json is read-only and cannot be combined with --set")
+    if set_values and not supplied:
+        raise click.UsageError("--set requires at least one value option")
+    mutation_modes = int(set_values) + bool(clear_fields) + int(reset)
+    if mutation_modes > 1:
+        raise click.UsageError("--set, --clear, and --reset cannot be combined")
+    if json_output and mutation_modes:
+        raise click.UsageError("--json is read-only and cannot be combined with mutations")
     if set_values:
         defaults.update_defaults(
             tilts=tilts,
@@ -540,6 +607,10 @@ def defaults_command(json_output, set_values, tilts, azimuths, thickness, brem_s
             thickness_ang=thickness,
             brem_step_ev=brem_step,
         )
+    elif clear_fields:
+        defaults.reset_defaults(*(_DEFAULT_FIELD_KEYS[field] for field in clear_fields))
+    elif reset:
+        defaults.reset_defaults()
     if json_output:
         try:
             values = defaults.load_defaults()
@@ -551,7 +622,12 @@ def defaults_command(json_output, set_values, tilts, azimuths, thickness, brem_s
         return 0
     values = defaults.load_defaults()
     for key, value in values.items():
-        emit_result(f"{key} = {value}")
+        suffix = ""
+        if key == "tilts" and not value:
+            suffix = " (inherit each material's catalog-profile polar tilts)"
+        elif key == "azimuths" and not value:
+            suffix = " (inherit each material's catalog-profile azimuths)"
+        emit_result(f"{key} = {value}{suffix}")
     return 0
 
 

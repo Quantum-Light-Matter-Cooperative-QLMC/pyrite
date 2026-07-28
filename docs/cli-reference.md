@@ -785,8 +785,14 @@ Usage: cxr energy-grid [OPTIONS] COMMAND [ARGS]...
 
   Derive and manage per-material photon-energy grids.
 
-  Derivation geometry differs from physical scan ranges; use ``cxr sweep`` for scan
-  ranges. Geometry flags override persistent defaults for one run.
+  ``derive`` and ``submit`` measure both coherent-line and bremsstrahlung upper bounds.
+  ``defaults`` controls that diagnostic derivation only; ``apply`` writes validated
+  bounds into the material catalog. Physical scan ranges belong to ``cxr sweep``.
+
+  Scan ``--fidelity full|survey`` is separate. It controls later simulation cost and
+  grid reduction; it never changes derivation or applied full bounds.
+
+  Command-line derivation values override persistent defaults for one run.
 
   Examples:
     cxr energy-grid derive --materials mose2,wse2 --energies 30,60
@@ -799,13 +805,13 @@ Options:
 Commands:
   apply         Apply derived bounds to material catalog.
   brem          Inspect or manually set bremsstrahlung energy grids.
-  defaults      Show or update persistent derivation defaults.
-  derive        Derive energy-grid bounds locally.
+  defaults      Show, update, or clear persistent derivation inputs.
+  derive        Derive line and bremsstrahlung energy-grid bounds locally.
   job           Inspect, follow, or stop remote energy-grid jobs.
   line          Inspect or manually set coherent line-energy grids.
   regen-golden  Regenerate or check material-catalog golden snapshot.
   show          Show line and bremsstrahlung grids together.
-  submit        Submit sliced energy-grid derivation remotely.
+  submit        Submit sliced line and bremsstrahlung bound derivation remotely.
 ```
 
 ## `cxr energy-grid apply`
@@ -815,7 +821,14 @@ Usage: cxr energy-grid apply [OPTIONS] JSON
 
   Apply derived bounds to material catalog.
 
-  Writes packaged ``materials.toml`` and provenance atomically after validation.
+  Consumes combined JSON from ``derive``/``submit``. Writes line bounds into the shared
+  per-material grid store, bremsstrahlung bounds into standard profile overrides, and
+  adds derived beam energies to the standard profile. Catalog and provenance writes are
+  atomic and validated.
+
+  Manual line and bremsstrahlung overrides remain unchanged unless ``--force`` is
+  passed. This command does not run a scan and does not select ``full`` or ``survey``
+  fidelity.
 
   Example:
     cxr energy-grid apply combined_line_grid_bounds.json --materials mose2,wse2
@@ -876,11 +889,24 @@ Options:
 ```text
 Usage: cxr energy-grid defaults [OPTIONS]
 
-  Show or update persistent derivation defaults.
+  Show, update, or clear persistent derivation inputs.
+
+  These values feed ``derive`` and ``submit`` when their matching options are omitted.
+  Geometry searches determine both line and bremsstrahlung upper bounds; ``brem-step``
+  controls only applied bremsstrahlung spacing.
+
+  Empty ``tilts`` or ``azimuths`` mean inherit each material's catalog-profile angles.
+  These are not physical scan defaults and do not select scan ``--fidelity
+  full|survey``.
 
 Options:
   --json                    Emit one versioned JSON object on stdout (show mode only).
   --set                     Persist supplied values; otherwise only show defaults.
+  --clear FIELD             Reset one field to inherited/built-in behavior; repeatable.
+                            Fields: tilts, azimuths, thickness, brem-step, energies,
+                            materials.
+  --reset                   Reset every persistent derivation field to inherited/built-
+                            in behavior.
   --tilts DEG,...           Persistent derivation polar tilts in degrees [0, 90).
   --azimuths DEG,...        Persistent azimuths in degrees [0, 360].
   --thickness ANGSTROM,...  Persistent positive crystal thicknesses in angstrom.
@@ -893,7 +919,7 @@ Options:
 ```text
 Usage: cxr energy-grid derive [OPTIONS]
 
-  Derive energy-grid bounds locally.
+  Derive line and bremsstrahlung energy-grid bounds locally.
 
 Options:
   --materials KEY,...       Material keys; comma-separated. Omit to use persistent
@@ -1073,7 +1099,7 @@ Options:
 ```text
 Usage: cxr energy-grid submit [OPTIONS]
 
-  Submit sliced energy-grid derivation remotely.
+  Submit sliced line and bremsstrahlung bound derivation remotely.
 
 Options:
   --materials KEY,...       Material keys; comma-separated. Omit to use persistent
