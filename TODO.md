@@ -1,6 +1,6 @@
 # TODO / Backlog
 
-Items live on `feature/...` / `bugfix/...` / `docs/...` branches, not `main`, till done.
+Items live on `feature/...` / `bugfix/...` / `explore/...` branches, not `main`, till done.
 In-progress detail live on branch (or design doc);
 `main` keep one-line summary + pointer, enforced by /todo-sync.
 Priority weigh value-to-goal (line-flux / enhancement predictions + publication validation story) vs effort and risk.
@@ -18,16 +18,32 @@ Item generation:
 
 ### Active
 
-1. **>user< CLI fixes.**
+1. **>user< general CLI fixes.**
    1. `cxr energy-grid` options are confused and need to be fixed. What does `defaults` apply to? `brem`, `line`, both, or is it just used for deriving the appropriate upper-bounds for each? What does `apply` do? I think this section needs to be reworked, or at a minimum, the help explanations made more detailed 
    2. I think once values are set for `cxr energy-grid defaults`, they cannot be removed (even though when I started, the fields for `tilts` and `azimtuhs` were both empty--not sure what empty would mean here)
-   3. 
-2. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-3.  **Debye-Waller provenance and anisotropy audit.** Continue replacing placeholder or reused `B_ang2` values with primary-source values and resolve per-site/tensor model needs. → `feature/debye-waller-audit`; audit: [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md).
+   3. How does the `fidelity` field contained in the backend code relate to this? Where does `full` vs `survey` come into play?
+2. **>user< `cxr remote attach` and related progress-tracking commands**
+   1. Progress bars (both 'compute' and 'cases') still only show the number of cases for the materials current displayed. Example: sub_100keV has 21 mats, 1568 cases per mat, starts with HOPG, then hBN. I submit, then run `cxr remote attach sub_100keV`. the summary progress bar *labels* both then show `829/1568 cases`, though the actual bar fill seems correct.
+      1. For the `cases` bar, this should be fixed to be `829/(total_cases)`
+      2. For `compute`, it should just be a percentage of completed compute.
+      3. We don't need the repeated `x/21 materials` fields; that can just be its own line reported once, which should be shown on all levels of verbosity.
+      4. For all these scan-progression indicators on `attach` or otherwise, it would be good on high-verbosity modes to report (with more colored bars but different colorscheme) showing compute usage -- CPU utilization, GPU utilization, percent/absolute memory utilization for host & GPU VRAM, etc. Those can be only on the highest verbosity level, though.
+      5. When `cxr remote attach` gets paused/queued, the job-wide pregress bar(s) go green with a checkmark as if they're done. They should turn orange and go to the paused state. Same with the 'State' and 'SLURM' texts--they go blue when 'PENDING/queued' rather than the paused color (also, do we really need both of those status indicators? Seems just one would do--the state one, and say 'PENDING' rather than 'queued')
+      6. 'profile=sub_100keV' should go on its own line
+   2. Add info on whether or not chi_g/U_g were pulled from cache or recomputed for each mat on the highest verbosity level
+   3. `remote attach` often gets disconnected by remote host closing connection. Add error handling to try to reconnect a couple times before allowing disconnect with explanatory message
+   4. Add some `squeue` information dipslay reports tracking SLURM progress
+   5. `remote attach`, add `p -> y (confirm)` sequence to pull the (potentially partially completed) items from the current job/profile being tracked
+   6.  `remote scan` and `remote submit` should be combined into one `remote submit` which defaults to `scan`'s behavior, with a `--headless` flag to do current `submit behavior` and a `--no-pull` flag (can't do both since `--headless` won't pull anyway) which will attach & track progress but won't auto-pull results
+   7.  `remote clear` should be able to clear based on `--profile`
+   8.  evaluate `cxr [remote] prune [--all OR --profile NAME]` to drop stale checkpoints locally or on remote. Prune shouldn't require confirmation
+   9.  
+3. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
+4.  **Debye-Waller provenance and anisotropy audit.** Continue replacing placeholder or reused `B_ang2` values with primary-source values and resolve per-site/tensor model needs. → `feature/debye-waller-audit`; audit: [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md).
    1. >user< Evaluate complexity/value of implementing full anisotropic/tensor-based Debye-Waller factors when available
    2. >user< Evaluate worth in both implementing the approximate scalar Debye-Waller formula (compare output to known values for various anisotropic materials we have in our DB), and in attempting to implement a fully-fledged DFPT system.
    3. >user< Take a crystal with a known DW factor, then manually change it up and down over a range of values that can reasonably be expected other crystals to have, and see how much it changes by -- if large, then its worth being careful here.
-4.  **GPU-memory follow-up.** Benchmark remote `rebrem --all --ne-brem 500 --step 20` for bounded CuPy reserved-pool memory; assess analogous `reline` cleanup separately.
+5.  **GPU-memory follow-up.** Benchmark remote `rebrem --all --ne-brem 500 --step 20` for bounded CuPy reserved-pool memory; assess analogous `reline` cleanup separately.
 
 ### Gated
 
