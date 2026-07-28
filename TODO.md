@@ -16,8 +16,9 @@ Item generation:
 ----------------
 
 1. Create branch of relevant type, switch to it.
-2. Write `tasks/<branch-leaf>.md`: 2-3 sentence problem summary + implementation
-   path / checklist, scoped to the item only. Do **not** make branch `TODO.md`
+2. Write `tasks/<branch-leaf>.md`: 1-3 sentence problem summary + implementation path / checklist, scoped to the item only.
+   1. If agent is *Opus/Sol/K3 tier or above*: determine if task is suitably complex/parallelizable for subagent delegation. If yes, write parallelized task lists into additional scoped task_subagent_<model>_<number>.md documents, with <model> chosen appropriately by task scope & complexity.
+   2. Do **not** make branch `TODO.md`
    diverge from `main`. Publish to `origin`.
 3. Add a 1-sentence item summary to `TODO.md` (branch and `main` stay identical),
    pointer `→ feature/<branch>; tasks/<branch-leaf>.md`; triage into existing
