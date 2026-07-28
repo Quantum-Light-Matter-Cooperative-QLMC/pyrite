@@ -5,7 +5,7 @@ from dataclasses import replace
 import numpy as np
 
 from cxr_mc.config import default_settings, material_sweep
-from cxr_mc.profiles import PROFILE_NAMES, dataset_identity, get_profile, variant_stem
+from cxr_mc.profiles import FIDELITY_NAMES, dataset_identity, get_profile, variant_stem
 from cxr_mc.sweep import build_cases
 
 
@@ -15,7 +15,7 @@ def test_full_profile_preserves_production_defaults_exactly():
     implicit_sweep = material_sweep("mose2")
     explicit_sweep = material_sweep("mose2", profile="full")
 
-    assert PROFILE_NAMES == ("full", "survey")
+    assert FIDELITY_NAMES == ("full", "survey")
     assert implicit_settings == explicit_settings
     assert implicit_settings.n_electrons == 300
     assert implicit_settings.n_electrons_brem == 150
@@ -27,7 +27,7 @@ def test_full_profile_preserves_production_defaults_exactly():
 
 def test_survey_profile_reduces_every_expensive_sweep_dimension():
     full = material_sweep("mose2")
-    survey = material_sweep("mose2", profile="survey")
+    survey = material_sweep("mose2", fidelity="survey")
     settings = default_settings("survey")
 
     assert settings.n_electrons == 60
@@ -48,7 +48,7 @@ def test_survey_profile_reduces_every_expensive_sweep_dimension():
 
 def test_dataset_identity_is_deterministic_and_resolved_parameter_sensitive():
     settings = default_settings("survey")
-    sweep = material_sweep("mose2", profile="survey")
+    sweep = material_sweep("mose2", fidelity="survey")
     first = dataset_identity("mose2", "survey", settings, sweep)
     same = dataset_identity("mose2", "survey", settings, sweep)
     changed = dataset_identity(
@@ -72,7 +72,7 @@ def test_variant_stem_preserves_canonical_full_and_isolates_variants():
         "hopg",
         "survey",
         default_settings("survey"),
-        material_sweep("hopg", profile="survey"),
+        material_sweep("hopg", fidelity="survey"),
     )
 
     assert variant_stem(full, canonical_full=True) == "hopg"

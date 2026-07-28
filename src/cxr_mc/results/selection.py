@@ -266,7 +266,7 @@ def _grid_names(material, profile="full"):
     from ..sweep import build_cases
 
     settings = default_settings(profile)
-    sweep = material_sweep(material, profile=profile)
+    sweep = material_sweep(material, fidelity=profile)
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
     return {c["name"] for c in cases}
 

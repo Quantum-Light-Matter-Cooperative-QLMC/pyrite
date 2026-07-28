@@ -58,7 +58,7 @@ def test_start_click_defaults_and_zero_meanings(monkeypatch):
             ["hopg"],
             {
                 "quick": False,
-                "profile": "full",
+                "fidelity": "full",
                 "workers": 0,
                 "parallel_materials": None,
                 "chunk_minutes": 10.0,
@@ -115,12 +115,6 @@ def test_remote_numeric_domains_fail_at_click_boundary(argv, option):
         (["start"], "needs material"),
         (["start", "hopg", "--all"], "--all does not take"),
         (["scan", "hopg", "--quick", "--grid"], "drop --grid"),
-        (["scan", "hopg", "--quick", "--fidelity", "survey"], "cannot be combined"),
-        (["scan", "hopg", "--quick", "--profile", "survey"], "cannot be combined"),
-        (
-            ["scan", "hopg", "--fidelity", "survey", "--profile", "survey"],
-            "not both",
-        ),
         (["pull", "hopg", "--brem-only", "--line-only"], "mutually exclusive"),
         (["stop"], "needs material"),
         (["clear"], "needs material"),
@@ -172,46 +166,7 @@ def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
         assert "skipping automatic pull" in result.stderr
     else:
         assert_clean_result(result)
-    assert calls[0]["profile"] == "survey"
-
-
-@pytest.mark.parametrize("command_name", ["scan", "rebrem", "reline", "submit"])
-def test_legacy_profile_alias_warns_and_forwards(monkeypatch, command_name):
-    calls = []
-    monkeypatch.setattr(
-        lifecycle,
-        "start_queue",
-        lambda materials, **kwargs: calls.append(kwargs) or "job",
-    )
-    monkeypatch.setattr(
-        lifecycle,
-        "start_rebrem_queue",
-        lambda materials, **kwargs: calls.append(kwargs) or "job",
-    )
-    monkeypatch.setattr(
-        lifecycle,
-        "start_reline_queue",
-        lambda materials, **kwargs: calls.append(kwargs) or "job",
-    )
-    monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
-
-    result = invoke(remote.command, [command_name, "hopg", "--profile", "survey", "--no-sync"])
-
-    assert result.exit_code == 0
-    assert calls[0]["profile"] == "survey"
-    assert "deprecated" in result.stderr
-    assert "--fidelity" in result.stderr
-
-
-@pytest.mark.parametrize("command_name", ["scan", "rebrem", "reline", "submit"])
-def test_fidelity_and_legacy_profile_together_is_a_usage_error(command_name):
-    result = invoke(
-        remote.command,
-        [command_name, "hopg", "--fidelity", "full", "--profile", "full"],
-    )
-
-    assert result.exit_code == 2
-    assert "not both" in result.stderr
+    assert calls[0]["fidelity"] == "survey"
 
 
 @pytest.mark.parametrize(

@@ -1183,10 +1183,10 @@ def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
         lambda path, **kwargs: calls.append((Path(path).name, kwargs)) or {},
     )
 
-    rebrem.rebrem_checkpoints(materials=["hopg", "hbn"], checkpoint_dir=tmp_path, profile="survey")
+    rebrem.rebrem_checkpoints(materials=["hopg", "hbn"], checkpoint_dir=tmp_path, fidelity="survey")
     explicit = calls.copy()
     calls.clear()
-    rebrem.rebrem_checkpoints(checkpoint_dir=tmp_path, profile="survey")
+    rebrem.rebrem_checkpoints(checkpoint_dir=tmp_path, fidelity="survey")
 
     assert {name: kwargs for name, kwargs in calls} == {name: kwargs for name, kwargs in explicit}
     assert {kwargs["ne_brem"] for _, kwargs in calls} == {30}
@@ -1496,10 +1496,10 @@ def test_reline_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
         lambda path, material, **kwargs: calls.append((material, kwargs)) or {},
     )
 
-    reline.reline_checkpoints(materials=["hopg", "hbn"], checkpoint_dir=tmp_path, profile="survey")
+    reline.reline_checkpoints(materials=["hopg", "hbn"], checkpoint_dir=tmp_path, fidelity="survey")
     explicit = calls.copy()
     calls.clear()
-    reline.reline_checkpoints(checkpoint_dir=tmp_path, profile="survey")
+    reline.reline_checkpoints(checkpoint_dir=tmp_path, fidelity="survey")
 
     assert {name: kwargs for name, kwargs in calls} == {name: kwargs for name, kwargs in explicit}
     assert {kwargs["line_ne"] for _, kwargs in calls} == {60}

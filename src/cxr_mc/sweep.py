@@ -480,7 +480,7 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
             return [int(fallback)]
         raw = _seq(grid)
         counts = [int(value) for value in raw]
-        if any(count <= 0 or count != value for count, value in zip(counts, raw)):
+        if any(count <= 0 or count != value for count, value in zip(counts, raw, strict=True)):
             raise ValueError(f"{label} electron counts must be positive integers")
         return counts
 

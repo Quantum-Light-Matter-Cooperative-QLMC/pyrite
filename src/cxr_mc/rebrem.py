@@ -40,7 +40,7 @@ def rebrem_checkpoints(
     brem_start_eV=None,
     brem_stop_eV=None,
     brem_step_eV=None,
-    profile=None,
+    fidelity=None,
     redo_all=False,
     save_every=100,
     progress_file=None,
@@ -87,14 +87,14 @@ def rebrem_checkpoints(
         resolved_ne = ne_brem
         resolved_start = brem_start_eV
         resolved_step = brem_step_eV
-        if profile is not None:
+        if fidelity is not None:
             from .recompute_defaults import settings, sweep, uniform_bounds
 
-            profile_settings = settings(profile)
+            profile_settings = settings(fidelity)
             if resolved_ne is None:
                 resolved_ne = profile_settings.n_electrons_brem
             try:
-                profile_sweep = sweep(stem, profile)
+                profile_sweep = sweep(stem, fidelity)
                 profile_start, _profile_stop, profile_step = uniform_bounds(
                     profile_sweep.E_grid_brem
                 )
@@ -134,7 +134,7 @@ def rebrem_checkpoints(
                 brem_start_eV=resolved_start,
                 brem_stop_eV=brem_stop_eV,
                 brem_step_eV=resolved_step,
-                profile=profile,
+                profile=fidelity,
                 max_seconds=max_seconds,
                 status=status,
                 **kw,
@@ -171,7 +171,7 @@ def _cli(args):
         brem_start_eV=getattr(args, "start", None),
         brem_stop_eV=getattr(args, "stop", None),
         brem_step_eV=args.step,
-        profile=getattr(args, "profile", None),
+        fidelity=getattr(args, "fidelity", None),
         redo_all=args.redo_all,
         save_every=args.save_every,
         progress_file=args.progress_file,
@@ -201,7 +201,7 @@ def _cli_json(args):
                 brem_start_eV=getattr(args, "start", None),
                 brem_stop_eV=getattr(args, "stop", None),
                 brem_step_eV=args.step,
-                profile=getattr(args, "profile", None),
+                fidelity=getattr(args, "fidelity", None),
                 redo_all=args.redo_all,
                 save_every=args.save_every,
                 progress_file=args.progress_file,
@@ -251,6 +251,7 @@ def _cli_json(args):
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
 @_cli_core.fidelity_option(help="Named sweep profile supplying omitted grid and electron defaults.")
+
 @click.option(
     "--ne-brem",
     type=_cli_core.POSITIVE_INT,
@@ -302,7 +303,6 @@ def command(
     materials,
     all_,
     fidelity,
-    legacy_profile,
     ne_brem,
     start,
     stop,
@@ -320,13 +320,12 @@ def command(
         raise click.UsageError("rebrem needs material name(s), or use --all")
     if start is not None and stop is not None and stop <= start:
         raise click.UsageError("rebrem --stop must be greater than --start")
-    profile = _cli_core.resolve_fidelity(fidelity, legacy_profile)
     handler = _cli_json if json_output else _cli
     return _cli_core.invoke_legacy(
         handler,
         material=list(materials),
         all=all_,
-        profile=profile,
+        fidelity=fidelity,
         ne_brem=ne_brem,
         start=start,
         stop=stop,

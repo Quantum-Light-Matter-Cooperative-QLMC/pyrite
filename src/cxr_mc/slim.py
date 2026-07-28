@@ -60,7 +60,7 @@ def _grid_from_stem(in_path):
         raise SystemExit(
             f"--grid: cannot resolve named-profile identity from checkpoint stem {stem!r}"
         )
-    return identity["material"], identity["profile"]
+    return identity["material"], identity["fidelity"]
 
 
 def _pct_smaller(before, after):

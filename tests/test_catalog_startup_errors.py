@@ -81,6 +81,7 @@ def test_transitive_module_not_found_is_not_reported_as_bad_catalog(monkeypatch)
         raise ModuleNotFoundError("No module named 'spglib'", name="spglib")
 
     monkeypatch.setattr(catalog, "load_crystal_from_cif", missing_transitive_dependency)
+    catalog.load_material_catalog.cache_clear()
 
     with pytest.raises(ModuleNotFoundError, match="spglib"):
         catalog.load_material_catalog()

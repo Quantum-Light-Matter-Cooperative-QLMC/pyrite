@@ -385,57 +385,21 @@ def json_option(function):
         help="Emit one versioned JSON object on stdout.",
     )(function)
 
-
-FIDELITY_CHOICES = ("full", "survey")
+FIDELITY_CHOICES = click.Choice(("full", "survey"), case_sensitive=True)
 _DEFAULT_FIDELITY_HELP = "Named settings/grid-reduction policy. survey is provisional and reduced."
 
-
 def fidelity_option(*, help: str = _DEFAULT_FIDELITY_HELP):
-    """Add ``--fidelity`` plus its deprecated, hidden ``--profile`` alias.
-
-    ``SweepProfile`` full/survey grid-reduction policies are exposed as
-    ``--fidelity``; the older ``--profile full|survey`` spelling collided with
-    the catalog ``[profiles.*]`` concept, so it stays only as a hidden,
-    deprecated alias. Call :func:`resolve_fidelity` in the command body to
-    obtain one effective value -- it applies the deprecation warning and
-    rejects explicit use of both.
-    """
-
+    """Add ``--fidelity`` option to a Click command."""
     def decorator(function):
-        function = click.option(
-            "--profile",
-            "legacy_profile",
-            type=click.Choice(FIDELITY_CHOICES, case_sensitive=True),
-            default=None,
-            hidden=True,
-            help="Deprecated; use --fidelity instead.",
-        )(function)
-        function = click.option(
+        return click.option(
             "--fidelity",
-            type=click.Choice(FIDELITY_CHOICES, case_sensitive=True),
+            type=FIDELITY_CHOICES,
             default="full",
             show_default=True,
             help=help,
         )(function)
-        return function
 
     return decorator
-
-
-def resolve_fidelity(fidelity: str, legacy_profile: str | None) -> str:
-    """Merge ``--fidelity`` with the deprecated ``--profile`` alias.
-
-    Forwards and warns on stderr when only the legacy alias is given; raises a
-    ``click.UsageError`` when both are given explicitly on the command line.
-    """
-    if legacy_profile is None:
-        return fidelity
-    ctx = click.get_current_context()
-    if ctx.get_parameter_source("fidelity") is click.core.ParameterSource.COMMANDLINE:
-        raise click.UsageError("pass either --fidelity or the deprecated --profile alias, not both")
-    emit_diagnostic("warning: --profile is deprecated; use --fidelity instead")
-    return legacy_profile
-
 
 def emit_result(message: str) -> None:
     click.echo(message)

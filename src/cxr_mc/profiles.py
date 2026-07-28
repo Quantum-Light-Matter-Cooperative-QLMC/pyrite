@@ -22,7 +22,7 @@ import numpy as np
 from .results import Settings
 from .sweep import Sweep, crystal_params
 
-PROFILE_NAMES = ("full", "survey")
+FIDELITY_NAMES = ("full", "survey")
 DATASET_IDENTITY_SCHEMA = "cxr.dataset-identity.v1"
 
 
@@ -148,7 +148,7 @@ def get_profile(name: str = "full") -> SweepProfile:
     try:
         return _PROFILES[name]
     except KeyError:
-        raise ValueError(f"unknown sweep profile {name!r} (choose from {PROFILE_NAMES})") from None
+        raise ValueError(f"unknown sweep profile {name!r} (choose from {FIDELITY_NAMES})") from None
 
 
 def _jsonable(value: Any) -> Any:
@@ -172,7 +172,7 @@ def _jsonable(value: Any) -> Any:
 
 def dataset_identity(
     material: str,
-    profile: str,
+    fidelity: str,
     settings: Settings,
     sweep: Sweep,
     *,
@@ -185,7 +185,7 @@ def dataset_identity(
         reflections = reflections[: sweep.max_reflections]
     resolved = {
         "material": material,
-        "profile": profile,
+        "fidelity": fidelity,
         "variant": variant,
         "settings": _jsonable(settings),
         "sweep": _jsonable(sweep),
@@ -211,7 +211,7 @@ def dataset_identity(
     return {
         "schema": DATASET_IDENTITY_SCHEMA,
         "material": material,
-        "profile": profile,
+        "fidelity": fidelity,
         "variant": variant,
         "parameter_sha256": hashlib.sha256(encoded).hexdigest(),
         "resolved_parameters": resolved,
@@ -225,38 +225,38 @@ def variant_stem(identity: Mapping[str, Any], *, canonical_full: bool = False) -
     resolved variants use a readable profile plus digest suffix.
     """
     material = str(identity["material"])
-    if canonical_full and identity["profile"] == "full" and identity.get("variant") is None:
+    if canonical_full and identity["fidelity"] == "full" and identity.get("variant") is None:
         return material
     variant = identity.get("variant")
     if variant == "quick":
         return f"{material}_quick"
-    label = str(variant or identity["profile"])
+    label = str(variant or identity["fidelity"])
     return f"{material}--{label}-{str(identity['parameter_sha256'])[:12]}"
 
 
-def named_profile_identity(material: str, profile: str = "full") -> dict[str, Any]:
-    """Resolve identity for an unmodified named material/profile pair."""
+def named_profile_identity(material: str, fidelity: str = "full") -> dict[str, Any]:
+    """Resolve identity for an unmodified named material/fidelity pair."""
     # Local import avoids config -> profiles -> config import cycle.
     from .config import default_settings, material_sweep
 
     return dataset_identity(
         material,
-        profile,
-        default_settings(profile),
-        material_sweep(material, profile=profile),
+        fidelity,
+        default_settings(fidelity),
+        material_sweep(material, fidelity=fidelity),
     )
 
 
-def named_profile_stem(material: str, profile: str = "full") -> str:
+def named_profile_stem(material: str, fidelity: str = "full") -> str:
     """Checkpoint stem for an unmodified named material/profile pair."""
     return variant_stem(
-        named_profile_identity(material, profile),
-        canonical_full=profile == "full",
+        named_profile_identity(material, fidelity),
+        canonical_full=fidelity == "full",
     )
 
 
 def high_energy_floor_identity(
-    material: str, floor_kev: float, profile: str = "full"
+    material: str, floor_kev: float, fidelity: str = "full"
 ) -> dict[str, Any]:
     """Resolve identity for a material/profile pair with its energy_keV grid
     floored at ``floor_kev`` (mats_to_sim.toml's ``high_energy_materials``
@@ -266,7 +266,7 @@ def high_energy_floor_identity(
     # Local import avoids config -> profiles -> config import cycle.
     from .config import default_settings, material_sweep
 
-    sweep = material_sweep(material, profile=profile)
+    sweep = material_sweep(material, fidelity=fidelity)
     energies = np.asarray(sweep.energy_keV, dtype=float)
     kept = energies[energies >= floor_kev]
     if kept.size == 0:
@@ -275,19 +275,19 @@ def high_energy_floor_identity(
             "floor); lower --high-energy-min-kev or drop this material"
         )
     sweep = replace(sweep, energy_keV=kept)
-    return dataset_identity(material, profile, default_settings(profile), sweep)
+    return dataset_identity(material, fidelity, default_settings(fidelity), sweep)
 
 
-def high_energy_floor_stem(material: str, floor_kev: float, profile: str = "full") -> str:
+def high_energy_floor_stem(material: str, floor_kev: float, fidelity: str = "full") -> str:
     """Checkpoint stem for a high-energy-floored material/profile pair."""
     return variant_stem(
-        high_energy_floor_identity(material, floor_kev, profile),
+        high_energy_floor_identity(material, floor_kev, fidelity),
         canonical_full=False,
     )
 
 
 _VARIANT_STEM_RE = re.compile(
-    r"^(?P<material>.+)--(?P<profile>full|survey)-(?P<digest>[0-9a-f]{12})$"
+    r"^(?P<material>.+)--(?P<fidelity>full|survey)-(?P<digest>[0-9a-f]{12})$"
 )
 
 
@@ -295,7 +295,7 @@ def identity_from_stem(stem: str) -> dict[str, Any] | None:
     """Reconstruct unmodified named-profile identity from a checkpoint stem."""
     match = _VARIANT_STEM_RE.fullmatch(stem)
     if match is not None:
-        identity = named_profile_identity(match["material"], match["profile"])
+        identity = named_profile_identity(match["material"], match["fidelity"])
         if identity["parameter_sha256"].startswith(match["digest"]):
             return identity
         return None

@@ -24,7 +24,7 @@ from typing import Any
 
 import numpy as np
 
-from .materials import CATALOG, MaterialSpec
+from .materials import CATALOG, MaterialSpec, load_material_catalog
 from .montecarlo import simulate_trajectories
 from .profiles import get_profile
 from .results import Settings
@@ -42,7 +42,7 @@ COLLAPSE_AZIMUTH = True
 PENETRATION_TILT_DEG = (0.0, 15.0, 45.0, 75.0)
 
 
-def default_settings(profile: str = "full"):
+def default_settings(fidelity: str = "full"):
     """The analysis / detector / unit knobs shared by the runner and the plots.
     The runner uses n_electrons*; every notebook that plots must use the SAME
     detector flags (apply_detector_qe / brem_source) so the displayed spectra
@@ -57,15 +57,16 @@ def default_settings(profile: str = "full"):
         convolve_with_det=False,
         brem_source="mc",  # "mc" | "external" | "none"
     )
-    return get_profile(profile).apply_settings(settings)
+    return get_profile(fidelity).apply_settings(settings)
 
 
-def _material_spec(material: str) -> MaterialSpec:
+def _material_spec(material: str, catalog_profile: str = "standard") -> MaterialSpec:
+    catalog = CATALOG if catalog_profile == "standard" else load_material_catalog(profile=catalog_profile)
     try:
-        return CATALOG.material(material)
+        return catalog.material(material)
     except KeyError:
         raise ValueError(
-            f"unknown material {material!r} (have {list(CATALOG.material_keys)})"
+            f"unknown material {material!r} (have {list(catalog.material_keys)})"
         ) from None
 
 
@@ -92,8 +93,10 @@ def material_grid(material: str) -> dict[str, object]:
 def material_sweep(
     material: str,
     *,
-    profile="full",
+    fidelity="full",
     theta_obs_deg=90.0,
+    catalog_profile="standard",
+    profile=None,
     **overrides: Any,
 ):
     """The full parametric :class:`sweep.Sweep` for ``material`` (the geometry
@@ -101,7 +104,12 @@ def material_sweep(
     field, e.g. ``material_sweep("ptse2", thickness_ang=2e4)``. For a named-stack
     key the Sweep's material is the film crystal; the catalog material key stays the
     CLI/checkpoint name."""
-    spec = _material_spec(material)
+    if profile is not None:
+        if profile in ("full", "survey"):
+            fidelity = profile
+        else:
+            catalog_profile = profile
+    spec = _material_spec(material, catalog_profile=catalog_profile)
     scan = spec.scan
     sweep = Sweep(
         material=spec.crystal_key,
@@ -118,9 +126,8 @@ def material_sweep(
         substrate=spec.substrate,
         stack=spec.stack or None,
     )
-    sweep = get_profile(profile).apply_sweep(sweep)
+    sweep = get_profile(fidelity).apply_sweep(sweep)
     return replace(sweep, **overrides) if overrides else sweep
-
 
 def trajectory_sweep(
     material: str,

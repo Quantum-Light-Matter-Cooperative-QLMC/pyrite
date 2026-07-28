@@ -318,7 +318,7 @@ def test_queue_script_no_flags_when_unset():
 def test_queue_script_and_stem_resolve_survey_profile():
     from cxr_mc.profiles import named_profile_stem
 
-    script = remote._queue_script("j", ["mos2"], quick=False, workers=None, profile="survey")
+    script = remote._queue_script("j", ["mos2"], quick=False, workers=None, fidelity="survey")
     assert "--fidelity survey" in script
     assert remote._stems(["mos2"], False, "survey") == [named_profile_stem("mos2", "survey")]
 
@@ -2558,36 +2558,6 @@ def test_remote_scan_forwards_parallel_materials(monkeypatch):
     remote.main(["scan", "hopg", "--parallel-materials", "3", "--chunk-minutes", "0", "--no-sync"])
 
     assert calls[0][1]["parallel_materials"] == 3
-
-
-def test_remote_scan_forwards_survey_fidelity(monkeypatch):
-    calls = []
-    monkeypatch.setattr(
-        lifecycle,
-        "start_queue",
-        lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
-    )
-    monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
-
-    remote.main(["scan", "hopg", "--fidelity", "survey", "--no-sync"])
-
-    assert calls[0][1]["profile"] == "survey"
-
-
-def test_remote_scan_legacy_profile_alias_warns_and_forwards(monkeypatch, capsys):
-    calls = []
-    monkeypatch.setattr(
-        lifecycle,
-        "start_queue",
-        lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
-    )
-    monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
-
-    remote.main(["scan", "hopg", "--profile", "survey", "--no-sync"])
-
-    assert calls[0][1]["profile"] == "survey"
-    assert "deprecated" in capsys.readouterr().err
-
 
 def test_remote_scan_submits_then_attaches_and_pulls(monkeypatch):
     events = []

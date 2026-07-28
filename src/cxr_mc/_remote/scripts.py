@@ -8,7 +8,7 @@ from . import config, transport
 
 
 # ---- detached job queue -------------------------------------------------------
-def _stems(materials, quick, profile="full", high_energy_min_kev=None):
+def _stems(materials, quick, fidelity="full", high_energy_min_kev=None):
     """Checkpoint stems a queue produces (the scan runner writes
     <material>_quick.pkl for --quick runs). ``high_energy_min_kev`` predicts the
     non-canonical stem for any material in mats_to_sim.toml's
@@ -16,11 +16,11 @@ def _stems(materials, quick, profile="full", high_energy_min_kev=None):
     if quick:
         return [f"{m}_quick" for m in materials]
     if high_energy_min_kev is None:
-        if profile == "full":
+        if fidelity == "full":
             return list(materials)
         from ..profiles import named_profile_stem
 
-        return [named_profile_stem(material, profile) for material in materials]
+        return [named_profile_stem(material, fidelity) for material in materials]
     from ..profiles import high_energy_floor_stem, named_profile_stem
     from ..scan import load_manifest_groups
 
@@ -28,11 +28,11 @@ def _stems(materials, quick, profile="full", high_energy_min_kev=None):
     stems = []
     for material in materials:
         if material in tagged:
-            stems.append(high_energy_floor_stem(material, high_energy_min_kev, profile))
-        elif profile == "full":
+            stems.append(high_energy_floor_stem(material, high_energy_min_kev, fidelity))
+        elif fidelity == "full":
             stems.append(material)
         else:
-            stems.append(named_profile_stem(material, profile))
+            stems.append(named_profile_stem(material, fidelity))
     return stems
 
 
@@ -84,7 +84,7 @@ def _queue_script(
     quick,
     workers,
     parallel_materials=config.DEFAULT_PARALLEL_MATERIALS,
-    profile="full",
+    fidelity="full",
     high_energy_min_kev=None,
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
@@ -92,8 +92,8 @@ def _queue_script(
     flags = ""
     if quick:
         flags += " --quick"
-    if profile != "full":
-        flags += f" --fidelity {profile}"
+    if fidelity != "full":
+        flags += f" --fidelity {fidelity}"
     if workers is not None:
         flags += f" --workers {workers}"
     if high_energy_min_kev is not None:
@@ -152,7 +152,7 @@ fi
 
 
 def _chunked_queue_script(
-    jobid, materials, quick, workers, chunk_minutes, profile="full", high_energy_min_kev=None
+    jobid, materials, quick, workers, chunk_minutes, fidelity="full", high_energy_min_kev=None
 ):
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
 
@@ -166,8 +166,8 @@ def _chunked_queue_script(
     flags = ""
     if quick:
         flags += " --quick"
-    if profile != "full":
-        flags += f" --fidelity {profile}"
+    if fidelity != "full":
+        flags += f" --fidelity {fidelity}"
     if workers is not None:
         flags += f" --workers {workers}"
     if high_energy_min_kev is not None:
@@ -260,11 +260,11 @@ def _rebrem_flags(
     ne_brem,
     brem_step_eV,
     redo_all,
-    profile="full",
+    fidelity="full",
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
-    flags = f" --fidelity {profile}"
+    flags = f" --fidelity {fidelity}"
     if ne_brem is not None:
         flags += f" --ne-brem {int(ne_brem)}"
     if brem_step_eV is not None:
@@ -284,7 +284,7 @@ def _rebrem_queue_script(
     ne_brem,
     brem_step_eV,
     redo_all,
-    profile="full",
+    fidelity="full",
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
@@ -296,7 +296,7 @@ def _rebrem_queue_script(
     the shared case-progress dashboard. The ``completed:``/``failed:`` log
     markers match the scan queue's so ``state._completed_materials`` drives the
     post-attach pull unchanged."""
-    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all, profile, brem_start_eV, brem_stop_eV)
+    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all, fidelity, brem_start_eV, brem_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -338,7 +338,7 @@ def _rebrem_chunked_queue_script(
     brem_step_eV,
     redo_all,
     chunk_minutes,
-    profile="full",
+    fidelity="full",
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
@@ -351,7 +351,7 @@ def _rebrem_chunked_queue_script(
     contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave
     unresolved (a later slice finishes it), else -> ``failed:``.
     """
-    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all, profile, brem_start_eV, brem_stop_eV)
+    flags = _rebrem_flags(ne_brem, brem_step_eV, redo_all, fidelity, brem_start_eV, brem_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
@@ -417,7 +417,7 @@ def _rebrem_queue_metadata(
     ne_brem,
     brem_step_eV,
     redo_all,
-    profile="full",
+    fidelity="full",
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
@@ -430,7 +430,7 @@ def _rebrem_queue_metadata(
             f"materials: {' '.join(materials)}",
             "quick: False",
             "kind: rebrem",
-            f"profile: {profile}",
+            f"fidelity: {fidelity}",
             f"ne_brem: {ne_brem}",
             f"brem_start_eV: {brem_start_eV}",
             f"brem_stop_eV: {brem_stop_eV}",
@@ -446,11 +446,11 @@ def _reline_flags(
     line_ne,
     line_step_eV,
     redo_all,
-    profile="full",
+    fidelity="full",
     line_start_eV=None,
     line_stop_eV=None,
 ):
-    flags = f" --fidelity {profile}"
+    flags = f" --fidelity {fidelity}"
     if line_ne is not None:
         flags += f" --line-ne {int(line_ne)}"
     if line_step_eV is not None:
@@ -470,7 +470,7 @@ def _reline_queue_script(
     line_ne,
     line_step_eV,
     redo_all,
-    profile="full",
+    fidelity="full",
     line_start_eV=None,
     line_stop_eV=None,
 ):
@@ -479,7 +479,7 @@ def _reline_queue_script(
     per-material JSON progress record a scan/rebrem does, and the
     ``completed:``/``failed:`` markers match so ``state._completed_materials``
     drives the post-attach pull unchanged."""
-    flags = _reline_flags(line_ne, line_step_eV, redo_all, profile, line_start_eV, line_stop_eV)
+    flags = _reline_flags(line_ne, line_step_eV, redo_all, fidelity, line_start_eV, line_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -521,7 +521,7 @@ def _reline_chunked_queue_script(
     line_step_eV,
     redo_all,
     chunk_minutes,
-    profile="full",
+    fidelity="full",
     line_start_eV=None,
     line_stop_eV=None,
 ):
@@ -534,7 +534,7 @@ def _reline_chunked_queue_script(
     contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave
     unresolved (a later slice finishes it), else -> ``failed:``.
     """
-    flags = _reline_flags(line_ne, line_step_eV, redo_all, profile, line_start_eV, line_stop_eV)
+    flags = _reline_flags(line_ne, line_step_eV, redo_all, fidelity, line_start_eV, line_stop_eV)
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
@@ -600,7 +600,7 @@ def _reline_queue_metadata(
     line_ne,
     line_step_eV,
     redo_all,
-    profile="full",
+    fidelity="full",
     line_start_eV=None,
     line_stop_eV=None,
 ):
@@ -611,7 +611,7 @@ def _reline_queue_metadata(
             f"materials: {' '.join(materials)}",
             "quick: False",
             "kind: reline",
-            f"profile: {profile}",
+            f"fidelity: {fidelity}",
             f"line_ne: {line_ne}",
             f"line_start_eV: {line_start_eV}",
             f"line_stop_eV: {line_stop_eV}",
@@ -784,7 +784,7 @@ def _queue_metadata(
     workers,
     parallel_materials: int | None = config.DEFAULT_PARALLEL_MATERIALS,
     chunk_minutes: float = 0,
-    profile: str = "full",
+    fidelity: str = "full",
     high_energy_min_kev: float | None = None,
 ):
     """Static metadata persisted before a queue becomes visible to SLURM."""
@@ -793,7 +793,7 @@ def _queue_metadata(
             f"job: {jobid}",
             f"materials: {' '.join(materials)}",
             f"quick: {bool(quick)}",
-            f"profile: {profile}",
+            f"fidelity: {fidelity}",
             f"workers: {workers}",
             f"parallel_materials: {parallel_materials}",
             f"chunk_minutes: {chunk_minutes}",

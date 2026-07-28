@@ -217,7 +217,6 @@ def _beam_uvw(ctx, param, value):
     default=None,
     help="run_cases max_workers (default auto; 0 = serial, no transport pool).",
 )
-@_cli_core.fidelity_option(help="Named settings/grid policy. survey is provisional and reduced.")
 @click.option(
     "--quick",
     is_flag=True,
@@ -254,6 +253,14 @@ def _beam_uvw(ctx, param, value):
 )
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option("--no-progress", is_flag=True, hidden=True)
+@_cli_core.fidelity_option()
+@click.option(
+    "--profile",
+    "catalog_profile",
+    default="standard",
+    show_default=True,
+    help="Catalog profile to run (e.g. standard, sub_100keV).",
+)
 @_cli_core.json_option
 def command(
     material,
@@ -264,7 +271,7 @@ def command(
     high_energy_min_kev,
     workers,
     fidelity,
-    legacy_profile,
+    catalog_profile,
     quick,
     n_families,
     beam_uvw,
@@ -275,8 +282,7 @@ def command(
     json_output,
 ):
     """Click entry point for the staged root migration."""
-    profile = _cli_core.resolve_fidelity(fidelity, legacy_profile)
-    if quick and profile != "full":
+    if quick and fidelity != "full":
         raise click.UsageError("--quick cannot be combined with --fidelity survey")
     if actually_all and material is not None:
         raise click.UsageError("scan -A/--actually-all does not take a material name")
@@ -304,7 +310,8 @@ def command(
             include_high_energy=include_high_energy,
             high_energy_min_kev=high_energy_min_kev,
             workers=workers,
-            profile=profile,
+            fidelity=fidelity,
+            catalog_profile=catalog_profile,
             quick=quick,
             n_families=n_families,
             beam_uvw=beam_uvw,
@@ -322,7 +329,8 @@ def command(
         include_high_energy=include_high_energy,
         high_energy_min_kev=high_energy_min_kev,
         workers=workers,
-        profile=profile,
+        fidelity=fidelity,
+        catalog_profile=catalog_profile,
         quick=quick,
         n_families=n_families,
         beam_uvw=beam_uvw,
@@ -464,8 +472,8 @@ def _resolved_run(args, material):
     assert default_settings is not None
     assert material_sweep is not None
 
-    profile = getattr(args, "profile", "full")
-    settings = default_settings() if profile == "full" else default_settings(profile)
+    fidelity = getattr(args, "fidelity", "full")
+    settings = default_settings() if fidelity == "full" else default_settings(fidelity)
     overrides = {}
     if getattr(args, "quick", False):
         overrides.update(
@@ -481,8 +489,8 @@ def _resolved_run(args, material):
         overrides["beam_uvw"] = tuple(args.beam_uvw)
     sweep = (
         material_sweep(material, **overrides)
-        if profile == "full"
-        else material_sweep(material, profile=profile, **overrides)
+        if fidelity == "full"
+        else material_sweep(material, fidelity=fidelity, **overrides)
     )
 
     # High-energy-only materials (mats_to_sim.toml's high_energy_materials list,
@@ -511,12 +519,12 @@ def _resolved_run(args, material):
 
     identity = dataset_identity(
         material,
-        profile,
+        fidelity,
         settings,
         sweep,
         variant="quick" if getattr(args, "quick", False) else None,
     )
-    canonical_full = profile == "full" and not overrides and not getattr(args, "quick", False)
+    canonical_full = fidelity == "full" and not overrides and not getattr(args, "quick", False)
     stem = variant_stem(identity, canonical_full=canonical_full)
     return settings, sweep, identity, stem
 
@@ -533,7 +541,7 @@ def _run_material(args, material, max_seconds=None):
     assert build_cases is not None
 
     settings, sweep, identity, stem = _resolved_run(args, material)
-    profile = identity["profile"]
+    profile = identity["fidelity"]
 
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
     cases, dropped = gate_cases_by_penetration(cases)

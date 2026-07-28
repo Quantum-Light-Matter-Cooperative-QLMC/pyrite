@@ -6,6 +6,7 @@ scan and Monte Carlo drivers.
 
 from __future__ import annotations
 
+import functools
 import logging
 import re
 import tomllib
@@ -161,10 +162,8 @@ class MaterialSpec:
 
     key: str
     label: str
-    #: Always ``"standard"``: materials resolve their scan defaults against
-    #: the ``standard`` profile plus its per-material override, if any (see
-    #: docs/cli-energy-grid-sweep-rework-plan.md decision 2). True
-    #: multi-profile membership/selection lands in Phase 2/3.
+    #: Name of the ``[profiles.*]`` campaign row this material resolved its
+    #: scan defaults from (plus that profile's per-material override, if any).
     profile: str
     crystal_key: str
     scan: ScanSpec
@@ -186,6 +185,11 @@ class MaterialCatalog:
     media: Mapping[str, MediumSpec]
     materials: Mapping[str, MaterialSpec]
     material_keys: tuple[str, ...]
+    #: Every ``[profiles.*]`` name defined by the source TOML.
+    profile_names: tuple[str, ...] = ()
+    #: Explicit ``profiles.NAME.materials`` membership lists, keyed by profile;
+    #: profiles without a membership row are absent (all materials allowed).
+    profile_memberships: Mapping[str, tuple[str, ...]] = MappingProxyType({})
 
     def crystal(self, key: str) -> CrystalSpec:
         """Return a crystal by key."""
@@ -742,27 +746,33 @@ def _material_elements(
 
 def _parse_materials(
     raw: object,
-    profiles: Mapping[str, Mapping[str, object]],
     crystals: Mapping[str, CrystalSpec],
     media: Mapping[str, MediumSpec],
     energy_grids: Mapping[str, LineGridByEnergy],
     errors: _Errors,
+    profiles: Mapping[str, Mapping[str, object]],
+    profile_name: str = "standard",
 ) -> dict[str, MaterialSpec]:
     table = _table(raw, "materials", errors)
     if table is None:
         return {}
     out: dict[str, MaterialSpec] = {}
-    standard = profiles.get("standard")
-    if not isinstance(standard, Mapping):
-        errors.add("profiles.standard", "must be defined; materials resolve scan defaults from it")
-        standard = {}
-    overrides_raw = standard.get("overrides")
+
+    selected_profile = profiles.get(profile_name)
+    if not isinstance(selected_profile, Mapping):
+        errors.add(
+            f"profiles.{profile_name}",
+            "must be defined; materials resolve scan defaults from it",
+        )
+        selected_profile = {}
+
+    overrides_raw = selected_profile.get("overrides")
     overrides = overrides_raw if isinstance(overrides_raw, Mapping) else {}
+
     # A material without its own energy_grids.<key> row falls back to the
-    # store entry keyed by its resolving profile's name ("standard" in Phase
-    # 1): the shared default bounds any material may diverge from with a
-    # bespoke override, without duplicating rows across ~30 materials.
-    default_line_grids = energy_grids.get("standard")
+    # store entry keyed by its resolving profile's name, or "standard".
+    default_line_grids = energy_grids.get(profile_name, energy_grids.get("standard"))
+
     allowed = {"label", "crystal", "substrate", "stack"}
     for key, value in table.items():
         path = f"materials.{key}"
@@ -778,15 +788,17 @@ def _parse_materials(
         if not isinstance(crystal_key, str) or crystal_key not in crystals:
             errors.add(f"{path}.crystal", "must reference a crystal")
             crystal_key = ""
+
         override_raw = overrides.get(key)
         override: Mapping[str, object] = (
             cast(Mapping[str, object], override_raw) if isinstance(override_raw, Mapping) else {}
         )
-        values = {name: standard[name] for name in _SCAN_KEYS if name in standard}
+        values = {name: selected_profile[name] for name in _SCAN_KEYS if name in selected_profile}
         if "thickness_ang" in override or "thickness_layers" in override:
             values.pop("thickness_ang", None)
             values.pop("thickness_layers", None)
         values.update({name: override[name] for name in _SCAN_KEYS if name in override})
+
         scan = _scan(
             values,
             f"{path}.scan",
@@ -814,8 +826,9 @@ def _parse_materials(
             errors.add(path, "cannot define both substrate and stack")
         if label and crystal_key and scan is not None:
             out[key] = MaterialSpec(
-                key, label, "standard", crystal_key, scan, substrate, tuple(layers)
+                key, label, profile_name, crystal_key, scan, substrate, tuple(layers)
             )
+
     for profile_key, profile_row in profiles.items():
         materials_list = profile_row.get("materials")
         if isinstance(materials_list, list):
@@ -887,10 +900,29 @@ def _warn_missing_mott(materials: Mapping[str, MaterialSpec], crystals, media) -
                 element,
             )
 
-
-def load_material_catalog(path: Path | None = None) -> MaterialCatalog:
+def load_material_catalog(
+    path: Path | None = None,
+    *,
+    profile: str = "standard",
+) -> MaterialCatalog:
     """Load, validate, and deeply freeze a schema-version-1 material catalog."""
-    source = DATA_DIR / "materials.toml" if path is None else Path(path)
+    source = Path(DATA_DIR) / "materials.toml" if path is None else Path(path)
+    # Cache key includes the file's mtime/size so rewriting the same path
+    # (tests do this) is never served a stale catalog.
+    try:
+        stat = source.stat()
+    except OSError as exc:
+        raise MaterialConfigError((f"{source}: {exc}",)) from exc
+    return _load_material_catalog_cached(source, stat.st_mtime_ns, stat.st_size, profile)
+
+
+@functools.lru_cache(maxsize=32)
+def _load_material_catalog_cached(
+    source: Path,
+    _mtime_ns: int,
+    _size: int,
+    profile: str,
+) -> MaterialCatalog:
     errors = _Errors()
     try:
         with source.open("rb") as stream:
@@ -915,7 +947,13 @@ def load_material_catalog(path: Path | None = None) -> MaterialCatalog:
     media = _parse_media(raw.get("media"), errors)
     energy_grids = _parse_energy_grids(raw.get("energy_grids", {}), errors)
     materials = _parse_materials(
-        raw.get("materials"), profiles, crystals, media, energy_grids, errors
+        raw.get("materials"),
+        crystals,
+        media,
+        energy_grids,
+        errors,
+        profiles,
+        profile_name=profile,
     )
     if errors.items:
         raise MaterialConfigError(errors.items)
@@ -928,9 +966,12 @@ def load_material_catalog(path: Path | None = None) -> MaterialCatalog:
         material_keys=tuple(materials),
     )
 
-
 _DEFAULT_CATALOG: MaterialCatalog | None = None
 _DEFAULT_CATALOG_LOCK = Lock()
+
+
+# Test hook: clear the parse cache (e.g. after monkeypatching CIF loaders).
+load_material_catalog.cache_clear = _load_material_catalog_cached.cache_clear  # ty: ignore[unresolved-attribute]
 
 
 def _get_default_catalog() -> MaterialCatalog:

@@ -35,7 +35,7 @@ def reline_checkpoints(
     line_start_eV=None,
     line_stop_eV=None,
     line_step_eV=None,
-    profile=None,
+    fidelity=None,
     from_config=True,
     redo_all=False,
     save_every=100,
@@ -76,10 +76,10 @@ def reline_checkpoints(
         stem = Path(path).stem if str(path).endswith(".pkl") else Path(path).name
         print(f"== {stem} ==")
         resolved_ne = line_ne
-        if profile is not None and resolved_ne is None:
+        if fidelity is not None and resolved_ne is None:
             from .recompute_defaults import settings
 
-            resolved_ne = settings(profile).n_electrons
+            resolved_ne = settings(fidelity).n_electrons
         kw = {}
         if progress_file is not None:
             from .scan import _write_progress_record
@@ -108,8 +108,8 @@ def reline_checkpoints(
             recompute_options["line_start_eV"] = line_start_eV
         if line_stop_eV is not None:
             recompute_options["line_stop_eV"] = line_stop_eV
-        if profile is not None:
-            recompute_options["profile"] = profile
+        if fidelity is not None:
+            recompute_options["profile"] = fidelity
         try:
             out[stem] = reline_checkpoint(
                 path,
@@ -152,7 +152,7 @@ def _cli(args):
         line_start_eV=getattr(args, "start", None),
         line_stop_eV=getattr(args, "stop", None),
         line_step_eV=args.line_step,
-        profile=getattr(args, "profile", None),
+        fidelity=getattr(args, "fidelity", None),
         redo_all=args.redo_all,
         save_every=args.save_every,
         progress_file=args.progress_file,
@@ -182,7 +182,7 @@ def _cli_json(args):
                 line_start_eV=getattr(args, "start", None),
                 line_stop_eV=getattr(args, "stop", None),
                 line_step_eV=args.line_step,
-                profile=getattr(args, "profile", None),
+                fidelity=getattr(args, "fidelity", None),
                 redo_all=args.redo_all,
                 save_every=args.save_every,
                 progress_file=args.progress_file,
@@ -283,7 +283,6 @@ def command(
     materials,
     all_,
     fidelity,
-    legacy_profile,
     line_ne,
     start,
     stop,
@@ -301,13 +300,12 @@ def command(
         raise click.UsageError("reline needs material name(s), or use --all")
     if start is not None and stop is not None and stop <= start:
         raise click.UsageError("reline --stop must be greater than --start")
-    profile = _cli_core.resolve_fidelity(fidelity, legacy_profile)
     handler = _cli_json if json_output else _cli
     return _cli_core.invoke_legacy(
         handler,
         material=list(materials),
         all=all_,
-        profile=profile,
+        fidelity=fidelity,
         line_ne=line_ne,
         start=start,
         stop=stop,

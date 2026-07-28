@@ -177,7 +177,7 @@ def start_queue(
     dry_run=False,
     parallel_materials=None,
     chunk_minutes=10.0,
-    profile="full",
+    fidelity="full",
     high_energy_min_kev=None,
 ):
     """Submit a material queue to SLURM. Returns its job id.
@@ -205,11 +205,11 @@ def start_queue(
         _refuse_if_busy(materials, quick)
     jobid = scripts._new_jobid()
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
-    stems = scripts._stems(materials, quick, profile, high_energy_min_kev)
+    stems = scripts._stems(materials, quick, fidelity, high_energy_min_kev)
     if chunked:
         parallel_materials = None
         payload = scripts._chunked_queue_script(
-            jobid, materials, quick, workers, chunk_minutes, profile, high_energy_min_kev
+            jobid, materials, quick, workers, chunk_minutes, fidelity, high_energy_min_kev
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
     else:
@@ -217,7 +217,7 @@ def start_queue(
             config.DEFAULT_PARALLEL_MATERIALS if parallel_materials is None else parallel_materials
         )
         payload = scripts._queue_script(
-            jobid, materials, quick, workers, parallel_materials, profile, high_energy_min_kev
+            jobid, materials, quick, workers, parallel_materials, fidelity, high_energy_min_kev
         )
         time_limit = config.SLURM_TIME
     script = scripts._slurm_batch_script(
@@ -232,7 +232,7 @@ def start_queue(
             workers,
             parallel_materials,
             chunk_minutes,
-            profile,
+            fidelity,
             high_energy_min_kev,
         ),
     )
@@ -270,7 +270,7 @@ def start_queue(
                             workers,
                             parallel_materials,
                             chunk_minutes,
-                            profile,
+                            fidelity,
                         )
                     ),
                 ),
@@ -345,7 +345,7 @@ def start_rebrem_queue(
     no_sync=False,
     dry_run=False,
     chunk_minutes=10.0,
-    profile="full",
+    fidelity="full",
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
@@ -373,7 +373,7 @@ def start_rebrem_queue(
             brem_step_eV,
             redo_all,
             chunk_minutes,
-            profile,
+            fidelity,
             brem_start_eV,
             brem_stop_eV,
         )
@@ -385,7 +385,7 @@ def start_rebrem_queue(
             ne_brem,
             brem_step_eV,
             redo_all,
-            profile,
+            fidelity,
             brem_start_eV,
             brem_stop_eV,
         )
@@ -405,7 +405,7 @@ def start_rebrem_queue(
             ne_brem,
             brem_step_eV,
             redo_all,
-            profile,
+            fidelity,
             brem_start_eV,
             brem_stop_eV,
         ),
@@ -443,7 +443,7 @@ def start_rebrem_queue(
                             ne_brem,
                             brem_step_eV,
                             redo_all,
-                            profile,
+                            fidelity,
                             brem_start_eV,
                             brem_stop_eV,
                         )
@@ -467,7 +467,7 @@ def start_reline_queue(
     no_sync=False,
     dry_run=False,
     chunk_minutes=10.0,
-    profile="full",
+    fidelity="full",
     line_start_eV=None,
     line_stop_eV=None,
 ):
@@ -494,7 +494,7 @@ def start_reline_queue(
             line_step_eV,
             redo_all,
             chunk_minutes,
-            profile,
+            fidelity,
             line_start_eV,
             line_stop_eV,
         )
@@ -506,7 +506,7 @@ def start_reline_queue(
             line_ne,
             line_step_eV,
             redo_all,
-            profile,
+            fidelity,
             line_start_eV,
             line_stop_eV,
         )
@@ -526,7 +526,7 @@ def start_reline_queue(
             line_ne,
             line_step_eV,
             redo_all,
-            profile,
+            fidelity,
             line_start_eV,
             line_stop_eV,
         ),
@@ -564,7 +564,7 @@ def start_reline_queue(
                             line_ne,
                             line_step_eV,
                             redo_all,
-                            profile,
+                            fidelity,
                             line_start_eV,
                             line_stop_eV,
                         )
@@ -784,7 +784,7 @@ def _resolve_survey_stems(stems):
     resolved = list(stems)
     for name in sorted(names):
         match = _VARIANT_STEM_RE.fullmatch(name)
-        if match is None or match["profile"] != "survey" or match["material"] not in bare:
+        if match is None or match["fidelity"] != "survey" or match["material"] not in bare:
             continue
         if name in resolved:
             continue

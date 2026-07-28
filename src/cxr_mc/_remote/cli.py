@@ -20,14 +20,13 @@ from ..cli._core import (
     emit_json_result,
     fidelity_option,
     invoke_legacy,
-    resolve_fidelity,
     run,
 )
 from ..scan import DEFAULT_HIGH_ENERGY_MIN_KEV, load_all_materials, load_manifest_groups
 from . import config, lifecycle, scripts, state, transport, viewer
 
 
-def remote_scan(material, quick=False, workers=None, profile="full"):
+def remote_scan(material, quick=False, workers=None, fidelity="full"):
     """Submit one material through SLURM and follow it to completion.
 
     This compatibility helper deliberately does not pull: callers that need a
@@ -35,7 +34,7 @@ def remote_scan(material, quick=False, workers=None, profile="full"):
     """
     transport._check_materials([material])
     jobid = lifecycle.start_queue(
-        [material], quick=quick, workers=workers, chunk_minutes=0, profile=profile
+        [material], quick=quick, workers=workers, chunk_minutes=0, fidelity=fidelity,
     )
     viewer.attach(jobid)
     return jobid
@@ -174,7 +173,7 @@ def _cli_scan(args):
     jobid = lifecycle.start_queue(
         materials,
         quick=args.quick,
-        profile=getattr(args, "profile", "full"),
+        fidelity=getattr(args, "fidelity", "full"),
         workers=args.workers,
         parallel_materials=getattr(args, "parallel_materials", None),
         chunk_minutes=getattr(args, "chunk_minutes", 10.0),
@@ -189,7 +188,7 @@ def _cli_scan(args):
             "warning: the SLURM scan produced no successful checkpoints; nothing to pull"
         )
         return
-    stems = scripts._stems(completed, args.quick, getattr(args, "profile", "full"))
+    stems = scripts._stems(completed, args.quick, getattr(args, "fidelity", "full"))
     # Code is already synced by the queue, so a grid pull skips its own sync;
     # preserve the requested grid/trim policy.
     lifecycle.pull(
@@ -212,7 +211,7 @@ def _cli_rebrem(args):
     materials = _selected_materials(args, "material")
     jobid = lifecycle.start_rebrem_queue(
         materials,
-        profile=getattr(args, "profile", "full"),
+        fidelity=getattr(args, "fidelity", "full"),
         ne_brem=args.ne_brem,
         brem_start_eV=getattr(args, "start", None),
         brem_stop_eV=getattr(args, "stop", None),
@@ -244,7 +243,7 @@ def _cli_reline(args):
     materials = _selected_materials(args, "material")
     jobid = lifecycle.start_reline_queue(
         materials,
-        profile=getattr(args, "profile", "full"),
+        fidelity=getattr(args, "fidelity", "full"),
         line_ne=args.line_ne,
         line_start_eV=getattr(args, "start", None),
         line_stop_eV=getattr(args, "stop", None),
@@ -329,7 +328,7 @@ def _cli_start(args):
     jobid = lifecycle.start_queue(
         materials,
         quick=args.quick,
-        profile=getattr(args, "profile", "full"),
+        fidelity=getattr(args, "fidelity", "full"),
         workers=args.workers,
         parallel_materials=args.parallel_materials,
         chunk_minutes=args.chunk_minutes,
@@ -524,7 +523,6 @@ def scan_command(
     material,
     all_,
     fidelity,
-    legacy_profile,
     quick,
     workers,
     parallel_materials,
@@ -540,8 +538,7 @@ def scan_command(
         raise click.UsageError(
             "scan --quick --grid: quick checkpoints aren't grid-filterable; drop --grid"
         )
-    profile = resolve_fidelity(fidelity, legacy_profile)
-    if quick and profile != "full":
+    if quick and fidelity != "full":
         raise click.UsageError("--quick cannot be combined with --fidelity survey")
     if parallel_materials is not None and chunk_minutes != 0:
         raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
@@ -551,7 +548,7 @@ def scan_command(
             "scan",
             material=material,
             all=all_,
-            profile=profile,
+            fidelity=fidelity,
             quick=quick,
             workers=workers,
             parallel_materials=parallel_materials,
@@ -608,7 +605,6 @@ def rebrem_command(
     material,
     all_,
     fidelity,
-    legacy_profile,
     redo_all,
     dry_run,
     no_sync,
@@ -622,14 +618,13 @@ def rebrem_command(
     _reject_all_with_values("rebrem", all_, materials)
     if start is not None and stop is not None and stop <= start:
         raise click.UsageError("rebrem --stop must be greater than --start")
-    profile = resolve_fidelity(fidelity, legacy_profile)
     return _invoke_click(
         _cli_rebrem,
         _click_args(
             "rebrem",
             material=materials,
             all=all_,
-            profile=profile,
+            fidelity=fidelity,
             ne_brem=ne_brem,
             start=start,
             stop=stop,
@@ -661,7 +656,6 @@ def reline_command(
     material,
     all_,
     fidelity,
-    legacy_profile,
     redo_all,
     dry_run,
     no_sync,
@@ -675,14 +669,13 @@ def reline_command(
     _reject_all_with_values("reline", all_, materials)
     if start is not None and stop is not None and stop <= start:
         raise click.UsageError("reline --stop must be greater than --start")
-    profile = resolve_fidelity(fidelity, legacy_profile)
     return _invoke_click(
         _cli_reline,
         _click_args(
             "reline",
             material=materials,
             all=all_,
-            profile=profile,
+            fidelity=fidelity,
             line_ne=line_ne,
             start=start,
             stop=stop,
@@ -768,6 +761,7 @@ def reline_command(
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
 @click.option("--dry-run", is_flag=True, help="Print submission preview; do not connect.")
 @click.option("-f", "--follow", is_flag=True, help="Track job after launch.")
+
 def start_command(
     materials,
     all_,
@@ -776,7 +770,6 @@ def start_command(
     include_high_energy,
     high_energy_min_kev,
     fidelity,
-    legacy_profile,
     quick,
     workers,
     parallel_materials,
@@ -802,8 +795,7 @@ def start_command(
         _reject_all_with_values("start", all_, materials)
     if parallel_materials is not None and chunk_minutes != 0:
         raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
-    profile = resolve_fidelity(fidelity, legacy_profile)
-    if quick and profile != "full":
+    if quick and fidelity != "full":
         raise click.UsageError("--quick cannot be combined with --fidelity survey")
     return _invoke_click(
         _cli_start,
@@ -815,7 +807,7 @@ def start_command(
             include_unverified_dw=include_unverified_dw,
             include_high_energy=include_high_energy,
             high_energy_min_kev=high_energy_min_kev,
-            profile=profile,
+            fidelity=fidelity,
             quick=quick,
             workers=workers,
             parallel_materials=parallel_materials,

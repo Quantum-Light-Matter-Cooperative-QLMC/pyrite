@@ -111,8 +111,6 @@ Options:
                              on every other material.
   --workers NUMBER           run_cases max_workers (default auto; 0 = serial, no
                              transport pool).
-  --fidelity [full|survey]   Named settings/grid policy. survey is provisional and
-                             reduced.  [default: full]
   --quick                    Use tiny smoke-test grid and write <material>_quick.pkl.
   --n-families NUMBER        Override positive dominant reflection-family count.
   --beam-uvw H K L           Override nonzero integer beam zone axis [uvw].
@@ -120,6 +118,10 @@ Options:
                              checkpoints]
   --max-minutes MINUTES      Soft wall-clock budget in minutes; exit 75 if resumable
                              work remains.
+  --fidelity [full|survey]   Named settings/grid-reduction policy. survey is provisional
+                             and reduced.  [default: full]
+  --profile TEXT             Catalog profile to run (e.g. standard, sub_100keV).
+                             [default: standard]
   --json                     Emit one versioned JSON object on stdout.
   -h, --help                 Show this message and exit.
 ```
