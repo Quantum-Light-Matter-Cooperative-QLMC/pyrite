@@ -18,8 +18,8 @@ Item generation:
 
 ### Active
 
-1. **`cxr energy-grid` CLI fixes.** Rework/document `defaults` + `apply` semantics, add unset path for stored defaults, explain backend `fidelity` (`full`/`survey`) mapping. → `feature/cli-fixes`.
-2. **`cxr remote` attach/progress UX.** Fix progress-bar labels + paused-state rendering, reconnect retry, submit/scan merge (`--headless`/`--no-pull`), `clear --profile`, evaluate `prune`, high-verbosity diagnostics. → `feature/cli-fixes`.
+1. **`cxr energy-grid` CLI fixes.** Rework/document `defaults` + `apply` semantics, add unset path for stored defaults, explain backend `fidelity` (`full`/`survey`) mapping. → `feature/energy-grid-cli`.
+2. **`cxr remote` attach/progress UX.** Fix progress-bar labels + paused-state rendering, reconnect retry, submit/scan merge (`--headless`/`--no-pull`), `clear --profile`, evaluate `prune`, high-verbosity diagnostics. → `feature/remote-attach-ux`.
 3. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
 4.  **Debye-Waller provenance and anisotropy audit.** Continue replacing placeholder or reused `B_ang2` values with primary-source values and resolve per-site/tensor model needs. → `feature/debye-waller-audit`; audit: [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md).
    1. >user< Evaluate complexity/value of implementing full anisotropic/tensor-based Debye-Waller factors when available
