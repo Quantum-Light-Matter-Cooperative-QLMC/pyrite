@@ -49,9 +49,7 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
     if isinstance(materials, str):
         materials = [materials]
     transport._check_materials(materials)  # interpolated into a remote shell command
-    label = (
-        f"profile={catalog_profile}" if catalog_profile != "standard" else ", ".join(materials)
-    )
+    label = f"profile={catalog_profile}" if catalog_profile != "standard" else ", ".join(materials)
     if catalog_profile != "standard":
         stems = [
             stem
@@ -76,8 +74,7 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
         busy = [
             (jid, sorted(set(materials).intersection(jmats)))
             for jid, _jquick, jmats in live_jobs
-            if live_profiles.get(jid) == catalog_profile
-            and set(materials).intersection(jmats)
+            if live_profiles.get(jid) == catalog_profile and set(materials).intersection(jmats)
         ]
     else:
         busy = [
@@ -197,6 +194,51 @@ def clear_all_remote(yes=False):
         r'find . -type f -name "*.pkl" -delete'
     )
     print(f"cleared on the box: {len(existing)} checkpoint file(s) under checkpoints/")
+
+
+def prune_remote(
+    *,
+    all_profiles: bool = False,
+    catalog_profile: str | None = None,
+    yes: bool = False,
+):
+    """Preview or prune stale records on box under exact stem reservations."""
+    from ..prune import _targets
+
+    targets = _targets(all_profiles, catalog_profile)
+    stems = [target.stem for target in targets]
+    live = state._live_jobs()
+    if live:
+        detail = "\n".join(
+            f"  job {jobid} is producing -> {', '.join(sorted(scripts._stems(materials, quick)))}"
+            for jobid, quick, materials in live
+        )
+        raise SystemExit(
+            "refusing remote prune: live job(s) are producing checkpoints.\n"
+            f"{detail}\n"
+            "wait for completion, or stop them with cxr remote stop --all."
+        )
+    reservations = state._reservation_holders(stems)
+    if reservations:
+        detail = "\n".join(
+            f"  reservation {owner} protects -> {stem}" for stem, owner in reservations
+        )
+        raise SystemExit(
+            "refusing remote prune: checkpoint reservation still active.\n"
+            f"{detail}\n"
+            "wait for submission to resolve, reap orphans, or stop its recorded job."
+        )
+    output = transport._ssh_capture(
+        scripts._prune_checkpoint_stems_command(
+            f"prune-{scripts._new_jobid()}",
+            stems,
+            all_profiles=all_profiles,
+            catalog_profile=catalog_profile,
+            yes=yes,
+        )
+    )
+    if output:
+        print(output)
 
 
 def _refuse_if_profile_live(catalog_profile):

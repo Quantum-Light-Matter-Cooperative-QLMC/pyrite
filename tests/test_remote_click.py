@@ -23,6 +23,7 @@ REMOTE_COMMANDS = (
     "reap",
     "pull",
     "clear",
+    "prune",
     "sync",
     "validate",
     "check",
@@ -119,6 +120,7 @@ def test_remote_numeric_domains_fail_at_click_boundary(argv, option):
         (["pull", "hopg", "--brem-only", "--line-only"], "mutually exclusive"),
         (["stop"], "needs material"),
         (["clear"], "needs material"),
+        (["prune", "--all", "--profile", "sub_100keV"], "cannot be combined"),
         (["check", "--follow"], "requires --detached"),
         (["check", "--pull", "--detached"], "mutually exclusive"),
     ],
@@ -129,6 +131,20 @@ def test_remote_incompatible_click_inputs_are_usage_errors(argv, message):
     assert result.exit_code == 2
     assert result.stdout == ""
     assert message in result.stderr
+
+
+def test_remote_prune_defaults_to_standard_preview(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "prune_remote",
+        lambda **kwargs: calls.append(kwargs),
+    )
+
+    result = invoke(remote.command, ["prune"])
+
+    assert_clean_result(result)
+    assert calls == [{"all_profiles": False, "catalog_profile": None, "yes": False}]
 
 
 @pytest.mark.parametrize("command_name", ["scan", "rebrem", "reline", "submit"])

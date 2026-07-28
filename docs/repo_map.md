@@ -46,8 +46,9 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 
 - **`cxr` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
   lazy Click dispatch for `scan`, `blaze`, `export`, `analyze`, `validate`,
-  `catalog`, `checkpoint`, `remote`, `energy-grid`, and `sweep`. Older flat checkpoint
-  verbs, `check`, and `check-config` remain hidden compatibility aliases.
+  `catalog`, `checkpoint`, `remote`, `energy-grid`, `sweep`, and `prune`.
+  Older flat checkpoint verbs, `check`, and `check-config` remain hidden
+  compatibility aliases.
   Checked user-facing inventory:
   [`docs/cli-reference.md`](cli-reference.md).
 - **`cxr catalog validate [catalog]`** → `check_config:_run`: validate bundled
@@ -55,6 +56,9 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   hidden alias: `cxr check-config`.
 - **`cxr checkpoint ...`** → `cli.checkpoint:command`: grouped local checkpoint
   shrink, component recompute, archive, restore, list, and merge operations.
+- **`cxr prune [--all | --profile NAME] [--yes]`** → `prune:command`: preview
+  or atomically rewrite current named-profile checkpoints, retaining only
+  records whose full case payload exactly matches current profile resolution.
 - **`cxr scan <material> [--fidelity full|survey]`** → `scan:main` →
   `run.run_sweep` → write canonical `checkpoints/<material>/{line,brem}.pkl`
   or an identity-qualified variant directory. Box shim: `python -m cxr_mc._entry.scan`.
@@ -73,7 +77,8 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 - **`cxr remote ...`** → `remote:*`: optional SSH/SLURM lifecycle for lab GPU
   box: submit, attach/status/logs, pull, stop, validation jobs. Canonical
   detached submission and validation paths are `remote submit` and
-  `remote validate`; `start` and `check` remain hidden aliases.
+  `remote validate`; `remote prune` applies profile-aware checkpoint pruning
+  under remote stem reservations; `start` and `check` remain hidden aliases.
 - **`cxr export [stem]`** → `export:main`: `marimo export html` of analysis
   app → `results/<stem>.html`.
 - **`cxr slim <checkpoint-dir> [--grid]`** → `slim:slim_checkpoint` →

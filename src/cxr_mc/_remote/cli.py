@@ -481,6 +481,14 @@ def _cli_clear(args):
     lifecycle.clear_remote(args.materials, args.yes)
 
 
+def _cli_prune(args):
+    lifecycle.prune_remote(
+        all_profiles=args.all_profiles,
+        catalog_profile=args.catalog_profile,
+        yes=args.yes,
+    )
+
+
 def _cli_sync(args):
     transport.sync_code()
 
@@ -986,6 +994,14 @@ command.add_command(start_command)
 _start_alias = copy(start_command)
 _start_alias.name = "start"
 _start_alias.hidden = True
+_start_alias.params = [copy(parameter) for parameter in start_command.params]
+for _parameter in _start_alias.params:
+    if isinstance(_parameter, click.Option) and "--follow" in _parameter.opts:
+        _parameter.hidden = False
+        _parameter.help = (
+            "Compatibility flag: track after launching. `submit` now tracks by default; "
+            "use --headless to detach."
+        )
 command.add_command(_start_alias)
 
 
@@ -1239,6 +1255,42 @@ def clear_command(materials, all_checkpoints, catalog_profile, yes):
             "clear",
             materials=list(materials),
             all_checkpoints=all_checkpoints,
+            catalog_profile=catalog_profile,
+            yes=yes,
+        ),
+    )
+
+
+@command.command(
+    "prune",
+    help=(
+        "Drop remote records obsolete under current scan profiles; preview "
+        "unless --yes. Defaults to profile=standard."
+    ),
+)
+@click.option(
+    "--all",
+    "all_profiles",
+    is_flag=True,
+    help="Prune current checkpoints for standard and every named catalog profile.",
+)
+@click.option(
+    "--profile",
+    "catalog_profile",
+    default=None,
+    metavar="NAME",
+    shell_complete=_cli_completion.complete_profile,
+    help="Prune current full and survey checkpoints for catalog profile NAME.",
+)
+@click.option("--yes", is_flag=True, help="Delete exact previewed stale records.")
+def prune_command(all_profiles, catalog_profile, yes):
+    if all_profiles and catalog_profile is not None:
+        raise click.UsageError("prune --all cannot be combined with --profile")
+    return _invoke_click(
+        _cli_prune,
+        _click_args(
+            "prune",
+            all_profiles=all_profiles,
             catalog_profile=catalog_profile,
             yes=yes,
         ),

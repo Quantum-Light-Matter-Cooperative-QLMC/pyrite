@@ -955,6 +955,36 @@ for stem in {stem_words}; do \
   printf 'CLEARED\\t%s\\n' "$f"; done"""
 
 
+def _prune_checkpoint_stems_command(
+    jobid: str,
+    stems: list[str],
+    *,
+    all_profiles: bool = False,
+    catalog_profile: str | None = None,
+    yes: bool = False,
+) -> str:
+    """Reserve exact current stems while running ``cxr prune`` remotely."""
+    transport._check_shell_tokens([jobid, *stems])
+    if all_profiles and catalog_profile is not None:
+        raise ValueError("all_profiles and catalog_profile are mutually exclusive")
+    reserve = _reserve_checkpoint_stems_command(jobid, stems)
+    release = _release_checkpoint_stems_command(jobid, stems)
+    args = ["prune"]
+    if all_profiles:
+        args.append("--all")
+    elif catalog_profile is not None:
+        args.extend(("--profile", catalog_profile))
+    if yes:
+        args.append("--yes")
+    command = " ".join(config.shell_arg(arg) for arg in args)
+    return (
+        f"{reserve}; "
+        f"release_prune() {{ {release}; }}; trap release_prune EXIT; "
+        f"cd {config.shell_remote_dir()} || exit $?; "
+        f"{config.shell_remote_uv()} run --no-sync cxr {command}"
+    )
+
+
 def _reap_job_command(jobid: str) -> str:
     """Remote command: release a job's reservations, then stamp its state terminal."""
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)

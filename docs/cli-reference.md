@@ -74,6 +74,7 @@ Commands:
   energy-grid  Derive, submit, inspect, and apply photon-energy grids.
   sweep        Show and edit scan parameter-range sweeps.
   profile      Manage catalog scan profiles (named campaign defaults).
+  prune        Drop checkpoint records obsolete under current scan profiles.
 ```
 
 ## `cxr scan`
@@ -467,6 +468,7 @@ Commands:
   clear     Delete remote checkpoints; preview unless --yes.
   jobs      List jobs with SLURM IDs, materials, and last events.
   logs      Show a job diagnostic log; defaults to latest.
+  prune     Drop remote records obsolete under current scan profiles; preview...
   pull      Fetch existing checkpoints from remote box.
   reap      Release orphaned checkpoint reservations; preview unless --yes.
   rebrem    Recompute brem-only remotely, follow, and pull completed checkpoints.
@@ -528,6 +530,22 @@ Usage: cxr remote logs [OPTIONS] [JOBID]
 Options:
   -f, --follow  Stream live; Ctrl-C disconnects viewer.
   -h, --help    Show this message and exit.
+```
+
+## `cxr remote prune`
+
+```text
+Usage: cxr remote prune [OPTIONS]
+
+  Drop remote records obsolete under current scan profiles; preview unless --yes.
+  Defaults to profile=standard.
+
+Options:
+  --all           Prune current checkpoints for standard and every named catalog
+                  profile.
+  --profile NAME  Prune current full and survey checkpoints for catalog profile NAME.
+  --yes           Delete exact previewed stale records.
+  -h, --help      Show this message and exit.
 ```
 
 ## `cxr remote pull`
@@ -1368,4 +1386,20 @@ Usage: cxr profile show [OPTIONS] NAME
 Options:
   --json      Emit one versioned JSON object on stdout.
   -h, --help  Show this message and exit.
+```
+
+## `cxr prune`
+
+```text
+Usage: cxr prune [OPTIONS]
+
+  Drop records obsolete under current scan profiles; preview unless --yes. With neither
+  selector, prune profile=standard.
+
+Options:
+  --all           Prune current checkpoints for standard and every named catalog
+                  profile.
+  --profile NAME  Prune current full and survey checkpoints for catalog profile NAME.
+  --yes           Delete exact previewed stale records.
+  -h, --help      Show this message and exit.
 ```

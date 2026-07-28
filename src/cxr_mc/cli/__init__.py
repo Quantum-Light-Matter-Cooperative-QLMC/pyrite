@@ -29,6 +29,7 @@ _COMMANDS = {
     "energy-grid": "cxr_mc.cli.energy_grid.command",
     "sweep": "cxr_mc.cli.sweep.command",
     "profile": "cxr_mc.cli.profile.command",
+    "prune": "cxr_mc.prune.command",
     "check": "cxr_mc.check.command",
     "check-config": "cxr_mc.check_config.command",
 }
@@ -53,6 +54,7 @@ _COMMAND_HELP = {
     "energy-grid": "Derive, submit, inspect, and apply photon-energy grids.",
     "sweep": "Show and edit scan parameter-range sweeps.",
     "profile": "Manage catalog scan profiles (named campaign defaults).",
+    "prune": "Drop checkpoint records obsolete under current scan profiles.",
     "check": "Launch validation or export cached validation figures.",
     "check-config": "Validate a material catalog without starting simulation.",
 }

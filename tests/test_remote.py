@@ -1628,10 +1628,7 @@ def test_attach_pull_keybinding_confirms_without_stopping_job(monkeypatch, capsy
 
 def test_pull_attached_progress_uses_reporting_profile_stems(monkeypatch):
     sections = {
-        "META": (
-            "materials: hopg hbn\nquick: False\nfidelity: full\n"
-            "catalog_profile: sub_100keV"
-        ),
+        "META": ("materials: hopg hbn\nquick: False\nfidelity: full\ncatalog_profile: sub_100keV"),
         "PROGRESS": (
             '{"material":"hopg","total_cases":4,"cached_cases":1,'
             '"completed_new_cases":1,"state":"running"}'
@@ -1646,9 +1643,7 @@ def test_pull_attached_progress_uses_reporting_profile_stems(monkeypatch):
             stem_calls.append((materials, quick, fidelity, kwargs)) or ["hopg-profile"]
         ),
     )
-    monkeypatch.setattr(
-        lifecycle, "pull", lambda stems, **kwargs: pulls.append((stems, kwargs))
-    )
+    monkeypatch.setattr(lifecycle, "pull", lambda stems, **kwargs: pulls.append((stems, kwargs)))
 
     viewer._pull_attached_progress("j", sections)
 
@@ -2608,15 +2603,16 @@ def test_clear_profile_targets_only_profile_stems(monkeypatch, capsys):
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda command: commands.append(command)
-        or "hopg--profile-sub_100keV.pkl\nhbn--profile-sub_100keV.pkl\n",
+        lambda command: (
+            commands.append(command)
+            or "hopg--profile-sub_100keV.pkl\nhbn--profile-sub_100keV.pkl\n"
+        ),
     )
     monkeypatch.setattr(
         scripts,
         "_stems",
         lambda materials, quick, fidelity, **kwargs: [
-            f"{material}--{fidelity}-profile-{kwargs['catalog_profile']}"
-            for material in materials
+            f"{material}--{fidelity}-profile-{kwargs['catalog_profile']}" for material in materials
         ],
     )
 
@@ -2717,6 +2713,54 @@ def test_clear_all_reports_nothing_when_empty(monkeypatch, capsys):
     monkeypatch.setattr(transport, "_ssh_capture", lambda *a: "\n")
     remote.clear_all_remote(yes=True)
     assert "nothing to clear" in capsys.readouterr().out
+
+
+def test_prune_remote_refuses_while_any_job_is_live(monkeypatch):
+    target = type("Target", (), {"stem": "hopg"})()
+    monkeypatch.setattr("cxr_mc.prune._targets", lambda *_args: [target])
+    monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", False, ["hopg"])])
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: pytest.fail("must not mutate remote checkpoints"),
+    )
+
+    with pytest.raises(SystemExit, match="live job"):
+        lifecycle.prune_remote()
+
+
+def test_prune_checkpoint_command_reserves_runs_and_releases():
+    command = scripts._prune_checkpoint_stems_command(
+        "prune-job",
+        ["hopg", "hopg--survey-deadbeef0000"],
+        catalog_profile="standard",
+        yes=True,
+    )
+
+    assert "for stem in hopg hopg--survey-deadbeef0000" in command
+    assert "trap release_prune EXIT" in command
+    assert "run --no-sync cxr prune --profile standard --yes" in command
+    assert command.index("for stem in hopg") < command.index("run --no-sync cxr prune")
+
+
+def test_prune_remote_dispatches_exact_reserved_stems(monkeypatch, capsys):
+    target = type("Target", (), {"stem": "hopg"})()
+    commands = []
+    monkeypatch.setattr("cxr_mc.prune._targets", lambda *_args: [target])
+    monkeypatch.setattr(state, "_live_jobs", lambda: [])
+    monkeypatch.setattr(state, "_reservation_holders", lambda stems: [])
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda command: commands.append(command) or "would prune remote",
+    )
+
+    lifecycle.prune_remote(catalog_profile="standard")
+
+    assert len(commands) == 1
+    assert "for stem in hopg" in commands[0]
+    assert "cxr prune --profile standard" in commands[0]
+    assert "would prune remote" in capsys.readouterr().out
 
 
 def _bash_or_skip(tmp_path):
