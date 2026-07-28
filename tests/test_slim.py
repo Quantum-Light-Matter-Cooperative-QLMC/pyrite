@@ -126,12 +126,12 @@ def test_slim_checkpoint_compresslevel_9_is_lossless_and_no_larger(tmp_path):
 
 
 # ---- grid filtering (checkpoint lifecycle: grid-filtered pull) ----------------
-def _grid_config_names(material="hopg", profile="full"):
+def _grid_config_names(material="hopg", profile="full", catalog_profile="standard"):
     """The real current-grid config names for a material, straight from the same
     build_cases path slim_results(grid=) rebuilds."""
     s = default_settings(profile)
     cases = build_cases(
-        material_sweep(material, profile=profile),
+        material_sweep(material, fidelity=profile, catalog_profile=catalog_profile),
         s.n_electrons,
         s.n_electrons_brem,
     )
@@ -166,7 +166,30 @@ def test_grid_accepts_survey_profile_selector_and_variant_stem():
     slim = slim_results(res, grid=("hopg", "survey"))
 
     assert set(slim) == keep
-    assert _grid_from_stem(named_profile_stem("hopg", "survey")) == ("hopg", "survey")
+    assert _grid_from_stem(named_profile_stem("hopg", "survey")) == (
+        "hopg",
+        "survey",
+        "standard",
+    )
+
+
+def test_grid_from_stem_resolves_catalog_profile_variant():
+    """A profile-variant stem (materials.toml [profiles.*]) yields the
+    3-tuple grid selector, and slim_results filters on that profile's grid --
+    this is the path `cxr remote pull --profile` exercises on the box via
+    `cxr slim --grid`."""
+    from cxr_mc.profiles import named_profile_stem
+    from cxr_mc.slim import _grid_from_stem
+
+    stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
+    selector = _grid_from_stem(f"checkpoints/{stem}")
+    assert selector == ("hopg", "full", "sub_100keV")
+
+    keep = set(_grid_config_names("hopg", catalog_profile="sub_100keV")[:2])
+    res = {name: {30.0: _record(0.0, 30.0)} for name in keep}
+    res["stale_old_config"] = {30.0: _record(0.0, 30.0)}
+    slim = slim_results(res, grid=selector)
+    assert set(slim) == keep
 
 
 def test_grid_is_lossless_per_record():

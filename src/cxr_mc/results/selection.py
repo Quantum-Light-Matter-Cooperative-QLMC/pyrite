@@ -252,10 +252,12 @@ def merge_dataset(local, incoming, dataset, force=False):
     return n_merged, n_skipped
 
 
-def _grid_names(material, profile="full"):
+def _grid_names(material, profile="full", catalog_profile="standard"):
     """Config names in the CURRENT grid for ``material`` -- exactly the set
-    ``config.material_sweep(material)`` -> ``sweep.build_cases`` produces now.
-    A stale config is any name NOT in this set.
+    ``config.material_sweep(material, catalog_profile=catalog_profile)`` ->
+    ``sweep.build_cases`` produces now. A stale config is any name NOT in this
+    set. ``catalog_profile`` selects the named materials.toml profile whose
+    grid a profile-variant checkpoint was swept on.
 
     The ``config`` / ``sweep`` imports are function-local on purpose: ``config``
     imports ``results`` at module load (``from .results import Settings``), so a
@@ -266,7 +268,7 @@ def _grid_names(material, profile="full"):
     from ..sweep import build_cases
 
     settings = default_settings(profile)
-    sweep = material_sweep(material, fidelity=profile)
+    sweep = material_sweep(material, fidelity=profile, catalog_profile=catalog_profile)
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
     return {c["name"] for c in cases}
 
@@ -283,7 +285,8 @@ def slim_results(
     config at full resolution, so transferring it from the GPU box is gigabyte-
     scale and mostly stale for any one plot. This trims it four independent ways:
 
-    grid : a material key. Keep only the configs in that material's CURRENT grid
+    grid : a material key, or a ``(material, fidelity[, catalog_profile])``
+        tuple. Keep only the configs in that material's CURRENT grid
         (:func:`_grid_names`), dropping configs left over from earlier grids --
         the ``filter_results`` narrowing computed from ``config.py`` alone, so the
         GPU box can shrink its accumulated union to just the live run before the

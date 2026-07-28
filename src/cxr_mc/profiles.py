@@ -307,13 +307,36 @@ _VARIANT_STEM_RE = re.compile(
 )
 
 
+def _catalog_profile_candidates() -> tuple[str, ...]:
+    """Catalog profiles a hashed variant stem could belong to: ``standard``
+    first (the common case), then every named profile in materials.toml.
+    Local import breaks the config/profiles import cycle (same pattern as
+    :func:`named_profile_identity`)."""
+    from .materials import CATALOG
+
+    return ("standard", *CATALOG.profile_names)
+
+
 def identity_from_stem(stem: str) -> dict[str, Any] | None:
-    """Reconstruct unmodified named-profile identity from a checkpoint stem."""
+    """Reconstruct unmodified named-profile identity from a checkpoint stem.
+
+    The stem's digest commits to a ``catalog_profile`` (hashed into the
+    payload whenever it diverges from ``standard``) but does not name it, so a
+    variant stem is matched by recomputing the identity under each known
+    catalog profile until the digests agree. A material that is not a member
+    of a candidate profile raises inside ``material_sweep`` -- that candidate
+    is simply skipped."""
     match = _VARIANT_STEM_RE.fullmatch(stem)
     if match is not None:
-        identity = named_profile_identity(match["material"], match["fidelity"])
-        if identity["parameter_sha256"].startswith(match["digest"]):
-            return identity
+        for catalog_profile in _catalog_profile_candidates():
+            try:
+                identity = named_profile_identity(
+                    match["material"], match["fidelity"], catalog_profile=catalog_profile
+                )
+            except (KeyError, ValueError):
+                continue
+            if identity["parameter_sha256"].startswith(match["digest"]):
+                return identity
         return None
     try:
         identity = named_profile_identity(stem, "full")

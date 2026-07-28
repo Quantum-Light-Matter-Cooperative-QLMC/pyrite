@@ -49,7 +49,8 @@ def _material_from_stem(in_path):
 
 
 def _grid_from_stem(in_path):
-    """Return material/profile selector for canonical or named-profile stem."""
+    """Return ``(material, fidelity, catalog_profile)`` for a canonical or
+    named-profile stem (a canonical stem yields the bare material key)."""
     stem = os.path.splitext(os.path.basename(os.path.normpath(in_path)))[0]
     if "--" not in stem:
         return _material_from_stem(in_path)
@@ -60,7 +61,7 @@ def _grid_from_stem(in_path):
         raise SystemExit(
             f"--grid: cannot resolve named-profile identity from checkpoint stem {stem!r}"
         )
-    return identity["material"], identity["fidelity"]
+    return identity["material"], identity["fidelity"], identity.get("catalog_profile", "standard")
 
 
 def _pct_smaller(before, after):
