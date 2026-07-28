@@ -424,6 +424,35 @@ def test_scan_explicit_material_outside_profile_is_usage_error(monkeypatch):
     assert "hopg" in result.stderr
 
 
+def test_resolved_run_threads_catalog_profile_into_material_sweep(monkeypatch):
+    """Regression: `_resolved_run` used to compute `catalog_profile` only after
+    building `sweep`, so `material_sweep()` always resolved the standard
+    profile's grid regardless of `--profile` -- the checkpoint identity/stem
+    were correctly tagged `sub_100keV` while the simulated parameters (energy
+    grid, thickness, etc.) silently stayed standard's. Caught live: `cxr
+    remote submit --all --profile sub_100keV` still ran 250 keV cases."""
+    import types
+
+    from cxr_mc.config import material_sweep as real_material_sweep
+
+    calls = []
+
+    def fake_material_sweep(material, **kwargs):
+        calls.append(kwargs)
+        # Content doesn't matter here -- only that `_resolved_run` forwarded
+        # `catalog_profile`; build a real (standard-profile) Sweep so the
+        # rest of `_resolved_run` (dataset_identity/variant_stem) has valid
+        # data to chew on.
+        return real_material_sweep(material, catalog_profile="standard")
+
+    monkeypatch.setattr(scan, "material_sweep", fake_material_sweep)
+    args = types.SimpleNamespace(catalog_profile="sub_100keV")
+
+    scan._resolved_run(args, "hopg")
+
+    assert calls[0]["catalog_profile"] == "sub_100keV"
+
+
 def test_standalone_click_usage_error_preserves_exit_and_streams():
     completed = subprocess.run(
         [sys.executable, "-m", "cxr_mc.scan", "hopg", "--workers", "-1"],

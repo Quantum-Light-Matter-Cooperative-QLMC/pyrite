@@ -518,6 +518,7 @@ def _resolved_run(args, material):
     assert material_sweep is not None
 
     fidelity = getattr(args, "fidelity", "full")
+    catalog_profile = getattr(args, "catalog_profile", "standard")
     settings = default_settings() if fidelity == "full" else default_settings(fidelity)
     overrides = {}
     if getattr(args, "quick", False):
@@ -533,9 +534,11 @@ def _resolved_run(args, material):
     if getattr(args, "beam_uvw", None) is not None:
         overrides["beam_uvw"] = tuple(args.beam_uvw)
     sweep = (
-        material_sweep(material, **overrides)
+        material_sweep(material, catalog_profile=catalog_profile, **overrides)
         if fidelity == "full"
-        else material_sweep(material, fidelity=fidelity, **overrides)
+        else material_sweep(
+            material, fidelity=fidelity, catalog_profile=catalog_profile, **overrides
+        )
     )
 
     # High-energy-only materials (mats_to_sim.toml's high_energy_materials list,
@@ -562,7 +565,6 @@ def _resolved_run(args, material):
 
     from .profiles import dataset_identity, variant_stem
 
-    catalog_profile = getattr(args, "catalog_profile", "standard")
     identity = dataset_identity(
         material,
         fidelity,
