@@ -70,6 +70,56 @@ def test_scan_budget_writes_paused_progress_state(monkeypatch, tmp_path):
     assert record["state"] == "paused"
 
 
+def test_scan_progress_records_compute_cost_when_progress_file_given(monkeypatch, tmp_path):
+    """item 6: _run_material wires sweep.case_cost through run_sweep's on_cost
+    callback into the remote progress JSON's done_cost/total_cost fields, so
+    `cxr remote attach` can render a compute-weighted bar (presentation.py's
+    _overall_progress_line(..., use_cost=True))."""
+
+    def _fake_run_sweep(*args, **kwargs):
+        assert kwargs["case_cost_fn"] is not None
+        kwargs["on_cost"](2.5, 5.0)
+        return True
+
+    monkeypatch.setattr(scan, "run_sweep", _fake_run_sweep)
+    _stub_cases(monkeypatch)
+    progress = tmp_path / "hopg.json"
+    result = _invoke("hopg", None, progress, "--checkpoint-dir", str(tmp_path))
+    assert result.exit_code == 0
+    record = json.loads(progress.read_text())
+    assert record["done_cost"] == 2.5
+    assert record["total_cost"] == 5.0
+
+
+def test_scan_progress_omits_cost_fields_without_progress_file(monkeypatch, tmp_path):
+    def _fake_run_sweep(*args, **kwargs):
+        assert kwargs["case_cost_fn"] is None
+        assert kwargs["on_cost"] is None
+        return True
+
+    monkeypatch.setattr(scan, "run_sweep", _fake_run_sweep)
+    _stub_cases(monkeypatch)
+    result = _invoke("hopg", None, None, "--checkpoint-dir", str(tmp_path))
+    assert result.exit_code == 0
+
+
+def test_write_progress_record_omits_cost_fields_when_either_is_none(tmp_path):
+    path = tmp_path / "hopg.json"
+    scan._write_progress_record(
+        path,
+        material="hopg",
+        total_cases=2,
+        cached_cases=0,
+        completed_new_cases=1,
+        state="running",
+        done_cost=3.0,
+        total_cost=None,
+    )
+    record = json.loads(path.read_text())
+    assert "done_cost" not in record
+    assert "total_cost" not in record
+
+
 def test_scan_no_max_minutes_passes_none_max_seconds(monkeypatch, tmp_path):
     captured = {}
 

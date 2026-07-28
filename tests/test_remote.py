@@ -1484,6 +1484,119 @@ def test_attach_returns_false_when_the_viewer_is_interrupted(monkeypatch, capsys
     assert "VIEWER DISCONNECTED" in capsys.readouterr().out
 
 
+class _FakeKeyListener:
+    """Scripted stand-in for viewer._KeyListener: one poll() result per call."""
+
+    def __init__(self, polls, *, active=True):
+        self._polls = list(polls)
+        self.active = active
+        self.stopped = False
+
+    def poll(self):
+        return self._polls.pop(0) if self._polls else []
+
+    def stop(self):
+        self.stopped = True
+
+
+def test_key_listener_inactive_when_stdin_is_not_a_tty(monkeypatch):
+    monkeypatch.setattr(viewer.sys.stdin, "isatty", lambda: False)
+
+    listener = viewer._KeyListener()
+
+    assert listener.active is False
+    assert listener.poll() == []
+    listener.stop()  # must be a harmless no-op
+
+
+def test_attach_header_shows_cancel_hint_only_when_keys_are_active():
+    assert f"{viewer._CANCEL_ARM_KEY} cancels job" in viewer._attach_header(1, cancel_hint=True)
+    assert "cancels job" not in viewer._attach_header(1, cancel_hint=False)
+
+
+def test_attach_header_shows_armed_confirm_banner():
+    header = viewer._attach_header(1, armed=True)
+    assert "CANCEL ARMED" in header
+    assert f"press {viewer._CANCEL_CONFIRM_KEY} to confirm" in header
+
+
+def test_attach_cancel_keybinding_confirms_and_scancels_the_job(monkeypatch, capsys):
+    """item 5: 'x' arms, 'y' on a LATER poll confirms -- two different keys, not
+    a bare single keystroke -- and cancels via lifecycle._stop_jobid."""
+    running = _status_output("running hopg [1/1] since now", squeue_state="RUNNING")
+    outputs = iter([running, running])
+    monkeypatch.setattr(viewer, "_status_stream", lambda _cmd: outputs)
+    fake_keys = _FakeKeyListener([["x"], ["y"]])
+    monkeypatch.setattr(viewer, "_KeyListener", lambda: fake_keys)
+    stopped = []
+    monkeypatch.setattr(lifecycle, "_stop_jobid", lambda jobid: stopped.append(jobid))
+
+    assert remote.attach("20260101-000000") is False
+
+    assert stopped == ["20260101-000000"]
+    assert fake_keys.stopped is True
+    out = capsys.readouterr().out
+    assert "CANCEL ARMED" in out
+    assert "CANCELLED BY USER" in out
+
+
+def test_attach_cancel_keybinding_disarms_on_any_other_key(monkeypatch, capsys):
+    running = _status_output("running hopg [1/1] since now", squeue_state="RUNNING")
+    done = _status_output("done now", squeue_state="NOT_QUEUED")
+    outputs = iter([running, done])
+    monkeypatch.setattr(viewer, "_status_stream", lambda _cmd: outputs)
+    fake_keys = _FakeKeyListener([["x"], ["z"]])
+    monkeypatch.setattr(viewer, "_KeyListener", lambda: fake_keys)
+    stopped = []
+    monkeypatch.setattr(lifecycle, "_stop_jobid", lambda jobid: stopped.append(jobid))
+
+    assert remote.attach("20260101-000000") is True
+
+    assert stopped == []  # wrong confirm key disarms instead of cancelling
+    assert "FINISHED" in capsys.readouterr().out
+
+
+def test_attach_cancel_arm_expires_without_a_confirm_key(monkeypatch, capsys):
+    running = _status_output("running hopg [1/1] since now", squeue_state="RUNNING")
+    done = _status_output("done now", squeue_state="NOT_QUEUED")
+    outputs = iter([running, done])
+    monkeypatch.setattr(viewer, "_status_stream", lambda _cmd: outputs)
+    fake_keys = _FakeKeyListener([["x"], []])
+    monkeypatch.setattr(viewer, "_KeyListener", lambda: fake_keys)
+    # First frame arms at t=0 (armed_until = 0 + _CANCEL_ARM_SECONDS); every
+    # later monotonic() call reads t=100, well past the window, so the second
+    # frame's expiry check must disarm before it ever looks at (the empty)
+    # keys.poll() for that frame.
+    clock = iter([0.0])
+    monkeypatch.setattr(viewer.time, "monotonic", lambda: next(clock, 100.0))
+    stopped = []
+    monkeypatch.setattr(lifecycle, "_stop_jobid", lambda jobid: stopped.append(jobid))
+
+    assert remote.attach("20260101-000000") is True
+
+    assert stopped == []
+    out = capsys.readouterr().out
+    assert out.count("CANCEL ARMED") == 1  # armed on frame 1, disarmed by frame 2
+    assert "FINISHED" in out
+
+
+def test_attach_cancel_request_failure_is_reported_without_a_traceback(monkeypatch, capsys):
+    running = _status_output("running hopg [1/1] since now", squeue_state="RUNNING")
+    outputs = iter([running, running])
+    monkeypatch.setattr(viewer, "_status_stream", lambda _cmd: outputs)
+    fake_keys = _FakeKeyListener([["x"], ["y"]])
+    monkeypatch.setattr(viewer, "_KeyListener", lambda: fake_keys)
+
+    def _raise(jobid):
+        raise SystemExit(f"job {jobid} is not an active SLURM job")
+
+    monkeypatch.setattr(lifecycle, "_stop_jobid", _raise)
+
+    assert remote.attach("20260101-000000") is False
+
+    assert "CANCEL REQUEST FAILED" in capsys.readouterr().out
+
+
 def test_status_stream_uses_one_ssh_process_for_multiple_frames(monkeypatch):
     processes = []
 
@@ -1616,6 +1729,153 @@ def test_overall_progress_line_counts_unstarted_materials_in_the_denominator():
 
 def test_overall_progress_line_is_none_without_records():
     assert remote._overall_progress_line({}) is None
+
+
+def test_parse_progress_records_keeps_valid_cost_fields():
+    payload = (
+        '{"material":"hopg","total_cases":4,"cached_cases":2,'
+        '"completed_new_cases":0,"state":"running",'
+        '"done_cost":25.0,"total_cost":100.0}'
+    )
+    records = remote._parse_progress_records(payload)
+    assert records["hopg"]["done_cost"] == 25.0
+    assert records["hopg"]["total_cost"] == 100.0
+
+
+def test_parse_progress_records_drops_cost_fields_when_done_exceeds_total():
+    payload = (
+        '{"material":"hopg","total_cases":4,"cached_cases":2,'
+        '"completed_new_cases":0,"state":"running",'
+        '"done_cost":150.0,"total_cost":100.0}'
+    )
+    records = remote._parse_progress_records(payload)
+    assert "done_cost" not in records["hopg"]
+    assert "total_cost" not in records["hopg"]
+
+
+def test_parse_progress_records_drops_non_numeric_cost_fields():
+    payload = (
+        '{"material":"hopg","total_cases":4,"cached_cases":2,'
+        '"completed_new_cases":0,"state":"running",'
+        '"done_cost":"lots","total_cost":100.0}'
+    )
+    records = remote._parse_progress_records(payload)
+    assert "done_cost" not in records["hopg"]
+    assert "total_cost" not in records["hopg"]
+
+
+def test_overall_progress_line_use_cost_weights_by_compute_not_case_count():
+    # hopg: 1 cheap case done of 1 total by count (100%), but that one case is
+    # only 10% of the material's compute; hbn hasn't started. A case-count bar
+    # would read 50% (1 material fully "done" of 2); the compute bar must read
+    # far lower since hopg's done work is cheap relative to the whole sweep.
+    records = remote._parse_progress_records(
+        "\n".join(
+            [
+                '{"material":"hopg","total_cases":1,"cached_cases":0,'
+                '"completed_new_cases":1,"state":"done",'
+                '"done_cost":10.0,"total_cost":100.0}',
+                '{"material":"hbn","total_cases":4,"cached_cases":0,'
+                '"completed_new_cases":0,"state":"running",'
+                '"done_cost":0.0,"total_cost":50.0}',
+            ]
+        )
+    )
+
+    cases_line = remote._overall_progress_line(records, ["hopg", "hbn"], use_cost=False)
+    compute_line = remote._overall_progress_line(records, ["hopg", "hbn"], use_cost=True)
+
+    assert " 50%" in cases_line
+    assert " 5%" in compute_line  # (10/100 + 0/50) / 2 = 5%
+
+
+def test_overall_progress_line_use_cost_falls_back_to_cases_without_cost_data():
+    records = remote._parse_progress_records(
+        '{"material":"hopg","total_cases":4,"cached_cases":2,'
+        '"completed_new_cases":0,"state":"running"}'
+    )
+    assert remote._overall_progress_line(
+        records, ["hopg"], use_cost=True
+    ) == remote._overall_progress_line(records, ["hopg"], use_cost=False)
+
+
+def test_status_shows_one_compute_bar_at_base_verbosity_when_cost_data_present(monkeypatch, capsys):
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _cmd: presentation._encode_sections(
+            {
+                "JOB": "j",
+                "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
+                "STATE": "running hopg",
+                "SQUEUE": "job_id=48291|state=RUNNING",
+                "PROGRESS": '{"material":"hopg","total_cases":5,"cached_cases":1,'
+                '"completed_new_cases":2,"state":"running",'
+                '"done_cost":30.0,"total_cost":100.0}',
+            }
+        ),
+    )
+
+    remote.job_status("j")  # detail 0
+
+    out = capsys.readouterr().out
+    assert "Progress " in out
+    assert "Progress (compute)" not in out  # single row at base verbosity
+    assert "Progress (cases)" not in out
+    assert " 30%" in out  # compute bar, not the 3/5=60% case bar
+
+
+def test_status_shows_both_bars_at_verbose_when_cost_data_present(monkeypatch, capsys):
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _cmd: presentation._encode_sections(
+            {
+                "JOB": "j",
+                "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
+                "STATE": "running hopg",
+                "SQUEUE": "job_id=48291|state=RUNNING",
+                "PROGRESS": '{"material":"hopg","total_cases":5,"cached_cases":1,'
+                '"completed_new_cases":2,"state":"running",'
+                '"done_cost":30.0,"total_cost":100.0}',
+            }
+        ),
+    )
+
+    remote.job_status("j", 1)  # -v
+
+    out = capsys.readouterr().out
+    assert "Progress (compute)" in out
+    assert "Progress (cases)" in out
+    assert " 30%" in out  # compute row
+    assert " 60%" in out  # cases row (3/5)
+
+
+def test_status_progress_row_unchanged_without_cost_data(monkeypatch, capsys):
+    """No cost data (rebrem/reline/legacy scan) -> the pre-item-6 single
+    "Progress" row, at every verbosity, byte-for-byte the same as before."""
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _cmd: presentation._encode_sections(
+            {
+                "JOB": "j",
+                "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
+                "STATE": "running hopg",
+                "SQUEUE": "job_id=48291|state=RUNNING",
+                "PROGRESS": '{"material":"hopg","total_cases":5,"cached_cases":1,'
+                '"completed_new_cases":2,"state":"running"}',
+            }
+        ),
+    )
+
+    remote.job_status("j", 1)  # -v
+
+    out = capsys.readouterr().out
+    assert "Progress (compute)" not in out
+    assert "Progress (cases)" not in out
+    assert "Progress " in out
+    assert " 60%" in out
 
 
 def test_status_renders_progress_bars_at_base_verbosity(monkeypatch, capsys):

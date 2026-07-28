@@ -333,6 +333,8 @@ def run_sweep(
     max_seconds=None,
     time_fn=None,
     dataset_identity=None,
+    case_cost_fn=None,
+    on_cost=None,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
@@ -377,6 +379,14 @@ def run_sweep(
     dataset_identity : optional JSON-serializable resolved-profile identity,
         persisted in ``meta.json``. Variant-aware callers use this to prove
         exactly which settings and sweep produced the component artifacts.
+    case_cost_fn : optional callable(case) -> float (e.g. sweep.case_cost).
+        When given, enables compute-weighted progress: relative cost is summed
+        over ``cases`` for the total and over the exact cached/completed case
+        set for what's done, so a live viewer can show a compute-aware percent
+        instead of a flat case count. None (default) disables ``on_cost``.
+    on_cost : optional callback(done_cost, total_cost), fired alongside
+        ``on_progress`` (after resume filtering and after every newly completed
+        case) whenever ``case_cost_fn`` is set; otherwise never called.
 
     Returns True iff every requested ``(name, E0_keV)`` pair ended up in
     ``results`` (i.e. the sweep ran to completion, budget or not); False if
@@ -441,6 +451,12 @@ def run_sweep(
     cached_cases = len(cases) - len(todo)
     print(f"{len(todo)} of {len(cases)} cases to run ({cached_cases} cached)")
     completed_new_cases = 0
+    total_cost = sum(case_cost_fn(c) for c in cases) if case_cost_fn is not None else None
+    done_cost = (
+        total_cost - sum(case_cost_fn(c) for c in todo) if case_cost_fn is not None else None
+    )
+    if on_cost is not None and case_cost_fn is not None:
+        on_cost(done_cost, total_cost)
     if on_progress is not None:
         on_progress(completed_new_cases, len(cases), cached_cases)
 
@@ -464,7 +480,7 @@ def run_sweep(
     progress_state = {"done": 0}
 
     def _cb(i, case, out):
-        nonlocal completed_new_cases
+        nonlocal completed_new_cases, done_cost
         store_result(results, case, out)
         if on_case is not None:
             on_case(case)
@@ -486,6 +502,10 @@ def run_sweep(
                 )
                 on_chunk(group_names[g])
         completed_new_cases += 1
+        if case_cost_fn is not None:
+            done_cost += case_cost_fn(case)
+        if on_cost is not None and case_cost_fn is not None:
+            on_cost(done_cost, total_cost)
         if on_progress is not None:
             on_progress(completed_new_cases, len(cases), cached_cases)
 

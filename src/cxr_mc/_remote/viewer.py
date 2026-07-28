@@ -1,11 +1,15 @@
 """Live job viewers: attach, status, list, logs."""
 
+import queue
+import select
 import subprocess
 import sys
+import threading
+import time
 
 import tqdm  # noqa: F401 -- kept importable at module level for test monkeypatching
 
-from . import config, presentation, scripts, state, transport
+from . import config, lifecycle, presentation, scripts, state, transport
 
 
 def _jobs_remote_command():
@@ -226,11 +230,105 @@ def _render_frame(frame, *, tty):
         print("─" * 60)
 
 
-def _attach_header(refresh):
+# Cancel-keybinding sequence (item 5): a bare 'q'/single keystroke must never
+# tear down a live SLURM allocation, so cancelling is two DIFFERENT keys --
+# 'x' arms, 'y' confirms within the window below; anything else (including a
+# repeated 'x') disarms silently. Checked once per ~2 s poll (see _KeyListener).
+_CANCEL_ARM_KEY = "x"
+_CANCEL_CONFIRM_KEY = "y"
+_CANCEL_ARM_SECONDS = 6.0
+
+
+class _KeyListener:
+    """Background nonblocking single-keypress capture for the attach loop.
+
+    A no-op (``active`` False, ``poll()`` always empty) unless stdin is an
+    interactive terminal -- piped/non-tty attach then behaves exactly as
+    before, with no cancel-keybinding hint shown. Cross-platform: POSIX uses
+    ``termios``/``tty`` cbreak mode plus ``select``; Windows uses ``msvcrt``
+    (no raw-mode setup needed there). Reads happen on a background daemon
+    thread so the main loop's blocking SSH read is never held up; ``poll()``
+    drains and returns every key buffered since the last call, in order, so a
+    fast 'x' then 'y' typed within one ~2 s window is never collapsed to just
+    the latest keystroke.
+    """
+
+    def __init__(self):
+        self.active = False
+        self._keys = queue.Queue()
+        self._stop_event = threading.Event()
+        self._restore = None
+        self._thread = None
+        if not sys.stdin.isatty():
+            return
+        try:
+            import msvcrt  # noqa: F401 -- Windows only; ImportError picks the POSIX branch below
+        except ImportError:
+            try:
+                import termios
+                import tty
+
+                fd = sys.stdin.fileno()
+                old = termios.tcgetattr(fd)
+                tty.setcbreak(fd)
+            except (OSError, ValueError, termios.error):
+                return
+            self._restore = lambda: termios.tcsetattr(fd, termios.TCSADRAIN, old)
+            self._thread = threading.Thread(target=self._poll_posix, args=(fd,), daemon=True)
+        else:
+            self._thread = threading.Thread(target=self._poll_windows, daemon=True)
+        self._thread.start()
+        self.active = True
+
+    def _poll_windows(self):
+        import msvcrt
+
+        while not self._stop_event.is_set():
+            if msvcrt.kbhit():  # ty: ignore[unresolved-attribute]
+                self._keys.put(msvcrt.getwch())  # ty: ignore[unresolved-attribute]
+            else:
+                self._stop_event.wait(0.1)
+
+    def _poll_posix(self, fd):
+        while not self._stop_event.is_set():
+            ready, _write, _exceptional = select.select([fd], [], [], 0.1)
+            if not ready:
+                continue
+            char = sys.stdin.read(1)
+            if char == "":
+                break  # EOF (e.g. stdin redirected from a closed pipe)
+            self._keys.put(char)
+
+    def poll(self):
+        """Every key buffered since the last call, oldest first."""
+        keys = []
+        while True:
+            try:
+                keys.append(self._keys.get_nowait())
+            except queue.Empty:
+                break
+        return keys
+
+    def stop(self):
+        self._stop_event.set()
+        if self._thread is not None:
+            self._thread.join(timeout=1)
+        if self._restore is not None:
+            self._restore()
+
+
+def _attach_header(refresh, *, armed=False, cancel_hint=True):
     """One-line banner above each live frame; the counter proves it's polling."""
+    if armed:
+        return presentation._paint(
+            f"ATTACHED · {config.remote_host()} · refresh {refresh} · "
+            f"CANCEL ARMED -- press {_CANCEL_CONFIRM_KEY} to confirm, any other key aborts",
+            "warning",
+        )
+    hint = f" · {_CANCEL_ARM_KEY} cancels job (confirm)" if cancel_hint else ""
     return presentation._paint(
         f"ATTACHED · {config.remote_host()} · refresh {refresh} · "
-        "Ctrl-C detaches (job keeps running)",
+        f"Ctrl-C detaches (job keeps running){hint}",
         "inactive",
     )
 
@@ -238,13 +336,16 @@ def _attach_header(refresh):
 def _live_status(jobid, detail):
     """Re-render ``status <jobid>`` at ``detail`` each poll until the job is terminal.
 
-    The viewer is read-only: Ctrl-C or a dropped SSH link tears down only this
-    loop, never the SLURM job. A chunked chain hops scheduler IDs between
+    The viewer is read-only by default: Ctrl-C or a dropped SSH link tears
+    down only this loop, never the SLURM job. The one exception is the
+    cancel keybinding (item 5) -- 'x' then 'y' within a few seconds scancels
+    the attached job via :func:`lifecycle._stop_jobid`; see ``_KeyListener``
+    and ``_CANCEL_ARM_SECONDS``. A chunked chain hops scheduler IDs between
     slices, so the shared status command re-reads the latest recorded ID each
     poll; the same ``_POLL_GRACE_POLLS`` watchdog declares a chain broken only
     after ~30 s with no live allocation and a non-terminal recorded state.
     Returns True once the job reaches a terminal state, False on viewer
-    disconnect or a stalled chain.
+    disconnect, a stalled chain, or a confirmed user cancel.
     """
     remote = _status_remote_command(scripts._job_assign(jobid), detail)
     tty = presentation._color_enabled()
@@ -252,7 +353,10 @@ def _live_status(jobid, detail):
     missed = 0
     state_ = ""
     broken = False
+    cancelled = False
     stream = None
+    keys = _KeyListener()
+    armed_until = None
     try:
         stream = _status_stream(remote)
         for output in stream:
@@ -264,13 +368,26 @@ def _live_status(jobid, detail):
             state_ = presentation._sanitize_terminal(sections.get("STATE", ""), multiline=True)
             scheduler = presentation._scheduler_fields(sections.get("SQUEUE", ""))
             live = scheduler.get("state", "") not in ("", "NOT_QUEUED")
+
+            if armed_until is not None and time.monotonic() >= armed_until:
+                armed_until = None  # confirm window lapsed; disarm silently
+            for key in keys.poll():
+                if armed_until is not None:
+                    confirmed = key.lower() == _CANCEL_CONFIRM_KEY
+                    armed_until = None
+                    if confirmed:
+                        cancelled = True
+                        break
+                elif key.lower() == _CANCEL_ARM_KEY:
+                    armed_until = time.monotonic() + _CANCEL_ARM_SECONDS
+
             frame = (
-                _attach_header(refresh)
+                _attach_header(refresh, armed=armed_until is not None, cancel_hint=keys.active)
                 + "\n\n"
                 + presentation._style_states(presentation._format_job_status(sections, detail))
             )
             _render_frame(frame, tty=tty)
-            if _is_terminal_state(state_):
+            if cancelled or _is_terminal_state(state_):
                 break
             missed = 0 if live else missed + 1
             if missed >= _POLL_GRACE_POLLS:
@@ -280,9 +397,18 @@ def _live_status(jobid, detail):
         _disconnect_hint(jobid)
         return False
     finally:
+        keys.stop()
         close = getattr(stream, "close", None)
         if close is not None:
             close()
+    if cancelled:
+        try:
+            lifecycle._stop_jobid(jobid)
+        except SystemExit as error:
+            print(f"\nJOB {jobid} · CANCEL REQUEST FAILED\n  {error}")
+        else:
+            print(f"\nJOB {jobid} · CANCELLED BY USER\n  Verify  cxr remote status {jobid} -vv")
+        return False
     if broken:
         print(
             f"\nJOB {jobid} · CHAIN STALLED\n"
@@ -300,9 +426,10 @@ def attach(jobid=None, detail=0):
 
     Equivalent to ``cxr remote status [-v|-vv]``, but the same report repaints
     in place every ~2 s. Ctrl-C (or a dropped link) detaches the viewer only;
-    the SLURM job keeps running. Returns True once the job reaches a terminal
-    state, False on disconnect or a stalled chain -- callers (scan/check) key
-    their auto-pull off that.
+    the SLURM job keeps running unless cancelled via the 'x'/'y' keybinding
+    (see :func:`_live_status`). Returns True once the job reaches a terminal
+    state, False on disconnect, a stalled chain, or a confirmed cancel --
+    callers (scan/check) key their auto-pull off that.
     """
     jobid = jobid or state._latest_jobid()
     if not jobid:

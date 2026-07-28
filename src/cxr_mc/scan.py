@@ -51,6 +51,7 @@ gate_cases_by_penetration = None
 material_sweep = None
 run_sweep = None
 build_cases = None
+case_cost = None
 
 
 def _load_runtime() -> None:
@@ -60,6 +61,7 @@ def _load_runtime() -> None:
     global material_sweep
     global run_sweep
     global build_cases
+    global case_cost
 
     from . import config as config_module
     from . import run as run_module
@@ -73,6 +75,7 @@ def _load_runtime() -> None:
     material_sweep = material_sweep or config_module.material_sweep
     run_sweep = run_sweep or run_module.run_sweep
     build_cases = build_cases or sweep_module.build_cases
+    case_cost = case_cost or sweep_module.case_cost
 
 
 def _read_manifest_toml(path: Path):
@@ -630,6 +633,12 @@ def _run_material(args, material, max_seconds=None):
         "completed_new_cases": 0,
     }
     latest_case = {}
+    # Compute-weighted progress (item 6): cost is a pure function of a case dict
+    # (sweep.case_cost), so the exact cached vs. done split run_sweep already
+    # tracks (identity, not just a count) lets `attach` render a percent that
+    # tracks relative matmul work instead of a flat case count -- see
+    # notebooks/scan_app.py for the same cost-weighted meter run locally.
+    latest_cost = {}
 
     def _note_case(case):
         # Frontier crystal case just finished -- surface its parameters so a live
@@ -641,6 +650,9 @@ def _run_material(args, material, max_seconds=None):
             azimuth_deg=round(float(case["tilt_azim_deg"]), 2),
             thickness_um=round(float(case["thickness_ang"]) / 1e4, 4),
         )
+
+    def _record_cost(done_cost, total_cost):
+        latest_cost.update(done_cost=done_cost, total_cost=total_cost)
 
     def _record_progress(completed_new_cases, total_cases, cached_cases):
         latest_progress.update(
@@ -655,6 +667,7 @@ def _run_material(args, material, max_seconds=None):
                 state="running",
                 current=dict(latest_case) or None,
                 **latest_progress,
+                **latest_cost,
             )
 
     if progress_file is not None:
@@ -676,6 +689,8 @@ def _run_material(args, material, max_seconds=None):
             on_case=_note_case if progress_file is not None else None,
             max_seconds=max_seconds,
             dataset_identity=identity,
+            case_cost_fn=case_cost if progress_file is not None else None,
+            on_cost=_record_cost if progress_file is not None else None,
         )
         # run_sweep returns a bool (complete?). Only a bare None -- test doubles
         # that predate the budget feature and don't bother returning anything --
@@ -688,6 +703,7 @@ def _run_material(args, material, max_seconds=None):
                 material=material,
                 state="failed",
                 **latest_progress,
+                **latest_cost,
             )
         raise
     if progress_file is not None:
@@ -696,6 +712,7 @@ def _run_material(args, material, max_seconds=None):
             material=material,
             state="done" if complete else "paused",
             **latest_progress,
+            **latest_cost,
         )
     n = sum(len(v) for v in results.values())
     if complete:
@@ -717,12 +734,18 @@ def _write_progress_record(
     completed_new_cases,
     state,
     current=None,
+    done_cost=None,
+    total_cost=None,
 ):
     """Atomically replace one scan's compact JSON progress record.
 
     ``current`` (optional) is the frontier crystal case's parameters (energy,
     both tilts, thickness) so a live viewer can show what's under test; it is
     omitted from the record when None (start/done/failed/paused snapshots).
+    ``done_cost``/``total_cost`` (optional) are relative compute-weight sums
+    (``sweep.case_cost``) enabling a compute-aware progress bar; omitted when
+    either is None -- callers that don't cost-weight (rebrem, reline, blaze)
+    keep writing the same record shape as before.
     """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -735,6 +758,9 @@ def _write_progress_record(
     }
     if current:
         record["current"] = current
+    if done_cost is not None and total_cost is not None:
+        record["done_cost"] = done_cost
+        record["total_cost"] = total_cost
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(record, separators=(",", ":")) + "\n", encoding="utf-8")
     os.replace(tmp, path)

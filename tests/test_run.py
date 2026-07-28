@@ -744,6 +744,47 @@ def test_run_sweep_progress_counts_cached_cases_on_resume(tmp_path, monkeypatch)
     assert progress == [(0, 2, 1), (1, 2, 1)]
 
 
+def test_run_sweep_on_cost_reports_cached_seed_and_per_case_totals(tmp_path, monkeypatch):
+    """item 6: on_cost seeds the cached case's exact cost (identity, not just a
+    count) then accumulates each newly completed case's cost -- see
+    scan._run_material, which wires sweep.case_cost through this callback into
+    the remote progress JSON's done_cost/total_cost fields."""
+    cached_case = _fake_case("cfg_a", 30.0)
+    existing = {"cfg_a": {30.0: {"case": cached_case, "spec": np.array([1.0])}}}
+    with open(tmp_path / "hopg.pkl", "wb") as f:
+        pickle.dump(existing, f)
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    cost = []
+
+    run_sweep(
+        [cached_case, _fake_case("cfg_b", 30.0)],
+        {},
+        checkpoint_dir=str(tmp_path),
+        progress=False,
+        case_cost_fn=lambda case: 1.0 if case["name"] == "cfg_a" else 3.0,
+        on_cost=lambda done, total: cost.append((done, total)),
+    )
+
+    # total = 1 (cfg_a) + 3 (cfg_b) = 4; cfg_a is cached so the initial call
+    # already seeds done_cost=1, not 0.
+    assert cost == [(1.0, 4.0), (4.0, 4.0)]
+
+
+def test_run_sweep_on_cost_never_fires_without_case_cost_fn(tmp_path, monkeypatch):
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    cost = []
+
+    run_sweep(
+        [_fake_case("cfg_a", 30.0)],
+        {},
+        checkpoint_dir=str(tmp_path),
+        progress=False,
+        on_cost=lambda done, total: cost.append((done, total)),
+    )
+
+    assert cost == []
+
+
 def test_run_sweep_on_chunk_fires_per_group(tmp_path, monkeypatch):
     monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
     # same (crystal, thickness, tilt, omitted footprint) -> one group;

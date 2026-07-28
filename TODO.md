@@ -27,14 +27,25 @@ skill.
    `scripts._scancel_jobs_command`: all STOP sentinels first, single scancel,
    one shared squeue poll, per-job release + terminal state; skips jobs with
    no scheduler id. Single-job callers keep `_stop_jobid`.
-5. **Cancel SLURM job while attached.** Keybinding in `cxr remote attach`
-   to scancel the attached job (a couple keystrokes, confirm; not bare `q`).
-   Note: viewer runs `ssh -n` with stdin closed and is Windows-careful —
-   keypress handling needs cross-platform nonblocking stdin (msvcrt/termios).
-6. **Compute-aware progress in attach.** Port the compute-progress
-   calculations from `notebooks/scan_app.py` to the remote progress bars:
-   replace the top-level summary bar in plain `cxr remote attach`, show both
-   bars under `-v/-vv`. (Folds backlog P2 "remote progress readout" item.)
+5. ~~**Cancel SLURM job while attached.**~~ [DONE] `viewer._KeyListener`:
+   background nonblocking single-keypress capture, POSIX `termios`/`tty`
+   cbreak + `select`, Windows `msvcrt` (picked via `try: import msvcrt` /
+   `except ImportError`, not a `sys.platform` literal check, so static
+   analysis doesn't flag the POSIX branch unreachable). Cancelling needs TWO
+   different keys -- `x` arms, `y` confirms within `_CANCEL_ARM_SECONDS`
+   (6s); any other key or a lapsed window disarms silently. Confirmed cancel
+   calls `lifecycle._stop_jobid`; a no-op (no hint shown) when stdin isn't a
+   tty. `_live_status` return value unchanged (False on cancel, same as
+   disconnect/stall) so scan/check auto-pull logic didn't need touching.
+6. ~~**Compute-aware progress in attach.**~~ [DONE] `sweep.case_cost` now
+   threads through `run_sweep(case_cost_fn=..., on_cost=...)` (run.py) ->
+   `scan._run_material` -> the progress JSON's new `done_cost`/`total_cost`
+   fields (scan.py's `_write_progress_record`, additive/optional so
+   rebrem/reline/blaze keep writing the old shape). `presentation.py`'s
+   `_overall_progress_line(..., use_cost=True)` and `_format_job_status`
+   render ONE compute-weighted bar at base verbosity when cost data exists
+   (falls back to the legacy case-count bar otherwise, byte-identical to
+   before), both bars side by side under `-v/-vv`.
 
 ## Landed alongside
 
@@ -46,3 +57,4 @@ skill.
 ## Order
 
 3 → 2 → 1 (submit/stop/naming cluster), then 4, then 5/6 (attach cluster).
+All six items done.

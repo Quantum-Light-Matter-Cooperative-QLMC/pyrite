@@ -243,7 +243,31 @@ def _aggregate_progress(records):
     return completed, total, state
 
 
-def _overall_progress_line(records, materials=()):
+def _cost_progress(record):
+    """One material's (done, total) in relative compute-cost units.
+
+    Falls back to its case counts when the source doesn't cost-weight
+    (rebrem/reline/legacy scan records lack ``done_cost``/``total_cost``), so a
+    caller can always ask for ``use_cost=True`` without special-casing kind."""
+    total_cost = record.get("total_cost")
+    done_cost = record.get("done_cost")
+    if isinstance(total_cost, (int, float)) and isinstance(done_cost, (int, float)):
+        return float(done_cost), float(total_cost)
+    return (
+        float(record["cached_cases"] + record["completed_new_cases"]),
+        float(record["total_cases"]),
+    )
+
+
+def _has_cost_data(records):
+    return any(
+        isinstance(record.get("total_cost"), (int, float))
+        and isinstance(record.get("done_cost"), (int, float))
+        for record in records.values()
+    )
+
+
+def _overall_progress_line(records, materials=(), *, use_cost=False):
     """One job-wide progress bar for the status header, shown at every level.
 
     ``materials`` is the full roster from job metadata. The bar is material-
@@ -252,6 +276,12 @@ def _overall_progress_line(records, materials=()):
     0.  This keeps the headline honest -- a sweep with 2 of 34 materials barely
     begun reads a few percent, not ~99% as a records-only case sum would when
     the unstarted materials are absent from both numerator and denominator.
+
+    ``use_cost`` weights each material's fraction by relative compute cost
+    (``sweep.case_cost``, see :func:`_cost_progress`) instead of a flat case
+    count -- a heavy high-energy case then moves the bar more than a cheap
+    low-energy one. The ``N/M cases`` trailer always reports raw case counts
+    regardless, since that's still the meaningful "how many done" figure.
     """
     aggregate = _aggregate_progress(records)
     if aggregate is None:
@@ -261,8 +291,11 @@ def _overall_progress_line(records, materials=()):
     n_materials = len(roster) or len(records)
     frac_sum = 0.0
     for record in records.values():
-        record_total = record["total_cases"]
-        record_done = record["cached_cases"] + record["completed_new_cases"]
+        if use_cost:
+            record_done, record_total = _cost_progress(record)
+        else:
+            record_total = record["total_cases"]
+            record_done = record["cached_cases"] + record["completed_new_cases"]
         frac_sum += 1.0 if record_total == 0 else record_done / record_total
     overall = 0.0 if n_materials == 0 else min(1.0, frac_sum / n_materials)
     percent = round(100 * overall)
@@ -444,9 +477,24 @@ def _format_job_status(sections, detail):
                 ("Mode", _mode_summary(metadata)),
             ]
         )
-        overall = _overall_progress_line(records, materials)
-        if overall is not None:
-            rows.append(("Progress", overall))
+        # Plain `attach`/`status` (detail 0) shows one bar -- compute-weighted
+        # when the job's progress records carry cost data, else the legacy
+        # case-count bar (unchanged for rebrem/reline/older jobs). -v/-vv show
+        # both so a heavy-vs-cheap-case skew is visible alongside raw counts.
+        if _has_cost_data(records):
+            overall_compute = _overall_progress_line(records, materials, use_cost=True)
+            overall_cases = _overall_progress_line(records, materials, use_cost=False)
+            if detail >= 1:
+                if overall_compute is not None:
+                    rows.append(("Progress (compute)", overall_compute))
+                if overall_cases is not None:
+                    rows.append(("Progress (cases)", overall_cases))
+            elif overall_compute is not None:
+                rows.append(("Progress", overall_compute))
+        else:
+            overall = _overall_progress_line(records, materials)
+            if overall is not None:
+                rows.append(("Progress", overall))
     output = [f"JOB {jobid}", _format_fields(rows)]
     if not diagnostic:
         progress = _format_case_progress(records, materials)
@@ -503,5 +551,31 @@ def _parse_progress_records(payload):
             continue
         if state not in {"running", "done", "failed", "paused"}:
             continue
+        _sanitize_cost_fields(record)
         records[material] = record
     return records
+
+
+def _sanitize_cost_fields(record):
+    """Drop ``done_cost``/``total_cost`` in place unless both are sane numbers.
+
+    These are optional (only scan-kind jobs emit them; rebrem/reline/legacy
+    records simply lack the keys) and remote-sourced, so a malformed or
+    adversarial pair falls back to case-count weighting rather than corrupting
+    the compute-weighted bar."""
+    total_cost = record.get("total_cost")
+    done_cost = record.get("done_cost")
+    if "total_cost" not in record and "done_cost" not in record:
+        return
+    valid = (
+        isinstance(total_cost, (int, float))
+        and not isinstance(total_cost, bool)
+        and isinstance(done_cost, (int, float))
+        and not isinstance(done_cost, bool)
+        and math.isfinite(total_cost)
+        and math.isfinite(done_cost)
+        and 0 <= done_cost <= total_cost
+    )
+    if not valid:
+        record.pop("total_cost", None)
+        record.pop("done_cost", None)
