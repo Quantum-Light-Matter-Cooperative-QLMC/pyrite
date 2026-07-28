@@ -347,6 +347,19 @@ def test_add_material_requires_materials_or_all(tmp_path, monkeypatch):
     assert "provide MATERIAL keys or --all" in result.stderr
 
 
+def test_add_material_short_all_flag(tmp_path, monkeypatch):
+    """-a is the short form of --all, matching the other listing options."""
+    from cxr_mc import scan
+
+    catalog = _catalog(tmp_path, monkeypatch)
+    monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg", "mose2"])
+
+    result = invoke(profile.command, ["add-material", "sub_100keV", "-a"])
+
+    assert_clean_result(result)
+    assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
+
+
 def test_dry_run_writes_nothing_and_never_prompts(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
     original = catalog.read_text()

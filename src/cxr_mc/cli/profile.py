@@ -539,6 +539,7 @@ def _membership_target(document, name):
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @click.argument("materials", nargs=-1)
 @click.option(
+    "-a",
     "--all",
     "all_materials",
     is_flag=True,

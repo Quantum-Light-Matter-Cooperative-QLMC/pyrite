@@ -1200,7 +1200,7 @@ Usage: cxr profile add-material [OPTIONS] NAME [MATERIALS]...
   `materials` row yet), which plain MATERIAL args cannot do.
 
 Options:
-  --all       Seed/extend membership with mats_to_sim.toml's verified `materials` list.
+  -a, --all   Seed/extend membership with mats_to_sim.toml's verified `materials` list.
   -y, --yes   Skip the 'standard' confirmation prompt.
   --dry-run   Print proposed TOML diff; write nothing.
   -h, --help  Show this message and exit.

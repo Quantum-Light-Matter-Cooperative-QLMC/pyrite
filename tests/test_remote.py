@@ -822,6 +822,15 @@ def test_start_standard_submit_suggests_stem_pull(monkeypatch, capsys):
     assert "cxr remote pull hopg " in output
 
 
+def test_submit_sub_100keV_uses_shipped_membership_without_material_args(capsys):
+    """The shipped sub_100keV catalog profile carries an explicit materials
+    list, so `submit --profile sub_100keV` needs no MATERIAL/--all."""
+    remote.main(["submit", "--profile", "sub_100keV", "--dry-run"])
+
+    out = capsys.readouterr().out
+    assert "hopg" in out and "zrte3" in out
+
+
 def test_interrupted_job_upload_releases_its_checkpoint_reservations(monkeypatch):
     commands = []
     monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
