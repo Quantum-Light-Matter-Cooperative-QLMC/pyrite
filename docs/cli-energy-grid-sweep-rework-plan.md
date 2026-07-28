@@ -242,7 +242,7 @@ pre-existing 15-diagnostic baseline (zero added); full suite
 **1773 passed / 39 skipped**, zero regressions; `docs/cli-reference.md`
 regenerated via `scripts/generate_cli_reference.py --write`.
 
-Not done / explicitly out of scope for this pass:
+Remaining:
 
 - `cxr remote scan` (the immediate-attach convenience wrapper, distinct from
   `submit`) was not given a `--profile` option — the Phase 3 design block
@@ -252,3 +252,38 @@ Not done / explicitly out of scope for this pass:
 - `_refuse_if_busy`'s collision-stem prediction ignores `fidelity` already
   (pre-existing gap, unrelated to this change) and was left as-is rather
   than also threading `catalog_profile` through it.
+- Add `cxr profile add-material --all <profile>` option to add standard list
+  of mats to profile (or just have the profiles default to inheriting that list
+  unelss overwritten -- then don't add `--all`)
+- Currently, `cxr remote submit --profile sub_100keV` throws an error
+  saying that a material must be provided as an arg. Based on design philosophy,
+  this is no longer the standard use case (though i think it is ok to support it for
+  quick test runs on single mats).
+
+## WIP 2026-07-27 (both remaining items landed, plus a live correctness bug)
+
+Both items above are done:
+
+- `cxr profile add-material NAME --all` seeds/extends membership from
+  `mats_to_sim.toml`'s verified `materials` list -- works even to seed an
+  implicit all-in-use profile (`standard`), which plain `MATERIAL` args still
+  refuse (guides to `--materials` instead).
+- `cxr remote submit --profile NAME` with no `MATERIAL`/`--all`/`-A` now
+  defaults to the profile's explicit `materials` membership when it has one;
+  a profile with no membership row still requires `--all`/`-A`/explicit
+  `MATERIAL` (no narrower list to guess). Naming one material directly
+  alongside `--profile` is unchanged.
+
+Also caught and fixed a real bug surfaced by manually running the new
+`sub_100keV` profile: `scan._resolved_run` computed `catalog_profile` only
+*after* building `sweep`, so `material_sweep()` always resolved the standard
+profile's grid regardless of `--profile` -- checkpoints were correctly
+identity/stem-tagged with the requested profile while the simulated
+parameters (energy grid, thickness, etc.) silently stayed standard's the
+whole time (`cxr remote submit --all --profile sub_100keV` was still running
+250 keV cases). `catalog_profile` now resolves before `sweep` is built and
+threads into both `material_sweep()` call branches; regression test added
+(`test_resolved_run_threads_catalog_profile_into_material_sweep`).
+
+Verified: ruff clean, ty at the 15-diagnostic baseline (zero added), full
+suite 1779 passed / 39 skipped. `docs/cli-reference.md` regenerated.

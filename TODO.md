@@ -94,3 +94,11 @@ predicts the matching qualified stem; `_remote/lifecycle.pull()` splits
 newest `mtime` wins, `--hash` pins one digest). Tests added across
 `test_material_catalog.py`, `test_profiles.py`, `test_local_click_cli.py`,
 `test_remote.py`, `test_remote_click.py`; full suite 1773 passed / 39 skipped.
+
+Follow-up: `cxr profile add-material NAME --all` (seed/extend membership from
+`mats_to_sim.toml`'s verified list, including implicit all-in-use profiles);
+`cxr remote submit --profile NAME` now runs with no `MATERIAL`/`--all`/`-A`
+when the profile has explicit membership. Also fixed a real bug found via
+manual testing: `scan._resolved_run` never passed `catalog_profile` into
+`material_sweep()`, so non-standard profiles ran standard's grid despite
+correct identity/stem tagging. Full suite 1779 passed / 39 skipped.
