@@ -1772,7 +1772,7 @@ def test_stop_materials_resolve_unique_live_jobs(monkeypatch):
         "_live_jobs",
         lambda: [("job1", False, ["hopg"]), ("job2", False, ["mose2", "wse2"])],
     )
-    monkeypatch.setattr(lifecycle, "_stop_jobid", stopped.append)
+    monkeypatch.setattr(lifecycle, "_stop_jobids", lambda jobids: stopped.extend(jobids))
 
     remote.stop_jobs(["wse2", "mose2"])
 
@@ -1786,7 +1786,7 @@ def test_stop_all_stops_every_live_job(monkeypatch):
         "_live_jobs",
         lambda: [("job1", False, ["hopg"]), ("job2", True, ["mose2"])],
     )
-    monkeypatch.setattr(lifecycle, "_stop_jobid", stopped.append)
+    monkeypatch.setattr(lifecycle, "_stop_jobids", lambda jobids: stopped.extend(jobids))
 
     remote.stop_jobs(all_jobs=True)
 
@@ -1846,7 +1846,7 @@ def test_stop_profile_matches_live_job_metadata(monkeypatch):
         "_job_profiles",
         lambda jobids: {"job1": "sub_100keV", "job2": "standard"},
     )
-    monkeypatch.setattr(lifecycle, "_stop_jobid", stopped.append)
+    monkeypatch.setattr(lifecycle, "_stop_jobids", lambda jobids: stopped.extend(jobids))
 
     remote.stop_jobs(profile="sub_100keV")
 
@@ -1885,6 +1885,58 @@ def test_job_profiles_parses_tab_separated_metadata(monkeypatch):
 
     assert profiles == {"job1": "sub_100keV", "job2": "standard"}
     assert "catalog_profile" in seen[0]
+
+
+def test_scancel_jobs_command_batches_sentinel_scancel_and_release():
+    cmd = scripts._scancel_jobs_command(["job1", "job2"])
+
+    # every STOP sentinel lands before the single scancel
+    assert cmd.index(': > "$D/STOP"') < cmd.index("scancel $SIDS")
+    assert cmd.count("scancel ") == 1
+    # one shared squeue poll loop, then per-job release + terminal state
+    assert cmd.count("squeue -h") == 1
+    assert 'echo "cancelled [$SID]' in cmd
+    assert '"$R"/*' in cmd  # reservation release
+
+
+def test_scancel_jobs_command_functional(monkeypatch, tmp_path):
+    """Run the batched cancel: STOP sentinels, one scancel, terminal states,
+    reservation release -- and a job without a scheduler id is skipped, not
+    fatal."""
+    bash = _bash_or_skip(tmp_path)
+    jobs = tmp_path / "jobs"
+    for jobid, sid in [("j1", "101"), ("j2", "102")]:
+        jobdir = jobs / jobid
+        jobdir.mkdir(parents=True)
+        (jobdir / "meta").write_text(f"slurm_job_id: {sid}\n")
+    (jobs / "j3").mkdir()  # no meta -> skipped
+    reservation = jobs / "reservations" / "hopg"
+    reservation.mkdir(parents=True)
+    (reservation / "jobid").write_text("j1")
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    scancel_log = tmp_path / "scancel.args"
+    fake_scancel = bin_dir / "scancel"
+    fake_scancel.write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" >> "{scancel_log.as_posix()}"\n')
+    fake_squeue = bin_dir / "squeue"
+    fake_squeue.write_text("#!/bin/sh\nexit 0\n")  # nothing live -> poll loop exits at once
+    for fake in (fake_scancel, fake_squeue):
+        fake.chmod(0o755)
+    monkeypatch.setattr(config, "REMOTE_DIR", tmp_path.as_posix())
+    monkeypatch.setenv("PATH", f"{bin_dir.as_posix()}:{os.environ['PATH']}")
+
+    command = scripts._scancel_jobs_command(["j1", "j2", "j3"])
+    result = subprocess.run(
+        [bash, "-c", command], capture_output=True, text=True, env=os.environ.copy()
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "skipping j3" in result.stderr
+    assert scancel_log.read_text().split() == ["101", "102"]  # one batched scancel
+    assert (jobs / "j1" / "STOP").exists() and (jobs / "j2" / "STOP").exists()
+    assert (jobs / "j1" / "state").read_text().startswith("cancelled [101]")
+    assert not reservation.exists()  # released
+    assert "cancelled SLURM job 102 for job j2" in result.stdout
 
 
 # ---- clear <material> (checkpoint lifecycle, component 3) ----------------------

@@ -885,6 +885,47 @@ def _squeue_state_command(scheduler_id: str, *, retired: str) -> str:
     )
 
 
+def _scancel_jobs_command(jobids: list[str]) -> str:
+    """Cancel many live jobs in ONE remote session (stop --all / multi-stop).
+
+    Per-job ``_stop_jobid`` pays one ssh plus a full scancel-propagation poll
+    per job, which serializes to 30+ s on a batch. Here every STOP sentinel
+    lands BEFORE the single ``scancel`` (a resubmitting slice must see STOP
+    even if it was about to re-queue), one poll loop waits for all scheduler
+    IDs to leave squeue together, and reservation release + terminal state
+    writes follow per job. Jobs without a recorded scheduler ID are skipped
+    with a diagnostic rather than aborting the batch.
+    """
+    transport._check_shell_tokens(jobids)
+    jobs = config.shell_remote_path(config.JOBS_SUBDIR)
+    reservation_root = config.shell_word(_reservation_root())
+    job_words = " ".join(jobids)
+    return (
+        f"JOBS={jobs}; SIDS=; PAIRS=; "
+        f"for j in {job_words}; do "
+        'D="$JOBS/$j"; '
+        'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
+        'case "$SID" in \'\'|*[!0-9]*) echo "skipping $j: no recorded scheduler id" >&2; continue ;; esac; '
+        ': > "$D/STOP"; '
+        'SIDS="$SIDS $SID"; PAIRS="$PAIRS $j:$SID"; done; '
+        '[ -n "$SIDS" ] || { echo "no cancellable SLURM jobs" >&2; exit 1; }; '
+        "scancel $SIDS || exit $?; "
+        "for pair in $PAIRS; do j=${pair%%:*}; SID=${pair##*:}; "
+        'echo "cancelling [$SID] $(date -Is)" > "$JOBS/$j/state"; done; '
+        "while :; do "
+        'LIVE=" $(squeue -h -u "$USER" -o \'%i\' 2>/dev/null | tr "\\n" " ") "; '
+        "pending=0; "
+        'for SID in $SIDS; do case "$LIVE" in *" $SID "*) pending=1 ;; esac; done; '
+        '[ "$pending" -eq 0 ] && break; sleep 1; done; '
+        f"R={reservation_root}; "
+        "for pair in $PAIRS; do j=${pair%%:*}; SID=${pair##*:}; "
+        'for d in "$R"/*; do [ -d "$d" ] || continue; '
+        '[ "$(cat "$d/jobid" 2>/dev/null)" = "$j" ] && rm -rf "$d"; done; '
+        'echo "cancelled [$SID] $(date -Is)" > "$JOBS/$j/state"; '
+        'echo "cancelled SLURM job $SID for job $j"; done'
+    )
+
+
 def _clear_checkpoint_stems_command(jobid: str, stems: list[str]) -> str:
     """Atomically reserve and delete checkpoint stems on the remote box.
 

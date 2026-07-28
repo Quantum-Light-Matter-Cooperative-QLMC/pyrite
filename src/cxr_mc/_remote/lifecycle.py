@@ -714,6 +714,19 @@ def _stop_jobid(jobid):
     transport._run(["ssh", "-n", config.remote_host(), remote])
 
 
+def _stop_jobids(jobids):
+    """Cancel active scheduler jobs in one batched ssh session.
+
+    ``stop --all`` / multi-material stops pay per-job ssh + scancel polling
+    through :func:`_stop_jobid`, which serializes to tens of seconds on a
+    batch; the batched command writes every STOP sentinel, scancels once,
+    and polls squeue once for the whole set (see
+    ``scripts._scancel_jobs_command``). Single-job callers (line_grid) keep
+    the granular :func:`_stop_jobid` error semantics."""
+    transport._check_shell_tokens(list(jobids))
+    transport._run(["ssh", "-n", config.remote_host(), scripts._scancel_jobs_command(list(jobids))])
+
+
 def stop_jobs(materials=None, all_jobs=False, *, yes=True, profile=None):
     """Stop live queue jobs by material name, by catalog profile, or every live
     job with ``all_jobs``.
@@ -766,8 +779,7 @@ def stop_jobs(materials=None, all_jobs=False, *, yes=True, profile=None):
         print("re-run with --yes to cancel")
         return
 
-    for jobid in jobids:
-        _stop_jobid(jobid)
+    _stop_jobids(jobids)
 
 
 def reap_reservations(min_age_minutes=5.0, yes=False):
