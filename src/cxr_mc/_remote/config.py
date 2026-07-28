@@ -11,7 +11,12 @@ REMOTE_UV = os.environ.get("CXR_REMOTE_UV", "/home/aamador/.local/bin/uv")
 SLURM_PARTITION = "gpu"
 SLURM_GPUS = 1
 SLURM_TIME = "UNLIMITED"
-DEFAULT_PARALLEL_MATERIALS = 2
+# Default 1: the box has one GPU (SLURM_GPUS=1), and >1 co-tenant `cxr scan`
+# processes time-slice the card while the runner's own CPU-pool/GPU pipeline
+# already overlaps the two phases -- contention for no throughput win, plus
+# VRAM-pool oversubscription. Opt in via parallel_materials; the queue script
+# exports CXR_MC_GPU_SHARE so co-tenant pool caps sum to CXR_MC_GPU_POOL_FRAC.
+DEFAULT_PARALLEL_MATERIALS = 1
 MAX_PARALLEL_MATERIALS = 4
 # repo root = three levels up from src/cxr_mc/_remote/config.py. remote.py orchestrates
 # the *checkout* (it tars the working tree up to the box), so it resolves paths

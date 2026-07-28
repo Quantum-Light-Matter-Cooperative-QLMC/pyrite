@@ -101,7 +101,9 @@ def _fake_out(case):
     )
 
 
-def _stub_run_cases(cases, max_workers=None, progress=False, callback=None, should_stop=None):
+def _stub_run_cases(
+    cases, max_workers=None, progress=False, callback=None, should_stop=None, keep_results=True
+):
     """Replaces run_cases: fires the callback immediately, no real MC."""
     for i, case in enumerate(cases):
         if callback is not None:
@@ -674,7 +676,7 @@ def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
     ran = []
 
     def _tracking_run_cases(
-        cases, max_workers=None, progress=False, callback=None, should_stop=None
+        cases, max_workers=None, progress=False, callback=None, should_stop=None, keep_results=True
     ):
         ran.extend(c["name"] for c in cases)
         _stub_run_cases(cases, callback=callback)
@@ -797,7 +799,9 @@ def test_run_sweep_budget_stops_early_and_resumes(tmp_path, monkeypatch):
 
     clock = {"t": 0.0}
 
-    def fake_run_cases(todo, max_workers=None, progress=True, callback=None, should_stop=None):
+    def fake_run_cases(
+        todo, max_workers=None, progress=True, callback=None, should_stop=None, keep_results=True
+    ):
         for i, c in enumerate(todo):
             if should_stop is not None and should_stop():
                 break
@@ -853,7 +857,9 @@ def test_run_sweep_no_budget_returns_complete(tmp_path, monkeypatch):
 
     clock = {"t": 0.0}
 
-    def fake_run_cases(todo, max_workers=None, progress=True, callback=None, should_stop=None):
+    def fake_run_cases(
+        todo, max_workers=None, progress=True, callback=None, should_stop=None, keep_results=True
+    ):
         for i, c in enumerate(todo):
             if should_stop is not None and should_stop():
                 break

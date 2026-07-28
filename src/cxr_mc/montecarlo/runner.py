@@ -19,7 +19,7 @@ import psutil
 
 from .._energy_grid import decode_energy_grid
 from . import spectrum as _spectrum_mod
-from ._backend import _GPU, cp
+from ._backend import _GPU, REAL, cp
 from .geometry import tilted_geometry
 from .groove import blazed_groove_spec
 from .spectrum import _segments_in_layer, mc_brem_spectrum, mc_spectrum
@@ -36,6 +36,12 @@ from .transport import simulate_trajectories
 _TIMING = os.environ.get("CXR_MC_TIMING", "") not in ("", "0")
 _N_CPUS = os.cpu_count()
 _TOTAL_MEM = psutil.virtual_memory().total // 1_000_000
+# Byte width of one spectrum-matmul intermediate element: fp32 on the GPU
+# (REAL == float32), fp64 on the CPU fallback. Sizing the adaptive chunk against
+# the ACTUAL element size instead of a hardcoded 8 lets the GPU path (4-byte
+# transients) hold twice the chunk the old float64 model allowed -- fewer matmul
+# iterations / kernel launches -- while the CPU path (8 bytes) is unchanged.
+_REAL_BYTES = np.dtype(REAL).itemsize
 
 
 def _env_chunk(name, default):
@@ -66,9 +72,9 @@ _SPEC_BUDGET_MB = _env_chunk("CXR_MC_SPEC_BUDGET_MB", 1920)
 
 
 def _adaptive_chunk(nbins):
-    """Segments per spectrum matmul sized so the ~3 concurrent float64
-    (chunk, nbins) intermediates in the mc_spectrum / mc_brem_spectrum chunk
-    loops fit in _SPEC_BUDGET_MB.
+    """Segments per spectrum matmul sized so the ~3 concurrent (chunk, nbins)
+    intermediates in the mc_spectrum / mc_brem_spectrum chunk loops fit in
+    _SPEC_BUDGET_MB.
 
     Replaces the fixed defaults after the 2026-07-18 qlmc OOMs: widening the
     line grid to 30000 eV grew nbins ~3x and silently tripled the per-matmul
@@ -76,18 +82,26 @@ def _adaptive_chunk(nbins):
     the byte product constant instead means the chunk shrinks as the grid
     widens and grows as it narrows. Chunking is mathematically exact (it only
     partitions a sum over segments), so this changes memory/speed, not physics.
+
+    The transients (x, sinc(x), sinc(x)**2) are REAL-dtype, so the byte budget
+    uses _REAL_BYTES: 4 on the GPU (fp32) -> ~2x the chunk the old hardcoded 8
+    allowed, 8 on the CPU (fp64) -> the original size bit-for-bit.
     """
     worker_intermediate_arrays = 3
-    adaptive_chunk_size = 1_000_000 * _SPEC_BUDGET_MB // (worker_intermediate_arrays * nbins * 8)
+    per_row_bytes = worker_intermediate_arrays * nbins * _REAL_BYTES
+    adaptive_chunk_size = 1_000_000 * _SPEC_BUDGET_MB // per_row_bytes
     return max(1000, min(adaptive_chunk_size, 100_000))
 
 
 # Stretch the CuPy memory-pool free cadence. free_all_blocks() forces a device
-# sync + full realloc, so paying it once per case is the conservative default;
-# the spike frees less often and leans on a reserved-pool watermark to stay
-# bounded. Read once at import; the GPU free path is driver-process only
-# (workers run transport), so no locking.
-_FREE_EVERY = _env_chunk("CXR_MC_FREE_EVERY", 1)  # free the pool every N GPU cases (1 = per-case)
+# sync + full realloc, so freeing every case is pure overhead once growth is
+# otherwise bounded. It now is: _ensure_pool_limit caps the pool
+# (_GPU_POOL_FRAC) and _spectrum_case_retry catches the resulting OOM and frees
+# on demand, so the per-case free is no longer load-bearing. Default 8 amortizes
+# the sync/realloc across cases; drop to 1 (CXR_MC_FREE_EVERY=1) for the old
+# per-case cadence, or set a watermark below. Read once at import; the GPU free
+# path is driver-process only (workers run transport), so no locking.
+_FREE_EVERY = _env_chunk("CXR_MC_FREE_EVERY", 8)  # free the pool every N GPU cases (1 = per-case)
 # Per-worker host-RAM budget [MB] for the full-case CPU pool. Default is the
 # measured footprint from the 2026-07-18 OOM'd coarse run on qlmc: the killed
 # worker held ~5.5 GB anon-rss at 200 keV (ne=500, 30000 eV grid), rounded up.
@@ -102,6 +116,13 @@ _pool_peak_bytes = 0  # high-water reserved pool size, for the A2 operational wa
 # OutOfMemoryError before the driver hard-OOMs the process. Fraction of total
 # VRAM; <=0 disables the cap (no-op, original unbounded behaviour).
 _GPU_POOL_FRAC = float(os.environ.get("CXR_MC_GPU_POOL_FRAC", "0.85"))
+# Number of scan processes sharing this one GPU (the remote queue's
+# parallel_materials runs that many `cxr scan` processes concurrently on the
+# single card, each its own CUDA context + pool). The queue script exports this;
+# the pool cap is divided by it so N concurrent processes cap at N*(FRAC/N) = FRAC
+# total instead of N*FRAC, which would oversubscribe VRAM and OOM. Default 1
+# (a lone process gets the full FRAC) -- today's behaviour bit-for-bit.
+_GPU_POOL_SHARE = max(1, _env_chunk("CXR_MC_GPU_SHARE", 1))
 # How many times a single GPU case may halve its chunk and retry on OOM.
 _GPU_OOM_RETRIES = _env_chunk("CXR_MC_GPU_OOM_RETRIES", 3)
 # Catchable OOM type, empty tuple on a CPU box so `except _GPU_OOM` never fires
@@ -149,11 +170,13 @@ def _ensure_pool_limit():
     No-op on a CPU box or when cap is disabled (`_GPU_POOL_FRAC <= 0`).
     Idempotent: safe to call on every case; the module flag means the actual
     `set_limit` runs once. Makes an over-budget alloc raise a catchable
-    OutOfMemoryError before the driver's own hard-OOM."""
+    OutOfMemoryError before the driver's own hard-OOM. The cap is divided by
+    `_GPU_POOL_SHARE` so co-tenant scan processes on one GPU sum to _GPU_POOL_FRAC
+    rather than oversubscribing it."""
     global _pool_limit_set
     if _pool_limit_set or not _GPU or cp is None or _GPU_POOL_FRAC <= 0:
         return
-    cp.get_default_memory_pool().set_limit(fraction=_GPU_POOL_FRAC)
+    cp.get_default_memory_pool().set_limit(fraction=_GPU_POOL_FRAC / _GPU_POOL_SHARE)
     _pool_limit_set = True
 
 
@@ -762,7 +785,13 @@ def _case_progress_label(cases):
 
 
 def run_cases(
-    cases, max_workers=None, progress=True, callback=None, should_stop=None, engine="auto"
+    cases,
+    max_workers=None,
+    progress=True,
+    callback=None,
+    should_stop=None,
+    engine="auto",
+    keep_results=True,
 ):
     """
     Run a list of case dicts through run_case, results in input order.
@@ -802,6 +831,12 @@ def run_cases(
         starts. Once it returns True, no new case is dispatched; work already
         in flight drains normally (callbacks still fire for those cases), and
         results for never-started cases stay None.
+    keep_results: True (default) retains every case's output in the returned
+        list -- bit-for-bit for callers that consume the return. False releases
+        each ``out`` right after its callback fires (results[i] = None), so a
+        long streaming sweep (``callback`` owns storage, return ignored) doesn't
+        pin every spectrum array in host RAM until the batch ends. The callback
+        still sees the live ``out``; only the retained list is dropped.
 
     Crawl protections: workers run BELOW_NORMAL priority (_worker_init) and get
     single-threaded BLAS (OMP/OPENBLAS/MKL_NUM_THREADS=1, inherited) -- N workers
@@ -854,6 +889,8 @@ def run_cases(
             results[i] = out
             if callback is not None:
                 callback(i, cases[i], out)
+            if not keep_results:
+                results[i] = None
         if timing is not None:
             timing.report("serial", nw=1)
         return results
@@ -902,6 +939,8 @@ def run_cases(
                 results[i] = out
                 if callback is not None:
                     callback(i, cases[i], out)
+                if not keep_results:
+                    results[i] = None
         if timing is not None:
             timing.report("GPU-pipeline", nw=nw)
         return results
@@ -928,6 +967,8 @@ def run_cases(
             results[i] = out
             if callback is not None:
                 callback(i, cases[i], out)
+            if not keep_results:
+                results[i] = None
             if not stopped and should_stop is not None and should_stop():
                 stopped = True
                 for f in futures:

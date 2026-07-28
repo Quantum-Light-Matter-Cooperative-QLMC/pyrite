@@ -508,7 +508,12 @@ def run_sweep(
 
     t0 = time.perf_counter()
     run_cases(
-        todo, max_workers=max_workers, progress=progress, callback=_cb, should_stop=should_stop
+        todo,
+        max_workers=max_workers,
+        progress=progress,
+        callback=_cb,
+        should_stop=should_stop,
+        keep_results=False,  # _cb owns storage; don't pin every spectrum in RAM
     )
     print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
     complete = all(c["name"] in results and c["E0_keV"] in results[c["name"]] for c in cases)

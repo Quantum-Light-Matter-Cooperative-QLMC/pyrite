@@ -276,7 +276,7 @@ def test_queue_script_has_per_material_scan_calls():
     assert "mose2" in s and "wse2" in s
     assert "20260101-000000" in s  # job id is embedded
     assert "mats=(mose2 wse2)" in s  # bash array drives the loop
-    assert "parallel_materials=2" in s
+    assert "parallel_materials=1" in s
     assert 'mkdir -p "$JOBDIR/progress"' in s
     assert '--progress-file "$JOBDIR/progress/$m.json"' in s
     assert "--no-progress" in s
@@ -289,6 +289,7 @@ def test_queue_script_accepts_three_parallel_materials():
     )
 
     assert "parallel_materials=3" in script
+    assert "export CXR_MC_GPU_SHARE=3" in script  # co-tenants split the VRAM pool cap
     assert "wait -n" in script
 
 
@@ -626,7 +627,7 @@ def test_chunk_minutes_zero_emits_monolithic_script(monkeypatch, capsys):
 
     out = capsys.readouterr().out
     assert "#SBATCH --time=UNLIMITED" in out
-    assert "parallel_materials=2" in out
+    assert "parallel_materials=1" in out
     assert "--max-minutes" not in out
 
 

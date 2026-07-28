@@ -71,9 +71,17 @@ def _validate_parallel_materials(parallel_materials):
     return parallel_materials
 
 
-def _uv_sync_block() -> str:
-    """Bash that records dependency-sync wall time without changing exit semantics."""
-    return f"""uv_sync_start_ns=$(date +%s%N)
+def _uv_sync_block(once: bool = False) -> str:
+    """Bash that records dependency-sync wall time without changing exit semantics.
+
+    once=True guards the sync behind a ``$JOBDIR/.synced`` sentinel so a
+    self-resubmitting chunked chain syncs on its FIRST slice only -- every later
+    slice runs in the same checked-out tree with the same lockfile, so re-syncing
+    is pure per-slice startup overhead. The sentinel is written only after a
+    successful sync, so a failed sync still exits 1 and the next slice retries.
+    Delete ``$JOBDIR/.synced`` to force a re-sync (e.g. after a mid-chain
+    dependency bump)."""
+    sync = f"""uv_sync_start_ns=$(date +%s%N)
 uv_sync_rc=0
 {config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
 uv_sync_elapsed_ms=$((($(date +%s%N) - uv_sync_start_ns) / 1000000))
@@ -82,6 +90,14 @@ printf 'timing: uv sync %d.%03d s\\n' \
 if [ "$uv_sync_rc" -ne 0 ]; then
   echo "FAILED (uv sync) $(date -Is)" > "$JOBDIR/state"
   exit 1
+fi"""
+    if not once:
+        return sync
+    return f"""if [ -f "$JOBDIR/.synced" ]; then
+  printf 'timing: uv sync skipped (already synced this chain)\\n' >> "$JOBDIR/log"
+else
+{sync}
+  : > "$JOBDIR/.synced"
 fi"""
 
 
@@ -114,10 +130,13 @@ def _queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block()}
+{_uv_sync_block(once=True)}
 mats=({mats})
 total=${{#mats[@]}}
 parallel_materials={parallel_materials}
+# co-tenant scan processes share the one GPU; each divides its CuPy pool cap
+# (_GPU_POOL_FRAC) by this so N processes cap at FRAC total, not N*FRAC.
+export CXR_MC_GPU_SHARE={parallel_materials}
 n=0
 failures=0
 active=0
@@ -198,7 +217,7 @@ def _chunked_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block()}
+{_uv_sync_block(once=True)}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
@@ -264,7 +283,7 @@ def _zhai_queue_script(jobid, ne, ne_brem, ne_supp, tmd_azimuth, refresh):
     return f"""JOBDIR={config.shell_word(jobdir)}
 cd {config.shell_remote_dir()} || exit 1
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block()}
+{_uv_sync_block(once=True)}
 echo "running zhai reproduction since $(date -Is)" > "$JOBDIR/state"
 if ! {config.shell_remote_uv()} run --no-sync python -m cxr_mc._entry.reproduce_zhai{flags} >> "$JOBDIR/log" 2>&1
 then
@@ -322,7 +341,7 @@ def _rebrem_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block()}
+{_uv_sync_block(once=True)}
 mats=({mats})
 total=${{#mats[@]}}
 n=0
@@ -378,7 +397,7 @@ def _rebrem_chunked_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block()}
+{_uv_sync_block(once=True)}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
@@ -505,7 +524,7 @@ def _reline_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block()}
+{_uv_sync_block(once=True)}
 mats=({mats})
 total=${{#mats[@]}}
 n=0
@@ -561,7 +580,7 @@ def _reline_chunked_queue_script(
 cd {config.shell_remote_dir()} || exit 1
 mkdir -p "$JOBDIR/progress"
 echo "started: $(date -Is)" >> "$JOBDIR/meta"
-{_uv_sync_block()}
+{_uv_sync_block(once=True)}
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
