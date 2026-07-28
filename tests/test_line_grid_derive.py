@@ -247,6 +247,30 @@ def test_main_returns_tempfail_when_budget_leaves_work(monkeypatch):
     assert analyze.main(["--materials", "hopg", "--energies", "200"]) == 75
 
 
+def test_main_uses_persistent_materials_and_energies(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        analyze.lg_defaults,
+        "load_defaults",
+        lambda: {
+            **analyze.lg_defaults.FALLBACK,
+            "materials": ["wse2", "mose2"],
+            "energies": [40.0, 60.0],
+        },
+    )
+    monkeypatch.setattr(
+        analyze,
+        "derive_all_materials",
+        lambda materials, energies, *args, **kwargs: (
+            seen.update(materials=materials, energies=energies) or {},
+            True,
+        ),
+    )
+
+    assert analyze.main([]) == 0
+    assert seen == {"materials": ["wse2", "mose2"], "energies": [40.0, 60.0]}
+
+
 def test_build_case_passes_wide_brem_grid_to_diagnostic_sweep(monkeypatch):
     # The brem coverage channel must be measured on the WIDE diagnostic brem
     # grid, not the profile's 30 keV E_grid_brem -- otherwise a per-material
