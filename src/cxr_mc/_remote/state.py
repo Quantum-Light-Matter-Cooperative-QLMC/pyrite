@@ -140,6 +140,21 @@ def _job_profiles(jobids: list[str]) -> dict[str, str]:
     return profiles
 
 
+def _profile_jobdirs(profile: str) -> set[str]:
+    """Return existing job dirs named ``profile`` or ``profile-N`` (one ssh).
+
+    Profile submits name their job after the profile; a re-submission after the
+    previous run finished still needs a fresh directory, so the caller suffixes
+    the first free ``-N``."""
+    transport._check_shell_tokens([profile])
+    remote = (
+        f"JOBS={config.shell_remote_path(config.JOBS_SUBDIR)}; "
+        f'for d in "$JOBS/{profile}" "$JOBS/{profile}"-*/; do [ -d "$d" ] || continue; '
+        'basename "$d"; done'
+    )
+    return set(transport._ssh_capture(remote).split())
+
+
 def _job_succeeded(jobid: str) -> bool:
     """Whether the batch script recorded a successful terminal state."""
     return _job_state(jobid).startswith("done")

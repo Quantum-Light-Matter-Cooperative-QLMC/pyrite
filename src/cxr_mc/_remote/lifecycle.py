@@ -170,6 +170,38 @@ def clear_all_remote(yes=False):
     print(f"cleared on the box: {len(existing)} checkpoint file(s) under checkpoints/")
 
 
+def _refuse_if_profile_live(catalog_profile):
+    """Refuse a second live job under one catalog profile.
+
+    Profile-named jobs make the profile the user-facing handle (``attach
+    NAME``, ``stop --profile NAME``, ``pull --profile NAME``); two live jobs
+    sharing it would make every one of those handles ambiguous."""
+    live = state._live_jobs()
+    if not live:
+        return
+    profiles = state._job_profiles([jobid for jobid, _quick, _mats in live])
+    clash = sorted(jobid for jobid, _quick, _mats in live if profiles.get(jobid) == catalog_profile)
+    if clash:
+        raise SystemExit(
+            f"refusing to submit: profile {catalog_profile!r} already has a live job "
+            f"({', '.join(clash)}); attach to it (cxr remote attach {clash[0]}) or stop it "
+            f"(cxr remote stop --profile {catalog_profile}) first."
+        )
+
+
+def _profile_jobid(catalog_profile):
+    """Job id for a profile submit: the profile name itself, or the first free
+    ``NAME-N`` when a finished run already holds the bare name (a live clash is
+    refused earlier by :func:`_refuse_if_profile_live`)."""
+    existing = state._profile_jobdirs(catalog_profile)
+    if catalog_profile not in existing:
+        return catalog_profile
+    suffix = 2
+    while f"{catalog_profile}-{suffix}" in existing:
+        suffix += 1
+    return f"{catalog_profile}-{suffix}"
+
+
 def start_queue(
     materials,
     quick=False,
@@ -197,7 +229,10 @@ def start_queue(
     shared value is safe across a mixed batch. ``catalog_profile`` forwards
     ``--profile`` (catalog campaign name, orthogonal to ``fidelity``) the
     same way -- the remote ``cxr scan`` re-validates it against the synced
-    catalog, so an unknown name still fails loudly on the box.
+    catalog, so an unknown name still fails loudly on the box. A non-standard
+    profile also names the job (``sub_100keV``, then ``sub_100keV-2`` once a
+    finished run holds the bare name) and refuses to submit while another job
+    under the same profile is live.
     """
     transport._check_materials(materials)
     transport._check_shell_tokens([catalog_profile])
@@ -209,7 +244,16 @@ def start_queue(
         )
     if not dry_run:
         _refuse_if_busy(materials, quick)
-    jobid = scripts._new_jobid()
+    if catalog_profile != "standard":
+        # a profile submit is named after the profile: readable, and the same
+        # handle stop/pull --profile already take. One live job per profile.
+        if not dry_run:
+            _refuse_if_profile_live(catalog_profile)
+            jobid = _profile_jobid(catalog_profile)
+        else:
+            jobid = catalog_profile  # preview only; no remote existence probe
+    else:
+        jobid = scripts._new_jobid()
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     stems = scripts._stems(materials, quick, fidelity, high_energy_min_kev, catalog_profile)
     if chunked:

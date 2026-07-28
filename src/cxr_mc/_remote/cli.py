@@ -737,7 +737,10 @@ def reline_command(
         "MATERIAL/--all/-A may be omitted when --profile NAME names a profile "
         "with an explicit `materials` membership list -- the profile's members "
         "become the queue. A profile with no membership row (implicit "
-        "all-in-use) still needs --all/-A or an explicit MATERIAL."
+        "all-in-use) still needs --all/-A or an explicit MATERIAL.\n\n"
+        "A --profile submit names the job after the profile (NAME, then "
+        "NAME-2 once a finished run holds the bare name) and refuses while "
+        "another job under the same profile is live."
     ),
 )
 @click.argument(

@@ -682,6 +682,9 @@ Usage: cxr remote submit [OPTIONS] [MATERIAL]...
   `materials` membership list -- the profile's members become the queue. A profile with
   no membership row (implicit all-in-use) still needs --all/-A or an explicit MATERIAL.
 
+  A --profile submit names the job after the profile (NAME, then NAME-2 once a finished
+  run holds the bare name) and refuses while another job under the same profile is live.
+
 Options:
   -a, --all                  Queue mats_to_sim.toml's verified `materials` list.
   -A, --actually-all         Queue every material in mats_to_sim.toml -- materials,

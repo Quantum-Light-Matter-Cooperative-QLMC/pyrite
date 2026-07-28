@@ -831,6 +831,52 @@ def test_submit_sub_100keV_uses_shipped_membership_without_material_args(capsys)
     assert "hopg" in out and "zrte3" in out
 
 
+def _quiet_submission(monkeypatch):
+    monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
+    monkeypatch.setattr(transport.subprocess, "run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(transport, "_run", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "48291\n")
+
+
+def test_profile_submit_names_job_after_profile(monkeypatch):
+    _quiet_submission(monkeypatch)
+    monkeypatch.setattr(state, "_live_jobs", lambda: [])
+    monkeypatch.setattr(state, "_profile_jobdirs", lambda _profile: set())
+
+    jobid = remote.start_queue(["hopg"], no_sync=True, catalog_profile="sub_100keV")
+
+    assert jobid == "sub_100keV"
+
+
+def test_profile_submit_suffixes_when_finished_run_holds_the_name(monkeypatch):
+    _quiet_submission(monkeypatch)
+    monkeypatch.setattr(state, "_live_jobs", lambda: [])
+    monkeypatch.setattr(
+        state,
+        "_profile_jobdirs",
+        lambda _profile: {"sub_100keV", "sub_100keV-2"},
+    )
+
+    jobid = remote.start_queue(["hopg"], no_sync=True, catalog_profile="sub_100keV")
+
+    assert jobid == "sub_100keV-3"
+
+
+def test_profile_submit_refuses_while_same_profile_is_live(monkeypatch):
+    _quiet_submission(monkeypatch)
+    monkeypatch.setattr(state, "_live_jobs", lambda: [("sub_100keV", False, ["hopg"])])
+    monkeypatch.setattr(state, "_job_profiles", lambda jobids: {"sub_100keV": "sub_100keV"})
+
+    with pytest.raises(SystemExit, match="already has a live job"):
+        remote.start_queue(["hopg"], no_sync=True, catalog_profile="sub_100keV")
+
+
+def test_profile_jobdirs_parses_existing_dirs(monkeypatch):
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "sub_100keV\nsub_100keV-2\n")
+
+    assert state._profile_jobdirs("sub_100keV") == {"sub_100keV", "sub_100keV-2"}
+
+
 def test_interrupted_job_upload_releases_its_checkpoint_reservations(monkeypatch):
     commands = []
     monkeypatch.setattr(lifecycle, "_refuse_if_busy", lambda *_args: None)
