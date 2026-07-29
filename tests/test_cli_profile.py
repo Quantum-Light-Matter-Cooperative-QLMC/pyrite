@@ -153,9 +153,7 @@ def test_set_replaces_grid_and_members_set_owns_membership(tmp_path, monkeypatch
     catalog = _catalog(tmp_path, monkeypatch)
 
     result = invoke(profile.command, ["set", "sub_100keV", "--polar", "10:30:10"])
-    members = invoke(
-        profile.command, ["members", "set", "sub_100keV", "hopg", "mose2"]
-    )
+    members = invoke(profile.command, ["members", "set", "sub_100keV", "hopg", "mose2"])
 
     assert_clean_result(result, stdout="updated profile sub_100keV\n")
     assert_clean_result(members, stdout="updated profile sub_100keV membership\n")
@@ -167,9 +165,7 @@ def test_set_replaces_grid_and_members_set_owns_membership(tmp_path, monkeypatch
 def test_set_unknown_material_in_membership_errors(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(
-        profile.command, ["members", "set", "sub_100keV", "unobtainium"]
-    )
+    result = invoke(profile.command, ["members", "set", "sub_100keV", "unobtainium"])
 
     assert result.exit_code == 1
     assert "unknown material: unobtainium" in result.stderr
@@ -247,9 +243,7 @@ def test_remove_values_and_missing_value_error(tmp_path, monkeypatch):
 def test_members_remove_and_no_op_requires_range_option(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
-    result = invoke(
-        profile.command, ["members", "remove", "sub_100keV", "hopg", "diamond"]
-    )
+    result = invoke(profile.command, ["members", "remove", "sub_100keV", "hopg", "diamond"])
     assert_clean_result(result)
     assert "removed hopg" in result.stdout
     assert "not members: diamond" in result.stdout
@@ -270,9 +264,7 @@ def test_members_reset_restores_implicit_membership(tmp_path, monkeypatch):
         reset,
         stdout="reset profile sub_100keV membership to all in-use materials (implicit)\n",
     )
-    section = catalog.read_text().split("[profiles.sub_100keV]", 1)[1].split(
-        "\n[", 1
-    )[0]
+    section = catalog.read_text().split("[profiles.sub_100keV]", 1)[1].split("\n[", 1)[0]
     assert "materials" not in section
     assert_clean_result(shown)
     assert "materials: all in-use materials (implicit)" in shown.stdout
@@ -440,9 +432,7 @@ def test_add_materials_explains_implicit_membership_is_already_all(tmp_path, mon
 def test_membership_verbs_reject_unknown_material(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(
-        profile.command, ["members", "add", "sub_100keV", "unobtainium"]
-    )
+    result = invoke(profile.command, ["members", "add", "sub_100keV", "unobtainium"])
 
     assert result.exit_code == 1
     assert "unknown material: unobtainium" in result.stderr

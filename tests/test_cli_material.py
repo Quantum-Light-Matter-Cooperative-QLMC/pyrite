@@ -55,9 +55,7 @@ def test_show_default_profile_reports_effective_sources(tmp_path, monkeypatch):
 def test_show_nonstandard_profile_json(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(
-        material.command, ["show", "hopg", "--profile", "survey", "--json"]
-    )
+    result = invoke(material.command, ["show", "hopg", "--profile", "survey", "--json"])
 
     assert_clean_result(result)
     document = json.loads(result.stdout)
@@ -87,14 +85,12 @@ def test_set_nonstandard_profile_override(tmp_path, monkeypatch):
 def test_reset_preserves_non_range_override_siblings(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
-    result = invoke(
-        material.command, ["set", "hopg", "--reset", "thickness"]
-    )
+    result = invoke(material.command, ["set", "hopg", "--reset", "thickness"])
 
     assert_clean_result(result, stdout="updated profile standard, material hopg\n")
-    section = catalog.read_text().split(
-        "[profiles.standard.overrides.hopg]", 1
-    )[1].split("\n[", 1)[0]
+    section = (
+        catalog.read_text().split("[profiles.standard.overrides.hopg]", 1)[1].split("\n[", 1)[0]
+    )
     assert "thickness_ang" not in section
     assert "E_grid_brem" in section
 
@@ -103,9 +99,7 @@ def test_overwrite_confirmation_and_dry_run(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
     original = catalog.read_text()
 
-    declined = invoke(
-        material.command, ["set", "hopg", "--thickness", "3000"], input="n\n"
-    )
+    declined = invoke(material.command, ["set", "hopg", "--thickness", "3000"], input="n\n")
     assert declined.exit_code == 1
     assert "profile standard, material hopg" in declined.stderr
     assert catalog.read_text() == original
@@ -123,9 +117,7 @@ def test_unknown_names_report_actionable_errors(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
     unknown_material = invoke(material.command, ["show", "hpg"])
-    unknown_profile = invoke(
-        material.command, ["show", "hopg", "--profile", "missing"]
-    )
+    unknown_profile = invoke(material.command, ["show", "hopg", "--profile", "missing"])
 
     assert unknown_material.exit_code == 1
     assert "unknown material: hpg. Did you mean: hopg?" in unknown_material.stderr

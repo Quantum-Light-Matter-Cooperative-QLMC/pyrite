@@ -236,18 +236,9 @@ def test_profile_members_and_material_commands_wire_catalog_completion():
         member_command = members.commands[name]
         assert _callback(member_command, "name") is _cli_completion.complete_profile
         assert _callback(member_command, "materials") is _cli_completion.complete_material
-    assert (
-        _callback(members.commands["reset"], "name")
-        is _cli_completion.complete_profile
-    )
+    assert _callback(members.commands["reset"], "name") is _cli_completion.complete_profile
 
     for name in ("show", "set"):
         material_command = material.command.commands[name]
-        assert (
-            _callback(material_command, "material")
-            is _cli_completion.complete_material
-        )
-        assert (
-            _callback(material_command, "profile_name")
-            is _cli_completion.complete_profile
-        )
+        assert _callback(material_command, "material") is _cli_completion.complete_material
+        assert _callback(material_command, "profile_name") is _cli_completion.complete_profile

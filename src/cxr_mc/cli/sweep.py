@@ -50,9 +50,7 @@ def _overview_payload(document):
                     for material_name, material_overrides in _catalog_io.profile_overrides(
                         row
                     ).items()
-                    if any(
-                        key in material_overrides for key in _catalog_io.RANGES.values()
-                    )
+                    if any(key in material_overrides for key in _catalog_io.RANGES.values())
                 ],
             }
             for name, row in profiles.items()
