@@ -86,6 +86,72 @@ same percentage can reduce throughput or OOM margin.
 - Candidate must show a repeatable end-to-end improvement on the matched
   workload; report regressions or neutral results rather than generalizing.
 
+## Recovered experiment evidence
+
+Artifacts remain unchanged under `scratch-perf/artifacts/compute_test_300keV*`.
+Every full session used MoS2, full fidelity, parameter SHA
+`bb0c36a6693522f15682f6b0ab6f7ac360b69a451345a18aa55e47bdc2df7986`,
+18 uncached cases, one GPU process, and requested/effective six-worker
+allocation on the same host. Submission argv is not embedded in the NDJSON;
+chunk values and all other comparison fields below come directly from terminal
+telemetry.
+
+| Line chunk | Successful runs | Wall seconds | OOM retries/run | Result |
+| ---: | ---: | --- | ---: | --- |
+| 20,000 | 3/3 | 94.313, 94.324, 94.789 | 0 | Stable candidate |
+| 25,000 | 3/3 | 233.566, 233.687, 233.823 | 11 | Stable completion after repeated fallback |
+| 22,000 | 1/1 | 234.757 | 11 | Same repeated-fallback regime |
+| 30,000 | 0/1 | failed at 11/18 after 100.728 | 1 recorded | Not viable |
+
+The 20,000 cohort averaged 94.475 seconds (SD 0.272, CV 0.29%) versus
+233.692 seconds (SD 0.129, CV 0.055%) at 25,000: 2.474x throughput, or 59.6%
+lower wall time. It had zero swap growth, 10.59-12.07 GiB peak VRAM, and
+4.65-4.81 GiB peak process-tree RSS. The 25,000 cohort peaked at 13.80 GiB
+VRAM. Its 11 caught OOMs per repetition account for the lost work.
+
+Checkpointing was only 0.284-0.305 seconds per successful run (0.13-0.30% of
+wall). Driver GPU-feed wait was 0.53-1.49%. Neither checkpoint write
+amplification nor CPU transport supply is material for this workload.
+
+Nsight attempts `compute_test_300keV-5`, `-6`, and `-7` are unusable:
+the reports contain one 9-17 microsecond NVTX range, no CUDA kernel records,
+and one `cuModuleGetLoadingMode` call. The two associated telemetry sessions
+stop after about 2.5 seconds with zero completed cases. They support no
+kernel-fragmentation or synchronization conclusion.
+
+## Implemented local candidate
+
+- `002b8e8` carries a successful line-OOM fallback forward as a non-increasing,
+  run-local line-chunk cap. Original cases, order, results, and brem chunks stay
+  unchanged.
+- `ee26601` restores phase-specific correctness: line OOM halves only line
+  chunk and may teach the cap; brem OOM halves only brem chunk; unattributed
+  catchable OOM retains legacy dual-halving without teaching. Telemetry exposes
+  total plus line/brem/generic retry counts and attempted/effective/learned
+  chunks.
+- `bfa1381` distinguishes structurally complete sessions from successful
+  `done` sessions. Failed terminals remain visible in CSV/timelines but no
+  longer contaminate bottleneck classification or comparable-session counts.
+
+Local evidence:
+
+- `tests/test_gpu_oom_retry.py`, `tests/test_chunk_invariance.py`,
+  `tests/test_performance_profile.py`: 23 passed before the analysis change.
+- `tests/test_montecarlo.py tests/test_run.py`: 131 passed.
+- `tests/test_performance_analysis.py`, `tests/test_performance_profile.py`,
+  `tests/test_gpu_oom_retry.py`, `tests/test_chunk_invariance.py`: 31 passed.
+- Full lint passed. Full typecheck reaches only pre-existing unresolved
+  optional imports `imageio.v3` and `kaleido` in
+  `src/cxr_mc/plots/render_trajectories.py`.
+
+Remote validation remains required before calling the adaptive candidate an
+end-to-end improvement. Remote compute is currently occupied by another
+user's long job; no sync, submit, stage, pull, stop, or clear action was taken.
+When authorized and capacity is free, run three uncached default-chunk
+repetitions from this branch against a fresh matched control, require zero
+uncaught OOM/swap growth, verify resumable checkpoints, and compare wall/cost
+rate beyond the recovered 0.29% candidate spread.
+
 ## Non-goals
 
 - Maximizing allocation percentages without a throughput benefit.
