@@ -388,9 +388,10 @@ class _FakeCatalog:
     ``validate_catalog_profile`` only ever touches ``profile_names`` and
     ``profile_materials``."""
 
-    def __init__(self, profile_names, memberships):
+    def __init__(self, profile_names, memberships, material_keys=("hopg", "mos2")):
         self.profile_names = profile_names
         self._memberships = memberships
+        self.material_keys = material_keys
 
     def profile_materials(self, name):
         if name not in self.profile_names:
@@ -432,6 +433,24 @@ def test_scan_explicit_material_outside_profile_is_usage_error(monkeypatch):
     assert result.exit_code == 2
     assert "does not include" in result.stderr
     assert "hopg" in result.stderr
+
+
+def test_resolve_profile_materials_uses_profile_or_catalog_order(monkeypatch):
+    import cxr_mc.materials as materials_pkg
+
+    monkeypatch.setattr(
+        materials_pkg,
+        "CATALOG",
+        _FakeCatalog(
+            ("standard", "narrowed"),
+            {"narrowed": ("hopg",)},
+            material_keys=("mos2", "hopg"),
+        ),
+    )
+
+    assert scan.resolve_profile_materials("standard") == ["mos2", "hopg"]
+    assert scan.resolve_profile_materials("narrowed") == ["hopg"]
+    assert scan.resolve_profile_materials("narrowed", "hopg") == ["hopg"]
 
 
 def test_resolved_run_threads_catalog_profile_into_material_sweep(monkeypatch):

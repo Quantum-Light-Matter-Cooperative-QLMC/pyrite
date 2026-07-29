@@ -689,13 +689,39 @@ def _csv_materials(material_csv):
     return requested
 
 
+def _group_materials(
+    document, requested, *, unverified_dw, high_energy_only, allow_unknown=False
+):
+    """Expand membership group selectors and return catalog-ordered material keys."""
+    requested = list(requested)
+    if unverified_dw or high_energy_only:
+        # The run-selection manifest remains the owner of these operational
+        # groups.  Import lazily: profile help must not load the run driver.
+        from cxr_mc.scan import load_manifest_groups
+
+        groups = load_manifest_groups()
+        if unverified_dw:
+            requested.extend(groups["no_verified_dw"])
+        if high_energy_only:
+            requested.extend(groups["high_energy_materials"])
+    if not requested:
+        raise ValueError("provide MATERIAL keys, --unverified-dw, or --high-energy-only")
+    if allow_unknown:
+        known = _catalog_io.material_rows(document)
+        requested = list(dict.fromkeys(requested))
+        return [key for key in known if key in requested] + [
+            key for key in requested if key not in known
+        ]
+    return _validate_materials(document, requested)
+
+
 def _validate_materials(document, requested):
-    requested = list(dict.fromkeys(requested))
+    requested = set(requested)
     known = _catalog_io.material_rows(document)
-    unknown = [key for key in requested if key not in known]
+    unknown = sorted(requested - set(known))
     if unknown:
         raise ValueError(f"unknown material: {', '.join(unknown)}")
-    return requested
+    return [key for key in known if key in requested]
 
 
 def _add_membership(document, name, requested):
@@ -703,7 +729,7 @@ def _add_membership(document, name, requested):
     target, membership = _membership_target(document, name)
     requested = _validate_materials(document, requested)
     added = [key for key in requested if key not in membership]
-    target["materials"] = [*membership, *added]
+    target["materials"] = _validate_materials(document, [*membership, *requested])
     return added, sorted(set(requested) - set(added))
 
 
@@ -721,6 +747,20 @@ def members_command():
     """Set, extend, shrink, or reset profile-owned material membership."""
 
 
+def _membership_group_options(function):
+    function = click.option(
+        "--high-energy-only",
+        is_flag=True,
+        help="Include mats_to_sim.toml's high-energy material group.",
+    )(function)
+    function = click.option(
+        "--unverified-dw",
+        is_flag=True,
+        help="Include mats_to_sim.toml's unverified-Debye-Waller material group.",
+    )(function)
+    return function
+
+
 def _member_options(function):
     function = click.option(
         "--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing."
@@ -734,15 +774,21 @@ def _member_options(function):
 @members_command.command("set")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @click.argument(
-    "materials", nargs=-1, required=True, shell_complete=_cli_completion.complete_material
+    "materials", nargs=-1, shell_complete=_cli_completion.complete_material
 )
+@_membership_group_options
 @_member_options
-def members_set_command(name, materials, yes, dry_run):
+def members_set_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
     """Replace NAME's explicit membership with MATERIAL keys."""
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
-        target["materials"] = _validate_materials(document, materials)
+        target["materials"] = _group_materials(
+            document,
+            materials,
+            unverified_dw=unverified_dw,
+            high_energy_only=high_energy_only,
+        )
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     _confirm_standard(name, "replace material membership of", yes, dry_run)
@@ -752,14 +798,21 @@ def members_set_command(name, materials, yes, dry_run):
 @members_command.command("add")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @click.argument(
-    "materials", nargs=-1, required=True, shell_complete=_cli_completion.complete_material
+    "materials", nargs=-1, shell_complete=_cli_completion.complete_material
 )
+@_membership_group_options
 @_member_options
-def members_add_command(name, materials, yes, dry_run):
+def members_add_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
     """Extend NAME's explicit membership with MATERIAL keys."""
     try:
         original, document = _catalog_io.catalog_text()
-        added, skipped = _add_membership(document, name, materials)
+        requested = _group_materials(
+            document,
+            materials,
+            unverified_dw=unverified_dw,
+            high_energy_only=high_energy_only,
+        )
+        added, skipped = _add_membership(document, name, requested)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     _confirm_standard(name, "add materials to", yes, dry_run)
@@ -772,14 +825,22 @@ def members_add_command(name, materials, yes, dry_run):
 @members_command.command("remove")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @click.argument(
-    "materials", nargs=-1, required=True, shell_complete=_cli_completion.complete_material
+    "materials", nargs=-1, shell_complete=_cli_completion.complete_material
 )
+@_membership_group_options
 @_member_options
-def members_remove_command(name, materials, yes, dry_run):
+def members_remove_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
     """Remove MATERIAL keys from NAME's explicit membership."""
     try:
         original, document = _catalog_io.catalog_text()
-        removed, missing = _remove_membership(document, name, materials)
+        requested = _group_materials(
+            document,
+            materials,
+            unverified_dw=unverified_dw,
+            high_energy_only=high_energy_only,
+            allow_unknown=True,
+        )
+        removed, missing = _remove_membership(document, name, requested)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     _confirm_standard(name, "remove materials from", yes, dry_run)

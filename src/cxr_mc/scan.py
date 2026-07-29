@@ -552,6 +552,25 @@ def validate_catalog_profile(
     return materials
 
 
+def resolve_profile_materials(catalog_profile: str, material: str | None = None) -> list[str]:
+    """Resolve one run selection from a profile and optional material override.
+
+    Shared boundary contract for ``cxr run`` and ``cxr remote run``: ``-m``
+    selects one profile member; omitting it selects the profile's explicit
+    membership, or every catalog material when membership is implicit.
+    """
+    from .materials import CATALOG
+
+    validate_catalog_profile(catalog_profile, [], intersect=False)
+    if material is not None:
+        materials = validate_catalog_profile(catalog_profile, [material], intersect=False)
+    else:
+        membership = CATALOG.profile_materials(catalog_profile)
+        materials = list(CATALOG.material_keys if membership is None else membership)
+    validate_materials(materials)
+    return materials
+
+
 def _selected(args):
     """Resolve MATERIAL/--all/-A plus the include-* flags into an ordered,
     deduplicated material list; also stashes ``args.high_energy_floor_map``

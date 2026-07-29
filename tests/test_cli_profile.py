@@ -254,6 +254,52 @@ def test_members_remove_and_no_op_requires_range_option(tmp_path, monkeypatch):
     assert "provide a range option" in bare.stderr
 
 
+def test_member_group_selectors_expand_in_catalog_order_and_support_dry_run(tmp_path, monkeypatch):
+    from cxr_mc import scan
+
+    catalog = _catalog(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        scan,
+        "load_manifest_groups",
+        lambda: {
+            "no_verified_dw": ["mose2"],
+            "high_energy_materials": ["hopg"],
+        },
+    )
+
+    set_result = invoke(
+        profile.command,
+        ["members", "set", "sub_100keV", "--unverified-dw", "hopg"],
+    )
+    assert_clean_result(set_result, stdout="updated profile sub_100keV membership\n")
+    assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
+
+    removed = invoke(
+        profile.command,
+        ["members", "remove", "sub_100keV", "--high-energy-only"],
+    )
+    assert_clean_result(removed, stdout="updated profile sub_100keV: removed hopg\n")
+    assert 'materials = ["mose2"]' in catalog.read_text()
+
+    original = catalog.read_text()
+    dry_run = invoke(
+        profile.command,
+        ["members", "add", "sub_100keV", "--high-energy-only", "--dry-run"],
+    )
+    assert_clean_result(dry_run)
+    assert 'materials = ["hopg", "mose2"]' in dry_run.stdout
+    assert catalog.read_text() == original
+
+
+def test_member_group_selectors_require_a_selector_or_material(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["members", "set", "sub_100keV"])
+
+    assert result.exit_code == 1
+    assert "provide MATERIAL keys, --unverified-dw, or --high-energy-only" in result.stderr
+
+
 def test_members_reset_restores_implicit_membership(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
