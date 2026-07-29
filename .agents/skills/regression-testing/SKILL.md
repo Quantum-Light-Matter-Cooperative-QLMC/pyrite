@@ -8,10 +8,6 @@ description: Use when designing fast regression tests for numerical, stochastic,
 Freeze the smallest externally meaningful behavior that would have caught the
 regression.
 
-For implementation requests, compose with `implementing-changes`.
-`regression-testing` owns test design; `implementing-changes` owns
-edit/verification flow.
-
 ## Test design
 
 1. Reproduce the failure with a focused test before changing implementation.
@@ -25,16 +21,12 @@ edit/verification flow.
 6. Keep CPU tests fast; place expensive external or publication comparisons in
    `checks/`.
 
-## Report
-
-State the original symptom, why the test fails before the fix, the seed and
-tolerance rationale, and the focused command used:
+Report original symptom, pre-fix failure, seed/tolerance rationale, and focused
+command:
 
 ```bash
 uv run python scripts/dev.py test tests/path/to/test.py -k test_name
 ```
-
-## Common mistakes
 
 - Snapshotting a large array when a physical invariant is the real contract.
 - Using a tolerance wide enough to hide the reported regression.

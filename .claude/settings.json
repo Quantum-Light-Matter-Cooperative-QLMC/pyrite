@@ -13,17 +13,6 @@
     ]
   },
   "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "startup|resume",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "uv sync --all-groups --extra viz-render"
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -33,19 +22,6 @@
             "shell": "bash",
             "command": "cd \"$CLAUDE_PROJECT_DIR\" && f=.venv/Scripts/python.exe; [ -x \"$f\" ] || f=.venv/bin/python; [ -x \"$f\" ] || f=python3; \"$f\" .claude/hooks/guard_local_sweep.py",
             "statusMessage": "Checking for local sweep"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && f=.venv/Scripts/python.exe; [ -x \"$f\" ] || f=.venv/bin/python; [ -x \"$f\" ] || f=python3; \"$f\" .claude/hooks/on_edit.py 2>/dev/null || true",
-            "statusMessage": "Formatting edited file"
           }
         ]
       }

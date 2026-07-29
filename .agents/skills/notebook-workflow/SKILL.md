@@ -1,23 +1,19 @@
 ---
 name: notebook-workflow
-description: Use when changing the scan, analysis, or validation marimo apps, or cleaning the remaining legacy validation notebook in checks/.
+description: Use when changing cxr-mc scan, analysis, trace, or validation marimo apps, or cleaning the legacy validation notebook under checks/.
 ---
 
 # Notebook Workflow
 
-## Owners
+- `scan_app.py`: sweep runner.
+- `analysis_app.py`: checkpoint analysis.
+- `trace_app.py`: direct transport/lattice viewer.
+- `validation_app.py`: validation studies.
+- `checks/cxr_analysis_feranchuk.ipynb`: only legacy Jupyter workflow.
 
-- `notebooks/scan_app.py`: interactive sweep runner.
-- `notebooks/analysis_app.py`: checkpoint analysis and visualization.
-- `notebooks/validation_app.py`: validation-study interface.
-- `checks/cxr_analysis_feranchuk.ipynb`: remaining legacy validation notebook;
-  it is the only notebook subject to nbQA and output stripping.
+Put reusable logic in `src/cxr_mc/`; keep apps thin. Add no new `.ipynb`
+workflows. Keep legacy notebook output-free.
 
-## Rules
-
-- Put reusable science and data logic in `src/cxr_mc/`; keep apps thin.
-- Keep the legacy notebook output-free and avoid adding new `.ipynb` workflows.
-- Validate marimo apps with `uv run marimo check <app.py>` when they change.
-- Run `uv run python scripts/dev.py nbqa` before editing the legacy notebook and
-  `uv run python scripts/dev.py nbstrip` before handoff.
-- Use `uv run python scripts/dev.py verify` for repository verification.
+After marimo edits run `uv run marimo check <app.py>`. For legacy notebook run
+`scripts/dev.py nbqa` before edits and `nbstrip` before handoff. Use
+`scripts/dev.py verify` for full repository verification.

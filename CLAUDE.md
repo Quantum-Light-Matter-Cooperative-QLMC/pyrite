@@ -1,7 +1,7 @@
-# cxr-mc Claude notes
+# cxr-mc Claude adapter
 
 @AGENTS.md
 
-`.claude/skills` generated mirror of portable skills in `.agents/skills`. Edit canonical tree, run `rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py sync-skills`.
-
-Claude commands under `.claude/commands` thin aliases to shared skills. `physics-validator` agent restricted adapter to independent verification contract in `docs/validation/README.md`.
+`.agents/skills` is canonical; `.claude/skills` is generated. After canonical
+edits, run `scripts/dev.py sync-skills`. Claude commands are thin skill aliases;
+`physics-validator` follows `docs/validation/README.md`.

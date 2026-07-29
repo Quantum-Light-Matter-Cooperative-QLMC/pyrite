@@ -1,129 +1,59 @@
-# cxr-mc AI Agent notes
+# cxr-mc agent contract
 
-File short, keep that way.
+Keep replies terse; preserve technical substance. Fragments OK. Drop filler,
+pleasantries, and hedging. Use normal clarity for security, irreversible
+actions, or ambiguity. Code, commits, PR text, quotations, and user-requested
+prose keep required format.
 
-Respond terse like smart caveman. All technical substance stay. Only fluff die.
+## Start here
 
-Rules:
-- Drop: articles (a/an/the), filler (just/really/basically), pleasantries, hedging
-- Fragments OK. Short synonyms. Technical terms exact. Code unchanged.
-- Pattern: [thing] [action] [reason]. [next step].
-- Not: "Sure! I'd be happy to help you with that."
-- Yes: "Bug in auth middleware. Fix:"
-
-Switch level: /caveman lite|full|ultra|wenyan
-Stop: "stop caveman" or "normal mode"
-
-Auto-Clarity: drop caveman for security warnings, irreversible actions, user confused. Resume after.
-
-Boundaries: code/commits/PRs written normal.
-
-Read `docs/repo_map.md` before explore source files.
-`README.md` has science-facing overview
-`docs/` has design notes
-`docs/physics-validation-ledger.md` tracks which physics verified; `docs/validation/README.md` is method
-`TODO.md` contains task backlog
-
-- `TODO.md` is **identical on every branch and on `main`**: the full triaged
-  backlog, one summary line per item + pointer. Branch-scoped detail lives in
-  `tasks/<branch-leaf>.md` (see `tasks/README.md`), never in `TODO.md` and never
-  in `docs/`. Keeping branch `TODO.md` == `main:TODO.md` prevents a
-  fast-forward from silently clobbering the backlog; see `TODO.md` header for the
-  full convention (incl. the merge-drop step for the `tasks/` file).
-- Work addressing/changing tracked item: inspect the `tasks/<branch>.md` detail +
-  the shared `TODO.md` before completion. Use `todo-sync` for cross-branch
-  reconciliation. Cheap subagent may inventory read-only; one writer edits TODO.
+- Read `docs/repo_map.md` before source exploration.
+- Use Tokensave first for indexed code search, callers/callees, impact, and
+  affected tests. Query `.tokensave/tokensave.db` for unsupported structural
+  queries. Use `rg` or direct reads for exact text, non-code, generated files,
+  and unindexed details.
+- `README.md`: science/install/workflow. `docs/`: guides, design, validation.
+  `TODO.md`: shared backlog.
+- Use Context7 only for current external-library docs. RTK filters verbose shell
+  output; do not wrap already-small commands.
 
 ## Canonical commands
 
-This repo is `uv` managed.
-
-Run all (offline) tests:
+Use project runner; never bare `pytest`, `.venv/bin/python`, or path-hack imports.
 
 ```bash
-uv run python scripts/dev.py test
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test path/to/test.py -k test_name
+CXR_ONLINE_TESTS=1 rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py lint
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py format
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py typecheck
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py nbstrip
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py verify
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py precommit
 ```
 
-Run single test:
+If `uv run` cannot write project environment, add
+`UV_PROJECT_ENVIRONMENT=/tmp/cxr-mc-venv`; do not switch interpreters.
 
-```bash
-uv run python scripts/dev.py test path/to/test.py -k test_name
-```
+## Work rules
 
-Run all tests (including online/external resources):
+- Make smallest owning change. Preserve unrelated dirty-tree work.
+- Prefer reusable logic in `src/cxr_mc/`; keep marimo apps thin. Keep notebooks
+  output-free. Run `uv run marimo check <app.py>` after marimo edits.
+- Invoke matching repo skill for CLI, notebooks, Monte Carlo, performance,
+  physics, docs, runtime, remote GPU, regression, catalog-golden, or TODO work.
+- CLI changes preserve documented command/help/output/exit contracts and
+  regenerate `docs/cli-reference.md`.
+- Heavy sweeps/GPU work use `cxr remote`; never run locally.
+- Add imports with first use. Verify with smallest useful command.
 
-```bash
-CXR_ONLINE_TESTS=1 uv run python scripts/dev.py test
-```
+## Backlog and physics
 
+`TODO.md` stays identical across branches. Branch detail belongs in
+`tasks/<branch-leaf>.md`; see `tasks/README.md`. Work touching tracked items
+uses `todo-sync`.
 
-Lint:
-
-```bash
-uv run python scripts/dev.py lint
-```
-
-Format:
-
-```bash
-uv run python scripts/dev.py format
-```
-
-Type check:
-
-```bash
-uv run python scripts/dev.py typecheck
-```
-
-Notebook cleanup:
-
-```bash
-uv run python scripts/dev.py nbstrip
-```
-
-Run full verification:
-
-```bash
-uv run python scripts/dev.py verify
-```
-
-Run all pre-commit hooks:
-
-```bash
-uv run python scripts/dev.py precommit
-```
-
-Agents prefer these commands always.
-
-## Working rules
-
-- Prefer edits in `src/cxr_mc/` over notebook logic.
-- Notebook changes stay output-free on commit.
-- When edit marimo notebooks, always run `uvx marimo check` on file, fix all issues you find
-- Don't duplicate README or TODO content here.
-- Read `docs/repo_map.md`, then use Tokensave for indexed code search,
-  dependency/caller analysis, impact, and affected tests.
-- Use Tokensave for symbol-precise navigation too: callers/callees, impact,
-  and reference lookups; fall back to `rg` for exact text.
-- Query `.tokensave/tokensave.db` for structural questions unsupported by the
-  Tokensave tools. Use direct source reads or `rg` for exact text, non-code,
-  generated files, or unindexed details.
-- Use Context7 only for current external-library documentation, never as a
-  repository source. Headroom manages context/model transport; RTK filters
-  shell output. Neither replaces repository navigation or verification.
-- Every CLI change: invoke `cli-ui-ux` for design, implementation, and tests.
-- Personal workflow: `investigating-changes` diagnoses; `planning-changes`
-  handles explicit/complex plans; `implementing-changes` edits;
-  `verifying-changes` gates completion claims.
-- Keep workflow proportionate; repo safety, physics-validation, remote-compute,
-  and domain-skill rules stay authoritative.
-- Keep changes surgical, verify with smallest useful command.
-- Add import same edit as its first usage, never earlier. Unused import between edits: lint/format autostrip, next edit re-add, loop repeat.
-
-New/edited physics needs derivation docstring:
-  - source eq; assumptions; limiting case
-  - `Validation: <id>` marker
-  - row in validation ledger.
-Verify physics with fresh context, never one that wrote it; only human marks claim `signed-off`.
-
-@RTK.md
+New/edited physics requires source equation, assumptions, limiting case,
+`Validation: <id>`, and ledger row. Fresh context verifies it; only human marks
+`signed-off`.

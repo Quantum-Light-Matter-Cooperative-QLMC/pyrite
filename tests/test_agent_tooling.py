@@ -18,6 +18,16 @@ def dev_module():
     return module
 
 
+@pytest.fixture
+def sweep_guard_module():
+    path = Path(__file__).parents[1] / ".claude" / "hooks" / "guard_local_sweep.py"
+    spec = importlib.util.spec_from_file_location("cxr_mc_sweep_guard", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def write_skill(root: Path, name: str, description: str | None = None) -> Path:
     skill_dir = root / name
     skill_dir.mkdir(parents=True)
@@ -145,3 +155,30 @@ def test_claude_project_memory_imports_shared_instructions() -> None:
     claude_md = Path(__file__).parents[1] / "CLAUDE.md"
 
     assert "@AGENTS.md" in claude_md.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "uv run cxr scan hopg",
+        "rtk env UV_CACHE_DIR=/tmp/cache uv run cxr scan hopg",
+        "git status && uv run cxr scan hopg",
+        "(uv run cxr scan hopg)",
+    ],
+)
+def test_sweep_guard_blocks_local_scan(sweep_guard_module, command: str) -> None:
+    assert sweep_guard_module._local_scan(command)
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "uv run cxr remote submit hopg",
+        "uv run cxr scan --help",
+        "echo 'uv run cxr scan hopg'",
+        "rg 'cxr scan' README.md",
+        "git status",
+    ],
+)
+def test_sweep_guard_allows_safe_commands(sweep_guard_module, command: str) -> None:
+    assert not sweep_guard_module._local_scan(command)

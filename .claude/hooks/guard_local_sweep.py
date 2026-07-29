@@ -1,21 +1,7 @@
 #!/usr/bin/env python
-"""PreToolUse hook: block a *local* ``cxr scan`` before it runs.
+"""Block local ``cxr scan`` invocations before Claude runs them.
 
-Wired from .claude/settings.json on Bash. Reads the hook payload (JSON on
-stdin), pulls the shell command, and blocks the one heavy-compute footgun in
-this repo: ``cxr scan`` run locally.
-
-Why: ``cxr scan <material>`` runs a material's full Monte-Carlo sweep on the
-local box. On WSL that reliably OOMs / crashes the session. The lab GPU box is
-the canonical home for sweeps -- ``cxr remote scan`` syncs code up, submits to
-SLURM, waits, and pulls the checkpoint back. ``cxr remote scan`` is *allowed*;
-only the flat local ``cxr scan`` is blocked.
-
-Blocking contract: exit 2 makes Claude Code treat stderr as a blocking reason
-shown to the model, so it can re-issue as ``cxr remote scan``. Any other path
-(no cxr, a different subcommand, --help, a read-only command that merely
-mentions cxr) exits 0 and lets the call through -- fail-open, never wedge the
-session on a parse edge case.
+Exit 2 blocks; parse failures and unrelated commands fail open.
 """
 
 import json
@@ -23,9 +9,6 @@ import os
 import shlex
 import sys
 
-# Leading commands that only *read* text; if the line starts with one of these,
-# a bare "cxr scan" inside it is an argument (grep pattern, echoed string), not
-# an invocation -- do not block.
 READ_ONLY_LEADERS = {
     "grep",
     "rg",
@@ -43,31 +26,61 @@ READ_ONLY_LEADERS = {
     "find",
     "git",
 }
+SHELL_SEPARATORS = set(";&|()")
 
 
-def _local_scan(command: str) -> bool:
-    """True iff ``command`` invokes the flat local ``cxr scan`` (not remote)."""
-    try:
-        tokens = shlex.split(command)
-    except ValueError:
-        return False  # unbalanced quotes -> fail open
-    if not tokens:
+def _segments(command: str) -> list[list[str]]:
+    """Split shell text at control operators while respecting quotes."""
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|()")
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    segments: list[list[str]] = [[]]
+    for token in lexer:
+        if token and set(token) <= SHELL_SEPARATORS:
+            if segments[-1]:
+                segments.append([])
+            continue
+        segments[-1].append(token)
+    return [segment for segment in segments if segment]
+
+
+def _leader(tokens: list[str]) -> str:
+    """Return effective command name through ``rtk env``/``env`` wrappers."""
+    index = 0
+    while index < len(tokens) and "=" in tokens[index]:
+        index += 1
+    if index < len(tokens) and os.path.basename(tokens[index]) == "rtk":
+        index += 1
+    if index < len(tokens) and os.path.basename(tokens[index]) == "env":
+        index += 1
+        while index < len(tokens) and (tokens[index].startswith("-") or "=" in tokens[index]):
+            index += 1
+    return os.path.basename(tokens[index]) if index < len(tokens) else ""
+
+
+def _segment_has_local_scan(tokens: list[str]) -> bool:
+    if _leader(tokens) in READ_ONLY_LEADERS:
         return False
-    if os.path.basename(tokens[0]) in READ_ONLY_LEADERS:
-        return False
-    if any(t in ("-h", "--help") for t in tokens):
+    if any(token in ("-h", "--help") for token in tokens):
         return False
 
     for i, tok in enumerate(tokens):
         if os.path.basename(tok) != "cxr":
             continue
-        # First real subcommand after `cxr`: skip options and KEY=VAL assigns.
         for nxt in tokens[i + 1 :]:
             if nxt.startswith("-") or "=" in nxt:
                 continue
-            return nxt == "scan"  # `remote` (or anything else) -> allowed
+            return nxt == "scan"
         return False
     return False
+
+
+def _local_scan(command: str) -> bool:
+    """Return whether any shell segment invokes flat local ``cxr scan``."""
+    try:
+        return any(_segment_has_local_scan(tokens) for tokens in _segments(command))
+    except ValueError:
+        return False
 
 
 def main() -> int:
@@ -81,7 +94,7 @@ def main() -> int:
         sys.stderr.write(
             "Blocked: `cxr scan` runs a full Monte-Carlo sweep locally and "
             "OOMs/crashes WSL. Route it to the lab GPU box instead:\n"
-            "  cxr remote scan <material>   (syncs code, submits SLURM, pulls checkpoint)\n"
+            "  cxr remote submit <material>\n"
             "See the remote-gpu-jobs skill. If you truly must run locally, ask "
             "the user to run it themselves.\n"
         )

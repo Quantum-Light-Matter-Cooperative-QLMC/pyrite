@@ -1,31 +1,19 @@
 ---
 name: performance
-description: Use when profiling, benchmarking, or investigating runtime, memory, GPU utilization, I/O, or plotting bottlenecks in cxr-mc.
+description: Use when profiling, benchmarking, or investigating cxr-mc runtime, memory, GPU use, I/O, plotting, or remote latency.
 ---
 
 # Performance
 
-Measure a representative workload before proposing optimization.
+Measure representative workload before optimization.
 
-## Workflow
+1. Record command, environment, data size, seed, backend, warm-up/cache state,
+   repeat count, wall time, peak memory, and GPU use when relevant.
+2. Profile cumulative/exclusive time; separate Python, NumPy/CuPy, I/O,
+   plotting, and remote transport.
+3. Compare identical workloads and report spread/uncertainty.
+4. Recommend changes only for measured material hotspots.
 
-1. Identify the narrowest real entry point and representative input.
-2. Record the exact command, environment, data size, seed, and CPU/GPU backend.
-3. Measure wall time and peak memory; include GPU utilization when relevant.
-4. Profile cumulative and exclusive time, separating Python, NumPy/CuPy, I/O,
-   and plotting costs.
-5. Compare against the same baseline and report uncertainty or run-to-run spread.
-6. Recommend changes only where the measured hotspot justifies them.
-
-## Report
-
-| Metric | Baseline | Candidate | Change |
-| --- | ---: | ---: | ---: |
-
-Include commands, workload, backend, repeated-run count, and the top hotspots.
-
-## Common mistakes
-
-- Comparing different inputs, backends, seeds, or warm-up states.
-- Timing compilation, cache fill, or file loading in only one arm.
-- Optimizing a microbenchmark that is not material to an end-to-end workload.
+Report baseline, candidate, delta, commands, workload, backend, repeats, and top
+hotspots. Never compare different inputs/backends/seeds or one warm arm against
+one cold arm. Do not generalize microbenchmarks beyond measured scope.
