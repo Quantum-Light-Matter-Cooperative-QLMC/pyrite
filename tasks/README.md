@@ -12,9 +12,11 @@ implementation path, checklist, decisions, and delegation plan here.
 
 ## Workflow
 
-1. Create task branch and `tasks/<branch-leaf>.md`.
+1. Create task branch/worktree and `tasks/<branch-leaf>.md`.
 2. Add one-line `TODO.md` summary:
    `→ feature/<branch>; tasks/<branch-leaf>.md`.
 3. Keep branch and main `TODO.md` identical; use `todo-sync`.
-4. Before dropping landed branch, promote durable content to `docs/`, remove
+4. Commit task doc + synced `TODO.md`; push branch with upstream before
+   implementation.
+5. Before dropping landed branch, promote durable content to `docs/`, remove
    task file, and update backlog state.
