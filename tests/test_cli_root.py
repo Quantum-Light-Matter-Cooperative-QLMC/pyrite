@@ -62,6 +62,7 @@ def test_root_help_prefers_grouped_checkpoint_commands(capsys):
             "restore",
             "archives",
             "union",
+            "prune",
             "check",
             "check-config",
         }
@@ -78,6 +79,7 @@ def test_root_help_prefers_grouped_checkpoint_commands(capsys):
         "restore",
         "archives",
         "union",
+        "prune",
         "check",
         "check-config",
     ),

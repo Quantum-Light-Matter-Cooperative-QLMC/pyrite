@@ -979,6 +979,38 @@
             "hidden": false,
             "path": "checkpoint merge",
             "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "all_profiles",
+                "help": "Prune current checkpoints for standard and every named catalog profile.",
+                "option_strings": [
+                  "--all"
+                ],
+                "required": false
+              },
+              {
+                "dest": "catalog_profile",
+                "help": "Prune current full and survey checkpoints for catalog profile NAME.",
+                "option_strings": [
+                  "--profile"
+                ],
+                "required": false
+              },
+              {
+                "dest": "yes",
+                "help": "Delete exact previewed stale records.",
+                "option_strings": [
+                  "--yes"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr checkpoint prune [OPTIONS]\n\n  Drop records obsolete under current scan profiles; preview unless --yes. With\n  neither selector, prune profile=standard.\n\nOptions:\n  --all           Prune current checkpoints for standard and every named catalog\n                  profile.\n  --profile NAME  Prune current full and survey checkpoints for catalog profile\n                  NAME.\n  --yes           Delete exact previewed stale records.\n  -h, --help      Show this message and exit.\n",
+            "hidden": false,
+            "path": "checkpoint prune",
+            "subcommands": []
           }
         ]
       },
@@ -4669,7 +4701,7 @@
           }
         ],
         "help": "Usage: cxr prune [OPTIONS]\n\n  Drop records obsolete under current scan profiles; preview unless --yes. With\n  neither selector, prune profile=standard.\n\nOptions:\n  --all           Prune current checkpoints for standard and every named catalog\n                  profile.\n  --profile NAME  Prune current full and survey checkpoints for catalog profile\n                  NAME.\n  --yes           Delete exact previewed stale records.\n  -h, --help      Show this message and exit.\n",
-        "hidden": false,
+        "hidden": true,
         "path": "prune",
         "subcommands": []
       },

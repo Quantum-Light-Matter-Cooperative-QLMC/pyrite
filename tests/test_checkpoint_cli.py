@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import click
 
-from cxr_mc import archive, reline
+from cxr_mc import archive, prune, reline
 from cxr_mc.cli import checkpoint as checkpoint_cli
 from cxr_mc.cli import command as root_command
 from tests.cli_helpers import assert_clean_result, invoke
@@ -20,6 +20,7 @@ def test_checkpoint_group_exposes_resource_oriented_tree():
         "restore",
         "list",
         "merge",
+        "prune",
     ]
 
 
@@ -42,3 +43,13 @@ def test_checkpoint_recompute_line_dispatches_existing_handler(monkeypatch):
     assert_clean_result(result)
     assert seen["material"] == ["hopg"]
     assert seen["all"] is False
+
+
+def test_checkpoint_prune_dispatches_existing_handler(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(prune, "prune_checkpoints", lambda **kwargs: seen.update(kwargs) or 0)
+
+    result = invoke(root_command, ["checkpoint", "prune", "--profile", "sub_100keV", "--yes"])
+
+    assert_clean_result(result)
+    assert seen == {"all_profiles": False, "catalog_profile": "sub_100keV", "yes": True}

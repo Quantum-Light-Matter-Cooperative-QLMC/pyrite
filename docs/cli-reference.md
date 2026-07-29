@@ -70,6 +70,7 @@ Commands:
   analyze      Launch the analysis app.
   viewer       Launch the 3D trajectory visualization app.
   validate     Launch validation or export cached validation figures.
+  catalog      Inspect and validate material-catalog configuration.
   checkpoint   Inspect, transform, recompute, and archive checkpoints.
   completion   Manage cxr shell tab-completion.
   remote       Run and manage MC sweeps on a remote GPU host.
@@ -246,7 +247,7 @@ Options:
 ```text
 Usage: cxr checkpoint [OPTIONS] COMMAND [ARGS]...
 
-  Inspect, transform, recompute, and archive local checkpoints.
+  Inspect, transform, recompute, archive, and prune local checkpoints.
 
   Existing top-level paths such as ``cxr slim`` and ``cxr archive`` remain compatibility
   aliases.
@@ -255,6 +256,7 @@ Usage: cxr checkpoint [OPTIONS] COMMAND [ARGS]...
     cxr checkpoint list
     cxr checkpoint archive hopg keeper
     cxr checkpoint recompute line hopg
+    cxr checkpoint prune --profile standard
 
 Options:
   -h, --help  Show this message and exit.
@@ -266,6 +268,7 @@ Commands:
   restore    Copy a shelved checkpoint back to active slot.
   list       List long-term checkpoint shelf.
   merge      Merge a shelved checkpoint into active slot.
+  prune      Remove records obsolete under current scan profiles.
 ```
 
 ## `cxr checkpoint slim`
@@ -418,6 +421,22 @@ Options:
   --delete-archive  Delete source archive after successful union.
   --force           Overwrite existing pre-union archive label.
   -h, --help        Show this message and exit.
+```
+
+## `cxr checkpoint prune`
+
+```text
+Usage: cxr checkpoint prune [OPTIONS]
+
+  Drop records obsolete under current scan profiles; preview unless --yes. With neither
+  selector, prune profile=standard.
+
+Options:
+  --all           Prune current checkpoints for standard and every named catalog
+                  profile.
+  --profile NAME  Prune current full and survey checkpoints for catalog profile NAME.
+  --yes           Delete exact previewed stale records.
+  -h, --help      Show this message and exit.
 ```
 
 ## `cxr completion`

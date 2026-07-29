@@ -13,6 +13,7 @@ _COMMANDS = {
     "restore": "cxr_mc.archive.restore_command",
     "list": "cxr_mc.archive.archives_command",
     "merge": "cxr_mc.archive.union_command",
+    "prune": "cxr_mc.prune.command",
 }
 
 _COMMAND_HELP = {
@@ -22,6 +23,7 @@ _COMMAND_HELP = {
     "restore": "Copy a shelved checkpoint back to active slot.",
     "list": "List long-term checkpoint shelf.",
     "merge": "Merge a shelved checkpoint into active slot.",
+    "prune": "Remove records obsolete under current scan profiles.",
 }
 
 _RECOMPUTE_COMMANDS = {
@@ -54,7 +56,7 @@ def recompute_command() -> None:
     no_args_is_help=True,
 )
 def command() -> None:
-    """Inspect, transform, recompute, and archive local checkpoints.
+    """Inspect, transform, recompute, archive, and prune local checkpoints.
 
     Existing top-level paths such as ``cxr slim`` and ``cxr archive`` remain
     compatibility aliases.
@@ -64,6 +66,7 @@ def command() -> None:
       cxr checkpoint list
       cxr checkpoint archive hopg keeper
       cxr checkpoint recompute line hopg
+      cxr checkpoint prune --profile standard
     """
 
 

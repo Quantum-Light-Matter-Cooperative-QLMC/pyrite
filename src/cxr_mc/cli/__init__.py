@@ -72,6 +72,7 @@ _COMMAND_HELP = {
         "restore",
         "archives",
         "union",
+        "prune",
         "sweep",
         "check",
         "check-config",
