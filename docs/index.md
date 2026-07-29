@@ -13,6 +13,7 @@ materials, detectors, and validation story, see the
 :maxdepth: 1
 
 running-on-a-cluster
+performance-profile-analysis
 sweep-profiles
 cli-reference
 ```

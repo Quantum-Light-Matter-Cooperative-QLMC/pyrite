@@ -1,0 +1,268 @@
+# Performance-profile analysis playbook
+
+Use this guide after collecting `cxr scan --performance-profile NAME` logs.
+Goal: identify throughput constraint from measured phase and resource behavior,
+then test one change at a time. High CPU or GPU utilization is supporting
+evidence, not optimization target; compute-weighted throughput is target.
+
+## Outputs
+
+Write analysis artifacts under:
+
+```text
+performance-profiles/<profile>/analysis/
+├── sessions.csv
+├── intervals.csv
+├── summary.md
+└── timelines/
+    └── <job>-<material>-<session>.png
+```
+
+`sessions.csv` holds one row per `session_id`. `intervals.csv` holds adjacent
+sample pairs after validation and counter differencing. `summary.md` reports
+evidence, bottleneck classification, uncertainty, and next controlled
+experiment.
+
+Do not modify raw `.ndjson` files.
+
+## Collect comparable runs
+
+Use one named catalog profile, one slow material, and one faster comparison
+material. Run at least three repetitions per configuration. Keep these fixed:
+
+- `parameter_sha256`, fidelity, beam parameters, grids, electron counts, and
+  seeds;
+- host, SLURM CPU/GPU allocation, worker request, and parallel-material count;
+- software commit and environment;
+- warm-up treatment and checkpoint state.
+
+The performance-profile name selects an existing catalog profile; it is not an
+arbitrary experiment label. Pulled remote logs retain job separation:
+
+```bash
+cxr remote submit --performance-profile sub_100keV --headless
+cxr remote profile pull sub_100keV
+```
+
+Cached cases contain no new compute and must not be compared with uncached
+runs. Prefer a separate dataset identity or archive/restore workflow over
+deleting checkpoints solely for profiling.
+
+Start with one material process per GPU. Test `--parallel-materials` only after
+single-process pipeline behavior is understood.
+
+Generate analysis artifacts after local collection or remote pull:
+
+```bash
+cxr profile analyze sub_100keV
+```
+
+Use `--performance-dir PATH` for a non-default log root and `--sample-period
+SECONDS` when collection did not use the default five-second interval.
+
+## Validate and normalize
+
+For every input line:
+
+1. Require `schema == "cxr.performance.v1"`.
+2. Group by `profile`, job directory, `material`, and `session_id`.
+3. Sort by `elapsed_seconds`; verify timestamps and elapsed time are monotonic.
+4. Require one `start` record and one terminal `done`, `paused`, or `failed`
+   record. Mark incomplete sessions instead of silently dropping them.
+5. Confirm one `parameter_sha256` and one execution topology per comparison.
+6. Mark intervals longer than twice expected sampling period as sampling gaps.
+7. Preserve `null` GPU fields as missing data, never zero.
+
+`start` precedes runtime-plan resolution, so topology and phase fields may
+first appear on a later sample.
+
+For adjacent valid samples, compute:
+
+```text
+dt = elapsed_seconds[i] - elapsed_seconds[i-1]
+case_rate = Δcompleted_new_cases / dt
+cost_rate = Δdone_cost / dt
+read_rate = Δio_read_bytes / dt
+write_rate = Δio_write_bytes / dt
+swap_in_rate = Δswap_in_bytes / dt
+swap_out_rate = Δswap_out_bytes / dt
+```
+
+Treat negative deltas from process-tree CPU or I/O counters as process-turnover
+discontinuities. Exclude those intervals from rate calculations; do not clamp
+them to zero.
+
+Useful normalized CPU metrics:
+
+```text
+host_core_occupancy =
+    process_cpu_percent / (100 * cpu_affinity_count)
+
+worker_cpu_efficiency =
+    Δ(process_cpu_user_seconds + process_cpu_system_seconds)
+    / (dt * effective_workers)
+```
+
+`worker_cpu_efficiency` includes driver CPU time, so values slightly above one
+are possible. Use it for comparisons, not accounting.
+
+## Session summary metrics
+
+Take rolling totals from last valid terminal sample:
+
+- wall time: `elapsed_seconds`;
+- throughput: `done_cost / elapsed_seconds`;
+- case throughput: `completed_new_cases / elapsed_seconds`;
+- transport time: `transport_seconds_total`;
+- spectrum time: `spectrum_seconds_total`;
+- driver feed-wait: `driver_wait_seconds_total`;
+- checkpoint share: `checkpoint_seconds_total / elapsed_seconds`;
+- GPU feed-wait fraction: `gpu_feed_wait_fraction`;
+- peak worker RSS: maximum `child_process_rss_max_bytes`;
+- peak process RSS and system memory percentage;
+- peak VRAM and CuPy reserved/peak memory;
+- total GPU OOM retries;
+- median and 90th-percentile CPU/GPU utilization, clocks, power, and iowait.
+
+For GPU-pipeline sessions:
+
+```text
+mean_transport_per_case =
+    transport_seconds_total / timed_case_count
+
+mean_spectrum_per_case =
+    spectrum_seconds_total / timed_case_count
+
+transport_supply_time =
+    mean_transport_per_case / effective_workers
+```
+
+Compare `transport_supply_time` with `mean_spectrum_per_case`. Use measured
+`gpu_feed_wait_fraction` as stronger evidence because it records actual driver
+blocking after overlap.
+
+Warm-up inflates initial transport waits and CUDA allocation/JIT work. Report
+both full-session and steady-state results. Derive steady-state totals by
+differencing rolling counters after pipeline fill; use at least
+`effective_workers` completed cases as initial warm-up when session length
+permits.
+
+## Timeline
+
+Produce one synchronized timeline per session with:
+
+1. `phase`, `active_case`, and `in_flight_case_count`;
+2. host and process-tree CPU;
+3. GPU compute and memory utilization;
+4. GPU SM clock, P-state, power, and temperature;
+5. process RSS, max worker RSS, system RAM, swap, VRAM, and CuPy pool;
+6. read/write rates and CPU iowait;
+7. cumulative completed cost and interval `cost_rate`;
+8. cumulative transport, spectrum, feed-wait, and checkpoint time.
+
+Shade intervals where CPU and GPU are both below 20%. Classify each shaded
+interval by active phase and resource evidence; do not label it a stall merely
+because no case completed during one sample interval.
+
+## Bottleneck decision table
+
+| Evidence | Likely constraint | Next experiment |
+|---|---|---|
+| `gpu_feed_wait_fraction >= 0.25`, frequent `transport_wait`, falling in-flight count | CPU transport cannot feed GPU | Increase workers within measured RAM headroom |
+| Effective workers equal memory cap; max worker RSS far below `worker_memory_budget_mib` | Conservative worker admission | Test lower `CXR_MC_WORKER_MEM_MB` or explicit `--workers` |
+| Low feed-wait, spectrum dominates, GPU busy | GPU spectrum compute | Test spectrum algorithm or safe chunk increase |
+| Low feed-wait, spectrum dominates, GPU below 20%, clocks active | Launch/synchronization or host work inside spectrum phase | Sweep `spec_chunk`/`brem_chunk`; profile spectrum internals if unchanged |
+| Low GPU utilization plus low clocks, low power, idle P-state during `spectrum` | Power-state, scheduling, or burst sampling | Compare longer cases; inspect GPU clock/throttle policy |
+| Checkpoint share material; write rate and iowait align with low utilization | Checkpoint/storage path | Reduce save cost or test faster storage |
+| Swap counters rise or available RAM collapses | Memory pressure | Reduce workers/chunks; do not increase concurrency |
+| CuPy reserved peak approaches pool limit or OOM retries rise | GPU memory limit | Reduce chunks or concurrency |
+| CPU pool phase, low worker CPU efficiency, low iowait | Scheduling, affinity, process priority, or serial Python | Inspect allocation/affinity and worker activity |
+| Both devices low during `idle` while work remains | Dispatch/control-flow fault | Reproduce with logs and inspect stop/deadline state |
+
+The 20–25% feed-wait boundary matches runner's existing pipeline decision
+rule. Treat every other threshold as an experiment trigger, not proof.
+
+## Controlled experiment order
+
+### 1. Worker admission
+
+Hold chunks and workload fixed. Compare current auto worker count against
+adjacent safe counts. Before relaxing memory policy, require:
+
+- sampled worker RSS comfortably below configured per-worker budget;
+- no swap activity;
+- adequate system available memory across repetitions.
+
+Win condition: higher `cost_rate`, lower feed-wait, stable memory, and no
+regression in spectrum time.
+
+### 2. Spectrum and bremsstrahlung chunks
+
+Hold workers fixed. Test smaller, current, and larger chunks within VRAM
+headroom. Record effective `spec_chunk` and `brem_chunk` from each active case.
+
+Win condition: lower spectrum time and higher end-to-end throughput without
+OOM retries or unsafe CuPy/VRAM growth.
+
+### 3. CuPy pool-release cadence
+
+Only test after chunk behavior is understood. Compare pool-release cadence
+while watching CuPy reserved peak and spectrum time.
+
+Win condition: less allocation/synchronization time with bounded reserved
+memory.
+
+### 4. Material concurrency
+
+Only if one scan cannot keep GPU busy after worker/chunk tuning. Compare one
+and two material processes, accounting for duplicated CUDA contexts, CuPy
+pools, and transport workers.
+
+Win condition: higher aggregate `done_cost / elapsed_seconds`, not merely
+higher GPU utilization.
+
+## Report template
+
+```markdown
+# Performance analysis: <profile>, <commit>, <date>
+
+## Workload
+- Materials:
+- Parameter SHA:
+- Host/GPU:
+- Allocation:
+- Repetitions:
+- Warm-up rule:
+
+## Baseline
+| Metric | Median | Spread |
+|---|---:|---:|
+| Wall time | | |
+| Cost rate | | |
+| GPU feed-wait fraction | | |
+| Mean transport/case | | |
+| Mean spectrum/case | | |
+| Checkpoint share | | |
+| Peak worker RSS | | |
+| Peak VRAM/CuPy pool | | |
+
+## Evidence
+- Observed:
+- Ruled out:
+- Remaining uncertainty:
+
+## Classification
+- Primary bottleneck:
+- Secondary bottleneck:
+- Confidence:
+
+## Next controlled experiment
+- One changed variable:
+- Expected signature:
+- Safety limit:
+- Acceptance criterion:
+```
+
+Optimization recommendation requires repeatable throughput improvement on
+identical inputs. Report run-to-run spread and retain raw logs with analysis
+artifacts.

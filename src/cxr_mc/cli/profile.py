@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import difflib
 import re
+from pathlib import Path
 
 import click
 import tomlkit
@@ -229,6 +230,50 @@ def command():
       cxr profile add sub_100keV --energy 75
       cxr profile delete sub_100keV -y
     """
+
+
+@command.command("analyze")
+@click.argument("name", shell_complete=_cli_completion.complete_profile)
+@click.option(
+    "--performance-dir",
+    type=click.Path(path_type=Path, file_okay=False),
+    default=Path("performance-profiles"),
+    show_default=True,
+    help="Directory containing NAME's local or pulled NDJSON logs.",
+)
+@click.option(
+    "--sample-period",
+    type=click.FloatRange(min=0, min_open=True),
+    default=5.0,
+    show_default=True,
+    metavar="SECONDS",
+    help="Expected sampling period; intervals over twice this value are gaps.",
+)
+def analyze_command(name, performance_dir, sample_period):
+    """Analyze NAME's performance logs into CSV, Markdown, and PNG artifacts."""
+    from cxr_mc.performance_analysis import (
+        PerformanceAnalysisError,
+        analyze_performance_profile,
+    )
+
+    try:
+        result = analyze_performance_profile(
+            name,
+            performance_dir,
+            sample_period=sample_period,
+        )
+    except (OSError, PerformanceAnalysisError) as exc:
+        raise CLIError(str(exc)) from None
+    emit_result(
+        f"analyzed {result['sessions']} sessions ({result['intervals']} intervals) "
+        f"-> {result['analysis_root']}"
+    )
+    if result["incomplete_sessions"]:
+        click.echo(
+            f"warning: {result['incomplete_sessions']} incomplete session(s)",
+            err=True,
+        )
+    return 0
 
 
 @command.command("list")

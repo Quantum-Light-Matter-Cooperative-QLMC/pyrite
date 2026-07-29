@@ -153,6 +153,10 @@ cxr remote profile pull sub_100keV
 ```
 
 Pulled files land under `performance-profiles/NAME/<job>/<material>.ndjson`.
+Use the
+[performance-profile analysis playbook](performance-profile-analysis.md) to
+validate sessions, derive phase/resource metrics, classify bottlenecks, and
+design controlled tuning runs.
 `cxr remote stop ...` cancels an active allocation with `scancel`. `cxr remote
 check` follows the same submit-and-wait workflow for its validation calculation;
 `cxr remote check --detached` returns after submission.

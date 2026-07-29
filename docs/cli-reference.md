@@ -1263,6 +1263,7 @@ Options:
 Commands:
   add              Add values to an existing profile's grids (union, sorted,...
   add-material     Add materials to a profile's explicit membership list.
+  analyze          Analyze NAME's performance logs into CSV, Markdown, and PNG...
   create           Create a new profile, cloning range defaults from --from...
   delete           Delete a profile; irreversible.
   list             List catalog profiles with membership and override counts.
@@ -1318,6 +1319,21 @@ Options:
   -y, --yes   Skip the 'standard' confirmation prompt.
   --dry-run   Print proposed TOML diff; write nothing.
   -h, --help  Show this message and exit.
+```
+
+## `cxr profile analyze`
+
+```text
+Usage: cxr profile analyze [OPTIONS] NAME
+
+  Analyze NAME's performance logs into CSV, Markdown, and PNG artifacts.
+
+Options:
+  --performance-dir DIRECTORY  Directory containing NAME's local or pulled NDJSON logs.
+                               [default: performance-profiles]
+  --sample-period SECONDS      Expected sampling period; intervals over twice this value
+                               are gaps.  [default: 5.0; x>0]
+  -h, --help                   Show this message and exit.
 ```
 
 ## `cxr profile create`
