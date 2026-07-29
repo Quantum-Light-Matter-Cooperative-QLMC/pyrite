@@ -138,8 +138,9 @@ Options:
                                   checkpoints]
   --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
                                   resumable work remains.
-  --performance-profile NAME      Sample CPU, RAM, GPU, VRAM, process-tree, case,
-                                  worker, and chunk metrics every 5 s into performance-
+  --performance-profile NAME      Run catalog profile NAME while sampling CPU, RAM, GPU,
+                                  VRAM, process-tree, case, worker, and chunk metrics
+                                  every 5 s into performance-
                                   profiles/NAME/<material>.ndjson.
   --fidelity [full|survey]        Named settings/grid-reduction policy. survey is
                                   provisional and reduced.  [default: full]
@@ -786,9 +787,9 @@ Options:
                               minutes 0.  [1<=x<=4]
   --chunk-minutes NUMBER      Self-resubmitting SLURM slice length; 0 runs one
                               monolithic job.  [default: 10.0]
-  --performance-profile NAME  Log CPU, RAM, GPU, VRAM, process, worker, chunk, and case
-                              metrics every 5 s; pull later with `cxr remote profile
-                              pull NAME`.
+  --performance-profile NAME  Run catalog profile NAME with CPU, RAM, GPU, VRAM,
+                              process, worker, chunk, and case logging every 5 s; pull
+                              with `cxr remote profile pull NAME`.
   --no-sync                   Skip code upload.
   --dry-run                   Print submission preview; do not connect.
   --headless                  Return after submission without attaching or pulling.

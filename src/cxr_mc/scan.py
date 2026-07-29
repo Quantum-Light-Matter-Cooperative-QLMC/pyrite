@@ -323,8 +323,9 @@ def _performance_profile(ctx, param, value):
     default=None,
     metavar="NAME",
     help=(
-        "Sample CPU, RAM, GPU, VRAM, process-tree, case, worker, and chunk metrics "
-        "every 5 s into performance-profiles/NAME/<material>.ndjson."
+        "Run catalog profile NAME while sampling CPU, RAM, GPU, VRAM, process-tree, "
+        "case, worker, and chunk metrics every 5 s into "
+        "performance-profiles/NAME/<material>.ndjson."
     ),
 )
 @click.option(
@@ -634,6 +635,13 @@ def _resolved_run(args, material):
 
     fidelity = getattr(args, "fidelity", "full")
     catalog_profile = getattr(args, "catalog_profile", "standard")
+    performance_profile = getattr(args, "performance_profile", None)
+    if performance_profile is not None:
+        if catalog_profile not in ("standard", performance_profile):
+            raise click.UsageError(
+                "--performance-profile and --profile must name the same catalog profile"
+            )
+        catalog_profile = performance_profile
     settings = default_settings() if fidelity == "full" else default_settings(fidelity)
     overrides = {}
     if getattr(args, "quick", False):

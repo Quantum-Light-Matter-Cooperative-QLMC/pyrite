@@ -1002,7 +1002,7 @@ def test_scan_performance_profile_records_resolved_beam(monkeypatch, tmp_path):
         checkpoint_dir=str(tmp_path),
         progress_file=None,
         no_progress=True,
-        performance_profile="baseline",
+        performance_profile="standard",
         performance_dir=str(tmp_path / "performance"),
         beam_transverse_fwhm_x_mm=0.25,
         beam_transverse_fwhm_y_mm=0.5,

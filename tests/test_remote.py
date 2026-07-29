@@ -930,6 +930,31 @@ def test_submit_sub_100keV_uses_shipped_membership_without_material_args(capsys)
     assert "hopg" in out and "zrte3" in out
 
 
+def test_submit_performance_profile_selects_catalog_profile(capsys):
+    remote.main(["submit", "--performance-profile", "sub_100keV", "--dry-run"])
+
+    out = capsys.readouterr().out
+    assert "hopg" in out and "zrte3" in out
+    assert "--profile sub_100keV" in out
+    assert "--performance-profile sub_100keV" in out
+
+
+def test_submit_rejects_conflicting_performance_and_catalog_profiles(capsys):
+    result = remote.main(
+        [
+            "submit",
+            "--profile",
+            "sub_100keV",
+            "--performance-profile",
+            "standard",
+            "--dry-run",
+        ]
+    )
+
+    assert result == 2
+    assert "must name the same catalog profile" in capsys.readouterr().err
+
+
 def test_submit_defaults_to_attach_and_pull(monkeypatch):
     events = []
     monkeypatch.setattr(

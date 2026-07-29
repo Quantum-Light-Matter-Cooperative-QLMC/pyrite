@@ -125,17 +125,25 @@ fit concurrently. Use `cxr remote status`, `cxr remote logs --follow`,
 or `cxr remote attach` to monitor the allocation. `attach` shows an independent
 case-progress bar for each material; `logs --follow` shows the raw shared job log.
 
-Add `--performance-profile NAME` to local `cxr scan` or remote `cxr remote
-submit`/legacy `scan` runs to sample resources every five seconds. Each NDJSON
-sample records host and process-tree CPU/RAM, GPU utilization and VRAM
-(`null` when no NVIDIA GPU is available), power, temperature, most recently
-completed case, progress, resolved worker topology, electron counts, grid
-widths, and adaptive spectrum/brem chunk sizes. Local logs go to
-`performance-profiles/NAME/<material>.ndjson`; remote logs appear beside case
-progress in `attach`. Fetch every remote job matching the name with:
+Use `--performance-profile NAME` to run existing catalog profile `NAME` with
+resource sampling enabled; it supplies the same profile selection as
+`--profile NAME`, so do not repeat both options:
 
 ```bash
-cxr remote profile pull NAME
+cxr remote submit --performance-profile sub_100keV
+```
+
+Local `cxr scan MATERIAL --performance-profile NAME` uses the same resolution.
+Each five-second NDJSON sample records host and process-tree CPU/RAM, GPU
+utilization and VRAM (`null` when no NVIDIA GPU is available), power,
+temperature, resolved beam parameters, most recently completed case, progress,
+worker topology, electron counts, grid widths, and adaptive spectrum/brem chunk
+sizes. Local logs go to `performance-profiles/NAME/<material>.ndjson`; remote
+logs appear beside case progress in `attach`. Fetch every remote job matching
+the catalog profile name with:
+
+```bash
+cxr remote profile pull sub_100keV
 ```
 
 Pulled files land under `performance-profiles/NAME/<job>/<material>.ndjson`.

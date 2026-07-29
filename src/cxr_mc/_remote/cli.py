@@ -913,8 +913,8 @@ def reline_command(
     default=None,
     metavar="NAME",
     help=(
-        "Log CPU, RAM, GPU, VRAM, process, worker, chunk, and case metrics every 5 s; "
-        "pull later with `cxr remote profile pull NAME`."
+        "Run catalog profile NAME with CPU, RAM, GPU, VRAM, process, worker, chunk, "
+        "and case logging every 5 s; pull with `cxr remote profile pull NAME`."
     ),
 )
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
@@ -961,6 +961,12 @@ def start_command(
     follow,
 ):
     materials = list(materials)
+    if performance_profile is not None:
+        if catalog_profile not in ("standard", performance_profile):
+            raise click.UsageError(
+                "--performance-profile and --profile must name the same catalog profile"
+            )
+        catalog_profile = performance_profile
     if actually_all and materials:
         raise click.UsageError("start -A/--actually-all does not take material names")
     if actually_all and all_:

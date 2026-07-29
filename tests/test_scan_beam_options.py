@@ -51,6 +51,40 @@ def test_scan_beam_options_do_not_override_material_energy_grid(monkeypatch):
     assert tuple(sweep.beam.energy_keV) == tuple(baseline.beam.energy_keV)
 
 
+def test_scan_performance_profile_selects_catalog_profile(monkeypatch):
+    captured = {}
+
+    def capture(args):
+        captured["identity"] = scan._resolved_run(args, "hopg")[2]
+
+    monkeypatch.setattr(scan, "run", capture)
+    result = CliRunner().invoke(
+        scan.command,
+        ["hopg", "--performance-profile", "sub_100keV"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["identity"]["catalog_profile"] == "sub_100keV"
+
+
+def test_scan_rejects_conflicting_performance_and_catalog_profiles(monkeypatch):
+    monkeypatch.setattr(scan, "run", lambda args: scan._resolved_run(args, "hopg"))
+    result = CliRunner().invoke(
+        scan.command,
+        [
+            "hopg",
+            "--profile",
+            "sub_100keV",
+            "--performance-profile",
+            "standard",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "must name the same catalog profile" in result.output
+
+
 def test_scan_beam_option_help_and_validation():
     runner = CliRunner()
     help_result = runner.invoke(scan.command, ["--help"])
