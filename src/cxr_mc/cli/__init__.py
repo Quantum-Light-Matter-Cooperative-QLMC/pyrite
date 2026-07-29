@@ -33,7 +33,7 @@ _COMMANDS = {
 
 _COMMAND_HELP = {
     "scan": "Run one material's MC sweep and write a checkpoint.",
-    "app": "Launch or export interactive analysis, viewer, and validation apps.",
+    "app": "Launch or export interactive analysis notebooks.",
     "checkpoint": "Inspect, transform, recompute, archive, and prune checkpoints.",
     "completion": "Manage cxr shell tab-completion.",
     "slim": "Shrink a checkpoint for transfer.",
@@ -77,16 +77,20 @@ _COMMAND_HELP = {
 @click.version_option(__version__, prog_name="cxr-mc", message="cxr-mc %(version)s")
 @color_option
 def command() -> None:
-    """Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.
+    """Manage coherent X-ray radiation simulation campaigns.
+
+    Start with a named profile: it defines campaign ranges, workloads, and
+    material membership. Then run scans, inspect checkpoints, or open analysis
+    notebooks.
 
     Run ``cxr COMMAND --help`` for command options, units, defaults, and side
     effects.
 
     \b
     Examples:
-      cxr scan mose2 --quick
-      cxr app analysis mose2
-      cxr remote submit mose2 --dry-run
+      cxr profile list
+      cxr profile show sub_100keV
+      cxr app analysis
     """
 
 

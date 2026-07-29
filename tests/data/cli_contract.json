@@ -90,7 +90,7 @@
         "required": false
       }
     ],
-    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr scan mose2 --quick\n    cxr app analysis mose2\n    cxr remote submit mose2 --dry-run\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  scan         Run one material's MC sweep and write a checkpoint.\n  app          Launch or export interactive analysis, viewer, and validation\n               apps.\n  checkpoint   Inspect, transform, recompute, archive, and prune checkpoints.\n  completion   Manage cxr shell tab-completion.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect, validate, edit, and blaze individual materials.\n",
+    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Manage coherent X-ray radiation simulation campaigns.\n\n  Start with a named profile: it defines campaign ranges, workloads, and\n  material membership. Then run scans, inspect checkpoints, or open analysis\n  notebooks.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr profile list\n    cxr profile show sub_100keV\n    cxr app analysis\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  scan         Run one material's MC sweep and write a checkpoint.\n  app          Launch or export interactive analysis notebooks.\n  checkpoint   Inspect, transform, recompute, archive, and prune checkpoints.\n  completion   Manage cxr shell tab-completion.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect, validate, edit, and blaze individual materials.\n",
     "hidden": false,
     "path": "",
     "subcommands": [
@@ -321,7 +321,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: cxr app [OPTIONS] COMMAND [ARGS]...\n\n  Launch interactive apps or write non-interactive artifacts.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  analysis    Launch or export the analysis app.\n  viewer      Launch or export the 3D trajectory viewer.\n  validation  Launch or export cached validation figures.\n",
+        "help": "Usage: cxr app [OPTIONS] COMMAND [ARGS]...\n\n  Launch or export interactive analysis notebooks.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  analysis    Launch or export the analysis app.\n  viewer      Launch or export the 3D trajectory viewer.\n  validation  Launch or export cached validation figures.\n",
         "hidden": false,
         "path": "app",
         "subcommands": [

@@ -49,14 +49,17 @@ Commands below are authoritative for this version.
 ```text
 Usage: cxr [OPTIONS] COMMAND [ARGS]...
 
-  Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.
+  Manage coherent X-ray radiation simulation campaigns.
+
+  Start with a named profile: it defines campaign ranges, workloads, and material
+  membership. Then run scans, inspect checkpoints, or open analysis notebooks.
 
   Run ``cxr COMMAND --help`` for command options, units, defaults, and side effects.
 
   Examples:
-    cxr scan mose2 --quick
-    cxr app analysis mose2
-    cxr remote submit mose2 --dry-run
+    cxr profile list
+    cxr profile show sub_100keV
+    cxr app analysis
 
 Options:
   --version                    Show the version and exit.
@@ -66,7 +69,7 @@ Options:
 
 Commands:
   scan         Run one material's MC sweep and write a checkpoint.
-  app          Launch or export interactive analysis, viewer, and validation apps.
+  app          Launch or export interactive analysis notebooks.
   checkpoint   Inspect, transform, recompute, archive, and prune checkpoints.
   completion   Manage cxr shell tab-completion.
   remote       Run and manage MC sweeps on a remote GPU host.
@@ -160,7 +163,7 @@ Options:
 ```text
 Usage: cxr app [OPTIONS] COMMAND [ARGS]...
 
-  Launch interactive apps or write non-interactive artifacts.
+  Launch or export interactive analysis notebooks.
 
 Options:
   -h, --help  Show this message and exit.

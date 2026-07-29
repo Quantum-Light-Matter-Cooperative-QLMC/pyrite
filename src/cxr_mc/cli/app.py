@@ -73,7 +73,7 @@ class LaunchLeafGroup(click.Group):
 
 @click.command(cls=AppGroup, lazy_commands=_LEAVES, lazy_help=_HELP, no_args_is_help=True)
 def command() -> None:
-    """Launch interactive apps or write non-interactive artifacts."""
+    """Launch or export interactive analysis notebooks."""
 
 
 def _load(path: str):
