@@ -1,4 +1,4 @@
-;# TODO / Backlog
+# TODO / Backlog
 
 Shared, priority-ordered backlog. Keep identical on every branch. Branch detail
 lives in `tasks/<branch-leaf>.md`; workflow and merge rules:
@@ -9,20 +9,11 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
 
 ### Active
 
-1. **Align local/remote run surfaces and profile selection.** Canonicalize
-   `cxr run` / `cxr remote run`, move material-group selection to profiles,
-   rename performance flags, add `--level9`, and drop deprecated command paths.
-   → `feature/cli-run-alignment`; [`tasks/cli-run-alignment.md`](tasks/cli-run-alignment.md).
-2. **Group interactive apps and exports.** Move analysis, viewer, and validation
-   launch/export flows under `cxr app`.
-   → `feature/cli-app-suite`; [`tasks/cli-app-suite.md`](tasks/cli-app-suite.md).
-3. **Consolidate material command tree.** Fold catalog validation and blazed
-   sweeps into `cxr material`.
-   → `feature/material-command-tree`;
-   [`tasks/material-command-tree.md`](tasks/material-command-tree.md).
-1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-2. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
-3. **GPU-memory follow-up.** Benchmark remote `rebrem --all --ne-brem 500 --step 20` for bounded CuPy reserved-pool memory; assess `reline` cleanup separately.
+1. **>user< Compute Performance Optimization** Evaluate cause of low CPU/Host RAM Utilization + Bursty GPU utilization on remote lab box, look to improve compute to maximum stable (non-OOM) state -- roughly 85% CPU/GPU/RAM/VRAM utilization across the board, keep GPU always fed where possible.
+2. **>user< SLURM Queue info** On `cxr remote attach` and related progress dashboard information (not in logs), want report of that job's position in the SLURM queue, along with top item in queue if job is pending.
+3. **>user< Time estimate on compute progress bar** Next to the percent complete indicator on the compute progress bar in the progress dashboards, add an overall elapsed time/remaining time/total time estimate based on how long the current compute has taken and the fraction of currently-completed compute. 
+4. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
+5. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
 
 ### Gated
 
@@ -36,13 +27,12 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
 
 ## P2 - medium-priority
 
-1. **Remote-job UX.** Profile-based job names + same-profile submit block, quieter submit pull suggestion, explicit-material-only stop list, faster `stop --all`, attach-time cancel key + compute-aware progress bars. → `feature/remote-ux`.
-2. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-3. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`.
-4. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-5. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
-6.  **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
-7. **Trace render UX.** Fix stale cached animation reuse/random seeds; place progress near render action; crop background/legend while keeping overlays; improve MP4 quality; add save dialog. >user<
-8. **Coherence ON-vs-OFF comparison.** Pair otherwise-identical coherent/incoherent datasets; report peak and integrated-flux ratios. Design: [`docs/coherent-emission.md`](docs/coherent-emission.md).
+1. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+2. **Coherence ON-vs-OFF comparison.** Pair otherwise-identical coherent/incoherent datasets; report peak and integrated-flux ratios. Design: [`docs/coherent-emission.md`](docs/coherent-emission.md).
 
-## P3 - lower / exploratory / small bugfixes
+## P3 - lower / exploratory / small bugfixes / on-hold
+
+1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`.
+2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+3. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
+4.  **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
