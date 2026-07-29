@@ -9,11 +9,16 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
 
 ### Active
 
-1. **>user< Compute Performance Optimization** Evaluate cause of low CPU/Host RAM Utilization + Bursty GPU utilization on remote lab box, look to improve compute to maximum stable (non-OOM) state -- roughly 85% CPU/GPU/RAM/VRAM utilization across the board, keep GPU always fed where possible.
-2. **>user< SLURM Queue info** On `cxr remote attach` and related progress dashboard information (not in logs), want report of that job's position in the SLURM queue, along with top item in queue if job is pending.
-3. **>user< Time estimate on compute progress bar** Next to the percent complete indicator on the compute progress bar in the progress dashboards, add an overall elapsed time/remaining time/total time estimate based on how long the current compute has taken and the fraction of currently-completed compute. 
-4. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-5. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
+1. **Compute performance optimization.** Measure and improve stable remote
+   CPU/GPU/RAM/VRAM utilization without OOM, keeping the GPU fed where evidence
+   supports it. → `feature/compute-performance-optimization`;
+   [`tasks/compute-performance-optimization.md`](tasks/compute-performance-optimization.md).
+2. **Remote progress dashboard.** Report a pending job's SLURM queue position
+   and top queued item, plus elapsed/remaining/estimated-total time beside
+   overall compute progress. → `feature/remote-progress-dashboard`;
+   [`tasks/remote-progress-dashboard.md`](tasks/remote-progress-dashboard.md).
+3. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
+4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
 
 ### Gated
 
