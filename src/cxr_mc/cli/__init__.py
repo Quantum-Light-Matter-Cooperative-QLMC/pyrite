@@ -40,7 +40,7 @@ _COMMAND_HELP = {
     "analyze": "Launch the analysis app.",
     "viewer": "Launch the 3D trajectory visualization app.",
     "validate": "Launch validation or export cached validation figures.",
-    "checkpoint": "Inspect, transform, recompute, and archive checkpoints.",
+    "checkpoint": "Inspect, transform, recompute, archive, and prune checkpoints.",
     "completion": "Manage cxr shell tab-completion.",
     "slim": "Shrink a checkpoint for transfer.",
     "rebrem": "Recompute bremsstrahlung arrays in local checkpoints.",

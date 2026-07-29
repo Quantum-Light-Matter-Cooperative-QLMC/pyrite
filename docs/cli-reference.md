@@ -70,14 +70,12 @@ Commands:
   analyze      Launch the analysis app.
   viewer       Launch the 3D trajectory visualization app.
   validate     Launch validation or export cached validation figures.
-  catalog      Inspect and validate material-catalog configuration.
-  checkpoint   Inspect, transform, recompute, and archive checkpoints.
+  checkpoint   Inspect, transform, recompute, archive, and prune checkpoints.
   completion   Manage cxr shell tab-completion.
   remote       Run and manage MC sweeps on a remote GPU host.
   energy-grid  Derive, submit, inspect, and apply photon-energy grids.
   profile      Manage named catalog campaigns and material membership.
   material     Inspect, validate, edit, and blaze individual materials.
-  prune        Drop checkpoint records obsolete under current scan profiles.
 ```
 
 ## `cxr scan`
@@ -1436,27 +1434,31 @@ Commands:
 ## `cxr profile members add`
 
 ```text
-Usage: cxr profile members add [OPTIONS] NAME MATERIALS...
+Usage: cxr profile members add [OPTIONS] NAME [MATERIALS]...
 
   Extend NAME's explicit membership with MATERIAL keys.
 
 Options:
-  -y, --yes   Skip the 'standard' confirmation prompt.
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
+  --unverified-dw     Include mats_to_sim.toml's unverified-Debye-Waller material group.
+  --high-energy-only  Include mats_to_sim.toml's high-energy material group.
+  -y, --yes           Skip the 'standard' confirmation prompt.
+  --dry-run           Print proposed TOML diff; write nothing.
+  -h, --help          Show this message and exit.
 ```
 
 ## `cxr profile members remove`
 
 ```text
-Usage: cxr profile members remove [OPTIONS] NAME MATERIALS...
+Usage: cxr profile members remove [OPTIONS] NAME [MATERIALS]...
 
   Remove MATERIAL keys from NAME's explicit membership.
 
 Options:
-  -y, --yes   Skip the 'standard' confirmation prompt.
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
+  --unverified-dw     Include mats_to_sim.toml's unverified-Debye-Waller material group.
+  --high-energy-only  Include mats_to_sim.toml's high-energy material group.
+  -y, --yes           Skip the 'standard' confirmation prompt.
+  --dry-run           Print proposed TOML diff; write nothing.
+  -h, --help          Show this message and exit.
 ```
 
 ## `cxr profile members reset`
@@ -1475,14 +1477,16 @@ Options:
 ## `cxr profile members set`
 
 ```text
-Usage: cxr profile members set [OPTIONS] NAME MATERIALS...
+Usage: cxr profile members set [OPTIONS] NAME [MATERIALS]...
 
   Replace NAME's explicit membership with MATERIAL keys.
 
 Options:
-  -y, --yes   Skip the 'standard' confirmation prompt.
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
+  --unverified-dw     Include mats_to_sim.toml's unverified-Debye-Waller material group.
+  --high-energy-only  Include mats_to_sim.toml's high-energy material group.
+  -y, --yes           Skip the 'standard' confirmation prompt.
+  --dry-run           Print proposed TOML diff; write nothing.
+  -h, --help          Show this message and exit.
 ```
 
 ## `cxr profile remove`
@@ -1673,20 +1677,4 @@ Usage: cxr material validate [OPTIONS] [MANIFEST]
 
 Options:
   -h, --help  Show this message and exit.
-```
-
-## `cxr prune`
-
-```text
-Usage: cxr prune [OPTIONS]
-
-  Drop records obsolete under current scan profiles; preview unless --yes. With neither
-  selector, prune profile=standard.
-
-Options:
-  --all           Prune current checkpoints for standard and every named catalog
-                  profile.
-  --profile NAME  Prune current full and survey checkpoints for catalog profile NAME.
-  --yes           Delete exact previewed stale records.
-  -h, --help      Show this message and exit.
 ```

@@ -64,9 +64,10 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   hidden alias: `cxr check-config`.
 - **`cxr checkpoint ...`** → `cli.checkpoint:command`: grouped local checkpoint
   shrink, component recompute, archive, restore, list, and merge operations.
-- **`cxr prune [--all | --profile NAME] [--yes]`** → `prune:command`: preview
-  or atomically rewrite current named-profile checkpoints, retaining only
-  records whose full case payload exactly matches current profile resolution.
+- **`cxr checkpoint prune [--all | --profile NAME] [--yes]`** →
+  `prune:command`: preview or atomically rewrite current named-profile
+  checkpoints, retaining only records whose full case payload exactly matches
+  current profile resolution. Hidden compatibility alias: `cxr prune`.
 - **`cxr scan <material> [--fidelity full|survey]`** → `scan:main` →
   `run.run_sweep` → write canonical `checkpoints/<material>/{line,brem}.pkl`
   or an identity-qualified variant directory. Box shim: `python -m cxr_mc._entry.scan`.
