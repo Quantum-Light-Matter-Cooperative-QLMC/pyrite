@@ -61,10 +61,12 @@ If `uv run` cannot write project environment, add
   normal checklist slices, or `lead-task` for complex/integrating ownership.
 - Example model tiers: Haiku/Luna → lite; Sonnet/Terra → normal;
   Opus/Sol/Fable/K3 → lead. Risk and scope override model label.
-- Use `rebase-branches` to bring task branches current with `main`. It fans
-  cheap subagents out per branch, rebases only clean or `TODO.md`-only cases,
-  aborts and reports real conflicts, and never pushes without explicit
-  instruction.
+- Use `repo-cleanup` for git hygiene. It fans cheap subagents out per item to
+  rebase task branches onto `main` (clean or `TODO.md`-only conflicts only;
+  real conflicts are aborted and reported), prune stale worktree/tracking
+  entries, remove clean worktrees on merged branches, `-d` delete fully
+  merged locals, and delete fully merged remote branches. Never pushes
+  otherwise without explicit instruction.
 - Task type stays separate: workers also invoke matching CLI, notebook,
   physics, performance, docs, remote, regression, or scientific skill.
 - Direct user invocation of a worker skill permits task-local checkpoint
