@@ -11,13 +11,14 @@ Enforce one invariant: every branch `TODO.md` equals authoritative
 ## Workflow
 
 1. Inspect `git worktree list --porcelain` and each target status.
-2. Read `TODO.md` from main worktree. Stop if it has unknown uncommitted edits;
-   never stash, discard, or overwrite user work.
-3. Compare target copies byte-for-byte. Preserve `>user<` text exactly.
-4. Copy only authoritative `TODO.md` into divergent clean or same-writer
-   worktrees.
+2. Read every worktree's current `TODO.md`, including uncommitted content.
+   Treat dirty state as reconciliation input, not a blocker.
+3. Merge unique intended edits into the main worktree copy. Preserve `>user<`
+   text exactly. Stop only when the same backlog item has incompatible edits
+   that cannot be combined without choosing intent.
+4. Copy the reconciled main `TODO.md` into every divergent worktree.
 5. Verify equality; report changed and blocked worktrees.
 
-Touch only `TODO.md`. Do not edit task/docs content, create/drop branches or
-worktrees, commit, push, rebase, or dispatch. Use `triage` for `>user<`
-extraction; use `dispatch-task` for task lifecycle.
+Never stash or discard work. Touch only `TODO.md`. Do not edit task/docs
+content, create/drop branches or worktrees, commit, push, rebase, or dispatch.
+Use `triage` for `>user<` extraction; use `dispatch-task` for task lifecycle.
