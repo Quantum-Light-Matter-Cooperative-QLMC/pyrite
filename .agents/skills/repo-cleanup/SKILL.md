@@ -19,9 +19,13 @@ checkout; anything needing a branch on disk gets a fresh temporary worktree
 1. `git fetch --all --prune`; inspect `git branch -vv`,
    `git worktree list --porcelain`, per-branch dirty status, and ahead/behind
    counts vs `main`.
-2. Skip and report: branches not behind `main`, dirty worktrees, mid-rebase or
+2. The controlling agent reads `main:TODO.md` and cross-references every
+   branch against it: note which branches a TODO item points at (and that
+   item's state), and flag any active branch not tracked in `TODO.md` —
+   untracked branches are reported as triage candidates, never deleted.
+3. Skip and report: branches not behind `main`, dirty worktrees, mid-rebase or
    mid-merge state, unclear ownership.
-3. Remaining behind-`main` branches are rebase candidates.
+4. Remaining behind-`main` branches are rebase candidates.
 
 ## Rebase per branch
 
@@ -66,7 +70,10 @@ Order matters: worktrees before their branches, local before remote.
    `git worktree remove`; a refusal means stop and report, never `--force`.
 3. Fully merged local branches: from `git branch --merged main`, delete with
    `git branch -d` only. Skip `main`, skip any branch still checked out in a
-   remaining worktree, skip anything with an open task doc not yet retired.
+   remaining worktree, skip anything with an open task doc not yet retired,
+   and skip any branch tied to an outstanding (not landed/done) `TODO.md`
+   item — a merged branch with a still-open item is a backlog inconsistency;
+   report it, do not delete.
 4. Remote prune: `git remote prune origin` drops stale tracking refs (safe).
 5. Fully merged remote branches: from `git branch -r --merged main`, delete
    with `git push origin --delete <branch>`. Never `main`/`master`, never a
@@ -75,10 +82,13 @@ Order matters: worktrees before their branches, local before remote.
 
 ## After
 
-1. Invoke `todo-sync` to restore `TODO.md` equality across rebased branches.
+1. The controlling agent itself invokes `todo-sync` to restore `TODO.md`
+   equality across rebased branches — never delegate this to a subagent.
 2. Do not run test suites per branch; dispatch and workers own validation.
 3. Report a table: branch → rebased old→new | skipped (reason) | aborted
    (conflict files) | retire candidate; plus chores done per item (worktree
-   removed, branch deleted, remote pruned/deleted) with recovery SHAs. List
-   branches now diverged from their upstream (each needs
-   `--force-with-lease`) and stop; push only on explicit user instruction.
+   removed, branch deleted, remote pruned/deleted) with recovery SHAs; plus
+   backlog findings (merged-but-still-outstanding TODO items, active branches
+   missing from `TODO.md` as triage candidates). List branches now diverged
+   from their upstream (each needs `--force-with-lease`) and stop; push only
+   on explicit user instruction.
