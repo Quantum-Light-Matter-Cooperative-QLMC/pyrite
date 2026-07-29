@@ -14,13 +14,12 @@ def _tp():
 
 
 def test_retry_succeeds_after_halving(monkeypatch):
-    monkeypatch.setattr(runner, "_GPU_OOM", (DummyOOM,))
     calls = []
 
     def fake_spectrum(case, tp, record_timing=False):
         calls.append((case.get("spec_chunk"), case.get("brem_chunk")))
         if len(calls) <= 3:
-            raise DummyOOM
+            raise runner._LineSpectrumOOM(DummyOOM())
         return {"ok": True}
 
     monkeypatch.setattr(runner, "_spectrum_case", fake_spectrum)
@@ -31,23 +30,124 @@ def test_retry_succeeds_after_halving(monkeypatch):
     assert case == {"spec_chunk": 30_000, "brem_chunk": 100_000}
     assert calls == [
         (30_000, 100_000),
-        (15_000, 50_000),
-        (7_500, 25_000),
-        (3_750, 12_500),
+        (15_000, 100_000),
+        (7_500, 100_000),
+        (3_750, 100_000),
     ]
+    assert out["_attempted_spec_chunk"] == 30_000
+    assert out["_effective_spec_chunk"] == 3_750
+    assert out["_gpu_oom_retries"] == 3
 
 
 def test_retry_reraises_on_exhaustion(monkeypatch):
-    monkeypatch.setattr(runner, "_GPU_OOM", (DummyOOM,))
     monkeypatch.setattr(
         runner,
         "_spectrum_case",
-        lambda c, tp, record_timing=False: (_ for _ in ()).throw(DummyOOM()),
+        lambda c, tp, record_timing=False: (_ for _ in ()).throw(
+            runner._LineSpectrumOOM(DummyOOM())
+        ),
     )
     import pytest
 
     with pytest.raises(DummyOOM):
         runner._spectrum_case_retry({}, _tp(), max_retries=2)
+
+
+def test_non_line_oom_does_not_teach_line_chunk(monkeypatch):
+    calls = []
+
+    def fake_spectrum(case, tp, record_timing=False):
+        calls.append((case.get("spec_chunk"), case.get("brem_chunk")))
+        raise DummyOOM
+
+    monkeypatch.setattr(runner, "_spectrum_case", fake_spectrum)
+    case = {"spec_chunk": 30_000, "brem_chunk": 100_000}
+
+    import pytest
+
+    with pytest.raises(DummyOOM):
+        runner._spectrum_case_retry(case, _tp(), max_retries=3)
+
+    assert calls == [(30_000, 100_000)]
+    assert case == {"spec_chunk": 30_000, "brem_chunk": 100_000}
+
+
+class _SyncProcessPoolExecutor:
+    def __init__(self, **_kwargs):
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc_info):
+        return False
+
+    def submit(self, fn, *args):
+        from concurrent.futures import Future
+
+        future = Future()
+        future.set_result(fn(*args))
+        return future
+
+
+def test_gpu_pipeline_reuses_successful_line_fallback(monkeypatch):
+    calls = []
+
+    def fake_transport(case, record_timing=False):
+        assert record_timing
+        return {
+            "E_grid": np.zeros(2000),
+            "E_brem": np.zeros(2000),
+            "_t_transport": 0.1,
+            "name": case["name"],
+        }
+
+    def fake_spectrum(case, tp, record_timing=False):
+        assert record_timing
+        calls.append((tp["name"], case.get("spec_chunk"), case.get("brem_chunk")))
+        if len(calls) == 1:
+            raise runner._LineSpectrumOOM(DummyOOM())
+        return {"name": tp["name"], "_t_spectrum": 0.2}
+
+    monkeypatch.setattr(runner, "_GPU", True)
+    monkeypatch.setattr(runner, "_gpu_pipeline_workers", lambda *_args: 2)
+    monkeypatch.setattr(runner, "_ensure_pool_limit", lambda: None)
+    monkeypatch.setattr(runner, "_process_pool_kwargs", lambda: {})
+    monkeypatch.setattr(runner, "_transport_case", fake_transport)
+    monkeypatch.setattr(runner, "_spectrum_case", fake_spectrum)
+    monkeypatch.setattr(
+        "concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor
+    )
+    cases = [
+        {
+            "name": f"case-{index}",
+            "spec_chunk": 30_000,
+            "brem_chunk": 100_000,
+        }
+        for index in range(3)
+    ]
+    timings = []
+
+    out = runner.run_cases(
+        cases,
+        max_workers=2,
+        progress=False,
+        on_timing=timings.append,
+    )
+
+    assert [item["name"] for item in out] == ["case-0", "case-1", "case-2"]
+    assert calls == [
+        ("case-0", 30_000, 100_000),
+        ("case-0", 15_000, 100_000),
+        ("case-1", 15_000, 100_000),
+        ("case-2", 15_000, 100_000),
+    ]
+    assert all(case["spec_chunk"] == 30_000 for case in cases)
+    assert all(case["brem_chunk"] == 100_000 for case in cases)
+    assert timings[0]["gpu_oom_retry_count"] == 1
+    assert timings[0]["attempted_spec_chunk"] == 30_000
+    assert timings[0]["effective_spec_chunk"] == 15_000
+    assert [timing["learned_spec_chunk"] for timing in timings] == [15_000] * 3
 
 
 def test_spectrum_case_emits_nsys_phase_ranges(monkeypatch):
