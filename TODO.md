@@ -13,12 +13,8 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
    CPU/GPU/RAM/VRAM utilization without OOM, keeping the GPU fed where evidence
    supports it. → `feature/compute-performance-optimization`;
    [`tasks/compute-performance-optimization.md`](tasks/compute-performance-optimization.md).
-2. **Remote progress dashboard.** Report a pending job's SLURM queue position
-   and top queued item, plus elapsed/remaining/estimated-total time beside
-   overall compute progress. → `feature/remote-progress-dashboard`;
-   [`tasks/remote-progress-dashboard.md`](tasks/remote-progress-dashboard.md).
-3. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
+2. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
+3. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
 
 ### Gated
 
