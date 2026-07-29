@@ -1636,6 +1636,40 @@ def test_implicit_job_selection_excludes_checkpoint_reservations(monkeypatch, tm
     assert all('[ -f "$d/meta" ] || continue' in command for command in commands)
 
 
+def test_latest_jobid_picks_newest_profile_job_not_bare_name(monkeypatch, tmp_path):
+    """Profile jobs are name-suffixed, so name order is not chronological.
+
+    The bare ``sub_100keV`` dir sorts after every ``sub_100keV-N`` (the glob
+    adds a trailing ``/`` and ``-`` < ``/``), so a plain name sort would default
+    ``attach``/``logs`` to the oldest, now-cancelled job. Selection must follow
+    meta mtime instead: the live ``-7`` chain is the newest.
+    """
+    commands = []
+    monkeypatch.setattr(transport, "_ssh_capture", lambda command: commands.append(command) or "")
+
+    remote._latest_jobid()
+
+    jobs = tmp_path / "jobs"
+    # Submission order: bare first (oldest), -7 last (newest, live). meta mtime
+    # encodes that; name order does not.
+    order = ["sub_100keV", "sub_100keV-2", "sub_100keV-7"]
+    for age, name in enumerate(reversed(order)):
+        job = jobs / name
+        job.mkdir(parents=True)
+        meta = job / "meta"
+        meta.write_text("slurm_job_id: 900\n")
+        stamp = 1_700_000_000 + (len(order) - age) * 60
+        os.utime(meta, (stamp, stamp))
+
+    command = commands[0].replace(
+        f'JOBS="{remote.REMOTE_DIR}/{remote.JOBS_SUBDIR}"', f'JOBS="{jobs}"'
+    )
+    result = subprocess.run(["bash", "-c", command], capture_output=True, text=True)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "sub_100keV-7"
+
+
 def test_jobs_report_identifiers_materials_and_last_event(monkeypatch, capsys):
     monkeypatch.setattr(
         transport,

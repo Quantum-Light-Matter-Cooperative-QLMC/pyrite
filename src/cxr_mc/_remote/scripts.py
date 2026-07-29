@@ -127,8 +127,7 @@ def _queue_script(
         flags += f" --profile {catalog_profile}"
     if performance_profile is not None:
         flags += (
-            f" --performance-profile {performance_profile}"
-            ' --performance-dir "$JOBDIR/performance"'
+            f' --performance-profile {performance_profile} --performance-dir "$JOBDIR/performance"'
         )
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
@@ -219,8 +218,7 @@ def _chunked_queue_script(
         flags += f" --profile {catalog_profile}"
     if performance_profile is not None:
         flags += (
-            f" --performance-profile {performance_profile}"
-            ' --performance-dir "$JOBDIR/performance"'
+            f' --performance-profile {performance_profile} --performance-dir "$JOBDIR/performance"'
         )
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
@@ -1008,15 +1006,25 @@ def _reap_job_command(jobid: str) -> str:
 
 
 def _recorded_job_dirs_command() -> str:
-    """Shell fragment that emits only submitted job directories, in order.
+    """Shell fragment that emits submitted job dirs oldest-first by meta mtime.
 
     ``jobs/reservations`` is bookkeeping for checkpoint ownership, not a job.
     A submitted job has its metadata file written before ``sbatch`` runs, so
     that marker also excludes incomplete or unrelated directories safely.
+
+    Emission is ordered by the ``meta`` file's mtime so ``tail -1`` is the
+    most-recently-submitted/active job. Name order is NOT chronological for
+    profile-named jobs (``sub_100keV``, ``sub_100keV-2`` ...): the bare name
+    sorts after every ``-N`` (the glob adds a trailing ``/`` and ``-`` < ``/``)
+    and ``-10`` < ``-2``, so a plain name sort would default ``attach``/``logs``
+    to the wrong job. A live chain keeps its meta fresh (it appends ``started:``
+    and ``slurm_job_id:`` each slice), so it stays the newest entry.
     """
     return (
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
-        '[ -f "$d/meta" ] || continue; printf "%s\\n" "$(basename "$d")"; done'
+        '[ -f "$d/meta" ] || continue; '
+        'printf "%s\\t%s\\n" "$(stat -c %Y "$d/meta")" "$(basename "$d")"; done '
+        "| sort -n | cut -f2"
     )
 
 
