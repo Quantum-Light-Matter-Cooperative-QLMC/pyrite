@@ -164,6 +164,8 @@ def test_root_and_group_help_expose_new_ownership_only():
 
     assert_clean_result(root)
     assert "material" in root.stdout
+    assert "\n  blaze " not in root.stdout
+    assert "\n  catalog " not in root.stdout
     assert "\n  sweep " not in root.stdout
     assert_clean_result(profile_help)
     assert "members" in profile_help.stdout
@@ -172,4 +174,16 @@ def test_root_and_group_help_expose_new_ownership_only():
     assert_clean_result(material_help)
     assert "show" in material_help.stdout
     assert "set" in material_help.stdout
+    assert "validate" in material_help.stdout
+    assert "blaze" in material_help.stdout
     assert "list" not in material_help.stdout
+
+
+def test_material_group_lazily_routes_validate_and_blaze():
+    validate_help = invoke(cli.command, ["material", "validate", "--help"])
+    blaze_help = invoke(cli.command, ["material", "blaze", "--help"])
+
+    assert_clean_result(validate_help)
+    assert "Validate bundled material catalog" in validate_help.stdout
+    assert_clean_result(blaze_help)
+    assert "blazed-crystal MC sweep" in blaze_help.stdout
