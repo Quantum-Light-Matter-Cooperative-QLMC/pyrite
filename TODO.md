@@ -36,9 +36,7 @@ summary once the branch exists.
 
 ### Active
 
-1. **>user< CLI Work** 
-   1. Add 'remove' to profile commands to remove one or a specific set of items from a parameter list (e.g., 150 keV from [100, 150, 200] keV energies)
-   2. Add 'rename' to profile commands to rename profile <NAME1> to <NAME2>
+1. **Profile-command CLI work.** `remove` (strip values from a profile's grids, on `main`) and `rename` (rename a profile, migrating its `energy_grids` bucket) done. → `feature/profile-rename`; `tasks/profile-rename.md`.
 2. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
 3.  **Debye-Waller provenance and anisotropy audit.** Continue replacing placeholder or reused `B_ang2` values with primary-source values and resolve per-site/tensor model needs. → `feature/debye-waller-audit`; audit: [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md).
    1. >user< Evaluate complexity/value of implementing full anisotropic/tensor-based Debye-Waller factors when available

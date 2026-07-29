@@ -228,6 +228,7 @@ def command():
       cxr profile show sub_100keV        (or: cxr profile sub_100keV)
       cxr profile create sub_100keV --energy 30:100:10
       cxr profile add sub_100keV --energy 75
+      cxr profile rename sub_100keV sub100
       cxr profile delete sub_100keV -y
     """
 
@@ -467,9 +468,7 @@ def _merge_values(name, updates, *, add):
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def add_command(
-    name, thickness, energy, polar, azimuth, ne_line, ne_brem, materials, yes, dry_run
-):
+def add_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, materials, yes, dry_run):
     """Incrementally add grid values or explicit profile materials.
 
     Incremental edit: ``cxr profile add sub_100keV --energy 75`` inserts 75 keV
@@ -504,23 +503,78 @@ def add_command(
 @command.command("remove")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @_range_cli_options
+@click.option(
+    "--materials",
+    metavar="KEY,...",
+    shell_complete=_cli_completion.complete_material_csv,
+    help="Remove from explicit material membership (comma-separated material keys).",
+)
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def remove_command(name, thickness, energy, polar, azimuth, yes, dry_run):
-    """Remove values from an existing profile's grids.
+def remove_command(name, thickness, energy, polar, azimuth, materials, yes, dry_run):
+    """Remove values from an existing profile's grids, or shrink its material membership.
 
-    Every listed value must be present; otherwise nothing is written. Catalog
-    validation rejects removals that would empty a required grid.
+    Every listed grid value must be present; otherwise nothing is written.
+    Catalog validation rejects removals that would empty a required grid.
+    ``--materials`` shrinks an explicit membership list; use
+    ``cxr profile set NAME --materials KEY,...`` to replace it outright.
     """
     updates = _collect_updates(thickness, energy, polar, azimuth)
-    if not updates:
-        raise click.UsageError("provide a range option")
+    if not updates and materials is None:
+        raise click.UsageError("provide a range option or --materials")
     try:
-        original, document = _merge_values(name, updates, add=False)
+        if updates:
+            original, document = _merge_values(name, updates, add=False)
+        else:
+            original, document = _sweep._catalog_text()
+            _existing_profile(document, name)
+        removed = missing = []
+        if materials is not None:
+            removed, missing = _remove_membership(document, name, materials)
     except (OSError, ValueError, tomlkit.exceptions.ParseError) as exc:
         raise CLIError(str(exc)) from None
-    _confirm_standard(name, "remove values from", yes, dry_run)
-    return _write(document, original, dry_run, f"updated profile {name}")
+    action = "remove values from" if materials is None else "remove materials from"
+    _confirm_standard(name, action, yes, dry_run)
+    message = f"updated profile {name}"
+    if materials is not None:
+        message += f": removed {', '.join(removed) or '(none)'}"
+        if missing:
+            message += f"; not members: {', '.join(missing)}"
+    return _write(document, original, dry_run, message)
+
+
+@command.command("rename")
+@click.argument("name", shell_complete=_cli_completion.complete_profile)
+@click.argument("new_name")
+@click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
+def rename_command(name, new_name, dry_run):
+    """Rename profile NAME to NEW_NAME.
+
+    'standard' cannot be renamed: profile-name defaults throughout cxr-mc
+    assume it exists. NEW_NAME must not already exist. Migrates the profile's
+    ``[energy_grids.NAME]`` fallback bucket (if any) to ``NEW_NAME`` alongside it.
+    """
+    if name == "standard":
+        raise CLIError("cannot rename profile 'standard': the catalog schema requires it")
+    _check_name(new_name)
+    if new_name == name:
+        raise CLIError(f"profile {name!r} already named {new_name!r}")
+    try:
+        original, document = _sweep._catalog_text()
+        profiles = _sweep._profile_rows(document)
+        if new_name in profiles:
+            raise ValueError(f"profile {new_name!r} already exists")
+        target = _existing_profile(document, name)
+        del profiles[name]
+        profiles[new_name] = target
+        energy_grids = document.get("energy_grids")
+        if isinstance(energy_grids, dict) and name in energy_grids:
+            grid = energy_grids[name]
+            del energy_grids[name]
+            energy_grids[new_name] = grid
+    except (OSError, ValueError, tomlkit.exceptions.ParseError) as exc:
+        raise CLIError(str(exc)) from None
+    return _write(document, original, dry_run, f"renamed profile {name} to {new_name}")
 
 
 @command.command("delete")
@@ -621,6 +675,18 @@ def _add_membership(document, name, material_csv):
     return added, sorted(set(requested) - set(added))
 
 
+def _remove_membership(document, name, material_csv):
+    """Shrink explicit membership and return removed and not-member keys."""
+    target, membership = _membership_target(document, name)
+    requested = [key.strip() for key in material_csv.split(",") if key.strip()]
+    if not requested:
+        raise ValueError("--materials requires at least one material key")
+    requested = list(dict.fromkeys(requested))
+    removed = [key for key in requested if key in membership]
+    target["materials"] = [key for key in membership if key not in removed]
+    return removed, sorted(set(requested) - set(removed))
+
+
 @command.command("add-material")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @click.argument("materials", nargs=-1)
@@ -683,7 +749,7 @@ def add_material_command(name, materials, all_materials, yes, dry_run):
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def remove_material_command(name, materials, yes, dry_run):
-    """Remove materials from a profile's explicit membership list."""
+    """Remove positional material keys; prefer ``profile remove --materials``."""
     try:
         original, document = _sweep._catalog_text()
         target, membership = _membership_target(document, name)

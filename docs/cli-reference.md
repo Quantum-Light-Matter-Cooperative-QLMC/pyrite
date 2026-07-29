@@ -1271,6 +1271,7 @@ Usage: cxr profile [OPTIONS] COMMAND [ARGS]...
     cxr profile show sub_100keV        (or: cxr profile sub_100keV)
     cxr profile create sub_100keV --energy 30:100:10
     cxr profile add sub_100keV --energy 75
+    cxr profile rename sub_100keV sub100
     cxr profile delete sub_100keV -y
 
 Options:
@@ -1283,8 +1284,9 @@ Commands:
   create           Create a new profile, cloning range defaults from --from...
   delete           Delete a profile; irreversible.
   list             List catalog profiles with membership and override counts.
-  remove           Remove values from an existing profile's grids.
-  remove-material  Remove materials from a profile's explicit membership list.
+  remove           Remove values from an existing profile's grids, or shrink its...
+  remove-material  Remove positional material keys; prefer ``profile remove...
+  rename           Rename profile NAME to NEW_NAME.
   set              Replace range grids or material membership on an existing profile.
   show             Show one profile's ranges, material membership, and overrides.
 ```
@@ -1427,10 +1429,12 @@ Options:
 ```text
 Usage: cxr profile remove [OPTIONS] NAME
 
-  Remove values from an existing profile's grids.
+  Remove values from an existing profile's grids, or shrink its material membership.
 
-  Every listed value must be present; otherwise nothing is written. Catalog validation
-  rejects removals that would empty a required grid.
+  Every listed grid value must be present; otherwise nothing is written. Catalog
+  validation rejects removals that would empty a required grid. ``--materials`` shrinks
+  an explicit membership list; use ``cxr profile set NAME --materials KEY,...`` to
+  replace it outright.
 
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
@@ -1445,6 +1449,8 @@ Options:
   --azimuth DEG,... | START:STOP:STEP
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges.
+  --materials KEY,...             Remove from explicit material membership (comma-
+                                  separated material keys).
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
@@ -1455,10 +1461,26 @@ Options:
 ```text
 Usage: cxr profile remove-material [OPTIONS] NAME MATERIALS...
 
-  Remove materials from a profile's explicit membership list.
+  Remove positional material keys; prefer ``profile remove --materials``.
 
 Options:
   -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr profile rename`
+
+```text
+Usage: cxr profile rename [OPTIONS] NAME NEW_NAME
+
+  Rename profile NAME to NEW_NAME.
+
+  'standard' cannot be renamed: profile-name defaults throughout cxr-mc assume it
+  exists. NEW_NAME must not already exist. Migrates the profile's
+  ``[energy_grids.NAME]`` fallback bucket (if any) to ``NEW_NAME`` alongside it.
+
+Options:
   --dry-run   Print proposed TOML diff; write nothing.
   -h, --help  Show this message and exit.
 ```

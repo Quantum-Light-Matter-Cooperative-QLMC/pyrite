@@ -229,6 +229,20 @@ def test_remove_values_and_missing_value_error(tmp_path, monkeypatch):
     assert "energy values not present in profile sub_100keV: 999" in missing.stderr
 
 
+def test_remove_materials_flag_and_no_op_requires_option(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["remove", "sub_100keV", "--materials", "hopg,diamond"])
+    assert_clean_result(result)
+    assert "removed hopg" in result.stdout
+    assert "not members: diamond" in result.stdout
+    assert "materials = []" in catalog.read_text()
+
+    bare = invoke(profile.command, ["remove", "sub_100keV"])
+    assert bare.exit_code == 2
+    assert "provide a range option or --materials" in bare.stderr
+
+
 def test_add_on_standard_prompts(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
     original = catalog.read_text()
@@ -297,6 +311,57 @@ def test_delete_json_requires_yes_and_reports_envelope(tmp_path, monkeypatch):
     assert document["schema"] == "cxr.profile.delete"
     assert document["ok"] is True
     assert document["payload"] == {"deleted": "sub_100keV"}
+
+
+def test_rename_moves_profile_and_energy_grid_bucket(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch, _REFERENCED_CATALOG)
+
+    result = invoke(profile.command, ["rename", "sub_100keV", "sub100"])
+
+    assert_clean_result(result, stdout="renamed profile sub_100keV to sub100\n")
+    text = catalog.read_text()
+    assert "[profiles.sub_100keV]" not in text
+    assert "[profiles.sub100]" in text
+    assert "[energy_grids.sub_100keV]" not in text
+    assert "[energy_grids.sub100]" in text
+
+
+def test_rename_forbids_standard(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["rename", "standard", "renamed"])
+
+    assert result.exit_code == 1
+    assert "cannot rename profile 'standard'" in result.stderr
+
+
+def test_rename_rejects_existing_or_same_name(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    original = catalog.read_text()
+
+    collision = invoke(profile.command, ["rename", "sub_100keV", "standard"])
+    assert collision.exit_code == 1
+    assert "already exists" in collision.stderr
+
+    same = invoke(profile.command, ["rename", "sub_100keV", "sub_100keV"])
+    assert same.exit_code == 1
+    assert "already named" in same.stderr
+
+    missing = invoke(profile.command, ["rename", "sub_100kv", "sub100"])
+    assert missing.exit_code == 1
+    assert "unknown profile: sub_100kv" in missing.stderr
+
+    assert catalog.read_text() == original
+
+
+def test_rename_dry_run_writes_nothing(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    original = catalog.read_text()
+
+    result = invoke(profile.command, ["rename", "sub_100keV", "sub100", "--dry-run"])
+
+    assert_clean_result(result)
+    assert catalog.read_text() == original
 
 
 def test_add_material_and_remove_material_roundtrip(tmp_path, monkeypatch):
