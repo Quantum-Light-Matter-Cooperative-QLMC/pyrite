@@ -222,3 +222,28 @@ def test_line_grid_wires_safe_completion_but_not_stop_target():
     for name in ("attach", "status", "logs"):
         assert _callback(job.commands[name], "jobid") is _cli_completion.complete_job_id
     assert _callback(job.commands["stop"], "jobid") is None
+
+
+def test_profile_members_and_material_commands_wire_catalog_completion():
+    from cxr_mc.cli import material, profile
+
+    members = profile.command.commands["members"]
+    for name in ("set", "add", "remove"):
+        member_command = members.commands[name]
+        assert _callback(member_command, "name") is _cli_completion.complete_profile
+        assert _callback(member_command, "materials") is _cli_completion.complete_material
+    assert (
+        _callback(members.commands["reset"], "name")
+        is _cli_completion.complete_profile
+    )
+
+    for name in ("show", "set"):
+        material_command = material.command.commands[name]
+        assert (
+            _callback(material_command, "material")
+            is _cli_completion.complete_material
+        )
+        assert (
+            _callback(material_command, "profile_name")
+            is _cli_completion.complete_profile
+        )

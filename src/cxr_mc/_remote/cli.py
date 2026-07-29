@@ -750,7 +750,7 @@ def _recompute_options(function):
     help="Recompute brem-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
-@fidelity_option(help="Named sweep profile supplying omitted grid and electron defaults.")
+@fidelity_option(help="Fidelity preset supplying omitted grid and electron defaults.")
 @click.option("--ne-brem", type=POSITIVE_INT, default=None, help="New brem electron count.")
 @click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Brem lower bound in eV.")
 @click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Brem exclusive upper bound in eV.")
@@ -796,7 +796,7 @@ def rebrem_command(
     help="Recompute line-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
-@fidelity_option(help="Named sweep profile supplying omitted grid and electron defaults.")
+@fidelity_option(help="Fidelity preset supplying omitted grid and electron defaults.")
 @click.option("--line-ne", type=POSITIVE_INT, default=None, help="New line electron count.")
 @click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Line lower bound in eV.")
 @click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Line exclusive upper bound in eV.")

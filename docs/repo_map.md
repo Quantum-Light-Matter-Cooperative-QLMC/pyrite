@@ -46,11 +46,18 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 
 - **`cxr` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
   lazy Click dispatch for `scan`, `blaze`, `export`, `analyze`, `validate`,
-  `catalog`, `checkpoint`, `remote`, `energy-grid`, `sweep`, and `prune`.
+  `catalog`, `checkpoint`, `remote`, `energy-grid`, `profile`, `material`, and
+  `prune`.
   Older flat checkpoint verbs, `check`, and `check-config` remain hidden
   compatibility aliases.
   Checked user-facing inventory:
   [`docs/cli-reference.md`](cli-reference.md).
+- **`cxr profile ...`** → `cli.profile`: manage named campaign defaults and
+  profile-owned material membership through `profile members
+  set|add|remove|reset`. An absent membership key means all in-use materials.
+- **`cxr material show|set MATERIAL [--profile NAME]`** → `cli.material`:
+  inspect effective ranges and edit per-profile material overrides. Hidden
+  compatibility aliases remain under `cxr sweep`.
 - **`cxr catalog validate [catalog]`** → `check_config:_run`: validate bundled
   offline catalog or explicit complete catalog without starting simulation;
   hidden alias: `cxr check-config`.
@@ -381,15 +388,18 @@ wired into pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
 `cxr` console-script dispatcher and CLI-specific helpers/groups.
 - Public: `main`.
 - Deps (lazy command imports): `analyze`, `blaze`, `catalog`, `check`,
-  `checkpoint`, `energy_grid`, `export`, `remote`, `scan`, `sweep`; hidden
+  `checkpoint`, `energy_grid`, `export`, `material`, `profile`, `remote`, `scan`;
+  hidden `sweep`
   compatibility paths additionally dispatch to `archive`, `check_config`,
   `rebrem`, `reline`, and `slim`. Eager lightweight deps: `cli._core`,
   `__version__`.
 
-### `cli/energy_grid.py`, `cli/sweep.py`
-Thin CLI command modules. `energy_grid` registers the domain-owned
-`line_grid` implementation; `sweep` owns catalog scan-range presentation and
-validated, atomic TOML edits.
+### `cli/energy_grid.py`, `cli/profile.py`, `cli/material.py`
+Thin CLI command modules. `energy_grid` registers domain-owned `line_grid`
+implementation; `profile` owns named campaign defaults and membership;
+`material` owns effective-range inspection and per-profile overrides. Shared
+validated atomic TOML helpers live in `cli/_catalog_io.py`; `cli/sweep.py`
+contains hidden compatibility aliases only.
 
 ### `cli/checkpoint.py`
 Canonical `cxr checkpoint` group. Lazily routes `slim`, component
@@ -397,9 +407,9 @@ Canonical `cxr checkpoint` group. Lazily routes `slim`, component
 checkpoint handlers while root-level legacy paths remain hidden aliases.
 
 ### `recompute_defaults.py`
-Profile-aware line/bremsstrahlung recompute defaults shared by local, grouped,
-and remote command paths. Resolves profile settings and material photon grids;
-keeps a compatibility fallback for branches predating named sweep profiles.
+Fidelity-aware line/bremsstrahlung recompute defaults shared by local, grouped,
+and remote command paths. Resolves preset settings and material photon grids;
+keeps a compatibility fallback for older branches.
 
 ### `cli/catalog.py`
 Canonical `cxr catalog` group. Lazily routes `catalog validate` to

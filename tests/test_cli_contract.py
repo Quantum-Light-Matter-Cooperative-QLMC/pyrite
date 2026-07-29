@@ -63,9 +63,9 @@ def _node_options(node):
     }
 
 
-def test_frozen_argparse_contract_records_post_p0_baseline():
+def test_frozen_click_contract_records_current_tree():
     assert _FROZEN["schema_version"] == 1
-    assert len(list(_help_cases(_FROZEN["root"]))) < 42
+    assert len(list(_help_cases(_FROZEN["root"]))) < 120
     assert len(_FROZEN["intentional_p0_corrections"]) == 9
 
 
@@ -96,7 +96,7 @@ def test_click_tree_preserves_frozen_command_and_option_names():
                 continue
             child_name = child["path"].split()[-1]
             child_path = tuple(child["path"].split())
-            if child_path not in _HIDDEN_COMPATIBILITY_PATHS:
+            if child_path not in _HIDDEN_COMPATIBILITY_PATHS and not child["hidden"]:
                 assert child_name in completed.stdout
             check(child)
 

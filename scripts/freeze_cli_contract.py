@@ -1,4 +1,4 @@
-"""Freeze argparse CLI behavior before Click migration.
+"""Freeze current Click command/help behavior.
 
 Usage:
     python scripts/freeze_cli_contract.py --write tests/data/cli_contract.json
@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-from collections.abc import Callable
 from pathlib import Path
-from unittest import mock
+
+import click
+from click.testing import CliRunner
 
 from cxr_mc import cli
 
@@ -82,133 +82,45 @@ INTENTIONAL_P0_CORRECTIONS = [
 ]
 
 
-class _ParserCaptured(Exception):
-    def __init__(self, parser: argparse.ArgumentParser):
-        self.parser = parser
-
-
-def _capture_parse_args(
-    parser: argparse.ArgumentParser,
-    args=None,
-    namespace=None,
-):
-    del args, namespace
-    raise _ParserCaptured(parser)
-
-
-def capture_root_parser() -> argparse.ArgumentParser:
-    """Capture parser constructed by real ``cxr_mc.cli.main``."""
-    with mock.patch.object(argparse.ArgumentParser, "parse_args", _capture_parse_args):
-        try:
-            cli.main([])
-        except _ParserCaptured as exc:
-            return exc.parser
-    raise AssertionError("cxr_mc.cli.main did not parse arguments")
-
-
-def _qualname(value: object) -> str:
-    module = getattr(value, "__module__", type(value).__module__)
-    qualname = getattr(value, "__qualname__", type(value).__qualname__)
-    name = f"{module}.{qualname}"
-    closure = getattr(value, "__closure__", None)
-    if closure:
-        targets = [
-            cell.cell_contents
-            for cell in closure
-            if isinstance(cell.cell_contents, Callable) and cell.cell_contents is not value
-        ]
-        if targets:
-            name += "[" + ",".join(_qualname(target) for target in targets) + "]"
-    return name
-
-
-def _json_value(value: object):
-    if value is argparse.SUPPRESS:
-        return "<SUPPRESS>"
-    if value is None or isinstance(value, bool | int | float | str):
-        return value
-    if isinstance(value, Path):
-        return str(value)
-    if isinstance(value, range):
-        return list(value)
-    if isinstance(value, tuple | list):
-        return [_json_value(item) for item in value]
-    if isinstance(value, dict):
-        return {str(key): _json_value(item) for key, item in value.items()}
-    if callable(value):
-        return _qualname(value)
-    return repr(value)
-
-
-def _dispatch_name(parser: argparse.ArgumentParser) -> str | None:
-    func = parser.get_default("func")
-    return _qualname(func) if callable(func) else None
-
-
-def _action_contract(action: argparse.Action) -> dict[str, object]:
+def _action_contract(parameter: click.Parameter) -> dict[str, object]:
+    if isinstance(parameter, click.Option):
+        option_strings = [*parameter.opts, *parameter.secondary_opts]
+        help_text = "<SUPPRESS>" if parameter.hidden else parameter.help
+    else:
+        option_strings = []
+        help_text = None
     return {
-        "action": type(action).__name__,
-        "choices": _json_value(action.choices),
-        "const": _json_value(action.const),
-        "default": _json_value(action.default),
-        "dest": action.dest,
-        "help": _json_value(action.help),
-        "metavar": _json_value(action.metavar),
-        "nargs": _json_value(action.nargs),
-        "option_strings": list(action.option_strings),
-        "required": action.required,
-        "type": _qualname(action.type) if callable(action.type) else None,
+        "dest": parameter.name,
+        "help": help_text,
+        "option_strings": option_strings,
+        "required": parameter.required,
     }
 
 
-def _parser_contract(
-    parser: argparse.ArgumentParser,
+def _help(path: tuple[str, ...]) -> str:
+    result = CliRunner().invoke(cli.command, [*path, "--help"], prog_name="cxr")
+    if result.exit_code != 0:
+        raise RuntimeError(f"help failed for {' '.join(path) or 'root'}: {result.stderr}")
+    return result.stdout
+
+
+def _command_contract(
+    command: click.Command,
     path: tuple[str, ...] = (),
 ) -> dict[str, object]:
-    subparsers_action = next(
-        (action for action in parser._actions if isinstance(action, argparse._SubParsersAction)),
-        None,
-    )
-    actions = [
-        _action_contract(action)
-        for action in parser._actions
-        if not isinstance(action, (argparse._HelpAction, argparse._SubParsersAction))
-    ]
-    groups = [
-        {
-            "required": group.required,
-            "destinations": [action.dest for action in group._group_actions],
-        }
-        for group in parser._mutually_exclusive_groups
-    ]
-    old_columns = os.environ.get("COLUMNS")
-    os.environ["COLUMNS"] = "80"
-    try:
-        help_text = parser.format_help()
-    finally:
-        if old_columns is None:
-            os.environ.pop("COLUMNS", None)
-        else:
-            os.environ["COLUMNS"] = old_columns
     subcommands = []
-    if subparsers_action is not None:
-        subcommands = [
-            _parser_contract(child, (*path, name))
-            for name, child in subparsers_action.choices.items()
-        ]
+    if isinstance(command, click.Group):
+        context = click.Context(command, info_name=path[-1] if path else "cxr")
+        for name in command.list_commands(context):
+            child = command.get_command(context, name)
+            if child is not None:
+                subcommands.append(_command_contract(child, (*path, name)))
     return {
-        "actions": actions,
-        "description": parser.description,
-        "dispatch": _dispatch_name(parser),
-        "epilog": parser.epilog,
-        "help": help_text,
-        "mutually_exclusive_groups": groups,
+        "actions": [_action_contract(parameter) for parameter in command.params],
+        "help": _help(path),
+        "hidden": command.hidden,
         "path": " ".join(path),
-        "prog": parser.prog,
         "subcommands": subcommands,
-        "subparsers_required": (
-            subparsers_action.required if subparsers_action is not None else None
-        ),
     }
 
 
@@ -216,7 +128,7 @@ def build_contract() -> dict[str, object]:
     return {
         "schema_version": SCHEMA_VERSION,
         "intentional_p0_corrections": INTENTIONAL_P0_CORRECTIONS,
-        "root": _parser_contract(capture_root_parser()),
+        "root": _command_contract(cli.command),
     }
 
 

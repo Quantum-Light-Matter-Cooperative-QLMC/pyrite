@@ -73,8 +73,8 @@ Commands:
   completion   Manage cxr shell tab-completion.
   remote       Run and manage MC sweeps on a remote GPU host.
   energy-grid  Derive, submit, inspect, and apply photon-energy grids.
-  sweep        Show and edit scan parameter-range sweeps.
-  profile      Manage catalog scan profiles (named campaign defaults).
+  profile      Manage named catalog campaigns and material membership.
+  material     Inspect effective ranges and edit material overrides.
   prune        Drop checkpoint records obsolete under current scan profiles.
 ```
 
@@ -364,7 +364,7 @@ Usage: cxr checkpoint recompute brem [OPTIONS] [MATERIALS]...
 
 Options:
   -a, --all                 Recompute every checkpoint.
-  --fidelity [full|survey]  Named sweep profile supplying omitted grid and electron
+  --fidelity [full|survey]  Fidelity preset supplying omitted grid and electron
                             defaults.  [default: full]
   --ne-brem N               Bremsstrahlung electron count; overrides profile default.
   --start EV                Wide-bremsstrahlung lower bound in eV; overrides profile.
@@ -393,7 +393,7 @@ Usage: cxr checkpoint recompute line [OPTIONS] [MATERIALS]...
 
 Options:
   -a, --all                 Recompute every checkpoint.
-  --fidelity [full|survey]  Named sweep profile supplying omitted grid and electron
+  --fidelity [full|survey]  Fidelity preset supplying omitted grid and electron
                             defaults.  [default: full]
   --line-ne N               Line-spectrum electron count; overrides profile default.
   --start EV                Line-grid lower bound in eV; overrides profile.
@@ -710,7 +710,7 @@ Options:
   --no-sync                 Skip code upload.
   --chunk-minutes NUMBER    Self-resubmitting SLURM slice length; 0 runs one monolithic
                             job.  [default: 10.0]
-  --fidelity [full|survey]  Named sweep profile supplying omitted grid and electron
+  --fidelity [full|survey]  Fidelity preset supplying omitted grid and electron
                             defaults.  [default: full]
   --ne-brem NUMBER          New brem electron count.
   --start NUMBER            Brem lower bound in eV.
@@ -733,7 +733,7 @@ Options:
   --no-sync                 Skip code upload.
   --chunk-minutes NUMBER    Self-resubmitting SLURM slice length; 0 runs one monolithic
                             job.  [default: 10.0]
-  --fidelity [full|survey]  Named sweep profile supplying omitted grid and electron
+  --fidelity [full|survey]  Fidelity preset supplying omitted grid and electron
                             defaults.  [default: full]
   --line-ne NUMBER          New line electron count.
   --start NUMBER            Line lower bound in eV.
@@ -913,7 +913,8 @@ Usage: cxr energy-grid [OPTIONS] COMMAND [ARGS]...
 
   ``derive`` and ``submit`` measure both coherent-line and bremsstrahlung upper bounds.
   ``defaults`` controls that diagnostic derivation only; ``apply`` writes validated
-  bounds into the material catalog. Physical scan ranges belong to ``cxr sweep``.
+  bounds into the material catalog. Physical scan profile defaults belong to ``cxr
+  profile``; per-material range overrides belong to ``cxr material``.
 
   Scan ``--fidelity full|survey`` is separate. It controls later simulation cost and
   grid reduction; it never changes derivation or applied full bounds.
@@ -1245,69 +1246,6 @@ Options:
   -h, --help                Show this message and exit.
 ```
 
-## `cxr sweep`
-
-```text
-Usage: cxr sweep [OPTIONS] COMMAND [ARGS]...
-
-  Show and edit physical scan parameter-range sweeps.
-
-  Operates on catalog ``[profiles.*]`` scan defaults and per-material overrides, not
-  ``SweepProfile`` full/survey reduction policies. Profile defaults and membership are
-  managed by ``cxr profile``.
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  set   Set per-material override ranges without touching energy grids.
-  show  Show defaults, overrides, or one material's effective scan ranges.
-```
-
-## `cxr sweep set`
-
-```text
-Usage: cxr sweep set [OPTIONS] MATERIAL
-
-  Set per-material override ranges without touching energy grids.
-
-  Replacing a value already set on MATERIAL prompts for confirmation unless --yes is
-  given; --dry-run never prompts. Overrides are stored under the material's owning
-  profile's ``overrides`` table (``profiles.standard.overrides.MATERIAL`` in Phase 1).
-  Profile defaults themselves are edited with ``cxr profile set``.
-
-Options:
-  --thickness ANGSTROM,... | START:STOP:STEP
-                                  Crystal thicknesses in angstrom; mixable with
-                                  start:stop:step ranges.
-  --energy KEV,... | START:STOP:STEP
-                                  Beam energies in keV; mixable with start:stop:step
-                                  ranges.
-  --polar DEG,... | START:STOP:STEP
-                                  Polar tilts in degrees [0, 90); mixable with
-                                  start:stop:step ranges.
-  --azimuth DEG,... | START:STOP:STEP
-                                  Azimuth tilts in degrees [0, 360]; mixable with
-                                  start:stop:step ranges.
-  --reset [thickness|energy|polar|azimuth|all]
-                                  Remove one override; repeat, or use --reset all.
-  -y, --yes                       Skip the overwrite confirmation prompt.
-  --dry-run                       Print proposed TOML diff; write nothing.
-  -h, --help                      Show this message and exit.
-```
-
-## `cxr sweep show`
-
-```text
-Usage: cxr sweep show [OPTIONS] [MATERIAL]
-
-  Show defaults, overrides, or one material's effective scan ranges.
-
-Options:
-  --json      Emit one versioned JSON object on stdout.
-  -h, --help  Show this message and exit.
-```
-
 ## `cxr profile`
 
 ```text
@@ -1315,8 +1253,10 @@ Usage: cxr profile [OPTIONS] COMMAND [ARGS]...
 
   Manage catalog scan profiles (named campaign defaults).
 
-  Profiles live in ``[profiles.*]`` and carry scan-parameter ranges plus optional
-  material membership and per-material overrides. Energy grids are managed separately by
+  Profiles are named campaigns in ``[profiles.*]``. They own default ranges, electron-
+  count grids, and optional material membership. An absent ``materials`` key means all
+  in-use materials; ``profile members`` is the only membership mutation surface. Per-
+  material range overrides are managed by ``cxr material``. Energy grids are managed by
   ``cxr energy-grid``.
 
   Examples:
@@ -1324,6 +1264,7 @@ Usage: cxr profile [OPTIONS] COMMAND [ARGS]...
     cxr profile show sub_100keV        (or: cxr profile sub_100keV)
     cxr profile create sub_100keV --energy 30:100:10
     cxr profile add sub_100keV --energy 75
+    cxr profile members set sub_100keV hopg mose2
     cxr profile rename sub_100keV sub100
     cxr profile delete sub_100keV -y
 
@@ -1331,17 +1272,16 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  add              Incrementally add grid values or explicit profile materials.
-  add-material     Add positional material keys; prefer ``profile add --materials``.
-  analyze          Analyze NAME's performance logs into CSV, Markdown, and PNG...
-  create           Create a new profile, cloning range defaults from --from...
-  delete           Delete a profile; irreversible.
-  list             List catalog profiles with membership and override counts.
-  remove           Remove values from an existing profile's grids, or shrink its...
-  remove-material  Remove positional material keys; prefer ``profile remove...
-  rename           Rename profile NAME to NEW_NAME.
-  set              Replace range grids or material membership on an existing profile.
-  show             Show one profile's ranges, material membership, and overrides.
+  add      Incrementally add values to profile grids.
+  analyze  Analyze NAME's performance logs into CSV, Markdown, and PNG artifacts.
+  create   Create a new profile, cloning range defaults from --from (standard).
+  delete   Delete a profile; irreversible.
+  list     List catalog profiles with membership and override counts.
+  members  Set, extend, shrink, or reset profile-owned material membership.
+  remove   Remove values from an existing profile's grids.
+  rename   Rename profile NAME to NEW_NAME.
+  set      Replace range grids on an existing profile.
+  show     Show one profile's ranges, material membership, and overrides.
 ```
 
 ## `cxr profile add`
@@ -1349,11 +1289,10 @@ Commands:
 ```text
 Usage: cxr profile add [OPTIONS] NAME
 
-  Incrementally add grid values or explicit profile materials.
+  Incrementally add values to profile grids.
 
   Incremental edit: ``cxr profile add sub_100keV --energy 75`` inserts 75 keV without
-  re-listing the grid. ``--materials`` extends an explicit membership list; use ``cxr
-  profile set NAME --materials KEY,...`` to replace it. No prompt except on 'standard'.
+  re-listing the grid. No prompt except on 'standard'.
 
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
@@ -1372,31 +1311,9 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
-  --materials KEY,...             Add to explicit material membership (comma-separated
-                                  material keys).
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
-```
-
-## `cxr profile add-material`
-
-```text
-Usage: cxr profile add-material [OPTIONS] NAME [MATERIALS]...
-
-  Add positional material keys; prefer ``profile add --materials``.
-
-  With --all, seeds (or extends) membership with mats_to_sim.toml's verified `materials`
-  list -- the same base set `cxr scan --all` runs -- so a profile can start from the
-  standard list and be trimmed down with `cxr profile remove-material` instead of typing
-  every key by hand. --all also seeds an implicit all-in-use profile (one with no
-  `materials` row yet), which plain MATERIAL args cannot do.
-
-Options:
-  -a, --all   Seed/extend membership with mats_to_sim.toml's verified `materials` list.
-  -y, --yes   Skip the 'standard' confirmation prompt.
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
 ```
 
 ## `cxr profile analyze`
@@ -1422,8 +1339,8 @@ Usage: cxr profile create [OPTIONS] NAME
   Create a new profile, cloning range defaults from --from (standard).
 
   Range options replace individual cloned grids. Overrides and material membership are
-  not cloned: the new profile starts with implicit all-in-use-materials membership and
-  no per-material overrides.
+  not cloned. Without --materials, the new profile starts with implicit all-in-use
+  membership and no per-material overrides.
 
 Options:
   --from SOURCE                   Clone range defaults from SOURCE profile; defaults to
@@ -1444,6 +1361,8 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
+  --materials KEY,...             Set explicit initial membership (comma-separated
+                                  material keys).
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
 ```
@@ -1477,17 +1396,84 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
+## `cxr profile members`
+
+```text
+Usage: cxr profile members [OPTIONS] COMMAND [ARGS]...
+
+  Set, extend, shrink, or reset profile-owned material membership.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  add     Extend NAME's explicit membership with MATERIAL keys.
+  remove  Remove MATERIAL keys from NAME's explicit membership.
+  reset   Restore NAME's implicit all-in-use material membership.
+  set     Replace NAME's explicit membership with MATERIAL keys.
+```
+
+## `cxr profile members add`
+
+```text
+Usage: cxr profile members add [OPTIONS] NAME MATERIALS...
+
+  Extend NAME's explicit membership with MATERIAL keys.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr profile members remove`
+
+```text
+Usage: cxr profile members remove [OPTIONS] NAME MATERIALS...
+
+  Remove MATERIAL keys from NAME's explicit membership.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr profile members reset`
+
+```text
+Usage: cxr profile members reset [OPTIONS] NAME
+
+  Restore NAME's implicit all-in-use material membership.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr profile members set`
+
+```text
+Usage: cxr profile members set [OPTIONS] NAME MATERIALS...
+
+  Replace NAME's explicit membership with MATERIAL keys.
+
+Options:
+  -y, --yes   Skip the 'standard' confirmation prompt.
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
 ## `cxr profile remove`
 
 ```text
 Usage: cxr profile remove [OPTIONS] NAME
 
-  Remove values from an existing profile's grids, or shrink its material membership.
+  Remove values from an existing profile's grids.
 
   Every listed grid value must be present; otherwise nothing is written. Catalog
-  validation rejects removals that would empty a required grid. ``--materials`` shrinks
-  an explicit membership list; use ``cxr profile set NAME --materials KEY,...`` to
-  replace it outright.
+  validation rejects removals that would empty a required grid.
 
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
@@ -1502,24 +1488,9 @@ Options:
   --azimuth DEG,... | START:STOP:STEP
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges.
-  --materials KEY,...             Remove from explicit material membership (comma-
-                                  separated material keys).
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
-```
-
-## `cxr profile remove-material`
-
-```text
-Usage: cxr profile remove-material [OPTIONS] NAME MATERIALS...
-
-  Remove positional material keys; prefer ``profile remove --materials``.
-
-Options:
-  -y, --yes   Skip the 'standard' confirmation prompt.
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
 ```
 
 ## `cxr profile rename`
@@ -1543,7 +1514,7 @@ Options:
 ```text
 Usage: cxr profile set [OPTIONS] NAME
 
-  Replace range grids or material membership on an existing profile.
+  Replace range grids on an existing profile.
 
   NAME must already exist (create it with ``cxr profile create``); unknown names error
   with suggestions. Editing 'standard' prompts for confirmation unless --yes is given;
@@ -1566,8 +1537,6 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
-  --materials KEY,...             Replace explicit material membership (comma-separated
-                                  material keys).
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
@@ -1583,6 +1552,67 @@ Usage: cxr profile show [OPTIONS] NAME
 Options:
   --json      Emit one versioned JSON object on stdout.
   -h, --help  Show this message and exit.
+```
+
+## `cxr material`
+
+```text
+Usage: cxr material [OPTIONS] COMMAND [ARGS]...
+
+  Inspect effective ranges and edit one material's profile overrides.
+
+  Profile membership is managed only by ``cxr profile members``. Catalog-wide material
+  discovery remains under ``cxr catalog``.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  set   Set or reset MATERIAL overrides without changing profile membership.
+  show  Show MATERIAL's effective ranges and inherited/overridden sources.
+```
+
+## `cxr material set`
+
+```text
+Usage: cxr material set [OPTIONS] MATERIAL
+
+  Set or reset MATERIAL overrides without changing profile membership.
+
+Options:
+  --profile TEXT                  Edit overrides under profile NAME.  [default:
+                                  standard]
+  --thickness ANGSTROM,... | START:STOP:STEP
+                                  Crystal thicknesses in angstrom. Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --energy KEV,... | START:STOP:STEP
+                                  Beam energies in keV. Comma-separated, mixable with
+                                  start:stop:step ranges.
+  --polar DEG,... | START:STOP:STEP
+                                  Polar tilts in degrees [0, 90). Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --azimuth DEG,... | START:STOP:STEP
+                                  Azimuth tilts in degrees [0, 360]. Comma-separated,
+                                  mixable with start:stop:step ranges.
+  --reset [thickness|energy|polar|azimuth|all]
+                                  Remove one override; repeat, or use --reset all.
+  -y, --yes                       Skip overwrite confirmation.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `cxr material show`
+
+```text
+Usage: cxr material show [OPTIONS] MATERIAL
+
+  Show MATERIAL's effective ranges and inherited/overridden sources.
+
+Options:
+  --profile TEXT  Resolve defaults and overrides under profile NAME.  [default:
+                  standard]
+  --json          Emit one versioned JSON object on stdout.
+  -h, --help      Show this message and exit.
 ```
 
 ## `cxr prune`

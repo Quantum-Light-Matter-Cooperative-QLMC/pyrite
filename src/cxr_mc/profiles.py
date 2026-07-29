@@ -1,4 +1,4 @@
-"""Named sweep profiles and reproducible dataset identities.
+"""Fidelity presets and reproducible dataset identities.
 
 Profiles are policies applied after catalog material lookup.  ``full`` is an
 exact compatibility policy: it leaves catalog grids unchanged and retains the
@@ -148,7 +148,7 @@ def get_profile(name: str = "full") -> SweepProfile:
     try:
         return _PROFILES[name]
     except KeyError:
-        raise ValueError(f"unknown sweep profile {name!r} (choose from {FIDELITY_NAMES})") from None
+        raise ValueError(f"unknown fidelity preset {name!r} (choose from {FIDELITY_NAMES})") from None
 
 
 def _jsonable(value: Any) -> Any:

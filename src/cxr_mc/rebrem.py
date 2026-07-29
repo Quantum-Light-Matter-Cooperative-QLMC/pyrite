@@ -250,7 +250,7 @@ def _cli_json(args):
     shell_complete=_cli_completion.complete_checkpoint_stem,
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
-@_cli_core.fidelity_option(help="Named sweep profile supplying omitted grid and electron defaults.")
+@_cli_core.fidelity_option(help="Fidelity preset supplying omitted grid and electron defaults.")
 @click.option(
     "--ne-brem",
     type=_cli_core.POSITIVE_INT,

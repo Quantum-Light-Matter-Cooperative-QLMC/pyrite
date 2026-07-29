@@ -123,7 +123,8 @@ def command():
     ``derive`` and ``submit`` measure both coherent-line and bremsstrahlung
     upper bounds. ``defaults`` controls that diagnostic derivation only;
     ``apply`` writes validated bounds into the material catalog. Physical scan
-    ranges belong to ``cxr sweep``.
+    profile defaults belong to ``cxr profile``; per-material range overrides
+    belong to ``cxr material``.
 
     Scan ``--fidelity full|survey`` is separate. It controls later simulation
     cost and grid reduction; it never changes derivation or applied full bounds.
