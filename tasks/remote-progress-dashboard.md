@@ -129,3 +129,35 @@ Authority: checkpoint commits; no push; no TODO writing; no delegation.
 Stop on an undefined queue cohort, inability to distinguish active compute from
 queue/pause time, a proposed extra SSH connection per refresh, unrelated dirty
 work, or output changes lacking explicit compatibility tests.
+
+## Implementation status
+
+- [x] Canonicalize dashboard monitoring under `status -a/--attach`; remove
+  standalone `attach` command and current references.
+- [x] Define queue cohort as all active jobs in the configured SLURM partition;
+  rank pending jobs by descending scheduler priority then numeric job ID.
+- [x] Acquire target allocation and partition cohort through one bounded
+  `squeue` snapshot inside the existing framed SSH stream.
+- [x] Persist additive `active_compute_seconds`, `measured_new_cases`, and
+  optional `measured_new_cost` across worker-process/chunk resumes.
+- [x] Derive stable compute elapsed/ETA/estimated-total values without counting
+  cached work, queue time, or paused time as measured throughput.
+- [x] Cover priority/rank/ties/partition changes, hostile/retired/error data,
+  cached/cost/parallel/pause/restart/failure/legacy timing, CLI migration,
+  interruption, frame reuse, and generated CLI artifacts.
+- [x] Refresh current cluster guidance, repository map, CLI contract, and CLI
+  reference.
+
+Verification on 2026-07-29:
+
+- `scripts/dev.py test tests/test_remote.py tests/test_scan_budget.py
+  tests/test_scan_beam_options.py tests/test_scan_coherent.py tests/test_run.py
+  tests/test_blaze.py` — 429 passed.
+- `scripts/dev.py lint` — passed.
+- CLI contract/reference `--check` — passed.
+- `scripts/dev.py typecheck` — changed paths clean; whole check remains blocked
+  by unresolved optional `imageio.v3` and `kaleido` imports in
+  `src/cxr_mc/plots/render_trajectories.py`.
+- Real `cxr remote --help`, `cxr remote status --help`,
+  `status --attach --json`, and removed `remote attach` probes matched the
+  documented command contract.

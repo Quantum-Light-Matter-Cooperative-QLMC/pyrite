@@ -494,7 +494,6 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  attach      Live-track a remote job; defaults to latest.
   clear       Delete remote checkpoints; preview unless --yes.
   jobs        List jobs with SLURM IDs, materials, and last events.
   logs        Show a job diagnostic log; defaults to latest.
@@ -510,18 +509,6 @@ Commands:
   stop        cancel active SLURM job(s) by material, profile, or every live job.
   sync        Push current code to remote box.
   validate    Run Zhai reproduction remotely or pull existing caches.
-```
-
-## `cxr remote attach`
-
-```text
-Usage: cxr remote attach [OPTIONS] [JOBID]
-
-  Live-track a remote job; defaults to latest.
-
-Options:
-  -v, --verbose  Add allocation detail; repeat for recent logs.
-  -h, --help     Show this message and exit.
 ```
 
 ## `cxr remote clear`
@@ -775,8 +762,14 @@ Usage: cxr remote status [OPTIONS] [JOBID]
 
   Show one job; use -v for allocation and -vv for logs.
 
+  By default prints one snapshot and exits. Use -a/--attach to continuously monitor the
+  same dashboard, reconnecting until the job is terminal; Ctrl-C detaches the viewer
+  only and the job keeps running.
+
 Options:
   -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
+  -a, --attach   Continuously monitor the dashboard until interrupted; Ctrl-C detaches
+                 viewer only.
   --json         Emit one versioned JSON object.
   -h, --help     Show this message and exit.
 ```

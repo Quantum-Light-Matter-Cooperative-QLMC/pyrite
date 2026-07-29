@@ -72,12 +72,6 @@ def _status_remote_command(job_assign, detail):
     only the 32 KiB log tail is gated behind ``-vv``. Shared verbatim by the
     one-shot ``status`` and the live ``attach`` loop so both render identically.
     """
-    slurm_detail = (
-        'squeue -h -j "$SID" -o '
-        "'job_id=%i|state=%T|name=%j|partition=%P|elapsed=%M|left=%L|nodes=%D|reason=%R'; "
-        if detail >= 1
-        else 'printf "job_id=%s|state=%s\\n" "$SID" "$STATE"; '
-    )
     progress = (
         '{ for f in "$D"/progress/*.json; do '
         '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done; '
@@ -119,15 +113,28 @@ def _status_remote_command(job_assign, detail):
         '{ printf "%s\\n" "$JOB"; } | emit JOB; '
         '{ cat "$D/meta" 2>/dev/null; } | emit META; '
         '{ cat "$D/state" 2>/dev/null; } | emit STATE; '
-        "{ "
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
-        'case "$SID" in \'\'|*[!0-9]*) echo "job_id=-|state=NOT_QUEUED" ;; '
-        "*) "
-        + scripts._squeue_state_command("$SID", retired="STATE=")
-        + 'if [ -n "$STATE" ]; then '
-        + slurm_detail
-        + 'else printf "job_id=%s|state=NOT_QUEUED\\n" "$SID"; fi ;; esac; '
-        + "} | emit SQUEUE || exit $?; "
+        "QUEUE_RAW=; "
+        'case "$SID" in \'\'|*[!0-9]*) ;; *) '
+        f"QUEUE_RAW=$(squeue -h --partition={config.shell_word(config.SLURM_PARTITION)} "
+        "--states=PENDING,RUNNING --sort=-p,i "
+        "-o 'job_id=%i|state=%T|name=%j|partition=%P|elapsed=%M|left=%L|"
+        "nodes=%D|reason=%R|priority=%Q|user=%u' 2>&1); "
+        'QUEUE_RC=$?; if [ "$QUEUE_RC" -ne 0 ]; then '
+        'printf "%s\\n" "$QUEUE_RAW" >&2; exit "$QUEUE_RC"; fi; '
+        ";; esac; "
+        "{ "
+        'case "$SID" in \'\'|*[!0-9]*) echo "job_id=-|state=NOT_QUEUED" ;; *) '
+        'TARGET=$(printf "%s\\n" "$QUEUE_RAW" | '
+        'awk -v sid="$SID" \'index($0, "job_id=" sid "|") == 1 { print; exit }\'); '
+        'if [ -n "$TARGET" ]; then printf "%s\\n" "$TARGET"; '
+        'else printf "job_id=%s|state=NOT_QUEUED\\n" "$SID"; fi ;; esac; '
+        "} | emit SQUEUE || exit $?; "
+        "{ "
+        f"printf 'cohort_partition={config.SLURM_PARTITION}|"
+        "order=priority_desc_job_id_asc\\n'; "
+        'if [ -n "${QUEUE_RAW+x}" ]; then printf "%s\\n" "$QUEUE_RAW"; fi; '
+        "} | emit QUEUE; "
         + progress
         + performance
         + resources
@@ -181,7 +188,7 @@ def tail_logs(jobid=None, follow=False):
 def _disconnect_hint(jobid):
     print(
         f"\n\nVIEWER DISCONNECTED · job {jobid} keeps running on {config.remote_host()}\n"
-        f"  Reconnect  cxr remote attach {jobid}\n"
+        f"  Reconnect  cxr remote status {jobid} -a\n"
         f"  Status     cxr remote status {jobid} -vv\n"
         "  Stop       cxr remote stop <material>"
     )
@@ -535,7 +542,7 @@ def attach(jobid=None, detail=0):
                 f"warning: no job id given; defaulting to {jobid}, which is not running "
                 f"(state: {current}).\n"
                 "  Live jobs   cxr remote jobs\n"
-                "  Attach one  cxr remote attach <job-id>",
+                "  Monitor one cxr remote status <job-id> -a",
                 file=sys.stderr,
             )
     return _live_status(jobid, detail)

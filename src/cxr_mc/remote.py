@@ -31,7 +31,7 @@ Run, wait for SLURM, then pull:
 
 Remote jobs survive SSH disconnects:
 
-    cxr remote attach [JOBID]           # (re)connect + track live (default: latest)
+cxr remote status [JOBID] --attach  # (re)connect + track live (default: latest)
     cxr remote jobs                     # list jobs on the box + their state
     cxr remote status [JOBID] [-v|-vv]  # job summary; SLURM details; case progress
     cxr remote logs [JOBID] --follow    # tail the remote log (live)
@@ -200,7 +200,6 @@ _selected_materials = cli._selected_materials
 _cli_rebrem = cli._cli_rebrem
 _cli_pull = cli._cli_pull
 _cli_start = cli._cli_start
-_cli_attach = cli._cli_attach
 _cli_jobs = cli._cli_jobs
 _cli_status = cli._cli_status
 _cli_logs = cli._cli_logs

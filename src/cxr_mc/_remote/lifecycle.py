@@ -31,7 +31,7 @@ def _refuse_if_busy(materials, quick):
             "refusing to start: a live job is already producing the same "
             "checkpoint(s), and two runs writing one <stem>.pkl race on its "
             f".tmp and crash.\n{detail}\n"
-            "attach to it (cxr remote attach <jobid>) or stop it "
+            "monitor it (cxr remote status <jobid> --attach) or stop it "
             "(cxr remote stop <material>) first, or run different materials."
         )
 
@@ -297,7 +297,8 @@ def _refuse_if_profile_live(catalog_profile):
     if clash:
         raise SystemExit(
             f"refusing to submit: profile {catalog_profile!r} already has a live job "
-            f"({', '.join(clash)}); attach to it (cxr remote attach {clash[0]}) or stop it "
+            f"({', '.join(clash)}); monitor it "
+            f"(cxr remote status {clash[0]} --attach) or stop it "
             f"(cxr remote stop --profile {catalog_profile}) first."
         )
 
@@ -534,7 +535,7 @@ def start_queue(
                         )
                     ),
                 ),
-                ("Attach", f"cxr remote attach {jobid}"),
+            ("Monitor", f"cxr remote status {jobid} --attach"),
                 ("Status", f"cxr remote status {jobid} -vv"),
                 ("Logs", f"cxr remote logs {jobid} --follow"),
                 *(
@@ -606,7 +607,7 @@ def start_zhai_queue(
                 ("SLURM", scheduler_id),
                 ("Host", config.remote_host()),
                 ("Workload", "Zhai reproduction"),
-                ("Attach", f"cxr remote attach {jobid}"),
+            ("Monitor", f"cxr remote status {jobid} --attach"),
                 ("Status", f"cxr remote status {jobid} -vv"),
                 ("Logs", f"cxr remote logs {jobid} --follow"),
                 ("Pull", "cxr remote check --pull  (after completion)"),
@@ -783,7 +784,7 @@ def start_rebrem_queue(
                         )
                     ),
                 ),
-                ("Attach", f"cxr remote attach {jobid}"),
+            ("Monitor", f"cxr remote status {jobid} --attach"),
                 ("Status", f"cxr remote status {jobid} -vv"),
                 ("Logs", f"cxr remote logs {jobid} --follow"),
                 ("Pull", f"cxr remote pull {' '.join(stems)}  (after completion)"),
@@ -904,7 +905,7 @@ def start_reline_queue(
                         )
                     ),
                 ),
-                ("Attach", f"cxr remote attach {jobid}"),
+            ("Monitor", f"cxr remote status {jobid} --attach"),
                 ("Status", f"cxr remote status {jobid} -vv"),
                 ("Logs", f"cxr remote logs {jobid} --follow"),
                 ("Pull", f"cxr remote pull {' '.join(stems)} --line-only  (after completion)"),

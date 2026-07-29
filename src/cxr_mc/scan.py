@@ -27,6 +27,7 @@ a harmless no-op.
 
 import io
 import json
+import math
 import os
 import re
 import threading
@@ -665,6 +666,8 @@ def _run_material(args, material, max_seconds=None):
     # tracks relative matmul work instead of a flat case count -- see
     # notebooks/scan_app.py for the same cost-weighted meter run locally.
     latest_cost = {}
+    initial_done_cost = None
+    progress_timer = _ProgressTimer(progress_file) if progress_file is not None else None
     runtime_info = {}
     timing_info: dict[str, Any] = {
         "checkpoint_count": 0,
@@ -700,7 +703,10 @@ def _run_material(args, material, max_seconds=None):
             latest_case.update(_case_summary(case))
 
     def _record_cost(done_cost, total_cost):
+        nonlocal initial_done_cost
         with performance_lock:
+            if initial_done_cost is None:
+                initial_done_cost = done_cost
             latest_cost.update(done_cost=done_cost, total_cost=total_cost)
 
     def _record_progress(completed_new_cases, total_cases, cached_cases):
@@ -714,6 +720,12 @@ def _run_material(args, material, max_seconds=None):
             cost_snapshot = dict(latest_cost)
             case_snapshot = dict(latest_case) or None
         if progress_file is not None:
+            assert progress_timer is not None
+            computed_cost = (
+                None
+                if initial_done_cost is None or "done_cost" not in cost_snapshot
+                else max(0.0, cost_snapshot["done_cost"] - initial_done_cost)
+            )
             _write_progress_record(
                 progress_file,
                 material=material,
@@ -721,6 +733,10 @@ def _run_material(args, material, max_seconds=None):
                 current=case_snapshot,
                 **progress_snapshot,
                 **cost_snapshot,
+                **progress_timer.snapshot(
+                    completed_new_cases=progress_snapshot["completed_new_cases"],
+                    computed_cost=computed_cost,
+                ),
             )
 
     def _record_runtime(info):
@@ -775,11 +791,13 @@ def _run_material(args, material, max_seconds=None):
             }
 
     if progress_file is not None:
+        assert progress_timer is not None
         _write_progress_record(
             progress_file,
             material=material,
             state="running",
             **latest_progress,
+            **progress_timer.snapshot(),
         )
     performance_logger = None
     performance_profile = getattr(args, "performance_profile", None)
@@ -810,6 +828,8 @@ def _run_material(args, material, max_seconds=None):
         )
         performance_logger.start()
     try:
+        if progress_timer is not None:
+            progress_timer.start()
         result = run_sweep(
             cases,
             results,
@@ -847,12 +867,21 @@ def _run_material(args, material, max_seconds=None):
         with performance_lock:
             performance_state["state"] = "failed"
         if progress_file is not None:
+            assert progress_timer is not None
             _write_progress_record(
                 progress_file,
                 material=material,
                 state="failed",
                 **latest_progress,
                 **latest_cost,
+                **progress_timer.snapshot(
+                    completed_new_cases=latest_progress["completed_new_cases"],
+                    computed_cost=(
+                        None
+                        if initial_done_cost is None or "done_cost" not in latest_cost
+                        else max(0.0, latest_cost["done_cost"] - initial_done_cost)
+                    ),
+                ),
             )
         if performance_logger is not None:
             performance_logger.close("failed")
@@ -862,12 +891,21 @@ def _run_material(args, material, max_seconds=None):
     if performance_logger is not None:
         performance_logger.close("done" if complete else "paused")
     if progress_file is not None:
+        assert progress_timer is not None
         _write_progress_record(
             progress_file,
             material=material,
             state="done" if complete else "paused",
             **latest_progress,
             **latest_cost,
+            **progress_timer.snapshot(
+                completed_new_cases=latest_progress["completed_new_cases"],
+                computed_cost=(
+                    None
+                    if initial_done_cost is None or "done_cost" not in latest_cost
+                    else max(0.0, latest_cost["done_cost"] - initial_done_cost)
+                ),
+            ),
         )
     n = sum(len(v) for v in results.values())
     if complete:
@@ -878,6 +916,58 @@ def _run_material(args, material, max_seconds=None):
             f"{args.checkpoint_dir}/{stem}/ ({n} records)"
         )
     return complete
+
+
+class _ProgressTimer:
+    """Persist additive active-process time and measured work across resumes."""
+
+    def __init__(self, path, *, time_fn=None):
+        self._time_fn = time.monotonic if time_fn is None else time_fn
+        self._started = None
+        self._base_seconds = 0.0
+        self._base_cases = 0
+        self._base_cost = 0.0
+        if path is None:
+            return
+        try:
+            previous = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            return
+        if not isinstance(previous, dict):
+            return
+        seconds = previous.get("active_compute_seconds")
+        cases = previous.get("measured_new_cases")
+        cost = previous.get("measured_new_cost")
+        if (
+            isinstance(seconds, (int, float))
+            and not isinstance(seconds, bool)
+            and 0 <= seconds < math.inf
+        ):
+            self._base_seconds = float(seconds)
+        if isinstance(cases, int) and not isinstance(cases, bool) and cases >= 0:
+            self._base_cases = cases
+        if (
+            isinstance(cost, (int, float))
+            and not isinstance(cost, bool)
+            and 0 <= cost < math.inf
+        ):
+            self._base_cost = float(cost)
+
+    def start(self):
+        if self._started is None:
+            self._started = self._time_fn()
+
+    def snapshot(self, *, completed_new_cases=0, computed_cost=None):
+        elapsed = 0.0 if self._started is None else max(0.0, self._time_fn() - self._started)
+        fields = {
+            "active_compute_seconds": self._base_seconds + elapsed,
+            "measured_new_cases": self._base_cases + max(0, int(completed_new_cases)),
+        }
+        if computed_cost is not None or self._base_cost > 0:
+            fields["measured_new_cost"] = self._base_cost + max(
+                0.0, float(computed_cost or 0.0)
+            )
+        return fields
 
 
 def _write_progress_record(
@@ -891,6 +981,9 @@ def _write_progress_record(
     current=None,
     done_cost=None,
     total_cost=None,
+    active_compute_seconds=None,
+    measured_new_cases=None,
+    measured_new_cost=None,
 ):
     """Atomically replace one scan's compact JSON progress record.
 
@@ -916,6 +1009,12 @@ def _write_progress_record(
     if done_cost is not None and total_cost is not None:
         record["done_cost"] = done_cost
         record["total_cost"] = total_cost
+    if active_compute_seconds is not None:
+        record["active_compute_seconds"] = active_compute_seconds
+    if measured_new_cases is not None:
+        record["measured_new_cases"] = measured_new_cases
+    if measured_new_cost is not None:
+        record["measured_new_cost"] = measured_new_cost
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(record, separators=(",", ":")) + "\n", encoding="utf-8")
     os.replace(tmp, path)

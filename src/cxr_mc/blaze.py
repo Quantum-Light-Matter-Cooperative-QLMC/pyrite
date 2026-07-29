@@ -47,6 +47,7 @@ material_sweep = None
 run_sweep = None
 build_cases = None
 _write_progress_record = None
+_ProgressTimer = None
 validate_materials = None
 
 
@@ -58,6 +59,7 @@ def _load_runtime() -> None:
     global run_sweep
     global build_cases
     global _write_progress_record
+    global _ProgressTimer
     global validate_materials
 
     from . import config as config_module
@@ -74,6 +76,7 @@ def _load_runtime() -> None:
     run_sweep = run_sweep or run_module.run_sweep
     build_cases = build_cases or sweep_module.build_cases
     _write_progress_record = _write_progress_record or scan_module._write_progress_record
+    _ProgressTimer = _ProgressTimer or scan_module._ProgressTimer
     validate_materials = validate_materials or scan_module.validate_materials
 
 
@@ -280,6 +283,7 @@ def run(args):
     assert run_sweep is not None
     assert build_cases is not None
     assert _write_progress_record is not None
+    assert _ProgressTimer is not None
     assert validate_materials is not None
     write_progress_record = _write_progress_record
 
@@ -332,6 +336,7 @@ def run(args):
     max_seconds = None if args.max_minutes is None else args.max_minutes * 60.0
 
     progress_file = getattr(args, "progress_file", None)
+    progress_timer = _ProgressTimer(progress_file) if progress_file is not None else None
     latest_progress = {
         "total_cases": len(cases),
         "cached_cases": 0,
@@ -345,21 +350,27 @@ def run(args):
             completed_new_cases=completed_new_cases,
         )
         if progress_file is not None:
+            assert progress_timer is not None
             write_progress_record(
                 progress_file,
                 material=args.material,
                 state="running",
                 **latest_progress,
+                **progress_timer.snapshot(completed_new_cases=completed_new_cases),
             )
 
     if progress_file is not None:
+        assert progress_timer is not None
         write_progress_record(
             progress_file,
             material=args.material,
             state="running",
             **latest_progress,
+            **progress_timer.snapshot(),
         )
     try:
+        if progress_timer is not None:
+            progress_timer.start()
         result = run_sweep(
             cases,
             results,
@@ -375,19 +386,27 @@ def run(args):
         complete = True if result is None else bool(result)
     except BaseException:
         if progress_file is not None:
+            assert progress_timer is not None
             write_progress_record(
                 progress_file,
                 material=args.material,
                 state="failed",
                 **latest_progress,
+                **progress_timer.snapshot(
+                    completed_new_cases=latest_progress["completed_new_cases"]
+                ),
             )
         raise
     if progress_file is not None:
+        assert progress_timer is not None
         write_progress_record(
             progress_file,
             material=args.material,
             state="done" if complete else "paused",
             **latest_progress,
+            **progress_timer.snapshot(
+                completed_new_cases=latest_progress["completed_new_cases"]
+            ),
         )
 
     n = sum(len(v) for v in results.values())
