@@ -12,7 +12,6 @@ caller also assigns it to this agent.
 
 1. Read `main:TODO.md`, matching `tasks/<branch-leaf>.md`,
    `git worktree list --porcelain`, branch status, and relevant instructions.
-   Invoke `todo-sync` only to check/restore `TODO.md` equality.
 2. Use `repo-orientation` and Tokensave to confirm owners, dependencies, and
    affected tests. Exact paths and non-code text may use `rg` or direct reads.
 3. If item still contains `>user<`, invoke `triage`; stop for plan review.
@@ -38,7 +37,7 @@ Only when explicitly asked:
 
 1. Verify branch landed and identify durable task content.
 2. Promote durable content to `docs/`; remove task file; update backlog.
-3. Invoke `todo-sync`; commit and push authorized lifecycle changes.
+3. Commit and push authorized lifecycle changes.
 4. Remove worktree/branch only after clean-state and recovery checks. Report
    deleted local/remote refs.
 
