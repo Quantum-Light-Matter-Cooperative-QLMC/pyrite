@@ -14,7 +14,12 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
    supports it. → `feature/compute-performance-optimization`;
    [`tasks/compute-performance-optimization.md`](tasks/compute-performance-optimization.md).
 2. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-3. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
+3. **Detector profiles and Zhai validation modernization.** Add profile-owned
+   detector geometry with a 90 degree standard default, then route maintained
+   Zhai/literature comparisons through current detector, Sweep, and case APIs.
+   → `feature/profile-observation-angle`;
+   [`tasks/profile-observation-angle.md`](tasks/profile-observation-angle.md).
+4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
 
 ### Gated
 
