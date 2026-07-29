@@ -270,3 +270,4 @@ checkpoints/**/*.tmp
 checkpoints/**/*meta.json
 performance-profiles/
 RTK.md
+.headroom_wrap_marker.json
