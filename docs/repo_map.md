@@ -56,9 +56,10 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   profile-owned material membership through `profile members
   set|add|remove|reset`. An absent membership key means all in-use materials.
 - **`cxr material show|set MATERIAL [--profile NAME]`** → `cli.material`:
-  inspect effective ranges and edit per-profile material overrides. Hidden
-  compatibility aliases remain under `cxr sweep`.
-- **`cxr catalog validate [catalog]`** → `check_config:_run`: validate bundled
+  inspect effective ranges and edit per-profile material overrides. `cxr material
+  blaze MATERIAL ...` routes to the specialized blazed sweep. Hidden compatibility
+  aliases remain under `cxr sweep`.
+- **`cxr material validate [catalog]`** → `check_config:_run`: validate bundled
   offline catalog or explicit complete catalog without starting simulation;
   hidden alias: `cxr check-config`.
 - **`cxr checkpoint ...`** → `cli.checkpoint:command`: grouped local checkpoint
@@ -259,7 +260,7 @@ Headless sweep entry: parse args → build cases → `run_sweep` → checkpoint.
 - Deps: `config`, `run`, `sweep`.
 
 ### `blaze.py`
-Headless blazed-crystal (sawtooth entrance face) sweep entry: `cxr blaze <material>
+Headless blazed-crystal (sawtooth entrance face) sweep entry: `cxr material blaze <material>
 --energy E [E...] --spacing S [S...] [--angles A [A...]]`. Mirrors `scan.py`'s
 parse args → build cases → `run_sweep` → checkpoint structure, but forces v1
 groove geometry (`theta_obs=90`, `tilt_azim=180`, no substrate/stack/footprint)
@@ -411,10 +412,6 @@ Fidelity-aware line/bremsstrahlung recompute defaults shared by local, grouped,
 and remote command paths. Resolves preset settings and material photon grids;
 keeps a compatibility fallback for older branches.
 
-### `cli/catalog.py`
-Canonical `cxr catalog` group. Lazily routes `catalog validate` to
-`check_config.command` while `cxr check-config` remains a hidden alias.
-
 ### `analyze.py`
 `cxr analyze` launcher for `notebooks/analysis_app.py`: persisted
 initial-material selection, smoke execution, edit/watch mode, ACP bridges,
@@ -423,7 +420,7 @@ SSH-tunnel-friendly fixed-port launch.
   `checkpoint_stem`, `initial_material`, `get_default_material`,
   `set_default_material`, `command`, `main`. `face_menu`/`checkpoint_stem`
   back the app's flat/blazed **Face** dropdown (blazed loads
-  `<material>_blazed.pkl` from `cxr blaze`).
+  `<material>_blazed.pkl` from `cxr material blaze`).
 
 ### `check.py`
 `cxr check` launcher for `notebooks/validation_app.py` plus cached validation

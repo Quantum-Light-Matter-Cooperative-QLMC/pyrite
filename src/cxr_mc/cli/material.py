@@ -17,11 +17,22 @@ from cxr_mc.cli._core import (
     THICKNESS_CSV_RANGE,
     TILT_CSV_RANGE,
     CLIError,
+    LazyGroup,
     emit_json_result,
     emit_result,
 )
 
 _RESET_CHOICES = click.Choice((*_catalog_io.RANGES, "all"), case_sensitive=False)
+
+_COMMANDS = {
+    "blaze": "cxr_mc.blaze.command",
+    "validate": "cxr_mc.check_config.command",
+}
+
+_COMMAND_HELP = {
+    "blaze": "Run a grooved-crystal sweep and write a checkpoint.",
+    "validate": "Validate a material catalog without starting simulation.",
+}
 
 
 def _unknown_material(document, material):
@@ -172,12 +183,18 @@ def _set(
     return 0
 
 
-@click.group(name="material", no_args_is_help=True)
+@click.group(
+    name="material",
+    cls=LazyGroup,
+    lazy_commands=_COMMANDS,
+    lazy_help=_COMMAND_HELP,
+    no_args_is_help=True,
+)
 def command():
-    """Inspect effective ranges and edit one material's profile overrides.
+    """Inspect, validate, edit, and blaze individual materials.
 
-    Profile membership is managed only by ``cxr profile members``. Catalog-wide
-    material discovery remains under ``cxr catalog``.
+    Profile membership remains under ``cxr profile members``. ``validate``
+    checks the complete catalog; ``blaze`` writes a face-specific checkpoint.
     """
 
 

@@ -86,7 +86,7 @@ def build_reference() -> str:
         "and `union` paths remain callable compatibility aliases but are hidden",
         "from root help.",
         "",
-        "Validation uses `cxr validate`, `cxr catalog validate`, and",
+        "Validation uses `cxr validate`, `cxr material validate`, and",
         "`cxr remote validate`. Legacy `check`, `check-config`, and remote",
         "`check` paths remain hidden compatibility aliases. Remote detached",
         "submission uses `cxr remote submit`; legacy `start` remains an alias.",

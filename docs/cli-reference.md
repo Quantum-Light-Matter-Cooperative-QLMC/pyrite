@@ -23,7 +23,7 @@ top-level `slim`, `rebrem`, `reline`, `archive`, `restore`, `archives`,
 and `union` paths remain callable compatibility aliases but are hidden
 from root help.
 
-Validation uses `cxr validate`, `cxr catalog validate`, and
+Validation uses `cxr validate`, `cxr material validate`, and
 `cxr remote validate`. Legacy `check`, `check-config`, and remote
 `check` paths remain hidden compatibility aliases. Remote detached
 submission uses `cxr remote submit`; legacy `start` remains an alias.
@@ -66,18 +66,16 @@ Options:
 
 Commands:
   scan         Run one material's MC sweep and write a checkpoint.
-  blaze        Run a grooved-crystal sweep and write a checkpoint.
   export       Export the analysis app as static HTML.
   analyze      Launch the analysis app.
   viewer       Launch the 3D trajectory visualization app.
   validate     Launch validation or export cached validation figures.
-  catalog      Inspect and validate material-catalog configuration.
   checkpoint   Inspect, transform, recompute, and archive checkpoints.
   completion   Manage cxr shell tab-completion.
   remote       Run and manage MC sweeps on a remote GPU host.
   energy-grid  Derive, submit, inspect, and apply photon-energy grids.
   profile      Manage named catalog campaigns and material membership.
-  material     Inspect effective ranges and edit material overrides.
+  material     Inspect, validate, edit, and blaze individual materials.
   prune        Drop checkpoint records obsolete under current scan profiles.
 ```
 
@@ -161,30 +159,6 @@ Options:
   -h, --help                      Show this message and exit.
 ```
 
-## `cxr blaze`
-
-```text
-Usage: cxr blaze [OPTIONS] MATERIAL
-
-  Run one material's blazed-crystal MC sweep and write its checkpoint.
-
-  Writes checkpoints/<material>_blazed.pkl, separate from flat-face scan checkpoints.
-  Repeat --energy/--spacing/--angles for multiple values.
-
-Options:
-  --energy E             Beam energies in keV (one or more).  [required]
-  --spacing S            Groove spacing(s) in meters (one, or one per energy).
-                         [required]
-  --angles A             Polar tilt values in degrees.  [0.0<x<90.0]
-  --workers NUMBER       run_cases max_workers (default auto; 0 = serial).
-  --checkpoint-dir DIR   Read and write blazed checkpoint pickles in DIR.  [default:
-                         checkpoints]
-  --max-minutes MINUTES  Soft wall-clock budget in minutes; exit 75 if resumable work
-                         remains.
-  --json                 Emit one versioned JSON object on stdout.
-  -h, --help             Show this message and exit.
-```
-
 ## `cxr export`
 
 ```text
@@ -265,38 +239,6 @@ Options:
   --ne-supp NUMBER  With --export, supplementary electrons per polar-tilt spectrum.
                     [default: 200]
   -h, --help        Show this message and exit.
-```
-
-## `cxr catalog`
-
-```text
-Usage: cxr catalog [OPTIONS] COMMAND [ARGS]...
-
-  Inspect and validate material-catalog configuration.
-
-  Example:
-    cxr catalog validate
-    cxr catalog validate path/to/materials.toml
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  validate  Validate a material catalog without starting simulation.
-```
-
-## `cxr catalog validate`
-
-```text
-Usage: cxr catalog validate [OPTIONS] [MANIFEST]
-
-  Validate bundled material catalog or an explicit full catalog TOML.
-
-  With no MANIFEST, reloads packaged materials.toml. Performs no simulation, network
-  access, or GPU probe.
-
-Options:
-  -h, --help  Show this message and exit.
 ```
 
 ## `cxr checkpoint`
@@ -1618,17 +1560,19 @@ Options:
 ```text
 Usage: cxr material [OPTIONS] COMMAND [ARGS]...
 
-  Inspect effective ranges and edit one material's profile overrides.
+  Inspect, validate, edit, and blaze individual materials.
 
-  Profile membership is managed only by ``cxr profile members``. Catalog-wide material
-  discovery remains under ``cxr catalog``.
+  Profile membership remains under ``cxr profile members``. ``validate`` checks the
+  complete catalog; ``blaze`` writes a face-specific checkpoint.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  set   Set or reset MATERIAL overrides without changing profile membership.
-  show  Show MATERIAL's effective ranges and inherited/overridden sources.
+  set       Set or reset MATERIAL overrides without...
+  show      Show MATERIAL's effective ranges and...
+  blaze     Run a grooved-crystal sweep and write a checkpoint.
+  validate  Validate a material catalog without starting simulation.
 ```
 
 ## `cxr material set`
@@ -1672,6 +1616,44 @@ Options:
                   standard]
   --json          Emit one versioned JSON object on stdout.
   -h, --help      Show this message and exit.
+```
+
+## `cxr material blaze`
+
+```text
+Usage: cxr material blaze [OPTIONS] MATERIAL
+
+  Run one material's blazed-crystal MC sweep and write its checkpoint.
+
+  Writes checkpoints/<material>_blazed.pkl, separate from flat-face scan checkpoints.
+  Repeat --energy/--spacing/--angles for multiple values.
+
+Options:
+  --energy E             Beam energies in keV (one or more).  [required]
+  --spacing S            Groove spacing(s) in meters (one, or one per energy).
+                         [required]
+  --angles A             Polar tilt values in degrees.  [0.0<x<90.0]
+  --workers NUMBER       run_cases max_workers (default auto; 0 = serial).
+  --checkpoint-dir DIR   Read and write blazed checkpoint pickles in DIR.  [default:
+                         checkpoints]
+  --max-minutes MINUTES  Soft wall-clock budget in minutes; exit 75 if resumable work
+                         remains.
+  --json                 Emit one versioned JSON object on stdout.
+  -h, --help             Show this message and exit.
+```
+
+## `cxr material validate`
+
+```text
+Usage: cxr material validate [OPTIONS] [MANIFEST]
+
+  Validate bundled material catalog or an explicit full catalog TOML.
+
+  With no MANIFEST, reloads packaged materials.toml. Performs no simulation, network
+  access, or GPU probe.
+
+Options:
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr prune`

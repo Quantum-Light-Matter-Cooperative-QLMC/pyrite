@@ -11,12 +11,10 @@ from ._core import LazyGroup, color_option, run
 
 _COMMANDS = {
     "scan": "cxr_mc.scan.command",
-    "blaze": "cxr_mc.blaze.command",
     "export": "cxr_mc.export.command",
     "analyze": "cxr_mc.analyze.command",
     "viewer": "cxr_mc.viewer.command",
     "validate": "cxr_mc.check.command",
-    "catalog": "cxr_mc.cli.catalog.command",
     "checkpoint": "cxr_mc.cli.checkpoint.command",
     "completion": "cxr_mc.cli.completion.command",
     "slim": "cxr_mc.slim.command",
@@ -38,12 +36,10 @@ _COMMANDS = {
 
 _COMMAND_HELP = {
     "scan": "Run one material's MC sweep and write a checkpoint.",
-    "blaze": "Run a grooved-crystal sweep and write a checkpoint.",
     "export": "Export the analysis app as static HTML.",
     "analyze": "Launch the analysis app.",
     "viewer": "Launch the 3D trajectory visualization app.",
     "validate": "Launch validation or export cached validation figures.",
-    "catalog": "Inspect and validate material-catalog configuration.",
     "checkpoint": "Inspect, transform, recompute, and archive checkpoints.",
     "completion": "Manage cxr shell tab-completion.",
     "slim": "Shrink a checkpoint for transfer.",
@@ -57,7 +53,7 @@ _COMMAND_HELP = {
     "energy-grid": "Derive, submit, inspect, and apply photon-energy grids.",
     "sweep": "Compatibility aliases for retired scan-range commands.",
     "profile": "Manage named catalog campaigns and material membership.",
-    "material": "Inspect effective ranges and edit material overrides.",
+    "material": "Inspect, validate, edit, and blaze individual materials.",
     "prune": "Drop checkpoint records obsolete under current scan profiles.",
     "check": "Launch validation or export cached validation figures.",
     "check-config": "Validate a material catalog without starting simulation.",

@@ -69,8 +69,8 @@ uv run cxr validate
 
 Main surfaces:
 
-- `cxr`: scan, analysis, validation, export, checkpoint, catalog, profile,
-  material, and remote workflows. See generated
+- `cxr`: scan, analysis, validation, export, checkpoint, profile, material,
+  and remote workflows. See generated
   [CLI reference](docs/cli-reference.md).
 - `notebooks/scan_app.py`: interactive sweep runner.
 - `notebooks/analysis_app.py`: checkpoint analysis.
@@ -89,7 +89,7 @@ Phase-specific CIFs live under `src/cxr_mc/data/cifs/`; production loading is
 offline. Validate edits with:
 
 ```bash
-uv run cxr catalog validate
+uv run cxr material validate
 ```
 
 Golden catalog snapshot must be regenerated after catalog/schema changes; use

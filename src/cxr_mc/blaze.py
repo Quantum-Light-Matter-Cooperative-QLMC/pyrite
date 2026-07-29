@@ -8,7 +8,7 @@ automatically by the existing geometry code
 (``montecarlo.groove.blazed_groove_spec``); this driver only supplies groove
 spacing and the scan grid.
 
-    cxr blaze hopg --spacing 2e-6 --energy 30 --angles 25 45
+    cxr material blaze hopg --spacing 2e-6 --energy 30 --angles 25 45
 
 adds a HOPG crystal with 2 micron-spaced grooves, scanned over polar angles
 25 deg and 45 deg.

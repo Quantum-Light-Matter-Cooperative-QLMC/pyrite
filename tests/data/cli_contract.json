@@ -90,7 +90,7 @@
         "required": false
       }
     ],
-    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr scan mose2 --quick\n    cxr analyze mose2\n    cxr remote submit mose2 --dry-run\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  scan         Run one material's MC sweep and write a checkpoint.\n  blaze        Run a grooved-crystal sweep and write a checkpoint.\n  export       Export the analysis app as static HTML.\n  analyze      Launch the analysis app.\n  viewer       Launch the 3D trajectory visualization app.\n  validate     Launch validation or export cached validation figures.\n  catalog      Inspect and validate material-catalog configuration.\n  checkpoint   Inspect, transform, recompute, and archive checkpoints.\n  completion   Manage cxr shell tab-completion.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect effective ranges and edit material overrides.\n  prune        Drop checkpoint records obsolete under current scan profiles.\n",
+    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr scan mose2 --quick\n    cxr analyze mose2\n    cxr remote submit mose2 --dry-run\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  scan         Run one material's MC sweep and write a checkpoint.\n  export       Export the analysis app as static HTML.\n  analyze      Launch the analysis app.\n  viewer       Launch the 3D trajectory visualization app.\n  validate     Launch validation or export cached validation figures.\n  checkpoint   Inspect, transform, recompute, and archive checkpoints.\n  completion   Manage cxr shell tab-completion.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect, validate, edit, and blaze individual materials.\n  prune        Drop checkpoint records obsolete under current scan profiles.\n",
     "hidden": false,
     "path": "",
     "subcommands": [
@@ -225,6 +225,15 @@
             "required": false
           },
           {
+            "dest": "coherent",
+            "help": "Sum CXR segment amplitudes with bunch phases (coherent) instead of adding segment intensities (incoherent, the default). Omit to defer to the profile. A coherent run gets an identity-qualified checkpoint stem (<material>--full-<digest>), so it never shares or clobbers the incoherent <material> checkpoint.",
+            "option_strings": [
+              "--coherent",
+              "--incoherent"
+            ],
+            "required": false
+          },
+          {
             "dest": "checkpoint_dir",
             "help": "Read and write checkpoint pickles in DIR.",
             "option_strings": [
@@ -305,95 +314,9 @@
             "required": false
           }
         ],
-        "help": "Usage: cxr scan [OPTIONS] [MATERIAL]\n\n  Run one material's MC sweep and write its checkpoint.\n\n  Pass MATERIAL, --all, or -A/--actually-all, never more than one. --all runs\n  the verified `materials` list, optionally widened with --include-unverified-dw\n  and/or --include-high-energy (floored at --high-energy-min-kev, default 150).\n  -A runs every material in mats_to_sim.toml, no exceptions.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\n  Beam overrides: --beam-transverse-fwhm-{x,y}-mm, --beam-bunch-length-\n  fs/--beam-long-shape, --beam-rep-rate-hz, and --beam-bunch-charge-pc replace\n  resolved catalog-profile distribution values. Beam energy always remains the\n  material scan grid; this command deliberately has no energy override.\n\nOptions:\n  -a, --all                       Run mats_to_sim.toml's verified `materials`\n                                  list; takes no MATERIAL.\n  -A, --actually-all              Run every material in mats_to_sim.toml --\n                                  materials, no_verified_dw,\n                                  high_energy_materials, and\n                                  materials_to_leave_out combined; takes no\n                                  MATERIAL. Not combined with --all/--include-\n                                  unverified-dw/--include-high-energy.\n  --include-unverified-dw         With --all, also run mats_to_sim.toml's\n                                  no_verified_dw materials.\n  --include-high-energy           With --all, also run mats_to_sim.toml's\n                                  high_energy_materials, filtered to --high-\n                                  energy-min-kev and above.\n  --high-energy-min-kev KEV       Energy floor applied to any selected\n                                  high_energy_materials member [default: 150.0\n                                  when selected via --include-high-energy/-A].\n                                  With an explicit MATERIAL, applies only if\n                                  that material is itself a\n                                  high_energy_materials entry; a no-op on every\n                                  other material.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use tiny smoke-test grid and write\n                                  <material>_quick.pkl.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --beam-uvw H K L                Override nonzero integer beam zone axis [uvw].\n  --beam-transverse-fwhm-x-mm MM  Beam horizontal Gaussian spot FWHM [mm];\n                                  overrides the resolved profile.\n  --beam-transverse-fwhm-y-mm MM  Beam vertical Gaussian spot FWHM [mm];\n                                  overrides the resolved profile.\n  --beam-bunch-length-fs FS       Longitudinal bunch RMS length [fs]; 0 is a\n                                  point bunch.\n  --beam-long-shape SHAPE         Longitudinal bunch shape: gaussian or uniform;\n                                  needs --beam-bunch-length-fs.\n  --beam-rep-rate-hz HZ           Beam repetition rate [Hz]; overrides the\n                                  resolved profile.\n  --beam-bunch-charge-pc PC       Single-bunch charge [pC]; overrides the\n                                  resolved profile.\n  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  --performance-profile NAME      Run catalog profile NAME while sampling CPU\n                                  pressure, RAM/swap, GPU clocks/VRAM, process-\n                                  tree, phase timing, queue, case, worker, and\n                                  chunk metrics every 5 s into performance-\n                                  profiles/NAME/<material>.ndjson.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  --profile TEXT                  Catalog profile to run (e.g. standard,\n                                  sub_100keV).  [default: standard]\n  --json                          Emit one versioned JSON object on stdout.\n  -h, --help                      Show this message and exit.\n",
+        "help": "Usage: cxr scan [OPTIONS] [MATERIAL]\n\n  Run one material's MC sweep and write its checkpoint.\n\n  Pass MATERIAL, --all, or -A/--actually-all, never more than one. --all runs\n  the verified `materials` list, optionally widened with --include-unverified-dw\n  and/or --include-high-energy (floored at --high-energy-min-kev, default 150).\n  -A runs every material in mats_to_sim.toml, no exceptions.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\n  Beam overrides: --beam-transverse-fwhm-{x,y}-mm, --beam-bunch-length-\n  fs/--beam-long-shape, --beam-rep-rate-hz, and --beam-bunch-charge-pc replace\n  resolved catalog-profile distribution values. Beam energy always remains the\n  material scan grid; this command deliberately has no energy override.\n\nOptions:\n  -a, --all                       Run mats_to_sim.toml's verified `materials`\n                                  list; takes no MATERIAL.\n  -A, --actually-all              Run every material in mats_to_sim.toml --\n                                  materials, no_verified_dw,\n                                  high_energy_materials, and\n                                  materials_to_leave_out combined; takes no\n                                  MATERIAL. Not combined with --all/--include-\n                                  unverified-dw/--include-high-energy.\n  --include-unverified-dw         With --all, also run mats_to_sim.toml's\n                                  no_verified_dw materials.\n  --include-high-energy           With --all, also run mats_to_sim.toml's\n                                  high_energy_materials, filtered to --high-\n                                  energy-min-kev and above.\n  --high-energy-min-kev KEV       Energy floor applied to any selected\n                                  high_energy_materials member [default: 150.0\n                                  when selected via --include-high-energy/-A].\n                                  With an explicit MATERIAL, applies only if\n                                  that material is itself a\n                                  high_energy_materials entry; a no-op on every\n                                  other material.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use tiny smoke-test grid and write\n                                  <material>_quick.pkl.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --beam-uvw H K L                Override nonzero integer beam zone axis [uvw].\n  --beam-transverse-fwhm-x-mm MM  Beam horizontal Gaussian spot FWHM [mm];\n                                  overrides the resolved profile.\n  --beam-transverse-fwhm-y-mm MM  Beam vertical Gaussian spot FWHM [mm];\n                                  overrides the resolved profile.\n  --beam-bunch-length-fs FS       Longitudinal bunch RMS length [fs]; 0 is a\n                                  point bunch.\n  --beam-long-shape SHAPE         Longitudinal bunch shape: gaussian or uniform;\n                                  needs --beam-bunch-length-fs.\n  --beam-rep-rate-hz HZ           Beam repetition rate [Hz]; overrides the\n                                  resolved profile.\n  --beam-bunch-charge-pc PC       Single-bunch charge [pC]; overrides the\n                                  resolved profile.\n  --coherent / --incoherent       Sum CXR segment amplitudes with bunch phases\n                                  (coherent) instead of adding segment\n                                  intensities (incoherent, the default). Omit to\n                                  defer to the profile. A coherent run gets an\n                                  identity-qualified checkpoint stem\n                                  (<material>--full-<digest>), so it never\n                                  shares or clobbers the incoherent <material>\n                                  checkpoint.\n  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  --performance-profile NAME      Run catalog profile NAME while sampling CPU\n                                  pressure, RAM/swap, GPU clocks/VRAM, process-\n                                  tree, phase timing, queue, case, worker, and\n                                  chunk metrics every 5 s into performance-\n                                  profiles/NAME/<material>.ndjson.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  --profile TEXT                  Catalog profile to run (e.g. standard,\n                                  sub_100keV).  [default: standard]\n  --json                          Emit one versioned JSON object on stdout.\n  -h, --help                      Show this message and exit.\n",
         "hidden": false,
         "path": "scan",
-        "subcommands": []
-      },
-      {
-        "actions": [
-          {
-            "dest": "material",
-            "help": null,
-            "option_strings": [],
-            "required": true
-          },
-          {
-            "dest": "energies",
-            "help": "Beam energies in keV (one or more).",
-            "option_strings": [
-              "--energy"
-            ],
-            "required": true
-          },
-          {
-            "dest": "spacings",
-            "help": "Groove spacing(s) in meters (one, or one per energy).",
-            "option_strings": [
-              "--spacing"
-            ],
-            "required": true
-          },
-          {
-            "dest": "angles",
-            "help": "Polar tilt values in degrees.",
-            "option_strings": [
-              "--angles"
-            ],
-            "required": false
-          },
-          {
-            "dest": "workers",
-            "help": "run_cases max_workers (default auto; 0 = serial).",
-            "option_strings": [
-              "--workers"
-            ],
-            "required": false
-          },
-          {
-            "dest": "checkpoint_dir",
-            "help": "Read and write blazed checkpoint pickles in DIR.",
-            "option_strings": [
-              "--checkpoint-dir"
-            ],
-            "required": false
-          },
-          {
-            "dest": "max_minutes",
-            "help": "Soft wall-clock budget in minutes; exit 75 if resumable work remains.",
-            "option_strings": [
-              "--max-minutes"
-            ],
-            "required": false
-          },
-          {
-            "dest": "progress_file",
-            "help": "<SUPPRESS>",
-            "option_strings": [
-              "--progress-file"
-            ],
-            "required": false
-          },
-          {
-            "dest": "no_progress",
-            "help": "<SUPPRESS>",
-            "option_strings": [
-              "--no-progress"
-            ],
-            "required": false
-          },
-          {
-            "dest": "json_output",
-            "help": "Emit one versioned JSON object on stdout.",
-            "option_strings": [
-              "--json"
-            ],
-            "required": false
-          }
-        ],
-        "help": "Usage: cxr blaze [OPTIONS] MATERIAL\n\n  Run one material's blazed-crystal MC sweep and write its checkpoint.\n\n  Writes checkpoints/<material>_blazed.pkl, separate from flat-face scan\n  checkpoints. Repeat --energy/--spacing/--angles for multiple values.\n\nOptions:\n  --energy E             Beam energies in keV (one or more).  [required]\n  --spacing S            Groove spacing(s) in meters (one, or one per energy).\n                         [required]\n  --angles A             Polar tilt values in degrees.  [0.0<x<90.0]\n  --workers NUMBER       run_cases max_workers (default auto; 0 = serial).\n  --checkpoint-dir DIR   Read and write blazed checkpoint pickles in DIR.\n                         [default: checkpoints]\n  --max-minutes MINUTES  Soft wall-clock budget in minutes; exit 75 if resumable\n                         work remains.\n  --json                 Emit one versioned JSON object on stdout.\n  -h, --help             Show this message and exit.\n",
-        "hidden": false,
-        "path": "blaze",
         "subcommands": []
       },
       {
@@ -631,28 +554,6 @@
         "hidden": false,
         "path": "validate",
         "subcommands": []
-      },
-      {
-        "actions": [],
-        "help": "Usage: cxr catalog [OPTIONS] COMMAND [ARGS]...\n\n  Inspect and validate material-catalog configuration.\n\n  Example:\n    cxr catalog validate\n    cxr catalog validate path/to/materials.toml\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  validate  Validate a material catalog without starting simulation.\n",
-        "hidden": false,
-        "path": "catalog",
-        "subcommands": [
-          {
-            "actions": [
-              {
-                "dest": "manifest",
-                "help": null,
-                "option_strings": [],
-                "required": false
-              }
-            ],
-            "help": "Usage: cxr catalog validate [OPTIONS] [MANIFEST]\n\n  Validate bundled material catalog or an explicit full catalog TOML.\n\n  With no MANIFEST, reloads packaged materials.toml. Performs no simulation,\n  network access, or GPU probe.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
-            "hidden": false,
-            "path": "catalog validate",
-            "subcommands": []
-          }
-        ]
       },
       {
         "actions": [],
@@ -4525,7 +4426,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: cxr material [OPTIONS] COMMAND [ARGS]...\n\n  Inspect effective ranges and edit one material's profile overrides.\n\n  Profile membership is managed only by ``cxr profile members``. Catalog-wide\n  material discovery remains under ``cxr catalog``.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  set   Set or reset MATERIAL overrides without changing profile membership.\n  show  Show MATERIAL's effective ranges and inherited/overridden sources.\n",
+        "help": "Usage: cxr material [OPTIONS] COMMAND [ARGS]...\n\n  Inspect, validate, edit, and blaze individual materials.\n\n  Profile membership remains under ``cxr profile members``. ``validate`` checks\n  the complete catalog; ``blaze`` writes a face-specific checkpoint.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  set       Set or reset MATERIAL overrides without...\n  show      Show MATERIAL's effective ranges and...\n  blaze     Run a grooved-crystal sweep and write a checkpoint.\n  validate  Validate a material catalog without starting simulation.\n",
         "hidden": false,
         "path": "material",
         "subcommands": [
@@ -4636,6 +4537,106 @@
             "help": "Usage: cxr material show [OPTIONS] MATERIAL\n\n  Show MATERIAL's effective ranges and inherited/overridden sources.\n\nOptions:\n  --profile TEXT  Resolve defaults and overrides under profile NAME.  [default:\n                  standard]\n  --json          Emit one versioned JSON object on stdout.\n  -h, --help      Show this message and exit.\n",
             "hidden": false,
             "path": "material show",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "material",
+                "help": null,
+                "option_strings": [],
+                "required": true
+              },
+              {
+                "dest": "energies",
+                "help": "Beam energies in keV (one or more).",
+                "option_strings": [
+                  "--energy"
+                ],
+                "required": true
+              },
+              {
+                "dest": "spacings",
+                "help": "Groove spacing(s) in meters (one, or one per energy).",
+                "option_strings": [
+                  "--spacing"
+                ],
+                "required": true
+              },
+              {
+                "dest": "angles",
+                "help": "Polar tilt values in degrees.",
+                "option_strings": [
+                  "--angles"
+                ],
+                "required": false
+              },
+              {
+                "dest": "workers",
+                "help": "run_cases max_workers (default auto; 0 = serial).",
+                "option_strings": [
+                  "--workers"
+                ],
+                "required": false
+              },
+              {
+                "dest": "checkpoint_dir",
+                "help": "Read and write blazed checkpoint pickles in DIR.",
+                "option_strings": [
+                  "--checkpoint-dir"
+                ],
+                "required": false
+              },
+              {
+                "dest": "max_minutes",
+                "help": "Soft wall-clock budget in minutes; exit 75 if resumable work remains.",
+                "option_strings": [
+                  "--max-minutes"
+                ],
+                "required": false
+              },
+              {
+                "dest": "progress_file",
+                "help": "<SUPPRESS>",
+                "option_strings": [
+                  "--progress-file"
+                ],
+                "required": false
+              },
+              {
+                "dest": "no_progress",
+                "help": "<SUPPRESS>",
+                "option_strings": [
+                  "--no-progress"
+                ],
+                "required": false
+              },
+              {
+                "dest": "json_output",
+                "help": "Emit one versioned JSON object on stdout.",
+                "option_strings": [
+                  "--json"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr material blaze [OPTIONS] MATERIAL\n\n  Run one material's blazed-crystal MC sweep and write its checkpoint.\n\n  Writes checkpoints/<material>_blazed.pkl, separate from flat-face scan\n  checkpoints. Repeat --energy/--spacing/--angles for multiple values.\n\nOptions:\n  --energy E             Beam energies in keV (one or more).  [required]\n  --spacing S            Groove spacing(s) in meters (one, or one per energy).\n                         [required]\n  --angles A             Polar tilt values in degrees.  [0.0<x<90.0]\n  --workers NUMBER       run_cases max_workers (default auto; 0 = serial).\n  --checkpoint-dir DIR   Read and write blazed checkpoint pickles in DIR.\n                         [default: checkpoints]\n  --max-minutes MINUTES  Soft wall-clock budget in minutes; exit 75 if resumable\n                         work remains.\n  --json                 Emit one versioned JSON object on stdout.\n  -h, --help             Show this message and exit.\n",
+            "hidden": false,
+            "path": "material blaze",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "manifest",
+                "help": null,
+                "option_strings": [],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr material validate [OPTIONS] [MANIFEST]\n\n  Validate bundled material catalog or an explicit full catalog TOML.\n\n  With no MANIFEST, reloads packaged materials.toml. Performs no simulation,\n  network access, or GPU probe.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
+            "hidden": false,
+            "path": "material validate",
             "subcommands": []
           }
         ]

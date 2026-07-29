@@ -108,7 +108,8 @@ def checkpoint_stem(material: str, face: str) -> str:
     """Checkpoint stem for a material's face variant.
 
     ``material`` itself for the flat (``cxr scan``) face; ``f"{material}_blazed"``
-    for the blazed (sawtooth entrance-face) checkpoint written by ``cxr blaze``.
+    for the blazed (sawtooth entrance-face) checkpoint written by
+    ``cxr material blaze``.
     Passing this stem to :func:`~cxr_mc.run.load_checkpoint` loads the matching
     ``.pkl`` -- no change to ``load_checkpoint`` / ``checkpoint_path_for`` needed.
     """
