@@ -191,6 +191,32 @@ def test_add_unions_sorts_deduplicates(tmp_path, monkeypatch):
     assert "energy_keV = {values = [30.0, 50.0, 75.0]}" in catalog.read_text()
 
 
+def test_add_accepts_material_option_alongside_grid_updates(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(
+        profile.command,
+        ["add", "sub_100keV", "--energy", "75", "--materials", "mose2,hopg"],
+    )
+
+    assert_clean_result(
+        result,
+        stdout="updated profile sub_100keV: added mose2; already members: hopg\n",
+    )
+    text = catalog.read_text()
+    assert "energy_keV = {values = [30.0, 50.0, 75.0]}" in text
+    assert 'materials = ["hopg", "mose2"]' in text
+
+
+def test_add_accepts_electron_count_grids(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["add", "sub_100keV", "--ne-line", "100,200"])
+
+    assert_clean_result(result, stdout="updated profile sub_100keV\n")
+    assert "n_electrons = {values = [100, 200]}" in catalog.read_text()
+
+
 def test_remove_values_and_missing_value_error(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
@@ -296,6 +322,16 @@ def test_membership_verbs_require_explicit_list(tmp_path, monkeypatch):
 
     assert result.exit_code == 1
     assert "implicit all-in-use-materials membership" in result.stderr
+    assert "cxr profile set standard --materials" in result.stderr
+
+
+def test_add_materials_explains_implicit_membership_is_already_all(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["add", "standard", "--materials", "mose2"])
+
+    assert result.exit_code == 1
+    assert "already includes every material" in result.stderr
     assert "cxr profile set standard --materials" in result.stderr
 
 

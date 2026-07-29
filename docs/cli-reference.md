@@ -1277,8 +1277,8 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  add              Add values to an existing profile's grids (union, sorted,...
-  add-material     Add materials to a profile's explicit membership list.
+  add              Incrementally add grid values or explicit profile materials.
+  add-material     Add positional material keys; prefer ``profile add --materials``.
   analyze          Analyze NAME's performance logs into CSV, Markdown, and PNG...
   create           Create a new profile, cloning range defaults from --from...
   delete           Delete a profile; irreversible.
@@ -1294,10 +1294,11 @@ Commands:
 ```text
 Usage: cxr profile add [OPTIONS] NAME
 
-  Add values to an existing profile's grids (union, sorted, deduplicated).
+  Incrementally add grid values or explicit profile materials.
 
   Incremental edit: ``cxr profile add sub_100keV --energy 75`` inserts 75 keV without
-  re-listing the grid. No prompt except on 'standard'.
+  re-listing the grid. ``--materials`` extends an explicit membership list; use ``cxr
+  profile set NAME --materials KEY,...`` to replace it. No prompt except on 'standard'.
 
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
@@ -1312,6 +1313,12 @@ Options:
   --azimuth DEG,... | START:STOP:STEP
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges.
+  -l, --ne-line N,...             Line-spectrum transport electron counts; positive
+                                  integers.
+  -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
+                                  integers.
+  --materials KEY,...             Add to explicit material membership (comma-separated
+                                  material keys).
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
@@ -1322,7 +1329,7 @@ Options:
 ```text
 Usage: cxr profile add-material [OPTIONS] NAME [MATERIALS]...
 
-  Add materials to a profile's explicit membership list.
+  Add positional material keys; prefer ``profile add --materials``.
 
   With --all, seeds (or extends) membership with mats_to_sim.toml's verified `materials`
   list -- the same base set `cxr scan --all` runs -- so a profile can start from the

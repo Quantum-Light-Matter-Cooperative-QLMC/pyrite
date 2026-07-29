@@ -458,23 +458,47 @@ def _merge_values(name, updates, *, add):
 @command.command("add")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @_range_cli_options
+@_ne_cli_options
+@click.option(
+    "--materials",
+    metavar="KEY,...",
+    shell_complete=_cli_completion.complete_material_csv,
+    help="Add to explicit material membership (comma-separated material keys).",
+)
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def add_command(name, thickness, energy, polar, azimuth, yes, dry_run):
-    """Add values to an existing profile's grids (union, sorted, deduplicated).
+def add_command(
+    name, thickness, energy, polar, azimuth, ne_line, ne_brem, materials, yes, dry_run
+):
+    """Incrementally add grid values or explicit profile materials.
 
     Incremental edit: ``cxr profile add sub_100keV --energy 75`` inserts 75 keV
-    without re-listing the grid. No prompt except on 'standard'.
+    without re-listing the grid. ``--materials`` extends an explicit membership
+    list; use ``cxr profile set NAME --materials KEY,...`` to replace it.
+    No prompt except on 'standard'.
     """
-    updates = _collect_updates(thickness, energy, polar, azimuth)
-    if not updates:
-        raise click.UsageError("provide a range option")
+    updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
+    if not updates and materials is None:
+        raise click.UsageError("provide a range option or --materials")
     try:
-        original, document = _merge_values(name, updates, add=True)
+        if updates:
+            original, document = _merge_values(name, updates, add=True)
+        else:
+            original, document = _sweep._catalog_text()
+            _existing_profile(document, name)
+        added = skipped = []
+        if materials is not None:
+            added, skipped = _add_membership(document, name, materials)
     except (OSError, ValueError, tomlkit.exceptions.ParseError) as exc:
         raise CLIError(str(exc)) from None
-    _confirm_standard(name, "add values to", yes, dry_run)
-    return _write(document, original, dry_run, f"updated profile {name}")
+    action = "add values to" if materials is None else "add materials to"
+    _confirm_standard(name, action, yes, dry_run)
+    message = f"updated profile {name}"
+    if materials is not None:
+        message += f": added {', '.join(added) or '(none)'}"
+        if skipped:
+            message += f"; already members: {', '.join(skipped)}"
+    return _write(document, original, dry_run, message)
 
 
 @command.command("remove")
@@ -573,11 +597,28 @@ def _membership_target(document, name):
     if materials is None:
         raise ValueError(
             f"profile {name!r} has implicit all-in-use-materials membership; "
-            f"seed an explicit list first with: cxr profile set {name} --materials KEY,..."
+            f"it already includes every material. To restrict it, use: "
+            f"cxr profile set {name} --materials KEY,..."
         )
     if not isinstance(materials, list):
         raise ValueError(f"profiles.{name}.materials must be an array of material keys")
     return target, materials
+
+
+def _add_membership(document, name, material_csv):
+    """Extend explicit membership and return added and already-present keys."""
+    target, membership = _membership_target(document, name)
+    requested = [key.strip() for key in material_csv.split(",") if key.strip()]
+    if not requested:
+        raise ValueError("--materials requires at least one material key")
+    known = _sweep._material_rows(document)
+    unknown = [key for key in requested if key not in known]
+    if unknown:
+        raise ValueError(f"unknown material: {', '.join(unknown)}")
+    requested = list(dict.fromkeys(requested))
+    added = [key for key in requested if key not in membership]
+    target["materials"] = [*membership, *added]
+    return added, sorted(set(requested) - set(added))
 
 
 @command.command("add-material")
@@ -593,7 +634,7 @@ def _membership_target(document, name):
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def add_material_command(name, materials, all_materials, yes, dry_run):
-    """Add materials to a profile's explicit membership list.
+    """Add positional material keys; prefer ``profile add --materials``.
 
     With --all, seeds (or extends) membership with mats_to_sim.toml's verified
     `materials` list -- the same base set `cxr scan --all` runs -- so a
@@ -611,7 +652,7 @@ def add_material_command(name, materials, all_materials, yes, dry_run):
         if existing is None and not all_materials:
             raise ValueError(
                 f"profile {name!r} has implicit all-in-use-materials membership; "
-                f"seed it with --all, or set an explicit list first with: "
+                f"it already includes every material. To restrict it, use: "
                 f"cxr profile set {name} --materials KEY,..."
             )
         membership = list(existing) if isinstance(existing, list) else []
