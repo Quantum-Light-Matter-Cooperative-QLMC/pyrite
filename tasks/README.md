@@ -12,8 +12,10 @@ implementation path, checklist, decisions, and delegation plan here.
 
 ## Workflow
 
-1. For `>user<` prose, use `triage`: read linked design, draft
-   `tasks/<branch-leaf>.md`, create local branch/worktree, and stop for review.
+1. Use `triage` on existing `>user<` prose or invoke `/triage <text>` directly:
+   read linked design, split independently ownable tasks, draft each
+   `tasks/<branch-leaf>.md`, create local branches/worktrees, and stop for
+   review.
 2. Replace reviewed prose with one-line `TODO.md` summary:
    `→ feature/<branch>; tasks/<branch-leaf>.md`.
 3. Use `todo-sync` only to keep branch and main `TODO.md` identical.

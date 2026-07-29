@@ -50,8 +50,9 @@ If `uv run` cannot write project environment, add
 
 ## Task dispatch
 
-- Use `triage` for new `>user<` prose. It drafts task doc and local
-  branch/worktree, syncs TODO pointer, then stops before commit/push for review.
+- Use `triage` for new `>user<` prose or `/triage <text>` direct input. It
+  drafts task docs and local branches/worktrees, syncs TODO pointers, then
+  stops before commit/push for review.
 - Use `dispatch-task` to route backlog work. It resolves task worktree/branch,
   owns approved setup/landed teardown, writes explicit authority/acceptance
   handoff, then selects:
