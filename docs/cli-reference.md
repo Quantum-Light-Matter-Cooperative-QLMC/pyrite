@@ -699,8 +699,8 @@ Options:
   -a, --all                   Run every material in mats_to_sim.toml.
   --fidelity [full|survey]    Named settings/grid policy. survey is provisional and
                               reduced.  [default: full]
-  --quick                     Use tiny smoke-test grid; incompatible with --grid.
-  --workers NUMBER            Transport workers (default: auto; 0 runs serially).
+  --quick                     Smoke-test grid; incompatible with --grid.
+  --workers NUMBER            Workers; 0 runs serially (default auto).
   --parallel-materials N      Simultaneous scans in one allocation; requires --chunk-
                               minutes 0.  [1<=x<=4]
   --chunk-minutes NUMBER      Self-resubmitting SLURM slice length; 0 runs one

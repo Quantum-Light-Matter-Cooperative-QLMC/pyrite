@@ -607,13 +607,13 @@ def command():
 @click.option(
     "--quick",
     is_flag=True,
-    help="Use tiny smoke-test grid; incompatible with --grid.",
+    help="Smoke-test grid; incompatible with --grid.",
 )
 @click.option(
     "--workers",
     type=NONNEGATIVE_INT,
     default=None,
-    help="Transport workers (default: auto; 0 runs serially).",
+    help="Workers; 0 runs serially (default auto).",
 )
 @click.option(
     "--parallel-materials",
