@@ -111,9 +111,16 @@ def _queue_script(
     high_energy_min_kev=None,
     catalog_profile="standard",
     performance_profile=None,
+    performance_repetitions=1,
+    performance_interval=5.0,
+    spec_chunk=None,
+    brem_chunk=None,
+    nsys=False,
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
     parallel_materials = _validate_parallel_materials(parallel_materials)
+    if nsys and performance_profile is None:
+        raise ValueError("nsys requires a performance profile")
     flags = ""
     if quick:
         flags += " --quick"
@@ -129,6 +136,13 @@ def _queue_script(
         flags += (
             f' --performance-profile {performance_profile} --performance-dir "$JOBDIR/performance"'
         )
+        if performance_interval != 5.0:
+            flags += f" --performance-interval {performance_interval:g}"
+    runtime_exports = ""
+    if spec_chunk is not None:
+        runtime_exports += f"\nexport CXR_MC_SPEC_CHUNK={spec_chunk}"
+    if brem_chunk is not None:
+        runtime_exports += f"\nexport CXR_MC_BREM_CHUNK={brem_chunk}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -142,22 +156,85 @@ parallel_materials={parallel_materials}
 # co-tenant scan processes share the one GPU; each divides its CuPy pool cap
 # (_GPU_POOL_FRAC) by this so N processes cap at FRAC total, not N*FRAC.
 export CXR_MC_GPU_SHARE={parallel_materials}
+performance_repetitions={performance_repetitions}{runtime_exports}
+nsys_enabled={int(bool(nsys))}
 n=0
 failures=0
 active=0
 run_material() {{
   local i="$1"
   local m="$2"
+  local repetition
+  local scan_rc
+  local trace_base
+  local -a checkpoint_flags=()
+  local -a scan_launcher=()
+  local -a scan_command=()
   echo "running $m [$i/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$i" "$total" "$m" "$(date -Is)" \
 >> "$JOBDIR/log"
-  if ! {config.shell_remote_uv()} run --no-sync python -m cxr_mc._entry.scan "$m"{flags} \
-    --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1
-  then
-    echo "WARNING: scan failed for $m; continuing" >> "$JOBDIR/log"
-    echo "warning at $m [$i/$total] $(date -Is)" > "$JOBDIR/state"
-    return 1
-  fi
+  for (( repetition=1; repetition<=performance_repetitions; repetition++ )); do
+    checkpoint_flags=()
+    if [ "$performance_repetitions" -gt 1 ] || [ "$nsys_enabled" -eq 1 ]; then
+      checkpoint_flags=(--checkpoint-dir "$JOBDIR/performance-checkpoints/$m/$repetition")
+    fi
+    if [ "$performance_repetitions" -gt 1 ]; then
+      printf '%s\\n' "performance repetition $repetition/$performance_repetitions" >> "$JOBDIR/log"
+    elif [ "$nsys_enabled" -eq 1 ]; then
+      printf '%s\\n' "Nsight Systems uncached trace" >> "$JOBDIR/log"
+    fi
+    if [ "$nsys_enabled" -eq 1 ]; then
+      scan_launcher=({config.shell_remote_path(".venv", "bin", "python")})
+    else
+      scan_launcher=({config.shell_remote_uv()} run --no-sync python)
+    fi
+    scan_command=(
+      "${{scan_launcher[@]}}" -m cxr_mc._entry.scan "$m"{flags}
+      "${{checkpoint_flags[@]}}" --progress-file "$JOBDIR/progress/$m.json" \\
+      --no-progress
+    )
+    scan_rc=0
+    if [ "$nsys_enabled" -eq 1 ]; then
+      trace_base="$JOBDIR/performance/{performance_profile}/$m"
+      mkdir -p "$(dirname "$trace_base")"
+      if ! command -v nsys >/dev/null 2>&1; then
+        echo "ERROR: --nsys requested but nsys is unavailable on the worker" >> "$JOBDIR/log"
+        scan_rc=127
+      else
+        export CXR_MC_NSYS=1
+        nsys profile \\
+          --trace=cuda,nvtx,osrt \\
+          --sample=process-tree \\
+          --cpuctxsw=process-tree \\
+          --python-sampling=true \\
+          --python-sampling-frequency=200 \\
+          --python-backtrace=cuda \\
+          --cudabacktrace=sync,kernel,memory \\
+          --wait=primary \\
+          --force-overwrite=true \\
+          --output="$trace_base" \\
+          "${{scan_command[@]}}" >> "$JOBDIR/log" 2>&1 || scan_rc=$?
+      fi
+    else
+      "${{scan_command[@]}}" >> "$JOBDIR/log" 2>&1 || scan_rc=$?
+    fi
+    if [ "$scan_rc" -ne 0 ]; then
+      if [ "$performance_repetitions" -gt 1 ]; then
+        echo "WARNING: scan failed for $m repetition $repetition; continuing" >> "$JOBDIR/log"
+        echo "warning at $m [$i/$total] repetition $repetition $(date -Is)" > "$JOBDIR/state"
+      else
+        echo "WARNING: scan failed for $m; continuing" >> "$JOBDIR/log"
+        echo "warning at $m [$i/$total] $(date -Is)" > "$JOBDIR/state"
+      fi
+      return 1
+    fi
+    if [ "$nsys_enabled" -eq 1 ] && [ -f "$trace_base.nsys-rep" ]; then
+      nsys stats \\
+        --report cuda_api_sum,cuda_gpu_kern_sum,cuda_kern_exec_sum,nvtx_sum \\
+        "$trace_base.nsys-rep" > "$trace_base.nsys-stats.txt" 2>&1 || \\
+        echo "WARNING: nsys stats failed; .nsys-rep remains available" >> "$JOBDIR/log"
+    fi
+  done
   echo "completed: $m" >> "$JOBDIR/log"
 }}
 for m in "${{mats[@]}}"; do
@@ -195,6 +272,9 @@ def _chunked_queue_script(
     high_energy_min_kev=None,
     catalog_profile="standard",
     performance_profile=None,
+    performance_interval=5.0,
+    spec_chunk=None,
+    brem_chunk=None,
 ):
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
 
@@ -220,6 +300,13 @@ def _chunked_queue_script(
         flags += (
             f' --performance-profile {performance_profile} --performance-dir "$JOBDIR/performance"'
         )
+        if performance_interval != 5.0:
+            flags += f" --performance-interval {performance_interval:g}"
+    runtime_exports = ""
+    if spec_chunk is not None:
+        runtime_exports += f"\nexport CXR_MC_SPEC_CHUNK={spec_chunk}"
+    if brem_chunk is not None:
+        runtime_exports += f"\nexport CXR_MC_BREM_CHUNK={brem_chunk}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
@@ -231,6 +318,7 @@ echo "started: $(date -Is)" >> "$JOBDIR/meta"
 mats=({mats})
 total=${{#mats[@]}}
 chunk_seconds={chunk_seconds}
+{runtime_exports.lstrip()}
 slice_start=$(date +%s)
 n=0
 for m in "${{mats[@]}}"; do
@@ -728,6 +816,7 @@ def _slurm_batch_script(
     job_name: str,
     reservation_stems: list[str] | None = None,
     time_limit: str = config.SLURM_TIME,
+    cpus_per_task: int = config.SLURM_CPUS_PER_MATERIAL,
 ) -> str:
     """Wrap a CXR queue payload in the lab box's one-GPU SLURM profile."""
     reservation_stems = reservation_stems or []
@@ -747,6 +836,7 @@ def _slurm_batch_script(
 #SBATCH --partition={config.SLURM_PARTITION}
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node={config.SLURM_GPUS}
+#SBATCH --cpus-per-task={cpus_per_task}
 #SBATCH --gres=gpu:{config.SLURM_GPUS}
 #SBATCH --time={time_limit}
 #SBATCH --output={sbatch_jobdir}/slurm-%j.out
@@ -836,6 +926,11 @@ def _queue_metadata(
     high_energy_min_kev: float | None = None,
     catalog_profile: str = "standard",
     performance_profile: str | None = None,
+    performance_repetitions: int = 1,
+    performance_interval: float = 5.0,
+    spec_chunk: int | None = None,
+    brem_chunk: int | None = None,
+    nsys: bool = False,
 ):
     """Static metadata persisted before a queue becomes visible to SLURM."""
     return "\n".join(
@@ -850,6 +945,11 @@ def _queue_metadata(
             f"chunk_minutes: {chunk_minutes}",
             f"high_energy_min_kev: {high_energy_min_kev}",
             f"performance_profile: {performance_profile}",
+            f"performance_repetitions: {performance_repetitions}",
+            f"performance_interval: {performance_interval}",
+            f"spec_chunk: {spec_chunk}",
+            f"brem_chunk: {brem_chunk}",
+            f"nsys: {bool(nsys)}",
             "progress_dashboard: True",
             "",
         ]

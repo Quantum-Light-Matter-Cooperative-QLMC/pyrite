@@ -525,9 +525,12 @@ class _SyncProcessPoolExecutor:
 
     captured: dict = {}
 
-    def __init__(self, max_workers=None, initializer=None, initargs=()):
+    def __init__(self, max_workers=None, initializer=None, initargs=(), mp_context=None):
         type(self).captured = dict(
-            max_workers=max_workers, initializer=initializer, initargs=initargs
+            max_workers=max_workers,
+            initializer=initializer,
+            initargs=initargs,
+            mp_context=mp_context,
         )
 
     def __enter__(self):
@@ -564,6 +567,22 @@ def test_run_cases_engine_auto_uses_cpu_pool_when_no_gpu(monkeypatch):
     assert [r["name"] for r in results] == ["c0", "c1", "c2"]
     assert _SyncProcessPoolExecutor.captured["initializer"] is runner._worker_init
     assert _SyncProcessPoolExecutor.captured["initargs"] == (False,)
+
+
+def test_run_cases_nsys_uses_spawn_processes(monkeypatch):
+    from cxr_mc.montecarlo import runner
+
+    monkeypatch.setattr(runner, "_GPU", False)
+    monkeypatch.setattr(runner, "_NSYS", True)
+    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
+
+    cases = [{"name": f"c{i}"} for i in range(3)]
+    runner.run_cases(cases, max_workers=2, progress=False, engine="auto")
+
+    context = _SyncProcessPoolExecutor.captured["mp_context"]
+    assert context is not None
+    assert context.get_start_method() == "spawn"
 
 
 def test_run_cases_engine_cpu_forces_cpu_pool_when_gpu_present(monkeypatch):

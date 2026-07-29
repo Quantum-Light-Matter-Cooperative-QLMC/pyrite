@@ -12,7 +12,6 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import List
 
 OUTER_FENCE_REGEX = re.compile(r"\A\s*(`{3,}|~{3,})[^\n]*\n(.*)\n\1\s*\Z", re.DOTALL)
 
@@ -168,8 +167,8 @@ def call_claude(prompt: str) -> str:
             errors="replace",
         )
         return strip_llm_wrapper(result.stdout.strip())
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Claude call failed:\n{e.stderr}")
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(f"Claude call failed:\n{exc.stderr}") from exc
 
 
 def build_compress_prompt(original: str) -> str:
@@ -191,7 +190,7 @@ TEXT:
 """
 
 
-def build_fix_prompt(original: str, compressed: str, errors: List[str]) -> str:
+def build_fix_prompt(original: str, compressed: str, errors: list[str]) -> str:
     errors_str = "\n".join(f"- {e}" for e in errors)
     return f"""You are fixing a caveman-compressed markdown file. Specific validation errors were found.
 

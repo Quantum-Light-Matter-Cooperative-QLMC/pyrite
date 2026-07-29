@@ -11,6 +11,7 @@ workers.
 import os
 import sys
 import warnings
+from contextlib import nullcontext
 from time import perf_counter
 from typing import Any
 
@@ -34,6 +35,7 @@ from .transport import simulate_trajectories
 # timing never leaks into the pickle. The flag is read at import so it applies in
 # every spawned transport worker too (env is inherited on spawn/forkserver).
 _TIMING = os.environ.get("CXR_MC_TIMING", "") not in ("", "0")
+_NSYS = os.environ.get("CXR_MC_NSYS", "") not in ("", "0")
 _N_CPUS = os.cpu_count()
 _TOTAL_MEM = psutil.virtual_memory().total // 1_000_000
 # Byte width of one spectrum-matmul intermediate element: fp32 on the GPU
@@ -91,6 +93,24 @@ def _adaptive_chunk(nbins):
     per_row_bytes = worker_intermediate_arrays * nbins * _REAL_BYTES
     adaptive_chunk_size = 1_000_000 * _SPEC_BUDGET_MB // per_row_bytes
     return max(1000, min(adaptive_chunk_size, 100_000))
+
+
+def _nsys_range(message):
+    """Return an NVTX range when the remote Nsight profiler is enabled."""
+    if not (_GPU and _NSYS):
+        return nullcontext()
+    from cupyx.profiler import time_range
+
+    return time_range(message)
+
+
+def _process_pool_kwargs():
+    """Use exec-based workers under Nsight; forkserver can deadlock its injection."""
+    if not _NSYS:
+        return {}
+    import multiprocessing
+
+    return {"mp_context": multiprocessing.get_context("spawn")}
 
 
 # Stretch the CuPy memory-pool free cadence. free_all_blocks() forces a device
@@ -645,7 +665,7 @@ def _spectrum_case_retry(case, tp, max_retries=_GPU_OOM_RETRIES, record_timing=F
 
     On a catchable OutOfMemoryError: free every pool block, halve the chunks on
     a COPY of the case (the original stays pristine for run_sweeps's checkpoint /
-    a later reline), and retry. Re-raises after `max_retires` exhausted."""
+    a later reline), and retry. Re-raises after `max_retries` exhausted."""
     timed = _TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     work = case
@@ -661,7 +681,7 @@ def _spectrum_case_retry(case, tp, max_retries=_GPU_OOM_RETRIES, record_timing=F
                 raise
             if cp is not None:
                 cp.get_default_memory_pool().free_all_blocks()
-            work = dict(case)
+            work = dict(work)
             _halve_case_chunks(work, tp)
 
 
@@ -669,6 +689,12 @@ def _spectrum_case(case, tp, record_timing=False):
     """GPU phase of run_case: line spectrum + brem from the already-transported
     segments ``tp`` (from _transport_case). Runs in the main process, so only one
     CUDA context ever touches the device."""
+    with _nsys_range(f"cxr.spectrum_case:{case.get('name', 'case')}"):
+        return _spectrum_case_impl(case, tp, record_timing)
+
+
+def _spectrum_case_impl(case, tp, record_timing=False):
+    """Implement :func:`_spectrum_case` inside its optional Nsight range."""
     timed = _TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     E_grid, E_brem, n_hat = tp["E_grid"], tp["E_brem"], tp["n_hat"]
@@ -684,22 +710,25 @@ def _spectrum_case(case, tp, record_timing=False):
     # (no coherent lines). layer_radiators absent -> single slab: the film radiates
     # from ALL its segments via the case's scalar crystal keys (bit-for-bit the
     # pre-multilayer path). See docs/multilayer-materials.md (per-layer radiation).
-    spec = _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, tp.get("groove"))
+    with _nsys_range("cxr.lines"):
+        spec = _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, tp.get("groove"))
 
     # BREM: EVERY layer radiates with its OWN composition (each Z^2 cross
     # section); each layer's brem self-absorbs through the whole stack, summed
     # over layers (a single layer is exactly the old single-material brem).
     # Factored into _brem_wide_from_segments so run.repair_brem_wide reuses this
     # SAME path (via _brem_for_case) and can't drift back to single-slab brem.
-    brem_wide = _brem_wide_from_segments(
-        segs_b,
-        E_brem,
-        case,
-        n_hat,
-        abs_layers,
-        groove=tp.get("groove"),
-    )
-    brem = np.interp(E_grid, E_brem, brem_wide)  # brem under the lines (line grid)
+    with _nsys_range("cxr.brem"):
+        brem_wide = _brem_wide_from_segments(
+            segs_b,
+            E_brem,
+            case,
+            n_hat,
+            abs_layers,
+            groove=tp.get("groove"),
+        )
+    with _nsys_range("cxr.interpolate"):
+        brem = np.interp(E_grid, E_brem, brem_wide)  # brem under the lines (line grid)
     # Return this case's GPU scratch on the A2 cadence so the CuPy memory pool
     # can't accumulate (and fragment) across a long sweep until it fills the card.
     if _GPU:
@@ -1063,7 +1092,11 @@ def run_cases(
         from concurrent.futures import ProcessPoolExecutor
 
         prefetch = nw + 2  # keep the transport pool ahead
-        with ProcessPoolExecutor(max_workers=nw, initializer=_worker_init) as ex:
+        with ProcessPoolExecutor(
+            max_workers=nw,
+            initializer=_worker_init,
+            **_process_pool_kwargs(),
+        ) as ex:
             inflight = {
                 i: (
                     ex.submit(_transport_case, cases[i], True)
@@ -1124,7 +1157,10 @@ def run_cases(
     from concurrent.futures import ProcessPoolExecutor, as_completed
 
     with ProcessPoolExecutor(
-        max_workers=max_workers, initializer=_worker_init, initargs=(engine == "cpu",)
+        max_workers=max_workers,
+        initializer=_worker_init,
+        initargs=(engine == "cpu",),
+        **_process_pool_kwargs(),
     ) as ex:
         futures = {
             (ex.submit(run_case, c, True) if on_timing is not None else ex.submit(run_case, c)): i

@@ -271,7 +271,8 @@ def test_scp_remote_path_quotes_hostile_but_valid_posix_path(monkeypatch):
 
 def test_queue_script_has_per_material_scan_calls():
     s = remote._queue_script("20260101-000000", ["mose2", "wse2"], quick=True, workers=8)
-    assert "python -m cxr_mc._entry.scan" in s
+    assert 'scan_launcher=("/home/aamador/.local/bin/uv" run --no-sync python)' in s
+    assert '"${scan_launcher[@]}" -m cxr_mc._entry.scan' in s
     assert "--quick" in s and "--workers 8" in s
     assert "mose2" in s and "wse2" in s
     assert "20260101-000000" in s  # job id is embedded
@@ -315,6 +316,62 @@ def test_queue_script_no_flags_when_unset():
     s = remote._queue_script("j", ["mos2"], quick=False, workers=None)
     assert "--quick" not in s and "--workers" not in s
     assert "--profile" not in s
+
+
+def test_queue_script_profiles_uncached_repetitions_with_fixed_runtime_knobs():
+    script = remote._queue_script(
+        "j",
+        ["mos2"],
+        quick=False,
+        workers=6,
+        performance_profile="compute_test_300keV",
+        performance_repetitions=3,
+        performance_interval=1.0,
+        spec_chunk=20_000,
+        brem_chunk=10_000,
+    )
+
+    assert "export CXR_MC_SPEC_CHUNK=20000" in script
+    assert "export CXR_MC_BREM_CHUNK=10000" in script
+    assert "performance_repetitions=3" in script
+    assert "repetition<=performance_repetitions" in script
+    assert '--checkpoint-dir "$JOBDIR/performance-checkpoints/$m/$repetition"' in script
+    assert "--performance-interval 1" in script
+
+
+def test_queue_script_wraps_single_profile_session_with_nsys():
+    script = remote._queue_script(
+        "j",
+        ["mos2"],
+        quick=False,
+        workers=6,
+        performance_profile="compute_test_300keV",
+        nsys=True,
+    )
+    metadata = scripts._queue_metadata(
+        "j",
+        ["mos2"],
+        False,
+        6,
+        performance_profile="compute_test_300keV",
+        nsys=True,
+    )
+
+    assert "command -v nsys" in script
+    assert "export CXR_MC_NSYS=1" in script
+    assert "nsys profile" in script
+    assert "--trace=cuda,nvtx,osrt" in script
+    assert "--python-backtrace=cuda" in script
+    assert "--wait=primary" in script
+    assert '--output="$trace_base"' in script
+    assert 'scan_launcher=("/home/aamador/dev/cxr-mc/.venv/bin/python")' in script
+    assert '--checkpoint-dir "$JOBDIR/performance-checkpoints/$m/$repetition"' in script
+    assert "nsys stats" in script
+    assert "--report cuda_api_sum,cuda_gpu_kern_sum,cuda_kern_exec_sum,nvtx_sum" in script
+    assert "nsys: True" in metadata
+    bash = shutil.which("bash")
+    if bash is not None:
+        assert subprocess.run([bash, "-n"], input=script, text=True).returncode == 0
 
 
 def test_queue_script_emits_profile_flag_when_not_standard():
@@ -388,6 +445,35 @@ def test_pull_performance_profile_fetches_each_matching_job(monkeypatch, tmp_pat
     ]
     assert all(path.is_file() for path in pulled)
     assert all("/performance/baseline/" in command for command in remote_commands)
+
+
+def test_pull_performance_profile_fetches_nsys_artifacts(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: (
+            "job-3\tmos2.ndjson\n"
+            "job-3\tmos2.nsys-rep\n"
+            "job-3\tmos2.sqlite\n"
+            "job-3\tmos2.nsys-stats.txt\n"
+            "job-3\tunsafe.report\n"
+        ),
+    )
+
+    def fake_download(_command, destination):
+        destination.write_bytes(b"artifact")
+
+    monkeypatch.setattr(transport, "_ssh_download", fake_download)
+
+    pulled = lifecycle.pull_performance_profile("baseline")
+
+    assert pulled == [
+        tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.ndjson",
+        tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.nsys-rep",
+        tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.sqlite",
+        tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.nsys-stats.txt",
+    ]
 
 
 def test_status_formats_latest_performance_profile():
@@ -474,6 +560,7 @@ def test_slurm_batch_script_requests_the_lab_gpu_profile():
     assert "#SBATCH --partition=gpu" in script
     assert "#SBATCH --nodes=1" in script
     assert "#SBATCH --ntasks-per-node=1" in script
+    assert "#SBATCH --cpus-per-task=8" in script
     assert "#SBATCH --gres=gpu:1" in script
     assert "#SBATCH --time=UNLIMITED" in script
     assert "module purge 2>/dev/null || true" in script
@@ -955,6 +1042,161 @@ def test_submit_rejects_conflicting_performance_and_catalog_profiles(capsys):
     assert "must name the same catalog profile" in capsys.readouterr().err
 
 
+def test_submit_rejects_performance_repetitions_without_profile(capsys):
+    result = remote.main(
+        [
+            "submit",
+            "mos2",
+            "--performance-repetitions",
+            "3",
+            "--chunk-minutes",
+            "0",
+            "--dry-run",
+        ]
+    )
+
+    assert result == 2
+    assert "--performance-repetitions requires --performance-profile" in capsys.readouterr().err
+
+
+def test_submit_rejects_performance_repetitions_in_chunked_mode(capsys):
+    result = remote.main(
+        [
+            "submit",
+            "mos2",
+            "--performance-profile",
+            "compute_test_300keV",
+            "--performance-repetitions",
+            "3",
+            "--dry-run",
+        ]
+    )
+
+    assert result == 2
+    assert "--performance-repetitions requires --chunk-minutes 0" in capsys.readouterr().err
+
+
+def test_submit_rejects_nsys_without_performance_profile(capsys):
+    result = remote.main(
+        ["submit", "mos2", "--nsys", "--chunk-minutes", "0", "--dry-run"]
+    )
+
+    assert result == 2
+    assert "--nsys requires --performance-profile" in capsys.readouterr().err
+
+
+def test_submit_rejects_nsys_in_chunked_mode(capsys):
+    result = remote.main(
+        [
+            "submit",
+            "mos2",
+            "--performance-profile",
+            "compute_test_300keV",
+            "--nsys",
+            "--dry-run",
+        ]
+    )
+
+    assert result == 2
+    assert "--nsys requires --chunk-minutes 0" in capsys.readouterr().err
+
+
+def test_submit_rejects_nsys_with_multiple_repetitions(capsys):
+    result = remote.main(
+        [
+            "submit",
+            "mos2",
+            "--performance-profile",
+            "compute_test_300keV",
+            "--performance-repetitions",
+            "2",
+            "--nsys",
+            "--chunk-minutes",
+            "0",
+            "--dry-run",
+        ]
+    )
+
+    assert result == 2
+    assert "--nsys requires --performance-repetitions 1" in capsys.readouterr().err
+
+
+def test_submit_rejects_nsys_with_multiple_materials(capsys):
+    result = remote.main(
+        [
+            "submit",
+            "mos2",
+            "hopg",
+            "--performance-profile",
+            "standard",
+            "--nsys",
+            "--chunk-minutes",
+            "0",
+            "--dry-run",
+        ]
+    )
+
+    assert result == 2
+    assert "--nsys requires exactly one material" in capsys.readouterr().err
+
+
+def test_submit_performance_runtime_knobs_reach_monolithic_dry_run(capsys):
+    result = remote.main(
+        [
+            "submit",
+            "mos2",
+            "--performance-profile",
+            "compute_test_300keV",
+            "--performance-repetitions",
+            "3",
+            "--performance-interval",
+            "1",
+            "--workers",
+            "6",
+            "--spec-chunk",
+            "20000",
+            "--brem-chunk",
+            "10000",
+            "--chunk-minutes",
+            "0",
+            "--dry-run",
+        ]
+    )
+
+    assert result is None
+    output = capsys.readouterr().out
+    assert "#SBATCH --cpus-per-task=6" in output
+    assert "--performance-interval 1" in output
+    assert "performance_repetitions=3" in output
+    assert "export CXR_MC_SPEC_CHUNK=20000" in output
+    assert "export CXR_MC_BREM_CHUNK=10000" in output
+
+
+def test_submit_nsys_reaches_monolithic_dry_run(capsys):
+    result = remote.main(
+        [
+            "submit",
+            "mos2",
+            "--performance-profile",
+            "compute_test_300keV",
+            "--workers",
+            "6",
+            "--spec-chunk",
+            "20000",
+            "--nsys",
+            "--chunk-minutes",
+            "0",
+            "--dry-run",
+        ]
+    )
+
+    assert result is None
+    output = capsys.readouterr().out
+    assert "nsys profile" in output
+    assert "nsys: True" in output
+    assert "export CXR_MC_NSYS=1" in output
+
+
 def test_submit_defaults_to_attach_and_pull(monkeypatch):
     events = []
     monkeypatch.setattr(
@@ -992,6 +1234,37 @@ def test_submit_no_pull_still_attaches(monkeypatch):
     remote.main(["submit", "hopg", "--no-pull", "--no-sync"])
 
     assert attached == ["j"]
+
+
+def test_submit_performance_repetitions_attach_but_skip_checkpoint_pull(monkeypatch, capsys):
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(
+        state,
+        "_completed_materials",
+        lambda *_args: pytest.fail("must not resolve profiling checkpoints"),
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "pull",
+        lambda *_args, **_kwargs: pytest.fail("must not pull profiling checkpoints"),
+    )
+
+    remote.main(
+        [
+            "submit",
+            "mos2",
+            "--performance-profile",
+            "compute_test_300keV",
+            "--performance-repetitions",
+            "3",
+            "--chunk-minutes",
+            "0",
+            "--no-sync",
+        ]
+    )
+
+    assert "isolated job-local checkpoints" in capsys.readouterr().err
 
 
 def test_submit_rejects_headless_with_no_pull(capsys):

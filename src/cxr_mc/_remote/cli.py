@@ -379,6 +379,8 @@ def _cli_pull_json(args):
 
 def _cli_start(args):
     materials, high_energy_min_kev = _start_selected(args)
+    if getattr(args, "nsys", False) and len(materials) != 1:
+        raise click.UsageError("--nsys requires exactly one material")
     jobid = lifecycle.start_queue(
         materials,
         quick=args.quick,
@@ -391,6 +393,11 @@ def _cli_start(args):
         high_energy_min_kev=high_energy_min_kev,
         catalog_profile=getattr(args, "catalog_profile", "standard"),
         performance_profile=getattr(args, "performance_profile", None),
+        performance_repetitions=getattr(args, "performance_repetitions", 1),
+        performance_interval=getattr(args, "performance_interval", 5.0),
+        spec_chunk=getattr(args, "spec_chunk", None),
+        brem_chunk=getattr(args, "brem_chunk", None),
+        nsys=getattr(args, "nsys", False),
     )
     if args.dry_run or args.headless:
         return
@@ -399,7 +406,15 @@ def _cli_start(args):
             "submit is still running or its viewer disconnected; skipping automatic pull"
         )
         return
-    if args.no_pull:
+    profiling_only = (
+        getattr(args, "performance_repetitions", 1) > 1 or getattr(args, "nsys", False)
+    )
+    if args.no_pull or profiling_only:
+        if profiling_only:
+            emit_diagnostic(
+                "performance profiling used isolated job-local checkpoints; "
+                "skipping automatic checkpoint pull"
+            )
         return
     completed = state._completed_materials(jobid, materials)
     if not completed:
@@ -925,8 +940,51 @@ def reline_command(
     metavar="NAME",
     help=(
         "Run catalog profile NAME with CPU pressure, RAM/swap, GPU clocks/VRAM, "
-        "process, phase timing, queue, worker, chunk, and case logging every 5 s; "
+        "process, phase timing, queue, worker, chunk, and case logging; "
         "pull with `cxr remote profile pull NAME`."
+    ),
+)
+@click.option(
+    "--performance-repetitions",
+    type=click.IntRange(1, 20),
+    default=1,
+    show_default=True,
+    metavar="N",
+    help=(
+        "Run N uncached sessions per material with isolated job-local checkpoints; "
+        "requires --performance-profile and --chunk-minutes 0. Profiling checkpoints "
+        "are not pulled."
+    ),
+)
+@click.option(
+    "--performance-interval",
+    type=POSITIVE_FLOAT,
+    default=5.0,
+    show_default=True,
+    metavar="SECONDS",
+    help="Performance telemetry sampling interval; requires --performance-profile.",
+)
+@click.option(
+    "--spec-chunk",
+    type=POSITIVE_INT,
+    default=None,
+    metavar="N",
+    help="Pin line-spectrum segments per GPU chunk; requires --performance-profile.",
+)
+@click.option(
+    "--brem-chunk",
+    type=POSITIVE_INT,
+    default=None,
+    metavar="N",
+    help="Pin bremsstrahlung segments per GPU chunk; requires --performance-profile.",
+)
+@click.option(
+    "--nsys",
+    is_flag=True,
+    help=(
+        "Capture one uncached full-profile session with Nsight Systems CUDA/NVTX "
+        "and Python-stack tracing; requires exactly one material, "
+        "--performance-profile, --performance-repetitions 1, and --chunk-minutes 0."
     ),
 )
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
@@ -963,6 +1021,11 @@ def start_command(
     parallel_materials,
     chunk_minutes,
     performance_profile,
+    performance_repetitions,
+    performance_interval,
+    spec_chunk,
+    brem_chunk,
+    nsys,
     no_sync,
     dry_run,
     headless,
@@ -979,6 +1042,27 @@ def start_command(
                 "--performance-profile and --profile must name the same catalog profile"
             )
         catalog_profile = performance_profile
+    if performance_profile is None:
+        if performance_repetitions != 1:
+            raise click.UsageError("--performance-repetitions requires --performance-profile")
+        if performance_interval != 5.0:
+            raise click.UsageError("--performance-interval requires --performance-profile")
+        if spec_chunk is not None:
+            raise click.UsageError("--spec-chunk requires --performance-profile")
+        if brem_chunk is not None:
+            raise click.UsageError("--brem-chunk requires --performance-profile")
+        if nsys:
+            raise click.UsageError("--nsys requires --performance-profile")
+    if performance_repetitions > 1 and chunk_minutes != 0:
+        raise click.UsageError("--performance-repetitions requires --chunk-minutes 0")
+    if performance_repetitions > 1 and parallel_materials not in (None, 1):
+        raise click.UsageError("--performance-repetitions requires one material process per GPU")
+    if nsys and chunk_minutes != 0:
+        raise click.UsageError("--nsys requires --chunk-minutes 0")
+    if nsys and performance_repetitions != 1:
+        raise click.UsageError("--nsys requires --performance-repetitions 1")
+    if nsys and parallel_materials not in (None, 1):
+        raise click.UsageError("--nsys requires one material process per GPU")
     if actually_all and materials:
         raise click.UsageError("start -A/--actually-all does not take material names")
     if actually_all and all_:
@@ -1035,6 +1119,11 @@ def start_command(
             parallel_materials=parallel_materials,
             chunk_minutes=chunk_minutes,
             performance_profile=performance_profile,
+            performance_repetitions=performance_repetitions,
+            performance_interval=performance_interval,
+            spec_chunk=spec_chunk,
+            brem_chunk=brem_chunk,
+            nsys=nsys,
             no_sync=no_sync,
             dry_run=dry_run,
             headless=headless,
@@ -1126,8 +1215,8 @@ def profile_command():
 @profile_command.command(
     "pull",
     help=(
-        "Fetch NDJSON logs for PERFORMANCE_PROFILE from every matching remote job "
-        "into performance-profiles/PROFILE/<job>/."
+        "Fetch NDJSON logs and Nsight artifacts for PERFORMANCE_PROFILE from every "
+        "matching remote job into performance-profiles/PROFILE/<job>/."
     ),
 )
 @click.argument(

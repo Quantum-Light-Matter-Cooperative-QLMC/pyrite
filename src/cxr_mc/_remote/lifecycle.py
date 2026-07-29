@@ -327,6 +327,11 @@ def start_queue(
     high_energy_min_kev=None,
     catalog_profile="standard",
     performance_profile=None,
+    performance_repetitions=1,
+    performance_interval=5.0,
+    spec_chunk=None,
+    brem_chunk=None,
+    nsys=False,
 ):
     """Submit a material queue to SLURM. Returns its job id.
 
@@ -347,12 +352,49 @@ def start_queue(
     profile also names the job (``sub_100keV``, then ``sub_100keV-2`` once a
     finished run holds the bare name) and refuses to submit while another job
     under the same profile is live.
+
+    ``performance_repetitions > 1`` runs uncached sessions against isolated
+    job-local checkpoint roots. It is intentionally monolithic: repetitions
+    are experiment samples, not resumable production checkpoints.
+
+    ``nsys`` wraps one uncached single-material session with Nsight Systems and
+    stores its CUDA/NVTX trace beside the performance NDJSON.
     """
     transport._check_materials(materials)
     transport._check_shell_tokens(
         [catalog_profile, *([performance_profile] if performance_profile is not None else [])]
     )
     chunked = chunk_minutes > 0
+    if (
+        not isinstance(performance_repetitions, int)
+        or isinstance(performance_repetitions, bool)
+        or not 1 <= performance_repetitions <= 20
+    ):
+        raise SystemExit("performance repetitions must be an integer from 1 to 20")
+    if performance_interval <= 0:
+        raise SystemExit("performance interval must be greater than zero")
+    if performance_profile is None and (
+        performance_repetitions != 1
+        or performance_interval != 5.0
+        or spec_chunk is not None
+        or brem_chunk is not None
+        or nsys
+    ):
+        raise SystemExit(
+            "performance repetitions, interval, chunk pins, and nsys require a performance profile"
+        )
+    if performance_repetitions > 1 and chunked:
+        raise SystemExit("performance repetitions require a monolithic allocation")
+    if performance_repetitions > 1 and parallel_materials not in (None, 1):
+        raise SystemExit("performance repetitions require one material process per GPU")
+    if nsys and chunked:
+        raise SystemExit("nsys requires a monolithic allocation")
+    if nsys and performance_repetitions != 1:
+        raise SystemExit("nsys requires exactly one performance repetition")
+    if nsys and parallel_materials not in (None, 1):
+        raise SystemExit("nsys requires one material process per GPU")
+    if nsys and len(materials) != 1:
+        raise SystemExit("nsys requires exactly one material")
     if chunked and parallel_materials is not None:
         raise SystemExit(
             "--parallel-materials only applies to a monolithic allocation; "
@@ -384,6 +426,9 @@ def start_queue(
             high_energy_min_kev,
             catalog_profile,
             performance_profile,
+            performance_interval,
+            spec_chunk,
+            brem_chunk,
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
     else:
@@ -400,10 +445,22 @@ def start_queue(
             high_energy_min_kev,
             catalog_profile,
             performance_profile,
+            performance_repetitions,
+            performance_interval,
+            spec_chunk,
+            brem_chunk,
+            nsys,
         )
         time_limit = config.SLURM_TIME
+    workers_per_material = config.SLURM_CPUS_PER_MATERIAL if workers is None else max(1, workers)
+    cpus_per_task = workers_per_material * (parallel_materials or 1)
     script = scripts._slurm_batch_script(
-        jobid, payload, job_name=f"cxr-{jobid}", reservation_stems=stems, time_limit=time_limit
+        jobid,
+        payload,
+        job_name=f"cxr-{jobid}",
+        reservation_stems=stems,
+        time_limit=time_limit,
+        cpus_per_task=cpus_per_task,
     )
     upload = scripts._write_job_script_command(
         jobdir,
@@ -418,6 +475,11 @@ def start_queue(
             high_energy_min_kev,
             catalog_profile,
             performance_profile,
+            performance_repetitions,
+            performance_interval,
+            spec_chunk,
+            brem_chunk,
+            nsys,
         ),
     )
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
@@ -466,6 +528,11 @@ def start_queue(
                             high_energy_min_kev,
                             catalog_profile,
                             performance_profile,
+                            performance_repetitions,
+                            performance_interval,
+                            spec_chunk,
+                            brem_chunk,
+                            nsys,
                         )
                     ),
                 ),
@@ -482,7 +549,16 @@ def start_queue(
                     if performance_profile is not None
                     else []
                 ),
-                ("Pull", f"{pull_hint}  (after completion)"),
+                *(
+                    [
+                        (
+                            "Checkpoints",
+                            "job-local profiling artifacts; no automatic checkpoint pull",
+                        )
+                    ]
+                    if performance_repetitions > 1 or nsys
+                    else [("Pull", f"{pull_hint}  (after completion)")]
+                ),
             ]
         )
     )
@@ -543,7 +619,7 @@ def start_zhai_queue(
 
 
 def pull_performance_profile(profile: str) -> list[Path]:
-    """Pull every NDJSON resource log stored under one named profile."""
+    """Pull performance NDJSON plus any Nsight report artifacts."""
     transport._check_shell_tokens([profile])
     jobs = config.remote_path(config.JOBS_SUBDIR)
     listing = transport._ssh_capture(
@@ -551,16 +627,18 @@ def pull_performance_profile(profile: str) -> list[Path]:
         '[ -d "$JOBS" ] || exit 0; '
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
         f'p="$d/performance/{profile}"; [ -d "$p" ] || continue; '
-        "find \"$p\" -maxdepth 1 -type f -name '*.ndjson' "
+        "find \"$p\" -maxdepth 1 -type f "
+        "\\( -name '*.ndjson' -o -name '*.nsys-rep' -o -name '*.sqlite' "
+        "-o -name '*.nsys-stats.txt' \\) "
         "-printf '%f\\n' | while IFS= read -r f; do "
         'printf "%s\\t%s\\n" "$(basename "$d")" "$f"; done; done'
     )
     artifacts = []
+    suffixes = (".nsys-stats.txt", ".nsys-rep", ".ndjson", ".sqlite")
     for line in listing.splitlines():
         jobid, separator, filename = line.partition("\t")
-        material, suffix = (
-            (filename[: -len(".ndjson")], ".ndjson") if filename.endswith(".ndjson") else ("", "")
-        )
+        suffix = next((item for item in suffixes if filename.endswith(item)), "")
+        material = filename[: -len(suffix)] if suffix else ""
         if (
             not separator
             or not suffix
@@ -570,7 +648,7 @@ def pull_performance_profile(profile: str) -> list[Path]:
             continue
         artifacts.append((jobid, filename))
     if not artifacts:
-        raise SystemExit(f"no remote performance logs found for profile {profile!r}")
+        raise SystemExit(f"no remote performance artifacts found for profile {profile!r}")
 
     local_root = config.LOCAL_ROOT / "performance-profiles" / profile
     pulled = []

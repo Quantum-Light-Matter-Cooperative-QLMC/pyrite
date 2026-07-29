@@ -132,6 +132,52 @@ def test_analyze_marks_sampling_gap_and_counter_discontinuity(tmp_path):
     assert intervals[1]["gpu_percent"] == ""
 
 
+def test_analyze_does_not_call_preexisting_idle_swap_memory_pressure(tmp_path):
+    idle_swap = {
+        "swap_used_bytes": 16 * 1024**2,
+        "swap_in_bytes": 70_828_032,
+        "swap_out_bytes": 871_804_928,
+        "gpu_feed_wait_fraction": 0.01,
+        "gpu_percent": 5,
+        "transport_seconds_total": 2,
+        "spectrum_seconds_total": 8,
+    }
+    _write_profile(
+        tmp_path,
+        [
+            _record(0, "start", **idle_swap),
+            _record(5, "tick", **idle_swap),
+            _record(10, "done", **idle_swap),
+        ],
+    )
+
+    performance_analysis.analyze_performance_profile("baseline", tmp_path / "performance-profiles")
+
+    summary = (
+        tmp_path / "performance-profiles" / "baseline" / "analysis" / "summary.md"
+    ).read_text()
+    assert "spectrum launch/synchronization or host work" in summary
+    assert "Primary bottleneck: memory pressure" not in summary
+
+
+def test_analyze_calls_growing_swap_io_memory_pressure(tmp_path):
+    _write_profile(
+        tmp_path,
+        [
+            _record(0, "start", swap_used_bytes=16 * 1024**2),
+            _record(5, "tick", swap_used_bytes=16 * 1024**2, swap_out_bytes=4096),
+            _record(10, "done", swap_used_bytes=16 * 1024**2, swap_out_bytes=8192),
+        ],
+    )
+
+    performance_analysis.analyze_performance_profile("baseline", tmp_path / "performance-profiles")
+
+    summary = (
+        tmp_path / "performance-profiles" / "baseline" / "analysis" / "summary.md"
+    ).read_text()
+    assert "Primary bottleneck: memory pressure" in summary
+
+
 def test_analyze_rejects_schema_mismatch_without_creating_analysis(tmp_path):
     source = _write_profile(tmp_path, [{**_record(0, "start"), "schema": "future"}])
 

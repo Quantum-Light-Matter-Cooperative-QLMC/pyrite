@@ -10,6 +10,7 @@ REMOTE_DIR = os.environ.get("CXR_REMOTE_DIR", "/home/aamador/dev/cxr-mc")
 REMOTE_UV = os.environ.get("CXR_REMOTE_UV", "/home/aamador/.local/bin/uv")
 SLURM_PARTITION = "gpu"
 SLURM_GPUS = 1
+SLURM_CPUS_PER_MATERIAL = 8
 SLURM_TIME = "UNLIMITED"
 # Default 1: the box has one GPU (SLURM_GPUS=1), and >1 co-tenant `cxr scan`
 # processes time-slice the card while the runner's own CPU-pool/GPU pipeline

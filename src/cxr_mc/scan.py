@@ -398,7 +398,15 @@ def command(
     if include_high_energy and not all_:
         raise click.UsageError("--include-high-energy requires --all")
     if not all_ and not actually_all and material is None:
-        raise click.UsageError("scan needs a material name, or use --all/-A")
+        from .materials import CATALOG
+
+        resolved_profile = _resolve_catalog_profile(catalog_profile, performance_profile)
+        has_membership = (
+            resolved_profile in CATALOG.profile_names
+            and CATALOG.profile_materials(resolved_profile) is not None
+        )
+        if not has_membership:
+            raise click.UsageError("scan needs a material name, or use --all/-A")
     if not json_output:
         return _cli_core.invoke_legacy(
             run,
@@ -461,6 +469,28 @@ def command(
 DEFAULT_HIGH_ENERGY_MIN_KEV = 150.0
 
 
+def _resolve_catalog_profile(catalog_profile: str, performance_profile: str | None) -> str:
+    """Reconcile ``--profile``/``--performance-profile`` into one catalog
+    profile name -- the same rule the command's early validation, material
+    selection (``_selected``), and per-material settings resolution
+    (``_resolved_run``) all need to agree on."""
+    if performance_profile is not None:
+        if catalog_profile not in ("standard", performance_profile):
+            raise click.UsageError(
+                "--performance-profile and --profile must name the same catalog profile"
+            )
+        catalog_profile = performance_profile
+    return catalog_profile
+
+
+def _effective_catalog_profile(args) -> str:
+    """``args``-based wrapper around :func:`_resolve_catalog_profile`."""
+    return _resolve_catalog_profile(
+        getattr(args, "catalog_profile", "standard"),
+        getattr(args, "performance_profile", None),
+    )
+
+
 def validate_catalog_profile(
     catalog_profile: str, materials: list[str], *, intersect: bool
 ) -> list[str]:
@@ -508,7 +538,7 @@ def _selected(args):
     materials' energy grids regardless of which flag pulled them in."""
     all_ = getattr(args, "all", False)
     actually_all = getattr(args, "actually_all", False)
-    catalog_profile = getattr(args, "catalog_profile", "standard")
+    catalog_profile = _effective_catalog_profile(args)
     args.high_energy_floor_map = {}
     if all_ or actually_all:
         if args.material is not None:
@@ -556,7 +586,15 @@ def _selected(args):
             if args.material in high_energy_materials:
                 args.high_energy_floor_map = {args.material: floor}
     else:
-        raise SystemExit("scan needs a material name, or use --all/-A")
+        from .materials import CATALOG
+
+        if catalog_profile not in CATALOG.profile_names:
+            available = ", ".join(sorted(CATALOG.profile_names)) or "(none defined)"
+            raise click.UsageError(f"unknown profile {catalog_profile!r}; available: {available}")
+        membership = CATALOG.profile_materials(catalog_profile)
+        if membership is None:
+            raise SystemExit("scan needs a material name, or use --all/-A")
+        materials = list(membership)
     validate_materials(materials)
     return materials
 
@@ -635,14 +673,7 @@ def _resolved_run(args, material):
     assert material_sweep is not None
 
     fidelity = getattr(args, "fidelity", "full")
-    catalog_profile = getattr(args, "catalog_profile", "standard")
-    performance_profile = getattr(args, "performance_profile", None)
-    if performance_profile is not None:
-        if catalog_profile not in ("standard", performance_profile):
-            raise click.UsageError(
-                "--performance-profile and --profile must name the same catalog profile"
-            )
-        catalog_profile = performance_profile
+    catalog_profile = _effective_catalog_profile(args)
     settings = default_settings() if fidelity == "full" else default_settings(fidelity)
     overrides = {}
     if getattr(args, "quick", False):

@@ -157,6 +157,14 @@ Use the
 [performance-profile analysis playbook](performance-profile-analysis.md) to
 validate sessions, derive phase/resource metrics, classify bottlenecks, and
 design controlled tuning runs.
+
+For a bursty, spectrum-dominated GPU run, add `--nsys --chunk-minutes 0` to a
+single-material, single-repetition performance submit. This runs an uncached
+job-local session under Nsight Systems and writes CUDA/NVTX/Python-stack trace
+artifacts beside the NDJSON. `cxr remote profile pull NAME` fetches the
+`.nsys-rep`, `.sqlite`, and `.nsys-stats.txt` files too; see the playbook's
+Nsight section for the exact command and interpretation limits.
+
 `cxr remote stop ...` cancels an active allocation with `scancel`. `cxr remote
 check` follows the same submit-and-wait workflow for its validation calculation;
 `cxr remote check --detached` returns after submission.

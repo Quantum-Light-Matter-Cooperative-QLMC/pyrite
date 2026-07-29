@@ -60,6 +60,95 @@ cxr profile analyze sub_100keV
 Use `--performance-dir PATH` for a non-default log root and `--sample-period
 SECONDS` when collection did not use the default five-second interval.
 
+### Repeat one uncached remote workload
+
+Run three comparable MoS2 sessions with one-second telemetry and a fixed
+six-worker allocation:
+
+```bash
+cxr remote submit mos2 \
+  --performance-profile compute_test_300keV \
+  --performance-repetitions 3 \
+  --performance-interval 1 \
+  --workers 6 \
+  --chunk-minutes 0 \
+  --headless
+
+cxr remote profile pull compute_test_300keV
+cxr profile analyze compute_test_300keV --sample-period 1
+```
+
+Repetition mode gives every session a separate job-local checkpoint root.
+Existing production checkpoints remain untouched, every repetition is
+uncached, and profiling checkpoints are not automatically pulled.
+
+After the baseline completes, test a smaller line-spectrum chunk while keeping
+every other option fixed:
+
+```bash
+cxr remote submit mos2 \
+  --performance-profile compute_test_300keV \
+  --performance-repetitions 3 \
+  --performance-interval 1 \
+  --workers 6 \
+  --spec-chunk 20000 \
+  --chunk-minutes 0 \
+  --headless
+```
+
+Wait for the baseline job to finish before submitting the candidate: one live
+job per named profile is allowed. Pull and analyze again; job directories keep
+the baseline and candidate sessions separate. Change `--brem-chunk` only in a
+later experiment if line-spectrum chunking does not explain the measured gap.
+
+### Capture one Nsight Systems timeline
+
+When one-second telemetry shows a spectrum-dominated run with bursty GPU use,
+capture CUDA API calls, kernels, NVTX phases, OS runtime activity, and Python
+stacks for one full uncached session:
+
+```bash
+cxr remote submit mos2 \
+  --performance-profile compute_test_300keV \
+  --performance-interval 1 \
+  --workers 6 \
+  --spec-chunk 20000 \
+  --nsys \
+  --chunk-minutes 0 \
+  --headless
+
+cxr remote profile pull compute_test_300keV
+```
+
+`--nsys` requires exactly one material, one material process, one performance
+repetition, and a monolithic allocation. It uses an isolated job-local
+checkpoint so the trace is uncached and never changes or pulls a production
+checkpoint. The lab worker must provide `nsys`; no local CUDA toolkit is
+required to collect the trace. Nsight sessions launch the synchronized virtual
+environment's Python directly and use the `spawn` multiprocessing context;
+ordinary scans retain the platform-default context. This avoids Nsight's known
+fork-without-exec deadlock mode.
+
+If an older submitted script remains at 0% with both CPU and GPU idle and its
+log ends with `Waiting for termination of re-parented processes`, cancel that
+job, sync the updated code, and submit again. It cannot recover useful work.
+
+The existing profile pull fetches these files beside the NDJSON:
+
+```text
+<material>.nsys-rep
+<material>.sqlite
+<material>.nsys-stats.txt
+```
+
+The text report summarizes CUDA APIs, kernels, launch-to-execution delay, and
+NVTX ranges. Open `.nsys-rep` in an equal-or-newer Nsight Systems GUI for the
+timeline. The runner emits one `cxr.spectrum_case:<configuration>` range per
+case with nested `cxr.lines`, `cxr.brem`, and `cxr.interpolate` ranges.
+
+Nsight instrumentation adds overhead. Use it to explain gaps, not as a
+throughput measurement or a replacement for the three-repetition comparison.
+
 ## Validate and normalize
 
 For every input line:
@@ -117,7 +206,7 @@ Take rolling totals from last valid terminal sample:
 - spectrum time: `spectrum_seconds_total`;
 - driver feed-wait: `driver_wait_seconds_total`;
 - checkpoint share: `checkpoint_seconds_total / elapsed_seconds`;
-- GPU feed-wait fraction: `gpu_feed_wait_fraction`;
+- transport feed-wait fraction: `gpu_feed_wait_fraction` (legacy field name);
 - peak worker RSS: maximum `child_process_rss_max_bytes`;
 - peak process RSS and system memory percentage;
 - peak VRAM and CuPy reserved/peak memory;
@@ -137,9 +226,11 @@ transport_supply_time =
     mean_transport_per_case / effective_workers
 ```
 
-Compare `transport_supply_time` with `mean_spectrum_per_case`. Use measured
-`gpu_feed_wait_fraction` as stronger evidence because it records actual driver
-blocking after overlap.
+Compare `transport_supply_time` with `mean_spectrum_per_case`.
+`gpu_feed_wait_fraction` records only driver time blocked on prefetched CPU
+transport results. It does not include host launch, synchronization, allocation,
+or transfer gaps inside the spectrum phase; use an Nsight trace to separate
+those.
 
 Warm-up inflates initial transport waits and CUDA allocation/JIT work. Report
 both full-session and steady-state results. Derive steady-state totals by

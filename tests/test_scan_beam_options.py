@@ -68,6 +68,23 @@ def test_scan_performance_profile_selects_catalog_profile(monkeypatch):
     assert captured["identity"]["catalog_profile"] == "sub_100keV"
 
 
+def test_scan_performance_profile_alone_selects_its_membership(monkeypatch):
+    captured = {}
+
+    def capture(args):
+        captured["materials"] = scan._selected(args)
+
+    monkeypatch.setattr(scan, "run", capture)
+    result = CliRunner().invoke(
+        scan.command,
+        ["--performance-profile", "compute_test_300keV"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["materials"] == ["hopg", "hbn", "hfte2", "mos2"]
+
+
 def test_scan_rejects_conflicting_performance_and_catalog_profiles(monkeypatch):
     monkeypatch.setattr(scan, "run", lambda args: scan._resolved_run(args, "hopg"))
     result = CliRunner().invoke(

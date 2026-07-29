@@ -338,6 +338,8 @@ def _session_row(
         "transport_supply_time": (
             transport / timed / workers if transport is not None and timed and workers else None
         ),
+        "swap_in_growth_bytes": _delta(records[0], terminal, "swap_in_bytes"),
+        "swap_out_growth_bytes": _delta(records[0], terminal, "swap_out_bytes"),
     }
     warm = next(
         (
@@ -375,7 +377,8 @@ def _write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> Non
 
 def _classification(row: dict[str, Any]) -> tuple[str, str]:
     feed_wait = _number(row.get("gpu_feed_wait_fraction")) or 0.0
-    swap = _number(row.get("peak_swap_used_bytes")) or 0.0
+    swap_in_growth = _number(row.get("swap_in_growth_bytes")) or 0.0
+    swap_out_growth = _number(row.get("swap_out_growth_bytes")) or 0.0
     retries = _number(row.get("gpu_oom_retries")) or 0.0
     checkpoint = _number(row.get("checkpoint_share")) or 0.0
     gpu = _number(row.get("median_gpu_percent"))
@@ -383,7 +386,7 @@ def _classification(row: dict[str, Any]) -> tuple[str, str]:
     transport = _number(row.get("transport_seconds")) or 0.0
     worker_rss = _number(row.get("peak_child_process_rss_max_bytes"))
     worker_budget = _number(row.get("worker_memory_budget_mib"))
-    if swap > 0:
+    if swap_in_growth > 0 or swap_out_growth > 0:
         return "memory pressure", "reduce workers or chunks; do not increase concurrency"
     if retries > 0:
         return "GPU memory limit", "reduce chunks or concurrency"

@@ -4,7 +4,7 @@ Talk like smart caveman. Same brain, fewer tokens.
 
 ## What it does
 
-Compress every model response to caveman-style prose. Drops articles, filler, pleasantries, and hedging. Keeps every technical detail, code block, error string, and symbol exact. Cuts 65% of output tokens (measured) with full accuracy preserved. Mode persists for the whole session until changed or stopped.
+Compress model responses to caveman-style prose. Drops articles, filler, pleasantries, and hedging. Keeps every technical detail, code block, error string, and symbol exact. Cuts 65% of output tokens (measured) with full accuracy preserved. Selected level persists when host carries session state; otherwise invoke skill again.
 
 Six intensity levels:
 
@@ -12,7 +12,7 @@ Six intensity levels:
 |-------|-------------|
 | `lite` | Drop filler/hedging. Sentences stay full. Professional but tight. |
 | `full` | Default. Drop articles, fragments OK, short synonyms. |
-| `ultra` | Bare fragments. Abbreviations (DB, auth, fn). Arrows for causality. |
+| `ultra` | Strip safe conjunctions. State each fact once. No invented abbreviations or causal arrows. |
 | `wenyan-lite` | Classical Chinese register, light compression. |
 | `wenyan-full` | Maximum 文言文. 80-90% character reduction. |
 | `wenyan-ultra` | Extreme classical compression. |
@@ -25,7 +25,10 @@ Auto-clarity rule: caveman drops to normal prose for security warnings, irrevers
 /caveman              # full mode (default)
 /caveman lite         # lighter compression
 /caveman ultra        # extreme compression
-/caveman wenyan       # classical Chinese
+/caveman wenyan       # alias for wenyan-full
+/caveman wenyan-lite
+/caveman wenyan-full
+/caveman wenyan-ultra
 stop caveman          # back to normal prose
 ```
 
@@ -37,10 +40,10 @@ Normal prose:
 > Your component re-renders because you create a new object reference each render. Wrapping it in `useMemo` will fix the issue.
 
 Caveman (full):
-> New object ref each render. Inline object prop = new ref = re-render. Wrap in `useMemo`.
+> New object reference each render. Inline object prop = new reference = re-render. Wrap in `useMemo`.
 
 Caveman (ultra):
-> Inline obj prop → new ref → re-render. `useMemo`.
+> Inline object prop, new reference, re-render. `useMemo`.
 
 ## See also
 

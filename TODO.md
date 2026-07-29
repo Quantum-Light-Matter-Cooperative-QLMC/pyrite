@@ -36,7 +36,7 @@ summary once the branch exists.
 
 ### Active
 
-1. **Profile-command CLI work.** `remove` (strip values from a profile's grids, on `main`) and `rename` (rename a profile, migrating its `energy_grids` bucket) done. → `feature/profile-rename`; `tasks/profile-rename.md`.
+1. **>user< Profile-command CLI work.** Combine `cxr sweep` and `cxr profile` (drop sweep) unless there's another good reason
 2. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
 3.  **Debye-Waller provenance and anisotropy audit.** Continue replacing placeholder or reused `B_ang2` values with primary-source values and resolve per-site/tensor model needs. → `feature/debye-waller-audit`; audit: [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md).
    1. >user< Evaluate complexity/value of implementing full anisotropic/tensor-based Debye-Waller factors when available

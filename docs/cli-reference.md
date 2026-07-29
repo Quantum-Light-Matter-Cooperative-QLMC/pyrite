@@ -70,6 +70,7 @@ Commands:
   validate     Launch validation or export cached validation figures.
   catalog      Inspect and validate material-catalog configuration.
   checkpoint   Inspect, transform, recompute, and archive checkpoints.
+  completion   Manage cxr shell tab-completion.
   remote       Run and manage MC sweeps on a remote GPU host.
   energy-grid  Derive, submit, inspect, and apply photon-energy grids.
   sweep        Show and edit scan parameter-range sweeps.
@@ -467,6 +468,42 @@ Options:
   -h, --help        Show this message and exit.
 ```
 
+## `cxr completion`
+
+```text
+Usage: cxr completion [OPTIONS] COMMAND [ARGS]...
+
+  Manage cxr shell tab-completion.
+
+  Example:
+    cxr completion install
+    cxr completion install --shell zsh --dry-run
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  install  Append cxr tab-completion setup to a shell rc/config file.
+```
+
+## `cxr completion install`
+
+```text
+Usage: cxr completion install [OPTIONS]
+
+  Append cxr tab-completion setup to a shell rc/config file.
+
+  Idempotent: rerunning skips a file that already contains the line. With no --shell,
+  detects from $SHELL.
+
+Options:
+  --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.
+  --rc-file FILE           Rc/config file to edit. Defaults to the shell's standard
+                           location.
+  --dry-run                Print what would change without writing.
+  -h, --help               Show this message and exit.
+```
+
 ## `cxr remote`
 
 ```text
@@ -568,7 +605,7 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  pull  Fetch NDJSON logs for PERFORMANCE_PROFILE from every matching remote job...
+  pull  Fetch NDJSON logs and Nsight artifacts for PERFORMANCE_PROFILE from every...
 ```
 
 ## `cxr remote profile pull`
@@ -576,8 +613,8 @@ Commands:
 ```text
 Usage: cxr remote profile pull [OPTIONS] PERFORMANCE_PROFILE
 
-  Fetch NDJSON logs for PERFORMANCE_PROFILE from every matching remote job into
-  performance-profiles/PROFILE/<job>/.
+  Fetch NDJSON logs and Nsight artifacts for PERFORMANCE_PROFILE from every matching
+  remote job into performance-profiles/PROFILE/<job>/.
 
 Options:
   -h, --help  Show this message and exit.
@@ -778,45 +815,61 @@ Usage: cxr remote submit [OPTIONS] [MATERIAL]...
   run holds the bare name) and refuses while another job under the same profile is live.
 
 Options:
-  -a, --all                   Queue mats_to_sim.toml's verified `materials` list.
-  -A, --actually-all          Queue every material in mats_to_sim.toml -- materials,
-                              no_verified_dw, high_energy_materials, and
-                              materials_to_leave_out combined. Not combined with
-                              --all/--include-unverified-dw/--include-high-energy or
-                              explicit materials.
-  --include-unverified-dw     With --all, also queue mats_to_sim.toml's no_verified_dw
-                              materials.
-  --include-high-energy       With --all, also queue mats_to_sim.toml's
-                              high_energy_materials, filtered to --high-energy-min-kev
-                              and above.
-  --high-energy-min-kev KEV   Energy floor applied to any queued high_energy_materials
-                              member [default: 150.0 when selected via --include-high-
-                              energy/-A]. With explicit MATERIAL(s), applies only to
-                              those that are themselves high_energy_materials entries; a
-                              no-op on every other material.
-  --fidelity [full|survey]    Named settings/grid policy. survey is provisional and
-                              reduced.  [default: full]
-  --profile TEXT              Catalog profile to run (e.g. standard, sub_100keV);
-                              orthogonal to --fidelity.  [default: standard]
-  --quick                     Use tiny smoke-test grid.
-  --workers NUMBER            Transport workers (default: auto; 0 runs serially).
-  --parallel-materials N      Simultaneous scans in one allocation; requires --chunk-
-                              minutes 0.  [1<=x<=4]
-  --chunk-minutes NUMBER      Self-resubmitting SLURM slice length; 0 runs one
-                              monolithic job.  [default: 10.0]
-  --performance-profile NAME  Run catalog profile NAME with CPU pressure, RAM/swap, GPU
-                              clocks/VRAM, process, phase timing, queue, worker, chunk,
-                              and case logging every 5 s; pull with `cxr remote profile
-                              pull NAME`.
-  --no-sync                   Skip code upload.
-  --dry-run                   Print submission preview; do not connect.
-  --headless                  Return after submission without attaching or pulling.
-  --no-pull                   Attach and track, but do not pull completed checkpoints.
-  --grid                      Grid-filter checkpoint before pulling; incompatible with
-                              --quick.
-  --drop-wide-brem            With --grid, drop wide-brem.
-  --downcast                  With --grid, downcast to float32.
-  -h, --help                  Show this message and exit.
+  -a, --all                       Queue mats_to_sim.toml's verified `materials` list.
+  -A, --actually-all              Queue every material in mats_to_sim.toml -- materials,
+                                  no_verified_dw, high_energy_materials, and
+                                  materials_to_leave_out combined. Not combined with
+                                  --all/--include-unverified-dw/--include-high-energy or
+                                  explicit materials.
+  --include-unverified-dw         With --all, also queue mats_to_sim.toml's
+                                  no_verified_dw materials.
+  --include-high-energy           With --all, also queue mats_to_sim.toml's
+                                  high_energy_materials, filtered to --high-energy-min-
+                                  kev and above.
+  --high-energy-min-kev KEV       Energy floor applied to any queued
+                                  high_energy_materials member [default: 150.0 when
+                                  selected via --include-high-energy/-A]. With explicit
+                                  MATERIAL(s), applies only to those that are themselves
+                                  high_energy_materials entries; a no-op on every other
+                                  material.
+  --fidelity [full|survey]        Named settings/grid policy. survey is provisional and
+                                  reduced.  [default: full]
+  --profile TEXT                  Catalog profile to run (e.g. standard, sub_100keV);
+                                  orthogonal to --fidelity.  [default: standard]
+  --quick                         Use tiny smoke-test grid.
+  --workers NUMBER                Transport workers (default: auto; 0 runs serially).
+  --parallel-materials N          Simultaneous scans in one allocation; requires
+                                  --chunk-minutes 0.  [1<=x<=4]
+  --chunk-minutes NUMBER          Self-resubmitting SLURM slice length; 0 runs one
+                                  monolithic job.  [default: 10.0]
+  --performance-profile NAME      Run catalog profile NAME with CPU pressure, RAM/swap,
+                                  GPU clocks/VRAM, process, phase timing, queue, worker,
+                                  chunk, and case logging; pull with `cxr remote profile
+                                  pull NAME`.
+  --performance-repetitions N     Run N uncached sessions per material with isolated
+                                  job-local checkpoints; requires --performance-profile
+                                  and --chunk-minutes 0. Profiling checkpoints are not
+                                  pulled.  [default: 1; 1<=x<=20]
+  --performance-interval SECONDS  Performance telemetry sampling interval; requires
+                                  --performance-profile.  [default: 5.0]
+  --spec-chunk N                  Pin line-spectrum segments per GPU chunk; requires
+                                  --performance-profile.
+  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk; requires
+                                  --performance-profile.
+  --nsys                          Capture one uncached full-profile session with Nsight
+                                  Systems CUDA/NVTX and Python-stack tracing; requires
+                                  exactly one material, --performance-profile,
+                                  --performance-repetitions 1, and --chunk-minutes 0.
+  --no-sync                       Skip code upload.
+  --dry-run                       Print submission preview; do not connect.
+  --headless                      Return after submission without attaching or pulling.
+  --no-pull                       Attach and track, but do not pull completed
+                                  checkpoints.
+  --grid                          Grid-filter checkpoint before pulling; incompatible
+                                  with --quick.
+  --drop-wide-brem                With --grid, drop wide-brem.
+  --downcast                      With --grid, downcast to float32.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr remote sync`
