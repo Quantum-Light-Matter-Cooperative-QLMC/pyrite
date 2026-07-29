@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -155,6 +156,19 @@ def test_claude_project_memory_imports_shared_instructions() -> None:
     claude_md = Path(__file__).parents[1] / "CLAUDE.md"
 
     assert "@AGENTS.md" in claude_md.read_text(encoding="utf-8")
+
+
+def test_agent_session_start_syncs_optional_dependencies() -> None:
+    root = Path(__file__).parents[1]
+    expected = "uv sync --all-groups --extra viz-render"
+    claude = json.loads((root / ".claude" / "settings.json").read_text())
+    codex = json.loads((root / ".codex" / "hooks.json").read_text())
+
+    claude_command = claude["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    codex_command = codex["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+
+    assert expected in claude_command
+    assert expected in codex_command
 
 
 @pytest.mark.parametrize(

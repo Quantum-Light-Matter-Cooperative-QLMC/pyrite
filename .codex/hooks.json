@@ -1,0 +1,18 @@
+{
+  "description": "Install locked project dependencies when Codex starts.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$(git rev-parse --show-toplevel)\" && uv sync --all-groups --extra viz-render",
+            "timeout": 600,
+            "statusMessage": "Syncing project dependencies"
+          }
+        ]
+      }
+    ]
+  }
+}
