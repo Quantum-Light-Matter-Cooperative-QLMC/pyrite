@@ -39,7 +39,7 @@ def test_help_documents_examples_units_side_effects_and_incompatibilities():
         (): ("Examples:", "cxr remote submit"),
         ("scan",): ("minutes", "writes <material>.pkl"),
         ("remote",): ("CXR_REMOTE_HOST", "Examples:"),
-        ("remote", "scan"): ("incompatible with --grid", "0 runs serially"),
+        ("remote", "scan"): ("PROFILE selects", "-m, --material"),
         ("remote", "pull"): ("mutually exclusive", "grid-filtered"),
         ("energy-grid",): ("cxr profile", "cxr material", "Examples:"),
         ("energy-grid", "derive"): ("keV", "angstrom", "spacing in eV"),

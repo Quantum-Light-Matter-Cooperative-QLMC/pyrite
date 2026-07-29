@@ -174,10 +174,14 @@ def test_local_commands_wire_material_checkpoint_archive_and_choice_completion()
 def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
     from cxr_mc._remote import cli
 
-    for name in ("scan", "submit", "start", "rebrem", "reline"):
+    for name in ("scan", "submit", "start"):
         command = cli.command.commands[name]
-        parameter = "materials" if name in {"submit", "start"} else "material"
-        assert _callback(command, parameter) is _cli_completion.complete_material
+        assert _callback(command, "catalog_profile") is _cli_completion.complete_profile
+        assert _callback(command, "material") is _cli_completion.complete_material
+    for name in ("rebrem", "reline"):
+        assert (
+            _callback(cli.command.commands[name], "material") is _cli_completion.complete_material
+        )
     assert (
         _callback(cli.command.commands["pull"], "material")
         is _cli_completion.complete_remote_checkpoint_stem

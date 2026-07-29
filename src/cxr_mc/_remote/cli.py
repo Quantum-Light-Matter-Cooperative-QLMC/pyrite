@@ -147,11 +147,9 @@ def _start_selected(args):
     is a no-op for any queued material outside ``high_energy_materials``, so
     it is safe to forward blindly.
 
-    With no MATERIAL/--all/-A and a ``--profile NAME`` that carries an
-    explicit material membership list, the profile's members are the
-    selection -- naming a campaign profile is enough information to know what
-    to run. A profile with no membership row (implicit all-in-use) still
-    requires ``--all``/explicit materials; there's no narrower list to guess."""
+    With no ``--material``/``--all``/``-A``, the profile's explicit membership
+    is the selection. A profile with no membership row uses the verified
+    ``materials`` manifest group."""
     from ..scan import validate_catalog_profile
 
     explicit = list(getattr(args, "materials", None) or [])
@@ -196,18 +194,19 @@ def _start_selected(args):
             tagged = set(load_manifest_groups(config.MATS_FILE)["high_energy_materials"])
             if tagged.intersection(materials):
                 high_energy_min_kev = floor
-    elif (
-        catalog_profile != "standard"
-        and (membership := _profile_default_materials(catalog_profile)) is not None
-    ):
-        materials = list(membership)
+    else:
+        membership = _profile_default_materials(catalog_profile)
+        materials = (
+            list(membership)
+            if membership is not None
+            else list(load_manifest_groups(config.MATS_FILE)["materials"])
+        )
+        materials = validate_catalog_profile(catalog_profile, materials, intersect=True)
         floor = getattr(args, "high_energy_min_kev", None)
         if floor is not None:
             tagged = set(load_manifest_groups(config.MATS_FILE)["high_energy_materials"])
             if tagged.intersection(materials):
                 high_energy_min_kev = floor
-    else:
-        raise SystemExit(f"{args.remote_command} needs material name(s), or use --all/-A")
     return materials, high_energy_min_kev
 
 
@@ -601,8 +600,9 @@ def _reject_all_with_values(command_name, all_, values):
         "over workflow defaults where offered.\n\n"
         "\b\n"
         "Examples:\n"
-        "  cxr remote submit hopg --dry-run\n"
-        "  cxr remote scan hopg\n"
+        "  cxr remote submit sub_100keV --dry-run\n"
+        "  cxr remote submit compute_test_300keV -p\n"
+        "  cxr remote submit standard -m hopg\n"
         "  cxr remote status -vv"
     ),
     no_args_is_help=False,
@@ -846,20 +846,25 @@ def reline_command(
         "Sync code, submit sweep(s), track progress, and pull checkpoints.\n\n"
         "Use --headless to return after submission. Use --no-pull to track "
         "through completion without automatically pulling checkpoints.\n\n"
-        "MATERIAL/--all/-A may be omitted when --profile NAME names a profile "
-        "with an explicit `materials` membership list -- the profile's members "
-        "become the queue. A profile with no membership row (implicit "
-        "all-in-use) still needs --all/-A or an explicit MATERIAL.\n\n"
-        "A --profile submit names the job after the profile (NAME, then "
+        "PROFILE selects the catalog campaign and its material membership. "
+        "Use -m/--material to run one member only. Profiles without an explicit "
+        "membership use mats_to_sim.toml's verified materials list.\n\n"
+        "A profile submit names the job after PROFILE (NAME, then "
         "NAME-2 once a finished run holds the bare name) and refuses while "
         "another job under the same profile is live."
     ),
 )
 @click.argument(
-    "materials",
-    nargs=-1,
-    metavar="[MATERIAL]...",
+    "catalog_profile",
+    required=False,
+    metavar="[PROFILE]",
+    shell_complete=_cli_completion.complete_profile,
+)
+@click.option(
+    "-m",
+    "--material",
     shell_complete=_cli_completion.complete_material,
+    help="Run one material from PROFILE instead of its full membership.",
 )
 @click.option(
     "-a", "--all", "all_", is_flag=True, help="Queue mats_to_sim.toml's verified `materials` list."
@@ -904,10 +909,10 @@ def reline_command(
 @fidelity_option(help="Named settings/grid policy. survey is provisional and reduced.")
 @click.option(
     "--profile",
-    "catalog_profile",
-    default="standard",
-    show_default=True,
-    help="Catalog profile to run (e.g. standard, sub_100keV); orthogonal to --fidelity.",
+    "legacy_catalog_profile",
+    default=None,
+    hidden=True,
+    help="Deprecated compatibility form for positional PROFILE.",
 )
 @click.option("--quick", is_flag=True, help="Use tiny smoke-test grid.")
 @click.option(
@@ -932,14 +937,12 @@ def reline_command(
     help="Self-resubmitting SLURM slice length; 0 runs one monolithic job.",
 )
 @click.option(
-    "--performance-profile",
-    callback=_performance_profile_name,
-    default=None,
-    metavar="NAME",
+    "-p",
+    "--perf",
+    is_flag=True,
     help=(
-        "Run catalog profile NAME with CPU pressure, RAM/swap, GPU clocks/VRAM, "
-        "process, phase timing, queue, worker, chunk, and case logging; "
-        "pull with `cxr remote profile pull NAME`."
+        "Log CPU pressure, RAM/swap, GPU clocks/VRAM, process, phase timing, "
+        "queue, worker, chunk, and case metrics for PROFILE."
     ),
 )
 @click.option(
@@ -950,7 +953,7 @@ def reline_command(
     metavar="N",
     help=(
         "Run N uncached sessions per material with isolated job-local checkpoints; "
-        "requires --performance-profile and --chunk-minutes 0. Profiling checkpoints "
+        "requires --perf and --chunk-minutes 0. Profiling checkpoints "
         "are not pulled."
     ),
 )
@@ -960,29 +963,29 @@ def reline_command(
     default=5.0,
     show_default=True,
     metavar="SECONDS",
-    help="Performance telemetry sampling interval; requires --performance-profile.",
+    help="Performance telemetry sampling interval; requires --perf.",
 )
 @click.option(
     "--spec-chunk",
     type=POSITIVE_INT,
     default=None,
     metavar="N",
-    help="Pin line-spectrum segments per GPU chunk; requires --performance-profile.",
+    help="Pin line-spectrum segments per GPU chunk; requires --perf.",
 )
 @click.option(
     "--brem-chunk",
     type=POSITIVE_INT,
     default=None,
     metavar="N",
-    help="Pin bremsstrahlung segments per GPU chunk; requires --performance-profile.",
+    help="Pin bremsstrahlung segments per GPU chunk; requires --perf.",
 )
 @click.option(
     "--nsys",
     is_flag=True,
     help=(
         "Capture one uncached full-profile session with Nsight Systems CUDA/NVTX "
-        "and Python-stack tracing; requires exactly one material, "
-        "--performance-profile, --performance-repetitions 1, and --chunk-minutes 0."
+        "and Python-stack tracing; requires exactly one material, --perf, "
+        "--performance-repetitions 1, and --chunk-minutes 0."
     ),
 )
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
@@ -1006,19 +1009,20 @@ def reline_command(
 @click.option("--downcast", is_flag=True, help="With --grid, downcast to float32.")
 @click.option("-f", "--follow", is_flag=True, hidden=True)
 def start_command(
-    materials,
+    catalog_profile,
+    material,
     all_,
     actually_all,
     include_unverified_dw,
     include_high_energy,
     high_energy_min_kev,
     fidelity,
-    catalog_profile,
+    legacy_catalog_profile,
     quick,
     workers,
     parallel_materials,
     chunk_minutes,
-    performance_profile,
+    perf,
     performance_repetitions,
     performance_interval,
     spec_chunk,
@@ -1033,24 +1037,26 @@ def start_command(
     downcast,
     follow,
 ):
-    materials = list(materials)
-    if performance_profile is not None:
-        if catalog_profile not in ("standard", performance_profile):
-            raise click.UsageError(
-                "--performance-profile and --profile must name the same catalog profile"
-            )
-        catalog_profile = performance_profile
+    if catalog_profile is not None and legacy_catalog_profile is not None:
+        raise click.UsageError("PROFILE and --profile cannot be combined")
+    catalog_profile = catalog_profile or legacy_catalog_profile
+    missing_selection = (
+        catalog_profile is None and material is None and not all_ and not actually_all
+    )
+    catalog_profile = catalog_profile or "standard"
+    materials = [material] if material is not None else []
+    performance_profile = catalog_profile if perf else None
     if performance_profile is None:
         if performance_repetitions != 1:
-            raise click.UsageError("--performance-repetitions requires --performance-profile")
+            raise click.UsageError("--performance-repetitions requires --perf")
         if performance_interval != 5.0:
-            raise click.UsageError("--performance-interval requires --performance-profile")
+            raise click.UsageError("--performance-interval requires --perf")
         if spec_chunk is not None:
-            raise click.UsageError("--spec-chunk requires --performance-profile")
+            raise click.UsageError("--spec-chunk requires --perf")
         if brem_chunk is not None:
-            raise click.UsageError("--brem-chunk requires --performance-profile")
+            raise click.UsageError("--brem-chunk requires --perf")
         if nsys:
-            raise click.UsageError("--nsys requires --performance-profile")
+            raise click.UsageError("--nsys requires --perf")
     if performance_repetitions > 1 and chunk_minutes != 0:
         raise click.UsageError("--performance-repetitions requires --chunk-minutes 0")
     if performance_repetitions > 1 and parallel_materials not in (None, 1):
@@ -1073,21 +1079,11 @@ def start_command(
         raise click.UsageError("--include-unverified-dw requires --all")
     if include_high_energy and not all_:
         raise click.UsageError("--include-high-energy requires --all")
+    if missing_selection:
+        raise click.UsageError("submit needs PROFILE, -m/--material, --all, or -A")
     if not actually_all:
         if all_ and materials:
             raise click.UsageError("start --all does not take material names")
-        if not all_ and not materials:
-            # A profile naming its own campaign materials is enough
-            # information to run bare `submit --profile NAME`; only fall back
-            # to requiring --all/explicit MATERIAL when it can't supply any
-            # (unknown name, or "standard"/implicit all-in-use membership).
-            profile_materials = (
-                None
-                if catalog_profile == "standard"
-                else _profile_default_materials(catalog_profile)
-            )
-            if profile_materials is None:
-                raise click.UsageError("start needs material name(s), or use --all")
     if parallel_materials is not None and chunk_minutes != 0:
         raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
     if quick and fidelity != "full":
@@ -1135,6 +1131,13 @@ def start_command(
 
 
 command.add_command(start_command)
+_scan_alias = copy(start_command)
+_scan_alias.name = "scan"
+_scan_alias.deprecated = "Use 'cxr remote submit'."
+_scan_alias.help = "Deprecated alias for `cxr remote submit`.\n\n" + (start_command.help or "")
+_scan_alias.params = [copy(parameter) for parameter in start_command.params]
+command.add_command(_scan_alias)
+
 _start_alias = copy(start_command)
 _start_alias.name = "start"
 _start_alias.hidden = True
