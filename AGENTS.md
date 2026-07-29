@@ -51,8 +51,9 @@ If `uv run` cannot write project environment, add
 ## Task dispatch
 
 - Use `triage` for new `>user<` prose or `/triage <text>` direct input. It
-  drafts task docs and local branches/worktrees, syncs TODO pointers, then
-  stops before commit/push for review.
+  drafts task docs and local branches/worktrees, syncs TODO pointers, commits
+  that setup on `main`, pushes `main` and the task branches, then stops for
+  review.
 - Use `dispatch-task` to route backlog work. It resolves task worktree/branch,
   owns approved setup/landed teardown, writes explicit authority/acceptance
   handoff, then selects:
@@ -60,6 +61,10 @@ If `uv run` cannot write project environment, add
   normal checklist slices, or `lead-task` for complex/integrating ownership.
 - Example model tiers: Haiku/Luna → lite; Sonnet/Terra → normal;
   Opus/Sol/Fable/K3 → lead. Risk and scope override model label.
+- Use `rebase-branches` to bring task branches current with `main`. It fans
+  cheap subagents out per branch, rebases only clean or `TODO.md`-only cases,
+  aborts and reports real conflicts, and never pushes without explicit
+  instruction.
 - Task type stays separate: workers also invoke matching CLI, notebook,
   physics, performance, docs, remote, regression, or scientific skill.
 - Direct user invocation of a worker skill permits task-local checkpoint

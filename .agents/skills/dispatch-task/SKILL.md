@@ -25,12 +25,12 @@ caller also assigns it to this agent.
 
 1. Verify reviewed task doc, one-line TODO pointer, branch, and worktree.
 2. Create/reuse missing branch/worktree; keep one TODO writer.
-3. Commit explicit task doc and synchronized `TODO.md`; push branch with
-   upstream before implementation.
+3. Verify triage's setup commit (task doc + synchronized `TODO.md`) exists and
+   `main` and the task branch are pushed with upstream.
 4. Dispatch only after clean status and remote setup verification.
 
-Direct user invocation authorizes required setup commit, TODO ownership, and
-initial branch push. Do not grant worker push or TODO authority implicitly.
+Direct user invocation authorizes TODO ownership. Setup commit and setup push
+belong to `triage`; do not grant worker push or TODO authority implicitly.
 
 ### Retire landed task
 
