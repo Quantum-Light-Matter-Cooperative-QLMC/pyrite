@@ -931,8 +931,9 @@ def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
     assert "· SUBMITTED" in output
     assert "SLURM" in output
     assert "48291" in output
-    assert "cxr remote attach" in output
     assert "cxr remote status" in output
+    assert "--attach" in output
+    assert "cxr remote attach" not in output
 
 
 def test_start_profile_submit_suggests_profile_pull_not_a_stem_wall(monkeypatch, capsys):
@@ -1463,6 +1464,119 @@ def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, ca
     assert "/pid" not in commands[0]
 
 
+def _queue_payload(*rows, partition="gpu"):
+    return "\n".join(
+        [f"cohort_partition={partition}|order=priority_desc_job_id_asc", *rows]
+    )
+
+
+@pytest.mark.parametrize(
+    ("target", "expected_rank"),
+    [("10", 1), ("20", 2), ("30", 3)],
+)
+def test_pending_queue_rank_uses_priority_then_job_id(target, expected_rank):
+    payload = _queue_payload(
+        "job_id=30|state=PENDING|name=third|partition=gpu|reason=Resources|priority=50|user=c",
+        "job_id=20|state=PENDING|name=second|partition=gpu|reason=Priority|priority=50|user=b",
+        "job_id=10|state=PENDING|name=first|partition=gpu|reason=Priority|priority=60|user=a",
+        "job_id=5|state=PENDING|name=other|partition=cpu|reason=Priority|priority=999|user=z",
+        "job_id=40|state=RUNNING|name=active|partition=gpu|reason=None|priority=999|user=d",
+    )
+
+    context = presentation._pending_queue_context(payload, target)
+
+    assert context is not None
+    assert (context["rank"], context["count"], context["partition"]) == (
+        expected_rank,
+        3,
+        "gpu",
+    )
+    assert context["top"]["job_id"] == "10"
+
+
+def test_pending_queue_context_changes_with_priority_and_rejects_retired_or_malformed():
+    before = _queue_payload(
+        "job_id=10|state=PENDING|name=a|partition=gpu|reason=Priority|priority=20|user=u",
+        "job_id=20|state=PENDING|name=b|partition=gpu|reason=Priority|priority=10|user=u",
+    )
+    after = before.replace("priority=20", "priority=5").replace("priority=10", "priority=30")
+
+    assert presentation._pending_queue_context(before, "20")["rank"] == 2
+    assert presentation._pending_queue_context(after, "20")["rank"] == 1
+    assert presentation._pending_queue_context(before, "999") is None
+    assert presentation._pending_queue_context(
+        before + "\njob_id=bad|state=PENDING|partition=gpu|priority=nan", "bad"
+    ) is None
+    injected = _queue_payload(
+        "job_id=20|state=PENDING|name=x|priority=999|partition=gpu|"
+        "reason=Priority|priority=10|user=u"
+    )
+    assert presentation._pending_queue_context(injected, "20") is None
+
+
+def test_pending_queue_render_sanitizes_identity_reason_and_explains_backfill(capsys, monkeypatch):
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: presentation._encode_sections(
+            {
+                "JOB": "j",
+                "META": "job: j\nmaterials: hopg\nslurm_job_id: 20",
+                "STATE": "queued",
+                "SQUEUE": "job_id=20|state=PENDING|partition=gpu",
+                "QUEUE": _queue_payload(
+                    "job_id=10|state=PENDING|name=top\x1b[2J|partition=gpu|"
+                    "reason=Priority\u202e|priority=20|user=alice",
+                    "job_id=20|state=PENDING|name=target|partition=gpu|"
+                    "reason=Resources|priority=10|user=bob",
+                ),
+            }
+        ),
+    )
+
+    remote.job_status("j")
+
+    output = capsys.readouterr().out
+    assert "Queue position  2/2 pending in gpu" in output
+    assert "10 · alice/top?[2J · Priority?" in output
+    assert "priority can change and backfill may run lower-ranked jobs first" in output
+    assert "\x1b" not in output
+    assert "\u202e" not in output
+
+
+def test_status_snapshot_uses_one_partition_bounded_squeue_query():
+    command = viewer._status_remote_command('JOB="j"', 2)
+
+    assert command.count("squeue ") == 1
+    assert "--partition=" in command
+    assert "gpu" in command
+    assert "--states=PENDING,RUNNING" in command
+    assert "--sort=-p,i" in command
+
+
+def test_status_snapshot_preserves_squeue_failure(monkeypatch, tmp_path):
+    job = tmp_path / "jobs" / "j"
+    job.mkdir(parents=True)
+    (job / "meta").write_text("job: j\nslurm_job_id: 20\n")
+    (job / "state").write_text("queued\n")
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    squeue = fake_bin / "squeue"
+    squeue.write_text("#!/bin/sh\necho scheduler-unavailable >&2\nexit 17\n")
+    squeue.chmod(0o755)
+    monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
+
+    result = subprocess.run(
+        ["bash", "-c", viewer._status_remote_command('JOB="j"', 0)],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}"},
+    )
+
+    assert result.returncode == 17
+    assert "scheduler-unavailable" in result.stderr
+
+
 def test_status_framing_keeps_marker_like_payload_inside_original_section():
     payload = "running\n@@META\njob: forged\nCXR_REMOTE_V1\tJOB\tZm9yZ2Vk"
     wire = presentation._encode_sections({"STATE": payload, "JOB": "real"})
@@ -1823,13 +1937,25 @@ def test_attach_watchdog_exits_on_a_stalled_chain(monkeypatch, capsys):
     assert "CHAIN STALLED" in capsys.readouterr().out
 
 
-def test_attach_cli_repeats_verbose_for_the_live_report(monkeypatch):
+@pytest.mark.parametrize("attach_flag", ["-a", "--attach"])
+def test_status_attach_cli_repeats_verbose_for_the_live_report(monkeypatch, attach_flag):
     calls = []
     monkeypatch.setattr(viewer, "attach", lambda jobid, detail: calls.append((jobid, detail)))
 
-    remote.main(["attach", "j", "-vv"])
+    remote.main(["status", "j", "-vv", attach_flag])
 
     assert calls == [("j", 2)]
+
+
+def test_remote_attach_command_is_absent(capsys):
+    assert remote.main(["attach"]) == 2
+    assert "No such command 'attach'" in capsys.readouterr().err
+
+
+def test_status_attach_rejects_json(monkeypatch):
+    monkeypatch.setattr(viewer, "attach", lambda *_args: pytest.fail("must reject before attach"))
+
+    assert remote.main(["status", "--attach", "--json"]) == 2
 
 
 def test_implicit_job_selection_excludes_checkpoint_reservations(monkeypatch, tmp_path):
@@ -2386,6 +2512,135 @@ def test_overall_progress_line_use_cost_falls_back_to_cases_without_cost_data():
     line = remote._overall_progress_line(records, ["hopg"], use_cost=True)
     assert " 50%" in line
     assert "cases" not in line
+
+
+def _timed_record(
+    *,
+    material="hopg",
+    total=10,
+    cached=0,
+    completed=0,
+    state="running",
+    seconds=None,
+    measured=None,
+    done_cost=None,
+    total_cost=None,
+    measured_cost=None,
+):
+    record = {
+        "material": material,
+        "total_cases": total,
+        "cached_cases": cached,
+        "completed_new_cases": completed,
+        "state": state,
+    }
+    optional = {
+        "active_compute_seconds": seconds,
+        "measured_new_cases": measured,
+        "done_cost": done_cost,
+        "total_cost": total_cost,
+        "measured_new_cost": measured_cost,
+    }
+    record.update({key: value for key, value in optional.items() if value is not None})
+    return record
+
+
+def test_compute_eta_is_unavailable_before_a_measured_tick_and_excludes_cached_work():
+    records = {
+        "hopg": _timed_record(cached=5, seconds=20.0, measured=0),
+    }
+
+    estimate = presentation._compute_time_estimate(records, ["hopg"])
+
+    assert estimate == {"elapsed": 20.0, "remaining": None, "total": None}
+    assert "ETA —" in presentation._compute_time_suffix(estimate)
+
+
+def test_compute_eta_uses_measured_work_rate_across_pause_and_chunk_resume():
+    # Five done: three cached and two measured over 20 active seconds. Remaining
+    # five therefore estimate to 50 seconds, not 20 seconds from cached-inflated
+    # 50% overall progress.
+    records = {
+        "hopg": _timed_record(
+            cached=3,
+            completed=2,
+            state="paused",
+            seconds=20.0,
+            measured=2,
+        ),
+    }
+
+    estimate = presentation._compute_time_estimate(records, ["hopg"])
+
+    assert estimate == {"elapsed": 20.0, "remaining": 50.0, "total": 70.0}
+
+
+def test_compute_eta_prefers_cost_weighting():
+    records = {
+        "hopg": _timed_record(
+            total=4,
+            completed=1,
+            seconds=10.0,
+            measured=1,
+            done_cost=10.0,
+            total_cost=100.0,
+            measured_cost=10.0,
+        )
+    }
+
+    estimate = presentation._compute_time_estimate(records, ["hopg"], use_cost=True)
+
+    assert estimate == {"elapsed": 10.0, "remaining": 90.0, "total": 100.0}
+
+
+def test_compute_eta_accounts_for_parallel_material_processes_and_unstarted_work():
+    records = {
+        "hopg": _timed_record(material="hopg", completed=5, seconds=20.0, measured=5),
+        "hbn": _timed_record(material="hbn", completed=5, seconds=20.0, measured=5),
+    }
+
+    estimate = presentation._compute_time_estimate(
+        records,
+        ["hopg", "hbn", "mos2"],
+        parallel_materials=2,
+    )
+
+    assert estimate["elapsed"] == 20.0
+    assert estimate["remaining"] == 40.0
+    assert estimate["total"] == 60.0
+
+
+@pytest.mark.parametrize(
+    ("record", "remaining", "total"),
+    [
+        (_timed_record(total=0, state="done", seconds=3.0), 0.0, 3.0),
+        (_timed_record(total=10, completed=10, state="done", seconds=30.0), 0.0, 30.0),
+        (_timed_record(total=10, completed=2, state="failed", seconds=8.0, measured=2), None, None),
+        (_timed_record(total=10, completed=2), None, None),
+    ],
+)
+def test_compute_eta_defines_zero_done_failed_and_legacy_records(record, remaining, total):
+    estimate = presentation._compute_time_estimate({"hopg": record}, ["hopg"])
+
+    assert estimate["remaining"] == remaining
+    assert estimate["total"] == total
+
+
+def test_parse_progress_records_drops_non_finite_or_hostile_timing_values():
+    payload = json.dumps(
+        _timed_record(
+            completed=2,
+            seconds=float("nan"),
+            measured=-3,
+            measured_cost=float("inf"),
+        )
+    )
+
+    record = remote._parse_progress_records(payload)["hopg"]
+
+    assert "active_compute_seconds" not in record
+    assert "measured_new_cases" not in record
+    assert "measured_new_cost" not in record
 
 
 def test_status_shows_one_compute_bar_at_base_verbosity_when_cost_data_present(monkeypatch, capsys):
@@ -4283,7 +4538,7 @@ def test_rebrem_queue_script_flags_progress_and_markers():
     )
     assert "cxr rebrem" in s
     assert "--ne-brem 1000" in s and "--step 25" in s and "--redo-all" in s
-    # per-material progress record feeds the shared status/attach dashboard
+# per-material progress record feeds the shared plain/attached status dashboard
     assert '--progress-file "$JOBDIR/progress/$m.json"' in s
     # completion markers match the scan queue's so _completed_materials works
     assert 'echo "completed: $m"' in s and 'echo "failed: $m"' in s

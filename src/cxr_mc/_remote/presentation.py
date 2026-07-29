@@ -23,7 +23,17 @@ _TQDM_FRAME_RE = re.compile(
 )
 _FRAME_PREFIX = "CXR_REMOTE_V1"
 _FRAME_SECTIONS = frozenset(
-    {"JOB", "META", "STATE", "SQUEUE", "PROGRESS", "PERFORMANCE", "RESOURCES", "LOG"}
+    {
+        "JOB",
+        "META",
+        "STATE",
+        "SQUEUE",
+        "QUEUE",
+        "PROGRESS",
+        "PERFORMANCE",
+        "RESOURCES",
+        "LOG",
+    }
 )
 
 
@@ -316,6 +326,88 @@ def _overall_progress_line(records, materials=(), *, use_cost=False, state_overr
     return f"{accent}  {percent:>3}%  {completed}/{job_total} cases"
 
 
+def _compute_time_estimate(records, materials=(), *, use_cost=False, parallel_materials=1):
+    """Aggregate additive process timing into stable job-wide compute estimates.
+
+    Work is normalized per material, so different case-grid sizes remain
+    comparable. Cached work reduces remaining work but never contributes to
+    measured throughput. Concurrent material-process seconds are converted to
+    approximate wall time using the configured parallelism.
+    """
+    roster = [material for material in materials if material and material != "-"]
+    ordered = roster or list(records)
+    if not ordered:
+        return {"elapsed": None, "remaining": None, "total": None}
+    try:
+        parallel = max(1, int(parallel_materials))
+    except (TypeError, ValueError):
+        parallel = 1
+    seconds = []
+    measured_fraction = 0.0
+    remaining_fraction = 0.0
+    failed = False
+    all_done = True
+    for material in ordered:
+        record = records.get(material)
+        if record is None:
+            remaining_fraction += 1.0
+            all_done = False
+            continue
+        failed = failed or record["state"] == "failed"
+        all_done = all_done and record["state"] == "done"
+        if use_cost:
+            done, total = _cost_progress(record)
+            measured = record.get("measured_new_cost")
+            if measured is None and "done_cost" not in record:
+                measured = record.get("measured_new_cases")
+        else:
+            done = float(record["cached_cases"] + record["completed_new_cases"])
+            total = float(record["total_cases"])
+            measured = record.get("measured_new_cases")
+        done_fraction = 1.0 if total == 0 else min(1.0, done / total)
+        remaining_fraction += 1.0 - done_fraction
+        if isinstance(measured, (int, float)) and not isinstance(measured, bool) and total > 0:
+            measured_fraction += min(done_fraction, float(measured) / total)
+        active = record.get("active_compute_seconds")
+        if isinstance(active, (int, float)) and not isinstance(active, bool):
+            seconds.append(float(active))
+    elapsed = max(max(seconds), sum(seconds) / parallel) if seconds else None
+    if elapsed is None:
+        return {"elapsed": None, "remaining": None, "total": None}
+    if all_done or remaining_fraction <= 0:
+        return {"elapsed": elapsed, "remaining": 0.0, "total": elapsed}
+    if failed or measured_fraction <= 0 or elapsed <= 0:
+        return {"elapsed": elapsed, "remaining": None, "total": None}
+    rate = measured_fraction / elapsed
+    remaining = remaining_fraction / rate
+    if not math.isfinite(remaining) or remaining < 0:
+        return {"elapsed": elapsed, "remaining": None, "total": None}
+    return {"elapsed": elapsed, "remaining": remaining, "total": elapsed + remaining}
+
+
+def _format_duration(seconds):
+    if seconds is None or not math.isfinite(seconds) or seconds < 0:
+        return "—"
+    rounded = int(round(seconds))
+    hours, remainder = divmod(rounded, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f"{hours}h {minutes:02d}m"
+    if minutes:
+        return f"{minutes}m {secs:02d}s"
+    return f"{secs}s"
+
+
+def _compute_time_suffix(estimate):
+    remaining = _format_duration(estimate["remaining"])
+    total = _format_duration(estimate["total"])
+    return (
+        f"elapsed {_format_duration(estimate['elapsed'])} · "
+        f"ETA {'~' + remaining if remaining != '—' else remaining} · "
+        f"est total {'~' + total if total != '—' else total}"
+    )
+
+
 def _format_now_testing(current):
     """Compact 'currently on this crystal case' clause -- energy, both tilts,
     thickness -- from a progress record's optional ``current`` snapshot. Returns
@@ -558,6 +650,78 @@ def _scheduler_fields(payload):
     return fields
 
 
+def _pending_queue_context(payload, target_job_id):
+    """Validated pending-priority snapshot for one partition cohort.
+
+    Wire format: one header declaring ``cohort_partition`` and deterministic
+    ``priority_desc_job_id_asc`` ordering, followed by scheduler rows. Rank is
+    recomputed here instead of trusting transport order. Missing/retired target
+    IDs and malformed rows produce no context rather than stale queue claims.
+    """
+    lines = payload.splitlines()
+    if not lines:
+        return None
+    def strict_fields(line):
+        fields = {}
+        for item in line.split("|"):
+            key, separator, value = item.partition("=")
+            key = _sanitize_terminal(key)
+            if not separator or not key or key in fields:
+                return None
+            fields[key] = _sanitize_terminal(value)
+        return fields
+
+    header = strict_fields(lines[0])
+    if header is None:
+        return None
+    partition = header.get("cohort_partition")
+    if (
+        not partition
+        or header.get("order") != "priority_desc_job_id_asc"
+        or not str(target_job_id).isdigit()
+    ):
+        return None
+    pending = []
+    for line in lines[1:]:
+        fields = strict_fields(line)
+        if fields is None:
+            continue
+        job_id = fields.get("job_id", "")
+        try:
+            priority = int(fields.get("priority", ""))
+        except ValueError:
+            continue
+        if (
+            not job_id.isdigit()
+            or fields.get("state", "").upper() != "PENDING"
+            or fields.get("partition") != partition
+            or priority < 0
+        ):
+            continue
+        pending.append(
+            {
+                "job_id": job_id,
+                "priority": priority,
+                "name": fields.get("name") or "-",
+                "user": fields.get("user") or "-",
+                "reason": fields.get("reason") or "-",
+            }
+        )
+    pending.sort(key=lambda item: (-int(item["priority"]), int(item["job_id"])))
+    target_index = next(
+        (index for index, item in enumerate(pending) if item["job_id"] == str(target_job_id)),
+        None,
+    )
+    if target_index is None or not pending:
+        return None
+    return {
+        "partition": partition,
+        "rank": target_index + 1,
+        "count": len(pending),
+        "top": pending[0],
+    }
+
+
 def _format_job_status(sections, detail):
     metadata = sections.get("META", "")
     fields = _metadata_fields(metadata)
@@ -583,6 +747,29 @@ def _format_job_status(sections, detail):
     rows = [
         ("State", display_state),
     ]
+    queue_context = (
+        _pending_queue_context(sections.get("QUEUE", ""), scheduler_id) if queued else None
+    )
+    if queue_context is not None:
+        top = queue_context["top"]
+        rows.extend(
+            [
+                (
+                    "Queue position",
+                    f"{queue_context['rank']}/{queue_context['count']} pending in "
+                    f"{queue_context['partition']}",
+                ),
+                (
+                    "Queue leader",
+                    f"{top['job_id']} · {top['user']}/{top['name']} · {top['reason']}",
+                ),
+                (
+                    "Queue note",
+                    "Priority snapshot; priority can change and backfill may run "
+                    "lower-ranked jobs first.",
+                ),
+            ]
+        )
     if diagnostic:
         slice_text = fields.get("slice_minutes", "-")
         try:
@@ -613,11 +800,17 @@ def _format_job_status(sections, detail):
         profile = _profile_summary(fields)
         if profile is not None:
             rows.append(("Profile", profile))
-        # Plain `attach`/`status` (detail 0) shows one bar -- compute-weighted
+        # Plain or attached `status` (detail 0) shows one bar -- compute-weighted
         # when the job's progress records carry cost data, else the legacy
         # case-count bar (unchanged for rebrem/reline/older jobs). -v/-vv show
         # both so a heavy-vs-cheap-case skew is visible alongside raw counts.
         if _has_cost_data(records):
+            timing = _compute_time_estimate(
+                records,
+                materials,
+                use_cost=True,
+                parallel_materials=fields.get("parallel_materials", 1),
+            )
             overall_compute = _overall_progress_line(
                 records, materials, use_cost=True, state_override=progress_state
             )
@@ -626,15 +819,22 @@ def _format_job_status(sections, detail):
             )
             if detail >= 1:
                 if overall_compute is not None:
-                    rows.append(("Progress (compute)", overall_compute))
+                    rows.append(
+                        ("Progress (compute)", f"{overall_compute}  ·  {_compute_time_suffix(timing)}")
+                    )
                 if overall_cases is not None:
                     rows.append(("Progress (cases)", overall_cases))
             elif overall_compute is not None:
-                rows.append(("Progress", overall_compute))
+                rows.append(("Progress", f"{overall_compute}  ·  {_compute_time_suffix(timing)}"))
         else:
+            timing = _compute_time_estimate(
+                records,
+                materials,
+                parallel_materials=fields.get("parallel_materials", 1),
+            )
             overall = _overall_progress_line(records, materials, state_override=progress_state)
             if overall is not None:
-                rows.append(("Progress", overall))
+                rows.append(("Progress", f"{overall}  ·  {_compute_time_suffix(timing)}"))
     output = [f"JOB {jobid}", _format_fields(rows)]
     if not diagnostic:
         progress = _format_case_progress(records, materials)
@@ -706,6 +906,7 @@ def _parse_progress_records(payload):
         if state not in {"running", "done", "failed", "paused"}:
             continue
         _sanitize_cost_fields(record)
+        _sanitize_timing_fields(record)
         records[material] = record
     return records
 
@@ -733,3 +934,25 @@ def _sanitize_cost_fields(record):
     if not valid:
         record.pop("total_cost", None)
         record.pop("done_cost", None)
+
+
+def _sanitize_timing_fields(record):
+    seconds = record.get("active_compute_seconds")
+    if not (
+        isinstance(seconds, (int, float))
+        and not isinstance(seconds, bool)
+        and math.isfinite(seconds)
+        and seconds >= 0
+    ):
+        record.pop("active_compute_seconds", None)
+    cases = record.get("measured_new_cases")
+    if not (isinstance(cases, int) and not isinstance(cases, bool) and cases >= 0):
+        record.pop("measured_new_cases", None)
+    cost = record.get("measured_new_cost")
+    if not (
+        isinstance(cost, (int, float))
+        and not isinstance(cost, bool)
+        and math.isfinite(cost)
+        and cost >= 0
+    ):
+        record.pop("measured_new_cost", None)

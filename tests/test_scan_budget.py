@@ -73,7 +73,7 @@ def test_scan_budget_writes_paused_progress_state(monkeypatch, tmp_path):
 def test_scan_progress_records_compute_cost_when_progress_file_given(monkeypatch, tmp_path):
     """item 6: _run_material wires sweep.case_cost through run_sweep's on_cost
     callback into the remote progress JSON's done_cost/total_cost fields, so
-    `cxr remote attach` can render a compute-weighted bar (presentation.py's
+`cxr remote status --attach` can render a compute-weighted bar (presentation.py's
     _overall_progress_line(..., use_cost=True))."""
 
     def _fake_run_sweep(*args, **kwargs):
@@ -118,6 +118,49 @@ def test_write_progress_record_omits_cost_fields_when_either_is_none(tmp_path):
     record = json.loads(path.read_text())
     assert "done_cost" not in record
     assert "total_cost" not in record
+
+
+def test_progress_timer_accumulates_active_time_and_work_across_chunk_resume(tmp_path):
+    path = tmp_path / "hopg.json"
+    clock = iter([100.0, 112.0])
+    first = scan._ProgressTimer(path, time_fn=lambda: next(clock))
+    first.start()
+    scan._write_progress_record(
+        path,
+        material="hopg",
+        total_cases=10,
+        cached_cases=0,
+        completed_new_cases=2,
+        state="paused",
+        **first.snapshot(completed_new_cases=2, computed_cost=5.0),
+    )
+
+    resumed_clock = iter([200.0, 208.0])
+    resumed = scan._ProgressTimer(path, time_fn=lambda: next(resumed_clock))
+    resumed.start()
+    timing = resumed.snapshot(completed_new_cases=1, computed_cost=2.0)
+
+    assert timing == {
+        "active_compute_seconds": 20.0,
+        "measured_new_cases": 3,
+        "measured_new_cost": 7.0,
+    }
+
+
+def test_progress_timer_ignores_legacy_or_invalid_prior_timing(tmp_path):
+    path = tmp_path / "hopg.json"
+    path.write_text(
+        '{"material":"hopg","active_compute_seconds":"old",'
+        '"measured_new_cases":-1,"measured_new_cost":NaN}'
+    )
+    clock = iter([10.0, 11.0])
+    timer = scan._ProgressTimer(path, time_fn=lambda: next(clock))
+    timer.start()
+
+    assert timer.snapshot(completed_new_cases=1) == {
+        "active_compute_seconds": 1.0,
+        "measured_new_cases": 1,
+    }
 
 
 def test_scan_no_max_minutes_passes_none_max_seconds(monkeypatch, tmp_path):

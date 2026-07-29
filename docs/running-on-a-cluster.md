@@ -121,9 +121,22 @@ cxr remote run standard -m hopg --dry-run
 `cxr remote run standard -m hopg` syncs, submits, follows the SLURM job, and
 pulls the checkpoint. Add `--headless` to return after submission.
 Use `--chunk-minutes 0 --parallel-materials 3` only for workloads measured to
-fit concurrently. Use `cxr remote status`, `cxr remote logs --follow`,
-or `cxr remote attach` to monitor the allocation. `attach` shows an independent
+fit concurrently. Use `cxr remote status`, `cxr remote logs --follow`, or
+`cxr remote status --attach` to monitor the allocation. Attached status shows an independent
 case-progress bar for each material; `logs --follow` shows the raw shared job log.
+While pending, status ranks the target among all pending jobs in the configured
+SLURM partition by scheduler priority (descending, then numeric job ID) and
+shows the current queue leader and reason. This is a consideration-order
+snapshot, not a start-time promise: priority can change and backfill can run a
+lower-ranked job first.
+
+Progress timing uses additive active worker-process seconds persisted in each
+atomic progress record. Cached cases reduce remaining work but do not inflate
+measured throughput; chunk queue time and pauses do not count as compute time.
+Elapsed compute is always shown when valid. ETA and estimated total remain `—`
+until at least one new unit of work supplies a finite rate. Cost-weighted work
+is preferred when available; parallel-material process seconds are folded back
+to approximate wall time using the submitted parallelism.
 
 Use `--perf` to enable resource sampling for the selected profile:
 
@@ -141,7 +154,7 @@ counters include CPU transport, spectrum, GPU feed-wait, checkpoint time, GPU
 OOM retries, and CuPy pool used/reserved/peak memory. These phase counters are
 enabled by `--perf`; `CXR_MC_TIMING` is not required. Logs go to
 `performance-profiles/NAME/<material>.ndjson`; remote logs appear beside case
-progress in `attach`. Fetch every remote job matching the catalog profile name
+progress in attached status. Fetch every remote job matching the catalog profile name
 with:
 
 ```bash
@@ -165,11 +178,11 @@ Nsight section for the exact command and interpretation limits.
 check` follows the same submit-and-wait workflow for its validation calculation;
 `cxr remote check --detached` returns after submission.
 
-With no job id, `cxr remote attach`/`logs`/`status` resolve to the most
+With no job id, `cxr remote status --attach`/`logs`/`status` resolve to the most
 recently active job. Profile submissions name their job after the profile
 (`sub_100keV`, then `sub_100keV-2` once the bare name is taken), so
 resubmitting a profile leaves the earlier, now-terminal jobs on the box.
-`attach` warns on stderr when it defaults to a job that is no longer running,
+`status --attach` warns on stderr when it defaults to a job that is no longer running,
 so a stale default never masks the live resubmission.
 
 `cxr remote prune-jobs` deletes terminal (done/failed/cancelled) job

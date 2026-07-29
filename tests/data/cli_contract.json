@@ -65,7 +65,6 @@
       "contract": "Human presentation sanitizes controls and machine framing uses versioned base64 fields.",
       "id": "remote-presentation-safety",
       "paths": [
-        "remote attach",
         "remote jobs",
         "remote status"
       ]
@@ -1403,33 +1402,10 @@
       },
       {
         "actions": [],
-        "help": "Usage: cxr remote [OPTIONS] COMMAND [ARGS]...\n\n  [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n  Host, remote directory, and executable come from CXR_REMOTE_HOST,\n  CXR_REMOTE_DIR, and CXR_REMOTE_UV. Command-line options take precedence over\n  workflow defaults where offered.\n\n  Examples:\n    cxr remote run sub_100keV --dry-run\n    cxr remote run compute_test_300keV -p\n    cxr remote run standard -m hopg\n    cxr remote status -vv\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  attach      Live-track a remote job; defaults to latest.\n  clear       Delete remote checkpoints; preview unless --yes.\n  jobs        List jobs with SLURM IDs, materials, and last events.\n  logs        Show a job diagnostic log; defaults to latest.\n  profile     Manage named compute-performance logs.\n  prune       Drop remote records obsolete under current scan profiles;...\n  prune-jobs  Delete terminal (done/failed/cancelled) job directories;...\n  pull        Fetch existing checkpoints from remote box.\n  reap        Release orphaned checkpoint reservations; preview unless --yes.\n  rebrem      Recompute brem-only remotely, follow, and pull completed...\n  reline      Recompute line-only remotely, follow, and pull completed...\n  run         Sync code, submit sweep(s), track progress, and pull...\n  status      Show one job; use -v for allocation and -vv for logs.\n  stop        cancel active SLURM job(s) by material, profile, or every...\n  sync        Push current code to remote box.\n  validate    Run Zhai reproduction remotely or pull existing caches.\n",
+        "help": "Usage: cxr remote [OPTIONS] COMMAND [ARGS]...\n\n  [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n  Host, remote directory, and executable come from CXR_REMOTE_HOST,\n  CXR_REMOTE_DIR, and CXR_REMOTE_UV. Command-line options take precedence over\n  workflow defaults where offered.\n\n  Examples:\n    cxr remote run sub_100keV --dry-run\n    cxr remote run compute_test_300keV -p\n    cxr remote run standard -m hopg\n    cxr remote status -vv\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  clear       Delete remote checkpoints; preview unless --yes.\n  jobs        List jobs with SLURM IDs, materials, and last events.\n  logs        Show a job diagnostic log; defaults to latest.\n  profile     Manage named compute-performance logs.\n  prune       Drop remote records obsolete under current scan profiles;...\n  prune-jobs  Delete terminal (done/failed/cancelled) job directories;...\n  pull        Fetch existing checkpoints from remote box.\n  reap        Release orphaned checkpoint reservations; preview unless --yes.\n  rebrem      Recompute brem-only remotely, follow, and pull completed...\n  reline      Recompute line-only remotely, follow, and pull completed...\n  run         Sync code, submit sweep(s), track progress, and pull...\n  status      Show one job; use -v for allocation and -vv for logs.\n  stop        cancel active SLURM job(s) by material, profile, or every...\n  sync        Push current code to remote box.\n  validate    Run Zhai reproduction remotely or pull existing caches.\n",
         "hidden": false,
         "path": "remote",
         "subcommands": [
-          {
-            "actions": [
-              {
-                "dest": "jobid",
-                "help": null,
-                "option_strings": [],
-                "required": false
-              },
-              {
-                "dest": "verbose",
-                "help": "Add allocation detail; repeat for recent logs.",
-                "option_strings": [
-                  "-v",
-                  "--verbose"
-                ],
-                "required": false
-              }
-            ],
-            "help": "Usage: cxr remote attach [OPTIONS] [JOBID]\n\n  Live-track a remote job; defaults to latest.\n\nOptions:\n  -v, --verbose  Add allocation detail; repeat for recent logs.\n  -h, --help     Show this message and exit.\n",
-            "hidden": false,
-            "path": "remote attach",
-            "subcommands": []
-          },
           {
             "actions": [
               {
@@ -2197,6 +2173,15 @@
                 "required": false
               },
               {
+                "dest": "attach",
+                "help": "Continuously monitor the dashboard until interrupted; Ctrl-C detaches viewer only.",
+                "option_strings": [
+                  "-a",
+                  "--attach"
+                ],
+                "required": false
+              },
+              {
                 "dest": "json_output",
                 "help": "Emit one versioned JSON object.",
                 "option_strings": [
@@ -2205,7 +2190,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote status [OPTIONS] [JOBID]\n\n  Show one job; use -v for allocation and -vv for logs.\n\nOptions:\n  -v, --verbose  Add allocation detail; repeat for case progress and recent\n                 logs.\n  --json         Emit one versioned JSON object.\n  -h, --help     Show this message and exit.\n",
+            "help": "Usage: cxr remote status [OPTIONS] [JOBID]\n\n  Show one job; use -v for allocation and -vv for logs.\n\n  By default prints one snapshot and exits. Use -a/--attach to continuously\n  monitor the same dashboard, reconnecting until the job is terminal; Ctrl-C\n  detaches the viewer only and the job keeps running.\n\nOptions:\n  -v, --verbose  Add allocation detail; repeat for case progress and recent\n                 logs.\n  -a, --attach   Continuously monitor the dashboard until interrupted; Ctrl-C\n                 detaches viewer only.\n  --json         Emit one versioned JSON object.\n  -h, --help     Show this message and exit.\n",
             "hidden": false,
             "path": "remote status",
             "subcommands": []

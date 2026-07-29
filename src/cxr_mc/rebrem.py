@@ -109,23 +109,45 @@ def rebrem_checkpoints(
                     resolved_step = profile_step
         kw = {}
         if progress_file is not None:
-            from .scan import _write_progress_record
+            from .scan import _ProgressTimer, _write_progress_record
 
             latest = {"total_cases": 0, "cached_cases": 0, "completed_new_cases": 0}
+            progress_timer = _ProgressTimer(progress_file)
 
-            def _on_progress(done, todo_total, skipped, _latest=latest, _stem=stem):
+            def _on_progress(
+                done,
+                todo_total,
+                skipped,
+                _latest=latest,
+                _stem=stem,
+                _timer=progress_timer,
+            ):
                 _latest.update(
                     total_cases=todo_total + skipped,
                     cached_cases=skipped,
                     completed_new_cases=done,
                 )
-                _write_progress_record(progress_file, material=_stem, state="running", **_latest)
+                _write_progress_record(
+                    progress_file,
+                    material=_stem,
+                    state="running",
+                    **_latest,
+                    **_timer.snapshot(completed_new_cases=done),
+                )
 
             kw["on_progress"] = _on_progress
-            _write_progress_record(progress_file, material=stem, state="running", **latest)
+            _write_progress_record(
+                progress_file,
+                material=stem,
+                state="running",
+                **latest,
+                **progress_timer.snapshot(),
+            )
         max_seconds = None if deadline is None else max(0.0, deadline - time.monotonic())
         status = {}
         try:
+            if progress_file is not None:
+                progress_timer.start()
             out[stem] = repair_checkpoint(
                 path,
                 save_every=save_every,
@@ -143,13 +165,27 @@ def rebrem_checkpoints(
             status["complete"] = False
             status["error"] = str(exc) or type(exc).__name__
             if progress_file is not None:
-                _write_progress_record(progress_file, material=stem, state="failed", **latest)
+                _write_progress_record(
+                    progress_file,
+                    material=stem,
+                    state="failed",
+                    **latest,
+                    **progress_timer.snapshot(
+                        completed_new_cases=latest["completed_new_cases"]
+                    ),
+                )
             raise
         finally:
             if summary_status is not None:
                 summary_status[stem] = dict(status)
         if progress_file is not None:
-            _write_progress_record(progress_file, material=stem, state="done", **latest)
+            _write_progress_record(
+                progress_file,
+                material=stem,
+                state="done" if status.get("complete", True) else "paused",
+                **latest,
+                **progress_timer.snapshot(completed_new_cases=latest["completed_new_cases"]),
+            )
         if not status.get("complete", True):
             incomplete = True
     if incomplete:

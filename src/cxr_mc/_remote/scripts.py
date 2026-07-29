@@ -560,7 +560,7 @@ def _rebrem_queue_metadata(
     brem_stop_eV=None,
 ):
     """Static metadata persisted before a rebrem queue is submitted. ``kind:
-    rebrem`` keys the Mode line in status/attach; ``materials``/``quick`` keep
+rebrem`` keys the Mode line in plain/attached status; ``materials``/``quick`` keep
     the shared _live_jobs/_refuse_if_busy/jobs-listing plumbing working."""
     return "\n".join(
         [

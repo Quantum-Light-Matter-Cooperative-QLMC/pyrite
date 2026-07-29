@@ -74,7 +74,7 @@ INTENTIONAL_P0_CORRECTIONS = [
     },
     {
         "id": "remote-presentation-safety",
-        "paths": ["remote attach", "remote jobs", "remote status"],
+        "paths": ["remote jobs", "remote status"],
         "contract": (
             "Human presentation sanitizes controls and machine framing uses versioned base64 fields."
         ),

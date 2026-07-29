@@ -84,7 +84,7 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 - **`cxr app validation`** → `check:_cli`: launch validation app; `cxr app validation export`
   writes cached literature-validation figures.
 - **`cxr remote ...`** → `remote:*`: optional SSH/SLURM lifecycle for lab GPU
-  box: run, attach/status/logs, pull, stop, validation jobs. Canonical
+  box: run, status [--attach], logs, pull, stop, validation jobs. Canonical
   submission and validation paths are `remote run` and `remote validate`;
   `remote prune` applies profile-aware checkpoint pruning under remote stem
   reservations; `check` remains a hidden alias.
@@ -450,8 +450,8 @@ and clear, remote validation jobs.
     discovery joins metadata against one scheduler snapshot.
   - `lifecycle.py` — submit/stage/stop/clear/pull job lifecycle; checkpoint pulls
     slim, stream, and clean up through one SSH session per stem.
-  - `viewer.py` — live attach/status/logs rendering; attach reuses one framed
-    SSH stream across refreshes.
+  - `viewer.py` — one-shot/attached status and logs rendering; attached status
+    reuses one framed SSH stream across refreshes.
   - `cli.py` — argparse wiring and subcommand dispatch.
   Names re-export as import-time snapshots; internal cross-module calls resolve
   through the owning submodule, so tests patch the owner (e.g.

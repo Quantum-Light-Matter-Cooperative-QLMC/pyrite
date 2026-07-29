@@ -333,10 +333,6 @@ def _cli_start(args):
         )
 
 
-def _cli_attach(args):
-    viewer.attach(args.jobid, args.verbose)
-
-
 def _cli_jobs(args):
     if not args.json_output:
         viewer.list_jobs()
@@ -349,6 +345,12 @@ def _cli_jobs(args):
 
 
 def _cli_status(args):
+    if getattr(args, "attach", False):
+        # Continuous, reconnecting monitor: the same acquisition/render path as
+        # the one-shot snapshot, repainted in place until the job is terminal or
+        # the viewer is interrupted (viewer-only disconnect; job keeps running).
+        viewer.attach(args.jobid, args.verbose)
+        return
     if not args.json_output:
         viewer.job_status(args.jobid, args.verbose)
         return
@@ -856,30 +858,21 @@ def start_command(
 command.add_command(start_command)
 
 
-@command.command("attach", help="Live-track a remote job; defaults to latest.")
-@click.argument(
-    "jobid",
-    required=False,
-    metavar="[JOBID]",
-    shell_complete=_cli_completion.complete_job_id,
-)
-@click.option(
-    "-v",
-    "--verbose",
-    count=True,
-    help="Add allocation detail; repeat for recent logs.",
-)
-def attach_command(jobid, verbose):
-    return _invoke_click(_cli_attach, _click_args("attach", jobid=jobid, verbose=verbose))
-
-
 @command.command("jobs", help="List jobs with SLURM IDs, materials, and last events.")
 @click.option("--json", "json_output", is_flag=True, help="Emit one versioned JSON object.")
 def jobs_command(json_output):
     return _invoke_click(_cli_jobs, _click_args("jobs", json_output=json_output))
 
 
-@command.command("status", help="Show one job; use -v for allocation and -vv for logs.")
+@command.command(
+    "status",
+    help=(
+        "Show one job; use -v for allocation and -vv for logs.\n\n"
+        "By default prints one snapshot and exits. Use -a/--attach to "
+        "continuously monitor the same dashboard, reconnecting until the job is "
+        "terminal; Ctrl-C detaches the viewer only and the job keeps running."
+    ),
+)
 @click.argument(
     "jobid",
     required=False,
@@ -892,11 +885,21 @@ def jobs_command(json_output):
     count=True,
     help="Add allocation detail; repeat for case progress and recent logs.",
 )
+@click.option(
+    "-a",
+    "--attach",
+    is_flag=True,
+    help="Continuously monitor the dashboard until interrupted; Ctrl-C detaches viewer only.",
+)
 @click.option("--json", "json_output", is_flag=True, help="Emit one versioned JSON object.")
-def status_command(jobid, verbose, json_output):
+def status_command(jobid, verbose, attach, json_output):
+    if attach and json_output:
+        raise click.UsageError("--attach streams a live dashboard and cannot be combined with --json")
     return _invoke_click(
         _cli_status,
-        _click_args("status", jobid=jobid, verbose=verbose, json_output=json_output),
+        _click_args(
+            "status", jobid=jobid, verbose=verbose, attach=attach, json_output=json_output
+        ),
     )
 
 
