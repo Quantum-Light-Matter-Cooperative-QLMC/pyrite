@@ -86,9 +86,15 @@ same percentage can reduce throughput or OOM margin.
 - Candidate must show a repeatable end-to-end improvement on the matched
   workload; report regressions or neutral results rather than generalizing.
 
-## Recovered experiment evidence
+## Historical experiment artifacts
 
 Artifacts remain unchanged under `scratch-perf/artifacts/compute_test_300keV*`.
+They predate the current branch candidate and were copied from completed remote
+job directories for offline diagnosis. They are outdated: do not use them as
+the current baseline, candidate acceptance evidence, or a source of current
+throughput claims. Their only present use is identifying the repeated-OOM
+fallback hypothesis that fresh matched runs must test.
+
 Every full session used MoS2, full fidelity, parameter SHA
 `bb0c36a6693522f15682f6b0ab6f7ac360b69a451345a18aa55e47bdc2df7986`,
 18 uncached cases, one GPU process, and requested/effective six-worker
@@ -98,16 +104,17 @@ telemetry.
 
 | Line chunk | Successful runs | Wall seconds | OOM retries/run | Result |
 | ---: | ---: | --- | ---: | --- |
-| 20,000 | 3/3 | 94.313, 94.324, 94.789 | 0 | Stable candidate |
+| 20,000 | 3/3 | 94.313, 94.324, 94.789 | 0 | Historical zero-OOM cohort |
 | 25,000 | 3/3 | 233.566, 233.687, 233.823 | 11 | Stable completion after repeated fallback |
 | 22,000 | 1/1 | 234.757 | 11 | Same repeated-fallback regime |
 | 30,000 | 0/1 | failed at 11/18 after 100.728 | 1 recorded | Not viable |
 
-The 20,000 cohort averaged 94.475 seconds (SD 0.272, CV 0.29%) versus
+Historically, the 20,000 cohort averaged 94.475 seconds (SD 0.272, CV 0.29%) versus
 233.692 seconds (SD 0.129, CV 0.055%) at 25,000: 2.474x throughput, or 59.6%
 lower wall time. It had zero swap growth, 10.59-12.07 GiB peak VRAM, and
 4.65-4.81 GiB peak process-tree RSS. The 25,000 cohort peaked at 13.80 GiB
-VRAM. Its 11 caught OOMs per repetition account for the lost work.
+VRAM. Its 11 caught OOMs per repetition motivate, but do not validate, the
+current adaptive candidate.
 
 Checkpointing was only 0.284-0.305 seconds per successful run (0.13-0.30% of
 wall). Driver GPU-feed wait was 0.53-1.49%. Neither checkpoint write
@@ -119,7 +126,7 @@ and one `cuModuleGetLoadingMode` call. The two associated telemetry sessions
 stop after about 2.5 seconds with zero completed cases. They support no
 kernel-fragmentation or synchronization conclusion.
 
-## Implemented local candidate
+## Provisional local candidate
 
 - `002b8e8` carries a successful line-OOM fallback forward as a non-increasing,
   run-local line-chunk cap. Original cases, order, results, and brem chunks stay
@@ -150,7 +157,8 @@ user's long job; no sync, submit, stage, pull, stop, or clear action was taken.
 When authorized and capacity is free, run three uncached default-chunk
 repetitions from this branch against a fresh matched control, require zero
 uncaught OOM/swap growth, verify resumable checkpoints, and compare wall/cost
-rate beyond the recovered 0.29% candidate spread.
+rate using the fresh control/candidate spread. The historical 0.29% spread is
+not an acceptance threshold.
 
 ## Non-goals
 
