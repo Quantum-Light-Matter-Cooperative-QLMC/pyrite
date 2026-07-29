@@ -1,4 +1,4 @@
-"""``cxr viewer`` -- launch the marimo 3D visualization app (``notebooks/trace_app.py``)
+"""``cxr app viewer`` -- launch the marimo 3D visualization app (``notebooks/trace_app.py``)
 with a chosen initial material.
 
 Marimo apps in this environment can't be driven live (no browser/kernel access;
@@ -18,13 +18,13 @@ mechanism) AND a ``CXR_VIEWER_INITIAL`` environment variable set on the
 subprocess, as a belt-and-suspenders fallback. :func:`initial_material` checks
 both.
 
-    cxr viewer                    # persisted default (fallback hopg)
-    cxr viewer wse2               # transient: this run only, doesn't persist
-    cxr viewer -d wse2            # persist wse2 as the new default, and launch it
-    cxr viewer --watch            # add marimo's --watch (combinable with either)
-    cxr viewer --smoke            # execute the app once without a browser
-    cxr viewer --edit             # `marimo edit` instead of `marimo run`
-    cxr viewer --no-token         # pass marimo's --no-token (disable auth token)
+    cxr app viewer                    # persisted default (fallback hopg)
+    cxr app viewer wse2               # transient: this run only, doesn't persist
+    cxr app viewer -d wse2            # persist wse2 as the new default, and launch it
+    cxr app viewer --watch            # add marimo's --watch (combinable with either)
+    cxr app viewer --smoke            # execute the app once without a browser
+    cxr app viewer --edit             # `marimo edit` instead of `marimo run`
+    cxr app viewer --no-token         # pass marimo's --no-token (disable auth token)
 """
 
 import os
@@ -118,6 +118,15 @@ def _smoke_command(material, output):
     ]
 
 
+def _export(stem: str | None, material: str | None) -> None:
+    """Export viewer HTML without starting a marimo server or browser."""
+    resolved = material or get_default_material() or "hopg"
+    stem = stem or f"cxr_viewer_{resolved}"
+    output = Path("results") / f"{stem}.html"
+    click.echo(f"exporting {NOTEBOOK} -> {output}")
+    subprocess.run(_smoke_command(resolved, output), check=True)
+
+
 def _launch(
     material, *, edit=False, watch=False, smoke=False, acp=False, tunnel=False, no_token=False
 ):
@@ -142,7 +151,7 @@ def _launch(
 
 def _cli(args):
     if args.default and args.material is None:
-        raise SystemExit("cxr viewer -d/--default: no material given to persist")
+        raise SystemExit("cxr app viewer -d/--default: no material given to persist")
 
     if args.default:
         set_default_material(args.material)
@@ -202,6 +211,18 @@ def command(material, persist_default, watch, smoke, edit, acp, tunnel, no_token
         tunnel=tunnel,
         no_token=no_token,
     )
+
+
+@click.command("export", help="Render the viewer as static HTML without starting marimo.")
+@click.argument(
+    "material",
+    required=False,
+    type=_cli_completion.MATERIAL,
+    shell_complete=_cli_completion.complete_material,
+)
+@click.option("--stem", help="Output stem under results/ (without .html).")
+def export_command(material, stem):
+    _export(stem, material)
 
 
 def main(argv=None):

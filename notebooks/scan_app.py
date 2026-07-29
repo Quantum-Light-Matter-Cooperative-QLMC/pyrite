@@ -297,7 +297,7 @@ def _(
                 mo,
                 "Checkpoint already complete",
                 f"All requested cases already exist in `{checkpoint_path}`.",
-                f"cxr analyze {MATERIAL}",
+                f"cxr app analysis {MATERIAL}",
             )
         else:
             output = mo.callout(f"Scan failed while reading checkpoint: `{error}`", kind="danger")
@@ -319,7 +319,7 @@ def _(
                     mo,
                     "Scan complete",
                     f"Results saved at `{checkpoint_path}`. Checkpoint remains resumable.",
-                    f"cxr analyze {MATERIAL}",
+                    f"cxr app analysis {MATERIAL}",
                     kind="success",
                 ),
             ]

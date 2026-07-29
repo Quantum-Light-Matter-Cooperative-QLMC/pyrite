@@ -1,4 +1,4 @@
-"""``cxr analyze`` -- launch the marimo analysis app (``notebooks/analysis_app.py``)
+"""``cxr app analysis`` -- launch the marimo analysis app (``notebooks/analysis_app.py``)
 with a chosen initial material.
 
 Marimo apps in this environment can't be driven live (no browser/kernel access;
@@ -18,13 +18,13 @@ mechanism) AND a ``CXR_ANALYZE_INITIAL`` environment variable set on the
 subprocess, as a belt-and-suspenders fallback. :func:`initial_material` checks
 both.
 
-    cxr analyze                    # persisted default (fallback hopg)
-    cxr analyze wse2               # transient: this run only, doesn't persist
-    cxr analyze -d wse2            # persist wse2 as the new default, and launch it
-    cxr analyze --watch            # add marimo's --watch (combinable with either)
-    cxr analyze --smoke            # execute the app once without a browser
-    cxr analyze --edit             # `marimo edit` instead of `marimo run`
-    cxr analyze --no-token         # pass marimo's --no-token (disable auth token)
+    cxr app analysis                    # persisted default (fallback hopg)
+    cxr app analysis wse2               # transient: this run only, doesn't persist
+    cxr app analysis -d wse2            # persist wse2 as the new default, and launch it
+    cxr app analysis --watch            # add marimo's --watch (combinable with either)
+    cxr app analysis --smoke            # execute the app once without a browser
+    cxr app analysis --edit             # `marimo edit` instead of `marimo run`
+    cxr app analysis --no-token         # pass marimo's --no-token (disable auth token)
 """
 
 import gzip
@@ -281,7 +281,7 @@ def _launch(
 
 def _cli(args):
     if args.default and args.material is None:
-        raise SystemExit("cxr analyze -d/--default: no material given to persist")
+        raise SystemExit("cxr app analysis -d/--default: no material given to persist")
 
     if args.default:
         set_default_material(args.material)

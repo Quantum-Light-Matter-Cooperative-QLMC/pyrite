@@ -251,8 +251,8 @@ def _cli_scan(args):
     )
     for stem in stems:
         print(
-            f"\ndone. checkpoints/{stem}/ is local; run `cxr analyze {stem}` "
-            f"(or run `cxr export`) -- visualization and static-HTML export "
+            f"\ndone. checkpoints/{stem}/ is local; run `cxr app analysis {stem}` "
+            f"(or run `cxr app analysis export`) -- visualization and static-HTML export "
             "stay local."
         )
 
@@ -435,8 +435,8 @@ def _cli_start(args):
     )
     for stem in stems:
         print(
-            f"\ndone. checkpoints/{stem}/ is local; run `cxr analyze {stem}` "
-            f"(or run `cxr export`) -- visualization and static-HTML export "
+            f"\ndone. checkpoints/{stem}/ is local; run `cxr app analysis {stem}` "
+            f"(or run `cxr app analysis export`) -- visualization and static-HTML export "
             "stay local."
         )
 

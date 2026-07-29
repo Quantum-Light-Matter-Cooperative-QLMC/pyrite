@@ -3,7 +3,7 @@ shelf for checkpoints (checkpoint lifecycle, component 2).
 
 The GPU box is scratch compute; the laptop is the durable store. A grid-filtered
 pull lands in the ACTIVE slot ``checkpoints/<stem>.pkl`` (exactly what
-``cxr analyze`` loads). These commands add a two-tier model on top of that:
+``cxr app analysis`` loads). These commands add a two-tier model on top of that:
 
     checkpoints/<stem>.pkl            active slot (viz loads this)
     checkpoints/archive/<label>.pkl   long-term shelf (named snapshots you keep)

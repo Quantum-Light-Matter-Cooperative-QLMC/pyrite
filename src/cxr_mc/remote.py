@@ -53,7 +53,7 @@ finishes. To DISCONNECT, just Ctrl-C (or close the terminal / drop the link) --
 that tears down the viewer only, and the job runs to completion. Reconnect any
 time with `attach`/`status`/`logs`, then `pull` once state is `done`.
 
-Then locally: run ``cxr analyze <material>`` or ``cxr export [stem]``.
+Then locally: run ``cxr app analysis <material>`` or ``cxr app analysis export [stem]``.
 
 Transport is ssh/scp only (uses the 'qlmc' host in ~/.ssh/config, cloudflared
 ProxyCommand and all) -- no rsync dependency, so it works from Windows Git Bash.

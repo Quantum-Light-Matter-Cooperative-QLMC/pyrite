@@ -52,7 +52,7 @@ def test_root_help_prefers_grouped_checkpoint_commands(capsys):
         if line.startswith("  ") and line.strip() and not line.lstrip().startswith("-")
     }
     assert "checkpoint" in command_lines
-    assert {"material", "validate"}.issubset(command_lines)
+    assert {"app", "material"}.issubset(command_lines)
     assert command_lines.isdisjoint(
         {
             "slim",
