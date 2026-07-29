@@ -507,6 +507,14 @@ def _cli_prune(args):
     )
 
 
+def _cli_prune_jobs(args):
+    lifecycle.prune_job_dirs(
+        profile=args.catalog_profile,
+        all_jobs=args.all_jobs,
+        yes=args.yes,
+    )
+
+
 def _cli_sync(args):
     transport.sync_code()
 
@@ -1364,6 +1372,37 @@ def prune_command(all_profiles, catalog_profile, yes):
         _click_args(
             "prune",
             all_profiles=all_profiles,
+            catalog_profile=catalog_profile,
+            yes=yes,
+        ),
+    )
+
+
+@command.command(
+    "prune-jobs",
+    help=(
+        "Delete terminal (done/failed/cancelled) job directories; preview "
+        "unless --yes. Live jobs are always kept."
+    ),
+)
+@click.option("--all", "all_jobs", is_flag=True, help="Prune every terminal job directory.")
+@click.option(
+    "--profile",
+    "catalog_profile",
+    default=None,
+    metavar="NAME",
+    shell_complete=_cli_completion.complete_profile,
+    help="Prune the NAME / NAME-N job-directory family only.",
+)
+@click.option("--yes", is_flag=True, help="Delete exact previewed directories.")
+def prune_jobs_command(all_jobs, catalog_profile, yes):
+    if all_jobs == (catalog_profile is not None):
+        raise click.UsageError("prune-jobs needs exactly one of --profile NAME or --all")
+    return _invoke_click(
+        _cli_prune_jobs,
+        _click_args(
+            "prune-jobs",
+            all_jobs=all_jobs,
             catalog_profile=catalog_profile,
             yes=yes,
         ),

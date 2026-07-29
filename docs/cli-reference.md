@@ -487,23 +487,24 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  attach    Live-track a remote job; defaults to latest.
-  clear     Delete remote checkpoints; preview unless --yes.
-  jobs      List jobs with SLURM IDs, materials, and last events.
-  logs      Show a job diagnostic log; defaults to latest.
-  profile   Manage named compute-performance logs.
-  prune     Drop remote records obsolete under current scan profiles; preview...
-  pull      Fetch existing checkpoints from remote box.
-  reap      Release orphaned checkpoint reservations; preview unless --yes.
-  rebrem    Recompute brem-only remotely, follow, and pull completed checkpoints.
-  reline    Recompute line-only remotely, follow, and pull completed checkpoints.
-  scan      Deprecated alias for `cxr remote submit`. (DEPRECATED: Use 'cxr remote
-            submit'.)
-  status    Show one job; use -v for allocation and -vv for logs.
-  stop      cancel active SLURM job(s) by material, profile, or every live job.
-  submit    Sync code, submit sweep(s), track progress, and pull checkpoints.
-  sync      Push current code to remote box.
-  validate  Run Zhai reproduction remotely or pull existing caches.
+  attach      Live-track a remote job; defaults to latest.
+  clear       Delete remote checkpoints; preview unless --yes.
+  jobs        List jobs with SLURM IDs, materials, and last events.
+  logs        Show a job diagnostic log; defaults to latest.
+  profile     Manage named compute-performance logs.
+  prune       Drop remote records obsolete under current scan profiles; preview...
+  prune-jobs  Delete terminal (done/failed/cancelled) job directories; preview...
+  pull        Fetch existing checkpoints from remote box.
+  reap        Release orphaned checkpoint reservations; preview unless --yes.
+  rebrem      Recompute brem-only remotely, follow, and pull completed checkpoints.
+  reline      Recompute line-only remotely, follow, and pull completed checkpoints.
+  scan        Deprecated alias for `cxr remote submit`. (DEPRECATED: Use 'cxr remote
+              submit'.)
+  status      Show one job; use -v for allocation and -vv for logs.
+  stop        cancel active SLURM job(s) by material, profile, or every live job.
+  submit      Sync code, submit sweep(s), track progress, and pull checkpoints.
+  sync        Push current code to remote box.
+  validate    Run Zhai reproduction remotely or pull existing caches.
 ```
 
 ## `cxr remote attach`
@@ -595,6 +596,21 @@ Options:
                   profile.
   --profile NAME  Prune current full and survey checkpoints for catalog profile NAME.
   --yes           Delete exact previewed stale records.
+  -h, --help      Show this message and exit.
+```
+
+## `cxr remote prune-jobs`
+
+```text
+Usage: cxr remote prune-jobs [OPTIONS]
+
+  Delete terminal (done/failed/cancelled) job directories; preview unless --yes. Live
+  jobs are always kept.
+
+Options:
+  --all           Prune every terminal job directory.
+  --profile NAME  Prune the NAME / NAME-N job-directory family only.
+  --yes           Delete exact previewed directories.
   -h, --help      Show this message and exit.
 ```
 

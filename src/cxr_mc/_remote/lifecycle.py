@@ -241,6 +241,48 @@ def prune_remote(
         print(output)
 
 
+def prune_job_dirs(*, profile=None, all_jobs=False, yes=False):
+    """Delete terminal (done/FAILED/cancelled) job directories on the box.
+
+    Preview unless ``yes``. Selection is exactly one of ``profile`` (its
+    ``NAME``/``NAME-N`` family) or ``all_jobs`` (every job directory). A live
+    chain is never removed -- the remote command skips any directory whose
+    latest recorded SLURM id is still in squeue -- so this is safe to run while
+    other jobs (including a fresh submission of the same profile) are live.
+    """
+    if all_jobs == (profile is not None):
+        raise SystemExit("prune-jobs needs exactly one of --profile NAME or --all")
+    if profile is not None:
+        transport._check_shell_tokens([profile])
+    records = [
+        line.split("\t")
+        for line in transport._ssh_capture(
+            scripts._prune_job_dirs_command(profile=profile, all_jobs=all_jobs, yes=yes)
+        ).splitlines()
+        if "\t" in line
+    ]
+    scope = f"profile {profile!r}" if profile is not None else "all profiles"
+    live_kept = sorted(r[1] for r in records if r[0] == "KEPT" and r[2] == "live")
+    if yes:
+        pruned = [r[1] for r in records if r[0] == "PRUNED"]
+        if pruned:
+            print("pruned job directories on the box:")
+            for jid in pruned:
+                print(f"  jobs/{jid}")
+        else:
+            print(f"(no terminal job directories to prune for {scope})")
+    else:
+        candidates = [(r[1], r[2]) for r in records if r[0] == "WOULD-PRUNE"]
+        if candidates:
+            print("would delete on the box (re-run with --yes to delete):")
+            for jid, st in candidates:
+                print(f"  jobs/{jid}  [{st}]")
+        else:
+            print(f"(no terminal job directories to prune for {scope})")
+    if live_kept:
+        print(f"kept {len(live_kept)} live job(s): {', '.join(live_kept)}")
+
+
 def _refuse_if_profile_live(catalog_profile):
     """Refuse a second live job under one catalog profile.
 
@@ -509,7 +551,7 @@ def pull_performance_profile(profile: str) -> list[Path]:
         '[ -d "$JOBS" ] || exit 0; '
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
         f'p="$d/performance/{profile}"; [ -d "$p" ] || continue; '
-        'find "$p" -maxdepth 1 -type f -name \'*.ndjson\' '
+        "find \"$p\" -maxdepth 1 -type f -name '*.ndjson' "
         "-printf '%f\\n' | while IFS= read -r f; do "
         'printf "%s\\t%s\\n" "$(basename "$d")" "$f"; done; done'
     )
@@ -517,9 +559,7 @@ def pull_performance_profile(profile: str) -> list[Path]:
     for line in listing.splitlines():
         jobid, separator, filename = line.partition("\t")
         material, suffix = (
-            (filename[: -len(".ndjson")], ".ndjson")
-            if filename.endswith(".ndjson")
-            else ("", "")
+            (filename[: -len(".ndjson")], ".ndjson") if filename.endswith(".ndjson") else ("", "")
         )
         if (
             not separator

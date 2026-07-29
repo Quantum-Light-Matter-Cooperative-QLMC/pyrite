@@ -21,6 +21,13 @@ def _completed_materials(jobid, materials):
     return [material for material in materials if material in completed]
 
 
+def _job_state(jobid):
+    """First line of a job's persisted ``state`` file, or '' when absent (one ssh)."""
+    transport._check_shell_tokens([jobid])
+    jobdir = config.shell_remote_path(config.JOBS_SUBDIR, jobid)
+    return transport._ssh_capture(f'D={jobdir}; head -n1 "$D/state" 2>/dev/null').strip()
+
+
 def _live_jobs():
     """[(jobid, quick, [materials])] for jobs still reported by SLURM.
 

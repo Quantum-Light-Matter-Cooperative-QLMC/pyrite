@@ -160,3 +160,21 @@ design controlled tuning runs.
 `cxr remote stop ...` cancels an active allocation with `scancel`. `cxr remote
 check` follows the same submit-and-wait workflow for its validation calculation;
 `cxr remote check --detached` returns after submission.
+
+With no job id, `cxr remote attach`/`logs`/`status` resolve to the most
+recently active job. Profile submissions name their job after the profile
+(`sub_100keV`, then `sub_100keV-2` once the bare name is taken), so
+resubmitting a profile leaves the earlier, now-terminal jobs on the box.
+`attach` warns on stderr when it defaults to a job that is no longer running,
+so a stale default never masks the live resubmission.
+
+`cxr remote prune-jobs` deletes terminal (done/failed/cancelled) job
+directories, previewing exact targets unless `--yes`. Scope it to one profile
+family with `--profile NAME` or sweep every profile with `--all`. A live chain
+is never removed, so it is safe to prune old runs of a profile while a fresh
+submission of the same profile is still going:
+
+```bash
+cxr remote prune-jobs --profile sub_100keV        # preview
+cxr remote prune-jobs --profile sub_100keV --yes  # delete
+```

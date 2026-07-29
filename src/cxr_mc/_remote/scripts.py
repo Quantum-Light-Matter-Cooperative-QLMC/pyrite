@@ -1034,3 +1034,43 @@ def _job_assign(jobid):
         transport._check_shell_tokens([jobid])
         return f'JOB="{jobid}"'
     return f"JOB=$({_recorded_job_dirs_command()} | tail -1)"
+
+
+def _prune_job_dirs_command(profile=None, all_jobs=False, yes=False):
+    """Remote command: delete terminal, non-live job directories.
+
+    Selects the whole ``jobs/`` tree (``all_jobs``) or one profile's
+    ``NAME``/``NAME-N`` family, then removes only dirs whose persisted state is
+    chain-terminal (done / FAILED / cancelled, matching viewer._is_terminal_state)
+    AND whose latest recorded SLURM id is not in ``squeue`` -- a live chain is
+    never pruned even if an earlier slice left a transient state. squeue failure
+    is fail-closed (nothing pruned). Emits one tab record per matched dir:
+    ``PRUNED``/``WOULD-PRUNE`` with the state, or ``KEPT`` with ``live`` or the
+    non-terminal state. ``profile`` is interpolated into the glob and must be
+    token-checked by the caller.
+    """
+    jobs = config.shell_remote_path(config.JOBS_SUBDIR)
+    glob = '"$JOBS"/*/' if all_jobs else f'"$JOBS/{profile}"/ "$JOBS/{profile}"-*/'
+    action = (
+        'rm -rf "$d" && printf "PRUNED\\t%s\\t%s\\n" "$jobid" "$st"'
+        if yes
+        else 'printf "WOULD-PRUNE\\t%s\\t%s\\n" "$jobid" "$st"'
+    )
+    return (
+        f"JOBS={jobs}; "
+        '[ -d "$JOBS" ] || exit 0; '
+        "LIVE=$(squeue -h -u \"$USER\" -o '%i' 2>&1); STATUS=$?; "
+        'if [ "$STATUS" -ne 0 ]; then '
+        'echo "could not query SLURM jobs" >&2; printf "%s\\n" "$LIVE" >&2; '
+        'exit "$STATUS"; fi; '
+        'LIVE=" $(printf "%s\\n" "$LIVE" | tr "\\n" " ") "; '
+        f'for d in {glob}; do [ -d "$d" ] || continue; [ -f "$d/meta" ] || continue; '
+        "jobid=${d%/}; jobid=${jobid##*/}; "
+        'st=$(head -n1 "$d/state" 2>/dev/null); '
+        'SID=$(sed -n "s/^slurm_job_id: //p" "$d/meta" 2>/dev/null | tail -1); '
+        'case "$SID" in ""|*[!0-9]*) ;; *) case "$LIVE" in *" $SID "*) '
+        'printf "KEPT\\t%s\\tlive\\n" "$jobid"; continue ;; esac ;; esac; '
+        'case "$st" in done*|FAILED*|cancelled*) ;; *) '
+        'printf "KEPT\\t%s\\t%s\\n" "$jobid" "${st:-<none>}"; continue ;; esac; '
+        f"{action}; done"
+    )

@@ -4316,3 +4316,201 @@ def test_pull_rejects_invalid_public_dataset_before_side_effects(monkeypatch, tm
         lifecycle.pull(["mos2"], dataset=dataset)
 
     assert not lifecycle.config.LOCAL_ROOT.exists()
+
+
+# --- attach: warn when defaulting to a terminal-state job ----------------------
+
+
+def test_attach_warns_when_defaulting_to_terminal_job(monkeypatch, capsys):
+    """No job id + resolved job already terminal -> stderr warning, still attaches."""
+    monkeypatch.setattr(state, "_latest_jobid", lambda: "sub_100keV")
+    monkeypatch.setattr(
+        state, "_job_state", lambda jobid: "cancelled [932] 2026-07-28T18:15:56-07:00"
+    )
+    seen = []
+    monkeypatch.setattr(
+        viewer, "_live_status", lambda jobid, detail: seen.append((jobid, detail)) or True
+    )
+
+    viewer.attach()
+
+    captured = capsys.readouterr()
+    assert "defaulting to sub_100keV" in captured.err
+    assert "not running" in captured.err
+    assert "defaulting" not in captured.out  # warning belongs on stderr
+    assert seen == [("sub_100keV", 0)]
+
+
+def test_attach_does_not_warn_for_explicit_jobid(monkeypatch, capsys):
+    """An explicit job id is an informed choice: never read state, never warn."""
+
+    def forbidden(jobid):
+        raise AssertionError("state must not be read for an explicit job id")
+
+    monkeypatch.setattr(state, "_job_state", forbidden)
+    monkeypatch.setattr(viewer, "_live_status", lambda jobid, detail: True)
+
+    viewer.attach("sub_100keV-3")
+
+    assert "defaulting" not in capsys.readouterr().err
+
+
+def test_attach_does_not_warn_when_default_job_is_live(monkeypatch, capsys):
+    monkeypatch.setattr(state, "_latest_jobid", lambda: "sub_100keV-7")
+    monkeypatch.setattr(state, "_job_state", lambda jobid: "running mos2 [4/21] since now")
+    monkeypatch.setattr(viewer, "_live_status", lambda jobid, detail: True)
+
+    viewer.attach()
+
+    assert "defaulting" not in capsys.readouterr().err
+
+
+# --- prune-jobs: delete terminal, non-live job directories ---------------------
+
+
+def _run_prune_jobs_command(command, jobs_dir, live_ids):
+    """Run a _prune_job_dirs_command against a real tmp jobs tree with a squeue shim."""
+    bindir = jobs_dir.parent / "bin"
+    bindir.mkdir(exist_ok=True)
+    squeue = bindir / "squeue"
+    squeue.write_text('#!/bin/sh\nprintf "%s\\n" ' + " ".join(f'"{i}"' for i in live_ids) + "\n")
+    squeue.chmod(0o755)
+    command = command.replace(
+        f'JOBS="{remote.REMOTE_DIR}/{remote.JOBS_SUBDIR}"', f'JOBS="{jobs_dir}"'
+    )
+    env = dict(os.environ, PATH=f"{bindir}:{os.environ['PATH']}")
+    return subprocess.run(["bash", "-c", command], capture_output=True, text=True, env=env)
+
+
+def _make_job(jobs_dir, name, state_line, slurm_ids):
+    job = jobs_dir / name
+    job.mkdir(parents=True)
+    (job / "meta").write_text("".join(f"slurm_job_id: {i}\n" for i in slurm_ids))
+    (job / "state").write_text(state_line + "\n")
+    return job
+
+
+def test_prune_jobs_command_keeps_live_and_non_terminal(monkeypatch, tmp_path):
+    """Only done/FAILED/cancelled dirs whose latest SLURM id is not live are removed."""
+    jobs = tmp_path / "jobs"
+    cancelled = _make_job(jobs, "sub_100keV", "cancelled [932] 2026-07-28", [915, 932])
+    live = _make_job(jobs, "sub_100keV-7", "running mos2 [4/21] since now", [942, 947])
+    crashed = _make_job(jobs, "sub_100keV-6", "running hbn [2/21] since then", [941])
+    done = _make_job(jobs, "20260715-113910-abcd", "done [21/21] 2026-07-15", [800])
+
+    command = scripts._prune_job_dirs_command(all_jobs=True, yes=True)
+    result = _run_prune_jobs_command(command, jobs, live_ids=["947"])
+
+    assert result.returncode == 0, result.stderr
+    assert "PRUNED\tsub_100keV\t" in result.stdout
+    assert "PRUNED\t20260715-113910-abcd\t" in result.stdout
+    assert "KEPT\tsub_100keV-7\tlive" in result.stdout
+    assert not cancelled.exists()
+    assert not done.exists()
+    assert live.exists()  # live chain never removed
+    assert crashed.exists()  # non-terminal state kept
+
+
+def test_prune_jobs_command_preview_deletes_nothing(tmp_path):
+    jobs = tmp_path / "jobs"
+    cancelled = _make_job(jobs, "sub_100keV", "cancelled [932] 2026-07-28", [932])
+
+    command = scripts._prune_job_dirs_command(all_jobs=True, yes=False)
+    result = _run_prune_jobs_command(command, jobs, live_ids=[])
+
+    assert result.returncode == 0, result.stderr
+    assert "WOULD-PRUNE\tsub_100keV\t" in result.stdout
+    assert cancelled.exists()  # preview never mutates
+
+
+def test_prune_jobs_command_profile_scopes_to_family(tmp_path):
+    jobs = tmp_path / "jobs"
+    _make_job(jobs, "sub_100keV", "cancelled [932]", [932])
+    _make_job(jobs, "sub_100keV-2", "cancelled [933]", [933])
+    other = _make_job(jobs, "20260715-113910-abcd", "cancelled [800]", [800])
+
+    command = scripts._prune_job_dirs_command(profile="sub_100keV", yes=True)
+    result = _run_prune_jobs_command(command, jobs, live_ids=[])
+
+    assert result.returncode == 0, result.stderr
+    assert "PRUNED\tsub_100keV\t" in result.stdout
+    assert "PRUNED\tsub_100keV-2\t" in result.stdout
+    assert other.exists()  # a standard timestamp job is outside the profile family
+
+
+def test_prune_jobs_command_fail_closed_when_squeue_errors(tmp_path):
+    """squeue failure must not delete anything (liveness unverifiable)."""
+    jobs = tmp_path / "jobs"
+    cancelled = _make_job(jobs, "sub_100keV", "cancelled [932]", [932])
+    command = scripts._prune_job_dirs_command(all_jobs=True, yes=True)
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    # A squeue that errors: liveness is unverifiable, so nothing may be pruned.
+    (bindir / "squeue").write_text("#!/bin/sh\necho boom >&2\nexit 1\n")
+    (bindir / "squeue").chmod(0o755)
+    command = command.replace(f'JOBS="{remote.REMOTE_DIR}/{remote.JOBS_SUBDIR}"', f'JOBS="{jobs}"')
+    result = subprocess.run(
+        ["bash", "-c", command],
+        capture_output=True,
+        text=True,
+        env=dict(os.environ, PATH=f"{bindir}:{os.environ['PATH']}"),
+    )
+
+    assert result.returncode != 0
+    assert cancelled.exists()
+
+
+def test_prune_job_dirs_reports_preview(monkeypatch, capsys):
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda command: "WOULD-PRUNE\tsub_100keV\tcancelled [932]\nKEPT\tsub_100keV-7\tlive\n",
+    )
+
+    lifecycle.prune_job_dirs(profile="sub_100keV")
+
+    out = capsys.readouterr().out
+    assert "jobs/sub_100keV" in out
+    assert "cancelled" in out
+    assert "kept 1 live job" in out
+
+
+def test_prune_job_dirs_reports_deletions(monkeypatch, capsys):
+    monkeypatch.setattr(
+        transport, "_ssh_capture", lambda command: "PRUNED\tsub_100keV\tcancelled [932]\n"
+    )
+
+    lifecycle.prune_job_dirs(all_jobs=True, yes=True)
+
+    out = capsys.readouterr().out
+    assert "pruned job directories" in out
+    assert "jobs/sub_100keV" in out
+
+
+def test_prune_job_dirs_requires_exactly_one_selector(monkeypatch):
+    monkeypatch.setattr(
+        transport, "_ssh_capture", lambda command: pytest.fail("must not reach ssh")
+    )
+
+    with pytest.raises(SystemExit, match="exactly one"):
+        lifecycle.prune_job_dirs()
+    with pytest.raises(SystemExit, match="exactly one"):
+        lifecycle.prune_job_dirs(profile="sub_100keV", all_jobs=True)
+
+
+def test_prune_jobs_cli_dispatch(monkeypatch):
+    calls = []
+    monkeypatch.setattr(lifecycle, "prune_job_dirs", lambda **kwargs: calls.append(kwargs))
+
+    remote.main(["prune-jobs", "--profile", "sub_100keV", "--yes"])
+
+    assert calls == [{"profile": "sub_100keV", "all_jobs": False, "yes": True}]
+
+
+def test_prune_jobs_cli_rejects_bad_selectors(monkeypatch):
+    monkeypatch.setattr(
+        lifecycle, "prune_job_dirs", lambda **kwargs: pytest.fail("must not dispatch")
+    )
+
+    assert remote.main(["prune-jobs"]) == 2
+    assert remote.main(["prune-jobs", "--all", "--profile", "sub_100keV"]) == 2

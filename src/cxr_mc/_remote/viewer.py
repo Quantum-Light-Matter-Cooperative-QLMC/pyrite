@@ -93,10 +93,10 @@ def _status_remote_command(job_assign, detail):
         "if command -v top >/dev/null 2>&1; then "
         "LC_ALL=C top -bn1 2>/dev/null | "
         "awk '/Cpu\\(s\\)|^%Cpu/ {for (i=1;i<=NF;i++) if ($i ~ /^id/) "
-        "{printf \"cpu_percent=%.1f|\", 100-$(i-1); exit}}'; fi; "
+        '{printf "cpu_percent=%.1f|", 100-$(i-1); exit}}\'; fi; '
         "if command -v free >/dev/null 2>&1; then "
         "free -b 2>/dev/null | awk '/^Mem:/ {printf "
-        "\"memory_used_bytes=%s|memory_total_bytes=%s|memory_percent=%.1f|\", "
+        '"memory_used_bytes=%s|memory_total_bytes=%s|memory_percent=%.1f|", '
         "$3, $2, 100*$3/$2}'; fi; "
         "if command -v nvidia-smi >/dev/null 2>&1; then "
         "nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total "
@@ -523,8 +523,19 @@ def attach(jobid=None, detail=0):
     state, False on disconnect, a stalled chain, or a confirmed cancel --
     callers (scan/check) key their auto-pull off that.
     """
+    defaulted = jobid is None
     jobid = jobid or state._latest_jobid()
     if not jobid:
         raise SystemExit("no jobs to attach to (start one: cxr remote start <materials>)")
     transport._check_shell_tokens([jobid])
+    if defaulted:
+        current = state._job_state(jobid)
+        if _is_terminal_state(current):
+            print(
+                f"warning: no job id given; defaulting to {jobid}, which is not running "
+                f"(state: {current}).\n"
+                "  Live jobs   cxr remote jobs\n"
+                "  Attach one  cxr remote attach <job-id>",
+                file=sys.stderr,
+            )
     return _live_status(jobid, detail)
