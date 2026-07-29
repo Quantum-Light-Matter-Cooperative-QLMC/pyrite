@@ -202,17 +202,27 @@ run_material() {{
         scan_rc=127
       else
         export CXR_MC_NSYS=1
-        nsys profile \\
-          --trace=cuda,nvtx,osrt \\
-          --sample=process-tree \\
-          --cpuctxsw=process-tree \\
-          --python-sampling=true \\
-          --python-sampling-frequency=200 \\
-          --python-backtrace=cuda \\
-          --cudabacktrace=sync,kernel,memory \\
-          --wait=primary \\
-          --force-overwrite=true \\
-          --output="$trace_base" \\
+        # --wait=all lets nsys wait for the spawn worker tree to exit cleanly
+        # (else --wait=primary SIGTERMs survivors -> leaked semaphores).
+        nsys_cmd=(
+          nsys profile
+          --trace=cuda,nvtx,osrt
+          --sample=process-tree
+          --cpuctxsw=process-tree
+          --wait=all
+          --force-overwrite=true
+          --output="$trace_base"
+        )
+        # nsys 2025.6.x Python stack-walkers SIGSEGV unwinding CPython 3.14's
+        # frame layout, so they are off by default. Opt in with
+        # CXR_MC_NSYS_PYSTACK=1 only on a supported Python/nsys pair.
+        if [ -n "${{CXR_MC_NSYS_PYSTACK:-}}" ]; then
+          nsys_cmd+=(
+            --python-sampling=true --python-sampling-frequency=200 \\
+            --python-backtrace=cuda --cudabacktrace=sync,kernel,memory
+          )
+        fi
+        "${{nsys_cmd[@]}}" \\
           "${{scan_command[@]}}" >> "$JOBDIR/log" 2>&1 || scan_rc=$?
       fi
     else
