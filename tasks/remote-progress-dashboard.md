@@ -2,8 +2,8 @@
 
 Branch: `feature/remote-progress-dashboard`
 
-TODO scope: former P1 items 2–3, pending SLURM queue context and compute-time
-estimates in `cxr remote attach` and related status dashboards.
+TODO scope: former P1 items 2–3, one canonical remote-status command, pending
+SLURM queue context, and compute-time estimates in its dashboard.
 
 ## Goal
 
@@ -11,13 +11,34 @@ When a job is pending, show its scheduler consideration position and the top
 pending item in the same queue view. Beside overall compute progress, show
 elapsed, estimated remaining, and estimated total compute time.
 
+Combine one-shot and continuous monitoring under:
+
+```text
+cxr remote status [JOB]
+cxr remote status [JOB] -a
+cxr remote status [JOB] --attach
+```
+
+Without `--attach`, `status` prints one snapshot and exits. With
+`-a/--attach`, it continuously monitors the same dashboard until interrupted.
+
 Keep these as structured dashboard/status information. Do not add them to raw
 job logs.
 
 ## Decisions
 
-- `status` and `attach` share one acquisition and rendering path; both receive
-  the feature at every useful verbosity without extra per-frame SSH sessions.
+- `status` is the only public command for the dashboard. Remove the standalone
+  `attach` command, including registration, help, completion, contract
+  snapshots, tests, and current documentation. Do not retain a hidden alias.
+- `status` preserves one-shot behavior by default. `-a/--attach` selects the
+  existing continuous, reconnecting monitor over the same job-selection and
+  verbosity options.
+- Interrupting `status --attach` disconnects only the viewer, reports that the
+  remote job remains active, and preserves the established interruption exit
+  behavior.
+- One-shot and attached status use one acquisition and rendering path and
+  receive queue/timing features at every useful verbosity without extra
+  per-frame SSH sessions.
 - Define queue position explicitly from Slurm's pending priority order, scoped
   to the relevant partition/cohort. It is scheduler consideration order, not a
   guaranteed start order: priority can change and backfill can run lower-ranked
@@ -52,19 +73,22 @@ job logs.
 
 ## Implementation path
 
-1. Specify the machine payload for queue rank/top item, including partition
+1. Move continuous-monitor dispatch behind `status -a/--attach`; remove the
+   standalone `attach` command and stale public references while preserving
+   job selection, verbosity, reconnection, interruption, and disconnect hints.
+2. Specify the machine payload for queue rank/top item, including partition
    scope, ordering, unavailable fields, and hostile scheduler text.
-2. Extend the existing marked status snapshot with one bounded queue query.
+3. Extend the existing marked status snapshot with one bounded queue query.
    Parse and sanitize it at the presentation boundary.
-3. Define additive progress timing fields and units. Accumulate active compute
+4. Define additive progress timing fields and units. Accumulate active compute
    time correctly across checkpoint resume and chunked self-submission without
    breaking legacy record parsing.
-4. Derive job-wide elapsed/remaining/total estimates from validated aggregate
+5. Derive job-wide elapsed/remaining/total estimates from validated aggregate
    progress, including parallel-material and cost-weighted cases.
-5. Render queue context only while pending and timing beside the overall bar.
-   Keep case rows compact and status/attach output identical.
-6. Update CLI output contracts/reference only if public help or snapshots
-   change; search for duplicated status renderers.
+6. Render queue context only while pending and timing beside the overall bar.
+   Keep case rows compact and one-shot/attached frames identical.
+7. Regenerate CLI contract/reference, update current examples, and search for
+   stale `remote attach` command references.
 
 ## Verification
 
@@ -74,12 +98,16 @@ job logs.
 - Pure ETA tests: no progress, one tick, cached-only start, cost weighting,
   multiple parallel materials, pause/resume, chunk restart, failed/done,
   zero-total, legacy records, and non-finite/hostile values.
-- Snapshot tests for narrow/redirected output, `NO_COLOR`, detail levels, and
-  identical `status`/`attach` frames.
+- CLI tests proving `status` remains one-shot by default, both `-a` and
+  `--attach` select continuous monitoring, standalone `attach` is absent, and
+  job/detail options compose with attached mode.
+- Snapshot tests for narrow/redirected output, `NO_COLOR`, detail levels,
+  interruption/disconnect behavior, and identical one-shot/attached frames.
 - Confirm one SSH status stream and one bounded scheduler query per frame.
+- Regenerate `tests/data/cli_contract.json` and `docs/cli-reference.md`.
 - Focused remote/scan/component suites, lint/type checks, then real
-  `cxr remote status --help` and `cxr remote attach --help` probes. No live
-  submission required for unit acceptance.
+  `cxr remote --help`, `cxr remote status --help`, and one-shot/attached
+  subprocess probes. No live submission required for unit acceptance.
 
 ## Non-goals
 
@@ -88,6 +116,7 @@ job logs.
 - Writing dashboard metadata into simulation logs.
 - Performance-kernel or checkpoint-throughput optimization.
 - New polling connections or unbounded full-cluster history queries.
+- Retaining `cxr remote attach` as a public or hidden compatibility alias.
 
 ## Dispatch
 
