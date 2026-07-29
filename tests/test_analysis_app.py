@@ -28,7 +28,7 @@ def test_no_checkpoint_state_displays_without_analysis_tabs() -> None:
         and any(
             isinstance(node, ast.Constant)
             and node.value
-            == "**No checkpoint data available.** Run `cxr scan <material>` to create one."
+            == "**No checkpoint data available.** Run `cxr run standard -m <material>` to create one."
             for node in ast.walk(cell)
         )
     )

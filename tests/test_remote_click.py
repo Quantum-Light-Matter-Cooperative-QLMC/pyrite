@@ -10,11 +10,9 @@ from cxr_mc._remote import lifecycle, viewer
 from tests.cli_helpers import assert_clean_result, invoke
 
 REMOTE_COMMANDS = (
-    "scan",
+    "run",
     "rebrem",
     "reline",
-    "submit",
-    "start",
     "attach",
     "jobs",
     "status",
@@ -45,7 +43,7 @@ def test_every_remote_click_help_path_is_offline(name):
     assert f"Usage: remote {name} " in result.stdout
 
 
-def test_start_click_defaults_and_zero_meanings(monkeypatch):
+def test_run_click_defaults_and_zero_meanings(monkeypatch):
     calls = []
     monkeypatch.setattr(
         lifecycle,
@@ -53,7 +51,9 @@ def test_start_click_defaults_and_zero_meanings(monkeypatch):
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "job",
     )
 
-    result = invoke(remote.command, ["submit", "hopg", "--workers", "0", "--headless"])
+    result = invoke(
+        remote.command, ["run", "standard", "-m", "hopg", "--workers", "0", "--headless"]
+    )
 
     assert_clean_result(result)
     assert calls == [
@@ -80,10 +80,48 @@ def test_start_click_defaults_and_zero_meanings(monkeypatch):
     ]
 
 
+def test_run_perf_flags_and_level9_reach_workflow(monkeypatch):
+    queued = []
+    pulled = []
+    monkeypatch.setattr(
+        lifecycle,
+        "start_queue",
+        lambda materials, **kwargs: queued.append((materials, kwargs)) or "job",
+    )
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(remote.state, "_completed_materials", lambda _jobid, materials: materials)
+    monkeypatch.setattr(
+        lifecycle,
+        "pull",
+        lambda stems, **kwargs: pulled.append((stems, kwargs)),
+    )
+
+    result = invoke(
+        remote.command,
+        [
+            "run",
+            "standard",
+            "-m",
+            "hopg",
+            "--perf",
+            "--perf-reps",
+            "1",
+            "--perf-interval",
+            "2",
+            "--chunk-minutes",
+            "0",
+            "--level9",
+        ],
+    )
+
+    assert_clean_result(result)
+    assert queued[0][1]["performance_repetitions"] == 1
+    assert queued[0][1]["performance_interval"] == 2.0
+    assert pulled[0][1]["level9"] is True
+
+
 def test_hidden_remote_aliases_remain_callable():
-    for alias in ("start", "check"):
-        result = invoke(remote.command, [alias, "--help"])
-        assert_clean_result(result)
+    assert_clean_result(invoke(remote.command, ["check", "--help"]))
 
     root_help = invoke(remote.command, ["--help"])
     command_lines = {
@@ -91,15 +129,15 @@ def test_hidden_remote_aliases_remain_callable():
         for line in root_help.stdout.splitlines()
         if line.startswith("  ") and line.strip() and not line.lstrip().startswith("-")
     }
-    assert {"submit", "validate"}.issubset(command_lines)
-    assert command_lines.isdisjoint({"start", "check"})
+    assert {"run", "validate"}.issubset(command_lines)
+    assert command_lines.isdisjoint({"scan", "submit", "start", "check"})
 
 
 @pytest.mark.parametrize(
     "argv, option",
     [
-        (["start", "hopg", "--workers", "-1"], "--workers"),
-        (["start", "hopg", "--chunk-minutes", "-1"], "--chunk-minutes"),
+        (["run", "standard", "-m", "hopg", "--workers", "-1"], "--workers"),
+        (["run", "standard", "-m", "hopg", "--chunk-minutes", "-1"], "--chunk-minutes"),
         (["rebrem", "hopg", "--ne-brem", "0"], "--ne-brem"),
         (["rebrem", "hopg", "--step", "nan"], "--step"),
         (["reline", "hopg", "--line-ne", "0"], "--line-ne"),
@@ -122,9 +160,7 @@ def test_remote_numeric_domains_fail_at_click_boundary(argv, option):
 @pytest.mark.parametrize(
     "argv, message",
     [
-        (["start"], "needs material"),
-        (["start", "hopg", "--all"], "--all does not take"),
-        (["scan", "hopg", "--quick", "--grid"], "drop --grid"),
+        (["run", "standard", "-m", "hopg", "--quick", "--grid"], "drop --grid"),
         (["pull", "hopg", "--brem-only", "--line-only"], "mutually exclusive"),
         (["stop"], "needs material"),
         (["clear"], "needs material"),
@@ -155,7 +191,7 @@ def test_remote_prune_defaults_to_standard_preview(monkeypatch):
     assert calls == [{"all_profiles": False, "catalog_profile": None, "yes": False}]
 
 
-@pytest.mark.parametrize("command_name", ["scan", "rebrem", "reline", "submit"])
+@pytest.mark.parametrize("command_name", ["run", "rebrem", "reline"])
 def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
     calls = []
     monkeypatch.setattr(
@@ -175,31 +211,33 @@ def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
     )
     monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
 
-    # ``rebrem``/``reline`` support --dry-run, which returns before the
-    # (mocked, always-disconnected) viewer.attach call; legacy ``scan`` always
-    # attaches. Canonical ``submit`` defaults to attach+pull, so use its
-    # explicit detached mode while this test isolates fidelity dispatch.
     argv = [command_name, "hopg", "--fidelity", "survey", "--no-sync"]
     if command_name in ("rebrem", "reline"):
         argv.append("--dry-run")
-    elif command_name == "submit":
-        argv.append("--headless")
+    else:
+        argv = [
+            command_name,
+            "standard",
+            "-m",
+            "hopg",
+            "--fidelity",
+            "survey",
+            "--no-sync",
+            "--headless",
+        ]
 
     result = invoke(remote.command, argv)
 
-    if command_name == "scan":
-        assert result.exit_code == 0
-        assert "skipping automatic pull" in result.stderr
-    else:
-        assert_clean_result(result)
+    assert_clean_result(result)
     assert calls[0]["fidelity"] == "survey"
 
 
-def test_submit_profile_option_dispatches_catalog_profile(monkeypatch):
+def test_run_profile_and_material_dispatch(monkeypatch):
     import cxr_mc.materials as materials_pkg
 
     class _FakeCatalog:
         profile_names = ("standard", "sub_100keV")
+        material_keys = ("hopg", "mose2")
 
         def profile_materials(self, _name):
             return None  # no membership row -> every candidate stays
@@ -214,21 +252,19 @@ def test_submit_profile_option_dispatches_catalog_profile(monkeypatch):
 
     result = invoke(
         remote.command,
-        ["submit", "hopg", "--profile", "sub_100keV", "--headless"],
+        ["run", "sub_100keV", "-m", "hopg", "--headless"],
     )
 
     assert_clean_result(result)
     assert calls[0]["catalog_profile"] == "sub_100keV"
 
 
-def test_submit_profile_with_membership_defaults_materials_when_none_given(monkeypatch):
-    """A profile naming its own campaign materials is enough to run `submit
-    --profile NAME` with no MATERIAL/--all -- naming it directly still works
-    too (see test_submit_profile_option_dispatches_catalog_profile)."""
+def test_run_profile_with_membership_defaults_materials(monkeypatch):
     import cxr_mc.materials as materials_pkg
 
     class _FakeCatalog:
         profile_names = ("standard", "sub_100keV")
+        material_keys = ("hopg", "mose2")
 
         def profile_materials(self, _name):
             return ("hopg", "mose2")
@@ -241,32 +277,35 @@ def test_submit_profile_with_membership_defaults_materials_when_none_given(monke
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "job",
     )
 
-    result = invoke(remote.command, ["submit", "--profile", "sub_100keV", "--headless"])
+    result = invoke(remote.command, ["run", "sub_100keV", "--headless"])
 
     assert_clean_result(result)
     assert calls[0][0] == ["hopg", "mose2"]
     assert calls[0][1]["catalog_profile"] == "sub_100keV"
 
 
-def test_submit_profile_without_membership_still_needs_material_or_all(monkeypatch):
-    """A profile with no explicit membership (implicit all-in-use) has no
-    narrower list to default to, so bare `submit --profile NAME` keeps
-    requiring --all/-A or an explicit MATERIAL -- unchanged from before."""
+def test_run_profile_without_membership_uses_all_catalog_materials(monkeypatch):
     import cxr_mc.materials as materials_pkg
 
     class _FakeCatalog:
         profile_names = ("standard", "sub_100keV")
+        material_keys = ("mose2", "hopg")
 
         def profile_materials(self, _name):
             return None
 
     monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "start_queue",
+        lambda materials, **kwargs: calls.append((materials, kwargs)) or "job",
+    )
 
-    result = invoke(remote.command, ["submit", "--profile", "sub_100keV"])
+    result = invoke(remote.command, ["run", "sub_100keV", "--headless"])
 
-    assert result.exit_code == 2
-    assert result.stdout == ""
-    assert "needs material name(s), or use --all" in result.stderr
+    assert_clean_result(result)
+    assert calls[0][0] == ["mose2", "hopg"]
 
 
 def test_pull_hash_option_dispatches_and_requires_one_qualified_selector(monkeypatch):

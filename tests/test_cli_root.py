@@ -17,7 +17,8 @@ def test_root_help_does_not_import_lazy_commands(monkeypatch, capsys):
     assert exc.value.code == 0
     captured = capsys.readouterr()
     assert captured.out.startswith("Usage: cxr ")
-    assert "scan" in captured.out
+    assert "run" in captured.out
+    assert "scan" not in captured.out
     assert captured.err == ""
 
 

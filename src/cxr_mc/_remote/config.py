@@ -12,7 +12,7 @@ SLURM_PARTITION = "gpu"
 SLURM_GPUS = 1
 SLURM_CPUS_PER_MATERIAL = 8
 SLURM_TIME = "UNLIMITED"
-# Default 1: the box has one GPU (SLURM_GPUS=1), and >1 co-tenant `cxr scan`
+# Default 1: the box has one GPU (SLURM_GPUS=1), and >1 co-tenant `cxr run`
 # processes time-slice the card while the runner's own CPU-pool/GPU pipeline
 # already overlaps the two phases -- contention for no throughput win, plus
 # VRAM-pool oversubscription. Opt in via parallel_materials; the queue script

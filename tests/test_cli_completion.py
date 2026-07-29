@@ -174,10 +174,9 @@ def test_local_commands_wire_material_checkpoint_archive_and_choice_completion()
 def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
     from cxr_mc._remote import cli
 
-    for name in ("scan", "submit", "start"):
-        command = cli.command.commands[name]
-        assert _callback(command, "catalog_profile") is _cli_completion.complete_profile
-        assert _callback(command, "material") is _cli_completion.complete_material
+    command = cli.command.commands["run"]
+    assert _callback(command, "catalog_profile") is _cli_completion.complete_profile
+    assert _callback(command, "material") is _cli_completion.complete_material
     for name in ("rebrem", "reline"):
         assert (
             _callback(cli.command.commands[name], "material") is _cli_completion.complete_material
@@ -188,11 +187,8 @@ def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
     )
     for name in ("attach", "status", "logs"):
         assert _callback(cli.command.commands[name], "jobid") is _cli_completion.complete_job_id
-    for name in ("scan", "start"):
-        values = _parameter(cli.command.commands[name], "parallel_materials").shell_complete(
-            None, ""
-        )
-        assert _values(values) == ["1", "2", "3", "4"]
+    values = _parameter(cli.command.commands["run"], "parallel_materials").shell_complete(None, "")
+    assert _values(values) == ["1", "2", "3", "4"]
 
     assert _callback(cli.command.commands["stop"], "materials") is None
     assert _callback(cli.command.commands["clear"], "materials") is None

@@ -889,7 +889,7 @@ def add_material_command(name, materials, all_materials, yes, dry_run):
     """Deprecated compatibility alias for ``profile members add``.
 
     With --all, seeds (or extends) membership with mats_to_sim.toml's verified
-    `materials` list -- the same base set `cxr scan --all` runs -- so a
+    `materials` list -- the verified manifest group -- so a
     profile can start from the standard list and be trimmed down with
     `cxr profile remove-material` instead of typing every key by hand. --all
     also seeds an implicit all-in-use profile (one with no `materials` row

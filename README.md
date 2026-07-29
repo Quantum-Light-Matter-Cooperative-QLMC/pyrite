@@ -22,7 +22,7 @@ Research code; absolute predictions remain bounded by
 
 Pipeline: Monte Carlo electron transport → segment-wise PXR+CBS and
 bremsstrahlung → layered self-absorption → instrument response. Default spectra
-add segments/electrons incoherently; `cxr scan --coherent` opts into an
+add segments/electrons incoherently; `cxr run --coherent` opts into an
 experimental phased sum using trajectory and bunch timing. That path is
 [unverified](docs/coherent-emission.md) and must not support scientific claims
 until its phase convention and bunch-form-factor limits are independently
@@ -54,8 +54,8 @@ CuPy falls back to CPU. `CXR_MC_DEBUG=1` shows backend selection;
 ## Run
 
 ```bash
-# Small survey scan; writes component checkpoints.
-uv run cxr scan hopg --fidelity survey
+# Small survey run; writes component checkpoints.
+uv run cxr run standard -m hopg --fidelity survey
 
 # Analyze existing checkpoint.
 uv run cxr app analysis hopg
@@ -69,7 +69,7 @@ uv run cxr app validation
 
 Main surfaces:
 
-- `cxr`: scan, analysis, validation, export, checkpoint, profile, material,
+- `cxr`: run, analysis, validation, export, checkpoint, profile, material,
   and remote workflows. See generated
   [CLI reference](docs/cli-reference.md).
 - `notebooks/scan_app.py`: interactive sweep runner.

@@ -94,7 +94,7 @@ def _check_shell_tokens(tokens):
 
 
 def _check_materials(materials):
-    """Validate runnable material keys for remote scan/start operations."""
+    """Validate runnable material keys for remote run operations."""
     from ..materials import CATALOG
 
     _check_shell_tokens(materials)

@@ -107,7 +107,7 @@ def select_initial_material(requested: str | None, menu: tuple[MaterialMenuRow, 
 def checkpoint_stem(material: str, face: str) -> str:
     """Checkpoint stem for a material's face variant.
 
-    ``material`` itself for the flat (``cxr scan``) face; ``f"{material}_blazed"``
+    ``material`` itself for the flat (``cxr run``) face; ``f"{material}_blazed"``
     for the blazed (sawtooth entrance-face) checkpoint written by
     ``cxr material blaze``.
     Passing this stem to :func:`~cxr_mc.run.load_checkpoint` loads the matching

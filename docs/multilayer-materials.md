@@ -208,7 +208,7 @@ the rejected intermediate designs that motivated the full boundary-aware path.
 ## Catalog / "adding a stack" checklist
 
 N-layer stacks are live in `data/materials.toml`; `substrate = "key"` remains
-two-layer sugar. To add a named stack runnable as `cxr scan <key>`:
+two-layer sugar. To add a named stack runnable as `cxr run standard -m <key>`:
 
 1. If a crystalline phase is absent, add its bundled CIF under `data/cifs/` and
    a `[crystals.<key>]` row. Add amorphous number densities under `[media.<key>]`.

@@ -1,4 +1,4 @@
-"""Regression tests for the ``cxr scan --coherent/--incoherent`` policy flag."""
+"""Regression tests for the ``cxr run --coherent/--incoherent`` policy flag."""
 
 from click.testing import CliRunner
 
@@ -12,7 +12,9 @@ def _resolved_run(monkeypatch, argv):
         captured["run"] = scan._resolved_run(args, "hopg")
 
     monkeypatch.setattr(scan, "run", capture)
-    result = CliRunner().invoke(scan.command, ["hopg", *argv], catch_exceptions=False)
+    result = CliRunner().invoke(
+        scan.command, ["standard", "-m", "hopg", *argv], catch_exceptions=False
+    )
     assert result.exit_code == 0, result.output
     return captured["run"]
 

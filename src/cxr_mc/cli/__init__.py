@@ -10,7 +10,7 @@ from .. import __version__
 from ._core import LazyGroup, color_option, run
 
 _COMMANDS = {
-    "scan": "cxr_mc.scan.command",
+    "run": "cxr_mc.scan.command",
     "app": "cxr_mc.cli.app.command",
     "checkpoint": "cxr_mc.cli.checkpoint.command",
     "completion": "cxr_mc.cli.completion.command",
@@ -32,7 +32,7 @@ _COMMANDS = {
 }
 
 _COMMAND_HELP = {
-    "scan": "Run one material's MC sweep and write a checkpoint.",
+    "run": "Run a profile's MC sweeps and write checkpoints.",
     "app": "Launch or export interactive analysis notebooks.",
     "checkpoint": "Inspect, transform, recompute, archive, and prune checkpoints.",
     "completion": "Manage cxr shell tab-completion.",
@@ -80,7 +80,7 @@ def command() -> None:
     """Manage coherent X-ray radiation simulation campaigns.
 
     Start with a named profile: it defines campaign ranges, workloads, and
-    material membership. Then run scans, inspect checkpoints, or open analysis
+    material membership. Then run campaigns, inspect checkpoints, or open analysis
     notebooks.
 
     Run ``cxr COMMAND --help`` for command options, units, defaults, and side
@@ -90,6 +90,8 @@ def command() -> None:
     Examples:
       cxr profile list
       cxr profile show sub_100keV
+      cxr run sub_100keV -m hopg
+      cxr remote run sub_100keV --dry-run
       cxr app analysis
     """
 

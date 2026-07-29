@@ -342,16 +342,14 @@ def start_queue(
     ``chunk_minutes=0`` for the original monolithic allocation, which is the
     only mode that accepts ``parallel_materials``.
 
-    ``high_energy_min_kev`` forwards ``--high-energy-min-kev`` to every
-    material's remote ``cxr scan`` invocation; it is a no-op there for any
-    material outside mats_to_sim.toml's ``high_energy_materials``, so one
-    shared value is safe across a mixed batch. ``catalog_profile`` forwards
-    ``--profile`` (catalog campaign name, orthogonal to ``fidelity``) the
-    same way -- the remote ``cxr scan`` re-validates it against the synced
-    catalog, so an unknown name still fails loudly on the box. A non-standard
-    profile also names the job (``sub_100keV``, then ``sub_100keV-2`` once a
-    finished run holds the bare name) and refuses to submit while another job
-    under the same profile is live.
+    ``catalog_profile`` is forwarded positionally to the synchronized run
+    entry point, which re-validates it against the remote catalog. A
+    non-standard profile also names the job (``sub_100keV``, then
+    ``sub_100keV-2`` once a finished run holds the bare name) and refuses to
+    submit while another job under the same profile is live.
+
+    ``high_energy_min_kev`` remains an internal metadata field for older job
+    records; the profile-first CLI always leaves it unset.
 
     ``performance_repetitions > 1`` runs uncached sessions against isolated
     job-local checkpoint roots. It is intentionally monolithic: repetitions

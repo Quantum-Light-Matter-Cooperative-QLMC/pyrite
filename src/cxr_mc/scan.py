@@ -6,16 +6,15 @@ non-interactively -- in particular over SSH on the GPU box; see cxr_mc.remote,
 which drives this and pulls the checkpoint back so interactive analysis and
 static-HTML export can stay on the laptop.
 
-    cxr scan mose2                # the full per-material grid (config)
-    cxr scan mose2 --fidelity survey  # provisional reduced survey
-    cxr scan mose2 --quick           # tiny grid: smoke test / pipeline check
-    cxr scan mose2 --workers 0    # serial (no transport worker pool)
-    cxr scan --all                # verified `materials` list only
-    cxr scan --all --include-unverified-dw --include-high-energy  # + no_verified_dw + high_energy_materials (>=150 keV)
-    cxr scan --all --include-high-energy --high-energy-min-kev 200  # override the 150 keV floor
-    cxr scan -A                    # every material in mats_to_sim.toml, no exceptions
+    cxr run                        # standard profile membership
+    cxr run sub_100keV             # named profile membership
+    cxr run standard -m mose2     # one standard-profile member
+    cxr run standard -m mose2 --fidelity survey
+    cxr run standard -m mose2 --quick
+    cxr run standard -m mose2 --workers 0
 
-(equivalently ``python -m cxr_mc._entry.scan mose2`` via the module shim).
+(equivalently ``python -m cxr_mc._entry.scan standard -m mose2`` via the
+module shim).
 
 The ``if __name__ == "__main__"`` guard on the entry point is REQUIRED, not
 stylistic: run_cases farms the electron transport out to a process pool, and the
@@ -115,7 +114,7 @@ def _manifest_list(raw, path: Path, key: str, *, required: bool) -> list[str]:
 
 
 def load_all_materials(path: Path | None = None) -> list[str]:
-    """Read the ordered ``materials`` list used by ``cxr scan --all``."""
+    """Read the ordered verified-material manifest group."""
     path = MATS_FILE if path is None else path
     raw = _read_manifest_toml(path)
     return _manifest_list(raw, path, "materials", required=True)
@@ -168,72 +167,31 @@ def _performance_profile(ctx, param, value):
 
 
 @click.command(
-    "scan",
+    "run",
     help=(
-        "Run one material's MC sweep and write its checkpoint.\n\n"
-        "Pass MATERIAL, --all, or -A/--actually-all, never more than one. --all "
-        "runs the verified `materials` list, optionally widened with "
-        "--include-unverified-dw and/or --include-high-energy (floored at "
-        "--high-energy-min-kev, default 150). -A runs every material in "
-        "mats_to_sim.toml, no exceptions.\n\n"
+        "Run a catalog profile's MC sweeps and write checkpoints.\n\n"
+        "PROFILE defaults to standard and owns material membership, campaign "
+        "ranges, and workload settings. Use -m/--material to run one profile "
+        "member instead of the full resolved membership.\n\n"
         "Resumes compatible checkpoints in CHECKPOINTS. Full writes "
         "<material>.pkl-compatible data in <material>/; variants use "
-        "identity-qualified stems.\n\n"
-        "Beam overrides: --beam-transverse-fwhm-{x,y}-mm, "
-        "--beam-bunch-length-fs/--beam-long-shape, "
-        "--beam-rep-rate-hz, and --beam-bunch-charge-pc replace resolved "
-        "catalog-profile distribution values. Beam energy always remains the "
-        "material scan grid; this command deliberately has no energy override."
+        "identity-qualified stems."
     ),
 )
 @click.argument(
-    "material",
+    "catalog_profile",
     required=False,
+    default="standard",
+    metavar="[PROFILE]",
+    shell_complete=_cli_completion.complete_profile,
+)
+@click.option(
+    "-m",
+    "--material",
     type=_cli_completion.MATERIAL,
-    shell_complete=_cli_completion.complete_material,
-)
-@click.option(
-    "-a",
-    "--all",
-    "all_",
-    is_flag=True,
-    help="Run mats_to_sim.toml's verified `materials` list; takes no MATERIAL.",
-)
-@click.option(
-    "-A",
-    "--actually-all",
-    "actually_all",
-    is_flag=True,
-    help=(
-        "Run every material in mats_to_sim.toml -- materials, no_verified_dw, "
-        "high_energy_materials, and materials_to_leave_out combined; takes no "
-        "MATERIAL. Not combined with --all/--include-unverified-dw/--include-high-energy."
-    ),
-)
-@click.option(
-    "--include-unverified-dw",
-    is_flag=True,
-    help="With --all, also run mats_to_sim.toml's no_verified_dw materials.",
-)
-@click.option(
-    "--include-high-energy",
-    is_flag=True,
-    help=(
-        "With --all, also run mats_to_sim.toml's high_energy_materials, "
-        "filtered to --high-energy-min-kev and above."
-    ),
-)
-@click.option(
-    "--high-energy-min-kev",
-    type=_cli_core.POSITIVE_FLOAT,
     default=None,
-    metavar="KEV",
-    help=(
-        "Energy floor applied to any selected high_energy_materials member "
-        "[default: 150.0 when selected via --include-high-energy/-A]. With an "
-        "explicit MATERIAL, applies only if that material is itself a "
-        "high_energy_materials entry; a no-op on every other material."
-    ),
+    shell_complete=_cli_completion.complete_material,
+    help="Run one member of PROFILE instead of its full membership.",
 )
 @click.option(
     "--workers",
@@ -251,57 +209,6 @@ def _performance_profile(ctx, param, value):
     type=_cli_core.POSITIVE_INT,
     default=None,
     help="Override positive dominant reflection-family count.",
-)
-@click.option(
-    "--beam-uvw",
-    type=int,
-    nargs=3,
-    callback=_beam_uvw,
-    default=None,
-    metavar="H K L",
-    help="Override nonzero integer beam zone axis [uvw].",
-)
-@click.option(
-    "--beam-transverse-fwhm-x-mm",
-    type=_cli_core.NONNEGATIVE_FLOAT,
-    default=None,
-    metavar="MM",
-    help="Beam horizontal Gaussian spot FWHM [mm]; overrides the resolved profile.",
-)
-@click.option(
-    "--beam-transverse-fwhm-y-mm",
-    type=_cli_core.NONNEGATIVE_FLOAT,
-    default=None,
-    metavar="MM",
-    help="Beam vertical Gaussian spot FWHM [mm]; overrides the resolved profile.",
-)
-@click.option(
-    "--beam-bunch-length-fs",
-    type=_cli_core.NONNEGATIVE_FLOAT,
-    default=None,
-    metavar="FS",
-    help="Longitudinal bunch RMS length [fs]; 0 is a point bunch.",
-)
-@click.option(
-    "--beam-long-shape",
-    type=click.Choice(("gaussian", "uniform"), case_sensitive=False),
-    default=None,
-    metavar="SHAPE",
-    help="Longitudinal bunch shape: gaussian or uniform; needs --beam-bunch-length-fs.",
-)
-@click.option(
-    "--beam-rep-rate-hz",
-    type=_cli_core.NONNEGATIVE_FLOAT,
-    default=None,
-    metavar="HZ",
-    help="Beam repetition rate [Hz]; overrides the resolved profile.",
-)
-@click.option(
-    "--beam-bunch-charge-pc",
-    type=_cli_core.NONNEGATIVE_FLOAT,
-    default=None,
-    metavar="PC",
-    help="Single-bunch charge [pC]; overrides the resolved profile.",
 )
 @click.option(
     "--coherent/--incoherent",
@@ -334,6 +241,7 @@ def _performance_profile(ctx, param, value):
     callback=_performance_profile,
     default=None,
     metavar="NAME",
+    hidden=True,
     help=(
         "Run catalog profile NAME while sampling CPU pressure, RAM/swap, GPU clocks/"
         "VRAM, process-tree, phase timing, queue, case, worker, and chunk metrics "
@@ -348,7 +256,8 @@ def _performance_profile(ctx, param, value):
     hidden=True,
 )
 @click.option(
-    "--performance-interval",
+    "--perf-interval",
+    "performance_interval",
     type=_cli_core.POSITIVE_FLOAT,
     default=5.0,
     hidden=True,
@@ -356,33 +265,14 @@ def _performance_profile(ctx, param, value):
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option("--no-progress", is_flag=True, hidden=True)
 @_cli_core.fidelity_option()
-@click.option(
-    "--profile",
-    "catalog_profile",
-    default="standard",
-    show_default=True,
-    help="Catalog profile to run (e.g. standard, sub_100keV).",
-)
 @_cli_core.json_option
 def command(
+    catalog_profile,
     material,
-    all_,
-    actually_all,
-    include_unverified_dw,
-    include_high_energy,
-    high_energy_min_kev,
     workers,
     fidelity,
-    catalog_profile,
     quick,
     n_families,
-    beam_uvw,
-    beam_transverse_fwhm_x_mm,
-    beam_transverse_fwhm_y_mm,
-    beam_bunch_length_fs,
-    beam_long_shape,
-    beam_rep_rate_hz,
-    beam_bunch_charge_pc,
     coherent,
     checkpoint_dir,
     max_minutes,
@@ -402,51 +292,29 @@ def command(
     # smoke test rather than silently clobber.
     if quick and coherent:
         raise click.UsageError("--quick cannot be combined with --coherent")
-    if actually_all and material is not None:
-        raise click.UsageError("scan -A/--actually-all does not take a material name")
-    if actually_all and all_:
-        raise click.UsageError("scan -A/--actually-all already includes --all; drop --all")
-    if actually_all and include_unverified_dw:
-        raise click.UsageError("scan -A/--actually-all already includes --include-unverified-dw")
-    if actually_all and include_high_energy:
-        raise click.UsageError("scan -A/--actually-all already includes --include-high-energy")
-    if all_ and material is not None:
-        raise click.UsageError("scan --all does not take a material name")
-    if include_unverified_dw and not all_:
-        raise click.UsageError("--include-unverified-dw requires --all")
-    if include_high_energy and not all_:
-        raise click.UsageError("--include-high-energy requires --all")
-    if not all_ and not actually_all and material is None:
-        from .materials import CATALOG
-
-        resolved_profile = _resolve_catalog_profile(catalog_profile, performance_profile)
-        has_membership = (
-            resolved_profile in CATALOG.profile_names
-            and CATALOG.profile_materials(resolved_profile) is not None
-        )
-        if not has_membership:
-            raise click.UsageError("scan needs a material name, or use --all/-A")
+    resolved_profile = _resolve_catalog_profile(catalog_profile, performance_profile)
+    resolve_profile_materials(resolved_profile, material)
     if not json_output:
         return _cli_core.invoke_legacy(
             run,
             material=material,
-            all=all_,
-            actually_all=actually_all,
-            include_unverified_dw=include_unverified_dw,
-            include_high_energy=include_high_energy,
-            high_energy_min_kev=high_energy_min_kev,
+            all=False,
+            actually_all=False,
+            include_unverified_dw=False,
+            include_high_energy=False,
+            high_energy_min_kev=None,
             workers=workers,
             fidelity=fidelity,
             catalog_profile=catalog_profile,
             quick=quick,
             n_families=n_families,
-            beam_uvw=beam_uvw,
-            beam_transverse_fwhm_x_mm=beam_transverse_fwhm_x_mm,
-            beam_transverse_fwhm_y_mm=beam_transverse_fwhm_y_mm,
-            beam_bunch_length_fs=beam_bunch_length_fs,
-            beam_long_shape=beam_long_shape,
-            beam_rep_rate_hz=beam_rep_rate_hz,
-            beam_bunch_charge_pc=beam_bunch_charge_pc,
+            beam_uvw=None,
+            beam_transverse_fwhm_x_mm=None,
+            beam_transverse_fwhm_y_mm=None,
+            beam_bunch_length_fs=None,
+            beam_long_shape=None,
+            beam_rep_rate_hz=None,
+            beam_bunch_charge_pc=None,
             coherent=coherent,
             checkpoint_dir=checkpoint_dir,
             max_minutes=max_minutes,
@@ -459,23 +327,23 @@ def command(
     return _cli_core.invoke_legacy(
         _run_json,
         material=material,
-        all=all_,
-        actually_all=actually_all,
-        include_unverified_dw=include_unverified_dw,
-        include_high_energy=include_high_energy,
-        high_energy_min_kev=high_energy_min_kev,
+        all=False,
+        actually_all=False,
+        include_unverified_dw=False,
+        include_high_energy=False,
+        high_energy_min_kev=None,
         workers=workers,
         fidelity=fidelity,
         catalog_profile=catalog_profile,
         quick=quick,
         n_families=n_families,
-        beam_uvw=beam_uvw,
-        beam_transverse_fwhm_x_mm=beam_transverse_fwhm_x_mm,
-        beam_transverse_fwhm_y_mm=beam_transverse_fwhm_y_mm,
-        beam_bunch_length_fs=beam_bunch_length_fs,
-        beam_long_shape=beam_long_shape,
-        beam_rep_rate_hz=beam_rep_rate_hz,
-        beam_bunch_charge_pc=beam_bunch_charge_pc,
+        beam_uvw=None,
+        beam_transverse_fwhm_x_mm=None,
+        beam_transverse_fwhm_y_mm=None,
+        beam_bunch_length_fs=None,
+        beam_long_shape=None,
+        beam_rep_rate_hz=None,
+        beam_bunch_charge_pc=None,
         coherent=coherent,
         checkpoint_dir=checkpoint_dir,
         max_minutes=max_minutes,
@@ -485,9 +353,6 @@ def command(
         progress_file=progress_file,
         no_progress=no_progress,
     )
-
-
-DEFAULT_HIGH_ENERGY_MIN_KEV = 150.0
 
 
 def _resolve_catalog_profile(catalog_profile: str, performance_profile: str | None) -> str:
@@ -572,71 +437,10 @@ def resolve_profile_materials(catalog_profile: str, material: str | None = None)
 
 
 def _selected(args):
-    """Resolve MATERIAL/--all/-A plus the include-* flags into an ordered,
-    deduplicated material list; also stashes ``args.high_energy_floor_map``
-    (material -> keV floor) so ``_resolved_run`` can filter high-energy-only
-    materials' energy grids regardless of which flag pulled them in."""
-    all_ = getattr(args, "all", False)
-    actually_all = getattr(args, "actually_all", False)
+    """Resolve profile-owned membership plus an optional one-material override."""
     catalog_profile = _effective_catalog_profile(args)
     args.high_energy_floor_map = {}
-    if all_ or actually_all:
-        if args.material is not None:
-            raise SystemExit("scan --all/-A does not take a material name")
-        groups = load_manifest_groups()
-        if actually_all:
-            materials = list(
-                dict.fromkeys(
-                    [
-                        *groups["materials"],
-                        *groups["no_verified_dw"],
-                        *groups["high_energy_materials"],
-                        *groups["materials_to_leave_out"],
-                    ]
-                )
-            )
-            high_energy_selected = set(groups["high_energy_materials"])
-        else:
-            materials = list(groups["materials"])
-            if getattr(args, "include_unverified_dw", False):
-                materials += groups["no_verified_dw"]
-            high_energy_selected = set()
-            if getattr(args, "include_high_energy", False):
-                materials += groups["high_energy_materials"]
-                high_energy_selected = set(groups["high_energy_materials"])
-            materials = list(dict.fromkeys(materials))
-        materials = validate_catalog_profile(catalog_profile, materials, intersect=True)
-        allowed = set(materials)
-        high_energy_selected &= allowed
-        if high_energy_selected:
-            floor = getattr(args, "high_energy_min_kev", None)
-            floor = DEFAULT_HIGH_ENERGY_MIN_KEV if floor is None else floor
-            args.high_energy_floor_map = {m: floor for m in high_energy_selected}
-    elif args.material is not None:
-        materials = [args.material]
-        materials = validate_catalog_profile(catalog_profile, materials, intersect=False)
-        # A direct MATERIAL invocation only applies the floor when the flag is
-        # explicitly given (no surprise default) AND the material is itself a
-        # high_energy_materials entry (a no-op otherwise) -- this is what lets
-        # `cxr remote submit` forward one shared --high-energy-min-kev across a
-        # mixed batch without it misfiring on non-high-energy materials.
-        floor = getattr(args, "high_energy_min_kev", None)
-        if floor is not None:
-            high_energy_materials = load_manifest_groups().get("high_energy_materials", [])
-            if args.material in high_energy_materials:
-                args.high_energy_floor_map = {args.material: floor}
-    else:
-        from .materials import CATALOG
-
-        if catalog_profile not in CATALOG.profile_names:
-            available = ", ".join(sorted(CATALOG.profile_names)) or "(none defined)"
-            raise click.UsageError(f"unknown profile {catalog_profile!r}; available: {available}")
-        membership = CATALOG.profile_materials(catalog_profile)
-        if membership is None:
-            raise SystemExit("scan needs a material name, or use --all/-A")
-        materials = list(membership)
-    validate_materials(materials)
-    return materials
+    return resolve_profile_materials(catalog_profile, getattr(args, "material", None))
 
 
 def run(args):
@@ -687,7 +491,7 @@ def _run_json(args):
         for material in [*completed, *failed]
     ]
     result = cli_json.operation_summary(
-        "scan",
+        "run",
         materials,
         completed,
         failed_materials=failed,
@@ -1118,7 +922,7 @@ def _write_progress_record(
 
 
 def main(argv=None):
-    return _cli_core.run(command, argv, prog_name="cxr scan")
+    return _cli_core.run(command, argv, prog_name="cxr run")
 
 
 if __name__ == "__main__":

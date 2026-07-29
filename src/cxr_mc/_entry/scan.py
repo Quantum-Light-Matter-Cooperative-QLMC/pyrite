@@ -3,7 +3,7 @@
 The remote box invokes ``python -m cxr_mc._entry.scan <material>`` inside its
 uv-synced checkout. The real logic -- and the rationale for the __main__ guard
 (spawn/forkserver re-import the entry module per worker) -- lives in cxr_mc.scan.
-Prefer the installed CLI: ``cxr scan <material>``.
+Prefer the installed CLI: ``cxr run [PROFILE] -m <material>``.
 """
 
 from cxr_mc.materials import MaterialConfigError

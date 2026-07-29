@@ -56,11 +56,11 @@ def _capture(monkeypatch, module, handler_name):
     return seen
 
 
-def test_scan_click_dispatches_defaults_and_zero_workers(monkeypatch):
+def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch):
     seen = _capture(monkeypatch, scan, "run")
     result = invoke(
         scan.command,
-        ["hopg", "--workers", "0", "--beam-uvw", "1", "0", "-1"],
+        ["standard", "-m", "hopg", "--workers", "0"],
     )
     assert_clean_result(result)
     assert seen == {
@@ -75,7 +75,7 @@ def test_scan_click_dispatches_defaults_and_zero_workers(monkeypatch):
         "catalog_profile": "standard",
         "quick": False,
         "n_families": None,
-        "beam_uvw": (1, 0, -1),
+        "beam_uvw": None,
         "beam_transverse_fwhm_x_mm": None,
         "beam_transverse_fwhm_y_mm": None,
         "beam_bunch_length_fs": None,
@@ -93,13 +93,15 @@ def test_scan_click_dispatches_defaults_and_zero_workers(monkeypatch):
     }
 
 
-def test_scan_fidelity_dispatch_and_quick_conflict(monkeypatch):
+def test_run_fidelity_dispatch_and_quick_conflict(monkeypatch):
     seen = _capture(monkeypatch, scan, "run")
-    result = invoke(scan.command, ["hopg", "--fidelity", "survey"])
+    result = invoke(scan.command, ["standard", "-m", "hopg", "--fidelity", "survey"])
     assert_clean_result(result)
     assert seen["fidelity"] == "survey"
 
-    conflict = invoke(scan.command, ["hopg", "--fidelity", "survey", "--quick"])
+    conflict = invoke(
+        scan.command, ["standard", "-m", "hopg", "--fidelity", "survey", "--quick"]
+    )
     assert conflict.exit_code == 2
     assert "cannot be combined" in conflict.stderr
 
@@ -249,8 +251,7 @@ def test_archive_click_dispatch(command, handler_name, argv, expected, monkeypat
 @pytest.mark.parametrize(
     ("command", "argv"),
     [
-        (scan.command, ["hopg", "--workers", "-1"]),
-        (scan.command, ["hopg", "--beam-uvw", "0", "0", "0"]),
+        (scan.command, ["standard", "-m", "hopg", "--workers", "-1"]),
         (blaze.command, ["hopg", "--energy", "0", "--spacing", "1e-6"]),
         (blaze.command, ["hopg", "--energy", "30", "--spacing", "1e-6", "--angles", "90"]),
         (check.command, ["--ne", "0"]),
@@ -275,22 +276,10 @@ def test_slim_dataset_modes_are_mutually_exclusive():
 @pytest.mark.parametrize(
     ("command", "argv", "message"),
     [
-        (scan.command, [], "needs a material"),
-        (scan.command, ["hopg", "--all"], "--all does not take"),
-        (scan.command, ["hopg", "-A"], "-A/--actually-all does not take"),
-        (scan.command, ["--all", "-A"], "already includes --all"),
-        (
-            scan.command,
-            ["-A", "--include-unverified-dw"],
-            "already includes --include-unverified-dw",
-        ),
-        (scan.command, ["-A", "--include-high-energy"], "already includes --include-high-energy"),
-        (scan.command, ["--include-unverified-dw"], "--include-unverified-dw requires --all"),
-        (scan.command, ["--include-high-energy"], "--include-high-energy requires --all"),
         (rebrem.command, [], "needs material"),
         (reline.command, ["hopg", "--all"], "--all does not take"),
         (analyze.command, ["--default"], "--default requires MATERIAL"),
-        (scan.command, ["not-a-material"], "not a configured material"),
+        (scan.command, ["standard", "-m", "not-a-material"], "not a configured material"),
     ],
 )
 def test_local_selection_errors_fail_at_click_boundary(command, argv, message):
@@ -301,86 +290,27 @@ def test_local_selection_errors_fail_at_click_boundary(command, argv, message):
     assert message in result.stderr
 
 
-def test_scan_all_include_flags_dispatch(monkeypatch):
-    seen = _capture(monkeypatch, scan, "run")
-    result = invoke(
-        scan.command,
-        [
-            "--all",
-            "--include-unverified-dw",
-            "--include-high-energy",
-            "--high-energy-min-kev",
-            "200",
-        ],
-    )
-    assert_clean_result(result)
-    assert seen["all"] is True
-    assert seen["include_unverified_dw"] is True
-    assert seen["include_high_energy"] is True
-    assert seen["high_energy_min_kev"] == 200.0
-
-
-def test_scan_actually_all_dispatch(monkeypatch):
-    seen = _capture(monkeypatch, scan, "run")
-    result = invoke(scan.command, ["-A"])
-    assert_clean_result(result)
-    assert seen["actually_all"] is True
-    assert seen["all"] is False
-
-
 @pytest.mark.parametrize(
-    ("argv", "expected_len"),
+    "flag",
     [
-        (["--all"], 21),
-        (["--all", "--include-unverified-dw"], 30),
-        (["--all", "--include-high-energy"], 25),
-        (["--all", "--include-unverified-dw", "--include-high-energy"], 34),
-        (["-A"], 46),
+        "--all",
+        "--actually-all",
+        "--include-unverified-dw",
+        "--include-high-energy",
+        "--high-energy-min-kev",
+        "--beam-uvw",
+        "--beam-transverse-fwhm-x-mm",
+        "--beam-transverse-fwhm-y-mm",
+        "--beam-bunch-length-fs",
+        "--beam-long-shape",
+        "--beam-rep-rate-hz",
+        "--beam-bunch-charge-pc",
     ],
 )
-def test_scan_selection_flags_resolve_expected_material_counts(monkeypatch, argv, expected_len):
-    seen = {}
-
-    def fake_run(args):
-        seen["materials"] = scan._selected(args)
-
-    monkeypatch.setattr(scan, "run", fake_run)
-    result = invoke(scan.command, argv)
-    assert_clean_result(result)
-    assert len(seen["materials"]) == expected_len
-    assert len(seen["materials"]) == len(set(seen["materials"]))
-
-
-def test_scan_include_high_energy_floors_energy_grid(monkeypatch):
-    seen = {}
-
-    def fake_run(args):
-        scan._selected(args)
-        seen["floor_map"] = args.high_energy_floor_map
-
-    monkeypatch.setattr(scan, "run", fake_run)
-    result = invoke(scan.command, ["--all", "--include-high-energy"])
-    assert_clean_result(result)
-    assert set(seen["floor_map"]) == {"tise2", "gep", "ges", "rese2"}
-    assert all(value == 150.0 for value in seen["floor_map"].values())
-
-
-def test_scan_direct_material_ignores_floor_unless_high_energy_tagged(monkeypatch):
-    seen = {}
-
-    def fake_run(args):
-        seen["materials"] = scan._selected(args)
-        seen["floor_map"] = dict(args.high_energy_floor_map)
-
-    monkeypatch.setattr(scan, "run", fake_run)
-
-    tagged = invoke(scan.command, ["tise2", "--high-energy-min-kev", "200"])
-    assert_clean_result(tagged)
-    assert seen["floor_map"] == {"tise2": 200.0}
-
-    untagged = invoke(scan.command, ["hopg", "--high-energy-min-kev", "200"])
-    assert_clean_result(untagged)
-    assert seen["floor_map"] == {}
+def test_run_rejects_removed_selection_and_beam_flags(flag):
+    result = invoke(scan.command, ["standard", flag])
+    assert result.exit_code == 2
+    assert f"No such option '{flag}'" in result.stderr
 
 
 class _FakeCatalog:
@@ -399,14 +329,14 @@ class _FakeCatalog:
         return self._memberships.get(name)
 
 
-def test_scan_unknown_profile_is_usage_error():
-    result = invoke(scan.command, ["hopg", "--profile", "bogus"])
+def test_run_unknown_profile_is_usage_error():
+    result = invoke(scan.command, ["bogus"])
     assert result.exit_code == 2
     assert "unknown profile 'bogus'" in result.stderr
     assert "standard" in result.stderr
 
 
-def test_scan_all_profile_membership_silently_intersects(monkeypatch):
+def test_run_profile_membership_is_default_selection(monkeypatch):
     import cxr_mc.materials as materials_pkg
 
     monkeypatch.setattr(
@@ -418,18 +348,18 @@ def test_scan_all_profile_membership_silently_intersects(monkeypatch):
         seen["materials"] = scan._selected(args)
 
     monkeypatch.setattr(scan, "run", fake_run)
-    result = invoke(scan.command, ["--all", "--profile", "narrowed"])
+    result = invoke(scan.command, ["narrowed"])
     assert_clean_result(result)
     assert seen["materials"] == ["hopg"]
 
 
-def test_scan_explicit_material_outside_profile_is_usage_error(monkeypatch):
+def test_run_explicit_material_outside_profile_is_usage_error(monkeypatch):
     import cxr_mc.materials as materials_pkg
 
     monkeypatch.setattr(
         materials_pkg, "CATALOG", _FakeCatalog(("standard", "narrowed"), {"narrowed": ("hopg",)})
     )
-    result = invoke(scan.command, ["mos2", "--profile", "narrowed"])
+    result = invoke(scan.command, ["narrowed", "-m", "mos2"])
     assert result.exit_code == 2
     assert "does not include" in result.stderr
     assert "hopg" in result.stderr
@@ -459,7 +389,7 @@ def test_resolved_run_threads_catalog_profile_into_material_sweep(monkeypatch):
     profile's grid regardless of `--profile` -- the checkpoint identity/stem
     were correctly tagged `sub_100keV` while the simulated parameters (energy
     grid, thickness, etc.) silently stayed standard's. Caught live: `cxr
-    remote submit --all --profile sub_100keV` still ran 250 keV cases."""
+    remote profile runs still used standard-profile 250 keV cases."""
     import types
 
     from cxr_mc.config import material_sweep as real_material_sweep
@@ -484,7 +414,16 @@ def test_resolved_run_threads_catalog_profile_into_material_sweep(monkeypatch):
 
 def test_standalone_click_usage_error_preserves_exit_and_streams():
     completed = subprocess.run(
-        [sys.executable, "-m", "cxr_mc.scan", "hopg", "--workers", "-1"],
+        [
+            sys.executable,
+            "-m",
+            "cxr_mc.scan",
+            "standard",
+            "-m",
+            "hopg",
+            "--workers",
+            "-1",
+        ],
         capture_output=True,
         text=True,
         check=False,

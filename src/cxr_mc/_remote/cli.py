@@ -22,7 +22,7 @@ from ..cli._core import (
     invoke_legacy,
     run,
 )
-from ..scan import DEFAULT_HIGH_ENERGY_MIN_KEV, load_all_materials, load_manifest_groups
+from ..scan import load_all_materials
 from . import config, lifecycle, presentation, scripts, state, transport, viewer
 
 
@@ -140,121 +140,12 @@ def _profile_default_materials(catalog_profile):
 
 
 def _start_selected(args):
-    """Resolve ``start``/``submit``'s materials plus a resolved high-energy
-    floor, mirroring ``scan._selected``. Unlike ``scan.py``'s per-material
-    floor map, a queue shares one flags string across every material in the
-    batch, so this returns a single floor (or ``None``); ``--high-energy-min-kev``
-    is a no-op for any queued material outside ``high_energy_materials``, so
-    it is safe to forward blindly.
-
-    With no ``--material``/``--all``/``-A``, the profile's explicit membership
-    is the selection. A profile with no membership row uses the verified
-    ``materials`` manifest group."""
+    """Validate the profile-owned material selection prepared by ``remote run``."""
     from ..scan import validate_catalog_profile
 
-    explicit = list(getattr(args, "materials", None) or [])
-    all_ = getattr(args, "all", False)
-    actually_all = getattr(args, "actually_all", False)
+    materials = list(getattr(args, "materials", None) or [])
     catalog_profile = getattr(args, "catalog_profile", "standard")
-    high_energy_min_kev = None
-    if all_ or actually_all:
-        if explicit:
-            raise SystemExit(f"{args.remote_command} --all/-A does not take material names")
-        groups = load_manifest_groups(config.MATS_FILE)
-        if actually_all:
-            materials = list(
-                dict.fromkeys(
-                    [
-                        *groups["materials"],
-                        *groups["no_verified_dw"],
-                        *groups["high_energy_materials"],
-                        *groups["materials_to_leave_out"],
-                    ]
-                )
-            )
-            high_energy_selected = set(groups["high_energy_materials"])
-        else:
-            materials = list(groups["materials"])
-            if getattr(args, "include_unverified_dw", False):
-                materials += groups["no_verified_dw"]
-            high_energy_selected = set()
-            if getattr(args, "include_high_energy", False):
-                materials += groups["high_energy_materials"]
-                high_energy_selected = set(groups["high_energy_materials"])
-            materials = list(dict.fromkeys(materials))
-        materials = validate_catalog_profile(catalog_profile, materials, intersect=True)
-        high_energy_selected &= set(materials)
-        if high_energy_selected:
-            floor = getattr(args, "high_energy_min_kev", None)
-            high_energy_min_kev = DEFAULT_HIGH_ENERGY_MIN_KEV if floor is None else floor
-    elif explicit:
-        materials = validate_catalog_profile(catalog_profile, explicit, intersect=False)
-        floor = getattr(args, "high_energy_min_kev", None)
-        if floor is not None:
-            tagged = set(load_manifest_groups(config.MATS_FILE)["high_energy_materials"])
-            if tagged.intersection(materials):
-                high_energy_min_kev = floor
-    else:
-        membership = _profile_default_materials(catalog_profile)
-        materials = (
-            list(membership)
-            if membership is not None
-            else list(load_manifest_groups(config.MATS_FILE)["materials"])
-        )
-        materials = validate_catalog_profile(catalog_profile, materials, intersect=True)
-        floor = getattr(args, "high_energy_min_kev", None)
-        if floor is not None:
-            tagged = set(load_manifest_groups(config.MATS_FILE)["high_energy_materials"])
-            if tagged.intersection(materials):
-                high_energy_min_kev = floor
-    return materials, high_energy_min_kev
-
-
-def _cli_scan(args):
-    if args.quick and args.grid:
-        raise SystemExit(
-            "scan --quick --grid: quick checkpoints aren't grid-filterable "
-            "(their grid isn't reproducible from material_sweep), so the "
-            "trailing pull would fail after the whole sweep ran. Drop --grid."
-        )
-    materials = _selected_materials(args, "material")
-    # `start_queue` validates material tokens, refuses checkpoint collisions,
-    # syncs once, and submits one bounded-concurrency scheduler job for the materials.
-    jobid = lifecycle.start_queue(
-        materials,
-        quick=args.quick,
-        fidelity=getattr(args, "fidelity", "full"),
-        workers=args.workers,
-        parallel_materials=getattr(args, "parallel_materials", None),
-        chunk_minutes=getattr(args, "chunk_minutes", 10.0),
-        no_sync=args.no_sync,
-        performance_profile=getattr(args, "performance_profile", None),
-    )
-    if not viewer.attach(jobid):
-        emit_diagnostic("scan is still running or its viewer disconnected; skipping automatic pull")
-        return
-    completed = state._completed_materials(jobid, materials)
-    if not completed:
-        emit_diagnostic(
-            "warning: the SLURM scan produced no successful checkpoints; nothing to pull"
-        )
-        return
-    stems = scripts._stems(completed, args.quick, getattr(args, "fidelity", "full"))
-    # Code is already synced by the queue, so a grid pull skips its own sync;
-    # preserve the requested grid/trim policy.
-    lifecycle.pull(
-        stems,
-        grid=args.grid,
-        drop_wide_brem=args.drop_wide_brem,
-        downcast=args.downcast,
-        no_sync=True,
-    )
-    for stem in stems:
-        print(
-            f"\ndone. checkpoints/{stem}/ is local; run `cxr app analysis {stem}` "
-            f"(or run `cxr app analysis export`) -- visualization and static-HTML export "
-            "stay local."
-        )
+    return validate_catalog_profile(catalog_profile, materials, intersect=False), None
 
 
 def _cli_rebrem(args):
@@ -402,7 +293,7 @@ def _cli_start(args):
         return
     if not viewer.attach(jobid):
         emit_diagnostic(
-            "submit is still running or its viewer disconnected; skipping automatic pull"
+            "run is still active or its viewer disconnected; skipping automatic pull"
         )
         return
     profiling_only = getattr(args, "performance_repetitions", 1) > 1 or getattr(args, "nsys", False)
@@ -431,6 +322,7 @@ def _cli_start(args):
         grid=args.grid,
         drop_wide_brem=args.drop_wide_brem,
         downcast=args.downcast,
+        level9=getattr(args, "level9", False),
         no_sync=True,
     )
     for stem in stems:
@@ -600,9 +492,9 @@ def _reject_all_with_values(command_name, all_, values):
         "over workflow defaults where offered.\n\n"
         "\b\n"
         "Examples:\n"
-        "  cxr remote submit sub_100keV --dry-run\n"
-        "  cxr remote submit compute_test_300keV -p\n"
-        "  cxr remote submit standard -m hopg\n"
+        "  cxr remote run sub_100keV --dry-run\n"
+        "  cxr remote run compute_test_300keV -p\n"
+        "  cxr remote run standard -m hopg\n"
         "  cxr remote status -vv"
     ),
     no_args_is_help=False,
@@ -610,107 +502,6 @@ def _reject_all_with_values(command_name, all_, values):
 def command():
     """Push code and run or manage MC sweeps on a remote GPU box."""
     _ensure_utf8_stdio()
-
-
-@command.command(
-    "scan",
-    help="Deprecated alias for `cxr remote submit`.",
-    deprecated="Use 'cxr remote submit'.",
-)
-@click.argument(
-    "material",
-    required=False,
-    metavar="[MATERIAL]",
-    shell_complete=_cli_completion.complete_material,
-)
-@click.option("-a", "--all", "all_", is_flag=True, help="Run every material in mats_to_sim.toml.")
-@fidelity_option(help="Named settings/grid policy. survey is provisional and reduced.")
-@click.option(
-    "--quick",
-    is_flag=True,
-    help="Smoke-test grid; incompatible with --grid.",
-)
-@click.option(
-    "--workers",
-    type=NONNEGATIVE_INT,
-    default=None,
-    help="Workers; 0 runs serially (default auto).",
-)
-@click.option(
-    "--parallel-materials",
-    type=click.IntRange(1, config.MAX_PARALLEL_MATERIALS),
-    default=None,
-    metavar="N",
-    help="Simultaneous scans in one allocation; requires --chunk-minutes 0.",
-    shell_complete=_cli_completion.choice_completer(range(1, config.MAX_PARALLEL_MATERIALS + 1)),
-)
-@click.option(
-    "--chunk-minutes",
-    type=NONNEGATIVE_FLOAT,
-    default=10.0,
-    show_default=True,
-    help="Self-resubmitting SLURM slice length; 0 runs one monolithic job.",
-)
-@click.option(
-    "--performance-profile",
-    callback=_performance_profile_name,
-    default=None,
-    metavar="NAME",
-    help=(
-        "Log CPU pressure, RAM/swap, GPU clocks/VRAM, process, phase timing, "
-        "queue, worker, chunk, and case metrics every 5 s."
-    ),
-)
-@click.option("--no-sync", is_flag=True, help="Skip code upload.")
-@click.option(
-    "--grid",
-    is_flag=True,
-    help="Grid-filter checkpoint before pulling; incompatible with --quick.",
-)
-@click.option("--drop-wide-brem", is_flag=True, help="With --grid, drop wide-brem.")
-@click.option("--downcast", is_flag=True, help="With --grid, downcast to float32.")
-def scan_command(
-    material,
-    all_,
-    fidelity,
-    quick,
-    workers,
-    parallel_materials,
-    chunk_minutes,
-    performance_profile,
-    no_sync,
-    grid,
-    drop_wide_brem,
-    downcast,
-):
-    values = [material] if material else []
-    _reject_all_with_values("scan", all_, values)
-    if quick and grid:
-        raise click.UsageError(
-            "scan --quick --grid: quick checkpoints aren't grid-filterable; drop --grid"
-        )
-    if quick and fidelity != "full":
-        raise click.UsageError("--quick cannot be combined with --fidelity survey")
-    if parallel_materials is not None and chunk_minutes != 0:
-        raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
-    return _invoke_click(
-        _cli_scan,
-        _click_args(
-            "scan",
-            material=material,
-            all=all_,
-            fidelity=fidelity,
-            quick=quick,
-            workers=workers,
-            parallel_materials=parallel_materials,
-            chunk_minutes=chunk_minutes,
-            performance_profile=performance_profile,
-            no_sync=no_sync,
-            grid=grid,
-            drop_wide_brem=drop_wide_brem,
-            downcast=downcast,
-        ),
-    )
 
 
 def _recompute_options(function):
@@ -841,15 +632,15 @@ def reline_command(
 
 
 @click.command(
-    "submit",
+    "run",
     help=(
         "Sync code, submit sweep(s), track progress, and pull checkpoints.\n\n"
         "Use --headless to return after submission. Use --no-pull to track "
         "through completion without automatically pulling checkpoints.\n\n"
         "PROFILE selects the catalog campaign and its material membership. "
         "Use -m/--material to run one member only. Profiles without an explicit "
-        "membership use mats_to_sim.toml's verified materials list.\n\n"
-        "A profile submit names the job after PROFILE (NAME, then "
+        "membership run every in-use catalog material.\n\n"
+        "A profile run names the job after PROFILE (NAME, then "
         "NAME-2 once a finished run holds the bare name) and refuses while "
         "another job under the same profile is live."
     ),
@@ -857,6 +648,7 @@ def reline_command(
 @click.argument(
     "catalog_profile",
     required=False,
+    default="standard",
     metavar="[PROFILE]",
     shell_complete=_cli_completion.complete_profile,
 )
@@ -866,54 +658,7 @@ def reline_command(
     shell_complete=_cli_completion.complete_material,
     help="Run one material from PROFILE instead of its full membership.",
 )
-@click.option(
-    "-a", "--all", "all_", is_flag=True, help="Queue mats_to_sim.toml's verified `materials` list."
-)
-@click.option(
-    "-A",
-    "--actually-all",
-    "actually_all",
-    is_flag=True,
-    help=(
-        "Queue every material in mats_to_sim.toml -- materials, no_verified_dw, "
-        "high_energy_materials, and materials_to_leave_out combined. Not "
-        "combined with --all/--include-unverified-dw/--include-high-energy or "
-        "explicit materials."
-    ),
-)
-@click.option(
-    "--include-unverified-dw",
-    is_flag=True,
-    help="With --all, also queue mats_to_sim.toml's no_verified_dw materials.",
-)
-@click.option(
-    "--include-high-energy",
-    is_flag=True,
-    help=(
-        "With --all, also queue mats_to_sim.toml's high_energy_materials, "
-        "filtered to --high-energy-min-kev and above."
-    ),
-)
-@click.option(
-    "--high-energy-min-kev",
-    type=POSITIVE_FLOAT,
-    default=None,
-    metavar="KEV",
-    help=(
-        "Energy floor applied to any queued high_energy_materials member "
-        "[default: 150.0 when selected via --include-high-energy/-A]. With "
-        "explicit MATERIAL(s), applies only to those that are themselves "
-        "high_energy_materials entries; a no-op on every other material."
-    ),
-)
 @fidelity_option(help="Named settings/grid policy. survey is provisional and reduced.")
-@click.option(
-    "--profile",
-    "legacy_catalog_profile",
-    default=None,
-    hidden=True,
-    help="Deprecated compatibility form for positional PROFILE.",
-)
 @click.option("--quick", is_flag=True, help="Use tiny smoke-test grid.")
 @click.option(
     "--workers",
@@ -946,7 +691,9 @@ def reline_command(
     ),
 )
 @click.option(
-    "--performance-repetitions",
+    "-r",
+    "--perf-reps",
+    "performance_repetitions",
     type=click.IntRange(1, 20),
     default=1,
     show_default=True,
@@ -958,7 +705,9 @@ def reline_command(
     ),
 )
 @click.option(
-    "--performance-interval",
+    "-i",
+    "--perf-interval",
+    "performance_interval",
     type=POSITIVE_FLOAT,
     default=5.0,
     show_default=True,
@@ -985,7 +734,7 @@ def reline_command(
     help=(
         "Capture one uncached full-profile session with Nsight Systems CUDA/NVTX "
         "and Python-stack tracing; requires exactly one material, --perf, "
-        "--performance-repetitions 1, and --chunk-minutes 0."
+        "--perf-reps 1, and --chunk-minutes 0."
     ),
 )
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
@@ -1007,17 +756,15 @@ def reline_command(
 )
 @click.option("--drop-wide-brem", is_flag=True, help="With --grid, drop wide-brem.")
 @click.option("--downcast", is_flag=True, help="With --grid, downcast to float32.")
-@click.option("-f", "--follow", is_flag=True, hidden=True)
+@click.option(
+    "--level9",
+    is_flag=True,
+    help="Recompress completed checkpoints at gzip level 9 before automatic pull.",
+)
 def start_command(
     catalog_profile,
     material,
-    all_,
-    actually_all,
-    include_unverified_dw,
-    include_high_energy,
-    high_energy_min_kev,
     fidelity,
-    legacy_catalog_profile,
     quick,
     workers,
     parallel_materials,
@@ -1035,22 +782,17 @@ def start_command(
     grid,
     drop_wide_brem,
     downcast,
-    follow,
+    level9,
 ):
-    if catalog_profile is not None and legacy_catalog_profile is not None:
-        raise click.UsageError("PROFILE and --profile cannot be combined")
-    catalog_profile = catalog_profile or legacy_catalog_profile
-    missing_selection = (
-        catalog_profile is None and material is None and not all_ and not actually_all
-    )
-    catalog_profile = catalog_profile or "standard"
-    materials = [material] if material is not None else []
+    from ..scan import resolve_profile_materials
+
+    materials = resolve_profile_materials(catalog_profile, material)
     performance_profile = catalog_profile if perf else None
     if performance_profile is None:
         if performance_repetitions != 1:
-            raise click.UsageError("--performance-repetitions requires --perf")
+            raise click.UsageError("--perf-reps requires --perf")
         if performance_interval != 5.0:
-            raise click.UsageError("--performance-interval requires --perf")
+            raise click.UsageError("--perf-interval requires --perf")
         if spec_chunk is not None:
             raise click.UsageError("--spec-chunk requires --perf")
         if brem_chunk is not None:
@@ -1058,54 +800,35 @@ def start_command(
         if nsys:
             raise click.UsageError("--nsys requires --perf")
     if performance_repetitions > 1 and chunk_minutes != 0:
-        raise click.UsageError("--performance-repetitions requires --chunk-minutes 0")
+        raise click.UsageError("--perf-reps requires --chunk-minutes 0")
     if performance_repetitions > 1 and parallel_materials not in (None, 1):
-        raise click.UsageError("--performance-repetitions requires one material process per GPU")
+        raise click.UsageError("--perf-reps requires one material process per GPU")
     if nsys and chunk_minutes != 0:
         raise click.UsageError("--nsys requires --chunk-minutes 0")
     if nsys and performance_repetitions != 1:
-        raise click.UsageError("--nsys requires --performance-repetitions 1")
+        raise click.UsageError("--nsys requires --perf-reps 1")
     if nsys and parallel_materials not in (None, 1):
         raise click.UsageError("--nsys requires one material process per GPU")
-    if actually_all and materials:
-        raise click.UsageError("start -A/--actually-all does not take material names")
-    if actually_all and all_:
-        raise click.UsageError("start -A/--actually-all already includes --all; drop --all")
-    if actually_all and include_unverified_dw:
-        raise click.UsageError("start -A/--actually-all already includes --include-unverified-dw")
-    if actually_all and include_high_energy:
-        raise click.UsageError("start -A/--actually-all already includes --include-high-energy")
-    if include_unverified_dw and not all_:
-        raise click.UsageError("--include-unverified-dw requires --all")
-    if include_high_energy and not all_:
-        raise click.UsageError("--include-high-energy requires --all")
-    if missing_selection:
-        raise click.UsageError("submit needs PROFILE, -m/--material, --all, or -A")
-    if not actually_all:
-        if all_ and materials:
-            raise click.UsageError("start --all does not take material names")
     if parallel_materials is not None and chunk_minutes != 0:
         raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
     if quick and fidelity != "full":
         raise click.UsageError("--quick cannot be combined with --fidelity survey")
     if quick and grid:
         raise click.UsageError(
-            "submit --quick --grid: quick checkpoints aren't grid-filterable; drop --grid"
+            "run --quick --grid: quick checkpoints aren't grid-filterable; drop --grid"
         )
     if headless and no_pull:
         raise click.UsageError("--headless cannot be combined with --no-pull")
-    if headless and follow:
-        raise click.UsageError("--headless cannot be combined with --follow")
     return _invoke_click(
         _cli_start,
         _click_args(
-            "start",
+            "run",
             materials=materials,
-            all=all_,
-            actually_all=actually_all,
-            include_unverified_dw=include_unverified_dw,
-            include_high_energy=include_high_energy,
-            high_energy_min_kev=high_energy_min_kev,
+            all=False,
+            actually_all=False,
+            include_unverified_dw=False,
+            include_high_energy=False,
+            high_energy_min_kev=None,
             fidelity=fidelity,
             catalog_profile=catalog_profile,
             quick=quick,
@@ -1125,31 +848,12 @@ def start_command(
             grid=grid,
             drop_wide_brem=drop_wide_brem,
             downcast=downcast,
-            follow=follow,
+            level9=level9,
         ),
     )
 
 
 command.add_command(start_command)
-_scan_alias = copy(start_command)
-_scan_alias.name = "scan"
-_scan_alias.deprecated = "Use 'cxr remote submit'."
-_scan_alias.help = "Deprecated alias for `cxr remote submit`.\n\n" + (start_command.help or "")
-_scan_alias.params = [copy(parameter) for parameter in start_command.params]
-command.add_command(_scan_alias)
-
-_start_alias = copy(start_command)
-_start_alias.name = "start"
-_start_alias.hidden = True
-_start_alias.params = [copy(parameter) for parameter in start_command.params]
-for _parameter in _start_alias.params:
-    if isinstance(_parameter, click.Option) and "--follow" in _parameter.opts:
-        _parameter.hidden = False
-        _parameter.help = (
-            "Compatibility flag: track after launching. `submit` now tracks by default; "
-            "use --headless to detach."
-        )
-command.add_command(_start_alias)
 
 
 @command.command("attach", help="Live-track a remote job; defaults to latest.")
@@ -1283,7 +987,7 @@ def reap_command(min_age_minutes, yes):
         "Fetch existing checkpoints from remote box.\n\n"
         "STEM is usually a bare material name, but MATERIAL@PROFILE selects the "
         "checkpoint the box produced for that catalog profile (--profile on "
-        "`cxr remote submit`) -- on-disk names never carry the profile, so this "
+        "`cxr remote run`) -- on-disk names never carry the profile, so this "
         "reads each candidate's meta.json remotely and pulls the newest match; "
         "--hash pins a specific parameter-hash prefix when more than one exists."
     ),

@@ -68,7 +68,7 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   `prune:command`: preview or atomically rewrite current named-profile
   checkpoints, retaining only records whose full case payload exactly matches
   current profile resolution. Hidden compatibility alias: `cxr prune`.
-- **`cxr scan <material> [--fidelity full|survey]`** → `scan:main` →
+- **`cxr run [PROFILE] [-m MATERIAL] [--fidelity full|survey]`** → `scan:main` →
   `run.run_sweep` → write canonical `checkpoints/<material>/{line,brem}.pkl`
   or an identity-qualified variant directory. Box shim: `python -m cxr_mc._entry.scan`.
 - **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
@@ -84,10 +84,10 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 - **`cxr app validation`** → `check:_cli`: launch validation app; `cxr app validation export`
   writes cached literature-validation figures.
 - **`cxr remote ...`** → `remote:*`: optional SSH/SLURM lifecycle for lab GPU
-  box: submit, attach/status/logs, pull, stop, validation jobs. Canonical
-  detached submission and validation paths are `remote submit` and
-  `remote validate`; `remote prune` applies profile-aware checkpoint pruning
-  under remote stem reservations; `start` and `check` remain hidden aliases.
+  box: run, attach/status/logs, pull, stop, validation jobs. Canonical
+  submission and validation paths are `remote run` and `remote validate`;
+  `remote prune` applies profile-aware checkpoint pruning under remote stem
+  reservations; `check` remains a hidden alias.
 - **`cxr slim <checkpoint-dir> [--grid]`** → `slim:slim_checkpoint` →
   `results.slim_results`: shrink checkpoint pickle for transfer (drop
   wide-brem / float32 / filter configs; `--grid` keep only material's

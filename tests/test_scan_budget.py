@@ -1,4 +1,4 @@
-"""``cxr scan --max-minutes`` budget: exit 75 on incomplete work, paused progress state."""
+"""``cxr run --max-minutes`` budget: exit 75 on incomplete work, paused progress state."""
 
 import json
 
@@ -8,9 +8,9 @@ from cxr_mc import scan
 
 
 def _invoke(material=None, max_minutes=None, progress_file=None, *extra):
-    argv = [material]
-    if material is None:
-        argv = []
+    argv = ["standard"]
+    if material is not None:
+        argv += ["-m", material]
     if max_minutes is not None:
         argv += ["--max-minutes", str(max_minutes)]
     if progress_file is not None:
@@ -134,8 +134,8 @@ def test_scan_no_max_minutes_passes_none_max_seconds(monkeypatch, tmp_path):
     assert captured["max_seconds"] is None
 
 
-def test_scan_all_threads_one_deadline_across_materials(monkeypatch, tmp_path):
-    """--all shares ONE deadline: each material gets what's left, clamped >= 0.
+def test_run_profile_threads_one_deadline_across_materials(monkeypatch, tmp_path):
+    """One profile run shares one deadline across its material membership.
 
     A 5-minute budget with a fake clock that burns 200 s per material must hand
     the second material less time than the first, and still CALL the third with
@@ -151,14 +151,17 @@ def test_scan_all_threads_one_deadline_across_materials(monkeypatch, tmp_path):
 
     monkeypatch.setattr(scan.time, "monotonic", lambda: clock["t"])
     monkeypatch.setattr(scan, "run_sweep", _fake_run_sweep)
-    monkeypatch.setattr(scan, "load_all_materials", lambda *a, **kw: ["hopg", "hbn", "mose2"])
+    monkeypatch.setattr(
+        scan,
+        "resolve_profile_materials",
+        lambda _profile, material=None: [material] if material else ["hopg", "hbn", "mose2"],
+    )
     _stub_cases(monkeypatch)
 
     result = _invoke(
         None,
         5.0,
         None,
-        "--all",
         "--checkpoint-dir",
         str(tmp_path),
     )

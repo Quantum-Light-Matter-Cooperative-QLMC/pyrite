@@ -2,7 +2,7 @@
 
 Runs the Monte-Carlo CXR parameter sweep for one material with a blazed
 groove entrance face, writing to a checkpoint kept separate from the
-crystal's flat-face (``cxr scan``) checkpoint:
+crystal's flat-face (``cxr run``) checkpoint:
 ``checkpoints/<material>_blazed.pkl``. Groove face angles are set
 automatically by the existing geometry code
 (``montecarlo.groove.blazed_groove_spec``); this driver only supplies groove

@@ -107,3 +107,21 @@ Also rename performance controls and add transfer compression:
 Land before `feature/cli-app-suite` and `feature/material-command-tree`; both
 touch root command inventory and generated CLI artifacts. Rebase those branches
 after this branch lands. `feature/checkpoint-prune` is otherwise independent.
+
+## Recovery status
+
+Recovered on `main` after merge `b5109af` landed only profile-group support and
+the shared selection resolver:
+
+- [x] Replace root `scan` with profile-first `run`.
+- [x] Replace remote `scan`/`submit`/`start` with `remote run`.
+- [x] Remove run-time material-group and local beam override flags.
+- [x] Rename remote performance controls to `--perf-reps`/`--perf-interval`.
+- [x] Forward `--level9` through automatic remote pull.
+- [x] Update completion, local-run guard, current guides, generated contract,
+  and CLI reference.
+- [x] Verify focused CLI/remote/profile behavior and real help paths.
+
+Verification: repository `verify` passed lint/type/docs and 2,024 tests with 39
+skips; its sole sandbox-blocked forkserver test passed separately outside the
+sandbox.

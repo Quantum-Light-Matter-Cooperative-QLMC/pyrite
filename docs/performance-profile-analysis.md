@@ -1,6 +1,6 @@
 # Performance-profile analysis playbook
 
-Use this guide after collecting `cxr scan --performance-profile NAME` logs.
+Use this guide after collecting `cxr remote run PROFILE --perf` logs.
 Goal: identify throughput constraint from measured phase and resource behavior,
 then test one change at a time. High CPU or GPU utilization is supporting
 evidence, not optimization target; compute-weighted throughput is target.
@@ -40,7 +40,7 @@ The performance-profile name selects an existing catalog profile; it is not an
 arbitrary experiment label. Pulled remote logs retain job separation:
 
 ```bash
-cxr remote submit --performance-profile sub_100keV --headless
+cxr remote run sub_100keV --perf --headless
 cxr remote profile pull sub_100keV
 ```
 
@@ -66,10 +66,10 @@ Run three comparable MoS2 sessions with one-second telemetry and a fixed
 six-worker allocation:
 
 ```bash
-cxr remote submit mos2 \
-  --performance-profile compute_test_300keV \
-  --performance-repetitions 3 \
-  --performance-interval 1 \
+cxr remote run compute_test_300keV -m mos2 \
+  --perf \
+  --perf-reps 3 \
+  --perf-interval 1 \
   --workers 6 \
   --chunk-minutes 0 \
   --headless
@@ -86,10 +86,10 @@ After the baseline completes, test a smaller line-spectrum chunk while keeping
 every other option fixed:
 
 ```bash
-cxr remote submit mos2 \
-  --performance-profile compute_test_300keV \
-  --performance-repetitions 3 \
-  --performance-interval 1 \
+cxr remote run compute_test_300keV -m mos2 \
+  --perf \
+  --perf-reps 3 \
+  --perf-interval 1 \
   --workers 6 \
   --spec-chunk 20000 \
   --chunk-minutes 0 \
@@ -108,9 +108,9 @@ capture CUDA API calls, kernels, NVTX phases, OS runtime activity, and native
 CPU samples for one full uncached session:
 
 ```bash
-cxr remote submit mos2 \
-  --performance-profile compute_test_300keV \
-  --performance-interval 1 \
+cxr remote run compute_test_300keV -m mos2 \
+  --perf \
+  --perf-interval 1 \
   --workers 6 \
   --spec-chunk 20000 \
   --nsys \

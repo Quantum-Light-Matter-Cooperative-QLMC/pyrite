@@ -2027,7 +2027,10 @@ def _(
     # rather than a nested action-accordion group.
     if MATERIAL is None:
         view = mo.callout(
-            mo.md("**No checkpoint data available.** Run `cxr scan <material>` to create one."),
+            mo.md(
+                "**No checkpoint data available.** "
+                "Run `cxr run standard -m <material>` to create one."
+            ),
             kind="info",
         )
     else:

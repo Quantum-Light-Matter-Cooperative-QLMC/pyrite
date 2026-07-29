@@ -13,11 +13,12 @@ Optional, dev-only tool: it is only useful if you have an ssh host configured
 (default 'qlmc', override via CXR_REMOTE_HOST) to run sweeps on. Every other
 ``cxr`` command works without it.
 
-One-shot (submit, wait for SLURM, then pull):
+Run, wait for SLURM, then pull:
 
-    cxr remote scan mose2               # sync code up, submit sweep, pull checkpoint
-    cxr remote scan mose2 --quick       # tiny grid smoke test
-    cxr remote scan mose2 --no-sync     # skip the code upload (code unchanged)
+    cxr remote run standard -m mose2    # sync, submit, track, pull
+    cxr remote run standard -m mose2 --quick
+    cxr remote run standard -m mose2 --no-sync
+    cxr remote run sub_100keV --headless
     cxr remote pull mose2 wse2          # fetch existing checkpoints (grid-filtered)
     cxr remote pull mose2 --full        # fetch the full, un-filtered checkpoint
     cxr remote rebrem mose2 --ne-brem 1000   # brem-only recompute of the box's
@@ -28,11 +29,8 @@ One-shot (submit, wait for SLURM, then pull):
                                     # run the Zhai + supplementary MC on the
                                     # box, or pull its cache back
 
-Asynchronous SLURM queue (survives ssh disconnect -- launch, walk away, reconnect later):
+Remote jobs survive SSH disconnects:
 
-    cxr remote start mose2 wse2 mos2    # queue several materials, run detached
-    cxr remote start mose2 --follow     # launch, then track it live
-    cxr remote start mose2 --quick      # detached quick smoke test
     cxr remote attach [JOBID]           # (re)connect + track live (default: latest)
     cxr remote jobs                     # list jobs on the box + their state
     cxr remote status [JOBID] [-v|-vv]  # job summary; SLURM details; case progress
@@ -41,10 +39,10 @@ Asynchronous SLURM queue (survives ssh disconnect -- launch, walk away, reconnec
     cxr remote stop --all               # cancel every live SLURM job
     cxr remote pull mose2 wse2 mos2     # fetch the finished checkpoints (grid-filtered)
 
-`start` returns immediately: it ships the code, writes a batch script under
-<remote>/jobs/<jobid>/, and submits it to SLURM. The batch job processes the
-materials with bounded concurrency (two `scan.py` processes by default),
-writing meta/state/log and its scheduler ID into the job dir.
+`remote run --headless` returns after shipping code, writing a batch script
+under <remote>/jobs/<jobid>/, and submitting it to SLURM. The batch job
+processes profile members with bounded concurrency, writing meta/state/log and
+its scheduler ID into the job dir.
 
 The SLURM job is independent of the submission SSH connection, so the SSH link
 is only ever a VIEWER. `attach` renders one local case-progress bar per material;
@@ -199,7 +197,6 @@ remote_check = cli.remote_check
 _ensure_utf8_stdio = cli._ensure_utf8_stdio
 _dispatch = cli._dispatch
 _selected_materials = cli._selected_materials
-_cli_scan = cli._cli_scan
 _cli_rebrem = cli._cli_rebrem
 _cli_pull = cli._cli_pull
 _cli_start = cli._cli_start

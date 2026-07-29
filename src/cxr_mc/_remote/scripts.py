@@ -128,16 +128,12 @@ def _queue_script(
         flags += f" --fidelity {fidelity}"
     if workers is not None:
         flags += f" --workers {workers}"
-    if high_energy_min_kev is not None:
-        flags += f" --high-energy-min-kev {high_energy_min_kev}"
-    if catalog_profile != "standard":
-        flags += f" --profile {catalog_profile}"
     if performance_profile is not None:
         flags += (
             f' --performance-profile {performance_profile} --performance-dir "$JOBDIR/performance"'
         )
         if performance_interval != 5.0:
-            flags += f" --performance-interval {performance_interval:g}"
+            flags += f" --perf-interval {performance_interval:g}"
     runtime_exports = ""
     if spec_chunk is not None:
         runtime_exports += f"\nexport CXR_MC_SPEC_CHUNK={spec_chunk}"
@@ -189,7 +185,7 @@ run_material() {{
       scan_launcher=({config.shell_remote_uv()} run --no-sync python)
     fi
     scan_command=(
-      "${{scan_launcher[@]}}" -m cxr_mc._entry.scan "$m"{flags}
+      "${{scan_launcher[@]}}" -m cxr_mc._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags}
       "${{checkpoint_flags[@]}}" --progress-file "$JOBDIR/progress/$m.json" \\
       --no-progress
     )
@@ -302,16 +298,12 @@ def _chunked_queue_script(
         flags += f" --fidelity {fidelity}"
     if workers is not None:
         flags += f" --workers {workers}"
-    if high_energy_min_kev is not None:
-        flags += f" --high-energy-min-kev {high_energy_min_kev}"
-    if catalog_profile != "standard":
-        flags += f" --profile {catalog_profile}"
     if performance_profile is not None:
         flags += (
             f' --performance-profile {performance_profile} --performance-dir "$JOBDIR/performance"'
         )
         if performance_interval != 5.0:
-            flags += f" --performance-interval {performance_interval:g}"
+            flags += f" --perf-interval {performance_interval:g}"
     runtime_exports = ""
     if spec_chunk is not None:
         runtime_exports += f"\nexport CXR_MC_SPEC_CHUNK={spec_chunk}"
@@ -342,7 +334,7 @@ for m in "${{mats[@]}}"; do
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.shell_remote_uv()} run --no-sync python -m cxr_mc._entry.scan "$m"{flags} --max-minutes "$remaining_min" \
+  {config.shell_remote_uv()} run --no-sync python -m cxr_mc._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags} --max-minutes "$remaining_min" \
     --progress-file "$JOBDIR/progress/$m.json" --no-progress >> "$JOBDIR/log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"

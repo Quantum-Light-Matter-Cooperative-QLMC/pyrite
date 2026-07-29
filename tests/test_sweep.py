@@ -675,7 +675,7 @@ def test_mote2_product_material_grid_matches_few_layer_sapphire():
 
 def test_named_stack_registered():
     # a registry key can name a full STACK: film crystal + substrate-side layers,
-    # runnable via `cxr scan <key>` like any single material
+    # runnable via `cxr run standard -m <key>` like any single material
     assert "mos2-on-sio2-si" in MATERIALS
     sweep = material_sweep("mos2-on-sio2-si")
     assert sweep.material == "mos2"
@@ -710,7 +710,7 @@ def test_trajectory_sweep_accepts_explicit_penetration_thickness():
 
 def test_scan_checkpoints_under_registry_name(monkeypatch, tmp_path):
     # the checkpoint must be named for the REGISTRY key, not the film crystal --
-    # otherwise `cxr scan mos2-on-sio2-si` would clobber/resume plain mos2.pkl
+    # otherwise `cxr run standard -m mos2-on-sio2-si` would clobber/resume plain mos2.pkl
     # (run_sweep's default derives the name from cases[0]["crystal"]).
     import argparse
 
@@ -1088,92 +1088,6 @@ def test_scan_forwards_n_families_and_beam_uvw_overrides(monkeypatch, tmp_path):
     case = seen["cases"][0]
     assert case["beam_uvw"] == (1, 0, 0)
     assert len(case["hkl_list"]) == len(override_hkl)
-
-
-def test_scan_all_runs_every_material_in_toml_manifest(monkeypatch, tmp_path):
-    """``cxr scan --all`` consumes the configured materials in file order."""
-    import argparse
-
-    from cxr_mc import scan
-
-    manifest = tmp_path / "mats_to_sim.toml"
-    manifest.write_text('materials = ["hopg", "hbn"]\n')
-    monkeypatch.setattr(scan, "MATS_FILE", manifest)
-    seen = []
-    monkeypatch.setattr(
-        scan, "run_sweep", lambda cases, results, **kw: seen.append(kw["checkpoint_path"])
-    )
-
-    scan.run(
-        argparse.Namespace(
-            material=None,
-            all=True,
-            workers=0,
-            quick=True,
-            n_families=None,
-            beam_uvw=None,
-            checkpoint_dir=str(tmp_path),
-        )
-    )
-
-    assert seen == [str(tmp_path / "hopg_quick"), str(tmp_path / "hbn_quick")]
-
-
-def test_scan_all_rejects_unknown_manifest_material_before_running(monkeypatch, tmp_path):
-    import argparse
-
-    from cxr_mc import scan
-
-    manifest = tmp_path / "mats_to_sim.toml"
-    manifest.write_text('materials = ["hopg", "missing"]\n')
-    monkeypatch.setattr(scan, "MATS_FILE", manifest)
-    monkeypatch.setattr(scan, "run_sweep", lambda *a, **kw: pytest.fail("must not run"))
-
-    with pytest.raises(SystemExit, match="unknown material"):
-        scan.run(
-            argparse.Namespace(
-                material=None,
-                all=True,
-                workers=0,
-                quick=False,
-                n_families=None,
-                beam_uvw=None,
-                checkpoint_dir=str(tmp_path),
-            )
-        )
-
-
-@pytest.mark.parametrize(
-    ("manifest_text", "message"),
-    [
-        ('materials = ["hopg", ""]\n', "non-empty strings"),
-        ('materials = ["hopg", "hopg"]\n', "duplicate material"),
-    ],
-)
-def test_scan_all_rejects_invalid_manifest_entries_before_running(
-    monkeypatch, tmp_path, manifest_text, message
-):
-    import argparse
-
-    from cxr_mc import scan
-
-    manifest = tmp_path / "mats_to_sim.toml"
-    manifest.write_text(manifest_text)
-    monkeypatch.setattr(scan, "MATS_FILE", manifest)
-    monkeypatch.setattr(scan, "run_sweep", lambda *a, **kw: pytest.fail("must not run"))
-
-    with pytest.raises(SystemExit, match=message):
-        scan.run(
-            argparse.Namespace(
-                material=None,
-                all=True,
-                workers=0,
-                quick=False,
-                n_families=None,
-                beam_uvw=None,
-                checkpoint_dir=str(tmp_path),
-            )
-        )
 
 
 def test_scan_rejects_explicit_unknown_material_before_building(monkeypatch, tmp_path):

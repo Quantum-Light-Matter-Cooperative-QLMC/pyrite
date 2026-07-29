@@ -1,6 +1,6 @@
 # Coherent-emission tracking
 
-`cxr scan --coherent` enables an experimental phased sum across trajectory
+`cxr run --coherent` enables an experimental phased sum across trajectory
 segments and electrons. Default scans remain incoherent and retain their
 historical checkpoint identity. Coherent scans use identity-qualified stems, so
 the two modes cannot overwrite each other.

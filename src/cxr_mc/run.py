@@ -154,7 +154,7 @@ def load_checkpoint(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
     it avoids the unpickle entirely on the common path."""
     path = checkpoint_path_for(material, checkpoint_dir)
     if not _checkpoint_exists(path):
-        print(f"no checkpoint at {path} -- run `cxr scan {material}` first")
+        print(f"no checkpoint at {path} -- run `cxr run standard -m {material}` first")
         return {}
     return _load_checkpoint_cached(path, _checkpoint_signature(path))
 

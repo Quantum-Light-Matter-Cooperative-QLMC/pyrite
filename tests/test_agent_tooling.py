@@ -177,10 +177,10 @@ def test_agent_session_start_syncs_optional_dependencies() -> None:
 @pytest.mark.parametrize(
     "command",
     [
-        "uv run cxr scan hopg",
-        "rtk env UV_CACHE_DIR=/tmp/cache uv run cxr scan hopg",
-        "git status && uv run cxr scan hopg",
-        "(uv run cxr scan hopg)",
+        "uv run cxr run standard -m hopg",
+        "rtk env UV_CACHE_DIR=/tmp/cache uv run cxr run standard -m hopg",
+        "git status && uv run cxr run standard -m hopg",
+        "(uv run cxr run standard -m hopg)",
     ],
 )
 def test_sweep_guard_blocks_local_scan(sweep_guard_module, command: str) -> None:
@@ -190,10 +190,10 @@ def test_sweep_guard_blocks_local_scan(sweep_guard_module, command: str) -> None
 @pytest.mark.parametrize(
     "command",
     [
-        "uv run cxr remote submit hopg",
-        "uv run cxr scan --help",
-        "echo 'uv run cxr scan hopg'",
-        "rg 'cxr scan' README.md",
+        "uv run cxr remote run standard -m hopg",
+        "uv run cxr run --help",
+        "echo 'uv run cxr run standard -m hopg'",
+        "rg 'cxr run' README.md",
         "git status",
     ],
 )

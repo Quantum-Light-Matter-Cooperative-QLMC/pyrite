@@ -1,6 +1,6 @@
 # Sweep fidelity and dataset identity
 
-`cxr scan` accepts two named, independently resolved fidelity policies:
+`cxr run` accepts two named, independently resolved fidelity policies:
 
 - `full` preserves production behavior: catalog grids, 300 line electrons,
   150 bremsstrahlung electrons, and complete configured reflection sets.
@@ -12,7 +12,7 @@
 Run a survey with:
 
 ```bash
-cxr scan mose2 --fidelity survey
+cxr run standard -m mose2 --fidelity survey
 ```
 
 The older `--profile full|survey` spelling still works but is deprecated and
@@ -28,7 +28,7 @@ Explicit `material_sweep` overrides apply after profile resolution.
 `cxr energy-grid` is upstream of this choice. Its `derive` and `submit`
 commands measure catalog-ready line and bremsstrahlung bounds without a
 fidelity setting, and `apply` stores those full bounds. Later
-`cxr scan --fidelity survey` reduces the stored photon grids together with
+`cxr run --fidelity survey` reduces the stored photon grids together with
 other sweep axes; `full` uses them unchanged.
 
 ## Identity and storage

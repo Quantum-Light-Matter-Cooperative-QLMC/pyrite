@@ -137,7 +137,7 @@ _pool_peak_bytes = 0  # high-water reserved pool size, for the A2 operational wa
 # VRAM; <=0 disables the cap (no-op, original unbounded behaviour).
 _GPU_POOL_FRAC = float(os.environ.get("CXR_MC_GPU_POOL_FRAC", "0.85"))
 # Number of scan processes sharing this one GPU (the remote queue's
-# parallel_materials runs that many `cxr scan` processes concurrently on the
+# parallel_materials runs that many `cxr run` processes concurrently on the
 # single card, each its own CUDA context + pool). The queue script exports this;
 # the pool cap is divided by it so N concurrent processes cap at N*(FRAC/N) = FRAC
 # total instead of N*FRAC, which would oversubscribe VRAM and OOM. Default 1

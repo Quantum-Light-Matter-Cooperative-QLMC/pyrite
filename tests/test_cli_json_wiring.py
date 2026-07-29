@@ -163,7 +163,7 @@ def test_archives_json_retains_unreadable_entry(monkeypatch, tmp_path):
     ("complete", "exit_code", "resumable"),
     [(True, 0, False), (False, 75, True)],
 )
-def test_scan_json_suppresses_human_output_and_preserves_resumable_exit(
+def test_run_json_suppresses_human_output_and_preserves_resumable_exit(
     monkeypatch, complete, exit_code, resumable
 ):
     def run_material(_args, material, max_seconds=None):
@@ -172,10 +172,12 @@ def test_scan_json_suppresses_human_output_and_preserves_resumable_exit(
 
     monkeypatch.setattr(scan, "_run_material", run_material)
 
-    document = _document(invoke(scan.command, ["hopg", "--json"]), exit_code=exit_code)
+    document = _document(
+        invoke(scan.command, ["standard", "-m", "hopg", "--json"]), exit_code=exit_code
+    )
 
     assert document["schema"] == "cxr.operation-summary"
-    assert document["payload"]["operation"] == "scan"
+    assert document["payload"]["operation"] == "run"
     assert document["payload"]["resumable"] is resumable
     assert "progress" not in json.dumps(document)
 

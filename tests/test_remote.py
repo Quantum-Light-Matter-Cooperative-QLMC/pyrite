@@ -5,7 +5,6 @@ These are pure-string/logic checks (no ssh), so they run anywhere. The one
 exception is the clear-listing regression test, which executes the box-side
 shell snippet under a local bash (skipped when bash is unavailable)."""
 
-import argparse
 import io
 import json
 import os
@@ -336,7 +335,7 @@ def test_queue_script_profiles_uncached_repetitions_with_fixed_runtime_knobs():
     assert "performance_repetitions=3" in script
     assert "repetition<=performance_repetitions" in script
     assert '--checkpoint-dir "$JOBDIR/performance-checkpoints/$m/$repetition"' in script
-    assert "--performance-interval 1" in script
+    assert "--perf-interval 1" in script
 
 
 def test_queue_script_wraps_single_profile_session_with_nsys():
@@ -377,14 +376,14 @@ def test_queue_script_wraps_single_profile_session_with_nsys():
         assert subprocess.run([bash, "-n"], input=script, text=True).returncode == 0
 
 
-def test_queue_script_emits_profile_flag_when_not_standard():
+def test_queue_script_emits_positional_profile_when_not_standard():
     script = scripts._queue_script("j", ["mos2"], False, None, catalog_profile="sub_100keV")
-    assert "--profile sub_100keV" in script
+    assert '_entry.scan "sub_100keV" -m "$m"' in script
 
     chunked = scripts._chunked_queue_script(
         "j", ["mos2"], False, None, 10, catalog_profile="sub_100keV"
     )
-    assert "--profile sub_100keV" in chunked
+    assert '_entry.scan "sub_100keV" -m "$m"' in chunked
 
 
 def test_queue_metadata_records_catalog_profile():
@@ -844,7 +843,7 @@ def test_cli_start_chunk_flags(monkeypatch, capsys):
 
     remote.main(
         [
-            "start",
+            "run",
             "standard",
             "-m",
             "hopg",
@@ -856,79 +855,9 @@ def test_cli_start_chunk_flags(monkeypatch, capsys):
         ]
     )  # legal: monolithic
     assert (
-        remote.main(["start", "standard", "-m", "hopg", "--dry-run", "--parallel-materials", "3"])
+        remote.main(["run", "standard", "-m", "hopg", "--dry-run", "--parallel-materials", "3"])
         == 2
     )  # illegal: chunked default
-
-
-@pytest.mark.parametrize(
-    ("argv", "message"),
-    [
-        (
-            ["start", "standard", "-m", "hopg", "-A", "--dry-run"],
-            "-A/--actually-all does not take",
-        ),
-        (["start", "-A", "--all", "--dry-run"], "already includes --all"),
-        (
-            ["start", "-A", "--include-unverified-dw", "--dry-run"],
-            "already includes --include-unverified-dw",
-        ),
-        (
-            ["start", "-A", "--include-high-energy", "--dry-run"],
-            "already includes --include-high-energy",
-        ),
-        (
-            ["start", "--include-unverified-dw", "--dry-run"],
-            "--include-unverified-dw requires --all",
-        ),
-        (["start", "--include-high-energy", "--dry-run"], "--include-high-energy requires --all"),
-    ],
-)
-def test_start_selection_flag_usage_errors(argv, message, capsys):
-    assert remote.main(argv) == 2
-    assert message in capsys.readouterr().err
-
-
-@pytest.mark.parametrize(
-    ("argv", "expected_len"),
-    [
-        (["start", "--all", "--dry-run"], 21),
-        (["start", "--all", "--include-unverified-dw", "--dry-run"], 30),
-        (["start", "--all", "--include-high-energy", "--dry-run"], 25),
-        (["start", "-A", "--dry-run"], 46),
-    ],
-)
-def test_start_selection_flags_resolve_expected_material_counts(argv, expected_len, capsys):
-    remote.main(argv)
-    first_line = capsys.readouterr().out.splitlines()[0]
-    materials = first_line.split(":", 1)[1].strip().split()
-    assert len(materials) == expected_len
-    assert len(materials) == len(set(materials))
-
-
-def test_start_include_high_energy_floors_flags_and_stems(capsys):
-    remote.main(["start", "--all", "--include-high-energy", "--dry-run"])
-    out = capsys.readouterr().out
-    scan_lines = [line for line in out.splitlines() if "_entry.scan" in line]
-    assert scan_lines and all("--high-energy-min-kev 150.0" in line for line in scan_lines)
-    assert "RESERVATIONS/hopg/jobid" in out  # untagged material: canonical stem
-    assert "RESERVATIONS/tise2/jobid" not in out  # tagged: floored, non-canonical stem
-    assert any(line.startswith('  if [ "$(cat "$RESERVATIONS/tise2--') for line in out.splitlines())
-
-
-def test_start_direct_material_floor_is_no_op_unless_high_energy_tagged(capsys):
-    remote.main(["start", "standard", "-m", "tise2", "--high-energy-min-kev", "200", "--dry-run"])
-    tagged = capsys.readouterr().out
-    remote.main(["start", "standard", "-m", "hopg", "--high-energy-min-kev", "200", "--dry-run"])
-    untagged = capsys.readouterr().out
-    tagged_scan = [line for line in tagged.splitlines() if "_entry.scan" in line]
-    untagged_scan = [line for line in untagged.splitlines() if "_entry.scan" in line]
-    assert tagged_scan and all("--high-energy-min-kev 200.0" in line for line in tagged_scan)
-    assert untagged_scan and all("--high-energy-min-kev" not in line for line in untagged_scan)
-    assert "RESERVATIONS/hopg/jobid" in untagged
-    assert any(
-        line.startswith('  if [ "$(cat "$RESERVATIONS/tise2--') for line in tagged.splitlines()
-    )
 
 
 def test_start_writes_static_metadata_before_sbatch(monkeypatch):
@@ -1031,27 +960,27 @@ def test_start_standard_submit_suggests_stem_pull(monkeypatch, capsys):
     assert "cxr remote pull hopg " in output
 
 
-def test_submit_profile_uses_shipped_membership_without_material_option(capsys):
+def test_run_profile_uses_shipped_membership_without_material_option(capsys):
     """A positional profile selects its explicit material membership."""
-    remote.main(["submit", "sub_100keV", "--dry-run"])
+    remote.main(["run", "sub_100keV", "--dry-run"])
 
     out = capsys.readouterr().out
     assert "hopg" in out and "zrte3" in out
 
 
-def test_submit_perf_uses_positional_catalog_profile(capsys):
-    remote.main(["submit", "sub_100keV", "--perf", "--dry-run"])
+def test_run_perf_uses_positional_catalog_profile(capsys):
+    remote.main(["run", "sub_100keV", "--perf", "--dry-run"])
 
     out = capsys.readouterr().out
     assert "hopg" in out and "zrte3" in out
-    assert "--profile sub_100keV" in out
+    assert '_entry.scan "sub_100keV" -m' in out
     assert "--performance-profile sub_100keV" in out
 
 
-def test_submit_rejects_positional_and_legacy_profiles(capsys):
+def test_run_rejects_retired_profile_option(capsys):
     result = remote.main(
         [
-            "submit",
+            "run",
             "sub_100keV",
             "--profile",
             "standard",
@@ -1060,15 +989,15 @@ def test_submit_rejects_positional_and_legacy_profiles(capsys):
     )
 
     assert result == 2
-    assert "PROFILE and --profile cannot be combined" in capsys.readouterr().err
+    assert "No such option '--profile'" in capsys.readouterr().err
 
 
-def test_submit_rejects_performance_repetitions_without_perf(capsys):
+def test_run_rejects_perf_reps_without_perf(capsys):
     result = remote.main(
         [
-            "submit",
+            "run",
             "compute_test_300keV",
-            "--performance-repetitions",
+            "--perf-reps",
             "3",
             "--chunk-minutes",
             "0",
@@ -1077,38 +1006,38 @@ def test_submit_rejects_performance_repetitions_without_perf(capsys):
     )
 
     assert result == 2
-    assert "--performance-repetitions requires --perf" in capsys.readouterr().err
+    assert "--perf-reps requires --perf" in capsys.readouterr().err
 
 
-def test_submit_rejects_performance_repetitions_in_chunked_mode(capsys):
+def test_run_rejects_perf_reps_in_chunked_mode(capsys):
     result = remote.main(
         [
-            "submit",
+            "run",
             "compute_test_300keV",
             "--perf",
-            "--performance-repetitions",
+            "--perf-reps",
             "3",
             "--dry-run",
         ]
     )
 
     assert result == 2
-    assert "--performance-repetitions requires --chunk-minutes 0" in capsys.readouterr().err
+    assert "--perf-reps requires --chunk-minutes 0" in capsys.readouterr().err
 
 
-def test_submit_rejects_nsys_without_performance_profile(capsys):
+def test_run_rejects_nsys_without_performance_profile(capsys):
     result = remote.main(
-        ["submit", "compute_test_300keV", "--nsys", "--chunk-minutes", "0", "--dry-run"]
+        ["run", "compute_test_300keV", "--nsys", "--chunk-minutes", "0", "--dry-run"]
     )
 
     assert result == 2
     assert "--nsys requires --perf" in capsys.readouterr().err
 
 
-def test_submit_rejects_nsys_in_chunked_mode(capsys):
+def test_run_rejects_nsys_in_chunked_mode(capsys):
     result = remote.main(
         [
-            "submit",
+            "run",
             "compute_test_300keV",
             "--perf",
             "--nsys",
@@ -1120,13 +1049,13 @@ def test_submit_rejects_nsys_in_chunked_mode(capsys):
     assert "--nsys requires --chunk-minutes 0" in capsys.readouterr().err
 
 
-def test_submit_rejects_nsys_with_multiple_repetitions(capsys):
+def test_run_rejects_nsys_with_multiple_repetitions(capsys):
     result = remote.main(
         [
-            "submit",
+            "run",
             "compute_test_300keV",
             "--perf",
-            "--performance-repetitions",
+            "--perf-reps",
             "2",
             "--nsys",
             "--chunk-minutes",
@@ -1136,13 +1065,13 @@ def test_submit_rejects_nsys_with_multiple_repetitions(capsys):
     )
 
     assert result == 2
-    assert "--nsys requires --performance-repetitions 1" in capsys.readouterr().err
+    assert "--nsys requires --perf-reps 1" in capsys.readouterr().err
 
 
-def test_submit_rejects_nsys_with_multiple_materials(capsys):
+def test_run_rejects_nsys_with_multiple_materials(capsys):
     result = remote.main(
         [
-            "submit",
+            "run",
             "sub_100keV",
             "--perf",
             "--nsys",
@@ -1156,17 +1085,17 @@ def test_submit_rejects_nsys_with_multiple_materials(capsys):
     assert "--nsys requires exactly one material" in capsys.readouterr().err
 
 
-def test_submit_performance_runtime_knobs_reach_monolithic_dry_run(capsys):
+def test_run_performance_runtime_knobs_reach_monolithic_dry_run(capsys):
     result = remote.main(
         [
-            "submit",
+            "run",
             "compute_test_300keV",
             "--material",
             "mos2",
             "--perf",
-            "--performance-repetitions",
+            "--perf-reps",
             "3",
-            "--performance-interval",
+            "--perf-interval",
             "1",
             "--workers",
             "6",
@@ -1183,16 +1112,16 @@ def test_submit_performance_runtime_knobs_reach_monolithic_dry_run(capsys):
     assert result is None
     output = capsys.readouterr().out
     assert "#SBATCH --cpus-per-task=6" in output
-    assert "--performance-interval 1" in output
+    assert "--perf-interval 1" in output
     assert "performance_repetitions=3" in output
     assert "export CXR_MC_SPEC_CHUNK=20000" in output
     assert "export CXR_MC_BREM_CHUNK=10000" in output
 
 
-def test_submit_nsys_reaches_monolithic_dry_run(capsys):
+def test_run_nsys_reaches_monolithic_dry_run(capsys):
     result = remote.main(
         [
-            "submit",
+            "run",
             "compute_test_300keV",
             "-m",
             "mos2",
@@ -1215,12 +1144,12 @@ def test_submit_nsys_reaches_monolithic_dry_run(capsys):
     assert "export CXR_MC_NSYS=1" in output
 
 
-def test_submit_defaults_to_attach_and_pull(monkeypatch):
+def test_run_defaults_to_attach_and_pull(monkeypatch):
     events = []
     monkeypatch.setattr(
         lifecycle,
         "start_queue",
-        lambda mats, **kwargs: events.append(("submit", mats, kwargs)) or "j",
+        lambda mats, **kwargs: events.append(("run", mats, kwargs)) or "j",
     )
     monkeypatch.setattr(viewer, "attach", lambda jobid: events.append(("attach", jobid)) or True)
     monkeypatch.setattr(state, "_completed_materials", lambda jobid, mats: list(mats))
@@ -1229,32 +1158,32 @@ def test_submit_defaults_to_attach_and_pull(monkeypatch):
         lifecycle, "pull", lambda stems, **kwargs: events.append(("pull", stems, kwargs))
     )
 
-    remote.main(["submit", "standard", "-m", "hopg", "--no-sync"])
+    remote.main(["run", "standard", "-m", "hopg", "--no-sync"])
 
-    assert [event[0] for event in events] == ["submit", "attach", "pull"]
+    assert [event[0] for event in events] == ["run", "attach", "pull"]
     assert events[-1][2]["no_sync"] is True
 
 
-def test_submit_headless_skips_attach_and_pull(monkeypatch):
+def test_run_headless_skips_attach_and_pull(monkeypatch):
     monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
     monkeypatch.setattr(viewer, "attach", lambda _jobid: pytest.fail("must not attach"))
     monkeypatch.setattr(lifecycle, "pull", lambda *_args, **_kwargs: pytest.fail("must not pull"))
 
-    remote.main(["submit", "standard", "-m", "hopg", "--headless", "--no-sync"])
+    remote.main(["run", "standard", "-m", "hopg", "--headless", "--no-sync"])
 
 
-def test_submit_no_pull_still_attaches(monkeypatch):
+def test_run_no_pull_still_attaches(monkeypatch):
     attached = []
     monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
     monkeypatch.setattr(viewer, "attach", lambda jobid: attached.append(jobid) or True)
     monkeypatch.setattr(lifecycle, "pull", lambda *_args, **_kwargs: pytest.fail("must not pull"))
 
-    remote.main(["submit", "standard", "-m", "hopg", "--no-pull", "--no-sync"])
+    remote.main(["run", "standard", "-m", "hopg", "--no-pull", "--no-sync"])
 
     assert attached == ["j"]
 
 
-def test_submit_performance_repetitions_attach_but_skip_checkpoint_pull(monkeypatch, capsys):
+def test_run_perf_reps_attach_but_skip_checkpoint_pull(monkeypatch, capsys):
     monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
     monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
     monkeypatch.setattr(
@@ -1270,12 +1199,12 @@ def test_submit_performance_repetitions_attach_but_skip_checkpoint_pull(monkeypa
 
     remote.main(
         [
-            "submit",
+            "run",
             "compute_test_300keV",
             "-m",
             "mos2",
             "--perf",
-            "--performance-repetitions",
+            "--perf-reps",
             "3",
             "--chunk-minutes",
             "0",
@@ -1286,14 +1215,15 @@ def test_submit_performance_repetitions_attach_but_skip_checkpoint_pull(monkeypa
     assert "isolated job-local checkpoints" in capsys.readouterr().err
 
 
-def test_submit_rejects_headless_with_no_pull(capsys):
-    assert remote.main(["submit", "standard", "-m", "hopg", "--headless", "--no-pull"]) == 2
+def test_run_rejects_headless_with_no_pull(capsys):
+    assert remote.main(["run", "standard", "-m", "hopg", "--headless", "--no-pull"]) == 2
     assert "--headless cannot be combined with --no-pull" in capsys.readouterr().err
 
 
-def test_remote_scan_help_marks_command_deprecated(capsys):
-    assert remote.main(["scan", "--help"]) == 0
-    assert "Deprecated" in capsys.readouterr().out
+@pytest.mark.parametrize("retired", ["scan", "submit", "start"])
+def test_retired_remote_run_commands_are_removed(retired, capsys):
+    assert remote.main([retired, "--help"]) == 2
+    assert f"No such command '{retired}'" in capsys.readouterr().err
 
 
 def _quiet_submission(monkeypatch):
@@ -3542,19 +3472,19 @@ def test_clear_listing_snippet_exits_zero_when_quick_pkl_missing(monkeypatch, tm
     assert "hopg.pkl" in out and "hopg_quick.pkl" not in out
 
 
-# ---- scan --quick --grid must be rejected at parse time -------------------------
-def test_scan_rejects_quick_plus_grid_before_any_work(monkeypatch):
+# ---- run --quick --grid must be rejected at parse time --------------------------
+def test_run_rejects_quick_plus_grid_before_any_work(monkeypatch):
     """--quick checkpoints aren't grid-filterable (cxr slim rejects _quick stems),
-    so scan --quick --grid must fail up front -- not run the whole sweep and then
+    so run --quick --grid must fail up front -- not run the whole sweep and then
     traceback on the trailing pull."""
     monkeypatch.setattr(
         state, "_live_jobs", lambda: pytest.fail("must reject before the busy check")
     )
     monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must reject before syncing"))
     monkeypatch.setattr(
-        cli, "remote_scan", lambda *a, **kw: pytest.fail("must reject before scanning")
+        lifecycle, "start_queue", lambda *a, **kw: pytest.fail("must reject before submitting")
     )
-    assert remote.main(["scan", "hopg", "--quick", "--grid"]) == 2
+    assert remote.main(["run", "standard", "-m", "hopg", "--quick", "--grid"]) == 2
 
 
 # ---- pull defaults to --grid; -f/--full opts into the plain whole-file pull -----
@@ -3881,21 +3811,18 @@ def test_pull_dataset_merge_skips_survey_discovery(monkeypatch, tmp_path):
         lifecycle.pull(["hopg"], dataset="brem", no_sync=True)
 
 
-def test_remote_start_all_uses_toml_manifest(monkeypatch, tmp_path):
-    manifest = tmp_path / "mats_to_sim.toml"
-    manifest.write_text('materials = ["hopg", "hbn"]\n')
-    monkeypatch.setattr(config, "MATS_FILE", manifest)
+def test_remote_run_uses_profile_membership(monkeypatch):
     calls = []
     monkeypatch.setattr(
         lifecycle, "start_queue", lambda materials, *args, **kwargs: calls.append(materials)
     )
 
-    remote.main(["start", "--all", "--dry-run"])
+    remote.main(["run", "sub_100keV", "--dry-run"])
 
-    assert calls == [["hopg", "hbn"]]
+    assert calls and "hopg" in calls[0] and "zrte3" in calls[0]
 
 
-def test_remote_start_defers_parallel_materials_default_to_start_queue(monkeypatch):
+def test_remote_run_defers_parallel_materials_default_to_start_queue(monkeypatch):
     """The CLI no longer bakes in a default: --parallel-materials is None
     unless given explicitly, so start_queue (mode-aware) resolves it. The
     monolithic default of 2 is exercised by
@@ -3907,13 +3834,13 @@ def test_remote_start_defers_parallel_materials_default_to_start_queue(monkeypat
         lambda materials, **kwargs: calls.append((materials, kwargs)) or "j",
     )
 
-    remote.main(["start", "standard", "-m", "hopg", "--dry-run", "--chunk-minutes", "0"])
+    remote.main(["run", "standard", "-m", "hopg", "--dry-run", "--chunk-minutes", "0"])
 
     assert calls[0][1]["parallel_materials"] is None
     assert calls[0][1]["chunk_minutes"] == 0.0
 
 
-def test_remote_start_accepts_parallel_materials_three_and_four(monkeypatch):
+def test_remote_run_accepts_parallel_materials_three_and_four(monkeypatch):
     calls = []
     monkeypatch.setattr(
         lifecycle,
@@ -3922,22 +3849,22 @@ def test_remote_start_accepts_parallel_materials_three_and_four(monkeypatch):
     )
 
     remote.main(
-        ["start", "sub_100keV", "--parallel-materials", "3", "--chunk-minutes", "0", "--dry-run"]
+        ["run", "sub_100keV", "--parallel-materials", "3", "--chunk-minutes", "0", "--dry-run"]
     )
     remote.main(
-        ["start", "sub_100keV", "--parallel-materials", "4", "--chunk-minutes", "0", "--dry-run"]
+        ["run", "sub_100keV", "--parallel-materials", "4", "--chunk-minutes", "0", "--dry-run"]
     )
 
     assert [kwargs["parallel_materials"] for _materials, kwargs in calls] == [3, 4]
 
 
-def test_remote_start_rejects_parallel_materials_above_four(monkeypatch):
+def test_remote_run_rejects_parallel_materials_above_four(monkeypatch):
     monkeypatch.setattr(
         lifecycle, "start_queue", lambda *_args, **_kwargs: pytest.fail("must reject before start")
     )
 
     assert (
-        remote.main(["start", "standard", "-m", "hopg", "--parallel-materials", "5", "--dry-run"])
+        remote.main(["run", "standard", "-m", "hopg", "--parallel-materials", "5", "--dry-run"])
         == 2
     )
 
@@ -3947,7 +3874,7 @@ def test_start_queue_rejects_parallel_materials_above_four():
         remote.start_queue(["hopg"], parallel_materials=5, chunk_minutes=0, dry_run=True)
 
 
-def test_remote_scan_forwards_parallel_materials(monkeypatch):
+def test_remote_run_forwards_parallel_materials(monkeypatch):
     calls = []
     monkeypatch.setattr(
         lifecycle,
@@ -3958,7 +3885,7 @@ def test_remote_scan_forwards_parallel_materials(monkeypatch):
 
     remote.main(
         [
-            "scan",
+            "run",
             "standard",
             "-m",
             "hopg",
@@ -3973,61 +3900,7 @@ def test_remote_scan_forwards_parallel_materials(monkeypatch):
     assert calls[0][1]["parallel_materials"] == 3
 
 
-def test_remote_scan_submits_then_attaches_and_pulls(monkeypatch):
-    events = []
-    monkeypatch.setattr(
-        lifecycle,
-        "start_queue",
-        lambda materials, **_kw: events.append(("start", materials)) or "j",
-    )
-    monkeypatch.setattr(viewer, "attach", lambda jobid: events.append(("attach", jobid)) or True)
-    monkeypatch.setattr(state, "_completed_materials", lambda _jobid, materials: materials)
-    monkeypatch.setattr(lifecycle, "pull", lambda stems, **_kw: events.append(("pull", stems)))
-
-    remote._cli_scan(
-        argparse.Namespace(
-            material="hopg",
-            all=False,
-            quick=False,
-            workers=None,
-            no_sync=False,
-            grid=False,
-            drop_wide_brem=False,
-            downcast=False,
-            remote_command="scan",
-        )
-    )
-
-    assert events == [("start", ["hopg"]), ("attach", "j"), ("pull", ["hopg"])]
-
-
-def test_interrupted_remote_scan_does_not_pull(monkeypatch):
-    events = []
-    monkeypatch.setattr(lifecycle, "start_queue", lambda *_args, **_kwargs: "j")
-    monkeypatch.setattr(viewer, "attach", lambda _jobid: False)
-    monkeypatch.setattr(
-        state, "_completed_materials", lambda *_args: pytest.fail("must not inspect completion")
-    )
-    monkeypatch.setattr(lifecycle, "pull", lambda *_args, **_kwargs: events.append("pull"))
-
-    remote._cli_scan(
-        argparse.Namespace(
-            material="hopg",
-            all=False,
-            quick=False,
-            workers=None,
-            no_sync=False,
-            grid=False,
-            drop_wide_brem=False,
-            downcast=False,
-            remote_command="scan",
-        )
-    )
-
-    assert events == []
-
-
-def test_remote_scan_preserves_hyphenated_catalog_material(monkeypatch):
+def test_remote_run_preserves_hyphenated_catalog_material(monkeypatch):
     calls = []
     monkeypatch.setattr(
         lifecycle, "start_queue", lambda materials, **_kw: calls.append(materials) or "j"
@@ -4036,7 +3909,7 @@ def test_remote_scan_preserves_hyphenated_catalog_material(monkeypatch):
     monkeypatch.setattr(state, "_completed_materials", lambda _jobid, materials: materials)
     monkeypatch.setattr(lifecycle, "pull", lambda *_args, **_kwargs: None)
 
-    remote.main(["scan", "standard", "-m", "mos2-on-sio2-si", "--no-sync"])
+    remote.main(["run", "standard", "-m", "mos2-on-sio2-si", "--no-sync"])
 
     assert calls == [["mos2-on-sio2-si"]]
 
@@ -4053,28 +3926,13 @@ def test_completed_materials_reads_success_markers_from_the_queue_log(monkeypatc
     assert "s/^completed: //p" in commands[0]
 
 
-def test_remote_scan_rejects_unknown_profile_before_busy_or_sync(monkeypatch):
+def test_remote_run_rejects_unknown_profile_before_busy_or_sync(monkeypatch):
     monkeypatch.setattr(
         state, "_live_jobs", lambda: pytest.fail("must validate before checking busy jobs")
     )
     monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must validate before syncing"))
 
-    assert remote.main(["scan", "not_in_catalog"]) == 2
-
-
-def test_remote_start_accepts_hyphenated_catalog_material(capsys):
-    remote.main(["start", "standard", "-m", "mos2-on-sio2-si", "--dry-run"])
-
-    assert "mos2-on-sio2-si" in capsys.readouterr().out
-
-
-def test_remote_start_rejects_unknown_profile_before_busy_or_sync(monkeypatch):
-    monkeypatch.setattr(
-        state, "_live_jobs", lambda: pytest.fail("must validate before checking busy jobs")
-    )
-    monkeypatch.setattr(transport, "sync_code", lambda: pytest.fail("must validate before syncing"))
-
-    assert remote.main(["start", "not_in_catalog"]) == 2
+    assert remote.main(["run", "not_in_catalog"]) == 2
 
 
 def test_pull_rejects_unsafe_stem_before_sync_or_local_mutation(monkeypatch, tmp_path):
@@ -4540,7 +4398,7 @@ def test_rebrem_chunked_queue_script_self_resubmits():
 def test_reline_queue_script_and_metadata():
     from cxr_mc._remote import scripts
 
-    # Default remote reline is chunked like `cxr remote start`.
+    # Default remote reline is chunked like `cxr remote run`.
     s = scripts._reline_chunked_queue_script(
         "J1", ["mos2", "w"], line_ne=40000, line_step_eV=None, redo_all=True, chunk_minutes=10.0
     )

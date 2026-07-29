@@ -21,7 +21,7 @@ def import_without_crystals(name, *args, **kwargs):
 
 builtins.__import__ = import_without_crystals
 from cxr_mc import cli
-cli.main(["scan", "hopg", "--quick"])
+cli.main(["run", "standard", "-m", "hopg", "--quick"])
 """
 
     result = subprocess.run(
@@ -54,7 +54,7 @@ def import_without_crystals(name, *args, **kwargs):
     return real_import(name, *args, **kwargs)
 
 builtins.__import__ = import_without_crystals
-sys.argv = ["cxr_mc._entry.scan", "hopg", "--quick"]
+sys.argv = ["cxr_mc._entry.scan", "standard", "-m", "hopg", "--quick"]
 runpy.run_module("cxr_mc._entry.scan", run_name="__main__")
 """
 

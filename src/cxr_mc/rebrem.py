@@ -53,7 +53,7 @@ def rebrem_checkpoints(
     copies excluded). Returns ``{stem: results}``.
 
     ``progress_file`` (single material only) atomically maintains the same
-    compact JSON progress record a remote scan writes (see
+    compact JSON progress record a remote run writes (see
     ``scan._write_progress_record``), so the remote rebrem queue feeds the
     ``cxr remote status``/``attach`` case-progress dashboard: repaired records
     count as new cases, already-at-target records as cached.

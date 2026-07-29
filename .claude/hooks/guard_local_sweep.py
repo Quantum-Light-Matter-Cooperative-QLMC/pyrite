@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Block local ``cxr scan`` invocations before Claude runs them.
+"""Block local ``cxr run`` invocations before Claude runs them.
 
 Exit 2 blocks; parse failures and unrelated commands fail open.
 """
@@ -58,7 +58,7 @@ def _leader(tokens: list[str]) -> str:
     return os.path.basename(tokens[index]) if index < len(tokens) else ""
 
 
-def _segment_has_local_scan(tokens: list[str]) -> bool:
+def _segment_has_local_run(tokens: list[str]) -> bool:
     if _leader(tokens) in READ_ONLY_LEADERS:
         return False
     if any(token in ("-h", "--help") for token in tokens):
@@ -70,15 +70,15 @@ def _segment_has_local_scan(tokens: list[str]) -> bool:
         for nxt in tokens[i + 1 :]:
             if nxt.startswith("-") or "=" in nxt:
                 continue
-            return nxt == "scan"
+            return nxt == "run"
         return False
     return False
 
 
 def _local_scan(command: str) -> bool:
-    """Return whether any shell segment invokes flat local ``cxr scan``."""
+    """Return whether any shell segment invokes flat local ``cxr run``."""
     try:
-        return any(_segment_has_local_scan(tokens) for tokens in _segments(command))
+        return any(_segment_has_local_run(tokens) for tokens in _segments(command))
     except ValueError:
         return False
 
@@ -92,9 +92,9 @@ def main() -> int:
     command = (payload.get("tool_input") or {}).get("command") or ""
     if _local_scan(command):
         sys.stderr.write(
-            "Blocked: `cxr scan` runs a full Monte-Carlo sweep locally and "
+            "Blocked: `cxr run` runs a full Monte-Carlo sweep locally and "
             "OOMs/crashes WSL. Route it to the lab GPU box instead:\n"
-            "  cxr remote submit <material>\n"
+            "  cxr remote run [PROFILE] [-m MATERIAL]\n"
             "See the remote-gpu-jobs skill. If you truly must run locally, ask "
             "the user to run it themselves.\n"
         )

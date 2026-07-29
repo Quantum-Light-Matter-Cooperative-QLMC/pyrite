@@ -54,7 +54,7 @@ def list_jobs():
     if not rows:
         print(
             f"No remote jobs on {config.remote_host()}. "
-            "Start one with `cxr remote start <materials>`."
+            "Start one with `cxr remote run [PROFILE]`."
         )
         return
     print(
@@ -526,7 +526,7 @@ def attach(jobid=None, detail=0):
     defaulted = jobid is None
     jobid = jobid or state._latest_jobid()
     if not jobid:
-        raise SystemExit("no jobs to attach to (start one: cxr remote start <materials>)")
+        raise SystemExit("no jobs to attach to (start one: cxr remote run [PROFILE])")
     transport._check_shell_tokens([jobid])
     if defaulted:
         current = state._job_state(jobid)

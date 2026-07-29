@@ -14,7 +14,7 @@ self-resubmitting slices. `--chunk-minutes 0` selects one monolithic
 `UNLIMITED` allocation; that mode defaults to two parallel materials and
 accepts at most four. `CXR_REMOTE_HOST`, `CXR_REMOTE_DIR`, and
 `CXR_REMOTE_UV` override configured connection values.
-`cxr remote submit PROFILE` runs the profile membership; `-m MATERIAL`
+`cxr remote run PROFILE` runs the profile membership; `-m MATERIAL`
 narrows it to one material and `-p/--perf` enables performance telemetry
 for that same profile.
 
@@ -25,8 +25,8 @@ from root help.
 
 Validation uses `cxr app validation`, `cxr material validate`, and
 `cxr remote validate`. Legacy `check`, `check-config`, and remote
-`check` paths remain hidden compatibility aliases. Remote detached
-submission uses `cxr remote submit`; legacy `start` remains an alias.
+`check` paths remain hidden compatibility aliases. Remote runs use
+`cxr remote run`; retired `scan`, `submit`, and `start` paths are absent.
 Energy-grid job lifecycle uses `cxr energy-grid job ...`; legacy flat job
 verbs remain aliases.
 
@@ -52,13 +52,15 @@ Usage: cxr [OPTIONS] COMMAND [ARGS]...
   Manage coherent X-ray radiation simulation campaigns.
 
   Start with a named profile: it defines campaign ranges, workloads, and material
-  membership. Then run scans, inspect checkpoints, or open analysis notebooks.
+  membership. Then run campaigns, inspect checkpoints, or open analysis notebooks.
 
   Run ``cxr COMMAND --help`` for command options, units, defaults, and side effects.
 
   Examples:
     cxr profile list
     cxr profile show sub_100keV
+    cxr run sub_100keV -m hopg
+    cxr remote run sub_100keV --dry-run
     cxr app analysis
 
 Options:
@@ -68,7 +70,7 @@ Options:
   -h, --help                   Show this message and exit.
 
 Commands:
-  scan         Run one material's MC sweep and write a checkpoint.
+  run          Run a profile's MC sweeps and write checkpoints.
   app          Launch or export interactive analysis notebooks.
   checkpoint   Inspect, transform, recompute, archive, and prune checkpoints.
   completion   Manage cxr shell tab-completion.
@@ -78,84 +80,40 @@ Commands:
   material     Inspect, validate, edit, and blaze individual materials.
 ```
 
-## `cxr scan`
+## `cxr run`
 
 ```text
-Usage: cxr scan [OPTIONS] [MATERIAL]
+Usage: cxr run [OPTIONS] [PROFILE]
 
-  Run one material's MC sweep and write its checkpoint.
+  Run a catalog profile's MC sweeps and write checkpoints.
 
-  Pass MATERIAL, --all, or -A/--actually-all, never more than one. --all runs the
-  verified `materials` list, optionally widened with --include-unverified-dw and/or
-  --include-high-energy (floored at --high-energy-min-kev, default 150). -A runs every
-  material in mats_to_sim.toml, no exceptions.
+  PROFILE defaults to standard and owns material membership, campaign ranges, and
+  workload settings. Use -m/--material to run one profile member instead of the full
+  resolved membership.
 
   Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-compatible
   data in <material>/; variants use identity-qualified stems.
 
-  Beam overrides: --beam-transverse-fwhm-{x,y}-mm, --beam-bunch-length-fs/--beam-long-
-  shape, --beam-rep-rate-hz, and --beam-bunch-charge-pc replace resolved catalog-profile
-  distribution values. Beam energy always remains the material scan grid; this command
-  deliberately has no energy override.
-
 Options:
-  -a, --all                       Run mats_to_sim.toml's verified `materials` list;
-                                  takes no MATERIAL.
-  -A, --actually-all              Run every material in mats_to_sim.toml -- materials,
-                                  no_verified_dw, high_energy_materials, and
-                                  materials_to_leave_out combined; takes no MATERIAL.
-                                  Not combined with --all/--include-unverified-
-                                  dw/--include-high-energy.
-  --include-unverified-dw         With --all, also run mats_to_sim.toml's no_verified_dw
-                                  materials.
-  --include-high-energy           With --all, also run mats_to_sim.toml's
-                                  high_energy_materials, filtered to --high-energy-min-
-                                  kev and above.
-  --high-energy-min-kev KEV       Energy floor applied to any selected
-                                  high_energy_materials member [default: 150.0 when
-                                  selected via --include-high-energy/-A]. With an
-                                  explicit MATERIAL, applies only if that material is
-                                  itself a high_energy_materials entry; a no-op on every
-                                  other material.
-  --workers NUMBER                run_cases max_workers (default auto; 0 = serial, no
-                                  transport pool).
-  --quick                         Use tiny smoke-test grid and write
-                                  <material>_quick.pkl.
-  --n-families NUMBER             Override positive dominant reflection-family count.
-  --beam-uvw H K L                Override nonzero integer beam zone axis [uvw].
-  --beam-transverse-fwhm-x-mm MM  Beam horizontal Gaussian spot FWHM [mm]; overrides the
-                                  resolved profile.
-  --beam-transverse-fwhm-y-mm MM  Beam vertical Gaussian spot FWHM [mm]; overrides the
-                                  resolved profile.
-  --beam-bunch-length-fs FS       Longitudinal bunch RMS length [fs]; 0 is a point
-                                  bunch.
-  --beam-long-shape SHAPE         Longitudinal bunch shape: gaussian or uniform; needs
-                                  --beam-bunch-length-fs.
-  --beam-rep-rate-hz HZ           Beam repetition rate [Hz]; overrides the resolved
-                                  profile.
-  --beam-bunch-charge-pc PC       Single-bunch charge [pC]; overrides the resolved
-                                  profile.
-  --coherent / --incoherent       Sum CXR segment amplitudes with bunch phases
-                                  (coherent) instead of adding segment intensities
-                                  (incoherent, the default). Omit to defer to the
-                                  profile. A coherent run gets an identity-qualified
-                                  checkpoint stem (<material>--full-<digest>), so it
-                                  never shares or clobbers the incoherent <material>
-                                  checkpoint.
-  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.  [default:
-                                  checkpoints]
-  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
-                                  resumable work remains.
-  --performance-profile NAME      Run catalog profile NAME while sampling CPU pressure,
-                                  RAM/swap, GPU clocks/VRAM, process-tree, phase timing,
-                                  queue, case, worker, and chunk metrics every 5 s into
-                                  performance-profiles/NAME/<material>.ndjson.
-  --fidelity [full|survey]        Named settings/grid-reduction policy. survey is
-                                  provisional and reduced.  [default: full]
-  --profile TEXT                  Catalog profile to run (e.g. standard, sub_100keV).
-                                  [default: standard]
-  --json                          Emit one versioned JSON object on stdout.
-  -h, --help                      Show this message and exit.
+  -m, --material MATERIAL    Run one member of PROFILE instead of its full membership.
+  --workers NUMBER           run_cases max_workers (default auto; 0 = serial, no
+                             transport pool).
+  --quick                    Use tiny smoke-test grid and write <material>_quick.pkl.
+  --n-families NUMBER        Override positive dominant reflection-family count.
+  --coherent / --incoherent  Sum CXR segment amplitudes with bunch phases (coherent)
+                             instead of adding segment intensities (incoherent, the
+                             default). Omit to defer to the profile. A coherent run gets
+                             an identity-qualified checkpoint stem
+                             (<material>--full-<digest>), so it never shares or clobbers
+                             the incoherent <material> checkpoint.
+  --checkpoint-dir DIR       Read and write checkpoint pickles in DIR.  [default:
+                             checkpoints]
+  --max-minutes MINUTES      Soft wall-clock budget in minutes; exit 75 if resumable
+                             work remains.
+  --fidelity [full|survey]   Named settings/grid-reduction policy. survey is provisional
+                             and reduced.  [default: full]
+  --json                     Emit one versioned JSON object on stdout.
+  -h, --help                 Show this message and exit.
 ```
 
 ## `cxr app`
@@ -527,9 +485,9 @@ Usage: cxr remote [OPTIONS] COMMAND [ARGS]...
   offered.
 
   Examples:
-    cxr remote submit sub_100keV --dry-run
-    cxr remote submit compute_test_300keV -p
-    cxr remote submit standard -m hopg
+    cxr remote run sub_100keV --dry-run
+    cxr remote run compute_test_300keV -p
+    cxr remote run standard -m hopg
     cxr remote status -vv
 
 Options:
@@ -547,11 +505,9 @@ Commands:
   reap        Release orphaned checkpoint reservations; preview unless --yes.
   rebrem      Recompute brem-only remotely, follow, and pull completed checkpoints.
   reline      Recompute line-only remotely, follow, and pull completed checkpoints.
-  scan        Deprecated alias for `cxr remote submit`. (DEPRECATED: Use 'cxr remote
-              submit'.)
+  run         Sync code, submit sweep(s), track progress, and pull checkpoints.
   status      Show one job; use -v for allocation and -vv for logs.
   stop        cancel active SLURM job(s) by material, profile, or every live job.
-  submit      Sync code, submit sweep(s), track progress, and pull checkpoints.
   sync        Push current code to remote box.
   validate    Run Zhai reproduction remotely or pull existing caches.
 ```
@@ -671,10 +627,10 @@ Usage: cxr remote pull [OPTIONS] [STEM|MATERIAL@PROFILE]...
   Fetch existing checkpoints from remote box.
 
   STEM is usually a bare material name, but MATERIAL@PROFILE selects the checkpoint the
-  box produced for that catalog profile (--profile on `cxr remote submit`) -- on-disk
-  names never carry the profile, so this reads each candidate's meta.json remotely and
-  pulls the newest match; --hash pins a specific parameter-hash prefix when more than
-  one exists.
+  box produced for that catalog profile (--profile on `cxr remote run`) -- on-disk names
+  never carry the profile, so this reads each candidate's meta.json remotely and pulls
+  the newest match; --hash pins a specific parameter-hash prefix when more than one
+  exists.
 
 Options:
   -a, --all         Pull every configured material.
@@ -754,12 +710,10 @@ Options:
   -h, --help                Show this message and exit.
 ```
 
-## `cxr remote scan`
+## `cxr remote run`
 
 ```text
-Usage: cxr remote scan [OPTIONS] [PROFILE]
-
-  Deprecated alias for `cxr remote submit`.
+Usage: cxr remote run [OPTIONS] [PROFILE]
 
   Sync code, submit sweep(s), track progress, and pull checkpoints.
 
@@ -767,68 +721,51 @@ Usage: cxr remote scan [OPTIONS] [PROFILE]
   without automatically pulling checkpoints.
 
   PROFILE selects the catalog campaign and its material membership. Use -m/--material to
-  run one member only. Profiles without an explicit membership use mats_to_sim.toml's
-  verified materials list.
+  run one member only. Profiles without an explicit membership run every in-use catalog
+  material.
 
-  A profile submit names the job after PROFILE (NAME, then NAME-2 once a finished run
-  holds the bare name) and refuses while another job under the same profile is live.
-  (DEPRECATED: Use 'cxr remote submit'.)
+  A profile run names the job after PROFILE (NAME, then NAME-2 once a finished run holds
+  the bare name) and refuses while another job under the same profile is live.
 
 Options:
-  -m, --material TEXT             Run one material from PROFILE instead of its full
-                                  membership.
-  -a, --all                       Queue mats_to_sim.toml's verified `materials` list.
-  -A, --actually-all              Queue every material in mats_to_sim.toml -- materials,
-                                  no_verified_dw, high_energy_materials, and
-                                  materials_to_leave_out combined. Not combined with
-                                  --all/--include-unverified-dw/--include-high-energy or
-                                  explicit materials.
-  --include-unverified-dw         With --all, also queue mats_to_sim.toml's
-                                  no_verified_dw materials.
-  --include-high-energy           With --all, also queue mats_to_sim.toml's
-                                  high_energy_materials, filtered to --high-energy-min-
-                                  kev and above.
-  --high-energy-min-kev KEV       Energy floor applied to any queued
-                                  high_energy_materials member [default: 150.0 when
-                                  selected via --include-high-energy/-A]. With explicit
-                                  MATERIAL(s), applies only to those that are themselves
-                                  high_energy_materials entries; a no-op on every other
-                                  material.
-  --fidelity [full|survey]        Named settings/grid policy. survey is provisional and
-                                  reduced.  [default: full]
-  --quick                         Use tiny smoke-test grid.
-  --workers NUMBER                Transport workers (default: auto; 0 runs serially).
-  --parallel-materials N          Simultaneous scans in one allocation; requires
-                                  --chunk-minutes 0.  [1<=x<=4]
-  --chunk-minutes NUMBER          Self-resubmitting SLURM slice length; 0 runs one
-                                  monolithic job.  [default: 10.0]
-  -p, --perf                      Log CPU pressure, RAM/swap, GPU clocks/VRAM, process,
-                                  phase timing, queue, worker, chunk, and case metrics
-                                  for PROFILE.
-  --performance-repetitions N     Run N uncached sessions per material with isolated
-                                  job-local checkpoints; requires --perf and --chunk-
-                                  minutes 0. Profiling checkpoints are not pulled.
-                                  [default: 1; 1<=x<=20]
-  --performance-interval SECONDS  Performance telemetry sampling interval; requires
-                                  --perf.  [default: 5.0]
-  --spec-chunk N                  Pin line-spectrum segments per GPU chunk; requires
-                                  --perf.
-  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk; requires
-                                  --perf.
-  --nsys                          Capture one uncached full-profile session with Nsight
-                                  Systems CUDA/NVTX and Python-stack tracing; requires
-                                  exactly one material, --perf, --performance-
-                                  repetitions 1, and --chunk-minutes 0.
-  --no-sync                       Skip code upload.
-  --dry-run                       Print submission preview; do not connect.
-  --headless                      Return after submission without attaching or pulling.
-  --no-pull                       Attach and track, but do not pull completed
-                                  checkpoints.
-  --grid                          Grid-filter checkpoint before pulling; incompatible
-                                  with --quick.
-  --drop-wide-brem                With --grid, drop wide-brem.
-  --downcast                      With --grid, downcast to float32.
-  -h, --help                      Show this message and exit.
+  -m, --material TEXT          Run one material from PROFILE instead of its full
+                               membership.
+  --fidelity [full|survey]     Named settings/grid policy. survey is provisional and
+                               reduced.  [default: full]
+  --quick                      Use tiny smoke-test grid.
+  --workers NUMBER             Transport workers (default: auto; 0 runs serially).
+  --parallel-materials N       Simultaneous scans in one allocation; requires --chunk-
+                               minutes 0.  [1<=x<=4]
+  --chunk-minutes NUMBER       Self-resubmitting SLURM slice length; 0 runs one
+                               monolithic job.  [default: 10.0]
+  -p, --perf                   Log CPU pressure, RAM/swap, GPU clocks/VRAM, process,
+                               phase timing, queue, worker, chunk, and case metrics for
+                               PROFILE.
+  -r, --perf-reps N            Run N uncached sessions per material with isolated job-
+                               local checkpoints; requires --perf and --chunk-minutes 0.
+                               Profiling checkpoints are not pulled.  [default: 1;
+                               1<=x<=20]
+  -i, --perf-interval SECONDS  Performance telemetry sampling interval; requires --perf.
+                               [default: 5.0]
+  --spec-chunk N               Pin line-spectrum segments per GPU chunk; requires
+                               --perf.
+  --brem-chunk N               Pin bremsstrahlung segments per GPU chunk; requires
+                               --perf.
+  --nsys                       Capture one uncached full-profile session with Nsight
+                               Systems CUDA/NVTX and Python-stack tracing; requires
+                               exactly one material, --perf, --perf-reps 1, and --chunk-
+                               minutes 0.
+  --no-sync                    Skip code upload.
+  --dry-run                    Print submission preview; do not connect.
+  --headless                   Return after submission without attaching or pulling.
+  --no-pull                    Attach and track, but do not pull completed checkpoints.
+  --grid                       Grid-filter checkpoint before pulling; incompatible with
+                               --quick.
+  --drop-wide-brem             With --grid, drop wide-brem.
+  --downcast                   With --grid, downcast to float32.
+  --level9                     Recompress completed checkpoints at gzip level 9 before
+                               automatic pull.
+  -h, --help                   Show this message and exit.
 ```
 
 ## `cxr remote status`
@@ -856,80 +793,6 @@ Options:
   --profile NAME  Stop live job(s) submitted with this catalog profile.
   --yes           Cancel exact previewed jobs; otherwise preview.
   -h, --help      Show this message and exit.
-```
-
-## `cxr remote submit`
-
-```text
-Usage: cxr remote submit [OPTIONS] [PROFILE]
-
-  Sync code, submit sweep(s), track progress, and pull checkpoints.
-
-  Use --headless to return after submission. Use --no-pull to track through completion
-  without automatically pulling checkpoints.
-
-  PROFILE selects the catalog campaign and its material membership. Use -m/--material to
-  run one member only. Profiles without an explicit membership use mats_to_sim.toml's
-  verified materials list.
-
-  A profile submit names the job after PROFILE (NAME, then NAME-2 once a finished run
-  holds the bare name) and refuses while another job under the same profile is live.
-
-Options:
-  -m, --material TEXT             Run one material from PROFILE instead of its full
-                                  membership.
-  -a, --all                       Queue mats_to_sim.toml's verified `materials` list.
-  -A, --actually-all              Queue every material in mats_to_sim.toml -- materials,
-                                  no_verified_dw, high_energy_materials, and
-                                  materials_to_leave_out combined. Not combined with
-                                  --all/--include-unverified-dw/--include-high-energy or
-                                  explicit materials.
-  --include-unverified-dw         With --all, also queue mats_to_sim.toml's
-                                  no_verified_dw materials.
-  --include-high-energy           With --all, also queue mats_to_sim.toml's
-                                  high_energy_materials, filtered to --high-energy-min-
-                                  kev and above.
-  --high-energy-min-kev KEV       Energy floor applied to any queued
-                                  high_energy_materials member [default: 150.0 when
-                                  selected via --include-high-energy/-A]. With explicit
-                                  MATERIAL(s), applies only to those that are themselves
-                                  high_energy_materials entries; a no-op on every other
-                                  material.
-  --fidelity [full|survey]        Named settings/grid policy. survey is provisional and
-                                  reduced.  [default: full]
-  --quick                         Use tiny smoke-test grid.
-  --workers NUMBER                Transport workers (default: auto; 0 runs serially).
-  --parallel-materials N          Simultaneous scans in one allocation; requires
-                                  --chunk-minutes 0.  [1<=x<=4]
-  --chunk-minutes NUMBER          Self-resubmitting SLURM slice length; 0 runs one
-                                  monolithic job.  [default: 10.0]
-  -p, --perf                      Log CPU pressure, RAM/swap, GPU clocks/VRAM, process,
-                                  phase timing, queue, worker, chunk, and case metrics
-                                  for PROFILE.
-  --performance-repetitions N     Run N uncached sessions per material with isolated
-                                  job-local checkpoints; requires --perf and --chunk-
-                                  minutes 0. Profiling checkpoints are not pulled.
-                                  [default: 1; 1<=x<=20]
-  --performance-interval SECONDS  Performance telemetry sampling interval; requires
-                                  --perf.  [default: 5.0]
-  --spec-chunk N                  Pin line-spectrum segments per GPU chunk; requires
-                                  --perf.
-  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk; requires
-                                  --perf.
-  --nsys                          Capture one uncached full-profile session with Nsight
-                                  Systems CUDA/NVTX and Python-stack tracing; requires
-                                  exactly one material, --perf, --performance-
-                                  repetitions 1, and --chunk-minutes 0.
-  --no-sync                       Skip code upload.
-  --dry-run                       Print submission preview; do not connect.
-  --headless                      Return after submission without attaching or pulling.
-  --no-pull                       Attach and track, but do not pull completed
-                                  checkpoints.
-  --grid                          Grid-filter checkpoint before pulling; incompatible
-                                  with --quick.
-  --drop-wide-brem                With --grid, drop wide-brem.
-  --downcast                      With --grid, downcast to float32.
-  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr remote sync`
