@@ -56,7 +56,7 @@ def test_scan_preview_and_analysis_handoff_are_explicit() -> None:
     assert "Scan preview ready" in source
     assert "Geometry preview" in source
     assert "Penetration exclusions" in source
-    assert "cxr analyze {MATERIAL}" in source
+    assert "cxr app analysis {MATERIAL}" in source
 
 
 def test_geometry_preview_is_lazy() -> None:

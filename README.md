@@ -58,13 +58,13 @@ CuPy falls back to CPU. `CXR_MC_DEBUG=1` shows backend selection;
 uv run cxr scan hopg --fidelity survey
 
 # Analyze existing checkpoint.
-uv run cxr analyze hopg
+uv run cxr app analysis hopg
 
 # Interactive transport/lattice viewer; no checkpoint required.
 uv run marimo run notebooks/trace_app.py
 
 # Validation dashboard.
-uv run cxr validate
+uv run cxr app validation
 ```
 
 Main surfaces:

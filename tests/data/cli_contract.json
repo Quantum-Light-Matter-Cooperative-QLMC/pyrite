@@ -90,7 +90,7 @@
         "required": false
       }
     ],
-    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr scan mose2 --quick\n    cxr analyze mose2\n    cxr remote submit mose2 --dry-run\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  scan         Run one material's MC sweep and write a checkpoint.\n  blaze        Run a grooved-crystal sweep and write a checkpoint.\n  export       Export the analysis app as static HTML.\n  analyze      Launch the analysis app.\n  viewer       Launch the 3D trajectory visualization app.\n  validate     Launch validation or export cached validation figures.\n  catalog      Inspect and validate material-catalog configuration.\n  checkpoint   Inspect, transform, recompute, and archive checkpoints.\n  completion   Manage cxr shell tab-completion.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect effective ranges and edit material overrides.\n  prune        Drop checkpoint records obsolete under current scan profiles.\n",
+    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Coherent X-ray radiation (PXR + coherent bremsstrahlung) toolkit.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr scan mose2 --quick\n    cxr app analysis mose2\n    cxr remote submit mose2 --dry-run\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  scan         Run one material's MC sweep and write a checkpoint.\n  blaze        Run a grooved-crystal sweep and write a checkpoint.\n  app          Launch or export interactive analysis, viewer, and validation\n               apps.\n  catalog      Inspect and validate material-catalog configuration.\n  checkpoint   Inspect, transform, recompute, and archive checkpoints.\n  completion   Manage cxr shell tab-completion.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect effective ranges and edit material overrides.\n  prune        Drop checkpoint records obsolete under current scan profiles.\n",
     "hidden": false,
     "path": "",
     "subcommands": [
@@ -225,6 +225,15 @@
             "required": false
           },
           {
+            "dest": "coherent",
+            "help": "Sum CXR segment amplitudes with bunch phases (coherent) instead of adding segment intensities (incoherent, the default). Omit to defer to the profile. A coherent run gets an identity-qualified checkpoint stem (<material>--full-<digest>), so it never shares or clobbers the incoherent <material> checkpoint.",
+            "option_strings": [
+              "--coherent",
+              "--incoherent"
+            ],
+            "required": false
+          },
+          {
             "dest": "checkpoint_dir",
             "help": "Read and write checkpoint pickles in DIR.",
             "option_strings": [
@@ -305,7 +314,7 @@
             "required": false
           }
         ],
-        "help": "Usage: cxr scan [OPTIONS] [MATERIAL]\n\n  Run one material's MC sweep and write its checkpoint.\n\n  Pass MATERIAL, --all, or -A/--actually-all, never more than one. --all runs\n  the verified `materials` list, optionally widened with --include-unverified-dw\n  and/or --include-high-energy (floored at --high-energy-min-kev, default 150).\n  -A runs every material in mats_to_sim.toml, no exceptions.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\n  Beam overrides: --beam-transverse-fwhm-{x,y}-mm, --beam-bunch-length-\n  fs/--beam-long-shape, --beam-rep-rate-hz, and --beam-bunch-charge-pc replace\n  resolved catalog-profile distribution values. Beam energy always remains the\n  material scan grid; this command deliberately has no energy override.\n\nOptions:\n  -a, --all                       Run mats_to_sim.toml's verified `materials`\n                                  list; takes no MATERIAL.\n  -A, --actually-all              Run every material in mats_to_sim.toml --\n                                  materials, no_verified_dw,\n                                  high_energy_materials, and\n                                  materials_to_leave_out combined; takes no\n                                  MATERIAL. Not combined with --all/--include-\n                                  unverified-dw/--include-high-energy.\n  --include-unverified-dw         With --all, also run mats_to_sim.toml's\n                                  no_verified_dw materials.\n  --include-high-energy           With --all, also run mats_to_sim.toml's\n                                  high_energy_materials, filtered to --high-\n                                  energy-min-kev and above.\n  --high-energy-min-kev KEV       Energy floor applied to any selected\n                                  high_energy_materials member [default: 150.0\n                                  when selected via --include-high-energy/-A].\n                                  With an explicit MATERIAL, applies only if\n                                  that material is itself a\n                                  high_energy_materials entry; a no-op on every\n                                  other material.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use tiny smoke-test grid and write\n                                  <material>_quick.pkl.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --beam-uvw H K L                Override nonzero integer beam zone axis [uvw].\n  --beam-transverse-fwhm-x-mm MM  Beam horizontal Gaussian spot FWHM [mm];\n                                  overrides the resolved profile.\n  --beam-transverse-fwhm-y-mm MM  Beam vertical Gaussian spot FWHM [mm];\n                                  overrides the resolved profile.\n  --beam-bunch-length-fs FS       Longitudinal bunch RMS length [fs]; 0 is a\n                                  point bunch.\n  --beam-long-shape SHAPE         Longitudinal bunch shape: gaussian or uniform;\n                                  needs --beam-bunch-length-fs.\n  --beam-rep-rate-hz HZ           Beam repetition rate [Hz]; overrides the\n                                  resolved profile.\n  --beam-bunch-charge-pc PC       Single-bunch charge [pC]; overrides the\n                                  resolved profile.\n  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  --performance-profile NAME      Run catalog profile NAME while sampling CPU\n                                  pressure, RAM/swap, GPU clocks/VRAM, process-\n                                  tree, phase timing, queue, case, worker, and\n                                  chunk metrics every 5 s into performance-\n                                  profiles/NAME/<material>.ndjson.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  --profile TEXT                  Catalog profile to run (e.g. standard,\n                                  sub_100keV).  [default: standard]\n  --json                          Emit one versioned JSON object on stdout.\n  -h, --help                      Show this message and exit.\n",
+        "help": "Usage: cxr scan [OPTIONS] [MATERIAL]\n\n  Run one material's MC sweep and write its checkpoint.\n\n  Pass MATERIAL, --all, or -A/--actually-all, never more than one. --all runs\n  the verified `materials` list, optionally widened with --include-unverified-dw\n  and/or --include-high-energy (floored at --high-energy-min-kev, default 150).\n  -A runs every material in mats_to_sim.toml, no exceptions.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\n  Beam overrides: --beam-transverse-fwhm-{x,y}-mm, --beam-bunch-length-\n  fs/--beam-long-shape, --beam-rep-rate-hz, and --beam-bunch-charge-pc replace\n  resolved catalog-profile distribution values. Beam energy always remains the\n  material scan grid; this command deliberately has no energy override.\n\nOptions:\n  -a, --all                       Run mats_to_sim.toml's verified `materials`\n                                  list; takes no MATERIAL.\n  -A, --actually-all              Run every material in mats_to_sim.toml --\n                                  materials, no_verified_dw,\n                                  high_energy_materials, and\n                                  materials_to_leave_out combined; takes no\n                                  MATERIAL. Not combined with --all/--include-\n                                  unverified-dw/--include-high-energy.\n  --include-unverified-dw         With --all, also run mats_to_sim.toml's\n                                  no_verified_dw materials.\n  --include-high-energy           With --all, also run mats_to_sim.toml's\n                                  high_energy_materials, filtered to --high-\n                                  energy-min-kev and above.\n  --high-energy-min-kev KEV       Energy floor applied to any selected\n                                  high_energy_materials member [default: 150.0\n                                  when selected via --include-high-energy/-A].\n                                  With an explicit MATERIAL, applies only if\n                                  that material is itself a\n                                  high_energy_materials entry; a no-op on every\n                                  other material.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use tiny smoke-test grid and write\n                                  <material>_quick.pkl.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --beam-uvw H K L                Override nonzero integer beam zone axis [uvw].\n  --beam-transverse-fwhm-x-mm MM  Beam horizontal Gaussian spot FWHM [mm];\n                                  overrides the resolved profile.\n  --beam-transverse-fwhm-y-mm MM  Beam vertical Gaussian spot FWHM [mm];\n                                  overrides the resolved profile.\n  --beam-bunch-length-fs FS       Longitudinal bunch RMS length [fs]; 0 is a\n                                  point bunch.\n  --beam-long-shape SHAPE         Longitudinal bunch shape: gaussian or uniform;\n                                  needs --beam-bunch-length-fs.\n  --beam-rep-rate-hz HZ           Beam repetition rate [Hz]; overrides the\n                                  resolved profile.\n  --beam-bunch-charge-pc PC       Single-bunch charge [pC]; overrides the\n                                  resolved profile.\n  --coherent / --incoherent       Sum CXR segment amplitudes with bunch phases\n                                  (coherent) instead of adding segment\n                                  intensities (incoherent, the default). Omit to\n                                  defer to the profile. A coherent run gets an\n                                  identity-qualified checkpoint stem\n                                  (<material>--full-<digest>), so it never\n                                  shares or clobbers the incoherent <material>\n                                  checkpoint.\n  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  --performance-profile NAME      Run catalog profile NAME while sampling CPU\n                                  pressure, RAM/swap, GPU clocks/VRAM, process-\n                                  tree, phase timing, queue, case, worker, and\n                                  chunk metrics every 5 s into performance-\n                                  profiles/NAME/<material>.ndjson.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  --profile TEXT                  Catalog profile to run (e.g. standard,\n                                  sub_100keV).  [default: standard]\n  --json                          Emit one versioned JSON object on stdout.\n  -h, --help                      Show this message and exit.\n",
         "hidden": false,
         "path": "scan",
         "subcommands": []
@@ -397,240 +406,273 @@
         "subcommands": []
       },
       {
-        "actions": [
-          {
-            "dest": "stem",
-            "help": null,
-            "option_strings": [],
-            "required": false
-          }
-        ],
-        "help": "Usage: cxr export [OPTIONS] [STEM]\n\n  Render notebooks/analysis_app.py to static HTML.\n\n  Writes results/<stem>.html; STEM defaults to analysis.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
+        "actions": [],
+        "help": "Usage: cxr app [OPTIONS] COMMAND [ARGS]...\n\n  Launch interactive apps or write non-interactive artifacts.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  analysis    Launch or export the analysis app.\n  viewer      Launch or export the 3D trajectory viewer.\n  validation  Launch or export cached validation figures.\n",
         "hidden": false,
-        "path": "export",
-        "subcommands": []
-      },
-      {
-        "actions": [
+        "path": "app",
+        "subcommands": [
           {
-            "dest": "material",
-            "help": null,
-            "option_strings": [],
-            "required": false
+            "actions": [
+              {
+                "dest": "material",
+                "help": null,
+                "option_strings": [],
+                "required": false
+              },
+              {
+                "dest": "persist_default",
+                "help": "Persist MATERIAL as default for future no-argument runs.",
+                "option_strings": [
+                  "-d",
+                  "--default"
+                ],
+                "required": false
+              },
+              {
+                "dest": "watch",
+                "help": "Reload app when source files change.",
+                "option_strings": [
+                  "--watch"
+                ],
+                "required": false
+              },
+              {
+                "dest": "smoke",
+                "help": "Execute app once headlessly and exit.",
+                "option_strings": [
+                  "--smoke"
+                ],
+                "required": false
+              },
+              {
+                "dest": "edit",
+                "help": "Use `marimo edit` instead of `marimo run`.",
+                "option_strings": [
+                  "--edit"
+                ],
+                "required": false
+              },
+              {
+                "dest": "acp",
+                "help": "Start local Claude and Codex ACP bridges.",
+                "option_strings": [
+                  "--acp"
+                ],
+                "required": false
+              },
+              {
+                "dest": "tunnel",
+                "help": "Bind fixed port for SSH tunneling.",
+                "option_strings": [
+                  "--tunnel"
+                ],
+                "required": false
+              },
+              {
+                "dest": "no_token",
+                "help": "Disable marimo auth token.",
+                "option_strings": [
+                  "--no-token"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr app analysis [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...\n\n  Launch notebooks/analysis_app.py with marimo run or edit.\n\n  MATERIAL overrides the persisted default for this run. --persist-default\n  stores it for later no-argument launches.\n\nOptions:\n  -d, --default  Persist MATERIAL as default for future no-argument runs.\n  --watch        Reload app when source files change.\n  --smoke        Execute app once headlessly and exit.\n  --edit         Use `marimo edit` instead of `marimo run`.\n  --acp          Start local Claude and Codex ACP bridges.\n  --tunnel       Bind fixed port for SSH tunneling.\n  --no-token     Disable marimo auth token.\n  -h, --help     Show this message and exit.\n\nCommands:\n  export  Render notebooks/analysis_app.py to static HTML.\n",
+            "hidden": false,
+            "path": "app analysis",
+            "subcommands": [
+              {
+                "actions": [
+                  {
+                    "dest": "stem",
+                    "help": null,
+                    "option_strings": [],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: cxr app analysis export [OPTIONS] [STEM]\n\n  Render notebooks/analysis_app.py to static HTML.\n\n  Writes results/<stem>.html; STEM defaults to analysis.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
+                "hidden": false,
+                "path": "app analysis export",
+                "subcommands": []
+              }
+            ]
           },
           {
-            "dest": "persist_default",
-            "help": "Persist MATERIAL as default for future no-argument runs.",
-            "option_strings": [
-              "-d",
-              "--default"
+            "actions": [
+              {
+                "dest": "material",
+                "help": null,
+                "option_strings": [],
+                "required": false
+              },
+              {
+                "dest": "persist_default",
+                "help": "Persist MATERIAL as default for future no-argument runs.",
+                "option_strings": [
+                  "-d",
+                  "--default"
+                ],
+                "required": false
+              },
+              {
+                "dest": "watch",
+                "help": "Reload app when source files change.",
+                "option_strings": [
+                  "--watch"
+                ],
+                "required": false
+              },
+              {
+                "dest": "smoke",
+                "help": "Execute app once headlessly and exit.",
+                "option_strings": [
+                  "--smoke"
+                ],
+                "required": false
+              },
+              {
+                "dest": "edit",
+                "help": "Use `marimo edit` instead of `marimo run`.",
+                "option_strings": [
+                  "--edit"
+                ],
+                "required": false
+              },
+              {
+                "dest": "acp",
+                "help": "Start local Claude and Codex ACP bridges.",
+                "option_strings": [
+                  "--acp"
+                ],
+                "required": false
+              },
+              {
+                "dest": "tunnel",
+                "help": "Bind fixed port for SSH tunneling.",
+                "option_strings": [
+                  "--tunnel"
+                ],
+                "required": false
+              },
+              {
+                "dest": "no_token",
+                "help": "Disable marimo auth token.",
+                "option_strings": [
+                  "--no-token"
+                ],
+                "required": false
+              }
             ],
-            "required": false
+            "help": "Usage: cxr app viewer [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...\n\n  Launch notebooks/trace_app.py with marimo run or edit.\n\n  3D trajectory and crystal structure visualization.\n\n  MATERIAL overrides the persisted default for this run. --persist-default\n  stores it for later no-argument launches.\n\nOptions:\n  -d, --default  Persist MATERIAL as default for future no-argument runs.\n  --watch        Reload app when source files change.\n  --smoke        Execute app once headlessly and exit.\n  --edit         Use `marimo edit` instead of `marimo run`.\n  --acp          Start local Claude and Codex ACP bridges.\n  --tunnel       Bind fixed port for SSH tunneling.\n  --no-token     Disable marimo auth token.\n  -h, --help     Show this message and exit.\n\nCommands:\n  export  Render the viewer as static HTML without starting marimo.\n",
+            "hidden": false,
+            "path": "app viewer",
+            "subcommands": [
+              {
+                "actions": [
+                  {
+                    "dest": "material",
+                    "help": null,
+                    "option_strings": [],
+                    "required": false
+                  },
+                  {
+                    "dest": "stem",
+                    "help": "Output stem under results/ (without .html).",
+                    "option_strings": [
+                      "--stem"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: cxr app viewer export [OPTIONS] [MATERIAL]\n\n  Render the viewer as static HTML without starting marimo.\n\nOptions:\n  --stem TEXT  Output stem under results/ (without .html).\n  -h, --help   Show this message and exit.\n",
+                "hidden": false,
+                "path": "app viewer export",
+                "subcommands": []
+              }
+            ]
           },
           {
-            "dest": "watch",
-            "help": "Reload app when source files change.",
-            "option_strings": [
-              "--watch"
+            "actions": [
+              {
+                "dest": "watch",
+                "help": "Pass marimo's --watch.",
+                "option_strings": [
+                  "--watch"
+                ],
+                "required": false
+              },
+              {
+                "dest": "edit",
+                "help": "Use `marimo edit` instead of `marimo run`.",
+                "option_strings": [
+                  "--edit"
+                ],
+                "required": false
+              },
+              {
+                "dest": "acp",
+                "help": "Start local Claude and Codex ACP bridges.",
+                "option_strings": [
+                  "--acp"
+                ],
+                "required": false
+              },
+              {
+                "dest": "tunnel",
+                "help": "Use fixed port for SSH tunneling.",
+                "option_strings": [
+                  "--tunnel"
+                ],
+                "required": false
+              }
             ],
-            "required": false
-          },
-          {
-            "dest": "smoke",
-            "help": "Execute app once headlessly and exit.",
-            "option_strings": [
-              "--smoke"
-            ],
-            "required": false
-          },
-          {
-            "dest": "edit",
-            "help": "Use `marimo edit` instead of `marimo run`.",
-            "option_strings": [
-              "--edit"
-            ],
-            "required": false
-          },
-          {
-            "dest": "acp",
-            "help": "Start local Claude and Codex ACP bridges.",
-            "option_strings": [
-              "--acp"
-            ],
-            "required": false
-          },
-          {
-            "dest": "tunnel",
-            "help": "Bind fixed port for SSH tunneling.",
-            "option_strings": [
-              "--tunnel"
-            ],
-            "required": false
-          },
-          {
-            "dest": "no_token",
-            "help": "Disable marimo auth token.",
-            "option_strings": [
-              "--no-token"
-            ],
-            "required": false
+            "help": "Usage: cxr app validation [OPTIONS] COMMAND [ARGS]...\n\n  Launch notebooks/validation_app.py, or export cached validation figures.\n\nOptions:\n  --watch     Pass marimo's --watch.\n  --edit      Use `marimo edit` instead of `marimo run`.\n  --acp       Start local Claude and Codex ACP bridges.\n  --tunnel    Use fixed port for SSH tunneling.\n  -h, --help  Show this message and exit.\n\nCommands:\n  export  Write cached validation figures; never starts marimo.\n",
+            "hidden": false,
+            "path": "app validation",
+            "subcommands": [
+              {
+                "actions": [
+                  {
+                    "dest": "outdir",
+                    "help": null,
+                    "option_strings": [
+                      "--outdir"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "ne",
+                    "help": null,
+                    "option_strings": [
+                      "--ne"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "ne_brem",
+                    "help": null,
+                    "option_strings": [
+                      "--ne-brem"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "ne_supp",
+                    "help": null,
+                    "option_strings": [
+                      "--ne-supp"
+                    ],
+                    "required": false
+                  }
+                ],
+                "help": "Usage: cxr app validation export [OPTIONS]\n\n  Write cached validation figures; never starts marimo.\n\nOptions:\n  --outdir DIRECTORY  [default: figures]\n  --ne INTEGER        [default: 20000]\n  --ne-brem INTEGER   [default: 200]\n  --ne-supp INTEGER   [default: 200]\n  -h, --help          Show this message and exit.\n",
+                "hidden": false,
+                "path": "app validation export",
+                "subcommands": []
+              }
+            ]
           }
-        ],
-        "help": "Usage: cxr analyze [OPTIONS] [MATERIAL]\n\n  Launch notebooks/analysis_app.py with marimo run or edit.\n\n  MATERIAL overrides the persisted default for this run. --persist-default\n  stores it for later no-argument launches.\n\nOptions:\n  -d, --default  Persist MATERIAL as default for future no-argument runs.\n  --watch        Reload app when source files change.\n  --smoke        Execute app once headlessly and exit.\n  --edit         Use `marimo edit` instead of `marimo run`.\n  --acp          Start local Claude and Codex ACP bridges.\n  --tunnel       Bind fixed port for SSH tunneling.\n  --no-token     Disable marimo auth token.\n  -h, --help     Show this message and exit.\n",
-        "hidden": false,
-        "path": "analyze",
-        "subcommands": []
-      },
-      {
-        "actions": [
-          {
-            "dest": "material",
-            "help": null,
-            "option_strings": [],
-            "required": false
-          },
-          {
-            "dest": "persist_default",
-            "help": "Persist MATERIAL as default for future no-argument runs.",
-            "option_strings": [
-              "-d",
-              "--default"
-            ],
-            "required": false
-          },
-          {
-            "dest": "watch",
-            "help": "Reload app when source files change.",
-            "option_strings": [
-              "--watch"
-            ],
-            "required": false
-          },
-          {
-            "dest": "smoke",
-            "help": "Execute app once headlessly and exit.",
-            "option_strings": [
-              "--smoke"
-            ],
-            "required": false
-          },
-          {
-            "dest": "edit",
-            "help": "Use `marimo edit` instead of `marimo run`.",
-            "option_strings": [
-              "--edit"
-            ],
-            "required": false
-          },
-          {
-            "dest": "acp",
-            "help": "Start local Claude and Codex ACP bridges.",
-            "option_strings": [
-              "--acp"
-            ],
-            "required": false
-          },
-          {
-            "dest": "tunnel",
-            "help": "Bind fixed port for SSH tunneling.",
-            "option_strings": [
-              "--tunnel"
-            ],
-            "required": false
-          },
-          {
-            "dest": "no_token",
-            "help": "Disable marimo auth token.",
-            "option_strings": [
-              "--no-token"
-            ],
-            "required": false
-          }
-        ],
-        "help": "Usage: cxr viewer [OPTIONS] [MATERIAL]\n\n  Launch notebooks/trace_app.py with marimo run or edit.\n\n  3D trajectory and crystal structure visualization.\n\n  MATERIAL overrides the persisted default for this run. --persist-default\n  stores it for later no-argument launches.\n\nOptions:\n  -d, --default  Persist MATERIAL as default for future no-argument runs.\n  --watch        Reload app when source files change.\n  --smoke        Execute app once headlessly and exit.\n  --edit         Use `marimo edit` instead of `marimo run`.\n  --acp          Start local Claude and Codex ACP bridges.\n  --tunnel       Bind fixed port for SSH tunneling.\n  --no-token     Disable marimo auth token.\n  -h, --help     Show this message and exit.\n",
-        "hidden": false,
-        "path": "viewer",
-        "subcommands": []
-      },
-      {
-        "actions": [
-          {
-            "dest": "watch",
-            "help": "Pass marimo's --watch.",
-            "option_strings": [
-              "--watch"
-            ],
-            "required": false
-          },
-          {
-            "dest": "edit",
-            "help": "Use `marimo edit` instead of `marimo run`.",
-            "option_strings": [
-              "--edit"
-            ],
-            "required": false
-          },
-          {
-            "dest": "acp",
-            "help": "Start local Claude and Codex ACP bridges.",
-            "option_strings": [
-              "--acp"
-            ],
-            "required": false
-          },
-          {
-            "dest": "tunnel",
-            "help": "Use fixed port for SSH tunneling.",
-            "option_strings": [
-              "--tunnel"
-            ],
-            "required": false
-          },
-          {
-            "dest": "export_",
-            "help": "Render cached figures instead of marimo.",
-            "option_strings": [
-              "--export"
-            ],
-            "required": false
-          },
-          {
-            "dest": "outdir",
-            "help": "With --export, output directory.",
-            "option_strings": [
-              "--outdir"
-            ],
-            "required": false
-          },
-          {
-            "dest": "ne",
-            "help": "With --export, Fig. 1c line electrons per energy.",
-            "option_strings": [
-              "--ne"
-            ],
-            "required": false
-          },
-          {
-            "dest": "ne_brem",
-            "help": "With --export, Fig. 1c bremsstrahlung electrons per energy.",
-            "option_strings": [
-              "--ne-brem"
-            ],
-            "required": false
-          },
-          {
-            "dest": "ne_supp",
-            "help": "With --export, supplementary electrons per polar-tilt spectrum.",
-            "option_strings": [
-              "--ne-supp"
-            ],
-            "required": false
-          }
-        ],
-        "help": "Usage: cxr validate [OPTIONS]\n\n  Launch notebooks/validation_app.py, or export its cached validation figures.\n\n  --export skips marimo and writes figures to --outdir. Electron-count options\n  affect export mode only.\n\nOptions:\n  --watch           Pass marimo's --watch.\n  --edit            Use `marimo edit` instead of `marimo run`.\n  --acp             Start local Claude and Codex ACP bridges.\n  --tunnel          Use fixed port for SSH tunneling.\n  --export          Render cached figures instead of marimo.\n  --outdir DIR      With --export, output directory.  [default: figures]\n  --ne NUMBER       With --export, Fig. 1c line electrons per energy.  [default:\n                    20000]\n  --ne-brem NUMBER  With --export, Fig. 1c bremsstrahlung electrons per energy.\n                    [default: 200]\n  --ne-supp NUMBER  With --export, supplementary electrons per polar-tilt\n                    spectrum.  [default: 200]\n  -h, --help        Show this message and exit.\n",
-        "hidden": false,
-        "path": "validate",
-        "subcommands": []
+        ]
       },
       {
         "actions": [],

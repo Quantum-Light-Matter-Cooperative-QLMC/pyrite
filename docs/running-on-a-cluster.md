@@ -85,8 +85,8 @@ The checkpoints are the only output you need off the cluster:
 rsync -avz login-node:~/cxr-mc/checkpoints/ ./checkpoints/
 ```
 
-Then run `cxr analyze <material>` (the `notebooks/analysis_app.py` marimo app) or
-run `cxr export` locally —
+Then run `cxr app analysis <material>` (the `notebooks/analysis_app.py` marimo app) or
+run `cxr app analysis export` locally —
 all interactive visualization and static-HTML export stay on your workstation.
 
 ## Notes

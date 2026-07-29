@@ -23,7 +23,7 @@ top-level `slim`, `rebrem`, `reline`, `archive`, `restore`, `archives`,
 and `union` paths remain callable compatibility aliases but are hidden
 from root help.
 
-Validation uses `cxr validate`, `cxr catalog validate`, and
+Validation uses `cxr app validation`, `cxr catalog validate`, and
 `cxr remote validate`. Legacy `check`, `check-config`, and remote
 `check` paths remain hidden compatibility aliases. Remote detached
 submission uses `cxr remote submit`; legacy `start` remains an alias.
@@ -55,7 +55,7 @@ Usage: cxr [OPTIONS] COMMAND [ARGS]...
 
   Examples:
     cxr scan mose2 --quick
-    cxr analyze mose2
+    cxr app analysis mose2
     cxr remote submit mose2 --dry-run
 
 Options:
@@ -67,10 +67,7 @@ Options:
 Commands:
   scan         Run one material's MC sweep and write a checkpoint.
   blaze        Run a grooved-crystal sweep and write a checkpoint.
-  export       Export the analysis app as static HTML.
-  analyze      Launch the analysis app.
-  viewer       Launch the 3D trajectory visualization app.
-  validate     Launch validation or export cached validation figures.
+  app          Launch or export interactive analysis, viewer, and validation apps.
   catalog      Inspect and validate material-catalog configuration.
   checkpoint   Inspect, transform, recompute, and archive checkpoints.
   completion   Manage cxr shell tab-completion.
@@ -185,23 +182,26 @@ Options:
   -h, --help             Show this message and exit.
 ```
 
-## `cxr export`
+## `cxr app`
 
 ```text
-Usage: cxr export [OPTIONS] [STEM]
+Usage: cxr app [OPTIONS] COMMAND [ARGS]...
 
-  Render notebooks/analysis_app.py to static HTML.
-
-  Writes results/<stem>.html; STEM defaults to analysis.
+  Launch interactive apps or write non-interactive artifacts.
 
 Options:
   -h, --help  Show this message and exit.
+
+Commands:
+  analysis    Launch or export the analysis app.
+  viewer      Launch or export the 3D trajectory viewer.
+  validation  Launch or export cached validation figures.
 ```
 
-## `cxr analyze`
+## `cxr app analysis`
 
 ```text
-Usage: cxr analyze [OPTIONS] [MATERIAL]
+Usage: cxr app analysis [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...
 
   Launch notebooks/analysis_app.py with marimo run or edit.
 
@@ -217,12 +217,28 @@ Options:
   --tunnel       Bind fixed port for SSH tunneling.
   --no-token     Disable marimo auth token.
   -h, --help     Show this message and exit.
+
+Commands:
+  export  Render notebooks/analysis_app.py to static HTML.
 ```
 
-## `cxr viewer`
+## `cxr app analysis export`
 
 ```text
-Usage: cxr viewer [OPTIONS] [MATERIAL]
+Usage: cxr app analysis export [OPTIONS] [STEM]
+
+  Render notebooks/analysis_app.py to static HTML.
+
+  Writes results/<stem>.html; STEM defaults to analysis.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
+## `cxr app viewer`
+
+```text
+Usage: cxr app viewer [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...
 
   Launch notebooks/trace_app.py with marimo run or edit.
 
@@ -240,31 +256,54 @@ Options:
   --tunnel       Bind fixed port for SSH tunneling.
   --no-token     Disable marimo auth token.
   -h, --help     Show this message and exit.
+
+Commands:
+  export  Render the viewer as static HTML without starting marimo.
 ```
 
-## `cxr validate`
+## `cxr app viewer export`
 
 ```text
-Usage: cxr validate [OPTIONS]
+Usage: cxr app viewer export [OPTIONS] [MATERIAL]
 
-  Launch notebooks/validation_app.py, or export its cached validation figures.
-
-  --export skips marimo and writes figures to --outdir. Electron-count options affect
-  export mode only.
+  Render the viewer as static HTML without starting marimo.
 
 Options:
-  --watch           Pass marimo's --watch.
-  --edit            Use `marimo edit` instead of `marimo run`.
-  --acp             Start local Claude and Codex ACP bridges.
-  --tunnel          Use fixed port for SSH tunneling.
-  --export          Render cached figures instead of marimo.
-  --outdir DIR      With --export, output directory.  [default: figures]
-  --ne NUMBER       With --export, Fig. 1c line electrons per energy.  [default: 20000]
-  --ne-brem NUMBER  With --export, Fig. 1c bremsstrahlung electrons per energy.
-                    [default: 200]
-  --ne-supp NUMBER  With --export, supplementary electrons per polar-tilt spectrum.
-                    [default: 200]
-  -h, --help        Show this message and exit.
+  --stem TEXT  Output stem under results/ (without .html).
+  -h, --help   Show this message and exit.
+```
+
+## `cxr app validation`
+
+```text
+Usage: cxr app validation [OPTIONS] COMMAND [ARGS]...
+
+  Launch notebooks/validation_app.py, or export cached validation figures.
+
+Options:
+  --watch     Pass marimo's --watch.
+  --edit      Use `marimo edit` instead of `marimo run`.
+  --acp       Start local Claude and Codex ACP bridges.
+  --tunnel    Use fixed port for SSH tunneling.
+  -h, --help  Show this message and exit.
+
+Commands:
+  export  Write cached validation figures; never starts marimo.
+```
+
+## `cxr app validation export`
+
+```text
+Usage: cxr app validation export [OPTIONS]
+
+  Write cached validation figures; never starts marimo.
+
+Options:
+  --outdir DIRECTORY  [default: figures]
+  --ne INTEGER        [default: 20000]
+  --ne-brem INTEGER   [default: 200]
+  --ne-supp INTEGER   [default: 200]
+  -h, --help          Show this message and exit.
 ```
 
 ## `cxr catalog`

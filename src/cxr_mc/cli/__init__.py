@@ -12,10 +12,7 @@ from ._core import LazyGroup, color_option, run
 _COMMANDS = {
     "scan": "cxr_mc.scan.command",
     "blaze": "cxr_mc.blaze.command",
-    "export": "cxr_mc.export.command",
-    "analyze": "cxr_mc.analyze.command",
-    "viewer": "cxr_mc.viewer.command",
-    "validate": "cxr_mc.check.command",
+    "app": "cxr_mc.cli.app.command",
     "catalog": "cxr_mc.cli.catalog.command",
     "checkpoint": "cxr_mc.cli.checkpoint.command",
     "completion": "cxr_mc.cli.completion.command",
@@ -39,10 +36,7 @@ _COMMANDS = {
 _COMMAND_HELP = {
     "scan": "Run one material's MC sweep and write a checkpoint.",
     "blaze": "Run a grooved-crystal sweep and write a checkpoint.",
-    "export": "Export the analysis app as static HTML.",
-    "analyze": "Launch the analysis app.",
-    "viewer": "Launch the 3D trajectory visualization app.",
-    "validate": "Launch validation or export cached validation figures.",
+    "app": "Launch or export interactive analysis, viewer, and validation apps.",
     "catalog": "Inspect and validate material-catalog configuration.",
     "checkpoint": "Inspect, transform, recompute, and archive checkpoints.",
     "completion": "Manage cxr shell tab-completion.",
@@ -94,7 +88,7 @@ def command() -> None:
     \b
     Examples:
       cxr scan mose2 --quick
-      cxr analyze mose2
+      cxr app analysis mose2
       cxr remote submit mose2 --dry-run
     """
 

@@ -77,17 +77,15 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   (validation-study interface). Shared pieces: `notebooks/_design.py` (page
   chrome), `notebooks/_widgets.py` (`MaterialSelect` anywidget). Scan,
   analysis, and trace apps read per-material grids in `config.py`.
-- **`cxr analyze [material]`** → `analyze:_cli`: launch or smoke-test analysis
-  app with explicit or persisted initial material.
-- **`cxr validate`** → `check:_cli`: launch validation app or export its
-  literature-validation figures from cached results; hidden alias: `cxr check`.
+- **`cxr app analysis [material]`** → `analyze:_cli`: launch or smoke-test analysis
+  app with explicit or persisted initial material; `cxr app analysis export` writes static HTML.
+- **`cxr app validation`** → `check:_cli`: launch validation app; `cxr app validation export`
+  writes cached literature-validation figures.
 - **`cxr remote ...`** → `remote:*`: optional SSH/SLURM lifecycle for lab GPU
   box: submit, attach/status/logs, pull, stop, validation jobs. Canonical
   detached submission and validation paths are `remote submit` and
   `remote validate`; `remote prune` applies profile-aware checkpoint pruning
   under remote stem reservations; `start` and `check` remain hidden aliases.
-- **`cxr export [stem]`** → `export:main`: `marimo export html` of analysis
-  app → `results/<stem>.html`.
 - **`cxr slim <checkpoint-dir> [--grid]`** → `slim:slim_checkpoint` →
   `results.slim_results`: shrink checkpoint pickle for transfer (drop
   wide-brem / float32 / filter configs; `--grid` keep only material's
@@ -416,7 +414,7 @@ Canonical `cxr catalog` group. Lazily routes `catalog validate` to
 `check_config.command` while `cxr check-config` remains a hidden alias.
 
 ### `analyze.py`
-`cxr analyze` launcher for `notebooks/analysis_app.py`: persisted
+`cxr app analysis` launcher for `notebooks/analysis_app.py`: persisted
 initial-material selection, smoke execution, edit/watch mode, ACP bridges,
 SSH-tunnel-friendly fixed-port launch.
 - Public: `material_menu`, `select_initial_material`, `face_menu`,
@@ -462,7 +460,7 @@ and clear, remote validation jobs.
   `transport._ssh_capture`), not the facade.
 
 ### `export.py`
-`cxr export` subcommand — `marimo export html` of `notebooks/analysis_app.py`
+`cxr app analysis export` subcommand — `marimo export html` of `notebooks/analysis_app.py`
 → `results/<stem>.html` (replace retired nbconvert-PDF path).
 - Public: `add_subparser`, `main`.
 
