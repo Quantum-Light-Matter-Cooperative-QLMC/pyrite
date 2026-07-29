@@ -25,13 +25,14 @@ are imported here (no GPU), so this module is cheap to import and test.
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from itertools import product
 from typing import Any
 
 import numpy as np
 
 from ._energy_grid import decode_energy_grid, encode_energy_grid
+from .longitudinal import LongitudinalDistribution, resolve_longitudinal_distribution
 from .materials import CATALOG, LayerSpec
 from .materials._transport_data import TRANSPORT_ELEMENTS
 from .materials.crystal import dominant_reflections
@@ -84,6 +85,10 @@ class BeamSpec:
       offsets (overriding the shape). Incoherent today, so a no-op on the
       spectrum -- the sampled offsets are the input the future coherent form
       factor consumes.
+    * ``longitudinal`` -- frozen declarative Gaussian, wavelength-matched
+      microtrain, or compressed-bunch policy. It is mutually exclusive with
+      the legacy flat bunch fields and resolves per material/energy/geometry
+      case without depending on macro-particle count.
     * ``rep_rate_hz`` / ``bunch_charge_pc`` -- pulsed-source rep rate and
       single-bunch charge; a detected-flux multiplier only, and the source of
       truth for average current ``I = bunch_charge_pc * rep_rate_hz``.
@@ -103,6 +108,7 @@ class BeamSpec:
     bunch_length_fs: float | None = None
     long_shape: str = "gaussian"
     long_offsets_fs: tuple[float, ...] | None = None
+    longitudinal: LongitudinalDistribution | None = None
     rep_rate_hz: float = 5000.0
     bunch_charge_pc: float = 1.0
     divergence_mrad: float | None = None
@@ -525,13 +531,15 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_em
     5x5 mm footprint). Each case also carries the beam phase-space fields from
     ``sweep.beam`` (:class:`BeamSpec`): ``beam_fwhm_mm`` (x-plane FWHM; default a
     1 mm Gaussian spot, ``None`` recovers the legacy point source), the
-    elliptical ``beam_fwhm_y_mm`` and the longitudinal ``bunch_length_fs`` /
-    ``long_shape`` / ``long_offsets_fs`` keys joining only when they diverge from
-    the isotropic point-bunch default. Optional ``n_electrons`` / ``n_electrons_brem`` sweep
-    grids (catalog profile settings) cross electron-count statistics into the
-    product and suffix the case name with ``ne=<line>/<brem>``; ``None`` keeps
-    the scalar counts passed by the caller. Returns the ``cases`` list;
-    preview it with :func:`geometry_table`."""
+    elliptical ``beam_fwhm_y_mm`` and either the legacy longitudinal
+    ``bunch_length_fs`` / ``long_shape`` / ``long_offsets_fs`` keys or one
+    resolved ``longitudinal_distribution`` record. Declarative policies resolve
+    only after material, energy, geometry, and catalog reflection provenance are
+    known; sampled offsets never enter case identity. Optional ``n_electrons`` /
+    ``n_electrons_brem`` sweep grids (catalog profile settings) cross
+    electron-count statistics into the product and suffix the case name with
+    ``ne=<line>/<brem>``; ``None`` keeps the scalar counts passed by the caller.
+    Returns the ``cases`` list; preview it with :func:`geometry_table`."""
     cp = crystal_params(sweep.material, sweep.n_families)
     if sweep.max_reflections is not None:
         cp["hkl_list"] = cp["hkl_list"][: sweep.max_reflections]
@@ -579,6 +587,13 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_em
         beam_case["rep_rate_hz"] = float(b.rep_rate_hz)
     if fwhm_y != fwhm_x:
         beam_case["beam_fwhm_y_mm"] = fwhm_y
+    if b.longitudinal is not None and (
+        b.bunch_length_fs is not None or b.long_offsets_fs is not None or b.long_shape != "gaussian"
+    ):
+        raise ValueError(
+            "longitudinal policy is incompatible with legacy bunch_length_fs, "
+            "long_shape, and long_offsets_fs fields"
+        )
     if b.bunch_length_fs is not None or b.long_offsets_fs is not None:
         beam_case["long_shape"] = b.long_shape
         if b.bunch_length_fs is not None:
@@ -684,6 +699,23 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_em
             name = f"{name} groove={sweep.groove_spacing_ang / 1e4:g}um"
         for i_e, E0 in enumerate(energies):
             line_case_grid = encode_energy_grid(line_grids[i_e])
+            resolved_longitudinal = None
+            if b.longitudinal is not None:
+                crystal_spec = CATALOG.crystal(cp["crystal"])
+                resolved_longitudinal = asdict(
+                    resolve_longitudinal_distribution(
+                        b.longitudinal,
+                        material=sweep.material,
+                        crystal=cp["crystal"],
+                        lattice=crystal_spec.lattice,
+                        hkl_list=cp["hkl_list"],
+                        surface_hkl=surface_hkl,
+                        beam_uvw=beam_uvw,
+                        energy_keV=float(E0),
+                        theta_obs_deg=float(sweep.theta_obs_deg),
+                        tilt_deg=float(tilt),
+                    )
+                )
             for i_n, (ne_line, ne_brem) in enumerate(ne_pairs):
                 case_name = f"{name} ne={ne_line}/{ne_brem}" if explicit_ne else name
                 cases.append(
@@ -698,6 +730,11 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_em
                         crystal_width_mm=None if width is None else float(width),
                         crystal_height_mm=None if height is None else float(height),
                         **beam_case,
+                        **(
+                            {"longitudinal_distribution": resolved_longitudinal}
+                            if resolved_longitudinal is not None
+                            else {}
+                        ),
                         E_grid=line_case_grid,  # legacy key (== line grid)
                         E_grid_line=line_case_grid,
                         E_grid_brem=(

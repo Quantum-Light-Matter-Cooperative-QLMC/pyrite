@@ -88,28 +88,40 @@ comparisons meaningful.
 - Use paired `--coherent` and `--incoherent` runs of each profile; do not create
   six mostly duplicated profiles.
 
-## Open decisions
+## Approved conventions
 
-These require explicit resolution and documentation before profile values are
-called scientifically meaningful:
+Approved 2026-07-29:
 
-- Does “200 fs length” mean RMS sigma, intensity/current FWHM, or full envelope
-  span? Existing `BeamSpec.bunch_length_fs` means RMS.
-- What retained-coherence target `eta` defines “appropriate” microbunch
-  duration: for example 0.5, 0.9, or another experiment-driven value?
-- Which emitted line defines `E_target` when multiple configured reciprocal
-  families contribute: pinned dominant basal reflection, strongest predicted
-  line, or a user-selected line?
-- Is train spacing exactly one target period, an integer harmonic, or supplied
-  by a known XFEL modulation mechanism? What modulation depth and timing jitter
-  should be assumed?
-- Confirm common physical charge and repetition rate; provisional values are
-  1 pC and 5 kHz.
-- Confirm 100 um means Gaussian FWHM rather than hard-edge diameter or another
-  width convention.
-- The unresolved `coherent-emission`/`line-energy-dispersion` phase convention
-  may block a wavelength-derived scientific claim. Resolve it or explicitly
-  constrain profile status to exploratory.
+- `200 fs` means RMS time width, matching
+  `BeamSpec.bunch_length_fs = sigma_t_fs`.
+- Retained longitudinal coherence uses `eta = 0.9` in
+  `|F(omega)|^2 = exp[-(omega sigma_t)^2]`, so the derived Gaussian
+  microbunch width is
+  `sigma_t = sqrt(-ln(0.9)) / omega`.
+- `E_target` is the catalog-pinned dominant basal reflection for each
+  material/electron-energy/geometry case. Derivation records the material,
+  electron energy, reflection, photon energy, and catalog provenance.
+- Train-center spacing is exactly one target period:
+  `T = 2*pi/omega = h/E_target`. Initial modulation depth is `1.0` (full);
+  initial timing jitter is `0 fs`.
+- Common physical bunch charge is `1 pC`; repetition rate is `5 kHz`.
+  Simulated macro-electron count remains a separate numerical parameter.
+- `100 um` means circular Gaussian transverse FWHM:
+  `transverse_fwhm_x_mm = transverse_fwhm_y_mm = 0.1`.
+- The `coherent-emission`/`line-energy-dispersion` phase convention remains
+  independently unvalidated. All resulting profile and comparison claims stay
+  explicitly exploratory until fresh-context validation resolves it and a
+  human signs off. A phase-model discrepancy that changes the timing
+  derivation remains a stop condition.
+
+Fresh-context review on 2026-07-29 rederived
+`T = 2*pi/omega = h/E_target` and
+`|F(omega)|^2 = exp[-(omega sigma_t)^2]`, but found a separate
+`coherent-emission` discrepancy: the segment field phase requires
+`exp{i[omega*t_j - (k+g).r_j]}`, while the implementation omits
+`exp(-i*g.r_j)`. This does not change the longitudinal timing derivation, so
+schema/timing work may proceed. It blocks coherent-estimator and comparison
+claims until corrected and independently revalidated.
 
 ## Owning paths
 

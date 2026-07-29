@@ -20,7 +20,7 @@ from typing import Any
 import numpy as np
 
 from .results import Settings
-from .sweep import Sweep, beam_replace, crystal_params
+from .sweep import Sweep, beam_replace, build_cases, crystal_params
 
 FIDELITY_NAMES = ("full", "survey")
 DATASET_IDENTITY_SCHEMA = "cxr.dataset-identity.v1"
@@ -232,6 +232,20 @@ def dataset_identity(
         sweep_payload["long_shape"] = beam_payload["long_shape"]
     if beam_payload["long_offsets_fs"] is not None:
         sweep_payload["long_offsets_fs"] = beam_payload["long_offsets_fs"]
+    if beam_payload["longitudinal"] is not None:
+        sweep_payload["longitudinal"] = beam_payload["longitudinal"]
+        cases = build_cases(
+            sweep,
+            n_electrons=settings.n_electrons,
+            n_electrons_brem=settings.n_electrons_brem,
+            coherent_emission=settings.coherent_emission,
+        )
+        serialized: dict[str, Any] = {}
+        for case in cases:
+            resolution = case["longitudinal_distribution"]
+            key = json.dumps(_jsonable(resolution), sort_keys=True, separators=(",", ":"))
+            serialized.setdefault(key, _jsonable(resolution))
+        resolved["longitudinal_resolutions"] = list(serialized.values())
     if beam_payload["rep_rate_hz"] != 5000.0:
         sweep_payload["rep_rate_hz"] = beam_payload["rep_rate_hz"]
     if beam_payload["bunch_charge_pc"] != 1.0:
