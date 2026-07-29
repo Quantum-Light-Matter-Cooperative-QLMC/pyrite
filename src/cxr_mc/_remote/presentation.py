@@ -419,7 +419,11 @@ def _format_performance_profiles(payload):
 
     def percent(record, key):
         value = record.get(key)
-        if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not math.isfinite(value)
+        ):
             return "-"
         return f"{value:.0f}%"
 

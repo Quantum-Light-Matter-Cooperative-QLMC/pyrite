@@ -361,8 +361,11 @@ def test_queue_script_wraps_single_profile_session_with_nsys():
     assert "export CXR_MC_NSYS=1" in script
     assert "nsys profile" in script
     assert "--trace=cuda,nvtx,osrt" in script
+    assert "--wait=all" in script
+    # Python stack-walkers stay opt-in (SIGSEGV on CPython 3.14 under nsys
+    # 2025.6.x); gated behind CXR_MC_NSYS_PYSTACK, not on by default.
+    assert 'if [ -n "${CXR_MC_NSYS_PYSTACK:-}" ]; then' in script
     assert "--python-backtrace=cuda" in script
-    assert "--wait=primary" in script
     assert '--output="$trace_base"' in script
     assert 'scan_launcher=("/home/aamador/dev/cxr-mc/.venv/bin/python")' in script
     assert '--checkpoint-dir "$JOBDIR/performance-checkpoints/$m/$repetition"' in script
@@ -1077,9 +1080,7 @@ def test_submit_rejects_performance_repetitions_in_chunked_mode(capsys):
 
 
 def test_submit_rejects_nsys_without_performance_profile(capsys):
-    result = remote.main(
-        ["submit", "mos2", "--nsys", "--chunk-minutes", "0", "--dry-run"]
-    )
+    result = remote.main(["submit", "mos2", "--nsys", "--chunk-minutes", "0", "--dry-run"])
 
     assert result == 2
     assert "--nsys requires --performance-profile" in capsys.readouterr().err

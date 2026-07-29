@@ -148,9 +148,7 @@ def detect_file_type(filepath: Path) -> str:
         if _is_yaml_content(lines):
             return "config"
 
-        code_lines = sum(
-            1 for line in lines if line.strip() and _is_code_line(line)
-        )
+        code_lines = sum(1 for line in lines if line.strip() and _is_code_line(line))
         non_empty = sum(1 for line in lines if line.strip())
         if non_empty > 0 and code_lines / non_empty > 0.4:
             return "code"

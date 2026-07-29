@@ -104,8 +104,8 @@ later experiment if line-spectrum chunking does not explain the measured gap.
 ### Capture one Nsight Systems timeline
 
 When one-second telemetry shows a spectrum-dominated run with bursty GPU use,
-capture CUDA API calls, kernels, NVTX phases, OS runtime activity, and Python
-stacks for one full uncached session:
+capture CUDA API calls, kernels, NVTX phases, OS runtime activity, and native
+CPU samples for one full uncached session:
 
 ```bash
 cxr remote submit mos2 \
@@ -128,6 +128,15 @@ required to collect the trace. Nsight sessions launch the synchronized virtual
 environment's Python directly and use the `spawn` multiprocessing context;
 ordinary scans retain the platform-default context. This avoids Nsight's known
 fork-without-exec deadlock mode.
+
+Python-level stack sampling and CUDA backtraces stay opt-in: nsys 2025.6.x
+stack-walkers SIGSEGV while unwinding CPython 3.14's frame layout, so the
+session omits `--python-sampling`/`--python-backtrace`/`--cudabacktrace` by
+default. Set `CXR_MC_NSYS_PYSTACK=1` in the submit environment to add them back
+only on a supported Python/nsys pair. Without them the trace still carries the
+CUDA kernel timeline, NVTX phases, OS runtime, and process-tree CPU samples --
+enough to diagnose bursty-GPU/low-CPU behavior; only Python-frame attribution
+is lost.
 
 If an older submitted script remains at 0% with both CPU and GPU idle and its
 log ends with `Waiting for termination of re-parented processes`, cancel that
