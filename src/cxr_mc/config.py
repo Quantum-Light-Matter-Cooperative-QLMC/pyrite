@@ -111,7 +111,8 @@ def material_sweep(
     material: str,
     *,
     fidelity="full",
-    theta_obs_deg=90.0,
+    theta_obs_deg: Any = None,
+    detector: Any = None,
     catalog_profile="standard",
     profile=None,
     **overrides: Any,
@@ -136,9 +137,27 @@ def material_sweep(
     beam_fields = _catalog(catalog_profile).profile_beam(catalog_profile)
     if beam_fields:
         beam = beam_replace(beam, **beam_fields)
+    catalog_detector = _catalog(catalog_profile).profile_detector(catalog_profile)
+    legacy_detector = {
+        "observation_angle_deg": theta_obs_deg,
+        "polar_acceptance_deg": overrides.pop("dtheta_obs_deg", None),
+        "solid_angle_sr": overrides.pop("domega_sr", None),
+    }
+    supplied_legacy = {key: value for key, value in legacy_detector.items() if value is not None}
+    if detector is not None and supplied_legacy:
+        conflicts = [
+            key for key, value in supplied_legacy.items() if getattr(detector, key) != value
+        ]
+        if conflicts:
+            raise ValueError(
+                "conflicting detector= and legacy detector override(s): " + ", ".join(conflicts)
+            )
+    resolved_detector = (
+        detector if detector is not None else replace(catalog_detector, **supplied_legacy)
+    )
     sweep = Sweep(
         material=spec.crystal_key,
-        theta_obs_deg=theta_obs_deg,
+        detector=resolved_detector,
         thickness_ang=scan.thickness_ang,
         beam=beam,
         tilt_deg=scan.tilt_deg,

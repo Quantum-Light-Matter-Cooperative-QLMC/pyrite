@@ -185,6 +185,26 @@ Suggested slices:
 3. Zhai anchor/case/cache migration plus validation app and remote plumbing;
 4. independent configuration/physics review and remote reproduction.
 
+## Milestone 1 evidence
+
+- Added frozen, validated `DetectorSpec`; reserved response/hardware fields
+  serialize into dataset identity but remain absent from case physics payloads.
+- `Sweep.detector` now owns runtime detector configuration. Legacy flat
+  constructor inputs normalize into it; mixed conflicting inputs fail.
+- Catalog profiles decode detector blocks with selected-profile → `standard` →
+  90 degree fallback precedence. Bundled `standard` is explicit.
+- `material_sweep` resolves profile detector defaults and explicit runtime
+  overrides. Cases retain historical radian keys and full-span acceptance
+  mapping.
+- Historical `hopg`/`full` standard identity remains
+  `d0bb205f2268b8cd30801b1146de8daf7e745ca70399919718519542a7c9b45c`;
+  every nondefault detector field changes identity.
+- Local evidence: 180 focused tests and 97 neighboring detector/config/run
+  tests passed; catalog golden regenerated with no diff; lint and typecheck
+  passed. Full CPU suite: 2070 passed, 39 skipped, 5 unrelated failures
+  (agent-skill mirror drift, missing remote `attach` on branch, sandboxed
+  forkserver permission).
+
 Task-local checkpoint commits are allowed after dispatch. No worker may push,
 edit canonical TODO ownership, mark physics `signed-off`, or run heavy work
 locally without separate authority.
