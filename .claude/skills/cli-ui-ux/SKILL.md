@@ -17,6 +17,8 @@ tested.
 3. Design help, validation, safety, compatibility, and automation before code.
 4. Keep imports lazy so root/nested help avoid hardware, network, or optional
    services.
+5. Add tab completion whenever command structure and shell integration support it;
+   complete valid commands, options, values, and safe local targets only.
 
 Use lowercase hyphenated names and one term per concept. Show units, domains,
 defaults, repeatability, precedence, incompatibilities, and side effects in
