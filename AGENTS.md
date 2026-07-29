@@ -48,6 +48,22 @@ If `uv run` cannot write project environment, add
 - Heavy sweeps/GPU work use `cxr remote`; never run locally.
 - Add imports with first use. Verify with smallest useful command.
 
+## Task dispatch
+
+- Use `dispatch-task` to route backlog work. It resolves task worktree/branch,
+  writes explicit authority/acceptance handoff, then selects:
+  `implement-task-lite` for small mechanical slices, `implement-task` for
+  normal checklist slices, or `lead-task` for complex/integrating ownership.
+- Example model tiers: Haiku/Luna → lite; Sonnet/Terra → normal;
+  Opus/Sol/Fable/K3 → lead. Risk and scope override model label.
+- Task type stays separate: workers also invoke matching CLI, notebook,
+  physics, performance, docs, remote, regression, or scientific skill.
+- Direct user invocation of a worker skill permits task-local checkpoint
+  commits unless user says otherwise; never permits push, TODO ownership, or
+  delegation. Supervisors may pass only authority they hold.
+- Checkpoint only independently valid slices: focused checks pass, scoped diff
+  reviewed, explicit paths staged. Never `git add .`; never mix unrelated WIP.
+
 ## Backlog and physics
 
 `TODO.md` stays identical across branches. Branch detail belongs in

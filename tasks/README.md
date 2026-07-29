@@ -18,5 +18,13 @@ implementation path, checklist, decisions, and delegation plan here.
 3. Keep branch and main `TODO.md` identical; use `todo-sync`.
 4. Commit task doc + synced `TODO.md`; push branch with upstream before
    implementation.
-5. Before dropping landed branch, promote durable content to `docs/`, remove
+5. Use `dispatch-task` to resolve worktree/branch and assign an explicit slice.
+   Choose `implement-task-lite`, `implement-task`, or `lead-task` by task
+   scope/risk; model label is secondary. State acceptance checks, required
+   domain skills, commit/push/TODO/delegation authority, and stop conditions.
+   Portable prompt: `Use the dispatch-task skill for <task>`. Clients may also
+   expose `$dispatch-task` or `/dispatch-task`.
+6. Commit independently valid checkpoints when authorized: focused checks
+   pass, scoped diff reviewed, explicit paths staged. Never mix unrelated WIP.
+7. Before dropping landed branch, promote durable content to `docs/`, remove
    task file, and update backlog state.

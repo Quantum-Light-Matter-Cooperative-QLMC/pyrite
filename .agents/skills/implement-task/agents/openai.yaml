@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implement Task"
+  short_description: "Execute a coherent task checklist slice"
+  default_prompt: "Use $implement-task to implement this cxr-mc task slice."

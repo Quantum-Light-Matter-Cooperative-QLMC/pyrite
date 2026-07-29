@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implement Task Lite"
+  short_description: "Execute one tightly bounded task slice"
+  default_prompt: "Use $implement-task-lite to complete this bounded cxr-mc task slice."
