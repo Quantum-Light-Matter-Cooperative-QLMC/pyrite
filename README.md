@@ -66,6 +66,25 @@ within a segment) with the finite-interaction-time lineshape
 `|Q|² = t_L² · sinc²(P·t_L)` — the physical replacement for the absorption-limited
 delta-function of the closed-form theory.
 
+### Beam phase space and rates
+
+`BeamSpec` owns incident-beam energy, independent transverse FWHM values,
+longitudinal RMS bunch length and shape, bunch charge, and repetition rate.
+Transport retains each electron's arrival offset separately from its
+time-since-entry, so lifetime plots remain unchanged and a future coherent
+bunch form factor can use absolute arrival time. Current PXR/CBS spectra still
+sum electrons incoherently; changing bunch length alone therefore does not
+change spectral yield.
+
+The metrics API computes sampled RMS sizes, bunch length, transverse and
+longitudinal emittance, Twiss parameters, Gaussian-equivalent peak current,
+and average current;
+the trace app shows a compact size, normalized-emittance, charge, and current
+summary.
+Result tables keep intrinsic per-nA values beside photons/s and counts/s at
+`bunch_charge_pc × rep_rate_hz`. `cxr scan --help` lists profile-overriding
+`--beam-*` distribution options; beam energy remains the material scan grid.
+
 ---
 
 ## Repository layout
@@ -97,10 +116,11 @@ directory and the data travels with an installed wheel. `*.pkl` checkpoints and
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `materials/`             | Material domain: `catalog.py` validates the immutable CIF-backed declarative catalog; `_cif.py` parses CIF structures; `crystal.py` owns reciprocal vectors, structure factors / `chi_g` (PXR) / `U_g` (CBS), Debye–Waller, absorption length, and physical constants; `atomic.py` supplies atomic responses; `attenuation.py` owns layered self-absorption. |
 | `montecarlo/`          | The transport + radiation pipeline: `simulate_trajectories` (MC electron transport), `mc_spectrum` (coherent lines), `mc_brem_spectrum` (Born+Elwert brem), detector helpers, `tilted_geometry`, and the case drivers `run_case`/`run_cases`. **Optional CuPy GPU** with automatic CPU fallback. |
-| `sweep.py`               | `Sweep` dataclass + `build_cases`. Every physical knob is a scalar (fixed) or a sequence (swept); cases = the Cartesian product.                                                                                                                                                                |
+| `beam_metrics.py`        | Pure sampled phase-space diagnostics: RMS size and bunch length, emittance/Twiss parameters, bunch charge, Gaussian-equivalent peak current, and average current. |
+| `sweep.py`               | `BeamSpec`, `Sweep`, and `build_cases`. Every swept physical knob is a scalar (fixed) or a sequence; cases = the Cartesian product.                                                                                                                                                                |
 | `config.py`              | Shared builders imported by both marimo apps: `default_settings()`, `material_sweep(mat)`, and `trajectory_sweep(mat)`. Per-material grids come from `data/materials.toml`; detector/analysis knobs remain here.                                                        |
 | `run.py`                 | `run_sweep(...)`: checkpointed, crash-safe, resumable driver around `run_cases`; `load_checkpoint`/`cases_from_results` for the viz side.                                                                                                                                                       |
-| `results/`             | `Settings` dataclass, per-record metrics (`peak_flux`, `coherent_flux`, `line_flux`, `line_quality`, …), and ranking helpers (`selection_score`, `top_geometries`).                                                                                                                            |
+| `results/`             | `Settings`, intrinsic per-nA and pulse-rate-scaled metrics (`peak_flux`, `coherent_flux`, `line_flux`, `line_quality`, …), and ranking helpers (`selection_score`, `top_geometries`).                                                                                                                            |
 | `plots/`               | Matplotlib and Altair spectrum, sweep, detector, comparison, and electron-penetration figures.                                                                                                                                                |
 | `detectors/timepix_response.py`    | Per-photon forward model of the Timepix3 (Si sensor): photoabsorption, e–h pairs, charge sharing, and the**~1.9 keV counting threshold** (the headline effect — it eats sub-2 keV line flux).                                                                                                 |
 | `detectors/eaglexo_response.py`    | Raptor Eagle XO CCD: a clean`solid_angle × QE(E)` operator (windowless direct-detection CCD).                                                                                                                                                                                                  |
@@ -175,7 +195,8 @@ material's thickness / energies / tilts / energy grids in
    No sweeps run here.
 3. **`notebooks/trace_app.py`** (the 3D viewer): interactive electron-trajectory
    animation and crystal-lattice view, running transport directly from the
-   catalog's scan grids — needs no checkpoint.
+   catalog's scan grids, with sampled beam phase-space diagnostics — needs no
+   checkpoint.
 4. **`notebooks/validation_app.py`** (the checks): inspect literature anchors,
    validation studies, and cached validation figures without changing sweep results.
 

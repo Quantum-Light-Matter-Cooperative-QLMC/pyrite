@@ -92,39 +92,58 @@ Usage: cxr scan [OPTIONS] [MATERIAL]
   Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-compatible
   data in <material>/; variants use identity-qualified stems.
 
+  Beam overrides: --beam-transverse-fwhm-{x,y}-mm, --beam-bunch-length-fs/--beam-long-
+  shape, --beam-rep-rate-hz, and --beam-bunch-charge-pc replace resolved catalog-profile
+  distribution values. Beam energy always remains the material scan grid; this command
+  deliberately has no energy override.
+
 Options:
-  -a, --all                  Run mats_to_sim.toml's verified `materials` list; takes no
-                             MATERIAL.
-  -A, --actually-all         Run every material in mats_to_sim.toml -- materials,
-                             no_verified_dw, high_energy_materials, and
-                             materials_to_leave_out combined; takes no MATERIAL. Not
-                             combined with --all/--include-unverified-dw/--include-high-
-                             energy.
-  --include-unverified-dw    With --all, also run mats_to_sim.toml's no_verified_dw
-                             materials.
-  --include-high-energy      With --all, also run mats_to_sim.toml's
-                             high_energy_materials, filtered to --high-energy-min-kev
-                             and above.
-  --high-energy-min-kev KEV  Energy floor applied to any selected high_energy_materials
-                             member [default: 150.0 when selected via --include-high-
-                             energy/-A]. With an explicit MATERIAL, applies only if that
-                             material is itself a high_energy_materials entry; a no-op
-                             on every other material.
-  --workers NUMBER           run_cases max_workers (default auto; 0 = serial, no
-                             transport pool).
-  --quick                    Use tiny smoke-test grid and write <material>_quick.pkl.
-  --n-families NUMBER        Override positive dominant reflection-family count.
-  --beam-uvw H K L           Override nonzero integer beam zone axis [uvw].
-  --checkpoint-dir DIR       Read and write checkpoint pickles in DIR.  [default:
-                             checkpoints]
-  --max-minutes MINUTES      Soft wall-clock budget in minutes; exit 75 if resumable
-                             work remains.
-  --fidelity [full|survey]   Named settings/grid-reduction policy. survey is provisional
-                             and reduced.  [default: full]
-  --profile TEXT             Catalog profile to run (e.g. standard, sub_100keV).
-                             [default: standard]
-  --json                     Emit one versioned JSON object on stdout.
-  -h, --help                 Show this message and exit.
+  -a, --all                       Run mats_to_sim.toml's verified `materials` list;
+                                  takes no MATERIAL.
+  -A, --actually-all              Run every material in mats_to_sim.toml -- materials,
+                                  no_verified_dw, high_energy_materials, and
+                                  materials_to_leave_out combined; takes no MATERIAL.
+                                  Not combined with --all/--include-unverified-
+                                  dw/--include-high-energy.
+  --include-unverified-dw         With --all, also run mats_to_sim.toml's no_verified_dw
+                                  materials.
+  --include-high-energy           With --all, also run mats_to_sim.toml's
+                                  high_energy_materials, filtered to --high-energy-min-
+                                  kev and above.
+  --high-energy-min-kev KEV       Energy floor applied to any selected
+                                  high_energy_materials member [default: 150.0 when
+                                  selected via --include-high-energy/-A]. With an
+                                  explicit MATERIAL, applies only if that material is
+                                  itself a high_energy_materials entry; a no-op on every
+                                  other material.
+  --workers NUMBER                run_cases max_workers (default auto; 0 = serial, no
+                                  transport pool).
+  --quick                         Use tiny smoke-test grid and write
+                                  <material>_quick.pkl.
+  --n-families NUMBER             Override positive dominant reflection-family count.
+  --beam-uvw H K L                Override nonzero integer beam zone axis [uvw].
+  --beam-transverse-fwhm-x-mm MM  Beam horizontal Gaussian spot FWHM [mm]; overrides the
+                                  resolved profile.
+  --beam-transverse-fwhm-y-mm MM  Beam vertical Gaussian spot FWHM [mm]; overrides the
+                                  resolved profile.
+  --beam-bunch-length-fs FS       Longitudinal bunch RMS length [fs]; 0 is a point
+                                  bunch.
+  --beam-long-shape SHAPE         Longitudinal bunch shape: gaussian or uniform; needs
+                                  --beam-bunch-length-fs.
+  --beam-rep-rate-hz HZ           Beam repetition rate [Hz]; overrides the resolved
+                                  profile.
+  --beam-bunch-charge-pc PC       Single-bunch charge [pC]; overrides the resolved
+                                  profile.
+  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.  [default:
+                                  checkpoints]
+  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
+                                  resumable work remains.
+  --fidelity [full|survey]        Named settings/grid-reduction policy. survey is
+                                  provisional and reduced.  [default: full]
+  --profile TEXT                  Catalog profile to run (e.g. standard, sub_100keV).
+                                  [default: standard]
+  --json                          Emit one versioned JSON object on stdout.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr blaze`
