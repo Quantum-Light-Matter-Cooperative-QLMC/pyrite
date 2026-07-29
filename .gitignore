@@ -268,4 +268,5 @@ checkpoints/*.pkl
 checkpoints/**/*.pkl
 checkpoints/**/*.tmp
 checkpoints/**/*meta.json
+performance-profiles/
 RTK.md

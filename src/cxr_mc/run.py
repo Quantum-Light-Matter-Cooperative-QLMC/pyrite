@@ -330,6 +330,7 @@ def run_sweep(
     on_chunk=None,
     on_progress=None,
     on_case=None,
+    on_runtime=None,
     max_seconds=None,
     time_fn=None,
     dataset_identity=None,
@@ -367,6 +368,9 @@ def run_sweep(
         Lets a live viewer surface which crystal case (energy, tilts, thickness)
         is currently under test without threading it through ``on_progress``'s
         fixed count signature.
+    on_runtime : optional callback(dict) fired once after resume filtering with
+        resolved engine, effective worker count, memory policy, representative
+        energy-grid widths, and spectrum/brem chunk sizing.
     max_seconds : optional soft wall-clock budget, measured from just before
         ``run_cases`` starts. None (default) means unbounded. When set, a
         deadline of ``time_fn() + max_seconds`` is checked (via ``run_cases``'s
@@ -450,6 +454,8 @@ def run_sweep(
     todo = [c for c in cases if not (c["name"] in results and c["E0_keV"] in results[c["name"]])]
     cached_cases = len(cases) - len(todo)
     print(f"{len(todo)} of {len(cases)} cases to run ({cached_cases} cached)")
+    if on_runtime is not None:
+        on_runtime(runner.runtime_plan(todo, max_workers))
     completed_new_cases = 0
     total_cost = sum(case_cost_fn(c) for c in cases) if case_cost_fn is not None else None
     done_cost = (

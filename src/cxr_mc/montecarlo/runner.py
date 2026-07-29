@@ -799,6 +799,56 @@ def _case_progress_label(cases):
     return f"{next(iter(materials))} cases" if len(materials) == 1 else "mixed cases"
 
 
+def case_runtime_plan(case):
+    """Return grid and chunk metrics for one concrete case."""
+    line_grid = decode_energy_grid(case.get("E_grid", []))
+    brem_grid = decode_energy_grid(case.get("E_grid_brem", []))
+    spec_chunk = (
+        case.get("spec_chunk")
+        or _SPEC_CHUNK
+        or (_adaptive_chunk(line_grid.size) if line_grid.size else None)
+    )
+    brem_chunk = (
+        case.get("brem_chunk")
+        or _BREM_CHUNK
+        or (_adaptive_chunk(brem_grid.size) if brem_grid.size else None)
+    )
+    return {
+        "spec_chunk": spec_chunk,
+        "brem_chunk": brem_chunk,
+        "line_grid_bins": int(line_grid.size),
+        "brem_grid_bins": int(brem_grid.size),
+        "line_electrons": case.get("Ne"),
+        "brem_electrons": case.get("Ne_brem"),
+    }
+
+
+def runtime_plan(cases, max_workers=None, engine="auto"):
+    """Resolve execution topology and representative chunk sizing for profiling."""
+    n = len(cases)
+    use_gpu = _GPU if engine == "auto" else engine == "gpu" and _GPU
+    if n == 0 or max_workers == 0:
+        workers = 1
+        resolved_engine = "serial"
+    elif use_gpu:
+        workers = max(1, _gpu_pipeline_workers(max_workers, n))
+        resolved_engine = "gpu-pipeline" if workers >= 2 else "serial"
+    else:
+        workers = _cpu_pool_workers(max_workers, n)
+        resolved_engine = "cpu-pool" if workers >= 2 else "serial"
+    representative = cases[0] if cases else {}
+    return {
+        "engine": resolved_engine,
+        "requested_workers": max_workers,
+        "effective_workers": workers,
+        "worker_memory_budget_mib": _WORKER_MEM_MB,
+        "gpu_pool_fraction": _GPU_POOL_FRAC,
+        "gpu_pool_share": _GPU_POOL_SHARE,
+        "spectrum_budget_mib": _SPEC_BUDGET_MB,
+        **case_runtime_plan(representative),
+    }
+
+
 def run_cases(
     cases,
     max_workers=None,

@@ -29,6 +29,8 @@ a harmless no-op.
 import io
 import json
 import os
+import re
+import threading
 import time
 import tomllib
 from contextlib import redirect_stderr, redirect_stdout
@@ -42,6 +44,7 @@ from .cli import _core as _cli_core
 from .cli import json as cli_json
 
 MATS_FILE = Path("mats_to_sim.toml")
+_PERFORMANCE_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 
 # Lazy runtime bindings keep help fast while preserving monkeypatchable module
 # seams used by focused driver tests.
@@ -149,6 +152,19 @@ def _beam_uvw(ctx, param, value):
     if value is None:
         return None
     return _cli_core.BEAM_UVW.convert(value, param, ctx)
+
+
+def _performance_profile(ctx, param, value):
+    if value is None:
+        return None
+    if _PERFORMANCE_PROFILE_RE.fullmatch(value) is None:
+        raise click.BadParameter(
+            "expected letters, digits, underscores, or hyphens; "
+            "must start with letter or digit",
+            ctx=ctx,
+            param=param,
+        )
+    return value
 
 
 @click.command(
@@ -301,6 +317,28 @@ def _beam_uvw(ctx, param, value):
     metavar="MINUTES",
     help="Soft wall-clock budget in minutes; exit 75 if resumable work remains.",
 )
+@click.option(
+    "--performance-profile",
+    callback=_performance_profile,
+    default=None,
+    metavar="NAME",
+    help=(
+        "Sample CPU, RAM, GPU, VRAM, process-tree, case, worker, and chunk metrics "
+        "every 5 s into performance-profiles/NAME/<material>.ndjson."
+    ),
+)
+@click.option(
+    "--performance-dir",
+    type=click.Path(path_type=Path),
+    default=None,
+    hidden=True,
+)
+@click.option(
+    "--performance-interval",
+    type=_cli_core.POSITIVE_FLOAT,
+    default=5.0,
+    hidden=True,
+)
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option("--no-progress", is_flag=True, hidden=True)
 @_cli_core.fidelity_option()
@@ -333,6 +371,9 @@ def command(
     beam_bunch_charge_pc,
     checkpoint_dir,
     max_minutes,
+    performance_profile,
+    performance_dir,
+    performance_interval,
     progress_file,
     no_progress,
     json_output,
@@ -379,6 +420,9 @@ def command(
             beam_bunch_charge_pc=beam_bunch_charge_pc,
             checkpoint_dir=checkpoint_dir,
             max_minutes=max_minutes,
+            performance_profile=performance_profile,
+            performance_dir=performance_dir,
+            performance_interval=performance_interval,
             progress_file=progress_file,
             no_progress=no_progress,
         )
@@ -404,6 +448,9 @@ def command(
         beam_bunch_charge_pc=beam_bunch_charge_pc,
         checkpoint_dir=checkpoint_dir,
         max_minutes=max_minutes,
+        performance_profile=performance_profile,
+        performance_dir=performance_dir,
+        performance_interval=performance_interval,
         progress_file=progress_file,
         no_progress=no_progress,
     )
@@ -719,36 +766,64 @@ def _run_material(args, material, max_seconds=None):
     # tracks relative matmul work instead of a flat case count -- see
     # notebooks/scan_app.py for the same cost-weighted meter run locally.
     latest_cost = {}
+    runtime_info = {}
+    performance_state = {"state": "running"}
+    performance_lock = threading.Lock()
 
     def _note_case(case):
         # Frontier crystal case just finished -- surface its parameters so a live
         # viewer can show what's under test (energy, both tilts, thickness).
-        latest_case.clear()
-        latest_case.update(
-            energy_keV=round(float(case["E0_keV"]), 3),
-            tilt_deg=round(float(case["tilt_deg"]), 2),
-            azimuth_deg=round(float(case["tilt_azim_deg"]), 2),
-            thickness_um=round(float(case["thickness_ang"]) / 1e4, 4),
-        )
+        from .montecarlo import runner as montecarlo_runner
+
+        with performance_lock:
+            latest_case.clear()
+            latest_case.update(
+                configuration=str(case["name"]),
+                energy_keV=round(float(case["E0_keV"]), 3),
+                tilt_deg=round(float(case["tilt_deg"]), 2),
+                azimuth_deg=round(float(case["tilt_azim_deg"]), 2),
+                thickness_um=round(float(case["thickness_ang"]) / 1e4, 4),
+                **montecarlo_runner.case_runtime_plan(case),
+            )
 
     def _record_cost(done_cost, total_cost):
-        latest_cost.update(done_cost=done_cost, total_cost=total_cost)
+        with performance_lock:
+            latest_cost.update(done_cost=done_cost, total_cost=total_cost)
 
     def _record_progress(completed_new_cases, total_cases, cached_cases):
-        latest_progress.update(
-            total_cases=total_cases,
-            cached_cases=cached_cases,
-            completed_new_cases=completed_new_cases,
-        )
+        with performance_lock:
+            latest_progress.update(
+                total_cases=total_cases,
+                cached_cases=cached_cases,
+                completed_new_cases=completed_new_cases,
+            )
+            progress_snapshot = dict(latest_progress)
+            cost_snapshot = dict(latest_cost)
+            case_snapshot = dict(latest_case) or None
         if progress_file is not None:
             _write_progress_record(
                 progress_file,
                 material=material,
                 state="running",
-                current=dict(latest_case) or None,
+                current=case_snapshot,
+                **progress_snapshot,
+                **cost_snapshot,
+            )
+
+    def _record_runtime(info):
+        with performance_lock:
+            runtime_info.clear()
+            runtime_info.update(info)
+
+    def _performance_context():
+        with performance_lock:
+            return {
+                **runtime_info,
                 **latest_progress,
                 **latest_cost,
-            )
+                "current": dict(latest_case) or None,
+                **performance_state,
+            }
 
     if progress_file is not None:
         _write_progress_record(
@@ -757,6 +832,36 @@ def _run_material(args, material, max_seconds=None):
             state="running",
             **latest_progress,
         )
+    performance_logger = None
+    performance_profile = getattr(args, "performance_profile", None)
+    if performance_profile is not None:
+        from .performance_profile import PerformanceLogger
+        from .profiles import _jsonable
+
+        performance_root = Path(
+            getattr(args, "performance_dir", None) or "performance-profiles"
+        )
+        profile_dir = performance_root / performance_profile
+        performance_logger = PerformanceLogger(
+            profile_dir / f"{material}.ndjson",
+            profile=performance_profile,
+            material=material,
+            static={
+                "fidelity": profile,
+                "catalog_profile": identity.get("catalog_profile", "standard"),
+                "parameter_sha256": identity["parameter_sha256"],
+                "checkpoint_stem": stem,
+                "total_case_count": len(cases),
+                # Beam parameters now resolve through Sweep.beam, including
+                # profile TOML values plus CLI overrides. Log that resolved
+                # dataclass instead of reconstructing legacy top-level fields.
+                "beam_parameters": _jsonable(sweep.beam),
+            },
+            context=_performance_context,
+            latest_path=profile_dir / f"{material}.latest.json",
+            interval_seconds=getattr(args, "performance_interval", 5.0),
+        )
+        performance_logger.start()
     try:
         result = run_sweep(
             cases,
@@ -765,18 +870,33 @@ def _run_material(args, material, max_seconds=None):
             checkpoint_path=ckpt,
             max_workers=args.workers,
             progress=not getattr(args, "no_progress", False),
-            on_progress=_record_progress if progress_file is not None else None,
-            on_case=_note_case if progress_file is not None else None,
+            on_progress=(
+                _record_progress
+                if progress_file is not None or performance_logger is not None
+                else None
+            ),
+            on_case=(
+                _note_case if progress_file is not None or performance_logger is not None else None
+            ),
+            on_runtime=_record_runtime if performance_logger is not None else None,
             max_seconds=max_seconds,
             dataset_identity=identity,
-            case_cost_fn=case_cost if progress_file is not None else None,
-            on_cost=_record_cost if progress_file is not None else None,
+            case_cost_fn=(
+                case_cost if progress_file is not None or performance_logger is not None else None
+            ),
+            on_cost=(
+                _record_cost
+                if progress_file is not None or performance_logger is not None
+                else None
+            ),
         )
         # run_sweep returns a bool (complete?). Only a bare None -- test doubles
         # that predate the budget feature and don't bother returning anything --
         # is read as complete; every other falsy return fails loud as incomplete.
         complete = True if result is None else bool(result)
     except BaseException:
+        with performance_lock:
+            performance_state["state"] = "failed"
         if progress_file is not None:
             _write_progress_record(
                 progress_file,
@@ -785,7 +905,13 @@ def _run_material(args, material, max_seconds=None):
                 **latest_progress,
                 **latest_cost,
             )
+        if performance_logger is not None:
+            performance_logger.close("failed")
         raise
+    with performance_lock:
+        performance_state["state"] = "done" if complete else "paused"
+    if performance_logger is not None:
+        performance_logger.close("done" if complete else "paused")
     if progress_file is not None:
         _write_progress_record(
             progress_file,

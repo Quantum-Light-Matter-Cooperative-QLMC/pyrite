@@ -970,6 +970,61 @@ def test_scan_progress_record_tracks_failure(monkeypatch, tmp_path):
     assert json.loads(path.read_text())["state"] == "failed"
 
 
+def test_scan_performance_profile_records_resolved_beam(monkeypatch, tmp_path):
+    import argparse
+
+    from cxr_mc import performance_profile, scan
+
+    observed = {}
+
+    class FakePerformanceLogger:
+        def __init__(self, _path, *, static, context, **_kwargs):
+            observed.update(static)
+            observed["context"] = context
+
+        def start(self):
+            pass
+
+        def close(self, _state):
+            pass
+
+    def fake_run_sweep(cases, _results, **kwargs):
+        kwargs["on_case"](cases[0])
+        return True
+
+    monkeypatch.setattr(performance_profile, "PerformanceLogger", FakePerformanceLogger)
+    monkeypatch.setattr(scan, "run_sweep", fake_run_sweep)
+    args = argparse.Namespace(
+        workers=0,
+        quick=True,
+        n_families=None,
+        beam_uvw=None,
+        checkpoint_dir=str(tmp_path),
+        progress_file=None,
+        no_progress=True,
+        performance_profile="baseline",
+        performance_dir=str(tmp_path / "performance"),
+        beam_transverse_fwhm_x_mm=0.25,
+        beam_transverse_fwhm_y_mm=0.5,
+        beam_bunch_length_fs=80.0,
+        beam_long_shape="uniform",
+        beam_rep_rate_hz=2500.0,
+        beam_bunch_charge_pc=2.0,
+    )
+
+    scan._run_material(args, "hopg")
+
+    beam = observed["beam_parameters"]
+    assert beam["energy_keV"] == [30, 50]
+    assert beam["transverse_fwhm_x_mm"] == 0.25
+    assert beam["transverse_fwhm_y_mm"] == 0.5
+    assert beam["bunch_length_fs"] == 80.0
+    assert beam["long_shape"] == "uniform"
+    assert beam["rep_rate_hz"] == 2500.0
+    assert beam["bunch_charge_pc"] == 2.0
+    assert observed["context"]()["current"]["configuration"]
+
+
 def test_scan_forwards_n_families_and_beam_uvw_overrides(monkeypatch, tmp_path):
     # mose2 auto-selects hkl_list via dominant_reflections (unlike HOPG/h-BN,
     # which hand-pin it), so n_families=6 must change the resolved reflection
