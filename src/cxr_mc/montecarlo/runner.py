@@ -569,6 +569,7 @@ def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove):
         mosaic_nodes=case.get("mosaic_mc_nodes", 1),
     )
     spec_chunk = case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(E_grid.size)
+    coherent = bool(case.get("coherent_emission", False))
     if radiators is None:
         return mc_spectrum(
             segs,
@@ -586,6 +587,7 @@ def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove):
             chunk=spec_chunk,
             layers=abs_layers,
             groove=groove,
+            coherent=coherent,
             **mosaic_kw,
         )
     assert case.get("groove_spacing_ang") is None
@@ -611,6 +613,7 @@ def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove):
             sinc_cutoff=case.get("sinc_cutoff"),
             chunk=spec_chunk,
             layers=abs_layers,
+            coherent=coherent,
             **mosaic_kw,
         )
     return spec

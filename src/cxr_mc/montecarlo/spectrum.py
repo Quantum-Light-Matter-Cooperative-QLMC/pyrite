@@ -32,7 +32,7 @@ from .groove import _THETA_TOL, escape_distance_ang
 from .transport import TRANSPORT_ELEMENTS, beta_from_keV
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
-_SEG_ARRAYS = ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "elec_id", "layer")
+_SEG_ARRAYS = ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "t0_ang", "elec_id", "layer")
 
 
 def _segments_in_layer(segments, L):
@@ -128,6 +128,7 @@ def mc_spectrum(
     mosaic_nodes=1,
     surface_hkl: tuple[int, int, int] | None = None,
     groove=None,
+    coherent=False,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron]
@@ -258,7 +259,52 @@ def mc_spectrum(
     ``docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md``.
 
     Validation: blazed-groove-geometry
+
+    coherent: opt-in coherent (phased) segment sum. None/False (default) is the
+    incoherent path above, bit-for-bit. When True the spectrum is
+    ``d2N/dE dOmega = alpha*omega/(4 pi^2 hbar c) |sum_j A_j Q_j e^{i phi_j}|^2``
+    -- the SAME per-segment quantities (resonance omega, complex A = A_PXR+A_CBS
+    per polarization, the finite-time factor and the escape factor) accumulated
+    as a COMPLEX field per polarization and squared at the end, rather than
+    accumulating ``|A_j|^2 * |Q_j|^2`` incoherently. Concretely, per segment the
+    complex field is
+
+        E_j(omega) = sqrt(alpha*omega/(4 pi^2 hbar c) * T_abs_j)
+                     * A_j * Q_j(omega) * exp[i(omega t_abs,j - omega n_hat.r_j)],
+
+    with the UN-squared finite-time factor ``Q_j = t_L sinc(P t_L / pi)`` (whose
+    modulus-square is the incoherent ``t_L^2 sinc^2``), the emission-time phase
+    ``omega t_abs,j`` (``t_abs = t_ang + t0_ang``, the segment age plus the
+    per-electron bunch offset, in Ang with c=1) and the far-field retardation
+    ``omega n_hat.r_j``. The lattice ``g`` phase is common-mode within one
+    reflection (it selects the resonance via omega_res / chi_g, the infinite-
+    crystal Fourier coefficient) and so does not enter the inter-segment phase;
+    distinct reflections are spectrally separated, so the coherent sum runs
+    WITHIN each reflection and orientation and reflections/orientations still add
+    incoherently. Two coherence scales fall out of the one sum: intra-electron
+    (segments of a trajectory) and inter-electron / superradiant (the spread of
+    ``t0_ang`` across the bunch, whose ``|<e^{i omega t0}>|^2`` is the Gaussian
+    bunch form factor ``exp[-(omega sigma_z)^2]``).
+
+    Limiting cases: coherent=False recovers the incoherent path bit-for-bit; a
+    single segment / single electron has only the self-term and is identical to
+    incoherent; a bunch much longer than the wavelength (or scrambled ``t0``)
+    decoheres the cross terms back to ``sum_j |A_j|^2``; a bunch much shorter
+    than the wavelength phases every emitter together into the ``|sum A_j|^2``
+    N^2-scaling limit. ``bunch_length_fs=None`` (all ``t0_ang=0``) is the
+    documented degenerate pure-geometry (position-phase) limit, still physics.
+
+    coherent is mutually exclusive with components (the PXR/CBS split is
+    ambiguous once the cross term ``A_PXR A_CBS*`` survives) -- v1 raises.
+
+    Validation: coherent-emission
     """
+    if coherent and components:
+        raise ValueError(
+            "coherent=True is incompatible with components=True: the PXR/CBS "
+            "split is ambiguous under coherence (the A_PXR*A_CBS cross term "
+            "survives). Request the coherent total, or components incoherently."
+        )
     if B_ang2 is None:
         raise ValueError(
             "mc_spectrum: B_ang2 (Debye-Waller B-factor [Ang^2]) is required; "
@@ -321,6 +367,20 @@ def mc_spectrum(
     E_tab_g = xp.asarray(E_tab, dtype=REAL)
 
     n_hat_d = xp.asarray(n_hat, dtype=REAL)  # detector dir is g-independent: hoist
+
+    # coherent (phased) sum precompute: the per-segment retardation scalar
+    # d_j = t_abs,j - n_hat.r_j [Ang, c=1] (emission-time phase minus far-field
+    # retardation) and the grid angular frequency omega(E) = E / hbar c [1/Ang].
+    # The reflection's g-phase is common-mode within one g (folded into chi_g /
+    # omega_res) and drops from the inter-segment phase. All-zero t0_ang (no
+    # bunch sampled) leaves the pure geometric position phase. Inert unless
+    # coherent=True.
+    if coherent:
+        cdtype = xp.result_type(REAL, 1j)
+        seg_t0 = xp.asarray(segments.get("t0_ang", np.zeros(seg_E.size)), dtype=REAL)
+        seg_t = xp.asarray(segments.get("t_ang", np.zeros(seg_E.size)), dtype=REAL)
+        d_all = (seg_t + seg_t0) - seg_r @ n_hat_d
+        omega_grid = E_grid / HBARC_EV_ANG
     # mosaic crystallite-orientation quadrature: None -> perfect crystal (default;
     # today's single-orientation result bit-for-bit). Otherwise a list of
     # (rotation, weight) tilting g across the Gaussian mosaic cone, summed
@@ -384,6 +444,7 @@ def mc_spectrum(
         A2 = xp.zeros(idx.size, dtype=REAL)
         A2_pxr = xp.zeros(idx.size, dtype=REAL)
         A2_cbs = xp.zeros(idx.size, dtype=REAL)
+        pol_A = []  # complex A = A_PXR + A_CBS per polarization (coherent path)
         for e in (e_s, e_p):  # sum |A|^2 over both polarizations
             e_d = xp.asarray(e, dtype=REAL)
             g_dot_e = g_vec_d @ e_d  # scalar (e fixed per reflection)
@@ -393,6 +454,9 @@ def mc_spectrum(
             braced_ge = g_dot_e - vdg * v_dot_e
             braced_kg = k_dot_g - k_dot_v * vdg
             A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
+            if coherent:
+                pol_A.append(A_PXR + A_CBS)  # keep phase: orthogonal pols still add incoherently
+                continue
             A2 += xp.abs(A_PXR + A_CBS) ** 2
             A2_pxr += xp.abs(A_PXR) ** 2
             A2_cbs += xp.abs(A_CBS) ** 2
@@ -437,6 +501,62 @@ def mc_spectrum(
             else:
                 tau = _stack_tau(layers, z_mid, n_hat[2], E_r)
         T_abs = xp.exp(-tau)
+
+        # -- 7c. coherent (phased) accumulation -----------------------------------
+        # Build the complex field per polarization within THIS reflection and
+        # orientation, square it, and add |field|^2 * wm to spec (reflections and
+        # mosaic orientations remain incoherent). The un-squared finite-time
+        # factor Q = t_L sinc(a_width(E-E_res)/pi) carries the amplitude scale
+        # (|Q|^2 = t_L^2 sinc^2); the emission-time/retardation phase is
+        # exp[i omega(E) d_j] with d_j = t_abs,j - n_hat.r_j.
+        if coherent:
+            amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * T_abs)
+            a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
+            d = d_all[idx]
+            coefs = [(amp * t_L) * A_e for A_e in pol_A]  # complex per polarization
+            fields = [xp.zeros(E_grid.size, dtype=cdtype) for _ in coefs]
+            good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
+            if sinc_cutoff is None:
+                for j0 in range(0, idx.size, chunk):
+                    sl = slice(j0, min(j0 + chunk, idx.size))
+                    m = good[sl]
+                    if not m.any():
+                        continue
+                    x = a_width[sl][m, None] * (E_grid[None, :] - E_r[sl][m, None]) / xp.pi
+                    ph = xp.exp(1j * d[sl][m, None] * omega_grid[None, :])
+                    SP = xp.sinc(x).astype(cdtype) * ph
+                    for c, f in zip(coefs, fields, strict=True):
+                        f += c[sl][m] @ SP
+            else:
+                dE = E_grid[1] - E_grid[0]
+                order = xp.argsort(E_r)
+                blk = 8192
+                for j0 in range(0, order.size, blk):
+                    sel = order[j0 : j0 + blk]
+                    sel = sel[good[sel]]
+                    if sel.size == 0:
+                        continue
+                    half = sinc_cutoff / a_width[sel]
+                    lo = float(_to_cpu((E_r[sel] - half).min()))
+                    hi = float(_to_cpu((E_r[sel] + half).max()))
+                    i0 = max(int((lo - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))), 0)
+                    i1 = min(
+                        int((hi - float(_to_cpu(E_grid[0]))) // float(_to_cpu(dE))) + 2,
+                        E_grid.size,
+                    )
+                    if i1 <= i0:
+                        continue
+                    x = a_width[sel][:, None] * (E_grid[None, i0:i1] - E_r[sel][:, None]) / xp.pi
+                    ph = xp.exp(1j * d[sel][:, None] * omega_grid[None, i0:i1])
+                    SP = xp.sinc(x).astype(cdtype) * ph
+                    for c, f in zip(coefs, fields, strict=True):
+                        f[i0:i1] += c[sel] @ SP
+            for f in fields:
+                # In-place via slice: a bare ``spec +=`` would rebind ``spec`` as
+                # a local and shadow the closure array (the incoherent path below
+                # mutates the loop-bound ``tgt`` for the same reason).
+                spec[:] += xp.abs(f) ** 2 * wm
+            return
 
         # -- 7. accumulate the finite-segment lineshape ---------------------------
         # d2N/dE dOmega = alpha*omega/(4 pi^2 hbar c) |A|^2 t_L^2

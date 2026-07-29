@@ -68,6 +68,9 @@ class SweepProfile:
     photon_grid_stride: int = 1
     photon_grid_span_fraction: float = 1.0
     provisional: bool = False
+    # Opt-in coherent (phased) segment sum. A policy, not a grid reduction, so it
+    # rides the profile like n_electrons. False (default) is the incoherent path.
+    coherent_emission: bool = False
 
     def apply_settings(self, settings: Settings) -> Settings:
         """Return settings with this profile's transport counts resolved."""
@@ -75,6 +78,7 @@ class SweepProfile:
             settings,
             n_electrons=self.n_electrons,
             n_electrons_brem=self.n_electrons_brem,
+            coherent_emission=self.coherent_emission,
         )
 
     def apply_sweep(self, sweep: Sweep) -> Sweep:
@@ -148,7 +152,9 @@ def get_profile(name: str = "full") -> SweepProfile:
     try:
         return _PROFILES[name]
     except KeyError:
-        raise ValueError(f"unknown fidelity preset {name!r} (choose from {FIDELITY_NAMES})") from None
+        raise ValueError(
+            f"unknown fidelity preset {name!r} (choose from {FIDELITY_NAMES})"
+        ) from None
 
 
 def _jsonable(value: Any) -> Any:
@@ -242,6 +248,21 @@ def dataset_identity(
     # pre-existing standard-profile identity keeps its historical digest.
     if catalog_profile != "standard":
         resolved["catalog_profile"] = catalog_profile
+    # coherent_emission (run-affecting) follows the same divergence-only rule: it
+    # is a NEW Settings field, so hashing it unconditionally would perturb every
+    # pre-existing digest. Strip it from the serialized settings and re-add it at
+    # the top level only when True -- an incoherent run's parameter_sha256 stays
+    # bit-for-bit, while a coherent run gets a distinct digest (and checkpoint
+    # stem) so the two never collide. The bunch fields (bunch_length_fs etc.)
+    # keep their own divergence rule above; coherent + a bunch therefore hash
+    # both keys, and coherent without a bunch is the distinct degenerate variant.
+    settings_payload = resolved["settings"]
+    if isinstance(settings_payload, Mapping):
+        coherent_on = bool(settings_payload.pop("coherent_emission", False))
+    else:  # pragma: no cover - settings is always a jsonable Mapping here
+        coherent_on = bool(getattr(settings, "coherent_emission", False))
+    if coherent_on:
+        resolved["coherent_emission"] = True
     encoded = json.dumps(resolved, sort_keys=True, separators=(",", ":")).encode()
     return {
         "schema": DATASET_IDENTITY_SCHEMA,

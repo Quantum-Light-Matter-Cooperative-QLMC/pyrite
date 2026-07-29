@@ -157,6 +157,21 @@ dN/dE dΩ    ∝ |E_tot|²          (replaces Σ_j |A_j|²)
   coherence is per-direction (phase depends on `n̂`), so the per-`n̂` `|Σ|²` is
   correct and directions still add incoherently. Confirm.
 
+## Follow-on: coherence ON-vs-OFF comparison (TODO P2 #8)
+
+Once the coherent path lands, add a capability to compare coherence-tracking-on
+against -off for the **same** config, so the coherent enhancement (or its
+absence) is quantifiable per case. The two runs are already first-class,
+non-colliding datasets — `--coherent` writes `<material>--full-<digest>` and the
+incoherent run keeps the bare `<material>` stem (distinct `parameter_sha256`), so
+both checkpoints coexist. The comparison layer only needs to *pair* them:
+- match a coherent checkpoint to its incoherent twin (same resolved parameters
+  except `coherent_emission`), likely by re-deriving both identities;
+- surface the per-(config, energy) ratio / delta (peak line yield, integrated
+  flux) so a user can see where coherence matters and where it is a no-op.
+Scope (analysis app view vs a `cxr` compare subcommand) is open; defer until the
+coherent numbers exist to compare against.
+
 ## Delegation
 
 Single-context task; no subagent fan-out needed. Physics verification is the one

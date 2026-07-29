@@ -84,6 +84,11 @@ class Settings:
     brem_source: str = "mc"  # "mc" | "external" | "none"
     n_electrons: int = 450  # transport electrons for the lines
     n_electrons_brem: int = 100  # transport electrons for the background
+    # Opt-in coherent (phased) segment sum in mc_spectrum. False (default) is the
+    # incoherent line spectrum, bit-for-bit. Run-affecting, so dataset_identity
+    # joins it into the hash ONLY when True (divergence-only rule); an incoherent
+    # run's parameter_sha256 -- and its checkpoint stem -- stays unchanged.
+    coherent_emission: bool = False
 
 
 def line_fwhm_eV(case: dict, E_pk: float, mosaic_rad: float | None) -> float:

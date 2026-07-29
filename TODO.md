@@ -65,5 +65,6 @@ summary once the branch exists.
    1.  Progress bar here shows up at the top of the marimo notebook instead of near the button that is pressed to start the render -- confusing
    2.  clip off the extra figure background & legend in the render, it is ugly. We just want the black grid space, with the colorbar and mat/config title info overlayed, but no background color. Saved render is also a bit pixelated, especially when opened in an mp4 viewer outside of the marimo app.
    3.  add button to open render saving dialogue (so user can promptly move it from the cache)
+8.  **Coherence ON-vs-OFF comparison.** Add capability to compare coherence-tracking-on against coherence-tracking-off for the same config, to quantify the coherent enhancement (or its absence) in any given case. Follow-on to the coherent-emission path. → `feature/coherent-emission-tracking`; [`tasks/coherent-emission-tracking.md`](tasks/coherent-emission-tracking.md).
 
 ## P3 - lower / exploratory / small bugfixes

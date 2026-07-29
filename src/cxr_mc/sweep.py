@@ -516,7 +516,7 @@ def _line_grid_for_energy(sweep: Sweep, default_grid: np.ndarray, energy_keV: fl
         raise ValueError(f"no E_grid_line configured for beam energy {energy_keV:g} keV") from None
 
 
-def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
+def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_emission=False):
     """Expand a :class:`Sweep` into a list of run_case dicts (the Cartesian
     product over the swept thickness / tilt / azimuth / footprint, each
     crossed with every beam energy). ``crystal_width_mm`` and
@@ -717,6 +717,9 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
                             if sweep.groove_spacing_ang is not None
                             else {}
                         ),
+                        # coherent segment sum: divergence-only key (absent -> the
+                        # incoherent default, bit-for-bit case payload).
+                        **({"coherent_emission": True} if coherent_emission else {}),
                         beam_uvw=beam_uvw,
                         surface_hkl=surface_hkl,
                         mosaic_fwhm_rad=mosaic_analytic_rad,  # analytic term (None if route="mc")

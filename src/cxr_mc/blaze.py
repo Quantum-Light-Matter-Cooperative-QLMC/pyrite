@@ -306,7 +306,14 @@ def run(args):
         if args.angles is not None:
             overrides["tilt_deg"] = args.angles
         sweep = material_sweep(args.material, **overrides)
-        cases.extend(build_cases(sweep, settings.n_electrons, settings.n_electrons_brem))
+        cases.extend(
+            build_cases(
+                sweep,
+                settings.n_electrons,
+                settings.n_electrons_brem,
+                coherent_emission=settings.coherent_emission,
+            )
+        )
 
     cases, dropped = gate_cases_by_penetration(cases)
     summary = format_penetration_watchdog_summary(dropped, material=args.material)
