@@ -1,6 +1,6 @@
 ---
 name: dispatch-task
-description: Use when a user or supervisor agent needs to assign cxr-mc backlog implementation to another agent, select an authority tier, resolve its task branch/worktree, or produce a complete worker handoff.
+description: Use when assigning cxr-mc backlog implementation, completing approved task branch/worktree setup, tearing down a landed task, selecting a worker tier, or producing a complete handoff.
 ---
 
 # Dispatch Task
@@ -10,16 +10,37 @@ caller also assigns it to this agent.
 
 ## Inventory
 
-1. Invoke `todo-sync`; read `main:TODO.md`, matching `tasks/<branch-leaf>.md`,
-   `git worktree list --porcelain`, target branch status, and relevant
-   instructions.
+1. Read `main:TODO.md`, matching `tasks/<branch-leaf>.md`,
+   `git worktree list --porcelain`, branch status, and relevant instructions.
+   Invoke `todo-sync` only to check/restore `TODO.md` equality.
 2. Use `repo-orientation` and Tokensave to confirm owners, dependencies, and
    affected tests. Exact paths and non-code text may use `rg` or direct reads.
-3. Prefer existing linked worktree. For new tasks, let one designated writer
-   create/sync task doc, TODO entry, branch, and worktree. Complete required
-   setup commit/push before dispatch.
+3. If item still contains `>user<`, invoke `triage`; stop for plan review.
 4. Stop on unrelated dirty state, missing/inaccessible worktree, ambiguous
    backlog ownership, or TODO divergence.
+
+## Lifecycle
+
+### Start approved task
+
+1. Verify reviewed task doc, one-line TODO pointer, branch, and worktree.
+2. Create/reuse missing branch/worktree; keep one TODO writer.
+3. Commit explicit task doc and synchronized `TODO.md`; push branch with
+   upstream before implementation.
+4. Dispatch only after clean status and remote setup verification.
+
+Direct user invocation authorizes required setup commit, TODO ownership, and
+initial branch push. Do not grant worker push or TODO authority implicitly.
+
+### Retire landed task
+
+Only when explicitly asked:
+
+1. Verify branch landed and identify durable task content.
+2. Promote durable content to `docs/`; remove task file; update backlog.
+3. Invoke `todo-sync`; commit and push authorized lifecycle changes.
+4. Remove worktree/branch only after clean-state and recovery checks. Report
+   deleted local/remote refs.
 
 ## Select worker
 
@@ -59,9 +80,9 @@ Stop conditions:
 Report:
 ```
 
-Direct user invocation defaults to `commits: checkpoint`, `push: no`,
-`todo-writer: no`, `delegate: no`. A supervisor may pass only authority it
-already has. Use one writer per worktree; parallelize read-only investigation
-or isolated branches, never overlapping edits.
+Worker handoff from direct user invocation defaults to `commits: checkpoint`,
+`push: no`, `todo-writer: no`, `delegate: no`. A supervisor may pass only
+authority it already has. Use one writer per worktree; parallelize read-only
+investigation or isolated branches, never overlapping edits.
 
 If agent dispatch is unavailable, return exact handoff prompt and target skill.

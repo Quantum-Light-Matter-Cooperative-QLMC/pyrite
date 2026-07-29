@@ -12,19 +12,20 @@ implementation path, checklist, decisions, and delegation plan here.
 
 ## Workflow
 
-1. Create task branch/worktree and `tasks/<branch-leaf>.md`.
-2. Add one-line `TODO.md` summary:
+1. For `>user<` prose, use `triage`: read linked design, draft
+   `tasks/<branch-leaf>.md`, create local branch/worktree, and stop for review.
+2. Replace reviewed prose with one-line `TODO.md` summary:
    `→ feature/<branch>; tasks/<branch-leaf>.md`.
-3. Keep branch and main `TODO.md` identical; use `todo-sync`.
-4. Commit task doc + synced `TODO.md`; push branch with upstream before
-   implementation.
-5. Use `dispatch-task` to resolve worktree/branch and assign an explicit slice.
+3. Use `todo-sync` only to keep branch and main `TODO.md` identical.
+4. Use `dispatch-task` to commit approved setup, push branch with upstream,
+   then assign an explicit slice.
    Choose `implement-task-lite`, `implement-task`, or `lead-task` by task
    scope/risk; model label is secondary. State acceptance checks, required
    domain skills, commit/push/TODO/delegation authority, and stop conditions.
    Portable prompt: `Use the dispatch-task skill for <task>`. Clients may also
    expose `$dispatch-task` or `/dispatch-task`.
-6. Commit independently valid checkpoints when authorized: focused checks
+5. Commit independently valid checkpoints when authorized: focused checks
    pass, scoped diff reviewed, explicit paths staged. Never mix unrelated WIP.
-7. Before dropping landed branch, promote durable content to `docs/`, remove
-   task file, and update backlog state.
+6. Ask `dispatch-task` to retire landed work: promote durable content to
+   `docs/`, remove task file, update/sync backlog, then remove branch/worktree
+   only after verification.

@@ -1,4 +1,4 @@
 interface:
   display_name: "Dispatch Task"
-  short_description: "Route task work to a bounded worker tier"
-  default_prompt: "Use $dispatch-task to assign an existing cxr-mc task safely."
+  short_description: "Own task lifecycle and bounded worker routing"
+  default_prompt: "Use $dispatch-task to set up, assign, or retire a cxr-mc task safely."

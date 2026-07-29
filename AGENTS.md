@@ -50,8 +50,11 @@ If `uv run` cannot write project environment, add
 
 ## Task dispatch
 
+- Use `triage` for new `>user<` prose. It drafts task doc and local
+  branch/worktree, syncs TODO pointer, then stops before commit/push for review.
 - Use `dispatch-task` to route backlog work. It resolves task worktree/branch,
-  writes explicit authority/acceptance handoff, then selects:
+  owns approved setup/landed teardown, writes explicit authority/acceptance
+  handoff, then selects:
   `implement-task-lite` for small mechanical slices, `implement-task` for
   normal checklist slices, or `lead-task` for complex/integrating ownership.
 - Example model tiers: Haiku/Luna → lite; Sonnet/Terra → normal;
@@ -68,7 +71,7 @@ If `uv run` cannot write project environment, add
 
 `TODO.md` stays identical across branches. Branch detail belongs in
 `tasks/<branch-leaf>.md`; see `tasks/README.md`. Work touching tracked items
-uses `todo-sync`.
+uses `todo-sync` only for exact cross-branch consistency.
 
 New/edited physics requires source equation, assumptions, limiting case,
 `Validation: <id>`, and ledger row. Fresh context verifies it; only human marks

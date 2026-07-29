@@ -1,0 +1,4 @@
+interface:
+  display_name: "Triage"
+  short_description: "Turn user backlog prose into a task plan"
+  default_prompt: "Use $triage to turn an untriaged cxr-mc backlog item into a reviewable task."
