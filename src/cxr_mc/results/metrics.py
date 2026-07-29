@@ -12,6 +12,8 @@ import warnings
 import numpy as np
 from scipy.signal import find_peaks, peak_widths
 
+from .store import beam_current_na
+
 
 def _find_peaks_props(spec, rel_prominence):
     """One peak-finding pass shared by line_index/line_quality/line_metrics:
@@ -137,7 +139,7 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
     spec = np.asarray(r["spec"], dtype=float)
     brem = np.asarray(r["brem"], dtype=float)
     dE = float(E[1] - E[0])
-    cur, sc = settings.beam_current_na, r["scale"]
+    cur, sc = beam_current_na(r, settings), r["scale"]
     smax = float(spec.max()) if spec.size else 0.0
     idx = line_index(spec, rel_prominence, metric)
     try:
@@ -158,6 +160,12 @@ def line_metrics(r, settings, rel_prominence=0.03, n_fwhm=3.0, metric="sharpness
     brem_int = float(np.trapezoid(brem, E))
     total_int = coh_int + brem_int
     return {
+        # Per-nA values are intrinsic to the MC yield. Existing absolute rates
+        # use case-derived pulsed-source current: photons/s at its rep rate.
+        "peak_flux_per_na": smax * sc,
+        "coherent_flux_per_na": coh_int * sc,
+        "line_flux_per_na": line_int * sc,
+        "total_flux_per_na": total_int * sc,
         "peak_flux": smax * sc * cur,
         "coherent_flux": coh_int * sc * cur,
         "line_eV": float(E[idx]),

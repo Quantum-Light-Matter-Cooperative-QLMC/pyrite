@@ -567,13 +567,16 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     # Beam phase-space fields threaded onto every case (constant across the
     # product). The legacy ``beam_fwhm_mm`` key stays == the x-plane FWHM so a
     # default isotropic spot is bit-for-bit; the elliptical ``beam_fwhm_y_mm``
-    # and the longitudinal bunch keys join ONLY when they actually diverge from
-    # the point-bunch/isotropic default, so an unchanged run's case dict is
-    # byte-identical to the pre-BeamSpec era.
+    # and the longitudinal bunch / pulse-rate keys join ONLY when they actually
+    # diverge from the point-bunch/default-source configuration, so existing
+    # case payloads and checkpoint matching remain stable.
     b = sweep.beam
     fwhm_x = None if b.transverse_fwhm_x_mm is None else float(b.transverse_fwhm_x_mm)
     fwhm_y = None if b.transverse_fwhm_y_mm is None else float(b.transverse_fwhm_y_mm)
     beam_case: dict[str, Any] = {"beam_fwhm_mm": fwhm_x}
+    if b.bunch_charge_pc != 1.0 or b.rep_rate_hz != 5000.0:
+        beam_case["bunch_charge_pc"] = float(b.bunch_charge_pc)
+        beam_case["rep_rate_hz"] = float(b.rep_rate_hz)
     if fwhm_y != fwhm_x:
         beam_case["beam_fwhm_y_mm"] = fwhm_y
     if b.bunch_length_fs is not None or b.long_offsets_fs is not None:

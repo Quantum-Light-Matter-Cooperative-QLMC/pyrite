@@ -169,6 +169,89 @@ def test_hbn_composition_runs_transport():
 
     assert segs["Ne"] == 4
     assert len(segs["E_keV"]) > 0
+    np.testing.assert_array_equal(segs["initial_E_keV"], np.full(4, 30.0))
+    np.testing.assert_array_equal(
+        segs["initial_v_hat"],
+        np.tile([0.0, 0.0, 1.0], (4, 1)),
+    )
+    np.testing.assert_array_equal(segs["initial_t0_ang"], np.zeros(4))
+
+
+@pytest.mark.parametrize("shape", ["gaussian", "uniform"])
+def test_longitudinal_bunch_sampling_matches_requested_rms(shape):
+    sigma_fs = 17.0
+    offsets_ang = transport._sample_bunch_offsets(
+        200_000,
+        sigma_fs,
+        shape,
+        None,
+        seed=842,
+    )
+    offsets_fs = offsets_ang / transport.C_ANG_PER_FS
+
+    assert offsets_fs.mean() == pytest.approx(0.0, abs=1e-13)
+    assert offsets_fs.std() == pytest.approx(sigma_fs, rel=5e-3)
+
+
+def test_longitudinal_bunch_stream_does_not_perturb_transport():
+    cp = crystal_params("hbn")
+    common = dict(composition=cp["composition"], seed=17, max_steps=10)
+    point = simulate_trajectories(30.0, 40, 100.0, **common)
+    bunched = simulate_trajectories(30.0, 40, 100.0, bunch_length_fs=10.0, **common)
+
+    for key in ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "elec_id", "layer"):
+        np.testing.assert_array_equal(point[key], bunched[key])
+    assert np.any(bunched["initial_t0_ang"] != 0.0)
+    np.testing.assert_array_equal(
+        bunched["t0_ang"],
+        bunched["initial_t0_ang"][bunched["elec_id"]],
+    )
+
+
+def test_explicit_longitudinal_offsets_override_shape_and_center():
+    cp = crystal_params("hbn")
+    supplied_fs = np.array([1.0, 2.0, 4.0, 9.0])
+    segs = simulate_trajectories(
+        30.0,
+        4,
+        100.0,
+        composition=cp["composition"],
+        seed=123,
+        max_steps=5,
+        bunch_length_fs=99.0,
+        long_shape="not-used",
+        long_offsets_fs=tuple(supplied_fs),
+    )
+    expected = (supplied_fs - supplied_fs.mean()) * transport.C_ANG_PER_FS
+
+    np.testing.assert_allclose(segs["initial_t0_ang"], expected)
+    np.testing.assert_array_equal(segs["t0_ang"], expected[segs["elec_id"]])
+
+
+def test_longitudinal_bunch_zero_length_is_point_bunch():
+    point = transport._sample_bunch_offsets(8, None, "gaussian", None, seed=7)
+    zero = transport._sample_bunch_offsets(8, 0.0, "gaussian", None, seed=7)
+    np.testing.assert_array_equal(point, zero)
+
+
+@pytest.mark.parametrize(
+    ("offsets", "match"),
+    [
+        (np.zeros((2, 2)), "one-dimensional"),
+        ([0.0, np.nan], "finite"),
+    ],
+)
+def test_explicit_longitudinal_offsets_reject_invalid_arrays(offsets, match):
+    with pytest.raises(ValueError, match=match):
+        transport._sample_bunch_offsets(
+            4 if np.asarray(offsets).ndim > 1 else 2, None, "gaussian", offsets, 1
+        )
+
+
+@pytest.mark.parametrize("sigma", [-1.0, np.inf, np.nan])
+def test_longitudinal_bunch_rejects_invalid_rms(sigma):
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        transport._sample_bunch_offsets(2, sigma, "gaussian", None, 1)
 
 
 def test_beam_fwhm_mm_zero_and_none_are_equivalent():

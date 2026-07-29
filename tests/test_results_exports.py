@@ -16,8 +16,10 @@ import cxr_mc.results as res
 FROZEN_EXPORTS = frozenset(
     {
         # store
+        "DEFAULT_BEAM_CURRENT_NA",
         "PER_NA",
         "Settings",
+        "beam_current_na",
         "line_fwhm_eV",
         "store_result",
         "detected_background",

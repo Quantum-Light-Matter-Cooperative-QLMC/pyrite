@@ -226,6 +226,10 @@ def _trajectory_data(
         / u,  # depth of segment ENDPOINT; transmitted electrons reach thick exactly
         elec_id=segs["elec_id"],  # emitting electron index, per segment
         L=segs["L_ang"],
+        initial_r_ang=np.asarray(segs["initial_r_ang"], dtype=float),
+        initial_v_hat=np.asarray(segs["initial_v_hat"], dtype=float),
+        initial_E_keV=np.asarray(segs["initial_E_keV"], dtype=float),
+        initial_t0_ang=np.asarray(segs["initial_t0_ang"], dtype=float),
         start_xyz=start / u,
         end_xyz=(r + 0.5 * L[:, None] * v) / u,
         # Groove-gap flights remain diagnostic-only: they do not radiate and

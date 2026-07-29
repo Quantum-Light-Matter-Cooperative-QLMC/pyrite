@@ -20,8 +20,8 @@ from cxr_mc.materials import (
 )
 from cxr_mc.montecarlo import runner
 from cxr_mc.sweep import (
-    BeamSpec,
     MATERIAL_LABELS,
+    BeamSpec,
     Sweep,
     build_cases,
     case_cost,
@@ -91,7 +91,9 @@ def test_real_manifest_materials_are_unique_and_buildable():
     assert all(key in CATALOG.materials for key in materials)
 
     for key in materials:
-        sweep = Sweep(material=key, thickness_ang=100.0, beam=BeamSpec(energy_keV=30.0), tilt_deg=5.0)
+        sweep = Sweep(
+            material=key, thickness_ang=100.0, beam=BeamSpec(energy_keV=30.0), tilt_deg=5.0
+        )
         cases = build_cases(sweep)
         assert cases, f"{key} produced no cases"
 
@@ -436,14 +438,26 @@ def test_build_cases_defaults_to_finite_footprint_and_beam_spot():
     finite 5x5 mm crystal footprint and a 1 mm FWHM Gaussian beam spot, so
     default sweeps transport a physically finite beam into a physically finite
     crystal rather than the legacy point-beam / laterally-infinite slab."""
-    case = build_cases(Sweep(material="mose2", thickness_ang=100.0, beam=BeamSpec(energy_keV=30.0), tilt_deg=5.0))[
-        0
-    ]
+    case = build_cases(
+        Sweep(material="mose2", thickness_ang=100.0, beam=BeamSpec(energy_keV=30.0), tilt_deg=5.0)
+    )[0]
 
     assert case["crystal_width_mm"] == 5.0
     assert case["crystal_height_mm"] == 5.0
     assert case["beam_fwhm_mm"] == 1.0
     assert case["name"] == "MoSe2 10nm pol=5 az=0 footprint=5x5mm"
+
+
+def test_build_cases_carries_pulse_source_fields_from_beam():
+    sweep = Sweep(
+        material="mose2",
+        thickness_ang=100.0,
+        beam=BeamSpec(energy_keV=30.0, bunch_charge_pc=2.0, rep_rate_hz=10_000.0),
+        tilt_deg=5.0,
+    )
+    case = build_cases(sweep)[0]
+    assert case["bunch_charge_pc"] == 2.0
+    assert case["rep_rate_hz"] == 10_000.0
 
 
 def test_brem_grid_upper_limit_tracks_case_beam_energy():
@@ -769,7 +783,9 @@ def test_build_cases_carries_groove_spacing():
 
 
 def test_build_cases_omits_groove_spacing_when_unset():
-    cases = build_cases(Sweep(material="hopg", thickness_ang=100.0, beam=BeamSpec(energy_keV=30.0), tilt_deg=5.0))
+    cases = build_cases(
+        Sweep(material="hopg", thickness_ang=100.0, beam=BeamSpec(energy_keV=30.0), tilt_deg=5.0)
+    )
     assert "groove_spacing_ang" not in cases[0]
 
 

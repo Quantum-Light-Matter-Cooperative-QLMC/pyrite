@@ -71,14 +71,21 @@ def _sample_bunch_offsets(Ne, bunch_length_fs, long_shape, long_offsets_fs, seed
     """
     if long_offsets_fs is not None:
         dt = np.asarray(long_offsets_fs, dtype=float)
+        if dt.ndim != 1:
+            raise ValueError("long_offsets_fs must be one-dimensional")
         if dt.size != Ne:
             raise ValueError(
                 f"long_offsets_fs has {dt.size} entries but Ne={Ne}; supply one "
                 "explicit longitudinal offset per electron"
             )
+        if not np.all(np.isfinite(dt)):
+            raise ValueError("long_offsets_fs must contain only finite values")
         dt = dt * C_ANG_PER_FS
     elif bunch_length_fs is not None:
-        sigma_ang = float(bunch_length_fs) * C_ANG_PER_FS
+        sigma_fs = float(bunch_length_fs)
+        if not np.isfinite(sigma_fs) or sigma_fs < 0.0:
+            raise ValueError("bunch_length_fs must be finite and non-negative")
+        sigma_ang = sigma_fs * C_ANG_PER_FS
         bunch_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(4)[3])
         if long_shape == "gaussian":
             dt = bunch_rng.normal(0.0, sigma_ang, size=Ne)
@@ -409,6 +416,9 @@ def simulate_trajectories(
       "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
       "t_ang" (M,), "t0_ang" (M,) [per-electron bunch offset], "elec_id" (M,),
       "layer" (M,) [emitting layer index]
+    incident phase-space diagnostics (one row per sampled electron, including
+    missed entries): "initial_r_ang" (Ne,3), "initial_v_hat" (Ne,3),
+      "initial_E_keV" (Ne,), "initial_t0_ang" (Ne,)
     non-radiating groove-gap flights:
       "vacuum_start_ang" (V,3), "vacuum_end_ang" (V,3),
       "vacuum_E_keV" (V,), "vacuum_t_ang" (V,), "vacuum_t0_ang" (V,),
@@ -533,6 +543,12 @@ def simulate_trajectories(
     # t_abs = t_ang + t0_ang. None/None -> all-zero (point bunch, bit-for-bit),
     # and nothing reads it in the incoherent spectrum today.
     t0_electron = _sample_bunch_offsets(Ne, bunch_length_fs, long_shape, long_offsets_fs, seed)
+    # Snapshot before transport mutates ``pos``, ``dirs``, and ``E``. These
+    # arrays describe incident phase space, including particles that miss a
+    # finite footprint.
+    initial_r_ang = pos.copy()
+    initial_v_hat = dirs.copy()
+    initial_E_keV = E.copy()
 
     seg_mid, seg_dir, seg_len, seg_E, seg_t0, seg_id, seg_lay = (
         [],
@@ -833,6 +849,13 @@ def simulate_trajectories(
     vacuum_t0_ang = t0_electron[vacuum_elec_id] if vacuum_elec_id.size else np.empty(0, dtype=float)
 
     return {
+        # Initial sampled phase space is diagnostic-only.  Keep per-electron
+        # arrays (including missed entries), separate from per-segment arrays,
+        # so beam metrics describe the incident bunch rather than its transport.
+        "initial_r_ang": initial_r_ang,
+        "initial_v_hat": initial_v_hat,
+        "initial_E_keV": initial_E_keV,
+        "initial_t0_ang": t0_electron.copy(),
         "r_mid": r_mid,
         "v_hat": v_hat,
         "L_ang": L_ang,

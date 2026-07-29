@@ -10,7 +10,9 @@ through post-processing and plots, and :func:`detected_background`, the
 DETECTED-units bremsstrahlung curve built from those knobs.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any, cast
 
 import numpy as np
 
@@ -26,13 +28,52 @@ from ..montecarlo import (
 )
 
 PER_NA = 6.2415e9  # electrons/s at 1 nA
+DEFAULT_BUNCH_CHARGE_PC = 1.0
+DEFAULT_REP_RATE_HZ = 5000.0
+DEFAULT_BEAM_CURRENT_NA = DEFAULT_BUNCH_CHARGE_PC * DEFAULT_REP_RATE_HZ / 1000.0
+
+
+def _pulse_current_na(case: Mapping[str, Any]) -> float:
+    charge_pc = float(case.get("bunch_charge_pc", DEFAULT_BUNCH_CHARGE_PC))
+    rep_rate_hz = float(case.get("rep_rate_hz", DEFAULT_REP_RATE_HZ))
+    return charge_pc * rep_rate_hz / 1000.0
+
+
+def beam_current_na(record_or_case: Mapping[str, Any] | None, settings=None) -> float:
+    """Average source current [nA] for a result record or case.
+
+    New cases carry pulsed-source parameters, for which ``1 pC * 1 kHz =
+    1 nA`` and therefore ``I[nA] = Q[pC] * f[kHz]``. Records made before
+    pulsed-beam support lack ``source_current_na``; retain their explicit
+    Settings value as the compatibility fallback. New records stamp current
+    outside ``case`` so default case identity remains legacy-compatible.
+
+    Validation: beam-phase-space-metrics
+    """
+    if record_or_case is not None:
+        if "source_current_na" in record_or_case:
+            return float(record_or_case["source_current_na"])
+        if "case" in record_or_case:
+            case = record_or_case["case"]
+            if isinstance(case, Mapping) and ("bunch_charge_pc" in case or "rep_rate_hz" in case):
+                return _pulse_current_na(cast(Mapping[str, Any], case))
+        else:
+            return _pulse_current_na(record_or_case)
+    if settings is not None:
+        return float(settings.beam_current_na)
+    return DEFAULT_BEAM_CURRENT_NA
 
 
 @dataclass
 class Settings:
-    """Analysis / detector / unit knobs shared by post-processing and plots."""
+    """Analysis / detector / unit knobs shared by post-processing and plots.
 
-    beam_current_na: float = 5.0
+    ``beam_current_na`` is a compatibility fallback for pre-pulse checkpoints.
+    Cases carrying ``bunch_charge_pc`` / ``rep_rate_hz`` derive their current
+    from those BeamSpec fields instead.
+    """
+
+    beam_current_na: float = DEFAULT_BEAM_CURRENT_NA
     # Legacy EDS/SDD polymer-window QE. The detector is now the Timepix3 quad or
     # the Eagle XO (each carries its OWN QE in its forward model), so this is OFF
     # by default -- the "intrinsic" spectra are then genuinely what leaves the
@@ -86,6 +127,9 @@ def store_result(results, case, out):
         # that never recorded it); surfaced as the "hit_frac" heatmap quantity.
         hit_frac=out.get("hit_frac", float("nan")),
         scale=case["domega_sr"] * PER_NA,  # (per e per sr) -> (per s per nA)
+        # Stored outside ``case``: current is reporting metadata, while the
+        # legacy-shaped case remains stable for checkpoint matching/identity.
+        source_current_na=_pulse_current_na(case),
         case=case,
     )
 

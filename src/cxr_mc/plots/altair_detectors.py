@@ -34,6 +34,7 @@ from altair.utils.schemapi import UndefinedType
 
 from ..detectors import eaglexo_response as eag
 from ..detectors import timepix_response as tpx
+from ..results import beam_current_na
 from ._common import _best_azimuth, _case_title
 from .altair_spectra import _scale as _axis_scale
 from .altair_spectra import _tilt_records, _validate_band, _windowed_frame
@@ -398,10 +399,10 @@ def eaglexo_charge_frame(recs, settings, *, coating="BN", collapse_azimuth=True,
     :func:`cxr_mc.plots.detectors._draw_eaglexo_charge`. Columns:
     ``energy_eV, charge_density, E0_keV, azimuth_deg, band``."""
     _validate_band(band)
-    cur = settings.beam_current_na
     frames = []
     for E0, grp in _collapsed(recs, collapse_azimuth=collapse_azimuth):
         for r in grp:
+            cur = beam_current_na(r, settings)
             resp = eag.get_response(r["E_grid"], coating=coating)
             E = np.asarray(r["E_grid"], dtype=float)
             cd_line = resp.charge_density((r["spec"] + r["brem"]) * r["scale"]) * cur

@@ -13,7 +13,7 @@ from cxr_mc.profiles import (
     named_profile_stem,
     variant_stem,
 )
-from cxr_mc.sweep import BeamSpec, build_cases
+from cxr_mc.sweep import build_cases
 
 
 def test_full_profile_preserves_production_defaults_exactly():

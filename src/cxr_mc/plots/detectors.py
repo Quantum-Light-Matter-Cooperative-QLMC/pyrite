@@ -10,6 +10,7 @@ from ..detectors import eaglexo_response as eag
 from ..detectors import timepix_response as tpx
 from ..results import (
     PER_NA,
+    beam_current_na,
     records,
 )
 from ._common import (
@@ -219,16 +220,15 @@ def plot_timepix_poisson(
         grp = [r for r in recs if r["case"]["E0_keV"] == E0]
         r = max(grp, key=_peak_line)
         _, det = _tpx_detected(r, settings, thickness_um, bias_v, n_mc, seed)
-        counts, expected = tpx.poisson_counts(
-            r["E_grid"], det * settings.beam_current_na, integration_s, rng
-        )
+        cur = beam_current_na(r, settings)
+        counts, expected = tpx.poisson_counts(r["E_grid"], det * cur, integration_s, rng)
         ax.step(
             r["E_grid"],
             counts,
             where="mid",
             color="k",
             lw=0.7,
-            label=f"measured ({integration_s:g} s @ {settings.beam_current_na:g} nA)",
+            label=f"measured ({integration_s:g} s @ {cur:g} nA)",
         )
         ax.plot(r["E_grid"], expected, "r-", lw=1.3, label="expected mean")
         ax.axvline(E_thr, color="b", ls=":", lw=0.8, label="threshold")
@@ -481,7 +481,6 @@ def _draw_eaglexo_charge(
     reports each curve's integrated charge rate [e-/s]."""
     fig.clear()
     ax = fig.subplots(1, 1)
-    cur = settings.beam_current_na
     energies = sorted({r["case"]["E0_keV"] for r in trecs})
     ymax, xlo, xhi = 0.0, np.inf, 0.0
     for E0 in energies:
@@ -491,6 +490,7 @@ def _draw_eaglexo_charge(
         grp = _best_azimuth(grp, collapse_azimuth)
         c = energy_color(E0, energies)
         for r in sorted(grp, key=lambda r: r["case"]["tilt_azim_deg"]):
+            cur = beam_current_na(r, settings)
             resp = eag.get_response(r["E_grid"], coating=coating)
             E = np.asarray(r["E_grid"], dtype=float)
             cd_line = resp.charge_density((r["spec"] + r["brem"]) * r["scale"]) * cur
@@ -571,23 +571,23 @@ def plot_eaglexo_charge_map(
     resolve photons, so its figure of merit is collected charge, not line flux.
 
     With ``exposure_s`` set, the map shows the WELL-FILL FRACTION (collected e- /
-    FULL_WELL_E) for that exposure at ``settings.beam_current_na`` instead -- how
+    FULL_WELL_E) for that exposure at each case's pulse current instead -- how
     close the brightest geometry comes to saturating the well. ``cases`` restricts
     to one sweep (cf. plot_heatmaps). Honors the same thin-axis -> line-plot
     fallback as plot_heatmaps (``auto_lines``): a single-valued x or y becomes a
     line plot (signal vs the varying axis, one line per the other). A thin
     wrapper around plot_heatmaps' ``value=`` mode -- see there for the shared
     panel/line machinery."""
-    cur = settings.beam_current_na
 
     def _val(r):
+        cur = beam_current_na(r, settings)
         rate = _eag_charge_rate(r, coating) * cur  # e-/s
         if exposure_s is not None:
             return rate * exposure_s / eag.FULL_WELL_E  # well-fill fraction
         return rate
 
     label = (
-        f"well-fill fraction ({exposure_s:g} s @ {cur:g} nA)"
+        f"well-fill fraction ({exposure_s:g} s; case pulse current)"
         if exposure_s is not None
         else "detected charge rate  (e$^-$/s)"
     )
