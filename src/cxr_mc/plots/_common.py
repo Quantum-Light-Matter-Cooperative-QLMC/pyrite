@@ -11,6 +11,7 @@ from ..montecarlo import (
     detector_efficiency,
 )
 from ..results import (
+    beam_current_na,
     detected_background,
     line_metrics,
 )
@@ -77,8 +78,8 @@ def _case_title(case, tail="", *, latex=True, e0_keV=None, tilt_fmt="0.1f"):
 # `results.store.store_result`), so it's guaranteed unique per record and --
 # unlike the rest of `case` (which can carry unhashable `composition`/
 # `hkl_list`/`abs_layers` entries) is always a plain hashable (str, float)
-# pair. `settings.beam_current_na` is the only settings field `line_metrics`
-# reads today -- extend this key if it grows to read more.
+# pair. Derived source current is the only record/settings value
+# `line_metrics` reads today -- extend this key if that grows.
 _LINE_METRICS_CACHE = {}
 _LINE_METRICS_CACHE_MAX = 100_000
 
@@ -88,7 +89,7 @@ def _cached_line_metrics(r, settings, rel_prominence, line_metric):
     key = (
         case["name"],
         case["E0_keV"],
-        settings.beam_current_na,
+        beam_current_na(r, settings),
         rel_prominence,
         line_metric,
     )

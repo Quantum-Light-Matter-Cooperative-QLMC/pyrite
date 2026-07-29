@@ -162,7 +162,12 @@ def _beam_uvw(ctx, param, value):
         "mats_to_sim.toml, no exceptions.\n\n"
         "Resumes compatible checkpoints in CHECKPOINTS. Full writes "
         "<material>.pkl-compatible data in <material>/; variants use "
-        "identity-qualified stems."
+        "identity-qualified stems.\n\n"
+        "Beam overrides: --beam-transverse-fwhm-{x,y}-mm, "
+        "--beam-bunch-length-fs/--beam-long-shape, "
+        "--beam-rep-rate-hz, and --beam-bunch-charge-pc replace resolved "
+        "catalog-profile distribution values. Beam energy always remains the "
+        "material scan grid; this command deliberately has no energy override."
     ),
 )
 @click.argument(
@@ -241,6 +246,48 @@ def _beam_uvw(ctx, param, value):
     help="Override nonzero integer beam zone axis [uvw].",
 )
 @click.option(
+    "--beam-transverse-fwhm-x-mm",
+    type=_cli_core.NONNEGATIVE_FLOAT,
+    default=None,
+    metavar="MM",
+    help="Beam horizontal Gaussian spot FWHM [mm]; overrides the resolved profile.",
+)
+@click.option(
+    "--beam-transverse-fwhm-y-mm",
+    type=_cli_core.NONNEGATIVE_FLOAT,
+    default=None,
+    metavar="MM",
+    help="Beam vertical Gaussian spot FWHM [mm]; overrides the resolved profile.",
+)
+@click.option(
+    "--beam-bunch-length-fs",
+    type=_cli_core.NONNEGATIVE_FLOAT,
+    default=None,
+    metavar="FS",
+    help="Longitudinal bunch RMS length [fs]; 0 is a point bunch.",
+)
+@click.option(
+    "--beam-long-shape",
+    type=click.Choice(("gaussian", "uniform"), case_sensitive=False),
+    default=None,
+    metavar="SHAPE",
+    help="Longitudinal bunch shape: gaussian or uniform; needs --beam-bunch-length-fs.",
+)
+@click.option(
+    "--beam-rep-rate-hz",
+    type=_cli_core.NONNEGATIVE_FLOAT,
+    default=None,
+    metavar="HZ",
+    help="Beam repetition rate [Hz]; overrides the resolved profile.",
+)
+@click.option(
+    "--beam-bunch-charge-pc",
+    type=_cli_core.NONNEGATIVE_FLOAT,
+    default=None,
+    metavar="PC",
+    help="Single-bunch charge [pC]; overrides the resolved profile.",
+)
+@click.option(
     "--checkpoint-dir",
     default="checkpoints",
     show_default=True,
@@ -278,6 +325,12 @@ def command(
     quick,
     n_families,
     beam_uvw,
+    beam_transverse_fwhm_x_mm,
+    beam_transverse_fwhm_y_mm,
+    beam_bunch_length_fs,
+    beam_long_shape,
+    beam_rep_rate_hz,
+    beam_bunch_charge_pc,
     checkpoint_dir,
     max_minutes,
     progress_file,
@@ -318,6 +371,12 @@ def command(
             quick=quick,
             n_families=n_families,
             beam_uvw=beam_uvw,
+            beam_transverse_fwhm_x_mm=beam_transverse_fwhm_x_mm,
+            beam_transverse_fwhm_y_mm=beam_transverse_fwhm_y_mm,
+            beam_bunch_length_fs=beam_bunch_length_fs,
+            beam_long_shape=beam_long_shape,
+            beam_rep_rate_hz=beam_rep_rate_hz,
+            beam_bunch_charge_pc=beam_bunch_charge_pc,
             checkpoint_dir=checkpoint_dir,
             max_minutes=max_minutes,
             progress_file=progress_file,
@@ -337,6 +396,12 @@ def command(
         quick=quick,
         n_families=n_families,
         beam_uvw=beam_uvw,
+        beam_transverse_fwhm_x_mm=beam_transverse_fwhm_x_mm,
+        beam_transverse_fwhm_y_mm=beam_transverse_fwhm_y_mm,
+        beam_bunch_length_fs=beam_bunch_length_fs,
+        beam_long_shape=beam_long_shape,
+        beam_rep_rate_hz=beam_rep_rate_hz,
+        beam_bunch_charge_pc=beam_bunch_charge_pc,
         checkpoint_dir=checkpoint_dir,
         max_minutes=max_minutes,
         progress_file=progress_file,
@@ -536,6 +601,15 @@ def _resolved_run(args, material):
         overrides["n_families"] = args.n_families
     if getattr(args, "beam_uvw", None) is not None:
         overrides["beam_uvw"] = tuple(args.beam_uvw)
+    beam_overrides = {
+        "transverse_fwhm_x_mm": getattr(args, "beam_transverse_fwhm_x_mm", None),
+        "transverse_fwhm_y_mm": getattr(args, "beam_transverse_fwhm_y_mm", None),
+        "bunch_length_fs": getattr(args, "beam_bunch_length_fs", None),
+        "long_shape": getattr(args, "beam_long_shape", None),
+        "rep_rate_hz": getattr(args, "beam_rep_rate_hz", None),
+        "bunch_charge_pc": getattr(args, "beam_bunch_charge_pc", None),
+    }
+    overrides.update({key: value for key, value in beam_overrides.items() if value is not None})
     sweep = (
         material_sweep(material, catalog_profile=catalog_profile, **overrides)
         if fidelity == "full"
@@ -543,6 +617,10 @@ def _resolved_run(args, material):
             material, fidelity=fidelity, catalog_profile=catalog_profile, **overrides
         )
     )
+    if getattr(args, "beam_long_shape", None) is not None and sweep.beam.bunch_length_fs is None:
+        raise click.UsageError(
+            "--beam-long-shape requires --beam-bunch-length-fs or a profile bunch"
+        )
 
     # High-energy-only materials (mats_to_sim.toml's high_energy_materials list,
     # pulled in via --include-high-energy or -A) are "only worthwhile to sim for
@@ -552,7 +630,9 @@ def _resolved_run(args, material):
     floor = getattr(args, "high_energy_floor_map", None) or {}
     floor = floor.get(material)
     if floor is not None and not getattr(args, "quick", False):
-        energies = np.asarray(sweep.energy_keV, dtype=float)
+        from .sweep import beam_replace
+
+        energies = np.asarray(sweep.beam.energy_keV, dtype=float)
         kept = energies[energies >= floor]
         if kept.size == 0:
             raise SystemExit(
@@ -564,7 +644,7 @@ def _resolved_run(args, material):
         # not the plain canonical stem -- otherwise a floored tise2 checkpoint
         # would collide with an unfiltered tise2 full-grid checkpoint.
         overrides["energy_keV"] = kept
-        sweep = replace(sweep, energy_keV=kept)
+        sweep = replace(sweep, beam=beam_replace(sweep.beam, energy_keV=kept))
 
     from .profiles import dataset_identity, variant_stem
 

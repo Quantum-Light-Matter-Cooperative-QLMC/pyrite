@@ -39,7 +39,7 @@ def test_survey_profile_reduces_every_expensive_sweep_dimension():
 
     assert settings.n_electrons == 60
     assert settings.n_electrons_brem == 30
-    assert len(np.atleast_1d(survey.energy_keV)) <= 2
+    assert len(np.atleast_1d(survey.beam.energy_keV)) <= 2
     assert len(np.atleast_1d(survey.thickness_ang)) <= 3
     assert len(np.atleast_1d(survey.tilt_deg)) <= 5
     assert len(np.atleast_1d(survey.tilt_azim_deg)) <= 2

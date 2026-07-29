@@ -200,12 +200,21 @@ re-exported from package** — `from cxr_mc.montecarlo import X` unchanged
 
 ### `sweep.py`
 Turn `Sweep` definition into Cartesian product of `run_case` dicts.
-- Public: `Sweep` (dataclass of all knobs), `LayerSpec` (one stack layer: material,
-  thickness, orientation), `build_cases`, `crystal_params`,
+- Public: `BeamSpec` (incident phase space and pulse properties), `Sweep`
+  (dataclass of simulation knobs), `beam_replace`, `LayerSpec` (one stack layer:
+  material, thickness, orientation), `build_cases`, `crystal_params`,
   `substrate_composition`, `stack_layers`, `film_on_substrate_layers`,
   `layer_radiator`, `substrate_radiator`, `geometry_table`,
   `fmt_thickness`, `pm` (±hkl expansion); `MATERIAL_LABELS` registry.
 - Deps: `materials` (`CATALOG`, `LayerSpec`), `materials.crystal`.
+
+### `beam_metrics.py`
+Pure diagnostics over sampled initial phase-space arrays: per-plane RMS size,
+geometric and normalized emittance, Twiss parameters, longitudinal RMS size and
+emittance, bunch charge, Gaussian-equivalent peak current, and average current.
+- Public: `PlaneMetrics`, `BeamMetrics`, `sampled_beam_metrics`,
+  `initial_state_metrics`.
+- Deps: NumPy, SciPy constants.
 
 ### `config.py`
 Default settings/sweep builders shared by CLI and both notebooks; per-material
@@ -301,7 +310,8 @@ freeze export set). Submodule DAG (leaf → driver):
   `plot_eaglexo_efficiency` / `_detected` / `_charge` / `_charge_map`. Deps:
   `_style`, `_common`, `sweeps`, `results`, `detectors.timepix_response`, `detectors.eaglexo_response`.
 - `trajectories` — `plot_electron_trajectories`, `plot_trajectory_grid`,
-  `plot_penetration_survival`. Deps: `_style`, `montecarlo`, `results`.
+  `plot_penetration_survival`, and transport initial-state arrays used by trace
+  beam diagnostics. Deps: `_style`, `montecarlo`, `results`.
 - `interactive` — `browse`, `browse_plotly`, `stream_chunk`, `plot_chunk`
   (slider/streaming drivers dispatching to `spectra`/`detectors` drawers).
   Top of DAG. Deps: `_style`, `_common`, `spectra`, `detectors`.

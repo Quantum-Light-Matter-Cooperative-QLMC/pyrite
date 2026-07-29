@@ -12,6 +12,10 @@ takes the Cartesian product over whatever is swept. So
     Sweep(tilt_deg=30.0,               tilt_azim_deg=0.0)          # one case geometry
     Sweep(tilt_deg=np.linspace(1,36,14), tilt_azim_deg=[0,9,18])   # 14*3 geometries
 
+The beam (central energy, transverse spot, longitudinal bunch, rep-rate) lives
+on ``Sweep.beam`` as a :class:`BeamSpec`; ``beam.energy_keV`` is the primary
+swept axis and accepts a scalar or sequence like any other grid.
+
 are both valid and need no other code changes.
 
 Crystallography (composition, dominant reflections, zone axis, B-factor, default
@@ -21,7 +25,7 @@ are imported here (no GPU), so this module is cheap to import and test.
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from itertools import product
 from typing import Any
 
@@ -34,6 +38,100 @@ from .materials.crystal import dominant_reflections
 
 ScalarOrSeq = float | Sequence[float] | np.ndarray
 MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
+
+
+# ---- beam phase space -------------------------------------------------------
+# Speed of light in transport-clock units: the electron clock is sum(L/beta) in
+# Angstrom (c=1), so a bunch length in fs converts via c = 2997.924580 Ang/fs.
+# Mirrors plots.trajectories.C_ANG_PER_FS (the same physical constant; kept in
+# sync so a bunch sampled in fs and an age plotted in fs use one conversion).
+C_ANG_PER_FS = 2997.924580
+
+# Relativistic-regime ceiling for the beam energy (PLACEHOLDER, decision 9
+# sub-decision open). ``beta_from_keV`` is already relativistic, but the Zhai
+# PXR/CBS radiation kernels are a NONRELATIVISTIC derivation, so a MeV-scale
+# beam (REGAE, 3-5 MeV) would leave the model's validity *silently*. BeamSpec
+# refuses (raises) above this ceiling rather than return wrong numbers. 300 keV
+# is the top of the current catalog working range (hopg) and is allowed
+# (strict ``>`` refusal); it sits well below the 3-5 MeV REGAE regime. The exact
+# value needs a physics call and is flagged in the validation ledger.
+# Validation: relativistic-ceiling (placeholder)
+BEAM_ENERGY_CEILING_KEV = 300.0
+
+_UNSET = object()
+
+
+@dataclass(frozen=True)
+class BeamSpec:
+    """The full electron-beam phase-space description, in one object.
+
+    A beam is a distribution over the 6-D phase space ``(x, x', y, y', z/t, d)``
+    plus its central energy ``E0``. This dataclass owns every *beam* property --
+    what describes the electrons *before* they reach the crystal -- so the whole
+    beam lives in one place instead of being scattered across ``Sweep`` and
+    ``results.Settings``. Fields, staged by what is wired today vs. reserved as a
+    documented extension point (inert default -> bit-for-bit legacy):
+
+    * ``energy_keV`` -- central beam kinetic energy, the primary swept axis
+      (``build_cases`` products over it). Scalar or sequence.
+    * ``transverse_fwhm_x_mm`` / ``_y_mm`` -- per-plane Gaussian spot FWHM [mm]
+      (the old isotropic ``Sweep.beam_fwhm_mm``, now elliptical -- decision 8).
+      ``None`` on both recovers the legacy point-source beam. Use
+      :meth:`isotropic` for the common equal-plane spot.
+    * ``bunch_length_fs`` -- RMS longitudinal bunch length [fs] (THIS task).
+      ``None`` -> legacy point bunch (all electrons at t=0). ``long_shape`` picks
+      the sampling law; ``long_offsets_fs`` supplies explicit per-particle
+      offsets (overriding the shape). Incoherent today, so a no-op on the
+      spectrum -- the sampled offsets are the input the future coherent form
+      factor consumes.
+    * ``rep_rate_hz`` / ``bunch_charge_pc`` -- pulsed-source rep rate and
+      single-bunch charge; a detected-flux multiplier only, and the source of
+      truth for average current ``I = bunch_charge_pc * rep_rate_hz``.
+    * ``divergence_mrad`` / ``energy_spread_frac`` -- FUTURE (x',y' and d RMS ->
+      full 6-D emittance). Inert defaults keep every current run bit-for-bit.
+
+    Mean-vs-spread: each phase-space axis has a *mean* set elsewhere (energy mean
+    = ``energy_keV``; direction mean = tilt geometry; position mean = origin) and
+    a *spread* owned here (``energy_spread_frac``, ``divergence_mrad``, the
+    transverse FWHMs). Macro-particle *counts* (``n_electrons``) are numerical
+    sampling, NOT a beam property, and deliberately stay out of ``BeamSpec``.
+    """
+
+    energy_keV: ScalarOrSeq = (30.0, 45.0, 60.0)
+    transverse_fwhm_x_mm: float | None = 1.0
+    transverse_fwhm_y_mm: float | None = 1.0
+    bunch_length_fs: float | None = None
+    long_shape: str = "gaussian"
+    long_offsets_fs: tuple[float, ...] | None = None
+    rep_rate_hz: float = 5000.0
+    bunch_charge_pc: float = 1.0
+    divergence_mrad: float | None = None
+    energy_spread_frac: float | None = None
+
+    @classmethod
+    def isotropic(cls, transverse_fwhm_mm: float | None = 1.0, **kw: Any) -> "BeamSpec":
+        """Convenience ctor for an azimuthally-symmetric spot (x == y)."""
+        return cls(
+            transverse_fwhm_x_mm=transverse_fwhm_mm,
+            transverse_fwhm_y_mm=transverse_fwhm_mm,
+            **kw,
+        )
+
+
+def beam_replace(beam: BeamSpec, **changes: Any) -> BeamSpec:
+    """:func:`dataclasses.replace` for a :class:`BeamSpec` that also accepts the
+    legacy isotropic aliases ``beam_fwhm_mm`` / ``transverse_fwhm_mm`` (each sets
+    BOTH transverse planes). Used to route the historical scalar-spot overrides
+    onto the per-plane fields without every call site knowing the split."""
+    iso = changes.pop("transverse_fwhm_mm", _UNSET)
+    if iso is _UNSET:
+        iso = changes.pop("beam_fwhm_mm", _UNSET)
+    else:
+        changes.pop("beam_fwhm_mm", None)
+    if iso is not _UNSET:
+        changes.setdefault("transverse_fwhm_x_mm", iso)
+        changes.setdefault("transverse_fwhm_y_mm", iso)
+    return replace(beam, **changes)
 
 
 def pm(*hkls: tuple[int, ...]) -> list[tuple[int, ...]]:
@@ -196,19 +294,24 @@ def crystal_params(material: str, n_families: int = 4) -> dict[str, Any]:
 class Sweep:
     """One parameter sweep.
 
-    Each of ``thickness_ang``, ``energy_keV``, ``tilt_deg``,
+    Each of ``thickness_ang``, ``beam.energy_keV``, ``tilt_deg``,
     ``tilt_azim_deg``, ``crystal_width_mm``, and ``crystal_height_mm`` is either
     a single number (fixed) or a sequence/array (swept); build_cases() takes the
-    product. The transverse dimensions must be both ``None`` (the legacy
+    product. The transverse crystal dimensions must be both ``None`` (the legacy
     infinite slab) or both strictly positive full dimensions in mm; they
-    default to a finite 5x5 mm footprint. ``beam_fwhm_mm`` defaults to a 1 mm
-    FWHM Gaussian beam spot (pass ``None`` for the legacy point-source beam).
+    default to a finite 5x5 mm footprint.
+
+    ``beam`` is the :class:`BeamSpec` owning EVERY beam property: the swept
+    central ``energy_keV`` (moved off ``Sweep`` -- decision 2), the transverse
+    spot (the old ``beam_fwhm_mm``, now per-plane -- decision 8), and the
+    longitudinal bunch / rep-rate / (future) emittance fields. Defaults to
+    ``BeamSpec()`` -- a 1 mm isotropic spot, point bunch, 5 kHz / 1 pC.
     The remaining fields are fixed setup that rarely changes per run.
     """
 
     material: str  # required: no default, so a Sweep can't silently load MoSe2
     thickness_ang: ScalarOrSeq = 2e4
-    energy_keV: ScalarOrSeq = (30.0, 45.0, 60.0)
+    beam: BeamSpec = field(default_factory=BeamSpec)
     tilt_deg: ScalarOrSeq = 30.0
     tilt_azim_deg: ScalarOrSeq = 0.0
     # Optional electron-count grids (catalog ``[profiles.*]`` settings,
@@ -226,7 +329,6 @@ class Sweep:
     # no substrate/stack, no finite footprint.
     crystal_width_mm: ScalarOrSeq | None = 5.0
     crystal_height_mm: ScalarOrSeq | None = 5.0
-    beam_fwhm_mm: float | None = 1.0  # None -> legacy point-source beam
     # fixed setup (single values) ------------------------------------------
     theta_obs_deg: float = 90.0
     n_families: int = 4
@@ -345,6 +447,30 @@ def _reject_banned_angles(
         )
 
 
+def _reject_relativistic_energies(energies: np.ndarray) -> None:
+    """Refuse beam energies above the nonrelativistic PXR/CBS validity ceiling.
+
+    ``beta_from_keV`` is relativistic, but the Zhai PXR/CBS radiation kernels are
+    a NONRELATIVISTIC derivation, so a MeV-scale beam (REGAE, 3-5 MeV) would
+    leave the model's validity *silently*. ``build_cases`` raises here rather
+    than emit wrong numbers -- no valid result exists above the ceiling today, so
+    a warning would be a correctness trap (decision 9). See
+    :data:`BEAM_ENERGY_CEILING_KEV` (placeholder) and the future relativistic /
+    channeling work (TODO On-Hold #1/#2).
+
+    Validation: relativistic-ceiling
+    """
+    hottest = float(np.max(np.atleast_1d(energies)))
+    if hottest > BEAM_ENERGY_CEILING_KEV:
+        raise ValueError(
+            f"beam energy {hottest:g} keV exceeds the nonrelativistic PXR/CBS "
+            f"model ceiling of {BEAM_ENERGY_CEILING_KEV:g} keV: the Zhai PXR/CBS "
+            "kernels are a nonrelativistic derivation and yield no valid result "
+            "above it. Relativistic / channeling support (REGAE 3-5 MeV) is "
+            "future work (TODO On-Hold #1/#2)."
+        )
+
+
 def _reject_invalid_groove_geometry(
     groove_spacing_ang: float, sweep: "Sweep", tilts: np.ndarray, azimuths: np.ndarray, stack
 ) -> None:
@@ -396,9 +522,12 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     crossed with every beam energy). ``crystal_width_mm`` and
     ``crystal_height_mm`` are full dimensions: both ``None`` recovers the
     legacy infinite slab, otherwise both must be positive (default: a finite
-    5x5 mm footprint). Each case also carries ``beam_fwhm_mm`` from the sweep
-    (default: a 1 mm FWHM Gaussian beam spot; ``None`` recovers the legacy
-    point-source beam). Optional ``n_electrons`` / ``n_electrons_brem`` sweep
+    5x5 mm footprint). Each case also carries the beam phase-space fields from
+    ``sweep.beam`` (:class:`BeamSpec`): ``beam_fwhm_mm`` (x-plane FWHM; default a
+    1 mm Gaussian spot, ``None`` recovers the legacy point source), the
+    elliptical ``beam_fwhm_y_mm`` and the longitudinal ``bunch_length_fs`` /
+    ``long_shape`` / ``long_offsets_fs`` keys joining only when they diverge from
+    the isotropic point-bunch default. Optional ``n_electrons`` / ``n_electrons_brem`` sweep
     grids (catalog profile settings) cross electron-count statistics into the
     product and suffix the case name with ``ne=<line>/<brem>``; ``None`` keeps
     the scalar counts passed by the caller. Returns the ``cases`` list;
@@ -412,7 +541,8 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     # the particle energy.
     # A uniform E_grid_brem keeps the legacy start/spacing behavior and extends
     # to each beam energy. Scalar/nonuniform grids are explicit and stay exact.
-    energies = _seq(sweep.energy_keV)
+    energies = _seq(sweep.beam.energy_keV)
+    _reject_relativistic_energies(energies)
     line_grids = tuple(
         _line_grid_for_energy(sweep, cp["E_grid"], float(energy)) for energy in energies
     )
@@ -434,6 +564,27 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
     domega = TIMEPIX3_DOMEGA_SR if sweep.domega_sr is None else sweep.domega_sr
     beam_uvw = cp["beam_uvw"] if sweep.beam_uvw is None else sweep.beam_uvw
     surface_hkl = cp["surface_hkl"] if sweep.beam_uvw is None else None
+    # Beam phase-space fields threaded onto every case (constant across the
+    # product). The legacy ``beam_fwhm_mm`` key stays == the x-plane FWHM so a
+    # default isotropic spot is bit-for-bit; the elliptical ``beam_fwhm_y_mm``
+    # and the longitudinal bunch / pulse-rate keys join ONLY when they actually
+    # diverge from the point-bunch/default-source configuration, so existing
+    # case payloads and checkpoint matching remain stable.
+    b = sweep.beam
+    fwhm_x = None if b.transverse_fwhm_x_mm is None else float(b.transverse_fwhm_x_mm)
+    fwhm_y = None if b.transverse_fwhm_y_mm is None else float(b.transverse_fwhm_y_mm)
+    beam_case: dict[str, Any] = {"beam_fwhm_mm": fwhm_x}
+    if b.bunch_charge_pc != 1.0 or b.rep_rate_hz != 5000.0:
+        beam_case["bunch_charge_pc"] = float(b.bunch_charge_pc)
+        beam_case["rep_rate_hz"] = float(b.rep_rate_hz)
+    if fwhm_y != fwhm_x:
+        beam_case["beam_fwhm_y_mm"] = fwhm_y
+    if b.bunch_length_fs is not None or b.long_offsets_fs is not None:
+        beam_case["long_shape"] = b.long_shape
+        if b.bunch_length_fs is not None:
+            beam_case["bunch_length_fs"] = float(b.bunch_length_fs)
+        if b.long_offsets_fs is not None:
+            beam_case["long_offsets_fs"] = tuple(float(x) for x in b.long_offsets_fs)
     material_spec = CATALOG.materials.get(sweep.material)
     label = material_spec.label if material_spec is not None else sweep.material
     width_src, height_src = sweep.crystal_width_mm, sweep.crystal_height_mm
@@ -546,9 +697,7 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100):
                         thickness_ang=float(thickness),
                         crystal_width_mm=None if width is None else float(width),
                         crystal_height_mm=None if height is None else float(height),
-                        beam_fwhm_mm=(
-                            None if sweep.beam_fwhm_mm is None else float(sweep.beam_fwhm_mm)
-                        ),
+                        **beam_case,
                         E_grid=line_case_grid,  # legacy key (== line grid)
                         E_grid_line=line_case_grid,
                         E_grid_brem=(

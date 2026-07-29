@@ -7,7 +7,7 @@ from cxr_mc.materials import LayerSpec, load_material_catalog
 from cxr_mc.materials.crystal import HBARC_EV_ANG
 from cxr_mc.montecarlo import beta_from_keV, mc_spectrum
 from cxr_mc.montecarlo.geometry import _orientation_R
-from cxr_mc.sweep import Sweep, build_cases, layer_radiator
+from cxr_mc.sweep import BeamSpec, Sweep, build_cases, layer_radiator
 
 GENERAL_LATTICE = {
     "system": "general",
@@ -108,7 +108,7 @@ def test_surface_orientation_reaches_case_and_explicit_sweep_beam_clears_it(monk
     base = dict(
         material="mose2",
         thickness_ang=100.0,
-        energy_keV=30.0,
+        beam=BeamSpec(energy_keV=30.0),
         tilt_deg=5.0,
         E_grid_line=np.array([100.0]),
         E_grid_brem=np.array([100.0]),
@@ -157,7 +157,7 @@ def test_detector_mosaic_geometry_uses_case_surface_hkl(monkeypatch):
         Sweep(
             material="mose2",
             thickness_ang=100.0,
-            energy_keV=30.0,
+            beam=BeamSpec(energy_keV=30.0),
             tilt_deg=20.0,
             E_grid_line=np.array([100.0]),
             E_grid_brem=np.array([100.0]),
@@ -259,7 +259,7 @@ crystal = "mos2"
     base = dict(
         material="sample",
         thickness_ang=100.0,
-        energy_keV=30.0,
+        beam=BeamSpec(energy_keV=30.0),
         tilt_deg=5.0,
         E_grid_line=grid,
         E_grid_brem=np.array([100.0]),

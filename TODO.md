@@ -42,7 +42,6 @@ summary once the branch exists.
    2. >user< Evaluate worth in both implementing the approximate scalar Debye-Waller formula (compare output to known values for various anisotropic materials we have in our DB), and in attempting to implement a fully-fledged DFPT system.
    3. >user< Take a crystal with a known DW factor, then manually change it up and down over a range of values that can reasonably be expected other crystals to have, and see how much it changes by -- if large, then its worth being careful here.
 3.  **GPU-memory follow-up.** Benchmark remote `rebrem --all --ne-brem 500 --step 20` for bounded CuPy reserved-pool memory; assess analogous `reline` cleanup separately.
-4.  **Discrete longitudinal bunch / beam phase space.** Gather all beam properties into one `BeamSpec` (energy, transverse size, longitudinal bunch, rep-rate/charge; future divergence + energy spread), initiate particles with a specified longitudinal distribution, expose standard beam metrics (emittance, Twiss, bunch length). Plumbing + metrics only; coherent emission deferred. Unblocks On-Hold #3 (superradiant PXR/CBS). → `feature/discrete-bunch-support`; [`tasks/discrete-bunch-support.md`](tasks/discrete-bunch-support.md).
 
 ### Gated
 
@@ -52,7 +51,7 @@ summary once the branch exists.
 
 1. **High-energy electron/channeling support.** Evaluate `Geant4` or similar for REGAE@DESY-scale beams (3–5 MeV, 50 fs, 100 fC, 200–300 µm target diameter), JungFrau detector ~0.5–4.5 m from interaction point. USER QUESTION: What is rep rate?
 2.  **Bent Crystals (After add channeling + relativistic electrons)**
-3.  **Superradiant PXR/CBS** need bunch length knowledge, coherent emission *across segments* (also needed by channeling radiation as in long-term features #1, #3). Bunch-length plumbing lands in P1-Active #5 (`feature/discrete-bunch-support`); this item is the coherent-sum follow-on.
+3.  **Superradiant PXR/CBS** need bunch length knowledge, coherent emission *across segments* (also needed by channeling radiation as in long-term features #1, #3); this item is the coherent-sum follow-on.
 
 ## P2 - medium-priority
 

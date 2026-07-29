@@ -271,6 +271,90 @@ def test_profile_names_and_memberships_are_exposed(tmp_path):
         catalog.profile_materials("bogus")
 
 
+def _catalog_with_standard_beam(beam_block: str) -> str:
+    """The minimal catalog plus a ``[profiles.standard.beam]`` distribution
+    block (appended after the material rows -- a valid out-of-order TOML
+    sub-table of the already-opened ``[profiles.standard]``)."""
+    return (
+        _minimal_catalog(
+            material_rows="""
+[materials.mos2]
+label = "mos2"
+crystal = "mos2"
+"""
+        )
+        + beam_block
+    )
+
+
+def test_profile_beam_block_decodes_and_reaches_material_sweep(tmp_path, monkeypatch):
+    from cxr_mc import config
+    from cxr_mc.materials import load_material_catalog
+
+    text = _catalog_with_standard_beam(
+        "\n[profiles.standard.beam]\n"
+        "transverse_fwhm_mm = 0.5\n"
+        "bunch_length_fs = 120.0\n"
+        'long_shape = "uniform"\n'
+        "rep_rate_hz = 1000.0\n"
+        "bunch_charge_pc = 2.5\n"
+    )
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
+
+    assert catalog.profile_beam("standard") == {
+        "transverse_fwhm_mm": 0.5,
+        "bunch_length_fs": 120.0,
+        "long_shape": "uniform",
+        "rep_rate_hz": 1000.0,
+        "bunch_charge_pc": 2.5,
+    }
+
+    monkeypatch.setattr(config, "CATALOG", catalog)
+    sweep = config.material_sweep("mos2")
+    # The isotropic alias routes onto both transverse planes; distribution
+    # fields apply; energy stays the per-material scan grid (not the beam block).
+    assert sweep.beam.transverse_fwhm_x_mm == 0.5
+    assert sweep.beam.transverse_fwhm_y_mm == 0.5
+    assert sweep.beam.bunch_length_fs == 120.0
+    assert sweep.beam.long_shape == "uniform"
+    assert sweep.beam.rep_rate_hz == 1000.0
+    assert sweep.beam.bunch_charge_pc == 2.5
+    np.testing.assert_array_equal(sweep.beam.energy_keV, catalog.material("mos2").scan.energy_keV)
+
+
+def test_profile_beam_block_rejects_energy_and_bad_values(tmp_path):
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    text = _catalog_with_standard_beam(
+        "\n[profiles.standard.beam]\n"
+        "energy_keV = [40.0]\n"  # energy is NOT settable in the beam block
+        "transverse_fwhm_x_mm = -1.0\n"  # must be finite positive
+        'long_shape = "triangular"\n'  # not a known sampling law
+        "long_offsets_fs = 5.0\n"  # must be an array
+    )
+    with pytest.raises(MaterialConfigError) as caught:
+        load_material_catalog(_write_catalog(tmp_path, text))
+    joined = "\n".join(caught.value.errors)
+    assert "profiles.standard.beam.energy_keV: unknown key" in joined
+    assert "profiles.standard.beam.transverse_fwhm_x_mm" in joined
+    assert "profiles.standard.beam.long_shape" in joined
+    assert "profiles.standard.beam.long_offsets_fs" in joined
+
+
+def test_profile_beam_offsets_coerced_to_tuple_and_absent_profile_is_none(tmp_path):
+    from cxr_mc.materials import load_material_catalog
+
+    text = _catalog_with_standard_beam(
+        "\n[profiles.standard.beam]\nlong_offsets_fs = [-10.0, 0.0, 10.0]\n"
+    )
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
+    beam = catalog.profile_beam("standard")
+    assert isinstance(beam["long_offsets_fs"], tuple)
+    assert beam["long_offsets_fs"] == (-10.0, 0.0, 10.0)
+    # A profile with no beam block -> None (the standard BeamSpec default applies).
+    assert catalog.profile_beam("bogus") is None
+
+
 def test_bundled_crystal_validation_ids_are_ledgered():
     from cxr_mc import DATA_DIR
 

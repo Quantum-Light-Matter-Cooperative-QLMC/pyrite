@@ -61,8 +61,10 @@ from .selection import (
     thicknesses_by_energy,
 )
 from .store import (
+    DEFAULT_BEAM_CURRENT_NA,
     PER_NA,
     Settings,
+    beam_current_na,
     detected_background,
     line_fwhm_eV,
     store_result,
@@ -78,7 +80,9 @@ from .tables import (
 __all__ = [
     # store
     "PER_NA",
+    "DEFAULT_BEAM_CURRENT_NA",
     "Settings",
+    "beam_current_na",
     "line_fwhm_eV",
     "store_result",
     "detected_background",

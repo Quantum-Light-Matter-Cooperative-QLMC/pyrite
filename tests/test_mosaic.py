@@ -15,7 +15,7 @@ from cxr_mc.montecarlo import (
     mosaic_psi_rad,
 )
 from cxr_mc.results import store_result
-from cxr_mc.sweep import Sweep, build_cases
+from cxr_mc.sweep import BeamSpec, Sweep, build_cases
 
 LINE_GRID = np.arange(50.0, 300.0, 5.0)
 BREM_GRID = np.arange(0.0, 1000.0, 100.0)
@@ -25,7 +25,7 @@ def _sweep(material, **kw):
     return Sweep(
         material=material,
         thickness_ang=1e4,
-        energy_keV=30,
+        beam=BeamSpec(energy_keV=30),
         tilt_deg=30.0,
         E_grid_line=LINE_GRID,
         E_grid_brem=BREM_GRID,

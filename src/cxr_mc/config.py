@@ -19,6 +19,7 @@ detector/analysis knobs still live here.
   * :data:`COLLAPSE_AZIMUTH` -- keep only the best azimuth per (tilt, energy).
 """
 
+import dataclasses
 from dataclasses import replace
 from typing import Any
 
@@ -28,7 +29,14 @@ from .materials import CATALOG, MaterialSpec, load_material_catalog
 from .montecarlo import simulate_trajectories
 from .profiles import get_profile
 from .results import Settings
-from .sweep import Sweep
+from .sweep import BeamSpec, Sweep, beam_replace
+
+# Override keys that address the beam (BeamSpec) rather than the Sweep itself,
+# so ``material_sweep(..., energy_keV=[30, 60])`` and the legacy scalar-spot
+# ``beam_fwhm_mm=`` keep working after the beam moved onto ``Sweep.beam``.
+_BEAM_OVERRIDE_KEYS = frozenset(
+    {f.name for f in dataclasses.fields(BeamSpec)} | {"beam_fwhm_mm", "transverse_fwhm_mm"}
+)
 
 MATERIALS = CATALOG.material_keys
 
@@ -60,10 +68,17 @@ def default_settings(fidelity: str = "full"):
     return get_profile(fidelity).apply_settings(settings)
 
 
-def _material_spec(material: str, catalog_profile: str = "standard") -> MaterialSpec:
-    catalog = (
+def _catalog(catalog_profile: str = "standard"):
+    """The bundled singleton for ``standard`` (avoids a re-parse), else the
+    profile-resolved catalog. Shared by :func:`_material_spec` and the beam-block
+    resolution in :func:`material_sweep`; both hit the same cached instance."""
+    return (
         CATALOG if catalog_profile == "standard" else load_material_catalog(profile=catalog_profile)
     )
+
+
+def _material_spec(material: str, catalog_profile: str = "standard") -> MaterialSpec:
+    catalog = _catalog(catalog_profile)
     try:
         return catalog.material(material)
     except KeyError:
@@ -113,11 +128,19 @@ def material_sweep(
             catalog_profile = profile
     spec = _material_spec(material, catalog_profile=catalog_profile)
     scan = spec.scan
+    # Energy is the per-material scan grid; the profile's optional
+    # ``[profiles.*.beam]`` block supplies only the distribution fields
+    # (transverse size, bunch, rep-rate/charge). ``standard`` has none -> the
+    # BeamSpec defaults, bit-for-bit legacy.
+    beam = BeamSpec(energy_keV=scan.energy_keV)
+    beam_fields = _catalog(catalog_profile).profile_beam(catalog_profile)
+    if beam_fields:
+        beam = beam_replace(beam, **beam_fields)
     sweep = Sweep(
         material=spec.crystal_key,
         theta_obs_deg=theta_obs_deg,
         thickness_ang=scan.thickness_ang,
-        energy_keV=scan.energy_keV,
+        beam=beam,
         tilt_deg=scan.tilt_deg,
         tilt_azim_deg=scan.tilt_azim_deg,
         E_grid_line=scan.E_grid_line,
@@ -129,7 +152,16 @@ def material_sweep(
         stack=spec.stack or None,
     )
     sweep = get_profile(fidelity).apply_sweep(sweep)
-    return replace(sweep, **overrides) if overrides else sweep
+    if not overrides:
+        return sweep
+    # Split beam-addressed overrides (energy_keV, spot/bunch fields) from
+    # Sweep-level ones so both keep working through the single **overrides API.
+    beam_over = {k: overrides.pop(k) for k in list(overrides) if k in _BEAM_OVERRIDE_KEYS}
+    if overrides:
+        sweep = replace(sweep, **overrides)
+    if beam_over:
+        sweep = replace(sweep, beam=beam_replace(sweep.beam, **beam_over))
+    return sweep
 
 
 def trajectory_sweep(
@@ -185,7 +217,7 @@ def trajectory_sweep(
     return Sweep(
         material=spec.crystal_key,  # named stacks: the film
         thickness_ang=thick,
-        energy_keV=list(energies),
+        beam=BeamSpec(energy_keV=list(energies)),
         tilt_deg=tilt_values,
         tilt_azim_deg=float(azim_deg),
         theta_obs_deg=90.0,

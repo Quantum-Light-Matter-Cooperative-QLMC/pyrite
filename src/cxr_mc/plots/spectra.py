@@ -12,6 +12,7 @@ from ..montecarlo import (
     mosaic_psi_rad,
 )
 from ..results import (
+    beam_current_na,
     best_azimuth,
     line_fwhm_eV,
     records,
@@ -217,7 +218,7 @@ def plot_peak_vs_tilt(results, settings):
     for _i, (E0, rs) in enumerate(sorted(by_E.items())):
         rs = sorted(rs, key=lambda r: r["case"]["tilt_deg"])
         tilts = [r["case"]["tilt_deg"] for r in rs]
-        peak = [float(np.max(r["spec"])) * r["scale"] * settings.beam_current_na for r in rs]
+        peak = [float(np.max(r["spec"])) * r["scale"] * beam_current_na(r, settings) for r in rs]
         ax.plot(tilts, peak, "o-", color=energy_color(E0, by_E), label=f"{E0:g} keV")
     ax.set_xlabel(r"polar tilt $\theta_\mathrm{tilt}$ (deg)")
     ax.set_ylabel("best-azimuth peak (Phs/eV/s)")

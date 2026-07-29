@@ -18,7 +18,7 @@ from ..materials import CATALOG
 from ..montecarlo import convolve_detector, detector_efficiency
 from ..sweep import fmt_thickness
 from .metrics import line_metrics
-from .store import Settings, detected_background
+from .store import Settings, beam_current_na, detected_background
 
 
 def results_dataframe(
@@ -64,10 +64,14 @@ _ROUND = {
     "azimuth [deg]": 1,
     "line [eV]": 0,
     "peak [Phs/eV/s]": 2,
+    "peak [Phs/eV/s/nA]": 2,
     "peak/bg": 2,
     "line [cts/s]": 1,
+    "line [cts/s/nA]": 1,
     "brem [cts/s]": 1,
+    "brem [cts/s/nA]": 1,
     "total [cts/s]": 1,
+    "total [cts/s/nA]": 1,
 }
 _CONFIG_COLS = {"material", "thickness", "polar [deg]", "azimuth [deg]"}
 
@@ -77,9 +81,10 @@ def summary_table(recs, settings):
     thickness, polar/azimuthal tilt) is broken out of the config name into its
     own columns under a 'config' super-header; the rest are the line peak, the
     EDS-convolved peak height, peak-over-background, and the integrated line /
-    brem / total count rates [counts/s] at ``settings.beam_current_na``. Returns
-    a DataFrame with a 2-level column index (empty if ``recs`` is empty)."""
-    cur = settings.beam_current_na
+    brem / total count rates [counts/s] at the case's bunch charge and
+    repetition rate, alongside intrinsic per-nA values. Old checkpoints fall
+    back to ``settings.beam_current_na``. Returns a DataFrame with a 2-level
+    column index (empty if ``recs`` is empty)."""
     rows = []
     for r in sorted(
         recs,
@@ -90,19 +95,22 @@ def summary_table(recs, settings):
         ),
     ):
         c = r["case"]
+        cur = beam_current_na(r, settings)
         qe = detector_efficiency(r["E_grid"]) if settings.apply_detector_qe else 1.0
         line_det = convolve_detector(r["E_grid"], r["spec"] * qe, r["fwhm"])
         brem_det = detected_background(r, settings) / r["scale"]
         i_pk = np.argmax(line_det)
-        line_cts = np.trapezoid(r["spec"], r["E_grid"]) * r["scale"] * cur
+        line_cts_per_na = np.trapezoid(r["spec"], r["E_grid"]) * r["scale"]
+        line_cts = line_cts_per_na * cur
         # brem over the FULL measured range (the wide grid) when available, so the
         # total rate reflects the real measurement out to the beam energy; fall
         # back to the line-grid brem if a (stale) wide brem is non-finite
-        brem_cts = np.trapezoid(r["brem"], r["E_grid"]) * r["scale"] * cur
+        brem_cts_per_na = np.trapezoid(r["brem"], r["E_grid"]) * r["scale"]
         if r.get("brem_wide") is not None:
-            wide = np.trapezoid(r["brem_wide"], r["E_grid_brem"]) * r["scale"] * cur
-            if np.isfinite(wide):
-                brem_cts = wide
+            wide_per_na = np.trapezoid(r["brem_wide"], r["E_grid_brem"]) * r["scale"]
+            if np.isfinite(wide_per_na):
+                brem_cts_per_na = wide_per_na
+        brem_cts = brem_cts_per_na * cur
         rows.append(
             {
                 "material": (
@@ -115,10 +123,14 @@ def summary_table(recs, settings):
                 "azimuth [deg]": c["tilt_azim_deg"],
                 "Ee [keV]": c["E0_keV"],
                 "line [eV]": r["E_grid"][i_pk],
+                "peak [Phs/eV/s/nA]": line_det[i_pk] * r["scale"],
                 "peak [Phs/eV/s]": line_det[i_pk] * r["scale"] * cur,
                 "peak/bg": (line_det[i_pk] / brem_det[i_pk]) if brem_det[i_pk] else np.inf,
+                "line [cts/s/nA]": line_cts_per_na,
                 "line [cts/s]": line_cts,
+                "brem [cts/s/nA]": brem_cts_per_na,
                 "brem [cts/s]": brem_cts,
+                "total [cts/s/nA]": line_cts_per_na + brem_cts_per_na,
                 "total [cts/s]": line_cts + brem_cts,
             }
         )
@@ -142,7 +154,8 @@ def show_summary(recs, settings):
         return
     print(
         ("window-QE applied, " if settings.apply_detector_qe else "unity QE, ")
-        + f"beam current {settings.beam_current_na:g} nA  |  "
+        + "per-nA columns are intrinsic; rate columns use each case's "
+        "bunch charge x repetition rate  |  "
         "peak/bg = EDS-convolved peak height / background at the peak"
     )
     display(df)

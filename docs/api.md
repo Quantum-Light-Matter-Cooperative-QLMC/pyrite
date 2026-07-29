@@ -23,6 +23,7 @@ registries.
    cxr_mc.blaze
    cxr_mc.check
    cxr_mc.check_config
+   cxr_mc.beam_metrics
    cxr_mc.config
    cxr_mc.detectors
    cxr_mc.line_grid

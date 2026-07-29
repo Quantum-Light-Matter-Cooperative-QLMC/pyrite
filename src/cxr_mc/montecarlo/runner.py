@@ -330,6 +330,21 @@ def run_case(case):
     return _spectrum_case(case, _transport_case(case))
 
 
+def _beam_kwargs(case):
+    """Beam phase-space kwargs a case dict forwards to ``simulate_trajectories``:
+    the transverse spot (elliptical ``beam_fwhm_mm`` / ``beam_fwhm_y_mm``) and
+    the longitudinal bunch (``bunch_length_fs`` / ``long_shape`` /
+    ``long_offsets_fs``). Absent keys default to the point-bunch isotropic beam,
+    bit-for-bit with the pre-BeamSpec case dict."""
+    return dict(
+        beam_fwhm_mm=case.get("beam_fwhm_mm"),
+        beam_fwhm_y_mm=case.get("beam_fwhm_y_mm"),
+        bunch_length_fs=case.get("bunch_length_fs"),
+        long_shape=case.get("long_shape", "gaussian"),
+        long_offsets_fs=case.get("long_offsets_fs"),
+    )
+
+
 def _transport_case(case):
     """CPU-only phase of run_case: the line + brem trajectory transport (pure
     numpy, never touches the GPU). Returns the segments + geometry + grids the
@@ -349,7 +364,7 @@ def _transport_case(case):
     # film-on-substrate stack drives multilayer transport too (substrate
     # backscatter / substrate brem); None -> single-material slab (unchanged).
     layers = case.get("abs_layers")
-    beam_fwhm_mm = case.get("beam_fwhm_mm")
+    beam_kw = _beam_kwargs(case)
     # blazed sawtooth entrance-face grooves (docs/superpowers/plans/
     # 2026-07-23-blazed-groove-geometry.md): built once per case, then threaded
     # into both electron-entry transport calls and the line-spectrum escape
@@ -368,7 +383,7 @@ def _transport_case(case):
         seed=case["seed"],
         beam_dir=beam,
         layers=layers,
-        beam_fwhm_mm=beam_fwhm_mm,
+        **beam_kw,
         crystal_width_mm=case.get("crystal_width_mm"),
         crystal_height_mm=case.get("crystal_height_mm"),
         tilt_polar_rad=tilt_polar_rad,
@@ -385,7 +400,7 @@ def _transport_case(case):
         seed=case["seed"] + 1,
         beam_dir=beam,
         layers=layers,
-        beam_fwhm_mm=beam_fwhm_mm,
+        **beam_kw,
         crystal_width_mm=case.get("crystal_width_mm"),
         crystal_height_mm=case.get("crystal_height_mm"),
         tilt_polar_rad=tilt_polar_rad,
@@ -469,7 +484,7 @@ def _brem_for_case(case, E_brem):
         seed=case["seed"] + 1,
         beam_dir=beam,
         layers=abs_layers,
-        beam_fwhm_mm=case.get("beam_fwhm_mm"),
+        **_beam_kwargs(case),
         crystal_width_mm=case.get("crystal_width_mm"),
         crystal_height_mm=case.get("crystal_height_mm"),
         tilt_polar_rad=tilt_polar_rad,
@@ -573,7 +588,7 @@ def _lines_for_case(case, E_grid):
         seed=case["seed"],
         beam_dir=beam,
         layers=abs_layers,
-        beam_fwhm_mm=case.get("beam_fwhm_mm"),
+        **_beam_kwargs(case),
         crystal_width_mm=case.get("crystal_width_mm"),
         crystal_height_mm=case.get("crystal_height_mm"),
         tilt_polar_rad=tilt_polar_rad,

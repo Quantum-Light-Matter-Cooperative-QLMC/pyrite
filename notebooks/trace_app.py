@@ -13,6 +13,7 @@ app = marimo.App(width="full")
 def _():
     import altair as alt
     import marimo as mo
+    import numpy as np
     from _design import page_title, style_sheet
     from _widgets import MaterialSelect
 
@@ -24,6 +25,7 @@ def _():
     except Exception:
         alt.data_transformers.disable_max_rows()
 
+    from cxr_mc.beam_metrics import initial_state_metrics
     from cxr_mc.config import default_settings, trajectory_sweep
     from cxr_mc.materials import CATALOG
     from cxr_mc.plots.altair_trajectories import (
@@ -51,7 +53,9 @@ def _():
         crystal_lattice_figure,
         default_settings,
         fmt_thickness,
+        initial_state_metrics,
         mo,
+        np,
         page_title,
         penetration_survival_chart,
         prune_render_cache,
@@ -337,7 +341,9 @@ def _(
     get_penetration_data,
     get_penetration_render_status,
     get_penetration_survival,
+    initial_state_metrics,
     mo,
+    np,
     penetration_azim_deg,
     penetration_azim_ui,
     penetration_beam_fwhm_ui,
@@ -483,6 +489,30 @@ def _(
         if _volume is not None:
             _volume.update_layout(width=900)
 
+        _beam_metrics = initial_state_metrics(
+            _data["initial_r_ang"],
+            _data["initial_v_hat"],
+            _data["initial_t0_ang"],
+            _data["initial_E_keV"],
+            _sweep.beam,
+        )
+        _gaussian_equivalent_peak_current = (
+            "inf"
+            if np.isinf(_beam_metrics.gaussian_equivalent_peak_current_a)
+            else f"{_beam_metrics.gaussian_equivalent_peak_current_a * 1e3:.3g} mA"
+        )
+        _beam_diagnostics = mo.md(
+            "**Sampled beam**  "
+            f"σx={_beam_metrics.x.position_sigma_mm * 1e3:.3g} µm; "
+            f"σy={_beam_metrics.y.position_sigma_mm * 1e3:.3g} µm; "
+            f"σt={_beam_metrics.sigma_t_fs:.3g} fs; "
+            f"εn,x/y={_beam_metrics.x.normalized_emittance_mm_rad:.3g}/"
+            f"{_beam_metrics.y.normalized_emittance_mm_rad:.3g} mm rad; "
+            f"Q={_beam_metrics.bunch_charge_pc:.3g} pC; "
+            f"Ipk,Gauss-eq={_gaussian_equivalent_peak_current}; "
+            f"Iavg={_beam_metrics.average_current_a * 1e9:.3g} nA"
+        )
+
         # Render button: prerender a smooth, looping fixed-camera video of the
         # SAME reveal sequence the old client-side animation played, offscreen
         # via kaleido + ffmpeg (see cxr_mc.plots.render_trajectories). Cached
@@ -586,6 +616,7 @@ def _(
 
         _parts = [
             _md,
+            _beam_diagnostics,
             mo.vstack(
                 [
                     mo.hstack(

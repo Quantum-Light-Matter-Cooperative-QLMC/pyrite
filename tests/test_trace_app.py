@@ -128,6 +128,15 @@ def test_penetration_ne_defaults_to_50() -> None:
     assert "start=25, stop=300, value=50, step=5" in source
 
 
+def test_penetration_view_surfaces_sampled_beam_diagnostics() -> None:
+    source = APP.read_text()
+
+    assert "from cxr_mc.beam_metrics import initial_state_metrics" in source
+    for key in ("initial_r_ang", "initial_v_hat", "initial_E_keV", "initial_t0_ang"):
+        assert key in source
+    assert "**Sampled beam**" in source
+
+
 def test_penetration_control_values_are_read_in_a_downstream_cell() -> None:
     tree = ast.parse(APP.read_text())
     controls_cell = next(

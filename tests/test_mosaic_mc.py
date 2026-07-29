@@ -17,7 +17,7 @@ from cxr_mc.montecarlo import (
     eds_fwhm_eV,
 )
 from cxr_mc.results import store_result
-from cxr_mc.sweep import Sweep, build_cases
+from cxr_mc.sweep import BeamSpec, Sweep, build_cases
 
 E_GRID = np.arange(400.0, 1400.0, 1.0)
 
@@ -73,7 +73,7 @@ def _sweep(**kw):
     return Sweep(
         material="hopg",
         thickness_ang=1e4,
-        energy_keV=30,
+        beam=BeamSpec(energy_keV=30),
         tilt_deg=30.0,
         E_grid_line=E_GRID,
         E_grid_brem=np.arange(0.0, 1000.0, 100.0),
@@ -100,7 +100,7 @@ def test_route_mc_is_noop_without_mosaic_data():
         Sweep(
             material="diamond",
             thickness_ang=1e4,
-            energy_keV=30,
+            beam=BeamSpec(energy_keV=30),
             tilt_deg=30.0,
             E_grid_line=E_GRID,
             E_grid_brem=np.arange(0.0, 1000.0, 100.0),
