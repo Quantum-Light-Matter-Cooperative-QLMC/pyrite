@@ -19,7 +19,7 @@ def test_retry_succeeds_after_halving(monkeypatch):
     def fake_spectrum(case, tp, record_timing=False):
         calls.append((case.get("spec_chunk"), case.get("brem_chunk")))
         if len(calls) <= 3:
-            raise runner._LineSpectrumOOM(DummyOOM())
+            raise runner._SpectrumPhaseOOM("line", DummyOOM())
         return {"ok": True}
 
     monkeypatch.setattr(runner, "_spectrum_case", fake_spectrum)
@@ -37,6 +37,9 @@ def test_retry_succeeds_after_halving(monkeypatch):
     assert out["_attempted_spec_chunk"] == 30_000
     assert out["_effective_spec_chunk"] == 3_750
     assert out["_gpu_oom_retries"] == 3
+    assert out["_line_gpu_oom_retries"] == 3
+    assert out["_brem_gpu_oom_retries"] == 0
+    assert out["_generic_gpu_oom_retries"] == 0
 
 
 def test_retry_reraises_on_exhaustion(monkeypatch):
@@ -44,7 +47,7 @@ def test_retry_reraises_on_exhaustion(monkeypatch):
         runner,
         "_spectrum_case",
         lambda c, tp, record_timing=False: (_ for _ in ()).throw(
-            runner._LineSpectrumOOM(DummyOOM())
+            runner._SpectrumPhaseOOM("line", DummyOOM())
         ),
     )
     import pytest
@@ -53,23 +56,50 @@ def test_retry_reraises_on_exhaustion(monkeypatch):
         runner._spectrum_case_retry({}, _tp(), max_retries=2)
 
 
-def test_non_line_oom_does_not_teach_line_chunk(monkeypatch):
+def test_generic_oom_preserves_legacy_dual_chunk_fallback(monkeypatch):
     calls = []
 
     def fake_spectrum(case, tp, record_timing=False):
         calls.append((case.get("spec_chunk"), case.get("brem_chunk")))
-        raise DummyOOM
+        if len(calls) == 1:
+            raise DummyOOM
+        return {"ok": True}
+
+    monkeypatch.setattr(runner, "_GPU_OOM", (DummyOOM,))
+    monkeypatch.setattr(runner, "_spectrum_case", fake_spectrum)
+    case = {"spec_chunk": 30_000, "brem_chunk": 100_000}
+
+    out = runner._spectrum_case_retry(case, _tp(), max_retries=3)
+
+    assert out["ok"]
+    assert calls == [(30_000, 100_000), (15_000, 50_000)]
+    assert case == {"spec_chunk": 30_000, "brem_chunk": 100_000}
+    assert out["_generic_gpu_oom_retries"] == 1
+    assert out["_line_gpu_oom_retries"] == 0
+    assert out["_brem_gpu_oom_retries"] == 0
+
+
+def test_brem_oom_halves_only_brem_and_preserves_original_case(monkeypatch):
+    calls = []
+
+    def fake_spectrum(case, tp, record_timing=False):
+        calls.append((case.get("spec_chunk"), case.get("brem_chunk")))
+        if len(calls) == 1:
+            raise runner._SpectrumPhaseOOM("brem", DummyOOM())
+        return {"ok": True}
 
     monkeypatch.setattr(runner, "_spectrum_case", fake_spectrum)
     case = {"spec_chunk": 30_000, "brem_chunk": 100_000}
 
-    import pytest
+    out = runner._spectrum_case_retry(case, _tp(), max_retries=3)
 
-    with pytest.raises(DummyOOM):
-        runner._spectrum_case_retry(case, _tp(), max_retries=3)
-
-    assert calls == [(30_000, 100_000)]
+    assert out["ok"]
+    assert calls == [(30_000, 100_000), (30_000, 50_000)]
     assert case == {"spec_chunk": 30_000, "brem_chunk": 100_000}
+    assert out["_attempted_brem_chunk"] == 100_000
+    assert out["_effective_brem_chunk"] == 50_000
+    assert out["_brem_gpu_oom_retries"] == 1
+    assert out["_line_gpu_oom_retries"] == 0
 
 
 class _SyncProcessPoolExecutor:
@@ -106,7 +136,7 @@ def test_gpu_pipeline_reuses_successful_line_fallback(monkeypatch):
         assert record_timing
         calls.append((tp["name"], case.get("spec_chunk"), case.get("brem_chunk")))
         if len(calls) == 1:
-            raise runner._LineSpectrumOOM(DummyOOM())
+            raise runner._SpectrumPhaseOOM("line", DummyOOM())
         return {"name": tp["name"], "_t_spectrum": 0.2}
 
     monkeypatch.setattr(runner, "_GPU", True)
@@ -145,6 +175,8 @@ def test_gpu_pipeline_reuses_successful_line_fallback(monkeypatch):
     assert all(case["spec_chunk"] == 30_000 for case in cases)
     assert all(case["brem_chunk"] == 100_000 for case in cases)
     assert timings[0]["gpu_oom_retry_count"] == 1
+    assert timings[0]["line_gpu_oom_retries"] == 1
+    assert timings[0]["brem_gpu_oom_retries"] == 0
     assert timings[0]["attempted_spec_chunk"] == 30_000
     assert timings[0]["effective_spec_chunk"] == 15_000
     assert [timing["learned_spec_chunk"] for timing in timings] == [15_000] * 3

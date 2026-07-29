@@ -150,11 +150,12 @@ _GPU_OOM = (cp.cuda.memory.OutOfMemoryError,) if cp is not None else ()
 _pool_limit_set = False
 
 
-class _LineSpectrumOOM(Exception):
-    """Tag a catchable OOM as originating in the coherent-line phase."""
+class _SpectrumPhaseOOM(Exception):
+    """Tag a catchable OOM with its owning spectrum phase."""
 
-    def __init__(self, error):
+    def __init__(self, phase, error):
         super().__init__(str(error))
+        self.phase = phase
         self.error = error
 
 
@@ -242,8 +243,13 @@ class _TimingAgg:
         chunk_metrics = {
             key[1:]: out.pop(key)
             for key in (
+                "_line_gpu_oom_retries",
+                "_brem_gpu_oom_retries",
+                "_generic_gpu_oom_retries",
                 "_attempted_spec_chunk",
                 "_effective_spec_chunk",
+                "_attempted_brem_chunk",
+                "_effective_brem_chunk",
                 "_learned_spec_chunk",
             )
             if key in out
@@ -680,10 +686,27 @@ def _effective_spec_chunk(case, tp):
     return case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(tp["E_grid"].size)
 
 
+def _effective_brem_chunk(case, tp):
+    """Resolve one case's bremsstrahlung chunk without changing the case."""
+    return case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(tp["E_brem"].size)
+
+
 def _halve_case_spec_chunk(case, tp):
     """Halve this case's effective line chunk in place; preserve brem tuning."""
     spec_cur = case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(tp["E_grid"].size)
     case["spec_chunk"] = max(1000, spec_cur // 2)
+
+
+def _halve_case_brem_chunk(case, tp):
+    """Halve this case's effective brem chunk in place; preserve line tuning."""
+    brem_cur = case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(tp["E_brem"].size)
+    case["brem_chunk"] = max(1000, brem_cur // 2)
+
+
+def _halve_case_chunks(case, tp):
+    """Legacy-compatible fallback for an OOM without phase attribution."""
+    _halve_case_spec_chunk(case, tp)
+    _halve_case_brem_chunk(case, tp)
 
 
 def _spectrum_case_retry(
@@ -703,27 +726,49 @@ def _spectrum_case_retry(
     timed = _TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     work = case
-    initial_chunk = _effective_spec_chunk(work, tp)
-    if spec_chunk_cap is not None and initial_chunk > spec_chunk_cap:
+    initial_spec_chunk = _effective_spec_chunk(work, tp)
+    initial_brem_chunk = _effective_brem_chunk(work, tp)
+    if spec_chunk_cap is not None and initial_spec_chunk > spec_chunk_cap:
         work = dict(work)
         work["spec_chunk"] = spec_chunk_cap
-        initial_chunk = spec_chunk_cap
+        initial_spec_chunk = spec_chunk_cap
+    line_retries = 0
+    brem_retries = 0
+    generic_retries = 0
     for attempt in range(max_retries + 1):
         try:
             out = _spectrum_case(work, tp, record_timing)
             if timed:
                 out["_t_spectrum"] = perf_counter() - t0
             out["_gpu_oom_retries"] = attempt
-            out["_attempted_spec_chunk"] = initial_chunk
+            out["_line_gpu_oom_retries"] = line_retries
+            out["_brem_gpu_oom_retries"] = brem_retries
+            out["_generic_gpu_oom_retries"] = generic_retries
+            out["_attempted_spec_chunk"] = initial_spec_chunk
             out["_effective_spec_chunk"] = _effective_spec_chunk(work, tp)
+            out["_attempted_brem_chunk"] = initial_brem_chunk
+            out["_effective_brem_chunk"] = _effective_brem_chunk(work, tp)
             return out
-        except _LineSpectrumOOM as tagged:
+        except _SpectrumPhaseOOM as tagged:
             if attempt == max_retries:
                 raise tagged.error from tagged
             if cp is not None:
                 cp.get_default_memory_pool().free_all_blocks()
             work = dict(work)
-            _halve_case_spec_chunk(work, tp)
+            if tagged.phase == "line":
+                line_retries += 1
+                _halve_case_spec_chunk(work, tp)
+            else:
+                brem_retries += 1
+                _halve_case_brem_chunk(work, tp)
+        except _GPU_OOM:
+            if attempt == max_retries:
+                raise
+            if cp is not None:
+                cp.get_default_memory_pool().free_all_blocks()
+            work = dict(work)
+            generic_retries += 1
+            _halve_case_chunks(work, tp)
 
 
 def _spectrum_case(case, tp, record_timing=False):
@@ -757,7 +802,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
                 segs, E_grid, case, n_hat, abs_layers, tp.get("groove")
             )
         except _GPU_OOM as error:
-            raise _LineSpectrumOOM(error) from error
+            raise _SpectrumPhaseOOM("line", error) from error
 
     # BREM: EVERY layer radiates with its OWN composition (each Z^2 cross
     # section); each layer's brem self-absorbs through the whole stack, summed
@@ -765,14 +810,17 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # Factored into _brem_wide_from_segments so run.repair_brem_wide reuses this
     # SAME path (via _brem_for_case) and can't drift back to single-slab brem.
     with _nsys_range("cxr.brem"):
-        brem_wide = _brem_wide_from_segments(
-            segs_b,
-            E_brem,
-            case,
-            n_hat,
-            abs_layers,
-            groove=tp.get("groove"),
-        )
+        try:
+            brem_wide = _brem_wide_from_segments(
+                segs_b,
+                E_brem,
+                case,
+                n_hat,
+                abs_layers,
+                groove=tp.get("groove"),
+            )
+        except _GPU_OOM as error:
+            raise _SpectrumPhaseOOM("brem", error) from error
     with _nsys_range("cxr.interpolate"):
         brem = np.interp(E_grid, E_brem, brem_wide)  # brem under the lines (line grid)
     # Return this case's GPU scratch on the A2 cadence so the CuPy memory pool
@@ -1083,8 +1131,13 @@ def run_cases(
         if timing is None:
             for key in (
                 "_gpu_oom_retries",
+                "_line_gpu_oom_retries",
+                "_brem_gpu_oom_retries",
+                "_generic_gpu_oom_retries",
                 "_attempted_spec_chunk",
                 "_effective_spec_chunk",
+                "_attempted_brem_chunk",
+                "_effective_brem_chunk",
                 "_learned_spec_chunk",
             ):
                 out.pop(key, None)
@@ -1199,9 +1252,9 @@ def run_cases(
                         cases[i], tp, spec_chunk_cap=learned_spec_chunk
                     )
                 )  # GPU, THIS process only
-                retries = out.get("_gpu_oom_retries", 0)
+                line_retries = out.get("_line_gpu_oom_retries", 0)
                 effective_spec_chunk = out.get("_effective_spec_chunk")
-                if retries and effective_spec_chunk is not None:
+                if line_retries and effective_spec_chunk is not None:
                     learned_spec_chunk = (
                         effective_spec_chunk
                         if learned_spec_chunk is None
