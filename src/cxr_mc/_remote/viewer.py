@@ -83,6 +83,11 @@ def _status_remote_command(job_assign, detail):
         '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done; '
         "} | emit PROGRESS; "
     )
+    performance = (
+        '{ for f in "$D"/performance/*/*.latest.json; do '
+        '[ -f "$f" ] || continue; cat "$f" 2>/dev/null || true; printf "\\n"; done; '
+        "} | emit PERFORMANCE; "
+    )
     resources = (
         "{ "
         "if command -v top >/dev/null 2>&1; then "
@@ -124,6 +129,7 @@ def _status_remote_command(job_assign, detail):
         + 'else printf "job_id=%s|state=NOT_QUEUED\\n" "$SID"; fi ;; esac; '
         + "} | emit SQUEUE || exit $?; "
         + progress
+        + performance
         + resources
         + log
     )

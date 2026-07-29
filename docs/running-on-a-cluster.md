@@ -106,7 +106,7 @@ submits every CXR compute run through SLURM. Its fixed lab allocation requests
 the `gpu` partition, one node, one task, and one GPU (`--gres=gpu:1`). Default
 `--chunk-minutes 10` runs one material at a time in bounded, self-resubmitting
 slices. `--chunk-minutes 0` selects a monolithic `UNLIMITED` allocation; only
-that mode accepts `--parallel-materials`, defaults to two concurrent materials,
+that mode accepts `--parallel-materials`, defaults to one material,
 and caps concurrency at four. The generated batch job starts with `module purge`, then loads
 `cuda`, `openmpi`, and `hdf5`; it uses the synced project's configured `uv`
 environment, not the WarpX-specific `jrozells` Conda environment.
@@ -118,12 +118,27 @@ contacting the lab box:
 cxr remote start hopg --dry-run
 ```
 
-`cxr remote scan hopg` syncs, submits, follows the SLURM job, and pulls the
-checkpoint. `cxr remote start hopg wse2` syncs, submits, and returns immediately.
+`cxr remote submit hopg` syncs, submits, follows the SLURM job, and pulls the
+checkpoint. Add `--headless` to return immediately after submission.
 Use `--chunk-minutes 0 --parallel-materials 3` only for workloads measured to
 fit concurrently. Use `cxr remote status`, `cxr remote logs --follow`,
 or `cxr remote attach` to monitor the allocation. `attach` shows an independent
 case-progress bar for each material; `logs --follow` shows the raw shared job log.
+
+Add `--performance-profile NAME` to local `cxr scan` or remote `cxr remote
+submit`/legacy `scan` runs to sample resources every five seconds. Each NDJSON
+sample records host and process-tree CPU/RAM, GPU utilization and VRAM
+(`null` when no NVIDIA GPU is available), power, temperature, most recently
+completed case, progress, resolved worker topology, electron counts, grid
+widths, and adaptive spectrum/brem chunk sizes. Local logs go to
+`performance-profiles/NAME/<material>.ndjson`; remote logs appear beside case
+progress in `attach`. Fetch every remote job matching the name with:
+
+```bash
+cxr remote profile pull NAME
+```
+
+Pulled files land under `performance-profiles/NAME/<job>/<material>.ndjson`.
 `cxr remote stop ...` cancels an active allocation with `scancel`. `cxr remote
 check` follows the same submit-and-wait workflow for its validation calculation;
 `cxr remote check --detached` returns after submission.

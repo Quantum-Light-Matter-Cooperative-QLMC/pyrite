@@ -23,7 +23,7 @@ from ..cli._core import (
     run,
 )
 from ..scan import DEFAULT_HIGH_ENERGY_MIN_KEV, load_all_materials, load_manifest_groups
-from . import config, lifecycle, scripts, state, transport, viewer
+from . import config, lifecycle, presentation, scripts, state, transport, viewer
 
 
 def remote_scan(material, quick=False, workers=None, fidelity="full"):
@@ -99,6 +99,18 @@ def _dispatch(handler):
         return handler(args)
 
     return _run_cli
+
+
+def _performance_profile_name(ctx, param, value):
+    if value is None:
+        return None
+    if presentation._SHELL_TOKEN_RE.fullmatch(value) is None:
+        raise click.BadParameter(
+            "expected letters, digits, underscores, or hyphens",
+            ctx=ctx,
+            param=param,
+        )
+    return value
 
 
 def _selected_materials(args, attribute):
@@ -217,6 +229,7 @@ def _cli_scan(args):
         parallel_materials=getattr(args, "parallel_materials", None),
         chunk_minutes=getattr(args, "chunk_minutes", 10.0),
         no_sync=args.no_sync,
+        performance_profile=getattr(args, "performance_profile", None),
     )
     if not viewer.attach(jobid):
         emit_diagnostic("scan is still running or its viewer disconnected; skipping automatic pull")
@@ -377,6 +390,7 @@ def _cli_start(args):
         dry_run=args.dry_run,
         high_energy_min_kev=high_energy_min_kev,
         catalog_profile=getattr(args, "catalog_profile", "standard"),
+        performance_profile=getattr(args, "performance_profile", None),
     )
     if args.dry_run or args.headless:
         return
@@ -446,6 +460,10 @@ def _cli_status(args):
 
 def _cli_logs(args):
     return viewer.tail_logs(args.jobid, args.follow)
+
+
+def _cli_profile_pull(args):
+    return lifecycle.pull_performance_profile(args.profile)
 
 
 def _cli_stop(args):
@@ -612,6 +630,13 @@ def command():
     show_default=True,
     help="Self-resubmitting SLURM slice length; 0 runs one monolithic job.",
 )
+@click.option(
+    "--performance-profile",
+    callback=_performance_profile_name,
+    default=None,
+    metavar="NAME",
+    help="Log CPU, RAM, GPU, VRAM, process, worker, chunk, and case metrics every 5 s.",
+)
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
 @click.option(
     "--grid",
@@ -628,6 +653,7 @@ def scan_command(
     workers,
     parallel_materials,
     chunk_minutes,
+    performance_profile,
     no_sync,
     grid,
     drop_wide_brem,
@@ -654,6 +680,7 @@ def scan_command(
             workers=workers,
             parallel_materials=parallel_materials,
             chunk_minutes=chunk_minutes,
+            performance_profile=performance_profile,
             no_sync=no_sync,
             grid=grid,
             drop_wide_brem=drop_wide_brem,
@@ -880,6 +907,16 @@ def reline_command(
     show_default=True,
     help="Self-resubmitting SLURM slice length; 0 runs one monolithic job.",
 )
+@click.option(
+    "--performance-profile",
+    callback=_performance_profile_name,
+    default=None,
+    metavar="NAME",
+    help=(
+        "Log CPU, RAM, GPU, VRAM, process, worker, chunk, and case metrics every 5 s; "
+        "pull later with `cxr remote profile pull NAME`."
+    ),
+)
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
 @click.option("--dry-run", is_flag=True, help="Print submission preview; do not connect.")
 @click.option(
@@ -913,6 +950,7 @@ def start_command(
     workers,
     parallel_materials,
     chunk_minutes,
+    performance_profile,
     no_sync,
     dry_run,
     headless,
@@ -978,6 +1016,7 @@ def start_command(
             workers=workers,
             parallel_materials=parallel_materials,
             chunk_minutes=chunk_minutes,
+            performance_profile=performance_profile,
             no_sync=no_sync,
             dry_run=dry_run,
             headless=headless,
@@ -1059,6 +1098,30 @@ def status_command(jobid, verbose, json_output):
 @click.option("-f", "--follow", is_flag=True, help="Stream live; Ctrl-C disconnects viewer.")
 def logs_command(jobid, follow):
     return _invoke_click(_cli_logs, _click_args("logs", jobid=jobid, follow=follow))
+
+
+@command.group("profile", help="Manage named compute-performance logs.")
+def profile_command():
+    pass
+
+
+@profile_command.command(
+    "pull",
+    help=(
+        "Fetch NDJSON logs for PERFORMANCE_PROFILE from every matching remote job "
+        "into performance-profiles/PROFILE/<job>/."
+    ),
+)
+@click.argument(
+    "profile",
+    callback=_performance_profile_name,
+    metavar="PERFORMANCE_PROFILE",
+)
+def profile_pull_command(profile):
+    return _invoke_click(
+        _cli_profile_pull,
+        _click_args("profile pull", profile=profile),
+    )
 
 
 @command.command("stop", help="cancel active SLURM job(s) by material, profile, or every live job.")

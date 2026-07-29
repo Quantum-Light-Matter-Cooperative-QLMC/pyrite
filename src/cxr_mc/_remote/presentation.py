@@ -23,7 +23,7 @@ _TQDM_FRAME_RE = re.compile(
 )
 _FRAME_PREFIX = "CXR_REMOTE_V1"
 _FRAME_SECTIONS = frozenset(
-    {"JOB", "META", "STATE", "SQUEUE", "PROGRESS", "RESOURCES", "LOG"}
+    {"JOB", "META", "STATE", "SQUEUE", "PROGRESS", "PERFORMANCE", "RESOURCES", "LOG"}
 )
 
 
@@ -394,6 +394,57 @@ def _format_compute_usage(payload):
     return "\n".join(lines) if lines else "  Resource metrics unavailable."
 
 
+def _format_performance_profiles(payload):
+    """Render latest persisted resource sample beside case-progress ticks."""
+    records = []
+    for line in payload.splitlines():
+        try:
+            record = json.loads(line)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if not isinstance(record, dict) or record.get("schema") != "cxr.performance.v1":
+            continue
+        material = record.get("material")
+        profile = record.get("profile")
+        if (
+            not isinstance(material, str)
+            or _SHELL_TOKEN_RE.fullmatch(material) is None
+            or not isinstance(profile, str)
+            or _SHELL_TOKEN_RE.fullmatch(profile) is None
+        ):
+            continue
+        records.append(record)
+    if not records:
+        return None
+
+    def percent(record, key):
+        value = record.get(key)
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
+            return "-"
+        return f"{value:.0f}%"
+
+    def gib(record, key):
+        value = record.get(key)
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+            return "-"
+        return f"{value / 1024**3:.1f} GiB"
+
+    lines = []
+    for record in sorted(records, key=lambda item: str(item["material"])):
+        workers = record.get("effective_workers", "-")
+        chunks = f"{record.get('spec_chunk', '-')}/{record.get('brem_chunk', '-')}"
+        lines.append(
+            f"  {_material_label(record['material']):<16} "
+            f"CPU {percent(record, 'cpu_percent'):>4} · "
+            f"RAM {percent(record, 'memory_percent'):>4} · "
+            f"RSS {gib(record, 'process_rss_bytes'):>8} · "
+            f"GPU {percent(record, 'gpu_percent'):>4} · "
+            f"VRAM {percent(record, 'vram_percent'):>4} · "
+            f"workers {workers} · chunks {chunks} · profile {record['profile']}"
+        )
+    return "\n".join(lines)
+
+
 def _format_coupling_provenance(records, materials=()):
     """Explain checkpoint reuse versus χ_g/U_g recomputation per material."""
     order = [material for material in materials if material in records]
@@ -586,6 +637,9 @@ def _format_job_status(sections, detail):
         if not records and detail >= 2:
             progress = _legacy_progress(sections.get("LOG", ""), state_text) or progress
         output.extend(["", "CASE PROGRESS", progress])
+        performance = _format_performance_profiles(sections.get("PERFORMANCE", ""))
+        if performance is not None:
+            output.extend(["", "PERFORMANCE PROFILE", performance])
     if detail >= 1:
         allocation = [
             ("SLURM job", scheduler_id),

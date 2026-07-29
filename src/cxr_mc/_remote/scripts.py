@@ -110,6 +110,7 @@ def _queue_script(
     fidelity="full",
     high_energy_min_kev=None,
     catalog_profile="standard",
+    performance_profile=None,
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
     parallel_materials = _validate_parallel_materials(parallel_materials)
@@ -124,6 +125,11 @@ def _queue_script(
         flags += f" --high-energy-min-kev {high_energy_min_kev}"
     if catalog_profile != "standard":
         flags += f" --profile {catalog_profile}"
+    if performance_profile is not None:
+        flags += (
+            f" --performance-profile {performance_profile}"
+            ' --performance-dir "$JOBDIR/performance"'
+        )
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -189,6 +195,7 @@ def _chunked_queue_script(
     fidelity="full",
     high_energy_min_kev=None,
     catalog_profile="standard",
+    performance_profile=None,
 ):
     """One SLURM slice of a self-resubmitting chain (spec: chunked remote jobs).
 
@@ -210,6 +217,11 @@ def _chunked_queue_script(
         flags += f" --high-energy-min-kev {high_energy_min_kev}"
     if catalog_profile != "standard":
         flags += f" --profile {catalog_profile}"
+    if performance_profile is not None:
+        flags += (
+            f" --performance-profile {performance_profile}"
+            ' --performance-dir "$JOBDIR/performance"'
+        )
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
@@ -825,6 +837,7 @@ def _queue_metadata(
     fidelity: str = "full",
     high_energy_min_kev: float | None = None,
     catalog_profile: str = "standard",
+    performance_profile: str | None = None,
 ):
     """Static metadata persisted before a queue becomes visible to SLURM."""
     return "\n".join(
@@ -838,6 +851,7 @@ def _queue_metadata(
             f"parallel_materials: {parallel_materials}",
             f"chunk_minutes: {chunk_minutes}",
             f"high_energy_min_kev: {high_energy_min_kev}",
+            f"performance_profile: {performance_profile}",
             "progress_dashboard: True",
             "",
         ]

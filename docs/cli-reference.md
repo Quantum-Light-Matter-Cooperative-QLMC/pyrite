@@ -138,6 +138,9 @@ Options:
                                   checkpoints]
   --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
                                   resumable work remains.
+  --performance-profile NAME      Sample CPU, RAM, GPU, VRAM, process-tree, case,
+                                  worker, and chunk metrics every 5 s into performance-
+                                  profiles/NAME/<material>.ndjson.
   --fidelity [full|survey]        Named settings/grid-reduction policy. survey is
                                   provisional and reduced.  [default: full]
   --profile TEXT                  Catalog profile to run (e.g. standard, sub_100keV).
@@ -487,6 +490,7 @@ Commands:
   clear     Delete remote checkpoints; preview unless --yes.
   jobs      List jobs with SLURM IDs, materials, and last events.
   logs      Show a job diagnostic log; defaults to latest.
+  profile   Manage named compute-performance logs.
   prune     Drop remote records obsolete under current scan profiles; preview...
   pull      Fetch existing checkpoints from remote box.
   reap      Release orphaned checkpoint reservations; preview unless --yes.
@@ -549,6 +553,32 @@ Usage: cxr remote logs [OPTIONS] [JOBID]
 Options:
   -f, --follow  Stream live; Ctrl-C disconnects viewer.
   -h, --help    Show this message and exit.
+```
+
+## `cxr remote profile`
+
+```text
+Usage: cxr remote profile [OPTIONS] COMMAND [ARGS]...
+
+  Manage named compute-performance logs.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  pull  Fetch NDJSON logs for PERFORMANCE_PROFILE from every matching remote job...
+```
+
+## `cxr remote profile pull`
+
+```text
+Usage: cxr remote profile pull [OPTIONS] PERFORMANCE_PROFILE
+
+  Fetch NDJSON logs for PERFORMANCE_PROFILE from every matching remote job into
+  performance-profiles/PROFILE/<job>/.
+
+Options:
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr remote prune`
@@ -666,21 +696,23 @@ Usage: cxr remote scan [OPTIONS] [MATERIAL]
   Deprecated alias for `cxr remote submit`. (DEPRECATED: Use 'cxr remote submit'.)
 
 Options:
-  -a, --all                 Run every material in mats_to_sim.toml.
-  --fidelity [full|survey]  Named settings/grid policy. survey is provisional and
-                            reduced.  [default: full]
-  --quick                   Use tiny smoke-test grid; incompatible with --grid.
-  --workers NUMBER          Transport workers (default: auto; 0 runs serially).
-  --parallel-materials N    Simultaneous scans in one allocation; requires --chunk-
-                            minutes 0.  [1<=x<=4]
-  --chunk-minutes NUMBER    Self-resubmitting SLURM slice length; 0 runs one monolithic
-                            job.  [default: 10.0]
-  --no-sync                 Skip code upload.
-  --grid                    Grid-filter checkpoint before pulling; incompatible with
-                            --quick.
-  --drop-wide-brem          With --grid, drop wide-brem.
-  --downcast                With --grid, downcast to float32.
-  -h, --help                Show this message and exit.
+  -a, --all                   Run every material in mats_to_sim.toml.
+  --fidelity [full|survey]    Named settings/grid policy. survey is provisional and
+                              reduced.  [default: full]
+  --quick                     Use tiny smoke-test grid; incompatible with --grid.
+  --workers NUMBER            Transport workers (default: auto; 0 runs serially).
+  --parallel-materials N      Simultaneous scans in one allocation; requires --chunk-
+                              minutes 0.  [1<=x<=4]
+  --chunk-minutes NUMBER      Self-resubmitting SLURM slice length; 0 runs one
+                              monolithic job.  [default: 10.0]
+  --performance-profile NAME  Log CPU, RAM, GPU, VRAM, process, worker, chunk, and case
+                              metrics every 5 s.
+  --no-sync                   Skip code upload.
+  --grid                      Grid-filter checkpoint before pulling; incompatible with
+                              --quick.
+  --drop-wide-brem            With --grid, drop wide-brem.
+  --downcast                  With --grid, downcast to float32.
+  -h, --help                  Show this message and exit.
 ```
 
 ## `cxr remote status`
@@ -728,41 +760,44 @@ Usage: cxr remote submit [OPTIONS] [MATERIAL]...
   run holds the bare name) and refuses while another job under the same profile is live.
 
 Options:
-  -a, --all                  Queue mats_to_sim.toml's verified `materials` list.
-  -A, --actually-all         Queue every material in mats_to_sim.toml -- materials,
-                             no_verified_dw, high_energy_materials, and
-                             materials_to_leave_out combined. Not combined with
-                             --all/--include-unverified-dw/--include-high-energy or
-                             explicit materials.
-  --include-unverified-dw    With --all, also queue mats_to_sim.toml's no_verified_dw
-                             materials.
-  --include-high-energy      With --all, also queue mats_to_sim.toml's
-                             high_energy_materials, filtered to --high-energy-min-kev
-                             and above.
-  --high-energy-min-kev KEV  Energy floor applied to any queued high_energy_materials
-                             member [default: 150.0 when selected via --include-high-
-                             energy/-A]. With explicit MATERIAL(s), applies only to
-                             those that are themselves high_energy_materials entries; a
-                             no-op on every other material.
-  --fidelity [full|survey]   Named settings/grid policy. survey is provisional and
-                             reduced.  [default: full]
-  --profile TEXT             Catalog profile to run (e.g. standard, sub_100keV);
-                             orthogonal to --fidelity.  [default: standard]
-  --quick                    Use tiny smoke-test grid.
-  --workers NUMBER           Transport workers (default: auto; 0 runs serially).
-  --parallel-materials N     Simultaneous scans in one allocation; requires --chunk-
-                             minutes 0.  [1<=x<=4]
-  --chunk-minutes NUMBER     Self-resubmitting SLURM slice length; 0 runs one monolithic
-                             job.  [default: 10.0]
-  --no-sync                  Skip code upload.
-  --dry-run                  Print submission preview; do not connect.
-  --headless                 Return after submission without attaching or pulling.
-  --no-pull                  Attach and track, but do not pull completed checkpoints.
-  --grid                     Grid-filter checkpoint before pulling; incompatible with
-                             --quick.
-  --drop-wide-brem           With --grid, drop wide-brem.
-  --downcast                 With --grid, downcast to float32.
-  -h, --help                 Show this message and exit.
+  -a, --all                   Queue mats_to_sim.toml's verified `materials` list.
+  -A, --actually-all          Queue every material in mats_to_sim.toml -- materials,
+                              no_verified_dw, high_energy_materials, and
+                              materials_to_leave_out combined. Not combined with
+                              --all/--include-unverified-dw/--include-high-energy or
+                              explicit materials.
+  --include-unverified-dw     With --all, also queue mats_to_sim.toml's no_verified_dw
+                              materials.
+  --include-high-energy       With --all, also queue mats_to_sim.toml's
+                              high_energy_materials, filtered to --high-energy-min-kev
+                              and above.
+  --high-energy-min-kev KEV   Energy floor applied to any queued high_energy_materials
+                              member [default: 150.0 when selected via --include-high-
+                              energy/-A]. With explicit MATERIAL(s), applies only to
+                              those that are themselves high_energy_materials entries; a
+                              no-op on every other material.
+  --fidelity [full|survey]    Named settings/grid policy. survey is provisional and
+                              reduced.  [default: full]
+  --profile TEXT              Catalog profile to run (e.g. standard, sub_100keV);
+                              orthogonal to --fidelity.  [default: standard]
+  --quick                     Use tiny smoke-test grid.
+  --workers NUMBER            Transport workers (default: auto; 0 runs serially).
+  --parallel-materials N      Simultaneous scans in one allocation; requires --chunk-
+                              minutes 0.  [1<=x<=4]
+  --chunk-minutes NUMBER      Self-resubmitting SLURM slice length; 0 runs one
+                              monolithic job.  [default: 10.0]
+  --performance-profile NAME  Log CPU, RAM, GPU, VRAM, process, worker, chunk, and case
+                              metrics every 5 s; pull later with `cxr remote profile
+                              pull NAME`.
+  --no-sync                   Skip code upload.
+  --dry-run                   Print submission preview; do not connect.
+  --headless                  Return after submission without attaching or pulling.
+  --no-pull                   Attach and track, but do not pull completed checkpoints.
+  --grid                      Grid-filter checkpoint before pulling; incompatible with
+                              --quick.
+  --drop-wide-brem            With --grid, drop wide-brem.
+  --downcast                  With --grid, downcast to float32.
+  -h, --help                  Show this message and exit.
 ```
 
 ## `cxr remote sync`

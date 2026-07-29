@@ -284,6 +284,7 @@ def start_queue(
     fidelity="full",
     high_energy_min_kev=None,
     catalog_profile="standard",
+    performance_profile=None,
 ):
     """Submit a material queue to SLURM. Returns its job id.
 
@@ -306,7 +307,9 @@ def start_queue(
     under the same profile is live.
     """
     transport._check_materials(materials)
-    transport._check_shell_tokens([catalog_profile])
+    transport._check_shell_tokens(
+        [catalog_profile, *([performance_profile] if performance_profile is not None else [])]
+    )
     chunked = chunk_minutes > 0
     if chunked and parallel_materials is not None:
         raise SystemExit(
@@ -338,6 +341,7 @@ def start_queue(
             fidelity,
             high_energy_min_kev,
             catalog_profile,
+            performance_profile,
         )
         time_limit = str(max(1, math.ceil(chunk_minutes * 3)))  # minutes: hard backstop
     else:
@@ -353,6 +357,7 @@ def start_queue(
             fidelity,
             high_energy_min_kev,
             catalog_profile,
+            performance_profile,
         )
         time_limit = config.SLURM_TIME
     script = scripts._slurm_batch_script(
@@ -370,6 +375,7 @@ def start_queue(
             fidelity,
             high_energy_min_kev,
             catalog_profile,
+            performance_profile,
         ),
     )
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
@@ -417,12 +423,23 @@ def start_queue(
                             fidelity,
                             high_energy_min_kev,
                             catalog_profile,
+                            performance_profile,
                         )
                     ),
                 ),
                 ("Attach", f"cxr remote attach {jobid}"),
                 ("Status", f"cxr remote status {jobid} -vv"),
                 ("Logs", f"cxr remote logs {jobid} --follow"),
+                *(
+                    [
+                        (
+                            "Performance",
+                            f"cxr remote profile pull {performance_profile}",
+                        )
+                    ]
+                    if performance_profile is not None
+                    else []
+                ),
                 ("Pull", f"{pull_hint}  (after completion)"),
             ]
         )
@@ -481,6 +498,61 @@ def start_zhai_queue(
         )
     )
     return jobid
+
+
+def pull_performance_profile(profile: str) -> list[Path]:
+    """Pull every NDJSON resource log stored under one named profile."""
+    transport._check_shell_tokens([profile])
+    jobs = config.remote_path(config.JOBS_SUBDIR)
+    listing = transport._ssh_capture(
+        f"JOBS={config.shell_word(jobs)}; "
+        '[ -d "$JOBS" ] || exit 0; '
+        'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
+        f'p="$d/performance/{profile}"; [ -d "$p" ] || continue; '
+        'find "$p" -maxdepth 1 -type f -name \'*.ndjson\' '
+        "-printf '%f\\n' | while IFS= read -r f; do "
+        'printf "%s\\t%s\\n" "$(basename "$d")" "$f"; done; done'
+    )
+    artifacts = []
+    for line in listing.splitlines():
+        jobid, separator, filename = line.partition("\t")
+        material, suffix = (
+            (filename[: -len(".ndjson")], ".ndjson")
+            if filename.endswith(".ndjson")
+            else ("", "")
+        )
+        if (
+            not separator
+            or not suffix
+            or presentation._SHELL_TOKEN_RE.fullmatch(jobid) is None
+            or presentation._SHELL_TOKEN_RE.fullmatch(material) is None
+        ):
+            continue
+        artifacts.append((jobid, filename))
+    if not artifacts:
+        raise SystemExit(f"no remote performance logs found for profile {profile!r}")
+
+    local_root = config.LOCAL_ROOT / "performance-profiles" / profile
+    pulled = []
+    for jobid, filename in artifacts:
+        destination = local_root / jobid / filename
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name(f".{destination.name}.{uuid.uuid4().hex}.part")
+        remote = config.remote_path(
+            config.JOBS_SUBDIR,
+            jobid,
+            "performance",
+            profile,
+            filename,
+        )
+        try:
+            transport._ssh_download(f"cat {config.shell_arg(remote)}", temporary)
+            temporary.replace(destination)
+        finally:
+            temporary.unlink(missing_ok=True)
+        pulled.append(destination)
+        print(f"pulled {jobid}/{filename} -> {destination}")
+    return pulled
 
 
 def start_rebrem_queue(

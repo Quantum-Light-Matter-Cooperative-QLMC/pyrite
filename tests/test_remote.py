@@ -335,6 +335,105 @@ def test_queue_metadata_records_catalog_profile():
     assert "catalog_profile: sub_100keV" in custom
 
 
+def test_queue_scripts_and_metadata_record_performance_profile():
+    monolithic = scripts._queue_script(
+        "j",
+        ["mos2"],
+        False,
+        None,
+        performance_profile="baseline",
+    )
+    chunked = scripts._chunked_queue_script(
+        "j",
+        ["mos2"],
+        False,
+        None,
+        10,
+        performance_profile="baseline",
+    )
+    metadata = scripts._queue_metadata(
+        "j",
+        ["mos2"],
+        False,
+        None,
+        performance_profile="baseline",
+    )
+
+    for script in (monolithic, chunked):
+        assert "--performance-profile baseline" in script
+        assert '--performance-dir "$JOBDIR/performance"' in script
+    assert "performance_profile: baseline" in metadata
+
+
+def test_pull_performance_profile_fetches_each_matching_job(monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: "job-1\thopg.ndjson\njob-2\tmos2.ndjson\n",
+    )
+    remote_commands = []
+
+    def fake_download(command, destination):
+        remote_commands.append(command)
+        destination.write_text('{"schema":"cxr.performance.v1"}\n')
+
+    monkeypatch.setattr(transport, "_ssh_download", fake_download)
+
+    pulled = lifecycle.pull_performance_profile("baseline")
+
+    assert pulled == [
+        tmp_path / "performance-profiles" / "baseline" / "job-1" / "hopg.ndjson",
+        tmp_path / "performance-profiles" / "baseline" / "job-2" / "mos2.ndjson",
+    ]
+    assert all(path.is_file() for path in pulled)
+    assert all("/performance/baseline/" in command for command in remote_commands)
+
+
+def test_status_formats_latest_performance_profile():
+    sections = {
+        "JOB": "j",
+        "META": (
+            "job: j\nmaterials: hopg\nworkers: 4\n"
+            "progress_dashboard: True\nperformance_profile: baseline\n"
+        ),
+        "STATE": "running hopg",
+        "SQUEUE": "job_id=1|state=RUNNING",
+        "PROGRESS": json.dumps(
+            {
+                "material": "hopg",
+                "total_cases": 10,
+                "cached_cases": 0,
+                "completed_new_cases": 2,
+                "state": "running",
+            }
+        ),
+        "PERFORMANCE": json.dumps(
+            {
+                "schema": "cxr.performance.v1",
+                "material": "hopg",
+                "profile": "baseline",
+                "cpu_percent": 80.0,
+                "memory_percent": 40.0,
+                "process_rss_bytes": 3 * 1024**3,
+                "gpu_percent": 90.0,
+                "vram_percent": 50.0,
+                "effective_workers": 4,
+                "spec_chunk": 2000,
+                "brem_chunk": 4000,
+            }
+        ),
+    }
+
+    output = presentation._format_job_status(sections, 0)
+
+    assert "PERFORMANCE PROFILE" in output
+    assert "CPU  80%" in output
+    assert "GPU  90%" in output
+    assert "workers 4" in output
+    assert "chunks 2000/4000" in output
+
+
 def test_stems_predicts_qualified_stem_for_non_standard_catalog_profile(monkeypatch):
     import cxr_mc.profiles as profiles_module
 
