@@ -1,10 +1,30 @@
 import json
+from types import SimpleNamespace
 
 import numpy as np
 
 from cxr_mc import performance_profile
 from cxr_mc._energy_grid import encode_energy_grid
 from cxr_mc.montecarlo import runner
+
+
+def test_gpu_metrics_include_activity_clocks_and_pstate(monkeypatch):
+    monkeypatch.setattr(
+        performance_profile.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0,
+            stdout="75, 20, 1000, 2000, 125, 60, 1500, 7000, P2\n",
+        ),
+    )
+
+    metrics = performance_profile._gpu_metrics()
+
+    assert metrics["gpu_percent"] == 75.0
+    assert metrics["gpu_memory_percent"] == 20.0
+    assert metrics["gpu_sm_clock_mhz"] == 1500.0
+    assert metrics["gpu_memory_clock_mhz"] == 7000.0
+    assert metrics["gpu_pstate"] == "P2"
 
 
 def test_performance_logger_writes_append_only_samples_and_latest(monkeypatch, tmp_path):
@@ -45,6 +65,13 @@ def test_performance_logger_writes_append_only_samples_and_latest(monkeypatch, t
     assert records[-1]["gpu_percent"] == 75.0
     assert records[-1]["effective_workers"] == 3
     assert records[-1]["current"]["energy_keV"] == 100.0
+    assert records[-1]["cpu_affinity_count"] >= 1
+    assert records[-1]["cpu_iowait_percent"] is not None
+    assert records[-1]["swap_total_bytes"] >= 0
+    assert records[-1]["process_cpu_user_seconds"] >= 0
+    assert records[-1]["process_context_switches"] >= 0
+    assert records[-1]["child_process_count"] >= 0
+    assert records[-1]["child_process_rss_max_bytes"] >= 0
     assert json.loads(latest.read_text()) == records[-1]
 
 
@@ -68,3 +95,59 @@ def test_runtime_plan_reports_effective_workers_and_chunks(monkeypatch):
     assert plan["brem_grid_bins"] == 20
     assert plan["spec_chunk"] > 0
     assert plan["brem_chunk"] > 0
+
+
+def test_timing_aggregate_exposes_phase_totals_and_strips_private_metrics():
+    aggregate = runner._TimingAgg()
+    out = {
+        "_t_transport": 2.0,
+        "_t_spectrum": 3.0,
+        "_gpu_oom_retries": 1,
+        "_cupy_pool_used_mib": 4.0,
+        "_cupy_pool_reserved_mib": 5.0,
+        "_cupy_pool_peak_mib": 6.0,
+    }
+
+    metrics = aggregate.collect(out, wait_seconds=0.5)
+
+    assert out == {}
+    assert metrics == {
+        "timed_case_count": 1,
+        "transport_seconds": 2.0,
+        "spectrum_seconds": 3.0,
+        "driver_wait_seconds": 0.5,
+        "transport_seconds_total": 2.0,
+        "spectrum_seconds_total": 3.0,
+        "driver_wait_seconds_total": 0.5,
+        "gpu_oom_retry_count": 1,
+        "cupy_pool_used_mib": 4.0,
+        "cupy_pool_reserved_mib": 5.0,
+        "cupy_pool_peak_mib": 6.0,
+    }
+
+
+def test_run_cases_profile_callbacks_report_timing_and_activity(monkeypatch):
+    def fake_run_case(_case, record_timing=False):
+        assert record_timing
+        return {
+            "value": 1,
+            "_t_transport": 2.0,
+            "_t_spectrum": 3.0,
+        }
+
+    monkeypatch.setattr(runner, "run_case", fake_run_case)
+    timings = []
+    activities = []
+
+    result = runner.run_cases(
+        [{"crystal": "hopg"}],
+        max_workers=0,
+        progress=False,
+        on_timing=timings.append,
+        on_activity=activities.append,
+    )
+
+    assert result == [{"value": 1}]
+    assert timings[0]["transport_seconds_total"] == 2.0
+    assert timings[0]["spectrum_seconds_total"] == 3.0
+    assert [activity["phase"] for activity in activities] == ["serial_case", "idle"]

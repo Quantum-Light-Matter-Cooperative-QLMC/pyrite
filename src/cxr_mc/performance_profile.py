@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import platform
 import subprocess
@@ -20,25 +21,39 @@ PROFILE_SCHEMA = "cxr.performance.v1"
 DEFAULT_INTERVAL_SECONDS = 5.0
 
 
+def _optional_float(value: str) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) else None
+
+
 def _utc_now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
-def _gpu_metrics() -> dict[str, float | None]:
+def _gpu_metrics() -> dict[str, Any]:
     """Read first GPU's device-wide counters, returning nulls when unavailable."""
     empty = {
         "gpu_percent": None,
+        "gpu_memory_percent": None,
         "vram_used_mib": None,
         "vram_total_mib": None,
         "vram_percent": None,
         "gpu_power_watts": None,
         "gpu_temperature_c": None,
+        "gpu_sm_clock_mhz": None,
+        "gpu_memory_clock_mhz": None,
+        "gpu_pstate": None,
     }
     try:
         result = subprocess.run(
             [
                 "nvidia-smi",
-                "--query-gpu=utilization.gpu,memory.used,memory.total,power.draw,temperature.gpu",
+                "--query-gpu=utilization.gpu,utilization.memory,memory.used,"
+                "memory.total,power.draw,temperature.gpu,clocks.current.sm,"
+                "clocks.current.memory,pstate",
                 "--format=csv,noheader,nounits",
             ],
             capture_output=True,
@@ -51,19 +66,24 @@ def _gpu_metrics() -> dict[str, float | None]:
     if result.returncode != 0 or not result.stdout.strip():
         return empty
     fields = [field.strip() for field in result.stdout.splitlines()[0].split(",")]
-    if len(fields) != 5:
+    if len(fields) != 9:
         return empty
-    try:
-        gpu_percent, used, total, power, temperature = (float(field) for field in fields)
-    except ValueError:
-        return empty
+    gpu_percent, memory_percent, used, total, power, temperature, sm_clock, memory_clock = (
+        _optional_float(field) for field in fields[:8]
+    )
     return {
         "gpu_percent": gpu_percent,
+        "gpu_memory_percent": memory_percent,
         "vram_used_mib": used,
         "vram_total_mib": total,
-        "vram_percent": 100.0 * used / total if total > 0 else None,
+        "vram_percent": (
+            100.0 * used / total if used is not None and total is not None and total > 0 else None
+        ),
         "gpu_power_watts": power,
         "gpu_temperature_c": temperature,
+        "gpu_sm_clock_mhz": sm_clock,
+        "gpu_memory_clock_mhz": memory_clock,
+        "gpu_pstate": fields[8] if fields[8] not in ("", "[N/A]", "N/A") else None,
     }
 
 
@@ -84,16 +104,28 @@ def _process_tree_metrics(
     threads = 0
     read_bytes = 0
     write_bytes = 0
+    cpu_user_seconds = 0.0
+    cpu_system_seconds = 0.0
+    context_switches = 0
+    child_rss: list[int] = []
     alive = 0
     for process in processes:
         try:
             tracked = known_processes.setdefault(process.pid, process)
-            rss += tracked.memory_info().rss
+            process_rss = tracked.memory_info().rss
+            rss += process_rss
+            if process.pid != root.pid:
+                child_rss.append(process_rss)
             cpu_percent += tracked.cpu_percent(interval=None)
             threads += tracked.num_threads()
             io = tracked.io_counters()
             read_bytes += io.read_bytes
             write_bytes += io.write_bytes
+            cpu_times = tracked.cpu_times()
+            cpu_user_seconds += cpu_times.user
+            cpu_system_seconds += cpu_times.system
+            switches = tracked.num_ctx_switches()
+            context_switches += switches.voluntary + switches.involuntary
             alive += 1
         except (psutil.Error, OSError):
             continue
@@ -104,7 +136,37 @@ def _process_tree_metrics(
         "thread_count": threads,
         "io_read_bytes": read_bytes,
         "io_write_bytes": write_bytes,
+        "process_cpu_user_seconds": round(cpu_user_seconds, 6),
+        "process_cpu_system_seconds": round(cpu_system_seconds, 6),
+        "process_context_switches": context_switches,
+        "child_process_count": len(child_rss),
+        "child_process_rss_max_bytes": max(child_rss, default=0),
+        "child_process_rss_mean_bytes": (
+            round(sum(child_rss) / len(child_rss)) if child_rss else 0
+        ),
     }
+
+
+def _optional_int_env(name: str) -> int | None:
+    try:
+        return int(os.environ[name])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _cpu_affinity_count(process: psutil.Process) -> int | None:
+    try:
+        return len(process.cpu_affinity())
+    except (AttributeError, psutil.Error, OSError):
+        return None
+
+
+def _cpu_frequency_mhz() -> float | None:
+    try:
+        frequency = psutil.cpu_freq()
+    except (AttributeError, OSError, RuntimeError):
+        return None
+    return frequency.current if frequency is not None and math.isfinite(frequency.current) else None
 
 
 class PerformanceLogger:
@@ -135,6 +197,7 @@ class PerformanceLogger:
         self._root = psutil.Process()
         self._known_processes: dict[int, psutil.Process] = {self._root.pid: self._root}
         psutil.cpu_percent(interval=None)
+        psutil.cpu_times_percent(interval=None)
         self._root.cpu_percent(interval=None)
 
     def start(self) -> None:
@@ -155,6 +218,8 @@ class PerformanceLogger:
 
     def sample(self, event: str) -> dict[str, Any]:
         memory = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+        cpu_times = psutil.cpu_times_percent(interval=None)
         try:
             load1, load5, load15 = os.getloadavg()
         except (AttributeError, OSError):
@@ -174,6 +239,11 @@ class PerformanceLogger:
             "cpu_percent": psutil.cpu_percent(interval=None),
             "cpu_count_logical": psutil.cpu_count(logical=True),
             "cpu_count_physical": psutil.cpu_count(logical=False),
+            "cpu_affinity_count": _cpu_affinity_count(self._root),
+            "slurm_cpus_per_task": _optional_int_env("SLURM_CPUS_PER_TASK"),
+            "slurm_cpus_on_node": _optional_int_env("SLURM_CPUS_ON_NODE"),
+            "cpu_iowait_percent": getattr(cpu_times, "iowait", None),
+            "cpu_frequency_mhz": _cpu_frequency_mhz(),
             "load_1m": load1,
             "load_5m": load5,
             "load_15m": load15,
@@ -181,6 +251,11 @@ class PerformanceLogger:
             "memory_available_bytes": memory.available,
             "memory_total_bytes": memory.total,
             "memory_percent": memory.percent,
+            "swap_used_bytes": swap.used,
+            "swap_total_bytes": swap.total,
+            "swap_percent": swap.percent,
+            "swap_in_bytes": swap.sin,
+            "swap_out_bytes": swap.sout,
             **_process_tree_metrics(self._root, self._known_processes),
             **_gpu_metrics(),
             **self.static,

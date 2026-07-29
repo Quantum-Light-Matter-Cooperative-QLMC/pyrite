@@ -36,6 +36,7 @@ import tomllib
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -159,8 +160,7 @@ def _performance_profile(ctx, param, value):
         return None
     if _PERFORMANCE_PROFILE_RE.fullmatch(value) is None:
         raise click.BadParameter(
-            "expected letters, digits, underscores, or hyphens; "
-            "must start with letter or digit",
+            "expected letters, digits, underscores, or hyphens; must start with letter or digit",
             ctx=ctx,
             param=param,
         )
@@ -323,8 +323,9 @@ def _performance_profile(ctx, param, value):
     default=None,
     metavar="NAME",
     help=(
-        "Run catalog profile NAME while sampling CPU, RAM, GPU, VRAM, process-tree, "
-        "case, worker, and chunk metrics every 5 s into "
+        "Run catalog profile NAME while sampling CPU pressure, RAM/swap, GPU clocks/"
+        "VRAM, process-tree, phase timing, queue, case, worker, and chunk metrics "
+        "every 5 s into "
         "performance-profiles/NAME/<material>.ndjson."
     ),
 )
@@ -775,24 +776,38 @@ def _run_material(args, material, max_seconds=None):
     # notebooks/scan_app.py for the same cost-weighted meter run locally.
     latest_cost = {}
     runtime_info = {}
+    timing_info: dict[str, Any] = {
+        "checkpoint_count": 0,
+        "checkpoint_seconds_total": 0.0,
+        "gpu_oom_retry_count_total": 0,
+        "gpu_feed_wait_fraction": None,
+    }
+    activity_info = {
+        "phase": "setup",
+        "active_case": None,
+        "in_flight_case_count": 0,
+    }
     performance_state = {"state": "running"}
     performance_lock = threading.Lock()
+
+    def _case_summary(case):
+        from .montecarlo import runner as montecarlo_runner
+
+        return {
+            "configuration": str(case["name"]),
+            "energy_keV": round(float(case["E0_keV"]), 3),
+            "tilt_deg": round(float(case["tilt_deg"]), 2),
+            "azimuth_deg": round(float(case["tilt_azim_deg"]), 2),
+            "thickness_um": round(float(case["thickness_ang"]) / 1e4, 4),
+            **montecarlo_runner.case_runtime_plan(case),
+        }
 
     def _note_case(case):
         # Frontier crystal case just finished -- surface its parameters so a live
         # viewer can show what's under test (energy, both tilts, thickness).
-        from .montecarlo import runner as montecarlo_runner
-
         with performance_lock:
             latest_case.clear()
-            latest_case.update(
-                configuration=str(case["name"]),
-                energy_keV=round(float(case["E0_keV"]), 3),
-                tilt_deg=round(float(case["tilt_deg"]), 2),
-                azimuth_deg=round(float(case["tilt_azim_deg"]), 2),
-                thickness_um=round(float(case["thickness_ang"]) / 1e4, 4),
-                **montecarlo_runner.case_runtime_plan(case),
-            )
+            latest_case.update(_case_summary(case))
 
     def _record_cost(done_cost, total_cost):
         with performance_lock:
@@ -823,12 +838,48 @@ def _run_material(args, material, max_seconds=None):
             runtime_info.clear()
             runtime_info.update(info)
 
+    def _record_timing(info):
+        with performance_lock:
+            checkpoint_seconds = info.get("checkpoint_seconds")
+            if checkpoint_seconds is not None:
+                timing_info["checkpoint_count"] += 1
+                timing_info["checkpoint_seconds"] = checkpoint_seconds
+                timing_info["checkpoint_seconds_total"] += checkpoint_seconds
+                return
+            retries = info.get("gpu_oom_retry_count", 0)
+            timing_info["gpu_oom_retry_count_total"] += retries
+            for key, value in info.items():
+                if key == "gpu_oom_retry_count":
+                    continue
+                if key in {
+                    "transport_seconds",
+                    "spectrum_seconds",
+                    "driver_wait_seconds",
+                }:
+                    timing_info[f"last_{key}"] = value
+                else:
+                    timing_info[key] = value
+            wait = timing_info.get("driver_wait_seconds_total", 0.0)
+            spectrum = timing_info.get("spectrum_seconds_total", 0.0)
+            denominator = wait + spectrum
+            timing_info["gpu_feed_wait_fraction"] = wait / denominator if denominator > 0 else None
+
+    def _record_activity(info):
+        info = dict(info)
+        active = info.pop("case", None)
+        active_case = _case_summary(active) if active is not None else None
+        with performance_lock:
+            activity_info.clear()
+            activity_info.update(info, active_case=active_case)
+
     def _performance_context():
         with performance_lock:
             return {
                 **runtime_info,
                 **latest_progress,
                 **latest_cost,
+                **timing_info,
+                **activity_info,
                 "current": dict(latest_case) or None,
                 **performance_state,
             }
@@ -846,9 +897,7 @@ def _run_material(args, material, max_seconds=None):
         from .performance_profile import PerformanceLogger
         from .profiles import _jsonable
 
-        performance_root = Path(
-            getattr(args, "performance_dir", None) or "performance-profiles"
-        )
+        performance_root = Path(getattr(args, "performance_dir", None) or "performance-profiles")
         profile_dir = performance_root / performance_profile
         performance_logger = PerformanceLogger(
             profile_dir / f"{material}.ndjson",
@@ -887,6 +936,8 @@ def _run_material(args, material, max_seconds=None):
                 _note_case if progress_file is not None or performance_logger is not None else None
             ),
             on_runtime=_record_runtime if performance_logger is not None else None,
+            on_timing=_record_timing if performance_logger is not None else None,
+            on_activity=_record_activity if performance_logger is not None else None,
             max_seconds=max_seconds,
             dataset_identity=identity,
             case_cost_fn=(

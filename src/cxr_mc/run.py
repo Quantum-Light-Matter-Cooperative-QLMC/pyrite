@@ -331,6 +331,8 @@ def run_sweep(
     on_progress=None,
     on_case=None,
     on_runtime=None,
+    on_timing=None,
+    on_activity=None,
     max_seconds=None,
     time_fn=None,
     dataset_identity=None,
@@ -371,6 +373,10 @@ def run_sweep(
     on_runtime : optional callback(dict) fired once after resume filtering with
         resolved engine, effective worker count, memory policy, representative
         energy-grid widths, and spectrum/brem chunk sizing.
+    on_timing : optional callback(dict) receiving rolling per-case transport,
+        spectrum, GPU feed-wait, retry, CuPy-pool, and checkpoint timings.
+    on_activity : optional callback(dict) receiving current driver phase,
+        case index, and in-flight work counts.
     max_seconds : optional soft wall-clock budget, measured from just before
         ``run_cases`` starts. None (default) means unbounded. When set, a
         deadline of ``time_fn() + max_seconds`` is checked (via ``run_cases``'s
@@ -421,6 +427,12 @@ def run_sweep(
         subset = {n: results[n] for n in results if _crystal_of(results[n]) == material}
         _checkpoint_components_save(checkpoint_path, subset)
         _manifest_save(checkpoint_path, subset, dataset_identity)
+
+    def _timed_save():
+        started = time.perf_counter()
+        _save()
+        if on_timing is not None:
+            on_timing({"checkpoint_seconds": time.perf_counter() - started})
 
     if resume and _checkpoint_exists(checkpoint_path):
         manifest_path = _manifest_path_for(checkpoint_path)
@@ -493,7 +505,7 @@ def run_sweep(
         name = case["name"]
         energies_remaining[name] -= 1
         if energies_remaining[name] == 0:  # this config (all energies) is done
-            _save()  # crash-safe at config granularity (this material's subset)
+            _timed_save()  # crash-safe at config granularity (this material's subset)
             g = group_key(case)
             group_remaining[g] -= 1
             if group_remaining[g] == 0 and on_chunk is not None:
@@ -531,6 +543,11 @@ def run_sweep(
         time_fn = time.monotonic
     deadline = None if max_seconds is None else time_fn() + max_seconds
     should_stop = None if deadline is None else (lambda: time_fn() >= deadline)
+    profile_callbacks = {}
+    if on_timing is not None:
+        profile_callbacks["on_timing"] = on_timing
+    if on_activity is not None:
+        profile_callbacks["on_activity"] = on_activity
 
     t0 = time.perf_counter()
     run_cases(
@@ -540,11 +557,12 @@ def run_sweep(
         callback=_cb,
         should_stop=should_stop,
         keep_results=False,  # _cb owns storage; don't pin every spectrum in RAM
+        **profile_callbacks,
     )
     print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
     complete = all(c["name"] in results and c["E0_keV"] in results[c["name"]] for c in cases)
     if not complete:
-        _save()  # persist whatever finished before the budget ran out
+        _timed_save()  # persist whatever finished before the budget ran out
     return complete
 
 

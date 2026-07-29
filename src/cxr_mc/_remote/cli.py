@@ -635,7 +635,10 @@ def command():
     callback=_performance_profile_name,
     default=None,
     metavar="NAME",
-    help="Log CPU, RAM, GPU, VRAM, process, worker, chunk, and case metrics every 5 s.",
+    help=(
+        "Log CPU pressure, RAM/swap, GPU clocks/VRAM, process, phase timing, "
+        "queue, worker, chunk, and case metrics every 5 s."
+    ),
 )
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
 @click.option(
@@ -913,8 +916,9 @@ def reline_command(
     default=None,
     metavar="NAME",
     help=(
-        "Run catalog profile NAME with CPU, RAM, GPU, VRAM, process, worker, chunk, "
-        "and case logging every 5 s; pull with `cxr remote profile pull NAME`."
+        "Run catalog profile NAME with CPU pressure, RAM/swap, GPU clocks/VRAM, "
+        "process, phase timing, queue, worker, chunk, and case logging every 5 s; "
+        "pull with `cxr remote profile pull NAME`."
     ),
 )
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")

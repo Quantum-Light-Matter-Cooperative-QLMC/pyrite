@@ -193,15 +193,44 @@ class _TimingAgg:
         self.transport: list[float] = []  # worker compute time for _transport_case
         self.spectrum: list[float] = []  # _spectrum_case body (GPU work in main proc)
         self.wait: list[float] = []  # driver blocked on the transport future (GPU idle)
+        self.transport_total = 0.0
+        self.spectrum_total = 0.0
+        self.wait_total = 0.0
 
-    def collect(self, out):
-        """Pop the private _t_* deltas a phase dict rode back on and record them."""
+    def collect(self, out, *, wait_seconds=None):
+        """Strip private metrics, accumulate them, and return one profile update."""
         t = out.pop("_t_transport", None)
         if t is not None:
             self.transport.append(t)
+            self.transport_total += t
         s = out.pop("_t_spectrum", None)
         if s is not None:
             self.spectrum.append(s)
+            self.spectrum_total += s
+        if wait_seconds is not None:
+            self.wait.append(wait_seconds)
+            self.wait_total += wait_seconds
+        retries = out.pop("_gpu_oom_retries", 0)
+        pool = {
+            key[1:]: out.pop(key)
+            for key in (
+                "_cupy_pool_used_mib",
+                "_cupy_pool_reserved_mib",
+                "_cupy_pool_peak_mib",
+            )
+            if key in out
+        }
+        return {
+            "timed_case_count": max(len(self.transport), len(self.spectrum)),
+            "transport_seconds": t,
+            "spectrum_seconds": s,
+            "driver_wait_seconds": wait_seconds,
+            "transport_seconds_total": self.transport_total,
+            "spectrum_seconds_total": self.spectrum_total,
+            "driver_wait_seconds_total": self.wait_total,
+            "gpu_oom_retry_count": retries,
+            **pool,
+        }
 
     def report(self, mode, nw):
         """Print the phase split, GPU-idle fraction, and pipeline verdict to stderr."""
@@ -279,7 +308,7 @@ def _report_timing(agg, mode, nw):
     print("\n".join(lines), file=sys.stderr, flush=True)
 
 
-def run_case(case):
+def run_case(case, record_timing=False):
     """
     Worker for one (crystal, beam energy) Monte Carlo case: transport + line
     spectrum + bremsstrahlung. Module-level so it can be pickled into worker
@@ -327,7 +356,11 @@ def run_case(case):
     Returns dict(E_grid, spec, brem [on E_grid], E_grid_brem, brem_wide [the
                 full-range background], eta, n_segments) plus crystal/E0.
     """
-    return _spectrum_case(case, _transport_case(case))
+    return _spectrum_case(
+        case,
+        _transport_case(case, record_timing),
+        record_timing,
+    )
 
 
 def _beam_kwargs(case):
@@ -345,12 +378,13 @@ def _beam_kwargs(case):
     )
 
 
-def _transport_case(case):
+def _transport_case(case, record_timing=False):
     """CPU-only phase of run_case: the line + brem trajectory transport (pure
     numpy, never touches the GPU). Returns the segments + geometry + grids the
     spectrum phase consumes. run_cases farms this out to a worker pool so the
     transport of upcoming cases overlaps the GPU work on the current one."""
-    t0 = perf_counter() if _TIMING else 0.0
+    timed = _TIMING or record_timing
+    t0 = perf_counter() if timed else 0.0
     if "E_grid_line" in case:
         E_grid = decode_energy_grid(case["E_grid_line"])
         E_brem = decode_energy_grid(case["E_grid_brem"])
@@ -410,7 +444,7 @@ def _transport_case(case):
     tp: dict[str, Any] = dict(
         E_grid=E_grid, E_brem=E_brem, n_hat=n_hat, segs=segs, segs_b=segs_b, groove=groove
     )
-    if _TIMING:
+    if timed:
         tp["_t_transport"] = perf_counter() - t0
     return tp
 
@@ -606,16 +640,22 @@ def _halve_case_chunks(case, tp):
     case["brem_chunk"] = max(1000, brem_cur // 2)
 
 
-def _spectrum_case_retry(case, tp, max_retries=_GPU_OOM_RETRIES):
+def _spectrum_case_retry(case, tp, max_retries=_GPU_OOM_RETRIES, record_timing=False):
     """Run the GPU phase, retrying on OOM with progressively halved chunks.
 
     On a catchable OutOfMemoryError: free every pool block, halve the chunks on
     a COPY of the case (the original stays pristine for run_sweeps's checkpoint /
     a later reline), and retry. Re-raises after `max_retires` exhausted."""
+    timed = _TIMING or record_timing
+    t0 = perf_counter() if timed else 0.0
     work = case
     for attempt in range(max_retries + 1):
         try:
-            return _spectrum_case(work, tp)
+            out = _spectrum_case(work, tp, record_timing)
+            if timed:
+                out["_t_spectrum"] = perf_counter() - t0
+                out["_gpu_oom_retries"] = attempt
+            return out
         except _GPU_OOM:
             if attempt == max_retries:
                 raise
@@ -625,11 +665,12 @@ def _spectrum_case_retry(case, tp, max_retries=_GPU_OOM_RETRIES):
             _halve_case_chunks(work, tp)
 
 
-def _spectrum_case(case, tp):
+def _spectrum_case(case, tp, record_timing=False):
     """GPU phase of run_case: line spectrum + brem from the already-transported
     segments ``tp`` (from _transport_case). Runs in the main process, so only one
     CUDA context ever touches the device."""
-    t0 = perf_counter() if _TIMING else 0.0
+    timed = _TIMING or record_timing
+    t0 = perf_counter() if timed else 0.0
     E_grid, E_brem, n_hat = tp["E_grid"], tp["E_brem"], tp["n_hat"]
     segs, segs_b = tp["segs"], tp["segs_b"]
     # optional film-on-substrate stack (None -> single slab, unchanged)
@@ -663,6 +704,17 @@ def _spectrum_case(case, tp):
     # can't accumulate (and fragment) across a long sweep until it fills the card.
     if _GPU:
         _maybe_free_pool()
+        if timed and cp is not None:
+            pool = cp.get_default_memory_pool()
+            out_pool = {
+                "_cupy_pool_used_mib": pool.used_bytes() / (1 << 20),
+                "_cupy_pool_reserved_mib": pool.total_bytes() / (1 << 20),
+                "_cupy_pool_peak_mib": _pool_peak_bytes / (1 << 20),
+            }
+        else:
+            out_pool = {}
+    else:
+        out_pool = {}
     out = dict(
         E_grid=E_grid,
         spec=spec,
@@ -680,7 +732,7 @@ def _spectrum_case(case, tp):
         crystal=case["crystal"],
         E0_keV=case["E0_keV"],
     )
-    if _TIMING:
+    if timed:
         # Ride the phase deltas back to the driver on the result dict; run_cases'
         # _TimingAgg.collect strips both keys before the result is stored. Carry
         # _t_transport through so the CPU-pool path (where transport time only
@@ -688,6 +740,7 @@ def _spectrum_case(case, tp):
         out["_t_spectrum"] = perf_counter() - t0
         if "_t_transport" in tp:
             out["_t_transport"] = tp["_t_transport"]
+        out.update(out_pool)
     return out
 
 
@@ -857,6 +910,8 @@ def run_cases(
     should_stop=None,
     engine="auto",
     keep_results=True,
+    on_timing=None,
+    on_activity=None,
 ):
     """
     Run a list of case dicts through run_case, results in input order.
@@ -892,6 +947,11 @@ def run_cases(
     callback: callable(i, case, out) invoked in THIS process as each case
         finishes; stream/checkpoint/plot without waiting for the batch.
         Exceptions propagate and abort the run.
+    on_timing: optional callback(dict) invoked after each case with transport,
+        spectrum, GPU feed-wait, retry, and CuPy-pool metrics. Enables phase
+        timing without requiring CXR_MC_TIMING or printing its stderr report.
+    on_activity: optional callback(dict) invoked at driver phase transitions
+        with phase, case index, and in-flight work counts.
     should_stop: optional callable() -> bool, checked before each new case
         starts. Once it returns True, no new case is dispatched; work already
         in flight drains normally (callbacks still fire for those cases), and
@@ -942,21 +1002,41 @@ def run_cases(
     if n == 0:
         return results
 
-    timing = _TimingAgg() if _TIMING else None
+    timing = _TimingAgg() if _TIMING or on_timing is not None else None
+
+    def _collect_timing(i, out, wait_seconds=None):
+        if timing is None:
+            return
+        metrics = timing.collect(out, wait_seconds=wait_seconds)
+        if on_timing is not None:
+            on_timing({"case_index": i, **metrics})
+
+    def _activity(phase, case_index=None, **metrics):
+        if on_activity is not None:
+            case = cases[case_index] if case_index is not None else None
+            on_activity(
+                {
+                    "phase": phase,
+                    "case_index": case_index,
+                    "case": case,
+                    **metrics,
+                }
+            )
 
     def _serial():
         for i in _maybe_bar(range(n)):
             if should_stop is not None and should_stop():
                 break
-            out = run_case(cases[i])
-            if timing is not None:
-                timing.collect(out)
+            _activity("serial_case", i, in_flight_case_count=1)
+            out = run_case(cases[i], True) if on_timing is not None else run_case(cases[i])
+            _collect_timing(i, out)
             results[i] = out
             if callback is not None:
                 callback(i, cases[i], out)
             if not keep_results:
                 results[i] = None
-        if timing is not None:
+        _activity("idle", in_flight_case_count=0)
+        if _TIMING and timing is not None:
             timing.report("serial", nw=1)
         return results
 
@@ -984,29 +1064,55 @@ def run_cases(
 
         prefetch = nw + 2  # keep the transport pool ahead
         with ProcessPoolExecutor(max_workers=nw, initializer=_worker_init) as ex:
-            inflight = {i: ex.submit(_transport_case, cases[i]) for i in range(min(prefetch, n))}
+            inflight = {
+                i: (
+                    ex.submit(_transport_case, cases[i], True)
+                    if on_timing is not None
+                    else ex.submit(_transport_case, cases[i])
+                )
+                for i in range(min(prefetch, n))
+            }
             stopped = False
             for i in _maybe_bar(range(n)):
                 if not stopped and should_stop is not None and should_stop():
                     stopped = True
                 if stopped and i not in inflight:
                     break
+                _activity(
+                    "transport_wait",
+                    i,
+                    in_flight_case_count=len(inflight),
+                    transport_prefetch_count=prefetch,
+                )
                 tw0 = perf_counter() if timing is not None else 0.0
                 tp = inflight.pop(i).result()  # transport (already overlapped)
-                if timing is not None:
-                    timing.wait.append(perf_counter() - tw0)  # GPU idle: draining the pool
+                wait_seconds = perf_counter() - tw0 if timing is not None else None
                 j = i + prefetch
                 if j < n and not stopped:
-                    inflight[j] = ex.submit(_transport_case, cases[j])
-                out = _spectrum_case_retry(cases[i], tp)  # GPU, THIS process only
-                if timing is not None:
-                    timing.collect(out)
+                    inflight[j] = (
+                        ex.submit(_transport_case, cases[j], True)
+                        if on_timing is not None
+                        else ex.submit(_transport_case, cases[j])
+                    )
+                _activity(
+                    "spectrum",
+                    i,
+                    in_flight_case_count=len(inflight),
+                    transport_prefetch_count=prefetch,
+                )
+                out = (
+                    _spectrum_case_retry(cases[i], tp, record_timing=True)
+                    if on_timing is not None
+                    else _spectrum_case_retry(cases[i], tp)
+                )  # GPU, THIS process only
+                _collect_timing(i, out, wait_seconds)
                 results[i] = out
                 if callback is not None:
                     callback(i, cases[i], out)
                 if not keep_results:
                     results[i] = None
-        if timing is not None:
+        _activity("idle", in_flight_case_count=0, transport_prefetch_count=prefetch)
+        if _TIMING and timing is not None:
             timing.report("GPU-pipeline", nw=nw)
         return results
 
@@ -1020,15 +1126,18 @@ def run_cases(
     with ProcessPoolExecutor(
         max_workers=max_workers, initializer=_worker_init, initargs=(engine == "cpu",)
     ) as ex:
-        futures = {ex.submit(run_case, c): i for i, c in enumerate(cases)}
+        futures = {
+            (ex.submit(run_case, c, True) if on_timing is not None else ex.submit(run_case, c)): i
+            for i, c in enumerate(cases)
+        }
+        _activity("cpu_pool", in_flight_case_count=len(futures))
         stopped = False
         for fut in _maybe_bar(as_completed(futures)):
             if fut.cancelled():
                 continue
             i = futures[fut]
             out = fut.result()
-            if timing is not None:
-                timing.collect(out)
+            _collect_timing(i, out)
             results[i] = out
             if callback is not None:
                 callback(i, cases[i], out)
@@ -1038,6 +1147,7 @@ def run_cases(
                 stopped = True
                 for f in futures:
                     f.cancel()
-    if timing is not None:
+    _activity("idle", in_flight_case_count=0)
+    if _TIMING and timing is not None:
         timing.report("CPU-pool", nw=max_workers)
     return results

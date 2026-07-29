@@ -989,6 +989,29 @@ def test_scan_performance_profile_records_resolved_beam(monkeypatch, tmp_path):
             pass
 
     def fake_run_sweep(cases, _results, **kwargs):
+        kwargs["on_runtime"]({"engine": "serial", "effective_workers": 1})
+        kwargs["on_activity"](
+            {
+                "phase": "spectrum",
+                "case_index": 0,
+                "case": cases[0],
+                "in_flight_case_count": 1,
+            }
+        )
+        kwargs["on_timing"](
+            {
+                "case_index": 0,
+                "timed_case_count": 1,
+                "transport_seconds": 2.0,
+                "spectrum_seconds": 3.0,
+                "driver_wait_seconds": 0.5,
+                "transport_seconds_total": 2.0,
+                "spectrum_seconds_total": 3.0,
+                "driver_wait_seconds_total": 0.5,
+                "gpu_oom_retry_count": 1,
+            }
+        )
+        kwargs["on_timing"]({"checkpoint_seconds": 0.25})
         kwargs["on_case"](cases[0])
         return True
 
@@ -1022,7 +1045,15 @@ def test_scan_performance_profile_records_resolved_beam(monkeypatch, tmp_path):
     assert beam["long_shape"] == "uniform"
     assert beam["rep_rate_hz"] == 2500.0
     assert beam["bunch_charge_pc"] == 2.0
-    assert observed["context"]()["current"]["configuration"]
+    context = observed["context"]()
+    assert context["current"]["configuration"]
+    assert context["active_case"]["configuration"]
+    assert context["phase"] == "spectrum"
+    assert context["transport_seconds_total"] == 2.0
+    assert context["spectrum_seconds_total"] == 3.0
+    assert context["gpu_feed_wait_fraction"] == 0.5 / 3.5
+    assert context["gpu_oom_retry_count_total"] == 1
+    assert context["checkpoint_seconds_total"] == 0.25
 
 
 def test_scan_forwards_n_families_and_beam_uvw_overrides(monkeypatch, tmp_path):

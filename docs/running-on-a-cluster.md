@@ -134,13 +134,19 @@ cxr remote submit --performance-profile sub_100keV
 ```
 
 Local `cxr scan MATERIAL --performance-profile NAME` uses the same resolution.
-Each five-second NDJSON sample records host and process-tree CPU/RAM, GPU
-utilization and VRAM (`null` when no NVIDIA GPU is available), power,
-temperature, resolved beam parameters, most recently completed case, progress,
-worker topology, electron counts, grid widths, and adaptive spectrum/brem chunk
-sizes. Local logs go to `performance-profiles/NAME/<material>.ndjson`; remote
-logs appear beside case progress in `attach`. Fetch every remote job matching
-the catalog profile name with:
+Each five-second NDJSON sample records host and process-tree CPU/RAM, CPU
+affinity/frequency/iowait, swap activity, GPU utilization, clocks, performance
+state, and VRAM (`null` when no NVIDIA GPU is available), power, temperature,
+resolved beam parameters, active driver phase/case, most recently completed
+case, in-flight work, progress, worker topology, electron counts, grid widths,
+adaptive spectrum/brem chunk sizes, and child-process max/mean RSS. Rolling
+counters include CPU transport, spectrum, GPU feed-wait, checkpoint time, GPU
+OOM retries, and CuPy pool used/reserved/peak memory. These phase counters are
+enabled by
+`--performance-profile`; `CXR_MC_TIMING` is not required. Local logs go to
+`performance-profiles/NAME/<material>.ndjson`; remote logs appear beside case
+progress in `attach`. Fetch every remote job matching the catalog profile name
+with:
 
 ```bash
 cxr remote profile pull sub_100keV

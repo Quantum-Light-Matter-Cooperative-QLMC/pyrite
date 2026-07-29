@@ -509,6 +509,35 @@ def test_run_sweep_writes_manifest_alongside_checkpoint(tmp_path, monkeypatch):
     assert manifest["sweep"]["crystal"] == ["hopg"]
 
 
+def test_run_sweep_reports_checkpoint_timing(tmp_path, monkeypatch):
+    def profile_run_cases(
+        cases,
+        max_workers=None,
+        progress=False,
+        callback=None,
+        should_stop=None,
+        keep_results=True,
+        on_timing=None,
+    ):
+        for i, case in enumerate(cases):
+            callback(i, case, _fake_out(case))
+
+    monkeypatch.setattr("cxr_mc.run.run_cases", profile_run_cases)
+    timings = []
+
+    run_sweep(
+        [_fake_case("cfg_a", 30.0)],
+        {},
+        checkpoint_dir=str(tmp_path),
+        progress=False,
+        on_timing=timings.append,
+    )
+
+    checkpoint = [timing for timing in timings if "checkpoint_seconds" in timing]
+    assert len(checkpoint) == 1
+    assert checkpoint[0]["checkpoint_seconds"] >= 0
+
+
 def test_run_sweep_persists_dataset_identity_in_manifest(tmp_path, monkeypatch):
     monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
     identity = {
