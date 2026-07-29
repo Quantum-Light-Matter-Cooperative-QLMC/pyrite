@@ -304,6 +304,18 @@ def _performance_profile(ctx, param, value):
     help="Single-bunch charge [pC]; overrides the resolved profile.",
 )
 @click.option(
+    "--coherent/--incoherent",
+    "coherent",
+    default=None,
+    help=(
+        "Sum CXR segment amplitudes with bunch phases (coherent) instead of "
+        "adding segment intensities (incoherent, the default). Omit to defer to "
+        "the profile. A coherent run gets an identity-qualified checkpoint stem "
+        "(<material>--full-<digest>), so it never shares or clobbers the "
+        "incoherent <material> checkpoint."
+    ),
+)
+@click.option(
     "--checkpoint-dir",
     default="checkpoints",
     show_default=True,
@@ -371,6 +383,7 @@ def command(
     beam_long_shape,
     beam_rep_rate_hz,
     beam_bunch_charge_pc,
+    coherent,
     checkpoint_dir,
     max_minutes,
     performance_profile,
@@ -383,6 +396,12 @@ def command(
     """Click entry point for the staged root migration."""
     if quick and fidelity != "full":
         raise click.UsageError("--quick cannot be combined with --fidelity survey")
+    # --quick writes the digest-free <material>_quick stem (variant_stem), so a
+    # coherent quick run would collide with the incoherent quick smoke test on
+    # the SAME path despite a distinct identity. Keep quick a pure incoherent
+    # smoke test rather than silently clobber.
+    if quick and coherent:
+        raise click.UsageError("--quick cannot be combined with --coherent")
     if actually_all and material is not None:
         raise click.UsageError("scan -A/--actually-all does not take a material name")
     if actually_all and all_:
@@ -428,6 +447,7 @@ def command(
             beam_long_shape=beam_long_shape,
             beam_rep_rate_hz=beam_rep_rate_hz,
             beam_bunch_charge_pc=beam_bunch_charge_pc,
+            coherent=coherent,
             checkpoint_dir=checkpoint_dir,
             max_minutes=max_minutes,
             performance_profile=performance_profile,
@@ -456,6 +476,7 @@ def command(
         beam_long_shape=beam_long_shape,
         beam_rep_rate_hz=beam_rep_rate_hz,
         beam_bunch_charge_pc=beam_bunch_charge_pc,
+        coherent=coherent,
         checkpoint_dir=checkpoint_dir,
         max_minutes=max_minutes,
         performance_profile=performance_profile,
@@ -675,6 +696,14 @@ def _resolved_run(args, material):
     fidelity = getattr(args, "fidelity", "full")
     catalog_profile = _effective_catalog_profile(args)
     settings = default_settings() if fidelity == "full" else default_settings(fidelity)
+    # --coherent/--incoherent overrides the profile's coherent_emission policy;
+    # None (omitted) defers to whatever the resolved profile set. The resolved
+    # settings.coherent_emission below drives both the dataset_identity hash
+    # (divergence-only rule in profiles.dataset_identity) and the canonical_full
+    # collision guard, so a coherent run never shares the <material> stem.
+    coherent = getattr(args, "coherent", None)
+    if coherent is not None:
+        settings = replace(settings, coherent_emission=coherent)
     overrides = {}
     if getattr(args, "quick", False):
         overrides.update(
@@ -748,6 +777,7 @@ def _resolved_run(args, material):
         and not overrides
         and not getattr(args, "quick", False)
         and catalog_profile == "standard"
+        and not settings.coherent_emission
     )
     stem = variant_stem(identity, canonical_full=canonical_full)
     return settings, sweep, identity, stem
@@ -767,7 +797,12 @@ def _run_material(args, material, max_seconds=None):
     settings, sweep, identity, stem = _resolved_run(args, material)
     profile = identity["fidelity"]
 
-    cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
+    cases = build_cases(
+        sweep,
+        settings.n_electrons,
+        settings.n_electrons_brem,
+        coherent_emission=settings.coherent_emission,
+    )
     cases, dropped = gate_cases_by_penetration(cases)
     summary = format_penetration_watchdog_summary(dropped, material=material)
     if summary is not None:
@@ -777,6 +812,7 @@ def _run_material(args, material, max_seconds=None):
         f"{len({c['name'] for c in cases})} configs "
         f"[profile={profile}, parameters={identity['parameter_sha256'][:12]}]"
         + (" (quick grid)" if args.quick else "")
+        + (" (coherent)" if settings.coherent_emission else "")
     )
     # read the RESOLVED orientation off the first case, not the Sweep request:
     # HOPG/h-BN hand-pin hkl_list and bypass dominant_reflections entirely, so

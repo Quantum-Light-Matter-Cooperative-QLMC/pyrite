@@ -21,7 +21,7 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
 
 1. **High-energy electron/channeling support.** Evaluate `Geant4` or similar for REGAE@DESY-scale beams (3–5 MeV, 50 fs, 100 fC, 200–300 µm target diameter), JungFrau detector ~0.5–4.5 m from interaction point. USER QUESTION: What is rep rate?
 2.  **Bent Crystals (After add channeling + relativistic electrons)**
-3.  **Superradiant PXR/CBS** need bunch length knowledge, coherent emission *across segments* (also needed by channeling radiation as in long-term features #1, #3); this item is the coherent-sum follow-on.
+3. **Superradiant PXR/CBS validation.** Optional phased segment/electron sum is implemented but unverified; resolve phase convention and bunch-form-factor limits before scientific use. Design: [`docs/coherent-emission.md`](docs/coherent-emission.md).
 
 ## P2 - medium-priority
 
@@ -32,5 +32,6 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
 5. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
 6.  **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
 7. **Trace render UX.** Fix stale cached animation reuse/random seeds; place progress near render action; crop background/legend while keeping overlays; improve MP4 quality; add save dialog. >user<
+8. **Coherence ON-vs-OFF comparison.** Pair otherwise-identical coherent/incoherent datasets; report peak and integrated-flux ratios. Design: [`docs/coherent-emission.md`](docs/coherent-emission.md).
 
 ## P3 - lower / exploratory / small bugfixes

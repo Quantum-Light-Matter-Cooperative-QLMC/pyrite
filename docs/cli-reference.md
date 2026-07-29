@@ -135,6 +135,13 @@ Options:
                                   profile.
   --beam-bunch-charge-pc PC       Single-bunch charge [pC]; overrides the resolved
                                   profile.
+  --coherent / --incoherent       Sum CXR segment amplitudes with bunch phases
+                                  (coherent) instead of adding segment intensities
+                                  (incoherent, the default). Omit to defer to the
+                                  profile. A coherent run gets an identity-qualified
+                                  checkpoint stem (<material>--full-<digest>), so it
+                                  never shares or clobbers the incoherent <material>
+                                  checkpoint.
   --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.  [default:
                                   checkpoints]
   --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if

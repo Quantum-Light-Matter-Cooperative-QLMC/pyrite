@@ -82,8 +82,12 @@ def test_scan_click_dispatches_defaults_and_zero_workers(monkeypatch):
         "beam_long_shape": None,
         "beam_rep_rate_hz": None,
         "beam_bunch_charge_pc": None,
+        "coherent": None,
         "checkpoint_dir": "checkpoints",
         "max_minutes": None,
+        "performance_profile": None,
+        "performance_interval": 5.0,
+        "performance_dir": None,
         "progress_file": None,
         "no_progress": False,
     }

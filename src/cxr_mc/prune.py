@@ -89,7 +89,12 @@ def _current_case_keys(target: _Target) -> dict[tuple[str, float], str]:
     )
     return {
         (case["name"], float(case["E0_keV"])): _case_key(case)
-        for case in build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
+        for case in build_cases(
+            sweep,
+            settings.n_electrons,
+            settings.n_electrons_brem,
+            coherent_emission=settings.coherent_emission,
+        )
     }
 
 

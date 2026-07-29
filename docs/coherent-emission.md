@@ -1,0 +1,48 @@
+# Coherent-emission tracking
+
+`cxr scan --coherent` enables an experimental phased sum across trajectory
+segments and electrons. Default scans remain incoherent and retain their
+historical checkpoint identity. Coherent scans use identity-qualified stems, so
+the two modes cannot overwrite each other.
+
+## Model
+
+For one reciprocal vector and polarization, the opt-in path computes
+
+```text
+E_tot(E, n_hat) = sum_j A_j Q_j(E) exp[i E(t_abs,j - n_hat.r_j)/(hbar c)]
+dN/(dE dOmega) proportional to |E_tot|^2
+```
+
+where `t_abs = t_ang + t0_ang`, `Q_j` is the unsquared finite-segment sinc
+amplitude, and `t0_ang` carries each electron's longitudinal bunch offset.
+Polarizations, reciprocal vectors, and mosaic orientations still add
+incoherently. `components=True` is rejected because coherent PXR/CBS cross terms
+make a uniquely additive component split impossible.
+
+Expected limits:
+
+- `--incoherent` and the default preserve the previous path bit-for-bit.
+- One segment gives the same self-term in both modes.
+- Identical in-phase emitters give the `N^2` intensity limit before
+  per-electron normalization.
+- Randomized or sufficiently spread arrival phases should approach the
+  incoherent sum.
+- A Gaussian longitudinal distribution should give bunch form factor
+  `exp[-(omega sigma_z)^2]`.
+
+## Validation boundary
+
+Status: **unverified**. The implementation and regression limits do not
+independently establish the phase model. Before scientific use:
+
+1. derive whether the spatial phase is `k.r` or `(k + g).r`, including sign and
+   its relation to the open line-energy-dispersion discrepancy;
+2. reproduce the Gaussian bunch form factor and decoherent limit independently;
+3. anchor representative CPU/GPU cases and quantify complex-grid memory cost;
+4. obtain human sign-off through the
+   [physics validation workflow](validation/README.md).
+
+Track status in the [`coherent-emission` ledger row](physics-validation-ledger.md).
+The next product feature is pairing otherwise-identical coherent and incoherent
+checkpoints and reporting peak/integrated-flux ratios.

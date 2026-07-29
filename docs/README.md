@@ -14,6 +14,7 @@ Guides, references, and validation records. They complement:
 | [performance-profile-analysis.md](performance-profile-analysis.md) | Analyze performance-profile NDJSON, classify bottlenecks, and design controlled tuning runs | guide |
 | [sweep-profiles.md](sweep-profiles.md) | Named full/survey fidelity policies, resolved provenance, and variant checkpoint identity | guide |
 | [physics-validation-ledger.md](physics-validation-ledger.md) | Physics claim status and evidence | living ledger |
+| [coherent-emission.md](coherent-emission.md) | Optional phased segment/electron sum and validation boundary | experimental, unverified |
 | [crystal-mosaicity.md](crystal-mosaicity.md) | Analytic mosaic broadening and exact orientation averaging | implemented |
 | [detector-solid-angle.md](detector-solid-angle.md) | Default single-direction treatment and opt-in face integral | opt-in integral implemented |
 | [external-bremsstrahlung-validation.md](external-bremsstrahlung-validation.md) | Versioned external-background fixtures, comparison, fitting, and subtraction | implemented |

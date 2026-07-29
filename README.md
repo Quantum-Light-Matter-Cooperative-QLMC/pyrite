@@ -21,10 +21,12 @@ Research code; absolute predictions remain bounded by
 - **Background:** incoherent bremsstrahlung forms smooth continuum.
 
 Pipeline: Monte Carlo electron transport → segment-wise PXR+CBS and
-bremsstrahlung → layered self-absorption → instrument response. Segments add
-incoherently; reciprocal vectors within each segment add coherently. Current
-spectra also sum electrons incoherently, so bunch length alone does not change
-yield.
+bremsstrahlung → layered self-absorption → instrument response. Default spectra
+add segments/electrons incoherently; `cxr scan --coherent` opts into an
+experimental phased sum using trajectory and bunch timing. That path is
+[unverified](docs/coherent-emission.md) and must not support scientific claims
+until its phase convention and bunch-form-factor limits are independently
+validated.
 
 Core conventions: beam along +z; detector at φ = 0; positive sample tilt points
 toward detector. At θ_obs = 90°, zero tilt self-absorbs photons traveling along
@@ -107,6 +109,7 @@ claims, assumptions, and evidence live in:
 
 - [validation ledger](docs/physics-validation-ledger.md)
 - [validation method and records](docs/validation/README.md)
+- [coherent-emission design and validation boundary](docs/coherent-emission.md)
 - [crystal mosaicity](docs/crystal-mosaicity.md)
 - [atomic data sources](docs/atomic-data-sources.md)
 - [detector solid-angle treatment](docs/detector-solid-angle.md)

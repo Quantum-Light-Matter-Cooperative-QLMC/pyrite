@@ -23,6 +23,7 @@ cli-reference
 :maxdepth: 1
 
 crystal-mosaicity
+coherent-emission
 detector-solid-angle
 external-bremsstrahlung-validation
 multilayer-materials

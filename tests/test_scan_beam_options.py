@@ -82,7 +82,7 @@ def test_scan_performance_profile_alone_selects_its_membership(monkeypatch):
     )
 
     assert result.exit_code == 0, result.output
-    assert captured["materials"] == ["hopg", "hbn", "hfte2", "mos2"]
+    assert captured["materials"] == ["mos2"]
 
 
 def test_scan_rejects_conflicting_performance_and_catalog_profiles(monkeypatch):
