@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv sync --all-groups --extra viz-render"
+            "command": "rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv sync --all-groups --extra viz-render"
           }
         ]
       }
