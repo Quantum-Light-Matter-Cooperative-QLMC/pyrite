@@ -207,9 +207,9 @@ def test_build_cases_layer_radiators_match_stack():
     assert all(c["layer_radiators"] is None for c in plain)
 
     # amorphous substrate -> [film radiator, None] (substrate adds no lines)
-    amorph = build_cases(Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0), substrate="sio2"))[
-        0
-    ]
+    amorph = build_cases(
+        Sweep(material="mose2", tilt_deg=30.0, beam=BeamSpec(energy_keV=30.0), substrate="sio2")
+    )[0]
     film, sub = amorph["layer_radiators"]
     assert sub is None
     # the film radiator must match the case's scalar crystal keys exactly

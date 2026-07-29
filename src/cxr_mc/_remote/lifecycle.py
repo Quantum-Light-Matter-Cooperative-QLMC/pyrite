@@ -627,7 +627,7 @@ def pull_performance_profile(profile: str) -> list[Path]:
         '[ -d "$JOBS" ] || exit 0; '
         'for d in "$JOBS"/*/; do [ -d "$d" ] || continue; '
         f'p="$d/performance/{profile}"; [ -d "$p" ] || continue; '
-        "find \"$p\" -maxdepth 1 -type f "
+        'find "$p" -maxdepth 1 -type f '
         "\\( -name '*.ndjson' -o -name '*.nsys-rep' -o -name '*.sqlite' "
         "-o -name '*.nsys-stats.txt' \\) "
         "-printf '%f\\n' | while IFS= read -r f; do "

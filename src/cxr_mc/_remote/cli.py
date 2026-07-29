@@ -406,9 +406,7 @@ def _cli_start(args):
             "submit is still running or its viewer disconnected; skipping automatic pull"
         )
         return
-    profiling_only = (
-        getattr(args, "performance_repetitions", 1) > 1 or getattr(args, "nsys", False)
-    )
+    profiling_only = getattr(args, "performance_repetitions", 1) > 1 or getattr(args, "nsys", False)
     if args.no_pull or profiling_only:
         if profiling_only:
             emit_diagnostic(
