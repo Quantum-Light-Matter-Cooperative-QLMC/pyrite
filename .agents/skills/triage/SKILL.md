@@ -1,12 +1,12 @@
 ---
 name: triage
-description: Use when /triage is invoked with optional task-description text or user-marked backlog prose must become reviewable cxr-mc task plans, local task branches/worktrees, and canonical TODO pointers before dispatch.
+description: Use when /triage is invoked with optional task-description text or user-marked backlog prose must become reviewable, locally committed cxr-mc task plans, task branches/worktrees, and canonical TODO pointers before dispatch.
 ---
 
 # Triage
 
-Convert task prose into reviewable work. Judgment only; stop before commit,
-push, or dispatch.
+Convert task prose into reviewable, committed work. Judgment plus local setup
+commit; stop before push or dispatch.
 
 ## Input
 
@@ -37,8 +37,11 @@ push, or dispatch.
 5. For each task, replace its existing marker or insert direct-input work as one
    canonical `TODO.md` summary with branch and `tasks/<leaf>.md` pointers. Place
    it in the appropriate priority/state section. Invoke `todo-sync`.
-6. Show task docs, TODO diff, branches/worktrees, assumptions, and open
-   decisions for user review.
+6. Commit the setup on `main` in one commit: stage explicit paths only
+   (`TODO.md`, each new `tasks/<leaf>.md`); never `git add .`, never sweep
+   unrelated dirty state. Use a `docs(tasks): triage <leaf>`-style message.
+7. Show task docs, TODO diff, commit, branches/worktrees, assumptions, and open
+   decisions for user review. Address feedback by amending the setup commit.
 
-Do not commit, push, implement, or dispatch. After approval, `dispatch-task`
-owns setup commit, upstream push, worker handoff, and eventual teardown.
+Do not push, implement, or dispatch. After approval, `dispatch-task` owns
+upstream push, worker handoff, and eventual teardown.
