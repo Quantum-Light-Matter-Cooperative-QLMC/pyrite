@@ -29,7 +29,11 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
 ## P2 - medium-priority
 
 1. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-2. **Coherence ON-vs-OFF comparison.** Pair otherwise-identical coherent/incoherent datasets; report peak and integrated-flux ratios. Design: [`docs/coherent-emission.md`](docs/coherent-emission.md).
+2. **Longitudinal bunch profiles and coherence comparison.** Add charge-matched
+   200 fs Gaussian, wavelength-matched microbunch-train, and compressed-bunch
+   HOPG/h-BN profiles with paired coherent/incoherent analysis. →
+   `feature/longitudinal-bunch-profiles`;
+   [`tasks/longitudinal-bunch-profiles.md`](tasks/longitudinal-bunch-profiles.md).
 
 ## P3 - lower / exploratory / small bugfixes / on-hold
 
