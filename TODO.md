@@ -16,10 +16,7 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
 2. **Group interactive apps and exports.** Move analysis, viewer, and validation
    launch/export flows under `cxr app`.
    → `feature/cli-app-suite`; [`tasks/cli-app-suite.md`](tasks/cli-app-suite.md).
-3. **Move prune under checkpoint.** Make `cxr checkpoint prune` canonical
-   without changing prune behavior.
-   → `feature/checkpoint-prune`; [`tasks/checkpoint-prune.md`](tasks/checkpoint-prune.md).
-4. **Consolidate material command tree.** Fold catalog validation and blazed
+3. **Consolidate material command tree.** Fold catalog validation and blazed
    sweeps into `cxr material`.
    → `feature/material-command-tree`;
    [`tasks/material-command-tree.md`](tasks/material-command-tree.md).
