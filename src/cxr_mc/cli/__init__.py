@@ -11,6 +11,7 @@ from ._core import LazyGroup, color_option, run
 
 _COMMANDS = {
     "run": "cxr_mc.scan.command",
+    "setup": "cxr_mc.cli.backend_setup.command",
     "app": "cxr_mc.cli.app.command",
     "checkpoint": "cxr_mc.cli.checkpoint.command",
     "completion": "cxr_mc.cli.completion.command",
@@ -33,6 +34,7 @@ _COMMANDS = {
 
 _COMMAND_HELP = {
     "run": "Run a profile's MC sweeps and write checkpoints.",
+    "setup": "Detect GPU hardware and write CXR_MC_BACKEND to .env (first run).",
     "app": "Launch or export interactive analysis notebooks.",
     "checkpoint": "Inspect, transform, recompute, archive, and prune checkpoints.",
     "completion": "Manage cxr shell tab-completion.",
@@ -88,6 +90,7 @@ def command() -> None:
 
     \b
     Examples:
+      cxr setup
       cxr profile list
       cxr profile show sub_100keV
       cxr run sub_100keV -m hopg

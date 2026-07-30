@@ -57,6 +57,7 @@ Usage: cxr [OPTIONS] COMMAND [ARGS]...
   Run ``cxr COMMAND --help`` for command options, units, defaults, and side effects.
 
   Examples:
+    cxr setup
     cxr profile list
     cxr profile show sub_100keV
     cxr run sub_100keV -m hopg
@@ -71,6 +72,7 @@ Options:
 
 Commands:
   run          Run a profile's MC sweeps and write checkpoints.
+  setup        Detect GPU hardware and write CXR_MC_BACKEND to .env (first run).
   app          Launch or export interactive analysis notebooks.
   checkpoint   Inspect, transform, recompute, archive, and prune checkpoints.
   completion   Manage cxr shell tab-completion.
@@ -126,6 +128,25 @@ Options:
                                provisional and reduced.  [default: full]
   --json                       Emit one versioned JSON object on stdout.
   -h, --help                   Show this message and exit.
+```
+
+## `cxr setup`
+
+```text
+Usage: cxr setup [OPTIONS]
+
+  Detect installed GPU hardware and write CXR_MC_BACKEND to repo-root .env.
+
+  Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-ls/lspci) --
+  no vendor Python package (cupy, dpnp/dpctl) needs to be installed first. Prompts
+  interactively to opt into an accelerator; defaults to cpu if none is detected,
+  declined, or the session is non-interactive. A no-op once CXR_MC_BACKEND is already
+  set in .env, unless --force is given.
+
+Options:
+  -y, --yes   Accept the top detected accelerator without an interactive prompt.
+  --force     Re-run detection and overwrite an existing CXR_MC_BACKEND value in .env.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr app`
