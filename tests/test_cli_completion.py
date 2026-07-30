@@ -185,7 +185,7 @@ def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
         _callback(cli.command.commands["pull"], "material")
         is _cli_completion.complete_remote_checkpoint_stem
     )
-    for name in ("attach", "status", "logs"):
+    for name in ("status", "logs"):
         assert _callback(cli.command.commands[name], "jobid") is _cli_completion.complete_job_id
     values = _parameter(cli.command.commands["run"], "parallel_materials").shell_complete(None, "")
     assert _values(values) == ["1", "2", "3", "4"]

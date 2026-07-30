@@ -13,7 +13,6 @@ REMOTE_COMMANDS = (
     "run",
     "rebrem",
     "reline",
-    "attach",
     "jobs",
     "status",
     "logs",
