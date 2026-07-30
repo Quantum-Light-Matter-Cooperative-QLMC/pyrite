@@ -11,7 +11,7 @@ workers.
 import os
 import sys
 import warnings
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from time import perf_counter
 from typing import Any
 
@@ -20,7 +20,14 @@ import psutil
 
 from .._energy_grid import decode_energy_grid
 from . import spectrum as _spectrum_mod
-from ._backend import _GPU, REAL, cp
+from ._backend import (
+    _GPU,
+    BACKEND,
+    REAL,
+    BackendResourceError,
+    BackendUnavailableError,
+)
+from ._resources import admitted_chunk, resolve_resource_policy
 from .geometry import tilted_geometry
 from .groove import blazed_groove_spec
 from .spectrum import _segments_in_layer, mc_brem_spectrum, mc_spectrum
@@ -63,6 +70,7 @@ def _env_chunk(name, default):
 # the energy-grid width via _adaptive_chunk; a positive CXR_MC_SPEC_CHUNK /
 # CXR_MC_BREM_CHUNK env value pins a fixed chunk (A1 sweep-accel spike), and an
 # explicit per-case spec_chunk/brem_chunk still wins over both.
+_RESOURCE_POLICY = resolve_resource_policy(BACKEND)
 _SPEC_CHUNK = _env_chunk("CXR_MC_SPEC_CHUNK", 0)
 _BREM_CHUNK = _env_chunk("CXR_MC_BREM_CHUNK", 0)
 # Transient-memory budget [MB] for one spectrum matmul. The chunk loops in
@@ -70,7 +78,12 @@ _BREM_CHUNK = _env_chunk("CXR_MC_BREM_CHUNK", 0)
 # (x, S = sinc(x)**2, and sinc's internal temporary), so transient bytes
 # ~= 3 * chunk * nbins * 8. Default 1920 MB reproduces the old fixed
 # chunk=40000 exactly on the pre-2026-07 ~2000-bin line grid.
-_SPEC_BUDGET_MB = _env_chunk("CXR_MC_SPEC_BUDGET_MB", 1920)
+_POLICY_DEVICE_MB = (
+    _RESOURCE_POLICY.device_budget_bytes // (1 << 20)
+    if _RESOURCE_POLICY.device_budget_bytes is not None
+    else 1920
+)
+_SPEC_BUDGET_MB = _env_chunk("CXR_MC_SPEC_BUDGET_MB", min(1920, _POLICY_DEVICE_MB))
 
 
 def _adaptive_chunk(nbins):
@@ -91,13 +104,27 @@ def _adaptive_chunk(nbins):
     """
     worker_intermediate_arrays = 3
     per_row_bytes = worker_intermediate_arrays * nbins * _REAL_BYTES
-    adaptive_chunk_size = 1_000_000 * _SPEC_BUDGET_MB // per_row_bytes
-    return max(1000, min(adaptive_chunk_size, 100_000))
+    requested = max(1000, min(1_000_000 * _SPEC_BUDGET_MB // per_row_bytes, 100_000))
+    return admitted_chunk(
+        requested_chunk=requested,
+        bins=nbins,
+        itemsize=_REAL_BYTES,
+        budget_bytes=_RESOURCE_POLICY.device_budget_bytes if _GPU else None,
+    )
+
+
+def _admit_chunk(chunk, bins):
+    return admitted_chunk(
+        requested_chunk=int(chunk),
+        bins=int(bins),
+        itemsize=_REAL_BYTES,
+        budget_bytes=_RESOURCE_POLICY.device_budget_bytes if _GPU else None,
+    )
 
 
 def _nsys_range(message):
     """Return an NVTX range when the remote Nsight profiler is enabled."""
-    if not (_GPU and _NSYS):
+    if not (_GPU and _NSYS and BACKEND.name == "cuda"):
         return nullcontext()
     from cupyx.profiler import time_range
 
@@ -121,7 +148,7 @@ def _process_pool_kwargs():
 # the sync/realloc across cases; drop to 1 (CXR_MC_FREE_EVERY=1) for the old
 # per-case cadence, or set a watermark below. Read once at import; the GPU free
 # path is driver-process only (workers run transport), so no locking.
-_FREE_EVERY = _env_chunk("CXR_MC_FREE_EVERY", 8)  # free the pool every N GPU cases (1 = per-case)
+_FREE_EVERY = _env_chunk("CXR_MC_FREE_EVERY", _RESOURCE_POLICY.release_every)
 # Per-worker host-RAM budget [MB] for the full-case CPU pool. Default is the
 # measured footprint from the 2026-07-18 OOM'd coarse run on qlmc: the killed
 # worker held ~5.5 GB anon-rss at 200 keV (ne=500, 30000 eV grid), rounded up.
@@ -135,7 +162,18 @@ _pool_peak_bytes = 0  # high-water reserved pool size, for the A2 operational wa
 # Cap the CuPy default pool so an over-budget alloc raises a *catchable*
 # OutOfMemoryError before the driver hard-OOMs the process. Fraction of total
 # VRAM; <=0 disables the cap (no-op, original unbounded behaviour).
-_GPU_POOL_FRAC = float(os.environ.get("CXR_MC_GPU_POOL_FRAC", "0.85"))
+_GPU_POOL_FRAC = float(
+    os.environ.get(
+        "CXR_MC_GPU_POOL_FRAC",
+        (
+            str(_RESOURCE_POLICY.device_budget_bytes / BACKEND.device.total_memory_bytes)
+            if _GPU
+            and _RESOURCE_POLICY.device_budget_bytes is not None
+            and BACKEND.device.total_memory_bytes
+            else "0"
+        ),
+    )
+)
 # Number of scan processes sharing this one GPU (the remote queue's
 # parallel_materials runs that many `cxr run` processes concurrently on the
 # single card, each its own CUDA context + pool). The queue script exports this;
@@ -144,9 +182,9 @@ _GPU_POOL_FRAC = float(os.environ.get("CXR_MC_GPU_POOL_FRAC", "0.85"))
 # (a lone process gets the full FRAC) -- today's behaviour bit-for-bit.
 _GPU_POOL_SHARE = max(1, _env_chunk("CXR_MC_GPU_SHARE", 1))
 # How many times a single GPU case may halve its chunk and retry on OOM.
-_GPU_OOM_RETRIES = _env_chunk("CXR_MC_GPU_OOM_RETRIES", 3)
+_GPU_OOM_RETRIES = _env_chunk("CXR_MC_GPU_OOM_RETRIES", _RESOURCE_POLICY.oom_retries)
 # Catchable OOM type, empty tuple on a CPU box so `except _GPU_OOM` never fires
-_GPU_OOM = (cp.cuda.memory.OutOfMemoryError,) if cp is not None else ()
+_GPU_OOM = BACKEND.oom_exceptions
 _pool_limit_set = False
 
 
@@ -182,14 +220,13 @@ def _maybe_free_pool():
     (1 / off) reproduces the original per-case free exactly. Driver-process only,
     so the module counter needs no lock."""
     global _cases_since_free, _pool_peak_bytes
-    assert cp is not None  # only called when _GPU is True
-    pool = cp.get_default_memory_pool()
-    reserved = pool.total_bytes()
+    stats = BACKEND.allocator_stats()
+    reserved = int((stats["reserved_mib"] or 0) * (1 << 20))
     if reserved > _pool_peak_bytes:
         _pool_peak_bytes = reserved
     _cases_since_free += 1
     if _should_free(_cases_since_free, _FREE_EVERY, reserved, _FREE_WATERMARK_MB):
-        pool.free_all_blocks()
+        BACKEND.release_memory()
         _cases_since_free = 0
 
 
@@ -203,9 +240,9 @@ def _ensure_pool_limit():
     `_GPU_POOL_SHARE` so co-tenant scan processes on one GPU sum to _GPU_POOL_FRAC
     rather than oversubscribing it."""
     global _pool_limit_set
-    if _pool_limit_set or not _GPU or cp is None or _GPU_POOL_FRAC <= 0:
+    if _pool_limit_set or not _GPU or _GPU_POOL_FRAC <= 0:
         return
-    cp.get_default_memory_pool().set_limit(fraction=_GPU_POOL_FRAC / _GPU_POOL_SHARE)
+    BACKEND.set_memory_limit(_GPU_POOL_FRAC / _GPU_POOL_SHARE)
     _pool_limit_set = True
 
 
@@ -260,9 +297,16 @@ class _TimingAgg:
                 "_cupy_pool_used_mib",
                 "_cupy_pool_reserved_mib",
                 "_cupy_pool_peak_mib",
+                "_allocator_used_mib",
+                "_allocator_reserved_mib",
+                "_allocator_peak_mib",
+                "_backend",
+                "_backend_vendor",
+                "_backend_device",
             )
             if key in out
         }
+        fallback_reason = out.pop("_backend_fallback_reason", None)
         return {
             "timed_case_count": max(len(self.transport), len(self.spectrum)),
             "transport_seconds": t,
@@ -272,6 +316,11 @@ class _TimingAgg:
             "spectrum_seconds_total": self.spectrum_total,
             "driver_wait_seconds_total": self.wait_total,
             "gpu_oom_retry_count": retries,
+            **(
+                {"backend_fallback_reason": fallback_reason}
+                if fallback_reason is not None
+                else {}
+            ),
             **chunk_metrics,
             **pool,
         }
@@ -504,7 +553,10 @@ def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers, groove=Non
     ``brem_chunk`` (segments per GPU matmul). Pure move of _spectrum_case's brem
     block; shared with :func:`_brem_for_case` so a brem-only repair regenerates
     the SAME multilayer background as a live sweep."""
-    brem_chunk = case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(E_brem.size)
+    brem_chunk = _admit_chunk(
+        case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(E_brem.size),
+        E_brem.size,
+    )
     n_lay = int(segs_b.get("n_layers", 1))
     if n_lay == 1:
         return mc_brem_spectrum(
@@ -594,7 +646,10 @@ def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove):
         mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
         mosaic_nodes=case.get("mosaic_mc_nodes", 1),
     )
-    spec_chunk = case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(E_grid.size)
+    spec_chunk = _admit_chunk(
+        case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(E_grid.size),
+        E_grid.size,
+    )
     coherent = bool(case.get("coherent_emission", False))
     if radiators is None:
         return mc_spectrum(
@@ -683,12 +738,18 @@ def _lines_for_case(case, E_grid):
 
 def _effective_spec_chunk(case, tp):
     """Resolve one case's line-spectrum chunk without changing the case."""
-    return case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(tp["E_grid"].size)
+    return _admit_chunk(
+        case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(tp["E_grid"].size),
+        tp["E_grid"].size,
+    )
 
 
 def _effective_brem_chunk(case, tp):
     """Resolve one case's bremsstrahlung chunk without changing the case."""
-    return case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(tp["E_brem"].size)
+    return _admit_chunk(
+        case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(tp["E_brem"].size),
+        tp["E_brem"].size,
+    )
 
 
 def _halve_case_spec_chunk(case, tp):
@@ -752,8 +813,7 @@ def _spectrum_case_retry(
         except _SpectrumPhaseOOM as tagged:
             if attempt == max_retries:
                 raise tagged.error from tagged
-            if cp is not None:
-                cp.get_default_memory_pool().free_all_blocks()
+            BACKEND.release_memory()
             work = dict(work)
             if tagged.phase == "line":
                 line_retries += 1
@@ -764,8 +824,7 @@ def _spectrum_case_retry(
         except _GPU_OOM:
             if attempt == max_retries:
                 raise
-            if cp is not None:
-                cp.get_default_memory_pool().free_all_blocks()
+            BACKEND.release_memory()
             work = dict(work)
             generic_retries += 1
             _halve_case_chunks(work, tp)
@@ -827,12 +886,19 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # can't accumulate (and fragment) across a long sweep until it fills the card.
     if _GPU:
         _maybe_free_pool()
-        if timed and cp is not None:
-            pool = cp.get_default_memory_pool()
+        if timed:
+            stats = BACKEND.allocator_stats()
             out_pool = {
-                "_cupy_pool_used_mib": pool.used_bytes() / (1 << 20),
-                "_cupy_pool_reserved_mib": pool.total_bytes() / (1 << 20),
-                "_cupy_pool_peak_mib": _pool_peak_bytes / (1 << 20),
+                "_allocator_used_mib": stats["used_mib"],
+                "_allocator_reserved_mib": stats["reserved_mib"],
+                "_allocator_peak_mib": stats["peak_mib"],
+                # Additive legacy aliases keep cxr.performance.v1 readers valid.
+                "_cupy_pool_used_mib": stats["used_mib"],
+                "_cupy_pool_reserved_mib": stats["reserved_mib"],
+                "_cupy_pool_peak_mib": stats["peak_mib"],
+                "_backend": BACKEND.name,
+                "_backend_vendor": BACKEND.vendor,
+                "_backend_device": BACKEND.device.name,
             }
         else:
             out_pool = {}
@@ -904,6 +970,21 @@ def _worker_init(force_cpu=False):
             pass
 
 
+@contextmanager
+def _cpu_spectrum_backend():
+    """Temporarily execute spectrum helpers with NumPy in the driver."""
+
+    global _GPU
+    previous = (_GPU, _spectrum_mod.xp, _spectrum_mod.REAL)
+    _GPU = False
+    _spectrum_mod.xp = np
+    _spectrum_mod.REAL = np.float64
+    try:
+        yield
+    finally:
+        _GPU, _spectrum_mod.xp, _spectrum_mod.REAL = previous
+
+
 def _available_mem_mb():
     """Return available system memory in MB"""
     return psutil.virtual_memory().available // 1_000_000
@@ -917,6 +998,24 @@ def _mem_worker_cap():
     oversubscribe host RAM and re-create the 2026-07-18 qlmc OOM, where the
     kernel killed one worker and ``BrokenProcessPool`` lost the whole run."""
     return min(_available_mem_mb(), int(_TOTAL_MEM * 0.85)) // _WORKER_MEM_MB
+
+
+def _admit_cpu_fallback():
+    """Require one policy-budgeted host worker before accelerator fallback."""
+
+    budget = min(
+        _available_mem_mb(),
+        max(
+            0,
+            int(_TOTAL_MEM * _RESOURCE_POLICY.host_fraction)
+            - _RESOURCE_POLICY.host_reserve_bytes // 1_000_000,
+        ),
+    )
+    if budget < _WORKER_MEM_MB:
+        raise BackendResourceError(
+            f"{_RESOURCE_POLICY.name} policy cannot admit CPU fallback: "
+            f"{budget} MiB budgeted, {_WORKER_MEM_MB} MiB required"
+        )
 
 
 def _gpu_pipeline_workers(max_workers, n):
@@ -980,14 +1079,20 @@ def case_runtime_plan(case):
     line_grid = decode_energy_grid(case.get("E_grid", []))
     brem_grid = decode_energy_grid(case.get("E_grid_brem", []))
     spec_chunk = (
-        case.get("spec_chunk")
-        or _SPEC_CHUNK
-        or (_adaptive_chunk(line_grid.size) if line_grid.size else None)
+        _admit_chunk(
+            case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(line_grid.size),
+            line_grid.size,
+        )
+        if line_grid.size
+        else None
     )
     brem_chunk = (
-        case.get("brem_chunk")
-        or _BREM_CHUNK
-        or (_adaptive_chunk(brem_grid.size) if brem_grid.size else None)
+        _admit_chunk(
+            case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(brem_grid.size),
+            brem_grid.size,
+        )
+        if brem_grid.size
+        else None
     )
     return {
         "spec_chunk": spec_chunk,
@@ -1018,6 +1123,21 @@ def runtime_plan(cases, max_workers=None, engine="auto"):
         "requested_workers": max_workers,
         "effective_workers": workers,
         "worker_memory_budget_mib": _WORKER_MEM_MB,
+        "backend": BACKEND.name,
+        "backend_vendor": BACKEND.vendor,
+        "backend_device": BACKEND.device.name,
+        "resource_policy_requested": _RESOURCE_POLICY.requested,
+        "resource_policy": _RESOURCE_POLICY.name,
+        "device_memory_budget_mib": (
+            _RESOURCE_POLICY.device_budget_bytes / (1 << 20)
+            if _RESOURCE_POLICY.device_budget_bytes is not None
+            else None
+        ),
+        "device_memory_reserve_mib": (
+            _RESOURCE_POLICY.device_reserve_bytes / (1 << 20)
+            if _RESOURCE_POLICY.device_reserve_bytes is not None
+            else None
+        ),
         "gpu_pool_fraction": _GPU_POOL_FRAC,
         "gpu_pool_share": _GPU_POOL_SHARE,
         "spectrum_budget_mib": _SPEC_BUDGET_MB,
@@ -1094,11 +1214,10 @@ def run_cases(
         raise ValueError(f"engine must be one of 'auto', 'gpu', 'cpu'; got {engine!r}")
     use_gpu = _GPU if engine == "auto" else engine == "gpu"
     if engine == "gpu" and not _GPU:
-        warnings.warn(
-            "run_cases(engine='gpu') requested but no GPU is present; falling back to the CPU pool",
-            stacklevel=2,
+        raise BackendUnavailableError(
+            "run_cases(engine='gpu') requested but no supported accelerator is available; "
+            "install cxr-mc[nvidia], cxr-mc[amd], or cxr-mc[intel], or use engine='auto'"
         )
-        use_gpu = False
 
     progress_label = _case_progress_label(cases)
 
@@ -1124,6 +1243,21 @@ def run_cases(
     results: list[Any] = [None] * n
     if n == 0:
         return results
+    fallback_reason = None
+    if use_gpu:
+        try:
+            case_runtime_plan(cases[0])
+        except BackendResourceError as error:
+            if engine != "auto" or os.environ.get("CXR_MC_BACKEND", "auto").lower() != "auto":
+                raise
+            _admit_cpu_fallback()
+            fallback_reason = f"device_budget_infeasible: {error}"
+            warnings.warn(
+                f"{fallback_reason}; falling back to CPU NumPy",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            use_gpu = False
 
     timing = _TimingAgg() if _TIMING or on_timing is not None else None
 
@@ -1139,6 +1273,7 @@ def run_cases(
                 "_attempted_brem_chunk",
                 "_effective_brem_chunk",
                 "_learned_spec_chunk",
+                "_backend_fallback_reason",
             ):
                 out.pop(key, None)
             return
@@ -1159,17 +1294,21 @@ def run_cases(
             )
 
     def _serial():
-        for i in _maybe_bar(range(n)):
-            if should_stop is not None and should_stop():
-                break
-            _activity("serial_case", i, in_flight_case_count=1)
-            out = run_case(cases[i], True) if on_timing is not None else run_case(cases[i])
-            _collect_timing(i, out)
-            results[i] = out
-            if callback is not None:
-                callback(i, cases[i], out)
-            if not keep_results:
-                results[i] = None
+        force_cpu = not use_gpu and _GPU
+        with _cpu_spectrum_backend() if force_cpu else nullcontext():
+            for i in _maybe_bar(range(n)):
+                if should_stop is not None and should_stop():
+                    break
+                _activity("serial_case", i, in_flight_case_count=1)
+                out = run_case(cases[i], True) if on_timing is not None else run_case(cases[i])
+                if fallback_reason is not None:
+                    out["_backend_fallback_reason"] = fallback_reason
+                _collect_timing(i, out)
+                results[i] = out
+                if callback is not None:
+                    callback(i, cases[i], out)
+                if not keep_results:
+                    results[i] = None
         _activity("idle", in_flight_case_count=0)
         if _TIMING and timing is not None:
             timing.report("serial", nw=1)
@@ -1240,18 +1379,35 @@ def run_cases(
                     in_flight_case_count=len(inflight),
                     transport_prefetch_count=prefetch,
                 )
-                out = (
-                    _spectrum_case_retry(
-                        cases[i],
-                        tp,
-                        record_timing=True,
-                        spec_chunk_cap=learned_spec_chunk,
+                try:
+                    out = (
+                        _spectrum_case_retry(
+                            cases[i],
+                            tp,
+                            record_timing=True,
+                            spec_chunk_cap=learned_spec_chunk,
+                        )
+                        if on_timing is not None
+                        else _spectrum_case_retry(
+                            cases[i], tp, spec_chunk_cap=learned_spec_chunk
+                        )
+                    )  # accelerator, THIS process only
+                except _GPU_OOM as error:
+                    if (
+                        engine != "auto"
+                        or os.environ.get("CXR_MC_BACKEND", "auto").lower() != "auto"
+                    ):
+                        raise
+                    _admit_cpu_fallback()
+                    reason = f"accelerator_oom_retries_exhausted: {error}"
+                    warnings.warn(
+                        f"{reason}; rerunning spectrum phase on CPU NumPy",
+                        RuntimeWarning,
+                        stacklevel=2,
                     )
-                    if on_timing is not None
-                    else _spectrum_case_retry(
-                        cases[i], tp, spec_chunk_cap=learned_spec_chunk
-                    )
-                )  # GPU, THIS process only
+                    with _cpu_spectrum_backend():
+                        out = _spectrum_case(cases[i], tp, on_timing is not None)
+                    out["_backend_fallback_reason"] = reason
                 line_retries = out.get("_line_gpu_oom_retries", 0)
                 effective_spec_chunk = out.get("_effective_spec_chunk")
                 if line_retries and effective_spec_chunk is not None:
@@ -1283,7 +1439,7 @@ def run_cases(
     with ProcessPoolExecutor(
         max_workers=max_workers,
         initializer=_worker_init,
-        initargs=(engine == "cpu",),
+        initargs=(not use_gpu and _GPU,),
         **_process_pool_kwargs(),
     ) as ex:
         futures = {

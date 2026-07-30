@@ -315,3 +315,26 @@ Stop on unavailable acceptance hardware, mutually incompatible dependency
 resolution, a candidate backend missing required complex/interpolation/einsum
 semantics, unexplained numerical drift, checkpoint identity changes, or
 unrelated dirty work outside explicit paths.
+
+## Implementation evidence (2026-07-29)
+
+- Ported compute-performance commits `002b8e8`, `ee26601`, and `bfa1381` as
+  scoped cherry-picks before backend edits. This preserves the learned
+  non-increasing successful line-chunk cap, phase-specific line/brem/generic
+  OOM retries and telemetry, and failed-session exclusion without merging the
+  other task's divergent `TODO.md` or branch-local docs.
+- Base dependencies are CPU-only. Vendor extras are `nvidia` (CUDA CuPy),
+  `amd` (Python-3.13-compatible upstream CuPy ROCm source build), and `intel`
+  (`dpnp` + `dpctl`). AMD's `amd-cupy 13.5.1` index wheel was rejected because
+  it exposes only `cp310`, while cxr-mc requires Python 3.13 or newer.
+- Intel host validation selected Level Zero `gpu:0`,
+  `Intel(R) Graphics [0x5693]`, 4,128,911,360 bytes, 128 compute units, no
+  fp64. `auto` resolved `conservative` with a 1,981,427,712-byte device budget
+  and 2,147,483,648-byte reserve.
+- Tiny Arc checks passed both finite line and bremsstrahlung chunk-invariance
+  kernels, followed by one end-to-end 1-electron line-plus-bremsstrahlung
+  `run_case`; all returned spectra were finite. This is functional evidence,
+  not a performance conclusion.
+- AMD hardware validation remains an explicit unfinished acceptance gate. No
+  ROCm support claim or cross-vendor performance claim is made without an
+  approved AMD device.

@@ -8,7 +8,6 @@ dependencies = [
     "altair>=6.2.2",
     "anywidget>=0.9",
     "click>=8.4.1",
-    "cupy-cuda13x[ctk]>=14.1.1",
     "datashader>=0.19.1",
     "crystals>=1.7,<2",
     "marimo[recommended]>=0.23.11",
@@ -30,11 +29,23 @@ dependencies = [
     "vl-convert-python>=1.9.0.post1",
     "xraydb>=4.5.8",
     "psutil>=7.2.2",
-    "dpctl>=0.22.1",
     "ty>=0.0.63",
 ]
 
 [project.optional-dependencies]
+nvidia = [
+    "cupy-cuda13x[ctk]>=14.1.1",
+]
+# AMD's current ``amd-cupy`` wheels are CPython 3.10-only. cxr-mc requires
+# Python 3.13+, so this extra builds upstream CuPy against ROCm instead. It must
+# not be installed beside the CUDA CuPy distribution in one environment.
+amd = [
+    "cupy>=13.4.0",
+]
+intel = [
+    "dpctl>=0.22.1",
+    "dpnp>=0.20.0",
+]
 # Offscreen prerendered viewer-animation path (src/cxr_mc/plots/render_trajectories.py).
 # Not a default dependency -- keeps `uv sync` lean; install with
 # `uv sync --extra viz-render`.

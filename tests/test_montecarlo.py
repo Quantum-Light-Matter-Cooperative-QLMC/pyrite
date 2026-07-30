@@ -604,19 +604,15 @@ def test_run_cases_engine_cpu_forces_cpu_pool_when_gpu_present(monkeypatch):
     assert _SyncProcessPoolExecutor.captured["initargs"] == (True,)
 
 
-def test_run_cases_engine_gpu_falls_back_to_cpu_pool_with_warning(monkeypatch):
+def test_run_cases_engine_gpu_errors_when_accelerator_unavailable(monkeypatch):
     from cxr_mc.montecarlo import runner
+    from cxr_mc.montecarlo._backend import BackendUnavailableError
 
     monkeypatch.setattr(runner, "_GPU", False)
-    monkeypatch.setattr(runner, "run_case", lambda case: {"name": case["name"]})
-    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
 
     cases = [{"name": f"c{i}"} for i in range(3)]
-    with pytest.warns(UserWarning, match="engine='gpu'"):
-        results = runner.run_cases(cases, max_workers=2, progress=False, engine="gpu")
-
-    assert [r["name"] for r in results] == ["c0", "c1", "c2"]
-    assert _SyncProcessPoolExecutor.captured["initargs"] == (False,)  # engine != "cpu"
+    with pytest.raises(BackendUnavailableError, match="engine='gpu'"):
+        runner.run_cases(cases, max_workers=2, progress=False, engine="gpu")
 
 
 def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():

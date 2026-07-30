@@ -167,7 +167,9 @@ def _sample_bunch_offsets(
 
 def beta_from_keV(E_keV):
     g = 1.0 + E_keV / 510.99895
-    return np.sqrt(1.0 - 1.0 / g**2)
+    # Exponentiation stays in the input array namespace. dpnp deliberately
+    # disables NumPy's ``__array_ufunc__`` bridge, unlike CuPy.
+    return (1.0 - 1.0 / g**2) ** 0.5
 
 
 # ---- elastic scattering models ------------------------------------------------

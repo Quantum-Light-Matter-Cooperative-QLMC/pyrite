@@ -70,6 +70,13 @@ def test_remote_host_rejects_ssh_option_and_shell_syntax_before_subprocess(monke
         transport._ssh_capture(":")
 
 
+def test_non_nvidia_remote_vendor_fails_before_script_generation(monkeypatch):
+    monkeypatch.setattr(config, "REMOTE_GPU_VENDOR", "amd")
+
+    with pytest.raises(ValueError, match="do not yet support amd"):
+        scripts._slurm_batch_script("job1", "echo ok", job_name="cxr-test")
+
+
 def test_sync_rejects_hostile_scp_host_before_transport(monkeypatch):
     monkeypatch.setattr(config, "HOST", "-oProxyCommand=touch-/tmp/pwn")
     monkeypatch.setattr(config, "SYNC_PATHS", [])

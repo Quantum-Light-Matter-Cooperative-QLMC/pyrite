@@ -8,6 +8,7 @@ from pathlib import Path, PurePosixPath
 HOST = os.environ.get("CXR_REMOTE_HOST", "qlmc")
 REMOTE_DIR = os.environ.get("CXR_REMOTE_DIR", "/home/aamador/dev/cxr-mc")
 REMOTE_UV = os.environ.get("CXR_REMOTE_UV", "/home/aamador/.local/bin/uv")
+REMOTE_GPU_VENDOR = os.environ.get("CXR_REMOTE_GPU_VENDOR", "nvidia")
 SLURM_PARTITION = "gpu"
 SLURM_GPUS = 1
 SLURM_CPUS_PER_MATERIAL = 8
@@ -106,6 +107,18 @@ def remote_uv() -> str:
         raise SystemExit(
             f"invalid CXR_REMOTE_UV={value!r}: expected executable name such as 'uv' "
             "or absolute POSIX path, not shell program text"
+        )
+    return value
+
+
+def remote_gpu_vendor() -> str:
+    """Return validated remote accelerator vendor capability selector."""
+
+    value = str(REMOTE_GPU_VENDOR).strip().lower()
+    if value not in {"nvidia", "amd", "intel"}:
+        raise SystemExit(
+            "invalid CXR_REMOTE_GPU_VENDOR="
+            f"{REMOTE_GPU_VENDOR!r}: expected nvidia, amd, or intel"
         )
     return value
 
