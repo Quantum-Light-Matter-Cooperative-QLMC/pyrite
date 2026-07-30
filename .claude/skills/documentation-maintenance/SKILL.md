@@ -25,8 +25,8 @@ Do not rewrite dated `docs/superpowers/{plans,specs}/`.
 ## Verify touched artifacts
 
 - CLI: run generator `--write`, then `--check`.
-- Ownership: `scripts/dev.py repo-map`.
+- Ownership: `cxr-dev repo-map`.
 - Docs/public API/navigation: strict `sphinx-build -W`.
-- Skills: `scripts/dev.py sync-skills`, then `check-skills`.
+- Skills: `cxr-dev sync-skills`, then `check-skills`.
 
 Inspect scoped diff; report checks and evidence gaps.

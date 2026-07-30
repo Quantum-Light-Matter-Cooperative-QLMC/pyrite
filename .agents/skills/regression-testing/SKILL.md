@@ -25,7 +25,7 @@ Report original symptom, pre-fix failure, seed/tolerance rationale, and focused
 command:
 
 ```bash
-uv run python scripts/dev.py test tests/path/to/test.py -k test_name
+uv run cxr-dev test tests/path/to/test.py -k test_name
 ```
 
 - Snapshotting a large array when a physical invariant is the real contract.

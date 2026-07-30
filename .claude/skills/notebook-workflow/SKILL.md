@@ -15,5 +15,5 @@ Put reusable logic in `src/cxr_mc/`; keep apps thin. Add no new `.ipynb`
 workflows. Keep legacy notebook output-free.
 
 After marimo edits run `uv run marimo check <app.py>`. For legacy notebook run
-`scripts/dev.py nbqa` before edits and `nbstrip` before handoff. Use
-`scripts/dev.py verify` for full repository verification.
+`cxr-dev nbqa` before edits and `nbstrip` before handoff. Use
+`cxr-dev verify` for full repository verification.

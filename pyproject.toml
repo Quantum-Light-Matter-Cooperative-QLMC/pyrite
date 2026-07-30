@@ -57,6 +57,7 @@ viz-render = [
 
 [project.scripts]
 cxr = "cxr_mc.cli:main"
+cxr-dev = "cxr_mc._dev:main"
 
 [build-system]
 requires = ["hatchling"]

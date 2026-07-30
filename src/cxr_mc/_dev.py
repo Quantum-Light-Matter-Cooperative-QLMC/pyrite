@@ -1,10 +1,9 @@
-#!/usr/bin/env python3
 """Small cross-platform developer command runner for cxr_mc.
 
 This keeps agents and humans out of shell one-liner hell on Windows.
-Run via:
+Exposed as the ``cxr-dev`` console script (see ``[project.scripts]``); run via:
 
-    uv run python scripts/dev.py <command>
+    uv run cxr-dev <command>
 
 Commands:
     acp-up     start the Claude and Codex ACP WebSocket bridges
@@ -37,7 +36,7 @@ import yaml
 
 from cxr_mc._acp import ACP_SERVERS, start_acp_servers, stop_acp_servers
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 AGENT_SKILLS_DIR = ROOT / ".agents" / "skills"
 CLAUDE_SKILLS_DIR = ROOT / ".claude" / "skills"
 LEGACY_NOTEBOOK = ROOT / "checks" / "cxr_analysis_feranchuk.ipynb"
@@ -55,7 +54,7 @@ def run(*args: str, cwd: Path = ROOT) -> None:
 def cmd_acp_up(_: argparse.Namespace) -> None:
     processes = start_acp_servers()
     print("ACP bridges running:")
-    for name, (_, port) in ACP_SERVERS.items():
+    for name, (_host, port) in ACP_SERVERS.items():
         print(f"  {name}: ws://localhost:{port}")
     print("Press Ctrl-C to stop both bridges, or run acp-down from another terminal.")
     try:
@@ -113,19 +112,19 @@ def cmd_repo_map(_: argparse.Namespace) -> None:
     print()
     print("Canonical commands:")
     for line in [
-        "uv run python scripts/dev.py acp-up",
-        "uv run python scripts/dev.py acp-down",
-        "uv run python scripts/dev.py lint",
-        "uv run python scripts/dev.py format",
-        "uv run python scripts/dev.py typecheck",
-        "uv run python scripts/dev.py precommit",
-        "uv run python scripts/dev.py test",
-        "uv run python scripts/dev.py smoke --material hopg --output-dir /tmp/cxr-mc-smoke",
-        "uv run python scripts/dev.py sync-skills",
-        "uv run python scripts/dev.py check-skills",
-        "uv run python scripts/dev.py verify",
-        "uv run python scripts/dev.py nbqa",
-        "uv run python scripts/dev.py nbstrip",
+        "uv run cxr-dev acp-up",
+        "uv run cxr-dev acp-down",
+        "uv run cxr-dev lint",
+        "uv run cxr-dev format",
+        "uv run cxr-dev typecheck",
+        "uv run cxr-dev precommit",
+        "uv run cxr-dev test",
+        "uv run cxr-dev smoke --material hopg --output-dir /tmp/cxr-mc-smoke",
+        "uv run cxr-dev sync-skills",
+        "uv run cxr-dev check-skills",
+        "uv run cxr-dev verify",
+        "uv run cxr-dev nbqa",
+        "uv run cxr-dev nbstrip",
     ]:
         print(f"  {line}")
 
@@ -324,7 +323,7 @@ def cmd_regen_golden(args: argparse.Namespace) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="dev.py")
+    ap = argparse.ArgumentParser(prog="cxr-dev")
     sub = ap.add_subparsers(dest="command", required=True)
 
     for name, fn in [

@@ -22,15 +22,15 @@ prose keep required format.
 Use project runner; never bare `pytest`, `.venv/bin/python`, or path-hack imports.
 
 ```bash
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test path/to/test.py -k test_name
-CXR_ONLINE_TESTS=1 rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py test
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py lint
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py format
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py typecheck
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py nbstrip
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py verify
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py precommit
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test path/to/test.py -k test_name
+CXR_ONLINE_TESTS=1 rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev lint
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev format
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev typecheck
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev nbstrip
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev verify
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev precommit
 ```
 
 If `uv run` cannot write project environment, add

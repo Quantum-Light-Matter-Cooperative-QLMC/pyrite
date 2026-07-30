@@ -8,15 +8,12 @@ from pathlib import Path
 
 import pytest
 
+from cxr_mc import _dev
+
 
 @pytest.fixture
 def dev_module():
-    path = Path(__file__).parents[1] / "scripts" / "dev.py"
-    spec = importlib.util.spec_from_file_location("cxr_mc_agent_tooling", path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return _dev
 
 
 @pytest.fixture

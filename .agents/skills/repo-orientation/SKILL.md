@@ -21,5 +21,5 @@ Find smallest owner and existing helper before editing. Prefer focused test over
 broad refactor. Context7 is only for current external-library docs; Headroom and
 RTK are not code indexes.
 
-Regenerate repo inventory with `scripts/dev.py repo-map` after packages, entry
+Regenerate repo inventory with `cxr-dev repo-map` after packages, entry
 points, or agent-tooling top-levels change.

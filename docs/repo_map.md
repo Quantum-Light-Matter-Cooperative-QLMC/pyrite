@@ -8,7 +8,7 @@ and design notes in
 backlog in
 [`TODO.md`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc/blob/main/TODO.md).
 Print current top-level directory inventory:
-`uv run python scripts/dev.py repo-map`.
+`uv run cxr-dev repo-map`.
 
 ## Dependency layers (leaf → driver)
 
