@@ -1,173 +1,135 @@
-# Plan: CLI scan-parameter reconfiguration, per-material overrides, multi-config checkpoints
+# Checkpoint variant naming and multi-config checkpoints
 
-Status: planned (decisions locked 2026-07-26). Owner: Alex.
+Status: **implemented** (naming migration landed 2026-07-29 on
+`feature/checkpoint-variant-naming`). Decisions locked 2026-07-29 supersede the
+2026-07-26 draft. Owner: Alex.
 
-## Decisions (made up front)
+This document describes how differently-configured runs of the same material are
+kept in separate checkpoints and how each is named, discovered, and pulled. It
+replaces an earlier draft that proposed a root-level override file and a
+`cxr config` subcommand; that surface was **retired** in favor of the
+`catalog_profile` / `data/materials.toml` mechanism that shipped instead (see
+"Retired design" below).
 
-1. **Multi-config checkpoints — Option A, per-set stems.** Each named
-   parameter-set writes its own pickle: `checkpoints/<material>@<set>.pkl`.
-   The catalog-default (or persisted-override) grid keeps `<material>.pkl`.
-   Generalizes the existing `_quick` → `<material>_quick.pkl` pattern; no
-   pickle schema change; `archive`/`restore`/`union`/`slim` already operate
-   per stem. Rejected: nested `{set: {config: {E0: record}}}` pickle (schema
-   migration across results/plots/run/slim/archive/union + both marimo apps)
-   and config-name fingerprints (opaque names, fingerprint-aware selection
-   everywhere).
-2. **Persisted overrides — root-level TOML.** `cxr-overrides.toml` at the
-   repo root (gitignored), managed by a new `cxr config` subcommand. The
-   packaged `data/materials.toml` and the immutable `CATALOG` are never
-   touched.
-3. **Session overrides — dedicated flags + generic `--set`.** Common knobs
-   get explicit `cxr scan` flags; everything else goes through repeated
-   `--set key=value` using the same grid grammar as the TOML.
+## Decisions (locked 2026-07-29)
 
-## Motivating gap
+1. **Checkpoint naming — @-stems.** A non-canonical run writes
+   `checkpoints/<material>@<label>-<digest>` (component dir) /
+   `<material>@<label>-<digest>.pkl` (legacy flat). The label names the run's
+   non-standard `catalog_profile` (else its fidelity); the 12-hex
+   `parameter_sha256` prefix guarantees two runs that share a label but differ
+   in resolved parameters never collide on disk. The canonical `full`/`standard`
+   run keeps the bare `<material>` stem and `--quick` keeps `<material>_quick`.
+   This replaces the shipped-but-opaque `<material>--<fidelity>-<hash>` scheme,
+   whose stem named no profile at all.
+2. **No separate override surface.** The `cxr config` subcommand,
+   `cxr-overrides.toml`, and a `cxr scan --preset` flag are **dropped**.
+   Per-material and per-campaign reconfiguration is expressed as a
+   `catalog_profile` in `data/materials.toml` (immutable `CATALOG`), which is
+   also what the digest and the `@`-stem label already key on. One mechanism,
+   not two.
 
-Scan grids are projections of the immutable `CATALOG`
-(`config.material_sweep`). The CLI exposes only `--quick`, `--n-families`,
-`--beam-uvw`. Worse, the checkpoint store is `{config_name: {E0: record}}`
-and the config name (`"{label} {thickness} pol=.. az=.."`) does NOT encode
-energy grids, `n_families`, `beam_uvw`, or electron counts — so running two
-different parameter-sets into one pickle silently resume-skips or mixes
-records. Per-set stems close that hole.
+## Motivating gap (still valid)
 
-## Override model
+Scan grids are projections of the immutable `CATALOG` (`config.material_sweep`).
+Before per-variant stems the checkpoint store keyed records only by a config
+name (`"{label} {thickness} pol=.. az=.."`) that did **not** encode energy
+grids, `n_families`, `beam_uvw`, electron counts, coherence, or the
+`catalog_profile` — so two differently-resolved parameter-sets run into one
+pickle would silently resume-skip or mix records. Per-variant stems, each keyed
+by the full `dataset_identity` digest, close that hole.
 
-Precedence (low → high):
+## Naming scheme (@-stems)
 
-```
-packaged materials.toml (CATALOG)
-  < cxr-overrides.toml [defaults]          # broad reconfiguration
-  < cxr-overrides.toml [materials.<key>]   # per-material custom set
-  < cxr scan session flags / --set         # this invocation only
-```
+`profiles.variant_stem(identity, canonical_full=...)` maps a resolved
+`dataset_identity` to its on-disk stem:
 
-`cxr-overrides.toml` schema (grid grammar identical to `materials.toml`:
-`values` / `arange` / `linspace` / `logspace`):
+| Run | Stem |
+|---|---|
+| canonical `full` + `standard`, no overrides | `<material>` |
+| `--quick` | `<material>_quick` |
+| non-standard `catalog_profile` (full/survey) | `<material>@<catalog_profile>-<digest>` |
+| standard-profile `survey` | `<material>@survey-<digest>` |
+| coherent / high-energy-floored / other override | `<material>@<fidelity>-<digest>` |
 
-```toml
-schema_version = 1
+`<digest>` is the first 12 hex of the identity's `parameter_sha256`. `scan._resolved_run`
+withholds `canonical_full` for any run that is not exactly the pristine
+standard/full grid (a non-standard profile, `--quick`, a floored grid, coherent
+emission, or a custom beam), so those all take an `@`-stem.
 
-[defaults]                       # applies to every material
-tilt_deg = { linspace = { start = 0.0, stop = 89.0, num = 19, endpoint = true } }
-n_families = 6
+### Dual-read migration (non-destructive)
 
-[materials.mose2]                # custom-set material
-thickness_ang = { values = [1e4, 5e4] }
-energy_keV = { values = [50.0, 100.0] }
-beam_uvw = [0, 0, 2]
-```
+Checkpoints written under the older `<material>--<fidelity>-<digest>` scheme are
+**not** renamed or migrated. `profiles._VARIANT_STEM_RE` and
+`profiles.identity_from_stem` resolve both stem shapes, so existing on-disk
+checkpoints keep loading, resuming, slimming, and pulling exactly as before;
+only newly-written stems use `@`. No rename script, no disk-touching migration.
 
-Allowed keys: the `ScanSpec` grid fields (`thickness_ang`, `energy_keV`,
-`tilt_deg`, `tilt_azim_deg`, `E_grid_line`, `E_grid_line_by_energy`,
-`E_grid_brem`) plus the scalar `Sweep` knobs already CLI-adjacent
-(`n_families`, `beam_uvw`, `theta_obs_deg`, `mosaic`, `mosaic_fwhm_deg`) and
-the `Settings` counts (`n_electrons`, `n_electrons_brem`,
-`beam_current_na`). Unknown keys or material names fail loud at load, reusing
-the catalog's grid validators (factor the `_GRID_KINDS` resolution out of
-`materials/catalog.py` into a shared helper rather than duplicating it).
+### Provenance sidecar (`meta.json`)
 
-File location resolution: `./cxr-overrides.toml`, overridable via
-`CXR_OVERRIDES` env var and `--overrides-file`. Add to `.gitignore`.
+Every checkpoint (component dir or flat pickle) has a `meta.json` sidecar written
+at run time by `run._manifest_save`, recording the resolved `dataset_identity`.
+This is the **authoritative** identity source:
+`profiles.identity_from_stem(stem, root)`, `archive._dataset_identity`, the
+remote lifecycle, and `analyze.profile_menu` all read it directly rather than
+recomputing a digest against the (possibly since-edited) live catalog. Recompute
+survives only as a fallback for sidecar-less stems.
 
-## New/changed CLI surface
+## Consumer awareness
 
-### `cxr config` (new subcommand, `src/cxr_mc/user_config.py`)
+- **`run.py` / `scan.py`** — write the `@`-stem and its `meta.json` sidecar; no
+  pickle schema change.
+- **`analyze.material_menu` / `analyze.profile_menu`** (`cxr app analysis`) — a
+  material counts as browsable if it has a bare `<material>` checkpoint **or**
+  any stem whose sidecar identifies it as that material. `profile_menu` lists
+  the canonical run plus every named-profile / non-canonical variant, each
+  labeled by its `catalog_profile` (or fidelity) and a short digest. This makes
+  every named-profile checkpoint selectable in the analysis app — the primary
+  fix this milestone delivers.
+- **`slim`, `archive`, `restore`, `merge`, `prune`** — stem-based; `@`-stems
+  round-trip. `slim._grid_from_stem` and `prune` resolve identity via the
+  sidecar; `prune` regenerates current named-profile `@`-stems and leaves
+  legacy `--` stems untouched (they are "unrecognized" under current profiles,
+  as documented).
+- **`cxr remote`** — `MATERIAL@PROFILE` remains a *pull selector* resolved via
+  each candidate's `meta.json` (`resolve_profile_stem`). A full on-disk `@`-stem
+  (with a `-<digest>` tail) is treated as a literal checkpoint, not a selector.
+  `@` is permitted through the remote shell-token gate (safe as a bare word);
+  stem prediction (`_remote/scripts._stems`), pull, and prune handle both
+  legacy `--` and new `@` stems.
 
-- `cxr config set [-m MATERIAL] KEY VALUE` — persist an override
-  (`[defaults]` without `-m`, `[materials.<key>]` with). VALUE accepts the
-  compact grammar below.
-- `cxr config get [-m MATERIAL] [KEY]` — show one value or the whole table.
-- `cxr config unset [-m MATERIAL] KEY` / `cxr config clear [-m MATERIAL]`.
-- `cxr config list` — full effective-override dump.
-- `cxr config materials` — **the "which materials are custom-set" listing**:
-  one row per `[materials.<key>]` table with its overridden keys.
-- `cxr config diff [MATERIAL]` — effective grid vs pristine catalog grid.
+## `cxr checkpoints` listing — deferred (recommendation)
 
-Writes are atomic (temp + `os.replace`, matching `_checkpoint_save`), file
-round-trips through `tomllib` for validation before replace.
+The 2026-07-26 draft proposed a `cxr checkpoints` command listing active stems
+with material / set / record-count / grid summary. It is **not implemented in
+this milestone**: browsability — the binding requirement — is delivered by
+`cxr app analysis`, and `cxr checkpoint list` already means "archive shelf", so
+an active-stem listing needs a fresh `cli-ui-ux` naming/output decision beyond
+the two locked decisions. Recommendation for a follow-up task: add
+`cxr checkpoint ls` (read-only), listing every active stem with its sidecar
+material / profile / record count, flagging sidecar-unresolvable stems
+`unknown` rather than hiding them.
 
-### `cxr scan` (extended)
+## Retired design (superseded by `catalog_profile`)
 
-- Dedicated flags: `--thickness`, `--energies`, `--tilts`, `--azimuths`
-  (comma-separated values or `linspace:start:stop:num` /
-  `arange:start:stop:step` / `logspace:start:stop:num`).
-- Generic escape hatch: `--set KEY=VALUE` (repeatable), same grammar; covers
-  every allowed key above without new argparse per field.
-- `--preset NAME` — names the parameter-set; checkpoint goes to
-  `checkpoints/<material>@NAME.pkl`.
-- `--no-overrides` — ignore `cxr-overrides.toml` for this run (pristine
-  catalog grid).
-- `--overrides-file PATH`.
+The earlier draft's override layer is retired and intentionally **not** built:
 
-Stem rule: no session grid changes → `<material>.pkl` (persisted overrides
-count as "the defaults" — that is their purpose). Any session-flag/`--set`
-grid change without `--preset` → write `<material>@adhoc.pkl` and print a
-warning naming the stem; with `--preset` → `<material>@<preset>.pkl`.
-`--quick` keeps `_quick` behavior unchanged. Preset names validated
-`[a-z0-9-]+` to keep stems filesystem- and `archive`-label-safe.
+- `cxr-overrides.toml` at repo root + `CXR_OVERRIDES` / `--overrides-file`
+  resolution.
+- `cxr config set/get/unset/clear/list/materials/diff` subcommand
+  (`user_config.py`).
+- `cxr scan --preset NAME` / `--set KEY=VALUE` / `--no-overrides` session flags
+  and the `<material>@adhoc.pkl` stem rule.
 
-### Provenance sidecar
+These solved per-material reconfiguration a second way; `catalog_profile`
+profiles in `data/materials.toml` already own that role, feed the identity
+digest, and now name the `@`-stem. Adding a parallel override file would create
+two sources of truth for the same grids. If pristine-catalog session overrides
+are ever wanted again, reopen as a new task rather than reviving this file.
 
-Every scan writes `<stem>.meta.json` next to the pickle: resolved sweep
-fields (grids as lists), settings counts, override sources used
-(catalog/defaults/material/session), timestamp, git rev. No pickle schema
-change; consumers that iterate `results.values()` are untouched.
-`cxr checkpoints` and `cxr config diff` read it.
-
-### `cxr checkpoints` (new, small)
-
-List active checkpoint stems: material, set name, record count, and grid
-summary from the sidecar (or "no meta" for legacy pickles).
-
-## Consumer awareness (per-set stems)
-
-- `run.py` — no change: `scan.py` already passes an explicit
-  `checkpoint_path`.
-- `analyze.material_menu` — also glob `<material>@*.pkl`; menu label
-  `"{label} ({set})"`; `load_checkpoint` gains stem passthrough (it already
-  takes an arbitrary stem string).
-- `slim`, `archive`, `restore`, `union` — already stem-based; verify with
-  tests that `@` stems round-trip (archive label inference, union same-
-  material check via `case["crystal"]` still works since the crystal is
-  unchanged across sets).
-- `remote` — thread the new scan flags through submit command construction
-  and pull the `@`-stem checkpoint + sidecar back (final slice).
-- Marimo `scan_app.py` — out of scope beyond continuing to work; it uses
-  `material_sweep`, so persisted overrides apply automatically (a follow-up
-  can add preset UI).
-
-## Implementation slices (each independently verifiable)
-
-1. **Override layer.** `user_config.py`: file discovery, parse, validation
-   (shared grid-resolver factored from `materials/catalog.py`), and
-   `apply_overrides(material) -> (sweep_overrides, settings_overrides)`.
-   Wire into `config.material_sweep` / `default_settings` behind an
-   `overrides=True` toggle. Tests: grammar, precedence, unknown-key
-   rejection, no-file no-op.
-2. **`cxr config` subcommand.** All verbs incl. `materials` and `diff`;
-   atomic writes. Tests: CLI round-trip via `main([...])`, list/materials
-   output.
-3. **`cxr scan` session flags + preset stems + sidecar.** Flag parsing to
-   overrides dict, stem rule, `meta.json` writer. Tests: stem derivation
-   matrix (default/adhoc/preset/quick), flag→Sweep equivalence with
-   programmatic `material_sweep(**overrides)`.
-4. **Consumers + `cxr checkpoints`.** analyze menu `@`-stems, archive/slim/
-   union `@`-stem tests, new listing command.
-5. **Remote passthrough + docs.** Thread flags/stems through `remote`;
-   update `docs/repo_map.md` entries (new `user_config.py`, changed CLI
-   dispatch list), README CLI table, TODO.md sync; regenerate repo-map
-   inventory.
-
-Verification per slice: `scripts/dev.py test` (targeted files), then full
-`verify` at the end. No physics touched → no validation-ledger entries; but
-`E_grid_*` overrides pass through the same positivity/finiteness validators
-as the catalog so a bad user grid cannot reach `mc_spectrum`.
-
-## Explicit non-goals
+## Non-goals
 
 - No nested-pickle schema change; legacy checkpoints load unchanged.
-- No editing of packaged `materials.toml` at runtime.
-- No marimo preset-selection UI (follow-up).
-- No cross-set merged analysis view (load two stores manually or use
-  `union` semantics later).
+- No runtime editing of packaged `materials.toml`.
+- No cross-variant merged analysis view (load stores manually or use `merge`).
+- No rename of existing on-disk `--<fidelity>-<hash>` checkpoints (dual-read).

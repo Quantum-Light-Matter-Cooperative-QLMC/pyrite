@@ -147,6 +147,25 @@ def test_profile_menu_lists_standard_and_sidecar_resolved_variant(tmp_path):
     )
 
 
+def test_material_and_profile_menu_browse_new_at_stem(tmp_path):
+    """A named-profile checkpoint written under the @-stem scheme
+    (`<material>@<catalog_profile>-<digest>`) is browsable in `cxr app
+    analysis`: material_menu marks the material available and profile_menu
+    lists the variant labeled by its catalog_profile. Sidecar-driven, so it
+    behaves identically to the legacy `--` path -- this guards the milestone's
+    binding acceptance against any future stem-text parsing creeping in."""
+    _write_variant(
+        tmp_path, "hbn@sub_100keV-6a7c899190fc", material="hbn", catalog_profile="sub_100keV"
+    )
+
+    material_rows = {row["value"]: row for row in analyze.material_menu(tmp_path)}
+    assert material_rows["hbn"]["disabled"] is False  # available via @-stem sidecar
+
+    assert analyze.profile_menu("hbn", tmp_path) == (
+        {"value": "hbn@sub_100keV-6a7c899190fc", "label": "sub_100keV (abcdef)", "disabled": False},
+    )
+
+
 def test_profile_menu_ignores_stem_belonging_to_a_different_material(tmp_path):
     _write_variant(tmp_path, "hopg--full-4303954822d6", material="hopg")
 

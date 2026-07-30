@@ -26,6 +26,12 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
    selector reading the sidecar. Stem-text embedding is delegated to
    `feature/checkpoint-variant-naming`. → `feature/profile-emission-modes`;
    [`tasks/profile-emission-modes.md`](tasks/profile-emission-modes.md).
+6. **Checkpoint variant naming + analyze-menu visibility.** Reconcile shipped
+   `<material>--<fidelity>-<hash>` checkpoint stems with the locked
+   `<material>@<profile>` plan (or amend the plan); fix `identity_from_stem`'s
+   fragile re-hash lookup to read the `meta.json` sidecar instead. →
+   `feature/checkpoint-variant-naming`;
+   [`tasks/checkpoint-variant-naming.md`](tasks/checkpoint-variant-naming.md).
 
 ### Gated
 

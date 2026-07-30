@@ -10,7 +10,10 @@ import unicodedata
 
 from ..cli import _core as _cli_core
 
-_SHELL_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+# ``@`` is permitted so ``<material>@<label>-<digest>`` checkpoint @-stems pass
+# the token check: it carries no shell meaning as a bare word (array expansion
+# needs ``${...[@]}``), and every stem still reaches remote commands quoted.
+_SHELL_TOKEN_RE = re.compile(r"^[A-Za-z0-9_@-]+$")
 
 _STATE_COLORS = _cli_core.COLORS
 # Glyph carried beside every progress track so state is never color-alone
