@@ -22,8 +22,10 @@ Research code; absolute predictions remain bounded by
 
 Pipeline: Monte Carlo electron transport → segment-wise PXR+CBS and
 bremsstrahlung → layered self-absorption → instrument response. Default spectra
-add segments/electrons incoherently; `cxr run --coherent` opts into an
-experimental phased sum using trajectory and bunch timing. That path is
+add segments/electrons incoherently; a profile's `emission` policy
+(`incoherent`/`coherent`/`both`) opts into an experimental phased sum using
+trajectory and bunch timing, where `both` runs one electron transport and stores
+the incoherent and coherent spectra side by side for comparison. That path is
 [unverified](docs/coherent-emission.md) and must not support scientific claims
 until its phase convention and bunch-form-factor limits are independently
 validated.
