@@ -52,7 +52,10 @@ def _grid_from_stem(in_path):
     """Return ``(material, fidelity, catalog_profile)`` for a canonical or
     named-profile stem (a canonical stem yields the bare material key)."""
     stem = os.path.splitext(os.path.basename(os.path.normpath(in_path)))[0]
-    if "--" not in stem:
+    # ``@`` (current @-stems) or ``--`` (legacy stems) marks a resolved variant
+    # whose identity comes from its sidecar/recompute; anything else is a bare
+    # canonical (or ``_quick``) material key.
+    if "--" not in stem and "@" not in stem:
         return _material_from_stem(in_path)
     from .profiles import identity_from_stem
 

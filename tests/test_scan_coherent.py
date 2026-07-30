@@ -70,7 +70,7 @@ def test_both_profile_gets_qualified_stem_and_divergent_digest(monkeypatch):
     assert settings.coherent_emission is True
     assert identity["resolved_parameters"].get("emission") == "both"
     assert stem != "hopg"
-    assert stem.startswith("hopg--full-")
+    assert stem.startswith("hopg@full-")
 
 
 def test_three_emission_modes_never_collide(monkeypatch):

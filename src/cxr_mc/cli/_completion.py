@@ -25,7 +25,9 @@ MAX_LOCAL_CANDIDATES = 200
 MAX_REMOTE_CANDIDATES = 100
 REMOTE_COMPLETION_TIMEOUT_SECONDS = 1.5
 
-_SAFE_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+# ``@`` is allowed so ``<material>@<label>-<digest>`` checkpoint @-stems surface
+# in local checkpoint-stem completion alongside legacy ``--<fidelity>-`` stems.
+_SAFE_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@-]*")
 _DEFAULT_CHECKPOINT_ROOT = Path("checkpoints")
 _ARCHIVE_CHECKPOINT_ROOT = Path(__file__).resolve().parents[2] / "checkpoints"
 

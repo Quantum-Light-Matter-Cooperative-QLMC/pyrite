@@ -3885,6 +3885,30 @@ def test_split_profile_selector_parses_and_rejects_empty_halves():
         lifecycle._split_profile_selector("@sub_100keV")
 
 
+def test_split_profile_selector_treats_full_at_stem_as_literal():
+    """After the @-stem migration a resolved on-disk stem carries an ``@`` too
+    (``<material>@<label>-<digest>``). It is an exact checkpoint, not a
+    MATERIAL@PROFILE query, so pull must pass it through literally rather than
+    try to re-resolve ``<label>-<digest>`` as a catalog profile."""
+    from cxr_mc.profiles import named_profile_stem
+
+    at_stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
+    assert "@" in at_stem and at_stem != "hopg@sub_100keV"  # full stem, has digest tail
+    assert lifecycle._split_profile_selector(at_stem) is None
+    # a bare selector (no digest tail) still resolves as a profile query
+    assert lifecycle._split_profile_selector("hopg@sub_100keV") == ("hopg", "sub_100keV")
+
+
+def test_check_shell_tokens_accepts_at_stems():
+    """@-stems must survive the remote shell-token gate so pull/prune/slim can
+    name them on the box (regression for the 2026-07-29 stem migration; ``@``
+    was previously rejected by ``_SHELL_TOKEN_RE``)."""
+    from cxr_mc.profiles import named_profile_stem
+
+    at_stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
+    remote._check_shell_tokens([at_stem])  # must not raise
+
+
 def _fake_remote_catalog(listing, meta_by_stem):
     """Route ``transport._ssh_capture`` calls: the checkpoint-dir listing
     command returns ``listing`` verbatim; any other command is treated as a

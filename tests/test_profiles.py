@@ -89,7 +89,7 @@ def test_variant_stem_preserves_canonical_full_and_isolates_variants():
     )
 
     assert variant_stem(full, canonical_full=True) == "hopg"
-    assert variant_stem(survey).startswith("hopg--survey-")
+    assert variant_stem(survey).startswith("hopg@survey-")
     assert variant_stem(full) != variant_stem(survey)
 
 
@@ -191,7 +191,8 @@ def test_catalog_profile_changes_hash_and_stem_when_not_standard():
     # test_named_profile_stem_default_catalog_profile_stays_canonical and
     # tests/test_material_catalog.py for that end-to-end contract.
     assert variant_stem(other) != "hopg"
-    assert variant_stem(other).startswith("hopg--full-")
+    # @-stem now carries the non-standard catalog_profile name as its label.
+    assert variant_stem(other).startswith("hopg@sub_100keV-")
 
 
 def test_named_profile_stem_default_catalog_profile_stays_canonical():
@@ -280,6 +281,26 @@ def test_identity_from_stem_resolves_non_standard_catalog_profile():
     assert identity_from_stem(survey)["catalog_profile"] == "standard"
 
 
+def test_identity_from_stem_dual_reads_legacy_hyphen_stem():
+    """Dual-read: checkpoints written under the pre-2026-07-29
+    ``<material>--<fidelity>-<digest>`` scheme still resolve after the @-stem
+    migration, so existing on-disk checkpoints are never orphaned. The @-stem
+    and its legacy twin share a digest -- only the stem text differs."""
+    identity = named_profile_identity("hopg", "survey")
+    digest = identity["parameter_sha256"][:12]
+    legacy_stem = f"hopg--survey-{digest}"
+    at_stem = named_profile_stem("hopg", "survey")
+
+    assert at_stem == f"hopg@survey-{digest}"  # new scheme is what gets written
+    resolved = identity_from_stem(legacy_stem)  # old scheme still reads back
+    assert resolved is not None
+    assert (resolved["material"], resolved["fidelity"], resolved["catalog_profile"]) == (
+        "hopg",
+        "survey",
+        "standard",
+    )
+
+
 def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path):
     """Regression (2026-07-29): a checkpoint written under a named profile that
     is edited *after* the run no longer resolves via recompute -- the stem's
@@ -297,7 +318,7 @@ def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path
         "parameter_sha256": "dead" * 16,  # 64 hex chars, un-recomputable today
     }
     stem = variant_stem(run_time_identity)
-    assert stem == "hopg--full-deaddeaddead"
+    assert stem == "hopg@sub_100keV-deaddeaddead"
 
     # Recompute-only path fails exactly as it did in the field.
     assert identity_from_stem(stem) is None

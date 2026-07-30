@@ -1144,7 +1144,10 @@ def _resolve_survey_stems(stems):
     resolved = list(stems)
     for name in sorted(names):
         match = _VARIANT_STEM_RE.fullmatch(name)
-        if match is None or match["fidelity"] != "survey" or match["material"] not in bare:
+        # A survey variant reads as ``--survey-`` (legacy ``fidelity`` group) or
+        # ``@survey-`` (@-stem ``label`` group for a standard-profile survey run).
+        survey_token = None if match is None else (match["fidelity"] or match["label"])
+        if match is None or survey_token != "survey" or match["material"] not in bare:
             continue
         if name in resolved:
             continue
@@ -1155,8 +1158,16 @@ def _resolve_survey_stems(stems):
 
 def _split_profile_selector(stem):
     """Split a ``MATERIAL@PROFILE`` pull selector into ``(material, profile)``,
-    or ``None`` for a plain stem (no ``@``)."""
-    if "@" not in stem:
+    or ``None`` for a plain stem (no ``@``, or a full ``@``-stem).
+
+    A resolved on-disk @-stem (``<material>@<label>-<digest>``, matching
+    :data:`~cxr_mc.profiles._VARIANT_STEM_RE`) is already an exact checkpoint,
+    not a profile query, so it passes through literally -- only a bare
+    ``MATERIAL@PROFILE`` with no digest tail is treated as a selector to
+    resolve via meta.json."""
+    from ..profiles import _VARIANT_STEM_RE
+
+    if "@" not in stem or _VARIANT_STEM_RE.fullmatch(stem) is not None:
         return None
     material, _, profile = stem.partition("@")
     if not material or not profile:

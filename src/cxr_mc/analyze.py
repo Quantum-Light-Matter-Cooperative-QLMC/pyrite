@@ -96,8 +96,9 @@ def material_menu(
         if stem in available:
             continue
         identity = _stem_dataset_identity(stem, checkpoint_dir)
-        if identity is not None and identity.get("material") in material_set:
-            available.add(identity["material"])
+        material_value = None if identity is None else identity.get("material")
+        if isinstance(material_value, str) and material_value in material_set:
+            available.add(material_value)
     rows: list[MaterialMenuRow] = [
         {
             "value": material,

@@ -315,17 +315,37 @@ def dataset_identity(
 def variant_stem(identity: Mapping[str, Any], *, canonical_full: bool = False) -> str:
     """Map identity to active checkpoint stem.
 
-    Canonical ``full`` retains historical ``<material>`` storage. Other
-    resolved variants use a readable profile plus digest suffix.
+    Canonical ``full`` retains historical ``<material>`` storage and ``--quick``
+    keeps the ``<material>_quick`` stem. Every other resolved variant uses a
+    readable ``<material>@<label>-<digest>`` stem (the "@-stem" scheme,
+    2026-07-29): the label names the run's ``catalog_profile`` when non-standard
+    (so a named-profile checkpoint finally carries its profile name), else the
+    fidelity. The 12-hex ``parameter_sha256`` prefix keeps two runs that share a
+    label but differ in parameters -- a coherent vs incoherent run, a re-run
+    after the backing profile was edited -- from ever colliding on disk.
+
+    Older ``<material>--<fidelity>-<digest>`` stems written before this scheme
+    are still resolved on read (dual-read; see :data:`_VARIANT_STEM_RE` and
+    :func:`identity_from_stem`); only newly written stems use ``@``.
     """
     material = str(identity["material"])
     if canonical_full and identity["fidelity"] == "full" and identity.get("variant") is None:
         return material
-    variant = identity.get("variant")
-    if variant == "quick":
+    if identity.get("variant") == "quick":
         return f"{material}_quick"
-    label = str(variant or identity["fidelity"])
-    return f"{material}--{label}-{str(identity['parameter_sha256'])[:12]}"
+    return f"{material}@{_stem_label(identity)}-{str(identity['parameter_sha256'])[:12]}"
+
+
+def _stem_label(identity: Mapping[str, Any]) -> str:
+    """Readable @-stem label: an explicit ``variant``, else a non-standard
+    ``catalog_profile`` name, else the fidelity."""
+    variant = identity.get("variant")
+    if variant:
+        return str(variant)
+    catalog_profile = identity.get("catalog_profile", "standard")
+    if catalog_profile and catalog_profile != "standard":
+        return str(catalog_profile)
+    return str(identity["fidelity"])
 
 
 def named_profile_identity(
@@ -389,8 +409,15 @@ def high_energy_floor_stem(
     )
 
 
+# Matches both stem schemes so old and new checkpoints resolve side by side
+# (dual-read): the legacy ``<material>--<fidelity>-<digest>`` form (``fidelity``
+# group set) and the current ``<material>@<label>-<digest>`` @-stem form
+# (``label`` group set). ``material`` and ``label`` are lazy so the trailing
+# ``-<12 hex>`` digest anchors the split unambiguously.
 _VARIANT_STEM_RE = re.compile(
-    r"^(?P<material>.+)--(?P<fidelity>full|survey)-(?P<digest>[0-9a-f]{12})$"
+    r"^(?P<material>.+?)"
+    r"(?:--(?P<fidelity>full|survey)|@(?P<label>[^@]+?))"
+    r"-(?P<digest>[0-9a-f]{12})$"
 )
 
 
@@ -402,6 +429,29 @@ def _catalog_profile_candidates() -> tuple[str, ...]:
     from .materials import CATALOG
 
     return ("standard", *CATALOG.profile_names)
+
+
+def _recompute_candidates(
+    groups: Mapping[str, str | None],
+) -> Any:
+    """``(fidelity, catalog_profile)`` pairs to try when recomputing a
+    sidecar-less variant stem's identity. The digest -- not the stem text --
+    decides the match, so this only narrows the search using whatever the stem
+    names: a legacy ``--<fidelity>-`` stem fixes the fidelity (profile unknown,
+    try every candidate); an ``@<label>-`` stem's label is either a fidelity
+    name (a standard-profile run) or a ``catalog_profile`` name (fidelity
+    unknown, try each)."""
+    fidelity = groups.get("fidelity")
+    if fidelity is not None:
+        for catalog_profile in _catalog_profile_candidates():
+            yield fidelity, catalog_profile
+        return
+    label = groups.get("label")
+    if label in FIDELITY_NAMES:
+        yield label, "standard"
+        return
+    for fidelity_name in FIDELITY_NAMES:
+        yield fidelity_name, label
 
 
 def _sidecar_identity(stem: str, root: str | os.PathLike[str]) -> dict[str, Any] | None:
@@ -440,25 +490,29 @@ def identity_from_stem(
     against the current catalog would silently fail to match in that case.
 
     Only stems with no such sidecar fall back to recomputing: the stem's digest
-    commits to a ``catalog_profile`` (hashed into the payload whenever it
-    diverges from ``standard``) but does not name it, so a variant stem is
-    matched by recomputing the identity under each known catalog profile until
-    the digests agree. A material that is not a member of a candidate profile
-    raises inside ``material_sweep`` -- that candidate is simply skipped."""
+    commits to a resolved parameter set but the stem text names it only
+    partially, so the identity is recomputed under each plausible
+    ``(fidelity, catalog_profile)`` pair (see :func:`_recompute_candidates`)
+    until the digests agree. A material that is not a member of a candidate
+    profile raises inside ``material_sweep`` -- that candidate is simply
+    skipped. A run whose digest depends on state not reconstructable from the
+    catalog alone (a coherent run, an edited profile) never matches here and
+    relies on its sidecar instead."""
     if root is not None:
         recorded = _sidecar_identity(stem, root)
         if recorded is not None:
             return recorded
     match = _VARIANT_STEM_RE.fullmatch(stem)
     if match is not None:
-        for catalog_profile in _catalog_profile_candidates():
+        groups = match.groupdict()
+        for fidelity, catalog_profile in _recompute_candidates(groups):
             try:
                 identity = named_profile_identity(
-                    match["material"], match["fidelity"], catalog_profile=catalog_profile
+                    groups["material"], fidelity, catalog_profile=catalog_profile
                 )
             except (KeyError, ValueError):
                 continue
-            if identity["parameter_sha256"].startswith(match["digest"]):
+            if identity["parameter_sha256"].startswith(groups["digest"]):
                 return identity
         return None
     try:
