@@ -1170,8 +1170,8 @@ Usage: cxr profile [OPTIONS] COMMAND [ARGS]...
   Manage catalog scan profiles (named campaign defaults).
 
   Profiles are named campaigns in ``[profiles.*]``. They own default ranges, electron-
-  count grids, detector geometry, and optional material membership. An absent
-  ``materials`` key means all in-use materials; ``profile members`` is the only
+  count grids, beam policy, detector geometry, and optional material membership. An
+  absent ``materials`` key means all in-use materials; ``profile members`` is the only
   membership mutation surface. Per-material range overrides are managed by ``cxr
   material``. Energy grids are managed by ``cxr energy-grid``.
 
@@ -1191,14 +1191,14 @@ Options:
 Commands:
   add      Incrementally add values to profile grids.
   analyze  Analyze NAME's performance logs into CSV, Markdown, and PNG artifacts.
-  create   Create a new profile, cloning ranges and detector from --from (standard).
+  create   Create a new profile, cloning defaults from --from (standard).
   delete   Delete a profile; irreversible.
   list     List catalog profiles with membership and override counts.
   members  Set, extend, shrink, or reset profile-owned material membership.
   remove   Remove values from an existing profile's grids.
   rename   Rename profile NAME to NEW_NAME.
-  set      Replace range grids or detector scalars on an existing profile.
-  show     Show one profile's ranges, resolved detector, membership, and overrides.
+  set      Replace range grids, beam fields, or detector scalars on a profile.
+  show     Show one profile's ranges, beam, detector, membership, and overrides.
 ```
 
 ## `cxr profile add`
@@ -1253,16 +1253,16 @@ Options:
 ```text
 Usage: cxr profile create [OPTIONS] NAME
 
-  Create a new profile, cloning ranges and detector from --from (standard).
+  Create a new profile, cloning defaults from --from (standard).
 
-  Range options replace individual cloned grids; detector options replace individual
-  cloned detector scalars. Overrides and material membership are not cloned. Without
+  Range options replace individual cloned grids; beam and detector options replace
+  individual cloned fields. Overrides and material membership are not cloned. Without
   --materials, the new profile starts with implicit all-in-use membership and no per-
   material overrides.
 
 Options:
-  --from SOURCE                   Clone range defaults from SOURCE profile; defaults to
-                                  standard.
+  --from SOURCE                   Clone range, beam, and detector defaults from SOURCE;
+                                  defaults to standard.
   --thickness ANGSTROM,... | START:STOP:STEP
                                   Crystal thicknesses in angstrom. Comma-separated,
                                   mixable with start:stop:step ranges.
@@ -1279,6 +1279,13 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
+  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.  [x>0.0]
+  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]
+  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]
+  --longitudinal [gaussian|microtrain|compressed]
+                                  Replace the complete declarative longitudinal policy.
+  --envelope-rms-fs FS            RMS duration for gaussian or microtrain longitudinal
+                                  policy.  [x>0.0]
   --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
                                   replacement.  [0.0<=x<=180.0]
   --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
@@ -1444,7 +1451,7 @@ Options:
 ```text
 Usage: cxr profile set [OPTIONS] NAME
 
-  Replace range grids or detector scalars on an existing profile.
+  Replace range grids, beam fields, or detector scalars on a profile.
 
   NAME must already exist (create it with ``cxr profile create``); unknown names error
   with suggestions. Editing 'standard' prompts for confirmation unless --yes is given;
@@ -1468,6 +1475,13 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
+  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.  [x>0.0]
+  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]
+  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]
+  --longitudinal [gaussian|microtrain|compressed]
+                                  Replace the complete declarative longitudinal policy.
+  --envelope-rms-fs FS            RMS duration for gaussian or microtrain longitudinal
+                                  policy.  [x>0.0]
   --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
                                   replacement.  [0.0<=x<=180.0]
   --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
@@ -1484,7 +1498,7 @@ Options:
 ```text
 Usage: cxr profile show [OPTIONS] NAME
 
-  Show one profile's ranges, resolved detector, membership, and overrides.
+  Show one profile's ranges, beam, detector, membership, and overrides.
 
 Options:
   --json      Emit one versioned JSON object on stdout.

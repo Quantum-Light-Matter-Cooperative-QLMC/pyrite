@@ -16,13 +16,21 @@ The project is uv-managed with a committed lockfile. On the login node:
 ```bash
 git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc.git
 cd cxr-mc
-uv sync                       # .venv + locked deps + the cxr_mc package
+uv sync                       # CPU-only base environment
+# or exactly one: --extra nvidia | --extra amd | --extra intel
 uv run cxr --help             # sanity check
 ```
 
-No GPU is required to install — `cupy` imports cleanly and the code falls back to
-CPU automatically. For GPU runs the compute node needs a CUDA runtime matching the
-`cupy-cuda13x` wheel (load it with `module load cuda/13.x` or similar).
+No GPU stack is installed by default. NVIDIA nodes use
+`uv sync --extra nvidia` and a CUDA runtime matching `cupy-cuda13x`. Intel
+nodes use `uv sync --extra intel`. AMD nodes currently require a ROCm toolchain
+and `CUPY_INSTALL_USE_HIP=1 uv sync --extra amd`; AMD-hosted wheels do not yet
+support cxr-mc's Python version. Keep ROCm deployment provisional until
+validated on the target cluster.
+
+Set `CXR_MC_BACKEND` explicitly in production jobs when silently changing
+hardware would be wrong. Automatic selection may fall back to CPU; explicit
+`cuda`, `rocm`, or `sycl` errors if unavailable or over budget.
 
 ## 2. One material per job
 
@@ -47,7 +55,7 @@ uv run cxr run standard -m "$MATERIAL"
 uv run cxr run standard -m "$MATERIAL" --fidelity survey
 ```
 
-On a GPU node one main-process CUDA context handles spectrum/bremsstrahlung while
+On an accelerator node one main-process device context handles spectrum/bremsstrahlung while
 a process pool prepares CPU electron transport, so `--cpus-per-task` supplies
 those transport workers. For a **CPU-only** partition, drop `--gres` and the CUDA
 module; `run_cases` uses a full-case worker pool capped by both core count and
@@ -97,7 +105,11 @@ all interactive visualization and static-HTML export stay on your workstation.
 - **`--quick`** runs a tiny smoke grid into `<material>_quick.pkl` — use it to
   validate your sbatch script cheaply before submitting the full sweep.
 - **fp64:** set `CXR_FP64=1` for double-precision reference runs (the GPU path
-  defaults to fp32).
+  defaults to fp32). Devices without fp64 error when selected explicitly;
+  automatic selection routes the reference run to CPU.
+- **small devices:** `CXR_MC_RESOURCE_POLICY=auto` selects `conservative` below
+  8 GiB and admits chunks before allocation. Use `balanced` or `throughput`
+  only after measuring headroom on the target node.
 
 ## Lab-box remote helper
 
@@ -107,9 +119,13 @@ the `gpu` partition, one node, one task, and one GPU (`--gres=gpu:1`). Default
 `--chunk-minutes 10` runs one material at a time in bounded, self-resubmitting
 slices. `--chunk-minutes 0` selects a monolithic `UNLIMITED` allocation; only
 that mode accepts `--parallel-materials`, defaults to one material,
-and caps concurrency at four. The generated batch job starts with `module purge`, then loads
-`cuda`, `openmpi`, and `hdf5`; it uses the synced project's configured `uv`
+and caps concurrency at four. This helper remains an NVIDIA lab-box path: its
+generated batch job starts with `module purge`, then loads `cuda`, `openmpi`,
+and `hdf5`; it uses the synced project's configured `uv`
 environment, not the WarpX-specific `jrozells` Conda environment.
+`CXR_REMOTE_GPU_VENDOR` defaults to `nvidia`; setting `amd` or `intel`
+fails before batch-script generation until those lab-box module/profiler paths
+are validated, so NVIDIA commands are never emitted for another vendor.
 
 Review the exact batch script and `sbatch --parsable` submission command without
 contacting the lab box:

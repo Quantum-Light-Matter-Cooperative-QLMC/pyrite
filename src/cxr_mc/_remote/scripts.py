@@ -822,6 +822,12 @@ def _slurm_batch_script(
     cpus_per_task: int = config.SLURM_CPUS_PER_MATERIAL,
 ) -> str:
     """Wrap a CXR queue payload in the lab box's one-GPU SLURM profile."""
+    vendor = config.remote_gpu_vendor()
+    if vendor != "nvidia":
+        raise ValueError(
+            f"cxr remote lab-box scripts do not yet support {vendor}; "
+            "use a site-specific SLURM template from docs/running-on-a-cluster.md"
+        )
     reservation_stems = reservation_stems or []
     transport._check_shell_tokens([jobid, *reservation_stems])
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)

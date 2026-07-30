@@ -43,9 +43,32 @@ uv sync
 uv run cxr --help
 ```
 
-Use `uv run ...`; bare system Python lacks locked dependencies. GPU is optional:
-CuPy falls back to CPU. `CXR_MC_DEBUG=1` shows backend selection;
-`CXR_FP64=1` forces reference/validation precision.
+Base `cxr-mc` is CPU-only. Install exactly one accelerator extra in a clean
+environment:
+
+| Hardware | Install | Backend |
+|---|---|---|
+| NVIDIA | `uv sync --extra nvidia` | CUDA CuPy |
+| AMD | `CUPY_INSTALL_USE_HIP=1 uv sync --extra amd` | ROCm source-built CuPy |
+| Intel | `uv sync --extra intel` | oneAPI `dpnp` + `dpctl` |
+
+Do not combine `nvidia` and `amd`: both provide the `cupy` import. AMD's current
+`amd-cupy` wheels only support CPython 3.10, below cxr-mc's Python requirement,
+so the AMD extra uses upstream CuPy's ROCm source build. ROCm remains
+provisional until exercised on AMD hardware.
+
+Use `uv run ...`; bare system Python lacks locked dependencies.
+`CXR_MC_BACKEND=auto|cpu|cuda|rocm|sycl` selects the array backend. `auto`
+tries CuPy, then SYCL, then NumPy; explicit accelerator selection errors if
+unavailable. `CXR_FP64=1` requires fp64 and falls back to CPU only under
+automatic selection.
+
+`CXR_MC_RESOURCE_POLICY=auto|conservative|balanced|throughput` controls memory
+admission, retry count, release cadence, and host-worker admission. `auto`
+uses `conservative` below 8 GiB. Its device budget is
+`min(50% of VRAM, VRAM - 2 GiB)`, protecting small GPUs such as the 4 GiB Arc
+A370M. Expert chunk/pool environment overrides remain supported but cannot
+bypass pre-allocation admission.
 
 > **Distribution warning:** locked `crystals` 1.7.0 dependency is GPLv3. Review
 > licensing before distributing source, wheels, binaries, or containers that

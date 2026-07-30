@@ -41,6 +41,69 @@ c = 2997.924580 Å/fs.
 Explicit arrays are required to be one-dimensional, finite, and one value per
 incident electron. Analytic RMS values must be finite and nonnegative.
 
+## Structured-policy extension (2026-07-29)
+
+Fresh-context validation also covered the resolved `compressed` and
+`microtrain` policies added to `_sample_bunch_offsets`.
+
+For a full-depth microtrain, the sampler draws an integer center index
+
+```text
+n = round(X),  X ~ Normal(0, sigma_center / T)
+sigma_center^2 = sigma_envelope^2 - sigma_micro^2 - sigma_jitter^2
+Delta t = n T + epsilon_micro + epsilon_jitter
+```
+
+where the two `epsilon` terms are independent zero-mean Gaussians with the
+named RMS widths. Direct indexed center sampling is distributionally
+equivalent to sampling from an explicitly materialized train with Gaussian
+center weights, without constructing tens of thousands of center locations.
+Subtracting the final sample mean changes only the common temporal phase and
+therefore leaves RMS pair separations and bunching-factor magnitude unchanged.
+
+Rounding makes the requested envelope RMS asymptotic rather than algebraically
+exact. When `T << sigma_center` and fractional center coordinates are
+effectively uniform, quantization contributes approximately `T^2 / 12`, so
+
+```text
+Var(Delta t) ~= sigma_envelope^2 + T^2 / 12.
+```
+
+The correction is negligible for the approved attosecond-scale periods inside
+a 200 fs RMS envelope, but exact-RMS claims must retain this qualification.
+
+At the target angular frequency `Omega`, `Omega T = 2 pi`, hence every integer
+center has identical phase. The Gaussian factors give
+
+```text
+|F(Omega)|^2
+  = exp[-Omega^2 (sigma_micro^2 + sigma_jitter^2)]
+  = eta * exp[-Omega^2 sigma_jitter^2]
+```
+
+when `sigma_micro = sqrt(-ln eta) / Omega`. Zero jitter therefore recovers the
+requested target bunching `eta`. The `compressed` policy draws one Gaussian
+with RMS `sigma_micro`, so it has the same zero-jitter target factor `eta` and
+is the single-microbunch limit.
+
+For `0 < modulation_depth = D < 1`, implementation uses `D` as the Bernoulli
+fraction of electrons drawn from the train and `1-D` from the unmodulated
+Gaussian envelope. Its field form factor is therefore
+
+```text
+F_mix = D F_train + (1-D) F_envelope,
+```
+
+not a linear interpolation of intensities. When the 200 fs envelope is
+decoherent at the target, target intensity is approximately
+`D^2 eta exp[-Omega^2 sigma_jitter^2]`, not `D eta`. This is a convention
+caveat, not a discrepancy for the approved initial `D=1`.
+
+All structured-policy draws use the same dedicated
+`SeedSequence(seed).spawn(4)[3]` bunch child stream as legacy analytic
+sampling. Additional train, jitter, and mixture draws consume only that child;
+transport, transverse-position, and groove-phase streams remain independent.
+
 ## Result
 
 Independent derivation and numeric probes match implementation. Verdict:

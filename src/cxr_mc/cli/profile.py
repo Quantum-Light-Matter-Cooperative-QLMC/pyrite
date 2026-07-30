@@ -85,6 +85,40 @@ def _range_cli_options(function):
     return function
 
 
+def _beam_cli_options(function):
+    function = click.option(
+        "--envelope-rms-fs",
+        type=click.FloatRange(min=0.0, min_open=True),
+        metavar="FS",
+        help="RMS duration for gaussian or microtrain longitudinal policy.",
+    )(function)
+    function = click.option(
+        "--longitudinal",
+        "longitudinal_kind",
+        type=click.Choice(("gaussian", "microtrain", "compressed")),
+        help="Replace the complete declarative longitudinal policy.",
+    )(function)
+    function = click.option(
+        "--bunch-charge-pc",
+        type=click.FloatRange(min=0.0, min_open=True),
+        metavar="PC",
+        help="Physical charge per bunch in pC.",
+    )(function)
+    function = click.option(
+        "--rep-rate-hz",
+        type=click.FloatRange(min=0.0, min_open=True),
+        metavar="HZ",
+        help="Bunch repetition rate in Hz.",
+    )(function)
+    function = click.option(
+        "--transverse-fwhm-mm",
+        type=click.FloatRange(min=0.0, min_open=True),
+        metavar="MM",
+        help="Circular Gaussian transverse FWHM in mm.",
+    )(function)
+    return function
+
+
 def _detector_cli_options(function):
     function = click.option(
         "--solid-angle",
@@ -135,6 +169,53 @@ def _collect_detector_updates(observation_angle_deg, polar_acceptance_deg, solid
         }.items()
         if value is not None
     }
+
+
+def _collect_beam_updates(
+    transverse_fwhm_mm,
+    rep_rate_hz,
+    bunch_charge_pc,
+    longitudinal_kind,
+    envelope_rms_fs,
+):
+    if longitudinal_kind is None and envelope_rms_fs is not None:
+        raise click.UsageError("--envelope-rms-fs requires --longitudinal")
+    if longitudinal_kind == "compressed" and envelope_rms_fs is not None:
+        raise click.UsageError("compressed derives its duration; omit --envelope-rms-fs")
+    if longitudinal_kind in {"gaussian", "microtrain"} and envelope_rms_fs is None:
+        raise click.UsageError(f"{longitudinal_kind} requires --envelope-rms-fs")
+    updates = {
+        key: value
+        for key, value in {
+            "transverse_fwhm_mm": transverse_fwhm_mm,
+            "rep_rate_hz": rep_rate_hz,
+            "bunch_charge_pc": bunch_charge_pc,
+        }.items()
+        if value is not None
+    }
+    if longitudinal_kind is not None:
+        policy = {"kind": longitudinal_kind}
+        if envelope_rms_fs is not None:
+            policy["envelope_rms_fs"] = envelope_rms_fs
+        updates["longitudinal"] = policy
+    return updates
+
+
+def _apply_beam_updates(profile, updates):
+    if not updates:
+        return
+    beam = profile.get("beam")
+    if beam is None:
+        beam = tomlkit.table()
+        profile["beam"] = beam
+    for key, value in updates.items():
+        if key == "longitudinal":
+            policy = tomlkit.table()
+            for policy_key, policy_value in value.items():
+                policy[policy_key] = policy_value
+            beam[key] = policy
+        else:
+            beam[key] = value
 
 
 def _unknown_profile(document, name):
@@ -206,6 +287,8 @@ def _profile_payload(document, name):
     overrides = _catalog_io.profile_overrides(profile)
     materials = profile.get("materials")
     range_keys = [*_catalog_io.RANGES.items(), *_EXTRA_RANGES.items()]
+    beam = profile.get("beam")
+    beam_payload = beam.unwrap() if hasattr(beam, "unwrap") else None
     raw_detector = profile.get("detector")
     if not isinstance(raw_detector, dict):
         standard = profiles.get("standard", {})
@@ -219,6 +302,7 @@ def _profile_payload(document, name):
             if key in profile
         ],
         "materials": list(materials) if isinstance(materials, list) else None,
+        "beam": beam_payload,
         "detector": {
             key: getattr(detector, key)
             for key, _label, _unit in _ACTIVE_DETECTOR_FIELDS
@@ -239,6 +323,18 @@ def _emit_show(payload):
         emit_result("  materials: all in-use materials (implicit)")
     else:
         emit_result(f"  materials: {', '.join(payload['materials']) or '(none)'}")
+    if payload["beam"] is not None:
+        beam = payload["beam"]
+        for key in ("transverse_fwhm_mm", "rep_rate_hz", "bunch_charge_pc"):
+            if key in beam:
+                emit_result(f"  beam.{key}: {beam[key]:g}")
+        longitudinal = beam.get("longitudinal")
+        if isinstance(longitudinal, dict):
+            emit_result(f"  beam.longitudinal.kind: {longitudinal['kind']}")
+            if "envelope_rms_fs" in longitudinal:
+                emit_result(
+                    f"  beam.longitudinal.envelope_rms_fs: {longitudinal['envelope_rms_fs']:g}"
+                )
     emit_result("  detector:")
     for key, label, unit in _ACTIVE_DETECTOR_FIELDS:
         value = payload["detector"][key]
@@ -289,11 +385,11 @@ def command():
     """Manage catalog scan profiles (named campaign defaults).
 
     Profiles are named campaigns in ``[profiles.*]``. They own default ranges,
-    electron-count grids, detector geometry, and optional material membership.
-    An absent ``materials`` key means all in-use materials; ``profile members``
-    is the only membership mutation surface. Per-material range overrides are
-    managed by ``cxr material``. Energy grids are managed by
-    ``cxr energy-grid``.
+    electron-count grids, beam policy, detector geometry, and optional material
+    membership. An absent ``materials`` key means all in-use materials;
+    ``profile members`` is the only membership mutation surface. Per-material
+    range overrides are managed by ``cxr material``. Energy grids are managed
+    by ``cxr energy-grid``.
 
     \b
     Examples:
@@ -400,7 +496,7 @@ def list_command(json_output):
     "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
 )
 def show_command(name, json_output):
-    """Show one profile's ranges, resolved detector, membership, and overrides."""
+    """Show one profile's ranges, beam, detector, membership, and overrides."""
     try:
         _text, document = _catalog_io.catalog_text()
         payload = _profile_payload(document, name)
@@ -423,10 +519,11 @@ def show_command(name, json_output):
     "source",
     metavar="SOURCE",
     shell_complete=_cli_completion.complete_profile,
-    help="Clone range defaults from SOURCE profile; defaults to standard.",
+    help="Clone range, beam, and detector defaults from SOURCE; defaults to standard.",
 )
 @_range_cli_options
 @_ne_cli_options
+@_beam_cli_options
 @_detector_cli_options
 @click.option(
     "--materials",
@@ -444,21 +541,33 @@ def create_command(
     azimuth,
     ne_line,
     ne_brem,
+    transverse_fwhm_mm,
+    rep_rate_hz,
+    bunch_charge_pc,
+    longitudinal_kind,
+    envelope_rms_fs,
     observation_angle_deg,
     polar_acceptance_deg,
     solid_angle_sr,
     materials,
     dry_run,
 ):
-    """Create a new profile, cloning ranges and detector from --from (standard).
+    """Create a new profile, cloning defaults from --from (standard).
 
-    Range options replace individual cloned grids; detector options replace
-    individual cloned detector scalars. Overrides and material membership are
-    not cloned. Without --materials, the new profile starts with implicit
-    all-in-use membership and no per-material overrides.
+    Range options replace individual cloned grids; beam and detector options
+    replace individual cloned fields. Overrides and material membership are not
+    cloned. Without --materials, the new profile starts with implicit all-in-use
+    membership and no per-material overrides.
     """
     _check_name(name)
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
+    beam_updates = _collect_beam_updates(
+        transverse_fwhm_mm,
+        rep_rate_hz,
+        bunch_charge_pc,
+        longitudinal_kind,
+        envelope_rms_fs,
+    )
     detector_updates = _collect_detector_updates(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr
     )
@@ -480,6 +589,7 @@ def create_command(
             target[key] = _clone_grid(value)
         for label, values in updates.items():
             target[_catalog_key(label)] = _catalog_io.values_item(values)
+        _apply_beam_updates(target, beam_updates)
         if detector_updates:
             detector = _detector_table(target)
             for key, value in detector_updates.items():
@@ -496,6 +606,7 @@ def create_command(
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @_range_cli_options
 @_ne_cli_options
+@_beam_cli_options
 @_detector_cli_options
 @click.option(
     "--materials",
@@ -513,6 +624,11 @@ def set_command(
     azimuth,
     ne_line,
     ne_brem,
+    transverse_fwhm_mm,
+    rep_rate_hz,
+    bunch_charge_pc,
+    longitudinal_kind,
+    envelope_rms_fs,
     observation_angle_deg,
     polar_acceptance_deg,
     solid_angle_sr,
@@ -520,7 +636,7 @@ def set_command(
     yes,
     dry_run,
 ):
-    """Replace range grids or detector scalars on an existing profile.
+    """Replace range grids, beam fields, or detector scalars on a profile.
 
     NAME must already exist (create it with ``cxr profile create``); unknown
     names error with suggestions. Editing 'standard' prompts for confirmation
@@ -528,11 +644,18 @@ def set_command(
     supplied fields; unlike range grids, they are not accepted by add/remove.
     """
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
+    beam_updates = _collect_beam_updates(
+        transverse_fwhm_mm,
+        rep_rate_hz,
+        bunch_charge_pc,
+        longitudinal_kind,
+        envelope_rms_fs,
+    )
     detector_updates = _collect_detector_updates(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr
     )
-    if not updates and not detector_updates and materials is None:
-        raise click.UsageError("provide a range or detector option")
+    if not updates and not beam_updates and not detector_updates and materials is None:
+        raise click.UsageError("provide a range, beam, or detector option")
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
@@ -541,6 +664,11 @@ def set_command(
             material_keys = _validate_materials(document, _csv_materials(materials))
         overwriting = [label for label in updates if _catalog_key(label) in target]
         existing_detector = target.get("detector", {})
+        detector_labels = [
+            label
+            for key, label, _unit in _ACTIVE_DETECTOR_FIELDS
+            if key in detector_updates
+        ]
         overwriting.extend(
             label
             for key, label, _unit in _ACTIVE_DETECTOR_FIELDS
@@ -550,17 +678,12 @@ def set_command(
         )
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
-    if overwriting or detector_updates or materials is not None:
-        detector_labels = [
-            label
-            for key, label, _unit in _ACTIVE_DETECTOR_FIELDS
-            if key in detector_updates
-        ]
+    if overwriting or beam_updates or detector_updates or materials is not None:
+        action_fields = list(dict.fromkeys([*overwriting, *detector_labels]))
+        if beam_updates:
+            action_fields.append("beam")
         _confirm_standard(
-            name,
-            f"set {', '.join([*overwriting, *detector_labels]) or 'materials'} on",
-            yes,
-            dry_run,
+            name, f"set {', '.join(action_fields) or 'materials'} on", yes, dry_run
         )
     if material_keys is not None:
         _warn_compat(
@@ -569,6 +692,7 @@ def set_command(
         )
     for label, values in updates.items():
         target[_catalog_key(label)] = _catalog_io.values_item(values)
+    _apply_beam_updates(target, beam_updates)
     if detector_updates:
         detector = _detector_table(target)
         for key, value in detector_updates.items():

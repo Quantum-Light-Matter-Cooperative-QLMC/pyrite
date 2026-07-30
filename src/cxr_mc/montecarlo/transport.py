@@ -10,7 +10,9 @@ GPU; the spectrum phase consumes the segment arrays it returns.
 
 import logging
 import os
+from collections.abc import Mapping
 from functools import cache
+from typing import Any
 
 import numpy as np
 
@@ -43,7 +45,14 @@ A0_SQ_CM2 = 2.8002852e-17  # Bohr radius squared [cm^2] (NIST SRD 64 unit)
 C_ANG_PER_FS = 2997.924580
 
 
-def _sample_bunch_offsets(Ne, bunch_length_fs, long_shape, long_offsets_fs, seed):
+def _sample_bunch_offsets(
+    Ne,
+    bunch_length_fs,
+    long_shape,
+    long_offsets_fs,
+    seed,
+    longitudinal_distribution: Mapping[str, Any] | None = None,
+):
     """Per-electron longitudinal arrival offset ``Delta t`` [Angstrom, c=1],
     centered on the bunch centroid (decision 3).
 
@@ -69,7 +78,61 @@ def _sample_bunch_offsets(Ne, bunch_length_fs, long_shape, long_offsets_fs, seed
 
     Validation: longitudinal-bunch-sampling
     """
-    if long_offsets_fs is not None:
+    if longitudinal_distribution is not None:
+        if bunch_length_fs is not None or long_offsets_fs is not None or long_shape != "gaussian":
+            raise ValueError(
+                "longitudinal_distribution is incompatible with legacy bunch fields"
+            )
+        kind = longitudinal_distribution.get("kind")
+        bunch_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(4)[3])
+        if kind in ("gaussian", "compressed"):
+            sigma_fs = longitudinal_distribution.get("rms_duration_fs")
+            if sigma_fs is None:
+                raise ValueError(f"{kind} resolution requires rms_duration_fs")
+            dt = bunch_rng.normal(0.0, float(sigma_fs), size=Ne)
+        elif kind == "microtrain":
+            envelope_fs = float(longitudinal_distribution["envelope_rms_fs"])
+            microbunch_fs = float(longitudinal_distribution["microbunch_rms_fs"])
+            spacing_fs = float(longitudinal_distribution["spacing_fs"])
+            jitter_fs = float(longitudinal_distribution["timing_jitter_fs"])
+            depth = float(longitudinal_distribution["modulation_depth"])
+            if not (
+                np.isfinite(envelope_fs)
+                and np.isfinite(microbunch_fs)
+                and np.isfinite(spacing_fs)
+                and envelope_fs > 0.0
+                and microbunch_fs >= 0.0
+                and spacing_fs > 0.0
+                and jitter_fs >= 0.0
+                and 0.0 <= depth <= 1.0
+            ):
+                raise ValueError("invalid resolved microtrain parameters")
+            center_variance = envelope_fs**2 - microbunch_fs**2 - jitter_fs**2
+            if center_variance <= 0.0:
+                raise ValueError(
+                    "microtrain envelope RMS must exceed combined microbunch width and jitter"
+                )
+            center_sigma_fs = np.sqrt(center_variance)
+            centers = np.rint(
+                bunch_rng.normal(0.0, center_sigma_fs / spacing_fs, size=Ne)
+            )
+            train = (
+                centers * spacing_fs
+                + bunch_rng.normal(0.0, microbunch_fs, size=Ne)
+                + bunch_rng.normal(0.0, jitter_fs, size=Ne)
+            )
+            if depth == 1.0:
+                dt = train
+            elif depth == 0.0:
+                dt = bunch_rng.normal(0.0, envelope_fs, size=Ne)
+            else:
+                unmodulated = bunch_rng.normal(0.0, envelope_fs, size=Ne)
+                mask = bunch_rng.random(Ne) < depth
+                dt = np.where(mask, train, unmodulated)
+        else:
+            raise ValueError(f"unknown resolved longitudinal kind {kind!r}")
+        dt = dt * C_ANG_PER_FS
+    elif long_offsets_fs is not None:
         dt = np.asarray(long_offsets_fs, dtype=float)
         if dt.ndim != 1:
             raise ValueError("long_offsets_fs must be one-dimensional")
@@ -104,7 +167,9 @@ def _sample_bunch_offsets(Ne, bunch_length_fs, long_shape, long_offsets_fs, seed
 
 def beta_from_keV(E_keV):
     g = 1.0 + E_keV / 510.99895
-    return np.sqrt(1.0 - 1.0 / g**2)
+    # Exponentiation stays in the input array namespace. dpnp deliberately
+    # disables NumPy's ``__array_ufunc__`` bridge, unlike CuPy.
+    return (1.0 - 1.0 / g**2) ** 0.5
 
 
 # ---- elastic scattering models ------------------------------------------------
@@ -274,6 +339,7 @@ def simulate_trajectories(
     bunch_length_fs=None,
     long_shape="gaussian",
     long_offsets_fs=None,
+    longitudinal_distribution=None,
     crystal_width_mm=None,
     crystal_height_mm=None,
     tilt_polar_rad=0.0,
@@ -350,18 +416,17 @@ def simulate_trajectories(
     (decision 8). None -> equals beam_fwhm_mm (isotropic), which draws
     sigma_x == sigma_y and is bit-for-bit with the historical scalar-spot path.
 
-    bunch_length_fs, long_shape, long_offsets_fs: longitudinal bunch sampling.
-    Each electron gets an arrival offset ``Delta t`` [Angstrom, c=1] via
-    :func:`_sample_bunch_offsets` (RMS ``bunch_length_fs`` fs, Gaussian or
-    uniform ``long_shape``; ``long_offsets_fs`` supplies explicit per-particle
-    offsets and overrides both), centered on the bunch centroid. Returned as the
-    per-segment ``t0_ang`` (and ``vacuum_t0_ang``) array, kept SEPARATE from the
-    relative-age ``t_ang``/``clock``. Drawn from an independent RNG child
-    (``spawn(4)[3]``), so it never perturbs the transport draws; and because the
-    current spectrum sum is incoherent, a nonzero offset has ZERO effect on the
-    emitted spectrum today -- it is the input the future coherent form factor
-    consumes. bunch_length_fs=None and long_offsets_fs=None -> all-zero t0_ang
-    (the legacy point bunch, bit-for-bit).
+    bunch_length_fs, long_shape, long_offsets_fs, longitudinal_distribution:
+    longitudinal bunch sampling. Each electron gets an arrival offset
+    ``Delta t`` [Angstrom, c=1] via :func:`_sample_bunch_offsets`. The legacy
+    fields provide Gaussian/uniform RMS sampling or explicit per-particle
+    offsets. The mutually exclusive resolved distribution provides Gaussian,
+    compressed-Gaussian, or directly indexed finite-train sampling without
+    materializing its many centers. Offsets are centered on the bunch centroid
+    and returned as per-segment ``t0_ang`` (and ``vacuum_t0_ang``), kept
+    SEPARATE from relative-age ``t_ang``/``clock``. The independent RNG child
+    (``spawn(4)[3]``) never perturbs transport draws. With no legacy or resolved
+    distribution, offsets are all zero (the legacy point bunch, bit-for-bit).
 
     crystal_width_mm, crystal_height_mm: optional full transverse dimensions
     [mm] of a rectangular prism centered at the beam origin. Both must be
@@ -542,7 +607,14 @@ def simulate_trajectories(
     # relative-age clock: the coherent sum later reads absolute time
     # t_abs = t_ang + t0_ang. None/None -> all-zero (point bunch, bit-for-bit),
     # and nothing reads it in the incoherent spectrum today.
-    t0_electron = _sample_bunch_offsets(Ne, bunch_length_fs, long_shape, long_offsets_fs, seed)
+    t0_electron = _sample_bunch_offsets(
+        Ne,
+        bunch_length_fs,
+        long_shape,
+        long_offsets_fs,
+        seed,
+        longitudinal_distribution,
+    )
     # Snapshot before transport mutates ``pos``, ``dirs``, and ``E``. These
     # arrays describe incident phase space, including particles that miss a
     # finite footprint.

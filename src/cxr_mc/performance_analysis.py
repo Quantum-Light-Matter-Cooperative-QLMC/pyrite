@@ -311,6 +311,7 @@ def _session_row(
         "source": str(source),
         "terminal_event": terminal.get("event"),
         "complete": terminal.get("event") in TERMINAL_EVENTS and not warnings,
+        "successful": terminal.get("event") == "done" and not warnings,
         "warnings": "; ".join(warnings),
         "parameter_sha256": terminal.get("parameter_sha256"),
         "host": terminal.get("host"),
@@ -416,8 +417,8 @@ def _format_metric(row: dict[str, Any], key: str) -> str:
 
 
 def _write_summary(path: Path, profile: str, rows: list[dict[str, Any]]) -> None:
-    complete = [row for row in rows if row["complete"]]
-    classifications = [_classification(row) for row in complete]
+    successful = [row for row in rows if row["successful"]]
+    classifications = [_classification(row) for row in successful]
     primary = statistics.mode(item[0] for item in classifications) if classifications else "unknown"
     next_step = next(
         (step for constraint, step in classifications if constraint == primary),
@@ -425,7 +426,7 @@ def _write_summary(path: Path, profile: str, rows: list[dict[str, Any]]) -> None
     )
     materials = sorted({str(row["material"]) for row in rows})
     parameter_hashes = sorted(
-        {str(row["parameter_sha256"]) for row in complete if row.get("parameter_sha256")}
+        {str(row["parameter_sha256"]) for row in successful if row.get("parameter_sha256")}
     )
     topologies = {
         (
@@ -436,9 +437,9 @@ def _write_summary(path: Path, profile: str, rows: list[dict[str, Any]]) -> None
             row.get("spec_chunk"),
             row.get("brem_chunk"),
         )
-        for row in complete
+        for row in successful
     }
-    cache_states = {bool((_number(row.get("cached_cases")) or 0) > 0) for row in complete}
+    cache_states = {bool((_number(row.get("cached_cases")) or 0) > 0) for row in successful}
     comparison_issues = []
     if len(parameter_hashes) > 1:
         comparison_issues.append("multiple parameter SHA values; do not pool these sessions")
@@ -446,7 +447,7 @@ def _write_summary(path: Path, profile: str, rows: list[dict[str, Any]]) -> None
         comparison_issues.append("multiple execution topologies; compare each topology separately")
     if len(cache_states) > 1:
         comparison_issues.append("cached and uncached sessions are mixed; do not compare them")
-    if len(complete) < 3:
+    if len(successful) < 3:
         comparison_issues.append(
             "fewer than three valid sessions; classification confidence is low"
         )
@@ -455,7 +456,7 @@ def _write_summary(path: Path, profile: str, rows: list[dict[str, Any]]) -> None
         "",
         "## Workload",
         f"- Materials: {', '.join(materials) or 'none'}",
-        f"- Sessions: {len(rows)} ({len(complete)} valid complete)",
+        f"- Sessions: {len(rows)} ({len(successful)} valid successful)",
         f"- Parameter SHA values: {', '.join(parameter_hashes) or 'unavailable'}",
         "- Warm-up rule: first `effective_workers` newly completed cases",
         "",
@@ -483,7 +484,7 @@ def _write_summary(path: Path, profile: str, rows: list[dict[str, Any]]) -> None
         "",
         "## Classification",
         f"- Primary bottleneck: {primary}",
-        f"- Confidence: {'medium' if len(complete) >= 3 else 'low; fewer than three valid sessions'}",
+        f"- Confidence: {'medium' if len(successful) >= 3 else 'low; fewer than three valid sessions'}",
         "",
         "## Next controlled experiment",
         f"- One changed variable: {next_step}",
@@ -660,4 +661,5 @@ def analyze_performance_profile(
         "intervals": len(interval_rows),
         "analysis_root": analysis_root,
         "incomplete_sessions": sum(not row["complete"] for row in session_rows),
+        "unsuccessful_sessions": sum(not row["successful"] for row in session_rows),
     }

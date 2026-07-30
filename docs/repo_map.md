@@ -180,8 +180,11 @@ bremsstrahlung, parallel case runner, detector-convolution helpers.
 Split from single module into submodules; **every public and internal name
 re-exported from package** — `from cxr_mc.montecarlo import X` unchanged
 (`tests/test_montecarlo_exports.py` freeze export set).
-- `_backend` — GPU/CPU array backend probe + banner: `xp`, `cp`, `REAL`,
-  `_to_cpu`, `_GPU`.
+- `_backend` — portable NumPy, CUDA/ROCm CuPy, and Intel dpnp/SYCL backend
+  adapters; deterministic `CXR_MC_BACKEND` selection plus compatibility
+  exports `xp`, `cp`, `REAL`, `_to_cpu`, `_GPU`.
+- `_resources` — execution resource-policy resolution and backend-neutral
+  pre-allocation chunk admission. Small devices default conservative.
 - `materials.attenuation` — `_normalize_composition`, `_mu_total_inv_ang`, `_layer_dz`,
   `_stack_tau` (composition + cross-stack self-absorption). Deps: `_backend`,
   `materials.crystal`.

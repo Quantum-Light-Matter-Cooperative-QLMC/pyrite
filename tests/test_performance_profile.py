@@ -126,6 +126,28 @@ def test_timing_aggregate_exposes_phase_totals_and_strips_private_metrics():
     }
 
 
+def test_timing_aggregate_emits_backend_neutral_allocator_identity():
+    aggregate = runner._TimingAgg()
+    out = {
+        "_allocator_used_mib": 1.0,
+        "_allocator_reserved_mib": 2.0,
+        "_allocator_peak_mib": 3.0,
+        "_backend": "sycl",
+        "_backend_vendor": "intel",
+        "_backend_device": "Arc",
+        "_backend_fallback_reason": "accelerator_oom_retries_exhausted",
+    }
+
+    metrics = aggregate.collect(out)
+
+    assert out == {}
+    assert metrics["allocator_reserved_mib"] == 2.0
+    assert metrics["backend"] == "sycl"
+    assert metrics["backend_vendor"] == "intel"
+    assert metrics["backend_device"] == "Arc"
+    assert metrics["backend_fallback_reason"] == "accelerator_oom_retries_exhausted"
+
+
 def test_run_cases_profile_callbacks_report_timing_and_activity(monkeypatch):
     def fake_run_case(_case, record_timing=False):
         assert record_timing

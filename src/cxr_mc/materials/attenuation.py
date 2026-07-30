@@ -39,14 +39,14 @@ def _mu_total_inv_ang(comp, E_eV):
     output is multiplied into the host-side spectra in the notebook). Keying off
     the input device -- not the global _GPU flag -- keeps the CPU post-processing
     path numpy even when a GPU is present."""
-    from ..montecarlo._backend import _GPU, REAL, _to_cpu, cp
+    from ..montecarlo._backend import REAL, _to_cpu, is_device_array, xp
 
     E_cpu = _to_cpu(E_eV)
     mu = 0.0
     for el, n_i in comp:
         mu = mu + 1.0 / absorption_length_ang(el, E_cpu, n_i)
-    if _GPU and cp is not None and isinstance(E_eV, cp.ndarray):
-        return cp.asarray(mu, dtype=REAL)
+    if is_device_array(E_eV):
+        return xp.asarray(mu, dtype=REAL)
     return mu
 
 

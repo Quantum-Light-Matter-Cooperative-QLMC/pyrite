@@ -25,6 +25,14 @@ experiment.
 
 Do not modify raw `.ndjson` files.
 
+Runtime records include `backend`, `backend_vendor`, `backend_device`,
+requested/resolved resource policy, device budget/reserve, backend-neutral
+`allocator_*_mib`, OOM attempts, effective chunks, and any
+`backend_fallback_reason`. Legacy `cupy_pool_*_mib` fields remain emitted and
+readable for existing `cxr.performance.v1` artifacts. NVIDIA device utilization
+comes from `nvidia-smi`; unavailable vendor counters remain null rather than
+being mislabeled as NVIDIA data.
+
 ## Collect comparable runs
 
 Use one named catalog profile, one slow material, and one faster comparison

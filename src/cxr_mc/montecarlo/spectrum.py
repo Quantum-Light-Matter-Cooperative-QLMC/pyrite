@@ -270,29 +270,35 @@ def mc_spectrum(
     complex field is
 
         E_j(omega) = sqrt(alpha*omega/(4 pi^2 hbar c) * T_abs_j)
-                     * A_j * Q_j(omega) * exp[i(omega t_abs,j - omega n_hat.r_j)],
+                     * A_j * Q_j(omega)
+                     * exp{i[omega t_abs,j - (omega n_hat + g).r_j]},
 
     with the UN-squared finite-time factor ``Q_j = t_L sinc(P t_L / pi)`` (whose
     modulus-square is the incoherent ``t_L^2 sinc^2``), the emission-time phase
     ``omega t_abs,j`` (``t_abs = t_ang + t0_ang``, the segment age plus the
     per-electron bunch offset, in Ang with c=1) and the far-field retardation
-    ``omega n_hat.r_j``. The lattice ``g`` phase is common-mode within one
-    reflection (it selects the resonance via omega_res / chi_g, the infinite-
-    crystal Fourier coefficient) and so does not enter the inter-segment phase;
-    distinct reflections are spectrally separated, so the coherent sum runs
-    WITHIN each reflection and orientation and reflections/orientations still add
-    incoherently. Two coherence scales fall out of the one sum: intra-electron
+    ``omega n_hat.r_j``. The reciprocal-harmonic spatial phase
+    ``g.r_j`` follows the repository's structure-factor convention
+    ``S(g)=sum F exp(+i g.R)``, whose susceptibility harmonic is
+    ``chi_g exp(-i g.r)``. Distinct reflections are spectrally separated, so
+    the coherent sum runs WITHIN each reflection and orientation and
+    reflections/orientations still add incoherently. Two coherence scales fall
+    out of the one sum: intra-electron
     (segments of a trajectory) and inter-electron / superradiant (the spread of
     ``t0_ang`` across the bunch, whose ``|<e^{i omega t0}>|^2`` is the Gaussian
     bunch form factor ``exp[-(omega sigma_z)^2]``).
 
     Limiting cases: coherent=False recovers the incoherent path bit-for-bit; a
     single segment / single electron has only the self-term and is identical to
-    incoherent; a bunch much longer than the wavelength (or scrambled ``t0``)
-    decoheres the cross terms back to ``sum_j |A_j|^2``; a bunch much shorter
-    than the wavelength phases every emitter together into the ``|sum A_j|^2``
-    N^2-scaling limit. ``bunch_length_fs=None`` (all ``t0_ang=0``) is the
-    documented degenerate pure-geometry (position-phase) limit, still physics.
+    incoherent. A bunch much longer than the wavelength (or independently
+    scrambled per-electron ``t0``) removes inter-electron cross terms but
+    preserves each electron's intra-trajectory field,
+    ``sum_e |sum_{j in e} E_j|^2``; it equals the per-segment incoherent path
+    only when each electron contributes one segment or its internal segment
+    phases also decohere. A bunch much shorter than the wavelength phases every
+    emitter together into the ``|sum A_j|^2`` N^2-scaling limit.
+    ``bunch_length_fs=None`` (all ``t0_ang=0``) is the documented degenerate
+    pure-geometry (position-phase) limit, still physics.
 
     coherent is mutually exclusive with components (the PXR/CBS split is
     ambiguous once the cross term ``A_PXR A_CBS*`` survives) -- v1 raises.
@@ -370,11 +376,10 @@ def mc_spectrum(
 
     # coherent (phased) sum precompute: the per-segment retardation scalar
     # d_j = t_abs,j - n_hat.r_j [Ang, c=1] (emission-time phase minus far-field
-    # retardation) and the grid angular frequency omega(E) = E / hbar c [1/Ang].
-    # The reflection's g-phase is common-mode within one g (folded into chi_g /
-    # omega_res) and drops from the inter-segment phase. All-zero t0_ang (no
-    # bunch sampled) leaves the pure geometric position phase. Inert unless
-    # coherent=True.
+    # retardation) and photon wavenumber k_gamma(E) = E / hbar c [1/Ang].
+    # Each reflection adds its spatial susceptibility phase -g.r_j inside
+    # _accumulate. All-zero t0_ang leaves the physical trajectory phase.
+    # Inert unless coherent=True.
     if coherent:
         cdtype = xp.result_type(REAL, 1j)
         seg_t0 = xp.asarray(segments.get("t0_ang", np.zeros(seg_E.size)), dtype=REAL)
@@ -513,6 +518,7 @@ def mc_spectrum(
             amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * T_abs)
             a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
             d = d_all[idx]
+            g_phase = seg_r[idx] @ g_vec_d
             coefs = [(amp * t_L) * A_e for A_e in pol_A]  # complex per polarization
             fields = [xp.zeros(E_grid.size, dtype=cdtype) for _ in coefs]
             good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
@@ -523,7 +529,13 @@ def mc_spectrum(
                     if not m.any():
                         continue
                     x = a_width[sl][m, None] * (E_grid[None, :] - E_r[sl][m, None]) / xp.pi
-                    ph = xp.exp(1j * d[sl][m, None] * omega_grid[None, :])
+                    ph = xp.exp(
+                        1j
+                        * (
+                            d[sl][m, None] * omega_grid[None, :]
+                            - g_phase[sl][m, None]
+                        )
+                    )
                     SP = xp.sinc(x).astype(cdtype) * ph
                     for c, f in zip(coefs, fields, strict=True):
                         f += c[sl][m] @ SP
@@ -547,7 +559,13 @@ def mc_spectrum(
                     if i1 <= i0:
                         continue
                     x = a_width[sel][:, None] * (E_grid[None, i0:i1] - E_r[sel][:, None]) / xp.pi
-                    ph = xp.exp(1j * d[sel][:, None] * omega_grid[None, i0:i1])
+                    ph = xp.exp(
+                        1j
+                        * (
+                            d[sel][:, None] * omega_grid[None, i0:i1]
+                            - g_phase[sel][:, None]
+                        )
+                    )
                     SP = xp.sinc(x).astype(cdtype) * ph
                     for c, f in zip(coefs, fields, strict=True):
                         f[i0:i1] += c[sel] @ SP

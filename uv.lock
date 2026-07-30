@@ -214,7 +214,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
+    { name = "pycparser" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -489,6 +489,16 @@ nvrtc = [
 ]
 
 [[package]]
+name = "cupy"
+version = "14.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cuda-pathfinder" },
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/85/86/e99f52f4a50e5faaf4932cf3574d64d870bce224314be7fca91a6d02cda7/cupy-14.1.1.tar.gz", hash = "sha256:3d4d193a5b028e1823d1d44fe6268364d8fb76c3793ad4e28e1427c56ceb2f80", size = 3953009, upload-time = "2026-06-01T04:55:30.379Z" }
+
+[[package]]
 name = "cupy-cuda13x"
 version = "14.1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -521,9 +531,7 @@ dependencies = [
     { name = "anywidget" },
     { name = "click" },
     { name = "crystals" },
-    { name = "cupy-cuda13x", extra = ["ctk"] },
     { name = "datashader" },
-    { name = "dpctl" },
     { name = "marimo", extra = ["recommended"] },
     { name = "matplotlib" },
     { name = "nbconvert" },
@@ -547,6 +555,16 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+amd = [
+    { name = "cupy" },
+]
+intel = [
+    { name = "dpctl" },
+    { name = "dpnp" },
+]
+nvidia = [
+    { name = "cupy-cuda13x", extra = ["ctk"] },
+]
 viz-render = [
     { name = "imageio" },
     { name = "imageio-ffmpeg" },
@@ -575,9 +593,11 @@ requires-dist = [
     { name = "anywidget", specifier = ">=0.9" },
     { name = "click", specifier = ">=8.4.1" },
     { name = "crystals", specifier = ">=1.7,<2" },
-    { name = "cupy-cuda13x", extras = ["ctk"], specifier = ">=14.1.1" },
+    { name = "cupy", marker = "extra == 'amd'", specifier = ">=13.4.0" },
+    { name = "cupy-cuda13x", extras = ["ctk"], marker = "extra == 'nvidia'", specifier = ">=14.1.1" },
     { name = "datashader", specifier = ">=0.19.1" },
-    { name = "dpctl", specifier = ">=0.22.1" },
+    { name = "dpctl", marker = "extra == 'intel'", specifier = ">=0.22.1" },
+    { name = "dpnp", marker = "extra == 'intel'", specifier = ">=0.20.0" },
     { name = "imageio", marker = "extra == 'viz-render'" },
     { name = "imageio-ffmpeg", marker = "extra == 'viz-render'" },
     { name = "kaleido", marker = "extra == 'viz-render'" },
@@ -602,7 +622,7 @@ requires-dist = [
     { name = "vl-convert-python", specifier = ">=1.9.0.post1" },
     { name = "xraydb", specifier = ">=4.5.8" },
 ]
-provides-extras = ["viz-render"]
+provides-extras = ["nvidia", "amd", "intel", "viz-render"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -709,6 +729,20 @@ wheels = [
 ]
 
 [[package]]
+name = "dpcpp-cpp-rt"
+version = "2026.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "intel-opencl-rt" },
+    { name = "intel-openmp" },
+    { name = "intel-sycl-rt" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/98/20fffd109174139f7dc5a3413ffca0d71e0ea0837b5d7b62b634aa44ad3d/dpcpp_cpp_rt-2026.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:9e7058dedf18c9cc8e5baff596dc6cf0c532807f3a5934b60e95be2f69ee4014", size = 28712, upload-time = "2026-07-01T15:15:11.919Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/30/0cabcb462472ec50bdb4f3feaa312640a7831d97df73bf789d9eff507eca/dpcpp_cpp_rt-2026.1.0-py2.py3-none-win_amd64.whl", hash = "sha256:77f8b791cb400f0da6d59cd1e56b25b12ea643edf059d5d1f0cb25bc39489b16", size = 58378, upload-time = "2026-07-01T15:10:03.804Z" },
+]
+
+[[package]]
 name = "dpctl"
 version = "0.22.1"
 source = { registry = "https://pypi.org/simple" }
@@ -722,6 +756,27 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/92/c4/c4b7b874e088c054752a45d42d08012f2e366f1f32a98c192426c9eb6a29/dpctl-0.22.1-0-cp313-cp313-win_amd64.whl", hash = "sha256:e976273835a9bb3082a075f2f7f93cf0949940bc58d7b62298b38821eb6c4ba8", size = 1454683, upload-time = "2026-04-29T17:18:35.424Z" },
     { url = "https://files.pythonhosted.org/packages/50/f4/20101038952589a6193552fe7efd95ed0c37105f3ed2a9baedd618440d2c/dpctl-0.22.1-0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:14edbe66fd560cdd861c37704e7f28ab29d7faca6d010bda0fe8302857035dc0", size = 1271660, upload-time = "2026-04-29T17:18:48.598Z" },
     { url = "https://files.pythonhosted.org/packages/0b/9a/55023cc989488eba60bccf96b8b4fa95a84c00b8b6105107c71dc1ce046c/dpctl-0.22.1-0-cp314-cp314-win_amd64.whl", hash = "sha256:e922465861e97d34bf053563aa71b13c22639ac95b916288e19c567de297b2e7", size = 1457051, upload-time = "2026-04-29T17:19:02.002Z" },
+]
+
+[[package]]
+name = "dpnp"
+version = "0.20.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dpcpp-cpp-rt" },
+    { name = "dpctl" },
+    { name = "numpy" },
+    { name = "onemkl-sycl-blas" },
+    { name = "onemkl-sycl-dft" },
+    { name = "onemkl-sycl-lapack" },
+    { name = "onemkl-sycl-rng" },
+    { name = "onemkl-sycl-vm" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c6/dc/d0c72851dca39595dce029e58b6087f29d60e80f21fadbd8aae830bdc281/dpnp-0.20.0-0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:b9552f9de4a9f7a80551d9b98624da8f32376961534f9d52e3c7ea11bcab693e", size = 28575630, upload-time = "2026-04-28T15:32:07.653Z" },
+    { url = "https://files.pythonhosted.org/packages/da/97/ec8407105728b4fb582db5a9dd9b938edd809081d951f0c6e105e83813c1/dpnp-0.20.0-0-cp313-cp313-win_amd64.whl", hash = "sha256:cead023caa384da74b353b834870d3a37497cfa8e423a7ee7f89811ce505ce54", size = 29174849, upload-time = "2026-04-28T15:32:38.4Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/26/c11a16abab7389b74dd706a8cab39328f1f1a44ce06dd7d6accd76b40491/dpnp-0.20.0-0-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:0013d958e11279caa7e3579711ba50db5deb11b4917a49dd1f4403adf13bd87a", size = 28584450, upload-time = "2026-04-28T15:32:59.317Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/e6/6002efd0ac1f51bf190ef968250e1739d9fce8cdcbdf4b60aa659eb62450/dpnp-0.20.0-0-cp314-cp314-win_amd64.whl", hash = "sha256:5602e54eb6b30bcaa64f363d85f5869f1c1d4b1886cdaddd708344207c0b8629", size = 29179065, upload-time = "2026-04-28T15:33:31.074Z" },
 ]
 
 [[package]]
@@ -1047,6 +1102,31 @@ source = { registry = "https://pypi.org/simple" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2a/9c/cfdfb3429b32fbd2bed7a9bcce2989efa329ca1b87b70e03bc9170650512/intel_cmplr_lic_rt-2026.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:ec9f7c495bda8f5d260442056808ee75cf4c1a145910ce999e0e8964d78ce1ba", size = 18914, upload-time = "2026-07-01T15:15:01.218Z" },
     { url = "https://files.pythonhosted.org/packages/49/b2/02def0f52f055cb449631c43fc13761f8e11549dbb732dfe0586c7cf9bc5/intel_cmplr_lic_rt-2026.1.0-py2.py3-none-win_amd64.whl", hash = "sha256:19e568a1b37e5080140c2694f990505948b7c0cf08d4090beab70702b76c6a50", size = 49550, upload-time = "2026-07-01T15:10:25.868Z" },
+]
+
+[[package]]
+name = "intel-opencl-rt"
+version = "2026.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "intel-cmplr-lic-rt" },
+    { name = "tbb" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/24/ac/08bb51b090cc1dc3ab24567901610b33d5495c76194e6714e26a2c66390a/intel_opencl_rt-2026.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:b2891b6a6f347f21d2a9f0e872fb97e1aef407b4c34714516994dd884ea5e19e", size = 204358325, upload-time = "2026-07-01T15:15:07.515Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/8f/574738fd8f384c635f50a3f78e5f47763020486960ac83564a954b82bec7/intel_opencl_rt-2026.1.0-py2.py3-none-win_amd64.whl", hash = "sha256:0967dc144f9cdf3aaa0fc722b92a54119cff9867f0b07e8dee8b8c0a88f05e44", size = 109494809, upload-time = "2026-07-01T15:10:08.519Z" },
+]
+
+[[package]]
+name = "intel-openmp"
+version = "2026.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "intel-cmplr-lib-ur" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/72/23/60aeb428e6b1fb34fb81d4970d91ff8b5deeeeb446e1628bd78f9e3d1f8b/intel_openmp-2026.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:e6887f701b7d2323ed147008893b9af22e511aaa97e0fc9c37eb8be24a5366b0", size = 52547733, upload-time = "2026-07-01T15:14:42.64Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/cc/b4cb4ed4a1cca9dcc63cec93f7813ef3840f37d8bd30c06b8013948edc00/intel_openmp-2026.1.0-py2.py3-none-win_amd64.whl", hash = "sha256:8f9f86d93da9d549eec7bae26d65d6188ed748792ce655b5cdbc2e1a15cb7206", size = 26355044, upload-time = "2026-07-01T15:10:22.582Z" },
 ]
 
 [[package]]
@@ -1647,6 +1727,20 @@ wheels = [
 ]
 
 [[package]]
+name = "mkl"
+version = "2026.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "intel-openmp" },
+    { name = "onemkl-license" },
+    { name = "tbb" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/61/da/4921e17b1f455f7fed30d5cc0964f3289eee6a6cb03cdf7d5e20c14bd025/mkl-2026.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:4d5a26449818a8aebd4b2aaf6b291831e691f9cf74b152df49b99cf48bbd5360", size = 224034262, upload-time = "2026-07-01T15:11:10.038Z" },
+    { url = "https://files.pythonhosted.org/packages/d6/bd/e35bd5477278c91b0f5d4733b13009d183c284d636d68c649204858c207a/mkl-2026.1.0-py2.py3-none-win_amd64.whl", hash = "sha256:8194a8270d70622eff00eec84c793efc382b14848b98c3ace6bacdda42170a80", size = 180806880, upload-time = "2026-07-01T15:14:02.845Z" },
+]
+
+[[package]]
 name = "msgspec"
 version = "0.21.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1883,7 +1977,7 @@ name = "nvidia-cublas"
 version = "13.5.1.27"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cuda-nvrtc", marker = "sys_platform != 'emscripten'" },
+    { name = "nvidia-cuda-nvrtc" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9c/da/45f78bb61f93a467ccaccf2eafbf23483bdcb29d3c5d16f8cb918be1aea0/nvidia_cublas-13.5.1.27-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:bc355b10e35b01cf88e8dcc0fbe0fd1ef86a05fddae78a44dc133d7e63eaf973", size = 515580892, upload-time = "2026-05-26T16:43:17.967Z" },
@@ -1916,7 +2010,7 @@ name = "nvidia-cufft"
 version = "12.3.0.29"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink", marker = "sys_platform != 'emscripten'" },
+    { name = "nvidia-nvjitlink" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f9/bc/543e6dfbcb659ed07a94a72d8925c8b5688dabc1f616ab2f6575483a3cb6/nvidia_cufft-12.3.0.29-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:3c268ec73fdbfd22e42913dcef6e49e0c305ab09cd9848268a841cbe9f33f748", size = 184700143, upload-time = "2026-05-26T16:45:25.443Z" },
@@ -1939,9 +2033,9 @@ name = "nvidia-cusolver"
 version = "12.2.2.18"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas", marker = "sys_platform != 'emscripten'" },
-    { name = "nvidia-cusparse", marker = "sys_platform != 'emscripten'" },
-    { name = "nvidia-nvjitlink", marker = "sys_platform != 'emscripten'" },
+    { name = "nvidia-cublas" },
+    { name = "nvidia-cusparse" },
+    { name = "nvidia-nvjitlink" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a0/0e/7d555ee81c406511db8e23588848bac24f12b7b034e63ddb20e8d2130ff2/nvidia_cusolver-12.2.2.18-py3-none-manylinux_2_27_aarch64.whl", hash = "sha256:c3597aa0992b8252d82e3d01b836fb732df0e3de8a9b65dd11a036916f619cf6", size = 251141017, upload-time = "2026-05-26T16:49:16.299Z" },
@@ -1954,7 +2048,7 @@ name = "nvidia-cusparse"
 version = "12.8.1.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-nvjitlink", marker = "sys_platform != 'emscripten'" },
+    { name = "nvidia-nvjitlink" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fc/a6/b455cfaf3d255c09916f556764811d6e35cad83383a75c618807c7fa34a3/nvidia_cusparse-12.8.1.7-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:ddba3dc1d5a265e4d38ef516f9e3843834dc27f8ad99ca6d193a714275e5d21a", size = 172714512, upload-time = "2026-05-26T16:50:37.199Z" },
@@ -1970,6 +2064,86 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/f0/ee/580ca6f29dcab0221db8706badca1bbbb084f1975c4d4e83329c3a7e31f0/nvidia_nvjitlink-13.3.33-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl", hash = "sha256:26a6de7fb4c8fdaa7703d3dad720d6d427ddfea5c48a528fd97c11733ad830e5", size = 40742423, upload-time = "2026-05-26T16:54:51.613Z" },
     { url = "https://files.pythonhosted.org/packages/69/30/45414e35ff2eee7db3da037e5707037ccf9d2b5218ffbdb055ea4d5aa98a/nvidia_nvjitlink-13.3.33-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:ce48b37dfeb3cb1eae4cf85adacb47d7a6539ea2272870c9a3628ce275c2037e", size = 39168635, upload-time = "2026-05-26T16:54:13.906Z" },
     { url = "https://files.pythonhosted.org/packages/67/f2/ec9c05a108095828dfc58840978c627b3c313fdf2a567c6de9ffbbb46901/nvidia_nvjitlink-13.3.33-py3-none-win_amd64.whl", hash = "sha256:4297ee49639b4f2e07255a1d69b3acc7ab2d011bb892b403e91ac98368962e3b", size = 37766359, upload-time = "2026-05-26T17:11:28.96Z" },
+]
+
+[[package]]
+name = "onemkl-license"
+version = "2026.1.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e3/ef/8437c187319e779a76f4dbb468a1863d729297d79a1b5f44b10a58c96ec2/onemkl_license-2026.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:39fd829648af92c9e03c22ba228f07174d829aaa2fe3c5f6cd7073b8eb8a9805", size = 56161, upload-time = "2026-07-01T15:11:45.836Z" },
+    { url = "https://files.pythonhosted.org/packages/66/0d/82581d2048b5a01f3145fa48cc9c461f34443499420dcdaa6ecbb444ce4d/onemkl_license-2026.1.0-py2.py3-none-win_amd64.whl", hash = "sha256:425b599af279e6bc03e27319d75aa156ca7dd8645dbcd0c324ef894d3fae6be3", size = 56185, upload-time = "2026-07-01T15:13:49.098Z" },
+]
+
+[[package]]
+name = "onemkl-sycl-blas"
+version = "2026.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dpcpp-cpp-rt" },
+    { name = "intel-opencl-rt" },
+    { name = "mkl" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d6/c5/94ce322721013c42578398846e57da4273d1f8e48ab1e49ad311a418d36e/onemkl_sycl_blas-2026.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:229dd19462b4a588c156ea73bce29feaf0e96434d797a9bae38a89694fc46493", size = 20658169, upload-time = "2026-07-01T15:11:48.683Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/f9/c39f81e686db4be90cb79e14ca5298772c8584de8afb5518aa2dd75abb6d/onemkl_sycl_blas-2026.1.0-py2.py3-none-win_amd64.whl", hash = "sha256:c4478971431ac022a1b8268655bdb8cc49c877c93e8700e68e18c8271be42993", size = 15924024, upload-time = "2026-07-01T15:14:38.589Z" },
+]
+
+[[package]]
+name = "onemkl-sycl-dft"
+version = "2026.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dpcpp-cpp-rt" },
+    { name = "intel-opencl-rt" },
+    { name = "mkl" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/71/60/80d4fa8e4e100f290572cf99856e067195fb9d22a7f462b8e0993833c526/onemkl_sycl_dft-2026.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:71bd34f8c25b6869a440a01eadd2743151601bf2d011b01c11206ec81f6de80b", size = 6691008, upload-time = "2026-07-01T15:11:38.183Z" },
+    { url = "https://files.pythonhosted.org/packages/01/af/ea8b355642e61c0176d033f873917c707ff8fb7d8a66c51ef0c4ecd94cf9/onemkl_sycl_dft-2026.1.0-py2.py3-none-win_amd64.whl", hash = "sha256:f57ec87c2af23dbae00f94fd3941c2443beb5330c82eec8475d8c219b13e35bc", size = 5966913, upload-time = "2026-07-01T15:14:35.847Z" },
+]
+
+[[package]]
+name = "onemkl-sycl-lapack"
+version = "2026.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dpcpp-cpp-rt" },
+    { name = "intel-opencl-rt" },
+    { name = "mkl" },
+    { name = "onemkl-sycl-blas" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0c/ee/9058fe036b82bc742adb6280574502da2a8c70364a945829579fd3dd8084/onemkl_sycl_lapack-2026.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:97ff3626f99463e50734a85034ed2ca765601b5c5d3b0560695da7aec0b4f629", size = 8436464, upload-time = "2026-07-01T15:11:43.165Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/d1/46baabeb2e855d840dfb10e92a86f8a47299ee64f9325f7635bc8265d7a9/onemkl_sycl_lapack-2026.1.0-py2.py3-none-win_amd64.whl", hash = "sha256:e25599ff5a23439d52021ed2f29bf0450a5bfd77495084694032d0bd8c4188ba", size = 6463381, upload-time = "2026-07-01T15:14:33.205Z" },
+]
+
+[[package]]
+name = "onemkl-sycl-rng"
+version = "2026.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dpcpp-cpp-rt" },
+    { name = "intel-opencl-rt" },
+    { name = "mkl" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f0/3c/4ee5d31e04539d1acd0a1acd3ddf722db570ac8c381d5bc2a9a197e31ca7/onemkl_sycl_rng-2026.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:6d24ee79da2d7fe38b99dfdf3c36e39f2dc796be0ab5c477a3e6d1c244ed5ccd", size = 23548890, upload-time = "2026-07-01T15:11:16.953Z" },
+    { url = "https://files.pythonhosted.org/packages/26/b5/bbbb459df6cfba8d4f9f034ec21478eef820c7377e3de46e4ac954ca21f8/onemkl_sycl_rng-2026.1.0-py2.py3-none-win_amd64.whl", hash = "sha256:fb5f168c5032777fa65022272d77e2c67ada06c4d89459a2d08cd0b2ad56c041", size = 15554363, upload-time = "2026-07-01T15:14:22.132Z" },
+]
+
+[[package]]
+name = "onemkl-sycl-vm"
+version = "2026.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dpcpp-cpp-rt" },
+    { name = "intel-opencl-rt" },
+    { name = "mkl" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ce/16/54dd0f2408c60536946535e7c450aa1797579baabc482272154eabb4840a/onemkl_sycl_vm-2026.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:2547d9998b8fb5f04d37688304341ece222b9a08f24ac8bed665f3a20d1254cb", size = 20076528, upload-time = "2026-07-01T15:11:34.528Z" },
+    { url = "https://files.pythonhosted.org/packages/83/a4/afaec50df906ca8dc29fc063c66174a9ca99d8bc4ac5ea60dfbf4a53ca5c/onemkl_sycl_vm-2026.1.0-py2.py3-none-win_amd64.whl", hash = "sha256:ce8a10dd62582a7551d3c8dff07f807cb71b865e7164686bc5c1722bf54f02c8", size = 16265458, upload-time = "2026-07-01T15:13:46.071Z" },
 ]
 
 [[package]]
@@ -2136,7 +2310,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "ptyprocess" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -3297,7 +3471,7 @@ name = "starlette"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio", marker = "sys_platform != 'emscripten'" },
+    { name = "anyio" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/e3/7c1dc7381d9f8ab7d854328ebfa884e62cb3f3d8549ddfd37c7814f42afa/starlette-1.3.1.tar.gz", hash = "sha256:05d0213193f2fbaae60e2ecb593b4add4262ad4e46536b54abe36f11a71724e0", size = 2703240, upload-time = "2026-06-12T09:23:11.602Z" }
 wheels = [
@@ -3311,6 +3485,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/46/58/8c37dea7bbf769b20d58e7ace7e5edfe65b849442b00ffcdd56be88697c6/tabulate-0.10.0.tar.gz", hash = "sha256:e2cfde8f79420f6deeffdeda9aaec3b6bc5abce947655d17ac662b126e48a60d", size = 91754, upload-time = "2026-03-04T18:55:34.402Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/99/55/db07de81b5c630da5cbf5c7df646580ca26dfaefa593667fc6f2fe016d2e/tabulate-0.10.0-py3-none-any.whl", hash = "sha256:f0b0622e567335c8fabaaa659f1b33bcb6ddfe2e496071b743aa113f8774f2d3", size = 39814, upload-time = "2026-03-04T18:55:31.284Z" },
+]
+
+[[package]]
+name = "tbb"
+version = "2023.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "tcmlib" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/25/0c/0266c71e3fa50a71db5ce8a1d0807863df3215c5f7b5fe7c98b257561138/tbb-2023.1.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:64ad35241c736a595498f5343abec8eaaa203e9fe0dbdbf4b86d37c5a3ab1d9c", size = 6840282, upload-time = "2026-07-01T15:10:33.348Z" },
+    { url = "https://files.pythonhosted.org/packages/ac/ff/168d3498762069b0cd2dff20ab34d53fa48a0a35ffd1965cf456c603f292/tbb-2023.1.0-py3-none-win_amd64.whl", hash = "sha256:27df1315202defc67a73800c667ba4fbd03cf8924f73949373d4a34d1443fca2", size = 428501, upload-time = "2026-07-01T15:12:55.771Z" },
 ]
 
 [[package]]
@@ -3591,8 +3777,8 @@ name = "uvicorn"
 version = "0.49.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", marker = "sys_platform != 'emscripten'" },
-    { name = "h11", marker = "sys_platform != 'emscripten'" },
+    { name = "click" },
+    { name = "h11" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c4/1f/fa18009dea8469069cca78a4e877a008ab78f08b064bfc9ab891579077ff/uvicorn-0.49.0.tar.gz", hash = "sha256:ebf4271aa580d9de97f93192d4595176df6e91f9aae919ca73e4fc07df1e66a3", size = 91284, upload-time = "2026-06-03T22:01:30.448Z" }
 wheels = [

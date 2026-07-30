@@ -85,6 +85,7 @@ def test_analyze_writes_intervals_sessions_summary_and_timeline(tmp_path):
     intervals = list(csv.DictReader((analysis / "intervals.csv").open()))
     assert sessions[0]["cost_rate"] == "2.0"
     assert sessions[0]["complete"] == "True"
+    assert sessions[0]["successful"] == "True"
     assert intervals[0]["cost_rate"] == "2.0"
     assert intervals[0]["worker_cpu_efficiency"] == "0.75"
     assert intervals[0]["host_core_occupancy"] == "0.5"
@@ -106,7 +107,39 @@ def test_analyze_marks_incomplete_session(tmp_path):
         )
     )
     assert sessions[0]["complete"] == "False"
+    assert sessions[0]["successful"] == "False"
     assert "expected one terminal record" in sessions[0]["warnings"]
+
+
+def test_analyze_excludes_failed_terminal_from_bottleneck_summary(tmp_path):
+    _write_profile(
+        tmp_path,
+        [
+            _record(0, "start"),
+            _record(5, "tick"),
+            _record(
+                10,
+                "failed",
+                gpu_oom_retry_count_total=3,
+                gpu_feed_wait_fraction=0.0,
+            ),
+        ],
+    )
+
+    result = performance_analysis.analyze_performance_profile(
+        "baseline", tmp_path / "performance-profiles"
+    )
+
+    analysis = tmp_path / "performance-profiles" / "baseline" / "analysis"
+    sessions = list(csv.DictReader((analysis / "sessions.csv").open()))
+    assert sessions[0]["complete"] == "True"
+    assert sessions[0]["successful"] == "False"
+    assert result["incomplete_sessions"] == 0
+    assert result["unsuccessful_sessions"] == 1
+    summary = (analysis / "summary.md").read_text()
+    assert "Sessions: 1 (0 valid successful)" in summary
+    assert "Primary bottleneck: unknown" in summary
+    assert "Primary bottleneck: GPU memory limit" not in summary
 
 
 def test_analyze_marks_sampling_gap_and_counter_discontinuity(tmp_path):
