@@ -81,6 +81,35 @@ found or the user declines. Never re-prompt once `CXR_MC_BACKEND` is set.
    gate as scoped above needs *some* durable "already asked" marker either
    way -- resolve alongside this.
 
+### Decisions resolved (provisional -- no live user dialogue this run; flag for human confirmation)
+
+1. **Trigger point: explicit `cxr setup` command.** No auto-fire on other
+   commands. Rationale: matches the doc's own leaning; avoids stdin-prompt
+   hangs in scripted/CI use and preserves every other command's documented
+   `--help`/output/exit contract untouched. Implemented as a new root-level
+   `cxr setup` (`src/cxr_mc/cli/backend_setup.py`), visible (not
+   `lazy_hidden`) since it's the onboarding entry point.
+2. **Instruct, not auto-sync.** `cxr setup` never runs `uv sync`; it writes
+   `.env` and prints the matching follow-up command (`uv sync --extra
+   nvidia|intel`, or `CUPY_INSTALL_USE_HIP=1 uv sync --extra amd`), noting the
+   SessionStart hook (`.claude/hooks/sync_local_backend.sh`) already handles
+   Claude Code sessions automatically. Rationale: keeps the command fast and
+   network-independent; avoids duplicating the hook's sync logic.
+3. **`CXR_MC_RESOURCE_POLICY`: out of scope for this slice.** Not touched.
+   Rationale: the Delegation note below already scopes this task to "no
+   cross-module integration beyond one CLI entry point and `.env` I/O";
+   `CXR_MC_RESOURCE_POLICY=auto` already has a safe runtime default
+   (`resolve_resource_policy`, `<8 GiB -> conservative`) with no first-run
+   correctness gap, so bundling a VRAM-query heuristic here would widen the
+   slice without an acceptance-driven need. Left as a possible follow-up task
+   if a human wants VRAM-aware resource-policy defaults at setup time.
+4. **Explicit `cpu`, not an untouched `.env`.** On no GPU detected, a
+   declined prompt, or a non-interactive session, `cxr setup` writes
+   `CXR_MC_BACKEND=cpu` explicitly. Rationale: matches the doc's own
+   stated reason (avoids re-probing indefinitely) and gives `cxr setup` a
+   reliable "already asked" gate (`read_existing_backend` returning non-None)
+   independent of `select_backend`'s runtime `auto` behavior.
+
 ## Delegation
 
 Bounded single feature, but the four decisions above should be resolved
@@ -88,6 +117,13 @@ Bounded single feature, but the four decisions above should be resolved
 Suggest `implement-task` (normal checklist) tier; not `-lite` given the CLI
 contract and multi-branch detection logic, not `lead-task` given no
 cross-module integration beyond one CLI entry point and `.env` I/O.
+
+## Status
+
+Implemented: `src/cxr_mc/cli/backend_setup.py` (`cxr setup` command, wired
+into `src/cxr_mc/cli/__init__.py`), tests in `tests/test_cli_backend_setup.py`,
+`docs/cli-reference.md` regenerated. All acceptance checks below met; see
+commits on `feature/backend-autodetect`.
 
 ## Acceptance checks
 
