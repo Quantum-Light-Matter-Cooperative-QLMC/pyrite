@@ -851,9 +851,12 @@ def repair_line_spec(
     max_seconds=None,
     status=None,
 ):
-    """Regenerate the coherent line ``spec`` for cached records with the CURRENT
-    line path (:func:`cxr_mc.montecarlo._lines_for_case`) -- the mirror of
-    :func:`repair_brem_wide`, WITHOUT recomputing the brem background.
+    """Regenerate the incoherent line ``spec`` for cached records with the
+    CURRENT line path (:func:`cxr_mc.montecarlo._line_pair_for_case`) -- the
+    mirror of :func:`repair_brem_wide`, WITHOUT recomputing the brem background.
+    A ``coherent``/``both`` checkpoint (one carrying ``spec_coherent``) has BOTH
+    its incoherent ``spec`` and its ``spec_coherent`` refreshed onto the new grid
+    from a single re-transport, so the coherent array never drifts off-grid.
 
     Target line grid per record (see :func:`_target_line_grid`): ``line_step_eV``
     (explicit uniform spacing), else ``from_config`` rebuilds it from
@@ -938,7 +941,17 @@ def repair_line_spec(
             c["Ne"] = int(line_ne)
         if profile is not None:
             c["line_profile"] = profile
-        r["spec"] = runner._lines_for_case(c, target)
+        # `spec` is always the incoherent line sum; a coherent/both checkpoint
+        # (detected by an existing `spec_coherent`) gets BOTH arrays refreshed
+        # onto the new grid from ONE re-transport, so `spec_coherent` never goes
+        # stale relative to `spec`/`E_grid`. Old pre-dual coherent checkpoints
+        # (no `spec_coherent` key) are orphaned by design -- reline only ever
+        # re-derives the incoherent `spec` for those.
+        want_coherent = "spec_coherent" in r
+        spec, spec_coherent = runner._line_pair_for_case(c, target, want_coherent=want_coherent)
+        r["spec"] = spec
+        if want_coherent:
+            r["spec_coherent"] = spec_coherent
         r["E_grid"] = target
         c["E_grid_line"] = (float(target[0]), float(target[-1]), len(target))
         bw = r.get("brem_wide")

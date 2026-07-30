@@ -1453,7 +1453,9 @@ def test_repair_line_spec_rewrites_spec_and_reinterp_brem_keeps_brem_wide(monkey
     from cxr_mc import run
 
     monkeypatch.setattr(
-        run.runner, "_lines_for_case", lambda case, E_grid: np.full(E_grid.shape, 5.0)
+        run.runner,
+        "_line_pair_for_case",
+        lambda case, E_grid, *, want_coherent: (np.full(E_grid.shape, 5.0), None),
     )
     results = {"mos2@30": {30.0: _line_record()}}
     r = results["mos2@30"][30.0]
@@ -1466,11 +1468,43 @@ def test_repair_line_spec_rewrites_spec_and_reinterp_brem_keeps_brem_wide(monkey
     np.testing.assert_allclose(r["brem"], np.interp(r["E_grid"], r["E_grid_brem"], r["brem_wide"]))
 
 
+def test_repair_line_spec_refreshes_both_spec_and_spec_coherent(monkeypatch):
+    """A coherent/both checkpoint (record carries `spec_coherent`) relines BOTH
+    arrays onto the new grid from one re-transport, so `spec_coherent` never
+    goes stale relative to `spec`/`E_grid`; an incoherent record only gets
+    `spec` and grows no `spec_coherent`."""
+    import numpy as np
+
+    from cxr_mc import run
+
+    def fake_pair(case, E_grid, *, want_coherent):
+        spec = np.full(E_grid.shape, 5.0)
+        return spec, (np.full(E_grid.shape, 9.0) if want_coherent else None)
+
+    monkeypatch.setattr(run.runner, "_line_pair_for_case", fake_pair)
+
+    both = _line_record()
+    both["spec_coherent"] = np.zeros(32)  # stale placeholder to be overwritten
+    incoh = _line_record()
+    results = {"both@30": {30.0: both}, "incoh@30": {30.0: incoh}}
+
+    n = run.repair_line_spec(results, material="mos2", line_ne=999, from_config=False)
+
+    assert n == 2
+    assert np.all(both["spec"] == 5.0)
+    assert np.all(both["spec_coherent"] == 9.0)
+    assert both["spec"].shape == both["spec_coherent"].shape == both["E_grid"].shape
+    assert np.all(incoh["spec"] == 5.0)
+    assert "spec_coherent" not in incoh
+
+
 def test_repair_line_spec_persists_profile_and_explicit_bounds(monkeypatch):
     from cxr_mc import run
 
     monkeypatch.setattr(
-        run.runner, "_lines_for_case", lambda _case, grid: np.ones(np.asarray(grid).shape)
+        run.runner,
+        "_line_pair_for_case",
+        lambda _case, grid, *, want_coherent: (np.ones(np.asarray(grid).shape), None),
     )
     results = {"mos2@30": {30.0: _line_record()}}
     record = results["mos2@30"][30.0]
@@ -1498,7 +1532,9 @@ def test_repair_line_spec_skips_at_target(monkeypatch):
     from cxr_mc import run
 
     monkeypatch.setattr(
-        run.runner, "_lines_for_case", lambda case, E_grid: np.full(E_grid.shape, 5.0)
+        run.runner,
+        "_line_pair_for_case",
+        lambda case, E_grid, *, want_coherent: (np.full(E_grid.shape, 5.0), None),
     )
     results = {"mos2@30": {30.0: _line_record(ne=200)}}
     # same Ne, same grid, finite spec -> nothing to redo
@@ -1512,7 +1548,9 @@ def test_repair_line_spec_max_seconds_stops_early(monkeypatch):
     from cxr_mc import run
 
     monkeypatch.setattr(
-        run.runner, "_lines_for_case", lambda case, E_grid: np.full(E_grid.shape, 5.0)
+        run.runner,
+        "_line_pair_for_case",
+        lambda case, E_grid, *, want_coherent: (np.full(E_grid.shape, 5.0), None),
     )
     results = {"mos2@30": {30.0: _line_record(ne=200)}}  # 1 stale record (line_ne bump)
     n = run.repair_line_spec(

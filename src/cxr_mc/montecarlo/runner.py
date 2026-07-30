@@ -709,14 +709,13 @@ def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove, *, cohere
     return spec
 
 
-def _lines_for_case(case, E_grid):
-    """Regenerate a case's coherent line spectrum on ``E_grid`` from scratch:
-    tilted geometry + optional groove, transport ``Ne`` electrons at ``seed``
-    (the line seed, NOT ``seed + 1``), then the per-layer line spectrum via
-    :func:`_lines_for_segments`. Returns ``spec``. The line half of run_case's
-    transport + spectrum phases factored out so :func:`cxr_mc.run.repair_line_spec`
-    (``cxr reline``) reuses the EXACT live-sweep line path -- multilayer,
-    mosaic, groove and all -- rather than re-deriving it by hand."""
+def _transport_lines_for_case(case):
+    """Re-run a case's LINE transport from scratch: tilted geometry + optional
+    groove, then transport ``Ne`` electrons at ``seed`` (the line seed, NOT
+    ``seed + 1``). Returns ``(segs, n_hat, abs_layers, groove)`` -- the shared
+    front half of :func:`_lines_for_case` / :func:`_line_pair_for_case` so a
+    reline reproduces the EXACT live-sweep transport (multilayer, mosaic, groove
+    and all) before the line kernel(s) run on the SAME segments."""
     abs_layers = case.get("abs_layers")
     tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
     tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
@@ -742,7 +741,36 @@ def _lines_for_case(case, E_grid):
         tilt_azim_rad=tilt_azim_rad,
         groove=groove,
     )
-    return _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove)
+    return segs, n_hat, abs_layers, groove
+
+
+def _lines_for_case(case, E_grid, *, coherent=None):
+    """Regenerate a case's line spectrum on ``E_grid`` from scratch (re-transport
+    + per-layer line kernel via :func:`_lines_for_segments`). Returns one
+    ``spec``. ``coherent`` overrides the kernel coherence (``None`` = derive from
+    ``case["coherent_emission"]``). The line half of run_case's transport +
+    spectrum phases factored out so :func:`cxr_mc.run.repair_line_spec`
+    (``cxr reline``) reuses the EXACT live-sweep line path rather than
+    re-deriving it by hand."""
+    segs, n_hat, abs_layers, groove = _transport_lines_for_case(case)
+    return _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove, coherent=coherent)
+
+
+def _line_pair_for_case(case, E_grid, *, want_coherent):
+    """Reline mirror of the runner's one-transport / dual-kernel invariant: one
+    re-transport of ``case`` yields the incoherent ``spec`` and (when
+    ``want_coherent``) a ``spec_coherent`` from the SAME segments, so a
+    ``cxr reline`` that moves a ``coherent``/``both`` checkpoint onto a new grid
+    keeps both arrays on that grid instead of leaving ``spec_coherent`` stale.
+    Returns ``(spec, spec_coherent_or_None)``."""
+    segs, n_hat, abs_layers, groove = _transport_lines_for_case(case)
+    spec = _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove, coherent=False)
+    spec_coherent = (
+        _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove, coherent=True)
+        if want_coherent
+        else None
+    )
+    return spec, spec_coherent
 
 
 def _effective_spec_chunk(case, tp):
