@@ -75,3 +75,8 @@ must remain until moved into a task file. Edit and drop items on `main`.
 2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
 3. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
 4.  **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
+5. **`--no-cache` for run/remote run.** Add a flag to `cxr run`/`cxr remote
+   run` that skips loading the existing checkpoint pickle and recomputes/
+   overwrites it; remote chunked-queue interaction needs a design decision
+   first. → `feature/run-no-cache`;
+   [`tasks/feature/run-no-cache/`](tasks/feature/run-no-cache/).
