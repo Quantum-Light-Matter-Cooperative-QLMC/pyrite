@@ -70,3 +70,48 @@ def test_run_internal_performance_profile_rejects_profile_mismatch():
 
     assert result.exit_code == 2
     assert "must name the same catalog profile" in result.output
+
+
+def test_run_perf_flag_defaults_to_full_profile_membership(monkeypatch):
+    captured = {}
+
+    def capture(args):
+        captured["performance_profile"] = args.performance_profile
+        captured["material"] = args.material
+
+    monkeypatch.setattr(scan, "run", capture)
+    result = CliRunner().invoke(
+        scan.command,
+        ["sub_100keV", "-p"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["performance_profile"] == "sub_100keV"
+    assert captured["material"] is None
+
+
+def test_run_perf_flag_with_material_profiles_single_member(monkeypatch):
+    captured = {}
+
+    def capture(args):
+        captured["performance_profile"] = args.performance_profile
+        captured["material"] = args.material
+
+    monkeypatch.setattr(scan, "run", capture)
+    result = CliRunner().invoke(
+        scan.command,
+        ["sub_100keV", "-m", "hopg", "-p"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["performance_profile"] == "sub_100keV"
+    assert captured["material"] == "hopg"
+
+
+def test_run_perf_interval_requires_perf_flag():
+    result = CliRunner().invoke(scan.command, ["sub_100keV", "-i", "10"])
+
+    assert result.exit_code == 2
+    assert "--perf-interval requires -p/--perf" in result.output

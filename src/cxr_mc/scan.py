@@ -226,6 +226,17 @@ def _performance_profile(ctx, param, value):
     help="Soft wall-clock budget in minutes; exit 75 if resumable work remains.",
 )
 @click.option(
+    "-p",
+    "--perf",
+    is_flag=True,
+    help=(
+        "Sample CPU pressure, RAM/swap, GPU clocks/VRAM, process-tree, phase "
+        "timing, queue, case, worker, and chunk metrics for PROFILE's resolved "
+        "membership into performance-profiles/PROFILE/<material>.ndjson "
+        "(cxr.performance.v1). Combine with -m to profile a single member."
+    ),
+)
+@click.option(
     "--performance-profile",
     callback=_performance_profile,
     default=None,
@@ -245,11 +256,14 @@ def _performance_profile(ctx, param, value):
     hidden=True,
 )
 @click.option(
+    "-i",
     "--perf-interval",
     "performance_interval",
     type=_cli_core.POSITIVE_FLOAT,
     default=5.0,
-    hidden=True,
+    show_default=True,
+    metavar="SECONDS",
+    help="Performance-telemetry sampling interval; requires -p/--perf.",
 )
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option("--no-progress", is_flag=True, hidden=True)
@@ -264,6 +278,7 @@ def command(
     n_families,
     checkpoint_dir,
     max_minutes,
+    perf,
     performance_profile,
     performance_dir,
     performance_interval,
@@ -274,6 +289,12 @@ def command(
     """Click entry point for the staged root migration."""
     if quick and fidelity != "full":
         raise click.UsageError("--quick cannot be combined with --fidelity survey")
+    if perf and performance_profile is None:
+        # -p is sugar for --performance-profile PROFILE: profile the positional
+        # profile's full membership (or one member when -m is given).
+        performance_profile = catalog_profile
+    if performance_interval != 5.0 and performance_profile is None:
+        raise click.UsageError("--perf-interval requires -p/--perf")
     resolved_profile = _resolve_catalog_profile(catalog_profile, performance_profile)
     resolve_profile_materials(resolved_profile, material)
     if not json_output:
@@ -922,11 +943,7 @@ class _ProgressTimer:
             self._base_seconds = float(seconds)
         if isinstance(cases, int) and not isinstance(cases, bool) and cases >= 0:
             self._base_cases = cases
-        if (
-            isinstance(cost, (int, float))
-            and not isinstance(cost, bool)
-            and 0 <= cost < math.inf
-        ):
+        if isinstance(cost, (int, float)) and not isinstance(cost, bool) and 0 <= cost < math.inf:
             self._base_cost = float(cost)
 
     def start(self):
@@ -940,9 +957,7 @@ class _ProgressTimer:
             "measured_new_cases": self._base_cases + max(0, int(completed_new_cases)),
         }
         if computed_cost is not None or self._base_cost > 0:
-            fields["measured_new_cost"] = self._base_cost + max(
-                0.0, float(computed_cost or 0.0)
-            )
+            fields["measured_new_cost"] = self._base_cost + max(0.0, float(computed_cost or 0.0))
         return fields
 
 

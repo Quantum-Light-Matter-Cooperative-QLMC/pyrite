@@ -95,19 +95,27 @@ Usage: cxr run [OPTIONS] [PROFILE]
   data in <material>/; variants use identity-qualified stems.
 
 Options:
-  -m, --material MATERIAL   Run one member of PROFILE instead of its full membership.
-  --workers NUMBER          run_cases max_workers (default auto; 0 = serial, no
-                            transport pool).
-  --quick                   Use tiny smoke-test grid and write <material>_quick.pkl.
-  --n-families NUMBER       Override positive dominant reflection-family count.
-  --checkpoint-dir DIR      Read and write checkpoint pickles in DIR.  [default:
-                            checkpoints]
-  --max-minutes MINUTES     Soft wall-clock budget in minutes; exit 75 if resumable work
-                            remains.
-  --fidelity [full|survey]  Named settings/grid-reduction policy. survey is provisional
-                            and reduced.  [default: full]
-  --json                    Emit one versioned JSON object on stdout.
-  -h, --help                Show this message and exit.
+  -m, --material MATERIAL      Run one member of PROFILE instead of its full membership.
+  --workers NUMBER             run_cases max_workers (default auto; 0 = serial, no
+                               transport pool).
+  --quick                      Use tiny smoke-test grid and write <material>_quick.pkl.
+  --n-families NUMBER          Override positive dominant reflection-family count.
+  --checkpoint-dir DIR         Read and write checkpoint pickles in DIR.  [default:
+                               checkpoints]
+  --max-minutes MINUTES        Soft wall-clock budget in minutes; exit 75 if resumable
+                               work remains.
+  -p, --perf                   Sample CPU pressure, RAM/swap, GPU clocks/VRAM, process-
+                               tree, phase timing, queue, case, worker, and chunk
+                               metrics for PROFILE's resolved membership into
+                               performance-profiles/PROFILE/<material>.ndjson
+                               (cxr.performance.v1). Combine with -m to profile a single
+                               member.
+  -i, --perf-interval SECONDS  Performance-telemetry sampling interval; requires
+                               -p/--perf.  [default: 5.0]
+  --fidelity [full|survey]     Named settings/grid-reduction policy. survey is
+                               provisional and reduced.  [default: full]
+  --json                       Emit one versioned JSON object on stdout.
+  -h, --help                   Show this message and exit.
 ```
 
 ## `cxr app`
