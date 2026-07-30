@@ -3,6 +3,12 @@
 import numpy as np
 import pytest
 
+from cxr_mc.materials.crystal import (
+    CRYSTALS,
+    HBARC_EV_ANG,
+    beta_from_Ee,
+    reciprocal_g_vector,
+)
 from cxr_mc.montecarlo import mc_spectrum
 from cxr_mc.montecarlo._backend import REAL
 
@@ -50,6 +56,45 @@ def test_identical_in_phase_electrons_reach_n_squared_limit():
     # Field doubles, intensity quadruples, then per-electron /Ne normalization
     # leaves twice the one-electron yield.
     np.testing.assert_allclose(pair, 2.0 * single, rtol=RTOL)
+
+
+@pytest.mark.parametrize("sinc_cutoff", [None, 4.0])
+def test_straight_trajectory_segments_are_in_phase_at_resonance(sinc_cutoff):
+    """The reciprocal-harmonic phase cancels propagation phase on resonance."""
+    n_hat = np.asarray(KWARGS["n_hat"], dtype=float)
+    n_hat /= np.linalg.norm(n_hat)
+    _, g_norm = reciprocal_g_vector((0, 0, 2), CRYSTALS["hopg"]["lattice"])
+    beta = float(beta_from_Ee(30e3))
+    k_gamma = beta * g_norm / (1.0 - beta * n_hat[2])
+    target_energy = HBARC_EV_ANG * k_gamma
+    dz = np.pi / g_norm
+    segments = _segments(2)
+    segments.update(
+        r_mid=np.array([[4.0, 0.0, 5.0], [4.0, 0.0, 5.0 + dz]]),
+        L_ang=np.full(2, dz),
+        t_ang=np.array([0.0, dz / beta]),
+        elec_id=np.zeros(2, dtype=int),
+        Ne=1,
+        thickness_ang=100.0,
+        crystal_width_ang=100.0,
+        crystal_height_ang=100.0,
+    )
+    single = {
+        key: value[:1] if isinstance(value, np.ndarray) else value
+        for key, value in segments.items()
+    }
+    single["Ne"] = 1
+
+    energy_grid = target_energy + np.array([-1.0, 0.0, 1.0])
+    one_segment = mc_spectrum(
+        single, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **KWARGS
+    )
+    two_segments = mc_spectrum(
+        segments, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **KWARGS
+    )
+
+    assert one_segment[1] > 0.0
+    np.testing.assert_allclose(two_segments[1], 4.0 * one_segment[1], rtol=RTOL)
 
 
 def test_coherent_components_are_rejected():

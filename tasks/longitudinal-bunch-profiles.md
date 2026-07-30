@@ -187,6 +187,25 @@ claims until corrected and independently revalidated.
 11. Run fast CPU verification locally. Run representative full/GPU campaigns
     only through `cxr remote`, after profile/math review.
 
+### Progress
+
+- Checkpoint `bfd87eb` completes the first independently valid schema/sampler
+  slice: checklist items 1-4; deterministic case payload and dataset-identity
+  portions of item 6; timing/sampling validation portions of item 10; fast
+  focused evidence from item 11.
+- Fresh `theta_obs=90 deg`, `tilt=45 deg` validation independently matches
+  HOPG and h-BN at 30 and 100 keV. The timing claim is conditional on the
+  approved positive catalog-pinned `(002)` branch; the upstream
+  `line-energy-dispersion` harmonic-sign question remains unresolved.
+- Coherent phase review found the existing segment sum omitted
+  `exp(-i*g.r_j)`. The correction now applies in both sinc paths; a
+  straight-trajectory regression anchors resonance cancellation. Fresh-context
+  revalidation verdict is `rederived`, including the qualified long-bunch limit
+  that removes inter-electron but not intra-electron cross terms.
+- Catalog/CLI profiles, physical-charge estimator, paired analysis, and
+  representative remote campaigns remain. Remote/full-campaign evidence is
+  explicitly deferred while remote capacity is unavailable.
+
 ## Acceptance checks
 
 - Each profile resolves exactly 16 cases before coherent-mode pairing:
