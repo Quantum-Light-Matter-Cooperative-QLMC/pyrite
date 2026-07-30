@@ -167,6 +167,43 @@ def _(MaterialSelect, material_ui, mo):
 
 
 @app.cell
+def _(mo, res_all):
+    # Emission view selector, composed BESIDE the material/face selectors. Its
+    # options are gated on the loaded checkpoint's STORED spectra: `Coherent`
+    # appears only when a record carries a `spec_coherent` (a `coherent`/`both`
+    # run), so an incoherent checkpoint offers just `Incoherent`. Every spectrum
+    # read below routes through `apply_emission` keyed on this value, so a `both`
+    # checkpoint toggles incoherent-vs-coherent everywhere without per-plot code.
+    from cxr_mc.analyze import emission_menu as _emission_menu
+
+    _rows = _emission_menu(res_all)
+    _opts = {row["label"]: row["value"] for row in _rows if not row["disabled"]} or {
+        "Incoherent": "incoherent"
+    }
+    emission_ui = mo.ui.radio(
+        options=_opts,
+        value=next(iter(_opts)),
+        label="Emission",
+        inline=True,
+    )
+    emission_ui
+    return (emission_ui,)
+
+
+@app.cell
+def _(emission_ui, res_all):
+    # The emission-picked view of the loaded checkpoint: for `Coherent` each
+    # record's `spec` is pointed at its `spec_coherent` (shallow copy, arrays
+    # shared, checkpoint untouched); `Incoherent` passes `res_all` through. Every
+    # downstream `res`/`res_view`/scan/detector reader inherits the selection.
+    from cxr_mc.analyze import apply_emission as _apply_emission
+
+    _emission = emission_ui.value if emission_ui.value is not None else "incoherent"
+    res = _apply_emission(res_all, _emission)
+    return (res,)
+
+
+@app.cell
 def _(
     cases_from_results,
     default_settings,
@@ -190,7 +227,7 @@ def _(
         FACE = None
     _results = _loaded or {}
     cases = cases_from_results(_results)  # rebuild the case list from the records
-    res = filter_results(_results, cases)  # all loaded cases for this material
+    res_all = filter_results(_results, cases)  # all loaded cases for this material
 
     def face_title(chart):
         """Append a ` (blazed)` suffix to a chart's title on the blazed face, so a
@@ -199,7 +236,7 @@ def _(
             return chart
         return chart.properties(title=f"{chart.title} (blazed)")
 
-    return FACE, MATERIAL, cases, face_title, res, settings
+    return FACE, MATERIAL, cases, face_title, res_all, settings
 
 
 @app.cell
