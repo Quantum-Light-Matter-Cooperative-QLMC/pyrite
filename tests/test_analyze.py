@@ -515,3 +515,69 @@ def test_command_watch_combines_with_run_and_edit():
     assert edit_cmd[3] == "edit"
     assert edit_cmd[4] == "--watch"
     assert edit_cmd[5] == analyze.NOTEBOOK
+
+
+# --- emission view selector (analysis-app) ------------------------------
+
+
+def _emission_records(*, coherent=False):
+    import numpy as np
+
+    record = {"case": {"E0_keV": 30.0}, "spec": np.array([1.0, 2.0, 3.0])}
+    if coherent:
+        record["spec_coherent"] = np.array([10.0, 20.0, 30.0])
+    return {"hopg@30": {30.0: record}}
+
+
+def test_emission_menu_incoherent_only_when_no_spec_coherent():
+    rows = analyze.emission_menu(_emission_records(coherent=False))
+    by_value = {row["value"]: row for row in rows}
+    assert by_value["incoherent"]["disabled"] is False
+    assert by_value["coherent"]["disabled"] is True
+
+
+def test_emission_menu_enables_coherent_when_spec_coherent_present():
+    rows = analyze.emission_menu(_emission_records(coherent=True))
+    by_value = {row["value"]: row for row in rows}
+    assert by_value["incoherent"]["disabled"] is False
+    assert by_value["coherent"]["disabled"] is False
+
+
+def test_emission_menu_both_disabled_for_empty_results():
+    rows = analyze.emission_menu({})
+    assert all(row["disabled"] for row in rows)
+
+
+def test_pick_spectrum_routes_incoherent_and_coherent():
+    import numpy as np
+
+    record = next(iter(_emission_records(coherent=True)["hopg@30"].values()))
+    np.testing.assert_array_equal(analyze.pick_spectrum(record, "incoherent"), [1.0, 2.0, 3.0])
+    np.testing.assert_array_equal(analyze.pick_spectrum(record, "coherent"), [10.0, 20.0, 30.0])
+
+
+def test_pick_spectrum_falls_back_to_spec_without_spec_coherent():
+    import numpy as np
+
+    record = next(iter(_emission_records(coherent=False)["hopg@30"].values()))
+    # coherent requested but none stored -> the incoherent spec, never a KeyError
+    np.testing.assert_array_equal(analyze.pick_spectrum(record, "coherent"), [1.0, 2.0, 3.0])
+
+
+def test_apply_emission_incoherent_is_identity():
+    results = _emission_records(coherent=True)
+    assert analyze.apply_emission(results, "incoherent") is results
+
+
+def test_apply_emission_coherent_swaps_spec_without_mutating_source():
+    import numpy as np
+
+    results = _emission_records(coherent=True)
+    original = results["hopg@30"][30.0]["spec"].copy()
+
+    picked = analyze.apply_emission(results, "coherent")
+
+    np.testing.assert_array_equal(picked["hopg@30"][30.0]["spec"], [10.0, 20.0, 30.0])
+    # source checkpoint record is left intact (shallow copy, arrays shared)
+    np.testing.assert_array_equal(results["hopg@30"][30.0]["spec"], original)
+    assert picked["hopg@30"][30.0] is not results["hopg@30"][30.0]

@@ -82,7 +82,6 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch):
         "beam_long_shape": None,
         "beam_rep_rate_hz": None,
         "beam_bunch_charge_pc": None,
-        "coherent": None,
         "checkpoint_dir": "checkpoints",
         "max_minutes": None,
         "performance_profile": None,

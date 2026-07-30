@@ -202,7 +202,10 @@ re-exported from package** — `from cxr_mc.montecarlo import X` unchanged
 - `montecarlo/groove.py` — blazed sawtooth entrance-face grooves (escape-path engineering): closed-form entry/escape, `Sweep.groove_spacing_ang` knob.
 - `runner` — `run_case`, `run_cases` (CPU transport pipelined behind one CUDA
   spectrum context, or memory-capped full-case CPU pool), `_transport_case`,
-  `_spectrum_case`, `_worker_init`. Deps: `_backend`, `transport`, `geometry`,
+  `_spectrum_case`, `_worker_init`. `_spectrum_case` always stores the incoherent
+  `spec` and, when the profile emission includes coherent, a `spec_coherent` from
+  the SAME transport (one transport, two line kernels); `_line_pair_for_case`
+  mirrors this for `cxr reline`. Deps: `_backend`, `transport`, `geometry`,
   `spectrum`.
 - Deps: `materials.crystal`, `materials.attenuation`, `DATA_DIR`.
 
@@ -237,7 +240,10 @@ scan grids project from immutable `materials.CATALOG`.
 ### `profiles.py`
 Named `full`/provisional `survey` policies, deterministic serialization of
 resolved settings and sweeps, SHA-256 dataset identity, and variant checkpoint
-stem selection.
+stem selection. `SweepProfile.emission` (`incoherent`/`coherent`/`both`, with a
+derived `coherent_emission`) is the profile-owned emission policy;
+`dataset_identity` adds an `emission` divergence key so the three modes get three
+distinct digests (incoherent unchanged, bit-for-bit).
 - Public: `SweepProfile`, `PROFILE_NAMES`, `get_profile`, `dataset_identity`,
   `variant_stem`.
 - Deps: `results` (`Settings`), `sweep` (`Sweep`), NumPy.
@@ -419,10 +425,13 @@ keeps a compatibility fallback for older branches.
 initial-material selection, smoke execution, edit/watch mode, ACP bridges,
 SSH-tunnel-friendly fixed-port launch.
 - Public: `material_menu`, `select_initial_material`, `face_menu`,
-  `checkpoint_stem`, `initial_material`, `get_default_material`,
-  `set_default_material`, `command`, `main`. `face_menu`/`checkpoint_stem`
-  back the app's flat/blazed **Face** dropdown (blazed loads
-  `<material>_blazed.pkl` from `cxr material blaze`).
+  `emission_menu`, `pick_spectrum`, `apply_emission`, `checkpoint_stem`,
+  `initial_material`, `get_default_material`, `set_default_material`, `command`,
+  `main`. `face_menu`/`checkpoint_stem` back the app's flat/blazed **Face**
+  dropdown (blazed loads `<material>_blazed.pkl` from `cxr material blaze`).
+  `emission_menu`/`apply_emission` back the app's **Emission** radio
+  (Incoherent/Coherent), gated per checkpoint on the stored `spec`/`spec_coherent`
+  and routing every spectrum read through the one `pick_spectrum`.
 
 ### `check.py`
 `cxr check` launcher for `notebooks/validation_app.py` plus cached validation

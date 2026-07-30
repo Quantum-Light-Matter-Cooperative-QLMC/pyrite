@@ -12,7 +12,9 @@ DETECTED-units bremsstrahlung curve built from those knobs.
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Literal, cast
+
+EmissionMode = Literal["incoherent", "coherent", "both"]
 
 import numpy as np
 
@@ -84,11 +86,22 @@ class Settings:
     brem_source: str = "mc"  # "mc" | "external" | "none"
     n_electrons: int = 450  # transport electrons for the lines
     n_electrons_brem: int = 100  # transport electrons for the background
-    # Opt-in coherent (phased) segment sum in mc_spectrum. False (default) is the
-    # incoherent line spectrum, bit-for-bit. Run-affecting, so dataset_identity
-    # joins it into the hash ONLY when True (divergence-only rule); an incoherent
-    # run's parameter_sha256 -- and its checkpoint stem -- stays unchanged.
-    coherent_emission: bool = False
+    # Emission policy (tri-state). "incoherent" (default) is the incoherent line
+    # spectrum, bit-for-bit; "coherent" is the phased segment sum in mc_spectrum;
+    # "both" runs one transport and stores both spectra. Run-affecting, so
+    # dataset_identity joins it into the hash ONLY when it diverges from
+    # "incoherent" (divergence-only rule); an incoherent run's parameter_sha256
+    # -- and its checkpoint stem -- stays unchanged.
+    emission: EmissionMode = "incoherent"
+
+    @property
+    def coherent_emission(self) -> bool:
+        """Derived: whether the emission policy runs the coherent kernel.
+
+        Kept so existing transport-side readers (``build_cases``, ``blaze``,
+        ``prune``, scan progress) stay unchanged while the tri-state
+        ``emission`` field is the single source of truth."""
+        return self.emission in {"coherent", "both"}
 
 
 def line_fwhm_eV(case: dict, E_pk: float, mosaic_rad: float | None) -> float:

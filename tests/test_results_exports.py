@@ -18,6 +18,7 @@ FROZEN_EXPORTS = frozenset(
         # store
         "DEFAULT_BEAM_CURRENT_NA",
         "PER_NA",
+        "EmissionMode",
         "Settings",
         "beam_current_na",
         "line_fwhm_eV",

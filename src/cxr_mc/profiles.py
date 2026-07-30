@@ -19,7 +19,7 @@ from typing import Any
 
 import numpy as np
 
-from .results import Settings
+from .results import EmissionMode, Settings
 from .sweep import Sweep, beam_replace, build_cases, crystal_params
 
 FIDELITY_NAMES = ("full", "survey")
@@ -68,9 +68,17 @@ class SweepProfile:
     photon_grid_stride: int = 1
     photon_grid_span_fraction: float = 1.0
     provisional: bool = False
-    # Opt-in coherent (phased) segment sum. A policy, not a grid reduction, so it
-    # rides the profile like n_electrons. False (default) is the incoherent path.
-    coherent_emission: bool = False
+    # Emission policy (tri-state). A policy, not a grid reduction, so it rides
+    # the profile like n_electrons. "incoherent" (default) is the incoherent
+    # path; "coherent"/"both" enable the phased kernel.
+    emission: EmissionMode = "incoherent"
+
+    @property
+    def coherent_emission(self) -> bool:
+        """Derived: whether this profile's emission policy runs the coherent
+        kernel. Kept so ``build_cases(coherent_emission=)`` and other
+        transport-side readers are untouched by the tri-state rename."""
+        return self.emission in {"coherent", "both"}
 
     def apply_settings(self, settings: Settings) -> Settings:
         """Return settings with this profile's transport counts resolved."""
@@ -78,7 +86,7 @@ class SweepProfile:
             settings,
             n_electrons=self.n_electrons,
             n_electrons_brem=self.n_electrons_brem,
-            coherent_emission=self.coherent_emission,
+            emission=self.emission,
         )
 
     def apply_sweep(self, sweep: Sweep) -> Sweep:
@@ -274,21 +282,23 @@ def dataset_identity(
     # pre-existing standard-profile identity keeps its historical digest.
     if catalog_profile != "standard":
         resolved["catalog_profile"] = catalog_profile
-    # coherent_emission (run-affecting) follows the same divergence-only rule: it
-    # is a NEW Settings field, so hashing it unconditionally would perturb every
+    # emission (run-affecting) follows the same divergence-only rule: it is a NEW
+    # Settings field, so hashing it unconditionally would perturb every
     # pre-existing digest. Strip it from the serialized settings and re-add it at
-    # the top level only when True -- an incoherent run's parameter_sha256 stays
-    # bit-for-bit, while a coherent run gets a distinct digest (and checkpoint
-    # stem) so the two never collide. The bunch fields (bunch_length_fs etc.)
-    # keep their own divergence rule above; coherent + a bunch therefore hash
-    # both keys, and coherent without a bunch is the distinct degenerate variant.
+    # the top level only when it diverges from "incoherent" -- an incoherent
+    # run's parameter_sha256 stays bit-for-bit, while "coherent" and "both" each
+    # get a distinct digest (and checkpoint stem) so the three modes never
+    # collide or resume into one another. Clean rename of the old
+    # coherent_emission=True key: no legacy back-compat branch, so pre-existing
+    # coherent checkpoints are intentionally orphaned (rev-and-re-run). The bunch
+    # fields (bunch_length_fs etc.) keep their own divergence rule above.
     settings_payload = resolved["settings"]
     if isinstance(settings_payload, Mapping):
-        coherent_on = bool(settings_payload.pop("coherent_emission", False))
+        emission = str(settings_payload.pop("emission", "incoherent"))
     else:  # pragma: no cover - settings is always a jsonable Mapping here
-        coherent_on = bool(getattr(settings, "coherent_emission", False))
-    if coherent_on:
-        resolved["coherent_emission"] = True
+        emission = str(getattr(settings, "emission", "incoherent"))
+    if emission != "incoherent":
+        resolved["emission"] = emission
     encoded = json.dumps(resolved, sort_keys=True, separators=(",", ":")).encode()
     return {
         "schema": DATASET_IDENTITY_SCHEMA,

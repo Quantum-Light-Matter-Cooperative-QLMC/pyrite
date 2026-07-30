@@ -271,6 +271,65 @@ def profile_menu(material: str, checkpoint_dir: Path | str) -> tuple[MaterialMen
     return tuple(rows)
 
 
+def emission_menu(results) -> tuple[MaterialMenuRow, ...]:
+    """Emission-view rows for a LOADED checkpoint's records: ``Incoherent`` (the
+    always-stored ``spec``) and ``Coherent`` (the ``spec_coherent`` a
+    ``coherent``/``both`` run also stored). ``Coherent`` is ``disabled`` unless at
+    least one loaded record carries a ``spec_coherent`` array, so an incoherent
+    checkpoint offers only the incoherent view. Mirrors :func:`face_menu`'s
+    ``disabled`` convention; gated on the stored spectra rather than the sidecar
+    so it reflects exactly what can be drawn."""
+    has_incoherent = False
+    has_coherent = False
+    for by_energy in (results or {}).values():
+        for record in by_energy.values():
+            if record.get("spec") is not None:
+                has_incoherent = True
+            if record.get("spec_coherent") is not None:
+                has_coherent = True
+    return (
+        {"value": "incoherent", "label": "Incoherent", "disabled": not has_incoherent},
+        {"value": "coherent", "label": "Coherent", "disabled": not has_coherent},
+    )
+
+
+def pick_spectrum(record, emission):
+    """Central incoherent-vs-coherent spectrum picker: the coherent
+    ``spec_coherent`` when ``emission == "coherent"`` and the record stored one,
+    else the incoherent ``spec``. Every analysis-app spectrum read routes through
+    this (via :func:`apply_emission`) so a ``both`` checkpoint can toggle emission
+    without any downstream plot knowing the difference."""
+    if emission == "coherent":
+        coherent = record.get("spec_coherent")
+        if coherent is not None:
+            return coherent
+    return record.get("spec")
+
+
+def apply_emission(results, emission):
+    """Return a ``results`` view whose every record's ``spec`` is the
+    :func:`pick_spectrum` choice for ``emission``. ``incoherent`` (the default,
+    and any record lacking ``spec_coherent``) returns ``results`` unchanged;
+    ``coherent`` returns a shallow-copied nested dict where each record with a
+    ``spec_coherent`` has its ``spec`` pointed at that array. Records are
+    shallow-copied (array refs shared, never mutated), so the loaded checkpoint is
+    left intact while every ``r["spec"]`` reader sees the selected emission."""
+    if emission != "coherent":
+        return results
+    picked: dict = {}
+    for name, by_energy in (results or {}).items():
+        picked[name] = {}
+        for energy, record in by_energy.items():
+            chosen = pick_spectrum(record, emission)
+            if chosen is record.get("spec"):
+                picked[name][energy] = record
+            else:
+                new_record = dict(record)
+                new_record["spec"] = chosen
+                picked[name][energy] = new_record
+    return picked
+
+
 def get_default_material():
     """The persisted default material, or None if never set / empty."""
     try:

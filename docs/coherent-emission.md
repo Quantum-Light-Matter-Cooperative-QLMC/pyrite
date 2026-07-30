@@ -44,5 +44,10 @@ independently establish the phase model. Before scientific use:
    [physics validation workflow](validation/README.md).
 
 Track status in the [`coherent-emission` ledger row](physics-validation-ledger.md).
-The next product feature is pairing otherwise-identical coherent and incoherent
-checkpoints and reporting peak/integrated-flux ratios.
+Emission is a profile policy (`incoherent`/`coherent`/`both`) rather than a
+transient CLI flag: `both` runs a **single** electron transport per case and
+stores both the incoherent `spec` and a `spec_coherent` from the same segments,
+so a paired coherent-vs-incoherent comparison (peak/integrated-flux ratios) is
+now one checkpoint with two spectra instead of two separate runs. The analysis
+app exposes an Emission selector, gated per checkpoint on the stored spectra, to
+switch every plot between the two.
