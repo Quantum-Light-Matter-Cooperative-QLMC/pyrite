@@ -1,7 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run python scripts/dev.py:*)",
       "Bash(rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr:*)",
       "Bash(rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run marimo:*)",
       "Bash(rtk git diff:*)",
@@ -19,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv sync --all-groups --extra viz-render"
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/sync_local_backend.sh\""
           }
         ]
       }
