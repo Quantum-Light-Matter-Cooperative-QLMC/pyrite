@@ -3,8 +3,10 @@
 from dataclasses import replace
 
 import numpy as np
+import pytest
 
 from cxr_mc.config import default_settings, material_sweep
+from cxr_mc.detectors import DetectorSpec
 from cxr_mc.profiles import (
     FIDELITY_NAMES,
     dataset_identity,
@@ -99,6 +101,75 @@ def test_catalog_profile_leaves_standard_hash_bit_for_bit():
     assert implicit["parameter_sha256"] == explicit["parameter_sha256"]
     assert implicit["catalog_profile"] == "standard"
     assert "catalog_profile" not in implicit["resolved_parameters"]
+
+
+def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
+    identity = dataset_identity("hopg", "full", default_settings(), material_sweep("hopg"))
+    sweep_payload = identity["resolved_parameters"]["sweep"]
+
+    assert identity["parameter_sha256"] == (
+        "d0bb205f2268b8cd30801b1146de8daf7e745ca70399919718519542a7c9b45c"
+    )
+    assert "detector" not in sweep_payload
+    assert sweep_payload["theta_obs_deg"] == 90.0
+    assert sweep_payload["dtheta_obs_deg"] is None
+    assert sweep_payload["domega_sr"] is None
+
+
+def test_nondefault_detector_round_trips_cases_identity_and_stem():
+    settings = default_settings()
+    standard_sweep = material_sweep("hopg")
+    detector = DetectorSpec(
+        119.0,
+        16.6,
+        0.066,
+        response_model="registry/zhai",
+        qe_curve="package-data/qe/zhai.csv",
+    )
+    custom_sweep = material_sweep("hopg", detector=detector)
+    standard = dataset_identity("hopg", "full", settings, standard_sweep)
+    custom = dataset_identity("hopg", "full", settings, custom_sweep)
+    case = build_cases(custom_sweep)[0]
+    payload = custom["resolved_parameters"]["sweep"]
+
+    assert custom_sweep.detector == detector
+    assert case["theta_obs_rad"] == pytest.approx(np.deg2rad(119.0))
+    assert case["dtheta_obs_rad"] == pytest.approx(np.deg2rad(16.6))
+    assert case["domega_sr"] == pytest.approx(0.066)
+    assert payload["theta_obs_deg"] == 119.0
+    assert payload["dtheta_obs_deg"] == 16.6
+    assert payload["domega_sr"] == 0.066
+    assert payload["detector"] == {
+        "qe_curve": "package-data/qe/zhai.csv",
+        "response_model": "registry/zhai",
+    }
+    assert custom["parameter_sha256"] != standard["parameter_sha256"]
+    assert variant_stem(custom) != variant_stem(standard)
+
+
+@pytest.mark.parametrize(
+    "detector",
+    [
+        DetectorSpec(observation_angle_deg=119.0),
+        DetectorSpec(polar_acceptance_deg=16.6),
+        DetectorSpec(solid_angle_sr=0.066),
+        DetectorSpec(response_model="registry/test"),
+        DetectorSpec(qe_curve="package-data/qe/test.csv"),
+        DetectorSpec(pixel_pitch_um=55.0),
+        DetectorSpec(sensor_thickness_um=500.0),
+        DetectorSpec(distance_mm=400.0),
+        DetectorSpec(threshold_eV=100.0),
+    ],
+)
+def test_every_nondefault_detector_field_changes_identity(detector):
+    settings = default_settings()
+    standard_sweep = material_sweep("hopg")
+    standard = dataset_identity("hopg", "full", settings, standard_sweep)
+    changed = dataset_identity(
+        "hopg", "full", settings, replace(standard_sweep, detector=detector)
+    )
+
+    assert changed["parameter_sha256"] != standard["parameter_sha256"]
 
 
 def test_catalog_profile_changes_hash_and_stem_when_not_standard():

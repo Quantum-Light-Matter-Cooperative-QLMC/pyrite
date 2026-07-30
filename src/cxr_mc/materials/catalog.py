@@ -16,11 +16,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 from types import MappingProxyType
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 
 from .. import DATA_DIR
+from ..detectors.spec import DetectorSpec
 from ._catalog_decode import (
     LineGridByEnergy,
     _direction,
@@ -195,12 +196,21 @@ class MaterialCatalog:
     #: keyed by profile; profiles with no beam block are absent. Energy is NOT
     #: here -- it stays the per-material ``ScanSpec.energy_keV`` scan grid.
     profile_beams: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+    #: Explicit profile detector blocks. Missing selected-profile blocks inherit
+    #: ``standard``; missing standard falls back to :class:`DetectorSpec`.
+    profile_detectors: Mapping[str, DetectorSpec] = MappingProxyType({})
 
     def profile_beam(self, name: str) -> Mapping[str, object] | None:
         """Decoded ``[profiles.NAME.beam]`` distribution overrides, or ``None``
         when the profile carries no beam block (the ``standard`` beam default
         applies). Consumed by :func:`config.material_sweep` via ``beam_replace``."""
         return self.profile_beams.get(name)
+
+    def profile_detector(self, name: str) -> DetectorSpec:
+        """Resolved detector for ``name`` with standard then legacy fallback."""
+        return self.profile_detectors.get(
+            name, self.profile_detectors.get("standard", DetectorSpec())
+        )
 
     def profile_materials(self, name: str) -> tuple[str, ...] | None:
         """Explicit ``profiles.NAME.materials`` membership, or ``None`` when the
@@ -693,6 +703,19 @@ _BEAM_POSITIVE_KEYS = frozenset(
 )
 _BEAM_LONG_SHAPES = frozenset({"gaussian", "uniform"})
 _BEAM_KEYS = _BEAM_POSITIVE_KEYS | {"long_shape", "long_offsets_fs"}
+_DETECTOR_KEYS = frozenset(
+    {
+        "observation_angle_deg",
+        "polar_acceptance_deg",
+        "solid_angle_sr",
+        "response_model",
+        "qe_curve",
+        "pixel_pitch_um",
+        "sensor_thickness_um",
+        "distance_mm",
+        "threshold_eV",
+    }
+)
 
 
 def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, object] | None:
@@ -732,6 +755,20 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
     return out or None
 
 
+def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> DetectorSpec | None:
+    """Validate one portable ``[profiles.NAME.detector]`` block."""
+    table = _table(raw, path, errors)
+    if table is None:
+        return None
+    errors.keys(table, path, set(_DETECTOR_KEYS))
+    known = {key: value for key, value in table.items() if key in _DETECTOR_KEYS}
+    try:
+        return DetectorSpec(**cast("dict[str, Any]", known))
+    except (TypeError, ValueError) as exc:
+        errors.add(path, str(exc))
+        return None
+
+
 def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
     """Parse ``[profiles.*]`` campaign rows.
 
@@ -749,7 +786,7 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         row = _table(value, path, errors)
         if row is None:
             continue
-        errors.keys(row, path, set(_SCAN_KEYS) | {"materials", "overrides", "beam"})
+        errors.keys(row, path, set(_SCAN_KEYS) | {"materials", "overrides", "beam", "detector"})
         has_ang = "thickness_ang" in row
         has_layers = "thickness_layers" in row
         if has_ang == has_layers:
@@ -777,6 +814,12 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                 row_out["beam"] = beam
             else:
                 del row_out["beam"]
+        if "detector" in row_out:
+            detector = _parse_profile_detector(row_out["detector"], f"{path}.detector", errors)
+            if detector is not None:
+                row_out["detector"] = detector
+            else:
+                del row_out["detector"]
         out[key] = row_out
     return out
 
@@ -1054,6 +1097,11 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("beam"), Mapping)
     }
+    profile_detectors = {
+        name: cast("DetectorSpec", row["detector"])
+        for name, row in profiles.items()
+        if isinstance(row.get("detector"), DetectorSpec)
+    }
     return MaterialCatalog(
         schema_version=1,
         crystals=MappingProxyType(crystals),
@@ -1063,6 +1111,7 @@ def _load_material_catalog_cached(
         profile_names=tuple(profiles),
         profile_memberships=MappingProxyType(profile_memberships),
         profile_beams=MappingProxyType(profile_beams),
+        profile_detectors=MappingProxyType(profile_detectors),
     )
 
 

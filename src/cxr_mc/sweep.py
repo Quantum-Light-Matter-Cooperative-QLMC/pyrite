@@ -25,13 +25,14 @@ are imported here (no GPU), so this module is cheap to import and test.
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import InitVar, dataclass, field, replace
 from itertools import product
 from typing import Any
 
 import numpy as np
 
 from ._energy_grid import decode_energy_grid, encode_energy_grid
+from .detectors import DetectorSpec
 from .materials import CATALOG, LayerSpec
 from .materials._transport_data import TRANSPORT_ELEMENTS
 from .materials.crystal import dominant_reflections
@@ -330,7 +331,7 @@ class Sweep:
     crystal_width_mm: ScalarOrSeq | None = 5.0
     crystal_height_mm: ScalarOrSeq | None = 5.0
     # fixed setup (single values) ------------------------------------------
-    theta_obs_deg: float = 90.0
+    theta_obs_deg: InitVar[float | None] = None
     n_families: int = 4
     # Optional resolved-profile cap applied after catalog-pinned or dynamically
     # selected reflections. None preserves the complete production set.
@@ -347,8 +348,8 @@ class Sweep:
     E_grid_line_by_energy: Mapping[float, np.ndarray] | None = None
     E_grid_brem: np.ndarray | None = None
     e_grid_eV: np.ndarray | None = None  # deprecated: alias for E_grid_line
-    dtheta_obs_deg: float | None = None  # None -> Timepix3 default
-    domega_sr: float | None = None  # None -> Timepix3 default
+    dtheta_obs_deg: InitVar[float | None] = None
+    domega_sr: InitVar[float | None] = None
     beam_uvw: tuple | None = None  # None -> per-material default
     # GPU memory knobs: segments per matmul in the spectrum / brem kernels (None
     # -> 40000 / 20000 defaults). Lower them (e.g. 4000) to cap peak GPU memory on
@@ -401,7 +402,60 @@ class Sweep:
     # physical baseline. Only that study sets this True. azimuth==90 stays banned
     # regardless -- no legitimate use, and it carried the azim-90 ranking bug.
     allow_normal_incidence: bool = False
+    # Canonical detector owner. Kept after existing fields so legacy positional
+    # Sweep construction retains its historical argument order.
+    detector: DetectorSpec | None = None
 
+    def __post_init__(
+        self,
+        theta_obs_deg: float | None,
+        dtheta_obs_deg: float | None,
+        domega_sr: float | None,
+    ) -> None:
+        """Normalize legacy flat detector inputs onto ``detector``.
+
+        A supplied nested detector and flat aliases may coexist only when their
+        active values agree. This keeps old construction working while making
+        mixed-source mistakes fail at the public boundary.
+        """
+        supplied = {
+            "theta_obs_deg": theta_obs_deg,
+            "dtheta_obs_deg": dtheta_obs_deg,
+            "domega_sr": domega_sr,
+        }
+        nested = self.detector
+        if nested is not None and not isinstance(nested, DetectorSpec):
+            raise TypeError("detector must be a DetectorSpec")
+        base = DetectorSpec() if nested is None else nested
+        detector_values = {
+            "theta_obs_deg": base.observation_angle_deg,
+            "dtheta_obs_deg": base.polar_acceptance_deg,
+            "domega_sr": base.solid_angle_sr,
+        }
+        conflicts = [
+            name
+            for name, value in supplied.items()
+            if nested is not None and value is not None and value != detector_values[name]
+        ]
+        if conflicts:
+            joined = ", ".join(conflicts)
+            raise ValueError(
+                f"conflicting nested detector and legacy flat input(s): {joined}; "
+                "supply DetectorSpec values or flat theta_obs_deg/dtheta_obs_deg/domega_sr, "
+                "not both"
+            )
+        if nested is None:
+            base = replace(
+                base,
+                observation_angle_deg=(
+                    base.observation_angle_deg if theta_obs_deg is None else theta_obs_deg
+                ),
+                polar_acceptance_deg=(
+                    base.polar_acceptance_deg if dtheta_obs_deg is None else dtheta_obs_deg
+                ),
+                solid_angle_sr=base.solid_angle_sr if domega_sr is None else domega_sr,
+            )
+        self.detector = base
 
 def _seq(x):
     """Normalize a scalar-or-sequence into a 1-D float array, order preserved."""
@@ -497,7 +551,8 @@ def _reject_invalid_groove_geometry(
         raise ValueError("grooves require tilt_azim_deg == 180 for every case")
     if not np.all((tilts > 0.0) & (tilts < 90.0)):
         raise ValueError("grooves require 0 < tilt_deg < 90 for every case")
-    if not np.isclose(sweep.theta_obs_deg, 90.0):
+    assert sweep.detector is not None
+    if not np.isclose(sweep.detector.observation_angle_deg, 90.0):
         raise ValueError("grooves require theta_obs_deg == 90 for every case")
     if stack is not None:
         raise ValueError("grooves are v1 single-slab only (no substrate/stack)")
@@ -560,8 +615,17 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_em
             brem_start = float(cp["E_grid"][0])
         brem_grid = np.arange(brem_start, float(energies.max()) * 1e3 + 50.0, 50.0)  # type: ignore[reportArgumentType]
 
-    dtheta = TIMEPIX3_DTHETA_OBS_DEG if sweep.dtheta_obs_deg is None else sweep.dtheta_obs_deg
-    domega = TIMEPIX3_DOMEGA_SR if sweep.domega_sr is None else sweep.domega_sr
+    assert sweep.detector is not None
+    dtheta = (
+        TIMEPIX3_DTHETA_OBS_DEG
+        if sweep.detector.polar_acceptance_deg is None
+        else sweep.detector.polar_acceptance_deg
+    )
+    domega = (
+        TIMEPIX3_DOMEGA_SR
+        if sweep.detector.solid_angle_sr is None
+        else sweep.detector.solid_angle_sr
+    )
     beam_uvw = cp["beam_uvw"] if sweep.beam_uvw is None else sweep.beam_uvw
     surface_hkl = cp["surface_hkl"] if sweep.beam_uvw is None else None
     # Beam phase-space fields threaded onto every case (constant across the
@@ -709,7 +773,7 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_em
                             if isinstance(brem_case_grid, tuple)
                             else brem_case_grid
                         ),
-                        theta_obs_rad=np.deg2rad(sweep.theta_obs_deg),
+                        theta_obs_rad=np.deg2rad(sweep.detector.observation_angle_deg),
                         tilt_deg=float(tilt),
                         tilt_azim_deg=float(azim),
                         **(

@@ -355,6 +355,89 @@ def test_profile_beam_offsets_coerced_to_tuple_and_absent_profile_is_none(tmp_pa
     assert catalog.profile_beam("bogus") is None
 
 
+def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
+    tmp_path, monkeypatch
+):
+    from cxr_mc import config
+    from cxr_mc.detectors import DetectorSpec
+    from cxr_mc.materials import load_material_catalog
+
+    text = (
+        _catalog_with_two_profiles(tmp_path).read_text()
+        + "\n[profiles.standard.detector]\n"
+        + "observation_angle_deg = 91.0\n"
+        + "polar_acceptance_deg = 12.0\n"
+        + "solid_angle_sr = 0.05\n"
+        + "\n[profiles.narrowed.detector]\n"
+        + "observation_angle_deg = 119.0\n"
+        + "polar_acceptance_deg = 16.6\n"
+        + "solid_angle_sr = 0.066\n"
+    )
+    path = _write_catalog(tmp_path, text)
+    catalog = load_material_catalog(path, profile="narrowed")
+
+    assert catalog.profile_detector("standard") == DetectorSpec(91.0, 12.0, 0.05)
+    selected = DetectorSpec(119.0, 16.6, 0.066)
+    assert catalog.profile_detector("narrowed") == selected
+
+    monkeypatch.setattr(config, "_catalog", lambda catalog_profile="standard": catalog)
+    profiled = config.material_sweep("mos2", catalog_profile="narrowed")
+    explicit = config.material_sweep(
+        "mos2",
+        catalog_profile="narrowed",
+        detector=DetectorSpec(100.0, 8.0, 0.01),
+    )
+    assert profiled.detector == selected
+    assert explicit.detector == DetectorSpec(100.0, 8.0, 0.01)
+
+
+def test_profile_detector_omission_inherits_standard_then_legacy_fallback(tmp_path):
+    from cxr_mc.detectors import DetectorSpec
+    from cxr_mc.materials import load_material_catalog
+
+    fallback = load_material_catalog(
+        _write_catalog(
+            tmp_path,
+            _minimal_catalog(
+                material_rows="""
+[materials.mos2]
+label = "mos2"
+crystal = "mos2"
+"""
+            ),
+        )
+    )
+    assert fallback.profile_detector("standard") == DetectorSpec()
+
+    text = (
+        _catalog_with_two_profiles(tmp_path).read_text()
+        + "\n[profiles.standard.detector]\nobservation_angle_deg = 91.0\n"
+    )
+    inherited = load_material_catalog(_write_catalog(tmp_path, text), profile="narrowed")
+    assert inherited.profile_detector("narrowed") == DetectorSpec(91.0)
+
+
+def test_profile_detector_rejects_bad_fields_with_catalog_path(tmp_path):
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    text = (
+        _minimal_catalog(
+            material_rows="""
+[materials.mos2]
+label = "mos2"
+crystal = "mos2"
+"""
+        )
+        + "\n[profiles.standard.detector]\n"
+        + "observation_angle_deg = 181.0\n"
+        + 'qe_curve = "/tmp/machine-local.csv"\n'
+    )
+    with pytest.raises(MaterialConfigError) as caught:
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+    assert "profiles.standard.detector" in str(caught.value)
+
+
 def test_bundled_crystal_validation_ids_are_ledgered():
     from cxr_mc import DATA_DIR
 

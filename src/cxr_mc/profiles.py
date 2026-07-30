@@ -211,6 +211,18 @@ def dataset_identity(
     # only when actually set, so pre-existing runs keep their historical
     # parameter_sha256 (and therefore their checkpoint identity) bit-for-bit.
     sweep_payload = resolved["sweep"]
+    detector_payload = sweep_payload.pop("detector")
+    sweep_payload["theta_obs_deg"] = detector_payload["observation_angle_deg"]
+    sweep_payload["dtheta_obs_deg"] = detector_payload["polar_acceptance_deg"]
+    sweep_payload["domega_sr"] = detector_payload["solid_angle_sr"]
+    reserved_detector = {
+        key: value
+        for key, value in detector_payload.items()
+        if key not in {"observation_angle_deg", "polar_acceptance_deg", "solid_angle_sr"}
+        and value is not None
+    }
+    if reserved_detector:
+        sweep_payload["detector"] = reserved_detector
     # Flat legacy projection of the beam (decision 6). The beam lives on
     # ``Sweep.beam`` in code, but the hashed payload keeps the HISTORICAL flat
     # top-level keys -- ``energy_keV`` and ``beam_fwhm_mm`` at their old

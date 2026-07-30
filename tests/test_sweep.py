@@ -1,6 +1,7 @@
 """Sweep / build_cases: the Cartesian expansion and the required-material guard."""
 
 import json
+from dataclasses import replace
 
 import numpy as np
 import pytest
@@ -14,6 +15,7 @@ from cxr_mc.config import (
     material_sweep,
     trajectory_sweep,
 )
+from cxr_mc.detectors import DetectorSpec
 from cxr_mc.materials import (
     CATALOG,
     LayerSpec,
@@ -125,6 +127,73 @@ def test_build_cases_is_cartesian_product():
     }
 
     assert required <= set(cases[0])
+
+
+def test_standard_sweep_owns_ninety_degree_detector_and_builds_pi_over_two_case():
+    sweep = material_sweep("mose2")
+    case = build_cases(sweep)[0]
+
+    assert sweep.detector == DetectorSpec(observation_angle_deg=90.0)
+    assert case["theta_obs_rad"] == pytest.approx(np.pi / 2.0)
+
+
+def test_legacy_flat_detector_inputs_normalize_to_detector_and_cases():
+    sweep = Sweep(
+        material="mose2",
+        beam=BeamSpec(energy_keV=30.0),
+        tilt_deg=5.0,
+        theta_obs_deg=119.0,
+        dtheta_obs_deg=16.6,
+        domega_sr=0.066,
+    )
+    case = build_cases(sweep)[0]
+
+    assert sweep.detector == DetectorSpec(119.0, 16.6, 0.066)
+    assert case["theta_obs_rad"] == pytest.approx(np.deg2rad(119.0))
+    assert case["dtheta_obs_rad"] == pytest.approx(np.deg2rad(16.6))
+    assert case["domega_sr"] == pytest.approx(0.066)
+
+
+def test_conflicting_nested_and_flat_detector_inputs_fail_actionably():
+    with pytest.raises(ValueError, match="conflicting nested detector.*theta_obs_deg"):
+        Sweep(
+            material="mose2",
+            detector=DetectorSpec(observation_angle_deg=119.0),
+            theta_obs_deg=90.0,
+        )
+
+
+def test_reserved_detector_fields_remain_inert_in_case_construction():
+    active = DetectorSpec(119.0, 16.6, 0.066)
+    described = replace(
+        active,
+        response_model="registry/test",
+        qe_curve="package-data/qe/test.csv",
+        pixel_pitch_um=55.0,
+        sensor_thickness_um=500.0,
+        distance_mm=400.0,
+        threshold_eV=100.0,
+    )
+    base = Sweep(
+        material="mose2",
+        beam=BeamSpec(energy_keV=30.0),
+        tilt_deg=5.0,
+        detector=active,
+    )
+    plain_case = build_cases(base)[0]
+    described_case = build_cases(replace(base, detector=described))[0]
+
+    for key in ("theta_obs_rad", "dtheta_obs_rad", "domega_sr"):
+        assert described_case[key] == plain_case[key]
+    for key in (
+        "response_model",
+        "qe_curve",
+        "pixel_pitch_um",
+        "sensor_thickness_um",
+        "distance_mm",
+        "threshold_eV",
+    ):
+        assert key not in described_case
 
 
 def test_build_cases_selects_and_encodes_line_grid_for_each_beam_energy():
