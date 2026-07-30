@@ -20,6 +20,12 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
    → `feature/profile-observation-angle`;
    [`tasks/profile-observation-angle.md`](tasks/profile-observation-angle.md).
 4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
+5. **Coherent/incoherent emission profiles.** Move `--coherent/--incoherent`
+   into a `SweepProfile.emission` policy (`incoherent|coherent|both`); a single
+   transport computes both spectra for `both`; add an analysis-app emission
+   selector reading the sidecar. Stem-text embedding is delegated to
+   `feature/checkpoint-variant-naming`. → `feature/profile-emission-modes`;
+   [`tasks/profile-emission-modes.md`](tasks/profile-emission-modes.md).
 
 ### Gated
 
