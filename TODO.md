@@ -1,7 +1,7 @@
 # TODO / Backlog
 
 Shared, priority-ordered backlog. Keep identical on every branch. Branch detail
-lives in `tasks/<branch-leaf>.md`; workflow and merge rules:
+lives in `tasks/<branch-name>/` (entry doc `README.md`); workflow and merge rules:
 [`tasks/README.md`](tasks/README.md). `>user<` marks untriaged user text that
 must remain until moved into a task file. Reconcile with `todo-sync`.
 
@@ -12,26 +12,26 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
 1. **Compute performance optimization.** Measure and improve stable remote
    CPU/GPU/RAM/VRAM utilization without OOM, keeping the GPU fed where evidence
    supports it. → `feature/compute-performance-optimization`;
-   [`tasks/compute-performance-optimization.md`](tasks/compute-performance-optimization.md).
+   [`tasks/feature/compute-performance-optimization/`](tasks/feature/compute-performance-optimization/).
 2. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
 3. **Detector profiles and Zhai validation modernization.** Add profile-owned
    detector geometry with a 90 degree standard default, then route maintained
    Zhai/literature comparisons through current detector, Sweep, and case APIs.
    → `feature/profile-observation-angle`;
-   [`tasks/profile-observation-angle.md`](tasks/profile-observation-angle.md).
+   [`tasks/feature/profile-observation-angle/`](tasks/feature/profile-observation-angle/).
 4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
 5. **Coherent/incoherent emission profiles.** Move `--coherent/--incoherent`
    into a `SweepProfile.emission` policy (`incoherent|coherent|both`); a single
    transport computes both spectra for `both`; add an analysis-app emission
    selector reading the sidecar. Stem-text embedding is delegated to
    `feature/checkpoint-variant-naming`. → `feature/profile-emission-modes`;
-   [`tasks/profile-emission-modes.md`](tasks/profile-emission-modes.md).
+   [`tasks/feature/profile-emission-modes/`](tasks/feature/profile-emission-modes/).
 6. **Checkpoint variant naming + analyze-menu visibility.** Reconcile shipped
    `<material>--<fidelity>-<hash>` checkpoint stems with the locked
    `<material>@<profile>` plan (or amend the plan); fix `identity_from_stem`'s
    fragile re-hash lookup to read the `meta.json` sidecar instead. →
    `feature/checkpoint-variant-naming`;
-   [`tasks/checkpoint-variant-naming.md`](tasks/checkpoint-variant-naming.md).
+   [`tasks/feature/checkpoint-variant-naming/`](tasks/feature/checkpoint-variant-naming/).
 
 ### Gated
 
@@ -48,24 +48,24 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
 1. **Portable GPU backends.** Add maintained non-NVIDIA accelerator support
    behind a vendor-neutral backend contract while preserving CUDA and NumPy.
    → `feature/portable-gpu-backends`;
-   [`tasks/portable-gpu-backends.md`](tasks/portable-gpu-backends.md).
+   [`tasks/feature/portable-gpu-backends/`](tasks/feature/portable-gpu-backends/).
 2. **Backend auto-detection and first-run setup prompt.** Detect installed
    NVIDIA/AMD/Intel GPU hardware and offer a first-run CLI prompt to enable
    GPU acceleration (default CPU otherwise); persist the choice to `.env`'s
    `CXR_MC_BACKEND`, only when unset. → `feature/backend-autodetect`;
-   [`tasks/backend-autodetect.md`](tasks/backend-autodetect.md).
+   [`tasks/feature/backend-autodetect/`](tasks/feature/backend-autodetect/).
 3. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
 4. **Longitudinal bunch profiles and coherence comparison.** Add charge-matched
    200 fs Gaussian, wavelength-matched microbunch-train, and compressed-bunch
    HOPG/h-BN profiles with paired coherent/incoherent analysis. →
    `feature/longitudinal-bunch-profiles`;
-   [`tasks/longitudinal-bunch-profiles.md`](tasks/longitudinal-bunch-profiles.md).
+   [`tasks/feature/longitudinal-bunch-profiles/`](tasks/feature/longitudinal-bunch-profiles/).
 5. **Local run progress dashboard.** Replace the bare `cxr run <profile>` tqdm
    bar with the multi-panel dashboard used by `cxr remote status -a -vv`,
    rendering only the panels with local data — omit SLURM `SQUEUE` off-node and
    GPU rows without a GPU; fall back to tqdm when non-interactive. →
    `feature/local-run-dashboard`;
-   [`tasks/local-run-dashboard.md`](tasks/local-run-dashboard.md).
+   [`tasks/feature/local-run-dashboard/`](tasks/feature/local-run-dashboard/).
 
 ## P3 - lower / exploratory / small bugfixes / on-hold
 
