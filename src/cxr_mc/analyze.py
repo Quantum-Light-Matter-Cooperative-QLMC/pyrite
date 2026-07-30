@@ -28,6 +28,7 @@ both.
 """
 
 import gzip
+import json
 import os
 import pickle
 import subprocess
@@ -69,12 +70,15 @@ def material_menu(
 ) -> tuple[MaterialMenuRow, ...]:
     """Return configured analysis materials, checkpoint-available ones first.
 
-    Only direct ``<material>.pkl`` children of ``checkpoint_dir`` count. This
-    deliberately excludes archived/reproduction caches and unknown pickle stems.
-    Rows are grouped by availability -- materials with a checkpoint before
-    those without -- and each group is sorted alphabetically by label
-    (case-insensitive), so the dropdown surfaces ready-to-browse materials
-    first instead of raw catalog order.
+    A material counts as available if it has a direct ``<material>.pkl``
+    checkpoint OR at least one other stem whose ``meta.json`` sidecar
+    identifies it as that material (a named ``catalog_profile`` run,
+    ``--quick``, etc. -- see :func:`profile_menu`, which lists them). An
+    unrecognized stem (no sidecar, or a sidecar for a material outside
+    ``materials``) stays excluded. Rows are grouped by availability --
+    materials with a checkpoint before those without -- and each group is
+    sorted alphabetically by label (case-insensitive), so the dropdown
+    surfaces ready-to-browse materials first instead of raw catalog order.
     """
     if materials is None or labels is None:
         from .materials import CATALOG
@@ -85,7 +89,15 @@ def material_menu(
         if labels is None
         else labels
     )
-    available = set(_checkpoint_store.discover(checkpoint_dir)) & set(materials)
+    material_set = set(materials)
+    stems = _checkpoint_store.discover(checkpoint_dir)
+    available = set(stems) & material_set
+    for stem in stems:
+        if stem in available:
+            continue
+        identity = _stem_dataset_identity(stem, checkpoint_dir)
+        if identity is not None and identity.get("material") in material_set:
+            available.add(identity["material"])
     rows: list[MaterialMenuRow] = [
         {
             "value": material,
@@ -185,6 +197,78 @@ def face_menu(material: str, checkpoint_dir: Path | str) -> tuple[MaterialMenuRo
         }
         for face, label in (("flat", "Flat"), ("blazed", "Blazed"))
     )
+
+
+def _stem_manifest_path(stem: str, checkpoint_dir: Path | str) -> Path | None:
+    """The ``meta.json``/``.meta.json`` sidecar for ``stem``, or ``None``.
+
+    Checks the component-store location (``<stem>/meta.json``) then the
+    legacy flat-pickle sidecar (``<stem>.meta.json``), matching ``run.py``'s
+    ``_manifest_path_for`` convention without importing ``run`` (avoids a
+    heavier import for a menu-building helper).
+    """
+    root = Path(checkpoint_dir)
+    dir_manifest = _checkpoint_store.manifest_path(stem, root)
+    if dir_manifest.is_file():
+        return dir_manifest
+    flat_manifest = root / f"{stem}.meta.json"
+    return flat_manifest if flat_manifest.is_file() else None
+
+
+def _stem_dataset_identity(stem: str, checkpoint_dir: Path | str) -> dict[str, object] | None:
+    """Read ``stem``'s recorded ``dataset_identity`` straight from its sidecar.
+
+    Deliberately does not recompute/re-hash (see ``profiles.identity_from_stem``,
+    which does and can silently stop matching once a named ``catalog_profile``
+    is edited after the run that produced the stem). The sidecar is written at
+    save time (``run._manifest_save``) and never changes after, so reading it
+    back is the only source that stays correct regardless of later catalog edits.
+    """
+    manifest = _stem_manifest_path(stem, checkpoint_dir)
+    if manifest is None:
+        return None
+    try:
+        with manifest.open() as handle:
+            return json.load(handle).get("dataset_identity")
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def profile_menu(material: str, checkpoint_dir: Path | str) -> tuple[MaterialMenuRow, ...]:
+    """Selectable checkpoint variants for ``material``: the canonical run
+    (labeled ``Standard``) plus any other stem whose sidecar identifies it as
+    the same material -- named ``catalog_profile`` runs, ``--quick``, etc.
+
+    Each non-canonical row is labeled by its resolved ``catalog_profile`` (or
+    ``variant``/``fidelity`` when there is no named profile), suffixed with a
+    short digest so two runs under the same profile stay distinguishable.
+    Rows are canonical-first, then newest-first, so an unmodified
+    :func:`select_initial_material` default keeps existing single-checkpoint
+    materials behaving exactly as before.
+    """
+    root = Path(checkpoint_dir)
+    if not material or not root.is_dir():
+        return ()
+    rows: list[MaterialMenuRow] = []
+    if _checkpoint_store.checkpoint_exists(material, root):
+        rows.append({"value": material, "label": "Standard", "disabled": False})
+    variants: list[tuple[float, MaterialMenuRow]] = []
+    for stem in _checkpoint_store.discover(root):
+        if stem == material or stem == f"{material}_blazed":
+            continue
+        identity = _stem_dataset_identity(stem, root)
+        if identity is None or identity.get("material") != material:
+            continue
+        label = identity.get("catalog_profile")
+        if not label or label == "standard":
+            label = identity.get("variant") or identity.get("fidelity") or "variant"
+        digest = str(identity.get("parameter_sha256", ""))[:6]
+        manifest = _stem_manifest_path(stem, root)
+        mtime = manifest.stat().st_mtime if manifest is not None else 0.0
+        variants.append((-mtime, {"value": stem, "label": f"{label} ({digest})", "disabled": False}))
+    variants.sort(key=lambda item: item[0])
+    rows.extend(row for _, row in variants)
+    return tuple(rows)
 
 
 def get_default_material():

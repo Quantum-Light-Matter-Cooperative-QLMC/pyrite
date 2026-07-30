@@ -167,6 +167,34 @@ def _(MaterialSelect, material_ui, mo):
 
 
 @app.cell
+def _(MaterialSelect, material_ui, mo):
+    from cxr_mc.analyze import profile_menu as _profile_menu
+    from cxr_mc.analyze import select_initial_material as _select_initial_profile
+    from cxr_mc.run import _DEFAULT_CHECKPOINT_DIR as _PROFILE_CHECKPOINT_DIR
+
+    # Rebuilds whenever the material changes. "Standard" is the canonical
+    # <material> checkpoint; other rows are named catalog_profile / --quick
+    # checkpoints for the same material, resolved by reading each stem's
+    # meta.json sidecar (never re-derived by re-hashing -- see profile_menu's
+    # docstring). Default = Standard when it exists, else the newest variant.
+    _profile_material = material_ui.value["value"]
+    profile_options = (
+        _profile_menu(_profile_material, _PROFILE_CHECKPOINT_DIR) if _profile_material else ()
+    )
+    initial_profile = _select_initial_profile(None, profile_options)
+    profile_ui = mo.ui.anywidget(
+        MaterialSelect(
+            options=list(profile_options),
+            value=initial_profile,
+            label="Profile",
+            disabled=initial_profile is None,
+        )
+    )
+    profile_ui
+    return (profile_ui,)
+
+
+@app.cell
 def _(
     cases_from_results,
     default_settings,
@@ -174,16 +202,25 @@ def _(
     filter_results,
     load_analysis_checkpoint,
     material_ui,
+    profile_ui,
 ):
     from cxr_mc.analyze import checkpoint_stem
 
     MATERIAL = material_ui.value["value"]
     FACE = face_ui.value["value"]
+    PROFILE = profile_ui.value["value"] if profile_ui.value is not None else None
     settings = default_settings()
-    # Load the selected face's checkpoint (flat -> <material>.pkl,
-    # blazed -> <material>_blazed.pkl). MATERIAL stays the catalog key
-    # everywhere else (labels, CATALOG.material(MATERIAL), manifest lookups).
-    _stem = checkpoint_stem(MATERIAL, FACE) if MATERIAL is not None and FACE is not None else None
+    # A non-Standard profile selection names its own checkpoint stem directly
+    # (it already commits to a specific grid/beam/profile combination, so face
+    # doesn't apply); Standard falls back to the flat/blazed face stem as
+    # before. MATERIAL stays the catalog key everywhere else (labels,
+    # CATALOG.material(MATERIAL), manifest lookups).
+    if PROFILE is not None and PROFILE != MATERIAL:
+        _stem = PROFILE
+    elif MATERIAL is not None and FACE is not None:
+        _stem = checkpoint_stem(MATERIAL, FACE)
+    else:
+        _stem = None
     _loaded = load_analysis_checkpoint(_stem) if _stem is not None else None
     if _loaded is None:
         MATERIAL = None

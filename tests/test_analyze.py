@@ -4,6 +4,8 @@ unit-testable helper (:func:`analyze.initial_material`) because marimo apps
 can't be driven live in this environment; these tests exercise that helper and
 the CLI arg handling directly, without spawning marimo."""
 
+import json
+import os
 import sys
 
 import pytest
@@ -105,6 +107,83 @@ def test_material_menu_defaults_to_catalog_materials_and_spec_labels(tmp_path):
 def test_checkpoint_stem_flat_is_material_blazed_is_suffixed():
     assert analyze.checkpoint_stem("hopg", "flat") == "hopg"
     assert analyze.checkpoint_stem("hopg", "blazed") == "hopg_blazed"
+
+
+def _write_variant(checkpoint_dir, stem, *, material, catalog_profile="standard", variant=None,
+                    fidelity="full", digest="abcdef0123456789"):
+    stem_dir = checkpoint_dir / stem
+    stem_dir.mkdir()
+    (stem_dir / "line.pkl").touch()
+    (stem_dir / "meta.json").write_text(
+        json.dumps(
+            {
+                "dataset_identity": {
+                    "material": material,
+                    "fidelity": fidelity,
+                    "variant": variant,
+                    "catalog_profile": catalog_profile,
+                    "parameter_sha256": digest,
+                }
+            }
+        )
+    )
+
+
+def test_profile_menu_lists_standard_and_sidecar_resolved_variant(tmp_path):
+    (tmp_path / "hbn.pkl").touch()
+    _write_variant(
+        tmp_path, "hbn--full-6a7c899190fc", material="hbn", catalog_profile="hopg_hbn_microtrain_200fs"
+    )
+
+    menu = analyze.profile_menu("hbn", tmp_path)
+
+    assert menu == (
+        {"value": "hbn", "label": "Standard", "disabled": False},
+        {
+            "value": "hbn--full-6a7c899190fc",
+            "label": "hopg_hbn_microtrain_200fs (abcdef)",
+            "disabled": False,
+        },
+    )
+
+
+def test_profile_menu_ignores_stem_belonging_to_a_different_material(tmp_path):
+    _write_variant(tmp_path, "hopg--full-4303954822d6", material="hopg")
+
+    assert analyze.profile_menu("hbn", tmp_path) == ()
+
+
+def test_profile_menu_ignores_blazed_stem_and_stems_without_a_sidecar(tmp_path):
+    (tmp_path / "hbn_blazed.pkl").touch()
+    (tmp_path / "unknown.pkl").touch()
+
+    assert analyze.profile_menu("hbn", tmp_path) == ()
+
+
+def test_profile_menu_orders_newest_variant_first_when_no_standard(tmp_path):
+    _write_variant(tmp_path, "hbn--full-aaaaaaaaaaaa", material="hbn", digest="aaaaaa000000")
+    older = tmp_path / "hbn--full-aaaaaaaaaaaa" / "meta.json"
+    os.utime(older, (1_000_000, 1_000_000))
+    _write_variant(tmp_path, "hbn--full-bbbbbbbbbbbb", material="hbn", digest="bbbbbb000000")
+    newer = tmp_path / "hbn--full-bbbbbbbbbbbb" / "meta.json"
+    os.utime(newer, (2_000_000, 2_000_000))
+
+    menu = analyze.profile_menu("hbn", tmp_path)
+
+    assert [row["value"] for row in menu] == ["hbn--full-bbbbbbbbbbbb", "hbn--full-aaaaaaaaaaaa"]
+
+
+def test_profile_menu_labels_quick_variant_by_variant_not_catalog_profile(tmp_path):
+    _write_variant(tmp_path, "hbn_quick", material="hbn", variant="quick", fidelity="full")
+
+    menu = analyze.profile_menu("hbn", tmp_path)
+
+    assert menu == ({"value": "hbn_quick", "label": "quick (abcdef)", "disabled": False},)
+
+
+def test_profile_menu_empty_for_missing_material_or_dir(tmp_path):
+    assert analyze.profile_menu("", tmp_path) == ()
+    assert analyze.profile_menu("hbn", tmp_path / "does-not-exist") == ()
 
 
 @pytest.mark.parametrize(
