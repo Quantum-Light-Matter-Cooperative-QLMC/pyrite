@@ -59,7 +59,7 @@ def test_coherent_profile_gets_qualified_stem_and_divergent_digest(monkeypatch):
     # coherent joins the hash (divergence-only rule) and forces off canonical <material>
     assert identity["resolved_parameters"].get("emission") == "coherent"
     assert stem != "hopg"
-    assert stem.startswith("hopg--full-")
+    assert stem.startswith("hopg@full-")
     assert identity["parameter_sha256"] != id_def["parameter_sha256"]
 
 
