@@ -1170,15 +1170,16 @@ Usage: cxr profile [OPTIONS] COMMAND [ARGS]...
   Manage catalog scan profiles (named campaign defaults).
 
   Profiles are named campaigns in ``[profiles.*]``. They own default ranges, electron-
-  count grids, and optional material membership. An absent ``materials`` key means all
-  in-use materials; ``profile members`` is the only membership mutation surface. Per-
-  material range overrides are managed by ``cxr material``. Energy grids are managed by
-  ``cxr energy-grid``.
+  count grids, detector geometry, and optional material membership. An absent
+  ``materials`` key means all in-use materials; ``profile members`` is the only
+  membership mutation surface. Per-material range overrides are managed by ``cxr
+  material``. Energy grids are managed by ``cxr energy-grid``.
 
   Examples:
     cxr profile list
     cxr profile show sub_100keV        (or: cxr profile sub_100keV)
     cxr profile create sub_100keV --energy 30:100:10
+    cxr profile set sub_100keV --observation-angle 119
     cxr profile add sub_100keV --energy 75
     cxr profile members set sub_100keV hopg mose2
     cxr profile rename sub_100keV sub100
@@ -1190,14 +1191,14 @@ Options:
 Commands:
   add      Incrementally add values to profile grids.
   analyze  Analyze NAME's performance logs into CSV, Markdown, and PNG artifacts.
-  create   Create a new profile, cloning range defaults from --from (standard).
+  create   Create a new profile, cloning ranges and detector from --from (standard).
   delete   Delete a profile; irreversible.
   list     List catalog profiles with membership and override counts.
   members  Set, extend, shrink, or reset profile-owned material membership.
   remove   Remove values from an existing profile's grids.
   rename   Rename profile NAME to NEW_NAME.
-  set      Replace range grids on an existing profile.
-  show     Show one profile's ranges, material membership, and overrides.
+  set      Replace range grids or detector scalars on an existing profile.
+  show     Show one profile's ranges, resolved detector, membership, and overrides.
 ```
 
 ## `cxr profile add`
@@ -1252,11 +1253,12 @@ Options:
 ```text
 Usage: cxr profile create [OPTIONS] NAME
 
-  Create a new profile, cloning range defaults from --from (standard).
+  Create a new profile, cloning ranges and detector from --from (standard).
 
-  Range options replace individual cloned grids. Overrides and material membership are
-  not cloned. Without --materials, the new profile starts with implicit all-in-use
-  membership and no per-material overrides.
+  Range options replace individual cloned grids; detector options replace individual
+  cloned detector scalars. Overrides and material membership are not cloned. Without
+  --materials, the new profile starts with implicit all-in-use membership and no per-
+  material overrides.
 
 Options:
   --from SOURCE                   Clone range defaults from SOURCE profile; defaults to
@@ -1277,6 +1279,12 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
+  --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
+                                  replacement.  [0.0<=x<=180.0]
+  --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
+                                  replacement.  [0.0<x<=180.0]
+  --solid-angle SR                Detector solid angle in sr; scalar replacement.
+                                  [0.0<x<=12.566370614359172]
   --materials KEY,...             Set explicit initial membership (comma-separated
                                   material keys).
   --dry-run                       Print proposed TOML diff; write nothing.
@@ -1436,11 +1444,12 @@ Options:
 ```text
 Usage: cxr profile set [OPTIONS] NAME
 
-  Replace range grids on an existing profile.
+  Replace range grids or detector scalars on an existing profile.
 
   NAME must already exist (create it with ``cxr profile create``); unknown names error
   with suggestions. Editing 'standard' prompts for confirmation unless --yes is given;
-  --dry-run never prompts.
+  --dry-run never prompts. Detector scalars replace supplied fields; unlike range grids,
+  they are not accepted by add/remove.
 
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
@@ -1459,6 +1468,12 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
+  --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
+                                  replacement.  [0.0<=x<=180.0]
+  --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
+                                  replacement.  [0.0<x<=180.0]
+  --solid-angle SR                Detector solid angle in sr; scalar replacement.
+                                  [0.0<x<=12.566370614359172]
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
@@ -1469,7 +1484,7 @@ Options:
 ```text
 Usage: cxr profile show [OPTIONS] NAME
 
-  Show one profile's ranges, material membership, and overrides.
+  Show one profile's ranges, resolved detector, membership, and overrides.
 
 Options:
   --json      Emit one versioned JSON object on stdout.

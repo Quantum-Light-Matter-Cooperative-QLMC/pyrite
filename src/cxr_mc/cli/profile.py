@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import math
 import re
 from pathlib import Path
 
@@ -23,6 +24,7 @@ from cxr_mc.cli._core import (
     emit_json_result,
     emit_result,
 )
+from cxr_mc.detectors.spec import DetectorSpec
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
@@ -35,6 +37,11 @@ _RANGE_OPTIONS = (
 
 #: Electron-count profile settings (plan P2.4): single-value grids, sweepable.
 _EXTRA_RANGES = {"ne_line": "n_electrons", "ne_brem": "n_electrons_brem"}
+_ACTIVE_DETECTOR_FIELDS = (
+    ("observation_angle_deg", "observation angle", "deg"),
+    ("polar_acceptance_deg", "polar acceptance (full span)", "deg"),
+    ("solid_angle_sr", "solid angle", "sr"),
+)
 
 
 def _catalog_key(label):
@@ -78,6 +85,31 @@ def _range_cli_options(function):
     return function
 
 
+def _detector_cli_options(function):
+    function = click.option(
+        "--solid-angle",
+        "solid_angle_sr",
+        type=click.FloatRange(min=0.0, max=4.0 * math.pi, min_open=True),
+        metavar="SR",
+        help="Detector solid angle in sr; scalar replacement.",
+    )(function)
+    function = click.option(
+        "--polar-acceptance",
+        "polar_acceptance_deg",
+        type=click.FloatRange(min=0.0, max=180.0, min_open=True),
+        metavar="DEG",
+        help="Full detector polar acceptance span in degrees; scalar replacement.",
+    )(function)
+    function = click.option(
+        "--observation-angle",
+        "observation_angle_deg",
+        type=click.FloatRange(min=0.0, max=180.0),
+        metavar="DEG",
+        help="Detector observation angle in degrees [0, 180]; scalar replacement.",
+    )(function)
+    return function
+
+
 def _collect_updates(thickness, energy, polar, azimuth, ne_line=None, ne_brem=None):
     return {
         label: value
@@ -88,6 +120,18 @@ def _collect_updates(thickness, energy, polar, azimuth, ne_line=None, ne_brem=No
             "azimuth": azimuth,
             "ne_line": ne_line,
             "ne_brem": ne_brem,
+        }.items()
+        if value is not None
+    }
+
+
+def _collect_detector_updates(observation_angle_deg, polar_acceptance_deg, solid_angle_sr):
+    return {
+        key: value
+        for key, value in {
+            "observation_angle_deg": observation_angle_deg,
+            "polar_acceptance_deg": polar_acceptance_deg,
+            "solid_angle_sr": solid_angle_sr,
         }.items()
         if value is not None
     }
@@ -158,9 +202,15 @@ def _write(document, original, dry_run, done_message):
 
 def _profile_payload(document, name):
     profile = _existing_profile(document, name)
+    profiles = _catalog_io.profile_rows(document)
     overrides = _catalog_io.profile_overrides(profile)
     materials = profile.get("materials")
     range_keys = [*_catalog_io.RANGES.items(), *_EXTRA_RANGES.items()]
+    raw_detector = profile.get("detector")
+    if not isinstance(raw_detector, dict):
+        standard = profiles.get("standard", {})
+        raw_detector = standard.get("detector", {}) if isinstance(standard, dict) else {}
+    detector = DetectorSpec(**dict(raw_detector))
     return {
         "name": name,
         "ranges": [
@@ -169,6 +219,10 @@ def _profile_payload(document, name):
             if key in profile
         ],
         "materials": list(materials) if isinstance(materials, list) else None,
+        "detector": {
+            key: getattr(detector, key)
+            for key, _label, _unit in _ACTIVE_DETECTOR_FIELDS
+        },
         "overrides": {
             material: sorted(row)
             for material, row in overrides.items()
@@ -185,6 +239,11 @@ def _emit_show(payload):
         emit_result("  materials: all in-use materials (implicit)")
     else:
         emit_result(f"  materials: {', '.join(payload['materials']) or '(none)'}")
+    emit_result("  detector:")
+    for key, label, unit in _ACTIVE_DETECTOR_FIELDS:
+        value = payload["detector"][key]
+        display = "unspecified" if value is None else f"{value:g} {unit}"
+        emit_result(f"    {label}: {display}")
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
 
@@ -198,6 +257,17 @@ def _clone_grid(value):
             table[key] = _clone_grid(item)
         return table
     return tomlkit.item(plain)
+
+
+def _detector_table(profile):
+    """Return writable ``[profiles.NAME.detector]`` table."""
+    detector = profile.get("detector")
+    if detector is None:
+        detector = tomlkit.table()
+        profile["detector"] = detector
+    elif not isinstance(detector, dict):
+        raise ValueError("profile detector must be a table")
+    return detector
 
 
 class _ProfileGroup(click.Group):
@@ -219,16 +289,18 @@ def command():
     """Manage catalog scan profiles (named campaign defaults).
 
     Profiles are named campaigns in ``[profiles.*]``. They own default ranges,
-    electron-count grids, and optional material membership. An absent
-    ``materials`` key means all in-use materials; ``profile members`` is the
-    only membership mutation surface. Per-material range overrides are managed
-    by ``cxr material``. Energy grids are managed by ``cxr energy-grid``.
+    electron-count grids, detector geometry, and optional material membership.
+    An absent ``materials`` key means all in-use materials; ``profile members``
+    is the only membership mutation surface. Per-material range overrides are
+    managed by ``cxr material``. Energy grids are managed by
+    ``cxr energy-grid``.
 
     \b
     Examples:
       cxr profile list
       cxr profile show sub_100keV        (or: cxr profile sub_100keV)
       cxr profile create sub_100keV --energy 30:100:10
+      cxr profile set sub_100keV --observation-angle 119
       cxr profile add sub_100keV --energy 75
       cxr profile members set sub_100keV hopg mose2
       cxr profile rename sub_100keV sub100
@@ -328,7 +400,7 @@ def list_command(json_output):
     "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
 )
 def show_command(name, json_output):
-    """Show one profile's ranges, material membership, and overrides."""
+    """Show one profile's ranges, resolved detector, membership, and overrides."""
     try:
         _text, document = _catalog_io.catalog_text()
         payload = _profile_payload(document, name)
@@ -355,6 +427,7 @@ def show_command(name, json_output):
 )
 @_range_cli_options
 @_ne_cli_options
+@_detector_cli_options
 @click.option(
     "--materials",
     metavar="KEY,...",
@@ -363,16 +436,32 @@ def show_command(name, json_output):
 )
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def create_command(
-    name, source, thickness, energy, polar, azimuth, ne_line, ne_brem, materials, dry_run
+    name,
+    source,
+    thickness,
+    energy,
+    polar,
+    azimuth,
+    ne_line,
+    ne_brem,
+    observation_angle_deg,
+    polar_acceptance_deg,
+    solid_angle_sr,
+    materials,
+    dry_run,
 ):
-    """Create a new profile, cloning range defaults from --from (standard).
+    """Create a new profile, cloning ranges and detector from --from (standard).
 
-    Range options replace individual cloned grids. Overrides and material
-    membership are not cloned. Without --materials, the new profile starts with
-    implicit all-in-use membership and no per-material overrides.
+    Range options replace individual cloned grids; detector options replace
+    individual cloned detector scalars. Overrides and material membership are
+    not cloned. Without --materials, the new profile starts with implicit
+    all-in-use membership and no per-material overrides.
     """
     _check_name(name)
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
+    detector_updates = _collect_detector_updates(
+        observation_angle_deg, polar_acceptance_deg, solid_angle_sr
+    )
     source_name = source or "standard"
     try:
         original, document = _catalog_io.catalog_text()
@@ -391,6 +480,10 @@ def create_command(
             target[key] = _clone_grid(value)
         for label, values in updates.items():
             target[_catalog_key(label)] = _catalog_io.values_item(values)
+        if detector_updates:
+            detector = _detector_table(target)
+            for key, value in detector_updates.items():
+                detector[key] = value
         if materials is not None:
             target["materials"] = _validate_materials(document, _csv_materials(materials))
         profiles[name] = target
@@ -403,6 +496,7 @@ def create_command(
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @_range_cli_options
 @_ne_cli_options
+@_detector_cli_options
 @click.option(
     "--materials",
     metavar="KEY,...",
@@ -411,16 +505,34 @@ def create_command(
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def set_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, materials, yes, dry_run):
-    """Replace range grids on an existing profile.
+def set_command(
+    name,
+    thickness,
+    energy,
+    polar,
+    azimuth,
+    ne_line,
+    ne_brem,
+    observation_angle_deg,
+    polar_acceptance_deg,
+    solid_angle_sr,
+    materials,
+    yes,
+    dry_run,
+):
+    """Replace range grids or detector scalars on an existing profile.
 
     NAME must already exist (create it with ``cxr profile create``); unknown
     names error with suggestions. Editing 'standard' prompts for confirmation
-    unless --yes is given; --dry-run never prompts.
+    unless --yes is given; --dry-run never prompts. Detector scalars replace
+    supplied fields; unlike range grids, they are not accepted by add/remove.
     """
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
-    if not updates and materials is None:
-        raise click.UsageError("provide a range option")
+    detector_updates = _collect_detector_updates(
+        observation_angle_deg, polar_acceptance_deg, solid_angle_sr
+    )
+    if not updates and not detector_updates and materials is None:
+        raise click.UsageError("provide a range or detector option")
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
@@ -428,11 +540,27 @@ def set_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, mater
         if materials is not None:
             material_keys = _validate_materials(document, _csv_materials(materials))
         overwriting = [label for label in updates if _catalog_key(label) in target]
+        existing_detector = target.get("detector", {})
+        overwriting.extend(
+            label
+            for key, label, _unit in _ACTIVE_DETECTOR_FIELDS
+            if key in detector_updates
+            and isinstance(existing_detector, dict)
+            and key in existing_detector
+        )
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
-    if overwriting or materials is not None:
+    if overwriting or detector_updates or materials is not None:
+        detector_labels = [
+            label
+            for key, label, _unit in _ACTIVE_DETECTOR_FIELDS
+            if key in detector_updates
+        ]
         _confirm_standard(
-            name, f"overwrite {', '.join(overwriting) or 'materials'} on", yes, dry_run
+            name,
+            f"set {', '.join([*overwriting, *detector_labels]) or 'materials'} on",
+            yes,
+            dry_run,
         )
     if material_keys is not None:
         _warn_compat(
@@ -441,6 +569,10 @@ def set_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, mater
         )
     for label, values in updates.items():
         target[_catalog_key(label)] = _catalog_io.values_item(values)
+    if detector_updates:
+        detector = _detector_table(target)
+        for key, value in detector_updates.items():
+            detector[key] = value
     if material_keys is not None:
         target["materials"] = material_keys
     return _write(document, original, dry_run, f"updated profile {name}")

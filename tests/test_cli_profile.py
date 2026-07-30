@@ -74,6 +74,9 @@ def test_show_and_bare_name_alias(tmp_path, monkeypatch):
     assert "[sub_100keV]" in shown.stdout
     assert "energy: [30, 50]" in shown.stdout
     assert "materials: hopg" in shown.stdout
+    assert "observation angle: 90 deg" in shown.stdout
+    assert "polar acceptance (full span): unspecified" in shown.stdout
+    assert "solid angle: unspecified" in shown.stdout
 
     aliased = invoke(profile.command, ["sub_100keV"])
     assert_clean_result(aliased)
@@ -83,6 +86,11 @@ def test_show_and_bare_name_alias(tmp_path, monkeypatch):
     assert_clean_result(machine)
     payload = json.loads(machine.stdout)["payload"]
     assert payload["materials"] is None
+    assert payload["detector"] == {
+        "observation_angle_deg": 90.0,
+        "polar_acceptance_deg": None,
+        "solid_angle_sr": None,
+    }
     assert payload["overrides"] == {"hopg": ["thickness_ang"]}
 
 
@@ -95,6 +103,27 @@ def test_show_unknown_profile_suggests_and_points_to_create(tmp_path, monkeypatc
     assert "unknown profile: sub_100kv" in result.stderr
     assert "Did you mean: sub_100keV" in result.stderr
     assert "cxr profile create sub_100kv" in result.stderr
+
+
+def test_show_inherits_standard_detector_when_profile_block_is_absent(tmp_path, monkeypatch):
+    _catalog(
+        tmp_path,
+        monkeypatch,
+        _CATALOG
+        + "\n[profiles.standard.detector]\n"
+        + "observation_angle_deg = 91.0\n"
+        + "polar_acceptance_deg = 16.6\n"
+        + "solid_angle_sr = 0.066\n",
+    )
+
+    shown = invoke(profile.command, ["show", "sub_100keV", "--json"])
+
+    assert_clean_result(shown)
+    assert json.loads(shown.stdout)["payload"]["detector"] == {
+        "observation_angle_deg": 91.0,
+        "polar_acceptance_deg": 16.6,
+        "solid_angle_sr": 0.066,
+    }
 
 
 def test_create_clones_source_and_applies_range_overrides(tmp_path, monkeypatch):
@@ -134,6 +163,38 @@ def test_create_accepts_atomic_initial_membership(tmp_path, monkeypatch):
     assert_clean_result(result, stdout="created profile demo\n")
     section = catalog.read_text().split("[profiles.demo]", 1)[1].split("\n[", 1)[0]
     assert 'materials = ["hopg", "mose2"]' in section
+
+
+def test_create_and_show_round_trip_detector_scalars(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    created = invoke(
+        profile.command,
+        [
+            "create",
+            "zhai",
+            "--observation-angle",
+            "119",
+            "--polar-acceptance",
+            "16.6",
+            "--solid-angle",
+            "0.066",
+        ],
+    )
+    shown = invoke(profile.command, ["show", "zhai", "--json"])
+
+    assert_clean_result(created, stdout="created profile zhai\n")
+    assert_clean_result(shown)
+    assert json.loads(shown.stdout)["payload"]["detector"] == {
+        "observation_angle_deg": 119.0,
+        "polar_acceptance_deg": 16.6,
+        "solid_angle_sr": 0.066,
+    }
+    text = catalog.read_text()
+    assert "[profiles.zhai.detector]" in text
+    assert "observation_angle_deg = 119.0" in text
+    assert "polar_acceptance_deg = 16.6" in text
+    assert "solid_angle_sr = 0.066" in text
 
 
 def test_create_existing_or_invalid_name_errors(tmp_path, monkeypatch):
@@ -192,6 +253,65 @@ def test_set_nonstandard_never_prompts(tmp_path, monkeypatch):
     result = invoke(profile.command, ["set", "sub_100keV", "--energy", "40"])
 
     assert_clean_result(result, stdout="updated profile sub_100keV\n")
+
+
+def test_set_replaces_detector_scalars_and_standard_prompts(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    updated = invoke(
+        profile.command,
+        [
+            "set",
+            "sub_100keV",
+            "--observation-angle",
+            "119",
+            "--polar-acceptance",
+            "16.6",
+            "--solid-angle",
+            "0.066",
+        ],
+    )
+    declined = invoke(
+        profile.command,
+        ["set", "standard", "--observation-angle", "91"],
+        input="n\n",
+    )
+
+    assert_clean_result(updated, stdout="updated profile sub_100keV\n")
+    assert declined.exit_code == 1
+    assert "profile 'standard'" in declined.stderr
+    text = catalog.read_text()
+    assert "[profiles.sub_100keV.detector]" in text
+    assert "observation_angle_deg = 119.0" in text
+    assert "polar_acceptance_deg = 16.6" in text
+    assert "solid_angle_sr = 0.066" in text
+    assert "[profiles.standard.detector]" not in text
+
+
+def test_detector_scalar_options_validate_domains_and_dry_run(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    original = catalog.read_text()
+
+    dry_run = invoke(
+        profile.command,
+        ["set", "standard", "--observation-angle", "91", "--dry-run"],
+    )
+    bad_acceptance = invoke(
+        profile.command,
+        ["set", "sub_100keV", "--polar-acceptance", "0"],
+    )
+    bad_solid_angle = invoke(
+        profile.command,
+        ["create", "bad", "--solid-angle", "13"],
+    )
+
+    assert_clean_result(dry_run)
+    assert "+observation_angle_deg = 91.0" in dry_run.stdout
+    assert catalog.read_text() == original
+    assert bad_acceptance.exit_code == 2
+    assert "0<x<=180" in bad_acceptance.stderr
+    assert bad_solid_angle.exit_code == 2
+    assert "12.566" in bad_solid_angle.stderr
 
 
 def test_add_unions_sorts_deduplicates(tmp_path, monkeypatch):
@@ -333,7 +453,8 @@ def test_empty_updates_are_usage_errors(tmp_path, monkeypatch):
     for verb in ("set", "add", "remove"):
         result = invoke(profile.command, [verb, "sub_100keV"])
         assert result.exit_code == 2
-        assert "provide a range option" in result.stderr
+        expected = "provide a range or detector option" if verb == "set" else "provide a range option"
+        assert expected in result.stderr
 
 
 def test_delete_requires_yes_and_removes_profile(tmp_path, monkeypatch):
