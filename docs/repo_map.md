@@ -428,6 +428,15 @@ figure export, optional remote Zhai-job launch/status/pull helpers.
   `start_remote_zhai`, `remote_zhai_status`, `pull_remote_zhai`,
   `add_subparser`, `main`.
 
+### `_zhai.py`
+Canonical maintained Zhai detector geometry and cache-schema provenance shared
+by anchor figures, headless reproduction, validation-app export, and remote
+SLURM metadata. Heavy calculations remain in `checks/anchor_figures.py`; app
+and export consumers are cache-only and direct misses to `cxr remote validate`.
+- Internal: `ZHAI_DETECTOR`, `ZHAI_CACHE_SCHEMA`, `ZHAI_CACHE_FORMAT`,
+  `detector_metadata`.
+- Deps: `detectors.DetectorSpec`.
+
 ### `check_config.py`
 `cxr check-config` validate bundled material catalog or explicit full
 catalog without importing GPU-heavy CLI modules.

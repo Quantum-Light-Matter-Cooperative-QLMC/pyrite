@@ -23,6 +23,8 @@ if str(_CHECKS) not in sys.path:
 
 import anchor_figures as af  # noqa: E402
 
+from cxr_mc.detectors import DetectorSpec  # noqa: E402
+
 
 @pytest.fixture(scope="module")
 def anchor():
@@ -52,6 +54,85 @@ def test_line_energies_monotonic_and_in_window(anchor):
     vals = [lines[E0] for E0 in anchor.energies_keV]
     assert vals == sorted(vals)  # energy rises with beam energy
     assert all(anchor.e_min_eV < v < anchor.e_max_eV for v in vals)
+
+
+def test_zhai_detector_is_canonical_and_survives_current_case_path(anchor):
+    case = af.fig1c_case(
+        anchor,
+        25.0,
+        anchor.thick_bulk_ang,
+        ne=12,
+        ne_brem=7,
+        seed=5,
+    )
+
+    assert anchor.detector is af.ZHAI_DETECTOR
+    assert anchor.detector == DetectorSpec(119.0, 16.6, 0.066)
+    assert case["theta_obs_rad"] == pytest.approx(np.deg2rad(119.0))
+    assert case["dtheta_obs_rad"] == pytest.approx(np.deg2rad(16.6))
+    assert case["domega_sr"] == pytest.approx(0.066)
+    assert case["Ne"] == 12
+    assert case["Ne_brem"] == 7
+
+
+def test_observation_angle_changes_case_and_line_energy(anchor):
+    changed = af.ZhaiAnchor(detector=DetectorSpec(100.0, 16.6, 0.066))
+    case = af.fig1c_case(
+        changed,
+        25.0,
+        changed.thick_bulk_ang,
+        ne=1,
+        ne_brem=1,
+        seed=1,
+    )
+
+    assert case["theta_obs_rad"] == pytest.approx(np.deg2rad(100.0))
+    assert af.line_energy_eV(changed, 25.0) != pytest.approx(af.line_energy_eV(anchor, 25.0))
+
+
+def test_model_routes_resolved_case_geometry_through_all_components(monkeypatch):
+    detector = DetectorSpec(101.0, 12.0, 0.02)
+    anchor = af.ZhaiAnchor(detector=detector, energies_keV=(25.0,))
+    geometry_calls = []
+    aperture_calls = []
+
+    def fake_geometry(theta_obs_rad, polar_rad, azimuth_rad):
+        geometry_calls.append((theta_obs_rad, polar_rad, azimuth_rad))
+        return np.array([0.0, 0.0, 1.0]), np.array([1.0, 0.0, 0.0])
+
+    def fake_segments(*_args, **_kwargs):
+        return {
+            "n_backscattered": 0,
+            "n_transmitted": 1,
+            "Ne": 1,
+        }
+
+    def fake_aperture(E_eV, beta, theta_obs_rad, dtheta_obs_rad):
+        aperture_calls.append((E_eV, beta, theta_obs_rad, dtheta_obs_rad))
+        return 0.0
+
+    monkeypatch.setattr(af, "tilted_geometry", fake_geometry)
+    monkeypatch.setattr(af, "simulate_trajectories", fake_segments)
+    monkeypatch.setattr(af, "mc_spectrum", lambda *_args, **_kwargs: np.ones(anchor.E_grid.size))
+    monkeypatch.setattr(
+        af, "mc_brem_spectrum", lambda *_args, **_kwargs: np.zeros(anchor.E_grid.size)
+    )
+    monkeypatch.setattr(af, "eds_fwhm_eV", lambda _energy: 0.0)
+    monkeypatch.setattr(af, "aperture_fwhm_eV", fake_aperture)
+    monkeypatch.setattr(af, "convolve_detector", lambda _grid, spectrum, _fwhm: spectrum)
+
+    model = af.model_spectra(anchor, ne=1, ne_brem=1)
+
+    assert geometry_calls == pytest.approx(
+        [
+            (np.deg2rad(101.0), 0.0, 0.0),
+            (np.deg2rad(101.0), 0.0, 0.0),
+        ]
+    )
+    assert aperture_calls[0][2:] == pytest.approx((np.deg2rad(101.0), np.deg2rad(12.0)))
+    expected_flux = np.trapezoid(np.ones(anchor.E_grid.size), anchor.E_grid) * 0.02
+    assert model[25.0]["line_flux_per_e"] == pytest.approx(expected_flux)
+    assert model["film"]["line_flux_per_e"] == pytest.approx(expected_flux)
 
 
 def test_reference_curve_absent_returns_none(anchor, tmp_path):
@@ -127,6 +208,8 @@ def _synthetic_model(anchor):
 
 
 def test_cached_model_spectra_round_trip(anchor, tmp_path, monkeypatch):
+    from cxr_mc import _checkpoint_io
+
     expected = _synthetic_model(anchor)
     calls = []
 
@@ -145,8 +228,106 @@ def test_cached_model_spectra_round_trip(anchor, tmp_path, monkeypatch):
     assert second_hit
     assert path == second_path
     assert path.exists()
+    record = _checkpoint_io.load(str(path))
+    assert record["format"] == af.ZHAI_CACHE_FORMAT
+    assert record["schema"] == af.ZHAI_CACHE_SCHEMA
+    assert record["detector"] == af.detector_metadata(anchor.detector)
     assert calls == [(anchor, 12, 7)]
     assert first.keys() == second.keys()
+
+
+def test_cached_model_spectra_recomputes_pre_detector_payload(anchor, tmp_path, monkeypatch):
+    from cxr_mc import _checkpoint_io
+
+    expected = _synthetic_model(anchor)
+    calls = []
+
+    def fake_model_spectra(received_anchor, ne, ne_brem):
+        calls.append((received_anchor, ne, ne_brem))
+        return expected
+
+    monkeypatch.setattr(af, "model_spectra", fake_model_spectra)
+    path = tmp_path / (
+        f"zhai-v{af.ZHAI_CACHE_SCHEMA}-{af._zhai_cache_key(anchor, 12, 7)}.pkl"
+    )
+    _checkpoint_io.dump(expected, str(path))
+
+    model, cache_hit, returned_path = af.cached_model_spectra(
+        anchor, ne=12, ne_brem=7, cache_dir=tmp_path
+    )
+
+    assert not cache_hit
+    assert returned_path == path
+    assert model is expected
+    assert calls == [(anchor, 12, 7)]
+    assert _checkpoint_io.load(str(path))["detector"] == af.detector_metadata(anchor.detector)
+
+
+def test_cached_model_spectra_cache_only_miss_never_computes(anchor, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        af,
+        "model_spectra",
+        lambda *_args, **_kwargs: pytest.fail("cache-only miss must not compute"),
+    )
+
+    with pytest.raises(af.ZhaiCacheMiss, match="cxr remote validate"):
+        af.cached_model_spectra(
+            anchor,
+            ne=12,
+            ne_brem=7,
+            cache_dir=tmp_path,
+            cache_only=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("format", "cxr.zhai-cache.v3"),
+        ("schema", 3),
+        ("kind", "supplementary:hopg"),
+        ("detector", {"spec": {}, "case": {}}),
+    ],
+)
+def test_cache_payload_rejects_wrong_v4_metadata(anchor, field, value):
+    record = af._cache_record("fig1c", anchor.detector, {"ok": True})
+    record[field] = value
+
+    assert af._cache_payload(record, kind="fig1c", detector=anchor.detector) is None
+
+
+def test_cache_keys_include_anchor_helper_source(anchor, monkeypatch):
+    study = af.supplementary_study("wse2")
+    before_fig1c = af._zhai_cache_key(anchor, 12, 7)
+    before_supp = af._supplementary_cache_key(study, 42.0, 5, 0.0)
+    anchor_path = Path(af.__file__).resolve()
+    real_read_bytes = Path.read_bytes
+
+    def changed_helper_source(path):
+        content = real_read_bytes(path)
+        return content + b"\n# changed helper\n" if path.resolve() == anchor_path else content
+
+    monkeypatch.setattr(Path, "read_bytes", changed_helper_source)
+
+    assert af._zhai_cache_key(anchor, 12, 7) != before_fig1c
+    assert af._supplementary_cache_key(study, 42.0, 5, 0.0) != before_supp
+
+
+def test_legacy_comparison_exits_without_computing_on_cache_miss(tmp_path, monkeypatch):
+    import feranchuk_vs_zhai_check as comparison
+
+    monkeypatch.setattr(
+        comparison,
+        "cached_model_spectra",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            af.ZhaiCacheMiss(tmp_path / "missing.pkl")
+        ),
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        comparison.main(["--ne", "12", "--ne-brem", "7"])
+
+    assert exc_info.value.code == 75
 
 
 def test_cached_model_spectra_refreshes(anchor, tmp_path, monkeypatch):
@@ -520,6 +701,8 @@ def test_supplementary_overview_rejects_unknown_key():
 
 
 def test_reproduce_all_populates_every_cache_and_reuses_it(tmp_path, monkeypatch):
+    from cxr_mc import _checkpoint_io
+
     calls = []
 
     def fake_model_spectra(received_anchor, ne, ne_brem):
@@ -547,6 +730,10 @@ def test_reproduce_all_populates_every_cache_and_reuses_it(tmp_path, monkeypatch
     assert all(path.exists() for _label, path, _hit in results)
     assert all(hit is False for _label, _path, hit in results)  # first run: no cache hits
     assert len(calls) == 19
+    for _label, path, _hit in results:
+        record = _checkpoint_io.load(str(path))
+        assert record["schema"] == af.ZHAI_CACHE_SCHEMA
+        assert record["detector"] == af.detector_metadata(af.ZHAI_DETECTOR)
 
     calls.clear()
     results2 = af.reproduce_all(ne=11, ne_brem=3, ne_supp=5, cache_dir=tmp_path)
@@ -578,8 +765,10 @@ def test_export_all_figures_writes_expected_files(tmp_path, monkeypatch):
     )
 
     outdir = tmp_path / "figures"
+    cache_dir = tmp_path / "cache"
+    af.reproduce_all(ne=11, ne_brem=3, ne_supp=5, cache_dir=cache_dir)
     written = af.export_all_figures(
-        outdir=outdir, ne=11, ne_brem=3, ne_supp=5, cache_dir=tmp_path / "cache"
+        outdir=outdir, ne=11, ne_brem=3, ne_supp=5, cache_dir=cache_dir
     )
 
     names = {p.name for p in written}
@@ -639,7 +828,10 @@ def test_physics_source_tree_is_lf_only():
     repo_root = _CHECKS.parent
     offenders = [
         str(path.relative_to(repo_root))
-        for path in sorted((repo_root / "src" / "cxr_mc").glob("**/*.py"))
+        for path in [
+            *sorted((repo_root / "src" / "cxr_mc").glob("**/*.py")),
+            repo_root / "checks" / "anchor_figures.py",
+        ]
         if b"\r\n" in path.read_bytes()
     ]
     assert offenders == [], f"CRLF line endings found (breaks box<->laptop cache hash): {offenders}"

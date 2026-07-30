@@ -4223,6 +4223,15 @@ def test_zhai_queue_script_has_ne_flags_and_meta():
     assert "/pid" not in s
 
 
+def test_zhai_queue_metadata_records_cache_and_detector_provenance():
+    metadata = remote._zhai_queue_metadata("j", ne=11, ne_brem=3, ne_supp=5)
+
+    assert "zhai_cache_schema: 4" in metadata
+    assert "detector_observation_angle_deg: 119" in metadata
+    assert "detector_polar_acceptance_deg: 16.6" in metadata
+    assert "detector_solid_angle_sr: 0.066" in metadata
+
+
 def test_zhai_queue_script_no_refresh_flag_when_unset():
     s = remote._zhai_queue_script("j", ne=1, ne_brem=1, ne_supp=1, tmd_azimuth=0.0, refresh=False)
     assert "--refresh" not in s

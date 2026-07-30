@@ -213,3 +213,35 @@ Stop on an unresolved identity collision, ambiguous acceptance-angle
 convention, incompatible Zhai literature input, detector fields affecting
 physics without an owning response model, or unrelated work outside explicit
 paths.
+
+## Milestone 2 evidence
+
+- Profile `create`/`set` accept replace-only detector scalars; `show` text/JSON
+  emits resolved active geometry. Standard edits confirm, `--yes` bypasses,
+  and `--dry-run` never prompts.
+- Added one maintained Zhai source:
+  `DetectorSpec(119.0, 16.6, 0.066)` in `src/cxr_mc/_zhai.py`.
+  Fig. 1c and supplementary paths derive radian case values from current
+  `BeamSpec`/`Sweep`/`build_cases` construction.
+- Analytic line energy, tilted geometry, PXR/CBS, bremsstrahlung, aperture
+  broadening, detected-flux scaling, figure labels, headless reproduction, and
+  remote job metadata resolve from that detector/case provenance.
+- Zhai caches now use the `cxr.zhai-cache.v4` envelope and v4 filenames. Each
+  record persists detector spec plus resolved historical case fields; raw,
+  pre-detector, wrong-kind, wrong-schema, or mismatched-detector records are
+  recomputed.
+- `checks/feranchuk_vs_zhai_check.py` is a thin diagnostic over canonical
+  anchor/cache helpers; duplicate geometry and Monte-Carlo setup were removed.
+- Validation app, figure export, and legacy comparison are cache-only; misses
+  direct users to `cxr remote validate`. Remote unavailability never falls back
+  to heavy local cache population.
+- No equation, validation status, or `signed-off` ledger state changed.
+- Independent read-only physics/configuration review found five cache/local-run
+  gaps; all were fixed and re-review returned PASS. Seeded legacy-versus-case
+  parity produced identical trajectories and zero spectrum difference.
+- Fresh local evidence: 180 profile/core, 149 CLI-contract, 79 Zhai/app, and
+  326 remote tests passed; lint, typecheck, CLI generated checks, marimo check,
+  and validation-app HTML smoke passed. Full suite: 2081 passed, 39 skipped,
+  with the same five unrelated skill-mirror, remote-attach, and sandbox
+  forkserver failures. Strict Sphinx completed but failed on six pre-existing
+  warnings outside touched docs.

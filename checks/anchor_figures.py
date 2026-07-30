@@ -37,7 +37,6 @@ Run (CPU-force on a box with the cupy wheel but no CUDA device):
 from __future__ import annotations
 
 import hashlib
-import inspect
 import json
 import os
 import sys
@@ -56,6 +55,13 @@ for _p in (str(_HERE), str(_HERE.parent / "src")):
 
 from feranchuk_spence import photons_per_electron  # noqa: E402
 
+from cxr_mc._zhai import (  # noqa: E402
+    ZHAI_CACHE_FORMAT,
+    ZHAI_CACHE_SCHEMA,
+    ZHAI_DETECTOR,
+    detector_metadata,
+)
+from cxr_mc.detectors import DetectorSpec  # noqa: E402
 from cxr_mc.materials.crystal import (  # noqa: E402
     CRYSTALS,
     HBARC_EV_ANG,
@@ -73,17 +79,26 @@ from cxr_mc.montecarlo import (  # noqa: E402
     simulate_trajectories,
 )
 from cxr_mc.montecarlo.geometry import tilted_geometry  # noqa: E402
-from cxr_mc.sweep import crystal_params  # noqa: E402
+from cxr_mc.sweep import BeamSpec, Sweep, build_cases  # noqa: E402
 from cxr_mc.validation_background import (  # noqa: E402
     compare_external_background,
     subtract_external_background,
 )
 
 GRAPHITE_B_002 = 0.8  # graphite c-axis Debye-Waller B-factor [Ang^2], approx (Zhai SI)
-_ZHAI_CACHE_SCHEMA = 3  # v3: Table 4 orientation is keyed by sample thickness
 _EXTERNAL_BREM_V1 = _HERE / "reference_data" / "external_brem" / "v1"
 _ZHAI_FIG3B_BREM = _EXTERNAL_BREM_V1 / "zhai_fig3b_25kev_1mm_brem.csv"
 _ZHAI_FIG3B_EXPERIMENT = _EXTERNAL_BREM_V1 / "zhai_fig3b_25kev_1mm_experiment.csv"
+
+
+class ZhaiCacheMiss(FileNotFoundError):
+    """Raised when a cache-only validation surface cannot load a valid record."""
+
+    def __init__(self, path: Path):
+        self.path = path
+        super().__init__(
+            f"Zhai cache missing or stale: {path}; populate it with `cxr remote validate`"
+        )
 
 
 @dataclass(frozen=True)
@@ -111,7 +126,33 @@ class SupplementaryCoherentStudy:
     e_min_eV: float
     e_max_eV: float
     conditions_by_thickness_nm: tuple[tuple[float, tuple[SupplementaryCondition, ...]], ...]
-    theta_obs_rad: float = float(np.deg2rad(119.0))
+    detector: DetectorSpec = ZHAI_DETECTOR
+
+    def __post_init__(self) -> None:
+        if (
+            self.detector.polar_acceptance_deg is None
+            or self.detector.solid_angle_sr is None
+        ):
+            raise ValueError(
+                "Zhai detector requires polar_acceptance_deg and solid_angle_sr"
+            )
+
+    @property
+    def theta_obs_rad(self) -> float:
+        """Resolved observation angle in the historical case unit."""
+        return float(np.deg2rad(self.detector.observation_angle_deg))
+
+    @property
+    def dtheta_obs_rad(self) -> float:
+        """Resolved full polar acceptance in the historical case unit."""
+        assert self.detector.polar_acceptance_deg is not None
+        return float(np.deg2rad(self.detector.polar_acceptance_deg))
+
+    @property
+    def domega_sr(self) -> float:
+        """Resolved collection solid angle."""
+        assert self.detector.solid_angle_sr is not None
+        return self.detector.solid_angle_sr
 
     @property
     def E_grid(self) -> np.ndarray:
@@ -273,9 +314,7 @@ class ZhaiAnchor:
     hkl: tuple[int, int, int] = (0, 0, 2)
     hkl_list: tuple[tuple[int, int, int], ...] = ((0, 0, 2), (0, 0, -2))
     energies_keV: tuple[float, ...] = (17.5, 20.0, 22.5, 25.0)
-    theta_obs_rad: float = float(np.deg2rad(119.0))
-    dtheta_obs_rad: float = float(np.deg2rad(16.6))
-    domega_sr: float = 0.066
+    detector: DetectorSpec = ZHAI_DETECTOR
     per_nA: float = 6.2415e9  # electrons/s at 1 nA
     thick_bulk_ang: float = 1e7  # 1 mm
     thick_film_ang: float = 290.0  # 29 nm
@@ -284,14 +323,109 @@ class ZhaiAnchor:
     e_max_eV: float = 1250.0
     de_eV: float = 1.0
 
+    def __post_init__(self) -> None:
+        if (
+            self.detector.polar_acceptance_deg is None
+            or self.detector.solid_angle_sr is None
+        ):
+            raise ValueError(
+                "Zhai detector requires polar_acceptance_deg and solid_angle_sr"
+            )
+
     @property
     def E_grid(self) -> np.ndarray:
         return np.arange(self.e_min_eV, self.e_max_eV, self.de_eV)
 
     @property
+    def theta_obs_rad(self) -> float:
+        """Resolved observation angle in the historical case unit."""
+        return float(np.deg2rad(self.detector.observation_angle_deg))
+
+    @property
+    def dtheta_obs_rad(self) -> float:
+        """Resolved full polar acceptance in the historical case unit."""
+        assert self.detector.polar_acceptance_deg is not None
+        return float(np.deg2rad(self.detector.polar_acceptance_deg))
+
+    @property
+    def domega_sr(self) -> float:
+        """Resolved collection solid angle."""
+        assert self.detector.solid_angle_sr is not None
+        return self.detector.solid_angle_sr
+
+    @property
     def n_atoms_per_ang3(self) -> float:
         info = CRYSTALS[self.crystal]
         return len(info["basis"]) / info["V_cell"]
+
+
+def _resolved_case(
+    *,
+    material: str,
+    detector: DetectorSpec,
+    energy_keV: float,
+    thickness_ang: float,
+    E_grid: np.ndarray,
+    polar_tilt_deg: float,
+    azimuth_deg: float,
+    ne: int,
+    ne_brem: int,
+    seed: int,
+    hkl_list: tuple[tuple[int, ...], ...] | None = None,
+    B_ang2: float | None = None,
+) -> dict:
+    """Build one current Sweep case for a literature condition."""
+    sweep = Sweep(
+        material=material,
+        thickness_ang=thickness_ang,
+        beam=BeamSpec.isotropic(None, energy_keV=energy_keV),
+        tilt_deg=polar_tilt_deg,
+        tilt_azim_deg=azimuth_deg,
+        crystal_width_mm=None,
+        crystal_height_mm=None,
+        E_grid_line=E_grid,
+        E_grid_brem=E_grid,
+        allow_normal_incidence=polar_tilt_deg == 0.0,
+        detector=detector,
+    )
+    case = build_cases(sweep, n_electrons=ne, n_electrons_brem=ne_brem)[0]
+    # Literature anchors may intentionally pin a narrower reflection set or
+    # published Debye-Waller value than the general catalog sweep.
+    if hkl_list is not None:
+        case["hkl_list"] = list(hkl_list)
+    if B_ang2 is not None:
+        case["B_ang2"] = B_ang2
+    # The validation compares one reported detector window. build_cases expands
+    # uniform production brem grids to E0; keep this check's explicit window.
+    case["E_grid_brem"] = E_grid.copy()
+    case["seed"] = seed
+    return case
+
+
+def fig1c_case(
+    anchor: ZhaiAnchor,
+    E0_keV: float,
+    thickness_ang: float,
+    *,
+    ne: int,
+    ne_brem: int,
+    seed: int,
+) -> dict:
+    """Build one current case carrying the published Fig. 1c inputs."""
+    return _resolved_case(
+        material=anchor.crystal,
+        detector=anchor.detector,
+        energy_keV=E0_keV,
+        thickness_ang=thickness_ang,
+        E_grid=anchor.E_grid,
+        polar_tilt_deg=0.0,
+        azimuth_deg=0.0,
+        ne=ne,
+        ne_brem=ne_brem,
+        seed=seed,
+        hkl_list=anchor.hkl_list,
+        B_ang2=anchor.B_ang2,
+    )
 
 
 # ---- theory anchors (cheap, analytic) ----------------------------------------
@@ -404,52 +538,71 @@ def model_spectra(anchor: ZhaiAnchor, ne: int = 500, ne_brem: int = 200) -> dict
     spectrum, detector-convolved line + brem, peak energy, FWHM, and the
     per-electron integrated line flux into dOmega; plus a "film" entry.
     """
-    n_atoms = anchor.n_atoms_per_ang3
     E_grid = anchor.E_grid
     out: dict = {}
     for E0 in anchor.energies_keV:
         seed = int(E0 * 10)
-        segs = simulate_trajectories(
+        case = fig1c_case(
+            anchor,
             E0,
-            ne,
             anchor.thick_bulk_ang,
-            element="C",
-            n_atoms_per_ang3=n_atoms,
-            E_cut_keV=5.0,
+            ne=ne,
+            ne_brem=ne_brem,
             seed=seed,
+        )
+        beam_dir, n_hat = tilted_geometry(
+            case["theta_obs_rad"],
+            float(np.deg2rad(case["tilt_deg"])),
+            float(np.deg2rad(case["tilt_azim_deg"])),
+        )
+        segs = simulate_trajectories(
+            case["E0_keV"],
+            case["Ne"],
+            case["thickness_ang"],
+            composition=case["composition"],
+            E_cut_keV=5.0,
+            seed=case["seed"],
+            beam_dir=beam_dir,
         )
         spec = mc_spectrum(
             segs,
             E_grid,
-            crystal=anchor.crystal,
-            hkl_list=anchor.hkl_list,
-            theta_obs_rad=anchor.theta_obs_rad,
-            B_ang2=anchor.B_ang2,
+            crystal=case["crystal"],
+            hkl_list=case["hkl_list"],
+            n_hat=n_hat,
+            B_ang2=case["B_ang2"],
+            composition=case["composition"],
+            beam_uvw=case["beam_uvw"],
+            surface_hkl=case["surface_hkl"],
         )
-        beta = beta_from_keV(E0)
+        beta = beta_from_keV(case["E0_keV"])
         E_pk = float(E_grid[np.argmax(spec)])
         fwhm = float(
             np.hypot(
                 eds_fwhm_eV(E_pk),
-                aperture_fwhm_eV(E_pk, beta, anchor.theta_obs_rad, anchor.dtheta_obs_rad),
+                aperture_fwhm_eV(
+                    E_pk,
+                    beta,
+                    case["theta_obs_rad"],
+                    case["dtheta_obs_rad"],
+                ),
             )
         )
         spec_det = convolve_detector(E_grid, spec, fwhm)
         segs_b = simulate_trajectories(
-            E0,
-            ne_brem,
-            anchor.thick_bulk_ang,
-            element="C",
-            n_atoms_per_ang3=n_atoms,
+            case["E0_keV"],
+            case["Ne_brem"],
+            case["thickness_ang"],
+            composition=case["composition"],
             E_cut_keV=1.0,
-            seed=seed + 1,
+            seed=case["seed"] + 1,
+            beam_dir=beam_dir,
         )
         brem = mc_brem_spectrum(
             segs_b,
             E_grid,
-            element="C",
-            n_atoms_per_ang3=n_atoms,
-            theta_obs_rad=anchor.theta_obs_rad,
+            composition=case["composition"],
+            n_hat=n_hat,
         )
         brem_det = convolve_detector(E_grid, brem, fwhm)
         out[E0] = {
@@ -459,34 +612,50 @@ def model_spectra(anchor: ZhaiAnchor, ne: int = 500, ne_brem: int = 200) -> dict
             "brem_det": brem_det,
             "E_peak": E_pk,
             "fwhm": fwhm,
-            "line_flux_per_e": float(np.trapezoid(spec, E_grid) * anchor.domega_sr),
+            "line_flux_per_e": float(np.trapezoid(spec, E_grid) * case["domega_sr"]),
             "backscatter": float(segs["n_backscattered"] / segs["Ne"]),
         }
     # 29 nm film at the top energy, same detector FWHM
     E_top = anchor.energies_keV[-1]
-    segs_f = simulate_trajectories(
+    film_case = fig1c_case(
+        anchor,
         E_top,
-        ne,
         anchor.thick_film_ang,
-        element="C",
-        n_atoms_per_ang3=n_atoms,
-        E_cut_keV=5.0,
+        ne=ne,
+        ne_brem=ne_brem,
         seed=7,
+    )
+    film_beam_dir, film_n_hat = tilted_geometry(
+        film_case["theta_obs_rad"],
+        float(np.deg2rad(film_case["tilt_deg"])),
+        float(np.deg2rad(film_case["tilt_azim_deg"])),
+    )
+    segs_f = simulate_trajectories(
+        film_case["E0_keV"],
+        film_case["Ne"],
+        film_case["thickness_ang"],
+        composition=film_case["composition"],
+        E_cut_keV=5.0,
+        seed=film_case["seed"],
+        beam_dir=film_beam_dir,
     )
     spec_f = mc_spectrum(
         segs_f,
         E_grid,
-        crystal=anchor.crystal,
-        hkl_list=anchor.hkl_list,
-        theta_obs_rad=anchor.theta_obs_rad,
-        B_ang2=anchor.B_ang2,
+        crystal=film_case["crystal"],
+        hkl_list=film_case["hkl_list"],
+        n_hat=film_n_hat,
+        B_ang2=film_case["B_ang2"],
+        composition=film_case["composition"],
+        beam_uvw=film_case["beam_uvw"],
+        surface_hkl=film_case["surface_hkl"],
     )
     spec_f_det = convolve_detector(E_grid, spec_f, out[E_top]["fwhm"])
     out["film"] = {
         "E0_keV": E_top,
         "spec": spec_f,
         "spec_det": spec_f_det,
-        "line_flux_per_e": float(np.trapezoid(spec_f, E_grid) * anchor.domega_sr),
+        "line_flux_per_e": float(np.trapezoid(spec_f, E_grid) * film_case["domega_sr"]),
         "n_transmitted": int(segs_f.get("n_transmitted", 0)),
     }
     return out
@@ -496,18 +665,46 @@ def _zhai_cache_key(anchor: ZhaiAnchor, ne: int, ne_brem: int) -> str:
     """Fingerprint inputs and implementation files that affect the reproduction."""
     digest = hashlib.sha256()
     inputs = {
-        "schema": _ZHAI_CACHE_SCHEMA,
+        "schema": ZHAI_CACHE_SCHEMA,
         "anchor": asdict(anchor),
         "ne": ne,
         "ne_brem": ne_brem,
     }
     digest.update(json.dumps(inputs, sort_keys=True).encode())
-    digest.update(inspect.getsource(model_spectra).encode())
+    # Anchor helpers live outside src/. Hash this whole module so changes to
+    # case construction or component routing cannot reuse a stale v4 payload.
+    digest.update(Path(__file__).read_bytes())
     implementation_files = _HERE.parent.glob("src/cxr_mc/**/*.py")
     for path in sorted(implementation_files):
         digest.update(path.relative_to(_HERE.parent).as_posix().encode())
         digest.update(path.read_bytes())
     return digest.hexdigest()[:20]
+
+
+def _cache_record(kind: str, detector: DetectorSpec, payload: object) -> dict:
+    """Wrap generated data with cache schema and resolved detector provenance."""
+    return {
+        "format": ZHAI_CACHE_FORMAT,
+        "schema": ZHAI_CACHE_SCHEMA,
+        "kind": kind,
+        "detector": detector_metadata(detector),
+        "payload": payload,
+    }
+
+
+def _cache_payload(record: object, *, kind: str, detector: DetectorSpec) -> object | None:
+    """Return a valid v4 payload; reject pre-detector or mismatched records."""
+    if not isinstance(record, dict):
+        return None
+    expected = {
+        "format": ZHAI_CACHE_FORMAT,
+        "schema": ZHAI_CACHE_SCHEMA,
+        "kind": kind,
+        "detector": detector_metadata(detector),
+    }
+    if any(record.get(key) != value for key, value in expected.items()):
+        return None
+    return record.get("payload")
 
 
 def cached_model_spectra(
@@ -517,6 +714,7 @@ def cached_model_spectra(
     *,
     cache_dir: str | Path | None = None,
     refresh: bool = False,
+    cache_only: bool = False,
 ) -> tuple[dict, bool, Path]:
     """Load or atomically cache a Zhai reproduction keyed by inputs and code.
 
@@ -530,15 +728,23 @@ def cached_model_spectra(
         if cache_dir is not None
         else _HERE.parent / "checkpoints" / "zhai_reproduction"
     )
-    path = root / f"zhai-{_zhai_cache_key(anchor, ne, ne_brem)}.pkl"
+    path = root / f"zhai-v{ZHAI_CACHE_SCHEMA}-{_zhai_cache_key(anchor, ne, ne_brem)}.pkl"
     if path.exists() and not refresh:
-        return _checkpoint_io.load(str(path)), True, path
+        cached = _cache_payload(
+            _checkpoint_io.load(str(path)),
+            kind="fig1c",
+            detector=anchor.detector,
+        )
+        if cached is not None:
+            return cached, True, path
+    if cache_only:
+        raise ZhaiCacheMiss(path)
 
     model = model_spectra(anchor, ne=ne, ne_brem=ne_brem)
     root.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
-        _checkpoint_io.dump(model, str(tmp))
+        _checkpoint_io.dump(_cache_record("fig1c", anchor.detector, model), str(tmp))
         os.replace(tmp, path)
     finally:
         tmp.unlink(missing_ok=True)
@@ -599,7 +805,6 @@ def model_coherent_spectra(
     if ne < 1:
         raise ValueError("ne must be positive")
 
-    params = crystal_params(study.crystal)
     thickness_ang = float(thickness_nm) * 10.0
     spectra: dict[SupplementaryCondition, np.ndarray] = {}
     conditions = study.conditions_for(thickness_nm)
@@ -612,31 +817,44 @@ def model_coherent_spectra(
                 f"{study.crystal}'s TEM azimuth is unreported by Zhai et al.; "
                 "pass exploratory_azimuth_deg explicitly to model this study"
             )
+        seed = int(thickness_nm * 100) + index
+        case = _resolved_case(
+            material=study.crystal,
+            detector=study.detector,
+            energy_keV=condition.energy_keV,
+            thickness_ang=thickness_ang,
+            E_grid=study.E_grid,
+            polar_tilt_deg=condition.polar_tilt_deg,
+            azimuth_deg=azimuth_deg,
+            ne=ne,
+            ne_brem=1,
+            seed=seed,
+        )
         beam_dir, n_hat = tilted_geometry(
-            study.theta_obs_rad,
-            float(np.deg2rad(condition.polar_tilt_deg)),
-            float(np.deg2rad(azimuth_deg)),
+            case["theta_obs_rad"],
+            float(np.deg2rad(case["tilt_deg"])),
+            float(np.deg2rad(case["tilt_azim_deg"])),
         )
         # Each panel receives a reproducible, distinct transport realization.
-        seed = int(thickness_nm * 100) + index
         segments = simulate_trajectories(
-            condition.energy_keV,
-            ne,
-            thickness_ang,
-            composition=params["composition"],
+            case["E0_keV"],
+            case["Ne"],
+            case["thickness_ang"],
+            composition=case["composition"],
             beam_dir=beam_dir,
             E_cut_keV=5.0,
-            seed=seed,
+            seed=case["seed"],
         )
         spectra[condition] = mc_spectrum(
             segments,
             study.E_grid,
-            crystal=study.crystal,
-            hkl_list=params["hkl_list"],
+            crystal=case["crystal"],
+            hkl_list=case["hkl_list"],
             n_hat=n_hat,
-            B_ang2=params["B_ang2"],
-            composition=params["composition"],
-            beam_uvw=params["beam_uvw"],
+            B_ang2=case["B_ang2"],
+            composition=case["composition"],
+            beam_uvw=case["beam_uvw"],
+            surface_hkl=case["surface_hkl"],
         )
     return spectra
 
@@ -650,14 +868,14 @@ def _supplementary_cache_key(
     """Fingerprint a supplementary coherent-only calculation and its inputs."""
     digest = hashlib.sha256()
     inputs = {
-        "schema": _ZHAI_CACHE_SCHEMA,
+        "schema": ZHAI_CACHE_SCHEMA,
         "study": asdict(study),
         "thickness_nm": thickness_nm,
         "ne": ne,
         "exploratory_azimuth_deg": exploratory_azimuth_deg,
     }
     digest.update(json.dumps(inputs, sort_keys=True).encode())
-    digest.update(inspect.getsource(model_coherent_spectra).encode())
+    digest.update(Path(__file__).read_bytes())
     for path in sorted(_HERE.parent.glob("src/cxr_mc/**/*.py")):
         digest.update(path.relative_to(_HERE.parent).as_posix().encode())
         digest.update(path.read_bytes())
@@ -672,6 +890,7 @@ def cached_coherent_spectra(
     exploratory_azimuth_deg: float | None = None,
     cache_dir: str | Path | None = None,
     refresh: bool = False,
+    cache_only: bool = False,
 ) -> tuple[dict[SupplementaryCondition, np.ndarray], bool, Path]:
     """Load or atomically cache one supplementary coherent-only condition set."""
     from cxr_mc import _checkpoint_io
@@ -682,9 +901,17 @@ def cached_coherent_spectra(
         else _HERE.parent / "checkpoints" / "zhai_reproduction"
     )
     key = _supplementary_cache_key(study, thickness_nm, ne, exploratory_azimuth_deg)
-    path = root / f"zhai-supplement-{key}.pkl"
+    path = root / f"zhai-supplement-v{ZHAI_CACHE_SCHEMA}-{key}.pkl"
     if path.exists() and not refresh:
-        return _checkpoint_io.load(str(path)), True, path
+        cached = _cache_payload(
+            _checkpoint_io.load(str(path)),
+            kind=f"supplementary:{study.crystal}",
+            detector=study.detector,
+        )
+        if cached is not None:
+            return cached, True, path
+    if cache_only:
+        raise ZhaiCacheMiss(path)
 
     spectra = model_coherent_spectra(
         study, thickness_nm, ne=ne, exploratory_azimuth_deg=exploratory_azimuth_deg
@@ -692,7 +919,10 @@ def cached_coherent_spectra(
     root.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
     try:
-        _checkpoint_io.dump(spectra, str(tmp))
+        _checkpoint_io.dump(
+            _cache_record(f"supplementary:{study.crystal}", study.detector, spectra),
+            str(tmp),
+        )
         os.replace(tmp, path)
     finally:
         tmp.unlink(missing_ok=True)
@@ -954,7 +1184,11 @@ def figure_spectra(anchor: ZhaiAnchor, model: dict, reference: dict | None = Non
         ax.tick_params(axis="x", labelbottom=True)
         ax.grid(alpha=0.3)
         ax.legend(fontsize=8)
-    fig.suptitle(r"Model vs theory: PXR+CBS from HOPG, $\theta_{obs}$=119$\degree$, 0.066 sr")
+    fig.suptitle(
+        "Model vs theory: PXR+CBS from HOPG, "
+        rf"$\theta_{{obs}}$={anchor.detector.observation_angle_deg:g}$\degree$, "
+        f"{anchor.domega_sr:g} sr"
+    )
     fig.tight_layout()
     return fig
 
@@ -985,7 +1219,7 @@ def figure_flux_anchor(anchor: ZhaiAnchor, model: dict):
     ax_f.semilogy(E0s, mc_bulk, "o-", color="C0", label="MC (full transport, bulk)")
     ax_f.semilogy(E0s, fer_bulk, "s--", color="C1", label="Feranchuk Eq.(12), bulk")
     ax_f.set_xlabel("Beam energy (keV)")
-    ax_f.set_ylabel("Line flux (photons / electron into 0.066 sr)")
+    ax_f.set_ylabel(f"Line flux (photons / electron into {anchor.domega_sr:g} sr)")
     ax_f.set_title("Absolute line flux: MC vs analytic\n(transport vs escape-limited)")
     ax_f.grid(alpha=0.3, which="both")
     ax_f.legend(fontsize=8)
@@ -1051,7 +1285,6 @@ def _supplementary_detected_spectrum(
     Fig. S5b is tracked in docs/physics-validation-ledger.md (id
     `zhai-hbn-921-detected`).
     """
-    anchor = ZhaiAnchor()
     peak_eV = float(study.E_grid[np.argmax(spectrum)])
     fwhm_eV = float(
         np.hypot(
@@ -1060,13 +1293,13 @@ def _supplementary_detected_spectrum(
                 peak_eV,
                 beta_from_keV(condition.energy_keV),
                 study.theta_obs_rad,
-                anchor.dtheta_obs_rad,
+                study.dtheta_obs_rad,
             ),
         )
     )
     spectrum_eff = spectrum * detector_efficiency(study.E_grid)
     return convolve_detector(study.E_grid, spectrum_eff, fwhm_eV) * (
-        anchor.domega_sr * anchor.per_nA
+        study.domega_sr * ZhaiAnchor.per_nA
     )
 
 
@@ -1214,13 +1447,12 @@ def export_all_figures(
     tmd_exploratory_azimuth_deg: float = 0.0,
     cache_dir: str | Path | None = None,
 ) -> list[Path]:
-    """Render the complete publication figure set from whatever is already
-    cached under checkpoints/zhai_reproduction/ (a cache miss recomputes
-    locally rather than failing) -- the Fig.1c trio, every supplementary
-    panel, and the cross-material overview -- to `outdir`. One command turns
-    a `cxr remote check` pull into the full figure set with no per-study
-    clicking in the app. Returns the list of PNG paths written (a PDF is
-    written alongside each)."""
+    """Render the complete publication figure set from valid remote-populated caches.
+
+    A missing, stale, or pre-detector cache raises :class:`ZhaiCacheMiss`;
+    publication-sized Monte Carlo never starts locally from this rendering
+    surface. Returns PNG paths; a PDF is written alongside each.
+    """
     import matplotlib
 
     try:
@@ -1241,7 +1473,13 @@ def export_all_figures(
         plt.close(fig)
 
     anchor = ZhaiAnchor()
-    model, _hit, _path = cached_model_spectra(anchor, ne=ne, ne_brem=ne_brem, cache_dir=cache_dir)
+    model, _hit, _path = cached_model_spectra(
+        anchor,
+        ne=ne,
+        ne_brem=ne_brem,
+        cache_dir=cache_dir,
+        cache_only=True,
+    )
     reference = reference_curve(anchor)
     _save("zhai_fig1c_spectra_vs_theory", figure_spectra(anchor, model, reference))
     _save("zhai_flux_anchor", figure_flux_anchor(anchor, model))
@@ -1257,6 +1495,7 @@ def export_all_figures(
                 ne=ne_supp,
                 exploratory_azimuth_deg=azimuth_deg,
                 cache_dir=cache_dir,
+                cache_only=True,
             )
             fig = (
                 figure_supplementary_sem(study, thickness_nm, spectra)
@@ -1320,7 +1559,7 @@ def main(outdir: str = "figures", ne: int = 500, ne_brem: int = 200) -> None:
                 "Eq.10\n[eV]",
                 "diff\n[eV]",
                 "MC/closed\n(1 seg)",
-                "line flux\n[ph/e/0.066sr]",
+                f"line flux\n[ph/e/{anchor.domega_sr:g}sr]",
                 "backscatter",
             ],
             tablefmt="github",

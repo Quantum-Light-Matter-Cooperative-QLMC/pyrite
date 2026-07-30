@@ -203,7 +203,15 @@ def _export(outdir="figures", ne=20_000, ne_brem=200, ne_supp=200):
         sys.path.insert(0, str(checks_dir))
     import anchor_figures as af  # ty: ignore[unresolved-import]
 
-    written = af.export_all_figures(outdir, ne=ne, ne_brem=ne_brem, ne_supp=ne_supp)
+    try:
+        written = af.export_all_figures(
+            outdir,
+            ne=ne,
+            ne_brem=ne_brem,
+            ne_supp=ne_supp,
+        )
+    except FileNotFoundError as exc:
+        raise click.ClickException(str(exc)) from exc
     for path in written:
         print(f"wrote {path}")
 

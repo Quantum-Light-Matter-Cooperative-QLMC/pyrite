@@ -389,8 +389,8 @@ def _(mo):
         value=200,
         label="Bremsstrahlung electrons per energy",
     )
-    run_zhai_ui = mo.ui.run_button(label="Run Zhai reproduction")
-    refresh_zhai_ui = mo.ui.checkbox(value=False, label="Recompute (ignore cache)")
+    run_zhai_ui = mo.ui.run_button(label="Load Zhai reproduction cache")
+    refresh_zhai_ui = mo.ui.checkbox(value=False, label="Remote recompute on prepare")
     reproductions_controls = mo.vstack(
         [mo.hstack([ne_ui, ne_brem_ui]), mo.hstack([refresh_zhai_ui, run_zhai_ui])]
     )
@@ -413,25 +413,34 @@ def _(af, mo):
 
 
 @app.cell
-def _(af, anchor, mo, ne_brem_ui, ne_ui, refresh_zhai_ui, run_zhai_ui):
+def _(af, anchor, mo, ne_brem_ui, ne_ui, run_zhai_ui):
     if not run_zhai_ui.value:
         zhai_cache_hit = None
+        zhai_cache_miss = None
         zhai_cache_path = None
         zhai_model = None
         zhai_reference = None
     else:
         with mo.status.spinner(
-            title="Running Monte Carlo spectra",
-            subtitle="This is the expensive step; all three figures reuse the result.",
+            title="Loading Monte Carlo spectra",
+            subtitle="Cache misses are populated only through cxr remote validate.",
         ):
-            zhai_model, zhai_cache_hit, zhai_cache_path = af.cached_model_spectra(
-                anchor,
-                ne=int(ne_ui.value),
-                ne_brem=int(ne_brem_ui.value),
-                refresh=refresh_zhai_ui.value,
-            )
-            zhai_reference = af.reference_curve(anchor)
-    return zhai_cache_hit, zhai_cache_path, zhai_model, zhai_reference
+            try:
+                zhai_model, zhai_cache_hit, zhai_cache_path = af.cached_model_spectra(
+                    anchor,
+                    ne=int(ne_ui.value),
+                    ne_brem=int(ne_brem_ui.value),
+                    cache_only=True,
+                )
+                zhai_cache_miss = None
+                zhai_reference = af.reference_curve(anchor)
+            except af.ZhaiCacheMiss as exc:
+                zhai_cache_hit = False
+                zhai_cache_miss = str(exc)
+                zhai_cache_path = exc.path
+                zhai_model = None
+                zhai_reference = None
+    return zhai_cache_hit, zhai_cache_miss, zhai_cache_path, zhai_model, zhai_reference
 
 
 @app.cell
@@ -440,11 +449,14 @@ def _(
     anchor,
     mo,
     zhai_cache_hit,
+    zhai_cache_miss,
     zhai_cache_path,
     zhai_model,
     zhai_reference,
 ):
-    if zhai_model is None:
+    if zhai_cache_miss is not None:
+        reproductions_results = mo.callout(zhai_cache_miss, kind="warn")
+    elif zhai_model is None:
         reproductions_results = mo.callout(
             "Choose the sample counts, then run the reproduction.", kind="info"
         )
@@ -456,7 +468,7 @@ def _(
             "Eq. 10 (eV)",
             "difference (eV)",
             "MC / closed (one segment)",
-            "line flux (ph/e/0.066 sr)",
+            f"line flux (ph/e/{anchor.domega_sr:g} sr)",
             "backscatter",
         ]
         validation = mo.ui.table(
@@ -608,8 +620,8 @@ def _(af, check_support, mo, supplementary_study_ui, supplementary_thickness_ui)
         label="Exploratory TMD azimuth (deg; unreported)",
     )
     save_supplementary_azimuth_ui = mo.ui.run_button(label="Save repository default")
-    run_supplementary_ui = mo.ui.run_button(label="Run supplementary study")
-    refresh_supplementary_ui = mo.ui.checkbox(value=False, label="Recompute (ignore cache)")
+    run_supplementary_ui = mo.ui.run_button(label="Load supplementary cache")
+    refresh_supplementary_ui = mo.ui.checkbox(value=False, label="Remote recompute on prepare")
     supplementary_controls = mo.vstack(
         [
             mo.hstack(
@@ -666,8 +678,9 @@ def _(mo):
     This optional launcher prepares all expensive Zhai caches using the values
     currently selected above. It first probes the configured SSH GPU host. When
     available, it starts a detached job that continues after this app closes;
-    status is polled below and completed caches are pulled automatically. If the
-    SSH tools or host are unavailable before launch, the same batch runs locally.
+    status is polled below and completed caches are pulled automatically. Heavy
+    cache populations never fall back to local WSL; use `cxr remote validate`
+    after restoring remote access.
     """)
     return (remote_intro,)
 
@@ -685,7 +698,8 @@ def _(mo, ne_brem_ui, ne_ui, supplementary_azimuth_ui, supplementary_ne_ui):
                 f"{int(ne_brem_ui.value)} bremsstrahlung electrons, "
                 f"{int(supplementary_ne_ui.value)} supplementary electrons, "
                 f"TMD azimuth {float(supplementary_azimuth_ui.value):g}°. "
-                "Remote probe runs only after button press; unavailable SSH/GPU falls back locally."
+                "Remote probe runs only after button press; unavailable SSH/GPU never "
+                "falls back to heavy local computation."
             ),
             mo.hstack([prepare_zhai_caches_ui, remote_status_refresh_ui]),
         ]
@@ -709,7 +723,6 @@ def _(mo):
 
 @app.cell
 def _(
-    af,
     check_support,
     get_remote_zhai_job,
     get_remote_zhai_message,
@@ -742,16 +755,10 @@ def _(
                 f"Remote job `{_jobid}` launched; it is running in the background."
             )
         else:
-            set_remote_zhai_message(f"{_reason} Falling back to a local batch run.")
-            with mo.status.spinner(title="Remote unavailable; preparing caches locally"):
-                af.reproduce_all(
-                    ne=int(ne_ui.value),
-                    ne_brem=int(ne_brem_ui.value),
-                    ne_supp=int(supplementary_ne_ui.value),
-                    tmd_exploratory_azimuth_deg=float(supplementary_azimuth_ui.value),
-                    refresh=refresh_zhai_ui.value or refresh_supplementary_ui.value,
-                )
-            set_remote_zhai_message("Remote unavailable; the local fallback completed.")
+            set_remote_zhai_message(
+                f"{_reason} Heavy cache preparation was not started locally; "
+                "restore remote access and run `cxr remote validate`."
+            )
     elif _jobid is not None:
         _state, _report = check_support.remote_zhai_status(_jobid)
         if _state == "done":
@@ -773,7 +780,6 @@ def _(
 def _(
     af,
     mo,
-    refresh_supplementary_ui,
     run_supplementary_ui,
     supplementary_azimuth_ui,
     supplementary_ne_ui,
@@ -791,43 +797,47 @@ def _(
         exploratory_azimuth_deg = (
             float(supplementary_azimuth_ui.value) if study.has_unreported_azimuth else None
         )
-        with mo.status.spinner(
-            title="Running detector-convolved supplementary spectra",
-            subtitle="Reported-condition spectra are computed or loaded from cache.",
-        ):
-            spectra, cache_hit, cache_path = af.cached_coherent_spectra(
-                study,
-                thickness_nm,
-                ne=int(supplementary_ne_ui.value),
-                exploratory_azimuth_deg=exploratory_azimuth_deg,
-                refresh=refresh_supplementary_ui.value,
+        try:
+            with mo.status.spinner(
+                title="Loading detector-convolved supplementary spectra",
+                subtitle="Cache misses are populated only through cxr remote validate.",
+            ):
+                spectra, cache_hit, cache_path = af.cached_coherent_spectra(
+                    study,
+                    thickness_nm,
+                    ne=int(supplementary_ne_ui.value),
+                    exploratory_azimuth_deg=exploratory_azimuth_deg,
+                    cache_only=True,
+                )
+        except af.ZhaiCacheMiss as exc:
+            supplementary_results = mo.callout(str(exc), kind="warn")
+        else:
+            figure = (
+                af.figure_supplementary_sem(
+                    study,
+                    thickness_nm,
+                    spectra,
+                    orientation=tuple(supplementary_orientation_ui.value),
+                )
+                if study.crystal in {"hbn", "hopg"}
+                else af.figure_supplementary_tmd(study, thickness_nm, spectra)
             )
-        figure = (
-            af.figure_supplementary_sem(
-                study,
-                thickness_nm,
-                spectra,
-                orientation=tuple(supplementary_orientation_ui.value),
-            )
-            if study.crystal in {"hbn", "hopg"}
-            else af.figure_supplementary_tmd(study, thickness_nm, spectra)
-        )
-        supplementary_results = mo.vstack(
-            [
-                mo.callout(
-                    f"{'Loaded cached' if cache_hit else 'Computed and cached'} result at "
-                    f"`{cache_path.relative_to(cache_path.parents[1])}`."
-                    + (
-                        f" Exploratory TMD azimuth: {exploratory_azimuth_deg:g}° "
-                        "(not reported by Zhai et al.)."
-                        if exploratory_azimuth_deg is not None
-                        else " Reported Table 4 orientation(s) selected for this thickness."
+            supplementary_results = mo.vstack(
+                [
+                    mo.callout(
+                        f"{'Loaded cached' if cache_hit else 'Computed and cached'} result at "
+                        f"`{cache_path.relative_to(cache_path.parents[1])}`."
+                        + (
+                            f" Exploratory TMD azimuth: {exploratory_azimuth_deg:g}° "
+                            "(not reported by Zhai et al.)."
+                            if exploratory_azimuth_deg is not None
+                            else " Reported Table 4 orientation(s) selected for this thickness."
+                        ),
+                        kind="success",
                     ),
-                    kind="success",
-                ),
-                mo.center(figure),
-            ]
-        )
+                    mo.center(figure),
+                ]
+            )
     return (supplementary_results,)
 
 

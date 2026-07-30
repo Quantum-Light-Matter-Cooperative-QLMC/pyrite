@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from cxr_mc import check
+from tests.cli_helpers import invoke
 
 
 def test_validation_default_azimuth_roundtrip(tmp_path):
@@ -175,6 +176,24 @@ def test_export_tunnel_cli_calls_export_all_figures_and_skips_marimo(monkeypatch
     assert calls == [(str(tmp_path), 11, 200, 200)]
 
 
+def test_export_cache_miss_is_clean_cli_failure(monkeypatch, tmp_path):
+    class _FakeAF:
+        @staticmethod
+        def export_all_figures(*_args, **_kwargs):
+            raise FileNotFoundError(
+                "Zhai cache missing; populate it with `cxr remote validate`"
+            )
+
+    monkeypatch.setitem(sys.modules, "anchor_figures", _FakeAF())
+
+    result = invoke(check.command, ["--export", "--outdir", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert "Error: Zhai cache missing" in result.output
+    assert "cxr remote validate" in result.output
+    assert result.exception is not None
+
+
 def test_default_cli_launches_marimo_not_export(monkeypatch):
     calls = []
     monkeypatch.setattr(check, "_launch", lambda **kw: calls.append(kw))
@@ -232,6 +251,16 @@ def test_validation_app_centers_the_supplementary_figure():
     source = (repo_dir / check.NOTEBOOK).read_text(encoding="utf-8")
 
     assert "mo.center(figure)" in source
+
+
+def test_validation_app_never_falls_back_to_heavy_local_cache_population():
+    source = Path(check.NOTEBOOK).read_text(encoding="utf-8")
+
+    assert "falls back locally" not in source.lower()
+    assert "af.reproduce_all(" not in source
+    assert source.count("cache_only=True") >= 2
+    assert "Heavy cache preparation was not started locally" in source
+    assert "cxr remote validate" in source
 
 
 def test_validation_app_declares_evidence_tasks_and_authorities():

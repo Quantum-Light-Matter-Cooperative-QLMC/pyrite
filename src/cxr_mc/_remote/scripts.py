@@ -4,6 +4,7 @@ import datetime
 import shlex
 import uuid
 
+from .._zhai import ZHAI_CACHE_SCHEMA, ZHAI_DETECTOR
 from . import config, transport
 
 
@@ -968,6 +969,10 @@ def _zhai_queue_metadata(jobid, ne, ne_brem, ne_supp):
             f"ne: {ne}",
             f"ne_brem: {ne_brem}",
             f"ne_supp: {ne_supp}",
+            f"zhai_cache_schema: {ZHAI_CACHE_SCHEMA}",
+            f"detector_observation_angle_deg: {ZHAI_DETECTOR.observation_angle_deg:g}",
+            f"detector_polar_acceptance_deg: {ZHAI_DETECTOR.polar_acceptance_deg:g}",
+            f"detector_solid_angle_sr: {ZHAI_DETECTOR.solid_angle_sr:g}",
             "",
         ]
     )
