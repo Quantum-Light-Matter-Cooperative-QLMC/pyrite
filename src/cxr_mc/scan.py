@@ -30,6 +30,8 @@ import json
 import math
 import os
 import re
+import shutil
+import sys
 import threading
 import time
 import tomllib
@@ -265,6 +267,29 @@ def _performance_profile(ctx, param, value):
     metavar="SECONDS",
     help="Performance-telemetry sampling interval; requires -p/--perf.",
 )
+@click.option(
+    "--spec-chunk",
+    type=_cli_core.POSITIVE_INT,
+    default=None,
+    metavar="N",
+    help="Pin line-spectrum segments per GPU chunk; requires -p/--perf.",
+)
+@click.option(
+    "--brem-chunk",
+    type=_cli_core.POSITIVE_INT,
+    default=None,
+    metavar="N",
+    help="Pin bremsstrahlung segments per GPU chunk; requires -p/--perf.",
+)
+@click.option(
+    "--nsys",
+    is_flag=True,
+    help=(
+        "Capture one uncached full-profile session with Nsight Systems CUDA/NVTX "
+        "tracing (writes a .nsys-rep next to the perf log); requires exactly one "
+        "material via -m and -p/--perf."
+    ),
+)
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option("--no-progress", is_flag=True, hidden=True)
 @_cli_core.fidelity_option()
@@ -282,6 +307,9 @@ def command(
     performance_profile,
     performance_dir,
     performance_interval,
+    spec_chunk,
+    brem_chunk,
+    nsys,
     progress_file,
     no_progress,
     json_output,
@@ -295,6 +323,34 @@ def command(
         performance_profile = catalog_profile
     if performance_interval != 5.0 and performance_profile is None:
         raise click.UsageError("--perf-interval requires -p/--perf")
+    if (spec_chunk is not None or brem_chunk is not None) and performance_profile is None:
+        raise click.UsageError("--spec-chunk/--brem-chunk require -p/--perf")
+    if nsys:
+        if performance_profile is None:
+            raise click.UsageError("--nsys requires -p/--perf")
+        if material is None:
+            raise click.UsageError("--nsys requires exactly one material via -m/--material")
+    # Pin the GPU spectrum/brem chunk before the runtime import so the main
+    # process and every spawned transport worker (env inherited on spawn/
+    # forkserver) read it. Mirrors the remote job script's `export
+    # CXR_MC_SPEC_CHUNK` / `CXR_MC_BREM_CHUNK`.
+    if spec_chunk is not None:
+        os.environ["CXR_MC_SPEC_CHUNK"] = str(spec_chunk)
+    if brem_chunk is not None:
+        os.environ["CXR_MC_BREM_CHUNK"] = str(brem_chunk)
+    if nsys:
+        _reexec_under_nsys(
+            catalog_profile=catalog_profile,
+            material=material,
+            performance_profile=performance_profile,
+            performance_dir=performance_dir,
+            performance_interval=performance_interval,
+            workers=workers,
+            fidelity=fidelity,
+            quick=quick,
+            n_families=n_families,
+        )
+        return None  # os.execvp already replaced the process; defensive.
     resolved_profile = _resolve_catalog_profile(catalog_profile, performance_profile)
     resolve_profile_materials(resolved_profile, material)
     if not json_output:
@@ -354,6 +410,81 @@ def command(
         progress_file=progress_file,
         no_progress=no_progress,
     )
+
+
+def _nsys_reexec_command(
+    *,
+    catalog_profile,
+    material,
+    performance_profile,
+    performance_dir,
+    performance_interval,
+    workers,
+    fidelity,
+    quick,
+    n_families,
+):
+    """Build the ``nsys profile ... python -m cxr_mc._entry.scan`` argv and the
+    trace-output stem for a local ``--nsys`` capture.
+
+    Pure (no side effects) so the argv/trace contract is unit-testable. The
+    child re-runs this same command WITHOUT ``--nsys`` (so it cannot recurse)
+    under CXR_MC_NSYS=1, mirroring the remote job script's nsys launcher
+    (:mod:`cxr_mc._remote.scripts`). It points the child at an isolated,
+    always-uncached checkpoint dir so the trace covers real GPU work rather
+    than a fast checkpoint resume."""
+    perf_root = (
+        Path(performance_dir) if performance_dir is not None else Path("performance-profiles")
+    )
+    trace_base = perf_root / performance_profile / material
+    checkpoint_dir = perf_root / performance_profile / "nsys-checkpoints" / material
+    child = [
+        sys.executable,
+        "-m",
+        "cxr_mc._entry.scan",
+        catalog_profile,
+        "-m",
+        material,
+        "--performance-profile",
+        performance_profile,
+    ]
+    if performance_dir is not None:
+        child += ["--performance-dir", str(performance_dir)]
+    if performance_interval != 5.0:
+        child += ["--perf-interval", f"{performance_interval:g}"]
+    if workers is not None:
+        child += ["--workers", str(workers)]
+    if fidelity != "full":
+        child += ["--fidelity", fidelity]
+    if quick:
+        child += ["--quick"]
+    if n_families is not None:
+        child += ["--n-families", str(n_families)]
+    child += ["--checkpoint-dir", str(checkpoint_dir)]
+    nsys_cmd = [
+        "nsys",
+        "profile",
+        "--trace=cuda,nvtx,osrt",
+        "--sample=process-tree",
+        "--cpuctxsw=process-tree",
+        "--wait=all",
+        "--force-overwrite=true",
+        f"--output={trace_base}",
+    ]
+    return [*nsys_cmd, *child], trace_base
+
+
+def _reexec_under_nsys(**kwargs):
+    """Replace this process with the :func:`_nsys_reexec_command` launcher so
+    Nsight Systems captures one uncached CUDA/NVTX trace of the run. Sets
+    CXR_MC_NSYS=1 so the runner emits NVTX ranges in the child. Does not
+    return on success (``os.execvp``)."""
+    if shutil.which("nsys") is None:
+        raise click.UsageError("--nsys requested but the nsys executable is not on PATH")
+    argv, trace_base = _nsys_reexec_command(**kwargs)
+    trace_base.parent.mkdir(parents=True, exist_ok=True)
+    os.environ["CXR_MC_NSYS"] = "1"
+    os.execvp(argv[0], argv)
 
 
 def _resolve_catalog_profile(catalog_profile: str, performance_profile: str | None) -> str:

@@ -1,5 +1,7 @@
 """Regression tests for profile-owned ``cxr run`` beam configuration."""
 
+import os
+
 import pytest
 from click.testing import CliRunner
 
@@ -115,3 +117,109 @@ def test_run_perf_interval_requires_perf_flag():
 
     assert result.exit_code == 2
     assert "--perf-interval requires -p/--perf" in result.output
+
+
+@pytest.mark.parametrize("option", ("--spec-chunk", "--brem-chunk"))
+def test_run_chunk_pins_require_perf(option):
+    result = CliRunner().invoke(scan.command, ["sub_100keV", option, "128"])
+
+    assert result.exit_code == 2
+    assert "--spec-chunk/--brem-chunk require -p/--perf" in result.output
+
+
+def test_run_nsys_requires_perf():
+    result = CliRunner().invoke(scan.command, ["sub_100keV", "-m", "hopg", "--nsys"])
+
+    assert result.exit_code == 2
+    assert "--nsys requires -p/--perf" in result.output
+
+
+def test_run_nsys_requires_single_material():
+    result = CliRunner().invoke(scan.command, ["sub_100keV", "-p", "--nsys"])
+
+    assert result.exit_code == 2
+    assert "exactly one material" in result.output
+
+
+def test_run_chunk_pins_exported_before_runtime_import(monkeypatch):
+    seen = {}
+
+    def capture(args):
+        seen["spec"] = os.environ.get("CXR_MC_SPEC_CHUNK")
+        seen["brem"] = os.environ.get("CXR_MC_BREM_CHUNK")
+
+    monkeypatch.setattr(scan, "run", capture)
+    monkeypatch.delenv("CXR_MC_SPEC_CHUNK", raising=False)
+    monkeypatch.delenv("CXR_MC_BREM_CHUNK", raising=False)
+    result = CliRunner().invoke(
+        scan.command,
+        ["sub_100keV", "-p", "--spec-chunk", "128", "--brem-chunk", "64"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert seen["spec"] == "128"
+    assert seen["brem"] == "64"
+
+
+def test_run_nsys_reexecs_instead_of_running_in_process(monkeypatch):
+    captured = {}
+
+    def fake_reexec(**kwargs):
+        captured.update(kwargs)
+
+    def fail_run(args):  # pragma: no cover - must not be reached
+        raise AssertionError("run() must not execute in-process under --nsys")
+
+    monkeypatch.setattr(scan, "_reexec_under_nsys", fake_reexec)
+    monkeypatch.setattr(scan, "run", fail_run)
+    result = CliRunner().invoke(
+        scan.command,
+        ["sub_100keV", "-m", "hopg", "-p", "--nsys"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["material"] == "hopg"
+    assert captured["performance_profile"] == "sub_100keV"
+
+
+def test_nsys_reexec_command_builds_launcher_and_uncached_checkpoint():
+    argv, trace_base = scan._nsys_reexec_command(
+        catalog_profile="sub_100keV",
+        material="hopg",
+        performance_profile="sub_100keV",
+        performance_dir=None,
+        performance_interval=2.0,
+        workers=0,
+        fidelity="survey",
+        quick=False,
+        n_families=None,
+    )
+
+    assert argv[0] == "nsys" and argv[1] == "profile"
+    assert "--output=performance-profiles/sub_100keV/hopg" in argv
+    assert "-m" in argv and "cxr_mc._entry.scan" in argv
+    assert "--nsys" not in argv  # child must not recurse
+    assert "--performance-profile" in argv and "sub_100keV" in argv
+    assert "--perf-interval" in argv and "2" in argv
+    # isolated, always-uncached checkpoint dir so the trace covers real work
+    assert "--checkpoint-dir" in argv
+    assert "performance-profiles/sub_100keV/nsys-checkpoints/hopg" in argv
+    assert str(trace_base) == "performance-profiles/sub_100keV/hopg"
+
+
+def test_reexec_under_nsys_errors_when_nsys_missing(monkeypatch):
+    monkeypatch.setattr(scan.shutil, "which", lambda _name: None)
+    with pytest.raises(scan.click.UsageError, match="nsys executable is not on PATH"):
+        scan._reexec_under_nsys(
+            catalog_profile="sub_100keV",
+            material="hopg",
+            performance_profile="sub_100keV",
+            performance_dir=None,
+            performance_interval=5.0,
+            workers=None,
+            fidelity="full",
+            quick=False,
+            n_families=None,
+        )

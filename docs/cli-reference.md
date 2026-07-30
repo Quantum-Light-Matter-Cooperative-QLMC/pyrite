@@ -112,6 +112,14 @@ Options:
                                member.
   -i, --perf-interval SECONDS  Performance-telemetry sampling interval; requires
                                -p/--perf.  [default: 5.0]
+  --spec-chunk N               Pin line-spectrum segments per GPU chunk; requires
+                               -p/--perf.
+  --brem-chunk N               Pin bremsstrahlung segments per GPU chunk; requires
+                               -p/--perf.
+  --nsys                       Capture one uncached full-profile session with Nsight
+                               Systems CUDA/NVTX tracing (writes a .nsys-rep next to the
+                               perf log); requires exactly one material via -m and
+                               -p/--perf.
   --fidelity [full|survey]     Named settings/grid-reduction policy. survey is
                                provisional and reduced.  [default: full]
   --json                       Emit one versioned JSON object on stdout.
