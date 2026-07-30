@@ -42,8 +42,14 @@ Requires Python ≥3.13 and [uv](https://docs.astral.sh/uv/).
 git clone https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc.git
 cd cxr-mc
 uv sync
+uv run cxr-dev bootstrap  # per-clone local git config (TODO.md merge driver)
 uv run cxr --help
 ```
+
+`cxr-dev bootstrap` is idempotent and only sets local git config that cannot be
+committed (it registers the `.gitattributes` `TODO.md merge=ours` driver so
+merge/rebase conflicts on `TODO.md` resolve to the current branch automatically).
+Run it once per clone; worktrees share the config.
 
 Base `cxr-mc` is CPU-only. Install exactly one accelerator extra in a clean
 environment:

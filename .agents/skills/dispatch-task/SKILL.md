@@ -24,8 +24,9 @@ caller also assigns it to this agent.
 
 1. Verify reviewed task doc, one-line TODO pointer, branch, and worktree.
 2. Create/reuse missing branch/worktree; keep one TODO writer.
-3. Verify triage's setup commit (task doc + synchronized `TODO.md`) exists and
-   `main` and the task branch are pushed with upstream.
+3. Verify triage's setup commit (task doc + `main:TODO.md` pointer) exists and
+   `main` and the task branch are pushed with upstream. Branch `TODO.md` need
+   not match main — the `merge=ours` driver reconciles it on merge/rebase.
 4. Dispatch only after clean status and remote setup verification.
 
 Direct user invocation authorizes TODO ownership. Setup commit and setup push
@@ -36,8 +37,9 @@ belong to `triage`; do not grant worker push or TODO authority implicitly.
 Only when explicitly asked:
 
 1. Verify branch landed and identify durable task content.
-2. Promote durable content to `docs/`; remove the task directory; update
-   backlog.
+2. Promote durable content to `docs/`; remove the task directory; drop the
+   completed item's line from `TODO.md` on `main` (the authoritative writer —
+   the `merge=ours` driver discards an overlapping branch-side removal).
 3. Commit and push authorized lifecycle changes.
 4. Remove worktree/branch only after clean-state and recovery checks. Report
    deleted local/remote refs.

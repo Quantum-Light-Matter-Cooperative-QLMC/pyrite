@@ -77,10 +77,12 @@ If `uv run` cannot write project environment, add
 
 ## Backlog and physics
 
-`TODO.md` stays identical across branches. Branch detail belongs in
-`tasks/<branch-name>/` (full task branch name; entry doc `README.md`); see
-`tasks/README.md`. Work touching tracked items uses `todo-sync` only for exact
-cross-branch consistency.
+`TODO.md` is authoritative on `main`; branch copies are disposable and
+auto-resolve to `main` on merge/rebase via the `TODO.md merge=ours` driver (run
+`uv run cxr-dev bootstrap` once per clone). Edit and drop items on `main`. Branch
+detail belongs in `tasks/<branch-name>/` (full task branch name; entry doc
+`README.md`); see `tasks/README.md`. `todo-sync` now only checks main's accuracy
+and that the driver is installed.
 
 New/edited physics requires source equation, assumptions, limiting case,
 `Validation: <id>`, and ledger row. Fresh context verifies it; only human marks

@@ -13,10 +13,19 @@ on a shared leaf.
 
 ## Invariant
 
-- `TODO.md` equals `main:TODO.md` on every branch: one summary per item plus
-  branch/task pointer.
+- `main:TODO.md` is the single source of truth: one summary per item plus a
+  branch/task pointer. Branch copies are disposable and need not match.
 - Branch detail never enters `TODO.md` or durable `docs/`.
-- This avoids silent fast-forward backlog replacement.
+- Merge/rebase never prompts for TODO.md conflict resolution. The
+  `.gitattributes` `TODO.md merge=ours` driver resolves conflicting hunks to the
+  current branch (main's copy when a task branch merges in, or the rebase base).
+  The driver lives in local git config — run `uv run cxr-dev bootstrap` once per
+  clone; without it, git falls back to a 3-way merge and conflicts return.
+- Always drop a completed task's line on `main` (`triage` / `dispatch-task`
+  retire) — the authoritative writer. The driver keeps main's copy for any hunk
+  main also touched, and adjacent list lines merge into one hunk, so a
+  branch-side removal is only honoured when main never edited that region.
+  Don't rely on it; drop on `main`.
 
 ## Workflow
 
@@ -26,7 +35,8 @@ on a shared leaf.
    for review.
 2. Replace reviewed prose with one-line `TODO.md` summary:
    `→ feature/<branch>; tasks/<branch-name>/`.
-3. Use `todo-sync` only to keep branch and main `TODO.md` identical.
+3. Use `todo-sync` only to check `main:TODO.md` accuracy and confirm the merge
+   driver is installed — not to force branch equality.
 4. Use `dispatch-task` to commit approved setup, push branch with upstream,
    then assign an explicit slice.
    Choose `implement-task-lite`, `implement-task`, or `lead-task` by task

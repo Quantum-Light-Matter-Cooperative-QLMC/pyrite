@@ -1,9 +1,11 @@
 # TODO / Backlog
 
-Shared, priority-ordered backlog. Keep identical on every branch. Branch detail
-lives in `tasks/<branch-name>/` (entry doc `README.md`); workflow and merge rules:
+Priority-ordered backlog; authoritative on `main`. Branch copies are disposable
+and auto-resolve to `main` on merge/rebase (`.gitattributes` `TODO.md merge=ours`
+driver — run `uv run cxr-dev bootstrap` once per clone). Branch detail lives in
+`tasks/<branch-name>/` (entry doc `README.md`); workflow and merge rules:
 [`tasks/README.md`](tasks/README.md). `>user<` marks untriaged user text that
-must remain until moved into a task file. Reconcile with `todo-sync`.
+must remain until moved into a task file. Edit and drop items on `main`.
 
 ## P1 - top-priority / high-value
 

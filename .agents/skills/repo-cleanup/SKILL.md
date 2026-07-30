@@ -47,7 +47,11 @@ Each subagent:
 2. No conflicts, or conflicts confined to `TODO.md` → rebase
    (`git -C <worktree> rebase main` in the branch's existing worktree, in the
    subagent's fresh worktree, or `git rebase main <branch>` for a branch
-   checked out nowhere). Resolve `TODO.md` by taking `main`'s version.
+   checked out nowhere). The `TODO.md merge=ours` driver auto-resolves TODO.md
+   to `main`'s version — no manual step. If the rebase still halts on TODO.md,
+   the driver is not installed: run `uv run cxr-dev bootstrap`, then take
+   `main`'s version and continue. (`git merge-tree` preflight may report TODO.md
+   as conflicted even though the real rebase resolves it.)
 3. Any other conflicted file → `git rebase --abort`; do not attempt
    resolution. Significant means any conflict outside `TODO.md`.
 4. A branch whose changes are fully contained in `main` is not a conflict;
@@ -82,8 +86,10 @@ Order matters: worktrees before their branches, local before remote.
 
 ## After
 
-1. The controlling agent itself invokes `todo-sync` to restore `TODO.md`
-   equality across rebased branches — never delegate this to a subagent.
+1. No cross-branch `TODO.md` equality pass: the `merge=ours` driver already
+   reconciled each rebased branch to `main`. Confirm the driver is installed
+   (`git config --local --get merge.ours.driver` = `true`, else
+   `uv run cxr-dev bootstrap`) and that `main:TODO.md` stayed accurate.
 2. Do not run test suites per branch; dispatch and workers own validation.
 3. Report a table: branch → rebased old→new | skipped (reason) | aborted
    (conflict files) | retire candidate; plus chores done per item (worktree

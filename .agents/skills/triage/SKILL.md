@@ -38,7 +38,8 @@ and branch push; stop before dispatch.
    unrelated dirty state, ambiguous intent, or missing design evidence.
 5. For each task, replace its existing marker or insert direct-input work as one
    canonical `TODO.md` summary with branch and `tasks/<branch-name>/` pointers.
-   Place it in the appropriate priority/state section. Invoke `todo-sync`.
+   Place it in the appropriate priority/state section. Edit only `main:TODO.md`;
+   branch copies reconcile via the `merge=ours` driver — no cross-branch sync.
 6. Commit the setup on `main` in one commit: stage explicit paths only
    (`TODO.md`, each new `tasks/<branch-name>/`); never `git add .`, never sweep
    unrelated dirty state. Use a `docs(tasks): triage <branch-name>`-style
