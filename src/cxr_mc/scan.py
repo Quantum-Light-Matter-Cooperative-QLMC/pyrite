@@ -658,11 +658,10 @@ def run(args):
         deadline = time.monotonic() + args.max_minutes * 60.0
         
     job_records = {}
-    args._job_records = job_records
-    
     use_dashboard = not getattr(args, "no_progress", False) and sys.stdout.isatty() and not os.environ.get("NO_COLOR")
-    
+
     if use_dashboard:
+        args._job_records = job_records
         os.environ["CXR_LOCAL_DASHBOARD"] = "1"
         detail = getattr(args, "verbose", 0)
         t = threading.Thread(target=_dashboard_loop, args=(args, materials, job_records, detail), daemon=True)
@@ -880,6 +879,7 @@ def _run_material(args, material, max_seconds=None):
     ckpt = os.path.join(args.checkpoint_dir, stem)
     results = {}
     progress_file = getattr(args, "progress_file", None)
+    has_dashboard = hasattr(args, "_job_records")
     latest_progress = {
         "total_cases": len(cases),
         "cached_cases": 0,
@@ -1086,11 +1086,13 @@ def _run_material(args, material, max_seconds=None):
             progress=not getattr(args, "no_progress", False),
             on_progress=(
                 _record_progress
-                if progress_file is not None or performance_logger is not None
+                if progress_file is not None or performance_logger is not None or has_dashboard
                 else None
             ),
             on_case=(
-                _note_case if progress_file is not None or performance_logger is not None else None
+                _note_case
+                if progress_file is not None or performance_logger is not None or has_dashboard
+                else None
             ),
             on_runtime=_record_runtime if performance_logger is not None else None,
             on_timing=_record_timing if performance_logger is not None else None,
@@ -1098,11 +1100,13 @@ def _run_material(args, material, max_seconds=None):
             max_seconds=max_seconds,
             dataset_identity=identity,
             case_cost_fn=(
-                case_cost if progress_file is not None or performance_logger is not None else None
+                case_cost
+                if progress_file is not None or performance_logger is not None or has_dashboard
+                else None
             ),
             on_cost=(
                 _record_cost
-                if progress_file is not None or performance_logger is not None
+                if progress_file is not None or performance_logger is not None or has_dashboard
                 else None
             ),
         )
