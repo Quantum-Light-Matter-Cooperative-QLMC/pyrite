@@ -3163,7 +3163,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: cxr profile [OPTIONS] COMMAND [ARGS]...\n\n  Manage catalog scan profiles (named campaign defaults).\n\n  Profiles are named campaigns in ``[profiles.*]``. They own default ranges,\n  electron-count grids, detector geometry, and optional material membership. An\n  absent ``materials`` key means all in-use materials; ``profile members`` is\n  the only membership mutation surface. Per-material range overrides are managed\n  by ``cxr material``. Energy grids are managed by ``cxr energy-grid``.\n\n  Examples:\n    cxr profile list\n    cxr profile show sub_100keV        (or: cxr profile sub_100keV)\n    cxr profile create sub_100keV --energy 30:100:10\n    cxr profile set sub_100keV --observation-angle 119\n    cxr profile add sub_100keV --energy 75\n    cxr profile members set sub_100keV hopg mose2\n    cxr profile rename sub_100keV sub100\n    cxr profile delete sub_100keV -y\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  add      Incrementally add values to profile grids.\n  analyze  Analyze NAME's performance logs into CSV, Markdown, and PNG...\n  create   Create a new profile, cloning ranges and detector from --from...\n  delete   Delete a profile; irreversible.\n  list     List catalog profiles with membership and override counts.\n  members  Set, extend, shrink, or reset profile-owned material membership.\n  remove   Remove values from an existing profile's grids.\n  rename   Rename profile NAME to NEW_NAME.\n  set      Replace range grids or detector scalars on an existing profile.\n  show     Show one profile's ranges, resolved detector, membership, and...\n",
+        "help": "Usage: cxr profile [OPTIONS] COMMAND [ARGS]...\n\n  Manage catalog scan profiles (named campaign defaults).\n\n  Profiles are named campaigns in ``[profiles.*]``. They own default ranges,\n  electron-count grids, beam policy, detector geometry, and optional material\n  membership. An absent ``materials`` key means all in-use materials; ``profile\n  members`` is the only membership mutation surface. Per-material range\n  overrides are managed by ``cxr material``. Energy grids are managed by ``cxr\n  energy-grid``.\n\n  Examples:\n    cxr profile list\n    cxr profile show sub_100keV        (or: cxr profile sub_100keV)\n    cxr profile create sub_100keV --energy 30:100:10\n    cxr profile set sub_100keV --observation-angle 119\n    cxr profile add sub_100keV --energy 75\n    cxr profile members set sub_100keV hopg mose2\n    cxr profile rename sub_100keV sub100\n    cxr profile delete sub_100keV -y\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  add      Incrementally add values to profile grids.\n  analyze  Analyze NAME's performance logs into CSV, Markdown, and PNG...\n  create   Create a new profile, cloning defaults from --from (standard).\n  delete   Delete a profile; irreversible.\n  list     List catalog profiles with membership and override counts.\n  members  Set, extend, shrink, or reset profile-owned material membership.\n  remove   Remove values from an existing profile's grids.\n  rename   Rename profile NAME to NEW_NAME.\n  set      Replace range grids, beam fields, or detector scalars on a profile.\n  show     Show one profile's ranges, beam, detector, membership, and...\n",
         "hidden": false,
         "path": "profile",
         "subcommands": [
@@ -3342,7 +3342,7 @@
               },
               {
                 "dest": "source",
-                "help": "Clone range defaults from SOURCE profile; defaults to standard.",
+                "help": "Clone range, beam, and detector defaults from SOURCE; defaults to standard.",
                 "option_strings": [
                   "--from"
                 ],
@@ -3399,6 +3399,46 @@
                 "required": false
               },
               {
+                "dest": "transverse_fwhm_mm",
+                "help": "Circular Gaussian transverse FWHM in mm.",
+                "option_strings": [
+                  "--transverse-fwhm-mm"
+                ],
+                "required": false
+              },
+              {
+                "dest": "rep_rate_hz",
+                "help": "Bunch repetition rate in Hz.",
+                "option_strings": [
+                  "--rep-rate-hz"
+                ],
+                "required": false
+              },
+              {
+                "dest": "bunch_charge_pc",
+                "help": "Physical charge per bunch in pC.",
+                "option_strings": [
+                  "--bunch-charge-pc"
+                ],
+                "required": false
+              },
+              {
+                "dest": "longitudinal_kind",
+                "help": "Replace the complete declarative longitudinal policy.",
+                "option_strings": [
+                  "--longitudinal"
+                ],
+                "required": false
+              },
+              {
+                "dest": "envelope_rms_fs",
+                "help": "RMS duration for gaussian or microtrain longitudinal policy.",
+                "option_strings": [
+                  "--envelope-rms-fs"
+                ],
+                "required": false
+              },
+              {
                 "dest": "observation_angle_deg",
                 "help": "Detector observation angle in degrees [0, 180]; scalar replacement.",
                 "option_strings": [
@@ -3439,7 +3479,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr profile create [OPTIONS] NAME\n\n  Create a new profile, cloning ranges and detector from --from (standard).\n\n  Range options replace individual cloned grids; detector options replace\n  individual cloned detector scalars. Overrides and material membership are not\n  cloned. Without --materials, the new profile starts with implicit all-in-use\n  membership and no per-material overrides.\n\nOptions:\n  --from SOURCE                   Clone range defaults from SOURCE profile;\n                                  defaults to standard.\n  --thickness ANGSTROM,... | START:STOP:STEP\n                                  Crystal thicknesses in angstrom. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges.\n  --energy KEV,... | START:STOP:STEP\n                                  Beam energies in keV. Comma-separated, mixable\n                                  with start:stop:step ranges.\n  --polar DEG,... | START:STOP:STEP\n                                  Polar tilts in degrees [0, 90). Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges.\n  --azimuth DEG,... | START:STOP:STEP\n                                  Azimuth tilts in degrees [0, 360]. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges.\n  -l, --ne-line N,...             Line-spectrum transport electron counts;\n                                  positive integers.\n  -b, --ne-brem N,...             Bremsstrahlung transport electron counts;\n                                  positive integers.\n  --observation-angle DEG         Detector observation angle in degrees [0,\n                                  180]; scalar replacement.  [0.0<=x<=180.0]\n  --polar-acceptance DEG          Full detector polar acceptance span in\n                                  degrees; scalar replacement.  [0.0<x<=180.0]\n  --solid-angle SR                Detector solid angle in sr; scalar\n                                  replacement.  [0.0<x<=12.566370614359172]\n  --materials KEY,...             Set explicit initial membership (comma-\n                                  separated material keys).\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: cxr profile create [OPTIONS] NAME\n\n  Create a new profile, cloning defaults from --from (standard).\n\n  Range options replace individual cloned grids; beam and detector options\n  replace individual cloned fields. Overrides and material membership are not\n  cloned. Without --materials, the new profile starts with implicit all-in-use\n  membership and no per-material overrides.\n\nOptions:\n  --from SOURCE                   Clone range, beam, and detector defaults from\n                                  SOURCE; defaults to standard.\n  --thickness ANGSTROM,... | START:STOP:STEP\n                                  Crystal thicknesses in angstrom. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges.\n  --energy KEV,... | START:STOP:STEP\n                                  Beam energies in keV. Comma-separated, mixable\n                                  with start:stop:step ranges.\n  --polar DEG,... | START:STOP:STEP\n                                  Polar tilts in degrees [0, 90). Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges.\n  --azimuth DEG,... | START:STOP:STEP\n                                  Azimuth tilts in degrees [0, 360]. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges.\n  -l, --ne-line N,...             Line-spectrum transport electron counts;\n                                  positive integers.\n  -b, --ne-brem N,...             Bremsstrahlung transport electron counts;\n                                  positive integers.\n  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.\n                                  [x>0.0]\n  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]\n  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]\n  --longitudinal [gaussian|microtrain|compressed]\n                                  Replace the complete declarative longitudinal\n                                  policy.\n  --envelope-rms-fs FS            RMS duration for gaussian or microtrain\n                                  longitudinal policy.  [x>0.0]\n  --observation-angle DEG         Detector observation angle in degrees [0,\n                                  180]; scalar replacement.  [0.0<=x<=180.0]\n  --polar-acceptance DEG          Full detector polar acceptance span in\n                                  degrees; scalar replacement.  [0.0<x<=180.0]\n  --solid-angle SR                Detector solid angle in sr; scalar\n                                  replacement.  [0.0<x<=12.566370614359172]\n  --materials KEY,...             Set explicit initial membership (comma-\n                                  separated material keys).\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "profile create",
             "subcommands": []
@@ -3892,6 +3932,46 @@
                 "required": false
               },
               {
+                "dest": "transverse_fwhm_mm",
+                "help": "Circular Gaussian transverse FWHM in mm.",
+                "option_strings": [
+                  "--transverse-fwhm-mm"
+                ],
+                "required": false
+              },
+              {
+                "dest": "rep_rate_hz",
+                "help": "Bunch repetition rate in Hz.",
+                "option_strings": [
+                  "--rep-rate-hz"
+                ],
+                "required": false
+              },
+              {
+                "dest": "bunch_charge_pc",
+                "help": "Physical charge per bunch in pC.",
+                "option_strings": [
+                  "--bunch-charge-pc"
+                ],
+                "required": false
+              },
+              {
+                "dest": "longitudinal_kind",
+                "help": "Replace the complete declarative longitudinal policy.",
+                "option_strings": [
+                  "--longitudinal"
+                ],
+                "required": false
+              },
+              {
+                "dest": "envelope_rms_fs",
+                "help": "RMS duration for gaussian or microtrain longitudinal policy.",
+                "option_strings": [
+                  "--envelope-rms-fs"
+                ],
+                "required": false
+              },
+              {
                 "dest": "observation_angle_deg",
                 "help": "Detector observation angle in degrees [0, 180]; scalar replacement.",
                 "option_strings": [
@@ -3941,7 +4021,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr profile set [OPTIONS] NAME\n\n  Replace range grids or detector scalars on an existing profile.\n\n  NAME must already exist (create it with ``cxr profile create``); unknown names\n  error with suggestions. Editing 'standard' prompts for confirmation unless\n  --yes is given; --dry-run never prompts. Detector scalars replace supplied\n  fields; unlike range grids, they are not accepted by add/remove.\n\nOptions:\n  --thickness ANGSTROM,... | START:STOP:STEP\n                                  Crystal thicknesses in angstrom. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges.\n  --energy KEV,... | START:STOP:STEP\n                                  Beam energies in keV. Comma-separated, mixable\n                                  with start:stop:step ranges.\n  --polar DEG,... | START:STOP:STEP\n                                  Polar tilts in degrees [0, 90). Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges.\n  --azimuth DEG,... | START:STOP:STEP\n                                  Azimuth tilts in degrees [0, 360]. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges.\n  -l, --ne-line N,...             Line-spectrum transport electron counts;\n                                  positive integers.\n  -b, --ne-brem N,...             Bremsstrahlung transport electron counts;\n                                  positive integers.\n  --observation-angle DEG         Detector observation angle in degrees [0,\n                                  180]; scalar replacement.  [0.0<=x<=180.0]\n  --polar-acceptance DEG          Full detector polar acceptance span in\n                                  degrees; scalar replacement.  [0.0<x<=180.0]\n  --solid-angle SR                Detector solid angle in sr; scalar\n                                  replacement.  [0.0<x<=12.566370614359172]\n  -y, --yes                       Skip the 'standard' confirmation prompt.\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: cxr profile set [OPTIONS] NAME\n\n  Replace range grids, beam fields, or detector scalars on a profile.\n\n  NAME must already exist (create it with ``cxr profile create``); unknown names\n  error with suggestions. Editing 'standard' prompts for confirmation unless\n  --yes is given; --dry-run never prompts. Detector scalars replace supplied\n  fields; unlike range grids, they are not accepted by add/remove.\n\nOptions:\n  --thickness ANGSTROM,... | START:STOP:STEP\n                                  Crystal thicknesses in angstrom. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges.\n  --energy KEV,... | START:STOP:STEP\n                                  Beam energies in keV. Comma-separated, mixable\n                                  with start:stop:step ranges.\n  --polar DEG,... | START:STOP:STEP\n                                  Polar tilts in degrees [0, 90). Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges.\n  --azimuth DEG,... | START:STOP:STEP\n                                  Azimuth tilts in degrees [0, 360]. Comma-\n                                  separated, mixable with start:stop:step\n                                  ranges.\n  -l, --ne-line N,...             Line-spectrum transport electron counts;\n                                  positive integers.\n  -b, --ne-brem N,...             Bremsstrahlung transport electron counts;\n                                  positive integers.\n  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.\n                                  [x>0.0]\n  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]\n  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]\n  --longitudinal [gaussian|microtrain|compressed]\n                                  Replace the complete declarative longitudinal\n                                  policy.\n  --envelope-rms-fs FS            RMS duration for gaussian or microtrain\n                                  longitudinal policy.  [x>0.0]\n  --observation-angle DEG         Detector observation angle in degrees [0,\n                                  180]; scalar replacement.  [0.0<=x<=180.0]\n  --polar-acceptance DEG          Full detector polar acceptance span in\n                                  degrees; scalar replacement.  [0.0<x<=180.0]\n  --solid-angle SR                Detector solid angle in sr; scalar\n                                  replacement.  [0.0<x<=12.566370614359172]\n  -y, --yes                       Skip the 'standard' confirmation prompt.\n  --dry-run                       Print proposed TOML diff; write nothing.\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "profile set",
             "subcommands": []
@@ -3963,7 +4043,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr profile show [OPTIONS] NAME\n\n  Show one profile's ranges, resolved detector, membership, and overrides.\n\nOptions:\n  --json      Emit one versioned JSON object on stdout.\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: cxr profile show [OPTIONS] NAME\n\n  Show one profile's ranges, beam, detector, membership, and overrides.\n\nOptions:\n  --json      Emit one versioned JSON object on stdout.\n  -h, --help  Show this message and exit.\n",
             "hidden": false,
             "path": "profile show",
             "subcommands": []

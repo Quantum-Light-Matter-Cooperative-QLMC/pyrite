@@ -512,7 +512,11 @@ def test_empty_updates_are_usage_errors(tmp_path, monkeypatch):
     for verb in ("set", "add", "remove"):
         result = invoke(profile.command, [verb, "sub_100keV"])
         assert result.exit_code == 2
-        expected = "provide a range or detector option" if verb == "set" else "provide a range option"
+        expected = (
+            "provide a range, beam, or detector option"
+            if verb == "set"
+            else "provide a range option"
+        )
         assert expected in result.stderr
 
 
