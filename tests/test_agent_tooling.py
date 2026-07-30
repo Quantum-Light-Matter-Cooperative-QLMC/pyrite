@@ -199,3 +199,37 @@ def test_sweep_guard_blocks_local_scan(sweep_guard_module, command: str) -> None
 )
 def test_sweep_guard_allows_safe_commands(sweep_guard_module, command: str) -> None:
     assert not sweep_guard_module._local_scan(command)
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "CXR_LOCAL_SWEEP_OK=1 uv run cxr run standard -m hopg",
+        "rtk env CXR_LOCAL_SWEEP_OK=1 uv run cxr run standard -m hopg",
+        "env CXR_LOCAL_SWEEP_OK=true uv run cxr run standard -m hopg",
+    ],
+)
+def test_sweep_guard_inline_override_opts_out_a_detected_run(
+    sweep_guard_module, monkeypatch, command: str
+) -> None:
+    monkeypatch.delenv("CXR_LOCAL_SWEEP_OK", raising=False)
+    # Still detected as a local run -- the detector is unchanged ...
+    assert sweep_guard_module._local_scan(command)
+    # ... but the inline opt-in suppresses the block.
+    assert sweep_guard_module._override_active(command)
+
+
+def test_sweep_guard_ambient_override_opts_out(sweep_guard_module, monkeypatch) -> None:
+    command = "uv run cxr run standard -m hopg"
+    monkeypatch.setenv("CXR_LOCAL_SWEEP_OK", "1")
+    assert sweep_guard_module._override_active(command)
+
+
+@pytest.mark.parametrize("value", ["", "0", "false", "no", "off"])
+def test_sweep_guard_falsey_override_still_blocks(
+    sweep_guard_module, monkeypatch, value: str
+) -> None:
+    monkeypatch.delenv("CXR_LOCAL_SWEEP_OK", raising=False)
+    command = f"CXR_LOCAL_SWEEP_OK={value} uv run cxr run standard -m hopg"
+    assert sweep_guard_module._local_scan(command)
+    assert not sweep_guard_module._override_active(command)

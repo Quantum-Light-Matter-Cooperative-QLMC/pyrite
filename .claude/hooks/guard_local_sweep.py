@@ -2,10 +2,18 @@
 """Block local ``cxr run`` invocations before Claude runs them.
 
 Exit 2 blocks; parse failures and unrelated commands fail open.
+
+The block is an opt-in-overridable safety default for GPU-less/underprovisioned
+WSL hosts. A box with a real accelerator declares itself a local compute node by
+setting ``CXR_LOCAL_SWEEP_OK`` truthy -- ambient in the hook's environment (e.g.
+`.claude/settings.local.json` env) or inline on the command
+(``CXR_LOCAL_SWEEP_OK=1 cxr run ...``). Default stays a hard block so shared
+contributors on unfit hosts remain protected.
 """
 
 import json
 import os
+import re
 import shlex
 import sys
 
@@ -27,6 +35,15 @@ READ_ONLY_LEADERS = {
     "git",
 }
 SHELL_SEPARATORS = set(";&|()")
+
+# Truthy override values; everything else (including unset) keeps the block.
+_FALSEY = {"", "0", "false", "no", "off"}
+_OVERRIDE_VAR = "CXR_LOCAL_SWEEP_OK"
+_OVERRIDE_ASSIGN_RE = re.compile(rf"^{_OVERRIDE_VAR}=(?P<value>.*)$")
+
+
+def _is_truthy(value: str | None) -> bool:
+    return value is not None and value.strip().lower() not in _FALSEY
 
 
 def _segments(command: str) -> list[list[str]]:
@@ -83,6 +100,26 @@ def _local_scan(command: str) -> bool:
         return False
 
 
+def _override_active(command: str) -> bool:
+    """Return whether this host opted this ``cxr run`` out of the sweep block.
+
+    Honors an ambient ``CXR_LOCAL_SWEEP_OK`` in the hook's environment and an
+    inline ``CXR_LOCAL_SWEEP_OK=<truthy>`` assignment anywhere in the command
+    (covering bare ``VAR=1 cmd`` and ``rtk env``/``env VAR=1`` placement).
+    """
+    if _is_truthy(os.environ.get(_OVERRIDE_VAR)):
+        return True
+    try:
+        tokens = shlex.split(command, posix=True)
+    except ValueError:
+        return False
+    for token in tokens:
+        match = _OVERRIDE_ASSIGN_RE.match(token)
+        if match and _is_truthy(match.group("value")):
+            return True
+    return False
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -90,13 +127,14 @@ def main() -> int:
         return 0
 
     command = (payload.get("tool_input") or {}).get("command") or ""
-    if _local_scan(command):
+    if _local_scan(command) and not _override_active(command):
         sys.stderr.write(
             "Blocked: `cxr run` runs a full Monte-Carlo sweep locally and "
             "OOMs/crashes WSL. Route it to the lab GPU box instead:\n"
             "  cxr remote run [PROFILE] [-m MATERIAL]\n"
-            "See the remote-gpu-jobs skill. If you truly must run locally, ask "
-            "the user to run it themselves.\n"
+            "See the remote-gpu-jobs skill. On a host with a real accelerator, "
+            "set CXR_LOCAL_SWEEP_OK=1 (ambient or inline) to run locally. If you "
+            "truly must run locally without it, ask the user to run it themselves.\n"
         )
         return 2
 
