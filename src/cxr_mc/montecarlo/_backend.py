@@ -53,8 +53,9 @@ class ArrayBackend:
     array_type: type[Any] = np.ndarray
     oom_exceptions: tuple[type[BaseException], ...] = ()
 
-    def __init__(self, device: DeviceInfo):
+    def __init__(self, device: DeviceInfo, *, fallback_reason: str | None = None):
         self.device = device
+        self.fallback_reason = fallback_reason
 
     def to_cpu(self, value: Any) -> np.ndarray:
         return np.asarray(value)
@@ -76,7 +77,7 @@ class ArrayBackend:
 
 
 class NumPyBackend(ArrayBackend):
-    def __init__(self):
+    def __init__(self, *, fallback_reason: str | None = None):
         super().__init__(
             DeviceInfo(
                 backend="cpu",
@@ -84,7 +85,8 @@ class NumPyBackend(ArrayBackend):
                 name="host CPU",
                 total_memory_bytes=None,
                 supports_fp64=True,
-            )
+            ),
+            fallback_reason=fallback_reason,
         )
 
 
@@ -285,20 +287,26 @@ def select_backend(requested: str | None = None) -> ArrayBackend:
         backend = _load_sycl()
     else:
         backend = None
+        failures = []
         for loader in (_load_cupy, _load_sycl):
             try:
                 backend = loader()
                 break
             except BackendUnavailableError as error:
+                failures.append(str(error))
                 logger.debug("accelerator probe skipped: %s", error)
         if backend is None:
-            return NumPyBackend()
+            return NumPyBackend(
+                fallback_reason="accelerator_unavailable: " + "; ".join(failures)
+            )
     if os.environ.get("CXR_FP64") == "1" and not backend.device.supports_fp64:
         if requested == "auto":
             logger.warning(
                 "%s lacks fp64; CXR_FP64=1 selects CPU NumPy", backend.device.name
             )
-            return NumPyBackend()
+            return NumPyBackend(
+                fallback_reason=f"unsupported_fp64: {backend.device.name}"
+            )
         raise BackendUnavailableError(
             f"CXR_MC_BACKEND={backend.name} device {backend.device.name!r} lacks fp64; "
             "unset CXR_FP64 or select CXR_MC_BACKEND=cpu"

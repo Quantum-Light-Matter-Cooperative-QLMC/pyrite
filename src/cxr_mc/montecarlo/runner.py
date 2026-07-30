@@ -1126,6 +1126,7 @@ def runtime_plan(cases, max_workers=None, engine="auto"):
         "backend": BACKEND.name,
         "backend_vendor": BACKEND.vendor,
         "backend_device": BACKEND.device.name,
+        "backend_fallback_reason": BACKEND.fallback_reason,
         "resource_policy_requested": _RESOURCE_POLICY.requested,
         "resource_policy": _RESOURCE_POLICY.name,
         "device_memory_budget_mib": (

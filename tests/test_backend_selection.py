@@ -5,7 +5,7 @@ import types
 import numpy as np
 import pytest
 
-from cxr_mc.montecarlo import _backend
+from cxr_mc.montecarlo import _backend, runner
 from cxr_mc.montecarlo._resources import GIB, admitted_chunk, resolve_resource_policy
 
 
@@ -41,7 +41,9 @@ def test_auto_falls_back_to_cpu(monkeypatch):
     monkeypatch.setattr(_backend, "_load_cupy", unavailable)
     monkeypatch.setattr(_backend, "_load_sycl", unavailable)
 
-    assert _backend.select_backend("auto").name == "cpu"
+    backend = _backend.select_backend("auto")
+    assert backend.name == "cpu"
+    assert backend.fallback_reason == "accelerator_unavailable: missing; missing"
 
 
 def test_explicit_fp64_incompatible_backend_errors(monkeypatch):
@@ -124,3 +126,12 @@ def test_preallocation_admission_caps_or_errors():
             itemsize=8,
             budget_bytes=1_000_000,
         )
+
+
+def test_cpu_fallback_requires_host_ram_admission(monkeypatch):
+    monkeypatch.setattr(runner, "_TOTAL_MEM", 8_000)
+    monkeypatch.setattr(runner, "_available_mem_mb", lambda: 4_000)
+    monkeypatch.setattr(runner, "_WORKER_MEM_MB", 6_144)
+
+    with pytest.raises(_backend.BackendResourceError, match="cannot admit CPU fallback"):
+        runner._admit_cpu_fallback()
