@@ -9,6 +9,7 @@ from cxr_mc.config import default_settings, material_sweep
 from cxr_mc.detectors import DetectorSpec
 from cxr_mc.profiles import (
     FIDELITY_NAMES,
+    SweepProfile,
     dataset_identity,
     get_profile,
     identity_from_stem,
@@ -193,6 +194,70 @@ def test_catalog_profile_changes_hash_and_stem_when_not_standard():
 def test_named_profile_stem_default_catalog_profile_stays_canonical():
     assert named_profile_stem("hopg", "full") == "hopg"
     assert named_profile_stem("hopg", "full", catalog_profile="standard") == "hopg"
+
+
+def test_named_profiles_default_to_incoherent_emission():
+    """Back-compat: the tri-state emission rename leaves both presets on the
+    incoherent (default) policy, with the derived coherent_emission property
+    off, so existing runs keep the bit-for-bit incoherent path."""
+    for name in FIDELITY_NAMES:
+        profile = get_profile(name)
+        assert profile.emission == "incoherent"
+        assert profile.coherent_emission is False
+    # Settings resolved for those profiles carry the same incoherent default.
+    settings = default_settings("full").__class__()
+    assert settings.emission == "incoherent"
+    assert settings.coherent_emission is False
+
+
+@pytest.mark.parametrize(
+    ("emission", "coherent"),
+    [("incoherent", False), ("coherent", True), ("both", True)],
+)
+def test_emission_mode_resolves_through_profile_to_settings(emission, coherent):
+    """Each emission mode rides SweepProfile.apply_settings onto Settings, and
+    the derived coherent_emission property agrees on both sides."""
+    profile = SweepProfile("probe", n_electrons=10, n_electrons_brem=5, emission=emission)
+    assert profile.coherent_emission is coherent
+
+    resolved = profile.apply_settings(default_settings())
+    assert resolved.emission == emission
+    assert resolved.coherent_emission is coherent
+
+
+def test_emission_modes_yield_three_distinct_digests_incoherent_unchanged():
+    """dataset_identity emits a distinct digest per emission mode, and the
+    incoherent digest is bit-for-bit identical to the pre-rename default (the
+    incoherent path adds no key to the hashed payload)."""
+    sweep = material_sweep("hopg")
+    base = default_settings()
+    incoherent = dataset_identity("hopg", "full", replace(base, emission="incoherent"), sweep)
+    coherent = dataset_identity("hopg", "full", replace(base, emission="coherent"), sweep)
+    both = dataset_identity("hopg", "full", replace(base, emission="both"), sweep)
+
+    digests = {
+        incoherent["parameter_sha256"],
+        coherent["parameter_sha256"],
+        both["parameter_sha256"],
+    }
+    assert len(digests) == 3
+
+    # incoherent adds no divergence key; coherent/both each surface their token.
+    assert "emission" not in incoherent["resolved_parameters"]
+    assert coherent["resolved_parameters"]["emission"] == "coherent"
+    assert both["resolved_parameters"]["emission"] == "both"
+
+    # Known pre-change incoherent digests (captured before the tri-state rename)
+    # must stay bit-for-bit -- orphaning old coherent stems but never incoherent.
+    assert incoherent["parameter_sha256"] == (
+        "d0bb205f2268b8cd30801b1146de8daf7e745ca70399919718519542a7c9b45c"
+    )
+    survey_incoherent = dataset_identity(
+        "mose2", "survey", default_settings("survey"), material_sweep("mose2", fidelity="survey")
+    )
+    assert survey_incoherent["parameter_sha256"] == (
+        "a6d8116bf5f0aef9b61f0b43cc4e4e4522e6e8d51167e51450d0fc3232417a7e"
+    )
 
 
 def test_identity_from_stem_resolves_non_standard_catalog_profile():

@@ -63,6 +63,7 @@ from .selection import (
 from .store import (
     DEFAULT_BEAM_CURRENT_NA,
     PER_NA,
+    EmissionMode,
     Settings,
     beam_current_na,
     detected_background,
@@ -81,6 +82,7 @@ __all__ = [
     # store
     "PER_NA",
     "DEFAULT_BEAM_CURRENT_NA",
+    "EmissionMode",
     "Settings",
     "beam_current_na",
     "line_fwhm_eV",
