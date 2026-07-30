@@ -68,6 +68,12 @@ must remain until moved into a task file. Edit and drop items on `main`.
    GPU rows without a GPU; fall back to tqdm when non-interactive. →
    `feature/local-run-dashboard`;
    [`tasks/feature/local-run-dashboard/`](tasks/feature/local-run-dashboard/).
+6. **Cross-profile checkpoint case reuse.** Named catalog profiles get isolated
+   checkpoint stems (`<material>@<profile>-<hash>`), so two profiles with
+   overlapping cases (e.g. `sub_100keV`, `sub_200keV`) fully recompute shared
+   cases instead of sharing them; investigate a dedup key/storage model.
+   Investigation only, not yet scoped. → `feature/cross-profile-case-reuse`;
+   [`tasks/feature/cross-profile-case-reuse/`](tasks/feature/cross-profile-case-reuse/).
 
 ## P3 - lower / exploratory / small bugfixes / on-hold
 
