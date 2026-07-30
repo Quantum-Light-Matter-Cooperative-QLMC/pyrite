@@ -633,14 +633,20 @@ def _brem_for_case(case, E_brem):
     )
 
 
-def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove):
+def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove, *, coherent=None):
     """Coherent line spectrum on ``E_grid`` from already-transported line
     segments ``segs``. Single slab (``layer_radiators`` absent) radiates from
     all segments via the case's scalar crystal keys; a multilayer stack sums
     each CRYSTALLINE layer's lines incoherently, every line self-absorbing
     through the whole stack. Pure move of _spectrum_case's line block, shared
     with :func:`_lines_for_case` so a line-only reline reproduces the SAME
-    spectrum as a live sweep."""
+    spectrum as a live sweep.
+
+    ``coherent`` overrides the coherence of the interference kernel: ``None``
+    (default) derives it from ``case["coherent_emission"]`` (back-compat);
+    ``False`` forces the incoherent line sum, ``True`` the coherent one. The
+    dual-spectra runner passes both flags in turn over the SAME ``segs`` so one
+    transport yields both the incoherent ``spec`` and the ``spec_coherent``."""
     radiators = case.get("layer_radiators")
     mosaic_kw = dict(
         mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
@@ -650,7 +656,10 @@ def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove):
         case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(E_grid.size),
         E_grid.size,
     )
-    coherent = bool(case.get("coherent_emission", False))
+    if coherent is None:
+        coherent = bool(case.get("coherent_emission", False))
+    else:
+        coherent = bool(coherent)
     if radiators is None:
         return mc_spectrum(
             segs,
@@ -855,11 +864,24 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     # (no coherent lines). layer_radiators absent -> single slab: the film radiates
     # from ALL its segments via the case's scalar crystal keys (bit-for-bit the
     # pre-multilayer path). See docs/multilayer-materials.md (per-layer radiation).
+    # DUAL-SPECTRA: `spec` is ALWAYS the incoherent line sum (kept for every
+    # emission mode so no `record["spec"]` consumer KeyErrors); when the profile
+    # emission includes coherent (`case["coherent_emission"]` true for
+    # emission="coherent"|"both") a SECOND line sum on the SAME `segs` yields
+    # `spec_coherent`. One transport, two kernels -- both share `case["spec_chunk"]`
+    # so the OOM retry (_SpectrumPhaseOOM -> _halve_case_spec_chunk) covers the 2x
+    # complex coherent grid too.
+    want_coherent = bool(case.get("coherent_emission", False))
+    spec_coherent = None
     with _nsys_range("cxr.lines"):
         try:
             spec = _lines_for_segments(
-                segs, E_grid, case, n_hat, abs_layers, tp.get("groove")
+                segs, E_grid, case, n_hat, abs_layers, tp.get("groove"), coherent=False
             )
+            if want_coherent:
+                spec_coherent = _lines_for_segments(
+                    segs, E_grid, case, n_hat, abs_layers, tp.get("groove"), coherent=True
+                )
         except _GPU_OOM as error:
             raise _SpectrumPhaseOOM("line", error) from error
 
@@ -921,6 +943,8 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         crystal=case["crystal"],
         E0_keV=case["E0_keV"],
     )
+    if spec_coherent is not None:
+        out["spec_coherent"] = spec_coherent
     if timed:
         # Ride the phase deltas back to the driver on the result dict; run_cases'
         # _TimingAgg.collect strips both keys before the result is stored. Carry

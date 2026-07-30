@@ -100,3 +100,70 @@ def test_straight_trajectory_segments_are_in_phase_at_resonance(sinc_cutoff):
 def test_coherent_components_are_rejected():
     with pytest.raises(ValueError, match="incompatible with components"):
         mc_spectrum(_segments(), E_GRID, coherent=True, components=True, **KWARGS)
+
+
+def _runner_case():
+    return {
+        "crystal": "hopg",
+        "hkl_list": KWARGS["hkl_list"],
+        "B_ang2": KWARGS["B_ang2"],
+        "composition": None,
+        "E0_keV": 30.0,
+    }
+
+
+def _runner_tp(segs):
+    return {
+        "E_grid": E_GRID,
+        "E_brem": E_GRID,
+        "n_hat": KWARGS["n_hat"],
+        "segs": segs,
+        "segs_b": segs,
+        "groove": None,
+    }
+
+
+def test_runner_always_stores_incoherent_spec_and_omits_spec_coherent(monkeypatch):
+    """Default (incoherent) emission: `spec` is the incoherent line sum and no
+    `spec_coherent` is attached -- so no downstream `record["spec"]` consumer can
+    KeyError and no coherent grid is paid for."""
+    import cxr_mc.montecarlo.runner as runner
+
+    monkeypatch.setattr(
+        runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID)
+    )
+    segs = _segments(2)
+    segs.update(n_backscattered=0, n_missed=0)
+
+    out = runner._spectrum_case_impl(_runner_case(), _runner_tp(segs))
+
+    assert "spec_coherent" not in out
+    direct_incoherent = mc_spectrum(segs, E_GRID, coherent=False, **KWARGS)
+    np.testing.assert_allclose(out["spec"], direct_incoherent, rtol=RTOL)
+
+
+def test_runner_dual_spectra_from_one_transport(monkeypatch):
+    """emission includes coherent: ONE transport (`tp["segs"]`) yields both the
+    incoherent `spec` and a `spec_coherent`, each matching a direct
+    `mc_spectrum` on the SAME segments -- the single-transport / dual-kernel
+    invariant."""
+    import cxr_mc.montecarlo.runner as runner
+
+    monkeypatch.setattr(
+        runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID)
+    )
+    segs = _segments(2)
+    segs.update(n_backscattered=0, n_missed=0)
+
+    case = _runner_case()
+    case["coherent_emission"] = True
+    out = runner._spectrum_case_impl(case, _runner_tp(segs))
+
+    direct_incoherent = mc_spectrum(segs, E_GRID, coherent=False, **KWARGS)
+    direct_coherent = mc_spectrum(segs, E_GRID, coherent=True, **KWARGS)
+
+    np.testing.assert_allclose(out["spec"], direct_incoherent, rtol=RTOL)
+    np.testing.assert_allclose(out["spec_coherent"], direct_coherent, rtol=RTOL)
+    # The two kernels genuinely differ for this in-phase pair (n^2 build-up),
+    # so `spec` is NOT silently the coherent array.
+    assert not np.allclose(out["spec"], out["spec_coherent"], rtol=RTOL, atol=0.0)
