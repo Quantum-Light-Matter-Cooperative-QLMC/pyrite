@@ -48,10 +48,10 @@ Gap = a local in-process **section emitter + refresh loop** that reuses
 - `src/cxr_mc/_remote/presentation.py` — the renderer lives under `_remote/`
   but is transport-agnostic. Extract the render surface (`_format_job_status`,
   `_encode_sections`/`_marked_sections`, `_format_compute_usage`,
-  `_overall_progress_line`, `_parse_progress_records`, `_style_states`) into a
-  shared module (e.g. `src/cxr_mc/_dashboard/` or `cli/_dashboard.py`) that both
-  `_remote` and local `scan.py` import. Keep `_remote` re-exporting to avoid
-  churn. **No visual/format change to the remote view.**
+  `_overall_progress_line`, `_parse_progress_records`, `_style_states`) into
+  `cli/_dashboard.py` (decided — see Decisions) that both `_remote` and local
+  `scan.py` import. Keep `_remote/presentation.py` re-exporting to avoid churn.
+  **No visual/format change to the remote view.**
 - `src/cxr_mc/scan.py` — build sections in-process from the existing callback
   state (`latest_progress`, `latest_case`, cost/timing snapshots): `META` from
   run config/mode, `STATE` from run lifecycle, `PROGRESS` from records,
@@ -75,12 +75,15 @@ Gap = a local in-process **section emitter + refresh loop** that reuses
 
 ## Stepwise checklist
 
-- [ ] Extract shared renderer out of `_remote/presentation.py`; `_remote`
+- [ ] Extract shared renderer into `cli/_dashboard.py`; `_remote/presentation.py`
       re-exports; **snapshot-verify remote view byte-identical**.
-- [ ] Local section emitter in `scan.py` from existing callback state.
+- [ ] Local section emitter in `scan.py` from existing callback state; PROGRESS
+      via in-memory records → `json.dumps` → `_parse_progress_records`, with
+      sanitization factored into a shared helper.
 - [ ] Local GPU/host probe helper; guarded, silent on absence.
-- [ ] Refresh loop (rich `Live` or the `_live_status` redraw pattern in
-      `_remote/viewer.py:408`) replacing tqdm when interactive.
+- [ ] Refresh loop reusing `_render_frame` (`_remote/viewer.py:264`) + a thin
+      local timer tick — not `_live_status` wholesale — replacing tqdm when
+      interactive; tqdm fallback when non-tty.
 - [ ] Wire `-v/-vv` verbosity → `detail`; honor `--no-progress`, `NO_COLOR`,
       non-tty fallback.
 - [ ] Tests: emitter produces valid sections; partial-section rendering (no
@@ -88,16 +91,41 @@ Gap = a local in-process **section emitter + refresh loop** that reuses
       unchanged.
 - [ ] Regenerate `docs/cli-reference.md` if any `cxr run` help/flags change.
 
-## Decisions / open questions
+## Decisions (closed)
 
-- **Rich `Live` vs redraw loop.** `_remote/viewer._live_status` already does an
-  ANSI redraw loop with no rich dependency. Prefer reusing that pattern over
-  introducing `rich.Live` unless rich is already a dep. Decide during design.
-- **Shared module home.** `cli/_dashboard.py` vs new `_dashboard/` package —
-  pick by import-cycle safety (`presentation` imports `cli._core`).
-- **In-memory vs progress-file.** Local can compose sections directly from
-  callback state (no temp file) rather than write→read the progress file.
-  Confirm `_parse_progress_records` isn't the only source of derived fields.
+- **Renderer: reuse `_render_frame` + `_format_job_status`; no `rich`.** `rich`
+  is absent from `pyproject.toml` and unimported in `src/`; do not add it.
+  `_remote/viewer._render_frame` (`viewer.py:264`) already does a zero-dep ANSI
+  redraw (`\x1b[H\x1b[2J\x1b[3J` + frame), tty-gated, over exactly
+  `_style_states(_format_job_status(sections, detail))`. Extract **only** the
+  frame-render + a thin local timer-tick loop. Do **not** reuse `_live_status`
+  wholesale — it is SSH/SLURM-welded (`_KeyListener`, `scancel` on x+y, chain-hop
+  scheduler-ID watchdog, `_status_stream`; `viewer.py:408-482`), none of which
+  the local case wants. tqdm stays the non-tty fallback, gated on
+  `presentation._color_enabled()` exactly as the viewer does.
+- **Shared-renderer home: extract into `cli/_dashboard.py`; `_remote` re-exports.**
+  Move the transport-agnostic surface (`_format_job_status`,
+  `_encode_sections`/`_marked_sections`, `_format_compute_usage`,
+  `_overall_progress_line`, `_parse_progress_records`, `_style_states`,
+  glyph/color tables). No cycle: `presentation.py` imports only stdlib +
+  `cli._core` (`presentation.py:11`) — no transport/ssh — and `cli/_core.py`
+  imports neither `scan` nor `presentation` nor `_remote` at module scope, so
+  `scan → cli._dashboard → cli._core` has no path back to `scan`.
+  `_remote/presentation.py` re-exports the moved names for back-compat. Guard
+  the move with a snapshot test asserting `cxr remote status -a -vv` output is
+  byte-identical before/after.
+- **PROGRESS source: in-memory records → `json.dumps` → `_parse_progress_records`.**
+  `scan.py` already holds the structured state before `_write_progress_record`
+  serializes it, and `_parse_progress_records` (`presentation.py:888`) derives
+  nothing new — it only validates/sanitizes and keys by material. So build the
+  record dicts in memory, `json.dumps` them to a string, and feed
+  `_parse_progress_records(string)`: same validation as remote, **no disk I/O**,
+  no divergence. Factor the per-record sanitization
+  (`_sanitize_cost_fields`/`_sanitize_timing_fields`) into a helper both the
+  parser and the in-memory builder call, so validation lives in one place. A
+  first slice may poll the existing `--progress-file` scan already writes, but
+  the in-memory path is the clean end state — do not couple the local dashboard
+  to a temp file long-term.
 - **SLURM-on-node detection.** `$SLURM_JOB_ID` present ⇒ emit `SQUEUE` for own
   job only; do not shell `squeue` for the whole queue locally.
 
