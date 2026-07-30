@@ -285,9 +285,9 @@ def _performance_profile(ctx, param, value):
     "--nsys",
     is_flag=True,
     help=(
-        "Capture one uncached full-profile session with Nsight Systems CUDA/NVTX "
-        "tracing (writes a .nsys-rep next to the perf log); requires exactly one "
-        "material via -m and -p/--perf."
+        "Capture one uncached Nsight Systems CUDA/NVTX trace of the run (writes a "
+        ".nsys-rep next to the perf log); defaults to the profile's full "
+        "membership (-m narrows to one member). Requires -p/--perf."
     ),
 )
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
@@ -325,11 +325,8 @@ def command(
         raise click.UsageError("--perf-interval requires -p/--perf")
     if (spec_chunk is not None or brem_chunk is not None) and performance_profile is None:
         raise click.UsageError("--spec-chunk/--brem-chunk require -p/--perf")
-    if nsys:
-        if performance_profile is None:
-            raise click.UsageError("--nsys requires -p/--perf")
-        if material is None:
-            raise click.UsageError("--nsys requires exactly one material via -m/--material")
+    if nsys and performance_profile is None:
+        raise click.UsageError("--nsys requires -p/--perf")
     # Pin the GPU spectrum/brem chunk before the runtime import so the main
     # process and every spawned transport worker (env inherited on spawn/
     # forkserver) read it. Mirrors the remote job script's `export
@@ -432,22 +429,24 @@ def _nsys_reexec_command(
     under CXR_MC_NSYS=1, mirroring the remote job script's nsys launcher
     (:mod:`cxr_mc._remote.scripts`). It points the child at an isolated,
     always-uncached checkpoint dir so the trace covers real GPU work rather
-    than a fast checkpoint resume."""
+    than a fast checkpoint resume. ``material`` is optional: when omitted the
+    capture covers the profile's full membership and the trace/checkpoint stem
+    falls back to the profile name."""
     perf_root = (
         Path(performance_dir) if performance_dir is not None else Path("performance-profiles")
     )
-    trace_base = perf_root / performance_profile / material
-    checkpoint_dir = perf_root / performance_profile / "nsys-checkpoints" / material
+    stem = material if material is not None else performance_profile
+    trace_base = perf_root / performance_profile / stem
+    checkpoint_dir = perf_root / performance_profile / "nsys-checkpoints" / stem
     child = [
         sys.executable,
         "-m",
         "cxr_mc._entry.scan",
         catalog_profile,
-        "-m",
-        material,
-        "--performance-profile",
-        performance_profile,
     ]
+    if material is not None:
+        child += ["-m", material]
+    child += ["--performance-profile", performance_profile]
     if performance_dir is not None:
         child += ["--performance-dir", str(performance_dir)]
     if performance_interval != 5.0:

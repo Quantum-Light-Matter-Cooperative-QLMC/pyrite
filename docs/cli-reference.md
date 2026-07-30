@@ -116,10 +116,10 @@ Options:
                                -p/--perf.
   --brem-chunk N               Pin bremsstrahlung segments per GPU chunk; requires
                                -p/--perf.
-  --nsys                       Capture one uncached full-profile session with Nsight
-                               Systems CUDA/NVTX tracing (writes a .nsys-rep next to the
-                               perf log); requires exactly one material via -m and
-                               -p/--perf.
+  --nsys                       Capture one uncached Nsight Systems CUDA/NVTX trace of
+                               the run (writes a .nsys-rep next to the perf log);
+                               defaults to the profile's full membership (-m narrows to
+                               one member). Requires -p/--perf.
   --fidelity [full|survey]     Named settings/grid-reduction policy. survey is
                                provisional and reduced.  [default: full]
   --json                       Emit one versioned JSON object on stdout.

@@ -134,11 +134,26 @@ def test_run_nsys_requires_perf():
     assert "--nsys requires -p/--perf" in result.output
 
 
-def test_run_nsys_requires_single_material():
-    result = CliRunner().invoke(scan.command, ["sub_100keV", "-p", "--nsys"])
+def test_run_nsys_defaults_to_full_profile_membership(monkeypatch):
+    captured = {}
 
-    assert result.exit_code == 2
-    assert "exactly one material" in result.output
+    def fake_reexec(**kwargs):
+        captured.update(kwargs)
+
+    def fail_run(args):  # pragma: no cover - must not be reached
+        raise AssertionError("run() must not execute in-process under --nsys")
+
+    monkeypatch.setattr(scan, "_reexec_under_nsys", fake_reexec)
+    monkeypatch.setattr(scan, "run", fail_run)
+    result = CliRunner().invoke(
+        scan.command,
+        ["sub_100keV", "-p", "--nsys"],
+        catch_exceptions=False,
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["material"] is None  # full membership, no -m required
+    assert captured["performance_profile"] == "sub_100keV"
 
 
 def test_run_chunk_pins_exported_before_runtime_import(monkeypatch):
@@ -207,6 +222,26 @@ def test_nsys_reexec_command_builds_launcher_and_uncached_checkpoint():
     assert "--checkpoint-dir" in argv
     assert "performance-profiles/sub_100keV/nsys-checkpoints/hopg" in argv
     assert str(trace_base) == "performance-profiles/sub_100keV/hopg"
+
+
+def test_nsys_reexec_command_full_membership_uses_profile_stem():
+    argv, trace_base = scan._nsys_reexec_command(
+        catalog_profile="sub_100keV",
+        material=None,
+        performance_profile="sub_100keV",
+        performance_dir=None,
+        performance_interval=5.0,
+        workers=None,
+        fidelity="full",
+        quick=False,
+        n_families=None,
+    )
+
+    # full membership: only the `python -m cxr_mc._entry.scan` flag, no `-m <mat>`
+    assert argv.count("-m") == 1
+    assert "--output=performance-profiles/sub_100keV/sub_100keV" in argv
+    assert "performance-profiles/sub_100keV/nsys-checkpoints/sub_100keV" in argv
+    assert str(trace_base) == "performance-profiles/sub_100keV/sub_100keV"
 
 
 def test_reexec_under_nsys_errors_when_nsys_missing(monkeypatch):
