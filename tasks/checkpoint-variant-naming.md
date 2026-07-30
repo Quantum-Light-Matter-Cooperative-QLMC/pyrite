@@ -152,3 +152,46 @@ still wanted versus superseded by `catalog_profile`-based naming.
   check notebooks/analysis_app.py` passes if the notebook changed further.
 - `docs/repo_map.md`, README CLI table, `docs/cli-reference.md` regenerated
   if CLI surface changed.
+
+## Resolution status (2026-07-29)
+
+Decisions locked by user (do not re-litigate):
+- **A** — migrate stems to `<material>@<label>-<digest>` (@-stems), retaining a
+  12-hex digest for collision-safety; label = non-standard `catalog_profile`
+  else fidelity.
+- **B** — drop the `cxr config` / `--preset` / `cxr-overrides.toml` design;
+  keep `catalog_profile` / `materials.toml`.
+
+Migration path chosen: **dual-read** (non-destructive). `variant_stem` writes
+@-stems; `_VARIANT_STEM_RE` + `identity_from_stem` resolve BOTH new `@` and
+legacy `--<fidelity>-` stems. No rename/disk-touching migration; existing
+on-disk `--hash` checkpoints keep resolving via their sidecar (authoritative)
+or recompute (both stem shapes handled).
+
+Checklist:
+1. Naming scheme — DONE (Decision A).
+2. Plan doc rewritten for @-stems, `cxr config`/overrides retired — DONE.
+3. Sidecar-authoritative identity — LANDED in c6586c4; kept green.
+4. `analyze.profile_menu`/`material_menu` promoted (sidecar-driven, @- and
+   `--`-stem agnostic); `material_menu` type-narrowed. New @-stem browsability
+   test added; verified live in `cxr app analysis --smoke`. — DONE.
+5. `cxr checkpoints` — **DEFERRED** (recommendation recorded in plan doc):
+   browsability delivered by the app; `cxr checkpoint list` already = archive
+   shelf, so an active-stem listing needs a fresh cli-ui-ux naming decision
+   (beyond the two locked decisions). Recommend follow-up `cxr checkpoint ls`,
+   list all, flag unresolvable `unknown`.
+6. `--coherent` help + `docs/cli-reference.md` + `tests/data/cli_contract.json`
+   regenerated. `repo_map.md`/README unchanged (command set unchanged). — DONE.
+7. Full suite (2133 pass; 3 PRE-EXISTING `attach`/`REMOTE_COMMANDS` failures
+   unrelated to this task, confirmed at base 353e52f), lint clean, typecheck
+   clean re: this work (6 optional-dep import errors are env-only on WSL),
+   marimo check pass, smoke pass (canonical hopg + real legacy-variant hopg).
+
+Remote consumers verified for both stem shapes: `_SHELL_TOKEN_RE` allows `@`;
+`_split_profile_selector` treats a full @-stem as literal (not a query);
+`_resolve_survey_stems` matches `@survey-`; `resolve_profile_stem`/prune resolve
+via sidecar unchanged.
+
+Follow-ups: `cxr checkpoint ls` (above); emission-token stem embedding is
+cosmetic and owned nominally here but left to `feature/profile-emission-modes`
+coordination (digest+sidecar already carry correctness).
