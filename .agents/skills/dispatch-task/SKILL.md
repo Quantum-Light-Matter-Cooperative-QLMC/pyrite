@@ -10,7 +10,7 @@ caller also assigns it to this agent.
 
 ## Inventory
 
-1. Read `main:TODO.md`, matching `tasks/<branch-leaf>.md`,
+1. Read `main:TODO.md`, matching `tasks/<branch-name>/` (entry doc `README.md`),
    `git worktree list --porcelain`, branch status, and relevant instructions.
 2. Use `repo-orientation` and Tokensave to confirm owners, dependencies, and
    affected tests. Exact paths and non-code text may use `rg` or direct reads.
@@ -36,7 +36,8 @@ belong to `triage`; do not grant worker push or TODO authority implicitly.
 Only when explicitly asked:
 
 1. Verify branch landed and identify durable task content.
-2. Promote durable content to `docs/`; remove task file; update backlog.
+2. Promote durable content to `docs/`; remove the task directory; update
+   backlog.
 3. Commit and push authorized lifecycle changes.
 4. Remove worktree/branch only after clean-state and recovery checks. Report
    deleted local/remote refs.
@@ -63,7 +64,7 @@ Send explicit values; never rely on child inheriting supervisor context.
 ```text
 Worker skill:
 Task:
-Task file:
+Task doc (tasks/<branch-name>/README.md):
 Worktree:
 Branch:
 Slice / non-goals:

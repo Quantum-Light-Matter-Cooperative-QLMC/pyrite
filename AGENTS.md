@@ -78,8 +78,9 @@ If `uv run` cannot write project environment, add
 ## Backlog and physics
 
 `TODO.md` stays identical across branches. Branch detail belongs in
-`tasks/<branch-leaf>.md`; see `tasks/README.md`. Work touching tracked items
-uses `todo-sync` only for exact cross-branch consistency.
+`tasks/<branch-name>/` (full task branch name; entry doc `README.md`); see
+`tasks/README.md`. Work touching tracked items uses `todo-sync` only for exact
+cross-branch consistency.
 
 New/edited physics requires source equation, assumptions, limiting case,
 `Validation: <id>`, and ledger row. Fresh context verifies it; only human marks

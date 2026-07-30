@@ -23,7 +23,9 @@ and branch push; stop before dispatch.
 2. For each task, preserve full intent and read every linked design doc. Use
    `repo-orientation` and Tokensave when implementation ownership needs
    confirmation.
-3. For each task, derive `<leaf>` and draft `tasks/<leaf>.md` with:
+3. For each task, derive `<branch-name>` (the full task branch name) and draft
+   `tasks/<branch-name>/README.md` (slashes nest, e.g.
+   `tasks/feature/oom-stage2/README.md`) with:
 
    - problem and scope
    - implementation path and likely owners
@@ -35,11 +37,12 @@ and branch push; stop before dispatch.
 4. Create each local task branch/worktree if absent. Stop on name collision,
    unrelated dirty state, ambiguous intent, or missing design evidence.
 5. For each task, replace its existing marker or insert direct-input work as one
-   canonical `TODO.md` summary with branch and `tasks/<leaf>.md` pointers. Place
-   it in the appropriate priority/state section. Invoke `todo-sync`.
+   canonical `TODO.md` summary with branch and `tasks/<branch-name>/` pointers.
+   Place it in the appropriate priority/state section. Invoke `todo-sync`.
 6. Commit the setup on `main` in one commit: stage explicit paths only
-   (`TODO.md`, each new `tasks/<leaf>.md`); never `git add .`, never sweep
-   unrelated dirty state. Use a `docs(tasks): triage <leaf>`-style message.
+   (`TODO.md`, each new `tasks/<branch-name>/`); never `git add .`, never sweep
+   unrelated dirty state. Use a `docs(tasks): triage <branch-name>`-style
+   message.
 7. Push `main` and each new task branch with upstream (`git push -u`). Verify
    remote refs before presenting.
 8. Show task docs, TODO diff, commit, pushed branches/worktrees, assumptions,
@@ -48,3 +51,4 @@ and branch push; stop before dispatch.
 
 Do not implement or dispatch. After approval, `dispatch-task` owns worker
 handoff and eventual teardown.
+

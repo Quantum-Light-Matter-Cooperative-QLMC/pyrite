@@ -8,7 +8,8 @@ description: Use when implementing a coherent cxr-mc task checklist slice on its
 ## Start
 
 1. Confirm handoff, cwd, branch, worktree, status, merge state, and authority.
-   Read `AGENTS.md`, `main:TODO.md`, matching task file, and required skills.
+   Read `AGENTS.md`, `main:TODO.md`, matching task doc
+   (`tasks/<branch-name>/README.md`), and required skills.
 2. Invoke `todo-sync` and verify TODO invariant. Do not edit TODO unless
    `todo-writer: yes`; preserve `>user<` text.
 3. Invoke `repo-orientation`; read `docs/repo_map.md`, then use Tokensave for

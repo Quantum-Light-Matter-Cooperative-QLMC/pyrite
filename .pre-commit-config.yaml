@@ -19,3 +19,15 @@ repos:
     rev: 0.9.1
     hooks:
       - id: nbstripout
+
+  # Mirror canonical .agents/skills -> generated .claude/skills, staging the
+  # churn so both trees land in the same commit. Runs only when a staged path
+  # touches either skill tree.
+  - repo: local
+    hooks:
+      - id: sync-skills
+        name: sync .agents/skills -> .claude/skills
+        entry: scripts/hooks/sync-skills.sh
+        language: system
+        files: ^\.(agents|claude)/skills/
+        pass_filenames: false

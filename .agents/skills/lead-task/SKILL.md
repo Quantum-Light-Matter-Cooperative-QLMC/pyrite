@@ -10,14 +10,14 @@ Own milestone outcome, not unlimited repository scope.
 ## Establish control
 
 1. Read `AGENTS.md`; invoke `todo-sync` and `repo-orientation`. Confirm
-   `main:TODO.md`, task file, all worktrees/branches, clean ownership, merge
-   state, dependencies, and authority.
+   `main:TODO.md`, task doc (`tasks/<branch-name>/README.md`), all
+   worktrees/branches, clean ownership, merge state, dependencies, and authority.
 2. If authorized as TODO writer, preserve invariant and `>user<` text. New-task
    setup requires task doc + synced TODO setup commit and upstream push before
    implementation. Otherwise never edit TODO.
 3. Resolve goal, non-goals, decisions, acceptance evidence, owning paths,
    dependency order, integration points, and risks. Record branch-specific
-   detail in task file, durable landed decisions in `docs/`.
+   detail in the task doc, durable landed decisions in `docs/`.
 4. Use Tokensave first. Invoke every matching domain skill. Require fresh
    physics validation context for changed physics; route heavy compute through
    `remote-gpu-jobs`.
