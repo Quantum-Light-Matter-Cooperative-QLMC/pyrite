@@ -7,9 +7,17 @@ driver — run `uv run cxr-dev bootstrap` once per clone). Branch detail lives i
 [`tasks/README.md`](tasks/README.md). `>user<` marks untriaged user text that
 must remain until moved into a task file. Edit and drop items on `main`.
 
+1. **>user<** random thoughts, reamin to be triaged:
+   1. split up `cxr clear` command into each individual place where things could be cleared, e.g.,`cxr profile clear <profile>` to drop the checkpoints for that profile (TBD how this interacts with shared checkpoints/--no-cache -- please advise)
+   2. Force `cxr run <profile> -p` to operate as `--no-cache`? Force other required defaults rather than request user to supply them?
+   3. Drop `cxr checkpoint recompute` -- seems extraneous and confusing, doesn't work with current profile conventions
+   4. Maybe rework `cxr checkpoint` entirely? Once shared checkpoints between profiles are implemented, their provenance/ownership/naming becomes contested, so this command becomes confusing/difficult to use or implement well. Please advise on rework, how to move any important functionality to other commands.
+   5. tab completions are extremely slow, often takes multiple seconds to appear. Needs to be fixed
+
 ## P1 - top-priority / high-value
 
 ### Active
+
 
 1. **Compute performance optimization.** Measure and improve stable remote
    CPU/GPU/RAM/VRAM utilization without OOM, keeping the GPU fed where evidence
