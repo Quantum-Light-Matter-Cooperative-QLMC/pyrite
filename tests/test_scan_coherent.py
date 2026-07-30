@@ -1,17 +1,38 @@
-"""Regression tests for the ``cxr run --coherent/--incoherent`` policy flag."""
+"""Regression tests for the profile-owned emission policy on ``cxr run``.
+
+The former ``--coherent/--incoherent`` CLI flags are gone: emission
+(``incoherent``/``coherent``/``both``) is resolved from the profile onto
+``Settings.emission`` and drives both the ``dataset_identity`` divergence key
+and the canonical-stem collision guard. These tests inject the emission a
+profile would resolve (via ``default_settings``) and assert the resulting stem
+and digest, plus the absence of the removed flags."""
+
+from dataclasses import replace
 
 from click.testing import CliRunner
 
 from cxr_mc import scan
 
 
-def _resolved_run(monkeypatch, argv):
+def _resolved_run(monkeypatch, argv, emission=None):
+    """Invoke ``cxr run`` and capture ``_resolved_run``'s output. When
+    ``emission`` is given, wrap ``default_settings`` so the resolved profile
+    reports that emission mode -- the profile-owned path that replaces the
+    removed CLI flags."""
     captured = {}
 
     def capture(args):
         captured["run"] = scan._resolved_run(args, "hopg")
 
     monkeypatch.setattr(scan, "run", capture)
+    if emission is not None:
+        scan._load_runtime()
+        base = scan.default_settings
+        monkeypatch.setattr(
+            scan,
+            "default_settings",
+            lambda *a, **k: replace(base(*a, **k), emission=emission),
+        )
     result = CliRunner().invoke(
         scan.command, ["standard", "-m", "hopg", *argv], catch_exceptions=False
     )
@@ -19,63 +40,76 @@ def _resolved_run(monkeypatch, argv):
     return captured["run"]
 
 
-def test_scan_coherent_sets_settings_and_qualified_stem(monkeypatch):
-    settings, _sweep, identity, stem = _resolved_run(monkeypatch, ["--coherent"])
+def test_default_run_is_incoherent_canonical_stem(monkeypatch):
+    settings, _sweep, identity, stem = _resolved_run(monkeypatch, [])
 
+    assert settings.emission == "incoherent"
+    assert settings.coherent_emission is False
+    # incoherent keeps its historical bare <material> stem and adds no key
+    assert "emission" not in identity["resolved_parameters"]
+    assert stem == "hopg"
+
+
+def test_coherent_profile_gets_qualified_stem_and_divergent_digest(monkeypatch):
+    _s_def, _sw, id_def, stem_def = _resolved_run(monkeypatch, [])
+    settings, _sweep, identity, stem = _resolved_run(monkeypatch, [], emission="coherent")
+
+    assert settings.emission == "coherent"
     assert settings.coherent_emission is True
     # coherent joins the hash (divergence-only rule) and forces off canonical <material>
-    assert identity["resolved_parameters"].get("coherent_emission") is True
+    assert identity["resolved_parameters"].get("emission") == "coherent"
+    assert stem != "hopg"
+    assert stem.startswith("hopg--full-")
+    assert identity["parameter_sha256"] != id_def["parameter_sha256"]
+
+
+def test_both_profile_gets_qualified_stem_and_divergent_digest(monkeypatch):
+    settings, _sweep, identity, stem = _resolved_run(monkeypatch, [], emission="both")
+
+    assert settings.emission == "both"
+    assert settings.coherent_emission is True
+    assert identity["resolved_parameters"].get("emission") == "both"
     assert stem != "hopg"
     assert stem.startswith("hopg--full-")
 
 
-def test_scan_default_is_incoherent_canonical_stem(monkeypatch):
-    settings, _sweep, identity, stem = _resolved_run(monkeypatch, [])
+def test_three_emission_modes_never_collide(monkeypatch):
+    _s_i, _sw_i, id_i, stem_i = _resolved_run(monkeypatch, [])
+    _s_c, _sw_c, id_c, stem_c = _resolved_run(monkeypatch, [], emission="coherent")
+    _s_b, _sw_b, id_b, stem_b = _resolved_run(monkeypatch, [], emission="both")
 
-    assert settings.coherent_emission is False
-    # incoherent run keeps its historical bare <material> stem and digest
-    assert "coherent_emission" not in identity["resolved_parameters"]
-    assert stem == "hopg"
-
-
-def test_scan_incoherent_flag_matches_default(monkeypatch):
-    _s_default, _sw, id_default, stem_default = _resolved_run(monkeypatch, [])
-    _s_off, _sw_off, id_off, stem_off = _resolved_run(monkeypatch, ["--incoherent"])
-
-    # explicit --incoherent is the default: same canonical stem and digest
-    assert stem_off == stem_default == "hopg"
-    assert id_off["parameter_sha256"] == id_default["parameter_sha256"]
+    stems = {stem_i, stem_c, stem_b}
+    digests = {
+        id_i["parameter_sha256"],
+        id_c["parameter_sha256"],
+        id_b["parameter_sha256"],
+    }
+    assert len(stems) == 3
+    assert len(digests) == 3
+    assert stem_i == "hopg"  # incoherent stays canonical
 
 
-def test_scan_coherent_and_incoherent_never_collide(monkeypatch):
-    _s_on, _sw_on, id_on, stem_on = _resolved_run(monkeypatch, ["--coherent"])
-    _s_off, _sw_off, id_off, stem_off = _resolved_run(monkeypatch, ["--incoherent"])
+def test_coherent_incoherent_flags_are_removed():
+    # The policy flags no longer exist -- Click rejects them as unknown options.
+    for flag in ("--coherent", "--incoherent"):
+        result = CliRunner().invoke(scan.command, ["standard", "-m", "hopg", flag])
+        assert result.exit_code == 2, result.output
+        assert "no such option" in result.output.lower()
 
-    assert stem_on != stem_off
-    assert id_on["parameter_sha256"] != id_off["parameter_sha256"]
 
-
-def test_scan_coherent_help_lists_both_switches():
+def test_help_no_longer_lists_coherent_incoherent():
     result = CliRunner().invoke(scan.command, ["--help"])
 
     assert result.exit_code == 0
-    assert "--coherent / --incoherent" in result.output
-    assert "incoherent, the default" in result.output
+    assert "--coherent" not in result.output
+    assert "--incoherent" not in result.output
 
 
-def test_scan_rejects_quick_coherent_collision():
-    # --quick writes the digest-free <material>_quick stem, so a coherent quick
-    # run would clobber the incoherent quick checkpoint; reject the combination.
-    result = CliRunner().invoke(scan.command, ["hopg", "--quick", "--coherent"])
+def test_quick_run_is_incoherent_quick_stem(monkeypatch):
+    # --quick resolves to the digest-free <material>_quick stem; emission stays
+    # the profile default (incoherent). No coherent-quick collision to reject now
+    # that emission is profile-owned rather than a transient flag.
+    settings, _sweep, _identity, stem = _resolved_run(monkeypatch, ["--quick"])
 
-    assert result.exit_code == 2
-    assert "--quick cannot be combined with --coherent" in result.output
-
-
-def test_scan_allows_quick_incoherent(monkeypatch):
-    # --quick --incoherent is the default policy, not a collision: it resolves
-    # to the digest-free <material>_quick stem with coherent tracking off.
-    settings, _sweep, _identity, stem = _resolved_run(monkeypatch, ["--quick", "--incoherent"])
-
-    assert settings.coherent_emission is False
+    assert settings.emission == "incoherent"
     assert stem == "hopg_quick"

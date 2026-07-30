@@ -135,15 +135,6 @@
             "required": false
           },
           {
-            "dest": "coherent",
-            "help": "Sum CXR segment amplitudes with bunch phases (coherent) instead of adding segment intensities (incoherent, the default). Omit to defer to the profile. A coherent run gets an identity-qualified checkpoint stem (<material>--full-<digest>), so it never shares or clobbers the incoherent <material> checkpoint.",
-            "option_strings": [
-              "--coherent",
-              "--incoherent"
-            ],
-            "required": false
-          },
-          {
             "dest": "checkpoint_dir",
             "help": "Read and write checkpoint pickles in DIR.",
             "option_strings": [
@@ -216,7 +207,7 @@
             "required": false
           }
         ],
-        "help": "Usage: cxr run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to standard and owns material membership, campaign ranges,\n  and workload settings. Use -m/--material to run one profile member instead of\n  the full resolved membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL    Run one member of PROFILE instead of its full\n                             membership.\n  --workers NUMBER           run_cases max_workers (default auto; 0 = serial, no\n                             transport pool).\n  --quick                    Use tiny smoke-test grid and write\n                             <material>_quick.pkl.\n  --n-families NUMBER        Override positive dominant reflection-family count.\n  --coherent / --incoherent  Sum CXR segment amplitudes with bunch phases\n                             (coherent) instead of adding segment intensities\n                             (incoherent, the default). Omit to defer to the\n                             profile. A coherent run gets an identity-qualified\n                             checkpoint stem (<material>--full-<digest>), so it\n                             never shares or clobbers the incoherent <material>\n                             checkpoint.\n  --checkpoint-dir DIR       Read and write checkpoint pickles in DIR.\n                             [default: checkpoints]\n  --max-minutes MINUTES      Soft wall-clock budget in minutes; exit 75 if\n                             resumable work remains.\n  --fidelity [full|survey]   Named settings/grid-reduction policy. survey is\n                             provisional and reduced.  [default: full]\n  --json                     Emit one versioned JSON object on stdout.\n  -h, --help                 Show this message and exit.\n",
+        "help": "Usage: cxr run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to standard and owns material membership, campaign ranges,\n  and workload settings. Use -m/--material to run one profile member instead of\n  the full resolved membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL   Run one member of PROFILE instead of its full\n                            membership.\n  --workers NUMBER          run_cases max_workers (default auto; 0 = serial, no\n                            transport pool).\n  --quick                   Use tiny smoke-test grid and write\n                            <material>_quick.pkl.\n  --n-families NUMBER       Override positive dominant reflection-family count.\n  --checkpoint-dir DIR      Read and write checkpoint pickles in DIR.  [default:\n                            checkpoints]\n  --max-minutes MINUTES     Soft wall-clock budget in minutes; exit 75 if\n                            resumable work remains.\n  --fidelity [full|survey]  Named settings/grid-reduction policy. survey is\n                            provisional and reduced.  [default: full]\n  --json                    Emit one versioned JSON object on stdout.\n  -h, --help                Show this message and exit.\n",
         "hidden": false,
         "path": "run",
         "subcommands": []
