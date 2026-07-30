@@ -1,10 +1,12 @@
 """Named profile, provenance, and variant-storage regression contracts."""
 
+import json
 from dataclasses import replace
 
 import numpy as np
 import pytest
 
+from cxr_mc import _checkpoint_store
 from cxr_mc.config import default_settings, material_sweep
 from cxr_mc.detectors import DetectorSpec
 from cxr_mc.profiles import (
@@ -13,6 +15,7 @@ from cxr_mc.profiles import (
     dataset_identity,
     get_profile,
     identity_from_stem,
+    named_profile_identity,
     named_profile_stem,
     variant_stem,
 )
@@ -275,3 +278,44 @@ def test_identity_from_stem_resolves_non_standard_catalog_profile():
     # standard-profile variant stems keep resolving as before
     survey = named_profile_stem("hopg", "survey")
     assert identity_from_stem(survey)["catalog_profile"] == "standard"
+
+
+def test_identity_from_stem_reads_sidecar_when_profile_edited_after_run(tmp_path):
+    """Regression (2026-07-29): a checkpoint written under a named profile that
+    is edited *after* the run no longer resolves via recompute -- the stem's
+    digest was fixed at run time, and the edited profile now hashes to a
+    different value, so no candidate recompute matches. But the run-time
+    ``dataset_identity`` recorded in the stem's ``meta.json`` sidecar is
+    authoritative and still resolves. Mirrors the two on-disk
+    ``hopg_hbn_microtrain_200fs`` stems found that day (two runs a minute apart,
+    profile edited in between, neither recoverable by recompute)."""
+    # Identity as recorded at run time. A fabricated digest stands in for "the
+    # backing profile was later edited": the stem commits to this run-time
+    # digest, which no recompute against the current catalog can reproduce.
+    run_time_identity = {
+        **named_profile_identity("hopg", "full", catalog_profile="sub_100keV"),
+        "parameter_sha256": "dead" * 16,  # 64 hex chars, un-recomputable today
+    }
+    stem = variant_stem(run_time_identity)
+    assert stem == "hopg--full-deaddeaddead"
+
+    # Recompute-only path fails exactly as it did in the field.
+    assert identity_from_stem(stem) is None
+
+    # Write the run-time sidecar the sweep would have left beside the checkpoint.
+    manifest = _checkpoint_store.manifest_path(stem, tmp_path)
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(json.dumps({"dataset_identity": run_time_identity}))
+
+    # Sidecar read recovers the run-time identity regardless of the edit. The
+    # fabricated digest proves the result came from the sidecar, not recompute.
+    recovered = identity_from_stem(stem, tmp_path)
+    assert recovered is not None
+    assert recovered["parameter_sha256"] == "dead" * 16
+    assert recovered["material"] == "hopg"
+    assert recovered["fidelity"] == "full"
+    assert recovered["catalog_profile"] == "sub_100keV"
+
+    # A stem with no sidecar under the given root still falls back to recompute
+    # (which returns None for this fabricated digest).
+    assert identity_from_stem(stem, tmp_path / "no-such-checkpoint") is None

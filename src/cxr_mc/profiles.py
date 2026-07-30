@@ -12,6 +12,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
@@ -403,15 +404,51 @@ def _catalog_profile_candidates() -> tuple[str, ...]:
     return ("standard", *CATALOG.profile_names)
 
 
-def identity_from_stem(stem: str) -> dict[str, Any] | None:
-    """Reconstruct unmodified named-profile identity from a checkpoint stem.
+def _sidecar_identity(stem: str, root: str | os.PathLike[str]) -> dict[str, Any] | None:
+    """Return the resolved ``dataset_identity`` recorded in a stem's
+    ``meta.json`` sidecar at run time (:func:`cxr_mc.run._manifest_save`), or
+    ``None`` when no sidecar/identity is present. This is authoritative: it
+    survives edits to the backing named profile after the run, which a live
+    recompute against the *current* catalog would not (the digest would no
+    longer match). Same sidecar read already relied on by
+    :func:`archive._dataset_identity` and the remote lifecycle. Local import of
+    ``_checkpoint_store`` mirrors the deferred-import pattern used elsewhere in
+    this module."""
+    from . import _checkpoint_store
 
-    The stem's digest commits to a ``catalog_profile`` (hashed into the
-    payload whenever it diverges from ``standard``) but does not name it, so a
-    variant stem is matched by recomputing the identity under each known
-    catalog profile until the digests agree. A material that is not a member
-    of a candidate profile raises inside ``material_sweep`` -- that candidate
-    is simply skipped."""
+    manifest = _checkpoint_store.manifest_path(stem, root)
+    if not manifest.is_file():
+        return None
+    try:
+        with manifest.open() as handle:
+            identity = json.load(handle).get("dataset_identity")
+    except (OSError, ValueError, TypeError):
+        return None
+    return identity if isinstance(identity, dict) else None
+
+
+def identity_from_stem(
+    stem: str, root: str | os.PathLike[str] | None = None
+) -> dict[str, Any] | None:
+    """Reconstruct resolved identity from a checkpoint stem.
+
+    When ``root`` is given and the stem's ``meta.json`` sidecar records a
+    ``dataset_identity``, that recorded identity is authoritative and returned
+    directly. Reading the sidecar (the established pattern in
+    :func:`archive._dataset_identity` and ``_remote/lifecycle``) stays correct
+    even after the backing named profile is edited post-run -- a live recompute
+    against the current catalog would silently fail to match in that case.
+
+    Only stems with no such sidecar fall back to recomputing: the stem's digest
+    commits to a ``catalog_profile`` (hashed into the payload whenever it
+    diverges from ``standard``) but does not name it, so a variant stem is
+    matched by recomputing the identity under each known catalog profile until
+    the digests agree. A material that is not a member of a candidate profile
+    raises inside ``material_sweep`` -- that candidate is simply skipped."""
+    if root is not None:
+        recorded = _sidecar_identity(stem, root)
+        if recorded is not None:
+            return recorded
     match = _VARIANT_STEM_RE.fullmatch(stem)
     if match is not None:
         for catalog_profile in _catalog_profile_candidates():

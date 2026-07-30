@@ -56,7 +56,11 @@ def _grid_from_stem(in_path):
         return _material_from_stem(in_path)
     from .profiles import identity_from_stem
 
-    identity = identity_from_stem(stem)
+    # Pass the checkpoint's parent dir so identity_from_stem can read the stem's
+    # meta.json sidecar (authoritative dataset_identity recorded at run time)
+    # rather than recomputing against the possibly-edited live catalog.
+    root = os.path.dirname(os.path.normpath(in_path))
+    identity = identity_from_stem(stem, root)
     if identity is None:
         raise SystemExit(
             f"--grid: cannot resolve named-profile identity from checkpoint stem {stem!r}"
