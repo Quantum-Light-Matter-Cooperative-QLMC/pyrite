@@ -194,6 +194,15 @@ spacing_periods = 1
 modulation_depth = 1.0
 timing_jitter_fs = 0.0
 
+
+[profiles.compute_test]
+thickness_ang = {values = [10000000.0]}
+energy_keV = {values = [30.0, 60.0, 100.0, 200.0, 300.0]}
+tilt_deg = {values = [10.0, 45.0, 80.0]}
+tilt_azim_deg = {values = [100.0, 120.0, 180.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
+detector = {observation_angle_deg = 90.0}
+materials = ["hopg", "hbn", "mose2", "hfte2", "mos2"]
 [energy_grids.standard]
 line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } }, source = "derived" },
