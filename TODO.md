@@ -7,13 +7,6 @@ driver — run `uv run cxr-dev bootstrap` once per clone). Branch detail lives i
 [`tasks/README.md`](tasks/README.md). `>user<` marks untriaged user text that
 must remain until moved into a task file. Edit and drop items on `main`.
 
-1. **>user<** random thoughts, reamin to be triaged:
-   1. split up `cxr clear` command into each individual place where things could be cleared, e.g.,`cxr profile clear <profile>` to drop the checkpoints for that profile (TBD how this interacts with shared checkpoints/--no-cache -- please advise)
-   2. Force `cxr run <profile> -p` to operate as `--no-cache`? Force other required defaults rather than request user to supply them?
-   3. Drop `cxr checkpoint recompute` -- seems extraneous and confusing, doesn't work with current profile conventions
-   4. Maybe rework `cxr checkpoint` entirely? Once shared checkpoints between profiles are implemented, their provenance/ownership/naming becomes contested, so this command becomes confusing/difficult to use or implement well. Please advise on rework, how to move any important functionality to other commands.
-   5. tab completions are extremely slow, often takes multiple seconds to appear. Needs to be fixed
-
 ## P1 - top-priority / high-value
 
 ### Active
@@ -82,6 +75,12 @@ must remain until moved into a task file. Edit and drop items on `main`.
    cases instead of sharing them; investigate a dedup key/storage model.
    Investigation only, not yet scoped. → `feature/cross-profile-case-reuse`;
    [`tasks/feature/cross-profile-case-reuse/`](tasks/feature/cross-profile-case-reuse/).
+7. **Checkpoint command surface rework.** Split `cxr clear` into scoped
+   commands, fix or drop `cxr checkpoint recompute` under current profile
+   conventions, and rework `cxr checkpoint` once shared-checkpoint provenance
+   is decided. Blocked on `feature/cross-profile-case-reuse`'s dedup design;
+   design-first. → `feature/checkpoint-command-rework`;
+   [`tasks/feature/checkpoint-command-rework/`](tasks/feature/checkpoint-command-rework/).
 
 ## P3 - lower / exploratory / small bugfixes / on-hold
 
@@ -94,3 +93,13 @@ must remain until moved into a task file. Edit and drop items on `main`.
    overwrites it; remote chunked-queue interaction needs a design decision
    first. → `feature/run-no-cache`;
    [`tasks/feature/run-no-cache/`](tasks/feature/run-no-cache/).
+6. **`-p`/`--perf` should force `--no-cache`.** A `cxr run --perf` sample
+   against a warm checkpoint skips already-resumed cases, silently thinning
+   the performance profile; force `--no-cache` (and audit other `--perf`
+   flag interactions for the same silent-mismatch failure mode). Blocked on
+   `feature/run-no-cache` landing. → `feature/perf-flag-no-cache-defaults`;
+   [`tasks/feature/perf-flag-no-cache-defaults/`](tasks/feature/perf-flag-no-cache-defaults/).
+7. **Tab completion latency.** Shell completion for `cxr` often takes
+   multiple seconds; likely SSH-bound remote completion timeout or
+   process-startup overhead, not confirmed. → `feature/tab-completion-latency`;
+   [`tasks/feature/tab-completion-latency/`](tasks/feature/tab-completion-latency/).
