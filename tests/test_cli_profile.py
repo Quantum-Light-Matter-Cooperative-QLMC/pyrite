@@ -86,6 +86,65 @@ def test_show_and_bare_name_alias(tmp_path, monkeypatch):
     assert payload["overrides"] == {"hopg": ["thickness_ang"]}
 
 
+def test_show_create_and_set_round_trip_longitudinal_beam(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    created = invoke(
+        profile.command,
+        [
+            "create",
+            "microtrain",
+            "--materials",
+            "hopg",
+            "--transverse-fwhm-mm",
+            "0.1",
+            "--rep-rate-hz",
+            "5000",
+            "--bunch-charge-pc",
+            "1",
+            "--longitudinal",
+            "microtrain",
+            "--envelope-rms-fs",
+            "200",
+        ],
+    )
+    assert_clean_result(created, stdout="created profile microtrain\n")
+
+    shown = invoke(profile.command, ["show", "microtrain", "--json"])
+    assert_clean_result(shown)
+    beam = json.loads(shown.stdout)["payload"]["beam"]
+    assert beam == {
+        "transverse_fwhm_mm": 0.1,
+        "rep_rate_hz": 5000.0,
+        "bunch_charge_pc": 1.0,
+        "longitudinal": {"kind": "microtrain", "envelope_rms_fs": 200.0},
+    }
+
+    changed = invoke(
+        profile.command,
+        ["set", "microtrain", "--longitudinal", "compressed", "--bunch-charge-pc", "1"],
+    )
+    assert_clean_result(changed, stdout="updated profile microtrain\n")
+    text = catalog.read_text()
+    section = text.split("[profiles.microtrain.beam.longitudinal]", 1)[1].split("\n[", 1)[0]
+    assert 'kind = "compressed"' in section
+    assert "envelope_rms_fs" not in section
+
+
+def test_add_does_not_merge_longitudinal_policy(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    original = catalog.read_text()
+
+    result = invoke(
+        profile.command,
+        ["add", "sub_100keV", "--longitudinal", "compressed"],
+    )
+
+    assert result.exit_code == 2
+    assert "No such option '--longitudinal'" in result.stderr
+    assert catalog.read_text() == original
+
+
 def test_show_unknown_profile_suggests_and_points_to_create(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 

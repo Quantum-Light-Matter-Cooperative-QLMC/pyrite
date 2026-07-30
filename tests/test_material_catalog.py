@@ -355,6 +355,49 @@ def test_profile_beam_offsets_coerced_to_tuple_and_absent_profile_is_none(tmp_pa
     assert catalog.profile_beam("bogus") is None
 
 
+def test_profile_longitudinal_policy_decodes_and_reaches_material_sweep(tmp_path, monkeypatch):
+    from cxr_mc import config
+    from cxr_mc.materials import load_material_catalog
+
+    text = _catalog_with_standard_beam(
+        "\n[profiles.standard.beam]\n"
+        "bunch_charge_pc = 1.0\n"
+        "\n[profiles.standard.beam.longitudinal]\n"
+        'kind = "microtrain"\n'
+        "envelope_rms_fs = 200.0\n"
+        "retained_coherence = 0.9\n"
+    )
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
+
+    policy = catalog.profile_beam("standard")["longitudinal"]
+    assert policy == {
+        "kind": "microtrain",
+        "envelope_rms_fs": 200.0,
+        "retained_coherence": 0.9,
+    }
+    monkeypatch.setattr(config, "CATALOG", catalog)
+    sweep = config.material_sweep("mos2")
+    assert sweep.beam.bunch_charge_pc == 1.0
+    assert sweep.beam.longitudinal.kind == "microtrain"
+    assert sweep.beam.longitudinal.envelope_rms_fs == 200.0
+
+
+@pytest.mark.parametrize(
+    ("policy", "message"),
+    [
+        ('kind = "compressed"\nenvelope_rms_fs = 200.0', "must be omitted"),
+        ('kind = "gaussian"\nenvelope_rms_fs = 200.0\nretained_coherence = 0.8', "does not accept"),
+        ('kind = "microtrain"', "must be a finite positive"),
+    ],
+)
+def test_profile_longitudinal_policy_rejects_invalid_combinations(tmp_path, policy, message):
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    text = _catalog_with_standard_beam("\n[profiles.standard.beam.longitudinal]\n" + policy + "\n")
+    with pytest.raises(MaterialConfigError, match=message):
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+
 def test_bundled_crystal_validation_ids_are_ledgered():
     from cxr_mc import DATA_DIR
 

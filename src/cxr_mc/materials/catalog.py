@@ -692,7 +692,94 @@ _BEAM_POSITIVE_KEYS = frozenset(
     }
 )
 _BEAM_LONG_SHAPES = frozenset({"gaussian", "uniform"})
-_BEAM_KEYS = _BEAM_POSITIVE_KEYS | {"long_shape", "long_offsets_fs"}
+_BEAM_KEYS = _BEAM_POSITIVE_KEYS | {"long_shape", "long_offsets_fs", "longitudinal"}
+
+_LONGITUDINAL_KINDS = frozenset({"gaussian", "microtrain", "compressed"})
+_LONGITUDINAL_KEYS = frozenset(
+    {
+        "kind",
+        "envelope_rms_fs",
+        "retained_coherence",
+        "target_reflection",
+        "spacing_periods",
+        "modulation_depth",
+        "timing_jitter_fs",
+    }
+)
+
+
+def _parse_longitudinal_policy(raw: object, path: str, errors: _Errors) -> dict[str, object] | None:
+    """Validate one declarative longitudinal distribution policy."""
+    table = _table(raw, path, errors)
+    if table is None:
+        return None
+    errors.keys(table, path, set(_LONGITUDINAL_KEYS))
+    kind = table.get("kind")
+    if not isinstance(kind, str) or kind not in _LONGITUDINAL_KINDS:
+        errors.add(f"{path}.kind", f"must be one of {sorted(_LONGITUDINAL_KINDS)}")
+        return None
+
+    out: dict[str, object] = {"kind": kind}
+    envelope = table.get("envelope_rms_fs")
+    if kind in {"gaussian", "microtrain"}:
+        number = _number(envelope)
+        if number is None or number <= 0:
+            errors.add(f"{path}.envelope_rms_fs", "must be a finite positive number")
+        else:
+            out["envelope_rms_fs"] = number
+    elif envelope is not None:
+        errors.add(f"{path}.envelope_rms_fs", "must be omitted for compressed")
+
+    eta = table.get("retained_coherence", 0.9)
+    eta_number = _number(eta)
+    if eta_number is None or not 0 < eta_number <= 1:
+        errors.add(f"{path}.retained_coherence", "must satisfy 0 < eta <= 1")
+    elif "retained_coherence" in table:
+        out["retained_coherence"] = eta_number
+
+    spacing = table.get("spacing_periods", 1)
+    if type(spacing) is not int or spacing < 1:
+        errors.add(f"{path}.spacing_periods", "must be a positive integer")
+    elif "spacing_periods" in table:
+        out["spacing_periods"] = spacing
+
+    modulation = table.get("modulation_depth", 1.0)
+    modulation_number = _number(modulation)
+    if modulation_number is None or not 0 <= modulation_number <= 1:
+        errors.add(f"{path}.modulation_depth", "must satisfy 0 <= depth <= 1")
+    elif "modulation_depth" in table:
+        out["modulation_depth"] = modulation_number
+
+    jitter = table.get("timing_jitter_fs", 0.0)
+    jitter_number = _number(jitter)
+    if jitter_number is None or jitter_number < 0:
+        errors.add(f"{path}.timing_jitter_fs", "must be finite and non-negative")
+    elif "timing_jitter_fs" in table:
+        out["timing_jitter_fs"] = jitter_number
+
+    reflection = table.get("target_reflection")
+    if reflection is not None:
+        valid = (
+            isinstance(reflection, list)
+            and len(reflection) == 3
+            and all(type(item) is int for item in reflection)
+            and any(reflection)
+        )
+        if not valid:
+            errors.add(f"{path}.target_reflection", "must be a nonzero integer triple")
+        else:
+            out["target_reflection"] = tuple(reflection)
+
+    targeted = (
+        reflection is not None
+        or eta_number != 0.9
+        or spacing != 1
+        or modulation_number != 1.0
+        or jitter_number != 0.0
+    )
+    if kind == "gaussian" and targeted:
+        errors.add(path, "gaussian does not accept target-line or modulation controls")
+    return out
 
 
 def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, object] | None:
@@ -723,6 +810,10 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
                 errors.add(f"{path}.long_offsets_fs", "must be a non-empty array of finite numbers")
             else:
                 out[key] = tuple(offsets)
+        elif key == "longitudinal":
+            policy = _parse_longitudinal_policy(value, f"{path}.longitudinal", errors)
+            if policy is not None:
+                out[key] = MappingProxyType(policy)
         elif key in _BEAM_POSITIVE_KEYS:
             number = _number(value)
             if number is None or number <= 0:

@@ -202,9 +202,13 @@ claims until corrected and independently revalidated.
   straight-trajectory regression anchors resonance cancellation. Fresh-context
   revalidation verdict is `rederived`, including the qualified long-bunch limit
   that removes inter-electron but not intra-electron cross terms.
-- Catalog/CLI profiles, physical-charge estimator, paired analysis, and
-  representative remote campaigns remain. Remote/full-campaign evidence is
-  explicitly deferred while remote capacity is unavailable.
+- Three catalog profiles now resolve the exact 16-case HOPG/h-BN grid with
+  explicit `0.1 mm` circular Gaussian FWHM, `1 pC`, and `5 kHz` beam inputs.
+  Profile CLI create/set/show round-trips these beam and longitudinal fields;
+  `add` remains set-like and rejects longitudinal policy options.
+- Physical-charge coherent-estimator weighting remains. Paired analysis starts
+  as a manual user workflow; representative remote campaigns remain explicitly
+  deferred while remote capacity is unavailable.
 
 ## Acceptance checks
 

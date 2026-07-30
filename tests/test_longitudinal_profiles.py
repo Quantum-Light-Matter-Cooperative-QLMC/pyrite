@@ -3,10 +3,12 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
+from cxr_mc.config import material_sweep
 from cxr_mc.longitudinal import (
     H_EV_FS,
     LongitudinalDistribution,
 )
+from cxr_mc.materials import CATALOG
 from cxr_mc.montecarlo.transport import C_ANG_PER_FS, _sample_bunch_offsets
 from cxr_mc.profiles import dataset_identity
 from cxr_mc.results import Settings
@@ -82,6 +84,48 @@ def test_three_campaign_policies_have_16_cases_and_only_longitudinal_differences
         assert gaussian["rms_duration_fs"] == 200.0
         assert train["envelope_rms_fs"] == 200.0
         assert compressed["rms_duration_fs"] == pytest.approx(train["microbunch_rms_fs"])
+
+
+def test_bundled_campaign_profiles_resolve_exact_shared_beam_and_case_grid():
+    def plain(value):
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+        if isinstance(value, dict):
+            return {key: plain(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [plain(item) for item in value]
+        return value
+
+    names = (
+        "hopg_hbn_gaussian_200fs",
+        "hopg_hbn_microtrain_200fs",
+        "hopg_hbn_compressed_microbunch",
+    )
+    assert all(CATALOG.profile_materials(name) == ("hopg", "hbn") for name in names)
+    for name in names:
+        beam = material_sweep("hopg", profile=name).beam
+        assert beam.transverse_fwhm_x_mm == 0.1
+        assert beam.transverse_fwhm_y_mm == 0.1
+        assert beam.bunch_charge_pc == 1.0
+        assert beam.rep_rate_hz == 5000.0
+
+    campaigns = [
+        [
+            case
+            for material in ("hopg", "hbn")
+            for case in build_cases(material_sweep(material, profile=name))
+        ]
+        for name in names
+    ]
+    assert [len(cases) for cases in campaigns] == [16, 16, 16]
+    for group in zip(*campaigns, strict=True):
+        common = [
+            plain({key: value for key, value in case.items() if key != "longitudinal_distribution"})
+            for case in group
+        ]
+        assert common[0] == common[1] == common[2]
+        for case in group:
+            assert case["beam_fwhm_mm"] == 0.1
 
 
 def test_microtrain_sampling_is_deterministic_centered_and_has_target_bunching():

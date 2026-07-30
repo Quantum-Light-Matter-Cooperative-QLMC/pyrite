@@ -25,6 +25,7 @@ from typing import Any
 
 import numpy as np
 
+from .longitudinal import LongitudinalDistribution
 from .materials import CATALOG, MaterialSpec, load_material_catalog
 from .montecarlo import simulate_trajectories
 from .profiles import get_profile
@@ -135,7 +136,11 @@ def material_sweep(
     beam = BeamSpec(energy_keV=scan.energy_keV)
     beam_fields = _catalog(catalog_profile).profile_beam(catalog_profile)
     if beam_fields:
-        beam = beam_replace(beam, **beam_fields)
+        beam_changes = dict(beam_fields)
+        longitudinal = beam_changes.get("longitudinal")
+        if longitudinal is not None:
+            beam_changes["longitudinal"] = LongitudinalDistribution(**dict(longitudinal))
+        beam = beam_replace(beam, **beam_changes)
     sweep = Sweep(
         material=spec.crystal_key,
         theta_obs_deg=theta_obs_deg,
