@@ -120,6 +120,8 @@ Options:
                                the run (writes a .nsys-rep next to the perf log);
                                defaults to the profile's full membership (-m narrows to
                                one member). Requires -p/--perf.
+  --no-progress                Disable progress bars/dashboard.
+  -v, --verbose                Increase dashboard detail.
   --fidelity [full|survey]     Named settings/grid-reduction policy. survey is
                                provisional and reduced.  [default: full]
   --json                       Emit one versioned JSON object on stdout.

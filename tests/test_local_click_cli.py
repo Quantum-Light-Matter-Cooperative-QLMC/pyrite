@@ -89,6 +89,7 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch):
         "performance_dir": None,
         "progress_file": None,
         "no_progress": False,
+        "verbose": 0,
     }
 
 
