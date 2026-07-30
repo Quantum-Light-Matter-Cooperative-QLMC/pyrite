@@ -35,6 +35,28 @@ from .transport import TRANSPORT_ELEMENTS, beta_from_keV
 _SEG_ARRAYS = ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "t0_ang", "elec_id", "layer")
 
 
+def _sincsq_lineshape(a_width_j, E_grid, E_r_j):
+    """``sinc(a_width*(E - E_res)/pi)**2`` -- the finite-time line profile.
+
+    Previously spelled ``xp.sinc(x)**2`` over a freshly built ``x``; on the GPU
+    that was 5+ separate CuPy elementwise kernels (subtract, multiply, divide,
+    sinc, square) each allocating a full ``[seg, E]`` temporary -- the launch
+    storm that dominated the 300 keV line profile (``cxr.lines`` ~75 s, ~187k
+    ``cuLaunchKernel``). Written as one function it JIT-fuses to a single kernel
+    under CuPy (see ``xp.fuse`` wrap below); on NumPy it runs eager but is
+    bit-for-bit identical to the old ``np.sinc(x)**2`` -- ``np.sinc`` is exactly
+    ``y = pi*where(x==0, 1e-20, x); sin(y)/y`` -- so CPU goldens are unchanged.
+    """
+    x = a_width_j * (E_grid - E_r_j) / xp.pi
+    y = xp.pi * xp.where(x == 0.0, 1.0e-20, x)
+    s = xp.sin(y) / y
+    return s * s
+
+
+if hasattr(xp, "fuse"):  # CuPy exposes fuse(); NumPy/dpnp do not -> eager fallback
+    _sincsq_lineshape = xp.fuse()(_sincsq_lineshape)
+
+
 def _segments_in_layer(segments, L):
     """A view of `segments` restricted to those emitted in layer index L, keeping
     the scalar fields (Ne, thickness_ang, ...) so the per-electron normalization
@@ -585,8 +607,7 @@ def mc_spectrum(
                 m = good[sl]
                 if not m.any():
                     continue
-                x = a_width[sl][m, None] * (E_grid[None, :] - E_r[sl][m, None]) / xp.pi
-                S = xp.sinc(x) ** 2
+                S = _sincsq_lineshape(a_width[sl][m, None], E_grid[None, :], E_r[sl][m, None])
                 for w, tgt in targets:
                     tgt += w[sl][m] @ S
         else:
@@ -608,8 +629,7 @@ def mc_spectrum(
                 )
                 if i1 <= i0:
                     continue
-                x = a_width[sel][:, None] * (E_grid[None, i0:i1] - E_r[sel][:, None]) / xp.pi
-                S = xp.sinc(x) ** 2
+                S = _sincsq_lineshape(a_width[sel][:, None], E_grid[None, i0:i1], E_r[sel][:, None])
                 for w, tgt in targets:
                     tgt[i0:i1] += w[sel] @ S
 
