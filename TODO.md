@@ -60,6 +60,12 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
    HOPG/h-BN profiles with paired coherent/incoherent analysis. →
    `feature/longitudinal-bunch-profiles`;
    [`tasks/longitudinal-bunch-profiles.md`](tasks/longitudinal-bunch-profiles.md).
+5. **Local run progress dashboard.** Replace the bare `cxr run <profile>` tqdm
+   bar with the multi-panel dashboard used by `cxr remote status -a -vv`,
+   rendering only the panels with local data — omit SLURM `SQUEUE` off-node and
+   GPU rows without a GPU; fall back to tqdm when non-interactive. →
+   `feature/local-run-dashboard`;
+   [`tasks/local-run-dashboard.md`](tasks/local-run-dashboard.md).
 
 ## P3 - lower / exploratory / small bugfixes / on-hold
 
