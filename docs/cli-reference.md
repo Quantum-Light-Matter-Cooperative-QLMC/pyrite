@@ -1277,6 +1277,13 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
+  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.  [x>0.0]
+  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]
+  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]
+  --longitudinal [gaussian|microtrain|compressed]
+                                  Replace the complete declarative longitudinal policy.
+  --envelope-rms-fs FS            RMS duration for gaussian or microtrain longitudinal
+                                  policy.  [x>0.0]
   --materials KEY,...             Set explicit initial membership (comma-separated
                                   material keys).
   --dry-run                       Print proposed TOML diff; write nothing.
@@ -1459,6 +1466,13 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
+  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.  [x>0.0]
+  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]
+  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]
+  --longitudinal [gaussian|microtrain|compressed]
+                                  Replace the complete declarative longitudinal policy.
+  --envelope-rms-fs FS            RMS duration for gaussian or microtrain longitudinal
+                                  policy.  [x>0.0]
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.

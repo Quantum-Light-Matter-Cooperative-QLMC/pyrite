@@ -78,6 +78,40 @@ def _range_cli_options(function):
     return function
 
 
+def _beam_cli_options(function):
+    function = click.option(
+        "--envelope-rms-fs",
+        type=click.FloatRange(min=0.0, min_open=True),
+        metavar="FS",
+        help="RMS duration for gaussian or microtrain longitudinal policy.",
+    )(function)
+    function = click.option(
+        "--longitudinal",
+        "longitudinal_kind",
+        type=click.Choice(("gaussian", "microtrain", "compressed")),
+        help="Replace the complete declarative longitudinal policy.",
+    )(function)
+    function = click.option(
+        "--bunch-charge-pc",
+        type=click.FloatRange(min=0.0, min_open=True),
+        metavar="PC",
+        help="Physical charge per bunch in pC.",
+    )(function)
+    function = click.option(
+        "--rep-rate-hz",
+        type=click.FloatRange(min=0.0, min_open=True),
+        metavar="HZ",
+        help="Bunch repetition rate in Hz.",
+    )(function)
+    function = click.option(
+        "--transverse-fwhm-mm",
+        type=click.FloatRange(min=0.0, min_open=True),
+        metavar="MM",
+        help="Circular Gaussian transverse FWHM in mm.",
+    )(function)
+    return function
+
+
 def _collect_updates(thickness, energy, polar, azimuth, ne_line=None, ne_brem=None):
     return {
         label: value
@@ -91,6 +125,53 @@ def _collect_updates(thickness, energy, polar, azimuth, ne_line=None, ne_brem=No
         }.items()
         if value is not None
     }
+
+
+def _collect_beam_updates(
+    transverse_fwhm_mm,
+    rep_rate_hz,
+    bunch_charge_pc,
+    longitudinal_kind,
+    envelope_rms_fs,
+):
+    if longitudinal_kind is None and envelope_rms_fs is not None:
+        raise click.UsageError("--envelope-rms-fs requires --longitudinal")
+    if longitudinal_kind == "compressed" and envelope_rms_fs is not None:
+        raise click.UsageError("compressed derives its duration; omit --envelope-rms-fs")
+    if longitudinal_kind in {"gaussian", "microtrain"} and envelope_rms_fs is None:
+        raise click.UsageError(f"{longitudinal_kind} requires --envelope-rms-fs")
+    updates = {
+        key: value
+        for key, value in {
+            "transverse_fwhm_mm": transverse_fwhm_mm,
+            "rep_rate_hz": rep_rate_hz,
+            "bunch_charge_pc": bunch_charge_pc,
+        }.items()
+        if value is not None
+    }
+    if longitudinal_kind is not None:
+        policy = {"kind": longitudinal_kind}
+        if envelope_rms_fs is not None:
+            policy["envelope_rms_fs"] = envelope_rms_fs
+        updates["longitudinal"] = policy
+    return updates
+
+
+def _apply_beam_updates(profile, updates):
+    if not updates:
+        return
+    beam = profile.get("beam")
+    if beam is None:
+        beam = tomlkit.table()
+        profile["beam"] = beam
+    for key, value in updates.items():
+        if key == "longitudinal":
+            policy = tomlkit.table()
+            for policy_key, policy_value in value.items():
+                policy[policy_key] = policy_value
+            beam[key] = policy
+        else:
+            beam[key] = value
 
 
 def _unknown_profile(document, name):
@@ -161,6 +242,8 @@ def _profile_payload(document, name):
     overrides = _catalog_io.profile_overrides(profile)
     materials = profile.get("materials")
     range_keys = [*_catalog_io.RANGES.items(), *_EXTRA_RANGES.items()]
+    beam = profile.get("beam")
+    beam_payload = beam.unwrap() if hasattr(beam, "unwrap") else None
     return {
         "name": name,
         "ranges": [
@@ -169,6 +252,7 @@ def _profile_payload(document, name):
             if key in profile
         ],
         "materials": list(materials) if isinstance(materials, list) else None,
+        "beam": beam_payload,
         "overrides": {
             material: sorted(row)
             for material, row in overrides.items()
@@ -185,6 +269,18 @@ def _emit_show(payload):
         emit_result("  materials: all in-use materials (implicit)")
     else:
         emit_result(f"  materials: {', '.join(payload['materials']) or '(none)'}")
+    if payload["beam"] is not None:
+        beam = payload["beam"]
+        for key in ("transverse_fwhm_mm", "rep_rate_hz", "bunch_charge_pc"):
+            if key in beam:
+                emit_result(f"  beam.{key}: {beam[key]:g}")
+        longitudinal = beam.get("longitudinal")
+        if isinstance(longitudinal, dict):
+            emit_result(f"  beam.longitudinal.kind: {longitudinal['kind']}")
+            if "envelope_rms_fs" in longitudinal:
+                emit_result(
+                    f"  beam.longitudinal.envelope_rms_fs: {longitudinal['envelope_rms_fs']:g}"
+                )
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
 
@@ -355,6 +451,7 @@ def show_command(name, json_output):
 )
 @_range_cli_options
 @_ne_cli_options
+@_beam_cli_options
 @click.option(
     "--materials",
     metavar="KEY,...",
@@ -363,7 +460,21 @@ def show_command(name, json_output):
 )
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def create_command(
-    name, source, thickness, energy, polar, azimuth, ne_line, ne_brem, materials, dry_run
+    name,
+    source,
+    thickness,
+    energy,
+    polar,
+    azimuth,
+    ne_line,
+    ne_brem,
+    transverse_fwhm_mm,
+    rep_rate_hz,
+    bunch_charge_pc,
+    longitudinal_kind,
+    envelope_rms_fs,
+    materials,
+    dry_run,
 ):
     """Create a new profile, cloning range defaults from --from (standard).
 
@@ -373,6 +484,13 @@ def create_command(
     """
     _check_name(name)
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
+    beam_updates = _collect_beam_updates(
+        transverse_fwhm_mm,
+        rep_rate_hz,
+        bunch_charge_pc,
+        longitudinal_kind,
+        envelope_rms_fs,
+    )
     source_name = source or "standard"
     try:
         original, document = _catalog_io.catalog_text()
@@ -391,6 +509,7 @@ def create_command(
             target[key] = _clone_grid(value)
         for label, values in updates.items():
             target[_catalog_key(label)] = _catalog_io.values_item(values)
+        _apply_beam_updates(target, beam_updates)
         if materials is not None:
             target["materials"] = _validate_materials(document, _csv_materials(materials))
         profiles[name] = target
@@ -403,6 +522,7 @@ def create_command(
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @_range_cli_options
 @_ne_cli_options
+@_beam_cli_options
 @click.option(
     "--materials",
     metavar="KEY,...",
@@ -411,7 +531,23 @@ def create_command(
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def set_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, materials, yes, dry_run):
+def set_command(
+    name,
+    thickness,
+    energy,
+    polar,
+    azimuth,
+    ne_line,
+    ne_brem,
+    transverse_fwhm_mm,
+    rep_rate_hz,
+    bunch_charge_pc,
+    longitudinal_kind,
+    envelope_rms_fs,
+    materials,
+    yes,
+    dry_run,
+):
     """Replace range grids on an existing profile.
 
     NAME must already exist (create it with ``cxr profile create``); unknown
@@ -419,8 +555,15 @@ def set_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, mater
     unless --yes is given; --dry-run never prompts.
     """
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
-    if not updates and materials is None:
-        raise click.UsageError("provide a range option")
+    beam_updates = _collect_beam_updates(
+        transverse_fwhm_mm,
+        rep_rate_hz,
+        bunch_charge_pc,
+        longitudinal_kind,
+        envelope_rms_fs,
+    )
+    if not updates and not beam_updates and materials is None:
+        raise click.UsageError("provide a range option or beam option")
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
@@ -430,7 +573,7 @@ def set_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, mater
         overwriting = [label for label in updates if _catalog_key(label) in target]
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
-    if overwriting or materials is not None:
+    if overwriting or beam_updates or materials is not None:
         _confirm_standard(
             name, f"overwrite {', '.join(overwriting) or 'materials'} on", yes, dry_run
         )
@@ -441,6 +584,7 @@ def set_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, mater
         )
     for label, values in updates.items():
         target[_catalog_key(label)] = _catalog_io.values_item(values)
+    _apply_beam_updates(target, beam_updates)
     if material_keys is not None:
         target["materials"] = material_keys
     return _write(document, original, dry_run, f"updated profile {name}")

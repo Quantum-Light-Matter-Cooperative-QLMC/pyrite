@@ -386,15 +386,17 @@ def run_case(case, record_timing=False):
 def _beam_kwargs(case):
     """Beam phase-space kwargs a case dict forwards to ``simulate_trajectories``:
     the transverse spot (elliptical ``beam_fwhm_mm`` / ``beam_fwhm_y_mm``) and
-    the longitudinal bunch (``bunch_length_fs`` / ``long_shape`` /
-    ``long_offsets_fs``). Absent keys default to the point-bunch isotropic beam,
-    bit-for-bit with the pre-BeamSpec case dict."""
+    the legacy longitudinal bunch (``bunch_length_fs`` / ``long_shape`` /
+    ``long_offsets_fs``) or resolved ``longitudinal_distribution`` policy.
+    Absent keys default to the point-bunch isotropic beam, bit-for-bit with the
+    pre-BeamSpec case dict."""
     return dict(
         beam_fwhm_mm=case.get("beam_fwhm_mm"),
         beam_fwhm_y_mm=case.get("beam_fwhm_y_mm"),
         bunch_length_fs=case.get("bunch_length_fs"),
         long_shape=case.get("long_shape", "gaussian"),
         long_offsets_fs=case.get("long_offsets_fs"),
+        longitudinal_distribution=case.get("longitudinal_distribution"),
     )
 
 
