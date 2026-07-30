@@ -134,16 +134,21 @@ labelable in the menu. The pretty stem name lands with the naming task.
 
 ## Decisions and open questions
 
-- **Old-coherent-stem compatibility.** Renaming the hashed key
-  `coherent_emission`→`emission` changes every existing coherent checkpoint's
-  digest. Default: rev-and-re-run (coherent is unverified/experimental). Confirm
-  no coherent checkpoints on the GPU box are worth preserving; if some are, keep
-  emitting the legacy `coherent_emission=True` for the coherent-only case and
-  add `emission="both"` only for the new mode. **DECISION NEEDED before step 2.**
-- **`coherent`-only economics.** Incoherent `spec` is cheap once `segs` exist,
-  so keeping `spec` for a `coherent`-only run is nearly free and avoids the
-  KeyError class below. Confirm we always store `spec` (recommended) vs. truly
-  omitting it to save the incoherent line pass on the 2× complex grid.
+- **Old-coherent-stem compatibility. DECIDED (2026-07-29): rev-and-re-run,
+  drop old checkpoints.** Rename the hashed key `coherent_emission`→`emission`
+  cleanly (no legacy-key back-compat branch). Existing coherent checkpoints are
+  orphaned and discarded — coherent is unverified/experimental, cheap to
+  regenerate. The incoherent digest still stays bit-for-bit (incoherent adds no
+  key), so only coherent stems change.
+- **`coherent`-only economics. DECIDED (2026-07-29): always store `spec`.**
+  Every emission mode (incoherent, coherent, both) stores the incoherent `spec`;
+  `spec_coherent` is added when emission includes coherent. Incoherent `spec` is
+  cheap once `segs` exist, and always keeping it eliminates the `record["spec"]`
+  KeyError class entirely. Net: `coherent` and `both` differ only in that `both`
+  is the identity/label name; both physically store the same two arrays.
+  Reconsider whether a separate `coherent`-only identity is even worth keeping
+  vs. collapsing to `incoherent`|`both` (open, low-stakes — the digest key can
+  carry either).
 - **`--emission` override flag?** Emission is profile-owned per the ask. Optional
   future `--emission incoherent|coherent|both` that sets the profile policy
   (rides identity) rather than a transient flag — out of scope unless requested.
