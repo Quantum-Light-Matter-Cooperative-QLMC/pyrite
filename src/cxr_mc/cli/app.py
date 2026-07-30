@@ -127,7 +127,9 @@ def viewer_command() -> click.Group:
 @click.option("--acp", is_flag=True, help="Start local Claude and Codex ACP bridges.")
 @click.option("--tunnel", is_flag=True, help="Use fixed port for SSH tunneling.")
 @click.pass_context
-def validation_command(ctx: click.Context, watch: bool, edit: bool, acp: bool, tunnel: bool) -> None:
+def validation_command(
+    ctx: click.Context, watch: bool, edit: bool, acp: bool, tunnel: bool
+) -> None:
     """Launch validation app when no nested command is selected."""
     if ctx.invoked_subcommand is None:
         check = _load("cxr_mc.check.command")
@@ -151,7 +153,9 @@ def validation_command(ctx: click.Context, watch: bool, edit: bool, acp: bool, t
 @click.option("--ne-brem", type=int, default=200, show_default=True)
 @click.option("--ne-supp", type=int, default=200, show_default=True)
 @click.pass_context
-def validation_export_command(ctx: click.Context, outdir: str, ne: int, ne_brem: int, ne_supp: int) -> None:
+def validation_export_command(
+    ctx: click.Context, outdir: str, ne: int, ne_brem: int, ne_supp: int
+) -> None:
     """Delegate cached-figure export to existing validation orchestration."""
     check = _load("cxr_mc.check.command")
     ctx.invoke(

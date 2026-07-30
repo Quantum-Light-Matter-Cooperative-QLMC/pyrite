@@ -1472,9 +1472,7 @@ def test_job_status_reports_scheduler_state_not_process_liveness(monkeypatch, ca
 
 
 def _queue_payload(*rows, partition="gpu"):
-    return "\n".join(
-        [f"cohort_partition={partition}|order=priority_desc_job_id_asc", *rows]
-    )
+    return "\n".join([f"cohort_partition={partition}|order=priority_desc_job_id_asc", *rows])
 
 
 @pytest.mark.parametrize(
@@ -1511,9 +1509,12 @@ def test_pending_queue_context_changes_with_priority_and_rejects_retired_or_malf
     assert presentation._pending_queue_context(before, "20")["rank"] == 2
     assert presentation._pending_queue_context(after, "20")["rank"] == 1
     assert presentation._pending_queue_context(before, "999") is None
-    assert presentation._pending_queue_context(
-        before + "\njob_id=bad|state=PENDING|partition=gpu|priority=nan", "bad"
-    ) is None
+    assert (
+        presentation._pending_queue_context(
+            before + "\njob_id=bad|state=PENDING|partition=gpu|priority=nan", "bad"
+        )
+        is None
+    )
     injected = _queue_payload(
         "job_id=20|state=PENDING|name=x|priority=999|partition=gpu|"
         "reason=Priority|priority=10|user=u"
@@ -4578,7 +4579,7 @@ def test_rebrem_queue_script_flags_progress_and_markers():
     )
     assert "cxr rebrem" in s
     assert "--ne-brem 1000" in s and "--step 25" in s and "--redo-all" in s
-# per-material progress record feeds the shared plain/attached status dashboard
+    # per-material progress record feeds the shared plain/attached status dashboard
     assert '--progress-file "$JOBDIR/progress/$m.json"' in s
     # completion markers match the scan queue's so _completed_materials works
     assert 'echo "completed: $m"' in s and 'echo "failed: $m"' in s

@@ -80,9 +80,7 @@ def _sample_bunch_offsets(
     """
     if longitudinal_distribution is not None:
         if bunch_length_fs is not None or long_offsets_fs is not None or long_shape != "gaussian":
-            raise ValueError(
-                "longitudinal_distribution is incompatible with legacy bunch fields"
-            )
+            raise ValueError("longitudinal_distribution is incompatible with legacy bunch fields")
         kind = longitudinal_distribution.get("kind")
         bunch_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(4)[3])
         if kind in ("gaussian", "compressed"):
@@ -113,9 +111,7 @@ def _sample_bunch_offsets(
                     "microtrain envelope RMS must exceed combined microbunch width and jitter"
                 )
             center_sigma_fs = np.sqrt(center_variance)
-            centers = np.rint(
-                bunch_rng.normal(0.0, center_sigma_fs / spacing_fs, size=Ne)
-            )
+            centers = np.rint(bunch_rng.normal(0.0, center_sigma_fs / spacing_fs, size=Ne))
             train = (
                 centers * spacing_fs
                 + bunch_rng.normal(0.0, microbunch_fs, size=Ne)

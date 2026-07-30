@@ -266,7 +266,9 @@ def profile_menu(material: str, checkpoint_dir: Path | str) -> tuple[MaterialMen
         digest = str(identity.get("parameter_sha256", ""))[:6]
         manifest = _stem_manifest_path(stem, root)
         mtime = manifest.stat().st_mtime if manifest is not None else 0.0
-        variants.append((-mtime, {"value": stem, "label": f"{label} ({digest})", "disabled": False}))
+        variants.append(
+            (-mtime, {"value": stem, "label": f"{label} ({digest})", "disabled": False})
+        )
     variants.sort(key=lambda item: item[0])
     rows.extend(row for _, row in variants)
     return tuple(rows)

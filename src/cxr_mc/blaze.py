@@ -404,9 +404,7 @@ def run(args):
             material=args.material,
             state="done" if complete else "paused",
             **latest_progress,
-            **progress_timer.snapshot(
-                completed_new_cases=latest_progress["completed_new_cases"]
-            ),
+            **progress_timer.snapshot(completed_new_cases=latest_progress["completed_new_cases"]),
         )
 
     n = sum(len(v) for v in results.values())

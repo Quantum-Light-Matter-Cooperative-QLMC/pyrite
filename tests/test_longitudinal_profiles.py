@@ -47,20 +47,16 @@ def test_target_timing_uses_pinned_basal_reflection_and_h_over_e(
     material, energy_keV, expected_energy_eV
 ):
     policy = LongitudinalDistribution("microtrain", envelope_rms_fs=200.0)
-    case = next(
-        case for case in _campaign_cases(material, policy) if case["E0_keV"] == energy_keV
-    )
+    case = next(case for case in _campaign_cases(material, policy) if case["E0_keV"] == energy_keV)
     resolved = case["longitudinal_distribution"]
 
     assert resolved["target_material"] == material
     assert resolved["target_crystal"] == material
     assert resolved["target_reflection"] == (0, 0, 2)
     assert resolved["target_energy_eV"] == pytest.approx(expected_energy_eV, rel=1e-9)
-    assert resolved["target_period_fs"] == pytest.approx(
-        H_EV_FS / resolved["target_energy_eV"]
-    )
+    assert resolved["target_period_fs"] == pytest.approx(H_EV_FS / resolved["target_energy_eV"])
     omega = 2.0 * np.pi / resolved["target_period_fs"]
-    assert np.exp(-(omega * resolved["microbunch_rms_fs"]) ** 2) == pytest.approx(0.9)
+    assert np.exp(-((omega * resolved["microbunch_rms_fs"]) ** 2)) == pytest.approx(0.9)
     assert resolved["spacing_fs"] == pytest.approx(resolved["target_period_fs"])
     assert "catalog-pinned" in resolved["provenance"]
 
@@ -78,7 +74,10 @@ def test_three_campaign_policies_have_16_cases_and_only_longitudinal_differences
 
     assert [len(cases) for cases in campaigns] == [16, 16, 16]
     for group in zip(*campaigns, strict=True):
-        common = [{key: value for key, value in case.items() if key != "longitudinal_distribution"} for case in group]
+        common = [
+            {key: value for key, value in case.items() if key != "longitudinal_distribution"}
+            for case in group
+        ]
         assert common[0] == common[1] == common[2]
         gaussian, train, compressed = (case["longitudinal_distribution"] for case in group)
         assert gaussian["rms_duration_fs"] == 200.0

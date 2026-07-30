@@ -98,9 +98,7 @@ def test_run_fidelity_dispatch_and_quick_conflict(monkeypatch):
     assert_clean_result(result)
     assert seen["fidelity"] == "survey"
 
-    conflict = invoke(
-        scan.command, ["standard", "-m", "hopg", "--fidelity", "survey", "--quick"]
-    )
+    conflict = invoke(scan.command, ["standard", "-m", "hopg", "--fidelity", "survey", "--quick"])
     assert conflict.exit_code == 2
     assert "cannot be combined" in conflict.stderr
 

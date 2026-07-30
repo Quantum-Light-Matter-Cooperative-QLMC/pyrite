@@ -463,6 +463,7 @@ class Sweep:
             )
         self.detector = base
 
+
 def _seq(x):
     """Normalize a scalar-or-sequence into a 1-D float array, order preserved."""
     return np.atleast_1d(np.asarray(x, dtype=float))

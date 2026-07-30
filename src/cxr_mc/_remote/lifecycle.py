@@ -535,7 +535,7 @@ def start_queue(
                         )
                     ),
                 ),
-            ("Monitor", f"cxr remote status {jobid} --attach"),
+                ("Monitor", f"cxr remote status {jobid} --attach"),
                 ("Status", f"cxr remote status {jobid} -vv"),
                 ("Logs", f"cxr remote logs {jobid} --follow"),
                 *(
@@ -607,7 +607,7 @@ def start_zhai_queue(
                 ("SLURM", scheduler_id),
                 ("Host", config.remote_host()),
                 ("Workload", "Zhai reproduction"),
-            ("Monitor", f"cxr remote status {jobid} --attach"),
+                ("Monitor", f"cxr remote status {jobid} --attach"),
                 ("Status", f"cxr remote status {jobid} -vv"),
                 ("Logs", f"cxr remote logs {jobid} --follow"),
                 ("Pull", "cxr remote check --pull  (after completion)"),
@@ -784,7 +784,7 @@ def start_rebrem_queue(
                         )
                     ),
                 ),
-            ("Monitor", f"cxr remote status {jobid} --attach"),
+                ("Monitor", f"cxr remote status {jobid} --attach"),
                 ("Status", f"cxr remote status {jobid} -vv"),
                 ("Logs", f"cxr remote logs {jobid} --follow"),
                 ("Pull", f"cxr remote pull {' '.join(stems)}  (after completion)"),
@@ -905,7 +905,7 @@ def start_reline_queue(
                         )
                     ),
                 ),
-            ("Monitor", f"cxr remote status {jobid} --attach"),
+                ("Monitor", f"cxr remote status {jobid} --attach"),
                 ("Status", f"cxr remote status {jobid} -vv"),
                 ("Logs", f"cxr remote logs {jobid} --follow"),
                 ("Pull", f"cxr remote pull {' '.join(stems)} --line-only  (after completion)"),

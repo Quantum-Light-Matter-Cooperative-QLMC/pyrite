@@ -529,13 +529,7 @@ def mc_spectrum(
                     if not m.any():
                         continue
                     x = a_width[sl][m, None] * (E_grid[None, :] - E_r[sl][m, None]) / xp.pi
-                    ph = xp.exp(
-                        1j
-                        * (
-                            d[sl][m, None] * omega_grid[None, :]
-                            - g_phase[sl][m, None]
-                        )
-                    )
+                    ph = xp.exp(1j * (d[sl][m, None] * omega_grid[None, :] - g_phase[sl][m, None]))
                     SP = xp.sinc(x).astype(cdtype) * ph
                     for c, f in zip(coefs, fields, strict=True):
                         f += c[sl][m] @ SP
@@ -560,11 +554,7 @@ def mc_spectrum(
                         continue
                     x = a_width[sel][:, None] * (E_grid[None, i0:i1] - E_r[sel][:, None]) / xp.pi
                     ph = xp.exp(
-                        1j
-                        * (
-                            d[sel][:, None] * omega_grid[None, i0:i1]
-                            - g_phase[sel][:, None]
-                        )
+                        1j * (d[sel][:, None] * omega_grid[None, i0:i1] - g_phase[sel][:, None])
                     )
                     SP = xp.sinc(x).astype(cdtype) * ph
                     for c, f in zip(coefs, fields, strict=True):

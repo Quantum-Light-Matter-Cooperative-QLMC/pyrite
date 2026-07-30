@@ -129,13 +129,8 @@ class SupplementaryCoherentStudy:
     detector: DetectorSpec = ZHAI_DETECTOR
 
     def __post_init__(self) -> None:
-        if (
-            self.detector.polar_acceptance_deg is None
-            or self.detector.solid_angle_sr is None
-        ):
-            raise ValueError(
-                "Zhai detector requires polar_acceptance_deg and solid_angle_sr"
-            )
+        if self.detector.polar_acceptance_deg is None or self.detector.solid_angle_sr is None:
+            raise ValueError("Zhai detector requires polar_acceptance_deg and solid_angle_sr")
 
     @property
     def theta_obs_rad(self) -> float:
@@ -324,13 +319,8 @@ class ZhaiAnchor:
     de_eV: float = 1.0
 
     def __post_init__(self) -> None:
-        if (
-            self.detector.polar_acceptance_deg is None
-            or self.detector.solid_angle_sr is None
-        ):
-            raise ValueError(
-                "Zhai detector requires polar_acceptance_deg and solid_angle_sr"
-            )
+        if self.detector.polar_acceptance_deg is None or self.detector.solid_angle_sr is None:
+            raise ValueError("Zhai detector requires polar_acceptance_deg and solid_angle_sr")
 
     @property
     def E_grid(self) -> np.ndarray:

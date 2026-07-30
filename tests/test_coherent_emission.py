@@ -86,9 +86,7 @@ def test_straight_trajectory_segments_are_in_phase_at_resonance(sinc_cutoff):
     single["Ne"] = 1
 
     energy_grid = target_energy + np.array([-1.0, 0.0, 1.0])
-    one_segment = mc_spectrum(
-        single, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **KWARGS
-    )
+    one_segment = mc_spectrum(single, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **KWARGS)
     two_segments = mc_spectrum(
         segments, energy_grid, coherent=True, sinc_cutoff=sinc_cutoff, **KWARGS
     )
@@ -129,9 +127,7 @@ def test_runner_always_stores_incoherent_spec_and_omits_spec_coherent(monkeypatc
     KeyError and no coherent grid is paid for."""
     import cxr_mc.montecarlo.runner as runner
 
-    monkeypatch.setattr(
-        runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID)
-    )
+    monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
     segs = _segments(2)
     segs.update(n_backscattered=0, n_missed=0)
 
@@ -149,9 +145,7 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
     invariant."""
     import cxr_mc.montecarlo.runner as runner
 
-    monkeypatch.setattr(
-        runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID)
-    )
+    monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
     segs = _segments(2)
     segs.update(n_backscattered=0, n_missed=0)
 

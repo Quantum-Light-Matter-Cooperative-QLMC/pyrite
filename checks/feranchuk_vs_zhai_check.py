@@ -28,11 +28,14 @@ def comparison_rows(anchor: ZhaiAnchor, model: dict) -> tuple[list[list], list[l
         (anchor.thick_bulk_ang, "1 mm bulk", model[anchor.energies_keV[-1]]),
     )
     for thickness_ang, label, record in targets:
-        analytic = feranchuk_line_flux(
-            anchor,
-            anchor.energies_keV[-1],
-            thickness_ang,
-        ) * anchor.per_nA
+        analytic = (
+            feranchuk_line_flux(
+                anchor,
+                anchor.energies_keV[-1],
+                thickness_ang,
+            )
+            * anchor.per_nA
+        )
         line_counts = record["line_flux_per_e"] * anchor.per_nA
         note = "" if thickness_ang < 1e4 else "outside Eq.(6) validity"
         rows.extend(

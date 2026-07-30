@@ -180,9 +180,7 @@ def test_export_cache_miss_is_clean_cli_failure(monkeypatch, tmp_path):
     class _FakeAF:
         @staticmethod
         def export_all_figures(*_args, **_kwargs):
-            raise FileNotFoundError(
-                "Zhai cache missing; populate it with `cxr remote validate`"
-            )
+            raise FileNotFoundError("Zhai cache missing; populate it with `cxr remote validate`")
 
     monkeypatch.setitem(sys.modules, "anchor_figures", _FakeAF())
 

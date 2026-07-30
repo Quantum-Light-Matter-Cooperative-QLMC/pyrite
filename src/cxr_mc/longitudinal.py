@@ -182,9 +182,7 @@ def resolve_longitudinal_distribution(
     else:
         raise ValueError("targeted longitudinal modes require catalog orientation provenance")
 
-    hkl = policy.target_reflection or _dominant_basal_reflection(
-        hkl_list, surface_axis, lattice
-    )
+    hkl = policy.target_reflection or _dominant_basal_reflection(hkl_list, surface_axis, lattice)
     g_vec, g_norm = reciprocal_g_vector(hkl, lattice)
     surface_norm = float(np.linalg.norm(surface_axis))
     alignment = abs(float(g_vec @ surface_axis / (g_norm * surface_norm)))
@@ -207,9 +205,7 @@ def resolve_longitudinal_distribution(
     target_energy_eV = float(HBARC_EV_ANG * k_gamma_inv_ang)
     period_fs = float(H_EV_FS / target_energy_eV)
     omega_rad_fs = 2.0 * np.pi / period_fs
-    microbunch_rms_fs = float(
-        np.sqrt(-np.log(policy.retained_coherence)) / omega_rad_fs
-    )
+    microbunch_rms_fs = float(np.sqrt(-np.log(policy.retained_coherence)) / omega_rad_fs)
     rms_duration_fs = microbunch_rms_fs if policy.kind == "compressed" else None
 
     return ResolvedLongitudinalDistribution(
@@ -227,8 +223,5 @@ def resolve_longitudinal_distribution(
         target_energy_eV=target_energy_eV,
         target_wavelength_ang=float(HC_EV_ANG / target_energy_eV),
         target_period_fs=period_fs,
-        provenance=(
-            "catalog-pinned dominant positive basal reflection; "
-            f"{orientation_provenance}"
-        ),
+        provenance=(f"catalog-pinned dominant positive basal reflection; {orientation_provenance}"),
     )

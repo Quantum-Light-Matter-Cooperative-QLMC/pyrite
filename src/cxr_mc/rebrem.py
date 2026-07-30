@@ -170,9 +170,7 @@ def rebrem_checkpoints(
                     material=stem,
                     state="failed",
                     **latest,
-                    **progress_timer.snapshot(
-                        completed_new_cases=latest["completed_new_cases"]
-                    ),
+                    **progress_timer.snapshot(completed_new_cases=latest["completed_new_cases"]),
                 )
             raise
         finally:

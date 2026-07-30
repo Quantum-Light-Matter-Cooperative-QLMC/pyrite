@@ -292,9 +292,7 @@ def _cli_start(args):
     if args.dry_run or args.headless:
         return
     if not viewer.attach(jobid):
-        emit_diagnostic(
-            "run is still active or its viewer disconnected; skipping automatic pull"
-        )
+        emit_diagnostic("run is still active or its viewer disconnected; skipping automatic pull")
         return
     profiling_only = getattr(args, "performance_repetitions", 1) > 1 or getattr(args, "nsys", False)
     if args.no_pull or profiling_only:
@@ -894,12 +892,12 @@ def jobs_command(json_output):
 @click.option("--json", "json_output", is_flag=True, help="Emit one versioned JSON object.")
 def status_command(jobid, verbose, attach, json_output):
     if attach and json_output:
-        raise click.UsageError("--attach streams a live dashboard and cannot be combined with --json")
+        raise click.UsageError(
+            "--attach streams a live dashboard and cannot be combined with --json"
+        )
     return _invoke_click(
         _cli_status,
-        _click_args(
-            "status", jobid=jobid, verbose=verbose, attach=attach, json_output=json_output
-        ),
+        _click_args("status", jobid=jobid, verbose=verbose, attach=attach, json_output=json_output),
     )
 
 

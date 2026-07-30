@@ -117,8 +117,7 @@ def remote_gpu_vendor() -> str:
     value = str(REMOTE_GPU_VENDOR).strip().lower()
     if value not in {"nvidia", "amd", "intel"}:
         raise SystemExit(
-            "invalid CXR_REMOTE_GPU_VENDOR="
-            f"{REMOTE_GPU_VENDOR!r}: expected nvidia, amd, or intel"
+            f"invalid CXR_REMOTE_GPU_VENDOR={REMOTE_GPU_VENDOR!r}: expected nvidia, amd, or intel"
         )
     return value
 

@@ -247,9 +247,7 @@ def test_cached_model_spectra_recomputes_pre_detector_payload(anchor, tmp_path, 
         return expected
 
     monkeypatch.setattr(af, "model_spectra", fake_model_spectra)
-    path = tmp_path / (
-        f"zhai-v{af.ZHAI_CACHE_SCHEMA}-{af._zhai_cache_key(anchor, 12, 7)}.pkl"
-    )
+    path = tmp_path / (f"zhai-v{af.ZHAI_CACHE_SCHEMA}-{af._zhai_cache_key(anchor, 12, 7)}.pkl")
     _checkpoint_io.dump(expected, str(path))
 
     model, cache_hit, returned_path = af.cached_model_spectra(
@@ -319,9 +317,7 @@ def test_legacy_comparison_exits_without_computing_on_cache_miss(tmp_path, monke
     monkeypatch.setattr(
         comparison,
         "cached_model_spectra",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            af.ZhaiCacheMiss(tmp_path / "missing.pkl")
-        ),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(af.ZhaiCacheMiss(tmp_path / "missing.pkl")),
     )
 
     with pytest.raises(SystemExit) as exc_info:
@@ -767,9 +763,7 @@ def test_export_all_figures_writes_expected_files(tmp_path, monkeypatch):
     outdir = tmp_path / "figures"
     cache_dir = tmp_path / "cache"
     af.reproduce_all(ne=11, ne_brem=3, ne_supp=5, cache_dir=cache_dir)
-    written = af.export_all_figures(
-        outdir=outdir, ne=11, ne_brem=3, ne_supp=5, cache_dir=cache_dir
-    )
+    written = af.export_all_figures(outdir=outdir, ne=11, ne_brem=3, ne_supp=5, cache_dir=cache_dir)
 
     names = {p.name for p in written}
     assert "zhai_fig1c_spectra_vs_theory.png" in names

@@ -169,9 +169,7 @@ def test_every_nondefault_detector_field_changes_identity(detector):
     settings = default_settings()
     standard_sweep = material_sweep("hopg")
     standard = dataset_identity("hopg", "full", settings, standard_sweep)
-    changed = dataset_identity(
-        "hopg", "full", settings, replace(standard_sweep, detector=detector)
-    )
+    changed = dataset_identity("hopg", "full", settings, replace(standard_sweep, detector=detector))
 
     assert changed["parameter_sha256"] != standard["parameter_sha256"]
 

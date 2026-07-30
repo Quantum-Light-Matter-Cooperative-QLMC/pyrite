@@ -296,17 +296,11 @@ def select_backend(requested: str | None = None) -> ArrayBackend:
                 failures.append(str(error))
                 logger.debug("accelerator probe skipped: %s", error)
         if backend is None:
-            return NumPyBackend(
-                fallback_reason="accelerator_unavailable: " + "; ".join(failures)
-            )
+            return NumPyBackend(fallback_reason="accelerator_unavailable: " + "; ".join(failures))
     if os.environ.get("CXR_FP64") == "1" and not backend.device.supports_fp64:
         if requested == "auto":
-            logger.warning(
-                "%s lacks fp64; CXR_FP64=1 selects CPU NumPy", backend.device.name
-            )
-            return NumPyBackend(
-                fallback_reason=f"unsupported_fp64: {backend.device.name}"
-            )
+            logger.warning("%s lacks fp64; CXR_FP64=1 selects CPU NumPy", backend.device.name)
+            return NumPyBackend(fallback_reason=f"unsupported_fp64: {backend.device.name}")
         raise BackendUnavailableError(
             f"CXR_MC_BACKEND={backend.name} device {backend.device.name!r} lacks fp64; "
             "unset CXR_FP64 or select CXR_MC_BACKEND=cpu"

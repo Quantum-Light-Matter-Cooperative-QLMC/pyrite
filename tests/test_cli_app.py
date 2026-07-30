@@ -32,7 +32,10 @@ def test_analysis_leaf_launches_and_export_dispatches(monkeypatch):
     monkeypatch.setattr(
         analyze,
         "_launch",
-        lambda material, **kwargs: (launched.setdefault("material", material), launched.update(**kwargs)),
+        lambda material, **kwargs: (
+            launched.setdefault("material", material),
+            launched.update(**kwargs),
+        ),
     )
     monkeypatch.setattr("cxr_mc.export._export", lambda stem: launched.update(export=stem))
 
@@ -51,9 +54,13 @@ def test_analysis_leaf_launches_and_export_dispatches(monkeypatch):
 
 def test_viewer_export_never_launches(monkeypatch):
     launched = []
-    monkeypatch.setattr(viewer.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs)))
+    monkeypatch.setattr(
+        viewer.subprocess, "run", lambda *args, **kwargs: launched.append((args, kwargs))
+    )
 
-    result = CliRunner().invoke(cli.command, ["app", "viewer", "export", "mose2", "--stem", "trace"])
+    result = CliRunner().invoke(
+        cli.command, ["app", "viewer", "export", "mose2", "--stem", "trace"]
+    )
 
     assert result.exit_code == 0
     assert launched[0][0][0] == viewer._smoke_command("mose2", "results/trace.html")
@@ -62,11 +69,15 @@ def test_viewer_export_never_launches(monkeypatch):
 def test_validation_leaf_and_export_dispatch_without_cross_mode_flags(monkeypatch):
     calls = []
     monkeypatch.setattr(check, "_launch", lambda **kwargs: calls.append(("launch", kwargs)))
-    monkeypatch.setattr(check, "_export", lambda *args, **kwargs: calls.append(("export", args, kwargs)))
+    monkeypatch.setattr(
+        check, "_export", lambda *args, **kwargs: calls.append(("export", args, kwargs))
+    )
 
     runner = CliRunner()
     launch = runner.invoke(cli.command, ["app", "validation", "--watch"])
-    exported = runner.invoke(cli.command, ["app", "validation", "export", "--outdir", "out", "--ne", "11"])
+    exported = runner.invoke(
+        cli.command, ["app", "validation", "export", "--outdir", "out", "--ne", "11"]
+    )
 
     assert launch.exit_code == 0
     assert calls[0] == ("launch", {"edit": False, "watch": True})

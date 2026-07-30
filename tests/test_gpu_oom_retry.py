@@ -145,9 +145,7 @@ def test_gpu_pipeline_reuses_successful_line_fallback(monkeypatch):
     monkeypatch.setattr(runner, "_process_pool_kwargs", lambda: {})
     monkeypatch.setattr(runner, "_transport_case", fake_transport)
     monkeypatch.setattr(runner, "_spectrum_case", fake_spectrum)
-    monkeypatch.setattr(
-        "concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor
-    )
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
     cases = [
         {
             "name": f"case-{index}",

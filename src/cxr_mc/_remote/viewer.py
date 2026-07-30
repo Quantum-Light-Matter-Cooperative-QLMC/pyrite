@@ -53,8 +53,7 @@ def list_jobs():
         rows.append((jobid, scheduler_id, mode, materials.replace(" ", ", "), state_))
     if not rows:
         print(
-            f"No remote jobs on {config.remote_host()}. "
-            "Start one with `cxr remote run [PROFILE]`."
+            f"No remote jobs on {config.remote_host()}. Start one with `cxr remote run [PROFILE]`."
         )
         return
     print(
@@ -115,7 +114,7 @@ def _status_remote_command(job_assign, detail):
         '{ cat "$D/state" 2>/dev/null; } | emit STATE; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$D/meta" 2>/dev/null | tail -1); '
         "QUEUE_RAW=; "
-        'case "$SID" in \'\'|*[!0-9]*) ;; *) '
+        "case \"$SID\" in ''|*[!0-9]*) ;; *) "
         f"QUEUE_RAW=$(squeue -h --partition={config.shell_word(config.SLURM_PARTITION)} "
         "--states=PENDING,RUNNING --sort=-p,i "
         "-o 'job_id=%i|state=%T|name=%j|partition=%P|elapsed=%M|left=%L|"
@@ -134,11 +133,7 @@ def _status_remote_command(job_assign, detail):
         f"printf 'cohort_partition={config.SLURM_PARTITION}|"
         "order=priority_desc_job_id_asc\\n'; "
         'if [ -n "${QUEUE_RAW+x}" ]; then printf "%s\\n" "$QUEUE_RAW"; fi; '
-        "} | emit QUEUE; "
-        + progress
-        + performance
-        + resources
-        + log
+        "} | emit QUEUE; " + progress + performance + resources + log
     )
 
 

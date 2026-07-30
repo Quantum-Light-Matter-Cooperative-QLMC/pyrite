@@ -96,4 +96,3 @@ def test_render_reveal_animation_raises_clear_error_when_deps_missing(monkeypatc
 
     with pytest.raises(RuntimeError, match="viz-render"):
         render_reveal_animation(None, {"start_xyz": [], "end_xyz": []}, "out.mp4")
-

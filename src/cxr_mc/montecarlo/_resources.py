@@ -25,18 +25,13 @@ class ResourcePolicy:
     release_every: int
 
 
-def resolve_resource_policy(
-    backend: ArrayBackend, requested: str | None = None
-) -> ResourcePolicy:
+def resolve_resource_policy(backend: ArrayBackend, requested: str | None = None) -> ResourcePolicy:
     """Resolve named policy using device size when ``requested='auto'``."""
 
-    requested = (
-        requested or os.environ.get("CXR_MC_RESOURCE_POLICY", "auto")
-    ).strip().lower()
+    requested = (requested or os.environ.get("CXR_MC_RESOURCE_POLICY", "auto")).strip().lower()
     if requested not in _VALID_POLICIES:
         raise BackendResourceError(
-            "CXR_MC_RESOURCE_POLICY must be one of "
-            f"{', '.join(_VALID_POLICIES)}; got {requested!r}"
+            f"CXR_MC_RESOURCE_POLICY must be one of {', '.join(_VALID_POLICIES)}; got {requested!r}"
         )
     total = backend.device.total_memory_bytes
     name = requested

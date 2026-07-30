@@ -109,8 +109,16 @@ def test_checkpoint_stem_flat_is_material_blazed_is_suffixed():
     assert analyze.checkpoint_stem("hopg", "blazed") == "hopg_blazed"
 
 
-def _write_variant(checkpoint_dir, stem, *, material, catalog_profile="standard", variant=None,
-                    fidelity="full", digest="abcdef0123456789"):
+def _write_variant(
+    checkpoint_dir,
+    stem,
+    *,
+    material,
+    catalog_profile="standard",
+    variant=None,
+    fidelity="full",
+    digest="abcdef0123456789",
+):
     stem_dir = checkpoint_dir / stem
     stem_dir.mkdir()
     (stem_dir / "line.pkl").touch()
@@ -132,7 +140,10 @@ def _write_variant(checkpoint_dir, stem, *, material, catalog_profile="standard"
 def test_profile_menu_lists_standard_and_sidecar_resolved_variant(tmp_path):
     (tmp_path / "hbn.pkl").touch()
     _write_variant(
-        tmp_path, "hbn--full-6a7c899190fc", material="hbn", catalog_profile="hopg_hbn_microtrain_200fs"
+        tmp_path,
+        "hbn--full-6a7c899190fc",
+        material="hbn",
+        catalog_profile="hopg_hbn_microtrain_200fs",
     )
 
     menu = analyze.profile_menu("hbn", tmp_path)

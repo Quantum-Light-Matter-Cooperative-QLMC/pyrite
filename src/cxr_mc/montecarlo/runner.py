@@ -316,11 +316,7 @@ class _TimingAgg:
             "spectrum_seconds_total": self.spectrum_total,
             "driver_wait_seconds_total": self.wait_total,
             "gpu_oom_retry_count": retries,
-            **(
-                {"backend_fallback_reason": fallback_reason}
-                if fallback_reason is not None
-                else {}
-            ),
+            **({"backend_fallback_reason": fallback_reason} if fallback_reason is not None else {}),
             **chunk_metrics,
             **pool,
         }
@@ -1441,9 +1437,7 @@ def run_cases(
                             spec_chunk_cap=learned_spec_chunk,
                         )
                         if on_timing is not None
-                        else _spectrum_case_retry(
-                            cases[i], tp, spec_chunk_cap=learned_spec_chunk
-                        )
+                        else _spectrum_case_retry(cases[i], tp, spec_chunk_cap=learned_spec_chunk)
                     )  # accelerator, THIS process only
                 except _GPU_OOM as error:
                     if (

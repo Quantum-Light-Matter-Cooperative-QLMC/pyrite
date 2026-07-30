@@ -303,10 +303,7 @@ def _profile_payload(document, name):
         ],
         "materials": list(materials) if isinstance(materials, list) else None,
         "beam": beam_payload,
-        "detector": {
-            key: getattr(detector, key)
-            for key, _label, _unit in _ACTIVE_DETECTOR_FIELDS
-        },
+        "detector": {key: getattr(detector, key) for key, _label, _unit in _ACTIVE_DETECTOR_FIELDS},
         "overrides": {
             material: sorted(row)
             for material, row in overrides.items()
@@ -665,9 +662,7 @@ def set_command(
         overwriting = [label for label in updates if _catalog_key(label) in target]
         existing_detector = target.get("detector", {})
         detector_labels = [
-            label
-            for key, label, _unit in _ACTIVE_DETECTOR_FIELDS
-            if key in detector_updates
+            label for key, label, _unit in _ACTIVE_DETECTOR_FIELDS if key in detector_updates
         ]
         overwriting.extend(
             label
@@ -682,9 +677,7 @@ def set_command(
         action_fields = list(dict.fromkeys([*overwriting, *detector_labels]))
         if beam_updates:
             action_fields.append("beam")
-        _confirm_standard(
-            name, f"set {', '.join(action_fields) or 'materials'} on", yes, dry_run
-        )
+        _confirm_standard(name, f"set {', '.join(action_fields) or 'materials'} on", yes, dry_run)
     if material_keys is not None:
         _warn_compat(
             f"cxr profile set {name} --materials {materials}",
@@ -945,9 +938,7 @@ def _csv_materials(material_csv):
     return requested
 
 
-def _group_materials(
-    document, requested, *, unverified_dw, high_energy_only, allow_unknown=False
-):
+def _group_materials(document, requested, *, unverified_dw, high_energy_only, allow_unknown=False):
     """Expand membership group selectors and return catalog-ordered material keys."""
     requested = list(requested)
     if unverified_dw or high_energy_only:
@@ -1029,9 +1020,7 @@ def _member_options(function):
 
 @members_command.command("set")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
-@click.argument(
-    "materials", nargs=-1, shell_complete=_cli_completion.complete_material
-)
+@click.argument("materials", nargs=-1, shell_complete=_cli_completion.complete_material)
 @_membership_group_options
 @_member_options
 def members_set_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
@@ -1053,9 +1042,7 @@ def members_set_command(name, materials, unverified_dw, high_energy_only, yes, d
 
 @members_command.command("add")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
-@click.argument(
-    "materials", nargs=-1, shell_complete=_cli_completion.complete_material
-)
+@click.argument("materials", nargs=-1, shell_complete=_cli_completion.complete_material)
 @_membership_group_options
 @_member_options
 def members_add_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
@@ -1080,9 +1067,7 @@ def members_add_command(name, materials, unverified_dw, high_energy_only, yes, d
 
 @members_command.command("remove")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
-@click.argument(
-    "materials", nargs=-1, shell_complete=_cli_completion.complete_material
-)
+@click.argument("materials", nargs=-1, shell_complete=_cli_completion.complete_material)
 @_membership_group_options
 @_member_options
 def members_remove_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):

@@ -664,6 +664,7 @@ def _pending_queue_context(payload, target_job_id):
     lines = payload.splitlines()
     if not lines:
         return None
+
     def strict_fields(line):
         fields = {}
         for item in line.split("|"):
@@ -823,7 +824,10 @@ def _format_job_status(sections, detail):
             if detail >= 1:
                 if overall_compute is not None:
                     rows.append(
-                        ("Progress (compute)", f"{overall_compute}  ·  {_compute_time_suffix(timing)}")
+                        (
+                            "Progress (compute)",
+                            f"{overall_compute}  ·  {_compute_time_suffix(timing)}",
+                        )
                     )
                 if overall_cases is not None:
                     rows.append(("Progress (cases)", overall_cases))
