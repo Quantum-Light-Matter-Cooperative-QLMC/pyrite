@@ -49,8 +49,13 @@ must remain until moved into a task file. Reconcile with `todo-sync`.
    behind a vendor-neutral backend contract while preserving CUDA and NumPy.
    → `feature/portable-gpu-backends`;
    [`tasks/portable-gpu-backends.md`](tasks/portable-gpu-backends.md).
-2. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-3. **Longitudinal bunch profiles and coherence comparison.** Add charge-matched
+2. **Backend auto-detection and first-run setup prompt.** Detect installed
+   NVIDIA/AMD/Intel GPU hardware and offer a first-run CLI prompt to enable
+   GPU acceleration (default CPU otherwise); persist the choice to `.env`'s
+   `CXR_MC_BACKEND`, only when unset. → `feature/backend-autodetect`;
+   [`tasks/backend-autodetect.md`](tasks/backend-autodetect.md).
+3. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+4. **Longitudinal bunch profiles and coherence comparison.** Add charge-matched
    200 fs Gaussian, wavelength-matched microbunch-train, and compressed-bunch
    HOPG/h-BN profiles with paired coherent/incoherent analysis. →
    `feature/longitudinal-bunch-profiles`;
