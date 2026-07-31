@@ -84,7 +84,7 @@ def _uv_sync_block(once: bool = False) -> str:
     dependency bump)."""
     sync = f"""uv_sync_start_ns=$(date +%s%N)
 uv_sync_rc=0
-{config.shell_remote_uv()} sync >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
+{config.shell_remote_uv()} sync --extra {config.remote_gpu_vendor()} >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
 uv_sync_elapsed_ms=$((($(date +%s%N) - uv_sync_start_ns) / 1000000))
 printf 'timing: uv sync %d.%03d s\\n' \
   "$((uv_sync_elapsed_ms / 1000))" "$((uv_sync_elapsed_ms % 1000))" >> "$JOBDIR/log"
@@ -100,6 +100,38 @@ else
 {sync}
   : > "$JOBDIR/.synced"
 fi"""
+
+
+def _cpu_profile_block(catalog_profile, performance_profile, cpu_flags):
+    """Bash appended to a run_material body (nsys jobs only): a serial NumPy pass
+    under cProfile, profiling the same spectrum loop the GPU pipeline drives
+    in-process. Fresh checkpoint dir so no case resumes cached (a cache hit would
+    profile zero compute). Runtime opt-out: CXR_MC_NO_CPU_PROFILE=1. Failure here
+    only warns -- the GPU trace captured above is untouched."""
+    pstats_dump = (
+        "import pstats,sys; p=pstats.Stats(sys.argv[1]); "
+        'p.sort_stats("tottime").print_stats(60); '
+        'p.sort_stats("cumulative").print_stats(60)'
+    )
+    return f"""  if [ -z "${{CXR_MC_NO_CPU_PROFILE:-}}" ]; then
+    cpu_prof_base="$JOBDIR/performance/{performance_profile}/$m.cpu"
+    cpu_ckpt="$JOBDIR/cpu-profile-checkpoints/$m"
+    mkdir -p "$(dirname "$cpu_prof_base")" "$cpu_ckpt"
+    printf '%s\\n' "cProfile CPU-backend pass (serial, NumPy spectrum)" >> "$JOBDIR/log"
+    cpu_prof_rc=0
+    env -u CXR_MC_NSYS CXR_MC_BACKEND=cpu {config.shell_remote_uv()} run --no-sync python \\
+      -m cProfile -o "$cpu_prof_base.prof" \\
+      -m cxr_mc._entry.scan {config.shell_word(catalog_profile)} -m "$m"{cpu_flags} --workers 0 \\
+      --max-minutes 10 \\
+      --checkpoint-dir "$cpu_ckpt" --progress-file "$JOBDIR/progress/$m.cpu.json" \\
+      --no-progress >> "$JOBDIR/log" 2>&1 || cpu_prof_rc=$?
+    if [ "$cpu_prof_rc" -ne 0 ]; then
+      echo "WARNING: CPU cProfile pass failed for $m (exit $cpu_prof_rc); GPU trace unaffected" >> "$JOBDIR/log"
+    elif [ -f "$cpu_prof_base.prof" ]; then
+      {config.shell_remote_uv()} run --no-sync python -c '{pstats_dump}' "$cpu_prof_base.prof" > "$cpu_prof_base.txt" 2>&1 || echo "WARNING: pstats summary failed; .cpu.prof remains available" >> "$JOBDIR/log"
+    fi
+  fi
+"""
 
 
 def _queue_script(
@@ -135,6 +167,21 @@ def _queue_script(
         )
         if performance_interval != 5.0:
             flags += f" --perf-interval {performance_interval:g}"
+    # cProfile CPU-backend pass rides along with the GPU (nsys) profiling job:
+    # same material, forced onto the serial NumPy spectrum path so cProfile can
+    # attribute the compute the GPU pipeline otherwise drives in-process. It
+    # forces --workers 0 (serial, everything in THIS process) and drops
+    # --performance-profile so its sampler JSON never clobbers the GPU tick file.
+    #
+    # It always uses the tiny --quick smoke grid regardless of the parent job's
+    # fidelity: cProfile only needs a representative call distribution (which
+    # functions dominate tottime), not full statistics. A full-fidelity serial
+    # NumPy pass ran >1h and had to be killed; --quick finishes in minutes while
+    # firing the same spectrum functions. --max-minutes is a hard backstop.
+    cpu_flags = " --quick"
+    cpu_profile_block = (
+        _cpu_profile_block(catalog_profile, performance_profile, cpu_flags) if nsys else ""
+    )
     runtime_exports = ""
     if spec_chunk is not None:
         runtime_exports += f"\nexport CXR_MC_SPEC_CHUNK={spec_chunk}"
@@ -242,7 +289,7 @@ run_material() {{
         echo "WARNING: nsys stats failed; .nsys-rep remains available" >> "$JOBDIR/log"
     fi
   done
-  echo "completed: $m" >> "$JOBDIR/log"
+{cpu_profile_block}  echo "completed: $m" >> "$JOBDIR/log"
 }}
 for m in "${{mats[@]}}"; do
   n=$((n + 1))
@@ -267,6 +314,26 @@ else
   echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
 fi
 """
+
+
+_SBATCH_RETRY_ATTEMPTS = 5
+_SBATCH_RETRY_SECONDS = 5
+
+
+def _sbatch_retry_block(sbatch_cmd: str, script_word: str) -> str:
+    """Bash: submit via sbatch, retrying slurmctld's transient RPC timeouts.
+
+    The lab box's slurmctld occasionally answers a submission with "Socket
+    timed out on send/recv operation" under load; a few retries with backoff
+    clear it without failing a checkpointed chain over one RPC hiccup.
+    """
+    return f"""SID=""
+attempt=0
+while [ "$attempt" -lt {_SBATCH_RETRY_ATTEMPTS} ]; do
+  SID=$({sbatch_cmd} {script_word}) && break
+  attempt=$((attempt + 1))
+  [ "$attempt" -lt {_SBATCH_RETRY_ATTEMPTS} ] && sleep {_SBATCH_RETRY_SECONDS}
+done"""
 
 
 def _chunked_queue_script(
@@ -363,7 +430,11 @@ fi
 [ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
 k=$(grep -c "^slurm_job_id: " "$JOBDIR/meta" 2>/dev/null)
 echo "queued slice $((k + 1)) $(date -Is)" > "$JOBDIR/state"
-SID=$(sbatch --parsable --nice=10000 "$JOBDIR/run.sh") || {{ echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{_sbatch_retry_block("sbatch --parsable --nice=10000", '"$JOBDIR/run.sh"')}
+if [ -z "$SID" ]; then
+  echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"
+  exit 1
+fi
 SID=${{SID%%;*}}
 case "$SID" in ''|*[!0-9]*) echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1 ;; esac
 printf 'slurm_job_id: %s\\n' "$SID" >> "$JOBDIR/meta"
@@ -543,7 +614,11 @@ fi
 [ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
 k=$(grep -c "^slurm_job_id: " "$JOBDIR/meta" 2>/dev/null)
 echo "queued slice $((k + 1)) $(date -Is)" > "$JOBDIR/state"
-SID=$(sbatch --parsable --nice=10000 "$JOBDIR/run.sh") || {{ echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{_sbatch_retry_block("sbatch --parsable --nice=10000", '"$JOBDIR/run.sh"')}
+if [ -z "$SID" ]; then
+  echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"
+  exit 1
+fi
 SID=${{SID%%;*}}
 case "$SID" in ''|*[!0-9]*) echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1 ;; esac
 printf 'slurm_job_id: %s\\n' "$SID" >> "$JOBDIR/meta"
@@ -726,7 +801,11 @@ fi
 [ -f "$JOBDIR/STOP" ] && {{ echo "cancelled (stop requested) $(date -Is)" > "$JOBDIR/state"; exit 0; }}
 k=$(grep -c "^slurm_job_id: " "$JOBDIR/meta" 2>/dev/null)
 echo "queued slice $((k + 1)) $(date -Is)" > "$JOBDIR/state"
-SID=$(sbatch --parsable --nice=10000 "$JOBDIR/run.sh") || {{ echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1; }}
+{_sbatch_retry_block("sbatch --parsable --nice=10000", '"$JOBDIR/run.sh"')}
+if [ -z "$SID" ]; then
+  echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"
+  exit 1
+fi
 SID=${{SID%%;*}}
 case "$SID" in ''|*[!0-9]*) echo "FAILED (slice resubmission) $(date -Is)" > "$JOBDIR/state"; exit 1 ;; esac
 printf 'slurm_job_id: %s\\n' "$SID" >> "$JOBDIR/meta"
@@ -912,9 +991,15 @@ def _submit_slurm_command(
     sbatch = "sbatch --parsable --nice=10000" if nice else "sbatch --parsable"
     return f"""D={jobdir_word}; \
 echo "queued $(date -Is)" > "$D/state"; \
-SID=$({sbatch} {run_script_word}) || {{ \
+SID=""; attempt=0; \
+while [ "$attempt" -lt {_SBATCH_RETRY_ATTEMPTS} ]; do \
+  SID=$({sbatch} {run_script_word}) && break; \
+  attempt=$((attempt + 1)); \
+  [ "$attempt" -lt {_SBATCH_RETRY_ATTEMPTS} ] && sleep {_SBATCH_RETRY_SECONDS}; \
+done; \
+if [ -z "$SID" ]; then \
   echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; {release}; exit 1; \
-}}; \
+fi; \
 SID=${{SID%%;*}}; \
 case "$SID" in ''|*[!0-9]*) \
   echo "FAILED (sbatch submission) $(date -Is)" > "$D/state"; {release}; exit 1 ;; \

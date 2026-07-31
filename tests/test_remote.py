@@ -383,6 +383,52 @@ def test_queue_script_wraps_single_profile_session_with_nsys():
         assert subprocess.run([bash, "-n"], input=script, text=True).returncode == 0
 
 
+def test_queue_script_nsys_rides_cpu_cprofile_pass():
+    script = remote._queue_script(
+        "j",
+        ["mos2"],
+        quick=False,
+        workers=6,
+        catalog_profile="compute_test_300keV",
+        performance_profile="compute_test_300keV",
+        nsys=True,
+    )
+    # Serial NumPy pass under cProfile, alongside the GPU nsys trace.
+    assert "-m cProfile -o " in script
+    assert "env -u CXR_MC_NSYS CXR_MC_BACKEND=cpu" in script
+    # Always the tiny --quick grid (representative call distribution in minutes,
+    # not a >1h full-fidelity serial pass) with a hard --max-minutes backstop.
+    assert '_entry.scan "compute_test_300keV" -m "$m" --quick --workers 0' in script
+    assert "--max-minutes 10" in script
+    # Fresh checkpoint dir (a cache hit would profile zero compute) and no
+    # --performance-profile sampler that would clobber the GPU tick file.
+    assert '--checkpoint-dir "$cpu_ckpt"' in script
+    assert "cpu-profile-checkpoints" in script
+    assert "--performance-profile" not in script.split('printf \'%s\\n\' "cProfile')[1]
+    # Runtime opt-out, and a failure only warns (GPU trace already captured).
+    assert 'if [ -z "${CXR_MC_NO_CPU_PROFILE:-}" ]; then' in script
+    assert "GPU trace unaffected" in script
+    bash = shutil.which("bash")
+    if bash is not None:
+        assert subprocess.run([bash, "-n"], input=script, text=True).returncode == 0
+
+
+def test_queue_script_no_cpu_cprofile_without_nsys():
+    # A plain perf run (sampler only, no nsys) must not drag in the heavy serial
+    # CPU pass -- it rides along with the GPU trace exclusively.
+    script = remote._queue_script(
+        "j",
+        ["mos2"],
+        quick=False,
+        workers=6,
+        catalog_profile="compute_test_300keV",
+        performance_profile="compute_test_300keV",
+        nsys=False,
+    )
+    assert "cProfile" not in script
+    assert "CXR_MC_BACKEND=cpu" not in script
+
+
 def test_queue_script_emits_positional_profile_when_not_standard():
     script = scripts._queue_script("j", ["mos2"], False, None, catalog_profile="sub_100keV")
     assert '_entry.scan "sub_100keV" -m "$m"' in script
@@ -466,6 +512,8 @@ def test_pull_performance_profile_fetches_nsys_artifacts(monkeypatch, tmp_path):
             "job-3\tmos2.nsys-rep\n"
             "job-3\tmos2.sqlite\n"
             "job-3\tmos2.nsys-stats.txt\n"
+            "job-3\tmos2.cpu.prof\n"
+            "job-3\tmos2.cpu.txt\n"
             "job-3\tunsafe.report\n"
         ),
     )
@@ -482,6 +530,8 @@ def test_pull_performance_profile_fetches_nsys_artifacts(monkeypatch, tmp_path):
         tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.nsys-rep",
         tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.sqlite",
         tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.nsys-stats.txt",
+        tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.cpu.prof",
+        tmp_path / "performance-profiles" / "baseline" / "job-3" / "mos2.cpu.txt",
     ]
 
 

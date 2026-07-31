@@ -57,6 +57,45 @@ if hasattr(xp, "fuse"):  # CuPy exposes fuse(); NumPy/dpnp do not -> eager fallb
     _sincsq_lineshape = xp.fuse()(_sincsq_lineshape)
 
 
+def _line_amp_sq_core(
+    chi_re, chi_im, u_re, u_im, v_dot_kg, g_dot_e, om, v_dot_e, vdg, k_dot_g, k_dot_v, gamma, detuning
+):
+    """One polarization's |A|^2, |A_PXR|^2, |A_CBS|^2 (Zhai Eq. 13/14) as a single
+    fused GPU kernel. Replaces the per-reflection storm of complex CuPy elementwise
+    kernels (chi/detuning, the CBS braced product, three ``abs()**2``) that made up
+    the bulk of the residual ``cxr.lines`` GPU-idle after the sincsq fuse.
+
+    Split the complex amplitudes into real/imag: A_PXR = chi * f_pxr and
+    A_CBS = eUg/m * f_cbs with REAL scalars
+
+        f_pxr = (v.kg * g.e - omega^2 v.e) / detuning
+        f_cbs = -({g.e - (v.g)(v.e)} + v.e * {k.g - (k.v)(v.g)}/(v.g)) / (gamma * v.g)
+
+    so every op is real and the kernel fuses. |A_PXR + A_CBS|^2 is expanded on the
+    real/imag components, |A_PXR|^2 = |chi|^2 f_pxr^2, |A_CBS|^2 = |eUg/m|^2 f_cbs^2.
+
+    NOT bit-for-bit vs the old complex expression -- the multiply/divide are
+    reassociated (chi*(N/detuning) vs (chi/detuning)*N), so the line/PXR/CBS
+    goldens move at float-rounding level.
+    LEDGER + REGEN REQUIRED: add a physics-ledger row and regenerate the affected
+    spectrum goldens (regen-golden) before this is signed off. Validation: line-amplitude-fusion
+    """
+    f_pxr = (v_dot_kg * g_dot_e - om * om * v_dot_e) / detuning
+    braced_ge = g_dot_e - vdg * v_dot_e
+    braced_kg = k_dot_g - k_dot_v * vdg
+    f_cbs = -(braced_ge + v_dot_e * braced_kg / vdg) / (gamma * vdg)
+    re = chi_re * f_pxr + u_re * f_cbs
+    im = chi_im * f_pxr + u_im * f_cbs
+    a2 = re * re + im * im
+    a2_pxr = (chi_re * chi_re + chi_im * chi_im) * f_pxr * f_pxr
+    a2_cbs = (u_re * u_re + u_im * u_im) * f_cbs * f_cbs
+    return a2, a2_pxr, a2_cbs
+
+
+if hasattr(xp, "fuse"):
+    _line_amp_sq_core = xp.fuse()(_line_amp_sq_core)
+
+
 def _segments_in_layer(segments, L):
     """A view of `segments` restricted to those emitted in layer index L, keeping
     the scalar fields (Ne, thickness_ang, ...) so the per-electron normalization
@@ -477,16 +516,37 @@ def mc_spectrum(
             g_dot_e = g_vec_d @ e_d  # scalar (e fixed per reflection)
             v_dot_e = v @ e_d
             v_dot_kg = xp.einsum("ij,ij->i", v, kg_vec)
-            A_PXR = chi / detuning * (v_dot_kg * g_dot_e - om**2 * v_dot_e)
-            braced_ge = g_dot_e - vdg * v_dot_e
-            braced_kg = k_dot_g - k_dot_v * vdg
-            A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
             if coherent:
+                # Complex amplitudes retained verbatim -- the coherent path sums
+                # phased fields, so it keeps the un-reassociated expression and
+                # its goldens are unaffected.
+                A_PXR = chi / detuning * (v_dot_kg * g_dot_e - om**2 * v_dot_e)
+                braced_ge = g_dot_e - vdg * v_dot_e
+                braced_kg = k_dot_g - k_dot_v * vdg
+                A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
                 pol_A.append(A_PXR + A_CBS)  # keep phase: orthogonal pols still add incoherently
                 continue
-            A2 += xp.abs(A_PXR + A_CBS) ** 2
-            A2_pxr += xp.abs(A_PXR) ** 2
-            A2_cbs += xp.abs(A_CBS) ** 2
+            # Incoherent |A|^2 in one fused real kernel (reassociated, NOT
+            # bit-for-bit; ledger + regen required -- see _line_amp_sq_core,
+            # Validation: line-amplitude-fusion).
+            a2, a2_pxr, a2_cbs = _line_amp_sq_core(
+                chi.real,
+                chi.imag,
+                eUg_over_m.real,
+                eUg_over_m.imag,
+                v_dot_kg,
+                g_dot_e,
+                om,
+                v_dot_e,
+                vdg,
+                k_dot_g,
+                k_dot_v,
+                gamma,
+                detuning,
+            )
+            A2 += a2
+            A2_pxr += a2_pxr
+            A2_cbs += a2_cbs
 
         # -- 6. Beer-Lambert escape factor from the segment midpoint -------------
         # straight path along n_hat to whichever face the photon exits. With a
@@ -724,29 +784,21 @@ def mc_spectrum_solid_angle(
 
 # ---- bremsstrahlung background -------------------------------------------------
 R_E_CM2 = 7.9407877e-26  # classical electron radius squared [cm^2]
+_BREM_MC2_KEV = 510.99895  # electron rest energy [keV]
 
 
-def _brem_dsigma_dk(Z, T_keV, k_eV):
-    """
-    Bremsstrahlung cross section differential in photon energy,
-    dsigma/dk [cm^2/eV]: nonrelativistic Bethe-Heitler in Born approximation
-    with the Elwert Coulomb correction (cf. Koch & Motz, Rev. Mod. Phys. 31,
-    920 (1959)), evaluated with relativistic electron momenta:
+def _brem_dsigma_dk_core(T_i, k, Z):
+    """Pure-elementwise Bethe-Heitler + Elwert core, one fused GPU kernel.
 
-        dsigma/dk = (16/3) alpha r_e^2 Z^2 (1/k) (1/p_i^2)
-                    ln[(p_i+p_f)/(p_i-p_f)] * f_Elwert,
-        f_Elwert  = (beta_i/beta_f) (1-exp(-2 pi Z alpha/beta_i))
-                                  / (1-exp(-2 pi Z alpha/beta_f)),
-
-    with p in units of m_e c. Broadcasts T_keV (segments) against k_eV
-    (spectral grid); zero where k >= T. Adequate for Z <~ 30 and
-    T <~ 100 keV; swap in Seltzer-Berger tables for better accuracy.
-
-    Validation: brem-spectrum
-    """
-    mc2 = 510.99895  # keV
-    T_i = xp.asarray(T_keV, dtype=REAL)[:, None]
-    k = xp.asarray(k_eV, dtype=REAL)[None, :] / 1e3  # keV
+    ``T_i`` (kinetic energy [keV]) and ``k`` (photon energy [keV]) are the
+    already-reshaped, mutually broadcasting operands (segments x grid); ``Z`` is
+    the scalar atomic number. Split out of ``_brem_dsigma_dk`` so the whole chain
+    (sqrt/divide/log/exp/where/maximum -- ~15 CuPy elementwise kernels, each
+    allocating a full [seg, E] temporary and dominating ``cxr.brem`` at 300 keV)
+    JIT-fuses to a SINGLE kernel under CuPy (see ``xp.fuse`` wrap below). On NumPy
+    it runs eager with the identical ops, so it is bit-for-bit the old inline
+    expression and the brem-spectrum golden is unchanged."""
+    mc2 = _BREM_MC2_KEV
     T_f = T_i - k
     ok = (T_f > 1e-6) & (k > 0.0)  # k>0: no photon (and no 1/k blowup) at k=0
     T_f = xp.where(ok, T_f, 1e-6)
@@ -776,6 +828,34 @@ def _brem_dsigma_dk(Z, T_keV, k_eV):
         * elwert
     )  # per eV
     return xp.where(ok, dsig, 0.0)
+
+
+if hasattr(xp, "fuse"):  # CuPy exposes fuse(); NumPy/dpnp do not -> eager fallback
+    _brem_dsigma_dk_core = xp.fuse()(_brem_dsigma_dk_core)
+
+
+def _brem_dsigma_dk(Z, T_keV, k_eV):
+    """
+    Bremsstrahlung cross section differential in photon energy,
+    dsigma/dk [cm^2/eV]: nonrelativistic Bethe-Heitler in Born approximation
+    with the Elwert Coulomb correction (cf. Koch & Motz, Rev. Mod. Phys. 31,
+    920 (1959)), evaluated with relativistic electron momenta:
+
+        dsigma/dk = (16/3) alpha r_e^2 Z^2 (1/k) (1/p_i^2)
+                    ln[(p_i+p_f)/(p_i-p_f)] * f_Elwert,
+        f_Elwert  = (beta_i/beta_f) (1-exp(-2 pi Z alpha/beta_i))
+                                  / (1-exp(-2 pi Z alpha/beta_f)),
+
+    with p in units of m_e c. Broadcasts T_keV (segments) against k_eV
+    (spectral grid); zero where k >= T. Adequate for Z <~ 30 and
+    T <~ 100 keV; swap in Seltzer-Berger tables for better accuracy. The
+    elementwise math lives in the fused ``_brem_dsigma_dk_core``.
+
+    Validation: brem-spectrum
+    """
+    T_i = xp.asarray(T_keV, dtype=REAL)[:, None]
+    k = xp.asarray(k_eV, dtype=REAL)[None, :] / 1e3  # keV
+    return _brem_dsigma_dk_core(T_i, k, Z)
 
 
 def mc_brem_spectrum(

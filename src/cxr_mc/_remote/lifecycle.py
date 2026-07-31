@@ -628,12 +628,12 @@ def pull_performance_profile(profile: str) -> list[Path]:
         f'p="$d/performance/{profile}"; [ -d "$p" ] || continue; '
         'find "$p" -maxdepth 1 -type f '
         "\\( -name '*.ndjson' -o -name '*.nsys-rep' -o -name '*.sqlite' "
-        "-o -name '*.nsys-stats.txt' \\) "
+        "-o -name '*.nsys-stats.txt' -o -name '*.cpu.prof' -o -name '*.cpu.txt' \\) "
         "-printf '%f\\n' | while IFS= read -r f; do "
         'printf "%s\\t%s\\n" "$(basename "$d")" "$f"; done; done'
     )
     artifacts = []
-    suffixes = (".nsys-stats.txt", ".nsys-rep", ".ndjson", ".sqlite")
+    suffixes = (".nsys-stats.txt", ".cpu.prof", ".cpu.txt", ".nsys-rep", ".ndjson", ".sqlite")
     for line in listing.splitlines():
         jobid, separator, filename = line.partition("\t")
         suffix = next((item for item in suffixes if filename.endswith(item)), "")
