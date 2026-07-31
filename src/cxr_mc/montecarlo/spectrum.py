@@ -491,6 +491,12 @@ def mc_spectrum(
     # incoherently below (docs/crystal-mosaicity.md route 2).
     mosaic_quad = _mosaic_quadrature(mosaic_fwhm_rad, mosaic_nodes)
 
+    # NVTX sub-ranges to split the coarse ``cxr.lines`` range into structure-
+    # factor tabulation vs per-reflection accumulation (no-op off the profiled
+    # GPU path). Lazy import: runner imports this module, so a top-level import
+    # would be circular.
+    from .runner import _nsys_pop, _nsys_push
+
     def _accumulate(g_vec, chi_re, chi_im, u_re, u_im, wm):
         """Add one reflection's contribution for crystallite reciprocal vector
         ``g_vec``, scaled by the mosaic-quadrature weight ``wm``, into spec /
@@ -693,6 +699,7 @@ def mc_spectrum(
         #                  * sinc^2[(1 - v.n)(omega - omega_res) t_L / 2] * T_abs
         # weight = everything except the sinc^2 (times the mosaic weight wm);
         # a_width converts (E - E_res) to the sinc argument: P t_L = a_width(E - E_res).
+        _nsys_push("cxr.lines.accum")
         pref = ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * t_L**2 * T_abs
         weight = pref * A2 * wm
         targets = [(weight, spec)]
@@ -732,6 +739,7 @@ def mc_spectrum(
                 S = _sincsq_lineshape(a_width[sel][:, None], E_grid[None, i0:i1], E_r[sel][:, None])
                 for w, tgt in targets:
                     tgt[i0:i1] += w[sel] @ S
+        _nsys_pop()
 
     for hkl in hkl_list:
         # reciprocal vector in the sample frame: construction frame by default
@@ -742,12 +750,14 @@ def mc_spectrum(
         # structure-factor couplings depend on hkl + tabulation energy only (NOT on
         # the mosaic orientation), so tabulate once per reflection (CPU, a few ms)
         # and reuse across the orientation quadrature; push real/imag to the device.
+        _nsys_push("cxr.lines.tab")
         chi_tab = np.asarray(chi_g(crystal, hkl, E_tab, B_ang2, use_henke))
         u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke))
         chi_re = xp.asarray(chi_tab.real, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
         chi_im = xp.asarray(chi_tab.imag, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
         u_re = xp.asarray(u_tab.real, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
         u_im = xp.asarray(u_tab.imag, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
+        _nsys_pop()
 
         if mosaic_quad is None:  # perfect crystal: one orientation, weight 1
             _accumulate(g_vec, chi_re, chi_im, u_re, u_im, 1.0)

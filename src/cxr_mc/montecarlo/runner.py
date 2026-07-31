@@ -131,6 +131,28 @@ def _nsys_range(message):
     return time_range(message)
 
 
+def _nsys_push(message):
+    """Open an NVTX range (paired with :func:`_nsys_pop`) when Nsight is on.
+
+    A push/pop pair instead of :func:`_nsys_range` for bracketing a straight-
+    line block deep in a hot loop without indenting it -- the block must have a
+    single exit so the pop always runs. No-op off the profiled GPU path."""
+    if not (_GPU and _NSYS and BACKEND.name == "cuda"):
+        return
+    from cupy.cuda import nvtx
+
+    nvtx.RangePush(message)
+
+
+def _nsys_pop():
+    """Close the range opened by the matching :func:`_nsys_push`."""
+    if not (_GPU and _NSYS and BACKEND.name == "cuda"):
+        return
+    from cupy.cuda import nvtx
+
+    nvtx.RangePop()
+
+
 def _process_pool_kwargs():
     """Use exec-based workers under Nsight; forkserver can deadlock its injection."""
     if not _NSYS:
