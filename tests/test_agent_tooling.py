@@ -164,10 +164,12 @@ def test_agent_session_start_syncs_optional_dependencies() -> None:
 
     claude_command = claude["hooks"]["SessionStart"][0]["hooks"][0]["command"]
     codex_command = codex["hooks"]["SessionStart"][0]["hooks"][0]["command"]
+    claude_hook_script = (root / ".claude" / "hooks" / "sync_local_backend.sh").read_text()
 
-    assert expected in claude_command
+    assert "sync_local_backend.sh" in claude_command
+    assert expected in claude_hook_script
     assert expected in codex_command
-    assert cache_prefix in claude_command
+    assert cache_prefix in claude_hook_script
     assert cache_prefix in codex_command
 
 
