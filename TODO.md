@@ -11,6 +11,7 @@ must remain until moved into a task file. Edit and drop items on `main`.
 
 ### Active
 
+
 1. **Compute performance optimization.** Measure and improve stable remote
    CPU/GPU/RAM/VRAM utilization without OOM, keeping the GPU fed where evidence
    supports it. → `feature/compute-performance-optimization`;
@@ -68,6 +69,18 @@ must remain until moved into a task file. Edit and drop items on `main`.
    GPU rows without a GPU; fall back to tqdm when non-interactive. →
    `feature/local-run-dashboard`;
    [`tasks/feature/local-run-dashboard/`](tasks/feature/local-run-dashboard/).
+6. **Cross-profile checkpoint case reuse.** Named catalog profiles get isolated
+   checkpoint stems (`<material>@<profile>-<hash>`), so two profiles with
+   overlapping cases (e.g. `sub_100keV`, `sub_200keV`) fully recompute shared
+   cases instead of sharing them; investigate a dedup key/storage model.
+   Investigation only, not yet scoped. → `feature/cross-profile-case-reuse`;
+   [`tasks/feature/cross-profile-case-reuse/`](tasks/feature/cross-profile-case-reuse/).
+7. **Checkpoint command surface rework.** Split `cxr clear` into scoped
+   commands, fix or drop `cxr checkpoint recompute` under current profile
+   conventions, and rework `cxr checkpoint` once shared-checkpoint provenance
+   is decided. Blocked on `feature/cross-profile-case-reuse`'s dedup design;
+   design-first. → `feature/checkpoint-command-rework`;
+   [`tasks/feature/checkpoint-command-rework/`](tasks/feature/checkpoint-command-rework/).
 
 ## P3 - lower / exploratory / small bugfixes / on-hold
 
@@ -75,3 +88,18 @@ must remain until moved into a task file. Edit and drop items on `main`.
 2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
 3. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
 4.  **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
+5. **`--no-cache` for run/remote run.** Add a flag to `cxr run`/`cxr remote
+   run` that skips loading the existing checkpoint pickle and recomputes/
+   overwrites it; remote chunked-queue interaction needs a design decision
+   first. → `feature/run-no-cache`;
+   [`tasks/feature/run-no-cache/`](tasks/feature/run-no-cache/).
+6. **`-p`/`--perf` should force `--no-cache`.** A `cxr run --perf` sample
+   against a warm checkpoint skips already-resumed cases, silently thinning
+   the performance profile; force `--no-cache` (and audit other `--perf`
+   flag interactions for the same silent-mismatch failure mode). Blocked on
+   `feature/run-no-cache` landing. → `feature/perf-flag-no-cache-defaults`;
+   [`tasks/feature/perf-flag-no-cache-defaults/`](tasks/feature/perf-flag-no-cache-defaults/).
+7. **Tab completion latency.** Shell completion for `cxr` often takes
+   multiple seconds; likely SSH-bound remote completion timeout or
+   process-startup overhead, not confirmed. → `feature/tab-completion-latency`;
+   [`tasks/feature/tab-completion-latency/`](tasks/feature/tab-completion-latency/).

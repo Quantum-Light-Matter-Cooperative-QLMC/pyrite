@@ -82,7 +82,7 @@ from ._remote import (
     transport,
     viewer,
 )
-from ._remote import presentation as _presentation
+from .cli import _dashboard as _presentation
 
 # --- from config ------------------------------------------------------
 HOST = config.HOST

@@ -1270,8 +1270,11 @@ def run_cases(
 
     progress_label = _case_progress_label(cases)
 
+
     def _maybe_bar(iterable):
         if not progress:
+            return iterable
+        if os.environ.get("CXR_LOCAL_DASHBOARD") == "1":
             return iterable
         try:
             from tqdm.auto import tqdm

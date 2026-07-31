@@ -9,6 +9,7 @@ import time
 
 import tqdm  # noqa: F401 -- kept importable at module level for test monkeypatching
 
+from ..cli._dashboard import _render_frame
 from . import config, lifecycle, presentation, scripts, state, transport
 
 
@@ -261,17 +262,6 @@ def _is_terminal_state(state):
     return state.startswith(("done", "FAILED", "cancelled"))
 
 
-def _render_frame(frame, *, tty):
-    """Repaint one attach frame: in place on a tty, appended when piped."""
-    if tty:
-        # Home the cursor, clear the screen and scrollback so each poll
-        # overwrites the previous frame instead of scrolling -- the
-        # "continually updating" status view.
-        sys.stdout.write("\x1b[H\x1b[2J\x1b[3J" + frame + "\n")
-        sys.stdout.flush()
-    else:
-        print(frame)
-        print("─" * 60)
 
 
 # Cancel-keybinding sequence (item 5): a bare 'q'/single keystroke must never

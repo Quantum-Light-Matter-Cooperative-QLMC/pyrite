@@ -31,6 +31,7 @@ import math
 import os
 import re
 import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -44,6 +45,7 @@ import click
 
 from .cli import _completion as _cli_completion
 from .cli import _core as _cli_core
+from .cli import _dashboard
 from .cli import json as cli_json
 
 MATS_FILE = Path("mats_to_sim.toml")
@@ -82,6 +84,78 @@ def _load_runtime() -> None:
     run_sweep = run_sweep or run_module.run_sweep
     build_cases = build_cases or sweep_module.build_cases
     case_cost = case_cost or sweep_module.case_cost
+
+
+
+def _local_probe():
+    fields = []
+    if shutil.which("nvidia-smi"):
+        try:
+            out = subprocess.check_output(
+                ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
+                text=True, stderr=subprocess.DEVNULL
+            ).strip()
+            if out:
+                parts = out.split("\n")[0].split(",")
+                if len(parts) == 3:
+                    gpu = float(parts[0])
+                    vram_used = float(parts[1])
+                    vram_total = float(parts[2])
+                    vram_pct = 100.0 * vram_used / vram_total if vram_total > 0 else 0.0
+                    fields.extend([f"gpu_percent={gpu:.1f}", f"vram_used_mib={vram_used:.0f}", f"vram_total_mib={vram_total:.0f}", f"vram_percent={vram_pct:.1f}"])
+        except Exception:
+            pass
+    return "|".join(fields)
+
+def _build_sections(args, materials, job_records, detail):
+    meta = [
+        f"kind: {'quick' if getattr(args, 'quick', False) else 'material-sweep'}",
+        f"materials: {' '.join(materials)}",
+        "job: local",
+    ]
+    if getattr(args, "workers", None) is not None:
+        meta.append(f"workers: {args.workers}")
+    if getattr(args, "max_minutes", None) is not None:
+        meta.append(f"slice_minutes: {args.max_minutes}")
+    if getattr(args, "catalog_profile", None) is not None:
+        meta.append(f"profile: {args.catalog_profile}")
+    
+    slurm_job = os.environ.get("SLURM_JOB_ID")
+    if slurm_job:
+        meta.append(f"slurm_job_id: {slurm_job}")
+    
+    sections = {
+        "META": "\n".join(meta),
+        "STATE": "running",
+        "RESOURCES": _local_probe(),
+    }
+    
+    if slurm_job and shutil.which("squeue"):
+        try:
+            sq = subprocess.check_output(["squeue", "-j", slurm_job, "-o", "%i|%T|%P|%M|%L|%D|%r", "--noheader"], text=True, stderr=subprocess.DEVNULL).strip()
+            if sq:
+                parts = sq.split("|")
+                if len(parts) >= 7:
+                    sections["SQUEUE"] = f"job_id={parts[0]}|state={parts[1]}|partition={parts[2]}|elapsed={parts[3]}|left={parts[4]}|nodes={parts[5]}|reason={parts[6]}"
+        except Exception:
+            pass
+            
+    progress_lines = []
+    for _mat, rec in job_records.items():
+        progress_lines.append(json.dumps(rec))
+    
+    if progress_lines:
+        sections["PROGRESS"] = "\n".join(progress_lines)
+        
+    return sections
+
+_dashboard_stop = threading.Event()
+def _dashboard_loop(args, materials, job_records, detail):
+    while not _dashboard_stop.is_set():
+        sections = _build_sections(args, materials, job_records, detail)
+        frame = _dashboard._style_states(_dashboard._format_job_status(sections, detail))
+        _dashboard._render_frame(frame, tty=True)
+        _dashboard_stop.wait(1.0)
 
 
 def _read_manifest_toml(path: Path):
@@ -291,7 +365,8 @@ def _performance_profile(ctx, param, value):
     ),
 )
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
-@click.option("--no-progress", is_flag=True, hidden=True)
+@click.option("--no-progress", is_flag=True, help="Disable progress bars/dashboard.")
+@click.option("-v", "--verbose", count=True, help="Increase dashboard detail.")
 @_cli_core.fidelity_option()
 @_cli_core.json_option
 def command(
@@ -313,6 +388,7 @@ def command(
     progress_file,
     no_progress,
     json_output,
+    verbose,
 ):
     """Click entry point for the staged root migration."""
     if quick and fidelity != "full":
@@ -378,6 +454,7 @@ def command(
             performance_interval=performance_interval,
             progress_file=progress_file,
             no_progress=no_progress,
+            verbose=verbose,
         )
     return _cli_core.invoke_legacy(
         _run_json,
@@ -576,18 +653,39 @@ def _selected(args):
 
 def run(args):
     materials = _selected(args)
-    # One deadline spans the whole invocation (including --all): each material
-    # below gets whatever's left of it, not a fresh --max-minutes apiece.
     deadline = None
     if getattr(args, "max_minutes", None) is not None:
         deadline = time.monotonic() + args.max_minutes * 60.0
-    incomplete = False
-    for material in materials:
-        remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
-        if not _run_material(args, material, max_seconds=remaining):
-            incomplete = True
-    if incomplete:
-        raise SystemExit(75)  # EX_TEMPFAIL: budget hit, work remains
+        
+    job_records = {}
+    use_dashboard = not getattr(args, "no_progress", False) and sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+
+    if use_dashboard:
+        args._job_records = job_records
+        os.environ["CXR_LOCAL_DASHBOARD"] = "1"
+        detail = getattr(args, "verbose", 0)
+        t = threading.Thread(target=_dashboard_loop, args=(args, materials, job_records, detail), daemon=True)
+        t.start()
+        
+    try:
+        incomplete = False
+        for material in materials:
+            remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+            if not _run_material(args, material, max_seconds=remaining):
+                incomplete = True
+        if incomplete:
+            raise SystemExit(75)  # EX_TEMPFAIL: budget hit, work remains
+    finally:
+        if use_dashboard:
+            _dashboard_stop.set()
+            t.join(timeout=2.0)
+            sections = _build_sections(args, materials, job_records, getattr(args, "verbose", 0))
+            sections["STATE"] = "done" if not incomplete else "paused"
+            frame = _dashboard._style_states(_dashboard._format_job_status(sections, getattr(args, "verbose", 0)))
+            _dashboard._render_frame(frame, tty=True)
+            if "CXR_LOCAL_DASHBOARD" in os.environ:
+                del os.environ["CXR_LOCAL_DASHBOARD"]
+
 
 
 def _run_json(args):
@@ -781,6 +879,7 @@ def _run_material(args, material, max_seconds=None):
     ckpt = os.path.join(args.checkpoint_dir, stem)
     results = {}
     progress_file = getattr(args, "progress_file", None)
+    has_dashboard = hasattr(args, "_job_records")
     latest_progress = {
         "total_cases": len(cases),
         "cached_cases": 0,
@@ -846,13 +945,34 @@ def _run_material(args, material, max_seconds=None):
             progress_snapshot = dict(latest_progress)
             cost_snapshot = dict(latest_cost)
             case_snapshot = dict(latest_case) or None
+        
+        computed_cost = (
+            None
+            if initial_done_cost is None or "done_cost" not in cost_snapshot
+            else max(0.0, cost_snapshot["done_cost"] - initial_done_cost)
+        )
+        if hasattr(args, "_job_records"):
+            rec = {
+                "material": material,
+                "state": "running",
+                "total_cases": progress_snapshot["total_cases"],
+                "cached_cases": progress_snapshot["cached_cases"],
+                "completed_new_cases": progress_snapshot["completed_new_cases"],
+            }
+            if case_snapshot:
+                rec["current"] = case_snapshot
+            if "done_cost" in cost_snapshot and "total_cost" in cost_snapshot:
+                rec["done_cost"] = cost_snapshot["done_cost"]
+                rec["total_cost"] = cost_snapshot["total_cost"]
+            if progress_timer:
+                rec.update(progress_timer.snapshot(
+                    completed_new_cases=progress_snapshot["completed_new_cases"],
+                    computed_cost=computed_cost,
+                ))
+            args._job_records[material] = rec
+            
         if progress_file is not None:
             assert progress_timer is not None
-            computed_cost = (
-                None
-                if initial_done_cost is None or "done_cost" not in cost_snapshot
-                else max(0.0, cost_snapshot["done_cost"] - initial_done_cost)
-            )
             _write_progress_record(
                 progress_file,
                 material=material,
@@ -966,11 +1086,13 @@ def _run_material(args, material, max_seconds=None):
             progress=not getattr(args, "no_progress", False),
             on_progress=(
                 _record_progress
-                if progress_file is not None or performance_logger is not None
+                if progress_file is not None or performance_logger is not None or has_dashboard
                 else None
             ),
             on_case=(
-                _note_case if progress_file is not None or performance_logger is not None else None
+                _note_case
+                if progress_file is not None or performance_logger is not None or has_dashboard
+                else None
             ),
             on_runtime=_record_runtime if performance_logger is not None else None,
             on_timing=_record_timing if performance_logger is not None else None,
@@ -978,11 +1100,13 @@ def _run_material(args, material, max_seconds=None):
             max_seconds=max_seconds,
             dataset_identity=identity,
             case_cost_fn=(
-                case_cost if progress_file is not None or performance_logger is not None else None
+                case_cost
+                if progress_file is not None or performance_logger is not None or has_dashboard
+                else None
             ),
             on_cost=(
                 _record_cost
-                if progress_file is not None or performance_logger is not None
+                if progress_file is not None or performance_logger is not None or has_dashboard
                 else None
             ),
         )
@@ -1017,6 +1141,10 @@ def _run_material(args, material, max_seconds=None):
         performance_state["state"] = "done" if complete else "paused"
     if performance_logger is not None:
         performance_logger.close("done" if complete else "paused")
+    
+    if hasattr(args, "_job_records") and material in args._job_records:
+        args._job_records[material]["state"] = "done" if complete else "paused"
+        
     if progress_file is not None:
         assert progress_timer is not None
         _write_progress_record(
