@@ -203,6 +203,15 @@ tilt_azim_deg = {values = [100.0, 120.0, 180.0]}
 E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
 detector = {observation_angle_deg = 90.0}
 materials = ["hopg", "hbn", "mose2", "hfte2", "mos2"]
+
+[profiles.hopg_test]
+thickness_ang = {values = [1000.0, 10000.0, 100000.0, 1000000.0, 10000000.0]}
+energy_keV = {values = [30.0, 60.0, 100.0, 200.0, 300.0]}
+tilt_deg = {values = [15.0, 45.0, 75.0]}
+tilt_azim_deg = {values = [105.0, 135.0, 165.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
+detector = {observation_angle_deg = 90.0}
+materials = ["hopg"]
 [energy_grids.standard]
 line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } }, source = "derived" },

@@ -14,6 +14,7 @@ materials, detectors, and validation story, see the
 
 running-on-a-cluster
 performance-profile-analysis
+compute-performance-optimization
 sweep-profiles
 cli-reference
 ```
