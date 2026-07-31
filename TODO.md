@@ -7,6 +7,40 @@ driver — run `uv run cxr-dev bootstrap` once per clone). Branch detail lives i
 [`tasks/README.md`](tasks/README.md). `>user<` marks untriaged user text that
 must remain until moved into a task file. Edit and drop items on `main`.
 
+
+## P0 - >user< To be Triaged
+
+1. Add graphitic carbon nitride as material
+2. Fix broken materials project query (requires .env file with MP API Key)
+3. Do another thorough CLI simplification/clarification sweep
+   1. Why does `cxr profile` have `add` for all profile parameters except materials, which instead are `member`
+   2. `completion` should probably be worked in with `cxr setup` somehow. Drop `completion install` to just `completion` also, unless we plan to add `uninstall` to remove the completions.
+      1. is `completion install --shell <SHELL>` necessary, or can we autodetect/add to all present? Should we? or `install`/`remove` for all on default, allowing optional shell invocation when only one is desired? maybe that's already being done.
+   3. for `cxr remote`: `prune`, `prune-jobs`, and `clear` need re-evaluation/clarification. Probably should be worked-in/in conjunction with the `checkpoint` rework that is in progress on a branch.
+   4. Semi-related to above: stale `performance` logs currently have no way of being dropped and no automatic method to pull them
+         1. Why do we need to manually write `--chunk-minutes=0` on perf log? why only one material allowed? If `--chunk-minutes=0` is req'd for good perf log, then auto-set it. If more than one mat is fine, drop the req, or emit a warning if somewhat problematic.
+         2. Add the `-p` flag as an optional profile marker, so that some profiles will just automatically be run as perf tests?
+4. Use `uv` workspaces to separate out CLI and maybe Analysis/App work from core computations? `uv` notes on their website that they use their own workspaces to separate out CLI in particular
+   1. Either in concert with this, or separately, split up tests into subdirs (or whatever the standard pytest implementation is) to reduce the time spent running tests repo-wide before every single commit.
+5. Set up comparisons/param sweeps to analyze effect of longitudinal bunch length & transverse bunch size on coherent bunching for otherwise identical bunch parameters
+   1. tilted bunch front? maybe dumb, maybe easier way to get coherent enhancement?
+6. Improve support for other shells/operating systems outside of WSL (especially agent hooks which run automatically)
+   1. Create directory of shell scripts that are run as agent hooks to allow more complex setup & OS/shell handling
+7. General src refactor (maybe following work in items above) to group related loose files in src/cxr_mc/ into appropriately scoped subdirs
+8. LONG TERM GOALS (not now) (maybe a further applications for `uv` workspaces and/or some other way to split up optional packages):
+   1. Make this repo less CXR-specific, more general purpose.
+      1. Add more optional physics (300 keV & below, to start with)
+         1. Secondary electron emission (as an option)
+         2. Material ionization?
+         3. Obviously the higher-energy stuff
+         4. Research other effects worth including
+         5. Electron coherence (QED)?
+         6. Other particles? Protons, ions, neutrons? Presumably this is a very deep hole
+      2. Deeper support for complex shapes, add support for multiple physical materials for interaction with arbitrary location, shape, & orientation
+         1. Support for interaction with other libraries -- Requires research into common tools, filestandards, etc.. GPT? PIC Codes (warpX, etc.)?
+         2. Easy file export/standard data format. Necessary? Are there standards at all? Does anyone want this?
+         3. Importing of stl/stp files to define objects
+
 ## P1 - top-priority / high-value
 
 ### Active
