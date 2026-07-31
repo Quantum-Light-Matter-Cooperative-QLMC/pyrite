@@ -96,6 +96,44 @@ if hasattr(xp, "fuse"):
     _line_amp_sq_core = xp.fuse()(_line_amp_sq_core)
 
 
+def _dot3_core(a0, a1, a2, b0, b1, b2):
+    """Length-3 contraction ``a.b`` written as three fused multiply-adds.
+
+    Serves both ``M @ v`` (``v.shape == (3,)`` -> ``b*`` are scalars) and the
+    row-wise dot ``einsum('ij,ij->i', A, B)`` (``b*`` are columns of a second
+    ``(N,3)`` array). cuBLAS GEMV/GEMM on an inner dimension of 3 is
+    pathologically inefficient -- it is tuned for large K, so the skinny
+    length-3 contractions in the line path (``v@g``, ``v@n``, ``k@g``, ``v@e``,
+    the ``kg.kg`` / ``v.kg`` einsums, ``r@g`` phase) were dispatched as ~6.3k
+    ``internal::gemvx`` launches carrying ~24% of the 300 keV line-path GPU
+    time. Spelled elementwise this fuses to a single CuPy kernel (no cuBLAS
+    handle, no launch) and runs bit-for-bit identical on NumPy.
+
+    NOT bit-for-bit vs BLAS: the sum is reassociated to ``(a0*b0 + a1*b1) +
+    a2*b2``, which differs from GEMV accumulation at float-rounding level.
+    LEDGER + REGEN REQUIRED: fold into the physics-ledger row and regenerate the
+    affected spectrum goldens (regen-golden) before sign-off.
+    Validation: line-gemv-elementwise
+    """
+    return a0 * b0 + a1 * b1 + a2 * b2
+
+
+if hasattr(xp, "fuse"):
+    _dot3_core = xp.fuse()(_dot3_core)
+
+
+def _matvec3(m, v):
+    """``m @ v`` for ``m.shape == (N, 3)`` and ``v.shape == (3,)`` without a
+    cuBLAS GEMV -- see _dot3_core."""
+    return _dot3_core(m[:, 0], m[:, 1], m[:, 2], v[0], v[1], v[2])
+
+
+def _rowdot3(a, b):
+    """``einsum('ij,ij->i', a, b)`` for ``(N, 3)`` operands without cuBLAS -- see
+    _dot3_core."""
+    return _dot3_core(a[:, 0], a[:, 1], a[:, 2], b[:, 0], b[:, 1], b[:, 2])
+
+
 def _segments_in_layer(segments, L):
     """A view of `segments` restricted to those emitted in layer index L, keeping
     the scalar fields (Ne, thickness_ang, ...) so the per-electron normalization
@@ -445,7 +483,7 @@ def mc_spectrum(
         cdtype = xp.result_type(REAL, 1j)
         seg_t0 = xp.asarray(segments.get("t0_ang", np.zeros(seg_E.size)), dtype=REAL)
         seg_t = xp.asarray(segments.get("t_ang", np.zeros(seg_E.size)), dtype=REAL)
-        d_all = (seg_t + seg_t0) - seg_r @ n_hat_d
+        d_all = (seg_t + seg_t0) - _matvec3(seg_r, n_hat_d)
         omega_grid = E_grid / HBARC_EV_ANG
     # mosaic crystallite-orientation quadrature: None -> perfect crystal (default;
     # today's single-orientation result bit-for-bit). Otherwise a list of
@@ -466,8 +504,8 @@ def mc_spectrum(
 
         # -- 1. per-segment resonance energy (Eq. 10) ---------------------------
         #   omega_res = v.g / (1 - v.n)   [1/Ang]   (>0 required to radiate)
-        v_dot_g = v_all @ g_vec_d
-        denom = 1.0 - v_all @ n_hat_d  # the Doppler-like denominator
+        v_dot_g = _matvec3(v_all, g_vec_d)
+        denom = 1.0 - _matvec3(v_all, n_hat_d)  # the Doppler-like denominator
         omega_res = v_dot_g / denom
         E_res = HBARC_EV_ANG * omega_res  # -> eV
 
@@ -498,9 +536,12 @@ def mc_spectrum(
         # -- 4. photon kinematics per segment ------------------------------------
         k_vec = om[:, None] * n_hat_d  # photon wavevector omega * n_hat
         kg_vec = k_vec + g_vec_d  # diffracted wavevector k + g
-        kg2 = xp.einsum("ij,ij->i", kg_vec, kg_vec)
+        kg2 = _rowdot3(kg_vec, kg_vec)
         detuning = kg2 - om**2  # PXR denominator (~g^2, never small)
-        k_dot_g = k_vec @ g_vec_d
+        k_dot_g = _matvec3(k_vec, g_vec_d)
+        # v.kg is polarization-independent (kg fixed per segment): hoist out of
+        # the e_s/e_p loop so it is contracted once, not twice.
+        v_dot_kg = _rowdot3(v, kg_vec)
 
         # -- 5. Eq. (13) + relativistic Eq. (14) amplitudes, per segment ----------
         # CBS braced product {a;b} = a.b - (a.v)(b.v) and 1/gamma prefactor
@@ -514,8 +555,7 @@ def mc_spectrum(
         for e in (e_s, e_p):  # sum |A|^2 over both polarizations
             e_d = xp.asarray(e, dtype=REAL)
             g_dot_e = g_vec_d @ e_d  # scalar (e fixed per reflection)
-            v_dot_e = v @ e_d
-            v_dot_kg = xp.einsum("ij,ij->i", v, kg_vec)
+            v_dot_e = _matvec3(v, e_d)
             if coherent:
                 # Complex amplitudes retained verbatim -- the coherent path sums
                 # phased fields, so it keeps the un-reassociated expression and
@@ -600,7 +640,7 @@ def mc_spectrum(
             amp = xp.sqrt(ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * T_abs)
             a_width = dnm * t_L / (2.0 * HBARC_EV_ANG)
             d = d_all[idx]
-            g_phase = seg_r[idx] @ g_vec_d
+            g_phase = _matvec3(seg_r[idx], g_vec_d)
             coefs = [(amp * t_L) * A_e for A_e in pol_A]  # complex per polarization
             fields = [xp.zeros(E_grid.size, dtype=cdtype) for _ in coefs]
             good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
