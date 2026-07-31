@@ -22,6 +22,8 @@ Conventions:
   f0(s), s = sin(theta)/lambda = g/(4*pi).
 """
 
+import hashlib
+from collections import OrderedDict
 from functools import cache
 
 import numpy as np
@@ -83,6 +85,15 @@ def _chantler_bounds(element):
     return float(E.min()), float(E.max())
 
 
+# f'(E)/f''(E) depend only on (element, energy grid), never on g/hkl, but the
+# per-reflection line-spectrum loop re-requests the same (element, E_tab) pair
+# ~N_hkl times per case -- each hit is an xraydb FITPACK spline eval. Memoize on
+# the exact energy bytes so the repeats collapse to one spline pass per element.
+# Returns bit-identical arrays (frozen read-only so a hit can't be mutated).
+_HENKE_MEMO: "OrderedDict[tuple, tuple[np.ndarray, np.ndarray]]" = OrderedDict()
+_HENKE_MEMO_MAX = 256
+
+
 def henke_dispersion(element, E_eV, on_out_of_range="nan"):
     """
     Energy-dependent dispersion corrections (Chantler/FFAST via xraydb; name kept
@@ -101,6 +112,19 @@ def henke_dispersion(element, E_eV, on_out_of_range="nan"):
     Emin, Emax = _chantler_bounds(element)
     E = np.asarray(E_eV, dtype=float)
     shape = E.shape
+
+    # "raise" mode can throw, so it is not cached; every other request keys on
+    # the exact energy bytes and short-circuits to the frozen spline result.
+    # (ascontiguousarray only for hashing -- it would promote a 0-d scalar to
+    # shape (1,), so it must not touch the returned array's shape.)
+    if on_out_of_range != "raise":
+        digest = hashlib.blake2b(np.ascontiguousarray(E).tobytes()).digest()
+        key = (element, on_out_of_range, shape, digest)
+        cached = _HENKE_MEMO.get(key)
+        if cached is not None:
+            _HENKE_MEMO.move_to_end(key)
+            return cached
+
     Eflat = np.atleast_1d(E).ravel()
 
     # strict interior: f1_chantler can fail right at the table endpoints, and the
@@ -119,7 +143,15 @@ def henke_dispersion(element, E_eV, on_out_of_range="nan"):
         Ein = Eflat[in_range]
         fp[in_range] = np.asarray(xraydb.f1_chantler(element, Ein), dtype=float)
         fpp[in_range] = np.asarray(xraydb.f2_chantler(element, Ein), dtype=float)
-    return fp.reshape(shape), fpp.reshape(shape)
+    out_fp, out_fpp = fp.reshape(shape), fpp.reshape(shape)
+
+    if on_out_of_range != "raise":
+        out_fp.flags.writeable = False
+        out_fpp.flags.writeable = False
+        _HENKE_MEMO[key] = (out_fp, out_fpp)
+        if len(_HENKE_MEMO) > _HENKE_MEMO_MAX:
+            _HENKE_MEMO.popitem(last=False)
+    return out_fp, out_fpp
 
 
 def atomic_form_factor(element, g, E_eV, on_out_of_range="nan"):
