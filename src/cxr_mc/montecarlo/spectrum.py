@@ -767,15 +767,16 @@ def mc_spectrum(
         _nsys_pop()
 
     # The batched path below runs the whole hkl set through steps 1-6 in one
-    # vectorized (n_seg, N_g) pass, but only handles the coherent=False slab
-    # (no groove / no layers / no finite footprint) case. The coherent path and
-    # the special absorption geometries stay on the proven per-hkl _accumulate
+    # vectorized (n_seg, N_g) pass. It covers the coherent=False single-slab
+    # absorber (with or without a finite crystal footprint -- the escape
+    # DISTANCE is g-independent either way, so it hoists). The coherent path and
+    # the layered / grooved absorbers stay on the proven per-hkl _accumulate
     # loop, bit-for-bit.
     finite_footprint = (
         segments.get("crystal_width_ang") is not None
         and segments.get("crystal_height_ang") is not None
     )
-    if coherent or groove is not None or layers is not None or finite_footprint:
+    if coherent or groove is not None or layers is not None:
         for hkl in hkl_list:
             # reciprocal vector in the sample frame: construction frame by default
             # ([001] along the slab normal), rotated if beam_uvw given
@@ -859,7 +860,12 @@ def mc_spectrum(
         denom_full = (1.0 - v_dot_n)[:, None]  # (n_seg, 1)
         gamma_full = (1.0 / xp.sqrt(1.0 - beta_all**2))[:, None]
         t_L_full = (seg_L / beta_all)[:, None]
-        L_esc_full = _escape_length(seg_r[:, 2], thickness, nz)[:, None]
+        # escape distance is g-independent (straight ray along n_hat): a finite
+        # footprint picks the nearest prism face, else the plain slab path.
+        if finite_footprint:
+            L_esc_full = _segment_escape_distance(segments, n_hat, xp=xp)[:, None]
+        else:
+            L_esc_full = _escape_length(seg_r[:, 2], thickness, nz)[:, None]
 
         n_seg = v_all.shape[0]
         seg_block = max(1, 1_000_000 // max(1, N_g))  # bound (n_block, N_g) temporaries
@@ -922,7 +928,7 @@ def mc_spectrum(
                 A2_pxr = A2_pxr + a2p
                 A2_cbs = A2_cbs + a2c
 
-            # -- 6. Beer-Lambert escape factor (slab; geometry hoisted) ---------
+            # -- 6. Beer-Lambert escape factor (single slab; distance hoisted) --
             T_abs = xp.exp(-(L_esc * _mu_total_inv_ang(abs_comp, E_res)))
 
             # -- 7. weights (everything except the sinc^2), then accumulate -----
