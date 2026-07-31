@@ -134,31 +134,6 @@ def _rowdot3(a, b):
     return _dot3_core(a[:, 0], a[:, 1], a[:, 2], b[:, 0], b[:, 1], b[:, 2])
 
 
-def _batch_interp(x, grid, tables):
-    """Column-wise linear interpolation of ``x`` against a SHARED ascending
-    ``grid`` (1-D, size n) with per-column tables ``tables`` of shape
-    ``(N_g, n)``: ``tables[j]`` is the sampled function for column ``j`` of ``x``
-    (shape ``(n_seg, N_g)``). Collapses the per-reflection ``xp.interp`` calls of
-    the line path into one gather+blend kernel over all reflections at once.
-    Out-of-range ``x`` clamps to the endpoint value, matching ``xp.interp``.
-
-    NOT bit-for-bit vs ``xp.interp`` -- the slope/blend is reassociated at
-    float-rounding level. LEDGER + REGEN REQUIRED (folded into the batched line
-    path). Validation: line-hkl-batch
-    """
-    n = grid.size
-    idx = xp.clip(xp.searchsorted(grid, x), 1, n - 1)
-    x0 = grid[idx - 1]
-    x1 = grid[idx]
-    gcol = xp.arange(tables.shape[0])  # (N_g,) -> broadcasts over x's last axis
-    f0 = tables[gcol, idx - 1]
-    f1 = tables[gcol, idx]
-    y = f0 + (x - x0) / (x1 - x0) * (f1 - f0)
-    y = xp.where(x <= grid[0], tables[gcol, 0], y)
-    y = xp.where(x >= grid[-1], tables[gcol, n - 1], y)
-    return y
-
-
 def _interp1(x, grid, f):
     """Linear interpolation of ``x`` (any shape) against an ascending ``grid``
     (1-D, size n) with a SINGLE shared table ``f`` (1-D, size n), clamped to the
@@ -175,6 +150,89 @@ def _interp1(x, grid, f):
     y = xp.where(x <= grid[0], f[0], y)
     y = xp.where(x >= grid[-1], f[n - 1], y)
     return y
+
+
+# Pre-tabulated PXR prefactor denominator 4 pi^2 hbar c: one Python float, so
+# ``ALPHA_FS * om / _PREF_C1 * ...`` below is the SAME division as the inline
+# ``/ (4.0 * xp.pi**2 * HBARC_EV_ANG)`` it replaces (bit-for-bit).
+_PREF_C1 = 4.0 * xp.pi**2 * HBARC_EV_ANG
+
+
+def _interp_index(x, grid):
+    """Shared linear-interp bookkeeping for ``x`` against an ascending ``grid``:
+    the clipped bracket index, the blend fraction, and the below/above endpoint
+    masks. The batched line path interpolates the SAME ``E_res`` on the SAME
+    ``E_tab_g`` grid four+one times (chi/U real/imag + mu); computing the
+    ``searchsorted``/clip/fraction ONCE here and gathering per table (see
+    ``_interp_gather{2d,1d}``) removes that fivefold-redundant index launch
+    storm. The per-table gather+blend (``_interp_gather2d`` / ``_interp_gather1d``)
+    is bit-for-bit the old per-reflection blend, so no new reassociation beyond
+    the ``line-hkl-batch`` debt the batched path already carries."""
+    n = grid.size
+    idx = xp.clip(xp.searchsorted(grid, x), 1, n - 1)
+    frac = (x - grid[idx - 1]) / (grid[idx] - grid[idx - 1])
+    below = x <= grid[0]
+    above = x >= grid[-1]
+    return idx, frac, below, above
+
+
+def _interp_gather2d(idx, frac, below, above, tables, gcol):
+    """Per-column gather+blend for the shared ``_interp_index`` bracket against
+    per-``g`` ``tables`` of shape ``(N_g, n)`` (``gcol == arange(N_g)``, hoisted
+    once). Bit-for-bit the batched per-reflection ``xp.interp`` blend it replaces
+    (Validation: line-hkl-batch, unchanged debt)."""
+    f0 = tables[gcol, idx - 1]
+    y = f0 + frac * (tables[gcol, idx] - f0)
+    y = xp.where(below, tables[gcol, 0], y)
+    y = xp.where(above, tables[gcol, tables.shape[1] - 1], y)
+    return y
+
+
+def _interp_gather1d(idx, frac, below, above, f):
+    """Single-table gather+blend for the shared ``_interp_index`` bracket
+    against a g-independent 1-D table ``f`` (the mu(E) column). Bit-for-bit
+    identical to ``_interp1``."""
+    f0 = f[idx - 1]
+    y = f0 + frac * (f[idx] - f0)
+    y = xp.where(below, f[0], y)
+    y = xp.where(above, f[f.size - 1], y)
+    return y
+
+
+def _line_kin_core(vx, vy, vz, gx, gy, gz, denom, nx, ny, nz):
+    """Resonance frequency + photon kinematics for the batched line path as a
+    single fused GPU kernel: collapses the ~15 tiny elementwise launches of
+    inline steps 1+4 (``v.g``, ``omega_res``, ``k``, ``kg``, ``detuning``,
+    ``k.g``, ``v.kg``, ``k.v``) into one. Pure kernel-merge of the identical
+    expression tree (no reassociation, ``x**2`` written ``x*x``) -> bit-for-bit
+    vs the inline code; carries NO new validation debt of its own."""
+    v_dot_g = vx * gx + vy * gy + vz * gz
+    omega_res = v_dot_g / denom
+    kx, ky, kz = omega_res * nx, omega_res * ny, omega_res * nz
+    kgx, kgy, kgz = kx + gx, ky + gy, kz + gz
+    kg2 = kgx * kgx + kgy * kgy + kgz * kgz
+    detuning = kg2 - omega_res * omega_res
+    k_dot_g = kx * gx + ky * gy + kz * gz
+    v_dot_kg = vx * kgx + vy * kgy + vz * kgz
+    k_dot_v = omega_res * (1.0 - denom)
+    return omega_res, v_dot_g, detuning, k_dot_g, v_dot_kg, k_dot_v
+
+
+if hasattr(xp, "fuse"):
+    _line_kin_core = xp.fuse()(_line_kin_core)
+
+
+def _line_weight_core(omega_res, t_L, L_esc, mu, alpha_fs, pref_c1):
+    """PXR prefactor incl. the Beer-Lambert escape factor as one fused kernel:
+    ``T_abs = exp(-L_esc mu)`` folded into ``alpha_fs om / (4 pi^2 hbar c)
+    t_L^2 T_abs``. Pure kernel-merge of the identical inline step 6/7 expression
+    (``t_L**2`` written ``t_L*t_L``) -> bit-for-bit, no new validation debt."""
+    T_abs = xp.exp(-(L_esc * mu))
+    return alpha_fs * omega_res / pref_c1 * (t_L * t_L) * T_abs
+
+
+if hasattr(xp, "fuse"):
+    _line_weight_core = xp.fuse()(_line_weight_core)
 
 
 def _segments_in_layer(segments, L):
@@ -885,6 +943,7 @@ def mc_spectrum(
         _nsys_pop()
 
         N_g = G.shape[0]
+        GCOL = xp.arange(N_g)  # hoisted table-column selector for _interp_gather2d
         gx, gy, gz = G[:, 0][None, :], G[:, 1][None, :], G[:, 2][None, :]  # (1, N_g)
         nx, ny, nz = float(n_hat[0]), float(n_hat[1]), float(n_hat[2])
 
@@ -912,27 +971,25 @@ def mc_spectrum(
             t_L = t_L_full[sb]
             L_esc = L_esc_full[sb]
 
-            # -- 1. resonance energy per (segment, reflection) -------------------
-            v_dot_g = vx * gx + vy * gy + vz * gz  # (nb, N_g)
-            omega_res = v_dot_g / denom
+            # -- 1+4. resonance energy + photon kinematics (fused kernel) --------
+            # steps 1 and 4 are the same ~15 tiny elementwise ops for every seg
+            # block; _line_kin_core JIT-merges them into ONE launch, bit-for-bit.
+            omega_res, v_dot_g, detuning, k_dot_g, v_dot_kg, k_dot_v = _line_kin_core(
+                vx, vy, vz, gx, gy, gz, denom, nx, ny, nz
+            )
+            vdg = v_dot_g
             E_res = HBARC_EV_ANG * omega_res
             keep = (E_res > lo_keep) & (E_res > 10.0) & (E_res < hi_keep)
 
-            # -- 3. couplings at each resonance energy (batched interp) ----------
-            chi_re = _batch_interp(E_res, E_tab_g, CHI_RE)
-            chi_im = _batch_interp(E_res, E_tab_g, CHI_IM)
-            u_re = _batch_interp(E_res, E_tab_g, U_RE) / M_E_EV
-            u_im = _batch_interp(E_res, E_tab_g, U_IM) / M_E_EV
-
-            # -- 4. photon kinematics (component-wise, no cuBLAS) ----------------
-            kx, ky, kz = omega_res * nx, omega_res * ny, omega_res * nz
-            kgx, kgy, kgz = kx + gx, ky + gy, kz + gz
-            kg2 = kgx * kgx + kgy * kgy + kgz * kgz
-            detuning = kg2 - omega_res**2
-            k_dot_g = kx * gx + ky * gy + kz * gz
-            v_dot_kg = vx * kgx + vy * kgy + vz * kgz
-            k_dot_v = omega_res * (1.0 - denom)  # om * (v . n_hat)
-            vdg = v_dot_g
+            # -- 3. couplings at each resonance energy (shared interp index) -----
+            # chi/U real+imag all sample the SAME E_res on the SAME E_tab_g grid,
+            # so bracket ONCE (_interp_index) and gather per table -- kills the
+            # fourfold-redundant searchsorted/clip. Bit-for-bit vs _batch_interp.
+            _ix, _fr, _blw, _abv = _interp_index(E_res, E_tab_g)
+            chi_re = _interp_gather2d(_ix, _fr, _blw, _abv, CHI_RE, GCOL)
+            chi_im = _interp_gather2d(_ix, _fr, _blw, _abv, CHI_IM, GCOL)
+            u_re = _interp_gather2d(_ix, _fr, _blw, _abv, U_RE, GCOL) / M_E_EV
+            u_im = _interp_gather2d(_ix, _fr, _blw, _abv, U_IM, GCOL) / M_E_EV
 
             # -- 5. |A|^2 summed over both polarizations ------------------------
             A2 = xp.zeros_like(omega_res)
@@ -961,12 +1018,12 @@ def mc_spectrum(
                 A2_pxr = A2_pxr + a2p
                 A2_cbs = A2_cbs + a2c
 
-            # -- 6. Beer-Lambert escape factor (single slab; distance hoisted) --
-            # mu(E_res) from the on-device tabulation (no CPU sync); see mu_tab_g.
-            T_abs = xp.exp(-(L_esc * _interp1(E_res, E_tab_g, mu_tab_g)))
-
-            # -- 7. weights (everything except the sinc^2), then accumulate -----
-            pref = ALPHA_FS * omega_res / (4.0 * xp.pi**2 * HBARC_EV_ANG) * t_L**2 * T_abs
+            # -- 6+7. Beer-Lambert escape factor + weights (fused prefactor) -----
+            # mu(E_res) reuses the step-3 interp bracket (no fresh searchsorted);
+            # _line_weight_core folds T_abs = exp(-L_esc mu) into the PXR
+            # prefactor as one launch. a_width stays inline (needs ones_like).
+            mu = _interp_gather1d(_ix, _fr, _blw, _abv, mu_tab_g)
+            pref = _line_weight_core(omega_res, t_L, L_esc, mu, ALPHA_FS, _PREF_C1)
             a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(omega_res)
             weight = pref * A2 * WM
             good = keep & xp.isfinite(weight) & (weight > 0)
