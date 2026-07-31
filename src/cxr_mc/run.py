@@ -82,16 +82,29 @@ def _checkpoint_exists(checkpoint_path):
     path = Path(checkpoint_path)
     if path.suffix == ".pkl":
         return path.is_file()
-    return (path / "line.pkl").is_file() or path.with_suffix(".pkl").is_file()
+    return (
+        (path / "line.pkl").is_file()
+        or path.with_suffix(".pkl").is_file()
+        or _checkpoint_store.has_parts(path.name, path.parent)
+    )
 
 
 def _checkpoint_load(checkpoint_path):
     path = Path(checkpoint_path)
     if path.suffix == ".pkl":
         return _checkpoint_io.load(str(path))
-    if not (path / "line.pkl").is_file() and path.with_suffix(".pkl").is_file():
-        return _checkpoint_io.load(str(path.with_suffix(".pkl")))
-    return _checkpoint_store.load(path.name, path.parent)
+    if (path / "line.pkl").is_file():
+        base = _checkpoint_store.load(path.name, path.parent)
+    elif path.with_suffix(".pkl").is_file():
+        base = _checkpoint_io.load(str(path.with_suffix(".pkl")))
+    else:
+        base = {}
+    # Unconsolidated crash-safety shards (a sweep interrupted before its final
+    # consolidation) hold the newest per-config records; union them over any
+    # stale monolith, per (name, E0).
+    for name, by_energy in _checkpoint_store.load_parts(path.name, path.parent).items():
+        base.setdefault(name, {}).update(by_energy)
+    return base
 
 
 def _checkpoint_components_save(checkpoint_path, results, *, components=("line", "brem")):
@@ -112,7 +125,8 @@ def _checkpoint_signature(checkpoint_path):
         legacy = path.with_suffix(".pkl")
         stat = legacy.stat()
         return ((str(legacy.resolve()), stat.st_mtime_ns, stat.st_size),)
-    return _checkpoint_store.signature(path.name, path.parent)
+    sig = _checkpoint_store.signature(path.name, path.parent)
+    return sig or _checkpoint_store.parts_signature(path.name, path.parent)
 
 
 @functools.lru_cache(maxsize=4)
@@ -418,13 +432,20 @@ def run_sweep(
     def _crystal_of(rec_map):
         return next(iter(rec_map.values()))["case"]["crystal"]
 
+    # Sharded checkpointing applies to the component-directory layout only; a
+    # caller pinning a legacy ``<stem>.pkl`` keeps the whole-file save path.
+    _sharded = Path(checkpoint_path).suffix != ".pkl"
+
+    def _material_subset():
+        return {n: results[n] for n in results if _crystal_of(results[n]) == material}
+
     def _save():
         """Pickle just THIS material's configs -- ``results`` may also hold other
         materials run earlier in the same kernel, which belong in their own pkl.
         Refreshes the sidecar manifest alongside (see :func:`_manifest_save`) so
         :func:`checkpoint_manifest` never serves a stale energy/record-count
         summary after a fresh save."""
-        subset = {n: results[n] for n in results if _crystal_of(results[n]) == material}
+        subset = _material_subset()
         _checkpoint_components_save(checkpoint_path, subset)
         _manifest_save(checkpoint_path, subset, dataset_identity)
 
@@ -433,6 +454,25 @@ def run_sweep(
         _save()
         if on_timing is not None:
             on_timing({"checkpoint_seconds": time.perf_counter() - started})
+
+    def _save_part(name):
+        """Persist one just-finished config as an immutable shard -- O(1) per
+        config, versus ``_save``'s whole-store re-serialization (O(N^2) over a
+        sweep). The manifest is still refreshed each time (tiny JSON) so live
+        viewers see fresh energy/record counts before consolidation."""
+        started = time.perf_counter()
+        path = Path(checkpoint_path)
+        _checkpoint_store.save_part(path.name, path.parent, name, results[name])
+        _manifest_save(checkpoint_path, _material_subset(), dataset_identity)
+        if on_timing is not None:
+            on_timing({"checkpoint_seconds": time.perf_counter() - started})
+
+    def _consolidate():
+        """Fold shards into the authoritative ``{line,brem}.pkl`` monolith the
+        rest of the toolchain expects, then drop the shard directory."""
+        _timed_save()
+        path = Path(checkpoint_path)
+        _checkpoint_store.clear_parts(path.name, path.parent)
 
     if resume and _checkpoint_exists(checkpoint_path):
         manifest_path = _manifest_path_for(checkpoint_path)
@@ -505,7 +545,10 @@ def run_sweep(
         name = case["name"]
         energies_remaining[name] -= 1
         if energies_remaining[name] == 0:  # this config (all energies) is done
-            _timed_save()  # crash-safe at config granularity (this material's subset)
+            if _sharded:
+                _save_part(name)  # crash-safe at config granularity, O(1) write
+            else:
+                _timed_save()  # legacy monolith: whole-file rewrite
             g = group_key(case)
             group_remaining[g] -= 1
             if group_remaining[g] == 0 and on_chunk is not None:
@@ -561,7 +604,11 @@ def run_sweep(
     )
     print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")
     complete = all(c["name"] in results and c["E0_keV"] in results[c["name"]] for c in cases)
-    if not complete:
+    if _sharded:
+        # Shards carry the live records; fold them into the monolith once, at the
+        # end -- whether the sweep finished or the budget cut it short.
+        _consolidate()
+    elif not complete:
         _timed_save()  # persist whatever finished before the budget ran out
     return complete
 

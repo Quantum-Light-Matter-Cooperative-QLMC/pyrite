@@ -7,7 +7,9 @@ module splits records on write and merges them on read.  A legacy
 """
 
 import copy
+import hashlib
 import os
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -72,6 +74,72 @@ def _component_store(results: dict, component: str) -> dict:
         if selected:
             out[name] = selected
     return out
+
+
+def parts_dir(stem: str, root: str | os.PathLike[str]) -> Path:
+    """Directory holding per-config crash-safety shards during a live sweep.
+
+    ``run_sweep`` writes one shard per finished config here instead of
+    re-serializing the whole growing store on every save (which was O(N^2) in
+    total bytes across a sweep).  Shards are the intermediate only: a normal or
+    budget-stopped run consolidates them into the authoritative
+    ``{line,brem}.pkl`` monolith and clears this directory, so downstream tools
+    (slim/prune/archive/remote) still see the historical layout.  A hard crash
+    leaves shards behind; :func:`load_parts` recovers them on resume.
+    """
+    return checkpoint_dir(stem, root) / "parts"
+
+
+def _part_path(stem: str, root: str | os.PathLike[str], name: str) -> Path:
+    digest = hashlib.sha1(name.encode("utf-8")).hexdigest()[:16]
+    return parts_dir(stem, root) / f"{digest}.pkl"
+
+
+def save_part(
+    stem: str,
+    root: str | os.PathLike[str],
+    name: str,
+    record_map: dict,
+) -> None:
+    """Write one config's records (``{E0: record}``) as an immutable shard.
+
+    Records never change once a config completes, so each shard is written
+    exactly once -- the whole per-sweep write cost is O(N), not O(N^2).
+    """
+    _atomic_dump(_part_path(stem, root, name), {name: record_map})
+
+
+def load_parts(stem: str, root: str | os.PathLike[str]) -> dict:
+    """Merge every crash-safety shard back into a ``{name: {E0: record}}`` store."""
+    directory = parts_dir(stem, root)
+    if not directory.is_dir():
+        return {}
+    merged: dict = {}
+    for shard in sorted(directory.glob("*.pkl")):
+        merged.update(_checkpoint_io.load(str(shard)))
+    return merged
+
+
+def has_parts(stem: str, root: str | os.PathLike[str]) -> bool:
+    directory = parts_dir(stem, root)
+    return directory.is_dir() and any(directory.glob("*.pkl"))
+
+
+def clear_parts(stem: str, root: str | os.PathLike[str]) -> None:
+    shutil.rmtree(parts_dir(stem, root), ignore_errors=True)
+
+
+def parts_signature(stem: str, root: str | os.PathLike[str]) -> tuple:
+    """Newest-shard stat, so manifest/load caches invalidate as shards land."""
+    directory = parts_dir(stem, root)
+    if not directory.is_dir():
+        return ()
+    shards = sorted(directory.glob("*.pkl"))
+    if not shards:
+        return ()
+    newest = max(shards, key=lambda p: p.stat().st_mtime_ns)
+    stat = newest.stat()
+    return ((str(newest.resolve()), stat.st_mtime_ns, stat.st_size),)
 
 
 def _atomic_dump(path: Path, value: object) -> None:

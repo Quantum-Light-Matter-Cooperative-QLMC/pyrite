@@ -533,9 +533,10 @@ def test_run_sweep_reports_checkpoint_timing(tmp_path, monkeypatch):
         on_timing=timings.append,
     )
 
+    # one per-config shard write + one end-of-sweep consolidation into the monolith
     checkpoint = [timing for timing in timings if "checkpoint_seconds" in timing]
-    assert len(checkpoint) == 1
-    assert checkpoint[0]["checkpoint_seconds"] >= 0
+    assert len(checkpoint) == 2
+    assert all(timing["checkpoint_seconds"] >= 0 for timing in checkpoint)
 
 
 def test_run_sweep_persists_dataset_identity_in_manifest(tmp_path, monkeypatch):
@@ -640,6 +641,57 @@ def test_run_sweep_writes_checkpoint(tmp_path, monkeypatch):
     assert (ckpt / "brem.pkl").exists()
     saved = load_checkpoint("hopg", checkpoint_dir=str(tmp_path))
     assert "cfg_a" in saved
+
+
+def test_run_sweep_consolidates_and_clears_shards(tmp_path, monkeypatch):
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    run_sweep([_fake_case("cfg_a", 30.0)], {}, checkpoint_dir=str(tmp_path), progress=False)
+    # crash-safety shards are folded into the monolith and removed on a clean run
+    assert not (tmp_path / "hopg" / "parts").exists()
+
+
+def test_checkpoint_load_recovers_unconsolidated_shards(tmp_path):
+    from cxr_mc import _checkpoint_store
+    from cxr_mc.run import _checkpoint_exists, _checkpoint_load
+
+    # simulate a sweep killed after writing a shard but before consolidation:
+    # no line.pkl/brem.pkl monolith, only the parts directory
+    _checkpoint_store.save_part(
+        "hopg",
+        tmp_path,
+        "cfg_a",
+        {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])}},
+    )
+    ckpt = str(tmp_path / "hopg")
+    assert not (tmp_path / "hopg" / "line.pkl").exists()
+    assert _checkpoint_exists(ckpt)
+    loaded = _checkpoint_load(ckpt)
+    assert 30.0 in loaded["cfg_a"]
+
+
+def test_checkpoint_shards_win_over_stale_monolith(tmp_path):
+    from cxr_mc import _checkpoint_store
+    from cxr_mc.run import _checkpoint_load
+
+    # a monolith from a prior run holds cfg_a with an old spectrum
+    stale = {"cfg_a": {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])}}}
+    _checkpoint_store.save("hopg", tmp_path, stale)
+    # a newer shard supersedes cfg_a@30 and adds cfg_b
+    _checkpoint_store.save_part(
+        "hopg",
+        tmp_path,
+        "cfg_a",
+        {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([9.0])}},
+    )
+    _checkpoint_store.save_part(
+        "hopg",
+        tmp_path,
+        "cfg_b",
+        {45.0: {"case": _fake_case("cfg_b", 45.0), "spec": np.array([2.0])}},
+    )
+    loaded = _checkpoint_load(str(tmp_path / "hopg"))
+    assert np.array_equal(loaded["cfg_a"][30.0]["spec"], np.array([9.0]))
+    assert 45.0 in loaded["cfg_b"]
 
 
 def test_run_sweep_splits_line_and_brem_fields(tmp_path, monkeypatch):
