@@ -126,7 +126,7 @@ def _nsys_range(message):
     """Return an NVTX range when the remote Nsight profiler is enabled."""
     if not (_GPU and _NSYS and BACKEND.name == "cuda"):
         return nullcontext()
-    from cupyx.profiler import time_range
+    from cupyx.profiler import time_range  # ty: ignore[unresolved-import]
 
     return time_range(message)
 
@@ -139,7 +139,7 @@ def _nsys_push(message):
     single exit so the pop always runs. No-op off the profiled GPU path."""
     if not (_GPU and _NSYS and BACKEND.name == "cuda"):
         return
-    from cupy.cuda import nvtx
+    from cupy.cuda import nvtx  # ty: ignore[unresolved-import]
 
     nvtx.RangePush(message)
 
@@ -148,7 +148,7 @@ def _nsys_pop():
     """Close the range opened by the matching :func:`_nsys_push`."""
     if not (_GPU and _NSYS and BACKEND.name == "cuda"):
         return
-    from cupy.cuda import nvtx
+    from cupy.cuda import nvtx  # ty: ignore[unresolved-import]
 
     nvtx.RangePop()
 

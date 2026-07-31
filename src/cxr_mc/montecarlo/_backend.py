@@ -250,7 +250,7 @@ def _load_cupy(expected: str | None = None) -> CuPyBackend:
     try:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message=".*CUDA path could not be detected.*")
-            import cupy
+            import cupy  # ty: ignore[unresolved-import]
 
         return CuPyBackend(cupy, expected=expected)
     except BackendUnavailableError:
@@ -261,8 +261,8 @@ def _load_cupy(expected: str | None = None) -> CuPyBackend:
 
 def _load_sycl() -> SyclBackend:
     try:
-        import dpctl
-        import dpnp
+        import dpctl  # ty: ignore[unresolved-import]
+        import dpnp  # ty: ignore[unresolved-import]
 
         return SyclBackend(dpnp, dpctl)
     except BackendUnavailableError:
