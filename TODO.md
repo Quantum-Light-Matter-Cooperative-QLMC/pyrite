@@ -52,30 +52,25 @@ must remain until moved into a task file. Edit and drop items on `main`.
    behind a vendor-neutral backend contract while preserving CUDA and NumPy.
    → `feature/portable-gpu-backends`;
    [`tasks/feature/portable-gpu-backends/`](tasks/feature/portable-gpu-backends/).
-2. **Backend auto-detection and first-run setup prompt.** Detect installed
-   NVIDIA/AMD/Intel GPU hardware and offer a first-run CLI prompt to enable
-   GPU acceleration (default CPU otherwise); persist the choice to `.env`'s
-   `CXR_MC_BACKEND`, only when unset. → `feature/backend-autodetect`;
-   [`tasks/feature/backend-autodetect/`](tasks/feature/backend-autodetect/).
-3. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-4. **Longitudinal bunch profiles and coherence comparison.** Add charge-matched
+2. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+3. **Longitudinal bunch profiles and coherence comparison.** Add charge-matched
    200 fs Gaussian, wavelength-matched microbunch-train, and compressed-bunch
    HOPG/h-BN profiles with paired coherent/incoherent analysis. →
    `feature/longitudinal-bunch-profiles`;
    [`tasks/feature/longitudinal-bunch-profiles/`](tasks/feature/longitudinal-bunch-profiles/).
-5. **Local run progress dashboard.** Replace the bare `cxr run <profile>` tqdm
+4. **Local run progress dashboard.** Replace the bare `cxr run <profile>` tqdm
    bar with the multi-panel dashboard used by `cxr remote status -a -vv`,
    rendering only the panels with local data — omit SLURM `SQUEUE` off-node and
    GPU rows without a GPU; fall back to tqdm when non-interactive. →
    `feature/local-run-dashboard`;
    [`tasks/feature/local-run-dashboard/`](tasks/feature/local-run-dashboard/).
-6. **Cross-profile checkpoint case reuse.** Named catalog profiles get isolated
+5. **Cross-profile checkpoint case reuse.** Named catalog profiles get isolated
    checkpoint stems (`<material>@<profile>-<hash>`), so two profiles with
    overlapping cases (e.g. `sub_100keV`, `sub_200keV`) fully recompute shared
    cases instead of sharing them; investigate a dedup key/storage model.
    Investigation only, not yet scoped. → `feature/cross-profile-case-reuse`;
    [`tasks/feature/cross-profile-case-reuse/`](tasks/feature/cross-profile-case-reuse/).
-7. **Checkpoint command surface rework.** Split `cxr clear` into scoped
+6. **Checkpoint command surface rework.** Split `cxr clear` into scoped
    commands, fix or drop `cxr checkpoint recompute` under current profile
    conventions, and rework `cxr checkpoint` once shared-checkpoint provenance
    is decided. Blocked on `feature/cross-profile-case-reuse`'s dedup design;
