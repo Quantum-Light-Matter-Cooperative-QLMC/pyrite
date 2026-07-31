@@ -159,6 +159,24 @@ def _batch_interp(x, grid, tables):
     return y
 
 
+def _interp1(x, grid, f):
+    """Linear interpolation of ``x`` (any shape) against an ascending ``grid``
+    (1-D, size n) with a SINGLE shared table ``f`` (1-D, size n), clamped to the
+    endpoints like ``xp.interp``. The on-device sibling of ``_batch_interp`` for
+    a g-independent table (the absorption coefficient mu(E), shared across
+    reflections). Reassociated vs ``xp.interp`` at float-rounding level."""
+    n = grid.size
+    idx = xp.clip(xp.searchsorted(grid, x), 1, n - 1)
+    x0 = grid[idx - 1]
+    x1 = grid[idx]
+    f0 = f[idx - 1]
+    f1 = f[idx]
+    y = f0 + (x - x0) / (x1 - x0) * (f1 - f0)
+    y = xp.where(x <= grid[0], f[0], y)
+    y = xp.where(x >= grid[-1], f[n - 1], y)
+    return y
+
+
 def _segments_in_layer(segments, L):
     """A view of `segments` restricted to those emitted in layer index L, keeping
     the scalar fields (Ne, thickness_ang, ...) so the per-electron normalization
@@ -495,6 +513,21 @@ def mc_spectrum(
             pass
     E_tab = np.unique(np.concatenate(_grids))
     E_tab_g = xp.asarray(E_tab, dtype=REAL)
+    # Absorption coefficient mu(E) [1/Ang] tabulated on the SAME edge-resolved
+    # E_tab grid as chi/U, for on-device interpolation at each resonance energy
+    # (_interp1) in both the batched and per-hkl line paths. Previously mu was
+    # evaluated exactly per (segment, reflection) via a CPU xraydb spline behind
+    # a per-block _to_cpu sync -- the real GPU-starving cost (~59 s at ~9% GPU
+    # utilisation). mu uses only f2 and is smoother between nodes than chi/U (no
+    # f1 edge cusp), so this is at least as accurate as the chi/U interpolation
+    # already accepted here. Applied to the single-slab and finite-footprint
+    # branches (coherent AND incoherent alike, so their single-segment
+    # limiting-case identity still holds bit-for-bit); the layered _stack_tau
+    # and grooved escape paths keep exact per-point mu.
+    #
+    # Physics-METHOD change (tabulated vs exact absorption), not a reassociation.
+    # LEDGER + REGEN + human sign-off REQUIRED. Validation: line-absorption-tabulation
+    mu_tab_g = xp.asarray(np.asarray(_mu_total_inv_ang(abs_comp, E_tab)), dtype=REAL)
 
     n_hat_d = xp.asarray(n_hat, dtype=REAL)  # detector dir is g-independent: hoist
 
@@ -646,7 +679,7 @@ def mc_spectrum(
         elif finite_footprint:
             L_esc = _segment_escape_distance(segments, n_hat, xp=xp)[idx]
             if layers is None:
-                tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)
+                tau = L_esc * _interp1(E_r, E_tab_g, mu_tab_g)
             else:
                 tau = _stack_tau(layers, z_mid, n_hat[2], E_r, exit_distance_ang=L_esc)
         else:
@@ -655,7 +688,7 @@ def mc_spectrum(
                     L_esc = z_mid / (-n_hat[2])  # out the entrance face
                 else:
                     L_esc = (thickness - z_mid) / n_hat[2]  # out the back face
-                tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)
+                tau = L_esc * _interp1(E_r, E_tab_g, mu_tab_g)
             else:
                 tau = _stack_tau(layers, z_mid, n_hat[2], E_r)
         T_abs = xp.exp(-tau)
@@ -929,7 +962,8 @@ def mc_spectrum(
                 A2_cbs = A2_cbs + a2c
 
             # -- 6. Beer-Lambert escape factor (single slab; distance hoisted) --
-            T_abs = xp.exp(-(L_esc * _mu_total_inv_ang(abs_comp, E_res)))
+            # mu(E_res) from the on-device tabulation (no CPU sync); see mu_tab_g.
+            T_abs = xp.exp(-(L_esc * _interp1(E_res, E_tab_g, mu_tab_g)))
 
             # -- 7. weights (everything except the sinc^2), then accumulate -----
             pref = ALPHA_FS * omega_res / (4.0 * xp.pi**2 * HBARC_EV_ANG) * t_L**2 * T_abs
