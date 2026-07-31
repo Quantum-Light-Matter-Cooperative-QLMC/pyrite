@@ -134,6 +134,31 @@ def _rowdot3(a, b):
     return _dot3_core(a[:, 0], a[:, 1], a[:, 2], b[:, 0], b[:, 1], b[:, 2])
 
 
+def _batch_interp(x, grid, tables):
+    """Column-wise linear interpolation of ``x`` against a SHARED ascending
+    ``grid`` (1-D, size n) with per-column tables ``tables`` of shape
+    ``(N_g, n)``: ``tables[j]`` is the sampled function for column ``j`` of ``x``
+    (shape ``(n_seg, N_g)``). Collapses the per-reflection ``xp.interp`` calls of
+    the line path into one gather+blend kernel over all reflections at once.
+    Out-of-range ``x`` clamps to the endpoint value, matching ``xp.interp``.
+
+    NOT bit-for-bit vs ``xp.interp`` -- the slope/blend is reassociated at
+    float-rounding level. LEDGER + REGEN REQUIRED (folded into the batched line
+    path). Validation: line-hkl-batch
+    """
+    n = grid.size
+    idx = xp.clip(xp.searchsorted(grid, x), 1, n - 1)
+    x0 = grid[idx - 1]
+    x1 = grid[idx]
+    gcol = xp.arange(tables.shape[0])  # (N_g,) -> broadcasts over x's last axis
+    f0 = tables[gcol, idx - 1]
+    f1 = tables[gcol, idx]
+    y = f0 + (x - x0) / (x1 - x0) * (f1 - f0)
+    y = xp.where(x <= grid[0], tables[gcol, 0], y)
+    y = xp.where(x >= grid[-1], tables[gcol, n - 1], y)
+    return y
+
+
 def _segments_in_layer(segments, L):
     """A view of `segments` restricted to those emitted in layer index L, keeping
     the scalar fields (Ne, thickness_ang, ...) so the per-electron normalization
@@ -741,29 +766,187 @@ def mc_spectrum(
                     tgt[i0:i1] += w[sel] @ S
         _nsys_pop()
 
-    for hkl in hkl_list:
-        # reciprocal vector in the sample frame: construction frame by default
-        # ([001] along the slab normal), rotated if beam_uvw given
-        g_vec, _g = reciprocal_g_vector(hkl, info["lattice"])
-        if R_orient is not None:
-            g_vec = R_orient @ g_vec
-        # structure-factor couplings depend on hkl + tabulation energy only (NOT on
-        # the mosaic orientation), so tabulate once per reflection (CPU, a few ms)
-        # and reuse across the orientation quadrature; push real/imag to the device.
+    # The batched path below runs the whole hkl set through steps 1-6 in one
+    # vectorized (n_seg, N_g) pass, but only handles the coherent=False slab
+    # (no groove / no layers / no finite footprint) case. The coherent path and
+    # the special absorption geometries stay on the proven per-hkl _accumulate
+    # loop, bit-for-bit.
+    finite_footprint = (
+        segments.get("crystal_width_ang") is not None
+        and segments.get("crystal_height_ang") is not None
+    )
+    if coherent or groove is not None or layers is not None or finite_footprint:
+        for hkl in hkl_list:
+            # reciprocal vector in the sample frame: construction frame by default
+            # ([001] along the slab normal), rotated if beam_uvw given
+            g_vec, _g = reciprocal_g_vector(hkl, info["lattice"])
+            if R_orient is not None:
+                g_vec = R_orient @ g_vec
+            # structure-factor couplings depend on hkl + tabulation energy only (NOT
+            # on the mosaic orientation), so tabulate once per reflection (CPU, a few
+            # ms) and reuse across the orientation quadrature; push real/imag to GPU.
+            _nsys_push("cxr.lines.tab")
+            chi_tab = np.asarray(chi_g(crystal, hkl, E_tab, B_ang2, use_henke))
+            u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke))
+            chi_re = xp.asarray(chi_tab.real, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
+            chi_im = xp.asarray(chi_tab.imag, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
+            u_re = xp.asarray(u_tab.real, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
+            u_im = xp.asarray(u_tab.imag, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
+            _nsys_pop()
+
+            if mosaic_quad is None:  # perfect crystal: one orientation, weight 1
+                _accumulate(g_vec, chi_re, chi_im, u_re, u_im, 1.0)
+            else:  # incoherent average over the mosaic crystallite orientations
+                for R_m, wm in mosaic_quad:
+                    _accumulate(R_m @ g_vec, chi_re, chi_im, u_re, u_im, wm)
+    else:
+        # ---- batched incoherent line accumulation (options A + B) -----------
+        # Every reflection/orientation shares the segment geometry, so run the
+        # per-orientation block (steps 1-6) ONCE over an (n_seg, N_g) grid rather
+        # than ~N_g separate _accumulate passes -- this collapses the tiny-kernel
+        # launch storm that starved the GPU (cxr.lines setup ~59 s at 6% util).
+        # Length-3 contractions expand to component-wise fused multiply-adds (no
+        # cuBLAS, no (n_seg, N_g, 3) temporaries), and the g-independent segment
+        # quantities are hoisted out of the pass.
+        #
+        # NOT bit-for-bit vs the per-hkl loop: reassociates the float reductions
+        # (component dots, batched linear interp, union-order sinc matmul), same
+        # rounding-level move the chunk-invariance rtol gate already covers.
+        # LEDGER + REGEN REQUIRED before sign-off. Validation: line-hkl-batch
+        e_lo = float(_to_cpu(E_grid[0]))
+        e_hi = float(_to_cpu(E_grid[-1]))
+        pad = 0.2 * (e_hi - e_lo)  # keep sinc tails that reach into the window
+        lo_keep, hi_keep = e_lo - pad, e_hi + pad
+
+        # -- stack all (hkl, orientation) g-vectors + per-reflection tabulations --
         _nsys_push("cxr.lines.tab")
-        chi_tab = np.asarray(chi_g(crystal, hkl, E_tab, B_ang2, use_henke))
-        u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke))
-        chi_re = xp.asarray(chi_tab.real, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
-        chi_im = xp.asarray(chi_tab.imag, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
-        u_re = xp.asarray(u_tab.real, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
-        u_im = xp.asarray(u_tab.imag, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
+        g_rows, es_rows, ep_rows, wm_rows = [], [], [], []
+        cr_rows, ci_rows, ur_rows, ui_rows = [], [], [], []
+        orients = ((None, 1.0),) if mosaic_quad is None else mosaic_quad
+        for hkl in hkl_list:
+            g_vec, _g = reciprocal_g_vector(hkl, info["lattice"])
+            if R_orient is not None:
+                g_vec = R_orient @ g_vec
+            chi_tab = np.asarray(chi_g(crystal, hkl, E_tab, B_ang2, use_henke))
+            u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke))
+            for R_m, wm in orients:
+                gd = g_vec if R_m is None else R_m @ g_vec
+                e_s, e_p = _polarization_pair(n_hat, gd)
+                g_rows.append(gd)
+                es_rows.append(e_s)
+                ep_rows.append(e_p)
+                wm_rows.append(wm)
+                cr_rows.append(chi_tab.real)
+                ci_rows.append(chi_tab.imag)
+                ur_rows.append(u_tab.real)
+                ui_rows.append(u_tab.imag)
+        G = xp.asarray(np.array(g_rows), dtype=REAL)  # (N_g, 3)
+        ES = xp.asarray(np.array(es_rows), dtype=REAL)
+        EP = xp.asarray(np.array(ep_rows), dtype=REAL)
+        WM = xp.asarray(np.array(wm_rows), dtype=REAL)[None, :]  # (1, N_g)
+        CHI_RE = xp.asarray(np.array(cr_rows), dtype=REAL)  # (N_g, N_tab)
+        CHI_IM = xp.asarray(np.array(ci_rows), dtype=REAL)
+        U_RE = xp.asarray(np.array(ur_rows), dtype=REAL)
+        U_IM = xp.asarray(np.array(ui_rows), dtype=REAL)
         _nsys_pop()
 
-        if mosaic_quad is None:  # perfect crystal: one orientation, weight 1
-            _accumulate(g_vec, chi_re, chi_im, u_re, u_im, 1.0)
-        else:  # incoherent average over the mosaic crystallite orientations
-            for R_m, wm in mosaic_quad:
-                _accumulate(R_m @ g_vec, chi_re, chi_im, u_re, u_im, wm)
+        N_g = G.shape[0]
+        gx, gy, gz = G[:, 0][None, :], G[:, 1][None, :], G[:, 2][None, :]  # (1, N_g)
+        nx, ny, nz = float(n_hat[0]), float(n_hat[1]), float(n_hat[2])
+
+        # option B: g-independent per-segment quantities, computed once
+        v_dot_n = _matvec3(v_all, n_hat_d)
+        denom_full = (1.0 - v_dot_n)[:, None]  # (n_seg, 1)
+        gamma_full = (1.0 / xp.sqrt(1.0 - beta_all**2))[:, None]
+        t_L_full = (seg_L / beta_all)[:, None]
+        L_esc_full = _escape_length(seg_r[:, 2], thickness, nz)[:, None]
+
+        n_seg = v_all.shape[0]
+        seg_block = max(1, 1_000_000 // max(1, N_g))  # bound (n_block, N_g) temporaries
+        for s0 in range(0, n_seg, seg_block):
+            sb = slice(s0, min(s0 + seg_block, n_seg))
+            vx = v_all[sb, 0][:, None]  # (nb, 1)
+            vy = v_all[sb, 1][:, None]
+            vz = v_all[sb, 2][:, None]
+            denom = denom_full[sb]
+            gamma = gamma_full[sb]
+            t_L = t_L_full[sb]
+            L_esc = L_esc_full[sb]
+
+            # -- 1. resonance energy per (segment, reflection) -------------------
+            v_dot_g = vx * gx + vy * gy + vz * gz  # (nb, N_g)
+            omega_res = v_dot_g / denom
+            E_res = HBARC_EV_ANG * omega_res
+            keep = (E_res > lo_keep) & (E_res > 10.0) & (E_res < hi_keep)
+
+            # -- 3. couplings at each resonance energy (batched interp) ----------
+            chi_re = _batch_interp(E_res, E_tab_g, CHI_RE)
+            chi_im = _batch_interp(E_res, E_tab_g, CHI_IM)
+            u_re = _batch_interp(E_res, E_tab_g, U_RE) / M_E_EV
+            u_im = _batch_interp(E_res, E_tab_g, U_IM) / M_E_EV
+
+            # -- 4. photon kinematics (component-wise, no cuBLAS) ----------------
+            kx, ky, kz = omega_res * nx, omega_res * ny, omega_res * nz
+            kgx, kgy, kgz = kx + gx, ky + gy, kz + gz
+            kg2 = kgx * kgx + kgy * kgy + kgz * kgz
+            detuning = kg2 - omega_res**2
+            k_dot_g = kx * gx + ky * gy + kz * gz
+            v_dot_kg = vx * kgx + vy * kgy + vz * kgz
+            k_dot_v = omega_res * (1.0 - denom)  # om * (v . n_hat)
+            vdg = v_dot_g
+
+            # -- 5. |A|^2 summed over both polarizations ------------------------
+            A2 = xp.zeros_like(omega_res)
+            A2_pxr = xp.zeros_like(omega_res)
+            A2_cbs = xp.zeros_like(omega_res)
+            for E_pol in (ES, EP):
+                ex, ey, ez = E_pol[:, 0][None, :], E_pol[:, 1][None, :], E_pol[:, 2][None, :]
+                g_dot_e = gx * ex + gy * ey + gz * ez  # (1, N_g)
+                v_dot_e = vx * ex + vy * ey + vz * ez  # (nb, N_g)
+                a2, a2p, a2c = _line_amp_sq_core(
+                    chi_re,
+                    chi_im,
+                    u_re,
+                    u_im,
+                    v_dot_kg,
+                    g_dot_e,
+                    omega_res,
+                    v_dot_e,
+                    vdg,
+                    k_dot_g,
+                    k_dot_v,
+                    gamma,
+                    detuning,
+                )
+                A2 = A2 + a2
+                A2_pxr = A2_pxr + a2p
+                A2_cbs = A2_cbs + a2c
+
+            # -- 6. Beer-Lambert escape factor (slab; geometry hoisted) ---------
+            T_abs = xp.exp(-(L_esc * _mu_total_inv_ang(abs_comp, E_res)))
+
+            # -- 7. weights (everything except the sinc^2), then accumulate -----
+            pref = ALPHA_FS * omega_res / (4.0 * xp.pi**2 * HBARC_EV_ANG) * t_L**2 * T_abs
+            a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(omega_res)
+            weight = pref * A2 * WM
+            good = keep & xp.isfinite(weight) & (weight > 0)
+            gm = good.reshape(-1)
+            if not bool(gm.any()):
+                continue
+            E_r_f = E_res.reshape(-1)[gm]
+            aw_f = a_width.reshape(-1)[gm]
+            targets = [(weight, spec)]
+            if components:
+                targets.append((pref * A2_pxr * WM, spec_pxr))
+                targets.append((pref * A2_cbs * WM, spec_cbs))
+            _nsys_push("cxr.lines.accum")
+            for w, tgt in targets:
+                w_f = w.reshape(-1)[gm]
+                for j0 in range(0, E_r_f.size, chunk):
+                    sl2 = slice(j0, min(j0 + chunk, E_r_f.size))
+                    S = _sincsq_lineshape(aw_f[sl2][:, None], E_grid[None, :], E_r_f[sl2][:, None])
+                    tgt += w_f[sl2] @ S
+            _nsys_pop()
 
     if components:
         return _to_cpu(spec / Ne), _to_cpu(spec_pxr / Ne), _to_cpu(spec_cbs / Ne)
