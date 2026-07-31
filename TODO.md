@@ -76,6 +76,11 @@ must remain until moved into a task file. Edit and drop items on `main`.
    is decided. Blocked on `feature/cross-profile-case-reuse`'s dedup design;
    design-first. → `feature/checkpoint-command-rework`;
    [`tasks/feature/checkpoint-command-rework/`](tasks/feature/checkpoint-command-rework/).
+7. **Dashboard live verbosity cycling.** Press `v` in the local run dashboard
+   or the remote `attach`/`status -a` viewer to cycle detail level (0/`-v`/
+   `-vv`) live, no restart; reuses the existing `_KeyListener` keypress
+   machinery from the remote cancel keybind. → `feature/dashboard-verbosity-keybind`;
+   [`tasks/feature/dashboard-verbosity-keybind/`](tasks/feature/dashboard-verbosity-keybind/).
 
 ## P3 - lower / exploratory / small bugfixes / on-hold
 
