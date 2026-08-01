@@ -43,6 +43,11 @@ file. Edit and drop items on `main`.
    cache reuse, and correct or accurately report the ratio plot's unexpected
    material exclusions. → `fix/analysis-compare-loading-quality`;
    [`tasks/fix/analysis-compare-loading-quality/`](tasks/fix/analysis-compare-loading-quality/).
+2. **Preserve analysis-spectrum resolution when showing bremsstrahlung.**
+   Ensure enabling the background trace cannot coarsen the fine coherent-line
+   spectrum through interpolation or shared plot-point decimation. →
+   `fix/analysis-spectrum-resolution-with-brem`;
+   [`tasks/fix/analysis-spectrum-resolution-with-brem/`](tasks/fix/analysis-spectrum-resolution-with-brem/).
 
 ### Gated
 
