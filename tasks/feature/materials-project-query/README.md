@@ -2,74 +2,74 @@
 
 ## Problem and scope
 
-The repository has no maintained Materials Project query path, while catalog
-work needs a reproducible way to retrieve source crystal metadata.  Define and
-implement a small, explicit query workflow authenticated by a local, ignored
-`.env` file.  Never commit API keys, query responses containing credentials, or
-make package import depend on network access.
+The existing live external-database validation path calls
+`crystals.Crystal.from_mp(mp_id, api_key=...)` from
+`tests/external_db_fixtures.py`.  It reads `MP_API_KEY` only from the process
+environment, so a local ignored `.env` is not loaded; MP-only records skip when
+the shell has no exported key, and credentialed runs cannot reliably exercise
+the intended query.  Repair this established validation/fixture workflow with
+secure local `.env` loading.  Never commit API keys, query responses containing
+credentials, or make package import depend on network access.
 
-Scope: query configuration, an intentional command or developer entry point,
-normalization of retrieved source data into the catalog-ingestion workflow, and
-offline regression coverage.  This task does not add materials, turn runtime
-simulation into an online service, or change the packaged catalog schema unless
-the selected ingestion contract demonstrably requires it.
+Scope: test-fixture and `scripts/refresh_external_cif.py` configuration,
+deterministic live-query diagnostics, and offline regression coverage.  This
+task does not add materials, introduce a new public `cxr` command, turn runtime
+simulation into an online service, or change the packaged catalog schema.
 
 ## Implementation path and likely owners
 
-- `src/cxr_mc/materials/`: source-data retrieval/normalization boundary.
-- `src/cxr_mc/cli/`: only if a user-facing `cxr` command is selected.
-- `scripts/` or a dedicated developer-facing module: one-shot provenance
-  retrieval, if that is the least invasive interface.
-- `tests/`: mocked client and missing/invalid-key behavior; catalog fixtures
-  remain offline.
-- `docs/` and `.env.example`: non-secret setup, provenance, and failure
-  recovery guidance.
+- `tests/external_db_fixtures.py`: `MP_API_KEY` resolution and MP query error
+  classification.
+- `tests/test_crystal_external_db.py`: online-test gate and explicit
+  credential/query failure behavior.
+- `scripts/refresh_external_cif.py`: reuse fixture resolution, preserve cached
+  MP data when unavailable, and report actionable diagnostics.
+- `tests/`: mocked key-resolution and `Crystal.from_mp` failure coverage;
+  catalog fixtures remain offline.
+- `docs/` and `.env.example`: non-secret setup and recovery guidance.
 
 ## Checklist
 
-1. Locate previous ad-hoc Materials Project access and identify the required
-   query inputs/outputs for catalog work; record the chosen public interface.
-2. Define `MP_API_KEY` loading from a local `.env` without logging the value;
-   preserve explicit process-environment precedence and a clear missing-key
-   error.
-3. Add the minimal optional client dependency or isolated HTTP adapter only
-   after selecting its supported API endpoint and response contract.
-4. Implement deterministic retrieval/normalization with request identifiers,
-   source URL/version, and retrieval-date provenance suitable for committing
-   derived catalog inputs.
-5. Add offline mocked tests for successful query, missing key, malformed
-   response, and network/API failure.  Keep normal imports, catalog loading,
-   and full offline tests network-free.
-6. Add `.env.example` and user/developer documentation; regenerate CLI
-   reference if a public `cxr` command is added.
+1. Reproduce the credentialed MP-only online-test failure with an explicit key
+   in a local `.env`; capture the `Crystal.from_mp` exception/API behavior
+   without disclosing the key.
+2. Add a shared local key resolver that loads `.env` for this developer/test
+   path only, gives exported `MP_API_KEY` precedence, and never logs its value.
+3. Preserve the current `CXR_ONLINE_TESTS=1` opt-in.  Distinguish unavailable
+   credentials (skip) from a configured-key query/API failure (fail with an
+   actionable message), so broken MP access cannot silently skip.
+4. Route `scripts/refresh_external_cif.py` through the same resolver and retain
+   cached entries on unavailable credentials or failed fetches.
+5. Add offline mocked tests for `.env` loading, environment precedence,
+   missing key, and `Crystal.from_mp` failure. Keep default catalog imports and
+   ordinary tests network-free.
+6. Add `.env.example` and developer documentation; do not add a new `cxr`
+   command or an API client dependency unless reproduction proves `crystals`
+   itself cannot support the query.
 
 ## Decisions and open questions
 
-- Default assumption: `MP_API_KEY` is local developer configuration, supplied
-  through `.env` or the environment, never a repository setting.
-- Decide whether this is a developer-only retrieval tool or a supported `cxr`
-  command after locating intended callers.  Prefer developer-only if it only
-  creates catalog source artifacts.
-- Confirm query target(s), required fields, and provenance retention before
-  choosing `mp-api` versus a direct API adapter.
-- Do not perform live API calls in ordinary CI; optional credentialed checks
-  must be explicit.
+- `MP_API_KEY` is local developer configuration, supplied through `.env` or the
+  environment, never a repository setting. Exported environment wins.
+- Existing owner is test/fixture tooling, not runtime material loading or the
+  public CLI. Do not widen scope absent reproduction evidence.
+- `crystals>=1.7,<2` already supplies `Crystal.from_mp`; do not add `mp-api`
+  until a reproduced API incompatibility justifies replacement.
+- Do not perform live API calls in ordinary CI; credentialed checks remain
+  explicitly gated by `CXR_ONLINE_TESTS=1`.
 
 ## Delegation slices and required skills
 
-- Discovery/interface design: `repo-orientation`, `scientific-library`.
-- CLI surface, if selected: `cli-ui-ux`, `documentation-maintenance`.
+- Fixture/query diagnosis: `investigating-changes`, `repo-orientation`.
 - Offline failure-path coverage: `regression-testing`.
-- Material catalog output changes, if any: `regen-golden`,
-  `physics-review`.
+- Documentation and non-secret env template: `documentation-maintenance`.
 
 ## Acceptance checks
 
-- Missing credentials fail locally with actionable guidance and no secret
-  exposure; environment override behavior is tested.
-- Valid mocked API response becomes a validated, provenance-bearing result.
-- API, malformed-response, and transport failures are deterministic and
-  actionable.
-- Default catalog imports and test suite make no network calls.
+- A key in local `.env` is used by MP-only online tests and the refresh script;
+  exported environment wins and no secret appears in output.
+- Missing key skips only MP-only live cases; a configured-key query failure is
+  surfaced as a deterministic actionable failure.
+- Default catalog imports and ordinary tests make no network calls.
 - `.env.example` contains no credential; `.gitignore` continues to exclude
   `.env`.

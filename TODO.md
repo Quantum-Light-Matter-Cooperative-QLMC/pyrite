@@ -25,9 +25,9 @@ must remain until moved into a task file. Edit and drop items on `main`.
    [`tasks/feature/cli-surface-simplification/`](tasks/feature/cli-surface-simplification/).
 ## P0 - >user< To be Triaged
 
-1. **Repair Materials Project query workflow.** Define secure local
-   `MP_API_KEY` configuration, restore a provenance-bearing retrieval path, and
-   keep catalog/runtime imports offline; add mocked failure-path coverage. →
+1. **Repair Materials Project live-validation query.** Make the existing
+   `Crystal.from_mp` fixture load local `MP_API_KEY`, distinguish skipped
+   no-key cases from configured-key failures, and keep default tests offline. →
    `feature/materials-project-query`;
    [`tasks/feature/materials-project-query/`](tasks/feature/materials-project-query/).
 2. Set up comparisons/param sweeps to analyze effect of longitudinal bunch length & transverse bunch size on coherent bunching for otherwise identical bunch parameters
