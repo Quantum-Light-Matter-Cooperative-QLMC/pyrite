@@ -38,7 +38,8 @@ must remain until moved into a task file. Edit and drop items on `main`.
 5. Laptop-local SLURM is set up, but `cxr run` isn't connecting to it.
 6. Add local-version of `cxr remote clear` to drop local pickles. Same behavior as for remote.
 7. LONG TERM GOALS (not now) (maybe a further applications for `uv` workspaces and/or some other way to split up optional packages):
-   1. Make this repo less CXR-specific, more general purpose.
+   1. Implement additional dedicated TUI for navigating checkpoints, executing commands, examining/modifying profiles, running sweeps, improving/editing progress dashboard, etc.. Presumably using `textualize`, but TBD/to-be-researched
+   2. Make this repo less CXR-specific, more general purpose.
       1. Add more optional physics (300 keV & below, to start with)
          1. Secondary electron emission (as an option)
          2. Material ionization?
