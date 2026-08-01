@@ -1,3 +1,4 @@
+from cxr_mc import scan
 from cxr_mc.scan import _build_sections
 
 
@@ -73,3 +74,44 @@ def test_non_tty_falls_back_to_tqdm(monkeypatch):
     # when CXR_LOCAL_DASHBOARD is not set. 
     # Because we patched runner.py to do this.
     pass
+
+
+def test_dashboard_loop_cycles_detail_and_wraps(monkeypatch):
+    class FakeStop:
+        def __init__(self):
+            self.iterations = 0
+
+        def is_set(self):
+            return self.iterations >= 3
+
+        def wait(self, _seconds):
+            self.iterations += 1
+
+    class FakeKeys:
+        active = True
+
+        def __init__(self):
+            self.stopped = False
+
+        def poll(self):
+            return ["v"]
+
+        def stop(self):
+            self.stopped = True
+
+    fake_stop = FakeStop()
+    fake_keys = FakeKeys()
+    rendered = []
+    monkeypatch.setattr(scan, "_dashboard_stop", fake_stop)
+    monkeypatch.setattr(scan._dashboard, "_KeyListener", lambda: fake_keys)
+    monkeypatch.setattr(scan, "_build_sections", lambda *_args: {})
+    monkeypatch.setattr(scan._dashboard, "_format_job_status", lambda _sections, detail: detail)
+    monkeypatch.setattr(scan._dashboard, "_style_states", lambda detail: detail)
+    monkeypatch.setattr(
+        scan._dashboard, "_render_frame", lambda detail, *, tty: rendered.append((detail, tty))
+    )
+
+    scan._dashboard_loop(MockArgs(), ["hopg"], {}, detail=0)
+
+    assert rendered == [(1, True), (2, True), (0, True)]
+    assert fake_keys.stopped is True

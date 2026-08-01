@@ -60,23 +60,23 @@ User request: while watching either dashboard, press `v` to cycle
 
 ## Stepwise checklist
 
-- [ ] Move `_KeyListener` to `cli/_dashboard.py`; `_remote/viewer.py` imports
+- [x] Move `_KeyListener` to `cli/_dashboard.py`; `_remote/viewer.py` imports
       it; no behavior change (existing cancel/pull remote tests stay green).
-- [ ] Local: wire `_KeyListener` into `_dashboard_loop`; `v` cycles `detail`
+- [x] Local: wire `_KeyListener` into `_dashboard_loop`; `v` cycles `detail`
       0->1->2->0; verify a level change is visible on the next 1 Hz tick.
-- [ ] Remote: wire `v` into `_live_status`'s existing key-poll block; rebuild
+- [x] Remote: wire `v` into `_live_status`'s existing key-poll block; rebuild
       remote command + restart stream on any `detail` change; confirm no
       interaction with the `x`-arm/`y`-confirm window.
-- [ ] Discoverability: extend `_attach_header` hint text with the `v` keybind;
+- [x] Discoverability: extend `_attach_header` hint text with the `v` keybind;
       decide (open question below) whether the local dashboard gets an
       equivalent footer/header hint line, since it currently has none.
-- [ ] Tests: local key-cycle test (fake key listener, assert `detail` progresses
+- [x] Tests: local key-cycle test (fake key listener, assert `detail` progresses
       and next render reflects it); remote key-cycle test extending the
       existing `_FakeKeyListener` pattern (`tests/test_remote.py:2126`),
       asserting stream restart only on an actual `detail` change and that the
       rebuilt remote command matches `_status_remote_command` for the new
       level.
-- [ ] `docs/cli-reference.md` regen only if any help text changes (unlikely --
+- [x] `docs/cli-reference.md` regen only if any help text changes (not needed --
       this is a live-session keybind, not a new flag).
 
 ## Decisions / open questions
@@ -88,14 +88,31 @@ User request: while watching either dashboard, press `v` to cycle
   sections. Simpler, and a human keypress is infrequent enough that one extra
   round-trip per press is not worth the added branching -- revisit only if a
   reviewer flags the extra SSH round-trip as user-visible lag.
-- **Open:** should the local dashboard gain a header/hint line (it has none
-  today, unlike the remote attach header)? Needed for `v` discoverability but
-  is new UI surface beyond the ask -- implementer's call; a one-line footer
-  reusing `_paint`/`_style_states` conventions is the minimal option if yes.
-- **Open:** on remote stream restart, is there a brief blank/stale frame
-  between teardown and the first new-detail output? If so, keep rendering the
-  last frame until the new stream yields its first output rather than
-  blanking.
+- **Resolved:** no local header/hint line; the local dashboard has no existing
+  chrome, and adding one would consume vertical space on every refresh.
+- **Resolved:** keep rendering the last frame while the restarted remote
+  stream awaits its first new-detail output; do not blank the dashboard.
+
+## Implementation decisions
+
+- Local dashboard gets no new hint/header: it has no existing chrome, while
+  adding one would consume vertical space on every refresh. Remote attach's
+  existing interactive-only hint now advertises `v`; non-TTY output remains
+  unchanged.
+- Remote renders the current frame at the newly selected detail, then closes
+  and reopens the SSH stream. This retains the last frame until the restarted
+  stream yields fetched level-2 sections, avoiding a blank transition.
+
+## Verification
+
+- Focused dashboard/remote regression selection: 8 passed.
+- `tests/test_local_dashboard.py tests/test_remote.py`: 336 passed.
+- `cxr-dev lint`: passed.
+- `cxr-dev verify`: static checks passed; test stage reached 2,211 passed and
+  39 skipped, with only the sandbox-blocked multiprocessing forkserver test
+  failing (`PermissionError: [Errno 1] Operation not permitted`).
+- `cxr-dev test`: same 2,211 passed / 39 skipped / one sandbox forkserver
+  failure.
 
 ## Delegation / required skills
 
