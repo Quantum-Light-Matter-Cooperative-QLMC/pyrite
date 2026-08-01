@@ -24,7 +24,11 @@ def test_writes_line_and_creates_missing_rc_file(tmp_path, monkeypatch):
     assert_clean_result(result)
     assert "Installed cxr completion" in result.stdout
     content = rc_file.read_text()
-    assert content == '# cxr shell completion\neval "$(_CXR_COMPLETE=bash_source cxr)"\n'
+    assert content == (
+        "# >>> cxr shell completion >>>\n"
+        'eval "$(_CXR_COMPLETE=bash_source cxr)"\n'
+        "# <<< cxr shell completion <<<\n"
+    )
 
 
 def test_appends_after_existing_content_without_trailing_newline(tmp_path):
@@ -39,8 +43,9 @@ def test_appends_after_existing_content_without_trailing_newline(tmp_path):
     assert_clean_result(result)
     assert rc_file.read_text() == (
         "export PATH=$PATH:/opt/bin\n"
-        "# cxr shell completion\n"
+        "# >>> cxr shell completion >>>\n"
         'eval "$(_CXR_COMPLETE=zsh_source cxr)"\n'
+        "# <<< cxr shell completion <<<\n"
     )
 
 
@@ -82,7 +87,11 @@ def test_fish_uses_pipe_source_and_config_fish_default(monkeypatch, tmp_path):
 
     assert_clean_result(result)
     target = tmp_path / ".config" / "fish" / "config.fish"
-    assert target.read_text() == "# cxr shell completion\n_CXR_COMPLETE=fish_source cxr | source\n"
+    assert target.read_text() == (
+        "# >>> cxr shell completion >>>\n"
+        "_CXR_COMPLETE=fish_source cxr | source\n"
+        "# <<< cxr shell completion <<<\n"
+    )
 
 
 def test_zsh_honors_zdotdir(monkeypatch, tmp_path):
@@ -118,3 +127,74 @@ def test_unsupported_shell_choice_is_usage_error():
 
     assert result.exit_code == 2
     assert "powershell" in result.output
+
+
+def test_remove_managed_installation_and_preserve_other_content(tmp_path):
+    rc_file = tmp_path / ".zshrc"
+    rc_file.write_text("export KEEP=1\n")
+    installed = invoke(
+        root_command,
+        ["completion", "install", "--shell", "zsh", "--rc-file", str(rc_file)],
+    )
+
+    removed = invoke(
+        root_command,
+        ["completion", "remove", "--shell", "zsh", "--rc-file", str(rc_file)],
+    )
+
+    assert_clean_result(installed)
+    assert_clean_result(removed)
+    assert removed.stdout == f"Removed cxr completion from {rc_file}\n"
+    assert rc_file.read_text() == "export KEEP=1\n"
+
+
+def test_remove_recognizes_legacy_two_line_installation(tmp_path):
+    rc_file = tmp_path / ".bashrc"
+    rc_file.write_text(
+        "export KEEP=1\n"
+        "# cxr shell completion\n"
+        'eval "$(_CXR_COMPLETE=bash_source cxr)"\n'
+    )
+
+    result = invoke(
+        root_command,
+        ["completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)],
+    )
+
+    assert_clean_result(result)
+    assert rc_file.read_text() == "export KEEP=1\n"
+
+
+def test_remove_is_idempotent_and_dry_run_preserves_file(tmp_path):
+    rc_file = tmp_path / ".bashrc"
+    install = ["completion", "install", "--shell", "bash", "--rc-file", str(rc_file)]
+    invoke(root_command, install)
+    original = rc_file.read_text()
+
+    preview = invoke(root_command, [*install[:1], "remove", *install[2:], "--dry-run"])
+    assert_clean_result(preview)
+    assert "Would remove" in preview.stdout
+    assert rc_file.read_text() == original
+
+    invoke(root_command, ["completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)])
+    repeated = invoke(
+        root_command,
+        ["completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)],
+    )
+    assert_clean_result(repeated)
+    assert "not installed" in repeated.stdout
+
+
+def test_remove_does_not_delete_unmanaged_completion_line(tmp_path):
+    rc_file = tmp_path / ".bashrc"
+    line = 'eval "$(_CXR_COMPLETE=bash_source cxr)"\n'
+    rc_file.write_text(line)
+
+    result = invoke(
+        root_command,
+        ["completion", "remove", "--shell", "bash", "--rc-file", str(rc_file)],
+    )
+
+    assert_clean_result(result)
+    assert "not installed" in result.stdout
+    assert rc_file.read_text() == line
