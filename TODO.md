@@ -26,13 +26,18 @@ file. Edit and drop items on `main`.
    CPU/GPU/RAM/VRAM utilization without OOM, keeping the GPU fed where evidence
    supports it. → `feature/compute-performance-optimization`;
    [`tasks/feature/compute-performance-optimization/`](tasks/feature/compute-performance-optimization/).
-3. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-4. **Detector profiles and Zhai validation modernization.** Add profile-owned
+3. **Profile-aware quick energy grids.** Make local quick runs and remote CPU
+   profiling select bounded beam energies with valid effective line grids,
+   avoiding fixed 50 keV failures without weakening missing-grid validation. →
+   `fix/profile-aware-quick-energy-grid`;
+   [`tasks/fix/profile-aware-quick-energy-grid/`](tasks/fix/profile-aware-quick-energy-grid/).
+4. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
+5. **Detector profiles and Zhai validation modernization.** Add profile-owned
    detector geometry with a 90 degree standard default, then route maintained
    Zhai/literature comparisons through current detector, Sweep, and case APIs.
    → `feature/profile-observation-angle`;
    [`tasks/feature/profile-observation-angle/`](tasks/feature/profile-observation-angle/).
-5. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
+6. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
 
 ## P1 - top-priority back burner
 
