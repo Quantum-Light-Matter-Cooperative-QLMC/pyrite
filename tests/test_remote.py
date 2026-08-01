@@ -26,6 +26,7 @@ from cxr_mc._remote import (  # noqa: F401
     transport,
     viewer,
 )
+from cxr_mc.cli import _dashboard
 
 
 def test_check_materials_accepts_crystal_keys():
@@ -2139,19 +2140,62 @@ class _FakeKeyListener:
 
 
 def test_key_listener_inactive_when_stdin_is_not_a_tty(monkeypatch):
-    monkeypatch.setattr(viewer.sys.stdin, "isatty", lambda: False)
+    monkeypatch.setattr(_dashboard.sys.stdin, "isatty", lambda: False)
 
-    listener = viewer._KeyListener()
+    listener = _dashboard._KeyListener()
 
     assert listener.active is False
     assert listener.poll() == []
     listener.stop()  # must be a harmless no-op
+    assert viewer._KeyListener is _dashboard._KeyListener
 
 
 def test_attach_header_shows_cancel_hint_only_when_keys_are_active():
     assert f"{viewer._CANCEL_ARM_KEY} cancels job" in viewer._attach_header(1, cancel_hint=True)
     assert f"{viewer._PULL_ARM_KEY} pulls progress" in viewer._attach_header(1, cancel_hint=True)
+    assert "v cycles detail" in viewer._attach_header(1, cancel_hint=True)
     assert "cancels job" not in viewer._attach_header(1, cancel_hint=False)
+    assert "cycles detail" not in viewer._attach_header(1, cancel_hint=False)
+
+
+def test_attach_verbosity_key_cycles_restarts_stream_and_wraps(monkeypatch):
+    running = _status_output("running hopg [1/1] since now", squeue_state="RUNNING")
+    detailed = presentation._encode_sections(
+        {
+            "JOB": "j",
+            "META": "job: j\nmaterials: hopg\nslurm_job_id: 48291",
+            "STATE": "running hopg [1/1] since now",
+            "SQUEUE": "job_id=48291|state=RUNNING",
+            "RESOURCES": "cpu_percent=25.0",
+            "LOG": "detail-two log",
+        }
+    )
+    done = _status_output("done now", squeue_state="NOT_QUEUED")
+    streams = iter([[running], [running], [detailed, detailed], [done]])
+    commands = []
+
+    def status_stream(command):
+        commands.append(command)
+        return iter(next(streams))
+
+    monkeypatch.setattr(viewer, "_status_stream", status_stream)
+    fake_keys = _FakeKeyListener([["v"], ["v"], [], ["v"], []])
+    monkeypatch.setattr(viewer, "_KeyListener", lambda: fake_keys)
+    frames = []
+    monkeypatch.setattr(viewer, "_render_frame", lambda frame, *, tty: frames.append(frame))
+
+    assert remote.attach("20260101-000000") is True
+
+    assert len(commands) == 4
+    assert "tail -c 32768" not in commands[0]
+    assert "tail -c 32768" not in commands[1]
+    assert 'tail -c 32768 "$D/log"' in commands[2]
+    assert "tail -c 32768" not in commands[3]
+    assert "COMPUTE USAGE" in frames[2]
+    assert "detail-two log" in frames[2]
+    assert "COMPUTE USAGE" not in frames[3]
+    assert "detail-two log" not in frames[3]
+    assert fake_keys.stopped is True
 
 
 def test_attach_header_shows_armed_confirm_banner():

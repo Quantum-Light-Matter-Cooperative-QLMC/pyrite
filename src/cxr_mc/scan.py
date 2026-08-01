@@ -151,11 +151,18 @@ def _build_sections(args, materials, job_records, detail):
 
 _dashboard_stop = threading.Event()
 def _dashboard_loop(args, materials, job_records, detail):
-    while not _dashboard_stop.is_set():
-        sections = _build_sections(args, materials, job_records, detail)
-        frame = _dashboard._style_states(_dashboard._format_job_status(sections, detail))
-        _dashboard._render_frame(frame, tty=True)
-        _dashboard_stop.wait(1.0)
+    keys = _dashboard._KeyListener()
+    try:
+        while not _dashboard_stop.is_set():
+            for key in keys.poll():
+                if key.lower() == "v":
+                    detail = (detail + 1) % 3
+            sections = _build_sections(args, materials, job_records, detail)
+            frame = _dashboard._style_states(_dashboard._format_job_status(sections, detail))
+            _dashboard._render_frame(frame, tty=True)
+            _dashboard_stop.wait(1.0)
+    finally:
+        keys.stop()
 
 
 def _read_manifest_toml(path: Path):

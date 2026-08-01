@@ -1,15 +1,12 @@
 """Live job viewers: attach, status, list, logs."""
 
-import queue
-import select
 import subprocess
 import sys
-import threading
 import time
 
 import tqdm  # noqa: F401 -- kept importable at module level for test monkeypatching
 
-from ..cli._dashboard import _render_frame
+from ..cli._dashboard import _KeyListener, _render_frame
 from . import config, lifecycle, presentation, scripts, state, transport
 
 
@@ -274,84 +271,6 @@ _CANCEL_CONFIRM_KEY = "y"
 _CANCEL_ARM_SECONDS = 6.0
 
 
-class _KeyListener:
-    """Background nonblocking single-keypress capture for the attach loop.
-
-    A no-op (``active`` False, ``poll()`` always empty) unless stdin is an
-    interactive terminal -- piped/non-tty attach then behaves exactly as
-    before, with no cancel-keybinding hint shown. Cross-platform: POSIX uses
-    ``termios``/``tty`` cbreak mode plus ``select``; Windows uses ``msvcrt``
-    (no raw-mode setup needed there). Reads happen on a background daemon
-    thread so the main loop's blocking SSH read is never held up; ``poll()``
-    drains and returns every key buffered since the last call, in order, so a
-    fast 'x' then 'y' typed within one ~2 s window is never collapsed to just
-    the latest keystroke.
-    """
-
-    def __init__(self):
-        self.active = False
-        self._keys = queue.Queue()
-        self._stop_event = threading.Event()
-        self._restore = None
-        self._thread = None
-        if not sys.stdin.isatty():
-            return
-        try:
-            import msvcrt  # noqa: F401 -- Windows only; ImportError picks the POSIX branch below
-        except ImportError:
-            try:
-                import termios
-                import tty
-
-                fd = sys.stdin.fileno()
-                old = termios.tcgetattr(fd)
-                tty.setcbreak(fd)
-            except (OSError, ValueError, termios.error):
-                return
-            self._restore = lambda: termios.tcsetattr(fd, termios.TCSADRAIN, old)
-            self._thread = threading.Thread(target=self._poll_posix, args=(fd,), daemon=True)
-        else:
-            self._thread = threading.Thread(target=self._poll_windows, daemon=True)
-        self._thread.start()
-        self.active = True
-
-    def _poll_windows(self):
-        import msvcrt
-
-        while not self._stop_event.is_set():
-            if msvcrt.kbhit():  # ty: ignore[unresolved-attribute]
-                self._keys.put(msvcrt.getwch())  # ty: ignore[unresolved-attribute]
-            else:
-                self._stop_event.wait(0.1)
-
-    def _poll_posix(self, fd):
-        while not self._stop_event.is_set():
-            ready, _write, _exceptional = select.select([fd], [], [], 0.1)
-            if not ready:
-                continue
-            char = sys.stdin.read(1)
-            if char == "":
-                break  # EOF (e.g. stdin redirected from a closed pipe)
-            self._keys.put(char)
-
-    def poll(self):
-        """Every key buffered since the last call, oldest first."""
-        keys = []
-        while True:
-            try:
-                keys.append(self._keys.get_nowait())
-            except queue.Empty:
-                break
-        return keys
-
-    def stop(self):
-        self._stop_event.set()
-        if self._thread is not None:
-            self._thread.join(timeout=1)
-        if self._restore is not None:
-            self._restore()
-
-
 def _attach_header(refresh, *, armed=False, cancel_hint=True):
     """One-line banner above each live frame; the counter proves it's polling."""
     if armed:
@@ -362,7 +281,8 @@ def _attach_header(refresh, *, armed=False, cancel_hint=True):
             "warning",
         )
     hint = (
-        f" · {_CANCEL_ARM_KEY} cancels job · {_PULL_ARM_KEY} pulls progress (confirm)"
+        f" · v cycles detail · {_CANCEL_ARM_KEY} cancels job"
+        f" · {_PULL_ARM_KEY} pulls progress (confirm)"
         if cancel_hint
         else ""
     )
@@ -422,61 +342,79 @@ def _live_status(jobid, detail):
     armed_until = None
     armed_action = None
     try:
-        stream = _status_stream(remote)
-        for output in stream:
-            refresh += 1
-            sections = presentation._marked_sections(output)
-            if not sections:
-                print(presentation._sanitize_terminal(output, multiline=True), end="")
-                return False
-            state_ = presentation._sanitize_terminal(sections.get("STATE", ""), multiline=True)
-            scheduler = presentation._scheduler_fields(sections.get("SQUEUE", ""))
-            live = scheduler.get("state", "") not in ("", "NOT_QUEUED")
-
-            if armed_until is not None and time.monotonic() >= armed_until:
-                armed_until = None  # confirm window lapsed; disarm silently
-                armed_action = None
-            for key in keys.poll():
-                if armed_until is not None:
-                    confirmed = key.lower() == _CANCEL_CONFIRM_KEY
-                    armed_until = None
-                    action = armed_action
-                    armed_action = None
-                    if confirmed:
-                        if action == "cancel":
-                            cancelled = True
-                            break
-                        if action == "pull":
-                            pull_requested = True
-                elif key.lower() == _CANCEL_ARM_KEY:
-                    armed_until = time.monotonic() + _CANCEL_ARM_SECONDS
-                    armed_action = "cancel"
-                elif key.lower() == _PULL_ARM_KEY:
-                    armed_until = time.monotonic() + _CANCEL_ARM_SECONDS
-                    armed_action = "pull"
-
-            frame = (
-                _attach_header(
-                    refresh,
-                    armed=armed_action if armed_until is not None else False,
-                    cancel_hint=keys.active,
+        while True:
+            restart_requested = False
+            stream = _status_stream(remote)
+            for output in stream:
+                refresh += 1
+                sections = presentation._marked_sections(output)
+                if not sections:
+                    print(presentation._sanitize_terminal(output, multiline=True), end="")
+                    return False
+                state_ = presentation._sanitize_terminal(
+                    sections.get("STATE", ""), multiline=True
                 )
-                + "\n\n"
-                + presentation._style_states(presentation._format_job_status(sections, detail))
-            )
-            _render_frame(frame, tty=tty)
-            if pull_requested:
-                pull_requested = False
-                try:
-                    _pull_attached_progress(jobid, sections)
-                except (SystemExit, ValueError) as error:
-                    print(f"\nPARTIAL PULL FAILED · job {jobid}\n  {error}")
-            if cancelled or _is_terminal_state(state_):
+                scheduler = presentation._scheduler_fields(sections.get("SQUEUE", ""))
+                live = scheduler.get("state", "") not in ("", "NOT_QUEUED")
+
+                if armed_until is not None and time.monotonic() >= armed_until:
+                    armed_until = None  # confirm window lapsed; disarm silently
+                    armed_action = None
+                for key in keys.poll():
+                    if armed_until is not None:
+                        confirmed = key.lower() == _CANCEL_CONFIRM_KEY
+                        armed_until = None
+                        action = armed_action
+                        armed_action = None
+                        if confirmed:
+                            if action == "cancel":
+                                cancelled = True
+                                break
+                            if action == "pull":
+                                pull_requested = True
+                    elif key.lower() == "v":
+                        detail = (detail + 1) % 3
+                        remote = _status_remote_command(scripts._job_assign(jobid), detail)
+                        restart_requested = True
+                    elif key.lower() == _CANCEL_ARM_KEY:
+                        armed_until = time.monotonic() + _CANCEL_ARM_SECONDS
+                        armed_action = "cancel"
+                    elif key.lower() == _PULL_ARM_KEY:
+                        armed_until = time.monotonic() + _CANCEL_ARM_SECONDS
+                        armed_action = "pull"
+
+                frame = (
+                    _attach_header(
+                        refresh,
+                        armed=armed_action if armed_until is not None else False,
+                        cancel_hint=keys.active,
+                    )
+                    + "\n\n"
+                    + presentation._style_states(
+                        presentation._format_job_status(sections, detail)
+                    )
+                )
+                _render_frame(frame, tty=tty)
+                if pull_requested:
+                    pull_requested = False
+                    try:
+                        _pull_attached_progress(jobid, sections)
+                    except (SystemExit, ValueError) as error:
+                        print(f"\nPARTIAL PULL FAILED · job {jobid}\n  {error}")
+                if cancelled or _is_terminal_state(state_):
+                    break
+                if restart_requested:
+                    break
+                missed = 0 if live else missed + 1
+                if missed >= _POLL_GRACE_POLLS:
+                    broken = True
+                    break
+            if not restart_requested or cancelled or broken or _is_terminal_state(state_):
                 break
-            missed = 0 if live else missed + 1
-            if missed >= _POLL_GRACE_POLLS:
-                broken = True
-                break
+            close = getattr(stream, "close", None)
+            if close is not None:
+                close()
+            stream = None
     except KeyboardInterrupt:
         _disconnect_hint(jobid)
         return False
