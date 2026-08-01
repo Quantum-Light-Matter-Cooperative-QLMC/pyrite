@@ -17,15 +17,20 @@ must remain until moved into a task file. Edit and drop items on `main`.
    `feature/uv-workspace-split`;
    [`tasks/feature/uv-workspace-split/`](tasks/feature/uv-workspace-split/).
 2. **Simplify and clarify the CLI surface.** Unify profile mutation vocabulary,
-   settle completion install/remove and shell detection, clarify remote
-   checkpoint/job cleanup alongside the checkpoint rework, and add a coherent
-   performance-log lifecycle with justified automatic mode defaults. →
+   settle completion install/remove and shell detection, rework local and remote
+   checkpoint/job cleanup around shared per-case CAS ownership, resolve or drop
+   checkpoint recompute, and add a coherent performance-log lifecycle with
+   justified automatic mode defaults. →
    `feature/cli-surface-simplification`;
    [`tasks/feature/cli-surface-simplification/`](tasks/feature/cli-surface-simplification/).
+3. **Repair Materials Project live-validation query.** Make the existing
+   `Crystal.from_mp` fixture load local `MP_API_KEY`, distinguish skipped
+   no-key cases from configured-key failures, and keep default tests offline. →
+   `feature/materials-project-query`;
+   [`tasks/feature/materials-project-query/`](tasks/feature/materials-project-query/).
 ## P0 - >user< To be Triaged
 
-1. Fix broken materials project query (requires .env file with MP API Key)
-2. Set up comparisons/param sweeps to analyze effect of longitudinal bunch length & transverse bunch size on coherent bunching for otherwise identical bunch parameters
+1. Set up comparisons/param sweeps to analyze effect of longitudinal bunch length & transverse bunch size on coherent bunching for otherwise identical bunch parameters
    1. tilted bunch front? maybe dumb, maybe easier way to get coherent enhancement?
 3. Improve support for other shells/operating systems outside of WSL (especially agent hooks which run automatically)
    1. Create directory of shell scripts that are run as agent hooks to allow more complex setup & OS/shell handling
@@ -106,11 +111,6 @@ must remain until moved into a task file. Edit and drop items on `main`.
    GPU rows without a GPU; fall back to tqdm when non-interactive. →
    `feature/local-run-dashboard`;
    [`tasks/feature/local-run-dashboard/`](tasks/feature/local-run-dashboard/).
-5. **Checkpoint command surface rework.** Split `cxr clear` into scoped
-   commands, fix or drop `cxr checkpoint recompute` under current profile
-   conventions, and rework `cxr checkpoint` around the landed shared per-case
-   CAS, manifests, and garbage-collection model. → `feature/checkpoint-command-rework`;
-   [`tasks/feature/checkpoint-command-rework/`](tasks/feature/checkpoint-command-rework/).
 ## P3 - lower / exploratory / small bugfixes / on-hold
 
 1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`.
