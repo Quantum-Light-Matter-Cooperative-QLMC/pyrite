@@ -96,32 +96,64 @@ Sequence after dispatch:
 - [ ] Regenerate CLI docs/contracts; run focused CLI tests, real help/dry-run
       probes, then full repository verification.
 
-## Decisions and open questions
+## Decisions
 
-- Primary membership surface: `profile set|add|remove --materials`, current
-  `profile members ...`, or both with one documented as canonical?
-- Completion: collapse a lone install action to `cxr completion`, or add
-  explicit `install|remove`? Should default target only `$SHELL`, or all shells
-  with safely detected config files?
-- Cleanup naming: are `prune`, `prune-jobs`, and `clear` sufficiently distinct
-  once help names their resources, or should they move under resource groups?
-  Existing scripts and destructive safety rules constrain renames.
-- Does `cxr checkpoint recompute` get fixed, moved onto `cxr run`, or dropped?
-- Does local deletion live under `cxr checkpoint`, profile/material resource
-  groups, or a local counterpart to `remote clear`? A profile-scoped operation
-  must not delete shared cases still reachable from another dataset.
-- Which current `cxr checkpoint` subcommands still have coherent ownership once
-  manifests and shared cases are separate resources?
-- Stale performance-log definition: terminal job age, missing matching profile,
-  superseded repetition, explicit retention period, or user selection only?
-- Auto-pull timing: after every attached successful performance run, only on
-  explicit profile policy, or remain manual with a clearer next-action prompt?
-- Persistent performance policy: boolean profile field, named performance
-  configuration, or no persistent marker? Define precedence against explicit
-  `-p/--perf`, `--no-pull`, `--headless`, cache flags, and `--nsys`.
-- Which restrictions are measurement requirements versus current scheduler
-  implementation limits? Do not relax them until identical workload/provenance
-  remains guaranteed.
+### Locked command contract (2026-08-01)
+
+Compatibility paths remain callable because repository automation still uses
+them. Each deprecated invocation emits exactly one diagnostic on stderr; result
+stdout, side effects, and exit status remain those of the canonical handler.
+Removal is not scheduled: delete a compatibility path only after repository
+callers and operator scripts have migrated.
+
+| Existing path | Canonical path | Compatibility policy |
+|---|---|---|
+| `profile members set NAME MATERIAL...` | `profile set NAME --materials MATERIAL,...` | Keep hidden/nested; warn. |
+| `profile members add NAME MATERIAL...` | `profile add NAME --materials MATERIAL,...` | Keep hidden/nested; warn. |
+| `profile members remove NAME MATERIAL...` | `profile remove NAME --materials MATERIAL,...` | Keep hidden/nested; warn. |
+| `profile members reset NAME` | `profile set NAME --all-materials` | Keep hidden/nested; warn. |
+| `profile add-material` / `remove-material` | matching `profile add` / `remove --materials` | Keep hidden; update warning target. |
+| `profile analyze NAME` | `performance analyze NAME` | Keep hidden; warn. |
+| `remote profile pull NAME` | `remote performance pull NAME` | Keep hidden; warn. |
+| top-level `slim`, `rebrem`, `reline`, `archive`, `restore`, `archives`, `union`, `prune` | matching `checkpoint ...` path | Keep hidden; warn. |
+
+Primary profile membership uses comma-separated `--materials`, matching
+`profile create`. `set` replaces membership; `add` unions in catalog order and
+reports duplicates; `remove` subtracts and reports non-members;
+`set --all-materials` removes the explicit key and restores implicit all-in-use
+membership. Membership and range options may be combined atomically.
+
+Completion retains `completion install|remove`. With no `--shell`, only
+`$SHELL` is targeted. Both commands preserve `--shell`, `--rc-file`, and
+`--dry-run`; managed markers make current installs idempotent, and removal also
+recognizes the historical comment-plus-source-line installation.
+
+Checkpoint datasets and shared per-material CAS blobs are separate resources.
+Active and archived manifests are CAS reachability roots. Keep grouped
+`slim`, `archive`, `restore`, `list`, `merge`, `prune`, and `recompute`.
+`checkpoint clear MATERIAL...|--profile NAME|--all [--yes]` previews selected
+datasets and CAS blobs made unreachable by deleting them. Before mutation it
+re-reads every retained active/archive manifest; malformed or changed
+manifests abort. Remote deletion additionally revalidates jobs and reservations;
+unknown remote state blocks.
+
+Retain and repair `checkpoint recompute`. Resolve profile/dataset identity from
+manifest metadata; legacy or ambiguous stems require explicit `--profile`.
+Explicit grids/electron options override profile defaults. Rewrite component
+content keys, CAS blobs, and manifests atomically.
+
+Performance lifecycle is `performance list|analyze|prune` locally and
+`remote performance list|pull|prune` remotely. Explicit user selection defines
+stale logs; prune previews by default, and live/unknown remote state blocks.
+An attached successful performance run auto-pulls performance artifacts unless
+`--no-pull`; headless submission prints the explicit pull command.
+
+No persistent profile performance marker. Explicit `--perf` retains implied
+`--no-cache`; explicit `--recompute` overrides that default. Omitted
+`--chunk-minutes` becomes `0` for `--perf-reps >1`; explicit nonzero conflicts.
+Remote `--nsys` implies performance mode, one repetition, and zero chunking,
+but requires one explicitly selected material. Local `--nsys` retains
+full-profile support. Experimental chunk controls remain performance-only.
 
 ## Delegation slices and required skills
 
