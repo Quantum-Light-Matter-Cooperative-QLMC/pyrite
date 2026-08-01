@@ -21,25 +21,23 @@ must remain until moved into a task file. Edit and drop items on `main`.
    coverage; add measured domain-focused test paths. →
    `feature/uv-workspace-split`;
    [`tasks/feature/uv-workspace-split/`](tasks/feature/uv-workspace-split/).
+3. **Simplify and clarify the CLI surface.** Unify profile mutation vocabulary,
+   settle completion install/remove and shell detection, clarify remote
+   checkpoint/job cleanup alongside the checkpoint rework, and add a coherent
+   performance-log lifecycle with justified automatic mode defaults. →
+   `feature/cli-surface-simplification`;
+   [`tasks/feature/cli-surface-simplification/`](tasks/feature/cli-surface-simplification/).
 ## P0 - >user< To be Triaged
 
 1. Fix broken materials project query (requires .env file with MP API Key)
-2. Do another thorough CLI simplification/clarification sweep
-   1. Why does `cxr profile` have `add` for all profile parameters except materials, which instead are `member`
-   2. `completion` should probably be worked in with `cxr setup` somehow. Drop `completion install` to just `completion` also, unless we plan to add `uninstall` to remove the completions.
-      1. is `completion install --shell <SHELL>` necessary, or can we autodetect/add to all present? Should we? or `install`/`remove` for all on default, allowing optional shell invocation when only one is desired? maybe that's already being done.
-   3. for `cxr remote`: `prune`, `prune-jobs`, and `clear` need re-evaluation/clarification. Probably should be worked-in/in conjunction with the `checkpoint` rework that is in progress on a branch.
-   4. Semi-related to above: stale `performance` logs currently have no way of being dropped and no automatic method to pull them
-         1. Why do we need to manually write `--chunk-minutes=0` on perf log? why only one material allowed? If `--chunk-minutes=0` is req'd for good perf log, then auto-set it. If more than one mat is fine, drop the req, or emit a warning if somewhat problematic.
-         2. Add the `-p` flag as an optional profile marker, so that some profiles will just automatically be run as perf tests?
-3. Set up comparisons/param sweeps to analyze effect of longitudinal bunch length & transverse bunch size on coherent bunching for otherwise identical bunch parameters
+2. Set up comparisons/param sweeps to analyze effect of longitudinal bunch length & transverse bunch size on coherent bunching for otherwise identical bunch parameters
    1. tilted bunch front? maybe dumb, maybe easier way to get coherent enhancement?
-4. Improve support for other shells/operating systems outside of WSL (especially agent hooks which run automatically)
+3. Improve support for other shells/operating systems outside of WSL (especially agent hooks which run automatically)
    1. Create directory of shell scripts that are run as agent hooks to allow more complex setup & OS/shell handling
-5. General src refactor (maybe following work in items above) to group related loose files in src/cxr_mc/ into appropriately scoped subdirs
-6. Laptop-local SLURM is set up, but `cxr run` isn't connecting to it.
-7. Add local-version of `cxr remote clear` to drop local pickles. Same behavior as for remote.
-8. LONG TERM GOALS (not now) (maybe a further applications for `uv` workspaces and/or some other way to split up optional packages):
+4. General src refactor (maybe following work in items above) to group related loose files in src/cxr_mc/ into appropriately scoped subdirs
+5. Laptop-local SLURM is set up, but `cxr run` isn't connecting to it.
+6. Add local-version of `cxr remote clear` to drop local pickles. Same behavior as for remote.
+7. LONG TERM GOALS (not now) (maybe a further applications for `uv` workspaces and/or some other way to split up optional packages):
    1. Make this repo less CXR-specific, more general purpose.
       1. Add more optional physics (300 keV & below, to start with)
          1. Secondary electron emission (as an option)
