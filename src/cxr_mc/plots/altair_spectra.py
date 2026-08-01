@@ -43,6 +43,7 @@ from ._common import _best_azimuth, _case_title, _line_brem
 from .spectra import _comparison_drop_message
 
 _FRAME_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "component"]
+_TAIL_BUDGET_DIVISOR = 10
 
 # Case fields a `compare_spectrum_chart` caller may color by, and the axis/legend
 # metadata for each -- readable title + unit suffix used both in the legend and
@@ -165,6 +166,8 @@ def _record_frame(r, settings, *, include_brem, meta):
 
     total_E = E
     total = (line_det + brem_det) if include_brem else line_det
+    line_basis = line_det
+    line_grid = np.ones(E.shape, dtype=bool)
     brem_E = E
     brem = brem_det
 
@@ -182,6 +185,8 @@ def _record_frame(r, settings, *, include_brem, meta):
             brem_tail = brem_wide[wide_mask]
             total_E = np.concatenate([E, E_tail])
             total = np.concatenate([total, brem_tail])
+            line_basis = np.concatenate([line_det, np.zeros(E_tail.shape, dtype=float)])
+            line_grid = np.concatenate([line_grid, np.zeros(E_tail.shape, dtype=bool)])
             brem_E = np.concatenate([E, E_tail])
             brem = np.concatenate([brem, brem_tail])
 
@@ -190,6 +195,8 @@ def _record_frame(r, settings, *, include_brem, meta):
             {
                 "energy_eV": total_E,
                 "intensity": total * r["scale"],
+                "_line_intensity": line_basis * r["scale"],
+                "_line_grid": line_grid,
                 **meta,
                 "component": "total",
             }
@@ -201,6 +208,8 @@ def _record_frame(r, settings, *, include_brem, meta):
                 {
                     "energy_eV": brem_E,
                     "intensity": brem * r["scale"],
+                    "_line_intensity": line_basis * r["scale"],
+                    "_line_grid": line_grid,
                     **meta,
                     "component": "brem",
                 }
@@ -232,19 +241,81 @@ def _peak_preserving_indices(y, max_points):
 
 
 def _decimate_frame(df, max_points):
+    """Decimate logical traces without charging paired components twice.
+
+    The coherent-line grid owns the budget. When a wide background tail is
+    present, retain the complete line grid if it fits and spend the remainder
+    on the tail. Otherwise reserve ten percent for the tail and use the rest
+    for peak-preserving line sampling. Total/background components then reuse
+    identical selected coordinates.
+    """
     if max_points is None or df.empty or len(df) <= max_points:
-        return df
-    group_cols = [c for c in df.columns if c not in {"energy_eV", "intensity"}]
-    groups = list(df.groupby(group_cols, sort=False, dropna=False))
-    if not groups:
-        return df
-    per_group = max(3, int(max_points) // len(groups))
+        return df.drop(columns=["_line_intensity", "_line_grid"], errors="ignore")
+    trace_cols = [
+        c
+        for c in df.columns
+        if c
+        not in {"energy_eV", "intensity", "_line_intensity", "_line_grid", "component"}
+    ]
+    traces = list(df.groupby(trace_cols, sort=False, dropna=False))
+    if not traces:
+        return df.drop(columns=["_line_intensity", "_line_grid"], errors="ignore")
+    per_trace = max(3, int(max_points) // len(traces))
     frames = []
-    for _, grp in groups:
-        grp = grp.sort_values("energy_eV")
-        idx = _peak_preserving_indices(grp["intensity"].to_numpy(), per_group)
-        frames.append(grp.iloc[idx])
-    return pd.concat(frames, ignore_index=True)
+    for _, trace in traces:
+        components = {
+            component: grp.sort_values("energy_eV")
+            for component, grp in trace.groupby("component", sort=False, dropna=False)
+        }
+        basis = components.get("total", next(iter(components.values())))
+        basis_energy = basis["energy_eV"].to_numpy()
+        for component in components.values():
+            component_energy = component["energy_eV"].to_numpy()
+            if not np.array_equal(component_energy, basis_energy):
+                raise ValueError("spectrum components must share one energy grid")
+
+        basis_intensity = basis["_line_intensity"].to_numpy()
+        line_positions = np.flatnonzero(basis["_line_grid"].to_numpy())
+        tail_positions = np.flatnonzero(~basis["_line_grid"].to_numpy())
+        if line_positions.size and tail_positions.size:
+            minimum_tail = min(
+                tail_positions.size, max(1, per_trace // _TAIL_BUDGET_DIVISOR)
+            )
+            line_budget = min(line_positions.size, per_trace - minimum_tail)
+            tail_budget = min(tail_positions.size, per_trace - line_budget)
+        elif line_positions.size:
+            line_budget, tail_budget = min(line_positions.size, per_trace), 0
+        else:
+            line_budget, tail_budget = 0, min(tail_positions.size, per_trace)
+        line_idx = (
+            line_positions[_peak_preserving_indices(basis_intensity[line_positions], line_budget)]
+            if line_budget
+            else np.array([], dtype=int)
+        )
+        tail_idx = (
+            tail_positions[_peak_preserving_indices(basis_intensity[tail_positions], tail_budget)]
+            if tail_budget
+            else np.array([], dtype=int)
+        )
+        idx = np.sort(np.concatenate([line_idx, tail_idx]))
+        for component in components.values():
+            frames.append(component.iloc[idx])
+    return pd.concat(frames, ignore_index=True).drop(
+        columns=["_line_intensity", "_line_grid"]
+    )
+
+
+def _compact_component_frame(df):
+    """Store paired total/brem values once per rendered energy coordinate."""
+    index_cols = [c for c in df.columns if c not in {"intensity", "component"}]
+    compact = df.pivot(index=index_cols, columns="component", values="intensity").reset_index()
+    compact.columns.name = None
+    return compact
+
+
+def _fold_components(chart, include_brem):
+    components = ["total", "brem"] if include_brem else ["total"]
+    return chart.transform_fold(components, as_=["component", "intensity"])
 
 
 def spectrum_frame(
@@ -266,8 +337,10 @@ def spectrum_frame(
     zero there) for BOTH ``band`` values, so neither view cuts off abruptly at
     the line grid's edge. ``band="narrow"``/``"broad"`` no longer changes this
     data prep -- callers use it only to pick which default ``x_domain`` a chart
-    renders (see :func:`spectrum_chart`). ``max_points`` applies a
-    peak-preserving plot-time decimation across rendered traces.
+    renders (see :func:`spectrum_chart`). ``max_points`` bounds distinct energy
+    coordinates across logical traces. Paired total/background components share
+    those coordinates, so showing the background cannot consume the coherent
+    line's sampling budget.
     """
     _validate_band(band)
     energies = sorted({r["case"]["E0_keV"] for r in recs})
@@ -308,9 +381,11 @@ def spectrum_chart(
     ``band`` only tags which default ``x_domain`` this call renders, letting a
     caller pair a narrow line-grid-scale view with a broad beam-energy-scale
     view of the SAME underlying data. ``x_type``/``y_type`` are ``"linear"``
-    or ``"log"``; ``max_points`` applies peak-preserving plot-time decimation
-    before the Vega-Lite spec is built. Returns an :class:`altair.Chart`, or
-    ``None`` when there are no records.
+    or ``"log"``; ``max_points`` bounds serialized energy-coordinate rows
+    across logical traces before the Vega-Lite spec is built (with a minimum
+    of three rows per trace). Total/background values share each row, and line
+    points take priority over the wide tail. Returns an :class:`altair.Chart`,
+    or ``None`` when there are no records.
     """
     recs = _tilt_records(results, tilt_deg)
     if not recs:
@@ -334,7 +409,8 @@ def spectrum_chart(
         else _linear_y_scale(df, x_domain)
     )
 
-    base = alt.Chart(df).encode(
+    compact = _compact_component_frame(df)
+    base = _fold_components(alt.Chart(compact), include_brem).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
         y=alt.Y("intensity:Q", title="Intensity (Phs/eV/s/nA)", scale=y_scale),
         color=alt.Color("E0_keV:N", title="beam energy (keV)"),
@@ -426,7 +502,8 @@ def compare_spectrum_chart(
     )
     hue_title = _COMPARE_HUE_FIELDS[hue]
 
-    base = alt.Chart(df).encode(
+    compact = _compact_component_frame(df)
+    base = _fold_components(alt.Chart(compact), include_brem).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
         y=alt.Y("intensity:Q", title="Intensity (Phs/eV/s/nA)", scale=y_scale),
         color=alt.Color(f"{hue}:N", title=hue_title),
@@ -499,7 +576,8 @@ def multi_case_spectrum_chart(
         else _linear_y_scale(df, x_domain)
     )
 
-    base = alt.Chart(df).encode(
+    compact = _compact_component_frame(df)
+    base = _fold_components(alt.Chart(compact), include_brem).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
         y=alt.Y("intensity:Q", title="Intensity (Phs/eV/s/nA)", scale=y_scale),
         color=alt.Color("label:N", title="case"),
