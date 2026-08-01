@@ -851,7 +851,9 @@ def repair_brem_wide(
 
     Records computed before the brem-absorption fix have NaN ``brem_wide`` above
     the Henke ceiling (~30 keV) and at E=0, which the log plots drop (the
-    full-range curve clips at 30 keV). This re-runs only the cheap bremsstrahlung
+    full-range curve clips at 30 keV). All-zero arrays are stale placeholders,
+    too: accepting them as merely finite makes resume/cache paths suppress the
+    physical pedestal indefinitely. This re-runs only the cheap bremsstrahlung
     transport (``Ne_brem`` electrons, same seed as the original case) per record
     and rewrites ``r["brem_wide"]`` / ``r["brem"]`` in place; the line ``spec`` is
     left untouched. Everything needed is already stored in ``r["case"]``.
@@ -871,8 +873,9 @@ def repair_brem_wide(
         OOM resumable) -- and downstream re-repairs keep the new parameters.
         With either set, selection is by parameter mismatch (plus nonfinite
         ``brem_wide``) instead of nonfinite alone.
-    only_nonfinite : skip records whose ``brem_wide`` is already all-finite
-        (default), so only the stale ones are touched -- or, with new
+    only_nonfinite : skip records whose ``brem_wide`` is already finite and
+        contains a nonzero sample (default), so only stale missing/nonfinite/
+        all-zero placeholders are touched -- or, with new
         parameters given, skip records already at those parameters. Set False
         to redo all.
     save_every / save_cb : if both set, call ``save_cb(results)`` every
@@ -905,7 +908,12 @@ def repair_brem_wide(
     for name in results:
         for r in results[name].values():
             bw = r.get("brem_wide")
-            finite = bw is not None and np.isfinite(np.asarray(bw)).all()
+            bw_array = np.asarray(bw) if bw is not None else np.asarray([])
+            finite = (
+                bw_array.size > 0
+                and np.isfinite(bw_array).all()
+                and np.any(bw_array != 0)
+            )
             if only_nonfinite:
                 at_target = finite
                 if retune:
