@@ -36,6 +36,14 @@ file. Edit and drop items on `main`.
 
 ## P1 - top-priority back burner
 
+### Ready
+
+1. **Fix Analysis Compare loading and quality selection.** Analyze each
+   material checkpoint once for all three Compare plots, preserve persistent
+   cache reuse, and correct or accurately report the ratio plot's unexpected
+   material exclusions. → `fix/analysis-compare-loading-quality`;
+   [`tasks/fix/analysis-compare-loading-quality/`](tasks/fix/analysis-compare-loading-quality/).
+
 ### Gated
 
 1. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
