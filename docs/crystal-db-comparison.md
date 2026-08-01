@@ -4,8 +4,10 @@
 
 Guard the local crystal catalog against silent drift and transcription error by
 diffing each entry's **lattice geometry** against an authoritative external
-structure database, via the already-vendored [`crystals`](https://pypi.org/project/crystals/)
-library (v1.7).
+structure database. COD records use the already-vendored
+[`crystals`](https://pypi.org/project/crystals/) library (v1.7); Materials
+Project records use its supported [`mp-api`](https://docs.materialsproject.org/downloading-data/using-the-api/)
+client through the opt-in `external-db` extra.
 
 ## What is and isn't comparable
 
@@ -118,10 +120,14 @@ cross-database validation recorded below.
     so geometry validation fails. Local source remains Dittmar & Schaefer
     (1976), doi:10.1107/S0567740876008704.
 - **Regeneration.** `scripts/refresh_external_cif.py` re-fetches COD and
-  rewrites the JSON. The `@pytest.mark.online` test in
-  `tests/test_crystal_external_db.py` diffs local vs a live fetch and is gated
-  on `CXR_ONLINE_TESTS=1`. The MP audit above used the official `mp-api`
-  client separately; integrating it into the optional test remains follow-up.
+  rewrites the JSON. It resolves `MP_API_KEY` from a repository-local `.env`
+  when no non-empty exported value exists; the exported value wins. MP lookups
+  use `mp_api.client.MPRester.get_structure_by_material_id`, not
+  `crystals.Crystal.from_mp`'s unsupported legacy REST-v2 endpoint. Install its optional
+  client with `uv sync --extra external-db`; then run
+  `CXR_ONLINE_TESTS=1 uv run --extra external-db cxr-dev test tests/test_crystal_external_db.py`.
+  Missing keys skip MP-only online cases; configured-key query failures fail
+  with an actionable diagnostic and the refresh script retains cached values.
 - Item #1 (Debye–Waller) untouched, as required.
 
 ## Out of scope

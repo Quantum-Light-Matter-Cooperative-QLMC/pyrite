@@ -25,6 +25,7 @@ if str(_TESTS_DIR) not in sys.path:
 
 from external_db_fixtures import (  # noqa: E402
     EXTERNAL_LATTICE_JSON,
+    MPQueryError,
     fetch_external,
     iter_specs_sorted,
     lattice_tuple,
@@ -37,8 +38,14 @@ def main() -> int:
     entries = load_cached_lattices()
     written = 0
     skipped: list[str] = []
+    failed: list[str] = []
     for key, cod_id, mp_id in iter_specs_sorted():
-        crystal = fetch_external(cod_id, mp_id)
+        try:
+            crystal = fetch_external(cod_id, mp_id)
+        except MPQueryError as exc:
+            failed.append(key)
+            print(f"  keep {key}: {exc}")
+            continue
         if crystal is None:
             skipped.append(key)
             print(f"  skip {key}: mp-only, no MP_API_KEY set (keeping any cached entry)")
@@ -65,6 +72,9 @@ def main() -> int:
         print(
             f"skipped {len(skipped)} mp-only entries (set MP_API_KEY to include): {', '.join(skipped)}"
         )
+    if failed:
+        print(f"failed {len(failed)} MP entries; cached values were retained: {', '.join(failed)}")
+        return 1
     return 0
 
 

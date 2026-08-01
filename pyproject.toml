@@ -36,6 +36,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+external-db = [
+    "mp-api>=0.46",
+]
 nvidia = [
     "cupy-cuda13x[ctk]>=14.1.1",
 ]
