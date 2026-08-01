@@ -10,18 +10,13 @@ must remain until moved into a task file. Edit and drop items on `main`.
 
 ## P0 - Active
 
-1. **Add graphitic carbon nitride (g-C3N4).** New layered catalog material:
-   CIF + `[crystals.g_c3n4]`/`[materials.g_c3n4]` blocks, golden regen,
-   `validation_id` + ledger row; optional in-use profile membership + line-grid
-   bounds. → `feature/material-g-c3n4`;
-   [`tasks/feature/material-g-c3n4/`](tasks/feature/material-g-c3n4/).
-2. **Partition packaging and tests with a uv workspace.** Evaluate and, where
+1. **Partition packaging and tests with a uv workspace.** Evaluate and, where
    justified, separate core computation from CLI and optional analysis/app
    tooling while preserving imports, entry points, packaging, and full-suite
    coverage; add measured domain-focused test paths. →
    `feature/uv-workspace-split`;
    [`tasks/feature/uv-workspace-split/`](tasks/feature/uv-workspace-split/).
-3. **Simplify and clarify the CLI surface.** Unify profile mutation vocabulary,
+2. **Simplify and clarify the CLI surface.** Unify profile mutation vocabulary,
    settle completion install/remove and shell detection, clarify remote
    checkpoint/job cleanup alongside the checkpoint rework, and add a coherent
    performance-log lifecycle with justified automatic mode defaults. →
