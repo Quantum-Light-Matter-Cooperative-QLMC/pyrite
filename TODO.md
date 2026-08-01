@@ -3,7 +3,8 @@
 Kanban-style backlog; authoritative on `main`. `Active` contains only work in
 progress. P1-P3 are prioritized back-burner queues: items there are backlog,
 gated, or paused, never active. Move an item into `Active` when work starts and
-back to its priority queue when paused.
+back to its priority queue when paused. `Long-term plans` records unprioritized
+future direction, not committed work.
 
 Branch copies are disposable and auto-resolve to `main` on merge/rebase
 (`.gitattributes` `TODO.md merge=ours` driver — run `uv run cxr-dev bootstrap`
@@ -76,28 +77,37 @@ file. Edit and drop items on `main`.
 
 ## Inbox - >user< to be triaged
 
-1. Set up comparisons/param sweeps to analyze effect of longitudinal bunch length & transverse bunch size on coherent bunching for otherwise identical bunch parameters
-   1. tilted bunch front? maybe dumb, maybe easier way to get coherent enhancement?
-3. Improve support for other shells/operating systems outside of WSL (especially agent hooks which run automatically)
-   1. Create directory of shell scripts that are run as agent hooks to allow more complex setup & OS/shell handling
-4. General src refactor (maybe following work in items above) to group related loose files in src/cxr_mc/ into appropriately scoped subdirs
-5. Laptop-local SLURM is set up, but `cxr run` isn't connecting to it.
-6. Add local-version of `cxr remote clear` to drop local pickles. Same behavior as for remote.
-7. LONG TERM GOALS (not now) (maybe a further applications for `uv` workspaces and/or some other way to split up optional packages):
-   1. Implement additional dedicated TUI for navigating checkpoints, executing commands, examining/modifying profiles, running sweeps, improving/editing progress dashboard, etc.. Presumably using `textualize`, but TBD/to-be-researched
-   2. Make this repo less CXR-specific, more general purpose.
-      1. Add more optional physics (300 keV & below, to start with)
-         1. Secondary electron emission (as an option)
-         2. Material ionization?
-         3. Obviously the higher-energy stuff
-         4. Research other effects worth including
-         5. Electron coherence (QED)?
-         6. Coherent transition radiaton?
-         7. Other particles? Protons, ions, neutrons? Presumably this is a very deep hole
-      2. Deeper support for complex shapes, add support for multiple physical materials for interaction with arbitrary location, shape, & orientation
-         1. Support for interaction with other libraries -- Requires research into common tools, filestandards, etc.. GPT? PIC Codes (warpX, etc.)?
-         2. Easy file export/standard data format. Necessary? Are there standards at all? Does anyone want this?
-         3. Importing of stl/stp files to define objects
-      3. Add project tools (CLI object definition, control, interaction) for defining custom detectors, allowing loading & saving of custom detector responses, geometries, resolution, etc. (already partially implemented as Detector object)
-         1. X-ray/photon detectors
-         2. Electron/charged particle detectors
+1. **Coherent-bunching parameter study.** Compare effects of longitudinal bunch
+   length and transverse bunch size on coherent bunching while holding other
+   bunch parameters fixed; explore tilted bunch fronts or other routes to
+   coherent enhancement.
+2. **Cross-platform agent hooks.** Improve shell and operating-system support
+   beyond WSL, including a directory of hook scripts for more complex setup and
+   platform-specific handling.
+3. **Source-package organization.** Group related loose modules under
+   `src/cxr_mc/` into appropriately scoped subpackages after current structural
+   work settles.
+4. **Local SLURM integration.** Make `cxr run` use the configured laptop-local
+   SLURM installation.
+5. **Local checkpoint clearing.** Add a local equivalent of `cxr remote clear`
+   for deleting local checkpoint pickles with matching behavior.
+
+## Long-term plans
+
+Direction notes only; not prioritized backlog or active commitments.
+
+- **Workflow TUI.** Explore a dedicated interface, likely using Textual, for
+  navigating checkpoints, running commands and sweeps, editing profiles, and
+  extending the progress dashboard.
+- **Broader physics scope.** Generalize beyond CXR with optional physics across
+  wider energy regimes. Possible directions include secondary-electron
+  emission, material ionization, high-energy interactions, electron coherence
+  and QED effects, coherent transition radiation, and transport of protons,
+  ions, or neutrons.
+- **Complex geometry and interoperability.** Support multiple physical
+  materials with arbitrary position, shape, and orientation; research
+  interoperability with established simulation and PIC tools such as WarpX;
+  evaluate standard import/export formats, including STL and STEP geometry.
+- **Custom detector tooling.** Extend the existing detector model with CLI
+  tools for defining, loading, saving, and editing detector responses,
+  geometries, and resolution for photon and charged-particle detectors.
