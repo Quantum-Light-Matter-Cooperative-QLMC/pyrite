@@ -23,7 +23,19 @@ def _dataset(spec):
     """The layered chart's shared row data (a list of dict rows) from a
     ``Chart.to_dict()`` spec -- layers share one inline dataset referenced by
     name at the TOP level (``spec["data"]["name"]``), not per-layer."""
-    return spec["datasets"][spec["data"]["name"]]
+    rows = spec["datasets"][spec["data"]["name"]]
+    if not rows or "component" in rows[0]:
+        return rows
+    components = [name for name in ("total", "brem") if name in rows[0]]
+    return [
+        {
+            **{key: value for key, value in row.items() if key not in components},
+            "component": component,
+            "intensity": row[component],
+        }
+        for row in rows
+        for component in components
+    ]
 
 
 def _settings():

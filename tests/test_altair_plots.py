@@ -61,8 +61,24 @@ def _store():
     }
 
 
-def _dataset(spec):
+def _raw_dataset(spec):
     return spec["datasets"][spec["data"]["name"]]
+
+
+def _dataset(spec):
+    rows = _raw_dataset(spec)
+    if not rows or "component" in rows[0]:
+        return rows
+    components = [name for name in ("total", "brem") if name in rows[0]]
+    return [
+        {
+            **{key: value for key, value in row.items() if key not in components},
+            "component": component,
+            "intensity": row[component],
+        }
+        for row in rows
+        for component in components
+    ]
 
 
 def test_spectrum_frame_shapes_and_components():
@@ -123,6 +139,55 @@ def test_spectrum_frame_peak_preserving_decimation_keeps_line_peak():
     assert np.isclose(total["intensity"].max(), rec["spec"].max() * rec["scale"])
 
 
+def test_spectrum_frame_brem_toggle_preserves_total_sampling_budget():
+    rec = _record(30.0, -20.0, 0.0, n=1200)
+
+    line_only = spectrum_frame([rec], _settings(), include_brem=False, max_points=120)
+    with_brem = spectrum_frame([rec], _settings(), include_brem=True, max_points=120)
+
+    line_energy = line_only.loc[line_only.component == "total", "energy_eV"].to_numpy()
+    total_energy = with_brem.loc[with_brem.component == "total", "energy_eV"].to_numpy()
+    np.testing.assert_array_equal(total_energy, line_energy)
+
+
+def test_spectrum_frame_wide_brem_preserves_line_window_resolution():
+    rec = _record(30.0, -20.0, 0.0, n=12000, wide_brem=True)
+
+    line_only = spectrum_frame([rec], _settings(), include_brem=False, max_points=500)
+    with_brem = spectrum_frame([rec], _settings(), include_brem=True, max_points=500)
+
+    def _line_window(df):
+        total = df[df.component == "total"]
+        return total.loc[total.energy_eV.between(2400.0, 2600.0), "energy_eV"].to_numpy()
+
+    line_energy = _line_window(line_only)
+    total_energy = _line_window(with_brem)
+    line_shape = np.interp(line_energy, rec["E_grid"], rec["spec"])
+    total_shape = np.interp(total_energy, rec["E_grid"], rec["spec"])
+
+    def _sampled_fwhm(energy, intensity):
+        above_half = energy[intensity >= 0.5 * intensity.max()]
+        return above_half[-1] - above_half[0]
+
+    assert np.min(np.abs(total_energy - 2500.0)) == np.min(np.abs(line_energy - 2500.0))
+    assert total_shape.max() == line_shape.max()
+    assert _sampled_fwhm(total_energy, total_shape) == _sampled_fwhm(line_energy, line_shape)
+    assert np.median(np.diff(total_energy)) <= 1.15 * np.median(np.diff(line_energy))
+    assert np.diff(total_energy).max() <= 1.15 * np.diff(line_energy).max()
+
+
+def test_spectrum_frame_keeps_full_line_grid_before_decimating_wide_tail():
+    rec = _record(30.0, -20.0, 0.0, n=200, wide_brem=True)
+
+    df = spectrum_frame([rec], _settings(), include_brem=True, max_points=250)
+
+    total = df[df.component == "total"]
+    line_region = total[total.energy_eV <= rec["E_grid"].max()]
+    np.testing.assert_array_equal(line_region.energy_eV.to_numpy(), rec["E_grid"])
+    assert len(total) == 250
+    assert total.energy_eV.max() == 30000.0
+
+
 def test_spectrum_frame_excludes_brem_when_disabled():
     df = spectrum_frame([_record(30.0, -20.0, 0.0)], _settings(), include_brem=False)
     assert set(df["component"]) == {"total"}
@@ -138,6 +203,22 @@ def test_spectrum_chart_builds_valid_spec():
     assert enc["color"]["field"] == "E0_keV"
     # total + brem layers
     assert len(spec["layer"]) == 2
+
+
+def test_spectrum_chart_compacts_components_within_coordinate_budget():
+    rec = _record(30.0, -20.0, 0.0, n=1200)
+    chart = spectrum_chart(
+        {"HOPG bulk": {30.0: rec}},
+        _settings(),
+        include_brem=True,
+        max_points=120,
+    )
+
+    spec = chart.to_dict()
+    rows = _raw_dataset(spec)
+    assert len(rows) <= 120
+    assert {"total", "brem"}.issubset(rows[0])
+    assert spec["layer"][0]["transform"][0]["fold"] == ["total", "brem"]
 
 
 def test_spectrum_chart_accepts_log_x_scale_and_broadband():
