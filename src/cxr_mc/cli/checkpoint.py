@@ -14,6 +14,7 @@ _COMMANDS = {
     "list": "cxr_mc.archive.archives_command",
     "merge": "cxr_mc.archive.union_command",
     "prune": "cxr_mc.prune.command",
+    "clear": "cxr_mc.checkpoint_cleanup.command",
 }
 
 _COMMAND_HELP = {
@@ -24,6 +25,7 @@ _COMMAND_HELP = {
     "list": "List long-term checkpoint shelf.",
     "merge": "Merge a shelved checkpoint into active slot.",
     "prune": "Remove records obsolete under current scan profiles.",
+    "clear": "Delete local datasets and newly unreachable shared cases.",
 }
 
 _RECOMPUTE_COMMANDS = {
@@ -67,6 +69,7 @@ def command() -> None:
       cxr checkpoint archive hopg keeper
       cxr checkpoint recompute line hopg
       cxr checkpoint prune --profile standard
+      cxr checkpoint clear --profile standard
     """
 
 
