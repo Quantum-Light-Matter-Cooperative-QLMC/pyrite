@@ -15,14 +15,6 @@ must remain until moved into a task file. Edit and drop items on `main`.
    `validation_id` + ledger row; optional in-use profile membership + line-grid
    bounds. → `feature/material-g-c3n4`;
    [`tasks/feature/material-g-c3n4/`](tasks/feature/material-g-c3n4/).
-2. **Profile-default material selection.** Profile is the default selector on
-   both `run` and `pull`: a named/positional profile self-resolves to its
-   `[materials]` (implicit `standard` → in-use set); `-m/--material` narrows.
-   Fixes the `cxr remote pull --profile standard` catch-22 and `cxr run
-   standard` running everything (folds former P0 #9). CLI-contract work. →
-   `feature/remote-profile-default-selection`;
-   [`tasks/feature/remote-profile-default-selection/`](tasks/feature/remote-profile-default-selection/).
-
 ## P0 - >user< To be Triaged
 
 1. Fix broken materials project query (requires .env file with MP API Key)
@@ -41,19 +33,9 @@ must remain until moved into a task file. Edit and drop items on `main`.
 5. Improve support for other shells/operating systems outside of WSL (especially agent hooks which run automatically)
    1. Create directory of shell scripts that are run as agent hooks to allow more complex setup & OS/shell handling
 6. General src refactor (maybe following work in items above) to group related loose files in src/cxr_mc/ into appropriately scoped subdirs
-7. Fix this: make '--profile' the default behavior, '-m/--material', etc
-   1. (cxr-mc) ➜  cxr-mc git:(main) cxr remote pull --profile standard --all --level9
-      Usage: cxr remote pull [OPTIONS] [STEM|MATERIAL@PROFILE]...
-      Try 'cxr remote pull --help' for help.
-      Error: pull --profile already selects the profile's materials; drop --all
-      (cxr-mc) ➜  cxr-mc git:(main) cxr remote pull --profile standard --level9  
-      Usage: cxr remote pull [OPTIONS] [STEM|MATERIAL@PROFILE]...
-      Try 'cxr remote pull --help' for help.
-      Error: profile 'standard' has no explicit material membership; name materials alongside --profile, or use --all
-8. Related to above: 'cxr run standard' runs ALL materials rather than just those marked under [materials] in mats_to_sim.toml. The standard profile (and all profiles) should default their behavior to using [materials] unless explicitly set (this includes `pull`)
-9.  Laptop-local SLURM is set up, but `cxr run` isn't connecting to it.
-10. Add local-version of `cxr remote clear` to drop local pickles. Same behavior as for remote.
-11. LONG TERM GOALS (not now) (maybe a further applications for `uv` workspaces and/or some other way to split up optional packages):
+7. Laptop-local SLURM is set up, but `cxr run` isn't connecting to it.
+8. Add local-version of `cxr remote clear` to drop local pickles. Same behavior as for remote.
+9. LONG TERM GOALS (not now) (maybe a further applications for `uv` workspaces and/or some other way to split up optional packages):
    1. Make this repo less CXR-specific, more general purpose.
       1. Add more optional physics (300 keV & below, to start with)
          1. Secondary electron emission (as an option)
@@ -127,19 +109,12 @@ must remain until moved into a task file. Edit and drop items on `main`.
    GPU rows without a GPU; fall back to tqdm when non-interactive. →
    `feature/local-run-dashboard`;
    [`tasks/feature/local-run-dashboard/`](tasks/feature/local-run-dashboard/).
-5. **Cross-profile checkpoint case reuse.** Named catalog profiles get isolated
-   checkpoint stems (`<material>@<profile>-<hash>`), so two profiles with
-   overlapping cases (e.g. `sub_100keV`, `sub_200keV`) fully recompute shared
-   cases instead of sharing them; investigate a dedup key/storage model.
-   Investigation only, not yet scoped. → `feature/cross-profile-case-reuse`;
-   [`tasks/feature/cross-profile-case-reuse/`](tasks/feature/cross-profile-case-reuse/).
-6. **Checkpoint command surface rework.** Split `cxr clear` into scoped
+5. **Checkpoint command surface rework.** Split `cxr clear` into scoped
    commands, fix or drop `cxr checkpoint recompute` under current profile
-   conventions, and rework `cxr checkpoint` once shared-checkpoint provenance
-   is decided. Blocked on `feature/cross-profile-case-reuse`'s dedup design;
-   design-first. → `feature/checkpoint-command-rework`;
+   conventions, and rework `cxr checkpoint` around the landed shared per-case
+   CAS, manifests, and garbage-collection model. → `feature/checkpoint-command-rework`;
    [`tasks/feature/checkpoint-command-rework/`](tasks/feature/checkpoint-command-rework/).
-7. **Dashboard live verbosity cycling.** Press `v` in the local run dashboard
+6. **Dashboard live verbosity cycling.** Press `v` in the local run dashboard
    or the remote `attach`/`status -a` viewer to cycle detail level (0/`-v`/
    `-vv`) live, no restart; reuses the existing `_KeyListener` keypress
    machinery from the remote cancel keybind. → `feature/dashboard-verbosity-keybind`;
@@ -151,18 +126,7 @@ must remain until moved into a task file. Edit and drop items on `main`.
 2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
 3. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
 4.  **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
-5. **`--no-cache` for run/remote run.** Add a flag to `cxr run`/`cxr remote
-   run` that skips loading the existing checkpoint pickle and recomputes/
-   overwrites it; remote chunked-queue interaction needs a design decision
-   first. → `feature/run-no-cache`;
-   [`tasks/feature/run-no-cache/`](tasks/feature/run-no-cache/).
-6. **`-p`/`--perf` should force `--no-cache`.** A `cxr run --perf` sample
-   against a warm checkpoint skips already-resumed cases, silently thinning
-   the performance profile; force `--no-cache` (and audit other `--perf`
-   flag interactions for the same silent-mismatch failure mode). Blocked on
-   `feature/run-no-cache` landing. → `feature/perf-flag-no-cache-defaults`;
-   [`tasks/feature/perf-flag-no-cache-defaults/`](tasks/feature/perf-flag-no-cache-defaults/).
-7. **Tab completion latency.** Shell completion for `cxr` often takes
+5. **Tab completion latency.** Shell completion for `cxr` often takes
    multiple seconds; likely SSH-bound remote completion timeout or
    process-startup overhead, not confirmed. → `feature/tab-completion-latency`;
    [`tasks/feature/tab-completion-latency/`](tasks/feature/tab-completion-latency/).

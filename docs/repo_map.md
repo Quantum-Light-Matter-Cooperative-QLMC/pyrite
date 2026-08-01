@@ -245,25 +245,30 @@ derived `coherent_emission`) is the profile-owned emission policy;
 `dataset_identity` adds an `emission` divergence key so the three modes get three
 distinct digests (incoherent unchanged, bit-for-bit).
 - Public: `SweepProfile`, `PROFILE_NAMES`, `get_profile`, `dataset_identity`,
-  `variant_stem`.
+  `case_content_key`, `variant_stem`.
 - Deps: `results` (`Settings`), `sweep` (`Sweep`), NumPy.
 
 ### `run.py`
-Checkpointed, resumable sweep driver plus component checkpoint loaders/repair.
+Checkpointed, resumable sweep driver plus cross-profile per-case CAS replay,
+thin `cases.json` manifests, legacy seeding, and component loaders/repair.
 - Public: `run_sweep`, `load_checkpoint`, `checkpoint_path_for`,
   `cases_from_results`, `repair_brem_wide`, `repair_checkpoint`.
-- Deps: `montecarlo` (`run_cases`), `results` (`store_result`).
+- Deps: `_checkpoint_store`, `montecarlo` (`run_cases`), `results`
+  (`store_result`).
 
 ### `_checkpoint_store.py`
 Component storage adapter: active datasets live under
 `checkpoints/<stem>/{line,brem}.pkl`, merge transparently into historical
 in-memory result records, and migrate legacy `checkpoints/<stem>.pkl` stores on
-next save.
-- Internal: `discover`, `load`, `save`, `signature`, component/path helpers.
+next save. Shared case blobs live at
+`checkpoints/<material>/<first2hex>/<content-key>.pkl` and use atomic writes.
+- Internal: `discover`, `load`, `save`, `signature`, `cas_contains`,
+  `cas_load`, `cas_save`, component/path helpers.
 - Deps: `_checkpoint_io`, NumPy.
 
 ### `scan.py`
-Headless sweep entry: parse args → build cases → `run_sweep` → checkpoint.
+Headless sweep entry: parse args → build cases → `run_sweep` → checkpoint;
+owns `--no-cache`/`--recompute` and performance-run cache defaults.
 - Public: `main`, `run`, `add_subparser`.
 - Deps: `config`, `run`, `sweep`.
 

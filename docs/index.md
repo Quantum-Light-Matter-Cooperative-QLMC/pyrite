@@ -23,6 +23,7 @@ cli-reference
 :caption: Design notes & decision records
 :maxdepth: 1
 
+checkpoint-case-store
 crystal-mosaicity
 coherent-emission
 detector-solid-angle

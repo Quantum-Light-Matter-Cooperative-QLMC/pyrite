@@ -1,0 +1,63 @@
+# Cross-profile checkpoint case store
+
+Named profiles retain separate checkpoint identities while sharing numerically
+identical computed cases through a per-material content-addressable store
+(CAS). This avoids recomputing overlap such as the common energy range in
+`sub_100keV` and `sub_200keV`.
+
+## Identity and layout
+
+`profiles.case_content_key()` hashes schema `cxr.case-content-key.v1` plus the
+fully resolved case dictionary. Profile labels, fidelity/variant labels,
+execution chunk sizes, analytic mosaic post-processing, and reporting-only
+flux/current fields are excluded. Physics inputs, Monte Carlo mosaic width,
+and RNG seed remain keyed.
+
+Each raw transport output is stored once at:
+
+```text
+<checkpoint-root>/<material>/<first-two-hex>/<sha256>.pkl
+```
+
+Writes use same-filesystem temporary files plus `os.replace`. A content key
+names deterministic output, so independent writers need no shared lock.
+`run_sweep()` records a thin `<stem>/cases.json` (or `<stem>.cases.json` for a
+legacy file path) mapping each requested case to its content key.
+
+## Cache modes
+
+| Mode | Read CAS | Write CAS | Per-profile checkpoint |
+|---|---:|---:|---:|
+| default | yes | yes | yes |
+| `--recompute` | no | yes | yes |
+| `--no-cache` | no | no | yes |
+| `-p/--perf` without explicit cache flag | no | no | yes |
+
+`--no-cache` and `--recompute` are mutually exclusive. Explicit
+`--recompute` overrides the performance default, including Nsight re-exec.
+
+## Compatibility and migration
+
+Component checkpoints remain materialized under
+`checkpoints/<stem>/{line,brem}.pkl`. Analysis, archive, prune, slim, and remote
+pull retain their existing read contracts; manifest-only consumers belong to
+the checkpoint-command rework.
+
+A compatible existing profile checkpoint seeds missing CAS blobs during normal
+resume. Migration compares requested and stored case content keys before
+writing, so legacy records without sufficient identity metadata recompute
+instead of poisoning the shared store.
+
+Profile labels stay in dataset identity and provenance but not per-case content
+identity. Two profiles reuse a case only when resolved inputs, including seed,
+hash identically.
+
+## Ownership and regression surface
+
+- `src/cxr_mc/profiles.py`: content-key schema and canonical hashing.
+- `src/cxr_mc/_checkpoint_store.py`: sharded paths and atomic blob I/O.
+- `src/cxr_mc/run.py`: replay/write, migration, and `cases.json` manifests.
+- `src/cxr_mc/scan.py`: CLI cache modes and performance defaults.
+- `tests/test_profiles.py`, `tests/test_run.py`,
+  `tests/test_local_click_cli.py`, and `tests/test_scan_beam_options.py`:
+  identity, reuse, migration, flag, and forwarding regressions.
