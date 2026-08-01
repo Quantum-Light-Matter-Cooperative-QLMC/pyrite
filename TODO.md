@@ -91,6 +91,7 @@ file. Edit and drop items on `main`.
    SLURM installation.
 5. **Local checkpoint clearing.** Add a local equivalent of `cxr remote clear`
    for deleting local checkpoint pickles with matching behavior.
+6. **CPU Performance Flag** Add an optional flag (-c/--cpu) that enables CPU performance profiling, and a second (mutually exclusive) --cpu-only flag which ONLY profiles the CPU. This is because the CPU profiling is really slow, generally. Additionally, the current funcitonality launches the combined CPU/GPU profile first, which works normally, but after that finishes it starts the CPU-only task which is not properly tracked by the prgress dashboard (bug).
 
 ## Long-term plans
 
