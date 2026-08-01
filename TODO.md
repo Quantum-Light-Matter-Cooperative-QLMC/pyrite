@@ -111,12 +111,6 @@ must remain until moved into a task file. Edit and drop items on `main`.
    conventions, and rework `cxr checkpoint` around the landed shared per-case
    CAS, manifests, and garbage-collection model. → `feature/checkpoint-command-rework`;
    [`tasks/feature/checkpoint-command-rework/`](tasks/feature/checkpoint-command-rework/).
-6. **Dashboard live verbosity cycling.** Press `v` in the local run dashboard
-   or the remote `attach`/`status -a` viewer to cycle detail level (0/`-v`/
-   `-vv`) live, no restart; reuses the existing `_KeyListener` keypress
-   machinery from the remote cancel keybind. → `feature/dashboard-verbosity-keybind`;
-   [`tasks/feature/dashboard-verbosity-keybind/`](tasks/feature/dashboard-verbosity-keybind/).
-
 ## P3 - lower / exploratory / small bugfixes / on-hold
 
 1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`.
