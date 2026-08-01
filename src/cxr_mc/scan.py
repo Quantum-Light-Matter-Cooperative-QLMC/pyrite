@@ -800,6 +800,46 @@ def _run_json(args):
     )
 
 
+def _select_quick_energies(by_energy, e_grid_line, *, nominal=(30, 50), count=2):
+    """Bounded, deterministic quick beam energies with valid line grids.
+
+    ``--quick`` needs a small representative beam-energy subset whose line grids
+    the effective profile/material actually configures, so ``build_cases`` never
+    requests an absent per-energy grid. Policy:
+
+    * A fixed ``E_grid_line`` or an absent ``E_grid_line_by_energy`` mapping means
+      every beam energy resolves the same grid; keep the historical ``[30, 50]``
+      (int literals -- preserves the standard profile's checkpoint identity
+      bit-for-bit).
+    * Otherwise the valid energies are the mapping's keys. Preserve the nominal
+      ``30``/``50`` literals where they are valid, then fill any remaining slots
+      with the valid energies nearest the unmet nominal targets (ties break low)
+      to keep energy diversity. A profile exposing fewer than ``count`` valid
+      energies runs exactly those; an empty mapping falls through to the nominal
+      pair so the strict missing-grid error still fires downstream.
+    """
+    if by_energy is None or e_grid_line is not None:
+        return list(nominal)
+    valid = sorted(float(key) for key in by_energy)
+    if not valid:
+        return list(nominal)
+    valid_set = set(valid)
+    chosen = [energy for energy in nominal if float(energy) in valid_set]
+    chosen_values = {float(energy) for energy in chosen}
+    remaining = [energy for energy in valid if energy not in chosen_values]
+    for target in (energy for energy in nominal if float(energy) not in valid_set):
+        if len(chosen) >= count or not remaining:
+            break
+        nearest = min(remaining, key=lambda energy: (abs(energy - target), energy))
+        chosen.append(nearest)
+        remaining.remove(nearest)
+    for energy in remaining:
+        if len(chosen) >= count:
+            break
+        chosen.append(energy)
+    return chosen[:count]
+
+
 def _resolved_run(args, material):
     """Resolve settings, sweep, identity, and collision-free checkpoint stem."""
     import numpy as np
@@ -818,12 +858,24 @@ def _resolved_run(args, material):
     # the plain incoherent <material> stem.
     overrides = {}
     if getattr(args, "quick", False):
+        # Resolve quick beam energies from the effective profile/material line
+        # grids instead of forcing a fixed [30, 50]: a named profile may own an
+        # E_grid_line_by_energy mapping without 50 keV, and build_cases rejects a
+        # beam energy with no configured line grid before compute. The probe
+        # sweep (same catalog_profile/fidelity, no beam/tilt overrides) exposes
+        # the valid line-grid energies; _select_quick_energies keeps the standard
+        # profile's [30, 50] bit-for-bit where both are valid.
+        probe = (
+            material_sweep(material, catalog_profile=catalog_profile)
+            if fidelity == "full"
+            else material_sweep(material, fidelity=fidelity, catalog_profile=catalog_profile)
+        )
         overrides.update(
             # Start at 5 deg, not 0: tilt=0 is a banned emission geometry
             # (issue_notes.md #1), and build_cases rejects it.
             tilt_deg=np.linspace(5.0, 85.0, 5),
             tilt_azim_deg=np.array([10.0, 30.0]),
-            energy_keV=[30, 50],
+            energy_keV=_select_quick_energies(probe.E_grid_line_by_energy, probe.E_grid_line),
         )
     if getattr(args, "n_families", None) is not None:
         overrides["n_families"] = args.n_families

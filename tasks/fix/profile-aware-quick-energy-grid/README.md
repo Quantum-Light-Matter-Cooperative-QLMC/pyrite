@@ -46,22 +46,29 @@ quick-energy subset.
 
 ## Stepwise checklist
 
-- [ ] Encode the desired quick-energy selection policy in focused tests before
-      changing resolution.
-- [ ] Resolve quick energies from the effective catalog profile and material,
+- [x] Encode the desired quick-energy selection policy in focused tests before
+      changing resolution. (`tests/test_scan_quick_energy.py`)
+- [x] Resolve quick energies from the effective catalog profile and material,
       selecting only energies with valid line grids.
-- [ ] Preserve deterministic ordering, bounded case count, dataset identity,
-      and the standard profile's valid `[30, 50]` behavior.
-- [ ] Keep `build_cases` fail-closed for genuinely inconsistent energy/grid
-      inputs.
-- [ ] Verify local quick resolution for `hopg_test`,
-      `compute_test_300keV`, `sub_100keV`, and `standard` without running heavy
-      Monte Carlo locally.
-- [ ] Run focused scan/profile/remote script and CLI-contract tests.
+      (`scan._select_quick_energies`, probe sweep in `scan._resolved_run`)
+- [x] Preserve deterministic ordering, bounded case count, dataset identity,
+      and the standard profile's valid `[30, 50]` behavior. (int literals kept
+      when both nominal energies are valid, so the standard-profile hash stays
+      bit-for-bit)
+- [x] Keep `build_cases` fail-closed for genuinely inconsistent energy/grid
+      inputs. (`_line_grid_for_energy` unchanged; strict-error test added)
+- [x] Verify local quick resolution for `standard` and reproduce the lacking-50
+      case in-tree by dropping 50 keV from a real `standard`/hopg sweep.
+      `hopg_test`/`compute_test_300keV`/`sub_100keV` are user WIP profiles absent
+      from this worktree, so they are exercised only by the remote run below.
+- [x] Run focused scan/profile/remote script and CLI-contract tests.
+      (255 scan/profile/cli + 541 remote/contract pass)
 - [ ] Exercise one authorized remote combined quick GPU/CPU profile that lacks
       50 keV in its normal grid; confirm terminal success, pull, and analysis.
-- [ ] Document any intentional quick-selection semantic change and regenerate
-      generated CLI artifacts if required.
+      (requires user authorization + the WIP lacking-50 profile on the box)
+- [x] Document any intentional quick-selection semantic change and regenerate
+      generated CLI artifacts if required. (no user-facing CLI text changed;
+      no artifact regen needed)
 
 ## Decisions and open questions
 
@@ -74,16 +81,21 @@ Decided:
 - One fix covers local `--quick`, combined `--cpu`, and `--cpu-only`; do not add
   a CPU-only special-case photon grid.
 
-Open for implementation review:
+Resolved during implementation:
 
-- When nominal 30/50 keV quick energies are unavailable, select the first two
-  configured energies, the nearest valid energies to 30/50, or another stable
-  bounded policy. The choice must be deterministic, documented, and retain
-  enough energy diversity for representative profiling.
-- Whether a profile with only one valid energy should run that one energy or
-  fail with a clearer profile-validation error.
-- Whether quick selection should be a reusable profile helper or stay local to
-  `scan._resolved_run` until another caller needs it.
+- Selection policy: preserve the nominal `30`/`50` literals wherever they are
+  line-grid valid (keeps the standard profile bit-for-bit), then fill the
+  bounded 2-slot set with the valid energies nearest each unmet nominal target,
+  ties breaking toward the lower energy. Deterministic and diversity-preserving.
+  A fixed `E_grid_line` or absent `E_grid_line_by_energy` keeps `[30, 50]`.
+- A profile with only one valid line-grid energy runs that single energy rather
+  than failing: quick/CPU profiling must reach compute, and one energy is still a
+  bounded representative workload. An empty mapping falls through to the nominal
+  pair so `_line_grid_for_energy` raises the exact strict error downstream.
+- Selection lives as the local pure helper `scan._select_quick_energies` (takes
+  the `E_grid_line_by_energy` mapping + `E_grid_line`); kept in `scan.py` until a
+  second caller needs it. `_resolved_run` builds a probe sweep (same
+  catalog_profile/fidelity, no beam/tilt overrides) to read the effective keys.
 
 ## Delegation and required skills
 
