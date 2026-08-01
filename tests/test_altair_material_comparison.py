@@ -69,6 +69,18 @@ def test_material_comparison_chart_prints_dropped_materials(capsys):
     assert "Valid" not in out
 
 
+def test_material_comparison_chart_prints_exact_drop_reason(capsys):
+    material_comparison_chart(
+        [_point("Valid")],
+        {"No brem": "nonfinite_ratio", "Wrong energy": "beam_energy"},
+        select="line_brem_ratio",
+    )
+
+    out = capsys.readouterr().out
+    assert "No brem -- local line-to-bremsstrahlung ratio is undefined or non-finite" in out
+    assert "Wrong energy -- no checkpoint record exists at the selected beam energy" in out
+
+
 def test_material_comparison_chart_title_matches_selection_and_scope():
     chart = material_comparison_chart([_point("Valid")], [], select="peak", beam_energy_keV=60.0)
     assert chart.to_dict()["title"] == (

@@ -40,30 +40,30 @@ analysis tabs.
 
 ## Implementation checklist
 
-- [ ] Reproduce with the current checkpoint set; capture per-material load
+- [x] Reproduce with the current checkpoint set; capture per-material load
       counts and elapsed Compare-tab time for cold persistent cache and warm
       cache cases.
-- [ ] Inspect quality and local-ratio metrics for every candidate in at least
+- [x] Inspect quality and local-ratio metrics for every candidate in at least
       one retained material and one incorrectly dropped material. Record
       whether rejection comes from quality, non-finite ratio, or selection
       logic.
-- [ ] Factor one reusable per-material analysis summary that computes the
+- [x] Factor one reusable per-material analysis summary that computes the
       metrics/candidate information needed by all three plots from one loaded
       checkpoint.
-- [ ] Cache that shared summary once per checkpoint identity and every setting
+- [x] Cache that shared summary once per checkpoint identity and every setting
       that affects the computed metrics; derive each selection mode from the
       small summary without reloading checkpoint data.
-- [ ] Correct the ratio plot's metric/gating logic if reproduction proves it
+- [x] Correct the ratio plot's metric/gating logic if reproduction proves it
       wrong. Preserve the common quality `>= 0.5` eligibility rule unless the
       evidence establishes a different intended contract.
-- [ ] Represent and report drop reasons separately (quality floor, unavailable
+- [x] Represent and report drop reasons separately (quality floor, unavailable
       beam energy, undefined/non-finite ratio) so the UI never labels a ratio
       failure as a quality failure.
-- [ ] Add focused regressions covering one cold load per material across all
+- [x] Add focused regressions covering one cold load per material across all
       three plots, warm/restart cache hits, cache invalidation, consistent
       quality eligibility, and valid ratio selection across multiple
       materials.
-- [ ] Run notebook structural and real no-browser smoke checks plus focused
+- [x] Run notebook structural and real no-browser smoke checks plus focused
       tests, lint, and scoped diff review.
 
 ## Decisions and open questions
@@ -81,6 +81,30 @@ analysis tabs.
 - Open: should a mathematically undefined ratio omit only that selection point
   or render a diagnostic marker? Prefer omission with an exact reason unless
   measured data shows a more useful representation.
+
+Resolved during implementation: ratio ranking/gating was correct. On the live
+21-material checkpoint cohort, HOPG had 1,913 candidates at quality >= 0.5 and
+9 with finite local ratios. Every other material had qualifying lines (62 to
+2,073 each) but zero finite local ratios because its stored local
+bremsstrahlung integral was non-positive. Keep omission; report `nonfinite_ratio`
+instead of mislabeling it as a quality failure. No threshold or checkpoint data
+change required.
+
+## Implementation evidence
+
+- Identical 21-material, three-mode cold workload:
+  - previous per-mode cache keys: 63 checkpoint loads (3/material), 80.325 s;
+  - shared summary: 21 checkpoint loads (1/material), 35.361 s (2.27x faster);
+  - shared persistent cache cold population: 21 loads, 38.627 s;
+  - simulated app restart with valid artifacts: 0 loads, 0.135 s.
+- Focused material/app/cache tests: 113 passed.
+- Apps suite: 283 passed.
+- Core suite: 965 passed, 40 skipped, one sandbox-only forkserver failure;
+  isolated rerun outside sandbox passed, giving 966 effective passes.
+- `cxr-dev lint`, `cxr-dev typecheck`,
+  `marimo check notebooks/analysis_app.py`, `cxr app analysis hopg --smoke`, and
+  `git diff --check` passed. The first sandboxed Marimo runs were blocked by
+  local listener permissions; approved outside-sandbox reruns passed.
 
 ## Delegation
 

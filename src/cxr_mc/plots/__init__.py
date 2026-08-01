@@ -44,10 +44,12 @@ from .interactive import (
     stream_chunk,
 )
 from .spectra import (
+    MATERIAL_COMPARISON_SUMMARY_VERSION,
     _draw_by_energy,
     _draw_full_spectrum,
     draw_material_comparison,
     material_comparison_point,
+    material_comparison_summary,
     plot_best_spectra,
     plot_by_energy,
     plot_full_spectrum,
@@ -55,6 +57,7 @@ from .spectra import (
     plot_mosaic_comparison,
     plot_peak_vs_tilt,
     plot_tilt_panel,
+    select_material_comparison,
 )
 from .sweeps import (
     _AXIS_SPECS,
@@ -93,6 +96,7 @@ from .trajectories import (
 __all__ = [
     "COLORS",
     "C_ANG_PER_FS",
+    "MATERIAL_COMPARISON_SUMMARY_VERSION",
     "SI_K_EDGE_EV",
     "_AXIS_SPECS",
     "_EFF_CACHE",
@@ -138,6 +142,7 @@ __all__ = [
     "energy_color",
     "facet_metric",
     "material_comparison_point",
+    "material_comparison_summary",
     "plot_best_spectra",
     "plot_by_energy",
     "plot_chunk",
@@ -155,6 +160,7 @@ __all__ = [
     "plot_penetration_survival",
     "plot_scan",
     "plot_tilt_panel",
+    "select_material_comparison",
     "plot_timepix_detected",
     "plot_timepix_efficiency",
     "plot_timepix_poisson",

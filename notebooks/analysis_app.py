@@ -2012,7 +2012,11 @@ def _(
     settings,
 ):
     from cxr_mc.analyze import cached_analysis
-    from cxr_mc.plots import material_comparison_point
+    from cxr_mc.plots import (
+        MATERIAL_COMPARISON_SUMMARY_VERSION,
+        material_comparison_summary,
+        select_material_comparison,
+    )
     from cxr_mc.plots.altair_spectra import material_comparison_chart
 
     def cross_material_tab():
@@ -2038,27 +2042,37 @@ def _(
             if (analysis_checkpoint_manifest(_material_key) or {}).get("n_records", 0) > 0
         )
 
+        _summaries = {}
+        for _material_key in CATALOG.material_keys:
+            _summary = cached_analysis(
+                _material_key,
+                lambda _results: material_comparison_summary(_results, settings),
+                (
+                    "material_comparison_summary",
+                    MATERIAL_COMPARISON_SUMMARY_VERSION,
+                    0.03,
+                    "sharpness",
+                    settings.beam_current_na,
+                ),
+            )
+            if _summary:
+                _summaries[_material_key] = _summary
+
         def _comparison(select):
             _pts = []
-            _dropped = []
-            for _material_key in CATALOG.material_keys:
-                _point = cached_analysis(
-                    _material_key,
-                    lambda _results: material_comparison_point(
-                        _results,
-                        settings,
-                        select=select,
-                        beam_energy_keV=_beam_energy,
-                        min_line_quality=0.5,
-                    ),
-                    (select, _beam_energy, 0.5, settings.beam_current_na),
+            _dropped = {}
+            for _material_key, _summary in _summaries.items():
+                _point, _reason = select_material_comparison(
+                    _summary,
+                    select=select,
+                    beam_energy_keV=_beam_energy,
+                    min_line_quality=0.5,
                 )
                 if _point is None:
+                    if _reason is not None:
+                        _dropped[CATALOG.material(_material_key).label] = _reason
                     continue
                 _label = CATALOG.material(_material_key).label
-                if _point == "dropped":
-                    _dropped.append(_label)
-                    continue
                 _pts.append((_label, *_point))
             return material_comparison_chart(
                 _pts, _dropped, select=select, beam_energy_keV=_beam_energy, min_line_quality=0.5

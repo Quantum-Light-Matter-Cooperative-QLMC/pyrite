@@ -399,6 +399,27 @@ def test_cached_material_analysis_survives_process_cache_reset(tmp_path, monkeyp
     assert second == 7
 
 
+def test_cached_material_analysis_invalidates_when_checkpoint_changes(tmp_path):
+    checkpoint = tmp_path / "hopg.pkl"
+    with open(checkpoint, "wb") as f:
+        pickle.dump({"cfg": {30.0: {"value": 7}}}, f)
+
+    analyze_calls = []
+
+    def analyze(results):
+        analyze_calls.append(results)
+        return results["cfg"][30.0]["value"]
+
+    assert cached_material_analysis("hopg", analyze, ("summary", 1), str(tmp_path)) == 7
+    with open(checkpoint, "wb") as f:
+        pickle.dump({"cfg": {30.0: {"value": 9}}}, f)
+    new_mtime = os.path.getmtime(checkpoint) + 5.0
+    os.utime(checkpoint, (new_mtime, new_mtime))
+
+    assert cached_material_analysis("hopg", analyze, ("summary", 1), str(tmp_path)) == 9
+    assert len(analyze_calls) == 2
+
+
 # ---------------------------------------------------------------------------
 # checkpoint_manifest / _manifest_save
 # ---------------------------------------------------------------------------

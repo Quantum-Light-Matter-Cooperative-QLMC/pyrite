@@ -7,7 +7,11 @@ import numpy as np
 matplotlib.use("Agg")
 
 from cxr_mc.config import default_settings
-from cxr_mc.plots import plot_material_comparison
+from cxr_mc.plots import (
+    material_comparison_summary,
+    plot_material_comparison,
+    select_material_comparison,
+)
 
 
 def _record(name, E0_keV, line_eV, peak, tilt_deg=0.0, tilt_azim_deg=0.0):
@@ -116,13 +120,14 @@ def test_material_comparison_separates_overlapping_labels():
 
 def test_cross_material_tab_requests_new_comparisons():
     source = Path("notebooks/analysis_app.py").read_text()
-    # The three comparisons now route through a shared `_comparison(select)`
-    # helper (cached per material via cached_material_analysis) instead of
-    # each repeating its own keyword calls.
+    # One cached summary per material feeds all three small selections.
     assert '_comparison("quality_peak")' in source
     assert '_comparison("peak")' in source
     assert '_comparison("line_brem_ratio")' in source
     assert "select=select" in source
+    assert "material_comparison_summary(_results, settings)" in source
+    assert "for _material_key, _summary in _summaries.items():" in source
+    assert "lambda _results: material_comparison_point" not in source
     assert "min_line_eV" not in source
     assert source.count("beam_energy_keV=_beam_energy") == 2
     assert 'label="Compare all beam energies"' in source
@@ -130,6 +135,73 @@ def test_cross_material_tab_requests_new_comparisons():
     assert "cross_material_energy_options" in source
     assert source.count("min_line_quality=0.5") == 2
     assert "exclude_labels" not in source
+
+
+def test_shared_summary_selects_all_modes_without_recomputing_metrics(monkeypatch):
+    import cxr_mc.plots.spectra as spectra
+
+    first = _record("First", 30.0, 150.0, peak=100.0)
+    second = _record("Second", 60.0, 200.0, peak=10.0)
+    results = {"scan": {30.0: first, 60.0: second}}
+    calls = 0
+    original = spectra._metrics_map
+
+    def counting_metrics(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(spectra, "_metrics_map", counting_metrics)
+    summary = material_comparison_summary(results, default_settings())
+
+    for select in ("quality_peak", "peak", "line_brem_ratio"):
+        point, reason = select_material_comparison(summary, select=select)
+        assert point is not None
+        assert reason is None
+    assert calls == 1
+
+
+def test_material_comparison_selection_reports_exact_exclusion_reason():
+    valid = _record("Valid", 30.0, 150.0, peak=100.0)
+    summary = material_comparison_summary({"scan": {30.0: valid}}, default_settings())
+
+    point, reason = select_material_comparison(summary, beam_energy_keV=60.0)
+    assert point is None
+    assert reason == "beam_energy"
+
+    invalid_ratio = _record("Invalid ratio", 30.0, 150.0, peak=100.0)
+    invalid_ratio["brem"] = np.zeros_like(invalid_ratio["brem"])
+    summary = material_comparison_summary(
+        {"scan": {30.0: invalid_ratio}}, default_settings()
+    )
+    point, reason = select_material_comparison(summary, select="line_brem_ratio")
+    assert point is None
+    assert reason == "nonfinite_ratio"
+
+    low_quality = _record("Low quality", 30.0, 150.0, peak=100.0)
+    low_quality["spec"] = np.full_like(low_quality["spec"], 100.0)
+    summary = material_comparison_summary({"scan": {30.0: low_quality}}, default_settings())
+    point, reason = select_material_comparison(summary, select="line_brem_ratio")
+    assert point is None
+    assert reason == "quality_floor"
+
+
+def test_ratio_selection_retains_multiple_materials_with_finite_candidates():
+    summaries = {
+        label: material_comparison_summary(
+            {"scan": {30.0: _record(label, 30.0, energy, peak=peak)}},
+            default_settings(),
+        )
+        for label, energy, peak in (("First", 150.0, 100.0), ("Second", 200.0, 50.0))
+    }
+
+    selections = {
+        label: select_material_comparison(summary, select="line_brem_ratio")
+        for label, summary in summaries.items()
+    }
+
+    assert set(selections) == {"First", "Second"}
+    assert all(point is not None and reason is None for point, reason in selections.values())
 
 
 def test_material_comparison_drops_and_reports_material_with_no_qualifying_line(capsys):

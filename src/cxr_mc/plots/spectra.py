@@ -31,6 +31,14 @@ from ._style import (
     energy_color,
 )
 
+MATERIAL_COMPARISON_SUMMARY_VERSION = 1
+_COMPARISON_CASE_FIELDS = ("name", "E0_keV", "tilt_deg", "tilt_azim_deg")
+_COMPARISON_DROP_REASONS = {
+    "quality_floor": "no candidate line met the quality floor",
+    "beam_energy": "no checkpoint record exists at the selected beam energy",
+    "nonfinite_ratio": "local line-to-bremsstrahlung ratio is undefined or non-finite",
+}
+
 
 # ---- intrinsic spectra -------------------------------------------------------
 def plot_tilt_panel(ax, group, settings, include_brem=True, collapse_azimuth=False):
@@ -373,6 +381,84 @@ def _separate_annotation_boxes(fig, annotations):
                 break
 
 
+def material_comparison_summary(
+    results,
+    settings,
+    rel_prominence=0.03,
+    line_metric="sharpness",
+):
+    """Compute the small candidate summary shared by all material comparisons.
+
+    The returned tuple contains only selection metrics and plot geometry, so it
+    is suitable for :func:`cxr_mc.run.cached_material_analysis`'s persistent
+    artifact cache. Selection mode, beam-energy scope, and quality floor are
+    deliberately applied later by :func:`select_material_comparison`; changing
+    those controls therefore never reloads the checkpoint.
+    """
+    recs = records(results)
+    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
+    return tuple(
+        {
+            "case": {field: r["case"][field] for field in _COMPARISON_CASE_FIELDS},
+            "line_eV": m["line_eV"],
+            "line_flux": m["line_flux"],
+            "line_quality": m["line_quality"],
+            "peak_flux": m["peak_flux"],
+            "coherent_flux": m["coherent_flux"],
+            "line_brem_ratio": m["line_brem_ratio"],
+        }
+        for r in recs
+        for m in (metrics[id(r)],)
+    )
+
+
+def select_material_comparison(
+    summary,
+    select="quality_peak",
+    beam_energy_keV=None,
+    min_line_quality: float | None = 0.5,
+):
+    """Select one comparison point and return ``(point, exclusion_reason)``.
+
+    ``point`` is ``(line_eV, line_flux, quality, case)``. Empty summaries are
+    not exclusions and return ``(None, None)``. Non-empty summaries distinguish
+    unavailable beam energy, quality-floor rejection, and an undefined local
+    line-to-bremsstrahlung ratio.
+    """
+    if not summary:
+        return None, None
+    energy_candidates = [
+        candidate
+        for candidate in summary
+        if beam_energy_keV is None or candidate["case"]["E0_keV"] == beam_energy_keV
+    ]
+    if not energy_candidates:
+        return None, "beam_energy"
+    quality_candidates = [
+        candidate
+        for candidate in energy_candidates
+        if min_line_quality is None or candidate["line_quality"] >= min_line_quality
+    ]
+    if not quality_candidates:
+        return None, "quality_floor"
+    candidates = quality_candidates
+    if select == "line_brem_ratio":
+        candidates = [
+            candidate
+            for candidate in candidates
+            if np.isfinite(candidate["line_brem_ratio"])
+        ]
+        if not candidates:
+            return None, "nonfinite_ratio"
+    best = max(candidates, key=lambda candidate: selection_score(candidate, select))
+    return (
+        best["line_eV"],
+        best["line_flux"],
+        best["line_quality"],
+        best["case"],
+    ), None
+
+
 def material_comparison_point(
     results,
     settings,
@@ -382,31 +468,26 @@ def material_comparison_point(
     beam_energy_keV=None,
     min_line_quality: float | None = 0.5,
 ):
-    """Best-geometry summary for one material's results store: the per-material
-    selection body of :func:`plot_material_comparison`, factored out so it can
-    be cached per (checkpoint, selection) -- see
-    :func:`cxr_mc.run.cached_material_analysis` -- without re-unpickling the
-    checkpoint on every call. Returns ``(line_eV, line_flux, quality, case)``
-    for the selected geometry, the string ``"dropped"`` if ``results`` has
-    records but none clears the ``min_line_quality``/``line_brem_ratio``
-    gates, or ``None`` if ``results`` has no records at all."""
-    recs = records(results)
-    if not recs:
-        return None
-    metrics = _metrics_map(recs, settings, rel_prominence, line_metric)
-    candidates = [
-        r
-        for r in recs
-        if (beam_energy_keV is None or r["case"]["E0_keV"] == beam_energy_keV)
-        and (min_line_quality is None or metrics[id(r)]["line_quality"] >= min_line_quality)
-    ]
-    if select == "line_brem_ratio":
-        candidates = [r for r in candidates if np.isfinite(metrics[id(r)]["line_brem_ratio"])]
-    if not candidates:
-        return "dropped"
-    best = max(candidates, key=lambda r: selection_score(metrics[id(r)], select))
-    m = metrics[id(best)]
-    return (m["line_eV"], m["line_flux"], m["line_quality"], best["case"])
+    """Compatibility wrapper returning one point, ``"dropped"``, or ``None``."""
+    point, reason = select_material_comparison(
+        material_comparison_summary(results, settings, rel_prominence, line_metric),
+        select,
+        beam_energy_keV,
+        min_line_quality,
+    )
+    return "dropped" if reason is not None else point
+
+
+def _comparison_drop_message(dropped):
+    """Format material labels grouped with their exact exclusion reasons."""
+    if not dropped:
+        return ""
+    if not hasattr(dropped, "items"):
+        return f"{', '.join(dropped)} -- no candidate line met the gate."
+    return "; ".join(
+        f"{label} -- {_COMPARISON_DROP_REASONS.get(reason, reason)}"
+        for label, reason in dropped.items()
+    )
 
 
 def draw_material_comparison(
@@ -482,7 +563,7 @@ def draw_material_comparison(
     if dropped:
         print(
             f"Dropped from cross-material comparison (select={select!r}{quality_scope}): "
-            f"{', '.join(dropped)} -- no candidate line met the gate."
+            f"{_comparison_drop_message(dropped)}"
         )
     return fig
 
@@ -519,21 +600,17 @@ def plot_material_comparison(
     :func:`cxr_mc.run.cached_material_analysis`) instead of recomputing it,
     and re-unpickling every material's checkpoint, on every tab render."""
     pts = []
-    dropped = []
+    dropped = {}
     for label, results in results_by_material.items():
-        point = material_comparison_point(
-            results,
-            settings,
+        point, reason = select_material_comparison(
+            material_comparison_summary(results, settings, rel_prominence, line_metric),
             select,
-            rel_prominence,
-            line_metric,
             beam_energy_keV,
             min_line_quality,
         )
         if point is None:
-            continue
-        if point == "dropped":
-            dropped.append(label)
+            if reason is not None:
+                dropped[label] = reason
             continue
         pts.append((label, *point))
     return draw_material_comparison(pts, dropped, select, beam_energy_keV, min_line_quality)

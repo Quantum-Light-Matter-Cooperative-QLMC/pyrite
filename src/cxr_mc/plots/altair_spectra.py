@@ -40,6 +40,7 @@ import pandas as pd
 from ..results import records
 from ..results.store import _detected_background_wide
 from ._common import _best_azimuth, _case_title, _line_brem
+from .spectra import _comparison_drop_message
 
 _FRAME_COLUMNS = ["energy_eV", "intensity", "E0_keV", "azimuth_deg", "component"]
 
@@ -598,6 +599,6 @@ def material_comparison_chart(
     if dropped:
         print(
             f"Dropped from cross-material comparison (select={select!r}{quality_scope}): "
-            f"{', '.join(dropped)} -- no candidate line met the gate."
+            f"{_comparison_drop_message(dropped)}"
         )
     return chart.interactive()
