@@ -1852,3 +1852,138 @@ def test_reline_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
     assert {name: kwargs for name, kwargs in calls} == {name: kwargs for name, kwargs in explicit}
     assert {kwargs["line_ne"] for _, kwargs in calls} == {60}
     assert {kwargs["profile"] for _, kwargs in calls} == {"survey"}
+
+
+def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(
+    monkeypatch, tmp_path
+):
+    import json
+
+    import cxr_mc.run as run
+    from cxr_mc import reline
+
+    stem = "hopg@sub_100keV-deadbeef0000"
+    directory = tmp_path / stem
+    directory.mkdir()
+    (directory / "line.pkl").touch()
+    (directory / "meta.json").write_text(
+        json.dumps(
+            {
+                "dataset_identity": {
+                    "material": "hopg",
+                    "fidelity": "survey",
+                    "catalog_profile": "sub_100keV",
+                }
+            }
+        )
+    )
+    calls = []
+    monkeypatch.setattr(
+        run,
+        "reline_checkpoint",
+        lambda path, material, **kwargs: calls.append((path, material, kwargs)) or {},
+    )
+
+    reline.reline_checkpoints(
+        materials=[stem],
+        checkpoint_dir=tmp_path,
+        require_identity=True,
+    )
+
+    assert calls[0][1] == "hopg"
+    assert calls[0][2]["profile"] == "survey"
+    assert calls[0][2]["catalog_profile"] == "sub_100keV"
+
+
+def test_recompute_legacy_ambiguous_stem_requires_explicit_profile(tmp_path):
+    from cxr_mc.recompute_defaults import dataset_context
+
+    path = tmp_path / "old-derived-stem"
+
+    with pytest.raises(ValueError, match="no usable dataset identity"):
+        dataset_context(path, require_identity=True)
+
+    resolved = dataset_context(path, catalog_profile="standard", require_identity=True)
+    assert resolved.material == "old-derived-stem"
+    assert resolved.catalog_profile == "standard"
+
+
+def test_recompute_rejects_profile_mismatch(tmp_path):
+    import json
+
+    from cxr_mc.recompute_defaults import dataset_context
+
+    path = tmp_path / "hopg@survey"
+    path.mkdir()
+    (path / "meta.json").write_text(
+        json.dumps(
+            {
+                "dataset_identity": {
+                    "material": "hopg",
+                    "fidelity": "survey",
+                    "catalog_profile": "survey",
+                }
+            }
+        )
+    )
+
+    with pytest.raises(ValueError, match="not requested"):
+        dataset_context(path, catalog_profile="standard", require_identity=True)
+
+
+def test_recomputed_checkpoint_publishes_cas_before_component_and_manifest(
+    monkeypatch, tmp_path
+):
+    import json
+
+    import cxr_mc.run as run
+
+    checkpoint = tmp_path / "hopg@survey"
+    checkpoint.mkdir()
+    identity = {
+        "material": "hopg",
+        "fidelity": "survey",
+        "catalog_profile": "survey",
+        "parameter_sha256": "f" * 64,
+    }
+    (checkpoint / "meta.json").write_text(json.dumps({"dataset_identity": identity}))
+    case = {"crystal": "hopg", "name": "case", "E0_keV": 30.0}
+    results = {
+        "case": {
+            30.0: {
+                "case": case,
+                "E_grid": [1.0],
+                "spec": [2.0],
+                "brem": [3.0],
+                "eta": 1.0,
+            }
+        }
+    }
+    events = []
+    monkeypatch.setattr(
+        run._checkpoint_store,
+        "cas_save",
+        lambda material, key, root, payload: events.append(("cas", material, key, root)),
+    )
+    monkeypatch.setattr(
+        run,
+        "_checkpoint_components_save",
+        lambda path, value, components: events.append(("component", components)),
+    )
+    monkeypatch.setattr(
+        run,
+        "_manifest_save",
+        lambda path, value, dataset_identity: events.append(("meta", dataset_identity)),
+    )
+
+    def write_cases(path, cases, key_fn, dataset_identity):
+        events.append(("cases", [key_fn(item) for item in cases], dataset_identity))
+
+    monkeypatch.setattr(run, "_write_case_manifest", write_cases)
+
+    run._save_recomputed_checkpoint(checkpoint, results, components=("line",))
+
+    assert [event[0] for event in events] == ["cas", "component", "meta", "cases"]
+    assert events[0][1] == "hopg"
+    assert len(events[0][2]) == 64
+    assert events[-1][2] == identity

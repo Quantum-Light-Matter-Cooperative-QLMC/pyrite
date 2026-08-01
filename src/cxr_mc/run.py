@@ -337,6 +337,49 @@ def _manifest_save(checkpoint_path, results, dataset_identity=None):
     return manifest
 
 
+def _save_recomputed_checkpoint(checkpoint_path, results, *, components):
+    """Atomically refresh a recomputed component and its CAS reachability data.
+
+    CAS blobs land first, component and summary manifests next, and ``cases.json``
+    last. A crash therefore never publishes a content-key reference before its
+    blob or component exists.
+    """
+    from .profiles import case_content_key
+
+    path = Path(checkpoint_path)
+    root = path.parent
+    cases = []
+    keys_by_case_id = {}
+    for by_energy in results.values():
+        for record in by_energy.values():
+            case = record.get("case")
+            payload = _cas_payload_from_record(record)
+            if not isinstance(case, dict) or not _valid_cas_payload(payload):
+                continue
+            key = case_content_key(case)
+            _checkpoint_store.cas_save(str(case["crystal"]), key, root, payload)
+            cases.append(case)
+            keys_by_case_id[id(case)] = key
+
+    manifest_path = _manifest_path_for(checkpoint_path)
+    dataset_identity = None
+    if os.path.isfile(manifest_path):
+        try:
+            with open(manifest_path) as handle:
+                dataset_identity = json.load(handle).get("dataset_identity")
+        except (OSError, ValueError, TypeError):
+            dataset_identity = None
+
+    _checkpoint_components_save(checkpoint_path, results, components=components)
+    _manifest_save(checkpoint_path, results, dataset_identity)
+    _write_case_manifest(
+        checkpoint_path,
+        cases,
+        lambda case: keys_by_case_id.get(id(case)),
+        dataset_identity,
+    )
+
+
 def checkpoint_manifest(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
     """Summary of a checkpoint's contents -- distinct beam energies, record
     count, and swept case fields -- WITHOUT unpickling the checkpoint itself.
@@ -988,8 +1031,7 @@ def repair_checkpoint(checkpoint_path, save_every=100, max_seconds=None, status=
     results = _checkpoint_load(checkpoint_path)
 
     def save_cb(results):  # atomic; resumable on crash; keeps the sidecar manifest in step
-        _checkpoint_components_save(checkpoint_path, results, components=("brem",))
-        _manifest_save(checkpoint_path, results)
+        _save_recomputed_checkpoint(checkpoint_path, results, components=("brem",))
 
     n = repair_brem_wide(
         results,
@@ -1047,6 +1089,7 @@ def repair_line_spec(
     line_stop_eV=None,
     line_step_eV=None,
     profile=None,
+    catalog_profile="standard",
     from_config=True,
     redo_all=False,
     save_every=0,
@@ -1093,11 +1136,15 @@ def repair_line_spec(
             if profile is None:
                 from .config import material_sweep
 
-                sweep = material_sweep(material)
+                sweep = material_sweep(material, catalog_profile=catalog_profile)
             else:
                 from .recompute_defaults import sweep as profile_sweep
 
-                sweep = profile_sweep(material, profile)
+                sweep = profile_sweep(
+                    material,
+                    profile,
+                    catalog_profile=catalog_profile,
+                )
         except Exception:
             sweep = None  # unknown/derived stem -> fall back to each record's grid
 
@@ -1190,8 +1237,7 @@ def reline_checkpoint(
     results = _checkpoint_load(checkpoint_path)
 
     def save_cb(results):
-        _checkpoint_components_save(checkpoint_path, results, components=("line",))
-        _manifest_save(checkpoint_path, results)
+        _save_recomputed_checkpoint(checkpoint_path, results, components=("line",))
 
     n = repair_line_spec(
         results,

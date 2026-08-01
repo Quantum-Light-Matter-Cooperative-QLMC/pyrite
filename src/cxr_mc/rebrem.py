@@ -41,6 +41,8 @@ def rebrem_checkpoints(
     brem_stop_eV=None,
     brem_step_eV=None,
     fidelity=None,
+    catalog_profile=None,
+    require_identity=False,
     redo_all=False,
     save_every=100,
     progress_file=None,
@@ -84,17 +86,29 @@ def rebrem_checkpoints(
     for path in paths:
         stem = Path(path).stem if str(path).endswith(".pkl") else Path(path).name
         print(f"== {stem} ==")
+        from .recompute_defaults import dataset_context
+
+        context = dataset_context(
+            path,
+            catalog_profile=catalog_profile,
+            fidelity=fidelity,
+            require_identity=require_identity,
+        )
         resolved_ne = ne_brem
         resolved_start = brem_start_eV
         resolved_step = brem_step_eV
-        if fidelity is not None:
+        if context.identified or fidelity is not None or require_identity:
             from .recompute_defaults import settings, sweep, uniform_bounds
 
-            profile_settings = settings(fidelity)
+            profile_settings = settings(context.fidelity)
             if resolved_ne is None:
                 resolved_ne = profile_settings.n_electrons_brem
             try:
-                profile_sweep = sweep(stem, fidelity)
+                profile_sweep = sweep(
+                    context.material,
+                    context.fidelity,
+                    catalog_profile=context.catalog_profile,
+                )
                 profile_start, _profile_stop, profile_step = uniform_bounds(
                     profile_sweep.E_grid_brem
                 )
@@ -145,6 +159,9 @@ def rebrem_checkpoints(
             )
         max_seconds = None if deadline is None else max(0.0, deadline - time.monotonic())
         status = {}
+        repair_options = {}
+        if context.identified or fidelity is not None or require_identity:
+            repair_options["profile"] = context.fidelity
         try:
             if progress_file is not None:
                 progress_timer.start()
@@ -156,9 +173,9 @@ def rebrem_checkpoints(
                 brem_start_eV=resolved_start,
                 brem_stop_eV=brem_stop_eV,
                 brem_step_eV=resolved_step,
-                profile=fidelity,
                 max_seconds=max_seconds,
                 status=status,
+                **repair_options,
                 **kw,
             )
         except BaseException as exc:
@@ -206,6 +223,8 @@ def _cli(args):
         brem_stop_eV=getattr(args, "stop", None),
         brem_step_eV=args.step,
         fidelity=getattr(args, "fidelity", None),
+        catalog_profile=getattr(args, "catalog_profile", None),
+        require_identity=True,
         redo_all=args.redo_all,
         save_every=args.save_every,
         progress_file=args.progress_file,
@@ -236,6 +255,8 @@ def _cli_json(args):
                 brem_stop_eV=getattr(args, "stop", None),
                 brem_step_eV=args.step,
                 fidelity=getattr(args, "fidelity", None),
+                catalog_profile=getattr(args, "catalog_profile", None),
+                require_identity=True,
                 redo_all=args.redo_all,
                 save_every=args.save_every,
                 progress_file=args.progress_file,
@@ -284,7 +305,20 @@ def _cli_json(args):
     shell_complete=_cli_completion.complete_checkpoint_stem,
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
-@_cli_core.fidelity_option(help="Fidelity preset supplying omitted grid and electron defaults.")
+@click.option(
+    "--fidelity",
+    type=_cli_core.FIDELITY_CHOICES,
+    default=None,
+    help="Override dataset fidelity; defaults to checkpoint metadata or full for legacy data.",
+)
+@click.option(
+    "--profile",
+    "catalog_profile",
+    default=None,
+    metavar="NAME",
+    shell_complete=_cli_completion.complete_profile,
+    help="Catalog profile for legacy data; otherwise must match checkpoint metadata.",
+)
 @click.option(
     "--ne-brem",
     type=_cli_core.POSITIVE_INT,
@@ -336,6 +370,7 @@ def command(
     materials,
     all_,
     fidelity,
+    catalog_profile,
     ne_brem,
     start,
     stop,
@@ -359,6 +394,7 @@ def command(
         material=list(materials),
         all=all_,
         fidelity=fidelity,
+        catalog_profile=catalog_profile,
         ne_brem=ne_brem,
         start=start,
         stop=stop,

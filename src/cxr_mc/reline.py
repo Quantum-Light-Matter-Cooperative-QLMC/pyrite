@@ -36,6 +36,8 @@ def reline_checkpoints(
     line_stop_eV=None,
     line_step_eV=None,
     fidelity=None,
+    catalog_profile=None,
+    require_identity=False,
     from_config=True,
     redo_all=False,
     save_every=100,
@@ -75,11 +77,20 @@ def reline_checkpoints(
     for path in paths:
         stem = Path(path).stem if str(path).endswith(".pkl") else Path(path).name
         print(f"== {stem} ==")
+        from .recompute_defaults import dataset_context
+
+        context = dataset_context(
+            path,
+            catalog_profile=catalog_profile,
+            fidelity=fidelity,
+            require_identity=require_identity,
+        )
         resolved_ne = line_ne
-        if fidelity is not None and resolved_ne is None:
+        use_profile_defaults = context.identified or fidelity is not None or require_identity
+        if use_profile_defaults and resolved_ne is None:
             from .recompute_defaults import settings
 
-            resolved_ne = settings(fidelity).n_electrons
+            resolved_ne = settings(context.fidelity).n_electrons
         kw = {}
         if progress_file is not None:
             from .scan import _ProgressTimer, _write_progress_record
@@ -128,14 +139,15 @@ def reline_checkpoints(
             recompute_options["line_start_eV"] = line_start_eV
         if line_stop_eV is not None:
             recompute_options["line_stop_eV"] = line_stop_eV
-        if fidelity is not None:
-            recompute_options["profile"] = fidelity
+        if use_profile_defaults:
+            recompute_options["profile"] = context.fidelity
+            recompute_options["catalog_profile"] = context.catalog_profile
         try:
             if progress_file is not None:
                 progress_timer.start()
             out[stem] = reline_checkpoint(
                 path,
-                material=stem,
+                material=context.material,
                 save_every=save_every,
                 max_seconds=max_seconds,
                 status=status,
@@ -187,6 +199,8 @@ def _cli(args):
         line_stop_eV=getattr(args, "stop", None),
         line_step_eV=args.line_step,
         fidelity=getattr(args, "fidelity", None),
+        catalog_profile=getattr(args, "catalog_profile", None),
+        require_identity=True,
         redo_all=args.redo_all,
         save_every=args.save_every,
         progress_file=args.progress_file,
@@ -217,6 +231,8 @@ def _cli_json(args):
                 line_stop_eV=getattr(args, "stop", None),
                 line_step_eV=args.line_step,
                 fidelity=getattr(args, "fidelity", None),
+                catalog_profile=getattr(args, "catalog_profile", None),
+                require_identity=True,
                 redo_all=args.redo_all,
                 save_every=args.save_every,
                 progress_file=args.progress_file,
@@ -265,7 +281,20 @@ def _cli_json(args):
     shell_complete=_cli_completion.complete_checkpoint_stem,
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Recompute every checkpoint.")
-@_cli_core.fidelity_option(help="Fidelity preset supplying omitted grid and electron defaults.")
+@click.option(
+    "--fidelity",
+    type=_cli_core.FIDELITY_CHOICES,
+    default=None,
+    help="Override dataset fidelity; defaults to checkpoint metadata or full for legacy data.",
+)
+@click.option(
+    "--profile",
+    "catalog_profile",
+    default=None,
+    metavar="NAME",
+    shell_complete=_cli_completion.complete_profile,
+    help="Catalog profile for legacy data; otherwise must match checkpoint metadata.",
+)
 @click.option(
     "--line-ne",
     type=_cli_core.POSITIVE_INT,
@@ -317,6 +346,7 @@ def command(
     materials,
     all_,
     fidelity,
+    catalog_profile,
     line_ne,
     start,
     stop,
@@ -340,6 +370,7 @@ def command(
         material=list(materials),
         all=all_,
         fidelity=fidelity,
+        catalog_profile=catalog_profile,
         line_ne=line_ne,
         start=start,
         stop=stop,
