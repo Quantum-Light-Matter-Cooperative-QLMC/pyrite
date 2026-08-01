@@ -69,32 +69,44 @@ command-contract need; compute-kernel optimization owned by
 
 Sequence after dispatch:
 
-- [ ] Inventory current commands, aliases, selectors, defaults, precedence,
+- [x] Inventory current commands, aliases, selectors, defaults, precedence,
       prompts, streams, exit codes, destructive targets, and tests for all four
       areas. Record a proposed old -> new compatibility table before code.
-- [ ] Lock primary nouns/verbs and migration policy. Explicitly resolve the
+- [x] Lock primary nouns/verbs and migration policy. Explicitly resolve the
       open decisions below; record checkpoint resource ownership before
       changing shared local/remote cleanup paths.
-- [ ] Implement profile-mutation changes with replacement/union/implicit-all
+- [x] Implement profile-mutation changes with replacement/union/implicit-all
       behavior frozen by regression tests.
-- [ ] Implement completion lifecycle changes with dry-run, repeated install,
+- [x] Implement completion lifecycle changes with dry-run, repeated install,
       repeated removal, unknown-shell, explicit-shell, and custom-rc tests.
-- [ ] Lock checkpoint dataset-versus-case ownership and reachability semantics.
+- [x] Lock checkpoint dataset-versus-case ownership and reachability semantics.
       Define local and remote clear/prune targets, shared-case garbage
       collection, live-job/reservation protection, and exact preview/confirmation
       behavior before implementing deletion.
-- [ ] Fix `cxr checkpoint recompute` through current named-profile resolution or
+- [x] Fix `cxr checkpoint recompute` through current named-profile resolution or
       remove/migrate it with a compatibility path. Reassess the remaining
       checkpoint subcommands against manifest and shared-CAS ownership.
-- [ ] Implement performance-log list/pull/prune flow. Preview exact destructive
+- [x] Implement performance-log list/pull/prune flow. Preview exact destructive
       targets; revalidate before deletion; keep live/incomplete jobs fail-closed.
-- [ ] Audit performance-mode restrictions using representative remote command
+- [x] Audit performance-mode restrictions using representative remote command
       previews and existing telemetry provenance. Remove, warn, error, or
       auto-set each restriction with a documented reason.
-- [ ] Reconcile local and remote checkpoint cleanup through shared selectors and
+- [x] Reconcile local and remote checkpoint cleanup through shared selectors and
       safety invariants where practical. Keep one implementation owner per path.
-- [ ] Regenerate CLI docs/contracts; run focused CLI tests, real help/dry-run
+- [x] Regenerate CLI docs/contracts; run focused CLI tests, real help/dry-run
       probes, then full repository verification.
+
+## Implementation evidence (2026-08-01)
+
+- Profile membership, completion lifecycle, checkpoint clear/aliases/recompute,
+  and local/remote performance lifecycle landed as task-local checkpoint commits.
+- Performance checks: 59 local tests; 407 remote tests; combined focused suite
+  418 passed. Ruff and Pyright passed before documentation regeneration.
+- Generated `docs/cli-reference.md` and `tests/data/cli_contract.json`; updated
+  repository ownership map. Generator checks and runtime probes passed.
+- `cxr-dev verify`: lint/typecheck and 2,289 tests passed, 39 skipped; its sole
+  sandbox failure was the known forkserver Unix-socket restriction. The failed
+  CPU end-to-end test passed separately outside the sandbox (1 passed).
 
 ## Decisions
 

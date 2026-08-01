@@ -76,6 +76,7 @@ Commands:
   app          Launch or export interactive analysis notebooks.
   checkpoint   Inspect, transform, recompute, archive, and prune checkpoints.
   completion   Manage cxr shell tab-completion.
+  performance  List, analyze, or prune compute-performance artifacts.
   remote       Run and manage MC sweeps on a remote GPU host.
   energy-grid  Derive, submit, inspect, and apply photon-energy grids.
   profile      Manage named catalog campaigns and material membership.
@@ -294,6 +295,7 @@ Usage: cxr checkpoint [OPTIONS] COMMAND [ARGS]...
     cxr checkpoint archive hopg keeper
     cxr checkpoint recompute line hopg
     cxr checkpoint prune --profile standard
+    cxr checkpoint clear --profile standard
 
 Options:
   -h, --help  Show this message and exit.
@@ -306,6 +308,7 @@ Commands:
   list       List long-term checkpoint shelf.
   merge      Merge a shelved checkpoint into active slot.
   prune      Remove records obsolete under current scan profiles.
+  clear      Delete local datasets and newly unreachable shared cases.
 ```
 
 ## `cxr checkpoint slim`
@@ -356,8 +359,10 @@ Usage: cxr checkpoint recompute brem [OPTIONS] [MATERIALS]...
 
 Options:
   -a, --all                 Recompute every checkpoint.
-  --fidelity [full|survey]  Fidelity preset supplying omitted grid and electron
-                            defaults.  [default: full]
+  --fidelity [full|survey]  Override dataset fidelity; defaults to checkpoint metadata
+                            or full for legacy data.
+  --profile NAME            Catalog profile for legacy data; otherwise must match
+                            checkpoint metadata.
   --ne-brem N               Bremsstrahlung electron count; overrides profile default.
   --start EV                Wide-bremsstrahlung lower bound in eV; overrides profile.
   --stop EV                 Wide-bremsstrahlung exclusive upper bound in eV; default
@@ -385,8 +390,10 @@ Usage: cxr checkpoint recompute line [OPTIONS] [MATERIALS]...
 
 Options:
   -a, --all                 Recompute every checkpoint.
-  --fidelity [full|survey]  Fidelity preset supplying omitted grid and electron
-                            defaults.  [default: full]
+  --fidelity [full|survey]  Override dataset fidelity; defaults to checkpoint metadata
+                            or full for legacy data.
+  --profile NAME            Catalog profile for legacy data; otherwise must match
+                            checkpoint metadata.
   --line-ne N               Line-spectrum electron count; overrides profile default.
   --start EV                Line-grid lower bound in eV; overrides profile.
   --stop EV                 Line-grid exclusive upper bound in eV; overrides profile.
@@ -476,6 +483,24 @@ Options:
   -h, --help      Show this message and exit.
 ```
 
+## `cxr checkpoint clear`
+
+```text
+Usage: cxr checkpoint clear [OPTIONS] [MATERIALS]...
+
+  Delete local checkpoint datasets; preview unless --yes.
+
+  Archived and retained active manifests remain CAS reachability roots.
+
+Options:
+  --profile NAME        Delete active datasets owned by catalog profile NAME.
+  --all                 Delete every active dataset.
+  --yes                 Delete exact previewed targets.
+  --checkpoint-dir DIR  Checkpoint root containing active datasets, archives, and shared
+                        CAS blobs.  [default: checkpoints]
+  -h, --help            Show this message and exit.
+```
+
 ## `cxr completion`
 
 ```text
@@ -492,6 +517,7 @@ Options:
 
 Commands:
   install  Append cxr tab-completion setup to a shell rc/config file.
+  remove   Remove cxr tab-completion setup from a shell rc/config file.
 ```
 
 ## `cxr completion install`
@@ -510,6 +536,81 @@ Options:
                            location.
   --dry-run                Print what would change without writing.
   -h, --help               Show this message and exit.
+```
+
+## `cxr completion remove`
+
+```text
+Usage: cxr completion remove [OPTIONS]
+
+  Remove cxr tab-completion setup from a shell rc/config file.
+
+  Idempotent: only exact cxr-managed current or legacy blocks are removed. With no
+  --shell, detects from $SHELL.
+
+Options:
+  --shell [bash|zsh|fish]  Target shell. Defaults to detecting from $SHELL.
+  --rc-file FILE           Rc/config file to edit. Defaults to the shell's standard
+                           location.
+  --dry-run                Print what would change without writing.
+  -h, --help               Show this message and exit.
+```
+
+## `cxr performance`
+
+```text
+Usage: cxr performance [OPTIONS] COMMAND [ARGS]...
+
+  List, analyze, or prune local compute-performance artifacts.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  analyze  Analyze NAME's logs into CSV, Markdown, and PNG artifacts.
+  list     List local performance profiles with artifact counts and sizes.
+  prune    Delete explicitly selected local performance profiles; preview by default.
+```
+
+## `cxr performance analyze`
+
+```text
+Usage: cxr performance analyze [OPTIONS] NAME
+
+  Analyze NAME's logs into CSV, Markdown, and PNG artifacts.
+
+Options:
+  --performance-dir DIRECTORY  Directory containing NAME's local or pulled NDJSON logs.
+                               [default: performance-profiles]
+  --sample-period SECONDS      Expected sampling period; intervals over twice this value
+                               are gaps.  [default: 5.0; x>0]
+  -h, --help                   Show this message and exit.
+```
+
+## `cxr performance list`
+
+```text
+Usage: cxr performance list [OPTIONS] [PROFILES]...
+
+  List local performance profiles with artifact counts and sizes.
+
+Options:
+  --performance-dir DIRECTORY  [default: performance-profiles]
+  -h, --help                   Show this message and exit.
+```
+
+## `cxr performance prune`
+
+```text
+Usage: cxr performance prune [OPTIONS] [PROFILES]...
+
+  Delete explicitly selected local performance profiles; preview by default.
+
+Options:
+  --all                        Select every local profile.
+  --yes                        Delete exact previewed profile directories.
+  --performance-dir DIRECTORY  [default: performance-profiles]
+  -h, --help                   Show this message and exit.
 ```
 
 ## `cxr remote`
@@ -533,21 +634,21 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  clear       Delete remote checkpoints; preview unless --yes.
-  jobs        List jobs with SLURM IDs, materials, and last events.
-  logs        Show a job diagnostic log; defaults to latest.
-  profile     Manage named compute-performance logs.
-  prune       Drop remote records obsolete under current scan profiles; preview...
-  prune-jobs  Delete terminal (done/failed/cancelled) job directories; preview...
-  pull        Fetch existing checkpoints from remote box.
-  reap        Release orphaned checkpoint reservations; preview unless --yes.
-  rebrem      Recompute brem-only remotely, follow, and pull completed checkpoints.
-  reline      Recompute line-only remotely, follow, and pull completed checkpoints.
-  run         Sync code, submit sweep(s), track progress, and pull checkpoints.
-  status      Show one job; use -v for allocation and -vv for logs.
-  stop        cancel active SLURM job(s) by material, profile, or every live job.
-  sync        Push current code to remote box.
-  validate    Run Zhai reproduction remotely or pull existing caches.
+  clear        Delete remote checkpoints; preview unless --yes.
+  jobs         List jobs with SLURM IDs, materials, and last events.
+  logs         Show a job diagnostic log; defaults to latest.
+  performance  List, pull, or prune remote performance artifacts.
+  prune        Drop remote records obsolete under current scan profiles; preview...
+  prune-jobs   Delete terminal (done/failed/cancelled) job directories; preview...
+  pull         Fetch existing checkpoints from remote box.
+  reap         Release orphaned checkpoint reservations; preview unless --yes.
+  rebrem       Recompute brem-only remotely, follow, and pull completed checkpoints.
+  reline       Recompute line-only remotely, follow, and pull completed checkpoints.
+  run          Sync code, submit sweep(s), track progress, and pull checkpoints.
+  status       Show one job; use -v for allocation and -vv for logs.
+  stop         cancel active SLURM job(s) by material, profile, or every live job.
+  sync         Push current code to remote box.
+  validate     Run Zhai reproduction remotely or pull existing caches.
 ```
 
 ## `cxr remote clear`
@@ -588,27 +689,52 @@ Options:
   -h, --help    Show this message and exit.
 ```
 
-## `cxr remote profile`
+## `cxr remote performance`
 
 ```text
-Usage: cxr remote profile [OPTIONS] COMMAND [ARGS]...
+Usage: cxr remote performance [OPTIONS] COMMAND [ARGS]...
 
-  Manage named compute-performance logs.
+  List, pull, or prune remote performance artifacts.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  pull  Fetch NDJSON logs and Nsight artifacts for PERFORMANCE_PROFILE from every...
+  list   List remote performance artifact directories.
+  prune  Delete selected terminal-job performance artifacts; preview by default.
+  pull   Fetch one profile's NDJSON, Nsight, and CPU-profile artifacts.
 ```
 
-## `cxr remote profile pull`
+## `cxr remote performance list`
 
 ```text
-Usage: cxr remote profile pull [OPTIONS] PERFORMANCE_PROFILE
+Usage: cxr remote performance list [OPTIONS]
 
-  Fetch NDJSON logs and Nsight artifacts for PERFORMANCE_PROFILE from every matching
-  remote job into performance-profiles/PROFILE/<job>/.
+  List remote performance artifact directories.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
+## `cxr remote performance prune`
+
+```text
+Usage: cxr remote performance prune [OPTIONS] [PROFILE]...
+
+  Delete selected terminal-job performance artifacts; preview by default.
+
+Options:
+  --all       Select every remote profile.
+  --yes       Delete exact previewed directories.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr remote performance pull`
+
+```text
+Usage: cxr remote performance pull [OPTIONS] PERFORMANCE_PROFILE
+
+  Fetch one profile's NDJSON, Nsight, and CPU-profile artifacts.
 
 Options:
   -h, --help  Show this message and exit.
@@ -765,8 +891,8 @@ Options:
   --workers NUMBER             Transport workers (default: auto; 0 runs serially).
   --parallel-materials N       Simultaneous scans in one allocation; requires --chunk-
                                minutes 0.  [1<=x<=4]
-  --chunk-minutes NUMBER       Self-resubmitting SLURM slice length; 0 runs one
-                               monolithic job.  [default: 10.0]
+  --chunk-minutes NUMBER       Self-resubmitting SLURM slice length; defaults to 10, or
+                               0 for --perf-reps >1 and --nsys.
   -p, --perf                   Log CPU pressure, RAM/swap, GPU clocks/VRAM, process,
                                phase timing, queue, worker, chunk, and case metrics for
                                PROFILE.
@@ -781,13 +907,14 @@ Options:
   --brem-chunk N               Pin bremsstrahlung segments per GPU chunk; requires
                                --perf.
   --nsys                       Capture one uncached full-profile session with Nsight
-                               Systems CUDA/NVTX and Python-stack tracing; requires
-                               exactly one material, --perf, --perf-reps 1, and --chunk-
-                               minutes 0.
+                               Systems CUDA/NVTX and Python-stack tracing; implies
+                               --perf, --perf-reps 1, and --chunk-minutes 0; requires
+                               one explicit -m/--material.
   --no-sync                    Skip code upload.
   --dry-run                    Print submission preview; do not connect.
   --headless                   Return after submission without attaching or pulling.
-  --no-pull                    Attach and track, but do not pull completed checkpoints.
+  --no-pull                    Attach and track, but do not pull completed checkpoints
+                               or performance artifacts.
   --grid                       Grid-filter checkpoint before pulling; incompatible with
                                --quick.
   --drop-wide-brem             With --grid, drop wide-brem.
@@ -1213,9 +1340,10 @@ Usage: cxr profile [OPTIONS] COMMAND [ARGS]...
 
   Profiles are named campaigns in ``[profiles.*]``. They own default ranges, electron-
   count grids, beam policy, detector geometry, and optional material membership. An
-  absent ``materials`` key means all in-use materials; ``profile members`` is the only
-  membership mutation surface. Per-material range overrides are managed by ``cxr
-  material``. Energy grids are managed by ``cxr energy-grid``.
+  absent ``materials`` key means all in-use materials. Membership uses ``set|add|remove
+  --materials``; ``set --all-materials`` restores implicit membership. Per-material
+  range overrides are managed by ``cxr material``. Energy grids are managed by ``cxr
+  energy-grid``.
 
   Examples:
     cxr profile list
@@ -1223,7 +1351,7 @@ Usage: cxr profile [OPTIONS] COMMAND [ARGS]...
     cxr profile create sub_100keV --energy 30:100:10
     cxr profile set sub_100keV --observation-angle 119
     cxr profile add sub_100keV --energy 75
-    cxr profile members set sub_100keV hopg mose2
+    cxr profile set sub_100keV --materials hopg,mose2
     cxr profile rename sub_100keV sub100
     cxr profile delete sub_100keV -y
 
@@ -1231,16 +1359,14 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  add      Incrementally add values to profile grids.
-  analyze  Analyze NAME's performance logs into CSV, Markdown, and PNG artifacts.
-  create   Create a new profile, cloning defaults from --from (standard).
-  delete   Delete a profile; irreversible.
-  list     List catalog profiles with membership and override counts.
-  members  Set, extend, shrink, or reset profile-owned material membership.
-  remove   Remove values from an existing profile's grids.
-  rename   Rename profile NAME to NEW_NAME.
-  set      Replace range grids, beam fields, or detector scalars on a profile.
-  show     Show one profile's ranges, beam, detector, membership, and overrides.
+  add     Incrementally add values to profile grids.
+  create  Create a new profile, cloning defaults from --from (standard).
+  delete  Delete a profile; irreversible.
+  list    List catalog profiles with membership and override counts.
+  remove  Remove values from an existing profile's grids.
+  rename  Rename profile NAME to NEW_NAME.
+  set     Replace range grids, beam fields, or detector scalars on a profile.
+  show    Show one profile's ranges, beam, detector, membership, and overrides.
 ```
 
 ## `cxr profile add`
@@ -1270,24 +1396,11 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
+  --materials KEY,...             Add comma-separated material keys to explicit
+                                  membership.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
-```
-
-## `cxr profile analyze`
-
-```text
-Usage: cxr profile analyze [OPTIONS] NAME
-
-  Analyze NAME's performance logs into CSV, Markdown, and PNG artifacts.
-
-Options:
-  --performance-dir DIRECTORY  Directory containing NAME's local or pulled NDJSON logs.
-                               [default: performance-profiles]
-  --sample-period SECONDS      Expected sampling period; intervals over twice this value
-                               are gaps.  [default: 5.0; x>0]
-  -h, --help                   Show this message and exit.
 ```
 
 ## `cxr profile create`
@@ -1369,81 +1482,6 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `cxr profile members`
-
-```text
-Usage: cxr profile members [OPTIONS] COMMAND [ARGS]...
-
-  Set, extend, shrink, or reset profile-owned material membership.
-
-Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  add     Extend NAME's explicit membership with MATERIAL keys.
-  remove  Remove MATERIAL keys from NAME's explicit membership.
-  reset   Restore NAME's implicit all-in-use material membership.
-  set     Replace NAME's explicit membership with MATERIAL keys.
-```
-
-## `cxr profile members add`
-
-```text
-Usage: cxr profile members add [OPTIONS] NAME [MATERIALS]...
-
-  Extend NAME's explicit membership with MATERIAL keys.
-
-Options:
-  --unverified-dw     Include mats_to_sim.toml's unverified-Debye-Waller material group.
-  --high-energy-only  Include mats_to_sim.toml's high-energy material group.
-  -y, --yes           Skip the 'standard' confirmation prompt.
-  --dry-run           Print proposed TOML diff; write nothing.
-  -h, --help          Show this message and exit.
-```
-
-## `cxr profile members remove`
-
-```text
-Usage: cxr profile members remove [OPTIONS] NAME [MATERIALS]...
-
-  Remove MATERIAL keys from NAME's explicit membership.
-
-Options:
-  --unverified-dw     Include mats_to_sim.toml's unverified-Debye-Waller material group.
-  --high-energy-only  Include mats_to_sim.toml's high-energy material group.
-  -y, --yes           Skip the 'standard' confirmation prompt.
-  --dry-run           Print proposed TOML diff; write nothing.
-  -h, --help          Show this message and exit.
-```
-
-## `cxr profile members reset`
-
-```text
-Usage: cxr profile members reset [OPTIONS] NAME
-
-  Restore NAME's implicit all-in-use material membership.
-
-Options:
-  -y, --yes   Skip the 'standard' confirmation prompt.
-  --dry-run   Print proposed TOML diff; write nothing.
-  -h, --help  Show this message and exit.
-```
-
-## `cxr profile members set`
-
-```text
-Usage: cxr profile members set [OPTIONS] NAME [MATERIALS]...
-
-  Replace NAME's explicit membership with MATERIAL keys.
-
-Options:
-  --unverified-dw     Include mats_to_sim.toml's unverified-Debye-Waller material group.
-  --high-energy-only  Include mats_to_sim.toml's high-energy material group.
-  -y, --yes           Skip the 'standard' confirmation prompt.
-  --dry-run           Print proposed TOML diff; write nothing.
-  -h, --help          Show this message and exit.
-```
-
 ## `cxr profile remove`
 
 ```text
@@ -1467,6 +1505,8 @@ Options:
   --azimuth DEG,... | START:STOP:STEP
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
                                   mixable with start:stop:step ranges.
+  --materials KEY,...             Remove comma-separated material keys from explicit
+                                  membership.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
@@ -1530,6 +1570,9 @@ Options:
                                   replacement.  [0.0<x<=180.0]
   --solid-angle SR                Detector solid angle in sr; scalar replacement.
                                   [0.0<x<=12.566370614359172]
+  --materials KEY,...             Replace explicit membership with comma-separated
+                                  material keys.
+  --all-materials                 Restore implicit membership in every in-use material.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.

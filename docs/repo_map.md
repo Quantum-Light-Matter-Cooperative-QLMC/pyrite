@@ -412,7 +412,8 @@ wired into pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
 `cxr` console-script dispatcher and CLI-specific helpers/groups.
 - Public: `main`.
 - Deps (lazy command imports): `analyze`, `blaze`, `catalog`, `check`,
-  `checkpoint`, `energy_grid`, `export`, `material`, `profile`, `remote`, `scan`;
+  `checkpoint`, `energy_grid`, `export`, `material`, `performance`, `profile`,
+  `remote`, `scan`;
   hidden `sweep`
   compatibility paths additionally dispatch to `archive`, `check_config`,
   `rebrem`, `reline`, and `slim`. Eager lightweight deps: `cli._core`,
@@ -427,8 +428,20 @@ contains hidden compatibility aliases only.
 
 ### `cli/checkpoint.py`
 Canonical `cxr checkpoint` group. Lazily routes `slim`, component
-`recompute {brem,line}`, `archive`, `restore`, `list`, and `merge` to existing
-checkpoint handlers while root-level legacy paths remain hidden aliases.
+`recompute {brem,line}`, `archive`, `restore`, `list`, `merge`, and
+reachability-safe `clear` to existing checkpoint handlers while root-level
+legacy paths remain hidden aliases.
+
+### `checkpoint_cleanup.py`
+Local checkpoint dataset deletion and shared-CAS garbage collection. Selects
+datasets by material, profile, or all; previews exact dataset paths and blobs;
+treats active and archived manifests as reachability roots; revalidates retained
+manifests before mutation and fails closed on malformed or changed state.
+
+### `cli/performance.py`
+Canonical local performance-artifact lifecycle: inventory, analysis, and
+preview-by-default profile pruning. `profile analyze` remains a hidden warning
+alias. Revalidates selected file signatures before deletion.
 
 ### `recompute_defaults.py`
 Fidelity-aware line/bremsstrahlung recompute defaults shared by local, grouped,
@@ -485,10 +498,13 @@ and clear, remote validation jobs.
   - `state.py` — read-only job/reservation state queries over ssh; live-job
     discovery joins metadata against one scheduler snapshot.
   - `lifecycle.py` — submit/stage/stop/clear/pull job lifecycle; checkpoint pulls
-    slim, stream, and clean up through one SSH session per stem.
+    slim, stream, and clean up through one SSH session per stem; remote
+    performance inventory and terminal-job-only pruning revalidate scheduler,
+    job-state, and artifact inventory before deletion.
   - `viewer.py` — one-shot/attached status and logs rendering; attached status
     reuses one framed SSH stream across refreshes.
-  - `cli.py` — argparse wiring and subcommand dispatch.
+  - `cli.py` — Click wiring and subcommand dispatch, including canonical
+    `remote performance list|pull|prune` and performance-mode defaults.
   Names re-export as import-time snapshots; internal cross-module calls resolve
   through the owning submodule, so tests patch the owner (e.g.
   `transport._ssh_capture`), not the facade.
