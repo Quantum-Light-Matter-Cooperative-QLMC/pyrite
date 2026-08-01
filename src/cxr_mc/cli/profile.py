@@ -383,8 +383,9 @@ def command():
 
     Profiles are named campaigns in ``[profiles.*]``. They own default ranges,
     electron-count grids, beam policy, detector geometry, and optional material
-    membership. An absent ``materials`` key means all in-use materials;
-    ``profile members`` is the only membership mutation surface. Per-material
+    membership. An absent ``materials`` key means all in-use materials.
+    Membership uses ``set|add|remove --materials``; ``set --all-materials``
+    restores implicit membership. Per-material
     range overrides are managed by ``cxr material``. Energy grids are managed
     by ``cxr energy-grid``.
 
@@ -395,7 +396,7 @@ def command():
       cxr profile create sub_100keV --energy 30:100:10
       cxr profile set sub_100keV --observation-angle 119
       cxr profile add sub_100keV --energy 75
-      cxr profile members set sub_100keV hopg mose2
+      cxr profile set sub_100keV --materials hopg,mose2
       cxr profile rename sub_100keV sub100
       cxr profile delete sub_100keV -y
     """
@@ -609,7 +610,12 @@ def create_command(
     "--materials",
     metavar="KEY,...",
     shell_complete=_cli_completion.complete_material_csv,
-    hidden=True,
+    help="Replace explicit membership with comma-separated material keys.",
+)
+@click.option(
+    "--all-materials",
+    is_flag=True,
+    help="Restore implicit membership in every in-use material.",
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
@@ -630,6 +636,7 @@ def set_command(
     polar_acceptance_deg,
     solid_angle_sr,
     materials,
+    all_materials,
     yes,
     dry_run,
 ):
@@ -651,8 +658,16 @@ def set_command(
     detector_updates = _collect_detector_updates(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr
     )
-    if not updates and not beam_updates and not detector_updates and materials is None:
-        raise click.UsageError("provide a range, beam, or detector option")
+    if materials is not None and all_materials:
+        raise click.UsageError("--materials and --all-materials are mutually exclusive")
+    if (
+        not updates
+        and not beam_updates
+        and not detector_updates
+        and materials is None
+        and not all_materials
+    ):
+        raise click.UsageError("provide a range, beam, detector, or membership option")
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
@@ -673,16 +688,11 @@ def set_command(
         )
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
-    if overwriting or beam_updates or detector_updates or materials is not None:
+    if overwriting or beam_updates or detector_updates or materials is not None or all_materials:
         action_fields = list(dict.fromkeys([*overwriting, *detector_labels]))
         if beam_updates:
             action_fields.append("beam")
         _confirm_standard(name, f"set {', '.join(action_fields) or 'materials'} on", yes, dry_run)
-    if material_keys is not None:
-        _warn_compat(
-            f"cxr profile set {name} --materials {materials}",
-            f"cxr profile members set {name} {' '.join(material_keys)}",
-        )
     for label, values in updates.items():
         target[_catalog_key(label)] = _catalog_io.values_item(values)
     _apply_beam_updates(target, beam_updates)
@@ -692,6 +702,8 @@ def set_command(
             detector[key] = value
     if material_keys is not None:
         target["materials"] = material_keys
+    elif all_materials:
+        target.pop("materials", None)
     return _write(document, original, dry_run, f"updated profile {name}")
 
 
@@ -728,7 +740,7 @@ def _merge_values(name, updates, *, add):
     "--materials",
     metavar="KEY,...",
     shell_complete=_cli_completion.complete_material_csv,
-    hidden=True,
+    help="Add comma-separated material keys to explicit membership.",
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
@@ -755,11 +767,6 @@ def add_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, mater
         raise CLIError(str(exc)) from None
     action = "add values to" if materials is None else "add materials to"
     _confirm_standard(name, action, yes, dry_run)
-    if materials is not None:
-        _warn_compat(
-            f"cxr profile add {name} --materials {materials}",
-            f"cxr profile members add {name} {' '.join(requested)}",
-        )
     message = f"updated profile {name}"
     if materials is not None:
         message += f": added {', '.join(added) or '(none)'}"
@@ -775,7 +782,7 @@ def add_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, mater
     "--materials",
     metavar="KEY,...",
     shell_complete=_cli_completion.complete_material_csv,
-    hidden=True,
+    help="Remove comma-separated material keys from explicit membership.",
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
@@ -802,11 +809,6 @@ def remove_command(name, thickness, energy, polar, azimuth, materials, yes, dry_
         raise CLIError(str(exc)) from None
     action = "remove values from" if materials is None else "remove materials from"
     _confirm_standard(name, action, yes, dry_run)
-    if materials is not None:
-        _warn_compat(
-            f"cxr profile remove {name} --materials {materials}",
-            f"cxr profile members remove {name} {' '.join(requested)}",
-        )
     message = f"updated profile {name}"
     if materials is not None:
         message += f": removed {', '.join(removed) or '(none)'}"
@@ -924,7 +926,7 @@ def _membership_target(document, name):
         raise ValueError(
             f"profile {name!r} has implicit all-in-use-materials membership; "
             f"it already includes every material. To restrict it, use: "
-            f"cxr profile members set {name} MATERIAL..."
+            f"cxr profile set {name} --materials MATERIAL,..."
         )
     if not isinstance(materials, list):
         raise ValueError(f"profiles.{name}.materials must be an array of material keys")
@@ -989,7 +991,7 @@ def _remove_membership(document, name, requested):
     return removed, sorted(set(requested) - set(removed))
 
 
-@click.group("members", no_args_is_help=True)
+@click.group("members", no_args_is_help=True, hidden=True)
 def members_command():
     """Set, extend, shrink, or reset profile-owned material membership."""
 
@@ -1025,6 +1027,10 @@ def _member_options(function):
 @_member_options
 def members_set_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
     """Replace NAME's explicit membership with MATERIAL keys."""
+    _warn_compat(
+        f"cxr profile members set {name}",
+        f"cxr profile set {name} --materials MATERIAL,...",
+    )
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
@@ -1047,6 +1053,10 @@ def members_set_command(name, materials, unverified_dw, high_energy_only, yes, d
 @_member_options
 def members_add_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
     """Extend NAME's explicit membership with MATERIAL keys."""
+    _warn_compat(
+        f"cxr profile members add {name}",
+        f"cxr profile add {name} --materials MATERIAL,...",
+    )
     try:
         original, document = _catalog_io.catalog_text()
         requested = _group_materials(
@@ -1072,6 +1082,10 @@ def members_add_command(name, materials, unverified_dw, high_energy_only, yes, d
 @_member_options
 def members_remove_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
     """Remove MATERIAL keys from NAME's explicit membership."""
+    _warn_compat(
+        f"cxr profile members remove {name}",
+        f"cxr profile remove {name} --materials MATERIAL,...",
+    )
     try:
         original, document = _catalog_io.catalog_text()
         requested = _group_materials(
@@ -1096,6 +1110,10 @@ def members_remove_command(name, materials, unverified_dw, high_energy_only, yes
 @_member_options
 def members_reset_command(name, yes, dry_run):
     """Restore NAME's implicit all-in-use material membership."""
+    _warn_compat(
+        f"cxr profile members reset {name}",
+        f"cxr profile set {name} --all-materials",
+    )
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
@@ -1146,7 +1164,7 @@ def add_material_command(name, materials, all_materials, yes, dry_run):
             raise ValueError(
                 f"profile {name!r} has implicit all-in-use-materials membership; "
                 f"it already includes every material. To restrict it, use: "
-                f"cxr profile members set {name} MATERIAL..."
+                f"cxr profile set {name} --materials MATERIAL,..."
             )
         membership = list(existing) if isinstance(existing, list) else []
         requested = list(materials)
@@ -1165,7 +1183,7 @@ def add_material_command(name, materials, all_materials, yes, dry_run):
     _confirm_standard(name, "change material membership of", yes, dry_run)
     _warn_compat(
         f"cxr profile add-material {name}",
-        f"cxr profile members add {name} MATERIAL...",
+        f"cxr profile add {name} --materials MATERIAL,...",
     )
     skipped = sorted(set(requested) - set(added))
     message = f"updated profile {name}: added {', '.join(added) or '(none)'}"
@@ -1192,7 +1210,7 @@ def remove_material_command(name, materials, yes, dry_run):
     _confirm_standard(name, "change material membership of", yes, dry_run)
     _warn_compat(
         f"cxr profile remove-material {name}",
-        f"cxr profile members remove {name} MATERIAL...",
+        f"cxr profile remove {name} --materials MATERIAL,...",
     )
     message = f"updated profile {name}: removed {', '.join(removed) or '(none)'}"
     if missing:
