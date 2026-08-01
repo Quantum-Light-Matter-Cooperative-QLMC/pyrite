@@ -10,6 +10,16 @@ backlog in
 Print current top-level directory inventory:
 `uv run cxr-dev repo-map`.
 
+## Workspace ownership
+
+- Root `cxr-mc`: sole publishable distribution and owner of `src/cxr_mc/`,
+  packaged data, `cxr`, and `cxr-dev`.
+- `packages/cxr-mc-tests`: internal non-package uv member; owns pytest
+  dependencies and the member-selected focused verification path. Dependency
+  direction is `cxr-mc-tests -> cxr-mc`; both share one lock/environment.
+- Stable `cxr-dev test-suite {core,cli,apps,packaging}` selectors partition all
+  test modules; `integration` overlaps deliberately; `verify` remains full gate.
+
 ## Dependency layers (leaf → driver)
 
 ```

@@ -181,6 +181,7 @@ def test_every_generated_bash_payload_quotes_hostile_remote_dir(monkeypatch, bui
     expected_jobdir = config.shell_word(config.remote_path(config.JOBS_SUBDIR, "j"))
     assert f"JOBDIR={expected_jobdir}" in script
     assert "timing: uv sync %d.%03d s" in script
+    assert "sync --package cxr-mc --no-dev --extra" in script
     syntax = subprocess.run(["bash", "-n"], input=script, capture_output=True, text=True)
     assert syntax.returncode == 0, syntax.stderr
 
@@ -317,6 +318,12 @@ def test_queue_script_records_uv_sync_timing_and_preserves_failure_state(monkeyp
     assert result.returncode != 0
     assert (jobdir / "state").read_text().startswith("FAILED (uv sync)")
     assert "timing: uv sync " in (jobdir / "log").read_text()
+
+
+def test_queue_script_syncs_runtime_member_without_test_tools():
+    script = remote._queue_script("j", ["hopg"], quick=False, workers=None)
+
+    assert "sync --package cxr-mc --no-dev --extra" in script
 
 
 def test_queue_script_no_flags_when_unset():

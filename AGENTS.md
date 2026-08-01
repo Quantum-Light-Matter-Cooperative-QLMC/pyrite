@@ -23,6 +23,10 @@ Use project runner; never bare `pytest`, `.venv/bin/python`, or path-hack import
 
 ```bash
 rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite core
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite cli
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite apps
+rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite packaging
 rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test path/to/test.py -k test_name
 CXR_ONLINE_TESTS=1 rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
 rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev lint

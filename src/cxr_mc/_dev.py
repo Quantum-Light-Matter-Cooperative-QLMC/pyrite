@@ -16,6 +16,8 @@ Commands:
     nbqa       lint notebooks with nbQA + Ruff
     nbstrip    strip notebook outputs in-place
     test       run pytest, forwarding selectors and arguments
+    test-suite run one stable core/CLI/app/packaging/integration test suite
+    package-smoke build and install clean wheel/editable environments
     smoke      exercise checkpoint loading and plotting
     sync-skills mirror .agents/skills into .claude/skills
     check-skills validate the canonical skills and exact mirror
@@ -26,6 +28,7 @@ Commands:
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import re
 import shutil
 import subprocess
@@ -42,6 +45,65 @@ AGENT_SKILLS_DIR = ROOT / ".agents" / "skills"
 CLAUDE_SKILLS_DIR = ROOT / ".claude" / "skills"
 LEGACY_NOTEBOOK = ROOT / "checks" / "cxr_analysis_feranchuk.ipynb"
 SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+TEST_SUITE_PATTERNS = {
+    "packaging": (
+        "test_agent_tooling.py",
+        "test_cli_contract.py",
+        "test_cli_reference.py",
+        "test_detector_package.py",
+        "test_dev.py",
+        "test_materials_package.py",
+        "test_montecarlo_exports.py",
+        "test_plots_exports.py",
+        "test_results_exports.py",
+    ),
+    "apps": (
+        "test_altair_*.py",
+        "test_analysis_app.py",
+        "test_analyze.py",
+        "test_check.py",
+        "test_export.py",
+        "test_material_comparison.py",
+        "test_notebook_design.py",
+        "test_plot*.py",
+        "test_render_*.py",
+        "test_scan_app.py",
+        "test_trace_app.py",
+        "test_trajectories.py",
+        "test_validation_background.py",
+        "test_viewer.py",
+    ),
+    "cli": (
+        "test_archive.py",
+        "test_blaze.py",
+        "test_catalog_startup_errors.py",
+        "test_check_config.py",
+        "test_checkpoint_cli.py",
+        "test_cli_*.py",
+        "test_line_grid_cli.py",
+        "test_local_click_cli.py",
+        "test_local_dashboard.py",
+        "test_output_noise.py",
+        "test_prune.py",
+        "test_remote.py",
+        "test_remote_click.py",
+        "test_scan_*.py",
+        "test_slim.py",
+    ),
+}
+
+INTEGRATION_TESTS = (
+    "test_analysis_app.py",
+    "test_cli_contract.py",
+    "test_materials_package.py",
+    "test_montecarlo_exports.py",
+    "test_remote.py",
+    "test_results_exports.py",
+    "test_run.py",
+    "test_sweep.py",
+)
+TEST_SUITE_NAMES = ("core", "cli", "apps", "packaging", "integration")
 
 
 class AgentToolingError(RuntimeError):
@@ -120,6 +182,8 @@ def cmd_repo_map(_: argparse.Namespace) -> None:
         "uv run cxr-dev typecheck",
         "uv run cxr-dev precommit",
         "uv run cxr-dev test",
+        "uv run cxr-dev test-suite core",
+        "uv run cxr-dev package-smoke",
         "uv run cxr-dev smoke --material hopg --output-dir /tmp/cxr-mc-smoke",
         "uv run cxr-dev sync-skills",
         "uv run cxr-dev check-skills",
@@ -173,6 +237,41 @@ def cmd_test(args: argparse.Namespace) -> None:
     run("-m", "pytest", *getattr(args, "pytest_args", []))
 
 
+def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
+    """Return deterministic repository test paths for one documented suite.
+
+    Four domain suites partition every ``tests/test_*.py`` module exactly once.
+    ``integration`` intentionally samples public boundaries across domains; the
+    full ``cxr-dev test`` gate remains unchanged.
+    """
+    tests_dir = root / "tests"
+    files = sorted(tests_dir.glob("test_*.py"))
+    if name == "integration":
+        selected = [tests_dir / filename for filename in INTEGRATION_TESTS]
+        missing = [path.name for path in selected if not path.is_file()]
+        if missing:
+            raise AgentToolingError("missing integration tests: " + ", ".join(missing))
+        return selected
+    if name not in {"core", *TEST_SUITE_PATTERNS}:
+        raise AgentToolingError(f"unknown test suite {name!r}")
+
+    selected = []
+    for path in files:
+        owner = "core"
+        for candidate, patterns in TEST_SUITE_PATTERNS.items():
+            if any(fnmatch.fnmatchcase(path.name, pattern) for pattern in patterns):
+                owner = candidate
+                break
+        if owner == name:
+            selected.append(path)
+    return selected
+
+
+def cmd_test_suite(args: argparse.Namespace) -> None:
+    paths = [str(path.relative_to(ROOT)) for path in test_files_for_suite(args.suite)]
+    run("-m", "pytest", *paths, *getattr(args, "pytest_args", []))
+
+
 def cmd_smoke(args: argparse.Namespace) -> None:
     run(
         str(ROOT / "scripts" / "smoke.py"),
@@ -181,6 +280,10 @@ def cmd_smoke(args: argparse.Namespace) -> None:
         "--output-dir",
         args.output_dir,
     )
+
+
+def cmd_package_smoke(_: argparse.Namespace) -> None:
+    run(str(ROOT / "scripts" / "package_smoke.py"))
 
 
 def _frontmatter_fields(path: Path) -> dict[str, str]:
@@ -387,12 +490,17 @@ def build_parser() -> argparse.ArgumentParser:
         ("sync-skills", cmd_sync_skills),
         ("check-skills", cmd_check_skills),
         ("bootstrap", cmd_bootstrap),
+        ("package-smoke", cmd_package_smoke),
     ]:
         sp = sub.add_parser(name)
         sp.set_defaults(func=fn)
     test = sub.add_parser("test")
     test.add_argument("pytest_args", nargs=argparse.REMAINDER)
     test.set_defaults(func=cmd_test)
+    test_suite = sub.add_parser("test-suite")
+    test_suite.add_argument("suite", choices=TEST_SUITE_NAMES)
+    test_suite.add_argument("pytest_args", nargs=argparse.REMAINDER)
+    test_suite.set_defaults(func=cmd_test_suite)
     smoke = sub.add_parser("smoke")
     smoke.add_argument("--material", default="hopg")
     smoke.add_argument("--output-dir", default="smoke_out")

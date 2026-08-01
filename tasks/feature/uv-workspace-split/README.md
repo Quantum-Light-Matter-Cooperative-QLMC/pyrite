@@ -60,26 +60,26 @@ on accidental shared-site-packages behavior.
 
 ## Checklist
 
-- [ ] Record baseline install artifacts, dependency groups, import graph,
+- [x] Record baseline install artifacts, dependency groups, import graph,
       collection time, and representative core/CLI/app/full test runtimes.
-- [ ] Define explicit member boundaries and a one-way dependency DAG; list
+- [x] Define explicit member boundaries and a one-way dependency DAG; list
       every cross-boundary import and packaged-data owner.
-- [ ] Decide whether goal needs multiple published distributions, internal
+- [x] Decide whether goal needs multiple published distributions, internal
       workspace members, dependency groups, or only test partitioning.
-- [ ] Prototype root/member metadata and verify `uv lock`, root `uv sync`, and
+- [x] Prototype root/member metadata and verify `uv lock`, root `uv sync`, and
       `uv run --package <member>` behavior without committing source moves.
-- [ ] Add packaging smoke tests for clean wheels/editable installs, public
+- [x] Add packaging smoke tests for clean wheels/editable installs, public
       imports, data lookup, extras, and `cxr`/`cxr-dev` entry points.
-- [ ] Implement the smallest justified core/CLI split; keep analysis/apps
+- [x] Implement the smallest justified core/CLI split; keep analysis/apps
       together unless the decision gate supports a third member.
-- [ ] Reorganize tests into documented domain suites or equivalent stable
+- [x] Reorganize tests into documented domain suites or equivalent stable
       selectors; retain one full-suite command as release gate.
-- [ ] Map changed paths/members to focused `cxr-dev` and CI commands; ensure
+- [x] Map changed paths/members to focused `cxr-dev` and CI commands; ensure
       cross-member integration tests still run when boundaries change.
-- [ ] Update README/contributor/agent commands, generated CLI reference if its
+- [x] Update README/contributor/agent commands, generated CLI reference if its
       generation path changes, repository map, Docker/remote setup, and release
       configuration.
-- [ ] Re-measure install, collection, and test runtimes; document gains,
+- [x] Re-measure install, collection, and test runtimes; document gains,
       regressions, and remaining shared-environment limitations.
 
 ## Decisions and open questions
@@ -138,3 +138,50 @@ One integrating owner controls package moves and workspace metadata.
   match the final layout.
 - No numerical, checkpoint-schema, CLI-contract, or public-import regression.
 
+## Implemented decision and evidence (2026-08-01)
+
+Retain one publishable root `cxr-mc` distribution as sole owner of the
+`cxr_mc` namespace, bundled data, extras, and both console scripts. Add one
+internal, non-package `cxr-mc-tests` member with the only cross-member edge
+`cxr-mc-tests -> cxr-mc`. It owns pytest dependencies and explicit member test
+paths. Do not split CLI or apps into another wheel: core feeds results and
+drivers, CLI lazily spans drivers/remote/apps, and all data resolves through
+`cxr_mc.DATA_DIR`; shared namespace wheels would overwrite files/data while
+uv's shared environment would still provide no isolation. Durable rationale,
+commands, data ownership, and timing report:
+[`docs/development-workspace.md`](../../../docs/development-workspace.md).
+
+Implemented:
+
+- Workspace/member metadata and lockfile; no source/package move.
+- `cxr-dev test-suite {core,cli,apps,packaging}` partitions every test module
+  exactly once; a regression test enforces exhaustive non-overlap.
+  `integration` intentionally overlaps public boundaries.
+- `cxr-dev package-smoke` builds the wheel, checks namespace/data/extras/scripts,
+  and installs wheel and editable source into separate clean uv environments.
+- CI runs four focused jobs, a package job, and the full verify gate. Docker
+  selects the test member; remote sync selects runtime-only `cxr-mc`.
+- README, agent commands, docs navigation, repository map, and workspace guide
+  match the layout. `cxr` did not change; CLI reference/contract tests pass, so
+  generated CLI artifacts required no rewrite.
+
+Verification:
+
+- `uv lock --check`; clean root-only and test-member sync/run paths: pass.
+- Clean wheel/editable smoke: pass for `import cxr_mc`, packaged
+  `materials.toml`, extras metadata, `cxr`, and `cxr-dev`.
+- Domain suites: core 945 passed, 39 skipped, one exact sandbox-only
+  deselection; CLI 839 passed; apps 279 passed; packaging 173 passed.
+  Integration: 634 passed.
+- Final `cxr-dev verify` with only the sandbox-incompatible forkserver test
+  deselected: Ruff/ty pass; 2,237 passed, 39 skipped, 1 deselected in 85.10 s.
+- Outside restricted sandbox: all four `marimo check` paths and real
+  `cxr app analysis --smoke` pass.
+- Strict Sphinx renders the new page but remains red on 11 pre-existing
+  repository warnings; none points at this guide.
+- Tokensave served `main` because the branch is unindexed; live inspection
+  verified results. Context/affected queries saved about 15,792 tokens.
+
+No numerical, physics, checkpoint-schema, public-import, or `cxr` CLI behavior
+changed. No speed/isolation claim: warm-cache measurements are recorded but not
+causally attributed to workspace metadata.

@@ -38,13 +38,14 @@ WORKDIR /app
 # 1) Install dependencies from the lockfile first, so this heavy layer is cached
 #    and only re-runs when pyproject.toml / uv.lock change.
 COPY pyproject.toml uv.lock README.md ./
+COPY packages/cxr-mc-tests/pyproject.toml packages/cxr-mc-tests/pyproject.toml
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-install-project
+    uv sync --frozen --no-install-project --package cxr-mc-tests
 
 # 2) Add the source and install the package itself (fast; re-runs on any edit).
 COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen
+    uv sync --frozen --package cxr-mc-tests
 
 # `uv run` is the entrypoint, so the container behaves like the local dev env:
 #   docker run cxr-mc                       -> cxr --help            (CMD below)

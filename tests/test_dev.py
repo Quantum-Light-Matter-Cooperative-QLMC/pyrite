@@ -90,6 +90,36 @@ def test_test_forwards_pytest_arguments_when_option_comes_first(dev_module, monk
     assert calls[0].pytest_args == ["-k", "forward", "-vv"]
 
 
+def test_domain_suites_partition_every_test_module_once(dev_module) -> None:
+    all_tests = set((dev_module.ROOT / "tests").glob("test_*.py"))
+    selected = [
+        path
+        for suite in ("core", "cli", "apps", "packaging")
+        for path in dev_module.test_files_for_suite(suite)
+    ]
+
+    assert set(selected) == all_tests
+    assert len(selected) == len(set(selected))
+
+
+def test_test_suite_forwards_stable_paths_and_pytest_arguments(dev_module, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+
+    args = dev_module.build_parser().parse_args(["test-suite", "integration", "-k", "export"])
+    args.func(args)
+
+    assert calls == [
+        (
+            "-m",
+            "pytest",
+            *[f"tests/{name}" for name in dev_module.INTEGRATION_TESTS],
+            "-k",
+            "export",
+        )
+    ]
+
+
 def test_verify_runs_checks_in_required_order(dev_module, monkeypatch) -> None:
     calls = []
     for name in ("cmd_check_skills", "cmd_lint", "cmd_typecheck", "cmd_test"):
@@ -118,6 +148,15 @@ def test_smoke_forwards_material_and_output_directory(dev_module, monkeypatch) -
             "/tmp/cxr-mc-smoke",
         )
     ]
+
+
+def test_package_smoke_uses_repository_script(dev_module, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+
+    dev_module.cmd_package_smoke(Namespace())
+
+    assert calls == [(str(dev_module.ROOT / "scripts" / "package_smoke.py"),)]
 
 
 def test_repo_map_groups_present_vendor_directories_as_agent_tooling(dev_module, capsys) -> None:

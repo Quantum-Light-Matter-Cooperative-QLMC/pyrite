@@ -84,7 +84,7 @@ def _uv_sync_block(once: bool = False) -> str:
     dependency bump)."""
     sync = f"""uv_sync_start_ns=$(date +%s%N)
 uv_sync_rc=0
-{config.shell_remote_uv()} sync --extra {config.remote_gpu_vendor()} >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
+{config.shell_remote_uv()} sync --package cxr-mc --no-dev --extra {config.remote_gpu_vendor()} >> "$JOBDIR/log" 2>&1 || uv_sync_rc=$?
 uv_sync_elapsed_ms=$((($(date +%s%N) - uv_sync_start_ns) / 1000000))
 printf 'timing: uv sync %d.%03d s\\n' \
   "$((uv_sync_elapsed_ms / 1000))" "$((uv_sync_elapsed_ms % 1000))" >> "$JOBDIR/log"

@@ -67,5 +67,6 @@ validation/*
 :caption: API reference
 :maxdepth: 2
 
-api
+   api
+   development-workspace
 ```
