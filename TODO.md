@@ -25,7 +25,11 @@ must remain until moved into a task file. Edit and drop items on `main`.
    [`tasks/feature/cli-surface-simplification/`](tasks/feature/cli-surface-simplification/).
 ## P0 - >user< To be Triaged
 
-1. Fix broken materials project query (requires .env file with MP API Key)
+1. **Repair Materials Project query workflow.** Define secure local
+   `MP_API_KEY` configuration, restore a provenance-bearing retrieval path, and
+   keep catalog/runtime imports offline; add mocked failure-path coverage. →
+   `feature/materials-project-query`;
+   [`tasks/feature/materials-project-query/`](tasks/feature/materials-project-query/).
 2. Set up comparisons/param sweeps to analyze effect of longitudinal bunch length & transverse bunch size on coherent bunching for otherwise identical bunch parameters
    1. tilted bunch front? maybe dumb, maybe easier way to get coherent enhancement?
 3. Improve support for other shells/operating systems outside of WSL (especially agent hooks which run automatically)
