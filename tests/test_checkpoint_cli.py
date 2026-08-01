@@ -54,3 +54,15 @@ def test_checkpoint_prune_dispatches_existing_handler(monkeypatch):
 
     assert_clean_result(result)
     assert seen == {"all_profiles": False, "catalog_profile": "sub_100keV", "yes": True}
+
+
+def test_hidden_top_level_checkpoint_alias_warns_once(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(reline, "_cli", lambda args: seen.update(vars(args)))
+
+    result = invoke(root_command, ["reline", "hopg"])
+
+    assert result.exit_code == 0
+    assert result.stderr.count("is deprecated") == 1
+    assert "use 'cxr checkpoint recompute line'" in result.stderr
+    assert seen["material"] == ["hopg"]

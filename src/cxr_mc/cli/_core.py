@@ -103,12 +103,14 @@ class LazyGroup(click.Group):
         lazy_commands: Mapping[str, str] | None = None,
         lazy_help: Mapping[str, str] | None = None,
         lazy_hidden: Sequence[str] = (),
+        lazy_deprecated: Mapping[str, str] | None = None,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
         self.lazy_commands = dict(lazy_commands or {})
         self.lazy_help = dict(lazy_help or {})
         self.lazy_hidden = frozenset(lazy_hidden)
+        self.lazy_deprecated = dict(lazy_deprecated or {})
 
     def list_commands(self, ctx: click.Context) -> list[str]:
         eager = super().list_commands(ctx)
@@ -126,6 +128,20 @@ class LazyGroup(click.Group):
             command = copy(command)
             command.hidden = True
         return command
+
+    def resolve_command(
+        self, ctx: click.Context, args: list[str]
+    ) -> tuple[str | None, click.Command | None, list[str]]:
+        help_requested = any(arg in self.get_help_option_names(ctx) for arg in args)
+        cmd_name, command, remaining = super().resolve_command(ctx, args)
+        replacement = self.lazy_deprecated.get(cmd_name or "")
+        if replacement is not None and not help_requested:
+            click.echo(
+                f"warning: '{ctx.command_path} {cmd_name}' is deprecated; "
+                f"use '{replacement}'",
+                err=True,
+            )
+        return cmd_name, command, remaining
 
     def format_commands(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
         """Render root summaries without importing lazy command modules."""
