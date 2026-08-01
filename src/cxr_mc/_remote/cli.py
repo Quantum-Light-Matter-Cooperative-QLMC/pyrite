@@ -126,17 +126,21 @@ def _selected_materials(args, attribute):
 
 
 def _profile_default_materials(catalog_profile):
-    """A non-standard profile's explicit ``materials`` membership, or ``None``
-    when the profile has no membership row (implicit all-in-use -- the caller
-    falls through to requiring ``--all``/explicit materials, since there is no
-    narrower campaign list to default to). Also raises the usual
-    unknown-profile usage error via ``validate_catalog_profile`` -- an empty
-    material list never triggers its membership check, only its name check."""
-    from ..materials import CATALOG
-    from ..scan import validate_catalog_profile
+    """Resolve a profile's explicit membership or implicit in-use manifest."""
+    from ..scan import resolve_profile_materials
 
-    validate_catalog_profile(catalog_profile, [], intersect=False)
-    return CATALOG.profile_materials(catalog_profile)
+    return resolve_profile_materials(catalog_profile)
+
+
+def _profile_selected_materials(catalog_profile, materials):
+    """Resolve profile defaults or validate an explicit narrowing selection."""
+    if not materials:
+        return _profile_default_materials(catalog_profile)
+
+    from ..scan import validate_catalog_profile, validate_materials
+
+    validate_materials(materials)
+    return validate_catalog_profile(catalog_profile, materials, intersect=False)
 
 
 def _start_selected(args):
@@ -996,19 +1000,27 @@ def reap_command(min_age_minutes, yes):
 @click.argument(
     "material",
     nargs=-1,
-    metavar="[STEM|MATERIAL@PROFILE]...",
+    metavar="[PROFILE|STEM|MATERIAL@PROFILE]...",
     shell_complete=_cli_completion.complete_remote_checkpoint_stem,
 )
 @click.option("-a", "--all", "all_", is_flag=True, help="Pull every configured material.")
+@click.option(
+    "-m",
+    "--material",
+    "narrow_materials",
+    multiple=True,
+    metavar="MATERIAL",
+    shell_complete=_cli_completion.complete_material,
+    help="Narrow positional PROFILE or --profile to MATERIAL; repeatable.",
+)
 @click.option(
     "--profile",
     "catalog_profile",
     default=None,
     metavar="NAME",
     help=(
-        "Pull each member material's checkpoint for this catalog profile "
-        "(MATERIAL@PROFILE for every member; with explicit MATERIALs, "
-        "qualifies just those). Mutually exclusive with --all."
+        "Alias for positional PROFILE. Pull its explicit members, or the in-use "
+        "manifest when membership is implicit; -m/--material narrows it."
     ),
 )
 @click.option(
@@ -1023,7 +1035,7 @@ def reap_command(min_age_minutes, yes):
     "--full",
     "full_",
     is_flag=True,
-    help="Pull full unfiltered checkpoint (default: grid-filtered).",
+    help="Default is grid-filtered; pull full unfiltered checkpoint.",
 )
 @click.option("--drop-wide-brem", is_flag=True, help="With grid pull, drop wide-brem.")
 @click.option("--downcast", is_flag=True, help="With grid pull, downcast to float32.")
@@ -1048,6 +1060,7 @@ def reap_command(min_age_minutes, yes):
 def pull_command(
     material,
     all_,
+    narrow_materials,
     catalog_profile,
     hash_prefix,
     full_,
@@ -1061,22 +1074,39 @@ def pull_command(
     json_output,
 ):
     materials = list(material)
+    narrowed = list(narrow_materials)
+    if catalog_profile is None:
+        from ..materials import CATALOG
+
+        if materials and materials[0] in CATALOG.profile_names:
+            catalog_profile = materials.pop(0)
+        elif narrowed and materials:
+            if len(materials) != 1:
+                raise click.UsageError(
+                    "-m/--material takes one positional PROFILE or --profile NAME"
+                )
+            catalog_profile = materials.pop(0)
+        elif narrowed:
+            catalog_profile = "standard"
     if catalog_profile is not None:
         if all_:
-            raise click.UsageError(
-                "pull --profile already selects the profile's materials; drop --all"
+            emit_diagnostic(
+                "warning: pull profile already selects its materials; ignoring --all"
             )
+            all_ = False
+        if materials and narrowed:
+            raise click.UsageError(
+                "use positional material names or -m/--material to narrow, not both"
+            )
+        materials = narrowed or materials
         if any("@" in m for m in materials):
             raise click.UsageError(
-                "--profile qualifies bare material names; drop the @PROFILE selector"
+                "PROFILE qualifies bare material names; drop the @PROFILE selector"
             )
-        selected = materials or _profile_default_materials(catalog_profile)
-        if not selected:
-            raise click.UsageError(
-                f"profile {catalog_profile!r} has no explicit material membership; "
-                "name materials alongside --profile, or use --all"
-            )
+        selected = _profile_selected_materials(catalog_profile, materials)
         materials = [f"{m}@{catalog_profile}" for m in selected]
+    elif narrowed:
+        raise click.UsageError("-m/--material requires a PROFILE")
     _reject_all_with_values("pull", all_, materials)
     if brem_only and line_only:
         raise click.UsageError("--brem-only and --line-only are mutually exclusive")

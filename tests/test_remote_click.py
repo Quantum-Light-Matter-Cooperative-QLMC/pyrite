@@ -283,8 +283,9 @@ def test_run_profile_with_membership_defaults_materials(monkeypatch):
     assert calls[0][1]["catalog_profile"] == "sub_100keV"
 
 
-def test_run_profile_without_membership_uses_all_catalog_materials(monkeypatch):
+def test_run_profile_without_membership_uses_manifest_materials(monkeypatch):
     import cxr_mc.materials as materials_pkg
+    import cxr_mc.scan as scan
 
     class _FakeCatalog:
         profile_names = ("standard", "sub_100keV")
@@ -294,6 +295,7 @@ def test_run_profile_without_membership_uses_all_catalog_materials(monkeypatch):
             return None
 
     monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+    monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg"])
     calls = []
     monkeypatch.setattr(
         lifecycle,
@@ -304,7 +306,7 @@ def test_run_profile_without_membership_uses_all_catalog_materials(monkeypatch):
     result = invoke(remote.command, ["run", "sub_100keV", "--headless"])
 
     assert_clean_result(result)
-    assert calls[0][0] == ["mose2", "hopg"]
+    assert calls[0][0] == ["hopg"]
 
 
 def test_pull_hash_option_dispatches_and_requires_one_qualified_selector(monkeypatch):
@@ -409,6 +411,31 @@ def test_stop_profile_dispatches_and_rejects_combinations(monkeypatch):
     assert "--profile" in bare.stderr
 
 
+def test_clear_implicit_profile_uses_manifest_materials(monkeypatch):
+    import cxr_mc.materials as materials_pkg
+    import cxr_mc.scan as scan
+
+    class _FakeCatalog:
+        profile_names = ("standard",)
+
+        def profile_materials(self, _name):
+            return None
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+    monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg", "hbn"])
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "clear_remote",
+        lambda materials, yes, **kwargs: calls.append((materials, yes, kwargs)),
+    )
+
+    result = invoke(remote.command, ["clear", "--profile", "standard"])
+
+    assert_clean_result(result)
+    assert calls == [(["hopg", "hbn"], False, {"catalog_profile": "standard"})]
+
+
 def test_pull_profile_expands_membership_to_qualified_selectors(monkeypatch):
     import cxr_mc.materials as materials_pkg
 
@@ -427,6 +454,29 @@ def test_pull_profile_expands_membership_to_qualified_selectors(monkeypatch):
     )
 
     result = invoke(remote.command, ["pull", "--profile", "sub_100keV"])
+
+    assert_clean_result(result)
+    assert calls[0][0] == ["hopg@sub_100keV", "mose2@sub_100keV"]
+
+
+def test_pull_positional_profile_expands_membership(monkeypatch):
+    import cxr_mc.materials as materials_pkg
+
+    class _FakeCatalog:
+        profile_names = ("standard", "sub_100keV")
+
+        def profile_materials(self, _name):
+            return ("hopg", "mose2")
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "pull",
+        lambda materials, **kwargs: calls.append((materials, kwargs)),
+    )
+
+    result = invoke(remote.command, ["pull", "sub_100keV"])
 
     assert_clean_result(result)
     assert calls[0][0] == ["hopg@sub_100keV", "mose2@sub_100keV"]
@@ -455,16 +505,18 @@ def test_pull_profile_qualifies_explicit_materials(monkeypatch):
     assert calls[0][0] == ["hopg@sub_100keV"]
 
     with_all = invoke(remote.command, ["pull", "--all", "--profile", "sub_100keV"])
-    assert with_all.exit_code == 2
-    assert "drop --all" in with_all.stderr
+    assert with_all.exit_code == 0
+    assert "warning:" in with_all.stderr
+    assert "ignoring --all" in with_all.stderr
 
     with_selector = invoke(remote.command, ["pull", "hopg@sub_100keV", "--profile", "sub_100keV"])
     assert with_selector.exit_code == 2
     assert "drop the @PROFILE selector" in with_selector.stderr
 
 
-def test_pull_profile_without_membership_needs_explicit_materials(monkeypatch):
+def test_pull_profile_without_membership_uses_manifest_materials(monkeypatch):
     import cxr_mc.materials as materials_pkg
+    import cxr_mc.scan as scan
 
     class _FakeCatalog:
         profile_names = ("standard", "sub_100keV")
@@ -473,8 +525,55 @@ def test_pull_profile_without_membership_needs_explicit_materials(monkeypatch):
             return None
 
     monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+    monkeypatch.setattr(scan, "load_all_materials", lambda: ["mose2", "hopg"])
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "pull",
+        lambda materials, **kwargs: calls.append((materials, kwargs)),
+    )
 
     result = invoke(remote.command, ["pull", "--profile", "sub_100keV"])
 
+    assert_clean_result(result)
+    assert calls[0][0] == ["mose2@sub_100keV", "hopg@sub_100keV"]
+
+
+def test_pull_material_option_narrows_positional_profile(monkeypatch):
+    import cxr_mc.materials as materials_pkg
+
+    class _FakeCatalog:
+        profile_names = ("standard", "sub_100keV")
+
+        def profile_materials(self, _name):
+            return ("hopg", "mose2")
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "pull",
+        lambda materials, **kwargs: calls.append((materials, kwargs)),
+    )
+
+    result = invoke(remote.command, ["pull", "sub_100keV", "-m", "hopg"])
+
+    assert_clean_result(result)
+    assert calls[0][0] == ["hopg@sub_100keV"]
+
+
+def test_pull_material_option_rejects_material_outside_profile(monkeypatch):
+    import cxr_mc.materials as materials_pkg
+
+    class _FakeCatalog:
+        profile_names = ("standard", "sub_100keV")
+
+        def profile_materials(self, _name):
+            return ("hopg",)
+
+    monkeypatch.setattr(materials_pkg, "CATALOG", _FakeCatalog())
+
+    result = invoke(remote.command, ["pull", "sub_100keV", "-m", "hbn"])
+
     assert result.exit_code == 2
-    assert "no explicit material membership" in result.stderr
+    assert "profile 'sub_100keV' does not include hbn" in result.stderr

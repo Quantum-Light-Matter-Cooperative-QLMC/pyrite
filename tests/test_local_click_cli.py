@@ -363,7 +363,7 @@ def test_run_explicit_material_outside_profile_is_usage_error(monkeypatch):
     assert "hopg" in result.stderr
 
 
-def test_resolve_profile_materials_uses_profile_or_catalog_order(monkeypatch):
+def test_resolve_profile_materials_uses_profile_or_manifest_order(monkeypatch):
     import cxr_mc.materials as materials_pkg
 
     monkeypatch.setattr(
@@ -375,8 +375,9 @@ def test_resolve_profile_materials_uses_profile_or_catalog_order(monkeypatch):
             material_keys=("mos2", "hopg"),
         ),
     )
+    monkeypatch.setattr(scan, "load_all_materials", lambda: ["hopg", "mos2"])
 
-    assert scan.resolve_profile_materials("standard") == ["mos2", "hopg"]
+    assert scan.resolve_profile_materials("standard") == ["hopg", "mos2"]
     assert scan.resolve_profile_materials("narrowed") == ["hopg"]
     assert scan.resolve_profile_materials("narrowed", "hopg") == ["hopg"]
 

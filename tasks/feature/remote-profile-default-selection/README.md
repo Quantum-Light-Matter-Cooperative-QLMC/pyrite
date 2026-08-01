@@ -68,15 +68,15 @@ symptoms of the same missing default.
 
 ## Stepwise checklist
 
-- [ ] Write the profile→materials resolution rule (explicit `[materials]` → that
+- [x] Write the profile→materials resolution rule (explicit `[materials]` → that
       list; implicit → in-use set; `-m/--material` narrows; `--all` per decided
       rule; positional PROFILE accepted).
-- [ ] Implement in `pull_command` + `_profile_default_materials` (positional
+- [x] Implement in `pull_command` + `_profile_default_materials` (positional
       PROFILE + warn-and-ignore `--profile`/`--all`).
-- [ ] Apply the same rule to the `run` path (P0 #9, in scope).
-- [ ] Sweep sibling remote commands (`clear`, `stop`) for consistency.
-- [ ] Update help text; regenerate `docs/cli-reference.md`.
-- [ ] Update/extend CLI contract tests (see `scripts/freeze_cli_contract.py`,
+- [x] Apply the same rule to the `run` path (P0 #9, in scope).
+- [x] Sweep sibling remote commands (`clear`, `stop`) for consistency.
+- [x] Update help text; regenerate `docs/cli-reference.md`.
+- [x] Update/extend CLI contract tests (see `scripts/freeze_cli_contract.py`,
       `tests/` remote-CLI coverage).
 
 ## Decided rules
@@ -91,14 +91,24 @@ symptoms of the same missing default.
   current hard error — the profile already selects its materials.
 - **`-m/--material` narrows** within the selected profile.
 
-## Open questions
+## Resolved questions
 
 - Backward compat for existing scripts using `--profile X --all`: the decided
-  rule is warn-and-ignore (not error) — confirm no automation parses that exact
-  error string.
+  rule is warn-and-ignore (not error), frozen as an intentional P0 contract
+  correction.
 - For an implicit-membership profile (`standard`), "the profile's materials" =
-  the in-use manifest (what `--all` loads today). Confirm that is the intended
-  default set for `standard` on both `run` and `pull` (ties to P0 #9).
+  the in-use manifest (what `--all` loads today) for both `run` and `pull`.
+- `clear --profile` shares the same resolver. `stop --profile` remains a
+  scheduler-job metadata filter, so material-membership narrowing does not
+  apply.
+
+## Verification evidence
+
+- Neighboring remote/Click/completion/reference/contract suites: 578 passed.
+- Lint, typecheck, generated-file checks, and `git diff --check` passed.
+- Full verify: 2214 passed, 39 skipped; its two environment-only failures pass
+  focused with writable `NUMBA_CACHE_DIR` and outside sandbox forkserver
+  restrictions.
 
 ## Delegation slices & required skills
 
