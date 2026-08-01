@@ -53,6 +53,11 @@ def _read_case_manifest(path: Path) -> _CaseManifest:
     keys: set[str] = set()
     for index, case in enumerate(cases):
         key = case.get("content_key") if isinstance(case, dict) else None
+        if not isinstance(key, str):
+            raise _cli_core.CLIError(
+                f"cannot safely clear: invalid manifest {path}: "
+                f"cases[{index}].content_key is not a SHA-256 digest"
+            )
         try:
             keys.add(_checkpoint_store._validate_content_key(key))
         except (TypeError, ValueError):
