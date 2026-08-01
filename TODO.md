@@ -100,6 +100,7 @@ file. Edit and drop items on `main`.
 5. **Local checkpoint clearing.** Add a local equivalent of `cxr remote clear`
    for deleting local checkpoint pickles with matching behavior.
 6. **CPU Performance Flag** Add an optional flag (-c/--cpu) that enables CPU performance profiling, and a second (mutually exclusive) --cpu-only flag which ONLY profiles the CPU. This is because the CPU profiling is really slow, generally. Additionally, the current funcitonality launches the combined CPU/GPU profile first, which works normally, but after that finishes it starts the CPU-only task which is not properly tracked by the prgress dashboard (bug).
+7. **Block command name reuse as object names** Maybe already implemented, but it seems a possibility that a user might unintentionally name a profile or some other object one of the command names unintentionally when misusing it, e.g., `cxr profile create set hopg` might create a profile named 'set'. Seems an easy-ish thing to just block outright, no duplicating command names to avoid confusion. Low priority.
 
 ## Long-term plans
 
