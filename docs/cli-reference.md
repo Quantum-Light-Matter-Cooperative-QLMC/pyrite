@@ -648,7 +648,7 @@ Options:
 ## `cxr remote pull`
 
 ```text
-Usage: cxr remote pull [OPTIONS] [STEM|MATERIAL@PROFILE]...
+Usage: cxr remote pull [OPTIONS] [PROFILE|STEM|MATERIAL@PROFILE]...
 
   Fetch existing checkpoints from remote box.
 
@@ -659,22 +659,25 @@ Usage: cxr remote pull [OPTIONS] [STEM|MATERIAL@PROFILE]...
   exists.
 
 Options:
-  -a, --all         Pull every configured material.
-  --profile NAME    Pull each member material's checkpoint for this catalog profile
-                    (MATERIAL@PROFILE for every member; with explicit MATERIALs,
-                    qualifies just those). Mutually exclusive with --all.
-  --hash HEXPREFIX  Pin one MATERIAL@PROFILE selector to a parameter-hash prefix.
-  -f, --full        Pull full unfiltered checkpoint (default: grid-filtered).
-  --drop-wide-brem  With grid pull, drop wide-brem.
-  --downcast        With grid pull, downcast to float32.
-  --level9          Recompress remotely at gzip level 9.
-  --no-sync         With grid pull, skip code sync.
-  --brem-only       Merge only brem arrays locally; mutually exclusive with --line-only.
-  --line-only       Merge only line spectra locally; mutually exclusive with --brem-
-                    only.
-  --force           With partial merge, insert records absent locally.
-  --json            Emit one versioned JSON object.
-  -h, --help        Show this message and exit.
+  -a, --all                Pull every configured material.
+  -m, --material MATERIAL  Narrow positional PROFILE or --profile to MATERIAL;
+                           repeatable.
+  --profile NAME           Alias for positional PROFILE. Pull its explicit members, or
+                           the in-use manifest when membership is implicit;
+                           -m/--material narrows it.
+  --hash HEXPREFIX         Pin one MATERIAL@PROFILE selector to a parameter-hash prefix.
+  -f, --full               Default is grid-filtered; pull full unfiltered checkpoint.
+  --drop-wide-brem         With grid pull, drop wide-brem.
+  --downcast               With grid pull, downcast to float32.
+  --level9                 Recompress remotely at gzip level 9.
+  --no-sync                With grid pull, skip code sync.
+  --brem-only              Merge only brem arrays locally; mutually exclusive with
+                           --line-only.
+  --line-only              Merge only line spectra locally; mutually exclusive with
+                           --brem-only.
+  --force                  With partial merge, insert records absent locally.
+  --json                   Emit one versioned JSON object.
+  -h, --help               Show this message and exit.
 ```
 
 ## `cxr remote reap`

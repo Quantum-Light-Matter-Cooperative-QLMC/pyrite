@@ -19,6 +19,14 @@ from cxr_mc import cli
 SCHEMA_VERSION = 1
 INTENTIONAL_P0_CORRECTIONS = [
     {
+        "id": "remote-profile-default-selection",
+        "paths": ["remote pull"],
+        "contract": (
+            "Positional PROFILE and --profile resolve explicit membership or the in-use "
+            "manifest; -m/--material narrows, and redundant --all warns then is ignored."
+        ),
+    },
+    {
         "id": "remote-input-validation",
         "paths": ["remote"],
         "contract": (

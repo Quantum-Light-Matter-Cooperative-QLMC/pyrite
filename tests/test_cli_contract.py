@@ -66,7 +66,7 @@ def _node_options(node):
 def test_frozen_click_contract_records_current_tree():
     assert _FROZEN["schema_version"] == 1
     assert len(list(_help_cases(_FROZEN["root"]))) < 120
-    assert len(_FROZEN["intentional_p0_corrections"]) == 9
+    assert len(_FROZEN["intentional_p0_corrections"]) == 10
 
 
 @pytest.mark.parametrize(

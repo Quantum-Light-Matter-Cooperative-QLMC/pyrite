@@ -200,7 +200,13 @@ def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
 def test_remote_checkpoint_completion_includes_variant_stems():
     values = _values(_cli_completion.complete_remote_checkpoint_stem(None, None, "hopg"))
 
-    assert values == ["hopg", "hopg_blazed", "hopg_quick"]
+    assert {"hopg", "hopg_blazed", "hopg_quick"} <= set(values)
+
+
+def test_remote_checkpoint_completion_includes_positional_profiles():
+    values = _values(_cli_completion.complete_remote_checkpoint_stem(None, None, "standard"))
+
+    assert values == ["standard"]
 
 
 def test_line_grid_wires_safe_completion_but_not_stop_target():

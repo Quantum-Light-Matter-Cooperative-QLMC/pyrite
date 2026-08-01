@@ -1,6 +1,13 @@
 {
   "intentional_p0_corrections": [
     {
+      "contract": "Positional PROFILE and --profile resolve explicit membership or the in-use manifest; -m/--material narrows, and redundant --all warns then is ignored.",
+      "id": "remote-profile-default-selection",
+      "paths": [
+        "remote pull"
+      ]
+    },
+    {
       "contract": "Reject unsafe host, remote directory, executable, SSH/SCP word, Bash payload, and SBATCH directive inputs before crossing process boundaries.",
       "id": "remote-input-validation",
       "paths": [
@@ -89,7 +96,7 @@
         "required": false
       }
     ],
-    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Manage coherent X-ray radiation simulation campaigns.\n\n  Start with a named profile: it defines campaign ranges, workloads, and\n  material membership. Then run campaigns, inspect checkpoints, or open analysis\n  notebooks.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr profile list\n    cxr profile show sub_100keV\n    cxr run sub_100keV -m hopg\n    cxr remote run sub_100keV --dry-run\n    cxr app analysis\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  run          Run a profile's MC sweeps and write checkpoints.\n  app          Launch or export interactive analysis notebooks.\n  checkpoint   Inspect, transform, recompute, archive, and prune checkpoints.\n  completion   Manage cxr shell tab-completion.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect, validate, edit, and blaze individual materials.\n",
+    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Manage coherent X-ray radiation simulation campaigns.\n\n  Start with a named profile: it defines campaign ranges, workloads, and\n  material membership. Then run campaigns, inspect checkpoints, or open analysis\n  notebooks.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr setup\n    cxr profile list\n    cxr profile show sub_100keV\n    cxr run sub_100keV -m hopg\n    cxr remote run sub_100keV --dry-run\n    cxr app analysis\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  run          Run a profile's MC sweeps and write checkpoints.\n  setup        Detect GPU hardware and write CXR_MC_BACKEND to .env (first run).\n  app          Launch or export interactive analysis notebooks.\n  checkpoint   Inspect, transform, recompute, archive, and prune checkpoints.\n  completion   Manage cxr shell tab-completion.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect, validate, edit, and blaze individual materials.\n",
     "hidden": false,
     "path": "",
     "subcommands": [
@@ -218,9 +225,18 @@
           },
           {
             "dest": "no_progress",
-            "help": "<SUPPRESS>",
+            "help": "Disable progress bars/dashboard.",
             "option_strings": [
               "--no-progress"
+            ],
+            "required": false
+          },
+          {
+            "dest": "verbose",
+            "help": "Increase dashboard detail.",
+            "option_strings": [
+              "-v",
+              "--verbose"
             ],
             "required": false
           },
@@ -241,9 +257,34 @@
             "required": false
           }
         ],
-        "help": "Usage: cxr run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to standard and owns material membership, campaign ranges,\n  and workload settings. Use -m/--material to run one profile member instead of\n  the full resolved membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL      Run one member of PROFILE instead of its full\n                               membership.\n  --workers NUMBER             run_cases max_workers (default auto; 0 = serial,\n                               no transport pool).\n  --quick                      Use tiny smoke-test grid and write\n                               <material>_quick.pkl.\n  --n-families NUMBER          Override positive dominant reflection-family\n                               count.\n  --checkpoint-dir DIR         Read and write checkpoint pickles in DIR.\n                               [default: checkpoints]\n  --max-minutes MINUTES        Soft wall-clock budget in minutes; exit 75 if\n                               resumable work remains.\n  -p, --perf                   Sample CPU pressure, RAM/swap, GPU clocks/VRAM,\n                               process-tree, phase timing, queue, case, worker,\n                               and chunk metrics for PROFILE's resolved\n                               membership into performance-\n                               profiles/PROFILE/<material>.ndjson\n                               (cxr.performance.v1). Combine with -m to profile\n                               a single member.\n  -i, --perf-interval SECONDS  Performance-telemetry sampling interval; requires\n                               -p/--perf.  [default: 5.0]\n  --spec-chunk N               Pin line-spectrum segments per GPU chunk;\n                               requires -p/--perf.\n  --brem-chunk N               Pin bremsstrahlung segments per GPU chunk;\n                               requires -p/--perf.\n  --nsys                       Capture one uncached Nsight Systems CUDA/NVTX\n                               trace of the run (writes a .nsys-rep next to the\n                               perf log); defaults to the profile's full\n                               membership (-m narrows to one member). Requires\n                               -p/--perf.\n  --fidelity [full|survey]     Named settings/grid-reduction policy. survey is\n                               provisional and reduced.  [default: full]\n  --json                       Emit one versioned JSON object on stdout.\n  -h, --help                   Show this message and exit.\n",
+        "help": "Usage: cxr run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to standard and owns material membership, campaign ranges,\n  and workload settings. Use -m/--material to run one profile member instead of\n  the full resolved membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL      Run one member of PROFILE instead of its full\n                               membership.\n  --workers NUMBER             run_cases max_workers (default auto; 0 = serial,\n                               no transport pool).\n  --quick                      Use tiny smoke-test grid and write\n                               <material>_quick.pkl.\n  --n-families NUMBER          Override positive dominant reflection-family\n                               count.\n  --checkpoint-dir DIR         Read and write checkpoint pickles in DIR.\n                               [default: checkpoints]\n  --max-minutes MINUTES        Soft wall-clock budget in minutes; exit 75 if\n                               resumable work remains.\n  -p, --perf                   Sample CPU pressure, RAM/swap, GPU clocks/VRAM,\n                               process-tree, phase timing, queue, case, worker,\n                               and chunk metrics for PROFILE's resolved\n                               membership into performance-\n                               profiles/PROFILE/<material>.ndjson\n                               (cxr.performance.v1). Combine with -m to profile\n                               a single member.\n  -i, --perf-interval SECONDS  Performance-telemetry sampling interval; requires\n                               -p/--perf.  [default: 5.0]\n  --spec-chunk N               Pin line-spectrum segments per GPU chunk;\n                               requires -p/--perf.\n  --brem-chunk N               Pin bremsstrahlung segments per GPU chunk;\n                               requires -p/--perf.\n  --nsys                       Capture one uncached Nsight Systems CUDA/NVTX\n                               trace of the run (writes a .nsys-rep next to the\n                               perf log); defaults to the profile's full\n                               membership (-m narrows to one member). Requires\n                               -p/--perf.\n  --no-progress                Disable progress bars/dashboard.\n  -v, --verbose                Increase dashboard detail.\n  --fidelity [full|survey]     Named settings/grid-reduction policy. survey is\n                               provisional and reduced.  [default: full]\n  --json                       Emit one versioned JSON object on stdout.\n  -h, --help                   Show this message and exit.\n",
         "hidden": false,
         "path": "run",
+        "subcommands": []
+      },
+      {
+        "actions": [
+          {
+            "dest": "yes",
+            "help": "Accept the top detected accelerator without an interactive prompt.",
+            "option_strings": [
+              "-y",
+              "--yes"
+            ],
+            "required": false
+          },
+          {
+            "dest": "force",
+            "help": "Re-run detection and overwrite an existing CXR_MC_BACKEND value in .env.",
+            "option_strings": [
+              "--force"
+            ],
+            "required": false
+          }
+        ],
+        "help": "Usage: cxr setup [OPTIONS]\n\n  Detect installed GPU hardware and write CXR_MC_BACKEND to repo-root .env.\n\n  Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-\n  ls/lspci) -- no vendor Python package (cupy, dpnp/dpctl) needs to be installed\n  first. Prompts interactively to opt into an accelerator; defaults to cpu if\n  none is detected, declined, or the session is non-interactive. A no-op once\n  CXR_MC_BACKEND is already set in .env, unless --force is given.\n\nOptions:\n  -y, --yes   Accept the top detected accelerator without an interactive prompt.\n  --force     Re-run detection and overwrite an existing CXR_MC_BACKEND value in\n              .env.\n  -h, --help  Show this message and exit.\n",
+        "hidden": false,
+        "path": "setup",
         "subcommands": []
       },
       {
@@ -1694,8 +1735,17 @@
                 "required": false
               },
               {
+                "dest": "narrow_materials",
+                "help": "Narrow positional PROFILE or --profile to MATERIAL; repeatable.",
+                "option_strings": [
+                  "-m",
+                  "--material"
+                ],
+                "required": false
+              },
+              {
                 "dest": "catalog_profile",
-                "help": "Pull each member material's checkpoint for this catalog profile (MATERIAL@PROFILE for every member; with explicit MATERIALs, qualifies just those). Mutually exclusive with --all.",
+                "help": "Alias for positional PROFILE. Pull its explicit members, or the in-use manifest when membership is implicit; -m/--material narrows it.",
                 "option_strings": [
                   "--profile"
                 ],
@@ -1711,7 +1761,7 @@
               },
               {
                 "dest": "full_",
-                "help": "Pull full unfiltered checkpoint (default: grid-filtered).",
+                "help": "Default is grid-filtered; pull full unfiltered checkpoint.",
                 "option_strings": [
                   "-f",
                   "--full"
@@ -1783,7 +1833,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote pull [OPTIONS] [STEM|MATERIAL@PROFILE]...\n\n  Fetch existing checkpoints from remote box.\n\n  STEM is usually a bare material name, but MATERIAL@PROFILE selects the\n  checkpoint the box produced for that catalog profile (--profile on `cxr remote\n  run`) -- on-disk names never carry the profile, so this reads each candidate's\n  meta.json remotely and pulls the newest match; --hash pins a specific\n  parameter-hash prefix when more than one exists.\n\nOptions:\n  -a, --all         Pull every configured material.\n  --profile NAME    Pull each member material's checkpoint for this catalog\n                    profile (MATERIAL@PROFILE for every member; with explicit\n                    MATERIALs, qualifies just those). Mutually exclusive with\n                    --all.\n  --hash HEXPREFIX  Pin one MATERIAL@PROFILE selector to a parameter-hash\n                    prefix.\n  -f, --full        Pull full unfiltered checkpoint (default: grid-filtered).\n  --drop-wide-brem  With grid pull, drop wide-brem.\n  --downcast        With grid pull, downcast to float32.\n  --level9          Recompress remotely at gzip level 9.\n  --no-sync         With grid pull, skip code sync.\n  --brem-only       Merge only brem arrays locally; mutually exclusive with\n                    --line-only.\n  --line-only       Merge only line spectra locally; mutually exclusive with\n                    --brem-only.\n  --force           With partial merge, insert records absent locally.\n  --json            Emit one versioned JSON object.\n  -h, --help        Show this message and exit.\n",
+            "help": "Usage: cxr remote pull [OPTIONS] [PROFILE|STEM|MATERIAL@PROFILE]...\n\n  Fetch existing checkpoints from remote box.\n\n  STEM is usually a bare material name, but MATERIAL@PROFILE selects the\n  checkpoint the box produced for that catalog profile (--profile on `cxr remote\n  run`) -- on-disk names never carry the profile, so this reads each candidate's\n  meta.json remotely and pulls the newest match; --hash pins a specific\n  parameter-hash prefix when more than one exists.\n\nOptions:\n  -a, --all                Pull every configured material.\n  -m, --material MATERIAL  Narrow positional PROFILE or --profile to MATERIAL;\n                           repeatable.\n  --profile NAME           Alias for positional PROFILE. Pull its explicit\n                           members, or the in-use manifest when membership is\n                           implicit; -m/--material narrows it.\n  --hash HEXPREFIX         Pin one MATERIAL@PROFILE selector to a parameter-hash\n                           prefix.\n  -f, --full               Default is grid-filtered; pull full unfiltered\n                           checkpoint.\n  --drop-wide-brem         With grid pull, drop wide-brem.\n  --downcast               With grid pull, downcast to float32.\n  --level9                 Recompress remotely at gzip level 9.\n  --no-sync                With grid pull, skip code sync.\n  --brem-only              Merge only brem arrays locally; mutually exclusive\n                           with --line-only.\n  --line-only              Merge only line spectra locally; mutually exclusive\n                           with --brem-only.\n  --force                  With partial merge, insert records absent locally.\n  --json                   Emit one versioned JSON object.\n  -h, --help               Show this message and exit.\n",
             "hidden": false,
             "path": "remote pull",
             "subcommands": []

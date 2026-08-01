@@ -118,11 +118,14 @@ def complete_remote_checkpoint_stem(
     param: object,
     incomplete: str,
 ) -> list[CompletionItem]:
-    """Complete predictable remote checkpoint stems without network access."""
+    """Complete positional profiles and predictable stems without network access."""
     del ctx, param
     keys = _material_keys()
     return _items(
-        (stem for key in keys for stem in (key, f"{key}_quick", f"{key}_blazed")),
+        (
+            *_profile_keys(),
+            *(stem for key in keys for stem in (key, f"{key}_quick", f"{key}_blazed")),
+        ),
         incomplete,
     )
 

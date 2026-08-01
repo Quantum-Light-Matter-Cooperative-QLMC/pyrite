@@ -674,7 +674,10 @@ def resolve_profile_materials(catalog_profile: str, material: str | None = None)
 
     Shared boundary contract for ``cxr run`` and ``cxr remote run``: ``-m``
     selects one profile member; omitting it selects the profile's explicit
-    membership, or every catalog material when membership is implicit.
+    ``materials`` membership, or the in-use manifest set (``mats_to_sim.toml``
+    ``materials`` -- what ``--all`` loads) when membership is implicit, e.g.
+    ``standard``. An implicit profile defaults to the campaign's in-use
+    subset, not the full catalog.
     """
     from .materials import CATALOG
 
@@ -683,7 +686,7 @@ def resolve_profile_materials(catalog_profile: str, material: str | None = None)
         materials = validate_catalog_profile(catalog_profile, [material], intersect=False)
     else:
         membership = CATALOG.profile_materials(catalog_profile)
-        materials = list(CATALOG.material_keys if membership is None else membership)
+        materials = list(membership) if membership is not None else load_all_materials()
     validate_materials(materials)
     return materials
 
