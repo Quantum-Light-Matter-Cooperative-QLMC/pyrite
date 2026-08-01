@@ -402,7 +402,7 @@ def command():
     """
 
 
-@command.command("analyze")
+@command.command("analyze", hidden=True)
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @click.option(
     "--performance-dir",
@@ -420,30 +420,14 @@ def command():
     help="Expected sampling period; intervals over twice this value are gaps.",
 )
 def analyze_command(name, performance_dir, sample_period):
-    """Analyze NAME's performance logs into CSV, Markdown, and PNG artifacts."""
-    from cxr_mc.performance_analysis import (
-        PerformanceAnalysisError,
-        analyze_performance_profile,
+    """Deprecated compatibility alias for ``performance analyze``."""
+    _warn_compat(
+        f"cxr profile analyze {name}",
+        f"cxr performance analyze {name}",
     )
+    from cxr_mc.cli.performance import analyze
 
-    try:
-        result = analyze_performance_profile(
-            name,
-            performance_dir,
-            sample_period=sample_period,
-        )
-    except (OSError, PerformanceAnalysisError) as exc:
-        raise CLIError(str(exc)) from None
-    emit_result(
-        f"analyzed {result['sessions']} sessions ({result['intervals']} intervals) "
-        f"-> {result['analysis_root']}"
-    )
-    if result["incomplete_sessions"]:
-        click.echo(
-            f"warning: {result['incomplete_sessions']} incomplete session(s)",
-            err=True,
-        )
-    return 0
+    return analyze(name, performance_dir, sample_period)
 
 
 @command.command("list")

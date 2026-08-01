@@ -6,7 +6,7 @@ import json
 import pytest
 
 from cxr_mc import performance_analysis
-from cxr_mc.cli import profile
+from cxr_mc.cli import performance, profile
 from tests.cli_helpers import assert_clean_result, invoke
 
 
@@ -231,6 +231,28 @@ def test_profile_analyze_cli(tmp_path):
 
     result = invoke(
         profile.command,
+        [
+            "analyze",
+            "baseline",
+            "--performance-dir",
+            str(tmp_path / "performance-profiles"),
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert result.stderr.count("is deprecated") == 1
+    assert "cxr performance analyze baseline" in result.stderr
+    assert "analyzed 1 sessions (2 intervals)" in result.stdout
+
+
+def test_performance_analyze_cli(tmp_path):
+    _write_profile(
+        tmp_path,
+        [_record(0, "start"), _record(5, "tick"), _record(10, "done")],
+    )
+
+    result = invoke(
+        performance.command,
         [
             "analyze",
             "baseline",
