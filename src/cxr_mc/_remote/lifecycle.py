@@ -333,6 +333,8 @@ def start_queue(
     spec_chunk=None,
     brem_chunk=None,
     nsys=False,
+    cpu=False,
+    cpu_only=False,
 ):
     """Submit a material queue to SLURM. Returns its job id.
 
@@ -357,7 +359,8 @@ def start_queue(
     are experiment samples, not resumable production checkpoints.
 
     ``nsys`` wraps one uncached single-material session with Nsight Systems and
-    stores its CUDA/NVTX trace beside the performance NDJSON.
+    stores its CUDA/NVTX trace beside the performance NDJSON. ``cpu`` appends a
+    bounded serial cProfile phase; ``cpu_only`` runs that phase alone.
     """
     transport._check_materials(materials)
     transport._check_shell_tokens(
@@ -378,10 +381,23 @@ def start_queue(
         or spec_chunk is not None
         or brem_chunk is not None
         or nsys
+        or cpu
+        or cpu_only
     ):
         raise SystemExit(
-            "performance repetitions, interval, chunk pins, and nsys require a performance profile"
+            "performance repetitions, interval, chunk pins, nsys, and CPU profiling "
+            "require a performance profile"
         )
+    if cpu and cpu_only:
+        raise SystemExit("cpu and cpu-only modes are mutually exclusive")
+    if cpu_only and nsys:
+        raise SystemExit("cpu-only mode cannot be combined with nsys")
+    if cpu_only and performance_repetitions != 1:
+        raise SystemExit("cpu-only mode cannot use performance repetitions")
+    if cpu_only and performance_interval != 5.0:
+        raise SystemExit("cpu-only mode cannot set the performance sampling interval")
+    if cpu_only and (spec_chunk is not None or brem_chunk is not None):
+        raise SystemExit("cpu-only mode cannot set GPU chunk pins")
     if performance_repetitions > 1 and chunked:
         raise SystemExit("performance repetitions require a monolithic allocation")
     if performance_repetitions > 1 and parallel_materials not in (None, 1):
@@ -394,12 +410,14 @@ def start_queue(
         raise SystemExit("nsys requires one material process per GPU")
     if nsys and len(materials) != 1:
         raise SystemExit("nsys requires exactly one material")
+    if (cpu or cpu_only) and chunked:
+        raise SystemExit("CPU profiling requires a monolithic allocation")
     if chunked and parallel_materials is not None:
         raise SystemExit(
             "--parallel-materials only applies to a monolithic allocation; "
             "pass --chunk-minutes 0 to use it"
         )
-    if not dry_run:
+    if not dry_run and not cpu_only:
         _refuse_if_busy(materials, quick)
     if catalog_profile != "standard":
         # a profile submit is named after the profile: readable, and the same
@@ -412,7 +430,11 @@ def start_queue(
     else:
         jobid = scripts._new_jobid()
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
-    stems = scripts._stems(materials, quick, fidelity, high_energy_min_kev, catalog_profile)
+    stems = (
+        []
+        if cpu_only
+        else scripts._stems(materials, quick, fidelity, high_energy_min_kev, catalog_profile)
+    )
     if chunked:
         parallel_materials = None
         payload = scripts._chunked_queue_script(
@@ -449,6 +471,8 @@ def start_queue(
             spec_chunk,
             brem_chunk,
             nsys,
+            cpu,
+            cpu_only,
         )
         time_limit = config.SLURM_TIME
     workers_per_material = config.SLURM_CPUS_PER_MATERIAL if workers is None else max(1, workers)
@@ -479,6 +503,8 @@ def start_queue(
             spec_chunk,
             brem_chunk,
             nsys,
+            cpu,
+            cpu_only,
         ),
     )
     submit = scripts._submit_slurm_command(jobid, stems, nice=chunked)
@@ -532,6 +558,8 @@ def start_queue(
                             spec_chunk,
                             brem_chunk,
                             nsys,
+                            cpu,
+                            cpu_only,
                         )
                     ),
                 ),
@@ -555,7 +583,7 @@ def start_queue(
                             "job-local profiling artifacts; no automatic checkpoint pull",
                         )
                     ]
-                    if performance_repetitions > 1 or nsys
+                    if performance_repetitions > 1 or nsys or cpu or cpu_only
                     else [("Pull", f"{pull_hint}  (after completion)")]
                 ),
             ]

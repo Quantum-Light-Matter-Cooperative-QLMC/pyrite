@@ -264,8 +264,18 @@ def _mode_summary(metadata):
     speed = "quick" if fields.get("quick") == "True" else "standard"
     floor = fields.get("high_energy_min_kev")
     floor_suffix = f" · high-energy floor {floor} keV" if floor not in (None, "None") else ""
+    cpu = fields.get("cpu") == "True"
+    cpu_only = fields.get("cpu_only") == "True"
+    nsys = fields.get("nsys") == "True"
+    if cpu_only:
+        return f"CPU profile only · monolithic{floor_suffix}"
     if "chunk_minutes" not in fields and "parallel_materials" not in fields:
-        return speed + floor_suffix
+        mode = speed + floor_suffix
+        if nsys:
+            mode += " · Nsight"
+        if cpu:
+            mode += " · CPU profile"
+        return mode
     try:
         chunk_minutes = float(fields.get("chunk_minutes", "0"))
     except ValueError:
@@ -274,7 +284,12 @@ def _mode_summary(metadata):
         return f"{speed} · chunked into {chunk_minutes:g} min slices{floor_suffix}"
     parallel = fields.get("parallel_materials")
     suffix = f" · {parallel} materials at once" if parallel not in {None, "None"} else ""
-    return f"{speed} · monolithic{suffix}{floor_suffix}"
+    mode = f"{speed} · monolithic{suffix}{floor_suffix}"
+    if nsys:
+        mode += " · Nsight"
+    if cpu:
+        mode += " · CPU profile"
+    return mode
 
 
 def _profile_summary(fields):
@@ -509,9 +524,19 @@ def _format_case_progress(records, materials=()):
     """Render the latest validated atomic case snapshots."""
     if not records:
         return "  No case progress reported yet. Use `cxr remote logs` for diagnostics."
-    order = [material for material in materials if material in records]
-    order.extend(material for material in records if material not in order)
-    labels = {material: _material_label(material) for material in order}
+    order = []
+    for material in materials:
+        order.extend(
+            key for key, record in records.items() if record["material"] == material
+        )
+    order.extend(key for key in records if key not in order)
+    labels = {}
+    for key in order:
+        record = records[key]
+        label = _material_label(record["material"])
+        if record.get("phase") == "cpu":
+            label += " [CPU]"
+        labels[key] = label
     label_width = max(len("MATERIAL"), *(len(label) for label in labels.values()))
     lines = [f"  {'MATERIAL':<{label_width}}  {'PROGRESS':<16}  CASES  DONE  STATE    NOW TESTING"]
     for material in order:
@@ -825,9 +850,34 @@ def _format_job_status(sections, detail):
     # per-material CASE PROGRESS block render at levels 0/1/2 alike; the log is
     # still only pulled (and legacy-parsed) at -vv.
     records = {} if diagnostic else _parse_progress_records(sections.get("PROGRESS", ""))
+    cpu_phase = (
+        fields.get("cpu_only") == "True"
+        or state_text.startswith(
+            ("profiling CPU", "completed CPU", "CPU profile failed", "done CPU", "FAILED CPU")
+        )
+    )
+    phase_records = records
+    if cpu_phase:
+        cpu_records = {
+            record["material"]: record
+            for record in records.values()
+            if record.get("phase") == "cpu"
+        }
+        if cpu_records:
+            phase_records = cpu_records
+    else:
+        primary_records = {
+            record["material"]: record
+            for record in records.values()
+            if record.get("phase") != "cpu"
+        }
+        if primary_records:
+            phase_records = primary_records
     rows = [
         ("State", display_state),
     ]
+    if cpu_phase and state_text != display_state:
+        rows.append(("Phase", state_text))
     queue_context = (
         _pending_queue_context(sections.get("QUEUE", ""), scheduler_id) if queued else None
     )
@@ -866,7 +916,9 @@ def _format_job_status(sections, detail):
             ]
         )
     else:
-        done_materials = sum(1 for record in records.values() if record["state"] == "done")
+        done_materials = sum(
+            1 for record in phase_records.values() if record["state"] == "done"
+        )
         material_count = len([material for material in materials if material != "-"])
         roster = _format_material_roster(materials, include_count=False)
         material_summary = f"{done_materials}/{material_count} complete"
@@ -885,18 +937,18 @@ def _format_job_status(sections, detail):
         # when the job's progress records carry cost data, else the legacy
         # case-count bar (unchanged for rebrem/reline/older jobs). -v/-vv show
         # both so a heavy-vs-cheap-case skew is visible alongside raw counts.
-        if _has_cost_data(records):
+        if _has_cost_data(phase_records):
             timing = _compute_time_estimate(
-                records,
+                phase_records,
                 materials,
                 use_cost=True,
                 parallel_materials=fields.get("parallel_materials", 1),
             )
             overall_compute = _overall_progress_line(
-                records, materials, use_cost=True, state_override=progress_state
+                phase_records, materials, use_cost=True, state_override=progress_state
             )
             overall_cases = _overall_progress_line(
-                records, materials, use_cost=False, state_override=progress_state
+                phase_records, materials, use_cost=False, state_override=progress_state
             )
             if detail >= 1:
                 if overall_compute is not None:
@@ -912,11 +964,13 @@ def _format_job_status(sections, detail):
                 rows.append(("Progress", f"{overall_compute}  ·  {_compute_time_suffix(timing)}"))
         else:
             timing = _compute_time_estimate(
-                records,
+                phase_records,
                 materials,
                 parallel_materials=fields.get("parallel_materials", 1),
             )
-            overall = _overall_progress_line(records, materials, state_override=progress_state)
+            overall = _overall_progress_line(
+                phase_records, materials, state_override=progress_state
+            )
             if overall is not None:
                 rows.append(("Progress", f"{overall}  ·  {_compute_time_suffix(timing)}"))
     output = [f"JOB {jobid}", _format_fields(rows)]
@@ -989,9 +1043,13 @@ def _parse_progress_records(payload):
             continue
         if state not in {"running", "done", "failed", "paused"}:
             continue
+        phase = record.get("phase")
+        if phase not in (None, "primary", "cpu"):
+            continue
         _sanitize_cost_fields(record)
         _sanitize_timing_fields(record)
-        records[material] = record
+        key = material if phase in (None, "primary") else f"{material}:cpu"
+        records[key] = record
     return records
 
 

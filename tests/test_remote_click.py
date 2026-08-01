@@ -117,9 +117,81 @@ def test_run_click_defaults_and_zero_meanings(monkeypatch):
                 "spec_chunk": None,
                 "brem_chunk": None,
                 "nsys": False,
+                "cpu": False,
+                "cpu_only": False,
             },
         )
     ]
+
+
+@pytest.mark.parametrize(
+    ("flags", "message"),
+    [
+        (["--cpu", "--cpu-only"], "--cpu and --cpu-only are mutually exclusive"),
+        (["--cpu-only", "--nsys"], "--cpu-only cannot be combined with --nsys"),
+        (["--cpu", "--chunk-minutes", "1"], "--cpu requires --chunk-minutes 0"),
+        (["--cpu-only", "--chunk-minutes", "1"], "--cpu-only requires --chunk-minutes 0"),
+        (["--cpu-only", "--perf-reps", "2"], "cannot be combined with --perf-reps"),
+        (
+            ["--cpu-only", "--perf-interval", "2"],
+            "cannot be combined with --perf-interval",
+        ),
+    ],
+)
+def test_run_cpu_incompatible_inputs_fail_before_submission(monkeypatch, flags, message):
+    monkeypatch.setattr(
+        lifecycle,
+        "start_queue",
+        lambda *_args, **_kwargs: pytest.fail("invalid CPU flags must not submit"),
+    )
+
+    result = invoke(remote.command, ["run", "standard", "-m", "hopg", *flags])
+
+    assert result.exit_code == 2
+    assert message in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("flag", "cpu", "cpu_only"),
+    [("--cpu", True, False), ("--cpu-only", False, True)],
+)
+def test_run_cpu_flags_imply_performance_and_monolithic_dispatch(
+    monkeypatch, flag, cpu, cpu_only
+):
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "start_queue",
+        lambda materials, **kwargs: calls.append((materials, kwargs)) or "job",
+    )
+
+    result = invoke(
+        remote.command,
+        ["run", "standard", "-m", "hopg", flag, "--headless"],
+    )
+
+    assert_clean_result(result)
+    assert calls[0][1]["performance_profile"] == "standard"
+    assert calls[0][1]["chunk_minutes"] == 0.0
+    assert calls[0][1]["cpu"] is cpu
+    assert calls[0][1]["cpu_only"] is cpu_only
+
+
+def test_combined_cpu_failure_pulls_retained_primary_performance_artifacts(monkeypatch):
+    pulled = []
+    monkeypatch.setattr(lifecycle, "start_queue", lambda *_args, **_kwargs: "job")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(remote.state, "_job_succeeded", lambda _jobid: False)
+    monkeypatch.setattr(
+        lifecycle,
+        "pull_performance_profile",
+        lambda profile: pulled.append(profile),
+    )
+
+    result = invoke(remote.command, ["run", "standard", "-m", "hopg", "--cpu"])
+
+    assert_clean_result(result, stderr="CPU phase failed; pulling retained primary performance artifacts\nperformance profiling used isolated job-local checkpoints; skipping automatic checkpoint pull\n")
+    assert pulled == ["standard"]
 
 
 def test_run_perf_flags_and_level9_reach_workflow(monkeypatch):

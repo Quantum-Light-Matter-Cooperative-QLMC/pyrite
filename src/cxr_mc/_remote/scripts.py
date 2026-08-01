@@ -103,34 +103,37 @@ fi"""
 
 
 def _cpu_profile_block(catalog_profile, performance_profile, cpu_flags):
-    """Bash appended to a run_material body (nsys jobs only): a serial NumPy pass
-    under cProfile, profiling the same spectrum loop the GPU pipeline drives
-    in-process. Fresh checkpoint dir so no case resumes cached (a cache hit would
-    profile zero compute). Runtime opt-out: CXR_MC_NO_CPU_PROFILE=1. Failure here
-    only warns -- the GPU trace captured above is untouched."""
+    """First-class bounded serial CPU cProfile phase for one material."""
     pstats_dump = (
         "import pstats,sys; p=pstats.Stats(sys.argv[1]); "
         'p.sort_stats("tottime").print_stats(60); '
         'p.sort_stats("cumulative").print_stats(60)'
     )
-    return f"""  if [ -z "${{CXR_MC_NO_CPU_PROFILE:-}}" ]; then
-    cpu_prof_base="$JOBDIR/performance/{performance_profile}/$m.cpu"
-    cpu_ckpt="$JOBDIR/cpu-profile-checkpoints/$m"
-    mkdir -p "$(dirname "$cpu_prof_base")" "$cpu_ckpt"
-    printf '%s\\n' "cProfile CPU-backend pass (serial, NumPy spectrum)" >> "$JOBDIR/log"
-    cpu_prof_rc=0
-    env -u CXR_MC_NSYS CXR_MC_BACKEND=cpu {config.shell_remote_uv()} run --no-sync python \\
-      -m cProfile -o "$cpu_prof_base.prof" \\
-      -m cxr_mc._entry.scan {config.shell_word(catalog_profile)} -m "$m"{cpu_flags} --workers 0 \\
-      --max-minutes 10 \\
-      --checkpoint-dir "$cpu_ckpt" --progress-file "$JOBDIR/progress/$m.cpu.json" \\
-      --no-progress >> "$JOBDIR/log" 2>&1 || cpu_prof_rc=$?
-    if [ "$cpu_prof_rc" -ne 0 ]; then
-      echo "WARNING: CPU cProfile pass failed for $m (exit $cpu_prof_rc); GPU trace unaffected" >> "$JOBDIR/log"
-    elif [ -f "$cpu_prof_base.prof" ]; then
-      {config.shell_remote_uv()} run --no-sync python -c '{pstats_dump}' "$cpu_prof_base.prof" > "$cpu_prof_base.txt" 2>&1 || echo "WARNING: pstats summary failed; .cpu.prof remains available" >> "$JOBDIR/log"
-    fi
+    return f"""  echo "profiling CPU $m [$i/$total] since $(date -Is)" > "$JOBDIR/state"
+  cpu_prof_base="$JOBDIR/performance/{performance_profile}/$m.cpu"
+  cpu_ckpt="$JOBDIR/cpu-profile-checkpoints/$m"
+  mkdir -p "$(dirname "$cpu_prof_base")" "$cpu_ckpt"
+  printf '%s\\n' "cProfile CPU-backend pass (serial, NumPy spectrum)" >> "$JOBDIR/log"
+  cpu_prof_rc=0
+  env -u CXR_MC_NSYS CXR_MC_BACKEND=cpu {config.shell_remote_uv()} run --no-sync python \\
+    -m cProfile -o "$cpu_prof_base.prof" \\
+    -m cxr_mc._entry.scan {config.shell_word(catalog_profile)} -m "$m"{cpu_flags} --workers 0 \\
+    --max-minutes 10 \\
+    --checkpoint-dir "$cpu_ckpt" --progress-file "$JOBDIR/progress/$m.cpu.json" \\
+    --progress-phase cpu --no-progress >> "$JOBDIR/log" 2>&1 || cpu_prof_rc=$?
+  if [ "$cpu_prof_rc" -eq 0 ] && [ -f "$cpu_prof_base.prof" ]; then
+    {config.shell_remote_uv()} run --no-sync python -c '{pstats_dump}' \\
+      "$cpu_prof_base.prof" > "$cpu_prof_base.txt" 2>&1 || cpu_prof_rc=$?
   fi
+  if [ "$cpu_prof_rc" -ne 0 ] || [ ! -f "$cpu_prof_base.prof" ] || [ ! -f "$cpu_prof_base.txt" ]; then
+    mkdir -p "$JOBDIR/cpu-failures"
+    : > "$JOBDIR/cpu-failures/$m"
+    echo "CPU profile failed for $m (exit $cpu_prof_rc) $(date -Is)" > "$JOBDIR/state"
+    echo "ERROR: CPU cProfile phase failed for $m (exit $cpu_prof_rc)" >> "$JOBDIR/log"
+    return 1
+  fi
+  echo "completed CPU profile: $m $(date -Is)" > "$JOBDIR/state"
+  echo "completed CPU profile: $m" >> "$JOBDIR/log"
 """
 
 
@@ -149,11 +152,19 @@ def _queue_script(
     spec_chunk=None,
     brem_chunk=None,
     nsys=False,
+    cpu=False,
+    cpu_only=False,
 ):
     """CXR payload for one bounded-concurrency queue in a SLURM allocation."""
     parallel_materials = _validate_parallel_materials(parallel_materials)
     if nsys and performance_profile is None:
         raise ValueError("nsys requires a performance profile")
+    if (cpu or cpu_only) and performance_profile is None:
+        raise ValueError("CPU profiling requires a performance profile")
+    if cpu and cpu_only:
+        raise ValueError("cpu and cpu_only are mutually exclusive")
+    if cpu_only and nsys:
+        raise ValueError("cpu_only cannot be combined with nsys")
     flags = ""
     if quick:
         flags += " --quick"
@@ -161,14 +172,13 @@ def _queue_script(
         flags += f" --fidelity {fidelity}"
     if workers is not None:
         flags += f" --workers {workers}"
-    if performance_profile is not None:
+    if performance_profile is not None and not cpu_only:
         flags += (
             f' --performance-profile {performance_profile} --performance-dir "$JOBDIR/performance"'
         )
         if performance_interval != 5.0:
             flags += f" --perf-interval {performance_interval:g}"
-    # cProfile CPU-backend pass rides along with the GPU (nsys) profiling job:
-    # same material, forced onto the serial NumPy spectrum path so cProfile can
+    # cProfile phase uses the same material, forced onto the serial NumPy path so it can
     # attribute the compute the GPU pipeline otherwise drives in-process. It
     # forces --workers 0 (serial, everything in THIS process) and drops
     # --performance-profile so its sampler JSON never clobbers the GPU tick file.
@@ -180,7 +190,9 @@ def _queue_script(
     # firing the same spectrum functions. --max-minutes is a hard backstop.
     cpu_flags = " --quick"
     cpu_profile_block = (
-        _cpu_profile_block(catalog_profile, performance_profile, cpu_flags) if nsys else ""
+        _cpu_profile_block(catalog_profile, performance_profile, cpu_flags)
+        if cpu or cpu_only
+        else ""
     )
     runtime_exports = ""
     if spec_chunk is not None:
@@ -202,6 +214,8 @@ parallel_materials={parallel_materials}
 export CXR_MC_GPU_SHARE={parallel_materials}
 performance_repetitions={performance_repetitions}{runtime_exports}
 nsys_enabled={int(bool(nsys))}
+cpu_enabled={int(bool(cpu))}
+cpu_only_enabled={int(bool(cpu_only))}
 n=0
 failures=0
 active=0
@@ -214,9 +228,10 @@ run_material() {{
   local -a checkpoint_flags=()
   local -a scan_launcher=()
   local -a scan_command=()
-  echo "running $m [$i/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$i" "$total" "$m" "$(date -Is)" \
 >> "$JOBDIR/log"
+  if [ "$cpu_only_enabled" -eq 0 ]; then
+    echo "running primary $m [$i/$total] since $(date -Is)" > "$JOBDIR/state"
   for (( repetition=1; repetition<=performance_repetitions; repetition++ )); do
     checkpoint_flags=()
     if [ "$performance_repetitions" -gt 1 ] || [ "$nsys_enabled" -eq 1 ]; then
@@ -235,7 +250,7 @@ run_material() {{
     scan_command=(
       "${{scan_launcher[@]}}" -m cxr_mc._entry.scan {config.shell_word(catalog_profile)} -m "$m"{flags}
       "${{checkpoint_flags[@]}}" --progress-file "$JOBDIR/progress/$m.json" \\
-      --no-progress
+      --progress-phase primary --no-progress
     )
     scan_rc=0
     if [ "$nsys_enabled" -eq 1 ]; then
@@ -289,6 +304,10 @@ run_material() {{
         echo "WARNING: nsys stats failed; .nsys-rep remains available" >> "$JOBDIR/log"
     fi
   done
+    if [ "$cpu_enabled" -eq 1 ]; then
+      echo "completed primary: $m" >> "$JOBDIR/log"
+    fi
+  fi
 {cpu_profile_block}  echo "completed: $m" >> "$JOBDIR/log"
 }}
 for m in "${{mats[@]}}"; do
@@ -308,8 +327,14 @@ while [ "$active" -gt 0 ]; do
   fi
   active=$((active - 1))
 done
-if [ "$failures" -gt 0 ]; then
+if compgen -G "$JOBDIR/cpu-failures/*" >/dev/null; then
+  cpu_failure_count=$(find "$JOBDIR/cpu-failures" -maxdepth 1 -type f | wc -l)
+  echo "FAILED CPU profile ($cpu_failure_count material(s)) $(date -Is)" > "$JOBDIR/state"
+  exit 1
+elif [ "$failures" -gt 0 ]; then
   echo "done with $failures warning(s) [$total/$total] $(date -Is)" > "$JOBDIR/state"
+elif [ "$cpu_enabled" -eq 1 ] || [ "$cpu_only_enabled" -eq 1 ]; then
+  echo "done CPU profile [$total/$total] $(date -Is)" > "$JOBDIR/state"
 else
   echo "done [$total/$total] $(date -Is)" > "$JOBDIR/state"
 fi
@@ -1025,6 +1050,8 @@ def _queue_metadata(
     spec_chunk: int | None = None,
     brem_chunk: int | None = None,
     nsys: bool = False,
+    cpu: bool = False,
+    cpu_only: bool = False,
 ):
     """Static metadata persisted before a queue becomes visible to SLURM."""
     return "\n".join(
@@ -1044,6 +1071,8 @@ def _queue_metadata(
             f"spec_chunk: {spec_chunk}",
             f"brem_chunk: {brem_chunk}",
             f"nsys: {bool(nsys)}",
+            f"cpu: {bool(cpu)}",
+            f"cpu_only: {bool(cpu_only)}",
             "progress_dashboard: True",
             "",
         ]

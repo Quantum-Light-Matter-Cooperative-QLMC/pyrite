@@ -892,7 +892,7 @@ Options:
   --parallel-materials N       Simultaneous scans in one allocation; requires --chunk-
                                minutes 0.  [1<=x<=4]
   --chunk-minutes NUMBER       Self-resubmitting SLURM slice length; defaults to 10, or
-                               0 for --perf-reps >1 and --nsys.
+                               0 for --perf-reps >1, --nsys, and CPU profiling.
   -p, --perf                   Log CPU pressure, RAM/swap, GPU clocks/VRAM, process,
                                phase timing, queue, worker, chunk, and case metrics for
                                PROFILE.
@@ -910,6 +910,11 @@ Options:
                                Systems CUDA/NVTX and Python-stack tracing; implies
                                --perf, --perf-reps 1, and --chunk-minutes 0; requires
                                one explicit -m/--material.
+  -c, --cpu                    After the primary run, capture one bounded serial CPU
+                               cProfile pass; implies --perf and --chunk-minutes 0.
+  --cpu-only                   Capture only the bounded serial CPU cProfile pass; starts
+                               no primary GPU/Nsight scan and implies --perf and
+                               --chunk-minutes 0.
   --no-sync                    Skip code upload.
   --dry-run                    Print submission preview; do not connect.
   --headless                   Return after submission without attaching or pulling.

@@ -111,24 +111,48 @@ Scope is `cxr remote run`; no local-run flag is added by this slice.
 
 ## Stepwise checklist
 
-- [ ] Add `-c/--cpu` and `--cpu-only` to `cxr remote run`; encode mutual
+- [x] Add `-c/--cpu` and `--cpu-only` to `cxr remote run`; encode mutual
       exclusions, implied performance mode, monolithic allocation, and help.
-- [ ] Thread explicit CPU mode through Click invocation, lifecycle validation,
+- [x] Thread explicit CPU mode through Click invocation, lifecycle validation,
       queue metadata, script builders, mode summaries, and dry-run output.
-- [ ] Stop coupling `_cpu_profile_block` to `nsys`; launch it only for `--cpu`
+- [x] Stop coupling `_cpu_profile_block` to `nsys`; launch it only for `--cpu`
       or as the sole workload for `--cpu-only`.
-- [ ] Refactor CPU pass into a first-class queue phase with explicit start,
+- [x] Refactor CPU pass into a first-class queue phase with explicit start,
       completion, failure, exit status, and artifact paths.
-- [ ] Make progress aggregation phase-aware; preserve simultaneous historical
+- [x] Make progress aggregation phase-aware; preserve simultaneous historical
       GPU and active CPU records for one material without filename-order wins.
-- [ ] Update status/attach/jobs/logs and artifact list/pull/prune behavior for
+- [x] Update status/attach/jobs/logs and artifact list/pull/prune behavior for
       CPU-only and combined profiling jobs.
-- [ ] Add focused CLI/script/metadata/dashboard tests, including shell syntax
+- [x] Add focused CLI/script/metadata/dashboard tests, including shell syntax
       validation and failure propagation.
-- [ ] Regenerate `docs/cli-reference.md` and
+- [x] Regenerate `docs/cli-reference.md` and
       `tests/data/cli_contract.json` after the CLI change.
-- [ ] Run focused CPU checks locally; exercise the slow profiler only through
-      an authorized remote quick-profile job.
+- [x] Run focused CPU checks locally without heavy compute.
+- [ ] Exercise the slow profiler through an authorized remote quick-profile
+      job; not run in this slice because remote mutation was explicitly out of
+      authority.
+
+## Implementation evidence
+
+- `-c/--cpu` now implies the selected profile's performance mode and a
+  monolithic allocation, then runs the bounded serial CPU cProfile phase after
+  the primary phase. `--nsys` alone no longer starts cProfile.
+- `--cpu-only` starts no primary scan, performance sampler, Nsight command, or
+  primary checkpoint reservation. It rejects `--cpu`, `--nsys`, primary
+  repetition/sampling knobs, GPU chunk pins, and nonzero chunk allocations at
+  the Click boundary before lifecycle submission.
+- Queue metadata records `nsys`, `cpu`, and `cpu_only` separately. Primary and
+  CPU progress records carry `phase: primary|cpu`; dashboard keys and labels
+  retain both records for one material and select the active CPU phase for the
+  headline while preserving the completed primary row.
+- CPU phase state records start, per-material completion/failure, and final
+  `done CPU profile` / `FAILED CPU profile` truth. CPU failures return nonzero;
+  combined runs retain and automatically pull primary performance artifacts.
+- Existing performance inventory/pull/prune support already included
+  `.cpu.prof` and `.cpu.txt`; focused lifecycle tests remained green.
+- Verification: 459 neighboring remote/dashboard/scan tests passed; full CLI
+  suite 879 passed; `cxr-dev lint` and `cxr-dev typecheck` passed; generated CLI
+  reference and frozen contract both passed their `--check` commands.
 
 ## Broader optimization path
 

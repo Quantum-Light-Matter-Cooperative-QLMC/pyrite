@@ -293,6 +293,8 @@ def _cli_start(args):
         spec_chunk=getattr(args, "spec_chunk", None),
         brem_chunk=getattr(args, "brem_chunk", None),
         nsys=getattr(args, "nsys", False),
+        cpu=getattr(args, "cpu", False),
+        cpu_only=getattr(args, "cpu_only", False),
     )
     if args.dry_run:
         return
@@ -307,14 +309,24 @@ def _cli_start(args):
         emit_diagnostic("run is still active or its viewer disconnected; skipping automatic pull")
         return
     if getattr(args, "performance_profile", None) is not None and not args.no_pull:
-        if state._job_succeeded(jobid):
+        succeeded = state._job_succeeded(jobid)
+        if succeeded or getattr(args, "cpu", False):
+            if not succeeded:
+                emit_diagnostic(
+                    "CPU phase failed; pulling retained primary performance artifacts"
+                )
             lifecycle.pull_performance_profile(args.performance_profile)
         else:
             emit_diagnostic(
                 "performance run did not complete successfully; "
                 "skipping automatic performance-artifact pull"
             )
-    profiling_only = getattr(args, "performance_repetitions", 1) > 1 or getattr(args, "nsys", False)
+    profiling_only = (
+        getattr(args, "performance_repetitions", 1) > 1
+        or getattr(args, "nsys", False)
+        or getattr(args, "cpu", False)
+        or getattr(args, "cpu_only", False)
+    )
     if args.no_pull or profiling_only:
         if profiling_only:
             emit_diagnostic(
@@ -713,7 +725,7 @@ def reline_command(
     default=None,
     help=(
         "Self-resubmitting SLURM slice length; defaults to 10, or 0 for "
-        "--perf-reps >1 and --nsys."
+        "--perf-reps >1, --nsys, and CPU profiling."
     ),
 )
 @click.option(
@@ -772,6 +784,23 @@ def reline_command(
         "--chunk-minutes 0; requires one explicit -m/--material."
     ),
 )
+@click.option(
+    "-c",
+    "--cpu",
+    is_flag=True,
+    help=(
+        "After the primary run, capture one bounded serial CPU cProfile pass; "
+        "implies --perf and --chunk-minutes 0."
+    ),
+)
+@click.option(
+    "--cpu-only",
+    is_flag=True,
+    help=(
+        "Capture only the bounded serial CPU cProfile pass; starts no primary "
+        "GPU/Nsight scan and implies --perf and --chunk-minutes 0."
+    ),
+)
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
 @click.option("--dry-run", is_flag=True, help="Print submission preview; do not connect.")
 @click.option(
@@ -810,6 +839,8 @@ def start_command(
     spec_chunk,
     brem_chunk,
     nsys,
+    cpu,
+    cpu_only,
     no_sync,
     dry_run,
     headless,
@@ -822,7 +853,17 @@ def start_command(
     from ..scan import resolve_profile_materials
 
     materials = resolve_profile_materials(catalog_profile, material)
-    performance_profile = catalog_profile if perf or nsys else None
+    if cpu and cpu_only:
+        raise click.UsageError("--cpu and --cpu-only are mutually exclusive")
+    if cpu_only and nsys:
+        raise click.UsageError("--cpu-only cannot be combined with --nsys")
+    if cpu_only and performance_repetitions != 1:
+        raise click.UsageError("--cpu-only cannot be combined with --perf-reps")
+    if cpu_only and performance_interval != 5.0:
+        raise click.UsageError("--cpu-only cannot be combined with --perf-interval")
+    if cpu_only and (spec_chunk is not None or brem_chunk is not None):
+        raise click.UsageError("--cpu-only cannot be combined with GPU chunk pins")
+    performance_profile = catalog_profile if perf or nsys or cpu or cpu_only else None
     if performance_profile is None:
         if performance_repetitions != 1:
             raise click.UsageError("--perf-reps requires --perf")
@@ -834,7 +875,7 @@ def start_command(
             raise click.UsageError("--brem-chunk requires --perf")
     if nsys and material is None:
         raise click.UsageError("--nsys requires one explicit -m/--material")
-    if (performance_repetitions > 1 or nsys) and chunk_minutes is None:
+    if (performance_repetitions > 1 or nsys or cpu or cpu_only) and chunk_minutes is None:
         chunk_minutes = 0.0
     elif chunk_minutes is None:
         chunk_minutes = 10.0
@@ -848,6 +889,10 @@ def start_command(
         raise click.UsageError("--nsys requires --perf-reps 1")
     if nsys and parallel_materials not in (None, 1):
         raise click.UsageError("--nsys requires one material process per GPU")
+    if cpu and chunk_minutes != 0:
+        raise click.UsageError("--cpu requires --chunk-minutes 0")
+    if cpu_only and chunk_minutes != 0:
+        raise click.UsageError("--cpu-only requires --chunk-minutes 0")
     if parallel_materials is not None and chunk_minutes != 0:
         raise click.UsageError("--parallel-materials requires --chunk-minutes 0")
     if quick and fidelity != "full":
@@ -880,6 +925,8 @@ def start_command(
             spec_chunk=spec_chunk,
             brem_chunk=brem_chunk,
             nsys=nsys,
+            cpu=cpu,
+            cpu_only=cpu_only,
             no_sync=no_sync,
             dry_run=dry_run,
             headless=headless,

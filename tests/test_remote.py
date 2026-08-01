@@ -391,7 +391,7 @@ def test_queue_script_wraps_single_profile_session_with_nsys():
         assert subprocess.run([bash, "-n"], input=script, text=True).returncode == 0
 
 
-def test_queue_script_nsys_rides_cpu_cprofile_pass():
+def test_queue_script_cpu_flag_adds_cprofile_after_primary():
     script = remote._queue_script(
         "j",
         ["mos2"],
@@ -399,9 +399,9 @@ def test_queue_script_nsys_rides_cpu_cprofile_pass():
         workers=6,
         catalog_profile="compute_test_300keV",
         performance_profile="compute_test_300keV",
-        nsys=True,
+        cpu=True,
     )
-    # Serial NumPy pass under cProfile, alongside the GPU nsys trace.
+    # Serial NumPy pass under cProfile, after the primary performance run.
     assert "-m cProfile -o " in script
     assert "env -u CXR_MC_NSYS CXR_MC_BACKEND=cpu" in script
     # Always the tiny --quick grid (representative call distribution in minutes,
@@ -413,17 +413,16 @@ def test_queue_script_nsys_rides_cpu_cprofile_pass():
     assert '--checkpoint-dir "$cpu_ckpt"' in script
     assert "cpu-profile-checkpoints" in script
     assert "--performance-profile" not in script.split('printf \'%s\\n\' "cProfile')[1]
-    # Runtime opt-out, and a failure only warns (GPU trace already captured).
-    assert 'if [ -z "${CXR_MC_NO_CPU_PROFILE:-}" ]; then' in script
-    assert "GPU trace unaffected" in script
+    assert "profiling CPU $m" in script
+    assert "completed primary: $m" in script
+    assert "FAILED CPU profile" in script
+    assert "exit 1" in script
     bash = shutil.which("bash")
     if bash is not None:
         assert subprocess.run([bash, "-n"], input=script, text=True).returncode == 0
 
 
-def test_queue_script_no_cpu_cprofile_without_nsys():
-    # A plain perf run (sampler only, no nsys) must not drag in the heavy serial
-    # CPU pass -- it rides along with the GPU trace exclusively.
+def test_queue_script_nsys_alone_does_not_add_cpu_cprofile():
     script = remote._queue_script(
         "j",
         ["mos2"],
@@ -431,10 +430,91 @@ def test_queue_script_no_cpu_cprofile_without_nsys():
         workers=6,
         catalog_profile="compute_test_300keV",
         performance_profile="compute_test_300keV",
-        nsys=False,
+        nsys=True,
     )
     assert "cProfile" not in script
     assert "CXR_MC_BACKEND=cpu" not in script
+
+
+def test_queue_script_cpu_only_has_no_primary_gpu_or_sampler_phase():
+    script = remote._queue_script(
+        "j",
+        ["mos2"],
+        quick=False,
+        workers=6,
+        catalog_profile="compute_test_300keV",
+        performance_profile="compute_test_300keV",
+        cpu_only=True,
+    )
+
+    assert "-m cProfile -o " in script
+    assert "CXR_MC_BACKEND=cpu" in script
+    assert "--progress-phase cpu" in script
+    assert "cpu_only_enabled=1" in script
+    assert 'if [ "$cpu_only_enabled" -eq 0 ]; then' in script
+    assert "--performance-profile" not in script
+    assert "nsys_enabled=0" in script
+
+
+def test_queue_metadata_distinguishes_cpu_modes_from_nsys():
+    metadata = scripts._queue_metadata(
+        "j",
+        ["mos2"],
+        False,
+        None,
+        performance_profile="baseline",
+        cpu=True,
+    )
+    cpu_only = scripts._queue_metadata(
+        "j",
+        ["mos2"],
+        False,
+        None,
+        performance_profile="baseline",
+        cpu_only=True,
+    )
+
+    assert "nsys: False" in metadata
+    assert "cpu: True" in metadata
+    assert "cpu_only: False" in metadata
+    assert "cpu: False" in cpu_only
+    assert "cpu_only: True" in cpu_only
+
+
+@pytest.mark.parametrize("cpu_only", [False, True])
+def test_queue_script_cpu_failure_is_terminal_and_keeps_primary_artifacts(
+    monkeypatch, tmp_path, cpu_only
+):
+    fake_uv = tmp_path / "fake-uv"
+    fake_uv.write_text(
+        "#!/usr/bin/env bash\n"
+        "case \" $* \" in *\" -m cProfile \"*) exit 9 ;; esac\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    fake_uv.chmod(0o755)
+    monkeypatch.setattr(config, "REMOTE_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "REMOTE_UV", str(fake_uv))
+    artifact = tmp_path / "jobs" / "j" / "performance" / "baseline" / "mos2.ndjson"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("primary artifact\n", encoding="utf-8")
+    script = remote._queue_script(
+        "j",
+        ["mos2"],
+        quick=False,
+        workers=0,
+        performance_profile="baseline",
+        cpu=not cpu_only,
+        cpu_only=cpu_only,
+    )
+
+    result = subprocess.run(["bash"], input=script, capture_output=True, text=True)
+
+    assert result.returncode != 0
+    assert (tmp_path / "jobs" / "j" / "state").read_text().startswith(
+        "FAILED CPU profile"
+    )
+    assert artifact.read_text() == "primary artifact\n"
 
 
 def test_queue_script_emits_positional_profile_when_not_standard():
@@ -2311,6 +2391,20 @@ def test_jobs_report_identifiers_materials_and_last_event(monkeypatch, capsys):
     assert "running hbn [2/2]" in output
 
 
+def test_jobs_reports_cpu_only_mode_and_phase_state(monkeypatch, capsys):
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: "cpu-job\t48291\tcpu-only\tscan\thopg\tprofiling CPU hopg [1/1]\n",
+    )
+
+    remote.list_jobs()
+
+    output = capsys.readouterr().out
+    assert "CPU-only" in output
+    assert "profiling CPU hopg [1/1]" in output
+
+
 def test_logs_identify_resolved_job_and_host(monkeypatch, capsys):
     commands = []
     monkeypatch.setattr(
@@ -2684,6 +2778,55 @@ def test_parse_progress_records_accepts_paused_state():
     )
     records = remote._parse_progress_records(payload)
     assert records["hopg"]["state"] == "paused"
+
+
+def test_parse_progress_records_preserves_primary_and_cpu_phases_for_one_material():
+    records = remote._parse_progress_records(
+        "\n".join(
+            [
+                '{"material":"hopg","phase":"primary","total_cases":4,'
+                '"cached_cases":0,"completed_new_cases":4,"state":"done"}',
+                '{"material":"hopg","phase":"cpu","total_cases":4,'
+                '"cached_cases":0,"completed_new_cases":1,"state":"running"}',
+            ]
+        )
+    )
+
+    assert set(records) == {"hopg", "hopg:cpu"}
+    assert records["hopg"]["phase"] == "primary"
+    assert records["hopg:cpu"]["phase"] == "cpu"
+
+    output = remote._format_case_progress(records, ["hopg"])
+    assert output.count("HOPG") == 2
+    assert "CPU" in output
+
+
+def test_status_cpu_phase_uses_cpu_progress_without_hiding_primary():
+    sections = {
+        "JOB": "j",
+        "META": (
+            "job: j\nmaterials: hopg\nquick: False\nchunk_minutes: 0\n"
+            "parallel_materials: 1\nperformance_profile: baseline\n"
+            "nsys: False\ncpu: True\ncpu_only: False\n"
+        ),
+        "STATE": "profiling CPU hopg [1/1]",
+        "SQUEUE": "job_id=1|state=RUNNING",
+        "PROGRESS": "\n".join(
+            [
+                '{"material":"hopg","phase":"primary","total_cases":4,'
+                '"cached_cases":0,"completed_new_cases":4,"state":"done"}',
+                '{"material":"hopg","phase":"cpu","total_cases":4,'
+                '"cached_cases":0,"completed_new_cases":1,"state":"running"}',
+            ]
+        ),
+    }
+
+    output = presentation._format_job_status(sections, 0)
+
+    assert "CPU profile" in output
+    assert "profiling CPU hopg" in output
+    assert "25%" in output
+    assert output.count("HOPG") == 2
 
 
 def test_overall_progress_line_sums_cases_and_counts_done_materials():

@@ -389,6 +389,12 @@ def _performance_profile(ctx, param, value):
     ),
 )
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
+@click.option(
+    "--progress-phase",
+    type=click.Choice(("primary", "cpu"), case_sensitive=True),
+    default=None,
+    hidden=True,
+)
 @click.option("--no-progress", is_flag=True, help="Disable progress bars/dashboard.")
 @click.option("-v", "--verbose", count=True, help="Increase dashboard detail.")
 @_cli_core.fidelity_option()
@@ -412,6 +418,7 @@ def command(
     no_cache,
     recompute,
     progress_file,
+    progress_phase,
     no_progress,
     json_output,
     verbose,
@@ -498,6 +505,7 @@ def command(
             progress_file=progress_file,
             no_progress=no_progress,
             verbose=verbose,
+            **({"progress_phase": progress_phase} if progress_phase is not None else {}),
         )
     return _cli_core.invoke_legacy(
         _run_json,
@@ -528,6 +536,7 @@ def command(
         cache_write=cache_write,
         progress_file=progress_file,
         no_progress=no_progress,
+        **({"progress_phase": progress_phase} if progress_phase is not None else {}),
     )
 
 
@@ -933,6 +942,7 @@ def _run_material(args, material, max_seconds=None):
     ckpt = os.path.join(args.checkpoint_dir, stem)
     results = {}
     progress_file = getattr(args, "progress_file", None)
+    progress_phase = getattr(args, "progress_phase", None)
     has_dashboard = hasattr(args, "_job_records")
     latest_progress = {
         "total_cases": len(cases),
@@ -1030,6 +1040,7 @@ def _run_material(args, material, max_seconds=None):
             _write_progress_record(
                 progress_file,
                 material=material,
+                phase=progress_phase,
                 state="running",
                 current=case_snapshot,
                 **progress_snapshot,
@@ -1096,6 +1107,7 @@ def _run_material(args, material, max_seconds=None):
         _write_progress_record(
             progress_file,
             material=material,
+            phase=progress_phase,
             state="running",
             **latest_progress,
             **progress_timer.snapshot(),
@@ -1188,6 +1200,7 @@ def _run_material(args, material, max_seconds=None):
             _write_progress_record(
                 progress_file,
                 material=material,
+                phase=progress_phase,
                 state="failed",
                 **latest_progress,
                 **latest_cost,
@@ -1216,6 +1229,7 @@ def _run_material(args, material, max_seconds=None):
         _write_progress_record(
             progress_file,
             material=material,
+            phase=progress_phase,
             state="done" if complete else "paused",
             **latest_progress,
             **latest_cost,
@@ -1293,6 +1307,7 @@ def _write_progress_record(
     cached_cases,
     completed_new_cases,
     state,
+    phase=None,
     current=None,
     done_cost=None,
     total_cost=None,
@@ -1305,6 +1320,8 @@ def _write_progress_record(
     ``current`` (optional) is the frontier crystal case's parameters (energy,
     both tilts, thickness) so a live viewer can show what's under test; it is
     omitted from the record when None (start/done/failed/paused snapshots).
+    ``phase`` identifies parallel/serial orchestration phases sharing one
+    material name; legacy callers omit it.
     ``done_cost``/``total_cost`` (optional) are relative compute-weight sums
     (``sweep.case_cost``) enabling a compute-aware progress bar; omitted when
     either is None -- callers that don't cost-weight (rebrem, reline, blaze)
@@ -1319,6 +1336,8 @@ def _write_progress_record(
         "completed_new_cases": completed_new_cases,
         "state": state,
     }
+    if phase is not None:
+        record["phase"] = phase
     if current:
         record["current"] = current
     if done_cost is not None and total_cost is not None:

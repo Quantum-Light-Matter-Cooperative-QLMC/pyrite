@@ -18,6 +18,13 @@ def _jobs_remote_command():
         '[ -f "$d/meta" ] || continue; '
         'SID=$(sed -n "s/^slurm_job_id: //p" "$d/meta" 2>/dev/null | tail -1); '
         'Q=$(sed -n "s/^quick: //p" "$d/meta" 2>/dev/null | tail -1); '
+        'C=$(sed -n "s/^cpu: //p" "$d/meta" 2>/dev/null | tail -1); '
+        'O=$(sed -n "s/^cpu_only: //p" "$d/meta" 2>/dev/null | tail -1); '
+        'N=$(sed -n "s/^nsys: //p" "$d/meta" 2>/dev/null | tail -1); '
+        'if [ "$O" = True ]; then Q=cpu-only; '
+        'elif [ "$C" = True ] && [ "$N" = True ]; then Q=nsys+cpu; '
+        'elif [ "$C" = True ]; then Q=cpu; '
+        'elif [ "$N" = True ]; then Q=nsys; fi; '
         'K=$(sed -n "s/^kind: //p" "$d/meta" 2>/dev/null | tail -1); '
         '[ -n "$K" ] || { grep -q "^ne: " "$d/meta" 2>/dev/null && K=check || K=scan; }; '
         'M=$(sed -n "s/^materials: //p" "$d/meta" 2>/dev/null | tail -1); '
@@ -47,7 +54,14 @@ def list_jobs():
             presentation._sanitize_terminal(value)
             for value in (jobid, scheduler_id, quick, materials, state_)
         )
-        mode = "quick" if quick == "True" else "standard" if quick == "False" else "?"
+        mode = {
+            "True": "quick",
+            "False": "standard",
+            "cpu": "CPU profile",
+            "cpu-only": "CPU-only",
+            "nsys": "Nsight",
+            "nsys+cpu": "Nsight + CPU",
+        }.get(quick, "?")
         rows.append((jobid, scheduler_id, mode, materials.replace(" ", ", "), state_))
     if not rows:
         print(
@@ -296,8 +310,16 @@ def _attach_header(refresh, *, armed=False, cancel_hint=True):
 def _pull_attached_progress(jobid, sections):
     """Pull checkpoint stems that have emitted progress for attached job."""
     fields = presentation._metadata_fields(sections.get("META", ""))
+    if fields.get("cpu_only") == "True":
+        raise SystemExit("CPU-only profiling has no primary checkpoints to pull")
     records = presentation._parse_progress_records(sections.get("PROGRESS", ""))
-    materials = list(records)
+    materials = list(
+        dict.fromkeys(
+            record["material"]
+            for record in records.values()
+            if record.get("phase") != "cpu"
+        )
+    )
     if not materials:
         raise SystemExit("no partial checkpoints have reported progress yet")
     stems = scripts._stems(

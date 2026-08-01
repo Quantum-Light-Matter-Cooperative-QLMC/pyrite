@@ -120,6 +120,21 @@ def test_write_progress_record_omits_cost_fields_when_either_is_none(tmp_path):
     assert "total_cost" not in record
 
 
+def test_write_progress_record_persists_remote_phase_identity(tmp_path):
+    path = tmp_path / "hopg.cpu.json"
+    scan._write_progress_record(
+        path,
+        material="hopg",
+        phase="cpu",
+        total_cases=2,
+        cached_cases=0,
+        completed_new_cases=1,
+        state="running",
+    )
+
+    assert json.loads(path.read_text())["phase"] == "cpu"
+
+
 def test_progress_timer_accumulates_active_time_and_work_across_chunk_resume(tmp_path):
     path = tmp_path / "hopg.json"
     clock = iter([100.0, 112.0])
