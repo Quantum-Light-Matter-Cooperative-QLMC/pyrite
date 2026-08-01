@@ -17,9 +17,10 @@ must remain until moved into a task file. Edit and drop items on `main`.
    `feature/uv-workspace-split`;
    [`tasks/feature/uv-workspace-split/`](tasks/feature/uv-workspace-split/).
 2. **Simplify and clarify the CLI surface.** Unify profile mutation vocabulary,
-   settle completion install/remove and shell detection, clarify remote
-   checkpoint/job cleanup alongside the checkpoint rework, and add a coherent
-   performance-log lifecycle with justified automatic mode defaults. →
+   settle completion install/remove and shell detection, rework local and remote
+   checkpoint/job cleanup around shared per-case CAS ownership, resolve or drop
+   checkpoint recompute, and add a coherent performance-log lifecycle with
+   justified automatic mode defaults. →
    `feature/cli-surface-simplification`;
    [`tasks/feature/cli-surface-simplification/`](tasks/feature/cli-surface-simplification/).
 ## P0 - >user< To be Triaged
@@ -106,11 +107,6 @@ must remain until moved into a task file. Edit and drop items on `main`.
    GPU rows without a GPU; fall back to tqdm when non-interactive. →
    `feature/local-run-dashboard`;
    [`tasks/feature/local-run-dashboard/`](tasks/feature/local-run-dashboard/).
-5. **Checkpoint command surface rework.** Split `cxr clear` into scoped
-   commands, fix or drop `cxr checkpoint recompute` under current profile
-   conventions, and rework `cxr checkpoint` around the landed shared per-case
-   CAS, manifests, and garbage-collection model. → `feature/checkpoint-command-rework`;
-   [`tasks/feature/checkpoint-command-rework/`](tasks/feature/checkpoint-command-rework/).
 ## P3 - lower / exploratory / small bugfixes / on-hold
 
 1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`.

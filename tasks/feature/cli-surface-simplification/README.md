@@ -21,13 +21,17 @@ scripts through explicit aliases/deprecations where practical:
    add idempotent removal. Define no-option behavior: current shell from
    `$SHELL`, every detected installed shell, or another explicit policy. Keep
    `--shell`, `--rc-file`, and `--dry-run` semantics unambiguous and safe.
-3. **Remote destructive/cleanup vocabulary.** Clarify the distinct resources
-   targeted by `remote prune` (obsolete checkpoint records), `remote
-   prune-jobs` (terminal job directories), and `remote clear` (checkpoint
-   trees). Coordinate, do not duplicate, the active
-   [`feature/checkpoint-command-rework`](../checkpoint-command-rework/) task,
-   whose scope includes local clear and shared-CAS ownership. Design against
+3. **Checkpoint and cleanup vocabulary.** Rework local `cxr checkpoint` and the
+   remote cleanup surface against the landed shared per-case CAS, manifests,
+   and garbage-collection model documented in
    [`docs/checkpoint-case-store.md`](../../../docs/checkpoint-case-store.md).
+   Add safely scoped local deletion corresponding to `remote clear`; clarify
+   the resources targeted by `remote prune` (obsolete checkpoint records),
+   `remote prune-jobs` (terminal job directories), and `remote clear`
+   (checkpoint trees). Fix or drop `cxr checkpoint recompute` under current
+   named-profile conventions. Decide whether `slim`, `archive`, `restore`,
+   `list`, `merge`, and `prune` remain checkpoint-owned once dataset manifests
+   reference shared cases.
 4. **Performance-log lifecycle and mode defaults.** Add a safe way to preview
    and remove stale local/remote performance logs; decide when completed logs
    auto-pull. Audit every reason `--chunk-minutes 0`, one material, or another
@@ -38,8 +42,8 @@ scripts through explicit aliases/deprecations where practical:
    profiles may opt into performance mode persistently, and how an explicit
    command-line choice overrides that marker.
 
-Out of scope: checkpoint/CAS implementation owned by
-`feature/checkpoint-command-rework`; compute-kernel optimization owned by
+Out of scope: changing the landed shared-CAS storage format without a proven
+command-contract need; compute-kernel optimization owned by
 `feature/compute-performance-optimization`; broad unrelated command renames.
 
 ## Implementation path and likely owners
@@ -50,6 +54,10 @@ Out of scope: checkpoint/CAS implementation owned by
 - `src/cxr_mc/cli/completion.py`, `tests/test_cli_completion.py`: completion
   install/remove/detection policy, exact target preview, idempotence, and
   compatibility dispatch.
+- `src/cxr_mc/cli/checkpoint.py`, `src/cxr_mc/recompute_defaults.py`,
+  `src/cxr_mc/{run,_checkpoint_store,archive,prune,rebrem,reline,slim}.py`, and
+  `tests/test_checkpoint_cli.py`: checkpoint ownership, local cleanup,
+  recompute disposition, shared-case reachability, and compatibility aliases.
 - `src/cxr_mc/_remote/cli.py`, `_remote/lifecycle.py`, `_remote/scripts.py`,
   `tests/test_remote.py`: cleanup nouns, performance-log pull/removal, mode
   validation, and automatic defaulting.
@@ -65,20 +73,26 @@ Sequence after dispatch:
       prompts, streams, exit codes, destructive targets, and tests for all four
       areas. Record a proposed old -> new compatibility table before code.
 - [ ] Lock primary nouns/verbs and migration policy. Explicitly resolve the
-      open decisions below; coordinate checkpoint-owned decisions with
-      `feature/checkpoint-command-rework` before either branch changes shared
-      paths.
+      open decisions below; record checkpoint resource ownership before
+      changing shared local/remote cleanup paths.
 - [ ] Implement profile-mutation changes with replacement/union/implicit-all
       behavior frozen by regression tests.
 - [ ] Implement completion lifecycle changes with dry-run, repeated install,
       repeated removal, unknown-shell, explicit-shell, and custom-rc tests.
+- [ ] Lock checkpoint dataset-versus-case ownership and reachability semantics.
+      Define local and remote clear/prune targets, shared-case garbage
+      collection, live-job/reservation protection, and exact preview/confirmation
+      behavior before implementing deletion.
+- [ ] Fix `cxr checkpoint recompute` through current named-profile resolution or
+      remove/migrate it with a compatibility path. Reassess the remaining
+      checkpoint subcommands against manifest and shared-CAS ownership.
 - [ ] Implement performance-log list/pull/prune flow. Preview exact destructive
       targets; revalidate before deletion; keep live/incomplete jobs fail-closed.
 - [ ] Audit performance-mode restrictions using representative remote command
       previews and existing telemetry provenance. Remove, warn, error, or
       auto-set each restriction with a documented reason.
-- [ ] Reconcile overlapping remote checkpoint cleanup only after the checkpoint
-      task's command design is written. Keep one implementation owner per path.
+- [ ] Reconcile local and remote checkpoint cleanup through shared selectors and
+      safety invariants where practical. Keep one implementation owner per path.
 - [ ] Regenerate CLI docs/contracts; run focused CLI tests, real help/dry-run
       probes, then full repository verification.
 
@@ -92,6 +106,12 @@ Sequence after dispatch:
 - Cleanup naming: are `prune`, `prune-jobs`, and `clear` sufficiently distinct
   once help names their resources, or should they move under resource groups?
   Existing scripts and destructive safety rules constrain renames.
+- Does `cxr checkpoint recompute` get fixed, moved onto `cxr run`, or dropped?
+- Does local deletion live under `cxr checkpoint`, profile/material resource
+  groups, or a local counterpart to `remote clear`? A profile-scoped operation
+  must not delete shared cases still reachable from another dataset.
+- Which current `cxr checkpoint` subcommands still have coherent ownership once
+  manifests and shared cases are separate resources?
 - Stale performance-log definition: terminal job age, missing matching profile,
   superseded repetition, explicit retention period, or user selection only?
 - Auto-pull timing: after every attached successful performance run, only on
@@ -115,9 +135,10 @@ sequence slices. No worker may edit checkpoint-owned paths before coordination.
    skills `cli-ui-ux`, `regression-testing`.
 3. Performance-log lifecycle/default audit: `implement-task`; skills
    `cli-ui-ux`, `performance`, `remote-gpu-jobs`, `regression-testing`.
-4. Checkpoint cleanup reconciliation: remains with
-   `feature/checkpoint-command-rework`; this task supplies the compatibility
-   table and reviews the combined surface.
+4. Checkpoint command/reachability rework: `lead-task` owns the design;
+   implementation may split only after resource ownership and compatibility are
+   locked. Skills `cli-ui-ux`, `run-cxr-mc`, `regression-testing`,
+   `documentation-maintenance`; add `remote-gpu-jobs` for remote deletion.
 5. Docs/contracts: `documentation-maintenance`, after command decisions land.
 
 ## Acceptance checks
@@ -131,10 +152,14 @@ sequence slices. No worker may edit checkpoint-owned paths before coordination.
   and never edits an inferred file without preview/explicit command authority.
 - Performance logs can be listed, pulled, and preview-pruned locally/remotely;
   live or uncertain remote state blocks deletion.
+- Local and remote checkpoint cleanup preview exact dataset and shared-case
+  effects, preserve cases reachable from retained manifests, revalidate remote
+  jobs/reservations before mutation, and default to non-destructive preview.
+- `cxr checkpoint recompute` is either profile-correct or removed/migrated with
+  frozen compatibility behavior; remaining checkpoint verbs name the resource
+  they mutate.
 - Every `--perf`/`--perf-reps`/`--nsys` material/chunk/cache constraint has a
   tested behavior and help-text rationale. `-p/--perf` continues to imply
   `--no-cache` unless explicitly superseded by the landed cache contract.
-- Checkpoint cleanup has no duplicate or conflicting implementation between
-  this branch and `feature/checkpoint-command-rework`.
 - `docs/cli-reference.md` and `tests/data/cli_contract.json` regenerated;
-  focused completion/profile/remote tests and `cxr-dev verify` pass.
+  focused completion/profile/checkpoint/remote tests and `cxr-dev verify` pass.
