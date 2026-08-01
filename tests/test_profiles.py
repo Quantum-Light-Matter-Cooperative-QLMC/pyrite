@@ -12,6 +12,7 @@ from cxr_mc.detectors import DetectorSpec
 from cxr_mc.profiles import (
     FIDELITY_NAMES,
     SweepProfile,
+    case_content_key,
     dataset_identity,
     get_profile,
     identity_from_stem,
@@ -20,6 +21,53 @@ from cxr_mc.profiles import (
     variant_stem,
 )
 from cxr_mc.sweep import build_cases
+
+
+def _cases_by_key(material, catalog_profile):
+    sweep = material_sweep(material, catalog_profile=catalog_profile)
+    cases = build_cases(sweep, n_electrons=300, n_electrons_brem=150)
+    return {(c["name"], c["E0_keV"]): c for c in cases}
+
+
+def test_case_content_key_matches_across_profiles_for_shared_cases():
+    """The whole feature: sub_100keV's energy grid is a prefix of standard's with
+    identical thickness/tilt/azim grids, so every case they share (energies <=100
+    keV) resolves to a bit-identical case dict -- including the grid-derived seed --
+    and hashes to the SAME content key even though the two profiles are named
+    differently. The profile name never reaches the key."""
+    standard = _cases_by_key("hopg", "standard")
+    sub = _cases_by_key("hopg", "sub_100keV")
+    shared = set(standard) & set(sub)
+    assert shared, "standard and sub_100keV must share hopg cases"
+    for key in shared:
+        assert case_content_key(standard[key]) == case_content_key(sub[key])
+    # And a >100 keV case, present only in standard, is absent from sub_100keV's
+    # keyspace (nothing wrong shared).
+    assert any(E0 > 100.0 for _, E0 in standard) and not any(E0 > 100.0 for _, E0 in sub)
+
+
+def test_case_content_key_excludes_label_perf_and_flux_scale_fields():
+    case = next(iter(_cases_by_key("hopg", "standard").values()))
+    base = case_content_key(case)
+    # Denylisted fields: changing any leaves the key unchanged.
+    for field, value in (
+        ("domega_sr", (case.get("domega_sr") or 0.0) + 1.0),
+        ("beam_current_na", 99.0),
+        ("rep_rate_hz", 12345.0),
+        ("bunch_charge_pc", 7.0),
+        ("mosaic_fwhm_rad", 0.01),
+        ("spec_chunk", 4096),
+        ("brem_chunk", 2048),
+    ):
+        assert case_content_key({**case, field: value}) == base, field
+    # A profile-name-like label is not even a case field, so injecting one is
+    # ignored too (proves label independence directly).
+    assert case_content_key({**case, "catalog_profile": "whatever"}) == base
+    assert case_content_key({**case, "name": "purely cosmetic label"}) == base
+    # In-key physics fields DO change the key.
+    assert case_content_key({**case, "E0_keV": case["E0_keV"] + 1.0}) != base
+    assert case_content_key({**case, "seed": case["seed"] + 1}) != base
+    assert case_content_key({**case, "thickness_ang": case["thickness_ang"] * 2}) != base
 
 
 def test_full_profile_preserves_production_defaults_exactly():

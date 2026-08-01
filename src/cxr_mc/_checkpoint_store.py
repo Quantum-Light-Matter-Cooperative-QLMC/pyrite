@@ -235,3 +235,52 @@ def signature(stem: str, root: str | os.PathLike[str]) -> tuple:
     return tuple(
         (str(path.resolve()), path.stat().st_mtime_ns, path.stat().st_size) for path in present
     )
+
+
+# ---- per-case content-addressable store (CAS) --------------------------------
+# A shared per-material store of single-case blobs, addressed by
+# :func:`cxr_mc.profiles.case_content_key` and sharded git-style by the first two
+# hex chars of the key (256 buckets -> bounded directory sizes). One blob holds
+# one case's raw transport ``out`` dict, so a case computed by any profile can be
+# replayed (``store_result``) by any other profile whose case hashes equal. The
+# blobs live under the per-material directory alongside its component store; the
+# 2-hex shard names never collide with ``line.pkl`` / ``brem.pkl`` / ``meta.json``
+# and are invisible to :func:`discover`.
+
+
+def _validate_content_key(content_key: str) -> str:
+    if not isinstance(content_key, str) or len(content_key) != 64:
+        raise ValueError("content key must be a 64-character SHA-256 hex digest")
+    try:
+        int(content_key, 16)
+    except ValueError as exc:
+        raise ValueError("content key must be a 64-character SHA-256 hex digest") from exc
+    return content_key.lower()
+
+
+def cas_blob_path(material: str, content_key: str, root: str | os.PathLike[str]) -> Path:
+    """Sharded blob path ``<root>/<material>/<first2hex>/<content_key>.pkl``."""
+    content_key = _validate_content_key(content_key)
+    return Path(root) / material / content_key[:2] / f"{content_key}.pkl"
+
+
+def cas_contains(material: str, content_key: str, root: str | os.PathLike[str]) -> bool:
+    """Whether a case blob for ``content_key`` exists -- a single ``stat``, no load."""
+    return cas_blob_path(material, content_key, root).is_file()
+
+
+def cas_load(material: str, content_key: str, root: str | os.PathLike[str]) -> dict:
+    """Load one case's stored transport ``out`` dict from the CAS."""
+    return _checkpoint_io.load(str(cas_blob_path(material, content_key, root)))
+
+
+def cas_save(
+    material: str, content_key: str, root: str | os.PathLike[str], payload: object
+) -> None:
+    """Atomically write one case's transport ``out`` dict into the CAS.
+
+    Write-once-by-content: the same key always names the same physics, so the
+    atomic temp-file + ``os.replace`` (:func:`_atomic_dump`) makes concurrent
+    same-material writers touch distinct blobs and never clobber a monolith.
+    """
+    _atomic_dump(cas_blob_path(material, content_key, root), payload)

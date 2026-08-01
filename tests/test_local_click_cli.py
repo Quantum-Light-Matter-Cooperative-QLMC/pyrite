@@ -87,10 +87,39 @@ def test_run_click_dispatches_profile_material_and_zero_workers(monkeypatch):
         "performance_profile": None,
         "performance_interval": 5.0,
         "performance_dir": None,
+        "cache_read": True,
+        "cache_write": True,
         "progress_file": None,
         "no_progress": False,
         "verbose": 0,
     }
+
+
+@pytest.mark.parametrize(
+    ("extra", "expected"),
+    [
+        (["--no-cache"], (False, False)),
+        (["--recompute"], (False, True)),
+        (["-p"], (False, False)),
+        (["-p", "--no-cache"], (False, False)),
+        (["-p", "--recompute"], (False, True)),
+    ],
+)
+def test_run_cache_flag_precedence(monkeypatch, extra, expected):
+    seen = _capture(monkeypatch, scan, "run")
+    result = invoke(scan.command, ["standard", "-m", "hopg", *extra])
+    assert_clean_result(result)
+    assert (seen["cache_read"], seen["cache_write"]) == expected
+
+
+def test_run_cache_flags_are_mutually_exclusive(monkeypatch):
+    monkeypatch.setattr(scan, "run", lambda _args: None)
+    result = invoke(
+        scan.command,
+        ["standard", "-m", "hopg", "--no-cache", "--recompute"],
+    )
+    assert result.exit_code == 2
+    assert "--no-cache and --recompute are mutually exclusive" in result.stderr
 
 
 def test_run_fidelity_dispatch_and_quick_conflict(monkeypatch):

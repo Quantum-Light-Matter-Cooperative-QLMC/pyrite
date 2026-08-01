@@ -25,6 +25,47 @@ from .sweep import Sweep, beam_replace, build_cases, crystal_params
 
 FIDELITY_NAMES = ("full", "survey")
 DATASET_IDENTITY_SCHEMA = "cxr.dataset-identity.v1"
+CASE_CONTENT_KEY_SCHEMA = "cxr.case-content-key.v1"
+
+# Case-dict fields excluded from the per-case content key. EVERYTHING else in a
+# resolved ``build_cases`` case dict determines the stored spec/brem arrays and
+# stays in the key (rule when unsure: keep -- over-inclusion only loses reuse,
+# under-inclusion serves wrong numbers). These excluded fields are label / perf /
+# post-processing / flux-scale only:
+#   - ``name`` and profile/variant fields: presentation/provenance labels.
+#   - ``domega_sr``: detector solid angle. ``store_result`` folds it into the
+#     derived ``scale`` scalar (``domega_sr * PER_NA``); the spec/brem arrays are
+#     untouched. Recomputed per requester on reuse, so a reused blob's arrays are
+#     correct for any solid angle.
+#   - ``rep_rate_hz`` / ``bunch_charge_pc``: pulse cadence/charge. ``store_result``
+#     folds them into the derived ``source_current_na`` scalar only; never into
+#     the arrays.
+#   - ``beam_current_na``: legacy reporting fallback, never a kernel input.
+#   - ``mosaic_fwhm_rad``: analytic post-processing broadening in
+#     ``store_result``. The MC route remains keyed by ``mosaic_mc_fwhm_rad``.
+#   - ``spec_chunk`` / ``brem_chunk``: GPU batch sizes. Chunk-invariant per the
+#     goldens, and only ever set on ``-p/--perf`` runs -- which bypass the cache
+#     entirely (perf implies ``--no-cache``) -- so the cache never mixes chunks.
+# ``catalog_profile`` / ``variant`` / ``fidelity`` are NOT case-dict fields today
+# -- the profile name never reaches a case, which is exactly what lets two
+# differently-named profiles' shared case hash equal and reuse one blob. They are
+# listed anyway as belt-and-suspenders: should any future path stamp a label onto
+# a case dict, it must still never perturb the content key.
+_CONTENT_KEY_DENYLIST = frozenset(
+    {
+        "name",
+        "domega_sr",
+        "beam_current_na",
+        "rep_rate_hz",
+        "bunch_charge_pc",
+        "mosaic_fwhm_rad",
+        "spec_chunk",
+        "brem_chunk",
+        "catalog_profile",
+        "variant",
+        "fidelity",
+    }
+)
 
 
 def _centered_sample(values: Any, limit: int | None) -> Any:
@@ -310,6 +351,34 @@ def dataset_identity(
         "parameter_sha256": hashlib.sha256(encoded).hexdigest(),
         "resolved_parameters": resolved,
     }
+
+
+def case_content_key(case: Mapping[str, Any]) -> str:
+    """Content-addressable key for one :func:`cxr_mc.sweep.build_cases` case dict.
+
+    A canonical SHA-256 over the resolved case dict minus
+    :data:`_CONTENT_KEY_DENYLIST`. Because the case dict is already fully
+    resolved -- every physics-relevant field baked in by ``build_cases`` -- and
+    carries NO profile name, two cases requested by two differently-named
+    profiles that describe the same physics hash to the same key and share one
+    cached blob. That single profile-name exclusion is the whole cross-profile
+    reuse feature (see :mod:`cxr_mc.run`'s content-addressable store).
+
+    ``seed`` deliberately stays in the key: it is derived from a case's grid
+    position, so two profiles only share a key when their shared case also shares
+    a seed (i.e. their grids align, e.g. one energy grid a prefix of the other) --
+    exactly the case where the stored arrays are bit-identical. A shared physics
+    case whose seed differs simply gets a distinct key and recomputes; the store
+    never serves a mismatched-seed result.
+    """
+    payload = {
+        "schema": CASE_CONTENT_KEY_SCHEMA,
+        "case": _jsonable(
+            {key: value for key, value in case.items() if key not in _CONTENT_KEY_DENYLIST}
+        ),
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def variant_stem(identity: Mapping[str, Any], *, canonical_full: bool = False) -> str:

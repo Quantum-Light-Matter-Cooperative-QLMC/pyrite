@@ -111,7 +111,8 @@ Options:
                                metrics for PROFILE's resolved membership into
                                performance-profiles/PROFILE/<material>.ndjson
                                (cxr.performance.v1). Combine with -m to profile a single
-                               member.
+                               member. Runs without shared-cache reads or writes unless
+                               --recompute is explicit.
   -i, --perf-interval SECONDS  Performance-telemetry sampling interval; requires
                                -p/--perf.  [default: 5.0]
   --spec-chunk N               Pin line-spectrum segments per GPU chunk; requires
@@ -122,6 +123,11 @@ Options:
                                the run (writes a .nsys-rep next to the perf log);
                                defaults to the profile's full membership (-m narrows to
                                one member). Requires -p/--perf.
+  --no-cache                   Neither read nor write the shared per-case checkpoint
+                               cache: an ephemeral run that recomputes every case and
+                               stores nothing shared.
+  --recompute                  Ignore cached cases and recompute fresh, but repopulate
+                               the shared per-case cache with the results.
   --no-progress                Disable progress bars/dashboard.
   -v, --verbose                Increase dashboard detail.
   --fidelity [full|survey]     Named settings/grid-reduction policy. survey is

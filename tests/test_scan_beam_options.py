@@ -244,6 +244,23 @@ def test_nsys_reexec_command_full_membership_uses_profile_stem():
     assert str(trace_base) == "performance-profiles/sub_100keV/sub_100keV"
 
 
+def test_nsys_reexec_forwards_explicit_recompute():
+    argv, _ = scan._nsys_reexec_command(
+        catalog_profile="sub_100keV",
+        material="hopg",
+        performance_profile="sub_100keV",
+        performance_dir=None,
+        performance_interval=5.0,
+        workers=None,
+        fidelity="full",
+        quick=False,
+        n_families=None,
+        recompute=True,
+    )
+
+    assert "--recompute" in argv
+
+
 def test_reexec_under_nsys_errors_when_nsys_missing(monkeypatch):
     monkeypatch.setattr(scan.shutil, "which", lambda _name: None)
     with pytest.raises(scan.click.UsageError, match="nsys executable is not on PATH"):

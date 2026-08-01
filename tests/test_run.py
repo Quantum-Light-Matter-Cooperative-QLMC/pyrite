@@ -770,6 +770,188 @@ def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
     assert "cfg_a" in results and "cfg_b" in results
 
 
+# ---------------------------------------------------------------------------
+# Cross-profile content-addressable case reuse (--no-cache / --recompute gates)
+# ---------------------------------------------------------------------------
+
+
+def _tracking_run_cases_factory(ran):
+    def _tracking(
+        cases, max_workers=None, progress=False, callback=None, should_stop=None, keep_results=True
+    ):
+        ran.extend(c["name"] for c in cases)
+        _stub_run_cases(cases, callback=callback)
+
+    return _tracking
+
+
+def test_run_sweep_reuses_cases_across_stems_by_content_key(tmp_path, monkeypatch):
+    """A case computed under one profile's stem is replayed under a DIFFERENT
+    stem sharing the same material + content key, instead of recomputed."""
+    from cxr_mc.profiles import case_content_key
+
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 45.0)]
+
+    # Profile A run: populates the shared per-material CAS.
+    run_sweep(
+        cases,
+        {},
+        checkpoint_path=str(tmp_path / "hopg@a-000000000000"),
+        content_key_fn=case_content_key,
+        progress=False,
+    )
+    material = cases[0]["crystal"]
+    blobs = list((tmp_path / material).glob("*/*.pkl"))
+    assert len(blobs) == 2  # one blob per case
+
+    # Profile B run: a different stem, same cases -> everything reused, run_cases
+    # sees NOTHING to compute.
+    ran = []
+    monkeypatch.setattr("cxr_mc.run.run_cases", _tracking_run_cases_factory(ran))
+    results_b = {}
+    run_sweep(
+        cases,
+        results_b,
+        checkpoint_path=str(tmp_path / "hopg@b-111111111111"),
+        content_key_fn=case_content_key,
+        progress=False,
+    )
+    assert ran == []  # all reused from the CAS
+    assert results_b["cfg_a"][30.0]["spec"] is not None
+    assert results_b["cfg_b"][45.0]["spec"] is not None
+    # The reused record is rebuilt through store_result with the REQUESTED case.
+    assert results_b["cfg_a"][30.0]["case"] is cases[0]
+
+
+def test_no_cache_neither_reads_nor_writes(tmp_path, monkeypatch):
+    from cxr_mc.profiles import case_content_key
+
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    cases = [_fake_case("cfg_a", 30.0)]
+    # Pre-populate the CAS from a normal run.
+    run_sweep(
+        cases,
+        {},
+        checkpoint_path=str(tmp_path / "hopg@a-000000000000"),
+        content_key_fn=case_content_key,
+        progress=False,
+    )
+    material = cases[0]["crystal"]
+    before = {p.name for p in (tmp_path / material).glob("*/*.pkl")}
+    assert before
+
+    ran = []
+    monkeypatch.setattr("cxr_mc.run.run_cases", _tracking_run_cases_factory(ran))
+    run_sweep(
+        cases,
+        {},
+        checkpoint_path=str(tmp_path / "hopg@b-111111111111"),
+        content_key_fn=case_content_key,
+        cache_read=False,
+        cache_write=False,
+        resume=False,
+        progress=False,
+    )
+    assert ran == ["cfg_a"]  # no read -> recomputed
+    after = {p.name for p in (tmp_path / material).glob("*/*.pkl")}
+    assert after == before  # no write -> CAS untouched
+    assert not (tmp_path / "hopg@b-111111111111" / "cases.json").exists()  # ephemeral
+
+
+def test_recompute_skips_read_but_repopulates(tmp_path, monkeypatch):
+    from cxr_mc.profiles import case_content_key
+
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    cases = [_fake_case("cfg_a", 30.0)]
+    run_sweep(
+        cases,
+        {},
+        checkpoint_path=str(tmp_path / "hopg@a-000000000000"),
+        content_key_fn=case_content_key,
+        progress=False,
+    )
+    material = cases[0]["crystal"]
+    blob = next((tmp_path / material).glob("*/*.pkl"))
+    blob.unlink()  # remove so we can prove --recompute rewrites it
+
+    ran = []
+    monkeypatch.setattr("cxr_mc.run.run_cases", _tracking_run_cases_factory(ran))
+    run_sweep(
+        cases,
+        {},
+        checkpoint_path=str(tmp_path / "hopg@b-111111111111"),
+        content_key_fn=case_content_key,
+        cache_read=False,
+        cache_write=True,
+        resume=False,
+        progress=False,
+    )
+    assert ran == ["cfg_a"]  # skipped read -> recomputed
+    assert list((tmp_path / material).glob("*/*.pkl"))  # write -> repopulated
+    assert (tmp_path / "hopg@b-111111111111" / "cases.json").exists()  # manifest written
+
+
+def test_existing_checkpoint_seeds_shared_cache_on_resume(tmp_path, monkeypatch):
+    from cxr_mc.profiles import case_content_key
+
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    cases = [_fake_case("cfg_a", 30.0)]
+    stem = tmp_path / "hopg@legacy-000000000000"
+    run_sweep(cases, {}, checkpoint_path=str(stem), progress=False)
+    assert not list((tmp_path / "hopg").glob("*/*.pkl"))
+
+    run_sweep(
+        cases,
+        {},
+        checkpoint_path=str(stem),
+        content_key_fn=case_content_key,
+        progress=False,
+    )
+    assert len(list((tmp_path / "hopg").glob("*/*.pkl"))) == 1
+
+
+def test_invalid_cached_payload_falls_back_to_recompute(tmp_path, monkeypatch):
+    from cxr_mc import _checkpoint_io
+    from cxr_mc.profiles import case_content_key
+
+    cases = [_fake_case("cfg_a", 30.0)]
+    key = case_content_key(cases[0])
+    blob = tmp_path / "hopg" / key[:2] / f"{key}.pkl"
+    blob.parent.mkdir(parents=True)
+    _checkpoint_io.dump({"not": "a case payload"}, str(blob))
+    ran = []
+    monkeypatch.setattr("cxr_mc.run.run_cases", _tracking_run_cases_factory(ran))
+
+    run_sweep(
+        cases,
+        {},
+        checkpoint_path=str(tmp_path / "hopg@new-111111111111"),
+        content_key_fn=case_content_key,
+        progress=False,
+    )
+    assert ran == ["cfg_a"]
+
+
+def test_cas_rejects_non_sha256_content_key(tmp_path):
+    from cxr_mc import _checkpoint_store
+
+    with pytest.raises(ValueError, match="64-character SHA-256"):
+        _checkpoint_store.cas_blob_path("hopg", "../escape", tmp_path)
+
+
+def test_content_key_fn_none_leaves_cas_inert(tmp_path, monkeypatch):
+    """Without content_key_fn the CAS path is entirely dormant (byte-identical to
+    the pre-feature per-stem-only behavior): no blobs, no cases.json."""
+    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    cases = [_fake_case("cfg_a", 30.0)]
+    run_sweep(cases, {}, checkpoint_path=str(tmp_path / "hopg"), progress=False)
+    assert not list((tmp_path / "hopg").glob("*/*.pkl"))  # no sharded CAS blobs
+    assert not (tmp_path / "hopg" / "cases.json").exists()
+    # only the component store + its meta sidecar exist
+    assert (tmp_path / "hopg" / "line.pkl").exists()
+
+
 def test_run_sweep_reports_initial_and_per_case_progress(tmp_path, monkeypatch):
     monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
     cases = [

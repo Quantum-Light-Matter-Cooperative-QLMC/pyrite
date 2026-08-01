@@ -185,3 +185,40 @@ Lead-task must still resolve, before/during implementation:
   `tests/test_profiles.py` (`dataset_identity`/`variant_stem`); existing goldens
   unchanged (bit-for-bit stored records).
 - `uv run cxr-dev verify` passes; `docs/cli-reference.md` regenerated.
+
+## 10. Implementation decisions (2026-08-01)
+
+- `cases.json` is an additive thin reference manifest beside each profile's
+  existing component checkpoint. Component artifacts remain materialized for
+  compatibility with analysis, archive, prune, slim, and remote-pull consumers;
+  converting those consumers to manifest-only storage belongs with the blocked
+  checkpoint-command rework. Cross-profile compute reuse and future CAS GC do
+  not depend on that conversion.
+- CAS blobs use `_checkpoint_store._atomic_dump` (same-filesystem temporary file
+  plus `os.replace`). No lock: a SHA-256 key identifies deterministic raw output,
+  and independent processes use PID-qualified temporary paths.
+- Existing compatible profile checkpoints seed missing CAS blobs during normal
+  resume. Migration compares the requested and stored case content keys before
+  writing, preventing legacy checkpoints without identity metadata from
+  poisoning the shared store.
+- Content keys include schema `cxr.case-content-key.v1`; SHA-256 paths are
+  validated before filesystem access. Exclusions are labels (`name`, profile,
+  variant, fidelity), execution chunks, pulse/current/solid-angle scale fields,
+  and analytic `mosaic_fwhm_rad`. Exact-MC mosaic broadening remains keyed via
+  `mosaic_mc_fwhm_rad`; RNG seed remains keyed.
+- Default reads and writes CAS. `--recompute` skips reads and writes fresh blobs.
+  `--no-cache` and implicit `-p/--perf` neither read nor write CAS. Explicit
+  `--recompute` overrides the performance default, including Nsight re-exec.
+- The two absorbed no-cache backlog branches remain untouched. Reconciliation
+  still requires explicit lifecycle/TODO authority after this branch lands.
+
+### Verification evidence
+
+- Focused CAS/profile/CLI/reference checks: 195 passed.
+- Neighboring scan/checkpoint/archive checks: 50 passed.
+- `cxr-dev lint` and `cxr-dev typecheck`: passed.
+- `cxr-dev verify`: 2224 passed, 40 skipped; sole sandbox failure was Python
+  forkserver socket creation (`PermissionError: [Errno 1] Operation not
+  permitted`). The isolated failed multiprocessing test passed outside sandbox.
+- Real `cxr run --help` probe exposes both flags; incompatible flags return
+  Click usage exit 2 with the documented diagnostic.

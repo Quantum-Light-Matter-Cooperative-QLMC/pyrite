@@ -59,6 +59,67 @@ def _manifest_path_for(checkpoint_path):
     return f"{base}.meta.json"
 
 
+def _case_manifest_path(checkpoint_path):
+    """Path to a stem's per-profile case manifest (``cases.json``)."""
+    path = Path(checkpoint_path)
+    if path.suffix == ".pkl":
+        return path.with_suffix(".cases.json")
+    return path / "cases.json"
+
+
+def _write_case_manifest(checkpoint_path, cases, content_key_fn, dataset_identity):
+    """Atomically write the thin per-profile pointer table mapping each case's
+    ``(name, E0_keV)`` to its shared-store ``content_key`` (see
+    :func:`cxr_mc.profiles.case_content_key`), plus label provenance
+    (``catalog_profile``/``variant``/``parameter_sha256``). This is the reference
+    list a future GC / ``cxr clear`` walks to decide which shared blobs a profile
+    still needs. Atomic temp-file + ``os.replace`` mirrors :func:`_manifest_save`."""
+    entries = []
+    for case in cases:
+        key = content_key_fn(case)
+        if key is None:
+            continue
+        entries.append({"name": case["name"], "E0_keV": float(case["E0_keV"]), "content_key": key})
+    manifest = {
+        "schema": "cxr.case-manifest.v1",
+        "material": cases[0]["crystal"] if cases else None,
+        "cases": entries,
+    }
+    if dataset_identity is not None:
+        for field in ("catalog_profile", "variant", "parameter_sha256"):
+            value = dataset_identity.get(field)
+            if value is not None:
+                manifest[field] = value
+    manifest_path = _case_manifest_path(checkpoint_path)
+    os.makedirs(os.path.dirname(manifest_path) or ".", exist_ok=True)
+    tmp = f"{manifest_path}.{os.getpid()}.tmp"
+    with open(tmp, "w") as handle:
+        json.dump(manifest, handle)
+    os.replace(tmp, manifest_path)
+    return manifest
+
+
+_CAS_PAYLOAD_KEYS = frozenset({"E_grid", "spec", "brem", "eta"})
+_CAS_OPTIONAL_PAYLOAD_KEYS = frozenset({"E_grid_brem", "brem_wide", "hit_frac", "spec_coherent"})
+
+
+def _cas_payload_from_record(record):
+    """Recover the raw ``run_case`` payload retained by :func:`store_result`.
+
+    Used only to seed the CAS from a compatible pre-CAS profile checkpoint.
+    Derived/reporting fields (``scale``, current, FWHM, peak energy, case) stay
+    requester-owned and are rebuilt by :func:`store_result` on reuse.
+    """
+    if not _CAS_PAYLOAD_KEYS <= record.keys():
+        return None
+    keys = _CAS_PAYLOAD_KEYS | _CAS_OPTIONAL_PAYLOAD_KEYS
+    return {key: record[key] for key in keys if key in record}
+
+
+def _valid_cas_payload(payload):
+    return isinstance(payload, dict) and _CAS_PAYLOAD_KEYS <= payload.keys()
+
+
 def _checkpoint_save(checkpoint_path, results):
     """Atomically gzip-pickle ``results`` to ``checkpoint_path`` (see
     :mod:`cxr_mc._checkpoint_io`, TODO P2 #8): write a sibling ``.<pid>.tmp``
@@ -352,6 +413,9 @@ def run_sweep(
     dataset_identity=None,
     case_cost_fn=None,
     on_cost=None,
+    content_key_fn=None,
+    cache_read=True,
+    cache_write=True,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
@@ -411,6 +475,23 @@ def run_sweep(
     on_cost : optional callback(done_cost, total_cost), fired alongside
         ``on_progress`` (after resume filtering and after every newly completed
         case) whenever ``case_cost_fn`` is set; otherwise never called.
+    content_key_fn : optional callable(case) -> hex str (``profiles.case_content_key``).
+        When given, enables the shared per-material content-addressable case store
+        (CAS): each finished case's transport ``out`` is written once under its
+        content key (``cache_write``), and on resume any case still to run whose
+        content key already has a blob is REPLAYED from it instead of recomputed
+        (``cache_read``). The content key excludes the profile name, so a case
+        computed by one profile is reused by any other profile requesting the same
+        physics. None (default) leaves the CAS entirely inert -- byte-identical to
+        the pre-CAS per-stem-only path. Reuse replays through ``store_result`` with
+        the REQUESTED case, so the reconstructed record is bit-identical to a fresh
+        compute (including the requester's own detector/flux scalars).
+    cache_read : consult the CAS on resume for cross-profile reuse (default True;
+        ignored when ``content_key_fn`` is None). Set False by ``--no-cache`` /
+        ``--recompute`` / ``-p`` so a run recomputes rather than reuses.
+    cache_write : write each finished case into the CAS (default True; ignored
+        when ``content_key_fn`` is None). Set False by ``--no-cache`` / ``-p`` so
+        an ephemeral or measurement run never populates the shared store.
 
     Returns True iff every requested ``(name, E0_keV)`` pair ended up in
     ``results`` (i.e. the sweep ran to completion, budget or not); False if
@@ -428,6 +509,25 @@ def run_sweep(
     if checkpoint_path is None:
         checkpoint_path = checkpoint_path_for(material, checkpoint_dir)
     os.makedirs(os.path.dirname(checkpoint_path) or ".", exist_ok=True)
+    # Shared per-material content-addressable store lives under the checkpoint
+    # directory root (the parent of this stem's component dir), so every profile
+    # of this material addresses the SAME blob pool -- the cross-profile share.
+    cas_root = os.path.dirname(checkpoint_path) or "."
+    cache_read = cache_read and content_key_fn is not None
+    cache_write = cache_write and content_key_fn is not None
+
+    def _content_key(case):
+        """Content key for ``case`` or None when it is not canonically hashable
+        (an exotic/legacy case simply falls back to normal recompute + per-stem
+        store rather than aborting the run)."""
+        if content_key_fn is None:
+            return None
+        try:
+            key = content_key_fn(case)
+            _checkpoint_store.cas_blob_path(material, key, cas_root)
+            return key
+        except (TypeError, ValueError):
+            return None
 
     def _crystal_of(rec_map):
         return next(iter(rec_map.values()))["case"]["crystal"]
@@ -503,6 +603,59 @@ def run_sweep(
             f"resumed {sum(len(v) for v in loaded.values())} {material} cases from {checkpoint_path}"
         )
 
+        # Migration: seed missing blobs from a compatible existing checkpoint.
+        # Compare the stored case's key with the currently requested case before
+        # writing, so a legacy checkpoint without identity provenance can never
+        # poison the shared store with a mismatched record.
+        if cache_write:
+            for case in cases:
+                record = results.get(case["name"], {}).get(case["E0_keV"])
+                if record is None:
+                    continue
+                key = _content_key(case)
+                stored_key = _content_key(record.get("case", {}))
+                payload = _cas_payload_from_record(record)
+                if (
+                    key is not None
+                    and key == stored_key
+                    and payload is not None
+                    and not _checkpoint_store.cas_contains(material, key, cas_root)
+                ):
+                    _checkpoint_store.cas_save(material, key, cas_root, payload)
+
+    # Cross-profile reuse: any case not already resumed from this profile's own
+    # checkpoint whose content key already has a CAS blob (populated by ANY
+    # profile of this material) is replayed through store_result instead of
+    # recomputed. Replaying with the REQUESTED case makes the reconstructed
+    # record bit-identical to a fresh compute (the requester's own detector/flux
+    # scalars, its own case payload); only the profile-invariant transport arrays
+    # come from the shared blob.
+    if cache_read:
+        reused = 0
+        for c in cases:
+            if c["name"] in results and c["E0_keV"] in results[c["name"]]:
+                continue
+            key = _content_key(c)
+            if key is None or not _checkpoint_store.cas_contains(material, key, cas_root):
+                continue
+            try:
+                out = _checkpoint_store.cas_load(material, key, cas_root)
+            except (OSError, EOFError, pickle.UnpicklingError):
+                continue
+            if not _valid_cas_payload(out):
+                continue
+            store_result(results, c, out)
+            reused += 1
+        if reused:
+            print(f"reused {reused} {material} cases from shared content cache")
+            _save()  # persist reused cases into this profile's checkpoint + manifest
+
+    # Thin per-profile pointer table: (name, E0_keV) -> content_key, plus label
+    # provenance. Enables a future GC / `cxr clear` to know which shared blobs a
+    # profile references. Written on any run that populates the store.
+    if cache_write:
+        _write_case_manifest(checkpoint_path, cases, _content_key, dataset_identity)
+
     todo = [c for c in cases if not (c["name"] in results and c["E0_keV"] in results[c["name"]])]
     cached_cases = len(cases) - len(todo)
     print(f"{len(todo)} of {len(cases)} cases to run ({cached_cases} cached)")
@@ -540,6 +693,10 @@ def run_sweep(
     def _cb(i, case, out):
         nonlocal completed_new_cases, done_cost
         store_result(results, case, out)
+        if cache_write:
+            key = _content_key(case)
+            if key is not None:
+                _checkpoint_store.cas_save(material, key, cas_root, out)
         if on_case is not None:
             on_case(case)
         name = case["name"]

@@ -309,7 +309,8 @@ def _performance_profile(ctx, param, value):
         "Sample CPU pressure, RAM/swap, GPU clocks/VRAM, process-tree, phase "
         "timing, queue, case, worker, and chunk metrics for PROFILE's resolved "
         "membership into performance-profiles/PROFILE/<material>.ndjson "
-        "(cxr.performance.v1). Combine with -m to profile a single member."
+        "(cxr.performance.v1). Combine with -m to profile a single member. Runs "
+        "without shared-cache reads or writes unless --recompute is explicit."
     ),
 )
 @click.option(
@@ -364,6 +365,22 @@ def _performance_profile(ctx, param, value):
         "membership (-m narrows to one member). Requires -p/--perf."
     ),
 )
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    help=(
+        "Neither read nor write the shared per-case checkpoint cache: an "
+        "ephemeral run that recomputes every case and stores nothing shared."
+    ),
+)
+@click.option(
+    "--recompute",
+    is_flag=True,
+    help=(
+        "Ignore cached cases and recompute fresh, but repopulate the shared "
+        "per-case cache with the results."
+    ),
+)
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option("--no-progress", is_flag=True, help="Disable progress bars/dashboard.")
 @click.option("-v", "--verbose", count=True, help="Increase dashboard detail.")
@@ -385,6 +402,8 @@ def command(
     spec_chunk,
     brem_chunk,
     nsys,
+    no_cache,
+    recompute,
     progress_file,
     no_progress,
     json_output,
@@ -403,6 +422,19 @@ def command(
         raise click.UsageError("--spec-chunk/--brem-chunk require -p/--perf")
     if nsys and performance_profile is None:
         raise click.UsageError("--nsys requires -p/--perf")
+    # Shared per-case cache gates (see run_sweep's content-addressable store).
+    #   default    -> read + write
+    #   --recompute-> skip read, still repopulate (write)
+    #   --no-cache -> neither read nor write (ephemeral)
+    # A -p/--perf run defaults to --no-cache semantics so it measures real
+    # compute and never pollutes the shared store with a measurement run; an
+    # explicit --no-cache/--recompute on the same line wins (explicit beats the
+    # perf default).
+    if no_cache and recompute:
+        raise click.UsageError("--no-cache and --recompute are mutually exclusive")
+    perf_no_cache = performance_profile is not None and not (no_cache or recompute)
+    cache_read = not (no_cache or recompute or perf_no_cache)
+    cache_write = not (no_cache or perf_no_cache)
     # Pin the GPU spectrum/brem chunk before the runtime import so the main
     # process and every spawned transport worker (env inherited on spawn/
     # forkserver) read it. Mirrors the remote job script's `export
@@ -422,6 +454,8 @@ def command(
             fidelity=fidelity,
             quick=quick,
             n_families=n_families,
+            no_cache=no_cache,
+            recompute=recompute,
         )
         return None  # os.execvp already replaced the process; defensive.
     resolved_profile = _resolve_catalog_profile(catalog_profile, performance_profile)
@@ -452,6 +486,8 @@ def command(
             performance_profile=performance_profile,
             performance_dir=performance_dir,
             performance_interval=performance_interval,
+            cache_read=cache_read,
+            cache_write=cache_write,
             progress_file=progress_file,
             no_progress=no_progress,
             verbose=verbose,
@@ -481,6 +517,8 @@ def command(
         performance_profile=performance_profile,
         performance_dir=performance_dir,
         performance_interval=performance_interval,
+        cache_read=cache_read,
+        cache_write=cache_write,
         progress_file=progress_file,
         no_progress=no_progress,
     )
@@ -497,6 +535,8 @@ def _nsys_reexec_command(
     fidelity,
     quick,
     n_families,
+    no_cache=False,
+    recompute=False,
 ):
     """Build the ``nsys profile ... python -m cxr_mc._entry.scan`` argv and the
     trace-output stem for a local ``--nsys`` capture.
@@ -536,6 +576,10 @@ def _nsys_reexec_command(
         child += ["--quick"]
     if n_families is not None:
         child += ["--n-families", str(n_families)]
+    if no_cache:
+        child += ["--no-cache"]
+    elif recompute:
+        child += ["--recompute"]
     child += ["--checkpoint-dir", str(checkpoint_dir)]
     nsys_cmd = [
         "nsys",
@@ -1074,6 +1118,14 @@ def _run_material(args, material, max_seconds=None):
             interval_seconds=getattr(args, "performance_interval", 5.0),
         )
         performance_logger.start()
+    # Shared per-case cache gates. Default reads + writes; --recompute / --no-cache
+    # / a -p perf run narrow this (see the `run` command). cache_read also drives
+    # the per-stem resume, so a --no-cache/--recompute/perf run recomputes rather
+    # than resume-skipping (the perf-run "measures near-nothing" bug).
+    from .profiles import case_content_key
+
+    cache_read = getattr(args, "cache_read", True)
+    cache_write = getattr(args, "cache_write", True)
     try:
         if progress_timer is not None:
             progress_timer.start()
@@ -1083,6 +1135,10 @@ def _run_material(args, material, max_seconds=None):
             checkpoint_dir=args.checkpoint_dir,
             checkpoint_path=ckpt,
             max_workers=args.workers,
+            resume=cache_read,
+            content_key_fn=case_content_key,
+            cache_read=cache_read,
+            cache_write=cache_write,
             progress=not getattr(args, "no_progress", False),
             on_progress=(
                 _record_progress
