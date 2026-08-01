@@ -27,7 +27,19 @@ must remain until moved into a task file. Edit and drop items on `main`.
 6. Improve support for other shells/operating systems outside of WSL (especially agent hooks which run automatically)
    1. Create directory of shell scripts that are run as agent hooks to allow more complex setup & OS/shell handling
 7. General src refactor (maybe following work in items above) to group related loose files in src/cxr_mc/ into appropriately scoped subdirs
-8. LONG TERM GOALS (not now) (maybe a further applications for `uv` workspaces and/or some other way to split up optional packages):
+8. Fix this: make '--profile' the default behavior, '-m/--material', etc
+   1. (cxr-mc) ➜  cxr-mc git:(main) cxr remote pull --profile standard --all --level9
+      Usage: cxr remote pull [OPTIONS] [STEM|MATERIAL@PROFILE]...
+      Try 'cxr remote pull --help' for help.
+      Error: pull --profile already selects the profile's materials; drop --all
+      (cxr-mc) ➜  cxr-mc git:(main) cxr remote pull --profile standard --level9  
+      Usage: cxr remote pull [OPTIONS] [STEM|MATERIAL@PROFILE]...
+      Try 'cxr remote pull --help' for help.
+      Error: profile 'standard' has no explicit material membership; name materials alongside --profile, or use --all
+9. Related to above: 'cxr run standard' runs ALL materials rather than just those marked under [materials] in mats_to_sim.toml. The standard profile (and all profiles) should default their behavior to using [materials] unless explicitly set (this includes `pull`)
+10. Laptop-local SLURM is set up, but `cxr run` isn't connecting to it.
+11. Add local-version of `cxr remote clear` to drop local pickles. Same behavior as for remote.
+12. LONG TERM GOALS (not now) (maybe a further applications for `uv` workspaces and/or some other way to split up optional packages):
    1. Make this repo less CXR-specific, more general purpose.
       1. Add more optional physics (300 keV & below, to start with)
          1. Secondary electron emission (as an option)
