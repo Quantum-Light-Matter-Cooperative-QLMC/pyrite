@@ -1245,6 +1245,33 @@ def test_repair_brem_wide_skips_already_finite():
     assert n == 0
 
 
+def test_repair_brem_wide_recomputes_all_zero_placeholder(monkeypatch):
+    E = np.arange(100.0, 200.0, 10.0)
+    Eb = np.arange(0.0, 500.0, 50.0)
+    record = dict(
+        E_grid=E,
+        spec=np.ones_like(E),
+        brem=np.zeros_like(E),
+        E_grid_brem=Eb,
+        brem_wide=np.zeros_like(Eb),
+        eta=0.05,
+        scale=1.0,
+        case=_fake_case("cfg_a", 30.0),
+    )
+    monkeypatch.setattr(
+        "cxr_mc.montecarlo._brem_for_case",
+        lambda c, E_brem: np.full(np.asarray(E_brem, float).shape, 0.002),
+    )
+
+    n = repair_brem_wide(
+        {"cfg_a": {30.0: record}}, only_nonfinite=True, progress=False
+    )
+
+    assert n == 1
+    assert np.allclose(record["brem_wide"], 0.002)
+    assert np.allclose(record["brem"], 0.002)
+
+
 def test_repair_brem_wide_delegates_stacked_case_to_runner(monkeypatch):
     """A stale film-on-substrate record is repaired through the runner's
     ``_brem_for_case`` (the live-sweep path), which is handed the case's full
