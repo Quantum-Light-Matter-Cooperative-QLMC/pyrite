@@ -20,6 +20,7 @@ REMOTE_COMMANDS = (
     "reap",
     "pull",
     "profile",
+    "performance",
     "clear",
     "prune",
     "prune-jobs",
@@ -40,6 +41,48 @@ def test_every_remote_click_help_path_is_offline(name):
 
     assert_clean_result(result)
     assert f"Usage: remote {name} " in result.stdout
+
+
+def test_remote_performance_commands_dispatch(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "list_remote_performance",
+        lambda: calls.append(("list",)),
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "pull_performance_profile",
+        lambda profile: calls.append(("pull", profile)),
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "prune_remote_performance",
+        lambda profiles, **kwargs: calls.append(("prune", profiles, kwargs)),
+    )
+
+    assert_clean_result(invoke(remote.command, ["performance", "list"]))
+    assert_clean_result(invoke(remote.command, ["performance", "pull", "baseline"]))
+    assert_clean_result(
+        invoke(remote.command, ["performance", "prune", "baseline", "--yes"])
+    )
+
+    assert calls == [
+        ("list",),
+        ("pull", "baseline"),
+        ("prune", ["baseline"], {"all_profiles": False, "yes": True}),
+    ]
+
+
+def test_legacy_remote_profile_pull_warns_once(monkeypatch):
+    monkeypatch.setattr(lifecycle, "pull_performance_profile", lambda _profile: None)
+
+    result = invoke(remote.command, ["profile", "pull", "baseline"])
+
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert result.stderr.count("is deprecated") == 1
+    assert "cxr remote performance pull" in result.stderr
 
 
 def test_run_click_defaults_and_zero_meanings(monkeypatch):
@@ -82,13 +125,20 @@ def test_run_click_defaults_and_zero_meanings(monkeypatch):
 def test_run_perf_flags_and_level9_reach_workflow(monkeypatch):
     queued = []
     pulled = []
+    performance_pulled = []
     monkeypatch.setattr(
         lifecycle,
         "start_queue",
         lambda materials, **kwargs: queued.append((materials, kwargs)) or "job",
     )
     monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(remote.state, "_job_succeeded", lambda _jobid: True)
     monkeypatch.setattr(remote.state, "_completed_materials", lambda _jobid, materials: materials)
+    monkeypatch.setattr(
+        lifecycle,
+        "pull_performance_profile",
+        lambda profile: performance_pulled.append(profile),
+    )
     monkeypatch.setattr(
         lifecycle,
         "pull",
@@ -116,6 +166,7 @@ def test_run_perf_flags_and_level9_reach_workflow(monkeypatch):
     assert_clean_result(result)
     assert queued[0][1]["performance_repetitions"] == 1
     assert queued[0][1]["performance_interval"] == 2.0
+    assert performance_pulled == ["standard"]
     assert pulled[0][1]["level9"] is True
 
 

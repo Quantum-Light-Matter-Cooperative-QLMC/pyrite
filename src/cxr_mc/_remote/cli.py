@@ -18,6 +18,7 @@ from ..cli._core import (
     POSITIVE_INT,
     emit_diagnostic,
     emit_json_result,
+    emit_result,
     fidelity_option,
     invoke_legacy,
     run,
@@ -293,11 +294,26 @@ def _cli_start(args):
         brem_chunk=getattr(args, "brem_chunk", None),
         nsys=getattr(args, "nsys", False),
     )
-    if args.dry_run or args.headless:
+    if args.dry_run:
+        return
+    if args.headless:
+        if getattr(args, "performance_profile", None) is not None:
+            emit_result(
+                "performance artifacts remain remote; pull after completion with: "
+                f"cxr remote performance pull {args.performance_profile}"
+            )
         return
     if not viewer.attach(jobid):
         emit_diagnostic("run is still active or its viewer disconnected; skipping automatic pull")
         return
+    if getattr(args, "performance_profile", None) is not None and not args.no_pull:
+        if state._job_succeeded(jobid):
+            lifecycle.pull_performance_profile(args.performance_profile)
+        else:
+            emit_diagnostic(
+                "performance run did not complete successfully; "
+                "skipping automatic performance-artifact pull"
+            )
     profiling_only = getattr(args, "performance_repetitions", 1) > 1 or getattr(args, "nsys", False)
     if args.no_pull or profiling_only:
         if profiling_only:
@@ -372,6 +388,19 @@ def _cli_logs(args):
 
 def _cli_profile_pull(args):
     return lifecycle.pull_performance_profile(args.profile)
+
+
+def _cli_performance_list(args):
+    del args
+    return lifecycle.list_remote_performance()
+
+
+def _cli_performance_prune(args):
+    return lifecycle.prune_remote_performance(
+        args.profiles,
+        all_profiles=args.all_profiles,
+        yes=args.yes,
+    )
 
 
 def _cli_stop(args):
@@ -681,9 +710,11 @@ def reline_command(
 @click.option(
     "--chunk-minutes",
     type=NONNEGATIVE_FLOAT,
-    default=10.0,
-    show_default=True,
-    help="Self-resubmitting SLURM slice length; 0 runs one monolithic job.",
+    default=None,
+    help=(
+        "Self-resubmitting SLURM slice length; defaults to 10, or 0 for "
+        "--perf-reps >1 and --nsys."
+    ),
 )
 @click.option(
     "-p",
@@ -737,8 +768,8 @@ def reline_command(
     is_flag=True,
     help=(
         "Capture one uncached full-profile session with Nsight Systems CUDA/NVTX "
-        "and Python-stack tracing; requires exactly one material, --perf, "
-        "--perf-reps 1, and --chunk-minutes 0."
+        "and Python-stack tracing; implies --perf, --perf-reps 1, and "
+        "--chunk-minutes 0; requires one explicit -m/--material."
     ),
 )
 @click.option("--no-sync", is_flag=True, help="Skip code upload.")
@@ -751,7 +782,7 @@ def reline_command(
 @click.option(
     "--no-pull",
     is_flag=True,
-    help="Attach and track, but do not pull completed checkpoints.",
+    help="Attach and track, but do not pull completed checkpoints or performance artifacts.",
 )
 @click.option(
     "--grid",
@@ -791,7 +822,7 @@ def start_command(
     from ..scan import resolve_profile_materials
 
     materials = resolve_profile_materials(catalog_profile, material)
-    performance_profile = catalog_profile if perf else None
+    performance_profile = catalog_profile if perf or nsys else None
     if performance_profile is None:
         if performance_repetitions != 1:
             raise click.UsageError("--perf-reps requires --perf")
@@ -801,8 +832,12 @@ def start_command(
             raise click.UsageError("--spec-chunk requires --perf")
         if brem_chunk is not None:
             raise click.UsageError("--brem-chunk requires --perf")
-        if nsys:
-            raise click.UsageError("--nsys requires --perf")
+    if nsys and material is None:
+        raise click.UsageError("--nsys requires one explicit -m/--material")
+    if (performance_repetitions > 1 or nsys) and chunk_minutes is None:
+        chunk_minutes = 0.0
+    elif chunk_minutes is None:
+        chunk_minutes = 10.0
     if performance_repetitions > 1 and chunk_minutes != 0:
         raise click.UsageError("--perf-reps requires --chunk-minutes 0")
     if performance_repetitions > 1 and parallel_materials not in (None, 1):
@@ -917,7 +952,7 @@ def logs_command(jobid, follow):
     return _invoke_click(_cli_logs, _click_args("logs", jobid=jobid, follow=follow))
 
 
-@command.group("profile", help="Manage named compute-performance logs.")
+@command.group("profile", help="Manage named compute-performance logs.", hidden=True)
 def profile_command():
     pass
 
@@ -935,9 +970,65 @@ def profile_command():
     metavar="PERFORMANCE_PROFILE",
 )
 def profile_pull_command(profile):
+    emit_diagnostic(
+        "warning: 'cxr remote profile pull' is deprecated; "
+        "use 'cxr remote performance pull'"
+    )
     return _invoke_click(
         _cli_profile_pull,
         _click_args("profile pull", profile=profile),
+    )
+
+
+@command.group("performance", help="List, pull, or prune remote performance artifacts.")
+def performance_command():
+    pass
+
+
+@performance_command.command("list", help="List remote performance artifact directories.")
+def performance_list_command():
+    return _invoke_click(_cli_performance_list, _click_args("performance list"))
+
+
+@performance_command.command(
+    "pull",
+    help="Fetch one profile's NDJSON, Nsight, and CPU-profile artifacts.",
+)
+@click.argument("profile", callback=_performance_profile_name, metavar="PERFORMANCE_PROFILE")
+def performance_pull_command(profile):
+    return _invoke_click(
+        _cli_profile_pull,
+        _click_args("performance pull", profile=profile),
+    )
+
+
+@performance_command.command(
+    "prune",
+    help="Delete selected terminal-job performance artifacts; preview by default.",
+)
+@click.argument(
+    "profiles",
+    nargs=-1,
+    callback=lambda ctx, param, values: tuple(
+        _performance_profile_name(ctx, param, value) for value in values
+    ),
+    metavar="[PROFILE]...",
+)
+@click.option("--all", "all_profiles", is_flag=True, help="Select every remote profile.")
+@click.option("--yes", is_flag=True, help="Delete exact previewed directories.")
+def performance_prune_command(profiles, all_profiles, yes):
+    if all_profiles and profiles:
+        raise click.UsageError("remote performance prune --all does not take PROFILE names")
+    if not all_profiles and not profiles:
+        raise click.UsageError("remote performance prune needs PROFILE name(s), or use --all")
+    return _invoke_click(
+        _cli_performance_prune,
+        _click_args(
+            "performance prune",
+            profiles=list(profiles),
+            all_profiles=all_profiles,
+            yes=yes,
+        ),
     )
 
 

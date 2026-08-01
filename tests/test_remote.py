@@ -543,6 +543,111 @@ def test_pull_performance_profile_fetches_nsys_artifacts(monkeypatch, tmp_path):
     ]
 
 
+def test_remote_performance_inventory_parses_artifact_totals(monkeypatch):
+    commands = []
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda command: commands.append(command)
+        or "job-2\tbaseline\t3\t120\njob-1\tbaseline\t2\t80\n",
+    )
+
+    inventory = lifecycle.remote_performance_inventory()
+
+    assert inventory == [
+        ("job-1", "baseline", 2, 80),
+        ("job-2", "baseline", 3, 120),
+    ]
+    assert '"$JOBS"/*/performance/*/' in commands[0]
+
+
+def test_remote_performance_inventory_rejects_malformed_output(monkeypatch):
+    monkeypatch.setattr(transport, "_ssh_capture", lambda _command: "job\t../bad\t2\t80\n")
+
+    with pytest.raises(SystemExit, match="remote inventory was malformed"):
+        lifecycle.remote_performance_inventory()
+
+
+def test_prune_remote_performance_previews_terminal_jobs(monkeypatch, capsys):
+    inventory = [("job-1", "baseline", 2, 80), ("job-2", "keeper", 1, 40)]
+    monkeypatch.setattr(lifecycle, "remote_performance_inventory", lambda: inventory)
+    monkeypatch.setattr(state, "_live_jobs", lambda: [])
+    monkeypatch.setattr(state, "_job_state", lambda _jobid: "done [1/1]")
+    monkeypatch.setattr(
+        transport,
+        "_ssh_capture",
+        lambda _command: pytest.fail("preview must not delete"),
+    )
+
+    lifecycle.prune_remote_performance(["baseline"])
+
+    output = capsys.readouterr().out
+    assert "baseline/job-1 (2 artifact(s), 80 bytes)" in output
+    assert "preview only" in output
+    assert "keeper" not in output
+
+
+def test_prune_remote_performance_blocks_live_or_incomplete_jobs(monkeypatch):
+    inventory = [("job-1", "baseline", 2, 80)]
+    monkeypatch.setattr(lifecycle, "remote_performance_inventory", lambda: inventory)
+    monkeypatch.setattr(state, "_live_jobs", lambda: [("job-1", False, ["hopg"])])
+
+    with pytest.raises(SystemExit, match="live job"):
+        lifecycle.prune_remote_performance(["baseline"])
+
+    monkeypatch.setattr(state, "_live_jobs", lambda: [])
+    monkeypatch.setattr(state, "_job_state", lambda _jobid: "running hopg")
+    with pytest.raises(SystemExit, match="non-terminal job"):
+        lifecycle.prune_remote_performance(["baseline"])
+
+
+def test_prune_remote_performance_revalidates_and_deletes_exact_paths(monkeypatch, capsys):
+    inventory = [
+        ("job-1", "baseline", 2, 80),
+        ("job-2", "baseline", 1, 40),
+        ("job-3", "keeper", 1, 20),
+    ]
+    monkeypatch.setattr(lifecycle, "remote_performance_inventory", lambda: inventory)
+    monkeypatch.setattr(state, "_live_jobs", lambda: [])
+    monkeypatch.setattr(state, "_job_state", lambda _jobid: "done [1/1]")
+    commands = []
+    monkeypatch.setattr(transport, "_ssh_capture", lambda command: commands.append(command) or "")
+
+    lifecycle.prune_remote_performance(["baseline"], yes=True)
+
+    assert len(commands) == 1
+    assert f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/job-1/performance/baseline" in commands[0]
+    assert f"{config.REMOTE_DIR}/{config.JOBS_SUBDIR}/job-2/performance/baseline" in commands[0]
+    assert "job-3" not in commands[0]
+    assert "deleted 2 remote performance profile path(s)" in capsys.readouterr().out
+
+
+def test_prune_remote_performance_blocks_changed_inventory(monkeypatch):
+    inventories = iter(
+        [
+            [("job-1", "baseline", 2, 80)],
+            [("job-1", "baseline", 3, 120)],
+        ]
+    )
+    monkeypatch.setattr(lifecycle, "remote_performance_inventory", lambda: next(inventories))
+    monkeypatch.setattr(state, "_live_jobs", lambda: [])
+    monkeypatch.setattr(state, "_job_state", lambda _jobid: "done [1/1]")
+
+    with pytest.raises(SystemExit, match="inventory changed"):
+        lifecycle.prune_remote_performance(["baseline"], yes=True)
+
+
+def test_prune_remote_performance_blocks_changed_job_state(monkeypatch):
+    inventory = [("job-1", "baseline", 2, 80)]
+    states = iter(["done [1/1]", "FAILED (exit 1)"])
+    monkeypatch.setattr(lifecycle, "remote_performance_inventory", lambda: inventory)
+    monkeypatch.setattr(state, "_live_jobs", lambda: [])
+    monkeypatch.setattr(state, "_job_state", lambda _jobid: next(states))
+
+    with pytest.raises(SystemExit, match="job state"):
+        lifecycle.prune_remote_performance(["baseline"], yes=True)
+
+
 def test_status_formats_latest_performance_profile():
     sections = {
         "JOB": "j",
@@ -1075,7 +1180,7 @@ def test_run_rejects_perf_reps_without_perf(capsys):
     assert "--perf-reps requires --perf" in capsys.readouterr().err
 
 
-def test_run_rejects_perf_reps_in_chunked_mode(capsys):
+def test_run_perf_reps_default_to_monolithic_mode(capsys):
     result = remote.main(
         [
             "run",
@@ -1087,17 +1192,37 @@ def test_run_rejects_perf_reps_in_chunked_mode(capsys):
         ]
     )
 
+    assert result is None
+    assert "chunk_minutes: 0.0" in capsys.readouterr().out
+
+
+def test_run_rejects_explicit_nonzero_chunk_for_perf_reps(capsys):
+    result = remote.main(
+        [
+            "run",
+            "compute_test_300keV",
+            "--perf",
+            "--perf-reps",
+            "3",
+            "--chunk-minutes",
+            "10",
+            "--dry-run",
+        ]
+    )
+
     assert result == 2
     assert "--perf-reps requires --chunk-minutes 0" in capsys.readouterr().err
 
 
-def test_run_rejects_nsys_without_performance_profile(capsys):
+def test_run_nsys_implies_performance_profile(capsys):
     result = remote.main(
-        ["run", "compute_test_300keV", "--nsys", "--chunk-minutes", "0", "--dry-run"]
+        ["run", "compute_test_300keV", "-m", "mos2", "--nsys", "--dry-run"]
     )
 
-    assert result == 2
-    assert "--nsys requires --perf" in capsys.readouterr().err
+    assert result is None
+    output = capsys.readouterr().out
+    assert "performance_profile: compute_test_300keV" in output
+    assert "chunk_minutes: 0.0" in output
 
 
 def test_run_rejects_nsys_in_chunked_mode(capsys):
@@ -1105,8 +1230,11 @@ def test_run_rejects_nsys_in_chunked_mode(capsys):
         [
             "run",
             "compute_test_300keV",
-            "--perf",
+            "-m",
+            "mos2",
             "--nsys",
+            "--chunk-minutes",
+            "10",
             "--dry-run",
         ]
     )
@@ -1120,7 +1248,8 @@ def test_run_rejects_nsys_with_multiple_repetitions(capsys):
         [
             "run",
             "compute_test_300keV",
-            "--perf",
+            "-m",
+            "mos2",
             "--perf-reps",
             "2",
             "--nsys",
@@ -1134,7 +1263,7 @@ def test_run_rejects_nsys_with_multiple_repetitions(capsys):
     assert "--nsys requires --perf-reps 1" in capsys.readouterr().err
 
 
-def test_run_rejects_nsys_with_multiple_materials(capsys):
+def test_run_rejects_nsys_without_explicit_material(capsys):
     result = remote.main(
         [
             "run",
@@ -1148,7 +1277,7 @@ def test_run_rejects_nsys_with_multiple_materials(capsys):
     )
 
     assert result == 2
-    assert "--nsys requires exactly one material" in capsys.readouterr().err
+    assert "--nsys requires one explicit -m/--material" in capsys.readouterr().err
 
 
 def test_run_performance_runtime_knobs_reach_monolithic_dry_run(capsys):
@@ -1238,6 +1367,17 @@ def test_run_headless_skips_attach_and_pull(monkeypatch):
     remote.main(["run", "standard", "-m", "hopg", "--headless", "--no-sync"])
 
 
+def test_headless_performance_run_prints_canonical_pull_hint(monkeypatch, capsys):
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: pytest.fail("must not attach"))
+
+    remote.main(
+        ["run", "standard", "-m", "hopg", "--perf", "--headless", "--no-sync"]
+    )
+
+    assert "cxr remote performance pull standard" in capsys.readouterr().out
+
+
 def test_run_no_pull_still_attaches(monkeypatch):
     attached = []
     monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
@@ -1249,9 +1389,74 @@ def test_run_no_pull_still_attaches(monkeypatch):
     assert attached == ["j"]
 
 
+def test_performance_no_pull_skips_all_artifact_pulls(monkeypatch):
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(
+        state,
+        "_job_succeeded",
+        lambda _jobid: pytest.fail("--no-pull must not query terminal success for pulling"),
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "pull_performance_profile",
+        lambda _profile: pytest.fail("--no-pull must not pull performance artifacts"),
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "pull",
+        lambda *_args, **_kwargs: pytest.fail("--no-pull must not pull checkpoints"),
+    )
+
+    remote.main(
+        ["run", "standard", "-m", "hopg", "--perf", "--no-pull", "--no-sync"]
+    )
+
+
+def test_successful_performance_run_auto_pulls_artifacts(monkeypatch):
+    pulled = []
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(state, "_job_succeeded", lambda _jobid: True)
+    monkeypatch.setattr(state, "_completed_materials", lambda _jobid, mats: mats)
+    monkeypatch.setattr(scripts, "_stems", lambda mats, *_args, **_kwargs: mats)
+    monkeypatch.setattr(
+        lifecycle,
+        "pull_performance_profile",
+        lambda profile: pulled.append(("performance", profile)),
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "pull",
+        lambda stems, **_kwargs: pulled.append(("checkpoint", stems)),
+    )
+
+    remote.main(["run", "standard", "-m", "hopg", "--perf", "--no-sync"])
+
+    assert pulled == [("performance", "standard"), ("checkpoint", ["hopg"])]
+
+
+def test_failed_performance_run_skips_artifact_pull(monkeypatch, capsys):
+    monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(state, "_job_succeeded", lambda _jobid: False)
+    monkeypatch.setattr(state, "_completed_materials", lambda _jobid, _mats: [])
+    monkeypatch.setattr(
+        lifecycle,
+        "pull_performance_profile",
+        lambda _profile: pytest.fail("failed job must not auto-pull performance artifacts"),
+    )
+
+    remote.main(["run", "standard", "-m", "hopg", "--perf", "--no-sync"])
+
+    assert "did not complete successfully" in capsys.readouterr().err
+
+
 def test_run_perf_reps_attach_but_skip_checkpoint_pull(monkeypatch, capsys):
     monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
     monkeypatch.setattr(viewer, "attach", lambda _jobid: True)
+    monkeypatch.setattr(state, "_job_succeeded", lambda _jobid: True)
+    monkeypatch.setattr(lifecycle, "pull_performance_profile", lambda _profile: None)
     monkeypatch.setattr(
         state,
         "_completed_materials",
