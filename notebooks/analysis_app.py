@@ -1538,7 +1538,7 @@ def _(
         # Cross-material "case basket": user hand-picks individual cases from
         # whichever checkpoint is loaded above and overlays them, unlike the
         # single-swept-dimension polar/azim tabs. See
-        # docs/case-compare-tab-plan.md.
+        # docs/plans/case-compare-tab-plan.md.
         _basket = get_case_basket()
         _picker_block = mo.vstack(
             [

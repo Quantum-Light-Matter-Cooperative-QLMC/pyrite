@@ -320,7 +320,7 @@ def _(mo):
 @app.cell
 def _(mo):
     # Prerendered animation controls (workstream 2 of
-    # docs/viewer-camera-animation-plan.md): the interactive Plotly frame
+    # docs/plans/viewer-camera-animation-plan.md): the interactive Plotly frame
     # animation is gone -- the tab shows a static full-reveal figure plus an
     # explicit Render button that produces a smooth, looping fixed-camera
     # video via cxr_mc.plots.render_trajectories.render_reveal_animation.
@@ -477,7 +477,7 @@ def _(
             set_penetration_data((_data_key, _data, _nc))
 
         # Static full-reveal figure (orbit/hover intact); the old interactive
-        # Plotly frame animation is gone -- see docs/viewer-camera-animation-plan.md
+        # Plotly frame animation is gone -- see docs/plans/viewer-camera-animation-plan.md
         # workstream 2. Smooth playback now comes from the Render button below,
         # which prerenders a fixed-camera video via render_reveal_animation.
         _volume = trajectory_volume_figure_from_data(

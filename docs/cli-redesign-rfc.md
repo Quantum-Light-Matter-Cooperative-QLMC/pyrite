@@ -1,10 +1,12 @@
 # RFC: `cxr` CLI structural redesign
 
-- **Status:** Draft — open for comments
+- **Status:** Accepted — 2026-08-01
 - **Author:** Alex Amador
 - **Created:** 2026-08-01
-- **Supersedes/relates:** `TODO_CLI.md` (punch-list), `docs/cli-energy-grid-sweep-rework-plan.md`, `docs/scan-config-cli-plan.md`
+- **Supersedes/relates:** `TODO_CLI.md` (punch-list — folded into `TODO.md` `## CLI backlog`, 2026-08-01), `docs/cli-energy-grid-sweep-rework-plan.md`, `docs/plans/scan-config-cli-plan.md`
 - **Sub-RFC:** `docs/cli-artifact-model-rfc.md` (the content-addressed data-model change, split off — see D3)
+- **Companion:** `docs/package-structure-rfc.md` (package/repo reorg; its
+  command-home consolidation is a prerequisite for this RFC — see §4 phase 0)
 - **Authoritative surface at time of writing:** `docs/cli-reference.md` (v0.1.0)
 
 > An RFC is a design proposal circulated for critique *before* implementation, so
@@ -127,6 +129,27 @@ repetitions into set-and-forget. Following gcloud, context is
 **environment-scoped, not identity-scoped**: switching profile never forces a
 remote-target switch, and vice versa.
 
+**Precedence chain (documented, single order everywhere).** Every context-backed
+value resolves highest-wins:
+
+```
+per-call flag  >  environment (CXR_*)  >  config store  >  built-in default
+```
+
+This is the gcloud/kubectl contract. It must be stated in `docs/cli-reference.md`
+and enforced by one shared resolver so no command invents its own order. The
+`CXR_REMOTE_*` env vars keep working as the middle tier (they override the store
+but yield to an explicit flag), which is what today's callers already assume.
+
+**Naming caveat — `profile` is overloaded.** "Profile" already denotes the
+physics campaign object (`standard`/`survey`/…). Reusing it for the context
+pointer (`profile.current`) risks confusion with a future notion of a *context*
+that bundles remote + backend + campaign the way a kubectl context bundles
+cluster + user + namespace. Options: (a) keep `profile.current` (the pointer just
+names which campaign profile is active — arguably fine); (b) rename the bundle to
+`campaign.current` and reserve `context` for the whole environment set. See §6
+Q3.
+
 `cxr remote` survives **only** as the remote-as-*resource* namespace —
 `remote fetch` / `remote pull` / `remote list` / `remote target ...` — mirroring
 git/DVC `remote`. It no longer carries execution verbs.
@@ -179,6 +202,12 @@ Other cross-cutting standardizations:
 - **Output:** replace boolean `--json` with `-o, --output [table|json|wide]`
   (gh/kubectl model) — extensible, and enforced as **universally present** on
   every non-interactive command (fixes today's patchy `--json` coverage).
+  Contract: `table` is the human default; `json` is the machine-stable path and
+  the **only** format bound by the versioned-envelope automation contract (§1).
+  `wide` is a human convenience with no stability promise. `yaml` and
+  `jsonpath=<expr>` are reserved extension points (kubectl parity) — add on
+  demand, but every added format that isn't `json` is explicitly *not* a
+  contract surface, so scripts must target `-o json`.
 - Azimuth range corrected to the physical limit (`TODO_CLI.md` High-Pri #4 — see
   §5, it is a **bug**, tracked separately).
 
@@ -232,6 +261,13 @@ cxr checkpoint prune / reap / clear         →  cxr checkpoint gc  /  cxr check
 
 Phased so the automation contract never breaks:
 
+0. **Command-home consolidation (prerequisite)** — before any surface reorder,
+   unify where a CLI command *lives* in the tree. Today command implementations
+   are split between loose `src/cxr_mc/*.py` modules and `src/cxr_mc/cli/*.py`,
+   so D1's noun→verb reshuffle would edit two homes at once. This is a
+   package-structure change, not a surface one; it is owned by
+   **`docs/package-structure-rfc.md`** and lands first (pure refactor, zero
+   surface change, guarded by the existing `docs/cli-reference.md` freeze test).
 1. **Vocab (D4/D5) + deprecation harness (D7)** — additive: introduce canonical
    verbs/flags as primaries, wire old spellings as warning-emitting aliases.
    Zero behavior change. Ship first; lowest risk.
@@ -252,6 +288,10 @@ its alias rows in `docs/cli-deprecations.md`.
 ---
 
 ## 5. `TODO_CLI.md` punch-list mapping
+
+> `TODO_CLI.md` was folded into `TODO.md` `## CLI backlog` on 2026-08-01
+> (package-structure RFC P5). The item numbers below refer to that former
+> punch-list, preserved here as decision provenance.
 
 Splitting bugs from ergonomics from structure:
 
@@ -280,6 +320,9 @@ pointer in `cxr material` help; `app analysis` positional/subcommand collision.
    `--remote=NAME` overrides. Confirm the ergonomics.
 2. **`run` as blessed verb-first exception** — keep, or bite the bullet on
    `cxr profile run` for full consistency? (RFC recommends keep.)
+3. **`profile` vs `context` naming** — keep `config set profile.current`, or
+   rename the context bundle to `campaign.current` and reserve `context` for the
+   whole environment set (remote + backend + campaign)? (D2c naming caveat.)
 
 *Settled since the first draft:* `-o/--output` adopted over boolean `--json`
 (D5); the artifact model split into `docs/cli-artifact-model-rfc.md`, which owns

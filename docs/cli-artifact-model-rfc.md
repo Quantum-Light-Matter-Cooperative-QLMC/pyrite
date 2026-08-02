@@ -1,12 +1,14 @@
 # RFC: Content-addressed artifact model for grids, materials & checkpoints
 
-- **Status:** Draft — open for comments
+- **Status:** Accepted — 2026-08-01
 - **Author:** Alex Amador
 - **Created:** 2026-08-01
 - **Parent:** `docs/cli-redesign-rfc.md` (this is the split-off D3; the parent
   covers the surface layer — ordering, flags, job lifecycle, deprecation)
 - **Depends on:** nothing in the parent blocks this; but it is sequenced **last**
   (parent §4 phase 5) so it lands behind a stabilized command surface.
+- **Companion:** `docs/package-structure-rfc.md` (package/repo reorg; its
+  freeze-test convention is reused for the hash-input guard in §5 Q2).
 
 > Split from the parent CLI-redesign RFC because it is a **data-model** change,
 > not a surface one. The parent restructures how commands are spelled; this
@@ -66,6 +68,14 @@ Uniform across `material` and `energy-grid`:
 - `verify` — recompute the hash and confirm the stored bytes match.
 - `gc` — reclaim artifacts unreachable from any profile ref.
 
+**`gc` grace window (steal git reflog).** `gc` never reclaims an artifact the
+instant it becomes unreachable. Mirror `git gc --prune=<date>`: an artifact
+orphaned less than a grace window ago (propose default 14 days) is retained, and
+`gc --prune-all` (with the D6 destructive contract) forces immediate reclamation.
+This is cheap insurance against a mis-repointed profile (open Q4) deleting data
+that was reachable minutes earlier. Records the orphan timestamp in the store
+metadata, not in the artifact bytes (must not perturb the hash — see Q2).
+
 ## 3. Campaign lockfile (proposed)
 
 A `dvc.lock` / `Cargo.lock` analogue capturing `profile + resolved artifact
@@ -74,7 +84,15 @@ for a physics-validation repo where provenance is first-class. Records exactly
 which immutable artifacts a published result depended on, independent of later
 profile edits.
 
-Open: adopt in the first cut of this model, or add once the store exists?
+**Recommendation: adopt in the first cut** (resolves §5 Q1). For a
+physics-validation repo, "which exact immutable artifacts did this published
+result depend on" is the highest-value property either RFC delivers, and it is
+far cheaper to emit the lockfile from day one than to reconstruct provenance for
+results produced before it existed. The foundation is already in place —
+`profiles.py` has deterministic serialization and SHA-256 `dataset_identity` — so
+the lockfile is mostly a matter of writing the resolved `profile → artifact hash`
+map at run time. A campaign without a lockfile is not reproducible; treat the
+lockfile as part of "a run completed," not an optional add-on.
 
 ## 4. Migration
 
@@ -93,15 +111,25 @@ Deepest change in the redesign; land behind the stabilized parent surface
 
 ## 5. Open questions
 
-1. **Lockfile** — first cut, or follow-up? (§3)
+1. **Lockfile** — ~~first cut, or follow-up?~~ **Resolved: first cut** (§3
+   recommendation).
 2. **Hash inputs** — exact tuple that defines a grid/material artifact hash;
    which fields are identity vs. annotation (e.g. provenance notes must *not*
-   change the hash).
+   change the hash). *Recommendation:* steal DVC's normalize-then-hash — define
+   one canonical byte serialization of the identity tuple, list the excluded
+   annotation fields explicitly, and **freeze both with a test** (à la the
+   existing `test_*_exports.py` guards). The hash-input tuple is a compatibility
+   contract the moment it ships: a silent change re-hashes every artifact and
+   invalidates every lockfile. Build on `profiles.dataset_identity`, which
+   already excludes annotation from the digest.
 3. **Checkpoint reachability** — are checkpoints roots for `gc`, or reclaimable
    when their artifact is? (parent already treats archived checkpoints + active
-   manifests as CAS reachability roots — reconcile with that.)
+   manifests as CAS reachability roots — reconcile with that.) *Note:* the grace
+   window (§2) softens the blast radius of getting this wrong either way.
 4. **Migration reversibility** — is step 2 safely rollback-able if a repointed
-   profile misbehaves?
+   profile misbehaves? *Note:* the grace window guarantees the pre-repoint
+   artifacts survive the rollback window; a repoint is reversible as long as `gc
+   --prune-all` has not run.
 
 ## References
 

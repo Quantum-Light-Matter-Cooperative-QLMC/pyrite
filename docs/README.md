@@ -23,3 +23,15 @@ Guides, references, and validation records. They complement:
 | [atomic-data-sources.md](atomic-data-sources.md) | Atomic scattering data supplied by xraydb | adopted |
 | [crystal-db-comparison.md](crystal-db-comparison.md) | Offline external-database lattice cross-check | implemented |
 | [debye-waller-audit.md](debye-waller-audit.md) | Thermal-displacement provenance and scalar/tensor model scope | in progress |
+
+## Planning & decisions
+
+Split by lifetime (see [`package-structure-rfc.md`](package-structure-rfc.md)
+P4). These are dev-facing and excluded from the published site.
+
+- [`adr/`](adr/) — numbered architecture decision records (MADR-lite); the
+  durable, greppable "why we decided X" log.
+- [`plans/`](plans/) — tracked but **ephemeral** plans and handoffs; superseded
+  by shipped code and the docs above.
+- `*-rfc.md` — long-form design rationale (surface, artifact model, structure);
+  each accepted RFC gets an ADR stub.

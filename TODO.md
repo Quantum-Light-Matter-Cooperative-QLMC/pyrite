@@ -83,6 +83,43 @@ file. Edit and drop items on `main`.
 5. **Local checkpoint clearing.** Add a local equivalent of `cxr remote clear`
    for deleting local checkpoint pickles with matching behavior.
 
+## CLI backlog
+
+Command-surface bugs and ergonomics folded from the retired `TODO_CLI.md`. The
+structural redesign (noun/verb ordering, artifact model, deprecation policy)
+lives in [`docs/cli-redesign-rfc.md`](docs/cli-redesign-rfc.md) and its sub-RFCs,
+not here.
+
+### Bugs (fix + regression test)
+
+1. `energy-line` / energy-grid azimuth accepts 0–360° instead of the physical
+   `(90, 270)` limit.
+2. `cxr [remote] run -p` requires BOTH a single material AND a profile —
+   contradicts `run`'s own optional `-m`. Should accept profile, material, or
+   both.
+3. `cxr material` help text points to `cxr profile members`, which does not
+   exist (membership is `profile set/add/remove --materials`). Stale pointer.
+4. `cxr app analysis [MATERIAL] [COMMAND]` mixes an optional positional with a
+   subcommand at the same level — a material named `export` collides with the
+   `export` subcommand. (RFC D1 removes this structurally; live collision now.)
+
+### Ergonomics (ship anytime)
+
+1. Add `[coherent|incoherent|both]` to `cxr profile set` (and `add`). If a user
+   has individually added both, auto-switch to `both` — but make that switch
+   explicit/logged, not implicit magic.
+2. `cxr` with no args should print help, like `-h/--help`.
+
+## UI backlog
+
+General UI items folded from the retired `TODO_UI.md`.
+
+1. Clean up raw printed ssh commands shipped to remote unless a verbose flag is
+   given; otherwise show a well-formatted explanation, e.g. `Pulling "Standard
+   Performance Profile for MoS2" [progress bar + absolute progress]`.
+2. Golden data should be an optional installable, e.g. `uv add cxr-mc[golden]`
+   or part of `uv add cxr-mc[all]`.
+
 ## Long-term plans
 
 Direction notes only; not prioritized backlog or active commitments.
