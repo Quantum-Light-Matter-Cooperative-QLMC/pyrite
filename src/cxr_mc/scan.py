@@ -29,7 +29,6 @@ import io
 import json
 import math
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -49,7 +48,6 @@ from .cli import _dashboard
 from .cli import json as cli_json
 
 MATS_FILE = Path("mats_to_sim.toml")
-_PERFORMANCE_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 
 # Lazy runtime bindings keep help fast while preserving monkeypatchable module
 # seams used by focused driver tests.
@@ -86,14 +84,18 @@ def _load_runtime() -> None:
     case_cost = case_cost or sweep_module.case_cost
 
 
-
 def _local_probe():
     fields = []
     if shutil.which("nvidia-smi"):
         try:
             out = subprocess.check_output(
-                ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
-                text=True, stderr=subprocess.DEVNULL
+                [
+                    "nvidia-smi",
+                    "--query-gpu=utilization.gpu,memory.used,memory.total",
+                    "--format=csv,noheader,nounits",
+                ],
+                text=True,
+                stderr=subprocess.DEVNULL,
             ).strip()
             if out:
                 parts = out.split("\n")[0].split(",")
@@ -102,10 +104,18 @@ def _local_probe():
                     vram_used = float(parts[1])
                     vram_total = float(parts[2])
                     vram_pct = 100.0 * vram_used / vram_total if vram_total > 0 else 0.0
-                    fields.extend([f"gpu_percent={gpu:.1f}", f"vram_used_mib={vram_used:.0f}", f"vram_total_mib={vram_total:.0f}", f"vram_percent={vram_pct:.1f}"])
+                    fields.extend(
+                        [
+                            f"gpu_percent={gpu:.1f}",
+                            f"vram_used_mib={vram_used:.0f}",
+                            f"vram_total_mib={vram_total:.0f}",
+                            f"vram_percent={vram_pct:.1f}",
+                        ]
+                    )
         except Exception:
             pass
     return "|".join(fields)
+
 
 def _build_sections(args, materials, job_records, detail):
     meta = [
@@ -119,37 +129,46 @@ def _build_sections(args, materials, job_records, detail):
         meta.append(f"slice_minutes: {args.max_minutes}")
     if getattr(args, "catalog_profile", None) is not None:
         meta.append(f"profile: {args.catalog_profile}")
-    
+
     slurm_job = os.environ.get("SLURM_JOB_ID")
     if slurm_job:
         meta.append(f"slurm_job_id: {slurm_job}")
-    
+
     sections = {
         "META": "\n".join(meta),
         "STATE": "running",
         "RESOURCES": _local_probe(),
     }
-    
+
     if slurm_job and shutil.which("squeue"):
         try:
-            sq = subprocess.check_output(["squeue", "-j", slurm_job, "-o", "%i|%T|%P|%M|%L|%D|%r", "--noheader"], text=True, stderr=subprocess.DEVNULL).strip()
+            sq = subprocess.check_output(
+                ["squeue", "-j", slurm_job, "-o", "%i|%T|%P|%M|%L|%D|%r", "--noheader"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
             if sq:
                 parts = sq.split("|")
                 if len(parts) >= 7:
-                    sections["SQUEUE"] = f"job_id={parts[0]}|state={parts[1]}|partition={parts[2]}|elapsed={parts[3]}|left={parts[4]}|nodes={parts[5]}|reason={parts[6]}"
+                    sections["SQUEUE"] = (
+                        f"job_id={parts[0]}|state={parts[1]}|partition={parts[2]}|elapsed={parts[3]}|left={parts[4]}|nodes={parts[5]}|reason={parts[6]}"
+                    )
         except Exception:
             pass
-            
+
     progress_lines = []
     for _mat, rec in job_records.items():
         progress_lines.append(json.dumps(rec))
-    
+
     if progress_lines:
         sections["PROGRESS"] = "\n".join(progress_lines)
-        
+
     return sections
 
+
 _dashboard_stop = threading.Event()
+
+
 def _dashboard_loop(args, materials, job_records, detail):
     keys = _dashboard._KeyListener()
     try:
@@ -230,314 +249,6 @@ def validate_materials(materials: list[str]) -> None:
     unknown = [material for material in materials if material not in valid_materials]
     if unknown:
         raise SystemExit(f"unknown material(s): {', '.join(unknown)}")
-
-
-def _beam_uvw(ctx, param, value):
-    if value is None:
-        return None
-    return _cli_core.BEAM_UVW.convert(value, param, ctx)
-
-
-def _performance_profile(ctx, param, value):
-    if value is None:
-        return None
-    if _PERFORMANCE_PROFILE_RE.fullmatch(value) is None:
-        raise click.BadParameter(
-            "expected letters, digits, underscores, or hyphens; must start with letter or digit",
-            ctx=ctx,
-            param=param,
-        )
-    return value
-
-
-@click.command(
-    "run",
-    help=(
-        "Run a catalog profile's MC sweeps and write checkpoints.\n\n"
-        "PROFILE defaults to standard and owns material membership, campaign "
-        "ranges, and workload settings. Use -m/--material to run one profile "
-        "member instead of the full resolved membership.\n\n"
-        "Resumes compatible checkpoints in CHECKPOINTS. Full writes "
-        "<material>.pkl-compatible data in <material>/; variants use "
-        "identity-qualified stems."
-    ),
-)
-@click.argument(
-    "catalog_profile",
-    required=False,
-    default="standard",
-    metavar="[PROFILE]",
-    shell_complete=_cli_completion.complete_profile,
-)
-@click.option(
-    "-m",
-    "--material",
-    type=_cli_completion.MATERIAL,
-    default=None,
-    shell_complete=_cli_completion.complete_material,
-    help="Run one member of PROFILE instead of its full membership.",
-)
-@click.option(
-    "--workers",
-    type=_cli_core.NONNEGATIVE_INT,
-    default=None,
-    help="run_cases max_workers (default auto; 0 = serial, no transport pool).",
-)
-@click.option(
-    "--quick",
-    is_flag=True,
-    help="Use tiny smoke-test grid and write <material>_quick.pkl.",
-)
-@click.option(
-    "--n-families",
-    type=_cli_core.POSITIVE_INT,
-    default=None,
-    help="Override positive dominant reflection-family count.",
-)
-@click.option(
-    "--checkpoint-dir",
-    default="checkpoints",
-    show_default=True,
-    metavar="DIR",
-    help="Read and write checkpoint pickles in DIR.",
-)
-@click.option(
-    "--max-minutes",
-    type=_cli_core.POSITIVE_FLOAT,
-    default=None,
-    metavar="MINUTES",
-    help="Soft wall-clock budget in minutes; exit 75 if resumable work remains.",
-)
-@click.option(
-    "-p",
-    "--perf",
-    is_flag=True,
-    help=(
-        "Sample CPU pressure, RAM/swap, GPU clocks/VRAM, process-tree, phase "
-        "timing, queue, case, worker, and chunk metrics for PROFILE's resolved "
-        "membership into performance-profiles/PROFILE/<material>.ndjson "
-        "(cxr.performance.v1). Combine with -m to profile a single member. Runs "
-        "without shared-cache reads or writes unless --recompute is explicit."
-    ),
-)
-@click.option(
-    "--performance-profile",
-    callback=_performance_profile,
-    default=None,
-    metavar="NAME",
-    hidden=True,
-    help=(
-        "Run catalog profile NAME while sampling CPU pressure, RAM/swap, GPU clocks/"
-        "VRAM, process-tree, phase timing, queue, case, worker, and chunk metrics "
-        "every 5 s into "
-        "performance-profiles/NAME/<material>.ndjson."
-    ),
-)
-@click.option(
-    "--performance-dir",
-    type=click.Path(path_type=Path),
-    default=None,
-    hidden=True,
-)
-@click.option(
-    "-i",
-    "--perf-interval",
-    "performance_interval",
-    type=_cli_core.POSITIVE_FLOAT,
-    default=5.0,
-    show_default=True,
-    metavar="SECONDS",
-    help="Performance-telemetry sampling interval; requires -p/--perf.",
-)
-@click.option(
-    "--spec-chunk",
-    type=_cli_core.POSITIVE_INT,
-    default=None,
-    metavar="N",
-    help="Pin line-spectrum segments per GPU chunk; requires -p/--perf.",
-)
-@click.option(
-    "--brem-chunk",
-    type=_cli_core.POSITIVE_INT,
-    default=None,
-    metavar="N",
-    help="Pin bremsstrahlung segments per GPU chunk; requires -p/--perf.",
-)
-@click.option(
-    "--nsys",
-    is_flag=True,
-    help=(
-        "Capture one uncached Nsight Systems CUDA/NVTX trace of the run (writes a "
-        ".nsys-rep next to the perf log); defaults to the profile's full "
-        "membership (-m narrows to one member). Requires -p/--perf."
-    ),
-)
-@click.option(
-    "--no-cache",
-    is_flag=True,
-    help=(
-        "Neither read nor write the shared per-case checkpoint cache: an "
-        "ephemeral run that recomputes every case and stores nothing shared."
-    ),
-)
-@click.option(
-    "--recompute",
-    is_flag=True,
-    help=(
-        "Ignore cached cases and recompute fresh, but repopulate the shared "
-        "per-case cache with the results."
-    ),
-)
-@click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
-@click.option(
-    "--progress-phase",
-    type=click.Choice(("primary", "cpu"), case_sensitive=True),
-    default=None,
-    hidden=True,
-)
-@click.option("--no-progress", is_flag=True, help="Disable progress bars/dashboard.")
-@click.option("-v", "--verbose", count=True, help="Increase dashboard detail.")
-@_cli_core.fidelity_option()
-@_cli_core.json_option
-def command(
-    catalog_profile,
-    material,
-    workers,
-    fidelity,
-    quick,
-    n_families,
-    checkpoint_dir,
-    max_minutes,
-    perf,
-    performance_profile,
-    performance_dir,
-    performance_interval,
-    spec_chunk,
-    brem_chunk,
-    nsys,
-    no_cache,
-    recompute,
-    progress_file,
-    progress_phase,
-    no_progress,
-    json_output,
-    verbose,
-):
-    """Click entry point for the staged root migration."""
-    if quick and fidelity != "full":
-        raise click.UsageError("--quick cannot be combined with --fidelity survey")
-    if perf and performance_profile is None:
-        # -p is sugar for --performance-profile PROFILE: profile the positional
-        # profile's full membership (or one member when -m is given).
-        performance_profile = catalog_profile
-    if performance_interval != 5.0 and performance_profile is None:
-        raise click.UsageError("--perf-interval requires -p/--perf")
-    if (spec_chunk is not None or brem_chunk is not None) and performance_profile is None:
-        raise click.UsageError("--spec-chunk/--brem-chunk require -p/--perf")
-    if nsys and performance_profile is None:
-        raise click.UsageError("--nsys requires -p/--perf")
-    # Shared per-case cache gates (see run_sweep's content-addressable store).
-    #   default    -> read + write
-    #   --recompute-> skip read, still repopulate (write)
-    #   --no-cache -> neither read nor write (ephemeral)
-    # A -p/--perf run defaults to --no-cache semantics so it measures real
-    # compute and never pollutes the shared store with a measurement run; an
-    # explicit --no-cache/--recompute on the same line wins (explicit beats the
-    # perf default).
-    if no_cache and recompute:
-        raise click.UsageError("--no-cache and --recompute are mutually exclusive")
-    perf_no_cache = performance_profile is not None and not (no_cache or recompute)
-    cache_read = not (no_cache or recompute or perf_no_cache)
-    cache_write = not (no_cache or perf_no_cache)
-    # Pin the GPU spectrum/brem chunk before the runtime import so the main
-    # process and every spawned transport worker (env inherited on spawn/
-    # forkserver) read it. Mirrors the remote job script's `export
-    # CXR_MC_SPEC_CHUNK` / `CXR_MC_BREM_CHUNK`.
-    if spec_chunk is not None:
-        os.environ["CXR_MC_SPEC_CHUNK"] = str(spec_chunk)
-    if brem_chunk is not None:
-        os.environ["CXR_MC_BREM_CHUNK"] = str(brem_chunk)
-    if nsys:
-        _reexec_under_nsys(
-            catalog_profile=catalog_profile,
-            material=material,
-            performance_profile=performance_profile,
-            performance_dir=performance_dir,
-            performance_interval=performance_interval,
-            workers=workers,
-            fidelity=fidelity,
-            quick=quick,
-            n_families=n_families,
-            no_cache=no_cache,
-            recompute=recompute,
-        )
-        return None  # os.execvp already replaced the process; defensive.
-    resolved_profile = _resolve_catalog_profile(catalog_profile, performance_profile)
-    resolve_profile_materials(resolved_profile, material)
-    if not json_output:
-        return _cli_core.invoke_legacy(
-            run,
-            material=material,
-            all=False,
-            actually_all=False,
-            include_unverified_dw=False,
-            include_high_energy=False,
-            high_energy_min_kev=None,
-            workers=workers,
-            fidelity=fidelity,
-            catalog_profile=catalog_profile,
-            quick=quick,
-            n_families=n_families,
-            beam_uvw=None,
-            beam_transverse_fwhm_x_mm=None,
-            beam_transverse_fwhm_y_mm=None,
-            beam_bunch_length_fs=None,
-            beam_long_shape=None,
-            beam_rep_rate_hz=None,
-            beam_bunch_charge_pc=None,
-            checkpoint_dir=checkpoint_dir,
-            max_minutes=max_minutes,
-            performance_profile=performance_profile,
-            performance_dir=performance_dir,
-            performance_interval=performance_interval,
-            cache_read=cache_read,
-            cache_write=cache_write,
-            progress_file=progress_file,
-            no_progress=no_progress,
-            verbose=verbose,
-            **({"progress_phase": progress_phase} if progress_phase is not None else {}),
-        )
-    return _cli_core.invoke_legacy(
-        _run_json,
-        material=material,
-        all=False,
-        actually_all=False,
-        include_unverified_dw=False,
-        include_high_energy=False,
-        high_energy_min_kev=None,
-        workers=workers,
-        fidelity=fidelity,
-        catalog_profile=catalog_profile,
-        quick=quick,
-        n_families=n_families,
-        beam_uvw=None,
-        beam_transverse_fwhm_x_mm=None,
-        beam_transverse_fwhm_y_mm=None,
-        beam_bunch_length_fs=None,
-        beam_long_shape=None,
-        beam_rep_rate_hz=None,
-        beam_bunch_charge_pc=None,
-        checkpoint_dir=checkpoint_dir,
-        max_minutes=max_minutes,
-        performance_profile=performance_profile,
-        performance_dir=performance_dir,
-        performance_interval=performance_interval,
-        cache_read=cache_read,
-        cache_write=cache_write,
-        progress_file=progress_file,
-        no_progress=no_progress,
-        **({"progress_phase": progress_phase} if progress_phase is not None else {}),
-    )
 
 
 def _nsys_reexec_command(
@@ -719,17 +430,23 @@ def run(args):
     deadline = None
     if getattr(args, "max_minutes", None) is not None:
         deadline = time.monotonic() + args.max_minutes * 60.0
-        
+
     job_records = {}
-    use_dashboard = not getattr(args, "no_progress", False) and sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+    use_dashboard = (
+        not getattr(args, "no_progress", False)
+        and sys.stdout.isatty()
+        and not os.environ.get("NO_COLOR")
+    )
 
     if use_dashboard:
         args._job_records = job_records
         os.environ["CXR_LOCAL_DASHBOARD"] = "1"
         detail = getattr(args, "verbose", 0)
-        t = threading.Thread(target=_dashboard_loop, args=(args, materials, job_records, detail), daemon=True)
+        t = threading.Thread(
+            target=_dashboard_loop, args=(args, materials, job_records, detail), daemon=True
+        )
         t.start()
-        
+
     try:
         incomplete = False
         for material in materials:
@@ -744,11 +461,12 @@ def run(args):
             t.join(timeout=2.0)
             sections = _build_sections(args, materials, job_records, getattr(args, "verbose", 0))
             sections["STATE"] = "done" if not incomplete else "paused"
-            frame = _dashboard._style_states(_dashboard._format_job_status(sections, getattr(args, "verbose", 0)))
+            frame = _dashboard._style_states(
+                _dashboard._format_job_status(sections, getattr(args, "verbose", 0))
+            )
             _dashboard._render_frame(frame, tty=True)
             if "CXR_LOCAL_DASHBOARD" in os.environ:
                 del os.environ["CXR_LOCAL_DASHBOARD"]
-
 
 
 def _run_json(args):
@@ -1061,7 +779,7 @@ def _run_material(args, material, max_seconds=None):
             progress_snapshot = dict(latest_progress)
             cost_snapshot = dict(latest_cost)
             case_snapshot = dict(latest_case) or None
-        
+
         computed_cost = (
             None
             if initial_done_cost is None or "done_cost" not in cost_snapshot
@@ -1081,12 +799,14 @@ def _run_material(args, material, max_seconds=None):
                 rec["done_cost"] = cost_snapshot["done_cost"]
                 rec["total_cost"] = cost_snapshot["total_cost"]
             if progress_timer:
-                rec.update(progress_timer.snapshot(
-                    completed_new_cases=progress_snapshot["completed_new_cases"],
-                    computed_cost=computed_cost,
-                ))
+                rec.update(
+                    progress_timer.snapshot(
+                        completed_new_cases=progress_snapshot["completed_new_cases"],
+                        computed_cost=computed_cost,
+                    )
+                )
             args._job_records[material] = rec
-            
+
         if progress_file is not None:
             assert progress_timer is not None
             _write_progress_record(
@@ -1272,10 +992,10 @@ def _run_material(args, material, max_seconds=None):
         performance_state["state"] = "done" if complete else "paused"
     if performance_logger is not None:
         performance_logger.close("done" if complete else "paused")
-    
+
     if hasattr(args, "_job_records") and material in args._job_records:
         args._job_records[material]["state"] = "done" if complete else "paused"
-        
+
     if progress_file is not None:
         assert progress_timer is not None
         _write_progress_record(
@@ -1406,7 +1126,19 @@ def _write_progress_record(
     os.replace(tmp, path)
 
 
+def __getattr__(name):
+    # ``command`` moved to cxr_mc.cli.commands.scan; keep the module-level seam
+    # so ``scan.command`` and dispatch keep resolving without an import cycle.
+    if name == "command":
+        from .cli.commands.scan import command
+
+        return command
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
 def main(argv=None):
+    from .cli.commands.scan import command
+
     return _cli_core.run(command, argv, prog_name="cxr run")
 
 

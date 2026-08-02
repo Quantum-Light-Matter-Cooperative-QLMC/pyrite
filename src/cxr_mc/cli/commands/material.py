@@ -25,7 +25,7 @@ from cxr_mc.cli._core import (
 _RESET_CHOICES = click.Choice((*_catalog_io.RANGES, "all"), case_sensitive=False)
 
 _COMMANDS = {
-    "blaze": "cxr_mc.blaze.command",
+    "blaze": "cxr_mc.cli.commands.blaze.command",
     "validate": "cxr_mc.cli.commands.check_config.command",
 }
 

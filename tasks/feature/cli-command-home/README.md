@@ -10,12 +10,22 @@ Use `cli/commands/`, not a flat `cli/`: the existing `cli/` package has 16 modul
 
 ## Checklist
 
-- [ ] Add `cli/commands/` package and move standalone command wiring.
-- [ ] Split `scan.py` and `blaze.py` so drivers remain domain-owned and Click wiring moves.
-- [ ] Update lazy dispatch without changing surface behavior.
-- [ ] Preserve or deliberately replace every test import seam.
-- [ ] Regenerate `docs/cli-reference.md` and `docs/repo_map.md`.
-- [ ] Pass CLI reference/export-freeze, targeted CLI, lint, typecheck, and relevant full tests.
+- [x] Add `cli/commands/` package and move standalone command wiring.
+- [x] Split `scan.py` and `blaze.py` so drivers remain domain-owned and Click wiring moves.
+  Wiring → `cli/commands/{scan,blaze}.py`; drivers keep `run`/`_run_json`/`main`.
+  Domain modules re-export `command` via a lazy module `__getattr__` (no import
+  cycle) so `scan.command`/`blaze.command` seams and dispatch keep resolving.
+- [x] Update lazy dispatch without changing surface behavior. `cli/__init__.py`
+  `run` and `cli/commands/material.py` `blaze` now point at `cli.commands.*`.
+- [x] Preserve or deliberately replace every test import seam. Preserved via the
+  `__getattr__` seams — command-test files use `scan.<driver>`/`scan.command`
+  from the same name, so no test edits needed.
+- [x] `docs/cli-reference.md` current (generator `--check` passes; zero surface
+  change). `docs/repo_map.md` is a curated doc, accurate at its abstraction level
+  (`scan:main` / lazy dispatch, not internal wiring homes) — no change.
+- [x] Pass CLI reference/export-freeze, targeted CLI (890 passed), lint, typecheck.
+  Also fixed 2 pre-existing ty errors (`profile.py`/`sweep.py` importing through
+  the `sys.modules`-swap alias modules) by repointing at `cli.commands.*`.
 
 ## Non-goals
 

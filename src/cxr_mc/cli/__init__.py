@@ -10,7 +10,7 @@ from .. import __version__
 from ._core import LazyGroup, color_option, run
 
 _COMMANDS = {
-    "run": "cxr_mc.scan.command",
+    "run": "cxr_mc.cli.commands.scan.command",
     "setup": "cxr_mc.cli.commands.backend_setup.command",
     "app": "cxr_mc.cli.commands.app.command",
     "checkpoint": "cxr_mc.cli.commands.checkpoint.command",

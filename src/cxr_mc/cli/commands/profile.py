@@ -425,7 +425,7 @@ def analyze_command(name, performance_dir, sample_period):
         f"cxr profile analyze {name}",
         f"cxr performance analyze {name}",
     )
-    from cxr_mc.cli.performance import analyze
+    from cxr_mc.cli.commands.performance import analyze
 
     return analyze(name, performance_dir, sample_period)
 
