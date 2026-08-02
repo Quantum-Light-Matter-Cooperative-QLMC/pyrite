@@ -11,10 +11,10 @@ from cxr_mc.config import default_settings, material_sweep
 from cxr_mc.detectors import DetectorSpec
 from cxr_mc.profiles import (
     FIDELITY_NAMES,
-    SweepProfile,
+    FidelityPreset,
     case_content_key,
     dataset_identity,
-    get_profile,
+    get_fidelity_preset,
     identity_from_stem,
     named_profile_identity,
     named_profile_stem,
@@ -74,7 +74,7 @@ def test_full_profile_preserves_production_defaults_exactly():
     implicit_settings = default_settings()
     explicit_settings = default_settings("full")
     implicit_sweep = material_sweep("mose2")
-    explicit_sweep = material_sweep("mose2", profile="full")
+    explicit_sweep = material_sweep("mose2", fidelity="full")
 
     assert FIDELITY_NAMES == ("full", "survey")
     assert implicit_settings == explicit_settings
@@ -83,7 +83,7 @@ def test_full_profile_preserves_production_defaults_exactly():
     implicit_identity = dataset_identity("mose2", "full", implicit_settings, implicit_sweep)
     explicit_identity = dataset_identity("mose2", "full", explicit_settings, explicit_sweep)
     assert implicit_identity == explicit_identity
-    assert get_profile("full").provisional is False
+    assert get_fidelity_preset("full").provisional is False
 
 
 def test_survey_profile_reduces_every_expensive_sweep_dimension():
@@ -251,9 +251,9 @@ def test_named_profiles_default_to_incoherent_emission():
     incoherent (default) policy, with the derived coherent_emission property
     off, so existing runs keep the bit-for-bit incoherent path."""
     for name in FIDELITY_NAMES:
-        profile = get_profile(name)
-        assert profile.emission == "incoherent"
-        assert profile.coherent_emission is False
+        preset = get_fidelity_preset(name)
+        assert preset.emission == "incoherent"
+        assert preset.coherent_emission is False
     # Settings resolved for those profiles carry the same incoherent default.
     settings = default_settings("full").__class__()
     assert settings.emission == "incoherent"
@@ -265,12 +265,12 @@ def test_named_profiles_default_to_incoherent_emission():
     [("incoherent", False), ("coherent", True), ("both", True)],
 )
 def test_emission_mode_resolves_through_profile_to_settings(emission, coherent):
-    """Each emission mode rides SweepProfile.apply_settings onto Settings, and
+    """Each emission mode rides FidelityPreset.apply_settings onto Settings, and
     the derived coherent_emission property agrees on both sides."""
-    profile = SweepProfile("probe", n_electrons=10, n_electrons_brem=5, emission=emission)
-    assert profile.coherent_emission is coherent
+    preset = FidelityPreset("probe", n_electrons=10, n_electrons_brem=5, emission=emission)
+    assert preset.coherent_emission is coherent
 
-    resolved = profile.apply_settings(default_settings())
+    resolved = preset.apply_settings(default_settings())
     assert resolved.emission == emission
     assert resolved.coherent_emission is coherent
 

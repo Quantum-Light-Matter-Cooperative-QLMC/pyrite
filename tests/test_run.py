@@ -1263,9 +1263,7 @@ def test_repair_brem_wide_recomputes_all_zero_placeholder(monkeypatch):
         lambda c, E_brem: np.full(np.asarray(E_brem, float).shape, 0.002),
     )
 
-    n = repair_brem_wide(
-        {"cfg_a": {30.0: record}}, only_nonfinite=True, progress=False
-    )
+    n = repair_brem_wide({"cfg_a": {30.0: record}}, only_nonfinite=True, progress=False)
 
     assert n == 1
     assert np.allclose(record["brem_wide"], 0.002)
@@ -1488,7 +1486,7 @@ def test_repair_brem_wide_persists_profile_and_explicit_bounds(monkeypatch):
         brem_start_eV=100.0,
         brem_stop_eV=500.0,
         brem_step_eV=100.0,
-        profile="survey",
+        fidelity="survey",
     )
 
     assert n == 1
@@ -1548,7 +1546,7 @@ def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
 
     assert {name: kwargs for name, kwargs in calls} == {name: kwargs for name, kwargs in explicit}
     assert {kwargs["ne_brem"] for _, kwargs in calls} == {30}
-    assert {kwargs["profile"] for _, kwargs in calls} == {"survey"}
+    assert {kwargs["fidelity"] for _, kwargs in calls} == {"survey"}
 
 
 def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
@@ -1798,7 +1796,7 @@ def test_repair_line_spec_persists_profile_and_explicit_bounds(monkeypatch):
         line_start_eV=500.0,
         line_stop_eV=1100.0,
         line_step_eV=200.0,
-        profile="survey",
+        fidelity="survey",
         from_config=False,
     )
 
@@ -1899,12 +1897,10 @@ def test_reline_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
 
     assert {name: kwargs for name, kwargs in calls} == {name: kwargs for name, kwargs in explicit}
     assert {kwargs["line_ne"] for _, kwargs in calls} == {60}
-    assert {kwargs["profile"] for _, kwargs in calls} == {"survey"}
+    assert {kwargs["fidelity"] for _, kwargs in calls} == {"survey"}
 
 
-def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(
-    monkeypatch, tmp_path
-):
+def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(monkeypatch, tmp_path):
     import json
 
     import cxr_mc.run as run
@@ -1939,7 +1935,7 @@ def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(
     )
 
     assert calls[0][1] == "hopg"
-    assert calls[0][2]["profile"] == "survey"
+    assert calls[0][2]["fidelity"] == "survey"
     assert calls[0][2]["catalog_profile"] == "sub_100keV"
 
 
@@ -1979,9 +1975,7 @@ def test_recompute_rejects_profile_mismatch(tmp_path):
         dataset_context(path, catalog_profile="standard", require_identity=True)
 
 
-def test_recomputed_checkpoint_publishes_cas_before_component_and_manifest(
-    monkeypatch, tmp_path
-):
+def test_recomputed_checkpoint_publishes_cas_before_component_and_manifest(monkeypatch, tmp_path):
     import json
 
     import cxr_mc.run as run

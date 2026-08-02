@@ -9,7 +9,7 @@ from typing import Any, cast
 
 import numpy as np
 
-PROFILE_NAMES = ("full", "survey")
+from .profiles import FIDELITY_NAMES
 
 
 @dataclass(frozen=True)
@@ -54,7 +54,9 @@ def dataset_context(
     cases = _json_object(cases_path)
     identity = meta.get("dataset_identity") if meta is not None else None
     if identity is not None and not isinstance(identity, dict):
-        raise ValueError(f"invalid checkpoint metadata {meta_path}: dataset_identity is not an object")
+        raise ValueError(
+            f"invalid checkpoint metadata {meta_path}: dataset_identity is not an object"
+        )
 
     material = identity.get("material") if identity else None
     stored_fidelity = identity.get("fidelity") if identity else None
@@ -108,7 +110,7 @@ def dataset_context(
             f"checkpoint for {material!r} has no catalog-profile identity; pass --profile NAME"
         )
     resolved_fidelity = fidelity or stored_fidelity or "full"
-    _validate_profile(resolved_fidelity)
+    _validate_fidelity(resolved_fidelity)
     return DatasetContext(
         str(material),
         resolved_fidelity,
@@ -117,40 +119,40 @@ def dataset_context(
     )
 
 
-def _validate_profile(profile: str) -> str:
-    if profile not in PROFILE_NAMES:
-        raise ValueError(f"profile must be one of {', '.join(PROFILE_NAMES)}")
-    return profile
+def _validate_fidelity(fidelity: str) -> str:
+    if fidelity not in FIDELITY_NAMES:
+        raise ValueError(f"fidelity must be one of {', '.join(FIDELITY_NAMES)}")
+    return fidelity
 
 
-def settings(profile: str):
-    """Return settings for ``profile``, including compatibility before profiles land."""
+def settings(fidelity: str):
+    """Return settings for ``fidelity``, including compatibility before presets land."""
     from .config import default_settings
 
-    profile = _validate_profile(profile)
+    fidelity = _validate_fidelity(fidelity)
     try:
-        return cast(Any, default_settings)(profile=profile)
+        return cast(Any, default_settings)(fidelity=fidelity)
     except TypeError:
         current = default_settings()
-        if profile == "full":
+        if fidelity == "full":
             return current
         return replace(current, n_electrons=60, n_electrons_brem=30)
 
 
-def sweep(material: str, profile: str, *, catalog_profile: str = "standard"):
-    """Return material sweep for ``profile``, with a standalone survey fallback."""
+def sweep(material: str, fidelity: str, *, catalog_profile: str = "standard"):
+    """Return material sweep for ``fidelity``, with a standalone survey fallback."""
     from .config import material_sweep
 
-    profile = _validate_profile(profile)
+    fidelity = _validate_fidelity(fidelity)
     try:
         return cast(Any, material_sweep)(
             material,
-            fidelity=profile,
+            fidelity=fidelity,
             catalog_profile=catalog_profile,
         )
     except TypeError:
         current = material_sweep(material)
-        if profile == "full":
+        if fidelity == "full":
             return current
 
         def reduced(values, limit):

@@ -86,14 +86,18 @@ def _load_runtime() -> None:
     case_cost = case_cost or sweep_module.case_cost
 
 
-
 def _local_probe():
     fields = []
     if shutil.which("nvidia-smi"):
         try:
             out = subprocess.check_output(
-                ["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
-                text=True, stderr=subprocess.DEVNULL
+                [
+                    "nvidia-smi",
+                    "--query-gpu=utilization.gpu,memory.used,memory.total",
+                    "--format=csv,noheader,nounits",
+                ],
+                text=True,
+                stderr=subprocess.DEVNULL,
             ).strip()
             if out:
                 parts = out.split("\n")[0].split(",")
@@ -102,10 +106,18 @@ def _local_probe():
                     vram_used = float(parts[1])
                     vram_total = float(parts[2])
                     vram_pct = 100.0 * vram_used / vram_total if vram_total > 0 else 0.0
-                    fields.extend([f"gpu_percent={gpu:.1f}", f"vram_used_mib={vram_used:.0f}", f"vram_total_mib={vram_total:.0f}", f"vram_percent={vram_pct:.1f}"])
+                    fields.extend(
+                        [
+                            f"gpu_percent={gpu:.1f}",
+                            f"vram_used_mib={vram_used:.0f}",
+                            f"vram_total_mib={vram_total:.0f}",
+                            f"vram_percent={vram_pct:.1f}",
+                        ]
+                    )
         except Exception:
             pass
     return "|".join(fields)
+
 
 def _build_sections(args, materials, job_records, detail):
     meta = [
@@ -119,37 +131,46 @@ def _build_sections(args, materials, job_records, detail):
         meta.append(f"slice_minutes: {args.max_minutes}")
     if getattr(args, "catalog_profile", None) is not None:
         meta.append(f"profile: {args.catalog_profile}")
-    
+
     slurm_job = os.environ.get("SLURM_JOB_ID")
     if slurm_job:
         meta.append(f"slurm_job_id: {slurm_job}")
-    
+
     sections = {
         "META": "\n".join(meta),
         "STATE": "running",
         "RESOURCES": _local_probe(),
     }
-    
+
     if slurm_job and shutil.which("squeue"):
         try:
-            sq = subprocess.check_output(["squeue", "-j", slurm_job, "-o", "%i|%T|%P|%M|%L|%D|%r", "--noheader"], text=True, stderr=subprocess.DEVNULL).strip()
+            sq = subprocess.check_output(
+                ["squeue", "-j", slurm_job, "-o", "%i|%T|%P|%M|%L|%D|%r", "--noheader"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
             if sq:
                 parts = sq.split("|")
                 if len(parts) >= 7:
-                    sections["SQUEUE"] = f"job_id={parts[0]}|state={parts[1]}|partition={parts[2]}|elapsed={parts[3]}|left={parts[4]}|nodes={parts[5]}|reason={parts[6]}"
+                    sections["SQUEUE"] = (
+                        f"job_id={parts[0]}|state={parts[1]}|partition={parts[2]}|elapsed={parts[3]}|left={parts[4]}|nodes={parts[5]}|reason={parts[6]}"
+                    )
         except Exception:
             pass
-            
+
     progress_lines = []
     for _mat, rec in job_records.items():
         progress_lines.append(json.dumps(rec))
-    
+
     if progress_lines:
         sections["PROGRESS"] = "\n".join(progress_lines)
-        
+
     return sections
 
+
 _dashboard_stop = threading.Event()
+
+
 def _dashboard_loop(args, materials, job_records, detail):
     keys = _dashboard._KeyListener()
     try:
@@ -719,17 +740,23 @@ def run(args):
     deadline = None
     if getattr(args, "max_minutes", None) is not None:
         deadline = time.monotonic() + args.max_minutes * 60.0
-        
+
     job_records = {}
-    use_dashboard = not getattr(args, "no_progress", False) and sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+    use_dashboard = (
+        not getattr(args, "no_progress", False)
+        and sys.stdout.isatty()
+        and not os.environ.get("NO_COLOR")
+    )
 
     if use_dashboard:
         args._job_records = job_records
         os.environ["CXR_LOCAL_DASHBOARD"] = "1"
         detail = getattr(args, "verbose", 0)
-        t = threading.Thread(target=_dashboard_loop, args=(args, materials, job_records, detail), daemon=True)
+        t = threading.Thread(
+            target=_dashboard_loop, args=(args, materials, job_records, detail), daemon=True
+        )
         t.start()
-        
+
     try:
         incomplete = False
         for material in materials:
@@ -744,11 +771,12 @@ def run(args):
             t.join(timeout=2.0)
             sections = _build_sections(args, materials, job_records, getattr(args, "verbose", 0))
             sections["STATE"] = "done" if not incomplete else "paused"
-            frame = _dashboard._style_states(_dashboard._format_job_status(sections, getattr(args, "verbose", 0)))
+            frame = _dashboard._style_states(
+                _dashboard._format_job_status(sections, getattr(args, "verbose", 0))
+            )
             _dashboard._render_frame(frame, tty=True)
             if "CXR_LOCAL_DASHBOARD" in os.environ:
                 del os.environ["CXR_LOCAL_DASHBOARD"]
-
 
 
 def _run_json(args):
@@ -959,7 +987,7 @@ def _run_material(args, material, max_seconds=None):
     assert build_cases is not None
 
     settings, sweep, identity, stem = _resolved_run(args, material)
-    profile = identity["fidelity"]
+    fidelity = identity["fidelity"]
 
     cases = build_cases(
         sweep,
@@ -974,7 +1002,7 @@ def _run_material(args, material, max_seconds=None):
     print(
         f"{material}: {len(cases)} cases across "
         f"{len({c['name'] for c in cases})} configs "
-        f"[profile={profile}, parameters={identity['parameter_sha256'][:12]}]"
+        f"[profile={fidelity}, parameters={identity['parameter_sha256'][:12]}]"
         + (" (quick grid)" if args.quick else "")
         + ("" if settings.emission == "incoherent" else f" ({settings.emission})")
     )
@@ -1061,7 +1089,7 @@ def _run_material(args, material, max_seconds=None):
             progress_snapshot = dict(latest_progress)
             cost_snapshot = dict(latest_cost)
             case_snapshot = dict(latest_case) or None
-        
+
         computed_cost = (
             None
             if initial_done_cost is None or "done_cost" not in cost_snapshot
@@ -1081,12 +1109,14 @@ def _run_material(args, material, max_seconds=None):
                 rec["done_cost"] = cost_snapshot["done_cost"]
                 rec["total_cost"] = cost_snapshot["total_cost"]
             if progress_timer:
-                rec.update(progress_timer.snapshot(
-                    completed_new_cases=progress_snapshot["completed_new_cases"],
-                    computed_cost=computed_cost,
-                ))
+                rec.update(
+                    progress_timer.snapshot(
+                        completed_new_cases=progress_snapshot["completed_new_cases"],
+                        computed_cost=computed_cost,
+                    )
+                )
             args._job_records[material] = rec
-            
+
         if progress_file is not None:
             assert progress_timer is not None
             _write_progress_record(
@@ -1177,7 +1207,7 @@ def _run_material(args, material, max_seconds=None):
             profile=performance_profile,
             material=material,
             static={
-                "fidelity": profile,
+                "fidelity": fidelity,
                 "catalog_profile": identity.get("catalog_profile", "standard"),
                 "parameter_sha256": identity["parameter_sha256"],
                 "checkpoint_stem": stem,
@@ -1272,10 +1302,10 @@ def _run_material(args, material, max_seconds=None):
         performance_state["state"] = "done" if complete else "paused"
     if performance_logger is not None:
         performance_logger.close("done" if complete else "paused")
-    
+
     if hasattr(args, "_job_records") and material in args._job_records:
         args._job_records[material]["state"] = "done" if complete else "paused"
-        
+
     if progress_file is not None:
         assert progress_timer is not None
         _write_progress_record(

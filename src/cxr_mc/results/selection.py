@@ -252,7 +252,7 @@ def merge_dataset(local, incoming, dataset, force=False):
     return n_merged, n_skipped
 
 
-def _grid_names(material, profile="full", catalog_profile="standard"):
+def _grid_names(material, fidelity="full", catalog_profile="standard"):
     """Config names in the CURRENT grid for ``material`` -- exactly the set
     ``config.material_sweep(material, catalog_profile=catalog_profile)`` ->
     ``sweep.build_cases`` produces now. A stale config is any name NOT in this
@@ -267,8 +267,8 @@ def _grid_names(material, profile="full", catalog_profile="standard"):
     from ..config import default_settings, material_sweep
     from ..sweep import build_cases
 
-    settings = default_settings(profile)
-    sweep = material_sweep(material, fidelity=profile, catalog_profile=catalog_profile)
+    settings = default_settings(fidelity)
+    sweep = material_sweep(material, fidelity=fidelity, catalog_profile=catalog_profile)
     cases = build_cases(sweep, settings.n_electrons, settings.n_electrons_brem)
     return {c["name"] for c in cases}
 

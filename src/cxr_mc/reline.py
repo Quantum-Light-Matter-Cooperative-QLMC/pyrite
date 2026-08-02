@@ -140,7 +140,7 @@ def reline_checkpoints(
         if line_stop_eV is not None:
             recompute_options["line_stop_eV"] = line_stop_eV
         if use_profile_defaults:
-            recompute_options["profile"] = context.fidelity
+            recompute_options["fidelity"] = context.fidelity
             recompute_options["catalog_profile"] = context.catalog_profile
         try:
             if progress_file is not None:

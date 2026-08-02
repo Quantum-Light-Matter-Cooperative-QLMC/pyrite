@@ -37,7 +37,13 @@ Do not start the dependent slice until its decision is pinned:
    (pkg §6 Q1). Blocks slice 1. Recommendation: `cli/commands/` once `cli/`
    exceeds ~20 modules; otherwise flat.
 2. **`profile` vs `context` naming** — redesign §6 Q3. Blocks slice 3 (affects
-   D2c precedence chain). Pick one term before the surface reshuffle.
+   D2c precedence chain). **Resolved (2026-08-02):** `profile` is fixed as the
+   campaign term; no `context` rename. The overload was fidelity (`full`/`survey`)
+   squatting on "profile" — moved onto its own `fidelity` namespace in branch
+   `refactor/fidelity-namespace`. See `tasks/refactor/fidelity-namespace/README.md`
+   for the full five-sense taxonomy (A fidelity renamed; B campaign keeps
+   `profile`; C performance-profile, D named_profile/dataset-identity, E
+   line-shape all distinct and kept).
 
 ## Slices
 
