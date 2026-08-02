@@ -69,6 +69,7 @@ file. Edit and drop items on `main`.
    multiple seconds; likely SSH-bound remote completion timeout or
    process-startup overhead, not confirmed. → `feature/tab-completion-latency`;
    [`tasks/feature/tab-completion-latency/`](tasks/feature/tab-completion-latency/).
+6. **Add finite initial phase space (velocity vector spread) into 2D and 3D trajectory plots**
 
 ## Inbox - >user< to be triaged
 
@@ -86,6 +87,8 @@ file. Edit and drop items on `main`.
    SLURM installation.
 5. **Local checkpoint clearing.** Add a local equivalent of `cxr remote clear`
    for deleting local checkpoint pickles with matching behavior.
+6. **Evaluate refactoring `monteccarlo/runner.py` and `montecarlo/transport.py`**
+   into multiple smaller files, they are very long.
 
 ## CLI backlog
 
@@ -111,7 +114,8 @@ not here.
 
 1. Add `[coherent|incoherent|both]` to `cxr profile set` (and `add`). If a user
    has individually added both, auto-switch to `both` — but make that switch
-   explicit/logged, not implicit magic.
+   explicit/logged, not implicit magic. `remove` can also be used, does the opposite
+   (If on `both` and user `remove`'s `incoherent`, they explicitly get back `coherent`)
 2. `cxr` with no args should print help, like `-h/--help`.
 
 ## UI backlog
