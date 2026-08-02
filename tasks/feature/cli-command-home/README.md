@@ -34,3 +34,6 @@ Use `cli/commands/`, not a flat `cli/`: the existing `cli/` package has 16 modul
   changing root lazy dispatch; checkpoint commit only.
 - `wip/cli-command-home-scan-blaze`: split the `run` and blazed-sweep Click
   wiring from their headless drivers; checkpoint commit only.
+- `wip/cli-command-home-existing`: relocate the existing flat `cli/` command
+  modules into `cli/commands/` without changing root lazy dispatch; checkpoint
+  commit only.
