@@ -15,29 +15,17 @@ file. Edit and drop items on `main`.
 
 ## Active
 
-1. **Simplify and clarify the CLI surface.** Unify profile mutation vocabulary,
-   settle completion install/remove and shell detection, rework local and remote
-   checkpoint/job cleanup around shared per-case CAS ownership, resolve or drop
-   checkpoint recompute, and add a coherent performance-log lifecycle with
-   justified automatic mode defaults. →
-   `feature/cli-surface-simplification`;
-   [`tasks/feature/cli-surface-simplification/`](tasks/feature/cli-surface-simplification/).
-2. **Compute performance optimization.** Measure and improve stable remote
+1. **Compute performance optimization.** Measure and improve stable remote
    CPU/GPU/RAM/VRAM utilization without OOM, keeping the GPU fed where evidence
    supports it. → `feature/compute-performance-optimization`;
    [`tasks/feature/compute-performance-optimization/`](tasks/feature/compute-performance-optimization/).
-3. **Profile-aware quick energy grids.** Make local quick runs and remote CPU
-   profiling select bounded beam energies with valid effective line grids,
-   avoiding fixed 50 keV failures without weakening missing-grid validation. →
-   `fix/profile-aware-quick-energy-grid`;
-   [`tasks/fix/profile-aware-quick-energy-grid/`](tasks/fix/profile-aware-quick-energy-grid/).
-4. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-5. **Detector profiles and Zhai validation modernization.** Add profile-owned
+2. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
+3. **Detector profiles and Zhai validation modernization.** Add profile-owned
    detector geometry with a 90 degree standard default, then route maintained
    Zhai/literature comparisons through current detector, Sweep, and case APIs.
    → `feature/profile-observation-angle`;
    [`tasks/feature/profile-observation-angle/`](tasks/feature/profile-observation-angle/).
-6. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
+4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
 
 ## P1 - top-priority back burner
 
@@ -48,15 +36,16 @@ file. Edit and drop items on `main`.
    cache reuse, and correct or accurately report the ratio plot's unexpected
    material exclusions. → `fix/analysis-compare-loading-quality`;
    [`tasks/fix/analysis-compare-loading-quality/`](tasks/fix/analysis-compare-loading-quality/).
+
 ### Gated
 
 1. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
+2. **Superradiant PXR/CBS validation.** Optional phased segment/electron sum is implemented but unverified; resolve phase convention and bunch-form-factor limits before scientific use. Design: [`docs/coherent-emission.md`](docs/coherent-emission.md).
 
 ### Paused / on hold
 
 1. **High-energy electron/channeling support.** Evaluate `Geant4` or similar for REGAE@DESY-scale beams (3–5 MeV, 50 fs, 100 fC, 200–300 µm target diameter), JungFrau detector ~0.5–4.5 m from interaction point. USER QUESTION: What is rep rate?
-2.  **Bent Crystals (After add channeling + relativistic electrons)**
-3. **Superradiant PXR/CBS validation.** Optional phased segment/electron sum is implemented but unverified; resolve phase convention and bunch-form-factor limits before scientific use. Design: [`docs/coherent-emission.md`](docs/coherent-emission.md).
+2. **Bent Crystals (After add channeling + relativistic electrons)**
 
 ## P2 - medium-priority back burner
 
@@ -65,23 +54,13 @@ file. Edit and drop items on `main`.
    → `feature/portable-gpu-backends`;
    [`tasks/feature/portable-gpu-backends/`](tasks/feature/portable-gpu-backends/).
 2. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
-3. **Longitudinal bunch profiles and coherence comparison.** Add charge-matched
-   200 fs Gaussian, wavelength-matched microbunch-train, and compressed-bunch
-   HOPG/h-BN profiles with paired coherent/incoherent analysis. →
-   `feature/longitudinal-bunch-profiles`;
-   [`tasks/feature/longitudinal-bunch-profiles/`](tasks/feature/longitudinal-bunch-profiles/).
-4. **Local run progress dashboard.** Replace the bare `cxr run <profile>` tqdm
-   bar with the multi-panel dashboard used by `cxr remote status -a -vv`,
-   rendering only the panels with local data — omit SLURM `SQUEUE` off-node and
-   GPU rows without a GPU; fall back to tqdm when non-interactive. →
-   `feature/local-run-dashboard`;
-   [`tasks/feature/local-run-dashboard/`](tasks/feature/local-run-dashboard/).
+
 ## P3 - lower-priority / exploratory back burner
 
 1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`.
 2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
 3. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
-4.  **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
+4. **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
 5. **Tab completion latency.** Shell completion for `cxr` often takes
    multiple seconds; likely SSH-bound remote completion timeout or
    process-startup overhead, not confirmed. → `feature/tab-completion-latency`;
@@ -103,8 +82,6 @@ file. Edit and drop items on `main`.
    SLURM installation.
 5. **Local checkpoint clearing.** Add a local equivalent of `cxr remote clear`
    for deleting local checkpoint pickles with matching behavior.
-6. **CPU Performance Flag** Add an optional flag (-c/--cpu) that enables CPU performance profiling, and a second (mutually exclusive) --cpu-only flag which ONLY profiles the CPU. This is because the CPU profiling is really slow, generally. Additionally, the current funcitonality launches the combined CPU/GPU profile first, which works normally, but after that finishes it starts the CPU-only task which is not properly tracked by the prgress dashboard (bug).
-7. **Block command name reuse as object names** Maybe already implemented, but it seems a possibility that a user might unintentionally name a profile or some other object one of the command names unintentionally when misusing it, e.g., `cxr profile create set hopg` might create a profile named 'set'. Seems an easy-ish thing to just block outright, no duplicating command names to avoid confusion. Low priority.
 
 ## Long-term plans
 
