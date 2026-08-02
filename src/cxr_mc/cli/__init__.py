@@ -16,7 +16,7 @@ _COMMANDS = {
     "checkpoint": "cxr_mc.cli.commands.checkpoint.command",
     "completion": "cxr_mc.cli.commands.completion.command",
     "performance": "cxr_mc.cli.commands.performance.command",
-    "slim": "cxr_mc.slim.command",
+    "slim": "cxr_mc.cli.commands.slim.command",
     "rebrem": "cxr_mc.rebrem.command",
     "reline": "cxr_mc.reline.command",
     "archive": "cxr_mc.archive.archive_command",
