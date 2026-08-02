@@ -36,6 +36,11 @@ file. Edit and drop items on `main`.
    cache reuse, and correct or accurately report the ratio plot's unexpected
    material exclusions. → `fix/analysis-compare-loading-quality`;
    [`tasks/fix/analysis-compare-loading-quality/`](tasks/fix/analysis-compare-loading-quality/).
+2. **CLI redesign & repo-structure rollout.** Execute the accepted CLI-redesign,
+   artifact-model, and package-structure RFCs. Ordered slices, gates, and
+   acceptance criteria live in
+   [`docs/plans/cli-redesign-implementation-plan.md`](docs/plans/cli-redesign-implementation-plan.md);
+   start at slice 1 (command-home consolidation). Decisions: ADRs 0002–0005.
 
 ### Gated
 
