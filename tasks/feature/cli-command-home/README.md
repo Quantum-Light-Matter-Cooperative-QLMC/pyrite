@@ -27,3 +27,10 @@ Use `cli/commands/`, not a flat `cli/`: the existing `cli/` package has 16 modul
 - `docs/cli-reference.md` is unchanged except generated-path references required by the internal move, and its freeze test passes.
 - Root help remains lazy; all command paths and deprecated aliases preserve current behavior.
 - Existing export-freeze guards, targeted CLI tests, lint/typecheck, and the relevant suite pass.
+
+## Delegation
+
+- `wip/cli-command-home-standalone`: move standalone Click-only commands without
+  changing root lazy dispatch; checkpoint commit only.
+- `wip/cli-command-home-scan-blaze`: split the `run` and blazed-sweep Click
+  wiring from their headless drivers; checkpoint commit only.
