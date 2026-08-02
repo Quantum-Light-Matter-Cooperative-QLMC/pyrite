@@ -5,8 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-import click
-
 from .cli import _core as _cli_core
 from .materials import MaterialConfigError, load_material_catalog
 
@@ -26,17 +24,12 @@ def _run(args: SimpleNamespace) -> None:
     )
 
 
-@click.command(
-    "check-config",
-    help=(
-        "Validate bundled material catalog or an explicit full catalog TOML.\n\n"
-        "With no MANIFEST, reloads packaged materials.toml. Performs no simulation, "
-        "network access, or GPU probe."
-    ),
-)
-@click.argument("manifest", required=False, type=click.Path(path_type=Path))
-def command(manifest):
-    return _cli_core.invoke_legacy(_run, manifest=manifest)
+def __getattr__(name: str):
+    if name == "command":
+        from .cli.commands.check_config import command
+
+        return command
+    raise AttributeError(name)
 
 
-__all__ = ["command"]
+__all__ = ["_run"]

@@ -26,7 +26,7 @@ _RESET_CHOICES = click.Choice((*_catalog_io.RANGES, "all"), case_sensitive=False
 
 _COMMANDS = {
     "blaze": "cxr_mc.blaze.command",
-    "validate": "cxr_mc.check_config.command",
+    "validate": "cxr_mc.cli.commands.check_config.command",
 }
 
 _COMMAND_HELP = {

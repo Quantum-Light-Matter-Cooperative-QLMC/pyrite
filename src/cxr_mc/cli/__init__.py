@@ -30,7 +30,7 @@ _COMMANDS = {
     "material": "cxr_mc.cli.commands.material.command",
     "prune": "cxr_mc.prune.command",
     "check": "cxr_mc.check.command",
-    "check-config": "cxr_mc.check_config.command",
+    "check-config": "cxr_mc.cli.commands.check_config.command",
 }
 
 _COMMAND_HELP = {
