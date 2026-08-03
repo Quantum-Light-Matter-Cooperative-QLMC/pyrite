@@ -1067,7 +1067,7 @@ def _mem_worker_cap():
     pools (full-case CPU pool and GPU-pipeline transport pool) so neither can
     oversubscribe host RAM and re-create the 2026-07-18 qlmc OOM, where the
     kernel killed one worker and ``BrokenProcessPool`` lost the whole run."""
-    return min(_available_mem_mb(), int(_TOTAL_MEM * 0.85)) // _WORKER_MEM_MB
+    return min(_available_mem_mb(), int(_TOTAL_MEM * 0.9)) // _WORKER_MEM_MB
 
 
 def _admit_cpu_fallback():
@@ -1128,7 +1128,7 @@ def _cpu_pool_workers(max_workers, n):
     Returns the worker count to use, >= 1.
     """
     if _N_CPUS is not None:
-        _max_allowed_workers = _N_CPUS * 3 // 4
+        _max_allowed_workers = _N_CPUS * 4 // 5
     else:
         _max_allowed_workers = 6
 
@@ -1226,6 +1226,7 @@ def run_cases(
     keep_results=True,
     on_timing=None,
     on_activity=None,
+    transport_only=False,
 ):
     """
     Run a list of case dicts through run_case, results in input order.
@@ -1372,19 +1373,36 @@ def run_cases(
             for i in _maybe_bar(range(n)):
                 if should_stop is not None and should_stop():
                     break
+
                 _activity("serial_case", i, in_flight_case_count=1)
-                out = run_case(cases[i], True) if on_timing is not None else run_case(cases[i])
-                if fallback_reason is not None:
-                    out["_backend_fallback_reason"] = fallback_reason
-                _collect_timing(i, out)
+
+                if transport_only:
+                    _transport_case(
+                        cases[i],
+                        record_timing=on_timing is not None,
+                    )
+                    out = None
+                else:
+                    out = run_case(cases[i], True) if on_timing is not None else run_case(cases[i])
+
+                    if fallback_reason is not None:
+                        out["_backend_fallback_reason"] = fallback_reason
+
+                    _collect_timing(i, out)
+
                 results[i] = out
+
                 if callback is not None:
                     callback(i, cases[i], out)
+
                 if not keep_results:
                     results[i] = None
+
         _activity("idle", in_flight_case_count=0)
+
         if _TIMING and timing is not None:
             timing.report("serial", nw=1)
+
         return results
 
     def _single_thread_blas():

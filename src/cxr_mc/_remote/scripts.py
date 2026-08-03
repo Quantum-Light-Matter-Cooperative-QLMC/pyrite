@@ -113,11 +113,11 @@ def _cpu_profile_block(catalog_profile, performance_profile, cpu_flags):
   cpu_prof_base="$JOBDIR/performance/{performance_profile}/$m.cpu"
   cpu_ckpt="$JOBDIR/cpu-profile-checkpoints/$m"
   mkdir -p "$(dirname "$cpu_prof_base")" "$cpu_ckpt"
-  printf '%s\\n' "cProfile CPU-backend pass (serial, NumPy spectrum)" >> "$JOBDIR/log"
+  printf '%s\\n' "cProfile transport-only pass (serial CPU)">> "$JOBDIR/log"
   cpu_prof_rc=0
   env -u CXR_MC_NSYS CXR_MC_BACKEND=cpu {config.shell_remote_uv()} run --no-sync python \\
     -m cProfile -o "$cpu_prof_base.prof" \\
-    -m cxr_mc._entry.scan {config.shell_word(catalog_profile)} -m "$m"{cpu_flags} --workers 0 \\
+    -m cxr_mc._entry.scan {config.shell_word(catalog_profile)} -m "$m"{cpu_flags} --workers 0 --transport-only\\
     --max-minutes 10 \\
     --checkpoint-dir "$cpu_ckpt" --progress-file "$JOBDIR/progress/$m.cpu.json" \\
     --progress-phase cpu --no-progress >> "$JOBDIR/log" 2>&1 || cpu_prof_rc=$?

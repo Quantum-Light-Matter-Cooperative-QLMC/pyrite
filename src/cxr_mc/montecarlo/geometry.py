@@ -16,6 +16,7 @@ plane (zero y-component).
 """
 
 import numpy as np
+from numba import jit as njit
 
 from ..materials.crystal import _direct_lattice_vectors, _rotation_between, reciprocal_g_vector
 
@@ -46,6 +47,81 @@ def validate_transverse_dimensions(width, height, *, unit) -> tuple[float | None
     return width, height
 
 
+@njit(cache=True)
+def _first_prism_exit_numba(
+    r,
+    d,
+    z_min_ang,
+    z_max_ang,
+    finite_xy,
+    width_ang,
+    height_ang,
+):
+    n = r.shape[0]
+
+    distances = np.empty(n, dtype=r.dtype)
+    faces = np.empty(n, dtype=np.int8)
+
+    if finite_xy:
+        x_min_ang = -width_ang / 2
+        x_max_ang = width_ang / 2
+        y_min_ang = -height_ang / 2
+        y_max_ang = height_ang / 2
+
+    for i in range(n):
+        rx = r[i, 0]
+        ry = r[i, 1]
+        rz = r[i, 2]
+
+        dx = d[i, 0]
+        dy = d[i, 1]
+        dz = d[i, 2]
+
+        best_t = np.inf
+        best_face = Z_MIN
+
+        if finite_xy:
+            if dx != 0.0:
+                t = (x_min_ang - rx) / dx
+                if t > 0.0 and t < best_t:
+                    best_t = t
+                    best_face = X_MIN
+
+                t = (x_max_ang - rx) / dx
+                if t > 0.0 and t < best_t:
+                    best_t = t
+                    best_face = X_MAX
+
+            if dy != 0.0:
+                t = (y_min_ang - ry) / dy
+                if t > 0.0 and t < best_t:
+                    best_t = t
+                    best_face = Y_MIN
+
+                t = (y_max_ang - ry) / dy
+                if t > 0.0 and t < best_t:
+                    best_t = t
+                    best_face = Y_MAX
+
+        if dz != 0.0:
+            t = (z_min_ang - rz) / dz
+
+            if t > 0.0 and t < best_t:
+                best_t = t
+                best_face = Z_MIN
+
+            t = (z_max_ang - rz) / dz
+
+            if t > 0.0 and t < best_t:
+                best_t = t
+                best_face = Z_MAX
+
+        distances[i] = best_t
+        faces[i] = best_face
+
+    return distances, faces
+
+
 def first_prism_exit(
     r,
     d,
@@ -57,44 +133,64 @@ def first_prism_exit(
     xp=np,
 ):
     """Return each inside-origin ray's first forward rectangular-prism face exit.
-
     The sample-frame prism is ``[-width/2, width/2] x [-height/2, height/2] x
     [z_min_ang, z_max_ang]``. Origins must be inside that prism, and rays with
     a zero component never nominate the corresponding parallel faces. When both
     transverse dimensions are ``None``, the limiting geometry is the original
     z-only slab. Face ties resolve to the lowest face constant.
-
     Validation: finite-transverse-crystal
     """
     width_ang, height_ang = validate_transverse_dimensions(width_ang, height_ang, unit="Ang")
+
     r, d = xp.asarray(r), xp.asarray(d)
-    if width_ang is None:
-        numerators = (z_min_ang - r[..., 2], z_max_ang - r[..., 2])
-        components = (d[..., 2], d[..., 2])
-        faces = xp.asarray([Z_MIN, Z_MAX])
-    else:
-        assert height_ang is not None
-        hx, hy = width_ang / 2.0, height_ang / 2.0
-        numerators = (
-            -hx - r[..., 0],
-            hx - r[..., 0],
-            -hy - r[..., 1],
-            hy - r[..., 1],
-            z_min_ang - r[..., 2],
-            z_max_ang - r[..., 2],
+
+    if xp is np:
+        if width_ang is None:
+            finite_xy = False
+            width_numba = 0.0
+            height_numba = 0.0
+        else:
+            finite_xy = True
+            width_numba = width_ang
+            height_numba = height_ang
+        return _first_prism_exit_numba(
+            r,
+            d,
+            z_min_ang,
+            z_max_ang,
+            finite_xy,
+            width_numba,
+            height_numba,
         )
-        components = (d[..., 0], d[..., 0], d[..., 1], d[..., 1], d[..., 2], d[..., 2])
-        faces = xp.asarray([X_MIN, X_MAX, Y_MIN, Y_MAX, Z_MIN, Z_MAX])
-    candidates = xp.stack(
-        [
-            xp.where(c != 0.0, n / xp.where(c != 0.0, c, 1.0), xp.inf)
-            for n, c in zip(numerators, components, strict=True)
-        ],
-        axis=-1,
-    )
-    candidates = xp.where(candidates > 0.0, candidates, xp.inf)
-    choice = xp.argmin(candidates, axis=-1)
-    return xp.take_along_axis(candidates, choice[..., None], axis=-1)[..., 0], faces[choice]
+
+    else:
+        if width_ang is None:
+            numerators = (z_min_ang - r[..., 2], z_max_ang - r[..., 2])
+            components = (d[..., 2], d[..., 2])
+            faces = xp.asarray([Z_MIN, Z_MAX])
+        else:
+            assert height_ang is not None
+            hx, hy = width_ang / 2.0, height_ang / 2.0
+            numerators = (
+                -hx - r[..., 0],
+                hx - r[..., 0],
+                -hy - r[..., 1],
+                hy - r[..., 1],
+                z_min_ang - r[..., 2],
+                z_max_ang - r[..., 2],
+            )
+            components = (d[..., 0], d[..., 0], d[..., 1], d[..., 1], d[..., 2], d[..., 2])
+            faces = xp.asarray([X_MIN, X_MAX, Y_MIN, Y_MAX, Z_MIN, Z_MAX])
+        candidates = xp.stack(
+            [
+                xp.where(c != 0.0, n / xp.where(c != 0.0, c, 1.0), xp.inf)
+                for n, c in zip(numerators, components, strict=True)
+            ],
+            axis=-1,
+        )
+        candidates = xp.where(candidates > 0.0, candidates, xp.inf)
+        choice = xp.argmin(candidates, axis=-1)
+        return xp.take_along_axis(candidates, choice[..., None], axis=-1)[..., 0], faces[choice]
 
 
 def tilted_geometry(theta_obs_rad, tilt_polar_rad, tilt_azim_rad=0.0):

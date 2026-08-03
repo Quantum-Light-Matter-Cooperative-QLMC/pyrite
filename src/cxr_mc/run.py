@@ -459,6 +459,7 @@ def run_sweep(
     content_key_fn=None,
     cache_read=True,
     cache_write=True,
+    transport_only=False,
 ):
     """Run ``cases`` into ``results`` (mutated in place).
 
@@ -735,7 +736,23 @@ def run_sweep(
 
     def _cb(i, case, out):
         nonlocal completed_new_cases, done_cost
+
+        if transport_only:
+            completed_new_cases += 1
+
+            if case_cost_fn is not None:
+                done_cost += case_cost_fn(case)
+
+            if on_cost is not None and case_cost_fn is not None:
+                on_cost(done_cost, total_cost)
+
+            if on_progress is not None:
+                on_progress(completed_new_cases, len(cases), cached_cases)
+
+            return
+
         store_result(results, case, out)
+
         if cache_write:
             key = _content_key(case)
             if key is not None:
@@ -800,6 +817,7 @@ def run_sweep(
         callback=_cb,
         should_stop=should_stop,
         keep_results=False,  # _cb owns storage; don't pin every spectrum in RAM
+        transport_only=transport_only,
         **profile_callbacks,
     )
     print(f"{len(todo)} cases in {time.perf_counter() - t0:.0f} s")

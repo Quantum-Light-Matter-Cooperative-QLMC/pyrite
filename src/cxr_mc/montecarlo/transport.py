@@ -15,15 +15,12 @@ from functools import cache
 from typing import Any
 
 import numpy as np
+from numba import jit as njit
 
 from .. import DATA_DIR
 from ..materials._transport_data import TRANSPORT_ELEMENTS
 from ..materials.attenuation import _normalize_composition
 from .geometry import (
-    X_MAX,
-    X_MIN,
-    Y_MAX,
-    Y_MIN,
     Z_MAX,
     Z_MIN,
     first_prism_exit,
@@ -169,17 +166,26 @@ def beta_from_keV(E_keV):
 
 
 # ---- elastic scattering models ------------------------------------------------
+@njit(cache=True)
 def _sigma_browning_cm2(Z, E_keV):
     """
     Browning et al., J. Appl. Phys. 76, 2016 (1994): empirical fit to the
     tabulated Mott TOTAL elastic cross sections [cm^2], valid 0.1-30 keV,
     Z <= 92.
     """
-    return (
-        3.0e-18
-        * Z**1.7
-        / (E_keV + 0.005 * Z**1.7 * np.sqrt(E_keV) + 0.0007 * Z**2 / np.sqrt(E_keV))
-    )
+    out = np.empty_like(E_keV)
+
+    z17 = Z**1.7
+    numerator = 3.0e-18 * z17
+    z_exp = 0.005 * z17
+    z_squared = 0.0007 * Z * Z
+
+    for i in range(E_keV.size):
+        E = E_keV[i]
+        sqrt_E = np.sqrt(E)
+
+        out[i] = numerator / (E + z_exp * sqrt_E + z_squared / sqrt_E)
+    return out
 
 
 def _alpha_sr_joy(Z, E_keV):
@@ -249,6 +255,20 @@ def _mott_alpha_table(element, Z):
 _NO_MOTT = set()  # elements with no NIST Mott table -> screened-Rutherford
 
 
+@njit(cache=True)
+def _sample_cos_theta_sr_numba(Z, E_keV, R):
+    out = np.empty_like(E_keV)
+
+    Zfac = 3.4e-3 * Z**0.67
+
+    for i in range(E_keV.size):
+        alpha = Zfac / E_keV[i]
+
+        out[i] = 1.0 - 2.0 * alpha * R[i] / (1.0 + alpha - R[i])
+
+    return out
+
+
 def _sample_cos_theta(Z, E_keV, rng, elastic_model, element):
     """Polar scattering angle from the screened-Rutherford inversion, with the
     screening parameter from the chosen model. If elastic_model="mott" but no
@@ -259,22 +279,19 @@ def _sample_cos_theta(Z, E_keV, rng, elastic_model, element):
     per process at DEBUG (silent by default -- set CXR_MC_DEBUG=1 to see it;
     a ProcessPoolExecutor worker pool re-logs once per worker, since each
     worker gets its own _NO_MOTT cache)."""
+    R = rng.random(E_keV.shape)
     if elastic_model == "mott" and element not in _NO_MOTT:
         try:
             logE, logA = _mott_alpha_table(element, Z)
             alpha = 10.0 ** np.interp(np.log10(E_keV * 1e3), logE, logA)
+
+            return 1.0 - 2.0 * alpha * R / (1.0 + alpha - R)
+
         except FileNotFoundError:
-            logger.debug(
-                "transport: no Mott transport table for %r; using "
-                "the analytic screened-Rutherford screening for it instead.",
-                element,
-            )
+            logger.debug(...)
             _NO_MOTT.add(element)
-            alpha = _alpha_sr_joy(Z, E_keV)
-    else:
-        alpha = _alpha_sr_joy(Z, E_keV)
-    R = rng.random(E_keV.shape)
-    return 1.0 - 2.0 * alpha * R / (1.0 + alpha - R)
+
+    return _sample_cos_theta_sr_numba(Z, E_keV, R)
 
 
 def _dEds_keV_per_ang(Z, A, J_keV, rho_g_cm3, E_keV):
@@ -284,37 +301,98 @@ def _dEds_keV_per_ang(Z, A, J_keV, rho_g_cm3, E_keV):
     return -7.85e-4 * rho_g_cm3 * Z / (A * E_keV) * np.log(1.166 * (E_keV + k * J_keV) / J_keV)
 
 
-def _dEds_compound(comp, E_keV):
-    """
-    Joy-Luo stopping power [keV/Angstrom] for a compound, additive over
-    elements: dE/ds = -7.85e-4 / E * sum_i (n_i/N_A') Z_i ln(1.166(E+k J)/J)
-    with n_i in atoms/Ang^3 and N_A' = 0.602214 (Avogadro in mol/Ang^3*g
-    bookkeeping units; equals the single-element rho*Z/A form).
-    """
-    total = 0.0
-    for el, n_i in comp:
-        p = TRANSPORT_ELEMENTS[el]
-        k = 0.731 + 0.0688 * np.log10(p["Z"])
-        total = total + (n_i / 0.602214076) * p["Z"] * np.log(
-            1.166 * (E_keV + k * p["J_keV"]) / p["J_keV"]
-        )
-    return -7.85e-4 / E_keV * total
+@njit(cache=True)
+def _dEds_compound(J_arr, k_arr, coeff_arr, E_keV):
+    out = np.empty_like(E_keV)
+
+    for j in range(E_keV.size):
+        E = E_keV[j]
+        total = 0.0
+        for i in range(J_arr.size):
+            J = J_arr[i]
+            k = k_arr[i]
+            coeff = coeff_arr[i]
+
+            total += coeff * np.log(1.166 * (E + k * J) / J)
+
+        out[j] = -7.85e-4 / E * total
+    return out
 
 
+# def _dEds_compound(comp, E_keV):
+#     """
+#     Joy-Luo stopping power [keV/Angstrom] for a compound, additive over
+#     elements: dE/ds = -7.85e-4 / E * sum_i (n_i/N_A') Z_i ln(1.166(E+k J)/J)
+#     with n_i in atoms/Ang^3 and N_A' = 0.602214 (Avogadro in mol/Ang^3*g
+#     bookkeeping units; equals the single-element rho*Z/A form).
+#     """
+#     total = 0.0
+#     for el, n_i in comp:
+#         p = TRANSPORT_ELEMENTS[el]
+#         k = 0.731 + 0.0688 * np.log10(p["Z"])
+#         total = total + (n_i / 0.602214076) * p["Z"] * np.log(
+#             1.166 * (E_keV + k * p["J_keV"]) / p["J_keV"]
+#         )
+#     return -7.85e-4 / E_keV * total
+
+
+@njit(cache=True)
 def _rotate_directions(d, cos_t, phi):
-    """Rotate unit vectors d (N,3) by polar angle theta, azimuth phi."""
-    sin_t = np.sqrt(np.maximum(1.0 - cos_t**2, 0.0))
-    ref = np.zeros_like(d)
-    use_x = np.abs(d[:, 0]) < 0.9
-    ref[use_x, 0] = 1.0
-    ref[~use_x, 1] = 1.0
-    u = np.cross(d, ref)
-    u /= np.linalg.norm(u, axis=1)[:, None]
-    w = np.cross(d, u)
-    out = (
-        cos_t[:, None] * d + (sin_t * np.cos(phi))[:, None] * u + (sin_t * np.sin(phi))[:, None] * w
-    )
-    return out / np.linalg.norm(out, axis=1)[:, None]
+    """Rotate unit vectors d (N,3) by polar angle theta, azimuth phi.
+    First test @njit case, since it is the heaviest single item
+    in the transport path."""
+    out = np.empty_like(d)
+
+    for i in range(d.shape[0]):
+        dx = d[i, 0]
+        dy = d[i, 1]
+        dz = d[i, 2]
+
+        cos_theta_i = cos_t[i]
+        sin2_theta_i = 1.0 - cos_theta_i * cos_theta_i
+        if sin2_theta_i < 0.0:
+            sin2_theta_i = 0.0
+
+        sin_theta_i = np.sqrt(sin2_theta_i)
+
+        phi_i = phi[i]
+        cos_phi_i = np.cos(phi_i)
+        sin_phi_i = np.sin(phi_i)
+
+        if abs(dx) < 0.9:
+            refx = 1.0
+            refy = 0.0
+        else:
+            refx = 0.0
+            refy = 1.0
+        # refz left out because always zero
+
+        ux = -dz * refy
+        uy = dz * refx
+        uz = dx * refy - dy * refx
+
+        u_mag = np.sqrt(ux * ux + uy * uy + uz * uz)
+        ux /= u_mag
+        uy /= u_mag
+        uz /= u_mag
+
+        wx = dy * uz - dz * uy
+        wy = dz * ux - dx * uz
+        wz = dx * uy - dy * ux
+
+        sin_theta_cos_phi = sin_theta_i * cos_phi_i
+        sin_theta_sin_phi = sin_theta_i * sin_phi_i
+
+        outx = cos_theta_i * dx + sin_theta_cos_phi * ux + sin_theta_sin_phi * wx
+        outy = cos_theta_i * dy + sin_theta_cos_phi * uy + sin_theta_sin_phi * wy
+        outz = cos_theta_i * dz + sin_theta_cos_phi * uz + sin_theta_sin_phi * wz
+
+        out_mag = np.sqrt(outx * outx + outy * outy + outz * outz)
+        out[i, 0] = outx / out_mag
+        out[i, 1] = outy / out_mag
+        out[i, 2] = outz / out_mag
+
+    return out
 
 
 def simulate_trajectories(
@@ -507,11 +585,42 @@ def simulate_trajectories(
                 _normalize_composition(element, n_atoms_per_ang3, composition),
             )
         ]
+
     z_total = float(layers[-1][1])
     n_layers = len(layers)
-    L_comp = [[(el, float(n)) for el, n in lc] for (_, _, lc) in layers]
-    L_Zs = [[TRANSPORT_ELEMENTS[el]["Z"] for el, _ in lc] for lc in L_comp]
-    L_ncm3 = [[n * 1e24 for _, n in lc] for lc in L_comp]
+    L_elements = []
+    L_Zs = []
+    L_Js = []
+    L_ncm3 = []
+    L_ks = []
+    L_coeffs = []
+    for _, _, lc in layers:
+        elements = []
+        ncm3_arr = []
+        Z_arr = []
+        J_arr = []
+        k_arr = []
+        coeff_arr = []
+        for el, n_i in lc:
+            p = TRANSPORT_ELEMENTS[el]
+            Z_i = p["Z"]
+            J_i = p["J_keV"]
+            k_i = 0.731 + 0.0688 * np.log10(Z_i)
+            coeff_i = (n_i / 0.602214076) * Z_i
+            elements.append(el)
+            ncm3_arr.append(n_i * 1e24)
+            Z_arr.append(Z_i)
+            J_arr.append(J_i)
+            k_arr.append(k_i)
+            coeff_arr.append(coeff_i)
+
+        L_elements.append(elements)
+        L_Zs.append(np.asarray(Z_arr, dtype=float))
+        L_Js.append(np.asarray(J_arr, dtype=float))
+        L_ncm3.append(np.asarray(ncm3_arr, dtype=float))
+        L_ks.append(np.asarray(k_arr, dtype=float))
+        L_coeffs.append(np.asarray(coeff_arr, dtype=float))
+
     L_top = [float(a) for (a, _, _) in layers]
     L_bot = [float(b) for (_, b, _) in layers]
     internal_bounds = np.array(L_bot[:-1], dtype=float)  # between consecutive layers
@@ -663,8 +772,10 @@ def simulate_trajectories(
             grp = idx if lay_all is None else idx[lay_all == L]
             if grp.size == 0:
                 continue
-            comp = L_comp[L]
-            Zs = L_Zs[L]
+            J_arr = L_Js[L]
+            Z_arr = L_Zs[L]
+            k_arr = L_ks[L]
+            coeff_arr = L_coeffs[L]
             n_cm3s = L_ncm3[L]
             z_top_L, z_bot_L = L_top[L], L_bot[L]
             Ea = E[grp]  # kinetic energies [keV]
@@ -672,7 +783,7 @@ def simulate_trajectories(
             # -- 1. distance to the next elastic collision (this layer) ---------
             # Exponential free path P(s)=exp(-s/lambda)/lambda, total rate
             # additive over the layer's elements: 1/lambda = sum_i n_i sigma_i(E).
-            rates = _scatter_rates(Ea, Zs, n_cm3s)  # (n_elements, m) [1/cm]
+            rates = _scatter_rates(Ea, Z_arr, n_cm3s)  # (n_elements, m) [1/cm]
             lam_ang = 1e8 / rates.sum(axis=0)  # mean free path [Ang]
             step = -lam_ang * np.log(rng.random(grp.size))  # sampled flight [Ang]
 
@@ -697,7 +808,7 @@ def simulate_trajectories(
                     step = np.where(crossed_face, exit_distance, step)
                     cross_up = crossed_face & (exit_face == Z_MIN)
                     cross_dn = crossed_face & (exit_face == Z_MAX)
-                    exit_side = crossed_face & np.isin(exit_face, (X_MIN, X_MAX, Y_MIN, Y_MAX))
+                    exit_side = crossed_face & (exit_face < Z_MIN)
                     exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
                     exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
                 else:
@@ -726,7 +837,7 @@ def simulate_trajectories(
                     step = np.where(crossed_face, exit_distance, step)
                     cross_up = crossed_face & (exit_face == Z_MIN)
                     cross_dn = crossed_face & (exit_face == Z_MAX)
-                    exit_side = crossed_face & np.isin(exit_face, (X_MIN, X_MAX, Y_MIN, Y_MAX))
+                    exit_side = crossed_face & (exit_face < Z_MIN)
                     exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
                     exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
                 else:
@@ -771,7 +882,7 @@ def simulate_trajectories(
             # modified Bethe for THIS layer's composition; no straggling). The
             # clock advances by L/beta at the segment's start speed.
             pos[grp] = p + step[:, None] * d
-            E[grp] = Ea + _dEds_compound(comp, Ea) * step
+            E[grp] = Ea + _dEds_compound(J_arr, k_arr, coeff_arr, Ea) * step
             clock[grp] += step / beta_from_keV(Ea)
 
             if groove is not None:
@@ -800,9 +911,7 @@ def simulate_trajectories(
                         width_ang=width_ang,
                         height_ang=height_ang,
                     )
-                    side_before_entry = np.isin(side_face, (X_MIN, X_MAX, Y_MIN, Y_MAX)) & (
-                        side_distance < entry_distance
-                    )
+                    side_before_entry = (side_face < Z_MIN) & (side_distance < entry_distance)
                     exit_side[surf_local[side_before_entry]] = True
                     entry_distance = np.where(side_before_entry, np.inf, entry_distance)
 
@@ -862,21 +971,33 @@ def simulate_trajectories(
                 full = ~(cross_up | cross_dn | exit_side) & ~died
             else:
                 full = ~(cross_up | cross_dn | exit_side | surface_first) & ~died
+
             srv = grp[full]
+
             if srv.size:
-                cos_t = np.empty(srv.size)
-                if len(comp) == 1:
-                    cos_t = _sample_cos_theta(Zs[0], E[srv], rng, elastic_model, comp[0][0])
+                if Z_arr.size == 1:
+                    cos_t = _sample_cos_theta(Z_arr[0], E[srv], rng, elastic_model, elements[0])
+
                 else:
-                    p_el = rates[:, full] / rates[:, full].sum(axis=0)
+                    cos_t = np.empty(srv.size)
+
+                    p_el = rates[:, full]
+                    p_el = p_el / p_el.sum(axis=0)
+
                     u = rng.random(srv.size)
                     cum = np.cumsum(p_el, axis=0)
                     which = (u[None, :] > cum).sum(axis=0)  # element index
-                    for i_el, (el_i, _) in enumerate(comp):
+
+                    for i_el in range(Z_arr.size):
                         m = which == i_el
                         if m.any():
+                            srv_i = srv[m]
                             cos_t[m] = _sample_cos_theta(
-                                Zs[i_el], E[srv][m], rng, elastic_model, el_i
+                                Z_arr[i_el],
+                                E[srv_i],
+                                rng,
+                                elastic_model,
+                                elements[i_el],
                             )
                 phi = 2.0 * np.pi * rng.random(srv.size)
                 dirs[srv] = _rotate_directions(dirs[srv], cos_t, phi)
