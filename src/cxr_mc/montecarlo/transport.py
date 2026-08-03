@@ -158,11 +158,14 @@ def _sample_bunch_offsets(
     return dt - dt.mean()  # center on the bunch centroid (t=0 == centroid)
 
 
+@njit(cache=True)
 def beta_from_keV(E_keV):
-    g = 1.0 + E_keV / 510.99895
-    # Exponentiation stays in the input array namespace. dpnp deliberately
-    # disables NumPy's ``__array_ufunc__`` bridge, unlike CuPy.
-    return (1.0 - 1.0 / g**2) ** 0.5
+    out = np.empty_like(E_keV)
+    for j in range(E_keV.size):
+        g = 1.0 + E_keV[j] / 510.99895
+        g_inv_square = 1.0 / (g * g)
+        out[j] = (1.0 - g_inv_square) ** 0.5
+    return out
 
 
 # ---- elastic scattering models ------------------------------------------------
@@ -188,9 +191,41 @@ def _sigma_browning_cm2(Z, E_keV):
     return out
 
 
+@njit(cache=True)
+def _sigma_browning_cm2_scalar(Z_i, E_i):
+    """
+    Browning et al., J. Appl. Phys. 76, 2016 (1994): empirical fit to the
+    tabulated Mott TOTAL elastic cross sections [cm^2], valid 0.1-30 keV,
+    Z <= 92.
+    """
+
+    z17 = Z_i**1.7
+    numerator = 3.0e-18 * z17
+    z_exp = 0.005 * z17
+    z_squared = 0.0007 * Z_i * Z_i
+    sqrt_E_i = np.sqrt(E_i)
+
+    return numerator / (E_i + z_exp * sqrt_E_i + z_squared / sqrt_E_i)
+
+
 def _alpha_sr_joy(Z, E_keV):
     """Classic analytic screened-Rutherford screening parameter (Joy/Bishop)."""
     return 3.4e-3 * Z**0.67 / E_keV
+
+
+@njit(cache=True)
+def _alpha_sr_joy_scalar(Z, E_keV):
+    """Classic analytic screened-Rutherford screening parameter (Joy/Bishop)."""
+    return 3.4e-3 * Z**0.67 / E_keV
+
+
+@njit(cache=True)
+def _alpha_sr_joy_numba(Z, E_keV):
+    """Classic analytic screened-Rutherford screening parameter (Joy/Bishop)."""
+    out = np.empty_like(E_keV)
+    for j in range(E_keV.size):
+        out[j] = 3.4e-3 * Z**0.67 / E_keV[j]
+    return out
 
 
 def _alpha_from_first_moment(target):
@@ -269,6 +304,43 @@ def _sample_cos_theta_sr_numba(Z, E_keV, R):
     return out
 
 
+@njit(cache=True)
+def _sample_cos_theta_from_alpha(alpha, R):
+    return 1.0 - 2.0 * alpha * R / (1.0 + alpha - R)
+
+
+@njit(cache=True)
+def _sample_cos_theta_joy_scalar(Z, E_keV, R):
+    alpha = 3.4e-3 * Z**0.67 / E_keV
+    return 1.0 - 2.0 * alpha * R / (1.0 + alpha - R)
+
+
+@njit(cache=True)
+def _sample_cos_theta_numba(Z, E_keV, rng, elastic_model, element):
+    """Polar scattering angle from the screened-Rutherford inversion, with the
+    screening parameter from the chosen model. If elastic_model="mott" but no
+    NIST Mott transport table exists for `element` (e.g. W), fall back to the
+    analytic screened-Rutherford screening for that element. The miss is cached
+    in _NO_MOTT so we don't re-stat the filesystem every transport step
+    (lru_cache doesn't cache the FileNotFoundError); logged once per element
+    per process at DEBUG (silent by default -- set CXR_MC_DEBUG=1 to see it;
+    a ProcessPoolExecutor worker pool re-logs once per worker, since each
+    worker gets its own _NO_MOTT cache)."""
+    R = rng.random(E_keV.shape)
+    if elastic_model == "mott" and element not in _NO_MOTT:
+        try:
+            logE, logA = _mott_alpha_table(element, Z)
+            alpha = 10.0 ** np.interp(np.log10(E_keV * 1e3), logE, logA)
+
+            return 1.0 - 2.0 * alpha * R / (1.0 + alpha - R)
+
+        except FileNotFoundError:
+            logger.debug(...)
+            _NO_MOTT.add(element)
+
+    return _sample_cos_theta_sr_numba(Z, E_keV, R)
+
+
 def _sample_cos_theta(Z, E_keV, rng, elastic_model, element):
     """Polar scattering angle from the screened-Rutherford inversion, with the
     screening parameter from the chosen model. If elastic_model="mott" but no
@@ -319,21 +391,46 @@ def _dEds_compound(J_arr, k_arr, coeff_arr, E_keV):
     return out
 
 
-# def _dEds_compound(comp, E_keV):
-#     """
-#     Joy-Luo stopping power [keV/Angstrom] for a compound, additive over
-#     elements: dE/ds = -7.85e-4 / E * sum_i (n_i/N_A') Z_i ln(1.166(E+k J)/J)
-#     with n_i in atoms/Ang^3 and N_A' = 0.602214 (Avogadro in mol/Ang^3*g
-#     bookkeeping units; equals the single-element rho*Z/A form).
-#     """
-#     total = 0.0
-#     for el, n_i in comp:
-#         p = TRANSPORT_ELEMENTS[el]
-#         k = 0.731 + 0.0688 * np.log10(p["Z"])
-#         total = total + (n_i / 0.602214076) * p["Z"] * np.log(
-#             1.166 * (E_keV + k * p["J_keV"]) / p["J_keV"]
-#         )
-#     return -7.85e-4 / E_keV * total
+@njit(cache=True)
+def _rotate_direction_scalar(dx, dy, dz, cos_t, phi):
+    sin2 = 1.0 - cos_t * cos_t
+    if sin2 < 0.0:
+        sin2 = 0.0
+    sin_t = np.sqrt(sin2)
+
+    cos_phi = np.cos(phi)
+    sin_phi = np.sin(phi)
+
+    if abs(dx) < 0.9:
+        refx = 1.0
+        refy = 0.0
+    else:
+        refx = 0.0
+        refy = 1.0
+
+    ux = -dz * refy
+    uy = dz * refx
+    uz = dx * refy - dy * refx
+
+    u_mag = np.sqrt(ux * ux + uy * uy + uz * uz)
+    ux /= u_mag
+    uy /= u_mag
+    uz /= u_mag
+
+    wx = dy * uz - dz * uy
+    wy = dz * ux - dx * uz
+    wz = dx * uy - dy * ux
+
+    a = sin_t * cos_phi
+    b = sin_t * sin_phi
+
+    outx = cos_t * dx + a * ux + b * wx
+    outy = cos_t * dy + a * uy + b * wy
+    outz = cos_t * dz + a * uz + b * wz
+
+    mag = np.sqrt(outx * outx + outy * outy + outz * outz)
+
+    return outx / mag, outy / mag, outz / mag
 
 
 @njit(cache=True)
@@ -393,6 +490,10 @@ def _rotate_directions(d, cos_t, phi):
         out[i, 2] = outz / out_mag
 
     return out
+
+
+# @njit(cache=True)
+# def _transport_core_numba():
 
 
 def simulate_trajectories(
@@ -574,6 +675,8 @@ def simulate_trajectories(
     width_ang = None if width_mm is None else width_mm * 1.0e7
     height_ang = None if height_mm is None else height_mm * 1.0e7
     finite_footprint = width_ang is not None
+    max_segments = Ne * max_steps
+    max_vac = Ne * max_steps
 
     # Build the layer stack: explicit `layers` (film-on-substrate) overrides;
     # else a single layer spanning the slab (bit-for-bit the old transport).
@@ -647,6 +750,26 @@ def simulate_trajectories(
                 raise ValueError("elastic_model must be 'mott' or 'sr'")
             rates.append(n_i * sig_i)
         return np.array(rates)  # (n_elements, m)
+
+    @njit(cache=True)
+    def _scatter_rates_scalar(E_i, Z_i, n_cm3_i):
+        """Per-element elastic scattering rates [1/cm] at energies Ea (one layer)."""
+        if elastic_model == "mott":
+            sig_i = _sigma_browning_cm2_scalar(Z_i, E_i)
+        elif elastic_model == "sr":
+            a = _alpha_sr_joy_scalar(Z_i, E_i)
+            sig_i = (
+                5.21e-21
+                * Z_i**2
+                / E_i**2
+                * 4.0
+                * np.pi
+                / (a * (1.0 + a))
+                * ((E_i + 511.0) / (E_i + 1024.0)) ** 2
+            )
+        else:
+            raise ValueError("elastic_model must be 'mott' or 'sr'")
+        return n_cm3_i * sig_i
 
     rng = np.random.default_rng(seed)
     pos = np.zeros((Ne, 3))
@@ -727,16 +850,24 @@ def simulate_trajectories(
     initial_v_hat = dirs.copy()
     initial_E_keV = E.copy()
 
-    seg_mid, seg_dir, seg_len, seg_E, seg_t0, seg_id, seg_lay = (
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-    )
-    vac_start, vac_end, vac_E, vac_t0, vac_id = [], [], [], [], []
+    seg_mid = np.empty((max_segments, 3), dtype=float)
+    seg_dir = np.empty((max_segments, 3), dtype=float)
+
+    seg_len = np.empty(max_segments, dtype=float)
+    seg_E = np.empty(max_segments, dtype=float)
+    seg_t0 = np.empty(max_segments, dtype=float)
+
+    seg_id = np.empty(max_segments, dtype=np.int64)
+    seg_lay = np.empty(max_segments, dtype=np.int16)
+    nseg = 0
+
+    vac_start = np.empty((max_vac, 3))
+    vac_end = np.empty((max_vac, 3))
+    vac_E = np.empty(max_vac)
+    vac_t0 = np.empty(max_vac)
+    vac_id = np.empty(max_vac, dtype=np.int64)
+    nvac = 0
+
     zero_surface_events = np.zeros(Ne, dtype=np.int16) if groove is not None else None
     material_steps = np.zeros(Ne, dtype=np.int32) if groove is not None else None
     surface_events = np.zeros(Ne, dtype=np.int32) if groove is not None else None
@@ -769,15 +900,16 @@ def simulate_trajectories(
                 n_layers - 1,
             )
         for L in range(n_layers):
-            grp = idx if lay_all is None else idx[lay_all == L]
-            if grp.size == 0:
-                continue
             J_arr = L_Js[L]
             Z_arr = L_Zs[L]
             k_arr = L_ks[L]
             coeff_arr = L_coeffs[L]
             n_cm3s = L_ncm3[L]
             z_top_L, z_bot_L = L_top[L], L_bot[L]
+
+            grp = idx if lay_all is None else idx[lay_all == L]
+            if grp.size == 0:
+                continue
             Ea = E[grp]  # kinetic energies [keV]
 
             # -- 1. distance to the next elastic collision (this layer) ---------
@@ -823,6 +955,111 @@ def simulate_trajectories(
                     exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
                     exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
                     exit_side = np.zeros(grp.size, dtype=bool)
+
+                # -- 3. record the segment (the radiation source list) --------------
+                # midpoint -> escape-absorption path; direction -> v.g, v.n in the
+                # amplitudes; length -> interaction time t_L; START energy -> beta
+                dEds = _dEds_compound(J_arr, k_arr, coeff_arr, Ea)
+                beta = beta_from_keV(Ea)
+                for j in range(grp.size):
+                    g = grp[j]
+                    seg_dir[nseg, 0] = d[j, 0]
+                    seg_dir[nseg, 1] = d[j, 1]
+                    seg_dir[nseg, 2] = d[j, 2]
+
+                    seg_mid[nseg, 0] = p[j, 0] + 0.5 * step[j] * d[j, 0]
+                    seg_mid[nseg, 1] = p[j, 1] + 0.5 * step[j] * d[j, 1]
+                    seg_mid[nseg, 2] = p[j, 2] + 0.5 * step[j] * d[j, 2]
+
+                    seg_len[nseg] = step[j]
+                    seg_E[nseg] = Ea[j]
+                    seg_t0[nseg] = clock[g]  # age at segment START [Ang, c=1]
+                    seg_id[nseg] = g  # which electron emitted this segment
+                    seg_lay[nseg] = L  # emitting layer
+
+                    if nseg >= max_segments:
+                        raise RuntimeError("segment buffer exhausted")
+                    nseg += 1
+
+                    # -- 4. advance: straight line + continuous slowing-down ------------
+                    # Energy drains deterministically along the flight (CSDA: Joy-Luo
+                    # modified Bethe for THIS layer's composition; no straggling). The
+                    # clock advances by L/beta at the segment's start speed.
+                    pos[g, 0] = p[j, 0] + step[j] * d[j, 0]
+                    pos[g, 1] = p[j, 1] + step[j] * d[j, 1]
+                    pos[g, 2] = p[j, 2] + step[j] * d[j, 2]
+
+                    E_i = Ea[j] + dEds[j] * step[j]
+                    clock[g] += step[j] / beta[j]
+                    E[g] = E_i
+
+                    rates_arr = np.empty(Z_arr.size)
+                    total_rate = 0.0
+
+                    for i_el in range(Z_arr.size):
+                        rate = _scatter_rates(E_i, Z_arr[i_el], n_cm3s[i_el])
+                        rates_arr[i_el] = rate
+                        total_rate += rate
+
+                    # -- 5. kill exited / exhausted; pass internal crossers on ----------
+                    died_j = exit_top[j] or exit_bot[j] or exit_side[j] or E[g] < E_cut_keV
+                    if exit_top[j]:
+                        n_back += 1  # exited the entrance face
+                    if exit_bot[j]:
+                        n_trans += 1  # punched through the back face
+                    if exit_side[j]:
+                        n_side += 1  # exited a transverse prism face
+                    if died_j:
+                        alive[g] = False
+                    crossed_internal = (
+                        (cross_up[j] | cross_dn[j])  # reached a layer seam
+                        and not died_j
+                    )
+                    if crossed_internal:
+                        pos[g, 2] += np.sign(dirs[g, 2]) * EPS  # nudge just into neighbor
+                    full_j = not cross_up[j] and not cross_dn[j] and not exit_side[j] and not died_j
+                    if full_j:
+                        if Z_arr.size == 1:
+                            i_el = 0
+
+                        else:
+                            p_el = rates[:, j]
+                            p_el = p_el / p_el.sum()
+
+                            cum = np.cumsum(p_el)
+                            R = rng.random()
+                            i_el = (R > cum).sum()  # element index
+
+                        Z_i = Z_arr[i_el]
+                        el_i = elements[i_el]
+
+                        if elastic_model == "mott" and el_i not in _NO_MOTT:
+                            try:
+                                logE, logA = _mott_alpha_table(el_i, Z_i)
+
+                                alpha = 10.0 ** np.interp(
+                                    np.log10(E_i * 1e3),
+                                    logE,
+                                    logA,
+                                )
+
+                            except FileNotFoundError:
+                                _NO_MOTT.add(el_i)
+                                alpha = _alpha_sr_joy_scalar(Z_i, E_i)
+
+                        else:
+                            alpha = _alpha_sr_joy_scalar(Z_i, E_i)
+
+                        cos_t = _sample_cos_theta_from_alpha(alpha, R)
+
+                        phi = 2.0 * np.pi * rng.random()
+                        dx, dy, dz = _rotate_direction_scalar(
+                            dirs[g, 0], dirs[g, 1], dirs[g, 2], cos_t, phi
+                        )
+                        dirs[g, 0] = dx
+                        dirs[g, 1] = dy
+                        dirs[g, 2] = dz
+
             else:
                 if finite_footprint:
                     exit_distance, exit_face = first_prism_exit(
@@ -865,142 +1102,119 @@ def simulate_trajectories(
                 exit_top = exit_top & ~surface_first
                 exit_bot = exit_bot & ~surface_first
                 exit_side = exit_side & ~surface_first
-
-            # -- 3. record the segment (the radiation source list) --------------
-            # midpoint -> escape-absorption path; direction -> v.g, v.n in the
-            # amplitudes; length -> interaction time t_L; START energy -> beta.
-            seg_mid.append(p + 0.5 * step[:, None] * d)
-            seg_dir.append(d.copy())
-            seg_len.append(step)
-            seg_E.append(Ea.copy())
-            seg_t0.append(clock[grp].copy())  # age at segment START [Ang, c=1]
-            seg_id.append(grp.copy())  # which electron emitted this segment
-            seg_lay.append(np.full(grp.size, L, dtype=np.int16))  # emitting layer
-
-            # -- 4. advance: straight line + continuous slowing-down ------------
-            # Energy drains deterministically along the flight (CSDA: Joy-Luo
-            # modified Bethe for THIS layer's composition; no straggling). The
-            # clock advances by L/beta at the segment's start speed.
-            pos[grp] = p + step[:, None] * d
-            E[grp] = Ea + _dEds_compound(J_arr, k_arr, coeff_arr, Ea) * step
-            clock[grp] += step / beta_from_keV(Ea)
-
-            if groove is not None:
                 zero_event_counts = zero_surface_events
                 assert zero_event_counts is not None
+
                 below_cut = E[grp] < E_cut_keV
                 active_surface = surface_first & ~below_cut
                 zero_event_counts[grp[~active_surface]] = 0
                 reentered_group = np.zeros(grp.size, dtype=bool)
-            if groove is not None and active_surface.any():
-                surf_local = np.flatnonzero(active_surface)
-                surf_global = grp[surf_local]
-                surface_points = pos[surf_global].copy()
-                entry_distance = np.array(
-                    [
-                        first_surface_event(pi, di, groove, transition="entry")
-                        for pi, di in zip(surface_points, dirs[surf_global], strict=False)
-                    ]
-                )
-                if finite_footprint:
-                    side_distance, side_face = first_prism_exit(
-                        surface_points,
-                        dirs[surf_global],
-                        z_min_ang=0.0,
-                        z_max_ang=z_total,
-                        width_ang=width_ang,
-                        height_ang=height_ang,
+
+                if active_surface.any():
+                    surf_local = np.flatnonzero(active_surface)
+                    surf_global = grp[surf_local]
+                    surface_points = pos[surf_global].copy()
+                    entry_distance = np.array(
+                        [
+                            first_surface_event(pi, di, groove, transition="entry")
+                            for pi, di in zip(surface_points, dirs[surf_global], strict=False)
+                        ]
                     )
-                    side_before_entry = (side_face < Z_MIN) & (side_distance < entry_distance)
-                    exit_side[surf_local[side_before_entry]] = True
-                    entry_distance = np.where(side_before_entry, np.inf, entry_distance)
+                    if finite_footprint:
+                        side_distance, side_face = first_prism_exit(
+                            surface_points,
+                            dirs[surf_global],
+                            z_min_ang=0.0,
+                            z_max_ang=z_total,
+                            width_ang=width_ang,
+                            height_ang=height_ang,
+                        )
+                        side_before_entry = (side_face < Z_MIN) & (side_distance < entry_distance)
+                        exit_side[surf_local[side_before_entry]] = True
+                        entry_distance = np.where(side_before_entry, np.inf, entry_distance)
 
-                reentered = np.isfinite(entry_distance)
-                if reentered.any():
-                    re_local = surf_local[reentered]
-                    re_global = grp[re_local]
-                    reentered_group[re_local] = True
-                    distance = entry_distance[reentered]
-                    start = surface_points[reentered]
-                    direction = dirs[re_global]
-                    end = start + distance[:, None] * direction
-                    vac_start.append(start)
-                    vac_end.append(end)
-                    vac_E.append(E[re_global].copy())
-                    vac_t0.append(clock[re_global].copy())
-                    vac_id.append(re_global.copy())
-                    clock[re_global] += distance / beta_from_keV(E[re_global])
-                    surface_eps = max(
-                        64 * np.finfo(float).eps * groove.spacing_ang,
-                        2e-12 * groove.spacing_ang,
+                    reentered = np.isfinite(entry_distance)
+                    if reentered.any():
+                        re_local = surf_local[reentered]
+                        re_global = grp[re_local]
+                        reentered_group[re_local] = True
+                        distance = entry_distance[reentered]
+                        start = surface_points[reentered]
+                        direction = dirs[re_global]
+                        end = start + distance[:, None] * direction
+
+                        vac_start[nvac] = start
+                        vac_end[nvac] = end
+                        vac_E[nvac] = E[re_global].copy()
+                        vac_t0[nvac] = clock[re_global].copy()
+                        vac_id[nvac] = re_global.copy()
+                        nvac += 1
+
+                        clock[re_global] += distance / beta_from_keV(E[re_global])
+                        surface_eps = max(
+                            64 * np.finfo(float).eps * groove.spacing_ang,
+                            2e-12 * groove.spacing_ang,
+                        )
+                        pos[re_global] = end + surface_eps * direction
+                        assert surface_events is not None
+                        surface_events[re_global] += 1
+                        if np.any(surface_events[re_global] > max_steps):
+                            raise RuntimeError("grooved surface event limit exhausted")
+
+                    permanent = ~reentered & ~exit_side[surf_local]
+                    exit_top[surf_local[permanent]] = True
+                    short = step[surf_local] <= EPS
+                    zero_event_counts[surf_global] = np.where(
+                        short, zero_event_counts[surf_global] + 1, 0
                     )
-                    pos[re_global] = end + surface_eps * direction
-                    assert surface_events is not None
-                    surface_events[re_global] += 1
-                    if np.any(surface_events[re_global] > max_steps):
-                        raise RuntimeError("grooved surface event limit exhausted")
-
-                permanent = ~reentered & ~exit_side[surf_local]
-                exit_top[surf_local[permanent]] = True
-                short = step[surf_local] <= EPS
-                zero_event_counts[surf_global] = np.where(
-                    short, zero_event_counts[surf_global] + 1, 0
-                )
-                if np.any(zero_event_counts[surf_global] >= 2):
-                    raise RuntimeError("repeated zero-length grooved surface events")
-
-            # -- 5. kill exited / exhausted; pass internal crossers on ----------
-            if groove is None:
-                died = exit_top | exit_bot | exit_side | (E[grp] < E_cut_keV)
-            else:
+                    if np.any(zero_event_counts[surf_global] >= 2):
+                        raise RuntimeError("repeated zero-length grooved surface events")
                 died = exit_top | exit_bot | exit_side | below_cut
-            n_back += int(exit_top.sum())  # exited the entrance face
-            n_trans += int(exit_bot.sum())  # punched through the back face
-            n_side += int(exit_side.sum())  # exited a transverse prism face
-            alive[grp[died]] = False
-            crossed_internal = (cross_up | cross_dn) & ~died  # reached a layer seam
-            if crossed_internal.any():
-                ci = grp[crossed_internal]
-                pos[ci, 2] += np.sign(dirs[ci, 2]) * EPS  # nudge just into neighbor
+                n_back += int(exit_top.sum())  # exited the entrance face
+                n_trans += int(exit_bot.sum())  # punched through the back face
+                n_side += int(exit_side.sum())  # exited a transverse prism face
+                alive[grp[died]] = False
+                crossed_internal = (cross_up | cross_dn) & ~died  # reached a layer seam
+                if crossed_internal.any():
+                    ci = grp[crossed_internal]
+                    pos[ci, 2] += np.sign(dirs[ci, 2]) * EPS  # nudge just into neighbor
+                # -- 6. elastic collision: scatter the FULL-FLIGHT survivors --------
+                # (truncated flights did not collide). The scattering ELEMENT is
+                # chosen with probability n_i sigma_i / sum; the polar angle from that
+                # element's screened-Rutherford inversion; azimuth uniform; E unchanged.
 
-            # -- 6. elastic collision: scatter the FULL-FLIGHT survivors --------
-            # (truncated flights did not collide). The scattering ELEMENT is
-            # chosen with probability n_i sigma_i / sum; the polar angle from that
-            # element's screened-Rutherford inversion; azimuth uniform; E unchanged.
-            if groove is None:
-                full = ~(cross_up | cross_dn | exit_side) & ~died
-            else:
                 full = ~(cross_up | cross_dn | exit_side | surface_first) & ~died
 
-            srv = grp[full]
+                srv = grp[full]
 
-            if srv.size:
-                if Z_arr.size == 1:
-                    cos_t = _sample_cos_theta(Z_arr[0], E[srv], rng, elastic_model, elements[0])
+                if srv.size:
+                    if Z_arr.size == 1:
+                        cos_t = _sample_cos_theta(Z_arr[0], E[srv], rng, elastic_model, elements[0])
 
-                else:
-                    cos_t = np.empty(srv.size)
+                    else:
+                        cos_t = np.empty(srv.size)
 
-                    p_el = rates[:, full]
-                    p_el = p_el / p_el.sum(axis=0)
+                        p_el = rates[:, full]
+                        p_el = p_el / p_el.sum(axis=0)
 
-                    u = rng.random(srv.size)
-                    cum = np.cumsum(p_el, axis=0)
-                    which = (u[None, :] > cum).sum(axis=0)  # element index
+                        u = rng.random(srv.size)
+                        cum = np.cumsum(p_el, axis=0)
+                        which = (u[None, :] > cum).sum(axis=0)  # element index
 
-                    for i_el in range(Z_arr.size):
-                        m = which == i_el
-                        if m.any():
-                            srv_i = srv[m]
-                            cos_t[m] = _sample_cos_theta(
-                                Z_arr[i_el],
-                                E[srv_i],
-                                rng,
-                                elastic_model,
-                                elements[i_el],
-                            )
-                phi = 2.0 * np.pi * rng.random(srv.size)
-                dirs[srv] = _rotate_directions(dirs[srv], cos_t, phi)
+                        for i_el in range(Z_arr.size):
+                            m = which == i_el
+                            if m.any():
+                                srv_i = srv[m]
+                                cos_t[m] = _sample_cos_theta(
+                                    Z_arr[i_el],
+                                    E[srv_i],
+                                    rng,
+                                    elastic_model,
+                                    elements[i_el],
+                                )
+                    phi = 2.0 * np.pi * rng.random(srv.size)
+                    dirs[srv] = _rotate_directions(dirs[srv], cos_t, phi)
+
             if groove is not None:
                 assert material_steps is not None
                 count_material_step = alive[grp] & ~reentered_group
@@ -1015,21 +1229,19 @@ def simulate_trajectories(
         elec_id = np.empty(0, dtype=np.int64)
         layer = np.empty(0, dtype=np.int16)
     else:
-        r_mid = np.concatenate(seg_mid)
-        v_hat = np.concatenate(seg_dir)
-        L_ang = np.concatenate(seg_len)
-        E_keV = np.concatenate(seg_E)
-        t_ang = np.concatenate(seg_t0)
-        elec_id = np.concatenate(seg_id)
-        layer = np.concatenate(seg_lay)
+        r_mid = seg_mid
+        v_hat = seg_dir
+        L_ang = seg_len
+        E_keV = seg_E
+        t_ang = seg_t0
+        elec_id = seg_id
+        layer = seg_lay
 
-    vacuum_start_ang = np.concatenate(vac_start) if vac_start else np.empty((0, 3))
-    vacuum_end_ang = np.concatenate(vac_end) if vac_end else np.empty((0, 3))
-    vacuum_E_keV = np.concatenate(vac_E) if vac_E else np.empty(0)
-    vacuum_t_ang = np.concatenate(vac_t0) if vac_t0 else np.empty(0)
-    vacuum_elec_id = (
-        np.concatenate(vac_id).astype(np.int64) if vac_id else np.empty(0, dtype=np.int64)
-    )
+    vacuum_start_ang = vac_start[:nvac] if vac_start else np.empty((0, 3))
+    vacuum_end_ang = vac_end[:nvac] if vac_end else np.empty((0, 3))
+    vacuum_E_keV = vac_E[:nvac] if vac_E else np.empty(0)
+    vacuum_t_ang = vac_t0[:nvac] if vac_t0 else np.empty(0)
+    vacuum_elec_id = vac_id[:nvac].astype(np.int64) if vac_id else np.empty(0, dtype=np.int64)
     # Broadcast the per-electron bunch offset onto every segment / vacuum flight
     # (constant per electron, like its identity), so a coherent sum can read
     # t_abs = t_ang + t0_ang without re-deriving which electron emitted a
