@@ -34,7 +34,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from . import _checkpoint_io, _checkpoint_store
-from ._energy_grid import decode_energy_grid
+from .energy_grid.encoding import decode_energy_grid
 from .montecarlo import run_cases, runner
 from .results import records, store_result, sweep_values
 
@@ -909,11 +909,7 @@ def repair_brem_wide(
         for r in results[name].values():
             bw = r.get("brem_wide")
             bw_array = np.asarray(bw) if bw is not None else np.asarray([])
-            finite = (
-                bw_array.size > 0
-                and np.isfinite(bw_array).all()
-                and np.any(bw_array != 0)
-            )
+            finite = bw_array.size > 0 and np.isfinite(bw_array).all() and np.any(bw_array != 0)
             if only_nonfinite:
                 at_target = finite
                 if retune:

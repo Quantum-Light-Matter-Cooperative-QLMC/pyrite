@@ -26,7 +26,7 @@ registries.
    cxr_mc.beam_metrics
    cxr_mc.config
    cxr_mc.detectors
-   cxr_mc.line_grid
+   cxr_mc.energy_grid
    cxr_mc.montecarlo
    cxr_mc.plots
    cxr_mc.profiles

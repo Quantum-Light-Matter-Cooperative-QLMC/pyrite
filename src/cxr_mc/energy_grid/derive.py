@@ -15,9 +15,9 @@ geometries is run through cxr_mc.montecarlo.runner.run_cases, which pipelines
 the independent per-geometry transports across a CPU worker pool instead of
 running them one at a time.
 
-    python -m cxr_mc.line_grid.derive
-    python -m cxr_mc.line_grid.derive --materials hopg,diamond --energies 30,50
-    python -m cxr_mc.line_grid.derive --json-out /tmp/line_grid_bounds.json
+    python -m cxr_mc.energy_grid.derive
+    python -m cxr_mc.energy_grid.derive --materials hopg,diamond --energies 30,50
+    python -m cxr_mc.energy_grid.derive --json-out /tmp/line_grid_bounds.json
 """
 
 from __future__ import annotations
@@ -32,8 +32,8 @@ from dataclasses import asdict, dataclass
 import numpy as np
 
 from cxr_mc.config import material_sweep
-from cxr_mc.line_grid import defaults as lg_defaults
-from cxr_mc.line_grid.bounds import coverage_energy, margined_stop, spacing_num
+from cxr_mc.energy_grid import defaults as lg_defaults
+from cxr_mc.energy_grid.bounds import coverage_energy, margined_stop, spacing_num
 from cxr_mc.materials import CATALOG
 from cxr_mc.montecarlo.runner import run_cases
 from cxr_mc.sweep import _quantized_angles, build_cases

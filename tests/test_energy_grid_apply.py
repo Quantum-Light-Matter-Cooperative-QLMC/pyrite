@@ -3,7 +3,7 @@ import tomllib
 
 import pytest
 
-from cxr_mc.line_grid import apply
+from cxr_mc.energy_grid import apply
 
 BASE_TOML = """schema_version = 1
 

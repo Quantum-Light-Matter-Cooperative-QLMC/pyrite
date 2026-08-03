@@ -60,7 +60,7 @@ def test_click_help_paths_are_clean(path):
 
 @pytest.mark.parametrize(
     "module",
-    ("cxr_mc.line_grid.derive", "cxr_mc.line_grid.job"),
+    ("cxr_mc.energy_grid.derive", "cxr_mc.energy_grid.job"),
 )
 def test_standalone_module_entry_points_remain_available(module):
     completed = subprocess.run(
@@ -212,7 +212,7 @@ def test_click_submit_routes_legacy_message_to_stderr(monkeypatch):
 
 def test_click_derive_forwards_brem_step(monkeypatch):
     seen = {}
-    from cxr_mc.line_grid import derive
+    from cxr_mc.energy_grid import derive
 
     monkeypatch.setattr(derive, "main", lambda argv: seen.update(argv=argv) or 0)
 
@@ -224,7 +224,7 @@ def test_click_derive_forwards_brem_step(monkeypatch):
 
 @pytest.mark.parametrize("status", [1, 75, 130])
 def test_click_derive_preserves_nonzero_status(monkeypatch, status):
-    from cxr_mc.line_grid import derive
+    from cxr_mc.energy_grid import derive
 
     monkeypatch.setattr(derive, "main", lambda _argv: status)
 
@@ -454,7 +454,7 @@ def test_hidden_line_grid_job_aliases_remain_callable():
 
 
 def test_click_regen_golden_delegates_check(monkeypatch):
-    from cxr_mc.line_grid import golden
+    from cxr_mc.energy_grid import golden
 
     seen = {}
     monkeypatch.setattr(
@@ -471,7 +471,7 @@ def test_click_regen_golden_delegates_check(monkeypatch):
 
 @pytest.mark.parametrize("status", [1, 75, 130])
 def test_click_regen_golden_preserves_nonzero_status(monkeypatch, status):
-    from cxr_mc.line_grid import golden
+    from cxr_mc.energy_grid import golden
 
     monkeypatch.setattr(golden, "regen", lambda check=False: status)
 

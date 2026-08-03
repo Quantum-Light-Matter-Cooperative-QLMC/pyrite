@@ -420,7 +420,7 @@ wired into pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
   `__version__`.
 
 ### `cli/energy_grid.py`, `cli/profile.py`, `cli/material.py`
-Thin CLI command modules. `energy_grid` registers domain-owned `line_grid`
+Thin CLI command modules. `energy_grid` registers the domain-owned `energy_grid`
 implementation; `profile` owns named campaign defaults and membership;
 `material` owns effective-range inspection and per-profile overrides. Shared
 validated atomic TOML helpers live in `cli/_catalog_io.py`; `cli/sweep.py`

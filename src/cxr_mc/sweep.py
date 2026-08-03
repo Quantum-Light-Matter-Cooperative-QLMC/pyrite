@@ -31,8 +31,8 @@ from typing import Any
 
 import numpy as np
 
-from ._energy_grid import decode_energy_grid, encode_energy_grid
 from .detectors import DetectorSpec
+from .energy_grid.encoding import decode_energy_grid, encode_energy_grid
 from .longitudinal import LongitudinalDistribution, resolve_longitudinal_distribution
 from .materials import CATALOG, LayerSpec
 from .materials._transport_data import TRANSPORT_ELEMENTS

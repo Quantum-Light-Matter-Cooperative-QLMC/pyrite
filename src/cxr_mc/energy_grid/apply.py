@@ -6,7 +6,7 @@ leaving everything else untouched: the shared per-material derived-grid store
 docs/cli-energy-grid-sweep-rework-plan.md), per-material ``E_grid_brem``
 (``[profiles.standard.overrides.<material>]``), and ``[profiles.standard]
 energy_keV``. Each line-grid row carries its own ``source``
-("derived"/"manual") provenance inline; ``cxr_mc.line_grid.provenance``
+("derived"/"manual") provenance inline; ``cxr_mc.energy_grid.provenance``
 remains the sidecar for optional notes and for bremsstrahlung's separate
 manual/derived tracking (brem bounds aren't governed by decision 3).
 Candidate catalogs are fully validated before replacement.
@@ -25,8 +25,8 @@ from pathlib import Path
 
 import tomlkit
 
-from cxr_mc.line_grid import provenance as _provenance
-from cxr_mc.line_grid.bounds import spacing_num
+from cxr_mc.energy_grid import provenance as _provenance
+from cxr_mc.energy_grid.bounds import spacing_num
 
 _MATERIALS_TOML = Path(__file__).resolve().parent.parent / "data" / "materials.toml"
 _DEFAULT_MATERIAL = "standard"
@@ -424,7 +424,7 @@ def delete_line_grid(material, energies, *, dry_run=False) -> list[float]:
 
 
 def set_brem_grid(material, stop_eV, *, step_eV=None, note=None):
-    from cxr_mc.line_grid.defaults import load_defaults
+    from cxr_mc.energy_grid.defaults import load_defaults
 
     stop = _positive_float(stop_eV, "stop")
     step = _positive_float(

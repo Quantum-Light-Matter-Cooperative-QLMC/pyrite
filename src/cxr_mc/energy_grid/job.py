@@ -94,7 +94,7 @@ def _slice_payload(
         "CXR_MC_FREE_WATERMARK_MB=15000",
         "CXR_MC_TIMING=1",
         remote.shell_remote_uv(),
-        "run --no-sync python -m cxr_mc.line_grid.derive",
+        "run --no-sync python -m cxr_mc.energy_grid.derive",
         f"--grid-stop {grid_stop:g}",
         f"--brem-grid-stop {brem_grid_stop:g}",
         f"--energies {shlex.quote(energies)}",

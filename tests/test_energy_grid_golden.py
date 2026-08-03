@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from cxr_mc.line_grid import golden
+from cxr_mc.energy_grid import golden
 
 
 def test_regen_recognizes_source_checkout():
