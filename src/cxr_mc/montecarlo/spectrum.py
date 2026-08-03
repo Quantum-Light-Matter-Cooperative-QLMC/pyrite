@@ -494,7 +494,12 @@ def mc_spectrum(
     ``S(g)=sum F exp(+i g.R)``, whose susceptibility harmonic is
     ``chi_g exp(-i g.r)``. Distinct reflections are spectrally separated, so
     the coherent sum runs WITHIN each reflection and orientation and
-    reflections/orientations still add incoherently. Two coherence scales fall
+    reflections/orientations still add incoherently.
+
+    # TODO: To be confirmed numerically that lines are sufficiently separated to ignore cross-g coherence.
+    # TODO: This needs to be added to the validation ledger/documentation.
+
+    Two coherence scales fall
     out of the one sum: intra-electron
     (segments of a trajectory) and inter-electron / superradiant (the spread of
     ``t0_ang`` across the bunch, whose ``|<e^{i omega t0}>|^2`` is the Gaussian
@@ -973,9 +978,12 @@ def mc_spectrum(
 
         n_seg = v_all.shape[0]
         seg_block = max(1, 1_000_000 // max(1, N_g))  # bound (n_block, N_g) temporaries
+
+        debug_captured = False
+
         for s0 in range(0, n_seg, seg_block):
             sb = slice(s0, min(s0 + seg_block, n_seg))
-            vx = v_all[sb, 0][:, None]  # (nb, 1)
+            vx = v_all[sb, 0][:, None]  # (nb, 1)F
             vy = v_all[sb, 1][:, None]
             vz = v_all[sb, 2][:, None]
             denom = denom_full[sb]
@@ -1051,9 +1059,33 @@ def mc_spectrum(
             _nsys_push("cxr.lines.accum")
             for w, tgt in targets:
                 w_f = w.reshape(-1)[gm]
+                if not debug_captured:
+                    print("N_L:", E_r_f.size)
+                    print("N_E:", E_grid.size)
+                    print("chunk:", chunk)
+
+                    print("E_r:", E_r_f.dtype, E_r_f.shape)
+                    print("aw :", aw_f.dtype, aw_f.shape)
+                    print("w  :", w_f.dtype, w_f.shape)
+                    print("E  :", E_grid.dtype, E_grid.shape)
+                    E_r_f_np = xp.asnumpy(E_r_f)
+                    aw_f_np = xp.asnumpy(aw_f)
+                    w_f_np = xp.asnumpy(w_f)
+                    E_grid_np = xp.asnumpy(E_grid)
+                    np.savez(
+                        "/tmp/line_accum_debug.npz",
+                        E_r_f_np=E_r_f_np,
+                        aw_f_np=aw_f_np,
+                        w_f_np=w_f_np,
+                        E_grid_np=E_grid_np,
+                    )
+                    debug_captured = True
                 for j0 in range(0, E_r_f.size, chunk):
                     sl2 = slice(j0, min(j0 + chunk, E_r_f.size))
                     S = _sincsq_lineshape(aw_f[sl2][:, None], E_grid[None, :], E_r_f[sl2][:, None])
+                    rhs = w_f[sl2] @ S
+
+                    tgt += rhs
                     tgt += w_f[sl2] @ S
             _nsys_pop()
 
