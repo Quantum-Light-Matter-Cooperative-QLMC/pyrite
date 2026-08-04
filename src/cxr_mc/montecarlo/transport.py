@@ -3,9 +3,9 @@ montecarlo.transport
 
 Single-scattering electron transport (Zhai SI S2): element data, elastic
 scattering models (Browning free paths + NIST-Mott-calibrated screened-
-Rutherford angles, analytic SR fallback), Joy-Luo stopping power, and the
-vectorized event-driven trajectory simulator. Pure NumPy -- never touches the
-GPU; the spectrum phase consumes the segment arrays it returns.
+Rutherford angles, analytic SR fallback), Joy-Luo stopping power, and a
+Numba-compiled scalar event-driven transport core. CPU-only; the spectrum phase
+consumes the segment arrays returned here.
 """
 
 import logging
@@ -15,7 +15,7 @@ from functools import cache
 from typing import Any
 
 import numpy as np
-from numba import jit as njit
+from numba import njit
 
 from .. import DATA_DIR
 from ..materials._transport_data import TRANSPORT_ELEMENTS
@@ -340,35 +340,47 @@ def _sample_cos_theta_from_alpha(alpha, R):
 
 
 @njit(cache=True)
+def _interp_mott_log_alpha_scalar(logE_eV, logE_flat, logA_flat, start, length):
+    """Linear interpolation with the same endpoint clamping as ``np.interp``."""
+    if length <= 0:
+        raise ValueError("Mott interpolation table must contain at least one point")
+
+    first = start
+    last = start + length - 1
+    if logE_eV <= logE_flat[first]:
+        return logA_flat[first]
+    if logE_eV >= logE_flat[last]:
+        return logA_flat[last]
+
+    lo = first
+    hi = last
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        if logE_flat[mid] <= logE_eV:
+            lo = mid
+        else:
+            hi = mid
+
+    x0 = logE_flat[lo]
+    x1 = logE_flat[hi]
+    y0 = logA_flat[lo]
+    y1 = logA_flat[hi]
+    return y0 + (logE_eV - x0) * (y1 - y0) / (x1 - x0)
+
+
+@njit(cache=True)
 def _sample_cos_theta_joy_scalar(Z, E_keV, R):
     alpha = 3.4e-3 * Z**0.67 / E_keV
     return 1.0 - 2.0 * alpha * R / (1.0 + alpha - R)
 
 
 @njit(cache=True)
-def _sample_cos_theta_numba(Z, E_keV, rng, elastic_model, element):
+def _sample_cos_theta_mott_scalar(E_keV, rng, logE, logA):
     """Polar scattering angle from the screened-Rutherford inversion, with the
-    screening parameter from the chosen model. If elastic_model="mott" but no
-    NIST Mott transport table exists for `element` (e.g. W), fall back to the
-    analytic screened-Rutherford screening for that element. The miss is cached
-    in _NO_MOTT so we don't re-stat the filesystem every transport step
-    (lru_cache doesn't cache the FileNotFoundError); logged once per element
-    per process at DEBUG (silent by default -- set CXR_MC_DEBUG=1 to see it;
-    a ProcessPoolExecutor worker pool re-logs once per worker, since each
-    worker gets its own _NO_MOTT cache)."""
+    screening parameter from the chosen model."""
     R = rng.random(E_keV.shape)
-    if elastic_model == "mott" and element not in _NO_MOTT:
-        try:
-            logE, logA = _mott_alpha_table(element, Z)
-            alpha = 10.0 ** np.interp(np.log10(E_keV * 1e3), logE, logA)
-
-            return 1.0 - 2.0 * alpha * R / (1.0 + alpha - R)
-
-        except FileNotFoundError:
-            logger.debug(...)
-            _NO_MOTT.add(element)
-
-    return _sample_cos_theta_sr_numba(Z, E_keV, R)
+    alpha = 10.0 ** np.interp(np.log10(E_keV * 1e3), logE, logA)
+    return 1.0 - 2.0 * alpha * R / (1.0 + alpha - R)
 
 
 def _sample_cos_theta(Z, E_keV, rng, elastic_model, element):
@@ -537,14 +549,14 @@ def _rotate_directions(d, cos_t, phi):
 
 
 @njit(cache=True)
-def _transport_core_ungrooved_sr(
+def _transport_core_ungrooved(
     Ne,
     alive,
     max_steps,
     max_segments,
     n_layers,
     internal_bounds,
-    elastic_model,
+    elastic_model_code,
     z_total,
     clock,
     rng,
@@ -558,6 +570,11 @@ def _transport_core_ungrooved_sr(
     L_ncm3,
     L_top,
     L_bot,
+    mott_has_table,
+    mott_start,
+    mott_len,
+    mott_logE_flat,
+    mott_logA_flat,
     E_keV,
     seg_dir,
     seg_mid,
@@ -567,18 +584,26 @@ def _transport_core_ungrooved_sr(
     seg_id,
     seg_lay,
 ):
-    if elastic_model != "sr":
-        raise NotImplementedError("Numba ungrooved core currently supports elastic_model='sr' only")
-    EPS = 1e-6  # nudge across an internal boundary so the layer lookup is unambiguous
-    lockstep_step = 0
-    nseg = 0
+    """Compiled infinite-footprint, ungrooved transport core.
 
+    ``elastic_model_code`` is 0 for analytic screened Rutherford and 1 for
+    Browning/Mott transport. Mott angular tables are preloaded by the Python
+    wrapper; elements without a table use the analytic SR angular distribution
+    while retaining the Browning total elastic collision rate, matching the
+    legacy fallback behavior.
+    """
+    EPS = 1e-6
+    nseg = 0
     n_back = 0
     n_trans = 0
     n_side = 0
-
     n_alive = int(alive.sum())
 
+    # Reuse one small rate buffer for all events; only the first Z_arr.size
+    # entries are live for the current material layer.
+    rate_arr = np.empty(mott_has_table.shape[1])
+
+    lockstep_step = 0
     while lockstep_step < max_steps and n_alive > 0:
         lockstep_step += 1
 
@@ -589,52 +614,43 @@ def _transport_core_ungrooved_sr(
             if n_layers == 1:
                 L = 0
             else:
-                L = np.searchsorted(
-                    internal_bounds,
-                    pos[g, 2],
-                    side="right",
-                )
+                L = np.searchsorted(internal_bounds, pos[g, 2], side="right")
+
             J_arr = L_Js[L]
             Z_arr = L_Zs[L]
             k_arr = L_ks[L]
             coeff_arr = L_coeffs[L]
             n_cm3s = L_ncm3[L]
-            z_top_L, z_bot_L = L_top[L], L_bot[L]
-
+            z_top_L = L_top[L]
+            z_bot_L = L_bot[L]
             E_j = E_keV[g]
 
-            # -- 1. distance to the next elastic collision (this layer) ---------
-            # Exponential free path P(s)=exp(-s/lambda)/lambda, total rate
-            # additive over the layer's elements: 1/lambda = sum_i n_i sigma_i(E).
-            rate_arr = np.empty(Z_arr.size)
+            # 1. Sample the next elastic-collision distance.
             total_rate = 0.0
             for i_el in range(Z_arr.size):
-                rate = _scatter_rates_sr_scalar(E_j, Z_arr[i_el], n_cm3s[i_el])
+                if elastic_model_code == 1:
+                    rate = _scatter_rates_mott_scalar(E_j, Z_arr[i_el], n_cm3s[i_el])
+                else:
+                    rate = _scatter_rates_sr_scalar(E_j, Z_arr[i_el], n_cm3s[i_el])
                 rate_arr[i_el] = rate
                 total_rate += rate
+
             lam_ang = 1e8 / total_rate
             step_j = -lam_ang * np.log(rng.random())
-
-            cross_up_j = False
-            cross_dn_j = False
-            exit_side_j = False
 
             if nseg >= max_segments:
                 raise RuntimeError("segment buffer exhausted")
 
-            # -- 2. truncate at THIS layer's faces ------------------------------
-            # The entrance face (z_top==0) and back face (z_bot==z_total) are
-            # exits (vacuum -> no re-entry); an INTERNAL boundary instead hands
-            # the electron to the neighbor layer with NO collision (it continues
-            # straight and re-samples its free path in that layer next iteration).
+            # 2. Truncate the flight at this layer's z boundaries.
             dx = dirs[g, 0]
             dy = dirs[g, 1]
             dz = dirs[g, 2]
-
             px = pos[g, 0]
             py = pos[g, 1]
             pz = pos[g, 2]
 
+            cross_up_j = False
+            cross_dn_j = False
             if dz < 0.0:
                 s_boundary = (pz - z_top_L) / (-dz)
                 if step_j > s_boundary:
@@ -646,89 +662,82 @@ def _transport_core_ungrooved_sr(
                     step_j = s_boundary
                     cross_dn_j = True
 
-            exit_top_j = cross_up_j and z_top_L <= 0.0  # exited entrance (backscatter)
-            exit_bot_j = cross_dn_j and z_bot_L >= z_total  # exited back (transmit)
+            exit_top_j = cross_up_j and z_top_L <= 0.0
+            exit_bot_j = cross_dn_j and z_bot_L >= z_total
 
-            # -- 3. record the segment (the radiation source list) --------------
-            # midpoint -> escape-absorption path; direction -> v.g, v.n in the
-            # amplitudes; length -> interaction time t_L; START energy -> beta
+            # 3. Record the radiating material segment.
             dEds = _dEds_compound_scalar(J_arr, k_arr, coeff_arr, E_j)
             beta_j = beta_from_keV_scalar(E_j)
 
             seg_dir[nseg, 0] = dx
             seg_dir[nseg, 1] = dy
             seg_dir[nseg, 2] = dz
-
             seg_mid[nseg, 0] = px + 0.5 * step_j * dx
             seg_mid[nseg, 1] = py + 0.5 * step_j * dy
             seg_mid[nseg, 2] = pz + 0.5 * step_j * dz
-
             seg_len[nseg] = step_j
             seg_E[nseg] = E_j
-            seg_t0[nseg] = clock[g]  # age at segment START [Ang, c=1]
-            seg_id[nseg] = g  # which electron emitted this segment
-            seg_lay[nseg] = L  # emitting layer
-
+            seg_t0[nseg] = clock[g]
+            seg_id[nseg] = g
+            seg_lay[nseg] = L
             nseg += 1
 
-            # -- 4. advance: straight line + continuous slowing-down ------------
-            # Energy drains deterministically along the flight (CSDA: Joy-Luo
-            # modified Bethe for THIS layer's composition; no straggling). The
-            # clock advances by L/beta at the segment's start speed.
+            # 4. Advance position, energy, and transport clock.
             pos[g, 0] = px + step_j * dx
             pos[g, 1] = py + step_j * dy
             pos[g, 2] = pz + step_j * dz
-
             E_keV[g] = E_j + dEds * step_j
             clock[g] += step_j / beta_j
 
-            # -- 5. kill exited / exhausted; pass internal crossers on ----------
-            died_j = exit_top_j or exit_bot_j or exit_side_j or E_keV[g] < E_cut_keV
+            # 5. Exit, internal-boundary, or collision handling.
+            died_j = exit_top_j or exit_bot_j or E_keV[g] < E_cut_keV
             if exit_top_j:
-                n_back += 1  # exited the entrance face
+                n_back += 1
             if exit_bot_j:
-                n_trans += 1  # punched through the back face
-            if exit_side_j:
-                n_side += 1  # exited a transverse prism face
+                n_trans += 1
             if died_j:
                 alive[g] = False
                 n_alive -= 1
-            crossed_internal = (
-                (cross_up_j or cross_dn_j)  # reached a layer seam
-                and not died_j
-            )
+                continue
+
+            crossed_internal = cross_up_j or cross_dn_j
             if crossed_internal:
-                pos[g, 2] += np.sign(dirs[g, 2]) * EPS  # nudge just into neighbor
-            full_j = not cross_up_j and not cross_dn_j and not exit_side_j and not died_j
-            if full_j:
-                if Z_arr.size == 1:
-                    i_el = 0
+                pos[g, 2] += (1.0 if dirs[g, 2] > 0.0 else -1.0) * EPS
+                continue
 
-                else:
-                    # Sample the element that is scattered from thru scattering rate
-                    u = rng.random() * total_rate
+            # A full flight ended in an elastic collision. Pick the element with
+            # probability proportional to n_i * sigma_i(E).
+            if Z_arr.size == 1:
+                i_el = 0
+            else:
+                u = rng.random() * total_rate
+                cumulative = 0.0
+                i_el = Z_arr.size - 1
+                for k in range(Z_arr.size):
+                    cumulative += rate_arr[k]
+                    if cumulative > u:
+                        i_el = k
+                        break
 
-                    cumulative = 0.0
-                    for i_el in range(Z_arr.size):
-                        cumulative += rate_arr[i_el]
-
-                        if cumulative > u:
-                            break
-
-                Z_i = Z_arr[i_el]
-
+            Z_i = Z_arr[i_el]
+            if elastic_model_code == 1 and mott_has_table[L, i_el]:
+                log_alpha = _interp_mott_log_alpha_scalar(
+                    np.log10(E_keV[g] * 1e3),
+                    mott_logE_flat,
+                    mott_logA_flat,
+                    mott_start[L, i_el],
+                    mott_len[L, i_el],
+                )
+                alpha = 10.0**log_alpha
+            else:
                 alpha = _alpha_sr_joy_scalar(Z_i, E_keV[g])
 
-                R_theta = rng.random()
-                cos_t = _sample_cos_theta_from_alpha(alpha, R_theta)
-
-                phi = 2.0 * np.pi * rng.random()
-                dx, dy, dz = _rotate_direction_scalar(
-                    dirs[g, 0], dirs[g, 1], dirs[g, 2], cos_t, phi
-                )
-                dirs[g, 0] = dx
-                dirs[g, 1] = dy
-                dirs[g, 2] = dz
+            cos_t = _sample_cos_theta_from_alpha(alpha, rng.random())
+            phi = 2.0 * np.pi * rng.random()
+            dx, dy, dz = _rotate_direction_scalar(dirs[g, 0], dirs[g, 1], dirs[g, 2], cos_t, phi)
+            dirs[g, 0] = dx
+            dirs[g, 1] = dy
+            dirs[g, 2] = dz
 
     return nseg, n_back, n_trans, n_side
 
@@ -925,44 +934,96 @@ def simulate_trajectories(
             )
         ]
 
+    if elastic_model not in ("mott", "sr"):
+        raise ValueError("elastic_model must be 'mott' or 'sr'")
+    if finite_footprint:
+        raise NotImplementedError(
+            "Numba transport core does not yet support finite crystal footprints"
+        )
+    if groove is not None:
+        raise NotImplementedError("Numba transport core does not yet support grooves")
+
     z_total = float(layers[-1][1])
     n_layers = len(layers)
-    L_elements = []
     L_Zs = []
     L_Js = []
     L_ncm3 = []
     L_ks = []
     L_coeffs = []
+    mott_tables = []
+
     for _, _, lc in layers:
-        elements = []
         ncm3_arr = []
         Z_arr = []
         J_arr = []
         k_arr = []
         coeff_arr = []
+        layer_mott_tables = []
+
         for el, n_i in lc:
-            p = TRANSPORT_ELEMENTS[el]
-            Z_i = p["Z"]
-            J_i = p["J_keV"]
+            params = TRANSPORT_ELEMENTS[el]
+            Z_i = float(params["Z"])
+            J_i = float(params["J_keV"])
             k_i = 0.731 + 0.0688 * np.log10(Z_i)
             coeff_i = (n_i / 0.602214076) * Z_i
-            elements.append(el)
+
             ncm3_arr.append(n_i * 1e24)
             Z_arr.append(Z_i)
             J_arr.append(J_i)
             k_arr.append(k_i)
             coeff_arr.append(coeff_i)
 
-        L_elements.append(elements)
+            table = None
+            if elastic_model == "mott" and el not in _NO_MOTT:
+                try:
+                    table = _mott_alpha_table(el, Z_i)
+                except FileNotFoundError:
+                    logger.debug("No NIST Mott table for %s; using analytic SR angles", el)
+                    _NO_MOTT.add(el)
+            layer_mott_tables.append(table)
+
         L_Zs.append(np.asarray(Z_arr, dtype=float))
         L_Js.append(np.asarray(J_arr, dtype=float))
         L_ncm3.append(np.asarray(ncm3_arr, dtype=float))
         L_ks.append(np.asarray(k_arr, dtype=float))
         L_coeffs.append(np.asarray(coeff_arr, dtype=float))
+        mott_tables.append(layer_mott_tables)
 
-    L_top = [float(a) for (a, _, _) in layers]
-    L_bot = [float(b) for (_, b, _) in layers]
-    internal_bounds = np.array(L_bot[:-1], dtype=float)  # between consecutive layers
+    L_top = np.asarray([float(a) for (a, _, _) in layers], dtype=float)
+    L_bot = np.asarray([float(b) for (_, b, _) in layers], dtype=float)
+    internal_bounds = L_bot[:-1].copy()
+
+    # Numba only sees numeric Mott data. Tables are flattened because different
+    # elements may have different grid lengths; start/length locate each table.
+    max_elements = max(arr.size for arr in L_Zs)
+    mott_has_table = np.zeros((n_layers, max_elements), dtype=np.bool_)
+    mott_start = np.zeros((n_layers, max_elements), dtype=np.int64)
+    mott_len = np.zeros((n_layers, max_elements), dtype=np.int64)
+    mott_logE_chunks = []
+    mott_logA_chunks = []
+    offset = 0
+    for L, layer_tables in enumerate(mott_tables):
+        for i_el, table in enumerate(layer_tables):
+            if table is None:
+                continue
+            logE, logA = table
+            logE = np.asarray(logE, dtype=float)
+            logA = np.asarray(logA, dtype=float)
+            if logE.size != logA.size or logE.size == 0:
+                raise ValueError("invalid Mott interpolation table")
+            mott_has_table[L, i_el] = True
+            mott_start[L, i_el] = offset
+            mott_len[L, i_el] = logE.size
+            mott_logE_chunks.append(logE)
+            mott_logA_chunks.append(logA)
+            offset += logE.size
+
+    if mott_logE_chunks:
+        mott_logE_flat = np.concatenate(mott_logE_chunks)
+        mott_logA_flat = np.concatenate(mott_logA_chunks)
+    else:
+        mott_logE_flat = np.empty(0, dtype=float)
+        mott_logA_flat = np.empty(0, dtype=float)
 
     rng = np.random.default_rng(seed)
     pos = np.zeros((Ne, 3))
@@ -1054,20 +1115,20 @@ def simulate_trajectories(
     seg_id = np.empty(max_segments, dtype=np.int64)
     seg_lay = np.empty(max_segments, dtype=np.int16)
 
-    # Event-driven loop: ungrooved transport retains the legacy lockstep
-    # max_steps iterations bit-for-bit. Grooved transport counts only material
-    # collision/layer iterations against that budget; valid exit/re-entry pairs
-    # repeat the loop without consuming it. A separate per-electron surface-event
-    # bound prevents pathological geometry from becoming an unbounded loop.
+    # The compiled core preserves the legacy max_steps lockstep semantics for
+    # the currently supported infinite-footprint, ungrooved transport path.
+    # RNG consumption is scalar/event ordered, so seeded trajectories are not
+    # expected to remain bit-for-bit identical to the former vectorized loop.
 
-    nseg, n_back, n_trans, n_side = _transport_core_ungrooved_sr(
+    elastic_model_code = 1 if elastic_model == "mott" else 0
+    nseg, n_back, n_trans, n_side = _transport_core_ungrooved(
         Ne,
         alive,
         max_steps,
         max_segments,
         n_layers,
         internal_bounds,
-        "sr",
+        elastic_model_code,
         z_total,
         clock,
         rng,
@@ -1081,6 +1142,11 @@ def simulate_trajectories(
         L_ncm3,
         L_top,
         L_bot,
+        mott_has_table,
+        mott_start,
+        mott_len,
+        mott_logE_flat,
+        mott_logA_flat,
         E_keV,
         seg_dir,
         seg_mid,
@@ -1101,6 +1167,12 @@ def simulate_trajectories(
 
     t0_ang = t0_electron[elec_id] if elec_id.size else np.empty(0, dtype=float)
 
+    # Groove transport is not part of the compiled core yet, but retain the
+    # established return schema for ungrooved callers.
+    empty_vac_xyz = np.empty((0, 3), dtype=float)
+    empty_vac = np.empty(0, dtype=float)
+    empty_vac_id = np.empty(0, dtype=np.int64)
+
     return {
         # Initial sampled phase space is diagnostic-only.  Keep per-electron
         # arrays (including missed entries), separate from per-segment arrays,
@@ -1117,6 +1189,12 @@ def simulate_trajectories(
         "t0_ang": t0_ang,  # per-electron longitudinal bunch offset [Ang, c=1]
         "elec_id": elec_id,  # emitting electron index in [0, Ne)
         "layer": layer,  # emitting layer index in [0, n_layers)
+        "vacuum_start_ang": empty_vac_xyz,
+        "vacuum_end_ang": empty_vac_xyz.copy(),
+        "vacuum_E_keV": empty_vac,
+        "vacuum_t_ang": empty_vac.copy(),
+        "vacuum_t0_ang": empty_vac.copy(),
+        "vacuum_elec_id": empty_vac_id,
         "n_backscattered": n_back,
         "n_transmitted": n_trans,
         "n_side_exited": n_side,
@@ -1128,211 +1206,3 @@ def simulate_trajectories(
         "crystal_height_ang": height_ang,
         "n_layers": n_layers,
     }
-
-    # def _scatter_rates(Ea, Zs, n_cm3s):
-    #     """Per-element elastic scattering rates [1/cm] at energies Ea (one layer)."""
-    #     rates = []
-    #     for Z_i, n_i in zip(Zs, n_cm3s, strict=False):
-    #         if elastic_model == "mott":
-    #             sig_i = _sigma_browning_cm2(Z_i, Ea)
-    #         elif elastic_model == "sr":
-    #             a = _alpha_sr_joy(Z_i, Ea)
-    #             sig_i = (
-    #                 5.21e-21
-    #                 * Z_i**2
-    #                 / Ea**2
-    #                 * 4.0
-    #                 * np.pi
-    #                 / (a * (1.0 + a))
-    #                 * ((Ea + 511.0) / (Ea + 1024.0)) ** 2
-    #             )
-    #         else:
-    #             raise ValueError("elastic_model must be 'mott' or 'sr'")
-    #         rates.append(n_i * sig_i)
-    #     return np.array(rates)  # (n_elements, m)
-
-    # for L in range(n_layers):
-    #     J_arr = L_Js[L]
-    #     Z_arr = L_Zs[L]
-    #     k_arr = L_ks[L]
-    #     coeff_arr = L_coeffs[L]
-    #     n_cm3s = L_ncm3[L]
-    #     z_top_L, z_bot_L = L_top[L], L_bot[L]
-
-    #     grp = idx if lay_all is None else idx[lay_all == L]
-    #     if grp.size == 0:
-    #         continue
-    #     Ea = E[grp]  # kinetic energies [keV]
-
-    #     # -- 1. distance to the next elastic collision (this layer) ---------
-    #     # Exponential free path P(s)=exp(-s/lambda)/lambda, total rate
-    #     # additive over the layer's elements: 1/lambda = sum_i n_i sigma_i(E).
-    #     rates = _scatter_rates(Ea, Z_arr, n_cm3s)  # (n_elements, m) [1/cm]
-    #     lam_ang = 1e8 / rates.sum(axis=0)  # mean free path [Ang]
-    #     step = -lam_ang * np.log(rng.random(grp.size))  # sampled flight [Ang]
-
-    #     d = dirs[grp]  # current unit direction of each electron
-    #     p = pos[grp]  # current position [Ang]
-    #     # -- 2. truncate at THIS layer's faces ------------------------------
-    #     # The entrance face (z_top==0) and back face (z_bot==z_total) are
-    #     # exits (vacuum -> no re-entry); an INTERNAL boundary instead hands
-    #     # the electron to the neighbor layer with NO collision (it continues
-    #     # straight and re-samples its free path in that layer next iteration).
-    #     if finite_footprint:
-    #         exit_distance, exit_face = first_prism_exit(
-    #             p,
-    #             d,
-    #             z_min_ang=z_top_L,
-    #             z_max_ang=z_bot_L,
-    #             width_ang=width_ang,
-    #             height_ang=height_ang,
-    #         )
-    #         crossed_face = step > exit_distance
-    #         step = np.where(crossed_face, exit_distance, step)
-    #         cross_up = crossed_face & (exit_face == Z_MIN)
-    #         cross_dn = crossed_face & (exit_face == Z_MAX)
-    #         exit_side = crossed_face & (exit_face < Z_MIN)
-    #         exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
-    #         exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
-    #     else:
-    #         dz = d[:, 2]
-    #         pz = p[:, 2]
-    #         cross_up = (dz < 0) & (pz + step * dz < z_top_L)
-    #         cross_dn = (dz > 0) & (pz + step * dz > z_bot_L)
-    #         s_up = np.where(dz < 0, (pz - z_top_L) / (-dz + 1e-300), np.inf)
-    #         s_dn = np.where(dz > 0, (z_bot_L - pz) / (dz + 1e-300), np.inf)
-    #         step = np.where(cross_up, s_up, step)
-    #         step = np.where(cross_dn, s_dn, step)
-    #         exit_top = cross_up & (z_top_L <= 0.0)  # exited entrance (backscatter)
-    #         exit_bot = cross_dn & (z_bot_L >= z_total)  # exited back (transmit)
-    #         exit_side = np.zeros(grp.size, dtype=bool)
-    #     s_surface = np.array(
-    #         [
-    #             first_surface_event(pi, di, groove, transition="exit")
-    #             for pi, di in zip(p, d, strict=False)
-    #         ]
-    #     )
-    #     surface_first = s_surface < step
-    #     step = np.where(surface_first, s_surface, step)
-    #     cross_up = cross_up & ~surface_first
-    #     cross_dn = cross_dn & ~surface_first
-    #     exit_top = exit_top & ~surface_first
-    #     exit_bot = exit_bot & ~surface_first
-    #     exit_side = exit_side & ~surface_first
-    #     zero_event_counts = zero_surface_events
-    #     assert zero_event_counts is not None
-
-    #     below_cut = E[grp] < E_cut_keV
-    #     active_surface = surface_first & ~below_cut
-    #     zero_event_counts[grp[~active_surface]] = 0
-    #     reentered_group = np.zeros(grp.size, dtype=bool)
-
-    #     if active_surface.any():
-    #         surf_local = np.flatnonzero(active_surface)
-    #         surf_global = grp[surf_local]
-    #         surface_points = pos[surf_global].copy()
-    #         entry_distance = np.array(
-    #             [
-    #                 first_surface_event(pi, di, groove, transition="entry")
-    #                 for pi, di in zip(surface_points, dirs[surf_global], strict=False)
-    #             ]
-    #         )
-    #         if finite_footprint:
-    #             side_distance, side_face = first_prism_exit(
-    #                 surface_points,
-    #                 dirs[surf_global],
-    #                 z_min_ang=0.0,
-    #                 z_max_ang=z_total,
-    #                 width_ang=width_ang,
-    #                 height_ang=height_ang,
-    #             )
-    #             side_before_entry = (side_face < Z_MIN) & (side_distance < entry_distance)
-    #             exit_side[surf_local[side_before_entry]] = True
-    #             entry_distance = np.where(side_before_entry, np.inf, entry_distance)
-
-    #         reentered = np.isfinite(entry_distance)
-    #         if reentered.any():
-    #             re_local = surf_local[reentered]
-    #             re_global = grp[re_local]
-    #             reentered_group[re_local] = True
-    #             distance = entry_distance[reentered]
-    #             start = surface_points[reentered]
-    #             direction = dirs[re_global]
-    #             end = start + distance[:, None] * direction
-
-    #             vac_start[nvac] = start
-    #             vac_end[nvac] = end
-    #             vac_E[nvac] = E[re_global].copy()
-    #             vac_t0[nvac] = clock[re_global].copy()
-    #             vac_id[nvac] = re_global.copy()
-    #             nvac += 1
-
-    #             clock[re_global] += distance / beta_from_keV(E[re_global])
-    #             surface_eps = max(
-    #                 64 * np.finfo(float).eps * groove.spacing_ang,
-    #                 2e-12 * groove.spacing_ang,
-    #             )
-    #             pos[re_global] = end + surface_eps * direction
-    #             assert surface_events is not None
-    #             surface_events[re_global] += 1
-    #             if np.any(surface_events[re_global] > max_steps):
-    #                 raise RuntimeError("grooved surface event limit exhausted")
-
-    #         permanent = ~reentered & ~exit_side[surf_local]
-    #         exit_top[surf_local[permanent]] = True
-    #         short = step[surf_local] <= EPS
-    #         zero_event_counts[surf_global] = np.where(
-    #             short, zero_event_counts[surf_global] + 1, 0
-    #         )
-    #         if np.any(zero_event_counts[surf_global] >= 2):
-    #             raise RuntimeError("repeated zero-length grooved surface events")
-    #     died = exit_top | exit_bot | exit_side | below_cut
-    #     n_back += int(exit_top.sum())  # exited the entrance face
-    #     n_trans += int(exit_bot.sum())  # punched through the back face
-    #     n_side += int(exit_side.sum())  # exited a transverse prism face
-    #     alive[grp[died]] = False
-    #     crossed_internal = (cross_up | cross_dn) & ~died  # reached a layer seam
-    #     if crossed_internal.any():
-    #         ci = grp[crossed_internal]
-    #         pos[ci, 2] += np.sign(dirs[ci, 2]) * EPS  # nudge just into neighbor
-    #     # -- 6. elastic collision: scatter the FULL-FLIGHT survivors --------
-    #     # (truncated flights did not collide). The scattering ELEMENT is
-    #     # chosen with probability n_i sigma_i / sum; the polar angle from that
-    #     # element's screened-Rutherford inversion; azimuth uniform; E unchanged.
-
-    #     full = ~(cross_up | cross_dn | exit_side | surface_first) & ~died
-
-    #     srv = grp[full]
-
-    #     if srv.size:
-    #         if Z_arr.size == 1:
-    #             cos_t = _sample_cos_theta(Z_arr[0], E[srv], rng, elastic_model, elements[0])
-
-    #         else:
-    #             cos_t = np.empty(srv.size)
-
-    #             p_el = rates[:, full]
-    #             p_el = p_el / p_el.sum(axis=0)
-
-    #             u = rng.random(srv.size)
-    #             cum = np.cumsum(p_el, axis=0)
-    #             which = (u[None, :] > cum).sum(axis=0)  # element index
-
-    #             for i_el in range(Z_arr.size):
-    #                 m = which == i_el
-    #                 if m.any():
-    #                     srv_i = srv[m]
-    #                     cos_t[m] = _sample_cos_theta(
-    #                         Z_arr[i_el],
-    #                         E[srv_i],
-    #                         rng,
-    #                         elastic_model,
-    #                         elements[i_el],
-    #                     )
-    #         phi = 2.0 * np.pi * rng.random(srv.size)
-    #         dirs[srv] = _rotate_directions(dirs[srv], cos_t, phi)
-
-    # if groove is not None:
-    #     assert material_steps is not None
-    #     count_material_step = alive[grp] & ~reentered_group
-    #     material_steps[grp[count_material_step]] += 1
