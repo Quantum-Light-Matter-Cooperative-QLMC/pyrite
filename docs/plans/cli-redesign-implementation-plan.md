@@ -23,8 +23,8 @@ triage → dispatch flow; `TODO.md` stays authoritative for status.
 |---|---|---|---|
 | 0 | docs/TODO reorg | pkg P4/P5 | ✅ landed 2026-08-01 |
 | 1 | command-home → `src/cxr_mc/cli/commands/` | pkg P1 | ✅ landed 2026-08-04 |
-| 2 | energy-grid module rename | pkg P2 | none (parallel with 1) — **start here** |
-| 3 | noun→verb, remote-as-modifier, `-o` contract | redesign D1–D3 | needs 1 ✅ |
+| 2 | energy-grid module rename | pkg P2 | ✅ landed 2026-08-04 |
+| 3 | noun→verb, remote-as-modifier, `-o` contract | redesign D1–D3 | needs 1 ✅ — **start here**, after Q2 |
 | 4 | verb collapse **+** recompute/prune module fold | redesign D4 + pkg P3 | needs 3 |
 | 5 | vocab controls + deprecation rollout | redesign D5–D7 | needs 3 |
 | 6 | content-addressed store, lockfile, gc | artifact RFC (phase 5) | needs 3–5 |
