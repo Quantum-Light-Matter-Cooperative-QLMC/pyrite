@@ -1,9 +1,7 @@
-"""CLI adapter for photon-energy-grid commands.
+"""Compatibility alias for :mod:`cxr_mc.cli.commands.energy_grid`."""
 
-Implementation remains in :mod:`cxr_mc.line_grid`; this module owns its root
-CLI registration path while grid derivation code stays beside its domain code.
-"""
+import sys
 
-from cxr_mc.line_grid import command
+from .commands import energy_grid as _implementation
 
-__all__ = ["command"]
+sys.modules[__name__] = _implementation

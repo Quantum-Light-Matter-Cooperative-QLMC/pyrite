@@ -10,13 +10,13 @@ from .. import __version__
 from ._core import LazyGroup, color_option, run
 
 _COMMANDS = {
-    "run": "cxr_mc.scan.command",
-    "setup": "cxr_mc.cli.backend_setup.command",
-    "app": "cxr_mc.cli.app.command",
-    "checkpoint": "cxr_mc.cli.checkpoint.command",
-    "completion": "cxr_mc.cli.completion.command",
-    "performance": "cxr_mc.cli.performance.command",
-    "slim": "cxr_mc.slim.command",
+    "run": "cxr_mc.cli.commands.scan.command",
+    "setup": "cxr_mc.cli.commands.backend_setup.command",
+    "app": "cxr_mc.cli.commands.app.command",
+    "checkpoint": "cxr_mc.cli.commands.checkpoint.command",
+    "completion": "cxr_mc.cli.commands.completion.command",
+    "performance": "cxr_mc.cli.commands.performance.command",
+    "slim": "cxr_mc.cli.commands.slim.command",
     "rebrem": "cxr_mc.rebrem.command",
     "reline": "cxr_mc.reline.command",
     "archive": "cxr_mc.archive.archive_command",
@@ -24,13 +24,13 @@ _COMMANDS = {
     "archives": "cxr_mc.archive.archives_command",
     "union": "cxr_mc.archive.union_command",
     "remote": "cxr_mc.remote.command",
-    "energy-grid": "cxr_mc.cli.energy_grid.command",
-    "sweep": "cxr_mc.cli.sweep.command",
-    "profile": "cxr_mc.cli.profile.command",
-    "material": "cxr_mc.cli.material.command",
+    "energy-grid": "cxr_mc.cli.commands.energy_grid.command",
+    "sweep": "cxr_mc.cli.commands.sweep.command",
+    "profile": "cxr_mc.cli.commands.profile.command",
+    "material": "cxr_mc.cli.commands.material.command",
     "prune": "cxr_mc.prune.command",
     "check": "cxr_mc.check.command",
-    "check-config": "cxr_mc.check_config.command",
+    "check-config": "cxr_mc.cli.commands.check_config.command",
 }
 
 _COMMAND_HELP = {

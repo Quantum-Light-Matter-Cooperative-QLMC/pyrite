@@ -24,7 +24,7 @@ def test_app_help_imports_only_the_group(monkeypatch):
     assert "analysis" in result.output
     assert "viewer" in result.output
     assert "validation" in result.output
-    assert imported == ["cxr_mc.cli.app"]
+    assert imported == ["cxr_mc.cli.commands.app"]
 
 
 def test_analysis_leaf_launches_and_export_dispatches(monkeypatch):

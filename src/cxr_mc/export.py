@@ -16,8 +16,6 @@ import datetime
 import subprocess
 import sys
 
-import click
-
 from .cli import _core as _cli_core
 
 NOTEBOOK = "notebooks/analysis_app.py"
@@ -48,20 +46,18 @@ def _export(stem=None):
     subprocess.run(_command(stem), check=True)
 
 
-@click.command(
-    "export",
-    help=(
-        f"Render {NOTEBOOK} to static HTML.\n\n"
-        "Writes results/<stem>.html; STEM defaults to analysis."
-    ),
-)
-@click.argument("stem", required=False)
-def command(stem):
-    _export(stem)
-
-
 def main(argv=None):
+    from .cli.commands.export import command
+
     return _cli_core.run(command, argv, prog_name="cxr-export")
+
+
+def __getattr__(name: str):
+    if name == "command":
+        from .cli.commands.export import command
+
+        return command
+    raise AttributeError(name)
 
 
 if __name__ == "__main__":
