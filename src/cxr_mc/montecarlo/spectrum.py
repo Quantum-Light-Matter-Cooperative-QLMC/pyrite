@@ -346,6 +346,7 @@ def mc_spectrum(
     groove=None,
     coherent=False,
     electron_limit=None,
+    E_cut_keV=None,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron]
@@ -572,6 +573,10 @@ def mc_spectrum(
     seg_r = xp.asarray(segments["r_mid"], dtype=REAL)
     seg_elec_id = xp.asarray(segments["elec_id"])
     line_electron = seg_elec_id < Ne
+    if E_cut_keV is not None:
+        # See mc_brem_spectrum: shared dual-use electrons are transported to the
+        # LOWER of the two cutoffs, so restore this population's own floor.
+        line_electron = line_electron & (seg_E >= REAL(E_cut_keV))
     beta_all = beta_from_keV(seg_E)  # speed/c per segment
     v_all = beta_all[:, None] * seg_v  # velocity vectors (c=1)
 
@@ -1334,6 +1339,11 @@ def _brem_dsigma_dk(Z, T_keV, k_eV):
     """
     T_i = xp.asarray(T_keV, dtype=REAL)[:, None]
     k = xp.asarray(k_eV, dtype=REAL)[None, :] / 1e3  # keV
+    # Z must arrive dtype-tagged, not as a bare Python int: cupy.fuse types an
+    # untyped scalar operand by value (min_scalar_type), so the
+    # 16/3*alpha*r_e^2 prefactor -- a scalar*scalar product with Z**2 -- gets
+    # inferred as float16 and flushes ~3e-27 to zero, silently zeroing the
+    # whole cross section on every fused (non-raw-kernel) GPU path.
     Z = REAL(Z)
     return _brem_dsigma_dk_core(T_i, k, Z)
 
@@ -1350,6 +1360,7 @@ def mc_brem_spectrum(
     layers=None,
     groove=None,
     electron_limit=None,
+    E_cut_keV=None,
 ):
     """
     Incoherent bremsstrahlung background d2N/dE dOmega
@@ -1427,6 +1438,16 @@ def mc_brem_spectrum(
 
     seg_elec_id = xp.asarray(segments["elec_id"])
     brem_electron = seg_elec_id < Ne
+    if E_cut_keV is not None:
+        # Dual-use transport runs the shared electrons down to
+        # min(E_cut_lines, E_cut_brem), so segments below THIS population's own
+        # cutoff exist for the shared electrons but not for the brem-only ones.
+        # Drop them, or the ensemble mixes two cutoffs. Approximate at the
+        # boundary (the straddling segment is dropped whole rather than
+        # truncated), exact whenever the two cutoffs coincide.
+        brem_electron = brem_electron & (
+            xp.asarray(segments["E_keV"], dtype=REAL) >= REAL(E_cut_keV)
+        )
 
     seg_r = xp.asarray(segments["r_mid"], dtype=REAL)[brem_electron]
     seg_L = xp.asarray(segments["L_ang"], dtype=REAL)[brem_electron]

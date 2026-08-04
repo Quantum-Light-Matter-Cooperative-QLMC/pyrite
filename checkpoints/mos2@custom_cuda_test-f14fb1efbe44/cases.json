@@ -1,1 +1,0 @@
-{"schema": "cxr.case-manifest.v1", "material": "mos2", "cases": [{"name": "MoS2 1mm pol=45 az=180 footprint=5x5mm", "E0_keV": 300.0, "content_key": "71f9c297b7c265b253a841ab7744d7db495c2eb3f95fe190bd7bb708e540b615"}], "catalog_profile": "custom_cuda_test", "parameter_sha256": "f14fb1efbe44c7a70a9693673cba9eb6a541d8866651e910a12b7d28832f3a52"}
