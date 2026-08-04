@@ -122,6 +122,12 @@ def _first_prism_exit_numba(
     return distances, faces
 
 
+def _face_distance(coord, direction, boundary, mask, xp):
+    safe_direction = xp.where(mask, direction, 1.0)
+    distance = (boundary - coord) / safe_direction
+    return xp.where(mask, distance, xp.inf)
+
+
 def first_prism_exit(
     r,
     d,
@@ -130,36 +136,112 @@ def first_prism_exit(
     z_max_ang,
     width_ang=None,
     height_ang=None,
+    xp=np,
 ):
     """Return each inside-origin ray's first forward rectangular-prism face exit.
+
     The sample-frame prism is ``[-width/2, width/2] x [-height/2, height/2] x
     [z_min_ang, z_max_ang]``. Origins must be inside that prism, and rays with
     a zero component never nominate the corresponding parallel faces. When both
     transverse dimensions are ``None``, the limiting geometry is the original
     z-only slab. Face ties resolve to the lowest face constant.
+
     Validation: finite-transverse-crystal
     """
-    width_ang, height_ang = validate_transverse_dimensions(width_ang, height_ang, unit="Ang")
+    width_ang, height_ang = validate_transverse_dimensions(
+        width_ang,
+        height_ang,
+        unit="Ang",
+    )
 
-    r, d = np.asarray(r), np.asarray(d)
+    # Fast CPU path: compiled scalar/vector loop.
+    if xp is np:
+        r = np.asarray(r)
+        d = np.asarray(d)
+
+        if width_ang is None:
+            finite_xy = False
+            width_numba = 0.0
+            height_numba = 0.0
+        else:
+            finite_xy = True
+            width_numba = width_ang
+            height_numba = height_ang
+
+        return _first_prism_exit_numba(
+            r,
+            d,
+            z_min_ang,
+            z_max_ang,
+            finite_xy,
+            width_numba,
+            height_numba,
+        )
+
+    # GPU/backend-array path: stay entirely in xp.
+    r = xp.asarray(r)
+    d = xp.asarray(d)
+
+    x = r[..., 0]
+    y = r[..., 1]
+    z = r[..., 2]
+
+    if d.ndim == 1:
+        dx = d[0]
+        dy = d[1]
+        dz = d[2]
+    else:
+        dx = d[..., 0]
+        dy = d[..., 1]
+        dz = d[..., 2]
+
+    # z faces always exist.
+    s_zmin = _face_distance(z, dz, z_min_ang, dz < 0.0, xp)
+    s_zmax = _face_distance(z, dz, z_max_ang, dz > 0.0, xp)
 
     if width_ang is None:
-        finite_xy = False
-        width_numba = 0.0
-        height_numba = 0.0
+        # Only Z_MIN / Z_MAX are candidates.
+        candidates = xp.stack(
+            (
+                s_zmin,
+                s_zmax,
+            ),
+            axis=0,
+        )
+
+        which = xp.argmin(candidates, axis=0)
+        exit_distance = xp.min(candidates, axis=0)
+
+        # Candidate indices 0,1 correspond to face constants Z_MIN,Z_MAX.
+        exit_face = xp.where(which == 0, Z_MIN, Z_MAX)
+
     else:
-        finite_xy = True
-        width_numba = width_ang
-        height_numba = height_ang
-    return _first_prism_exit_numba(
-        r,
-        d,
-        z_min_ang,
-        z_max_ang,
-        finite_xy,
-        width_numba,
-        height_numba,
-    )
+        x_min = -0.5 * width_ang
+        x_max = +0.5 * width_ang
+        y_min = -0.5 * height_ang
+        y_max = +0.5 * height_ang
+
+        s_xmin = _face_distance(x, dx, x_min, dx < 0.0, xp)
+        s_xmax = _face_distance(x, dx, x_max, dx > 0.0, xp)
+        s_ymin = _face_distance(y, dy, y_min, dy < 0.0, xp)
+        s_ymax = _face_distance(y, dy, y_max, dy > 0.0, xp)
+
+        candidates = xp.stack(
+            (
+                s_xmin,  # X_MIN = 0
+                s_xmax,  # X_MAX = 1
+                s_ymin,  # Y_MIN = 2
+                s_ymax,  # Y_MAX = 3
+                s_zmin,  # Z_MIN = 4
+                s_zmax,  # Z_MAX = 5
+            ),
+            axis=0,
+        )
+
+        exit_face = xp.argmin(candidates, axis=0)
+        exit_distance = xp.min(candidates, axis=0)
+
+    return exit_distance, exit_face
 
 
 def tilted_geometry(theta_obs_rad, tilt_polar_rad, tilt_azim_rad=0.0):

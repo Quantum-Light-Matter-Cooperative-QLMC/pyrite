@@ -20,6 +20,7 @@ from numba import njit
 from .. import DATA_DIR
 from ..materials._transport_data import TRANSPORT_ELEMENTS
 from ..materials.attenuation import _normalize_composition
+from ._backend import _GPU
 from .geometry import (
     X_MAX,
     X_MIN,
@@ -31,6 +32,11 @@ from .geometry import (
     validate_transverse_dimensions,
 )
 from .groove import _first_surface_event_scalar_numba, entry_points
+
+if _GPU:
+    import cupy as xp
+else:
+    import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -161,14 +167,15 @@ def _sample_bunch_offsets(
     return dt - dt.mean()  # center on the bunch centroid (t=0 == centroid)
 
 
-@njit(cache=True)
-def beta_from_keV(E_keV):
-    out = np.empty_like(E_keV)
-    for j in range(E_keV.size):
-        g = 1.0 + E_keV[j] / 510.99895
-        g_inv_square = 1.0 / (g * g)
-        out[j] = (1.0 - g_inv_square) ** 0.5
-    return out
+def _beta_array(E_keV):
+    g = 1.0 + E_keV / 510.99895
+    return (1.0 - 1.0 / (g * g)) ** 0.5
+
+
+if _GPU:
+    beta_from_keV = xp.fuse(kernel_name="beta_from_keV")(_beta_array)
+else:
+    beta_from_keV = _beta_array
 
 
 @njit(cache=True)

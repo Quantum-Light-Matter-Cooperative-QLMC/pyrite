@@ -559,6 +559,8 @@ def _transport_case(case, record_timing=False):
     )
     if timed:
         tp["_t_transport"] = perf_counter() - t0
+        tp["_t_worker_return"] = perf_counter()
+
     return tp
 
 
@@ -1434,14 +1436,32 @@ def run_cases(
             **_process_pool_kwargs(),
         ) as ex:
             learned_spec_chunk = None
-            inflight = {
-                i: (
+
+            from threading import Event
+
+            transport_ready_times = {}
+            transport_ready_events = {}
+
+            def _submit_transport(i):
+                fut = (
                     ex.submit(_transport_case, cases[i], True)
                     if on_timing is not None
                     else ex.submit(_transport_case, cases[i])
                 )
-                for i in range(min(prefetch, n))
-            }
+
+                if timing is not None:
+                    ready = Event()
+                    transport_ready_events[i] = ready
+
+                    def _mark_ready(_fut, i=i, ready=ready):
+                        transport_ready_times[i] = perf_counter()
+                        ready.set()
+
+                    fut.add_done_callback(_mark_ready)
+
+                return fut
+
+            inflight = {i: _submit_transport(i) for i in range(min(prefetch, n))}
             stopped = False
             for i in _maybe_bar(range(n)):
                 if not stopped and should_stop is not None and should_stop():
@@ -1455,15 +1475,22 @@ def run_cases(
                     transport_prefetch_count=prefetch,
                 )
                 tw0 = perf_counter() if timing is not None else 0.0
-                tp = inflight.pop(i).result()  # transport (already overlapped)
+
+                fut = inflight.pop(i)
+                tp = fut.result()
+
                 wait_seconds = perf_counter() - tw0 if timing is not None else None
+
+                if timing is not None:
+                    # Future becomes "done" immediately before callbacks execute, so .result()
+                    # can theoretically wake a few microseconds before _mark_ready has run.
+                    # Wait for our callback stamp to exist.
+                    ready = transport_ready_events.pop(i)
+                    ready.wait()
+
                 j = i + prefetch
                 if j < n and not stopped:
-                    inflight[j] = (
-                        ex.submit(_transport_case, cases[j], True)
-                        if on_timing is not None
-                        else ex.submit(_transport_case, cases[j])
-                    )
+                    inflight[j] = _submit_transport(j)
                 _activity(
                     "spectrum",
                     i,
