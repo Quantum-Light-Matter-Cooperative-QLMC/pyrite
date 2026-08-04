@@ -5,7 +5,7 @@ import pytest
 
 from cxr_mc import energy_grid
 from cxr_mc.energy_grid import _command
-from tests.cli_helpers import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, invoke
 
 CLICK_COMMANDS = (
     "derive",

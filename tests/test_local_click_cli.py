@@ -18,7 +18,7 @@ from cxr_mc import (
     slim,
     viewer,
 )
-from tests.cli_helpers import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, invoke
 
 LOCAL_COMMANDS = [
     scan.command,

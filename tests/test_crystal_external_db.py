@@ -20,7 +20,8 @@ from __future__ import annotations
 import os
 
 import pytest
-from external_db_fixtures import (
+
+from tests.helpers.external_db_fixtures import (
     MP_API_KEY_ENV,
     TOL_ANGLE_DEG,
     TOL_COD_ANG,

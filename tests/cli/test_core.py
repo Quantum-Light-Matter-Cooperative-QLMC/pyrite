@@ -8,7 +8,7 @@ import pytest
 from click.testing import CliRunner
 
 from cxr_mc.cli import _core as _cli_core
-from tests.cli_helpers import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, invoke
 
 
 @pytest.mark.parametrize(

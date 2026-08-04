@@ -89,7 +89,10 @@ oracle = [
 # heavy MC physics validation lives in checks/, not here.
 pythonpath = ["src"]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = [
+    "-q",
+    "--import-mode=importlib"
+]
 markers = [
     "online: test fetches from an external structure database (COD/MP); skipped unless CXR_ONLINE_TESTS=1",
     "oracle: test requires the pinned optional independent-validation backend",

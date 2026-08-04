@@ -7,7 +7,7 @@ import pytest
 
 from cxr_mc import archive, blaze, energy_grid, rebrem, reline, remote, scan
 from cxr_mc._remote import lifecycle, viewer
-from tests.cli_helpers import invoke
+from tests.helpers.cli import invoke
 
 
 def _document(result, *, exit_code=0):

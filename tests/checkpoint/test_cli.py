@@ -7,7 +7,7 @@ import click
 from cxr_mc import archive, prune, reline
 from cxr_mc.cli import checkpoint as checkpoint_cli
 from cxr_mc.cli import command as root_command
-from tests.cli_helpers import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, invoke
 
 
 def test_checkpoint_group_exposes_resource_oriented_tree():

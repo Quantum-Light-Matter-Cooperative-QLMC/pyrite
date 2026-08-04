@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from cxr_mc import _checkpoint_store, prune
-from tests.cli_helpers import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, invoke
 
 
 def _case(*, grid=(100.0, 200.0, 10.0), tilt=0.0):

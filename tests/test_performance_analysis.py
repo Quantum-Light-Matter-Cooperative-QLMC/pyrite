@@ -7,7 +7,7 @@ import pytest
 
 from cxr_mc import performance_analysis
 from cxr_mc.cli import performance, profile
-from tests.cli_helpers import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, invoke
 
 
 def _record(elapsed, event, **updates):

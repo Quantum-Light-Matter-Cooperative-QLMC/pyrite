@@ -4,7 +4,8 @@ import importlib.util
 from pathlib import Path
 
 import pytest
-from external_db_fixtures import (
+
+from tests.helpers.external_db_fixtures import (
     MPQueryError,
     fetch_external,
     fetch_mp_lattice,
@@ -23,7 +24,10 @@ def test_resolve_mp_api_key_prefers_exported_value(tmp_path) -> None:
     dotenv = tmp_path / ".env"
     dotenv.write_text("MP_API_KEY=dotenv-key\n")
 
-    assert resolve_mp_api_key(environ={"MP_API_KEY": "exported-key"}, dotenv_path=dotenv) == "exported-key"
+    assert (
+        resolve_mp_api_key(environ={"MP_API_KEY": "exported-key"}, dotenv_path=dotenv)
+        == "exported-key"
+    )
 
 
 def test_mp_only_fetch_without_key_skips(monkeypatch) -> None:
@@ -95,7 +99,9 @@ def test_refresh_retains_cached_entry_after_configured_mp_failure(monkeypatch) -
 
     monkeypatch.setattr(module, "iter_specs_sorted", lambda: iter([("hfte2", None, "mp-32887")]))
     monkeypatch.setattr(module, "load_cached_lattices", lambda: cached)
-    monkeypatch.setattr(module, "write_cached_lattices", lambda entries: written.append(entries.copy()))
+    monkeypatch.setattr(
+        module, "write_cached_lattices", lambda entries: written.append(entries.copy())
+    )
 
     def fail_fetch(_cod_id, _mp_id):
         raise MPQueryError("Materials Project query failed for mp-32887 (HTTPError)")

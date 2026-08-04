@@ -23,7 +23,7 @@ _TESTS_DIR = Path(__file__).resolve().parents[1] / "tests"
 if str(_TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(_TESTS_DIR))
 
-from external_db_fixtures import (  # noqa: E402
+from tests.helpers.external_db_fixtures import (  # noqa: E402
     EXTERNAL_LATTICE_JSON,
     MPQueryError,
     fetch_external,

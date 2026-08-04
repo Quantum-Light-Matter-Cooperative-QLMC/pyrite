@@ -7,7 +7,7 @@ import pytest
 
 from cxr_mc import remote
 from cxr_mc._remote import lifecycle, viewer
-from tests.cli_helpers import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, invoke
 
 REMOTE_COMMANDS = (
     "run",
@@ -63,9 +63,7 @@ def test_remote_performance_commands_dispatch(monkeypatch):
 
     assert_clean_result(invoke(remote.command, ["performance", "list"]))
     assert_clean_result(invoke(remote.command, ["performance", "pull", "baseline"]))
-    assert_clean_result(
-        invoke(remote.command, ["performance", "prune", "baseline", "--yes"])
-    )
+    assert_clean_result(invoke(remote.command, ["performance", "prune", "baseline", "--yes"]))
 
     assert calls == [
         ("list",),
@@ -155,9 +153,7 @@ def test_run_cpu_incompatible_inputs_fail_before_submission(monkeypatch, flags, 
     ("flag", "cpu", "cpu_only"),
     [("--cpu", True, False), ("--cpu-only", False, True)],
 )
-def test_run_cpu_flags_imply_performance_and_monolithic_dispatch(
-    monkeypatch, flag, cpu, cpu_only
-):
+def test_run_cpu_flags_imply_performance_and_monolithic_dispatch(monkeypatch, flag, cpu, cpu_only):
     calls = []
     monkeypatch.setattr(
         lifecycle,
@@ -190,7 +186,10 @@ def test_combined_cpu_failure_pulls_retained_primary_performance_artifacts(monke
 
     result = invoke(remote.command, ["run", "standard", "-m", "hopg", "--cpu"])
 
-    assert_clean_result(result, stderr="CPU phase failed; pulling retained primary performance artifacts\nperformance profiling used isolated job-local checkpoints; skipping automatic checkpoint pull\n")
+    assert_clean_result(
+        result,
+        stderr="CPU phase failed; pulling retained primary performance artifacts\nperformance profiling used isolated job-local checkpoints; skipping automatic checkpoint pull\n",
+    )
     assert pulled == ["standard"]
 
 

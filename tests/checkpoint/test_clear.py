@@ -4,7 +4,7 @@ import json
 
 from cxr_mc import _checkpoint_store
 from cxr_mc.cli import command as root_command
-from tests.cli_helpers import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, invoke
 
 
 def _dataset(root, stem, material, keys, *, profile="standard"):

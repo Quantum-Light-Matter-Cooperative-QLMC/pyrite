@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from cxr_mc.cli import command as root_command
-from tests.cli_helpers import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, invoke
 
 
 def test_root_help_lists_completion_group(capsys):

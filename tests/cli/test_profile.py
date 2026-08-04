@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from cxr_mc.cli import _catalog_io, profile
-from tests.cli_helpers import assert_clean_result, invoke
+from tests.helpers.cli import assert_clean_result, invoke
 
 _CATALOG = """[profiles.standard]
 thickness_ang = { values = [1000.0] }

@@ -10,7 +10,7 @@ from click.testing import CliRunner, Result
 
 from cxr_mc import cli
 
-CONTRACT = Path(__file__).with_name("data") / "cli_contract.json"
+CONTRACT = Path(__file__).parents[1] / "data" / "cli_contract.json"
 
 
 def _help_cases(node):

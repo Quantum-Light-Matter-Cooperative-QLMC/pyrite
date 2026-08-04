@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from cxr_mc import check
-from tests.cli_helpers import invoke
+from tests.helpers.cli import invoke
 
 
 def test_validation_default_azimuth_roundtrip(tmp_path):
