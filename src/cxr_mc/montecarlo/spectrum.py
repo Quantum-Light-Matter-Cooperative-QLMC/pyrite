@@ -34,6 +34,8 @@ from .transport import TRANSPORT_ELEMENTS, beta_from_keV
 # ---- segment-sum CXR spectrum ------------------------------------------------
 _SEG_ARRAYS = ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "t0_ang", "elec_id", "layer")
 _USE_JIT_LINE_REDUCTION = True
+_USE_JIT_COHERENT_REDUCTION = True
+_USE_JIT_BREM_REDUCTION = True
 _JIT_LINE_BATCH_TARGET = 400_000
 
 
@@ -783,8 +785,45 @@ def mc_spectrum(
             d = d_all[idx]
             g_phase = _matvec3(seg_r[idx], g_vec_d)
             coefs = [(amp * t_L) * A_e for A_e in pol_A]  # complex per polarization
-            fields = [xp.zeros(E_grid.size, dtype=cdtype) for _ in coefs]
             good = xp.isfinite(amp) & (amp > 0) & (t_L > 0)
+
+            # GPU float32 fast path: reduce the two complex polarization fields
+            # directly in a raw kernel. This avoids materializing the dense
+            # complex SP[segment, energy] matrix and avoids both complex GEMVs.
+            # The exact CuPy path below remains the fallback for CPU/other
+            # backends, float64, and sinc_cutoff windowing.
+            _use_jit_coherent_reduction = (
+                _USE_JIT_COHERENT_REDUCTION
+                and getattr(xp, "__name__", "") == "cupy"
+                and np.dtype(REAL) == np.dtype(np.float32)
+                and sinc_cutoff is None
+            )
+            if _use_jit_coherent_reduction:
+                from .coherent_jit_kernel import (
+                    DEFAULT_COHERENT_KERNEL_CONFIG,
+                    run_coherent_reduction_kernel,
+                )
+
+                sel = xp.flatnonzero(good)
+                if sel.size:
+                    c_s, c_p = coefs
+                    run_coherent_reduction_kernel(
+                        xp.ascontiguousarray(E_r[sel], dtype=REAL),
+                        xp.ascontiguousarray(a_width[sel], dtype=REAL),
+                        xp.ascontiguousarray(d[sel] / HBARC_EV_ANG, dtype=REAL),
+                        xp.ascontiguousarray(g_phase[sel], dtype=REAL),
+                        xp.ascontiguousarray(c_s[sel].real, dtype=REAL),
+                        xp.ascontiguousarray(c_s[sel].imag, dtype=REAL),
+                        xp.ascontiguousarray(c_p[sel].real, dtype=REAL),
+                        xp.ascontiguousarray(c_p[sel].imag, dtype=REAL),
+                        xp.ascontiguousarray(E_grid, dtype=REAL),
+                        out=spec,
+                        mosaic_weight=wm,
+                        config=DEFAULT_COHERENT_KERNEL_CONFIG,
+                    )
+                return
+
+            fields = [xp.zeros(E_grid.size, dtype=cdtype) for _ in coefs]
             if sinc_cutoff is None:
                 for j0 in range(0, idx.size, chunk):
                     sl = slice(j0, min(j0 + chunk, idx.size))
@@ -823,9 +862,6 @@ def mc_spectrum(
                     for c, f in zip(coefs, fields, strict=True):
                         f[i0:i1] += c[sel] @ SP
             for f in fields:
-                # In-place via slice: a bare ``spec +=`` would rebind ``spec`` as
-                # a local and shadow the closure array (the incoherent path below
-                # mutates the loop-bound ``tgt`` for the same reason).
                 spec[:] += xp.abs(f) ** 2 * wm
             return
 
@@ -836,7 +872,7 @@ def mc_spectrum(
         # a_width converts (E - E_res) to the sinc argument: P t_L = a_width(E - E_res).
         _nsys_push("cxr.lines.accum")
         pref = ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * t_L**2 * T_abs
-        weight = pref * A2 * w
+        weight = pref * A2 * wm
         targets = [(weight, spec)]
         if components:
             targets += [(pref * A2_pxr * wm, spec_pxr), (pref * A2_cbs * wm, spec_cbs)]
@@ -1137,11 +1173,12 @@ def mc_spectrum(
                         S = _sincsq_lineshape(
                             aw_f[sl2][:, None], E_grid[None, :], E_r_f[sl2][:, None]
                         )
-                        rhs = w_f[sl2] @ S
-
-                        tgt += rhs
                         tgt += w_f[sl2] @ S
             _nsys_pop()
+
+        # Flush the residual line batch even when it never reached the target.
+        if _use_jit_line_reduction:
+            _flush_line_batch()
 
     if components:
         return _to_cpu(spec / Ne), _to_cpu(spec_pxr / Ne), _to_cpu(spec_cbs / Ne)
@@ -1389,6 +1426,63 @@ def mc_brem_spectrum(
         L_esc = _escape_length(z_mid, thickness, n_hat[2])
 
     spec = xp.zeros(E_grid.size, dtype=REAL)
+
+    # GPU float32 fast path: evaluate Bethe-Heitler/Elwert, absorption, and the
+    # segment reduction in one raw kernel. Instead of a dense T_abs[M, NE]
+    # matrix, pass only each segment's path length through each absorber layer.
+    _use_jit_brem_reduction = (
+        _USE_JIT_BREM_REDUCTION
+        and getattr(xp, "__name__", "") == "cupy"
+        and np.dtype(REAL) == np.dtype(np.float32)
+    )
+    if _use_jit_brem_reduction:
+        from .brem_jit_kernel import (
+            DEFAULT_BREM_KERNEL_CONFIG,
+            run_brem_reduction_kernel,
+        )
+
+        if layers is None:
+            path_by_layer = L_esc[:, None]
+            mu_by_layer = mu[None, :]
+        else:
+            path_cols = []
+            if finite_footprint:
+                for z_top, z_bot, _ in layers:
+                    path_cols.append(
+                        _layer_path_length(z_mid, n_hat[2], L_esc, float(z_top), float(z_bot))
+                    )
+            else:
+                for z_top, z_bot, _ in layers:
+                    dz = _layer_dz(z_mid, n_hat[2], float(z_top), float(z_bot))
+                    path_cols.append(dz * inv_nz)
+            path_by_layer = xp.stack(path_cols, axis=1)
+            mu_by_layer = xp.stack(layer_mu, axis=0)
+
+        path_by_layer = xp.ascontiguousarray(path_by_layer, dtype=REAL)
+        mu_by_layer = xp.ascontiguousarray(mu_by_layer, dtype=REAL)
+        path_flat = path_by_layer.reshape(-1)
+        mu_flat = mu_by_layer.reshape(-1)
+        T_jit = xp.ascontiguousarray(seg_E, dtype=REAL)
+        L_jit = xp.ascontiguousarray(seg_L, dtype=REAL)
+        E_jit = xp.ascontiguousarray(E_grid, dtype=REAL)
+        n_abs_layers = int(path_by_layer.shape[1])
+
+        for el_i, n_i in comp:
+            Z_i = TRANSPORT_ELEMENTS[el_i]["Z"]
+            run_brem_reduction_kernel(
+                T_jit,
+                L_jit,
+                path_flat,
+                mu_flat,
+                E_jit,
+                Z=Z_i,
+                density_cm3=n_i * 1e24,
+                n_layers=n_abs_layers,
+                out=spec,
+                config=DEFAULT_BREM_KERNEL_CONFIG,
+            )
+        return _to_cpu(spec / (4.0 * xp.pi) / Ne)
+
     M = seg_E.size
     for j0 in range(0, M, chunk):
         sl = slice(j0, min(j0 + chunk, M))
