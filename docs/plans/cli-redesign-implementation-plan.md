@@ -24,7 +24,7 @@ triage → dispatch flow; `TODO.md` stays authoritative for status.
 | 0 | docs/TODO reorg | pkg P4/P5 | ✅ landed 2026-08-01 |
 | 1 | command-home → `src/cxr_mc/cli/commands/` | pkg P1 | ✅ landed 2026-08-04 |
 | 2 | energy-grid module rename | pkg P2 | ✅ landed 2026-08-04 |
-| 3 | noun→verb, remote-as-modifier, `-o` contract | redesign D1–D3 | needs 1 ✅ — **start here**, after Q2 |
+| 3 | noun→verb, remote-as-modifier, `-o` contract | redesign D1–D3 | needs 1 ✅, Q2 ✅ — **start here** |
 | 4 | verb collapse **+** recompute/prune module fold | redesign D4 + pkg P3 | needs 3 |
 | 5 | vocab controls + deprecation rollout | redesign D5–D7 | needs 3 |
 | 6 | content-addressed store, lockfile, gc | artifact RFC (phase 5) | needs 3–5 |
@@ -35,8 +35,9 @@ Do not start the dependent slice until its decision is pinned:
 
 1. ~~**P1 destination shape**~~ — resolved in slice 1 as `cli/commands/`: the
    existing `cli/` held 16 modules and P1 added 13, past the flat threshold.
-2. **`profile` vs `context` naming** — redesign §6 Q3. Blocks slice 3 (affects
-   D2c precedence chain). **Resolved (2026-08-02):** `profile` is fixed as the
+2. ~~**`profile` vs `context` naming**~~ — redesign §6 Q3, blocked slice 3
+   (D2c precedence chain). **Resolved (2026-08-02), landed 2026-08-04:**
+   `profile` is fixed as the
    campaign term; no `context` rename. The overload was fidelity (`full`/`survey`)
    squatting on "profile" — moved onto its own `fidelity` namespace in branch
    `refactor/fidelity-namespace`. See `tasks/refactor/fidelity-namespace/README.md`

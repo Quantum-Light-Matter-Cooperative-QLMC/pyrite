@@ -4,8 +4,8 @@
 
 Resolve the CLI-redesign RFC §6 Q3 (`profile` vs `context`) by fixing **`profile`
 as the campaign term** and moving the **fidelity** concept (`full`/`survey`) onto
-its own `fidelity` namespace. Pure internal rename; no command surface, output,
-or checkpoint-format change.
+its own `fidelity` namespace. Internal rename; no command surface, output, or
+checkpoint-format change. One Python-API behavior change — see flagged item 1.
 
 ## The five "profile" senses
 
