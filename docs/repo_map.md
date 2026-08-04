@@ -62,17 +62,17 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   compatibility aliases.
   Checked user-facing inventory:
   [`docs/cli-reference.md`](cli-reference.md).
-- **`cxr profile ...`** → `cli.profile`: manage named campaign defaults and
+- **`cxr profile ...`** → `cli.commands.profile`: manage named campaign defaults and
   profile-owned material membership through `profile members
   set|add|remove|reset`. An absent membership key means all in-use materials.
-- **`cxr material show|set MATERIAL [--profile NAME]`** → `cli.material`:
+- **`cxr material show|set MATERIAL [--profile NAME]`** → `cli.commands.material`:
   inspect effective ranges and edit per-profile material overrides. `cxr material
   blaze MATERIAL ...` routes to the specialized blazed sweep. Hidden compatibility
   aliases remain under `cxr sweep`.
 - **`cxr material validate [catalog]`** → `check_config:_run`: validate bundled
   offline catalog or explicit complete catalog without starting simulation;
   hidden alias: `cxr check-config`.
-- **`cxr checkpoint ...`** → `cli.checkpoint:command`: grouped local checkpoint
+- **`cxr checkpoint ...`** → `cli.commands.checkpoint:command`: grouped local checkpoint
   shrink, component recompute, archive, restore, list, and merge operations.
 - **`cxr checkpoint prune [--all | --profile NAME] [--yes]`** →
   `prune:command`: preview or atomically rewrite current named-profile
@@ -277,9 +277,14 @@ next save. Shared case blobs live at
 - Deps: `_checkpoint_io`, NumPy.
 
 ### `scan.py`
-Headless sweep entry: parse args → build cases → `run_sweep` → checkpoint;
-owns `--no-cache`/`--recompute` and performance-run cache defaults.
-- Public: `main`, `run`, `add_subparser`.
+Headless sweep driver: build cases → `run_sweep` → checkpoint; owns
+`--no-cache`/`--recompute` and performance-run cache defaults, manifest and
+catalog-profile resolution, and nsys re-exec. Click wiring is in
+`cli/commands/scan.py`; `scan.command` stays available via a lazy
+`__getattr__` so the Monte Carlo hot path never imports Click.
+- Public: `main`, `run`, `command` (lazy), `load_all_materials`,
+  `load_manifest_groups`, `validate_materials`, `validate_catalog_profile`,
+  `resolve_profile_materials`.
 - Deps: `config`, `run`, `sweep`.
 
 ### `blaze.py`
@@ -289,7 +294,9 @@ parse args → build cases → `run_sweep` → checkpoint structure, but forces 
 groove geometry (`theta_obs=90`, `tilt_azim=180`, no substrate/stack/footprint)
 per (energy, spacing) pair and writes to a dedicated
 `checkpoints/<material>_blazed.pkl`, never the flat-face `<material>.pkl`.
-- Public: `main`, `run`, `add_subparser`.
+Click wiring is in `cli/commands/blaze.py`; `blaze.command` stays available via
+a lazy `__getattr__`.
+- Public: `main`, `run`, `command` (lazy).
 - Deps: `config`, `run`, `scan` (`validate_materials`, `_write_progress_record`), `sweep`.
 
 ## Results & plotting
@@ -409,24 +416,29 @@ wired into pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
 ## CLI & packaging
 
 ### `cli/`
-`cxr` console-script dispatcher and CLI-specific helpers/groups.
+`cxr` console-script dispatcher and CLI-specific helpers. Every subcommand's
+Click wiring lives in `cli/commands/`; pure domain logic stays in its domain
+module.
 - Public: `main`.
-- Deps (lazy command imports): `analyze`, `blaze`, `catalog`, `check`,
-  `checkpoint`, `energy_grid`, `export`, `material`, `performance`, `profile`,
-  `remote`, `scan`;
-  hidden `sweep`
-  compatibility paths additionally dispatch to `archive`, `check_config`,
-  `rebrem`, `reline`, and `slim`. Eager lightweight deps: `cli._core`,
+- Deps: lazy per-command imports from `cli.commands.*` (see `_COMMANDS`), plus
+  lazy `archive`, `check`, `prune`, `rebrem`, `reline`, `remote` for
+  domain-owned groups not yet moved. Eager lightweight deps: `cli._core`,
   `__version__`.
+- The pre-move module paths (`cli/profile.py`, `cli/material.py`,
+  `cli/energy_grid.py`, `cli/checkpoint.py`, `cli/performance.py`,
+  `cli/sweep.py`, `cli/completion.py`, `cli/app.py`, `cli/backend_setup.py`)
+  survive as one-line `sys.modules` aliases onto `cli.commands.*`, so old
+  import paths and monkeypatch seams keep working.
 
-### `cli/energy_grid.py`, `cli/profile.py`, `cli/material.py`
-Thin CLI command modules. `energy_grid` registers domain-owned `line_grid`
-implementation; `profile` owns named campaign defaults and membership;
-`material` owns effective-range inspection and per-profile overrides. Shared
-validated atomic TOML helpers live in `cli/_catalog_io.py`; `cli/sweep.py`
-contains hidden compatibility aliases only.
+### `cli/commands/`
+One module per `cxr` subcommand group, holding only the Click layer.
+`scan`/`blaze` command wiring split out of the fused `scan.py`/`blaze.py`
+drivers; `energy_grid` registers the domain-owned implementation; `profile`
+owns named campaign defaults and membership; `material` owns effective-range
+inspection and per-profile overrides; `sweep` is hidden compatibility aliases
+only. Shared validated atomic TOML helpers stay in `cli/_catalog_io.py`.
 
-### `cli/checkpoint.py`
+### `cli/commands/checkpoint.py`
 Canonical `cxr checkpoint` group. Lazily routes `slim`, component
 `recompute {brem,line}`, `archive`, `restore`, `list`, `merge`, and
 reachability-safe `clear` to existing checkpoint handlers while root-level
@@ -438,7 +450,7 @@ datasets by material, profile, or all; previews exact dataset paths and blobs;
 treats active and archived manifests as reachability roots; revalidates retained
 manifests before mutation and fails closed on malformed or changed state.
 
-### `cli/performance.py`
+### `cli/commands/performance.py`
 Canonical local performance-artifact lifecycle: inventory, analysis, and
 preview-by-default profile pruning. `profile analyze` remains a hidden warning
 alias. Revalidates selected file signatures before deletion.

@@ -21,11 +21,26 @@ Use `cli/commands/`, not a flat `cli/`: the existing `cli/` package has 16 modul
   `__getattr__` seams — command-test files use `scan.<driver>`/`scan.command`
   from the same name, so no test edits needed.
 - [x] `docs/cli-reference.md` current (generator `--check` passes; zero surface
-  change). `docs/repo_map.md` is a curated doc, accurate at its abstraction level
-  (`scan:main` / lazy dispatch, not internal wiring homes) — no change.
+  change).
+- [x] `docs/repo_map.md` updated. It is curated prose, but it named the moved
+  modules directly (`### cli/energy_grid.py, cli/profile.py, cli/material.py`,
+  `### cli/checkpoint.py`, `### cli/performance.py`) — those paths are now
+  7-line alias shims, so the map would have sent readers to the wrong files.
+  Added a `### cli/commands/` section documenting the one-module-per-group
+  layout and the `sys.modules` aliases, repointed the entry-point lines at
+  `cli.commands.*`, and refreshed the `scan.py`/`blaze.py` entries (their
+  `Public:` lists advertised an `add_subparser` that does not exist on `main`
+  either — pre-existing staleness, corrected while here).
 - [x] Pass CLI reference/export-freeze, targeted CLI (890 passed), lint, typecheck.
   Also fixed 2 pre-existing ty errors (`profile.py`/`sweep.py` importing through
   the `sys.modules`-swap alias modules) by repointing at `cli.commands.*`.
+
+## Independent verification (2026-08-04)
+
+Re-run in a clean env (`UV_PROJECT_ENVIRONMENT=/tmp/cxr-mc-venv-cch`), all green:
+lint, typecheck, suites packaging **183**, cli **890**, core **967 passed / 40
+skipped**, apps **287**. Packaging re-run after the `repo_map.md` edit: 183.
+No code defects found; the only gap was the doc above.
 
 ## Non-goals
 
