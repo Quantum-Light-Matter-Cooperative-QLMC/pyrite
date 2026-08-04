@@ -87,8 +87,14 @@ import numpy as np
 
 from .. import DATA_DIR
 from ..materials.crystal import absorption_length_ang
-from . import _si_sensor
-from ._si_sensor import FANO_SI, SI_N_PER_ANG3, W_EHP_EV
+from ._si_sensor import (
+    FANO_SI,
+    SI_N_PER_ANG3,
+    W_EHP_EV,
+    grid_key,
+    poisson_core,
+    prep_spectrum,
+)
 
 # ---- sensor variants (fixed, from the Eagle XO datasheet) --------------------
 # Active area and pixel pitch for the two CCD options; the active area (with the
@@ -298,7 +304,7 @@ class EagleResponse:
         as the input (e.g. Phs/eV/s/nA): ``spec * QE(E)``, optionally blurred by
         the photon-counting energy resolution. NaN/inf samples (a bad-geometry
         case) are treated as zero flux rather than poisoning the result."""
-        spec = _si_sensor.prep_spectrum(spec, self.E, "eaglexo_response")
+        spec = prep_spectrum(spec, self.E, "eaglexo_response")
         det = spec * self.qe
         if self.resolve_energy:
             from ..montecarlo import convolve_detector
@@ -354,7 +360,7 @@ def get_response(E_grid_eV, *, coating="BN", resolve_energy=False, n_pix=4):
     signature and reused. Prefer this over constructing EagleResponse directly
     when looping over many spectra so each gets a response matching ITS grid."""
     E = np.asarray(E_grid_eV, dtype=float)
-    key = _si_sensor.grid_key(E) + (coating.upper(), bool(resolve_energy), int(n_pix))
+    key = grid_key(E) + (coating.upper(), bool(resolve_energy), int(n_pix))
     resp = _RESPONSE_CACHE.get(key)
     if resp is None:
         resp = EagleResponse(E, coating=coating, resolve_energy=resolve_energy, n_pix=n_pix)
@@ -379,7 +385,7 @@ def poisson_counts(
     Returns (counts_per_bin, expected_per_bin): the integer draw and its mean."""
     rng = np.random.default_rng() if rng is None else rng
     E = np.asarray(E_grid_eV, dtype=float)
-    counts, expected = _si_sensor.poisson_core(E_grid_eV, detected_per_s, time_s, rng)
+    counts, expected = poisson_core(E_grid_eV, detected_per_s, time_s, rng)
     counts = counts.astype(float)
     if add_read_dark:
         # read noise in charge -> equivalent photon-count jitter per bin, plus
