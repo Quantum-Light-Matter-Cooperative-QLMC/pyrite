@@ -610,6 +610,7 @@ def _brem_wide_from_segments(
             layers=abs_layers,
             groove=groove,
             electron_limit=Ne,
+            E_cut_keV=case.get("E_cut_brem_keV", 1.0),
         )
     brem_wide = np.zeros(E_brem.shape, dtype=float)
     for L in range(n_lay):
@@ -625,6 +626,7 @@ def _brem_wide_from_segments(
             layers=abs_layers,
             groove=groove,
             electron_limit=Ne,
+            E_cut_keV=case.get("E_cut_brem_keV", 1.0),
         )
     return brem_wide
 
@@ -694,28 +696,18 @@ def _lines_for_segments(
     Ne=None,
 ):
     """Coherent line spectrum on ``E_grid`` from already-transported line
-        segments ``segs``. Single slab (``layer_radiators`` absent) radiates from
-        all segments via the case's scalar crystal keys; a multilayer stack sums
-        each CRYSTALLINE layer's lines incoherently, every line self-absorbing
-        through the whole stack. Pure move of _spectrum_case's line block, shared
-        with :func:`_lines_for_case` so a line-only reline reproduces the SAME
-        spectrum as a live sweep.
-    if want_coherent:
-        spec_coherent = _lines_for_segments(
-            segs,
-            E_grid,
-            case,
-            n_hat,
-            abs_layers,
-            tp.get("groove"),
-            coherent=True,
-            Ne=Ne_lines,
-        )
-        ``coherent`` overrides the coherence of the interference kernel: ``None``
-        (default) derives it from ``case["coherent_emission"]`` (back-compat);
-        ``False`` forces the incoherent line sum, ``True`` the coherent one. The
-        dual-spectra runner passes both flags in turn over the SAME ``segs`` so one
-        transport yields both the incoherent ``spec`` and the ``spec_coherent``."""
+    segments ``segs``. Single slab (``layer_radiators`` absent) radiates from
+    all segments via the case's scalar crystal keys; a multilayer stack sums
+    each CRYSTALLINE layer's lines incoherently, every line self-absorbing
+    through the whole stack. Pure move of _spectrum_case's line block, shared
+    with :func:`_lines_for_case` so a line-only reline reproduces the SAME
+    spectrum as a live sweep.
+
+    ``coherent`` overrides the coherence of the interference kernel: ``None``
+    (default) derives it from ``case["coherent_emission"]`` (back-compat);
+    ``False`` forces the incoherent line sum, ``True`` the coherent one. The
+    dual-spectra runner passes both flags in turn over the SAME ``segs`` so one
+    transport yields both the incoherent ``spec`` and the ``spec_coherent``."""
     radiators = case.get("layer_radiators")
     mosaic_kw = dict(
         mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
@@ -748,6 +740,7 @@ def _lines_for_segments(
             groove=groove,
             coherent=coherent,
             electron_limit=Ne,
+            E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             **mosaic_kw,
         )
     assert case.get("groove_spacing_ang") is None
@@ -775,6 +768,7 @@ def _lines_for_segments(
             layers=abs_layers,
             coherent=coherent,
             electron_limit=Ne,
+            E_cut_keV=case.get("E_cut_lines_keV", 5.0),
             **mosaic_kw,
         )
     return spec
@@ -798,7 +792,10 @@ def _transport_lines_for_case(case):
         )
 
     Ne = case["Ne"]
-    E_cut = case.get("E_cut_keV", 1.0)
+    # Lines-only re-transport: every electron is a line electron, so the whole
+    # ensemble gets the LINE cutoff. Must match _transport_for_case's
+    # E_cut_lines_keV or reline stops reproducing live-sweep transport.
+    E_cut = case.get("E_cut_lines_keV", 5.0)
     E_cut_by_electrons = np.full(Ne, E_cut, dtype=np.float64)
     segs = simulate_trajectories(
         case["E0_keV"],
@@ -1106,6 +1103,8 @@ def _worker_init(force_cpu=False):
     False.
     """
     if force_cpu:
+        global _GPU
+
         _GPU = False
         _spectrum_mod.xp = np
         _spectrum_mod.REAL = np.float64
