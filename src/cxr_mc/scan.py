@@ -677,7 +677,7 @@ def _run_material(args, material, max_seconds=None):
     assert build_cases is not None
 
     settings, sweep, identity, stem = _resolved_run(args, material)
-    profile = identity["fidelity"]
+    fidelity = identity["fidelity"]
 
     cases = build_cases(
         sweep,
@@ -692,7 +692,7 @@ def _run_material(args, material, max_seconds=None):
     print(
         f"{material}: {len(cases)} cases across "
         f"{len({c['name'] for c in cases})} configs "
-        f"[profile={profile}, parameters={identity['parameter_sha256'][:12]}]"
+        f"[profile={fidelity}, parameters={identity['parameter_sha256'][:12]}]"
         + (" (quick grid)" if args.quick else "")
         + ("" if settings.emission == "incoherent" else f" ({settings.emission})")
     )
@@ -897,7 +897,7 @@ def _run_material(args, material, max_seconds=None):
             profile=performance_profile,
             material=material,
             static={
-                "fidelity": profile,
+                "fidelity": fidelity,
                 "catalog_profile": identity.get("catalog_profile", "standard"),
                 "parameter_sha256": identity["parameter_sha256"],
                 "checkpoint_stem": stem,

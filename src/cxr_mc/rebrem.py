@@ -161,7 +161,7 @@ def rebrem_checkpoints(
         status = {}
         repair_options = {}
         if context.identified or fidelity is not None or require_identity:
-            repair_options["profile"] = context.fidelity
+            repair_options["fidelity"] = context.fidelity
         try:
             if progress_file is not None:
                 progress_timer.start()

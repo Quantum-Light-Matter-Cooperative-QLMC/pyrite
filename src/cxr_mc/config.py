@@ -28,7 +28,7 @@ import numpy as np
 from .longitudinal import LongitudinalDistribution
 from .materials import CATALOG, MaterialSpec, load_material_catalog
 from .montecarlo import simulate_trajectories
-from .profiles import get_profile
+from .profiles import get_fidelity_preset
 from .results import Settings
 from .sweep import BeamSpec, Sweep, beam_replace
 
@@ -66,7 +66,7 @@ def default_settings(fidelity: str = "full"):
         convolve_with_det=False,
         brem_source="mc",  # "mc" | "external" | "none"
     )
-    return get_profile(fidelity).apply_settings(settings)
+    return get_fidelity_preset(fidelity).apply_settings(settings)
 
 
 def _catalog(catalog_profile: str = "standard"):
@@ -122,12 +122,12 @@ def material_sweep(
     the runner scans and the viz notebook reduces). ``overrides`` replace any grid
     field, e.g. ``material_sweep("ptse2", thickness_ang=2e4)``. For a named-stack
     key the Sweep's material is the film crystal; the catalog material key stays the
-    CLI/checkpoint name."""
+    CLI/checkpoint name.
+
+    ``profile`` is a campaign alias for ``catalog_profile`` (fidelity now has its
+    own ``fidelity=`` keyword; it no longer squats on ``profile=``)."""
     if profile is not None:
-        if profile in ("full", "survey"):
-            fidelity = profile
-        else:
-            catalog_profile = profile
+        catalog_profile = profile
     spec = _material_spec(material, catalog_profile=catalog_profile)
     scan = spec.scan
     # Energy is the per-material scan grid; the profile's optional
@@ -175,7 +175,7 @@ def material_sweep(
         substrate=spec.substrate,
         stack=spec.stack or None,
     )
-    sweep = get_profile(fidelity).apply_sweep(sweep)
+    sweep = get_fidelity_preset(fidelity).apply_sweep(sweep)
     if not overrides:
         return sweep
     # Split beam-addressed overrides (energy_keV, spot/bunch fields) from

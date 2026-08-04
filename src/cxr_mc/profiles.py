@@ -95,8 +95,8 @@ def _coarsen_grid(values: Any, factor: int, span_fraction: float) -> np.ndarray:
 
 
 @dataclass(frozen=True)
-class SweepProfile:
-    """Independent settings and grid-reduction policy for one named profile."""
+class FidelityPreset:
+    """Independent settings and grid-reduction policy for one fidelity preset."""
 
     name: str
     n_electrons: int
@@ -117,13 +117,13 @@ class SweepProfile:
 
     @property
     def coherent_emission(self) -> bool:
-        """Derived: whether this profile's emission policy runs the coherent
+        """Derived: whether this preset's emission policy runs the coherent
         kernel. Kept so ``build_cases(coherent_emission=)`` and other
         transport-side readers are untouched by the tri-state rename."""
         return self.emission in {"coherent", "both"}
 
     def apply_settings(self, settings: Settings) -> Settings:
-        """Return settings with this profile's transport counts resolved."""
+        """Return settings with this preset's transport counts resolved."""
         return replace(
             settings,
             n_electrons=self.n_electrons,
@@ -132,7 +132,7 @@ class SweepProfile:
         )
 
     def apply_sweep(self, sweep: Sweep) -> Sweep:
-        """Return catalog sweep reduced according to this profile."""
+        """Return catalog sweep reduced according to this preset."""
         if self.name == "full":
             return sweep
         energies = _centered_sample(sweep.beam.energy_keV, self.max_energies)
@@ -178,9 +178,9 @@ class SweepProfile:
         )
 
 
-_PROFILES = {
-    "full": SweepProfile("full", n_electrons=300, n_electrons_brem=150),
-    "survey": SweepProfile(
+_FIDELITY_PRESETS = {
+    "full": FidelityPreset("full", n_electrons=300, n_electrons_brem=150),
+    "survey": FidelityPreset(
         "survey",
         n_electrons=60,
         n_electrons_brem=30,
@@ -197,10 +197,10 @@ _PROFILES = {
 }
 
 
-def get_profile(name: str = "full") -> SweepProfile:
-    """Return named profile or raise a boundary-friendly ``ValueError``."""
+def get_fidelity_preset(name: str = "full") -> FidelityPreset:
+    """Return named fidelity preset or raise a boundary-friendly ``ValueError``."""
     try:
-        return _PROFILES[name]
+        return _FIDELITY_PRESETS[name]
     except KeyError:
         raise ValueError(
             f"unknown fidelity preset {name!r} (choose from {FIDELITY_NAMES})"

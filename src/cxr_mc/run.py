@@ -840,7 +840,7 @@ def repair_brem_wide(
     brem_start_eV=None,
     brem_stop_eV=None,
     brem_step_eV=None,
-    profile=None,
+    fidelity=None,
     on_progress=None,
     max_seconds=None,
     status=None,
@@ -901,7 +901,8 @@ def repair_brem_wide(
     from .montecarlo import _brem_for_case
 
     retune = any(
-        value is not None for value in (ne_brem, brem_start_eV, brem_stop_eV, brem_step_eV, profile)
+        value is not None
+        for value in (ne_brem, brem_start_eV, brem_stop_eV, brem_step_eV, fidelity)
     )
     todo = []
     n_skipped = 0
@@ -916,7 +917,7 @@ def repair_brem_wide(
                     c = r["case"]
                     if ne_brem is not None and int(c.get("Ne_brem", -1)) != int(ne_brem):
                         at_target = False
-                    if profile is not None and c.get("brem_profile") != profile:
+                    if fidelity is not None and c.get("brem_profile") != fidelity:
                         at_target = False
                     if any(
                         value is not None for value in (brem_start_eV, brem_stop_eV, brem_step_eV)
@@ -975,8 +976,8 @@ def repair_brem_wide(
         c = r["case"]
         if ne_brem is not None:
             c["Ne_brem"] = int(ne_brem)
-        if profile is not None:
-            c["brem_profile"] = profile
+        if fidelity is not None:
+            c["brem_profile"] = fidelity
         if any(value is not None for value in (brem_start_eV, brem_stop_eV, brem_step_eV)):
             stored = _stored_brem_grid(r)
             step_b = (
@@ -1092,7 +1093,7 @@ def repair_line_spec(
     line_start_eV=None,
     line_stop_eV=None,
     line_step_eV=None,
-    profile=None,
+    fidelity=None,
     catalog_profile="standard",
     from_config=True,
     redo_all=False,
@@ -1137,16 +1138,16 @@ def repair_line_spec(
     sweep = None
     if from_config:
         try:
-            if profile is None:
+            if fidelity is None:
                 from .config import material_sweep
 
                 sweep = material_sweep(material, catalog_profile=catalog_profile)
             else:
-                from .recompute_defaults import sweep as profile_sweep
+                from .recompute_defaults import sweep as fidelity_sweep
 
-                sweep = profile_sweep(
+                sweep = fidelity_sweep(
                     material,
-                    profile,
+                    fidelity,
                     catalog_profile=catalog_profile,
                 )
         except Exception:
@@ -1169,8 +1170,8 @@ def repair_line_spec(
             finite = spec is not None and np.isfinite(np.asarray(spec)).all()
             grid_ok = eg.shape == target.shape and np.allclose(eg, target)
             ne_ok = line_ne is None or int(r["case"].get("Ne", -1)) == int(line_ne)
-            profile_ok = profile is None or r["case"].get("line_profile") == profile
-            at_target = finite and grid_ok and ne_ok and profile_ok
+            fidelity_ok = fidelity is None or r["case"].get("line_profile") == fidelity
+            at_target = finite and grid_ok and ne_ok and fidelity_ok
             if only_stale and not redo_all and at_target:
                 n_skipped += 1
                 continue
@@ -1194,8 +1195,8 @@ def repair_line_spec(
         c = r["case"]
         if line_ne is not None:
             c["Ne"] = int(line_ne)
-        if profile is not None:
-            c["line_profile"] = profile
+        if fidelity is not None:
+            c["line_profile"] = fidelity
         # `spec` is always the incoherent line sum; a coherent/both checkpoint
         # (detected by an existing `spec_coherent`) gets BOTH arrays refreshed
         # onto the new grid from ONE re-transport, so `spec_coherent` never goes

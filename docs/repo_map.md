@@ -245,17 +245,17 @@ scan grids project from immutable `materials.CATALOG`.
 - Public: `default_settings`, `material_grid`, `material_sweep`,
   `trajectory_sweep`; `MATERIALS` ordered tuple.
 - Deps: `materials` (`CATALOG`, `MaterialSpec`), `results` (`Settings`),
-  `profiles` (`get_profile`), `sweep` (`Sweep`).
+  `profiles` (`get_fidelity_preset`), `sweep` (`Sweep`).
 
 ### `profiles.py`
-Named `full`/provisional `survey` policies, deterministic serialization of
-resolved settings and sweeps, SHA-256 dataset identity, and variant checkpoint
-stem selection. `SweepProfile.emission` (`incoherent`/`coherent`/`both`, with a
-derived `coherent_emission`) is the profile-owned emission policy;
+Named `full`/provisional `survey` fidelity presets, deterministic serialization
+of resolved settings and sweeps, SHA-256 dataset identity, and variant checkpoint
+stem selection. `FidelityPreset.emission` (`incoherent`/`coherent`/`both`, with a
+derived `coherent_emission`) is the preset-owned emission policy;
 `dataset_identity` adds an `emission` divergence key so the three modes get three
 distinct digests (incoherent unchanged, bit-for-bit).
-- Public: `SweepProfile`, `PROFILE_NAMES`, `get_profile`, `dataset_identity`,
-  `case_content_key`, `variant_stem`.
+- Public: `FidelityPreset`, `FIDELITY_NAMES`, `get_fidelity_preset`,
+  `dataset_identity`, `case_content_key`, `variant_stem`.
 - Deps: `results` (`Settings`), `sweep` (`Sweep`), NumPy.
 
 ### `energy_grid/` (package)
