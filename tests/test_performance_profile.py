@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from cxr_mc import performance_profile
-from cxr_mc._energy_grid import encode_energy_grid
+from cxr_mc.energy_grid.encoding import encode_energy_grid
 from cxr_mc.montecarlo import runner
 
 

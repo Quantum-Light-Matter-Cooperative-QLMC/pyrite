@@ -81,7 +81,7 @@ TEST_SUITE_PATTERNS = {
         "test_check_config.py",
         "test_checkpoint_cli.py",
         "test_cli_*.py",
-        "test_line_grid_cli.py",
+        "test_energy_grid_cli.py",
         "test_local_click_cli.py",
         "test_local_dashboard.py",
         "test_output_noise.py",
@@ -468,7 +468,7 @@ def cmd_verify(args: argparse.Namespace) -> None:
 
 
 def cmd_regen_golden(args: argparse.Namespace) -> None:
-    from cxr_mc.line_grid.golden import regen
+    from cxr_mc.energy_grid.golden import regen
 
     raise SystemExit(regen(check=getattr(args, "check", False)))
 

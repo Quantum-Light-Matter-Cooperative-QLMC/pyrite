@@ -3,7 +3,8 @@ import sys
 
 import pytest
 
-from cxr_mc import line_grid
+from cxr_mc import energy_grid
+from cxr_mc.energy_grid import _command
 from tests.cli_helpers import assert_clean_result, invoke
 
 CLICK_COMMANDS = (
@@ -24,7 +25,7 @@ CLICK_COMMANDS = (
 
 
 def test_click_group_exposes_full_line_grid_tree():
-    assert tuple(line_grid.command.commands) == (
+    assert tuple(energy_grid.command.commands) == (
         "line",
         "brem",
         "derive",
@@ -52,7 +53,7 @@ def test_click_group_exposes_full_line_grid_tree():
     ],
 )
 def test_click_help_paths_are_clean(path):
-    result = invoke(line_grid.command, [*path, "--help"])
+    result = invoke(energy_grid.command, [*path, "--help"])
 
     assert_clean_result(result)
     assert "Usage:" in result.stdout
@@ -60,7 +61,7 @@ def test_click_help_paths_are_clean(path):
 
 @pytest.mark.parametrize(
     "module",
-    ("cxr_mc.line_grid.derive", "cxr_mc.line_grid.job"),
+    ("cxr_mc.energy_grid.derive", "cxr_mc.energy_grid.job"),
 )
 def test_standalone_module_entry_points_remain_available(module):
     completed = subprocess.run(
@@ -78,12 +79,12 @@ def test_standalone_module_entry_points_remain_available(module):
 def test_click_status_delegates_with_detail(monkeypatch):
     seen = {}
     monkeypatch.setattr(
-        line_grid.remote,
+        _command.remote,
         "job_status",
         lambda jobid=None, detail=0: seen.update(jobid=jobid, detail=detail),
     )
 
-    result = invoke(line_grid.command, ["job", "status", "job7", "-vv"])
+    result = invoke(energy_grid.command, ["job", "status", "job7", "-vv"])
 
     assert_clean_result(result)
     assert seen == {"jobid": "job7", "detail": 2}
@@ -94,13 +95,13 @@ def test_click_status_json_reuses_remote_machine_contract(monkeypatch):
 
     def status(args):
         seen.update(vars(args))
-        line_grid.emit_json_result(
-            line_grid.cli_json.JsonResult("cxr.remote.status", {"job": {"job_id": args.jobid}})
+        _command.emit_json_result(
+            _command.cli_json.JsonResult("cxr.remote.status", {"job": {"job_id": args.jobid}})
         )
 
-    monkeypatch.setattr(line_grid.remote, "_cli_status", status)
+    monkeypatch.setattr(_command.remote, "_cli_status", status)
 
-    result = invoke(line_grid.command, ["job", "status", "job7", "--json"])
+    result = invoke(energy_grid.command, ["job", "status", "job7", "--json"])
 
     assert_clean_result(result)
     assert '"schema":"cxr.remote.status"' in result.stdout
@@ -109,19 +110,19 @@ def test_click_status_json_reuses_remote_machine_contract(monkeypatch):
 
 @pytest.mark.parametrize("status", [1, 75, 130])
 def test_click_follow_logs_propagates_remote_exit_status(monkeypatch, status):
-    monkeypatch.setattr(line_grid.remote, "tail_logs", lambda _jobid, _follow: status)
+    monkeypatch.setattr(_command.remote, "tail_logs", lambda _jobid, _follow: status)
 
-    result = invoke(line_grid.command, ["job", "logs", "--follow"])
+    result = invoke(energy_grid.command, ["job", "logs", "--follow"])
 
     assert_clean_result(result, exit_code=status)
 
 
 def test_click_submit_with_invalid_azimuths_fails(monkeypatch):
     seen = {}
-    monkeypatch.setattr(line_grid.job, "start", lambda **kwargs: seen.update(kwargs))
+    monkeypatch.setattr(energy_grid.job, "start", lambda **kwargs: seen.update(kwargs))
 
     result = invoke(
-        line_grid.command,
+        energy_grid.command,
         [
             "submit",
             "--materials",
@@ -146,10 +147,10 @@ def test_click_submit_with_invalid_azimuths_fails(monkeypatch):
 
 def test_click_submit_forwards_geometry_and_set_default(monkeypatch):
     seen = {}
-    monkeypatch.setattr(line_grid.job, "start", lambda **kwargs: seen.update(kwargs))
+    monkeypatch.setattr(energy_grid.job, "start", lambda **kwargs: seen.update(kwargs))
 
     result = invoke(
-        line_grid.command,
+        energy_grid.command,
         [
             "submit",
             "--materials",
@@ -177,18 +178,18 @@ def test_click_submit_forwards_geometry_and_set_default(monkeypatch):
 
 def test_click_submit_uses_persistent_materials_and_energies(monkeypatch):
     seen = {}
-    monkeypatch.setattr(line_grid.job, "start", lambda **kwargs: seen.update(kwargs))
+    monkeypatch.setattr(energy_grid.job, "start", lambda **kwargs: seen.update(kwargs))
     monkeypatch.setattr(
-        line_grid.defaults,
+        energy_grid.defaults,
         "load_defaults",
         lambda: {
-            **line_grid.defaults.FALLBACK,
+            **energy_grid.defaults.FALLBACK,
             "materials": ["wse2", "mose2"],
             "energies": [40.0, 60.0],
         },
     )
 
-    result = invoke(line_grid.command, ["submit", "--dry-run"])
+    result = invoke(energy_grid.command, ["submit", "--dry-run"])
 
     assert_clean_result(result)
     assert seen["materials"] == "wse2,mose2"
@@ -197,12 +198,12 @@ def test_click_submit_uses_persistent_materials_and_energies(monkeypatch):
 
 def test_click_submit_routes_legacy_message_to_stderr(monkeypatch):
     monkeypatch.setattr(
-        line_grid.job,
+        energy_grid.job,
         "start",
         lambda **_kwargs: (_ for _ in ()).throw(SystemExit("invalid material text")),
     )
 
-    result = invoke(line_grid.command, ["submit", "--materials", "bad"])
+    result = invoke(energy_grid.command, ["submit", "--materials", "bad"])
 
     assert result.exit_code == 1
     assert result.stdout == ""
@@ -212,11 +213,11 @@ def test_click_submit_routes_legacy_message_to_stderr(monkeypatch):
 
 def test_click_derive_forwards_brem_step(monkeypatch):
     seen = {}
-    from cxr_mc.line_grid import derive
+    from cxr_mc.energy_grid import derive
 
     monkeypatch.setattr(derive, "main", lambda argv: seen.update(argv=argv) or 0)
 
-    result = invoke(line_grid.command, ["derive", "--brem-step", "12.5"])
+    result = invoke(energy_grid.command, ["derive", "--brem-step", "12.5"])
 
     assert_clean_result(result)
     assert seen["argv"] == ["--brem-step", "12.5"]
@@ -224,23 +225,23 @@ def test_click_derive_forwards_brem_step(monkeypatch):
 
 @pytest.mark.parametrize("status", [1, 75, 130])
 def test_click_derive_preserves_nonzero_status(monkeypatch, status):
-    from cxr_mc.line_grid import derive
+    from cxr_mc.energy_grid import derive
 
     monkeypatch.setattr(derive, "main", lambda _argv: status)
 
-    result = invoke(line_grid.command, ["derive"])
+    result = invoke(energy_grid.command, ["derive"])
 
     assert_clean_result(result, exit_code=status)
 
 
 def test_click_apply_dispatches_with_pull_and_force(monkeypatch):
     seen = {}
-    monkeypatch.setattr(line_grid, "_pull_combined", lambda: "combined.json")
+    monkeypatch.setattr(_command, "_pull_combined", lambda: "combined.json")
     monkeypatch.setattr(
-        line_grid.apply, "apply_file", lambda path, **kw: seen.update(path=path, **kw)
+        energy_grid.apply, "apply_file", lambda path, **kw: seen.update(path=path, **kw)
     )
 
-    result = invoke(line_grid.command, ["apply", "--pull", "--force"])
+    result = invoke(energy_grid.command, ["apply", "--pull", "--force"])
 
     assert_clean_result(result)
     assert seen["path"] == "combined.json"
@@ -257,10 +258,10 @@ def test_click_apply_dispatches_with_pull_and_force(monkeypatch):
 )
 def test_click_apply_expected_failures_use_stderr(monkeypatch, error, message):
     monkeypatch.setattr(
-        line_grid.apply, "apply_file", lambda *_args, **_kwargs: (_ for _ in ()).throw(error)
+        energy_grid.apply, "apply_file", lambda *_args, **_kwargs: (_ for _ in ()).throw(error)
     )
 
-    result = invoke(line_grid.command, ["apply", "bounds.json"])
+    result = invoke(energy_grid.command, ["apply", "bounds.json"])
 
     assert result.exit_code == 1
     assert result.stdout == ""
@@ -272,7 +273,7 @@ def test_click_apply_expected_failures_use_stderr(monkeypatch, error, message):
 def test_click_set_expected_domain_failure_uses_stderr(monkeypatch, command_name):
     target = "set_line_grid" if command_name == "line" else "set_brem_grid"
     monkeypatch.setattr(
-        line_grid.apply,
+        energy_grid.apply,
         target,
         lambda *_args, **_kwargs: (_ for _ in ()).throw(ValueError("unknown material")),
     )
@@ -280,7 +281,7 @@ def test_click_set_expected_domain_failure_uses_stderr(monkeypatch, command_name
     if command_name == "line":
         argv.extend(("--energy", "50"))
 
-    result = invoke(line_grid.command, argv)
+    result = invoke(energy_grid.command, argv)
 
     assert result.exit_code == 1
     assert result.stdout == ""
@@ -291,7 +292,7 @@ def test_click_set_expected_domain_failure_uses_stderr(monkeypatch, command_name
 def test_click_line_delete_confirmed_deletes_and_warns_stale_golden(monkeypatch):
     seen = {}
     monkeypatch.setattr(
-        line_grid.apply,
+        energy_grid.apply,
         "delete_line_grid",
         lambda material, energies, **kw: (
             seen.update(material=material, energies=list(energies)) or [30.0, 100.0]
@@ -299,7 +300,7 @@ def test_click_line_delete_confirmed_deletes_and_warns_stale_golden(monkeypatch)
     )
 
     result = invoke(
-        line_grid.command,
+        energy_grid.command,
         ["line", "delete", "hopg", "--energy", "30", "--energy", "100"],
         input="y\n",
     )
@@ -313,12 +314,12 @@ def test_click_line_delete_confirmed_deletes_and_warns_stale_golden(monkeypatch)
 
 def test_click_line_delete_declined_confirmation_aborts(monkeypatch):
     monkeypatch.setattr(
-        line_grid.apply,
+        energy_grid.apply,
         "delete_line_grid",
         lambda *_a, **_kw: pytest.fail("delete_line_grid must not run when declined"),
     )
 
-    result = invoke(line_grid.command, ["line", "delete", "hopg", "--energy", "30"], input="n\n")
+    result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30"], input="n\n")
 
     assert result.exit_code == 1
     assert result.stdout == ""
@@ -327,10 +328,10 @@ def test_click_line_delete_declined_confirmation_aborts(monkeypatch):
 
 def test_click_line_delete_yes_skips_prompt(monkeypatch):
     monkeypatch.setattr(
-        line_grid.apply, "delete_line_grid", lambda material, energies, **kw: [30.0]
+        energy_grid.apply, "delete_line_grid", lambda material, energies, **kw: [30.0]
     )
 
-    result = invoke(line_grid.command, ["line", "delete", "hopg", "--energy", "30", "--yes"])
+    result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30", "--yes"])
 
     assert result.exit_code == 0
     assert "deleted hopg: 30 keV" in result.stdout
@@ -339,12 +340,12 @@ def test_click_line_delete_yes_skips_prompt(monkeypatch):
 def test_click_line_delete_dry_run_skips_prompt_and_confirms_via_kwarg(monkeypatch):
     seen = {}
     monkeypatch.setattr(
-        line_grid.apply,
+        energy_grid.apply,
         "delete_line_grid",
         lambda material, energies, **kw: seen.update(kw) or [30.0],
     )
 
-    result = invoke(line_grid.command, ["line", "delete", "hopg", "--energy", "30", "--dry-run"])
+    result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30", "--dry-run"])
 
     assert result.exit_code == 0
     assert result.stdout == ""
@@ -354,7 +355,7 @@ def test_click_line_delete_dry_run_skips_prompt_and_confirms_via_kwarg(monkeypat
 
 def test_click_line_delete_dry_run_and_json_conflict():
     result = invoke(
-        line_grid.command, ["line", "delete", "hopg", "--energy", "30", "--dry-run", "--json"]
+        energy_grid.command, ["line", "delete", "hopg", "--energy", "30", "--dry-run", "--json"]
     )
 
     assert result.exit_code == 2
@@ -362,7 +363,7 @@ def test_click_line_delete_dry_run_and_json_conflict():
 
 
 def test_click_line_delete_json_requires_yes():
-    result = invoke(line_grid.command, ["line", "delete", "hopg", "--energy", "30", "--json"])
+    result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30", "--json"])
 
     assert result.exit_code == 2
     assert "--json requires --yes" in result.stderr
@@ -370,11 +371,11 @@ def test_click_line_delete_json_requires_yes():
 
 def test_click_line_delete_json_emits_one_envelope(monkeypatch):
     monkeypatch.setattr(
-        line_grid.apply, "delete_line_grid", lambda material, energies, **kw: [30.0]
+        energy_grid.apply, "delete_line_grid", lambda material, energies, **kw: [30.0]
     )
 
     result = invoke(
-        line_grid.command, ["line", "delete", "hopg", "--energy", "30", "--yes", "--json"]
+        energy_grid.command, ["line", "delete", "hopg", "--energy", "30", "--yes", "--json"]
     )
 
     assert_clean_result(result)
@@ -388,14 +389,14 @@ def test_click_line_delete_json_emits_one_envelope(monkeypatch):
 
 def test_click_line_delete_expected_failure_uses_stderr(monkeypatch):
     monkeypatch.setattr(
-        line_grid.apply,
+        energy_grid.apply,
         "delete_line_grid",
         lambda *_a, **_kw: (_ for _ in ()).throw(
             ValueError("no energy_grids entry for material: bad")
         ),
     )
 
-    result = invoke(line_grid.command, ["line", "delete", "bad", "--energy", "30", "--yes"])
+    result = invoke(energy_grid.command, ["line", "delete", "bad", "--energy", "30", "--yes"])
 
     assert result.exit_code == 1
     assert result.stdout == ""
@@ -405,18 +406,18 @@ def test_click_line_delete_expected_failure_uses_stderr(monkeypatch):
 
 def test_pull_combined_quotes_remote_scp_path(monkeypatch):
     calls = []
-    monkeypatch.setattr(line_grid.remote.config, "HOST", "qlmc")
-    monkeypatch.setattr(line_grid.remote.config, "REMOTE_DIR", "/srv/cxr data")
-    monkeypatch.setattr(line_grid.remote, "_run", lambda command: calls.append(command))
+    monkeypatch.setattr(_command.remote.config, "HOST", "qlmc")
+    monkeypatch.setattr(_command.remote.config, "REMOTE_DIR", "/srv/cxr data")
+    monkeypatch.setattr(_command.remote, "_run", lambda command: calls.append(command))
 
-    local = line_grid._pull_combined("bounds-result.json")
+    local = _command._pull_combined("bounds-result.json")
 
     assert local == "bounds-result.json"
     assert calls == [["scp", "qlmc:'/srv/cxr data/bounds-result.json'", "bounds-result.json"]]
 
 
 def test_click_stop_requires_explicit_target():
-    result = invoke(line_grid.command, ["job", "stop"])
+    result = invoke(energy_grid.command, ["job", "stop"])
 
     assert result.exit_code == 2
     assert "needs JOBID, or use --latest" in result.stderr
@@ -424,11 +425,11 @@ def test_click_stop_requires_explicit_target():
 
 def test_click_stop_previews_latest_and_yes_cancels(monkeypatch):
     seen = {}
-    monkeypatch.setattr(line_grid.remote, "_latest_jobid", lambda: "job9")
-    monkeypatch.setattr(line_grid.remote, "_stop_jobid", lambda jobid: seen.update(jobid=jobid))
+    monkeypatch.setattr(_command.remote, "_latest_jobid", lambda: "job9")
+    monkeypatch.setattr(_command.remote, "_stop_jobid", lambda jobid: seen.update(jobid=jobid))
 
-    preview = invoke(line_grid.command, ["job", "stop", "--latest"])
-    confirmed = invoke(line_grid.command, ["job", "stop", "--latest", "--yes"])
+    preview = invoke(energy_grid.command, ["job", "stop", "--latest"])
+    confirmed = invoke(energy_grid.command, ["job", "stop", "--latest", "--yes"])
 
     assert_clean_result(
         preview,
@@ -439,7 +440,7 @@ def test_click_stop_previews_latest_and_yes_cancels(monkeypatch):
 
 
 def test_hidden_line_grid_job_aliases_remain_callable():
-    root_help = invoke(line_grid.command, ["--help"])
+    root_help = invoke(energy_grid.command, ["--help"])
     command_lines = {
         line.split()[0]
         for line in root_help.stdout.splitlines()
@@ -449,12 +450,12 @@ def test_hidden_line_grid_job_aliases_remain_callable():
     assert command_lines.isdisjoint({"status", "attach", "logs", "stop"})
 
     for alias in ("status", "attach", "logs", "stop"):
-        result = invoke(line_grid.command, [alias, "--help"])
+        result = invoke(energy_grid.command, [alias, "--help"])
         assert_clean_result(result)
 
 
 def test_click_regen_golden_delegates_check(monkeypatch):
-    from cxr_mc.line_grid import golden
+    from cxr_mc.energy_grid import golden
 
     seen = {}
     monkeypatch.setattr(
@@ -463,7 +464,7 @@ def test_click_regen_golden_delegates_check(monkeypatch):
         lambda check=False: seen.update(check=check) or 0,
     )
 
-    result = invoke(line_grid.command, ["regen-golden", "--check"])
+    result = invoke(energy_grid.command, ["regen-golden", "--check"])
 
     assert_clean_result(result)
     assert seen["check"] is True
@@ -471,11 +472,11 @@ def test_click_regen_golden_delegates_check(monkeypatch):
 
 @pytest.mark.parametrize("status", [1, 75, 130])
 def test_click_regen_golden_preserves_nonzero_status(monkeypatch, status):
-    from cxr_mc.line_grid import golden
+    from cxr_mc.energy_grid import golden
 
     monkeypatch.setattr(golden, "regen", lambda check=False: status)
 
-    result = invoke(line_grid.command, ["regen-golden"])
+    result = invoke(energy_grid.command, ["regen-golden"])
 
     assert_clean_result(result, exit_code=status)
 
@@ -483,13 +484,13 @@ def test_click_regen_golden_preserves_nonzero_status(monkeypatch, status):
 def test_click_defaults_clear_fields(monkeypatch):
     seen = {}
     monkeypatch.setattr(
-        line_grid.defaults,
+        energy_grid.defaults,
         "reset_defaults",
-        lambda *keys: seen.update(keys=keys) or line_grid.defaults.FALLBACK,
+        lambda *keys: seen.update(keys=keys) or energy_grid.defaults.FALLBACK,
     )
 
     result = invoke(
-        line_grid.command,
+        energy_grid.command,
         ["defaults", "--clear", "tilts", "--clear", "brem-step"],
     )
 
@@ -500,12 +501,12 @@ def test_click_defaults_clear_fields(monkeypatch):
 def test_click_defaults_reset_all(monkeypatch):
     seen = {}
     monkeypatch.setattr(
-        line_grid.defaults,
+        energy_grid.defaults,
         "reset_defaults",
-        lambda *keys: seen.update(keys=keys) or line_grid.defaults.FALLBACK,
+        lambda *keys: seen.update(keys=keys) or energy_grid.defaults.FALLBACK,
     )
 
-    result = invoke(line_grid.command, ["defaults", "--reset"])
+    result = invoke(energy_grid.command, ["defaults", "--reset"])
 
     assert_clean_result(result)
     assert seen["keys"] == ()
@@ -513,12 +514,12 @@ def test_click_defaults_reset_all(monkeypatch):
 
 def test_click_defaults_explains_empty_angles(monkeypatch):
     monkeypatch.setattr(
-        line_grid.defaults,
+        energy_grid.defaults,
         "load_defaults",
-        lambda: {**line_grid.defaults.FALLBACK, "tilts": [], "azimuths": []},
+        lambda: {**energy_grid.defaults.FALLBACK, "tilts": [], "azimuths": []},
     )
 
-    result = invoke(line_grid.command, ["defaults"])
+    result = invoke(energy_grid.command, ["defaults"])
 
     assert_clean_result(result)
     assert "inherit each material's catalog-profile polar tilts" in result.stdout
@@ -535,7 +536,7 @@ def test_click_defaults_explains_empty_angles(monkeypatch):
     ],
 )
 def test_click_defaults_rejects_ambiguous_mutations(argv):
-    result = invoke(line_grid.command, argv)
+    result = invoke(energy_grid.command, argv)
 
     assert result.exit_code == 2
     assert result.stdout == ""
@@ -562,7 +563,7 @@ def test_click_defaults_rejects_ambiguous_mutations(argv):
     ],
 )
 def test_click_numeric_domains_fail_at_boundary(argv):
-    result = invoke(line_grid.command, argv)
+    result = invoke(energy_grid.command, argv)
 
     assert result.exit_code == 2
     assert result.stdout == ""
@@ -625,7 +626,7 @@ def test_cli_failure_exit_and_stream_contract(argv, exit_code, stderr_text):
     ],
 )
 def test_click_failure_exit_and_stream_contract(argv, exit_code, stderr_text):
-    result = invoke(line_grid.command, argv)
+    result = invoke(energy_grid.command, argv)
 
     assert result.exit_code == exit_code
     assert result.stdout == ""

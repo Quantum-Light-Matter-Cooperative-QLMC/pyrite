@@ -724,7 +724,9 @@ def remote_performance_inventory() -> list[tuple[str, str, int, int]]:
         try:
             files, size = int(fields[2]), int(fields[3])
         except ValueError:
-            raise SystemExit("refusing performance operation: remote inventory was malformed") from None
+            raise SystemExit(
+                "refusing performance operation: remote inventory was malformed"
+            ) from None
         if files < 0 or size < 0:
             raise SystemExit("refusing performance operation: remote inventory was malformed")
         inventory.append((fields[0], fields[1], files, size))
@@ -776,8 +778,7 @@ def prune_remote_performance(profiles=None, *, all_profiles=False, yes=False):
     if incomplete:
         raise SystemExit(
             "refusing performance prune: selected artifacts belong to "
-            "non-terminal job(s): "
-            + ", ".join(incomplete)
+            "non-terminal job(s): " + ", ".join(incomplete)
         )
     if not selected:
         print("(nothing to prune)")
@@ -801,7 +802,7 @@ def prune_remote_performance(profiles=None, *, all_profiles=False, yes=False):
         for jobid, profile, _files, _size in selected
     ]
     command = " ".join(config.shell_arg(target) for target in targets)
-    transport._ssh_capture(f"for target in {command}; do rm -rf -- \"$target\"; done")
+    transport._ssh_capture(f'for target in {command}; do rm -rf -- "$target"; done')
     print(f"deleted {len(selected)} remote performance profile path(s)")
 
 
@@ -1158,7 +1159,7 @@ def _stop_jobids(jobids):
     through :func:`_stop_jobid`, which serializes to tens of seconds on a
     batch; the batched command writes every STOP sentinel, scancels once,
     and polls squeue once for the whole set (see
-    ``scripts._scancel_jobs_command``). Single-job callers (line_grid) keep
+    ``scripts._scancel_jobs_command``). Single-job callers (energy_grid) keep
     the granular :func:`_stop_jobid` error semantics."""
     transport._check_shell_tokens(list(jobids))
     transport._run(["ssh", "-n", config.remote_host(), scripts._scancel_jobs_command(list(jobids))])

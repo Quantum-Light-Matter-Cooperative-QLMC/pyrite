@@ -18,7 +18,7 @@ from typing import Any
 import numpy as np
 import psutil
 
-from .._energy_grid import decode_energy_grid
+from ..energy_grid.encoding import decode_energy_grid
 from . import spectrum as _spectrum_mod
 from ._backend import (
     _GPU,
@@ -1291,7 +1291,6 @@ def run_cases(
         )
 
     progress_label = _case_progress_label(cases)
-
 
     def _maybe_bar(iterable):
         if not progress:

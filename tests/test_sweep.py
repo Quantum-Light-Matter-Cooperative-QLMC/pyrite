@@ -7,7 +7,6 @@ import numpy as np
 import pytest
 
 from cxr_mc import materials as material_registry
-from cxr_mc._energy_grid import decode_energy_grid
 from cxr_mc.config import (
     MATERIALS,
     PENETRATION_TILT_DEG,
@@ -16,6 +15,7 @@ from cxr_mc.config import (
     trajectory_sweep,
 )
 from cxr_mc.detectors import DetectorSpec
+from cxr_mc.energy_grid.encoding import decode_energy_grid
 from cxr_mc.materials import (
     CATALOG,
     LayerSpec,

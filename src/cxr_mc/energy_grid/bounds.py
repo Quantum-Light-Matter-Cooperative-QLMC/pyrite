@@ -1,4 +1,4 @@
-"""Pure helpers for cxr_mc.line_grid.derive: turn a simulated
+"""Pure helpers for cxr_mc.energy_grid.derive: turn a simulated
 coherent-line spectrum into a coverage energy, and a coverage energy into a
 catalog-ready line-grid ``stop``/``num`` pair.
 

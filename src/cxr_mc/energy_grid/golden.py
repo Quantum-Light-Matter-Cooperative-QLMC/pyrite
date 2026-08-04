@@ -8,7 +8,7 @@ so the regenerated golden always reflects on-disk state after a
 ``cxr_mc.materials.crystal`` module (the same functions the golden test treats as
 ground truth), never from the packaged singleton.
 
-Independence guardrail (tests/test_line_grid_golden.py): this module must not
+Independence guardrail (tests/test_energy_grid_golden.py): this module must not
 import the ``CATALOG`` singleton -- forcing a fresh disk load, never a stale
 in-memory catalog.
 """

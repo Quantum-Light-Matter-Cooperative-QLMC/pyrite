@@ -1,6 +1,6 @@
 import pytest
 
-import cxr_mc.line_grid.defaults as d
+import cxr_mc.energy_grid.defaults as d
 
 
 def test_load_missing_file_returns_fallback(tmp_path, monkeypatch):

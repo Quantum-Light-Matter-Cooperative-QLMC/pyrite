@@ -258,6 +258,18 @@ distinct digests (incoherent unchanged, bit-for-bit).
   `case_content_key`, `variant_stem`.
 - Deps: `results` (`Settings`), `sweep` (`Sweep`), NumPy.
 
+### `energy_grid/` (package)
+Photon-energy-grid derivation, bounds analysis, catalog application, and the
+compact grid encoding shared by sweep/runner (slice 2 renamed `line_grid/` +
+`_energy_grid.py` into one package matching the `cxr energy-grid` noun).
+- `encoding.py` (was `_energy_grid.py`) is the hot-path leaf: `encode_energy_grid`
+  / `decode_energy_grid`, imported by `sweep`, `run`, `montecarlo.runner`.
+- `_command.py` holds the 700-line Click group (eager `click`, `remote`, `cli`);
+  `__init__.py` is thin and exposes `command` lazily via `__getattr__` so
+  hot-path `energy_grid.encoding` imports stay Click-free. Monkeypatch seams for
+  `remote`/`cli_json`/`emit_json_result` live on `_command`, not the package.
+- Also: `derive`, `bounds`, `apply`, `defaults`, `provenance`, `golden`, `job`.
+
 ### `run.py`
 Checkpointed, resumable sweep driver plus cross-profile per-case CAS replay,
 thin `cases.json` manifests, legacy seeding, and component loaders/repair.

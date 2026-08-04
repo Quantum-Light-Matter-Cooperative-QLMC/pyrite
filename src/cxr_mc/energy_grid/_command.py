@@ -35,7 +35,7 @@ from cxr_mc.cli._core import (
     emit_result,
     invoke_legacy,
 )
-from cxr_mc.line_grid import apply, defaults, job
+from cxr_mc.energy_grid import apply, defaults, job
 
 _DEFAULT_FIELD_KEYS = {
     "tilts": "tilts",
@@ -167,7 +167,7 @@ def derive_command(
     brem_step,
 ):
     """Derive line and bremsstrahlung energy-grid bounds locally."""
-    from cxr_mc.line_grid import derive
+    from cxr_mc.energy_grid import derive
 
     argv = []
     for flag, value in (
@@ -385,7 +385,7 @@ def apply_command(json_path, materials, pull, force, regen_golden, dry_run):
     except (KeyError, ValueError, OSError) as exc:
         _expected_failure(exc)
     if regen_golden and not dry_run:
-        from cxr_mc.line_grid import golden
+        from cxr_mc.energy_grid import golden
 
         golden.regen()
     return 0
@@ -702,6 +702,6 @@ def regen_golden_command(check):
 
     Requires source checkout because installed wheels do not contain test data.
     """
-    from cxr_mc.line_grid import golden
+    from cxr_mc.energy_grid import golden
 
     return _invoke_callback(golden.regen, check=check)

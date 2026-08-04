@@ -323,7 +323,7 @@ def line_grid_show(
     derived-grid store (``[energy_grids.*]``, decision 3,
     docs/cli-energy-grid-sweep-rework-plan.md) whose rows carry their own
     ``source`` inline; ``brem_by_material`` is each material's already-resolved
-    effective ``E_grid_brem`` arange (:func:`cxr_mc.line_grid.apply.effective_brem`,
+    effective ``E_grid_brem`` arange (:func:`cxr_mc.energy_grid.apply.effective_brem`,
     ``profiles.standard.overrides.MATERIAL`` or the ``profiles.standard``
     default). ``provenance`` is the tool-owned sidecar, consulted only for
     optional line-grid notes and for bremsstrahlung's separate manual/derived

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import tomlkit
 
-from cxr_mc.line_grid.apply import _MATERIALS_TOML
+from cxr_mc.energy_grid.apply import _MATERIALS_TOML
 from cxr_mc.materials.catalog import load_material_catalog
 
 RANGES = {
