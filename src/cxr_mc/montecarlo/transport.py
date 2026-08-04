@@ -27,11 +27,10 @@ from .geometry import (
     Y_MIN,
     Z_MAX,
     Z_MIN,
-    first_prism_exit,
     project_beam_entry,
     validate_transverse_dimensions,
 )
-from .groove import entry_points, first_surface_event
+from .groove import _first_surface_event_scalar_numba, entry_points
 
 logger = logging.getLogger(__name__)
 
@@ -808,19 +807,29 @@ def _transport_core_ungrooved(
     return nseg, n_back, n_trans, n_side
 
 
-def _transport_core_grooved_legacy(
+@njit(cache=True)
+def _transport_core_grooved(
     Ne,
     alive,
     max_steps,
+    max_segments,
+    max_vac,
     n_layers,
     internal_bounds,
+    elastic_model_code,
     z_total,
+    finite_footprint,
+    width_ang,
+    height_ang,
+    groove_spacing,
+    groove_depth,
+    groove_st,
+    groove_ct,
     clock,
     rng,
     pos,
     dirs,
     E_cut_keV,
-    L_elements,
     L_Js,
     L_Zs,
     L_ks,
@@ -828,82 +837,68 @@ def _transport_core_grooved_legacy(
     L_ncm3,
     L_top,
     L_bot,
+    mott_has_table,
+    mott_start,
+    mott_len,
+    mott_logE_flat,
+    mott_logA_flat,
     E_keV,
-    elastic_model,
-    finite_footprint,
-    width_ang,
-    height_ang,
-    groove,
+    seg_dir,
+    seg_mid,
+    seg_len,
+    seg_E,
+    seg_t0,
+    seg_id,
+    seg_lay,
+    vac_start,
+    vac_end,
+    vac_E,
+    vac_t0,
+    vac_id,
 ):
-    """Validated vectorized groove path retained as a correctness fallback.
+    """Compiled groove-aware scalar transport.
 
-    The heavy numerical helpers (stopping, beta, rotations) remain Numba-compiled,
-    but facet exit/re-entry uses the existing geometry helpers so groove semantics
-    stay aligned with the pre-Numba transport implementation.
+    Groove facet exits and vacuum re-entries use the exact sawtooth event search
+    from :mod:`montecarlo.groove`, expressed entirely in scalar numeric form for
+    Numba.  Material exit/re-entry pairs do not consume ``max_steps``; the same
+    per-electron surface-event guard as the legacy implementation prevents
+    pathological geometry from looping forever.
     """
     EPS = 1e-6
-    seg_mid = []
-    seg_dir = []
-    seg_len = []
-    seg_E = []
-    seg_t0 = []
-    seg_id = []
-    seg_lay = []
-    vac_start = []
-    vac_end = []
-    vac_E = []
-    vac_t0 = []
-    vac_id = []
+    machine_eps = 2.220446049250313e-16
+    surface_eps = max(
+        64.0 * machine_eps * groove_spacing,
+        2.0e-12 * groove_spacing,
+    )
+
+    nseg = 0
+    nvac = 0
+    n_back = 0
+    n_trans = 0
+    n_side = 0
 
     zero_surface_events = np.zeros(Ne, dtype=np.int16)
     material_steps = np.zeros(Ne, dtype=np.int32)
     surface_events = np.zeros(Ne, dtype=np.int32)
 
-    n_back = 0
-    n_trans = 0
-    n_side = 0
+    # One small reusable rate buffer; material layers can have different
+    # element counts, bounded by the second Mott-table dimension.
+    rate_arr = np.empty(mott_has_table.shape[1])
 
-    def scatter_rates(Ea, Zs, n_cm3s):
-        rates = []
-        for Z_i, n_i in zip(Zs, n_cm3s, strict=False):
-            if elastic_model == "mott":
-                sig_i = _sigma_browning_cm2(Z_i, Ea)
-            else:
-                a = _alpha_sr_joy(Z_i, Ea)
-                sig_i = (
-                    5.21e-21
-                    * Z_i**2
-                    / Ea**2
-                    * 4.0
-                    * np.pi
-                    / (a * (1.0 + a))
-                    * ((Ea + 511.0) / (Ea + 1024.0)) ** 2
-                )
-            rates.append(n_i * sig_i)
-        return np.array(rates)
+    # Initially every alive electron is eligible for a material event.  An
+    # exit/re-entry pair leaves it eligible without consuming a material step.
+    n_eligible = int(alive.sum())
 
-    while True:
-        if not alive.any():
-            break
-        idx = np.flatnonzero(alive & (material_steps < max_steps))
-        if idx.size == 0:
-            break
-
-        if n_layers == 1:
-            lay_all = None
-        else:
-            lay_all = np.clip(
-                np.searchsorted(internal_bounds, pos[idx, 2], side="right"),
-                0,
-                n_layers - 1,
-            )
-
-        for L in range(n_layers):
-            grp = idx if lay_all is None else idx[lay_all == L]
-            if grp.size == 0:
+    while n_eligible > 0:
+        for g in range(Ne):
+            if not alive[g] or material_steps[g] >= max_steps:
                 continue
 
-            elements = L_elements[L]
+            if n_layers == 1:
+                L = 0
+            else:
+                L = np.searchsorted(internal_bounds, pos[g, 2], side="right")
+
             J_arr = L_Js[L]
             Z_arr = L_Zs[L]
             k_arr = L_ks[L]
@@ -911,218 +906,259 @@ def _transport_core_grooved_legacy(
             n_cm3s = L_ncm3[L]
             z_top_L = L_top[L]
             z_bot_L = L_bot[L]
-            Ea = E_keV[grp]
+            E_j = E_keV[g]
 
-            rates = scatter_rates(Ea, Z_arr, n_cm3s)
-            lam_ang = 1e8 / rates.sum(axis=0)
-            step = -lam_ang * np.log(rng.random(grp.size))
+            # 1. Sample the next elastic-collision distance in the current layer.
+            total_rate = 0.0
+            for i_el in range(Z_arr.size):
+                if elastic_model_code == 1:
+                    rate = _scatter_rates_mott_scalar(E_j, Z_arr[i_el], n_cm3s[i_el])
+                else:
+                    rate = _scatter_rates_sr_scalar(E_j, Z_arr[i_el], n_cm3s[i_el])
+                rate_arr[i_el] = rate
+                total_rate += rate
 
-            d = dirs[grp]
-            p = pos[grp]
+            lam_ang = 1e8 / total_rate
+            step_j = -lam_ang * np.log(rng.random())
+
+            if nseg >= max_segments:
+                raise RuntimeError("segment buffer exhausted")
+
+            dx = dirs[g, 0]
+            dy = dirs[g, 1]
+            dz = dirs[g, 2]
+            px = pos[g, 0]
+            py = pos[g, 1]
+            pz = pos[g, 2]
+
+            # 2a. Candidate layer/prism boundary event.
+            cross_up_j = False
+            cross_dn_j = False
+            exit_side_j = False
 
             if finite_footprint:
-                exit_distance, exit_face = first_prism_exit(
-                    p,
-                    d,
-                    z_min_ang=z_top_L,
-                    z_max_ang=z_bot_L,
-                    width_ang=width_ang,
-                    height_ang=height_ang,
+                exit_distance, exit_face = _first_prism_exit_scalar(
+                    px,
+                    py,
+                    pz,
+                    dx,
+                    dy,
+                    dz,
+                    z_top_L,
+                    z_bot_L,
+                    width_ang,
+                    height_ang,
                 )
-                crossed_face = step > exit_distance
-                step = np.where(crossed_face, exit_distance, step)
-                cross_up = crossed_face & (exit_face == Z_MIN)
-                cross_dn = crossed_face & (exit_face == Z_MAX)
-                exit_side = crossed_face & (exit_face < Z_MIN)
-                exit_top = cross_up & (z_top_L <= 0.0)
-                exit_bot = cross_dn & (z_bot_L >= z_total)
+                if step_j > exit_distance:
+                    step_j = exit_distance
+                    cross_up_j = exit_face == Z_MIN
+                    cross_dn_j = exit_face == Z_MAX
+                    exit_side_j = exit_face >= X_MIN and exit_face <= Y_MAX
             else:
-                dz = d[:, 2]
-                pz = p[:, 2]
-                cross_up = (dz < 0) & (pz + step * dz < z_top_L)
-                cross_dn = (dz > 0) & (pz + step * dz > z_bot_L)
-                s_up = np.where(dz < 0, (pz - z_top_L) / (-dz + 1e-300), np.inf)
-                s_dn = np.where(dz > 0, (z_bot_L - pz) / (dz + 1e-300), np.inf)
-                step = np.where(cross_up, s_up, step)
-                step = np.where(cross_dn, s_dn, step)
-                exit_top = cross_up & (z_top_L <= 0.0)
-                exit_bot = cross_dn & (z_bot_L >= z_total)
-                exit_side = np.zeros(grp.size, dtype=bool)
+                if dz < 0.0:
+                    s_boundary = (pz - z_top_L) / (-dz)
+                    if step_j > s_boundary:
+                        step_j = s_boundary
+                        cross_up_j = True
+                elif dz > 0.0:
+                    s_boundary = (z_bot_L - pz) / dz
+                    if step_j > s_boundary:
+                        step_j = s_boundary
+                        cross_dn_j = True
 
-            s_surface = np.array(
-                [
-                    first_surface_event(pi, di, groove, transition="exit")
-                    for pi, di in zip(p, d, strict=False)
-                ]
+            exit_top_j = cross_up_j and z_top_L <= 0.0
+            exit_bot_j = cross_dn_j and z_bot_L >= z_total
+
+            # 2b. Exact material->vacuum groove crossing competes with the
+            # collision/layer/prism event.  Strict '<' matches legacy tie behavior.
+            s_surface = _first_surface_event_scalar_numba(
+                px,
+                pz,
+                dx,
+                dz,
+                groove_spacing,
+                groove_depth,
+                groove_st,
+                groove_ct,
+                1,  # exit
             )
-            surface_first = s_surface < step
-            step = np.where(surface_first, s_surface, step)
-            cross_up = cross_up & ~surface_first
-            cross_dn = cross_dn & ~surface_first
-            exit_top = exit_top & ~surface_first
-            exit_bot = exit_bot & ~surface_first
-            exit_side = exit_side & ~surface_first
+            surface_first = s_surface < step_j
+            if surface_first:
+                step_j = s_surface
+                cross_up_j = False
+                cross_dn_j = False
+                exit_top_j = False
+                exit_bot_j = False
+                exit_side_j = False
 
-            seg_mid.append(p + 0.5 * step[:, None] * d)
-            seg_dir.append(d.copy())
-            seg_len.append(step.copy())
-            seg_E.append(Ea.copy())
-            seg_t0.append(clock[grp].copy())
-            seg_id.append(grp.copy())
-            seg_lay.append(np.full(grp.size, L, dtype=np.int16))
+            # 3. Record the radiating material segment.
+            dEds = _dEds_compound_scalar(J_arr, k_arr, coeff_arr, E_j)
+            beta_j = beta_from_keV_scalar(E_j)
 
-            pos[grp] = p + step[:, None] * d
-            E_keV[grp] = Ea + _dEds_compound(J_arr, k_arr, coeff_arr, Ea) * step
-            clock[grp] += step / beta_from_keV(Ea)
+            seg_dir[nseg, 0] = dx
+            seg_dir[nseg, 1] = dy
+            seg_dir[nseg, 2] = dz
+            seg_mid[nseg, 0] = px + 0.5 * step_j * dx
+            seg_mid[nseg, 1] = py + 0.5 * step_j * dy
+            seg_mid[nseg, 2] = pz + 0.5 * step_j * dz
+            seg_len[nseg] = step_j
+            seg_E[nseg] = E_j
+            seg_t0[nseg] = clock[g]
+            seg_id[nseg] = g
+            seg_lay[nseg] = L
+            nseg += 1
 
-            below_cut = E_keV[grp] < E_cut_keV
-            active_surface = surface_first & ~below_cut
-            zero_surface_events[grp[~active_surface]] = 0
-            reentered_group = np.zeros(grp.size, dtype=bool)
+            # 4. Advance through material and apply continuous stopping.
+            pos[g, 0] = px + step_j * dx
+            pos[g, 1] = py + step_j * dy
+            pos[g, 2] = pz + step_j * dz
+            E_keV[g] = E_j + dEds * step_j
+            clock[g] += step_j / beta_j
 
-            if active_surface.any():
-                surf_local = np.flatnonzero(active_surface)
-                surf_global = grp[surf_local]
-                surface_points = pos[surf_global].copy()
-                entry_distance = np.array(
-                    [
-                        first_surface_event(pi, di, groove, transition="entry")
-                        for pi, di in zip(surface_points, dirs[surf_global], strict=False)
-                    ]
+            below_cut = E_keV[g] < E_cut_keV
+            active_surface = surface_first and not below_cut
+            reentered = False
+
+            if not active_surface:
+                zero_surface_events[g] = 0
+            else:
+                # 5. From the groove surface, follow the unchanged ray through
+                # vacuum to its first exact vacuum->material re-entry.
+                sx = pos[g, 0]
+                sy = pos[g, 1]
+                sz = pos[g, 2]
+                entry_distance = _first_surface_event_scalar_numba(
+                    sx,
+                    sz,
+                    dx,
+                    dz,
+                    groove_spacing,
+                    groove_depth,
+                    groove_st,
+                    groove_ct,
+                    2,  # entry
                 )
 
                 if finite_footprint:
-                    side_distance, side_face = first_prism_exit(
-                        surface_points,
-                        dirs[surf_global],
-                        z_min_ang=0.0,
-                        z_max_ang=z_total,
-                        width_ang=width_ang,
-                        height_ang=height_ang,
+                    side_distance, side_face = _first_prism_exit_scalar(
+                        sx,
+                        sy,
+                        sz,
+                        dx,
+                        dy,
+                        dz,
+                        0.0,
+                        z_total,
+                        width_ang,
+                        height_ang,
                     )
-                    side_before_entry = (side_face < Z_MIN) & (side_distance < entry_distance)
-                    exit_side[surf_local[side_before_entry]] = True
-                    entry_distance = np.where(side_before_entry, np.inf, entry_distance)
+                    if side_face < Z_MIN and side_distance < entry_distance:
+                        exit_side_j = True
+                        entry_distance = np.inf
 
                 reentered = np.isfinite(entry_distance)
-                if reentered.any():
-                    re_local = surf_local[reentered]
-                    re_global = grp[re_local]
-                    reentered_group[re_local] = True
-                    distance = entry_distance[reentered]
-                    start = surface_points[reentered]
-                    direction = dirs[re_global]
-                    end = start + distance[:, None] * direction
+                if reentered:
+                    if nvac >= max_vac:
+                        raise RuntimeError("vacuum segment buffer exhausted")
 
-                    vac_start.append(start.copy())
-                    vac_end.append(end.copy())
-                    vac_E.append(E_keV[re_global].copy())
-                    vac_t0.append(clock[re_global].copy())
-                    vac_id.append(re_global.copy())
+                    ex = sx + entry_distance * dx
+                    ey = sy + entry_distance * dy
+                    ez = sz + entry_distance * dz
 
-                    clock[re_global] += distance / beta_from_keV(E_keV[re_global])
-                    surface_eps = max(
-                        64 * np.finfo(float).eps * groove.spacing_ang,
-                        2e-12 * groove.spacing_ang,
-                    )
-                    pos[re_global] = end + surface_eps * direction
-                    surface_events[re_global] += 1
-                    if np.any(surface_events[re_global] > max_steps):
+                    vac_start[nvac, 0] = sx
+                    vac_start[nvac, 1] = sy
+                    vac_start[nvac, 2] = sz
+                    vac_end[nvac, 0] = ex
+                    vac_end[nvac, 1] = ey
+                    vac_end[nvac, 2] = ez
+                    vac_E[nvac] = E_keV[g]
+                    vac_t0[nvac] = clock[g]
+                    vac_id[nvac] = g
+                    nvac += 1
+
+                    clock[g] += entry_distance / beta_from_keV_scalar(E_keV[g])
+                    pos[g, 0] = ex + surface_eps * dx
+                    pos[g, 1] = ey + surface_eps * dy
+                    pos[g, 2] = ez + surface_eps * dz
+
+                    surface_events[g] += 1
+                    if surface_events[g] > max_steps:
                         raise RuntimeError("grooved surface event limit exhausted")
+                elif not exit_side_j:
+                    # No later material intersection: permanent escape through
+                    # the grooved entrance surface.
+                    exit_top_j = True
 
-                permanent = ~reentered & ~exit_side[surf_local]
-                exit_top[surf_local[permanent]] = True
-                short = step[surf_local] <= EPS
-                zero_surface_events[surf_global] = np.where(
-                    short, zero_surface_events[surf_global] + 1, 0
-                )
-                if np.any(zero_surface_events[surf_global] >= 2):
+                if step_j <= EPS:
+                    zero_surface_events[g] += 1
+                else:
+                    zero_surface_events[g] = 0
+                if zero_surface_events[g] >= 2:
                     raise RuntimeError("repeated zero-length grooved surface events")
 
-            died = exit_top | exit_bot | exit_side | below_cut
-            n_back += int(exit_top.sum())
-            n_trans += int(exit_bot.sum())
-            n_side += int(exit_side.sum())
-            alive[grp[died]] = False
+            # 6. Kill true exits / cutoff electrons and handle internal seams.
+            died_j = exit_top_j or exit_bot_j or exit_side_j or below_cut
+            if exit_top_j:
+                n_back += 1
+            if exit_bot_j:
+                n_trans += 1
+            if exit_side_j:
+                n_side += 1
 
-            crossed_internal = (cross_up | cross_dn) & ~died
-            if crossed_internal.any():
-                ci = grp[crossed_internal]
-                pos[ci, 2] += np.sign(dirs[ci, 2]) * EPS
+            if died_j:
+                alive[g] = False
+                n_eligible -= 1
+                continue
 
-            full = ~(cross_up | cross_dn | exit_side | surface_first) & ~died
-            srv = grp[full]
-            if srv.size:
+            crossed_internal = cross_up_j or cross_dn_j
+            if crossed_internal:
+                pos[g, 2] += (1.0 if dirs[g, 2] > 0.0 else -1.0) * EPS
+
+            # 7. Only a full material flight ends in an elastic collision.
+            full_j = not cross_up_j and not cross_dn_j and not exit_side_j and not surface_first
+            if full_j:
                 if Z_arr.size == 1:
-                    cos_t = _sample_cos_theta(Z_arr[0], E_keV[srv], rng, elastic_model, elements[0])
+                    i_el = 0
                 else:
-                    cos_t = np.empty(srv.size)
-                    p_el = rates[:, full]
-                    p_el = p_el / p_el.sum(axis=0)
-                    u = rng.random(srv.size)
-                    cum = np.cumsum(p_el, axis=0)
-                    which = (u[None, :] > cum).sum(axis=0)
-                    for i_el in range(Z_arr.size):
-                        m = which == i_el
-                        if m.any():
-                            srv_i = srv[m]
-                            cos_t[m] = _sample_cos_theta(
-                                Z_arr[i_el],
-                                E_keV[srv_i],
-                                rng,
-                                elastic_model,
-                                elements[i_el],
-                            )
-                phi = 2.0 * np.pi * rng.random(srv.size)
-                dirs[srv] = _rotate_directions(dirs[srv], cos_t, phi)
+                    u = rng.random() * total_rate
+                    cumulative = 0.0
+                    i_el = Z_arr.size - 1
+                    for k in range(Z_arr.size):
+                        cumulative += rate_arr[k]
+                        if cumulative > u:
+                            i_el = k
+                            break
 
-            count_material_step = alive[grp] & ~reentered_group
-            material_steps[grp[count_material_step]] += 1
+                Z_i = Z_arr[i_el]
+                if elastic_model_code == 1 and mott_has_table[L, i_el]:
+                    log_alpha = _interp_mott_log_alpha_scalar(
+                        np.log10(E_keV[g] * 1e3),
+                        mott_logE_flat,
+                        mott_logA_flat,
+                        mott_start[L, i_el],
+                        mott_len[L, i_el],
+                    )
+                    alpha = 10.0**log_alpha
+                else:
+                    alpha = _alpha_sr_joy_scalar(Z_i, E_keV[g])
 
-    if seg_mid:
-        r_mid = np.concatenate(seg_mid)
-        v_hat = np.concatenate(seg_dir)
-        L_ang = np.concatenate(seg_len)
-        E_seg = np.concatenate(seg_E)
-        t_ang = np.concatenate(seg_t0)
-        elec_id = np.concatenate(seg_id).astype(np.int64, copy=False)
-        layer = np.concatenate(seg_lay).astype(np.int16, copy=False)
-    else:
-        r_mid = np.empty((0, 3), dtype=float)
-        v_hat = np.empty((0, 3), dtype=float)
-        L_ang = np.empty(0, dtype=float)
-        E_seg = np.empty(0, dtype=float)
-        t_ang = np.empty(0, dtype=float)
-        elec_id = np.empty(0, dtype=np.int64)
-        layer = np.empty(0, dtype=np.int16)
+                cos_t = _sample_cos_theta_from_alpha(alpha, rng.random())
+                phi = 2.0 * np.pi * rng.random()
+                ndx, ndy, ndz = _rotate_direction_scalar(
+                    dirs[g, 0], dirs[g, 1], dirs[g, 2], cos_t, phi
+                )
+                dirs[g, 0] = ndx
+                dirs[g, 1] = ndy
+                dirs[g, 2] = ndz
 
-    vacuum_start_ang = np.concatenate(vac_start) if vac_start else np.empty((0, 3), dtype=float)
-    vacuum_end_ang = np.concatenate(vac_end) if vac_end else np.empty((0, 3), dtype=float)
-    vacuum_E_keV = np.concatenate(vac_E) if vac_E else np.empty(0, dtype=float)
-    vacuum_t_ang = np.concatenate(vac_t0) if vac_t0 else np.empty(0, dtype=float)
-    vacuum_elec_id = (
-        np.concatenate(vac_id).astype(np.int64, copy=False)
-        if vac_id
-        else np.empty(0, dtype=np.int64)
-    )
+            # Legacy groove semantics: valid exit/re-entry pairs repeat without
+            # consuming a material step; all other surviving material events do.
+            if not reentered:
+                material_steps[g] += 1
+                if material_steps[g] >= max_steps:
+                    n_eligible -= 1
 
-    return (
-        r_mid,
-        v_hat,
-        L_ang,
-        E_seg,
-        t_ang,
-        elec_id,
-        layer,
-        vacuum_start_ang,
-        vacuum_end_ang,
-        vacuum_E_keV,
-        vacuum_t_ang,
-        vacuum_elec_id,
-        n_back,
-        n_trans,
-        n_side,
-    )
+    return nseg, nvac, n_back, n_trans, n_side
 
 
 def simulate_trajectories(
@@ -1305,6 +1341,7 @@ def simulate_trajectories(
     height_ang = None if height_mm is None else height_mm * 1.0e7
     finite_footprint = width_ang is not None
     max_segments = Ne * max_steps
+    max_vac = Ne * max_steps
 
     # Build the layer stack: explicit `layers` (film-on-substrate) overrides;
     # else a single layer spanning the slab (bit-for-bit the old transport).
@@ -1322,7 +1359,6 @@ def simulate_trajectories(
 
     z_total = float(layers[-1][1])
     n_layers = len(layers)
-    L_elements = []
     L_Zs = []
     L_Js = []
     L_ncm3 = []
@@ -1362,7 +1398,6 @@ def simulate_trajectories(
                     _NO_MOTT.add(el)
             layer_mott_tables.append(table)
 
-        L_elements.append(elements)
         L_Zs.append(np.asarray(Z_arr, dtype=float))
         L_Js.append(np.asarray(J_arr, dtype=float))
         L_ncm3.append(np.asarray(ncm3_arr, dtype=float))
@@ -1486,16 +1521,21 @@ def simulate_trajectories(
     initial_v_hat = dirs.copy()
     initial_E_keV = E_keV.copy()
 
-    if groove is None:
-        seg_mid = np.empty((max_segments, 3), dtype=float)
-        seg_dir = np.empty((max_segments, 3), dtype=float)
-        seg_len = np.empty(max_segments, dtype=float)
-        seg_E = np.empty(max_segments, dtype=float)
-        seg_t0 = np.empty(max_segments, dtype=float)
-        seg_id = np.empty(max_segments, dtype=np.int64)
-        seg_lay = np.empty(max_segments, dtype=np.int16)
+    # Preallocate fixed-capacity output buffers.  ``max_steps`` is already a
+    # conservative safety bound in ordinary runs; groove re-entry events can add
+    # material segments without consuming it, so the compiled core raises a
+    # clear buffer error if a pathological case exceeds this capacity.
+    seg_mid = np.empty((max_segments, 3), dtype=float)
+    seg_dir = np.empty((max_segments, 3), dtype=float)
+    seg_len = np.empty(max_segments, dtype=float)
+    seg_E = np.empty(max_segments, dtype=float)
+    seg_t0 = np.empty(max_segments, dtype=float)
+    seg_id = np.empty(max_segments, dtype=np.int64)
+    seg_lay = np.empty(max_segments, dtype=np.int16)
 
-        elastic_model_code = 1 if elastic_model == "mott" else 0
+    elastic_model_code = 1 if elastic_model == "mott" else 0
+
+    if groove is None:
         nseg, n_back, n_trans, n_side = _transport_core_ungrooved(
             Ne,
             alive,
@@ -1534,50 +1574,44 @@ def simulate_trajectories(
             seg_id,
             seg_lay,
         )
-
-        r_mid = seg_mid[:nseg]
-        v_hat = seg_dir[:nseg]
-        L_ang = seg_len[:nseg]
-        E_seg = seg_E[:nseg]
-        t_ang = seg_t0[:nseg]
-        elec_id = seg_id[:nseg]
-        layer = seg_lay[:nseg]
-
-        vacuum_start_ang = np.empty((0, 3), dtype=float)
-        vacuum_end_ang = np.empty((0, 3), dtype=float)
-        vacuum_E_keV = np.empty(0, dtype=float)
-        vacuum_t_ang = np.empty(0, dtype=float)
-        vacuum_elec_id = np.empty(0, dtype=np.int64)
+        nvac = 0
+        vac_start = np.empty((0, 3), dtype=float)
+        vac_end = np.empty((0, 3), dtype=float)
+        vac_E = np.empty(0, dtype=float)
+        vac_t0 = np.empty(0, dtype=float)
+        vac_id = np.empty(0, dtype=np.int64)
     else:
-        (
-            r_mid,
-            v_hat,
-            L_ang,
-            E_seg,
-            t_ang,
-            elec_id,
-            layer,
-            vacuum_start_ang,
-            vacuum_end_ang,
-            vacuum_E_keV,
-            vacuum_t_ang,
-            vacuum_elec_id,
-            n_back,
-            n_trans,
-            n_side,
-        ) = _transport_core_grooved_legacy(
+        vac_start_buf = np.empty((max_vac, 3), dtype=float)
+        vac_end_buf = np.empty((max_vac, 3), dtype=float)
+        vac_E_buf = np.empty(max_vac, dtype=float)
+        vac_t0_buf = np.empty(max_vac, dtype=float)
+        vac_id_buf = np.empty(max_vac, dtype=np.int64)
+
+        tp = float(groove.tilt_polar_rad)
+        groove_st = float(np.sin(tp))
+        groove_ct = float(np.cos(tp))
+        nseg, nvac, n_back, n_trans, n_side = _transport_core_grooved(
             Ne,
             alive,
             max_steps,
+            max_segments,
+            max_vac,
             n_layers,
             internal_bounds,
+            elastic_model_code,
             z_total,
+            finite_footprint,
+            0.0 if width_ang is None else float(width_ang),
+            0.0 if height_ang is None else float(height_ang),
+            float(groove.spacing_ang),
+            float(groove.depth_ang),
+            groove_st,
+            groove_ct,
             clock,
             rng,
             pos,
             dirs,
             E_cut_keV,
-            L_elements,
             L_Js,
             L_Zs,
             L_ks,
@@ -1585,13 +1619,44 @@ def simulate_trajectories(
             L_ncm3,
             L_top,
             L_bot,
+            mott_has_table,
+            mott_start,
+            mott_len,
+            mott_logE_flat,
+            mott_logA_flat,
             E_keV,
-            elastic_model,
-            finite_footprint,
-            width_ang,
-            height_ang,
-            groove,
+            seg_dir,
+            seg_mid,
+            seg_len,
+            seg_E,
+            seg_t0,
+            seg_id,
+            seg_lay,
+            vac_start_buf,
+            vac_end_buf,
+            vac_E_buf,
+            vac_t0_buf,
+            vac_id_buf,
         )
+        vac_start = vac_start_buf[:nvac]
+        vac_end = vac_end_buf[:nvac]
+        vac_E = vac_E_buf[:nvac]
+        vac_t0 = vac_t0_buf[:nvac]
+        vac_id = vac_id_buf[:nvac]
+
+    r_mid = seg_mid[:nseg]
+    v_hat = seg_dir[:nseg]
+    L_ang = seg_len[:nseg]
+    E_seg = seg_E[:nseg]
+    t_ang = seg_t0[:nseg]
+    elec_id = seg_id[:nseg]
+    layer = seg_lay[:nseg]
+
+    vacuum_start_ang = vac_start
+    vacuum_end_ang = vac_end
+    vacuum_E_keV = vac_E
+    vacuum_t_ang = vac_t0
+    vacuum_elec_id = vac_id
 
     t0_ang = t0_electron[elec_id] if elec_id.size else np.empty(0, dtype=float)
     vacuum_t0_ang = t0_electron[vacuum_elec_id] if vacuum_elec_id.size else np.empty(0, dtype=float)

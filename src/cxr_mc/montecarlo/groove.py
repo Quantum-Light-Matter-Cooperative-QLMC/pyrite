@@ -37,6 +37,7 @@ implemented below.
 from dataclasses import dataclass
 
 import numpy as np
+from numba import njit
 
 _THETA_TOL = 1e-9
 
@@ -131,25 +132,141 @@ def in_material(
     return inside
 
 
+@njit(cache=True)
+def _surface_depth_scalar_numba(x, spacing, depth, st, ct):
+    """Scalar sawtooth surface depth for compiled transport geometry."""
+    u = np.mod(x, spacing)
+    tan_tp = st / ct
+    x_valley = depth * tan_tp
+    if u <= x_valley:
+        return u / tan_tp
+    return (spacing - u) * tan_tp
+
+
+@njit(cache=True)
+def _groove_in_material_scalar_numba(x, z, thickness, spacing, depth, st, ct):
+    """Scalar material predicate used by the compiled facet-event search."""
+    return z >= _surface_depth_scalar_numba(x, spacing, depth, st, ct) and z <= thickness
+
+
+@njit(cache=True)
+def _first_surface_event_scalar_numba(
+    px,
+    pz,
+    dx,
+    dz,
+    spacing,
+    depth,
+    st,
+    ct,
+    transition_code,
+):
+    """Compiled scalar equivalent of :func:`first_surface_event`.
+
+    ``transition_code`` is 0 for either transition, 1 for material->vacuum
+    (exit), and 2 for vacuum->material (entry).  The candidate construction,
+    closed facet-depth band, geometry-scaled tolerances, and two-sided material
+    predicate intentionally mirror the validated Python implementation.
+    """
+    machine_eps = 2.220446049250313e-16
+    eps = max(32.0 * machine_eps * spacing, 1.0e-12 * spacing)
+    band_tol = 32.0 * machine_eps * max(spacing, depth)
+
+    if dz == 0.0:
+        if pz < 0.0 or pz > depth:
+            return np.inf
+        band_start = eps
+        band_end = np.inf
+    else:
+        s_at_zero = -pz / dz
+        s_at_depth = (depth - pz) / dz
+        band_start = max(eps, min(s_at_zero, s_at_depth))
+        band_end = max(s_at_zero, s_at_depth)
+        if band_end <= eps:
+            return np.inf
+
+    best = np.inf
+
+    # family 0: working facets n=(ct,0,-st), spacing*ct, exit sign +1
+    # family 1: relief facets  b=(st,0, ct), spacing*st, exit sign -1
+    for family in range(2):
+        if family == 0:
+            nx = ct
+            nz = -st
+            plane_spacing = spacing * ct
+            exit_rate_sign = 1.0
+        else:
+            nx = st
+            nz = ct
+            plane_spacing = spacing * st
+            exit_rate_sign = -1.0
+
+        rate = nx * dx + nz * dz
+        if rate == 0.0:
+            continue
+        origin = nx * px + nz * pz
+        transformed = (origin + band_start * rate) / plane_spacing
+        floor_index = int(np.floor(transformed))
+        ceil_index = int(np.ceil(transformed))
+
+        # The validated implementation checks +/- 1 around both floor and ceil.
+        for base_choice in range(2):
+            base = floor_index if base_choice == 0 else ceil_index
+            for offset in range(-1, 2):
+                period_index = base + offset
+                s = (period_index * plane_spacing - origin) / rate
+                if s <= eps or s > band_end or s >= best:
+                    continue
+
+                qx = px + s * dx
+                qz = pz + s * dz
+                if qz < -band_tol or qz > depth + band_tol:
+                    continue
+
+                before_x = qx - eps * dx
+                before_z = qz - eps * dz
+                after_x = qx + eps * dx
+                after_z = qz + eps * dz
+
+                before = _groove_in_material_scalar_numba(
+                    before_x, before_z, np.inf, spacing, depth, st, ct
+                )
+                after = _groove_in_material_scalar_numba(
+                    after_x, after_z, np.inf, spacing, depth, st, ct
+                )
+
+                is_exit = before and not after
+                is_entry = (not before) and after
+                if before == after and 0.0 < qz < depth:
+                    signed_rate = exit_rate_sign * rate
+                    is_exit = signed_rate > 0.0
+                    is_entry = signed_rate < 0.0
+
+                accept = False
+                if transition_code == 0:
+                    accept = is_exit or is_entry
+                elif transition_code == 1:
+                    accept = is_exit
+                else:  # transition_code == 2
+                    accept = is_entry
+
+                if accept:
+                    best = s
+
+    return best
+
+
 def first_surface_event(
     position: np.ndarray,
     direction: np.ndarray,
     spec: GrooveSpec,
     transition: str | None = None,
 ) -> float:
-    """
-    Return nearest strictly forward exact sawtooth crossing distance [Ang].
+    """Return nearest strictly forward exact sawtooth crossing distance [Ang].
 
-    Derivation: substitute ``r(s) = position + s*direction`` into working and
-    relief plane families from the module docstring. For each family, adjacent
-    integer period indices at the ray's entry into the physical facet band
-    ``0 <= z <= depth`` contain its first possible forward intersection.
-    A two-sided material predicate classifies exit versus entry. The closed
-    band admits only a geometry-scaled floating-point tolerance at its
-    apex/valley endpoints.
-    Assumptions: direction is a sample-frame unit vector and profile is
-    laterally periodic/infinite. Limiting case: facet-parallel tangency changes
-    no material state and returns infinity.
+    The public wrapper retains validation and ``GrooveSpec`` handling; the hot
+    scalar ray/facet search is implemented by a Numba helper so transport can
+    call the exact same geometry without leaving compiled code.
 
     ``transition`` may select material-to-vacuum ``"exit"`` or
     vacuum-to-material ``"entry"``; ``None`` accepts either transition.
@@ -164,73 +281,23 @@ def first_surface_event(
     if p.shape != (3,) or d.shape != (3,):
         raise ValueError("position and direction must be three-vectors")
 
-    spacing = spec.spacing_ang
-    depth = spec.depth_ang
-    eps = max(32 * np.finfo(float).eps * spacing, 1e-12 * spacing)
-    band_tol = 32 * np.finfo(float).eps * max(spacing, depth)
-
-    dz = d[2]
-    if dz == 0.0:
-        if not 0.0 <= p[2] <= depth:
-            return np.inf
-        band_start = eps
-        band_end = np.inf
-    else:
-        s_at_zero = -p[2] / dz
-        s_at_depth = (depth - p[2]) / dz
-        band_start = max(eps, min(s_at_zero, s_at_depth))
-        band_end = max(s_at_zero, s_at_depth)
-        if band_end <= eps:
-            return np.inf
-
+    code = 0 if transition is None else (1 if transition == "exit" else 2)
     tp = spec.tilt_polar_rad
-    st, ct = np.sin(tp), np.cos(tp)
-    families = (
-        (np.array([ct, 0.0, -st]), spacing * ct, 1.0),
-        (np.array([st, 0.0, ct]), spacing * st, -1.0),
-    )
-    best = np.inf
-    for normal, plane_spacing, exit_rate_sign in families:
-        rate = float(np.dot(normal, d))
-        if rate == 0.0:
-            continue
-        origin = float(np.dot(normal, p))
-        transformed = (origin + band_start * rate) / plane_spacing
-        floor_index = int(np.floor(transformed))
-        ceil_index = int(np.ceil(transformed))
-        indices = (
-            floor_index - 1,
-            floor_index,
-            floor_index + 1,
-            ceil_index - 1,
-            ceil_index,
-            ceil_index + 1,
+    st = np.sin(tp)
+    ct = np.cos(tp)
+    return float(
+        _first_surface_event_scalar_numba(
+            p[0],
+            p[2],
+            d[0],
+            d[2],
+            float(spec.spacing_ang),
+            float(spec.depth_ang),
+            float(st),
+            float(ct),
+            code,
         )
-        for period_index in indices:
-            s = (period_index * plane_spacing - origin) / rate
-            if not eps < s <= band_end or s >= best:
-                continue
-            q = p + s * d
-            # Plane arithmetic can place an analytic apex/valley one or a few
-            # ULP outside its closed physical band. Admit only geometry-scaled
-            # roundoff; points farther outside remain non-surface intersections.
-            if q[2] < -band_tol or q[2] > depth + band_tol:
-                continue
-            before = bool(in_material(q - eps * d, np.inf, spec))
-            after = bool(in_material(q + eps * d, np.inf, spec))
-            is_exit = before and not after
-            is_entry = not before and after
-            if before == after and 0.0 < q[2] < depth:
-                signed_rate = exit_rate_sign * rate
-                is_exit = signed_rate > 0.0
-                is_entry = signed_rate < 0.0
-            if (
-                (transition is None and (is_exit or is_entry))
-                or (transition == "exit" and is_exit)
-                or (transition == "entry" and is_entry)
-            ):
-                best = float(s)
-    return best
+    )
 
 
 def escape_distance_ang(x, z, spec):
