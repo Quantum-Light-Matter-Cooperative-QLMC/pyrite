@@ -43,14 +43,30 @@ regression. So:
   is an output filename, not a module path) — keeps the CLI freeze test green.
 - `docs/package-structure-rfc.md` — historical proposal; point-in-time record of the pre-move layout.
 
-## TODO (verification + land — nothing run yet)
+## Verification (run 2026-08-04, all green)
 
-- [ ] Lint: `rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache UV_PROJECT_ENVIRONMENT=/tmp/cxr-mc-venv uv run cxr-dev lint`
-- [ ] Typecheck: `... cxr-dev typecheck` (watch for stale `cxr_mc.line_grid` type refs).
-- [ ] Targeted tests (CPU): `... CXR_MC_BACKEND=cpu uv run cxr-dev test tests/test_energy_grid_apply.py tests/test_energy_grid_bounds.py tests/test_energy_grid_cli.py tests/test_energy_grid_defaults.py tests/test_energy_grid_derive.py tests/test_energy_grid_golden.py tests/test_energy_grid_job.py tests/test_energy_grid_provenance.py tests/test_sweep.py tests/test_performance_profile.py tests/test_cli_completion.py tests/test_cli_json.py tests/test_cli_json_wiring.py tests/test_cli_profile.py tests/test_material_catalog.py tests/test_remote.py tests/test_scan_quick_energy.py tests/test_altair_plots.py tests/test_altair_detectors.py`
-- [ ] CLI reference/export freeze — must stay green (zero surface change).
-- [ ] Checkpoint commit on `refactor/energy-grid-rename`.
+- [x] Lint: `rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache UV_PROJECT_ENVIRONMENT=/tmp/cxr-mc-venv uv run cxr-dev lint`
+- [x] Typecheck: `... cxr-dev typecheck` (no stale `cxr_mc.line_grid` type refs).
+- [x] Targeted tests (CPU): `... CXR_MC_BACKEND=cpu uv run cxr-dev test tests/test_energy_grid_apply.py tests/test_energy_grid_bounds.py tests/test_energy_grid_cli.py tests/test_energy_grid_defaults.py tests/test_energy_grid_derive.py tests/test_energy_grid_golden.py tests/test_energy_grid_job.py tests/test_energy_grid_provenance.py tests/test_sweep.py tests/test_performance_profile.py tests/test_cli_completion.py tests/test_cli_json.py tests/test_cli_json_wiring.py tests/test_cli_profile.py tests/test_material_catalog.py tests/test_remote.py tests/test_scan_quick_energy.py tests/test_altair_plots.py tests/test_altair_detectors.py` — **825 passed**.
+- [x] Suites: packaging **183**, cli **890**, core **967 passed / 40 skipped**, apps **287**.
+- [x] CLI reference/export freeze green (zero surface change), inside the cli suite.
+- [x] Checkpoint commit on `refactor/energy-grid-rename`.
 - [ ] On land: mark slice 2 done in the implementation-plan sequence table (like slice 0).
+
+### Fixes the verification pass turned up
+
+The mechanical token rewrite missed three spots; all fixed in this branch:
+
+1. **`from cxr_mc import line_grid` form** (module-object import, not a dotted path)
+   in `tests/test_energy_grid_cli.py` and `tests/test_cli_json_wiring.py`. The CLI
+   test also monkeypatched `line_grid.remote` / `.emit_json_result` / `.cli_json` /
+   `._pull_combined` — those attributes now live on `energy_grid._command`, and the
+   thin lazy `__init__` raises `AttributeError` for them, so the tests import
+   `_command` directly and patch that seam (8 failures, incl.
+   `test_click_follow_logs_propagates_remote_exit_status[1|75|130]`).
+2. **`_dev.py:84`** cli-suite glob still listed `test_line_grid_cli.py` → renamed.
+3. Stale path comments: `energy_grid/golden.py:11`, `remote.py:73`,
+   `_remote/lifecycle.py:1161`.
 
 ## Non-goals
 - No command/help/output/exit change; `docs/cli-reference.md` unaffected.

@@ -70,7 +70,7 @@ Override the box via env: CXR_REMOTE_HOST / CXR_REMOTE_DIR / CXR_REMOTE_UV.
 # that patches ``remote._ssh_capture`` will NOT intercept those internal calls.
 # Patch the owning module instead: ``monkeypatch.setattr(transport, "_ssh_capture", ...)``.
 # Patching a facade name only works when the caller itself resolves through
-# ``remote.<name>`` at call time (as ``line_grid/job.py`` does).
+# ``remote.<name>`` at call time (as ``energy_grid/job.py`` does).
 # ---------------------------------------------------------------------------
 
 from ._remote import (

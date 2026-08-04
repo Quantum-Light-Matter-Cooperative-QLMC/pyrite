@@ -5,7 +5,7 @@ import pickle
 
 import pytest
 
-from cxr_mc import archive, blaze, line_grid, rebrem, reline, remote, scan
+from cxr_mc import archive, blaze, energy_grid, rebrem, reline, remote, scan
 from cxr_mc._remote import lifecycle, viewer
 from tests.cli_helpers import invoke
 
@@ -95,9 +95,9 @@ def test_remote_jobs_runtime_failure_is_json_and_nonzero(monkeypatch):
 def test_line_grid_defaults_json_is_read_only(monkeypatch, tmp_path):
     defaults_path = tmp_path / "defaults.toml"
     defaults_path.write_text("")
-    monkeypatch.setattr(line_grid.defaults, "DEFAULTS_PATH", defaults_path)
+    monkeypatch.setattr(energy_grid.defaults, "DEFAULTS_PATH", defaults_path)
     monkeypatch.setattr(
-        line_grid.defaults,
+        energy_grid.defaults,
         "load_defaults",
         lambda: {
             "energies": [30],
@@ -109,11 +109,11 @@ def test_line_grid_defaults_json_is_read_only(monkeypatch, tmp_path):
         },
     )
 
-    document = _document(invoke(line_grid.command, ["defaults", "--json"]))
+    document = _document(invoke(energy_grid.command, ["defaults", "--json"]))
 
     assert document["schema"] == "cxr.energy-grid.defaults"
     assert document["payload"]["source"] == "persisted"
-    result = invoke(line_grid.command, ["defaults", "--set", "--json"])
+    result = invoke(energy_grid.command, ["defaults", "--set", "--json"])
     assert result.exit_code == 2
     assert result.stdout == ""
 
@@ -133,10 +133,10 @@ line_by_energy = [
 E_grid_brem = { arange = { start = 0, stop = 10, step = 1 } }
 """
     )
-    monkeypatch.setattr(line_grid.apply, "_MATERIALS_TOML", catalog)
-    monkeypatch.setattr(line_grid.apply._provenance, "load", lambda: {})
+    monkeypatch.setattr(energy_grid.apply, "_MATERIALS_TOML", catalog)
+    monkeypatch.setattr(energy_grid.apply._provenance, "load", lambda: {})
 
-    document = _document(invoke(line_grid.command, ["show", "hopg", "--json"]))
+    document = _document(invoke(energy_grid.command, ["show", "hopg", "--json"]))
 
     assert document["schema"] == "cxr.energy-grid.show"
     material = document["payload"]["materials"][0]

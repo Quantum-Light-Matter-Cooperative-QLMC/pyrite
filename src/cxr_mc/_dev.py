@@ -81,7 +81,7 @@ TEST_SUITE_PATTERNS = {
         "test_check_config.py",
         "test_checkpoint_cli.py",
         "test_cli_*.py",
-        "test_line_grid_cli.py",
+        "test_energy_grid_cli.py",
         "test_local_click_cli.py",
         "test_local_dashboard.py",
         "test_output_noise.py",
