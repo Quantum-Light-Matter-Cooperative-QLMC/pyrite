@@ -22,9 +22,9 @@ triage → dispatch flow; `TODO.md` stays authoritative for status.
 | # | Slice | Source | Gate |
 |---|---|---|---|
 | 0 | docs/TODO reorg | pkg P4/P5 | ✅ landed 2026-08-01 |
-| 1 | command-home → `src/cxr_mc/cli/` | pkg P1 | none — **start here** |
-| 2 | energy-grid module rename | pkg P2 | none (parallel with 1) |
-| 3 | noun→verb, remote-as-modifier, `-o` contract | redesign D1–D3 | needs 1 |
+| 1 | command-home → `src/cxr_mc/cli/commands/` | pkg P1 | ✅ landed 2026-08-04 |
+| 2 | energy-grid module rename | pkg P2 | none (parallel with 1) — **start here** |
+| 3 | noun→verb, remote-as-modifier, `-o` contract | redesign D1–D3 | needs 1 ✅ |
 | 4 | verb collapse **+** recompute/prune module fold | redesign D4 + pkg P3 | needs 3 |
 | 5 | vocab controls + deprecation rollout | redesign D5–D7 | needs 3 |
 | 6 | content-addressed store, lockfile, gc | artifact RFC (phase 5) | needs 3–5 |
@@ -33,9 +33,8 @@ triage → dispatch flow; `TODO.md` stays authoritative for status.
 
 Do not start the dependent slice until its decision is pinned:
 
-1. **P1 destination shape** — flat `cli/` vs a `cli/commands/` sub-package
-   (pkg §6 Q1). Blocks slice 1. Recommendation: `cli/commands/` once `cli/`
-   exceeds ~20 modules; otherwise flat.
+1. ~~**P1 destination shape**~~ — resolved in slice 1 as `cli/commands/`: the
+   existing `cli/` held 16 modules and P1 added 13, past the flat threshold.
 2. **`profile` vs `context` naming** — redesign §6 Q3. Blocks slice 3 (affects
    D2c precedence chain). Pick one term before the surface reshuffle.
 

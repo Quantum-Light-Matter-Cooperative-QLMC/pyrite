@@ -26,10 +26,6 @@ file. Edit and drop items on `main`.
    → `feature/profile-observation-angle`;
    [`tasks/feature/profile-observation-angle/`](tasks/feature/profile-observation-angle/).
 4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
-5. **CLI command-home consolidation.** Move all `cxr` command wiring to
-   `src/cxr_mc/cli/commands/` without changing the command surface or public
-   domain imports. → `feature/cli-command-home`;
-   [`tasks/feature/cli-command-home/`](tasks/feature/cli-command-home/).
 
 ## P1 - top-priority back burner
 
