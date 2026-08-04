@@ -275,3 +275,4 @@ performance-profiles/
 RTK.md
 .headroom_wrap_marker.json
 *.tar.gz
+checkpoints/**/cases.json
