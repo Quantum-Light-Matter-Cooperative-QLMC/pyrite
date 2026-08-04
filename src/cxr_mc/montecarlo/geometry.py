@@ -159,6 +159,13 @@ def first_prism_exit(
         r = np.asarray(r)
         d = np.asarray(d)
 
+        # The xp path accepts a single shared direction (shape (3,)) broadcast
+        # over all origins -- mc_self_absorption passes exactly that. The numba
+        # kernel indexes d[i, k], so materialise the broadcast as a stride-0
+        # view before handing it over.
+        if d.ndim == 1:
+            d = np.broadcast_to(d, r.shape)
+
         if width_ang is None:
             finite_xy = False
             width_numba = 0.0
