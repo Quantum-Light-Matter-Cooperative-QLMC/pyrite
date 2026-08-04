@@ -1,0 +1,61 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug trace_app (marimo)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "marimo",
+            "args": [
+                "run",
+                "${workspaceFolder}/notebooks/trace_app.py"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "subProcess": true
+        },
+        {
+            "name": "Debug scan_app (marimo)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "marimo",
+            "args": [
+                "run",
+                "${workspaceFolder}/notebooks/scan_app.py"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "subProcess": true
+        },
+        {
+            "name": "Debug analysis_app (marimo)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "marimo",
+            "args": [
+                "run",
+                "${workspaceFolder}/notebooks/analysis_app.py"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "subProcess": true
+        },
+        {
+            "name": "Debug validation_app (marimo)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "marimo",
+            "args": [
+                "run",
+                "${workspaceFolder}/notebooks/validation_app.py"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "subProcess": true
+        },
+    ]
+}
