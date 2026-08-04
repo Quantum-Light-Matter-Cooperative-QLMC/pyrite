@@ -130,7 +130,6 @@ def first_prism_exit(
     z_max_ang,
     width_ang=None,
     height_ang=None,
-    xp=np,
 ):
     """Return each inside-origin ray's first forward rectangular-prism face exit.
     The sample-frame prism is ``[-width/2, width/2] x [-height/2, height/2] x
@@ -142,55 +141,25 @@ def first_prism_exit(
     """
     width_ang, height_ang = validate_transverse_dimensions(width_ang, height_ang, unit="Ang")
 
-    r, d = xp.asarray(r), xp.asarray(d)
+    r, d = np.asarray(r), np.asarray(d)
 
-    if xp is np:
-        if width_ang is None:
-            finite_xy = False
-            width_numba = 0.0
-            height_numba = 0.0
-        else:
-            finite_xy = True
-            width_numba = width_ang
-            height_numba = height_ang
-        return _first_prism_exit_numba(
-            r,
-            d,
-            z_min_ang,
-            z_max_ang,
-            finite_xy,
-            width_numba,
-            height_numba,
-        )
-
+    if width_ang is None:
+        finite_xy = False
+        width_numba = 0.0
+        height_numba = 0.0
     else:
-        if width_ang is None:
-            numerators = (z_min_ang - r[..., 2], z_max_ang - r[..., 2])
-            components = (d[..., 2], d[..., 2])
-            faces = xp.asarray([Z_MIN, Z_MAX])
-        else:
-            assert height_ang is not None
-            hx, hy = width_ang / 2.0, height_ang / 2.0
-            numerators = (
-                -hx - r[..., 0],
-                hx - r[..., 0],
-                -hy - r[..., 1],
-                hy - r[..., 1],
-                z_min_ang - r[..., 2],
-                z_max_ang - r[..., 2],
-            )
-            components = (d[..., 0], d[..., 0], d[..., 1], d[..., 1], d[..., 2], d[..., 2])
-            faces = xp.asarray([X_MIN, X_MAX, Y_MIN, Y_MAX, Z_MIN, Z_MAX])
-        candidates = xp.stack(
-            [
-                xp.where(c != 0.0, n / xp.where(c != 0.0, c, 1.0), xp.inf)
-                for n, c in zip(numerators, components, strict=True)
-            ],
-            axis=-1,
-        )
-        candidates = xp.where(candidates > 0.0, candidates, xp.inf)
-        choice = xp.argmin(candidates, axis=-1)
-        return xp.take_along_axis(candidates, choice[..., None], axis=-1)[..., 0], faces[choice]
+        finite_xy = True
+        width_numba = width_ang
+        height_numba = height_ang
+    return _first_prism_exit_numba(
+        r,
+        d,
+        z_min_ang,
+        z_max_ang,
+        finite_xy,
+        width_numba,
+        height_numba,
+    )
 
 
 def tilted_geometry(theta_obs_rad, tilt_polar_rad, tilt_azim_rad=0.0):
