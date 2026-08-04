@@ -620,7 +620,7 @@ def _transport_core_ungrooved(
     rng,
     pos,
     dirs,
-    E_cut_keV,
+    E_cut_by_electrons,
     L_Js,
     L_Zs,
     L_ks,
@@ -664,15 +664,15 @@ def _transport_core_ungrooved(
     lockstep_step = 0
     while lockstep_step < max_steps and n_alive > 0:
         lockstep_step += 1
-
-        for g in range(Ne):
-            if not alive[g]:
+        for e in range(Ne):
+            E_cut_e = E_cut_by_electrons[e]
+            if not alive[e]:
                 continue
 
             if n_layers == 1:
                 L = 0
             else:
-                L = np.searchsorted(internal_bounds, pos[g, 2], side="right")
+                L = np.searchsorted(internal_bounds, pos[e, 2], side="right")
 
             J_arr = L_Js[L]
             Z_arr = L_Zs[L]
@@ -681,7 +681,7 @@ def _transport_core_ungrooved(
             n_cm3s = L_ncm3[L]
             z_top_L = L_top[L]
             z_bot_L = L_bot[L]
-            E_j = E_keV[g]
+            E_j = E_keV[e]
 
             # 1. Sample the next elastic-collision distance.
             total_rate = 0.0
@@ -700,12 +700,12 @@ def _transport_core_ungrooved(
                 raise RuntimeError("segment buffer exhausted")
 
             # 2. Truncate the flight at this layer's z boundaries.
-            dx = dirs[g, 0]
-            dy = dirs[g, 1]
-            dz = dirs[g, 2]
-            px = pos[g, 0]
-            py = pos[g, 1]
-            pz = pos[g, 2]
+            dx = dirs[e, 0]
+            dy = dirs[e, 1]
+            dz = dirs[e, 2]
+            px = pos[e, 0]
+            py = pos[e, 1]
+            pz = pos[e, 2]
 
             cross_up_j = False
             cross_dn_j = False
@@ -747,20 +747,20 @@ def _transport_core_ungrooved(
             seg_mid[nseg, 2] = pz + 0.5 * step_j * dz
             seg_len[nseg] = step_j
             seg_E[nseg] = E_j
-            seg_t0[nseg] = clock[g]
-            seg_id[nseg] = g
+            seg_t0[nseg] = clock[e]
+            seg_id[nseg] = e
             seg_lay[nseg] = L
             nseg += 1
 
             # 4. Advance position, energy, and transport clock.
-            pos[g, 0] = px + step_j * dx
-            pos[g, 1] = py + step_j * dy
-            pos[g, 2] = pz + step_j * dz
-            E_keV[g] = E_j + dEds * step_j
-            clock[g] += step_j / beta_j
+            pos[e, 0] = px + step_j * dx
+            pos[e, 1] = py + step_j * dy
+            pos[e, 2] = pz + step_j * dz
+            E_keV[e] = E_j + dEds * step_j
+            clock[e] += step_j / beta_j
 
             # 5. Exit, internal-boundary, or collision handling.
-            died_j = exit_top_j or exit_bot_j or exit_side_j or E_keV[g] < E_cut_keV
+            died_j = exit_top_j or exit_bot_j or exit_side_j or E_keV[e] < E_cut_e
             if exit_top_j:
                 n_back += 1
             if exit_bot_j:
@@ -768,13 +768,13 @@ def _transport_core_ungrooved(
             if exit_side_j:
                 n_side += 1
             if died_j:
-                alive[g] = False
+                alive[e] = False
                 n_alive -= 1
                 continue
 
             crossed_internal = cross_up_j or cross_dn_j
             if crossed_internal:
-                pos[g, 2] += (1.0 if dirs[g, 2] > 0.0 else -1.0) * EPS
+                pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS
                 continue
 
             # A full flight ended in an elastic collision. Pick the element with
@@ -794,7 +794,7 @@ def _transport_core_ungrooved(
             Z_i = Z_arr[i_el]
             if elastic_model_code == 1 and mott_has_table[L, i_el]:
                 log_alpha = _interp_mott_log_alpha_scalar(
-                    np.log10(E_keV[g] * 1e3),
+                    np.log10(E_keV[e] * 1e3),
                     mott_logE_flat,
                     mott_logA_flat,
                     mott_start[L, i_el],
@@ -802,14 +802,14 @@ def _transport_core_ungrooved(
                 )
                 alpha = 10.0**log_alpha
             else:
-                alpha = _alpha_sr_joy_scalar(Z_i, E_keV[g])
+                alpha = _alpha_sr_joy_scalar(Z_i, E_keV[e])
 
             cos_t = _sample_cos_theta_from_alpha(alpha, rng.random())
             phi = 2.0 * np.pi * rng.random()
-            dx, dy, dz = _rotate_direction_scalar(dirs[g, 0], dirs[g, 1], dirs[g, 2], cos_t, phi)
-            dirs[g, 0] = dx
-            dirs[g, 1] = dy
-            dirs[g, 2] = dz
+            dx, dy, dz = _rotate_direction_scalar(dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, phi)
+            dirs[e, 0] = dx
+            dirs[e, 1] = dy
+            dirs[e, 2] = dz
 
     return nseg, n_back, n_trans, n_side
 
@@ -836,7 +836,7 @@ def _transport_core_grooved(
     rng,
     pos,
     dirs,
-    E_cut_keV,
+    E_cut_by_electrons,
     L_Js,
     L_Zs,
     L_ks,
@@ -897,14 +897,16 @@ def _transport_core_grooved(
     n_eligible = int(alive.sum())
 
     while n_eligible > 0:
-        for g in range(Ne):
-            if not alive[g] or material_steps[g] >= max_steps:
+        for e in range(Ne):
+            E_cut_e = E_cut_by_electrons[e]
+
+            if not alive[e] or material_steps[e] >= max_steps:
                 continue
 
             if n_layers == 1:
                 L = 0
             else:
-                L = np.searchsorted(internal_bounds, pos[g, 2], side="right")
+                L = np.searchsorted(internal_bounds, pos[e, 2], side="right")
 
             J_arr = L_Js[L]
             Z_arr = L_Zs[L]
@@ -913,7 +915,7 @@ def _transport_core_grooved(
             n_cm3s = L_ncm3[L]
             z_top_L = L_top[L]
             z_bot_L = L_bot[L]
-            E_j = E_keV[g]
+            E_j = E_keV[e]
 
             # 1. Sample the next elastic-collision distance in the current layer.
             total_rate = 0.0
@@ -931,12 +933,12 @@ def _transport_core_grooved(
             if nseg >= max_segments:
                 raise RuntimeError("segment buffer exhausted")
 
-            dx = dirs[g, 0]
-            dy = dirs[g, 1]
-            dz = dirs[g, 2]
-            px = pos[g, 0]
-            py = pos[g, 1]
-            pz = pos[g, 2]
+            dx = dirs[e, 0]
+            dy = dirs[e, 1]
+            dz = dirs[e, 2]
+            px = pos[e, 0]
+            py = pos[e, 1]
+            pz = pos[e, 2]
 
             # 2a. Candidate layer/prism boundary event.
             cross_up_j = False
@@ -1010,30 +1012,30 @@ def _transport_core_grooved(
             seg_mid[nseg, 2] = pz + 0.5 * step_j * dz
             seg_len[nseg] = step_j
             seg_E[nseg] = E_j
-            seg_t0[nseg] = clock[g]
-            seg_id[nseg] = g
+            seg_t0[nseg] = clock[e]
+            seg_id[nseg] = e
             seg_lay[nseg] = L
             nseg += 1
 
             # 4. Advance through material and apply continuous stopping.
-            pos[g, 0] = px + step_j * dx
-            pos[g, 1] = py + step_j * dy
-            pos[g, 2] = pz + step_j * dz
-            E_keV[g] = E_j + dEds * step_j
-            clock[g] += step_j / beta_j
+            pos[e, 0] = px + step_j * dx
+            pos[e, 1] = py + step_j * dy
+            pos[e, 2] = pz + step_j * dz
+            E_keV[e] = E_j + dEds * step_j
+            clock[e] += step_j / beta_j
 
-            below_cut = E_keV[g] < E_cut_keV
+            below_cut = E_keV[e] < E_cut_e
             active_surface = surface_first and not below_cut
             reentered = False
 
             if not active_surface:
-                zero_surface_events[g] = 0
+                zero_surface_events[e] = 0
             else:
                 # 5. From the groove surface, follow the unchanged ray through
                 # vacuum to its first exact vacuum->material re-entry.
-                sx = pos[g, 0]
-                sy = pos[g, 1]
-                sz = pos[g, 2]
+                sx = pos[e, 0]
+                sy = pos[e, 1]
+                sz = pos[e, 2]
                 entry_distance = _first_surface_event_scalar_numba(
                     sx,
                     sz,
@@ -1078,18 +1080,18 @@ def _transport_core_grooved(
                     vac_end[nvac, 0] = ex
                     vac_end[nvac, 1] = ey
                     vac_end[nvac, 2] = ez
-                    vac_E[nvac] = E_keV[g]
-                    vac_t0[nvac] = clock[g]
-                    vac_id[nvac] = g
+                    vac_E[nvac] = E_keV[e]
+                    vac_t0[nvac] = clock[e]
+                    vac_id[nvac] = e
                     nvac += 1
 
-                    clock[g] += entry_distance / beta_from_keV_scalar(E_keV[g])
-                    pos[g, 0] = ex + surface_eps * dx
-                    pos[g, 1] = ey + surface_eps * dy
-                    pos[g, 2] = ez + surface_eps * dz
+                    clock[e] += entry_distance / beta_from_keV_scalar(E_keV[e])
+                    pos[e, 0] = ex + surface_eps * dx
+                    pos[e, 1] = ey + surface_eps * dy
+                    pos[e, 2] = ez + surface_eps * dz
 
-                    surface_events[g] += 1
-                    if surface_events[g] > max_steps:
+                    surface_events[e] += 1
+                    if surface_events[e] > max_steps:
                         raise RuntimeError("grooved surface event limit exhausted")
                 elif not exit_side_j:
                     # No later material intersection: permanent escape through
@@ -1097,10 +1099,10 @@ def _transport_core_grooved(
                     exit_top_j = True
 
                 if step_j <= EPS:
-                    zero_surface_events[g] += 1
+                    zero_surface_events[e] += 1
                 else:
-                    zero_surface_events[g] = 0
-                if zero_surface_events[g] >= 2:
+                    zero_surface_events[e] = 0
+                if zero_surface_events[e] >= 2:
                     raise RuntimeError("repeated zero-length grooved surface events")
 
             # 6. Kill true exits / cutoff electrons and handle internal seams.
@@ -1113,13 +1115,13 @@ def _transport_core_grooved(
                 n_side += 1
 
             if died_j:
-                alive[g] = False
+                alive[e] = False
                 n_eligible -= 1
                 continue
 
             crossed_internal = cross_up_j or cross_dn_j
             if crossed_internal:
-                pos[g, 2] += (1.0 if dirs[g, 2] > 0.0 else -1.0) * EPS
+                pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS
 
             # 7. Only a full material flight ends in an elastic collision.
             full_j = not cross_up_j and not cross_dn_j and not exit_side_j and not surface_first
@@ -1139,7 +1141,7 @@ def _transport_core_grooved(
                 Z_i = Z_arr[i_el]
                 if elastic_model_code == 1 and mott_has_table[L, i_el]:
                     log_alpha = _interp_mott_log_alpha_scalar(
-                        np.log10(E_keV[g] * 1e3),
+                        np.log10(E_keV[e] * 1e3),
                         mott_logE_flat,
                         mott_logA_flat,
                         mott_start[L, i_el],
@@ -1147,22 +1149,22 @@ def _transport_core_grooved(
                     )
                     alpha = 10.0**log_alpha
                 else:
-                    alpha = _alpha_sr_joy_scalar(Z_i, E_keV[g])
+                    alpha = _alpha_sr_joy_scalar(Z_i, E_keV[e])
 
                 cos_t = _sample_cos_theta_from_alpha(alpha, rng.random())
                 phi = 2.0 * np.pi * rng.random()
                 ndx, ndy, ndz = _rotate_direction_scalar(
-                    dirs[g, 0], dirs[g, 1], dirs[g, 2], cos_t, phi
+                    dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, phi
                 )
-                dirs[g, 0] = ndx
-                dirs[g, 1] = ndy
-                dirs[g, 2] = ndz
+                dirs[e, 0] = ndx
+                dirs[e, 1] = ndy
+                dirs[e, 2] = ndz
 
             # Legacy groove semantics: valid exit/re-entry pairs repeat without
             # consuming a material step; all other surviving material events do.
             if not reentered:
-                material_steps[g] += 1
-                if material_steps[g] >= max_steps:
+                material_steps[e] += 1
+                if material_steps[e] >= max_steps:
                     n_eligible -= 1
 
     return nseg, nvac, n_back, n_trans, n_side
@@ -1192,6 +1194,7 @@ def simulate_trajectories(
     tilt_polar_rad=0.0,
     tilt_azim_rad=0.0,
     groove=None,
+    E_cut_by_electrons=None,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -1363,6 +1366,26 @@ def simulate_trajectories(
 
     if elastic_model not in ("mott", "sr"):
         raise ValueError("elastic_model must be 'mott' or 'sr'")
+
+    if E_cut_by_electrons is None:
+        E_cut_by_electrons = np.full(
+            Ne,
+            float(E_cut_keV),
+            dtype=np.float64,
+        )
+    else:
+        E_cut_by_electrons = np.asarray(
+            E_cut_by_electrons,
+            dtype=np.float64,
+        )
+
+        if E_cut_by_electrons.shape != (Ne,):
+            raise ValueError(
+                f"E_cut_by_electrons must have shape ({Ne},), got {E_cut_by_electrons.shape}"
+            )
+
+        if not np.all(np.isfinite(E_cut_by_electrons)):
+            raise ValueError("E_cut_by_electrons must contain only finite values")
 
     z_total = float(layers[-1][1])
     n_layers = len(layers)
@@ -1559,7 +1582,7 @@ def simulate_trajectories(
             rng,
             pos,
             dirs,
-            E_cut_keV,
+            E_cut_by_electrons,
             L_Js,
             L_Zs,
             L_ks,
@@ -1618,7 +1641,7 @@ def simulate_trajectories(
             rng,
             pos,
             dirs,
-            E_cut_keV,
+            E_cut_by_electrons,
             L_Js,
             L_Zs,
             L_ks,

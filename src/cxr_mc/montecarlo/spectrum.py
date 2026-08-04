@@ -345,6 +345,7 @@ def mc_spectrum(
     surface_hkl: tuple[int, int, int] | None = None,
     groove=None,
     coherent=False,
+    electron_limit=None,
 ):
     """
     Per-electron CXR spectrum d2N/dE dOmega [photons / eV / sr / electron]
@@ -550,7 +551,10 @@ def mc_spectrum(
         surface_hkl=surface_hkl,
     )
     thickness = segments["thickness_ang"]
-    Ne = segments["Ne"]
+    if electron_limit is None:
+        Ne = segments["Ne"]
+    else:
+        Ne = electron_limit
 
     n_hat = _observation_direction(theta_obs_rad, n_hat)
     if groove is not None:
@@ -566,6 +570,8 @@ def mc_spectrum(
     seg_v = xp.asarray(segments["v_hat"], dtype=REAL)
     seg_L = xp.asarray(segments["L_ang"], dtype=REAL)
     seg_r = xp.asarray(segments["r_mid"], dtype=REAL)
+    seg_elec_id = xp.asarray(segments["elec_id"])
+    line_electron = seg_elec_id < Ne
     beta_all = beta_from_keV(seg_E)  # speed/c per segment
     v_all = beta_all[:, None] * seg_v  # velocity vectors (c=1)
 
@@ -655,7 +661,12 @@ def mc_spectrum(
         # -- 2. drop segments whose line misses the spectral window -------------
         # (pad by 20% so sinc tails that reach into the window still count)
         pad = 0.2 * (E_grid[-1] - E_grid[0])
-        keep = (E_res > float(E_grid[0] - pad)) & (E_res > 10.0) & (E_res < E_grid[-1] + pad)
+        keep = (
+            line_electron
+            & (E_res > float(E_grid[0] - pad))
+            & (E_res > 10.0)
+            & (E_res < E_grid[-1] + pad)
+        )
         if not keep.any():
             return
         idx = xp.flatnonzero(keep)
@@ -1093,7 +1104,10 @@ def mc_spectrum(
             )
             vdg = v_dot_g
             E_res = HBARC_EV_ANG * omega_res
-            keep = (E_res > lo_keep) & (E_res > 10.0) & (E_res < hi_keep)
+
+            line_electron_block = line_electron[sb][:, None]
+
+            keep = line_electron_block & (E_res > lo_keep) & (E_res > 10.0) & (E_res < hi_keep)
 
             # -- 3. couplings at each resonance energy (shared interp index) -----
             # chi/U real+imag all sample the SAME E_res on the SAME E_tab_g grid,
@@ -1335,6 +1349,7 @@ def mc_brem_spectrum(
     composition=None,
     layers=None,
     groove=None,
+    electron_limit=None,
 ):
     """
     Incoherent bremsstrahlung background d2N/dE dOmega
@@ -1383,7 +1398,10 @@ def mc_brem_spectrum(
     """
     comp = _normalize_composition(element, n_atoms_per_ang3, composition)
     thickness = segments["thickness_ang"]
-    Ne = segments["Ne"]
+    if electron_limit is None:
+        Ne = segments["Ne"]
+    else:
+        Ne = electron_limit
 
     n_hat = _observation_direction(theta_obs_rad, n_hat)
     if groove is not None:
@@ -1407,9 +1425,13 @@ def mc_brem_spectrum(
             for (_, _, c) in layers
         ]
 
-    seg_r = xp.asarray(segments["r_mid"], dtype=REAL)
-    seg_L = xp.asarray(segments["L_ang"], dtype=REAL)
-    seg_E = xp.asarray(segments["E_keV"], dtype=REAL)
+    seg_elec_id = xp.asarray(segments["elec_id"])
+    brem_electron = seg_elec_id < Ne
+
+    seg_r = xp.asarray(segments["r_mid"], dtype=REAL)[brem_electron]
+    seg_L = xp.asarray(segments["L_ang"], dtype=REAL)[brem_electron]
+    seg_E = xp.asarray(segments["E_keV"], dtype=REAL)[brem_electron]
+
     z_mid = seg_r[:, 2]
     finite_footprint = (
         segments.get("crystal_width_ang") is not None
@@ -1421,7 +1443,7 @@ def mc_brem_spectrum(
             dtype=REAL,
         )
     elif finite_footprint:
-        L_esc = _segment_escape_distance(segments, n_hat, xp=xp)
+        L_esc = _segment_escape_distance(segments, n_hat, xp=xp)[brem_electron]
     else:
         L_esc = _escape_length(z_mid, thickness, n_hat[2])
 

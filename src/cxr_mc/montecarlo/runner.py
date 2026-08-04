@@ -521,12 +521,35 @@ def _transport_case(case, record_timing=False):
         groove = blazed_groove_spec(
             case["groove_spacing_ang"], case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad
         )
-    segs = simulate_trajectories(
+
+    Ne = case["Ne"]
+    Ne_brem = case["Ne_brem"]
+    Ne_transport = max(Ne, Ne_brem)
+
+    electron_ids = np.arange(Ne_transport)
+
+    line_mask = electron_ids < Ne
+    brem_mask = electron_ids < Ne_brem
+
+    combined_transport_mask = line_mask & brem_mask
+    line_only_transport_mask = line_mask & ~brem_mask
+    brem_only_transport_mask = brem_mask & ~line_mask
+
+    E_cut_lines = case.get("E_cut_lines_keV", 5.0)
+    E_cut_brem = case.get("E_cut_brem_keV", 1.0)
+
+    E_cut_by_electrons = np.empty(Ne_transport, dtype=np.float64)
+
+    E_cut_by_electrons[line_only_transport_mask] = E_cut_lines
+    E_cut_by_electrons[brem_only_transport_mask] = E_cut_brem
+    E_cut_by_electrons[combined_transport_mask] = min(E_cut_lines, E_cut_brem)
+
+    segs_all = simulate_trajectories(
         case["E0_keV"],
-        case["Ne"],
+        Ne_transport,
         case["thickness_ang"],
+        E_cut_by_electrons=E_cut_by_electrons,
         composition=case["composition"],
-        E_cut_keV=case.get("E_cut_lines_keV", 5.0),
         seed=case["seed"],
         beam_dir=beam,
         layers=layers,
@@ -537,25 +560,15 @@ def _transport_case(case, record_timing=False):
         tilt_azim_rad=tilt_azim_rad,
         groove=groove,
     )
-    # brem segs: the electrons enter through the same grooved face either way.
-    segs_b = simulate_trajectories(
-        case["E0_keV"],
-        case["Ne_brem"],
-        case["thickness_ang"],
-        composition=case["composition"],
-        E_cut_keV=case.get("E_cut_brem_keV", 1.0),
-        seed=case["seed"] + 1,
-        beam_dir=beam,
-        layers=layers,
-        **beam_kw,
-        crystal_width_mm=case.get("crystal_width_mm"),
-        crystal_height_mm=case.get("crystal_height_mm"),
-        tilt_polar_rad=tilt_polar_rad,
-        tilt_azim_rad=tilt_azim_rad,
-        groove=groove,
-    )
+
     tp: dict[str, Any] = dict(
-        E_grid=E_grid, E_brem=E_brem, n_hat=n_hat, segs=segs, segs_b=segs_b, groove=groove
+        E_grid=E_grid,
+        E_brem=E_brem,
+        n_hat=n_hat,
+        segs=segs_all,
+        Ne_lines=Ne,
+        Ne_brem=Ne_brem,
+        groove=groove,
     )
     if timed:
         tp["_t_transport"] = perf_counter() - t0
@@ -564,7 +577,15 @@ def _transport_case(case, record_timing=False):
     return tp
 
 
-def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers, groove=None):
+def _brem_wide_from_segments(
+    segs_b,
+    E_brem,
+    case,
+    n_hat,
+    abs_layers,
+    groove=None,
+    Ne=None,
+):
     """Bremsstrahlung background on ``E_brem`` from already-transported brem
     segments ``segs_b``. EVERY layer radiates with its OWN composition (each
     Z^2 cross section) and self-absorbs through the WHOLE stack
@@ -578,6 +599,7 @@ def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers, groove=Non
         E_brem.size,
     )
     n_lay = int(segs_b.get("n_layers", 1))
+
     if n_lay == 1:
         return mc_brem_spectrum(
             segs_b,
@@ -587,6 +609,7 @@ def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers, groove=Non
             chunk=brem_chunk,
             layers=abs_layers,
             groove=groove,
+            electron_limit=Ne,
         )
     brem_wide = np.zeros(E_brem.shape, dtype=float)
     for L in range(n_lay):
@@ -601,6 +624,7 @@ def _brem_wide_from_segments(segs_b, E_brem, case, n_hat, abs_layers, groove=Non
             chunk=brem_chunk,
             layers=abs_layers,
             groove=groove,
+            electron_limit=Ne,
         )
     return brem_wide
 
@@ -627,12 +651,17 @@ def _brem_for_case(case, E_brem):
         groove = blazed_groove_spec(
             case["groove_spacing_ang"], case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad
         )
+
+    Ne_brem = case["Ne_brem"]
+    E_cut_brem = case.get("E_cut_brem_keV", 1.0)
+    E_cut_by_electrons = np.full(Ne_brem, E_cut_brem, dtype=np.float64)
+
     segs_b = simulate_trajectories(
         case["E0_keV"],
         case["Ne_brem"],
         case["thickness_ang"],
+        E_cut_by_electrons=E_cut_by_electrons,
         composition=case["composition"],
-        E_cut_keV=case.get("E_cut_brem_keV", 1.0),
         seed=case["seed"] + 1,
         beam_dir=beam,
         layers=abs_layers,
@@ -653,20 +682,40 @@ def _brem_for_case(case, E_brem):
     )
 
 
-def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove, *, coherent=None):
+def _lines_for_segments(
+    segs,
+    E_grid,
+    case,
+    n_hat,
+    abs_layers,
+    groove,
+    *,
+    coherent=None,
+    Ne=None,
+):
     """Coherent line spectrum on ``E_grid`` from already-transported line
-    segments ``segs``. Single slab (``layer_radiators`` absent) radiates from
-    all segments via the case's scalar crystal keys; a multilayer stack sums
-    each CRYSTALLINE layer's lines incoherently, every line self-absorbing
-    through the whole stack. Pure move of _spectrum_case's line block, shared
-    with :func:`_lines_for_case` so a line-only reline reproduces the SAME
-    spectrum as a live sweep.
-
-    ``coherent`` overrides the coherence of the interference kernel: ``None``
-    (default) derives it from ``case["coherent_emission"]`` (back-compat);
-    ``False`` forces the incoherent line sum, ``True`` the coherent one. The
-    dual-spectra runner passes both flags in turn over the SAME ``segs`` so one
-    transport yields both the incoherent ``spec`` and the ``spec_coherent``."""
+        segments ``segs``. Single slab (``layer_radiators`` absent) radiates from
+        all segments via the case's scalar crystal keys; a multilayer stack sums
+        each CRYSTALLINE layer's lines incoherently, every line self-absorbing
+        through the whole stack. Pure move of _spectrum_case's line block, shared
+        with :func:`_lines_for_case` so a line-only reline reproduces the SAME
+        spectrum as a live sweep.
+    if want_coherent:
+        spec_coherent = _lines_for_segments(
+            segs,
+            E_grid,
+            case,
+            n_hat,
+            abs_layers,
+            tp.get("groove"),
+            coherent=True,
+            Ne=Ne_lines,
+        )
+        ``coherent`` overrides the coherence of the interference kernel: ``None``
+        (default) derives it from ``case["coherent_emission"]`` (back-compat);
+        ``False`` forces the incoherent line sum, ``True`` the coherent one. The
+        dual-spectra runner passes both flags in turn over the SAME ``segs`` so one
+        transport yields both the incoherent ``spec`` and the ``spec_coherent``."""
     radiators = case.get("layer_radiators")
     mosaic_kw = dict(
         mosaic_fwhm_rad=case.get("mosaic_mc_fwhm_rad"),
@@ -698,6 +747,7 @@ def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove, *, cohere
             layers=abs_layers,
             groove=groove,
             coherent=coherent,
+            electron_limit=Ne,
             **mosaic_kw,
         )
     assert case.get("groove_spacing_ang") is None
@@ -724,6 +774,7 @@ def _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove, *, cohere
             chunk=spec_chunk,
             layers=abs_layers,
             coherent=coherent,
+            electron_limit=Ne,
             **mosaic_kw,
         )
     return spec
@@ -745,12 +796,16 @@ def _transport_lines_for_case(case):
         groove = blazed_groove_spec(
             case["groove_spacing_ang"], case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad
         )
+
+    Ne = case["Ne"]
+    E_cut = case.get("E_cut_keV", 1.0)
+    E_cut_by_electrons = np.full(Ne, E_cut, dtype=np.float64)
     segs = simulate_trajectories(
         case["E0_keV"],
         case["Ne"],
         case["thickness_ang"],
+        E_cut_by_electrons=E_cut_by_electrons,
         composition=case["composition"],
-        E_cut_keV=case.get("E_cut_lines_keV", 5.0),
         seed=case["seed"],
         beam_dir=beam,
         layers=abs_layers,
@@ -784,9 +839,21 @@ def _line_pair_for_case(case, E_grid, *, want_coherent):
     keeps both arrays on that grid instead of leaving ``spec_coherent`` stale.
     Returns ``(spec, spec_coherent_or_None)``."""
     segs, n_hat, abs_layers, groove = _transport_lines_for_case(case)
-    spec = _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove, coherent=False)
+    Ne_lines = case["Ne"]
+    spec = _lines_for_segments(
+        segs,
+        E_grid,
+        case,
+        n_hat,
+        abs_layers,
+        groove,
+        coherent=False,
+        Ne=Ne_lines,
+    )
     spec_coherent = (
-        _lines_for_segments(segs, E_grid, case, n_hat, abs_layers, groove, coherent=True)
+        _lines_for_segments(
+            segs, E_grid, case, n_hat, abs_layers, groove, coherent=True, Ne=Ne_lines
+        )
         if want_coherent
         else None
     )
@@ -900,7 +967,9 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     timed = _TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     E_grid, E_brem, n_hat = tp["E_grid"], tp["E_brem"], tp["n_hat"]
-    segs, segs_b = tp["segs"], tp["segs_b"]
+    segs = tp["segs"]
+    Ne_lines = tp["Ne_lines"]
+    Ne_brem = tp["Ne_brem"]
     # optional film-on-substrate stack (None -> single slab, unchanged)
     abs_layers = case.get("abs_layers")
 
@@ -924,11 +993,26 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     with _nsys_range("cxr.lines"):
         try:
             spec = _lines_for_segments(
-                segs, E_grid, case, n_hat, abs_layers, tp.get("groove"), coherent=False
+                segs,
+                E_grid,
+                case,
+                n_hat,
+                abs_layers,
+                tp.get("groove"),
+                coherent=False,
+                Ne=Ne_lines,
             )
+
             if want_coherent:
                 spec_coherent = _lines_for_segments(
-                    segs, E_grid, case, n_hat, abs_layers, tp.get("groove"), coherent=True
+                    segs,
+                    E_grid,
+                    case,
+                    n_hat,
+                    abs_layers,
+                    tp.get("groove"),
+                    coherent=True,
+                    Ne=Ne_lines,
                 )
         except _GPU_OOM as error:
             raise _SpectrumPhaseOOM("line", error) from error
@@ -941,12 +1025,13 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     with _nsys_range("cxr.brem"):
         try:
             brem_wide = _brem_wide_from_segments(
-                segs_b,
+                segs,
                 E_brem,
                 case,
                 n_hat,
                 abs_layers,
                 groove=tp.get("groove"),
+                Ne=Ne_brem,
             )
         except _GPU_OOM as error:
             raise _SpectrumPhaseOOM("brem", error) from error
@@ -1021,7 +1106,6 @@ def _worker_init(force_cpu=False):
     False.
     """
     if force_cpu:
-        global _GPU
         _GPU = False
         _spectrum_mod.xp = np
         _spectrum_mod.REAL = np.float64
