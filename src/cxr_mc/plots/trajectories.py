@@ -175,7 +175,6 @@ def _trajectory_data(
         Ne,
         total_thickness_ang,
         composition=case["composition"],
-        E_cut_by_electrons=case.get("E_cut_lines_keV", 1.0),
         seed=seed,
         beam_dir=beam,
         layers=abs_layers,
