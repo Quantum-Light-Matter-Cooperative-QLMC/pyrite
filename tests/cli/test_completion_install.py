@@ -151,9 +151,7 @@ def test_remove_managed_installation_and_preserve_other_content(tmp_path):
 def test_remove_recognizes_legacy_two_line_installation(tmp_path):
     rc_file = tmp_path / ".bashrc"
     rc_file.write_text(
-        "export KEEP=1\n"
-        "# cxr shell completion\n"
-        'eval "$(_CXR_COMPLETE=bash_source cxr)"\n'
+        'export KEEP=1\n# cxr shell completion\neval "$(_CXR_COMPLETE=bash_source cxr)"\n'
     )
 
     result = invoke(
