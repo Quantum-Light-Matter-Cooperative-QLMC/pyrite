@@ -32,7 +32,7 @@ def test_resolve_mp_api_key_prefers_exported_value(tmp_path) -> None:
 
 def test_mp_only_fetch_without_key_skips(monkeypatch) -> None:
     monkeypatch.delenv("MP_API_KEY", raising=False)
-    monkeypatch.setattr("external_db_fixtures._REPO_ROOT", Path("/nonexistent"))
+    monkeypatch.setattr("tests.helpers.external_db_fixtures._REPO_ROOT", Path("/nonexistent"))
 
     assert fetch_external(None, "mp-149") is None
 

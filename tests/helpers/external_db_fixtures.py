@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 Lattice = tuple[float, float, float, float, float, float]
 
 # Cached external lattices live beside the golden fixture.
-EXTERNAL_LATTICE_JSON = Path(__file__).parent / "data" / "external_crystal_lattices.json"
+EXTERNAL_LATTICE_JSON = Path(__file__).parent.parent / "data" / "external_crystal_lattices.json"
 
 # COD ships experimental cells, so an exact (<=1e-2 A / 0.1 deg) match is
 # expected. Materials Project cells are DFT-relaxed and carry a systematic

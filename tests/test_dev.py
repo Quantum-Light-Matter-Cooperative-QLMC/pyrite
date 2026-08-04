@@ -91,7 +91,7 @@ def test_test_forwards_pytest_arguments_when_option_comes_first(dev_module, monk
 
 
 def test_domain_suites_partition_every_test_module_once(dev_module) -> None:
-    all_tests = set((dev_module.ROOT / "tests").glob("test_*.py"))
+    all_tests = set((dev_module.ROOT / "tests").rglob("test_*.py"))
     selected = [
         path
         for suite in ("core", "cli", "apps", "packaging")

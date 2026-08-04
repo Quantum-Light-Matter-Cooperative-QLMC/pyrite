@@ -10,7 +10,7 @@ from click.testing import CliRunner
 
 from cxr_mc.cli import command
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 REFERENCE = ROOT / "docs" / "cli-reference.md"
 
 

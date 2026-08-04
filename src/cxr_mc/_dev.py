@@ -49,9 +49,9 @@ SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 TEST_SUITE_PATTERNS = {
     "packaging": (
         "test_agent_tooling.py",
-        "test_cli_contract.py",
-        "test_cli_reference.py",
-        "test_detector_package.py",
+        "cli/test_contract.py",
+        "cli/test_reference.py",
+        "detectors/test_package.py",
         "test_dev.py",
         "test_materials_package.py",
         "test_montecarlo_exports.py",
@@ -59,7 +59,7 @@ TEST_SUITE_PATTERNS = {
         "test_results_exports.py",
     ),
     "apps": (
-        "test_altair_*.py",
+        "notebooks/altair/test_*.py",
         "test_analysis_app.py",
         "test_analyze.py",
         "test_check.py",
@@ -79,9 +79,9 @@ TEST_SUITE_PATTERNS = {
         "test_blaze.py",
         "test_catalog_startup_errors.py",
         "test_check_config.py",
-        "test_checkpoint_cli.py",
-        "test_cli_*.py",
-        "test_energy_grid_cli.py",
+        "checkpoint/test_cli.py",
+        "cli/test_*.py",
+        "energy-grid/test_cli.py",
         "test_local_click_cli.py",
         "test_local_dashboard.py",
         "test_output_noise.py",
@@ -94,8 +94,8 @@ TEST_SUITE_PATTERNS = {
 }
 
 INTEGRATION_TESTS = (
-    "test_analysis_app.py",
-    "test_cli_contract.py",
+    "notebooks/analysis_app/test_app.py",
+    "cli/test_contract.py",
     "test_materials_package.py",
     "test_montecarlo_exports.py",
     "test_remote.py",
@@ -245,7 +245,7 @@ def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
     full ``cxr-dev test`` gate remains unchanged.
     """
     tests_dir = root / "tests"
-    files = sorted(tests_dir.glob("test_*.py"))
+    files = sorted(tests_dir.rglob("test_*.py"))
     if name == "integration":
         selected = [tests_dir / filename for filename in INTEGRATION_TESTS]
         missing = [path.name for path in selected if not path.is_file()]
@@ -259,7 +259,8 @@ def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
     for path in files:
         owner = "core"
         for candidate, patterns in TEST_SUITE_PATTERNS.items():
-            if any(fnmatch.fnmatchcase(path.name, pattern) for pattern in patterns):
+            relative = path.relative_to(tests_dir).as_posix()
+            if any(fnmatch.fnmatchcase(relative, pattern) for pattern in patterns):
                 owner = candidate
                 break
         if owner == name:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-APP = Path(__file__).parents[1] / "notebooks" / "analysis_app.py"
+APP = Path(__file__).parents[3] / "notebooks" / "analysis_app.py"
 
 
 def _attribute_path(node: ast.AST) -> tuple[str, ...]:

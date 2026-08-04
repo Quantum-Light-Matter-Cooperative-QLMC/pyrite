@@ -228,13 +228,14 @@ def test_recompute_json_uses_status_for_partial_summary(monkeypatch, module, nam
 def test_recompute_json_marks_low_level_exception_failed(monkeypatch, module, low_level):
     from cxr_mc import run
 
-    monkeypatch.setattr(
-        run,
-        low_level,
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("checkpoint failed")),
-    )
+    def fail(*_args, **_kwargs):
+        raise OSError("checkpoint failed")
 
-    document = _document(invoke(module.command, ["hopg", "--json"]), exit_code=1)
+    monkeypatch.setattr(run, low_level, fail)
+
+    document = _document(
+        invoke(module.command, ["hopg", "--profile", "standard", "--json"]), exit_code=1
+    )
 
     assert document["payload"]["completed_materials"] == []
     assert document["payload"]["failed_materials"] == ["hopg"]
