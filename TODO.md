@@ -26,6 +26,11 @@ file. Edit and drop items on `main`.
    → `feature/profile-observation-angle`;
    [`tasks/feature/profile-observation-angle/`](tasks/feature/profile-observation-angle/).
 4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
+5. **CLI deprecation substrate (RFC D7).** Compatibility-warning harness for
+   retired/renamed `cxr` spellings, prerequisite for
+   [`docs/plans/cli-redesign-implementation-plan.md`](docs/plans/cli-redesign-implementation-plan.md)
+   slice 3. → `feature/cli-deprecation-substrate`;
+   [`tasks/feature/cli-deprecation-substrate/`](tasks/feature/cli-deprecation-substrate/).
 
 ## P1 - top-priority back burner
 

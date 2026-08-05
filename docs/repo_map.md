@@ -442,6 +442,17 @@ module.
   survive as one-line `sys.modules` aliases onto `cli.commands.*`, so old
   import paths and monkeypatch seams keep working.
 
+### `cli/_deprecations.py`
+RFC D7 deprecation harness: frozen `Deprecation` registry keyed by command
+path, `DeprecatingGroup(click.Group)` that warns once per invocation in
+`resolve_command` (before callbacks and `--help`), and
+`scripts/generate_cli_deprecations.py` regenerates
+[`docs/cli-deprecations.md`](cli-deprecations.md) from the registry.
+- Public: `DEPRECATIONS`, `Deprecation`, `DeprecatingGroup`, `message`, `warn`,
+  `invocation_path`, `SUPPORT_WINDOW_MINORS`.
+- Wired into `cli/_core.py` (`LazyGroup(DeprecatingGroup)`), `cli/commands/profile.py`,
+  `cli/commands/sweep.py`, `energy_grid/_command.py`, `_remote/cli.py`.
+
 ### `cli/commands/`
 One module per `cxr` subcommand group, holding only the Click layer.
 `scan`/`blaze` command wiring split out of the fused `scan.py`/`blaze.py`

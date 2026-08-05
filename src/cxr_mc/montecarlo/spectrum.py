@@ -1201,13 +1201,6 @@ def _brem_dsigma_dk(Z, T_keV, k_eV):
     return _brem_dsigma_dk_core(T_i, k, Z)
 
 
-@xp.fuse()
-def fused_prefactor(T_i, k, Z):
-    mc2 = _BREM_MC2_KEV
-    p_i = xp.sqrt(T_i * (T_i + 2.0 * mc2)) / mc2
-    return 16.0 / 3.0 * ALPHA_FS * R_E_CM2 * Z**2 / xp.maximum(k * 1e3, 1e-30) / p_i**2
-
-
 def mc_brem_spectrum(
     segments,
     E_grid_eV,

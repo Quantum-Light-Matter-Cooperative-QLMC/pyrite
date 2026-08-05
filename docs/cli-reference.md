@@ -6,8 +6,10 @@ Version: `0.1.0`
 
 Current command reference generated from live Click definitions. See
 [README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc#readme) for scientific workflow,
-[cluster guide](running-on-a-cluster.md) for scheduler templates, and
-[repository map](repo_map.md) for implementation ownership.
+[cluster guide](running-on-a-cluster.md) for scheduler templates,
+[repository map](repo_map.md) for implementation ownership, and
+[deprecations](cli-deprecations.md) for retired-spelling replacements and
+removal versions.
 
 Remote lab defaults: `--chunk-minutes 10` runs one material at a time in
 self-resubmitting slices. `--chunk-minutes 0` selects one monolithic
