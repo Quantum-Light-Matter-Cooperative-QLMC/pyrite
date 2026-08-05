@@ -70,7 +70,8 @@ packages = ["src/cxr_mc"]
 
 [dependency-groups]
 dev = [
-    "pytest"
+    "pytest",
+    "pytest-xdist>=3.8.0",
 ]
 # Docs toolchain (Sphinx site). Not a default group, so `uv sync` and the Docker
 # image stay lean; build with `uv run --group docs sphinx-build ...`.
