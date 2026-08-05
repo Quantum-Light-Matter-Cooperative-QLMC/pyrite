@@ -18,7 +18,7 @@ accepts at most four. Context-backed values use one precedence chain:
 per-call flag, then `CXR_*` environment, then `cxr config` store, then
 built-in default. `CXR_PROFILE` and `CXR_REMOTE_HOST` are the environment
 tiers for the current profile and remote target.
-`cxr remote run PROFILE` runs the profile membership; `-m MATERIAL`
+`cxr run PROFILE --remote` runs the profile membership; `-m MATERIAL`
 narrows it to one material and `-p/--perf` enables performance telemetry
 for that same profile.
 
@@ -27,10 +27,11 @@ top-level `slim`, `rebrem`, `reline`, `archive`, `restore`, `archives`,
 and `union` paths remain callable compatibility aliases but are hidden
 from root help.
 
-Validation uses `cxr app validation`, `cxr material validate`, and
-`cxr remote validate`. Legacy `check`, `check-config`, and remote
-`check` paths remain hidden compatibility aliases. Remote runs use
-`cxr remote run`; retired `scan`, `submit`, and `start` paths are absent.
+Validation uses `cxr app validation` and `cxr material validate`; the
+Zhai reproduction uses `cxr run --preset zhai --remote`. Legacy `check`,
+`check-config`, `remote validate`, and `remote check` paths remain hidden
+compatibility aliases. Remote runs use `cxr run --remote`; retired
+`remote run`, `scan`, `submit`, and `start` paths are hidden or absent.
 Energy-grid job lifecycle uses `cxr energy-grid job ...`; legacy flat job
 verbs remain aliases.
 
@@ -66,7 +67,7 @@ Usage: cxr [OPTIONS] COMMAND [ARGS]...
     cxr profile list
     cxr profile show sub_100keV
     cxr run sub_100keV -m hopg
-    cxr remote run sub_100keV --dry-run
+    cxr run sub_100keV --remote --dry-run
     cxr app analysis launch
 
 Options:
@@ -140,6 +141,19 @@ Options:
                                   repopulate the shared per-case cache with the results.
   --no-progress                   Disable progress bars/dashboard.
   -v, --verbose                   Increase dashboard detail.
+  --preset [zhai]                 Run a named reproduction workflow; zhai requires
+                                  -R/--remote.
+  --ne NUMBER                     With --preset zhai, Fig. 1c line electrons per energy.
+                                  [default: 20000]
+  --ne-brem NUMBER                With --preset zhai, Fig. 1c bremsstrahlung electrons
+                                  per energy.  [default: 200]
+  --ne-supp NUMBER                With --preset zhai, supplementary electrons per polar-
+                                  tilt spectrum.  [default: 200]
+  --tmd-azimuth DEGREES           With --preset zhai, exploratory TMD azimuth.
+                                  [default: 0.0]
+  --refresh                       With --preset zhai, recompute matching cache.
+  --no-sync                       With -R/--remote, skip code upload.
+  --dry-run                       With -R/--remote, print submission preview only.
   -R, --remote [TARGET]           Run remotely; bare uses the configured target, =TARGET
                                   overrides it.
   --wait                          Wait for remote completion and pull results.
@@ -777,10 +791,10 @@ Usage: cxr remote [OPTIONS] COMMAND [ARGS]...
   offered.
 
   Examples:
-    cxr remote run sub_100keV --dry-run
-    cxr remote run compute_test_300keV -p
-    cxr remote run standard -m hopg
-    cxr remote status -vv
+    cxr run sub_100keV --remote --dry-run
+    cxr run compute_test_300keV --remote -p
+    cxr run standard -m hopg --remote
+    cxr job status -vv
 
 Options:
   -h, --help  Show this message and exit.
@@ -791,9 +805,7 @@ Commands:
   prune-jobs   Delete terminal (done/failed/cancelled) job directories; preview...
   pull         Fetch existing checkpoints from remote box.
   rm           Delete remote checkpoints; preview unless --yes.
-  run          Sync code, submit sweep(s), track progress, and pull checkpoints.
   sync         Push current code to remote box.
-  validate     Run Zhai reproduction remotely or pull existing caches.
 ```
 
 ## `cxr remote gc`
@@ -889,12 +901,14 @@ Usage: cxr remote pull [OPTIONS] [PROFILE|STEM|MATERIAL@PROFILE]...
   Fetch existing checkpoints from remote box.
 
   STEM is usually a bare material name, but MATERIAL@PROFILE selects the checkpoint the
-  box produced for that catalog profile (--profile on `cxr remote run`) -- on-disk names
+  box produced for that catalog profile (PROFILE on `cxr run --remote`) -- on-disk names
   never carry the profile, so this reads each candidate's meta.json remotely and pulls
   the newest match; --hash pins a specific parameter-hash prefix when more than one
   exists.
 
 Options:
+  --preset [zhai]                 Fetch an existing reproduction cache instead of
+                                  checkpoints.
   -a, --all                       Pull every configured material.
   -m, --material MATERIAL         Narrow positional PROFILE or --profile to MATERIAL;
                                   repeatable.
@@ -933,71 +947,6 @@ Options:
   -h, --help      Show this message and exit.
 ```
 
-## `cxr remote run`
-
-```text
-Usage: cxr remote run [OPTIONS] [PROFILE]
-
-  Sync code, submit sweep(s), track progress, and pull checkpoints.
-
-  Use --headless to return after submission. Use --no-pull to track through completion
-  without automatically pulling checkpoints.
-
-  PROFILE selects the catalog campaign and its material membership; when omitted it uses
-  the current configured profile (standard built-in). Use -m/--material to run one
-  member only. Profiles without an explicit membership run every in-use catalog
-  material.
-
-  A profile run names the job after PROFILE (NAME, then NAME-2 once a finished run holds
-  the bare name) and refuses while another job under the same profile is live.
-
-Options:
-  -m, --material TEXT          Run one material from PROFILE instead of its full
-                               membership.
-  --fidelity [full|survey]     Named settings/grid policy. survey is provisional and
-                               reduced.  [default: full]
-  --quick                      Use tiny smoke-test grid.
-  --workers NUMBER             Transport workers (default: auto; 0 runs serially).
-  --parallel-materials N       Simultaneous scans in one allocation; requires --chunk-
-                               minutes 0.  [1<=x<=4]
-  --chunk-minutes NUMBER       Self-resubmitting SLURM slice length; defaults to 10, or
-                               0 for --perf-reps >1, --nsys, and CPU profiling.
-  -p, --perf                   Log CPU pressure, RAM/swap, GPU clocks/VRAM, process,
-                               phase timing, queue, worker, chunk, and case metrics for
-                               PROFILE.
-  -r, --perf-reps N            Run N uncached sessions per material with isolated job-
-                               local checkpoints; requires --perf and --chunk-minutes 0.
-                               Profiling checkpoints are not pulled.  [default: 1;
-                               1<=x<=20]
-  -i, --perf-interval SECONDS  Performance telemetry sampling interval; requires --perf.
-                               [default: 5.0]
-  --spec-chunk N               Pin line-spectrum segments per GPU chunk; requires
-                               --perf.
-  --brem-chunk N               Pin bremsstrahlung segments per GPU chunk; requires
-                               --perf.
-  --nsys                       Capture one uncached full-profile session with Nsight
-                               Systems CUDA/NVTX and Python-stack tracing; implies
-                               --perf, --perf-reps 1, and --chunk-minutes 0; requires
-                               one explicit -m/--material.
-  -c, --cpu                    After the primary run, capture one bounded serial CPU
-                               cProfile pass; implies --perf and --chunk-minutes 0.
-  --cpu-only                   Capture only the bounded serial CPU cProfile pass; starts
-                               no primary GPU/Nsight scan and implies --perf and
-                               --chunk-minutes 0.
-  --no-sync                    Skip code upload.
-  --dry-run                    Print submission preview; do not connect.
-  --headless                   Return after submission without attaching or pulling.
-  --no-pull                    Attach and track, but do not pull completed checkpoints
-                               or performance artifacts.
-  --grid                       Grid-filter checkpoint before pulling; incompatible with
-                               --quick.
-  --drop-wide-brem             With --grid, drop wide-brem.
-  --downcast                   With --grid, downcast to float32.
-  --level9                     Recompress completed checkpoints at gzip level 9 before
-                               automatic pull.
-  -h, --help                   Show this message and exit.
-```
-
 ## `cxr remote sync`
 
 ```text
@@ -1007,27 +956,6 @@ Usage: cxr remote sync [OPTIONS]
 
 Options:
   -h, --help  Show this message and exit.
-```
-
-## `cxr remote validate`
-
-```text
-Usage: cxr remote validate [OPTIONS]
-
-  Run Zhai reproduction remotely or pull existing caches.
-
-Options:
-  --ne NUMBER           Fig. 1c line electrons per energy.  [default: 20000]
-  --ne-brem NUMBER      Fig. 1c bremsstrahlung electrons per energy.  [default: 200]
-  --ne-supp NUMBER      Supplementary electrons per polar-tilt spectrum.  [default: 200]
-  --tmd-azimuth NUMBER  Exploratory TMD azimuth in degrees.  [default: 0.0]
-  --refresh             Recompute matching cache.
-  --no-sync             Skip code upload.
-  -d, --detached        Launch detached; mutually exclusive with --pull.
-  -f, --follow          Track detached job; requires --detached.
-  --pull                Only fetch existing Zhai caches; mutually exclusive with
-                        --detached.
-  -h, --help            Show this message and exit.
 ```
 
 ## `cxr job`

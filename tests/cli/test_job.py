@@ -11,7 +11,11 @@ def test_job_list_filters_canonical_kind_and_emits_json(monkeypatch):
     monkeypatch.setattr(
         viewer,
         "jobs_raw",
-        lambda: "run-1\t1\tFalse\tscan\thopg\trunning\ngrid-1\t2\tFalse\tenergy-grid\thbn\tdone\n",
+        lambda: (
+            "run-1\t1\tFalse\tscan\thopg\trunning\n"
+            "grid-1\t2\tFalse\tenergy-grid\thbn\tdone\n"
+            "zhai-1\t3\tFalse\tzhai\tzhai\tdone\n"
+        ),
     )
 
     result = invoke(job.command, ["list", "--kind", "grid", "-o", "json"])
@@ -19,6 +23,12 @@ def test_job_list_filters_canonical_kind_and_emits_json(monkeypatch):
     assert_clean_result(result)
     jobs = json.loads(result.stdout)["payload"]["jobs"]
     assert [(item["job_id"], item["kind"]) for item in jobs] == [("grid-1", "grid")]
+
+    validate = invoke(job.command, ["list", "--kind", "validate", "-o", "json"])
+
+    assert_clean_result(validate)
+    jobs = json.loads(validate.stdout)["payload"]["jobs"]
+    assert [(item["job_id"], item["kind"]) for item in jobs] == [("zhai-1", "validate")]
 
 
 def test_job_attach_delegates_to_shared_viewer(monkeypatch):

@@ -96,7 +96,7 @@
         "required": false
       }
     ],
-    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Manage coherent X-ray radiation simulation campaigns.\n\n  Start with a named profile: it defines campaign ranges, workloads, and\n  material membership. Then run campaigns, inspect checkpoints, or open analysis\n  notebooks.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr setup\n    cxr profile list\n    cxr profile show sub_100keV\n    cxr run sub_100keV -m hopg\n    cxr remote run sub_100keV --dry-run\n    cxr app analysis launch\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  run          Run a profile's MC sweeps and write checkpoints.\n  setup        Detect GPU hardware and write CXR_MC_BACKEND to .env (first run).\n  app          Launch or export interactive analysis notebooks.\n  checkpoint   Inspect, transform, recompute, archive, and reclaim checkpoints.\n  completion   Manage cxr shell tab-completion.\n  config       Set and inspect current profile and remote-target defaults.\n  performance  List, analyze, or delete compute-performance artifacts.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  job          List, inspect, follow, or stop asynchronous remote jobs.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect, validate, edit, and blaze individual materials.\n",
+    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Manage coherent X-ray radiation simulation campaigns.\n\n  Start with a named profile: it defines campaign ranges, workloads, and\n  material membership. Then run campaigns, inspect checkpoints, or open analysis\n  notebooks.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr setup\n    cxr profile list\n    cxr profile show sub_100keV\n    cxr run sub_100keV -m hopg\n    cxr run sub_100keV --remote --dry-run\n    cxr app analysis launch\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  run          Run a profile's MC sweeps and write checkpoints.\n  setup        Detect GPU hardware and write CXR_MC_BACKEND to .env (first run).\n  app          Launch or export interactive analysis notebooks.\n  checkpoint   Inspect, transform, recompute, archive, and reclaim checkpoints.\n  completion   Manage cxr shell tab-completion.\n  config       Set and inspect current profile and remote-target defaults.\n  performance  List, analyze, or delete compute-performance artifacts.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  job          List, inspect, follow, or stop asynchronous remote jobs.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect, validate, edit, and blaze individual materials.\n",
     "hidden": false,
     "path": "",
     "subcommands": [
@@ -265,6 +265,70 @@
             "required": false
           },
           {
+            "dest": "preset",
+            "help": "Run a named reproduction workflow; zhai requires -R/--remote.",
+            "option_strings": [
+              "--preset"
+            ],
+            "required": false
+          },
+          {
+            "dest": "ne",
+            "help": "With --preset zhai, Fig. 1c line electrons per energy.",
+            "option_strings": [
+              "--ne"
+            ],
+            "required": false
+          },
+          {
+            "dest": "ne_brem",
+            "help": "With --preset zhai, Fig. 1c bremsstrahlung electrons per energy.",
+            "option_strings": [
+              "--ne-brem"
+            ],
+            "required": false
+          },
+          {
+            "dest": "ne_supp",
+            "help": "With --preset zhai, supplementary electrons per polar-tilt spectrum.",
+            "option_strings": [
+              "--ne-supp"
+            ],
+            "required": false
+          },
+          {
+            "dest": "tmd_azimuth",
+            "help": "With --preset zhai, exploratory TMD azimuth.",
+            "option_strings": [
+              "--tmd-azimuth"
+            ],
+            "required": false
+          },
+          {
+            "dest": "refresh",
+            "help": "With --preset zhai, recompute matching cache.",
+            "option_strings": [
+              "--refresh"
+            ],
+            "required": false
+          },
+          {
+            "dest": "no_sync",
+            "help": "With -R/--remote, skip code upload.",
+            "option_strings": [
+              "--no-sync"
+            ],
+            "required": false
+          },
+          {
+            "dest": "dry_run",
+            "help": "With -R/--remote, print submission preview only.",
+            "option_strings": [
+              "--dry-run"
+            ],
+            "required": false
+          },
+          {
             "dest": "remote_target",
             "help": "Run remotely; bare uses the configured target, =TARGET overrides it.",
             "option_strings": [
@@ -315,7 +379,7 @@
             "required": false
           }
         ],
-        "help": "Usage: cxr run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to the current configured profile (standard built-in) and\n  owns material membership, campaign ranges, and workload settings. Use\n  -m/--material to run one profile member instead of the full resolved\n  membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL         Run one member of PROFILE instead of its full\n                                  membership.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use tiny smoke-test grid and write\n                                  <material>_quick.pkl.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  -p, --perf                      Sample CPU pressure, RAM/swap, GPU\n                                  clocks/VRAM, process-tree, phase timing,\n                                  queue, case, worker, and chunk metrics for\n                                  PROFILE's resolved membership into\n                                  performance-profiles/PROFILE/<material>.ndjson\n                                  (cxr.performance.v1). Combine with -m to\n                                  profile a single member. Runs without shared-\n                                  cache reads or writes unless --recompute is\n                                  explicit.\n  -i, --perf-interval SECONDS     Performance-telemetry sampling interval;\n                                  requires -p/--perf.  [default: 5.0]\n  --spec-chunk N                  Pin line-spectrum segments per GPU chunk;\n                                  requires -p/--perf.\n  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk;\n                                  requires -p/--perf.\n  --nsys                          Capture one uncached Nsight Systems CUDA/NVTX\n                                  trace of the run (writes a .nsys-rep next to\n                                  the perf log); defaults to the profile's full\n                                  membership (-m narrows to one member).\n                                  Requires -p/--perf.\n  --no-cache                      Neither read nor write the shared per-case\n                                  checkpoint cache: an ephemeral run that\n                                  recomputes every case and stores nothing\n                                  shared.\n  --recompute                     Ignore cached cases and recompute fresh, but\n                                  repopulate the shared per-case cache with the\n                                  results.\n  --no-progress                   Disable progress bars/dashboard.\n  -v, --verbose                   Increase dashboard detail.\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --wait                          Wait for remote completion and pull results.\n  --detach                        Return after remote submission.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+        "help": "Usage: cxr run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to the current configured profile (standard built-in) and\n  owns material membership, campaign ranges, and workload settings. Use\n  -m/--material to run one profile member instead of the full resolved\n  membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL         Run one member of PROFILE instead of its full\n                                  membership.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use tiny smoke-test grid and write\n                                  <material>_quick.pkl.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  -p, --perf                      Sample CPU pressure, RAM/swap, GPU\n                                  clocks/VRAM, process-tree, phase timing,\n                                  queue, case, worker, and chunk metrics for\n                                  PROFILE's resolved membership into\n                                  performance-profiles/PROFILE/<material>.ndjson\n                                  (cxr.performance.v1). Combine with -m to\n                                  profile a single member. Runs without shared-\n                                  cache reads or writes unless --recompute is\n                                  explicit.\n  -i, --perf-interval SECONDS     Performance-telemetry sampling interval;\n                                  requires -p/--perf.  [default: 5.0]\n  --spec-chunk N                  Pin line-spectrum segments per GPU chunk;\n                                  requires -p/--perf.\n  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk;\n                                  requires -p/--perf.\n  --nsys                          Capture one uncached Nsight Systems CUDA/NVTX\n                                  trace of the run (writes a .nsys-rep next to\n                                  the perf log); defaults to the profile's full\n                                  membership (-m narrows to one member).\n                                  Requires -p/--perf.\n  --no-cache                      Neither read nor write the shared per-case\n                                  checkpoint cache: an ephemeral run that\n                                  recomputes every case and stores nothing\n                                  shared.\n  --recompute                     Ignore cached cases and recompute fresh, but\n                                  repopulate the shared per-case cache with the\n                                  results.\n  --no-progress                   Disable progress bars/dashboard.\n  -v, --verbose                   Increase dashboard detail.\n  --preset [zhai]                 Run a named reproduction workflow; zhai\n                                  requires -R/--remote.\n  --ne NUMBER                     With --preset zhai, Fig. 1c line electrons per\n                                  energy.  [default: 20000]\n  --ne-brem NUMBER                With --preset zhai, Fig. 1c bremsstrahlung\n                                  electrons per energy.  [default: 200]\n  --ne-supp NUMBER                With --preset zhai, supplementary electrons\n                                  per polar-tilt spectrum.  [default: 200]\n  --tmd-azimuth DEGREES           With --preset zhai, exploratory TMD azimuth.\n                                  [default: 0.0]\n  --refresh                       With --preset zhai, recompute matching cache.\n  --no-sync                       With -R/--remote, skip code upload.\n  --dry-run                       With -R/--remote, print submission preview\n                                  only.\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --wait                          Wait for remote completion and pull results.\n  --detach                        Return after remote submission.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
         "hidden": false,
         "path": "run",
         "subcommands": []
@@ -2369,7 +2433,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: cxr remote [OPTIONS] COMMAND [ARGS]...\n\n  [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n  Host, remote directory, and executable come from CXR_REMOTE_HOST,\n  CXR_REMOTE_DIR, and CXR_REMOTE_UV. Command-line options take precedence over\n  workflow defaults where offered.\n\n  Examples:\n    cxr remote run sub_100keV --dry-run\n    cxr remote run compute_test_300keV -p\n    cxr remote run standard -m hopg\n    cxr remote status -vv\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  gc           Reclaim remote records obsolete under current scan profiles...\n  performance  List, pull, or delete remote performance artifacts.\n  prune-jobs   Delete terminal (done/failed/cancelled) job directories;...\n  pull         Fetch existing checkpoints from remote box.\n  rm           Delete remote checkpoints; preview unless --yes.\n  run          Sync code, submit sweep(s), track progress, and pull...\n  sync         Push current code to remote box.\n  validate     Run Zhai reproduction remotely or pull existing caches.\n",
+        "help": "Usage: cxr remote [OPTIONS] COMMAND [ARGS]...\n\n  [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n  Host, remote directory, and executable come from CXR_REMOTE_HOST,\n  CXR_REMOTE_DIR, and CXR_REMOTE_UV. Command-line options take precedence over\n  workflow defaults where offered.\n\n  Examples:\n    cxr run sub_100keV --remote --dry-run\n    cxr run compute_test_300keV --remote -p\n    cxr run standard -m hopg --remote\n    cxr job status -vv\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  gc           Reclaim remote records obsolete under current scan profiles...\n  performance  List, pull, or delete remote performance artifacts.\n  prune-jobs   Delete terminal (done/failed/cancelled) job directories;...\n  pull         Fetch existing checkpoints from remote box.\n  rm           Delete remote checkpoints; preview unless --yes.\n  sync         Push current code to remote box.\n",
         "hidden": false,
         "path": "remote",
         "subcommands": [
@@ -2765,6 +2829,14 @@
           {
             "actions": [
               {
+                "dest": "preset",
+                "help": "Fetch an existing reproduction cache instead of checkpoints.",
+                "option_strings": [
+                  "--preset"
+                ],
+                "required": false
+              },
+              {
                 "dest": "material",
                 "help": null,
                 "option_strings": [],
@@ -2887,7 +2959,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote pull [OPTIONS] [PROFILE|STEM|MATERIAL@PROFILE]...\n\n  Fetch existing checkpoints from remote box.\n\n  STEM is usually a bare material name, but MATERIAL@PROFILE selects the\n  checkpoint the box produced for that catalog profile (--profile on `cxr remote\n  run`) -- on-disk names never carry the profile, so this reads each candidate's\n  meta.json remotely and pulls the newest match; --hash pins a specific\n  parameter-hash prefix when more than one exists.\n\nOptions:\n  -a, --all                       Pull every configured material.\n  -m, --material MATERIAL         Narrow positional PROFILE or --profile to\n                                  MATERIAL; repeatable.\n  --profile NAME                  Alias for positional PROFILE. Pull its\n                                  explicit members, or the in-use manifest when\n                                  membership is implicit; -m/--material narrows\n                                  it.\n  --hash HEXPREFIX                Pin one MATERIAL@PROFILE selector to a\n                                  parameter-hash prefix.\n  -f, --full                      Default is grid-filtered; pull full unfiltered\n                                  checkpoint.\n  --drop-wide-brem                With grid pull, drop wide-brem.\n  --downcast                      With grid pull, downcast to float32.\n  --level9                        Recompress remotely at gzip level 9.\n  --no-sync                       With grid pull, skip code sync.\n  --brem-only                     Merge only brem arrays locally; mutually\n                                  exclusive with --line-only.\n  --line-only                     Merge only line spectra locally; mutually\n                                  exclusive with --brem-only.\n  --force                         With partial merge, insert records absent\n                                  locally.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: cxr remote pull [OPTIONS] [PROFILE|STEM|MATERIAL@PROFILE]...\n\n  Fetch existing checkpoints from remote box.\n\n  STEM is usually a bare material name, but MATERIAL@PROFILE selects the\n  checkpoint the box produced for that catalog profile (PROFILE on `cxr run\n  --remote`) -- on-disk names never carry the profile, so this reads each\n  candidate's meta.json remotely and pulls the newest match; --hash pins a\n  specific parameter-hash prefix when more than one exists.\n\nOptions:\n  --preset [zhai]                 Fetch an existing reproduction cache instead\n                                  of checkpoints.\n  -a, --all                       Pull every configured material.\n  -m, --material MATERIAL         Narrow positional PROFILE or --profile to\n                                  MATERIAL; repeatable.\n  --profile NAME                  Alias for positional PROFILE. Pull its\n                                  explicit members, or the in-use manifest when\n                                  membership is implicit; -m/--material narrows\n                                  it.\n  --hash HEXPREFIX                Pin one MATERIAL@PROFILE selector to a\n                                  parameter-hash prefix.\n  -f, --full                      Default is grid-filtered; pull full unfiltered\n                                  checkpoint.\n  --drop-wide-brem                With grid pull, drop wide-brem.\n  --downcast                      With grid pull, downcast to float32.\n  --level9                        Recompress remotely at gzip level 9.\n  --no-sync                       With grid pull, skip code sync.\n  --brem-only                     Merge only brem arrays locally; mutually\n                                  exclusive with --line-only.\n  --line-only                     Merge only line spectra locally; mutually\n                                  exclusive with --brem-only.\n  --force                         With partial merge, insert records absent\n                                  locally.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "remote pull",
             "subcommands": []
@@ -3353,7 +3425,7 @@
               }
             ],
             "help": "Usage: cxr remote run [OPTIONS] [PROFILE]\n\n  Sync code, submit sweep(s), track progress, and pull checkpoints.\n\n  Use --headless to return after submission. Use --no-pull to track through\n  completion without automatically pulling checkpoints.\n\n  PROFILE selects the catalog campaign and its material membership; when omitted\n  it uses the current configured profile (standard built-in). Use -m/--material\n  to run one member only. Profiles without an explicit membership run every in-\n  use catalog material.\n\n  A profile run names the job after PROFILE (NAME, then NAME-2 once a finished\n  run holds the bare name) and refuses while another job under the same profile\n  is live.\n\nOptions:\n  -m, --material TEXT          Run one material from PROFILE instead of its full\n                               membership.\n  --fidelity [full|survey]     Named settings/grid policy. survey is provisional\n                               and reduced.  [default: full]\n  --quick                      Use tiny smoke-test grid.\n  --workers NUMBER             Transport workers (default: auto; 0 runs\n                               serially).\n  --parallel-materials N       Simultaneous scans in one allocation; requires\n                               --chunk-minutes 0.  [1<=x<=4]\n  --chunk-minutes NUMBER       Self-resubmitting SLURM slice length; defaults to\n                               10, or 0 for --perf-reps >1, --nsys, and CPU\n                               profiling.\n  -p, --perf                   Log CPU pressure, RAM/swap, GPU clocks/VRAM,\n                               process, phase timing, queue, worker, chunk, and\n                               case metrics for PROFILE.\n  -r, --perf-reps N            Run N uncached sessions per material with\n                               isolated job-local checkpoints; requires --perf\n                               and --chunk-minutes 0. Profiling checkpoints are\n                               not pulled.  [default: 1; 1<=x<=20]\n  -i, --perf-interval SECONDS  Performance telemetry sampling interval; requires\n                               --perf.  [default: 5.0]\n  --spec-chunk N               Pin line-spectrum segments per GPU chunk;\n                               requires --perf.\n  --brem-chunk N               Pin bremsstrahlung segments per GPU chunk;\n                               requires --perf.\n  --nsys                       Capture one uncached full-profile session with\n                               Nsight Systems CUDA/NVTX and Python-stack\n                               tracing; implies --perf, --perf-reps 1, and\n                               --chunk-minutes 0; requires one explicit\n                               -m/--material.\n  -c, --cpu                    After the primary run, capture one bounded serial\n                               CPU cProfile pass; implies --perf and --chunk-\n                               minutes 0.\n  --cpu-only                   Capture only the bounded serial CPU cProfile\n                               pass; starts no primary GPU/Nsight scan and\n                               implies --perf and --chunk-minutes 0.\n  --no-sync                    Skip code upload.\n  --dry-run                    Print submission preview; do not connect.\n  --headless                   Return after submission without attaching or\n                               pulling.\n  --no-pull                    Attach and track, but do not pull completed\n                               checkpoints or performance artifacts.\n  --grid                       Grid-filter checkpoint before pulling;\n                               incompatible with --quick.\n  --drop-wide-brem             With --grid, drop wide-brem.\n  --downcast                   With --grid, downcast to float32.\n  --level9                     Recompress completed checkpoints at gzip level 9\n                               before automatic pull.\n  -h, --help                   Show this message and exit.\n",
-            "hidden": false,
+            "hidden": true,
             "path": "remote run",
             "subcommands": []
           },
@@ -3531,7 +3603,7 @@
               }
             ],
             "help": "Usage: cxr remote validate [OPTIONS]\n\n  Run Zhai reproduction remotely or pull existing caches.\n\nOptions:\n  --ne NUMBER           Fig. 1c line electrons per energy.  [default: 20000]\n  --ne-brem NUMBER      Fig. 1c bremsstrahlung electrons per energy.  [default:\n                        200]\n  --ne-supp NUMBER      Supplementary electrons per polar-tilt spectrum.\n                        [default: 200]\n  --tmd-azimuth NUMBER  Exploratory TMD azimuth in degrees.  [default: 0.0]\n  --refresh             Recompute matching cache.\n  --no-sync             Skip code upload.\n  -d, --detached        Launch detached; mutually exclusive with --pull.\n  -f, --follow          Track detached job; requires --detached.\n  --pull                Only fetch existing Zhai caches; mutually exclusive with\n                        --detached.\n  -h, --help            Show this message and exit.\n",
-            "hidden": false,
+            "hidden": true,
             "path": "remote validate",
             "subcommands": []
           }

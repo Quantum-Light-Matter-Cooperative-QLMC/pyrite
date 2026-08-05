@@ -180,7 +180,9 @@ def test_export_cache_miss_is_clean_cli_failure(monkeypatch, tmp_path):
     class _FakeAF:
         @staticmethod
         def export_all_figures(*_args, **_kwargs):
-            raise FileNotFoundError("Zhai cache missing; populate it with `cxr remote validate`")
+            raise FileNotFoundError(
+                "Zhai cache missing; populate it with `cxr run --preset zhai --remote`"
+            )
 
     monkeypatch.setitem(sys.modules, "anchor_figures", _FakeAF())
 
@@ -188,7 +190,7 @@ def test_export_cache_miss_is_clean_cli_failure(monkeypatch, tmp_path):
 
     assert result.exit_code == 1
     assert "Error: Zhai cache missing" in result.output
-    assert "cxr remote validate" in result.output
+    assert "cxr run --preset zhai --remote" in result.output
     assert result.exception is not None
 
 
@@ -258,7 +260,7 @@ def test_validation_app_never_falls_back_to_heavy_local_cache_population():
     assert "af.reproduce_all(" not in source
     assert source.count("cache_only=True") >= 2
     assert "Heavy cache preparation was not started locally" in source
-    assert "cxr remote validate" in source
+    assert "cxr run --preset zhai --remote" in source
 
 
 def test_validation_app_declares_evidence_tasks_and_authorities():

@@ -4,7 +4,7 @@ shim over checks/anchor_figures.py::reproduce_all.
 The remote box invokes ``python -m cxr_mc._entry.reproduce_zhai`` inside its
 uv-synced checkout. Populates checkpoints/zhai_reproduction/ for every cache the
 validation app's Zhai sections hit -- no figures, no display -- so a later ``cxr
-remote check --pull`` (or plain local ``cxr check``) sees an instant cache hit.
+remote pull --preset zhai`` (or plain local ``cxr check``) sees an instant cache hit.
 
 Run (defaults match the app's own UI defaults, so the pulled cache is guaranteed
 to hit locally):

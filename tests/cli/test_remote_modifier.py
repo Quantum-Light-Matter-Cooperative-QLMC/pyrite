@@ -81,6 +81,84 @@ def test_invalid_remote_target_is_usage_error_and_restores_host(monkeypatch):
     assert remote_config.remote_host() == "configured-box"
 
 
+def test_zhai_preset_waits_pulls_and_restores_explicit_target(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(remote_config, "HOST", "configured-box")
+
+    def check(**kwargs):
+        seen.update(kwargs, host=remote_config.remote_host())
+
+    monkeypatch.setattr(remote_cli, "remote_check", check)
+
+    result = invoke(
+        scan.command,
+        [
+            "--preset",
+            "zhai",
+            "--remote=box-a",
+            "--wait",
+            "--ne",
+            "11",
+            "--ne-brem",
+            "3",
+            "--ne-supp",
+            "5",
+            "--tmd-azimuth",
+            "35",
+            "--refresh",
+            "--no-sync",
+        ],
+    )
+
+    assert_clean_result(result)
+    assert seen == {
+        "ne": 11,
+        "ne_brem": 3,
+        "ne_supp": 5,
+        "tmd_azimuth": 35.0,
+        "refresh": True,
+        "no_sync": True,
+        "detach": False,
+        "dry_run": False,
+        "host": "box-a",
+    }
+    assert remote_config.remote_host() == "configured-box"
+
+
+def test_zhai_preset_detach_and_dry_run_flow_to_remote_workflow(monkeypatch):
+    calls = []
+    monkeypatch.setattr(remote_cli, "remote_check", lambda **kwargs: calls.append(kwargs))
+
+    detached = invoke(scan.command, ["--preset", "zhai", "--remote", "--detach"])
+    preview = invoke(scan.command, ["--preset", "zhai", "--remote", "--dry-run"])
+
+    assert_clean_result(detached)
+    assert_clean_result(preview)
+    assert calls[0]["detach"] is True
+    assert calls[0]["dry_run"] is False
+    assert calls[1]["detach"] is False
+    assert calls[1]["dry_run"] is True
+
+
+def test_zhai_preset_rejects_locality_and_normal_run_inputs():
+    local = invoke(scan.command, ["--preset", "zhai"])
+    positional = invoke(scan.command, ["standard", "--preset", "zhai", "--remote"])
+    normal_option = invoke(
+        scan.command,
+        ["--preset", "zhai", "--remote", "--material", "hopg"],
+    )
+    missing_preset = invoke(scan.command, ["--remote", "--ne", "11"])
+
+    assert local.exit_code == 2
+    assert "require -R/--remote" in local.stderr
+    assert positional.exit_code == 2
+    assert "normal-run option(s): PROFILE" in positional.stderr
+    assert normal_option.exit_code == 2
+    assert "normal-run option(s): --material" in normal_option.stderr
+    assert missing_preset.exit_code == 2
+    assert "require --preset zhai: --ne" in missing_preset.stderr
+
+
 def test_remote_optional_value_parses_around_profile(monkeypatch):
     seen = []
     monkeypatch.setattr(

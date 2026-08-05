@@ -180,6 +180,44 @@ def _performance_profile(ctx, param, value):
 )
 @click.option("--no-progress", is_flag=True, help="Disable progress bars/dashboard.")
 @click.option("-v", "--verbose", count=True, help="Increase dashboard detail.")
+@click.option(
+    "--preset",
+    type=click.Choice(("zhai",), case_sensitive=True),
+    default=None,
+    help="Run a named reproduction workflow; zhai requires -R/--remote.",
+)
+@click.option(
+    "--ne",
+    type=_cli_core.POSITIVE_INT,
+    default=20_000,
+    show_default=True,
+    help="With --preset zhai, Fig. 1c line electrons per energy.",
+)
+@click.option(
+    "--ne-brem",
+    type=_cli_core.POSITIVE_INT,
+    default=200,
+    show_default=True,
+    help="With --preset zhai, Fig. 1c bremsstrahlung electrons per energy.",
+)
+@click.option(
+    "--ne-supp",
+    type=_cli_core.POSITIVE_INT,
+    default=200,
+    show_default=True,
+    help="With --preset zhai, supplementary electrons per polar-tilt spectrum.",
+)
+@click.option(
+    "--tmd-azimuth",
+    type=_cli_core.FINITE_FLOAT,
+    default=0.0,
+    show_default=True,
+    metavar="DEGREES",
+    help="With --preset zhai, exploratory TMD azimuth.",
+)
+@click.option("--refresh", is_flag=True, help="With --preset zhai, recompute matching cache.")
+@click.option("--no-sync", is_flag=True, help="With -R/--remote, skip code upload.")
+@click.option("--dry-run", is_flag=True, help="With -R/--remote, print submission preview only.")
 @_cli_core.remote_option
 @click.option("--wait", is_flag=True, help="Wait for remote completion and pull results.")
 @click.option("--detach", is_flag=True, help="Return after remote submission.")
@@ -210,20 +248,98 @@ def command(
     no_progress,
     json_output,
     verbose,
+    preset,
+    ne,
+    ne_brem,
+    ne_supp,
+    tmd_azimuth,
+    refresh,
+    no_sync,
+    dry_run,
     remote_target,
     wait,
     detach,
 ):
     """Click entry point for the staged root migration."""
-    try:
-        catalog_profile = _cli_config.resolve("profile.current", catalog_profile).value
-    except _cli_config.ConfigError as exc:
-        raise _cli_core.CLIError(str(exc)) from exc
+    raw_catalog_profile = catalog_profile
+    if preset is None:
+        try:
+            catalog_profile = _cli_config.resolve("profile.current", catalog_profile).value
+        except _cli_config.ConfigError as exc:
+            raise _cli_core.CLIError(str(exc)) from exc
     if wait and detach:
         raise click.UsageError("--wait and --detach are mutually exclusive")
     if remote_target is None and (wait or detach):
         raise click.UsageError("--wait/--detach require -R/--remote")
+    if remote_target is None and (preset is not None or no_sync or dry_run):
+        raise click.UsageError("--preset/--no-sync/--dry-run require -R/--remote")
+    zhai_parameters = {
+        "ne": "--ne",
+        "ne_brem": "--ne-brem",
+        "ne_supp": "--ne-supp",
+        "tmd_azimuth": "--tmd-azimuth",
+        "refresh": "--refresh",
+    }
+    explicit_zhai = [
+        flag
+        for parameter, flag in zhai_parameters.items()
+        if ctx.get_parameter_source(parameter) is click.core.ParameterSource.COMMANDLINE
+    ]
+    if preset is None and explicit_zhai:
+        raise click.UsageError(f"Zhai option(s) require --preset zhai: {', '.join(explicit_zhai)}")
     if remote_target is not None:
+        if preset == "zhai":
+            normal_run_parameters = {
+                "catalog_profile": "PROFILE",
+                "material": "--material",
+                "workers": "--workers",
+                "fidelity": "--fidelity",
+                "quick": "--quick",
+                "n_families": "--n-families",
+                "checkpoint_dir": "--checkpoint-dir",
+                "max_minutes": "--max-minutes",
+                "perf": "--perf",
+                "performance_profile": "--performance-profile",
+                "performance_dir": "--performance-dir",
+                "performance_interval": "--perf-interval",
+                "spec_chunk": "--spec-chunk",
+                "brem_chunk": "--brem-chunk",
+                "nsys": "--nsys",
+                "no_cache": "--no-cache",
+                "recompute": "--recompute",
+                "progress_file": "--progress-file",
+                "progress_phase": "--progress-phase",
+                "no_progress": "--no-progress",
+                "json_output": "--output",
+                "verbose": "--verbose",
+            }
+            explicit_normal = [
+                flag
+                for parameter, flag in normal_run_parameters.items()
+                if ctx.get_parameter_source(parameter) is click.core.ParameterSource.COMMANDLINE
+            ]
+            if raw_catalog_profile is not None and "PROFILE" not in explicit_normal:
+                explicit_normal.insert(0, "PROFILE")
+            if explicit_normal:
+                raise click.UsageError(
+                    "--preset zhai does not support normal-run option(s): "
+                    + ", ".join(explicit_normal)
+                )
+            from ..._remote import cli as remote_cli
+            from ..._remote import config as remote_config
+
+            target = None if remote_target == "__configured__" else remote_target
+            with remote_config.override_remote_host(target):
+                return remote_cli.remote_check(
+                    ne=ne,
+                    ne_brem=ne_brem,
+                    ne_supp=ne_supp,
+                    tmd_azimuth=tmd_azimuth,
+                    refresh=refresh,
+                    no_sync=no_sync,
+                    detach=detach,
+                    dry_run=dry_run,
+                )
         if json_output:
             raise click.UsageError("remote run does not yet support --output json")
         local_only = {
@@ -265,6 +381,8 @@ def command(
                 spec_chunk=spec_chunk,
                 brem_chunk=brem_chunk,
                 nsys=nsys,
+                no_sync=no_sync,
+                dry_run=dry_run,
                 headless=detach,
                 no_pull=False,
             )

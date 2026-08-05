@@ -32,6 +32,8 @@ _HIDDEN_COMPATIBILITY_PATHS = {
     ("check",),
     ("check-config",),
     ("remote", "start"),
+    ("remote", "run"),
+    ("remote", "validate"),
     ("remote", "check"),
     ("line-grid", "status"),
     ("line-grid", "attach"),

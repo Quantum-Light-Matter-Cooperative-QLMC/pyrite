@@ -33,6 +33,10 @@ REMOTE_COMMANDS = (
 )
 
 
+def assert_legacy_run_result(result, *, stderr=""):
+    assert_clean_result(result, stderr=f"{message('remote run')}\n{stderr}")
+
+
 def test_remote_exports_click_group():
     assert isinstance(remote.command, click.Group)
     assert set(remote.command.commands) == set(REMOTE_COMMANDS)
@@ -98,7 +102,7 @@ def test_run_click_defaults_and_zero_meanings(monkeypatch):
         remote.command, ["run", "standard", "-m", "hopg", "--workers", "0", "--headless"]
     )
 
-    assert_clean_result(result)
+    assert_legacy_run_result(result)
     assert calls == [
         (
             ["hopg"],
@@ -169,7 +173,7 @@ def test_run_cpu_flags_imply_performance_and_monolithic_dispatch(monkeypatch, fl
         ["run", "standard", "-m", "hopg", flag, "--headless"],
     )
 
-    assert_clean_result(result)
+    assert_legacy_run_result(result)
     assert calls[0][1]["performance_profile"] == "standard"
     assert calls[0][1]["chunk_minutes"] == 0.0
     assert calls[0][1]["cpu"] is cpu
@@ -189,7 +193,7 @@ def test_combined_cpu_failure_pulls_retained_primary_performance_artifacts(monke
 
     result = invoke(remote.command, ["run", "standard", "-m", "hopg", "--cpu"])
 
-    assert_clean_result(
+    assert_legacy_run_result(
         result,
         stderr="CPU phase failed; pulling retained primary performance artifacts\nperformance profiling used isolated job-local checkpoints; skipping automatic checkpoint pull\n",
     )
@@ -237,7 +241,7 @@ def test_run_perf_flags_and_level9_reach_workflow(monkeypatch):
         ],
     )
 
-    assert_clean_result(result)
+    assert_legacy_run_result(result)
     assert queued[0][1]["performance_repetitions"] == 1
     assert queued[0][1]["performance_interval"] == 2.0
     assert performance_pulled == ["standard"]
@@ -253,8 +257,54 @@ def test_hidden_remote_aliases_remain_callable():
         for line in root_help.stdout.splitlines()
         if line.startswith("  ") and line.strip() and not line.lstrip().startswith("-")
     }
-    assert {"run", "validate"}.issubset(command_lines)
-    assert command_lines.isdisjoint({"scan", "submit", "start", "check"})
+    assert command_lines.isdisjoint({"run", "validate", "scan", "submit", "start", "check"})
+
+
+@pytest.mark.parametrize("name", ["validate", "check"])
+def test_legacy_zhai_execution_aliases_warn_once(monkeypatch, name):
+    monkeypatch.setattr(remote.cli, "remote_check", lambda **_kwargs: None)
+
+    result = invoke(remote.command, [name])
+
+    assert result.exit_code == 0
+    assert result.stderr.count("is deprecated") == 1
+    assert "cxr run --preset zhai --remote" in result.stderr
+
+
+def test_legacy_zhai_pull_alias_warns_with_retrieval_replacement(monkeypatch):
+    monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: None)
+
+    result = invoke(remote.command, ["validate", "--pull"])
+
+    assert result.exit_code == 0
+    assert result.stderr.count("is deprecated") == 1
+    assert "cxr remote pull --preset zhai" in result.stderr
+
+
+def test_legacy_zhai_detached_follow_warning_preserves_no_pull(monkeypatch):
+    monkeypatch.setattr(lifecycle, "start_zhai_queue", lambda **_kwargs: "job")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: None)
+
+    result = invoke(remote.command, ["validate", "--detached", "--follow"])
+
+    assert result.exit_code == 0
+    assert "cxr run --preset zhai --remote --detach" in result.stderr
+
+
+def test_pull_zhai_preset_dispatches_without_checkpoint_selection(monkeypatch):
+    calls = []
+    monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: calls.append("pull"))
+
+    result = invoke(remote.command, ["pull", "--preset", "zhai"])
+    incompatible = invoke(remote.command, ["pull", "hopg", "--preset", "zhai"])
+    output = invoke(remote.command, ["pull", "--preset", "zhai", "-o", "wide"])
+
+    assert_clean_result(result)
+    assert calls == ["pull"]
+    assert incompatible.exit_code == 2
+    assert "does not take checkpoint option(s): material" in incompatible.stderr
+    assert output.exit_code == 2
+    assert "does not take checkpoint option(s): output" in output.stderr
 
 
 @pytest.mark.parametrize(
@@ -403,7 +453,7 @@ def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
     result = invoke(remote.command, argv)
 
     if command_name == "run":
-        assert_clean_result(result)
+        assert_legacy_run_result(result)
     else:
         assert result.exit_code == 0
         assert result.stderr.count("is deprecated") == 1
@@ -463,7 +513,7 @@ def test_run_profile_and_material_dispatch(monkeypatch):
         ["run", "sub_100keV", "-m", "hopg", "--headless"],
     )
 
-    assert_clean_result(result)
+    assert_legacy_run_result(result)
     assert calls[0]["catalog_profile"] == "sub_100keV"
 
 
@@ -487,7 +537,7 @@ def test_run_profile_with_membership_defaults_materials(monkeypatch):
 
     result = invoke(remote.command, ["run", "sub_100keV", "--headless"])
 
-    assert_clean_result(result)
+    assert_legacy_run_result(result)
     assert calls[0][0] == ["hopg", "mose2"]
     assert calls[0][1]["catalog_profile"] == "sub_100keV"
 
@@ -514,7 +564,7 @@ def test_run_profile_without_membership_uses_manifest_materials(monkeypatch):
 
     result = invoke(remote.command, ["run", "sub_100keV", "--headless"])
 
-    assert_clean_result(result)
+    assert_legacy_run_result(result)
     assert calls[0][0] == ["hopg"]
 
 

@@ -120,13 +120,14 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 - **`cxr app validation launch`** → `check:_cli`: launch the validation app;
   `cxr app validation export` writes cached literature-validation figures. The
   same explicit `launch|export` shape applies to `cxr app viewer`.
-- **`cxr remote ...`** → `remote:*`: optional SSH/SLURM lifecycle for lab GPU
-  box. Canonical profile submission is now `cxr run --remote`; the old
-  `remote run` path remains visible until the rest of the D2a execution verbs
-  migrate. Other execution/resource commands remain here during D2a, while
+- **`cxr remote ...`** → `remote:*`: optional SSH/SLURM resources for lab GPU
+  box. Canonical profile and Zhai reproduction submissions are
+  `cxr run --remote` and `cxr run --preset zhai --remote`; hidden warning aliases
+  preserve `remote run`, `remote validate`, and `remote check`. Resource commands
+  remain here, while
   retired `jobs`, `status`, `logs`, and `stop` paths are hidden aliases of the
-  canonical top-level job lifecycle. Remote validation remains `remote validate`
-  until its owning execution verb migrates;
+  canonical top-level job lifecycle. `remote pull --preset zhai` retrieves an
+  existing reproduction cache;
   `remote gc` applies profile-aware checkpoint pruning under remote stem
   reservations and releases orphaned reservations, replacing the hidden
   `remote prune` and `remote reap` aliases; `remote rm` deletes remote
@@ -572,7 +573,8 @@ figure export, optional remote Zhai-job launch/status/pull helpers.
 Canonical maintained Zhai detector geometry and cache-schema provenance shared
 by anchor figures, headless reproduction, validation-app export, and remote
 SLURM metadata. Heavy calculations remain in `checks/anchor_figures.py`; app
-and export consumers are cache-only and direct misses to `cxr remote validate`.
+and export consumers are cache-only and direct misses to
+`cxr run --preset zhai --remote`.
 - Internal: `ZHAI_DETECTOR`, `ZHAI_CACHE_SCHEMA`, `ZHAI_CACHE_FORMAT`,
   `detector_metadata`.
 - Deps: `detectors.DetectorSpec`.

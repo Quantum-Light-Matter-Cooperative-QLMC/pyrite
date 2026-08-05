@@ -36,12 +36,12 @@ def test_checked_cli_reference_is_current():
 def test_help_documents_examples_units_side_effects_and_incompatibilities():
     runner = CliRunner()
     cases = {
-        (): ("Examples:", "cxr remote run"),
-        ("run",): ("minutes", "write checkpoints"),
+        (): ("Examples:", "cxr run"),
+        ("run",): ("minutes", "--preset"),
         ("remote",): ("CXR_REMOTE_HOST", "Examples:"),
         ("remote", "run"): ("PROFILE selects", "-m, --material"),
-        ("remote", "pull"): ("mutually exclusive", "grid-filtered"),
-        ("energy-grid",): ("cxr profile", "cxr material", "Examples:"),
+        ("remote", "pull"): ("--preset", "grid-filtered"),
+        ("energy-grid",): ("cxr profile", "per-material range overrides", "Examples:"),
         ("energy-grid", "derive"): ("keV", "angstrom", "spacing in eV"),
         ("energy-grid", "apply"): ("precedence", "write nothing"),
         ("energy-grid", "job", "status"): ("latest recorded job", "repeat"),

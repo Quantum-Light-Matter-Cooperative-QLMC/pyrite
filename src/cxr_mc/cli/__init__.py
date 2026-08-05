@@ -100,7 +100,7 @@ def command() -> None:
       cxr profile list
       cxr profile show sub_100keV
       cxr run sub_100keV -m hopg
-      cxr remote run sub_100keV --dry-run
+      cxr run sub_100keV --remote --dry-run
       cxr app analysis launch
     """
 

@@ -486,7 +486,7 @@ def attach(jobid=None, detail=0):
     defaulted = jobid is None
     jobid = jobid or state._latest_jobid()
     if not jobid:
-        raise SystemExit("no jobs to attach to (start one: cxr remote run [PROFILE])")
+        raise SystemExit("no jobs to attach to (start one: cxr run [PROFILE] --remote)")
     transport._check_shell_tokens([jobid])
     if defaulted:
         current = state._job_state(jobid)

@@ -39,7 +39,7 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 | `cxr prune` | `cxr checkpoint gc` | 0.1.0 | 0.3.0 |  |
 | `cxr rebrem` | `cxr checkpoint recompute brem` | 0.1.0 | 0.3.0 |  |
 | `cxr reline` | `cxr checkpoint recompute line` | 0.1.0 | 0.3.0 |  |
-| `cxr remote check` | `cxr material validate --remote` | 0.1.0 | 0.3.0 |  |
+| `cxr remote check` | `cxr run --preset zhai --remote` | 0.1.0 | 0.3.0 |  |
 | `cxr remote clear` | `cxr remote rm` | 0.1.0 | 0.3.0 |  |
 | `cxr remote jobs` | `cxr job list` | 0.1.0 | 0.3.0 |  |
 | `cxr remote logs` | `cxr job logs` | 0.1.0 | 0.3.0 |  |
@@ -49,8 +49,10 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 | `cxr remote reap` | `cxr remote gc` | 0.1.0 | 0.3.0 | `gc` also drops obsolete records; use `--min-age-minutes` as before. |
 | `cxr remote rebrem` | `cxr checkpoint recompute brem --remote` | 0.1.0 | 0.3.0 |  |
 | `cxr remote reline` | `cxr checkpoint recompute line --remote` | 0.1.0 | 0.3.0 |  |
+| `cxr remote run` | `cxr run --remote` | 0.1.0 | 0.3.0 |  |
 | `cxr remote status` | `cxr job status` | 0.1.0 | 0.3.0 |  |
 | `cxr remote stop` | `cxr job stop` | 0.1.0 | 0.3.0 |  |
+| `cxr remote validate` | `cxr run --preset zhai --remote` | 0.1.0 | 0.3.0 |  |
 | `cxr restore` | `cxr checkpoint restore` | 0.1.0 | 0.3.0 |  |
 | `cxr slim` | `cxr checkpoint slim` | 0.1.0 | 0.3.0 |  |
 | `cxr sweep set` | `cxr material set` | 0.1.0 | 0.3.0 | The warning names the material and profile actually given. |

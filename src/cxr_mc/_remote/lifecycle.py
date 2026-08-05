@@ -652,7 +652,7 @@ def start_zhai_queue(
                 ("Monitor", f"cxr remote status {jobid} --attach"),
                 ("Status", f"cxr remote status {jobid} -vv"),
                 ("Logs", f"cxr remote logs {jobid} --follow"),
-                ("Pull", "cxr remote check --pull  (after completion)"),
+                ("Pull", "cxr remote pull --preset zhai  (after completion)"),
             ]
         )
     )
@@ -1549,7 +1549,7 @@ def pull_zhai_cache():
     )
     names = [Path(p).name for p in transport._ssh_capture(listing).split()]
     if not names:
-        print("(no zhai cache files on the box -- run `cxr remote check` first)")
+        print("(no zhai cache files on the box -- run `cxr run --preset zhai --remote` first)")
         return
     dest = config.LOCAL_ROOT / "checkpoints" / "zhai_reproduction"
     dest.mkdir(parents=True, exist_ok=True)

@@ -11,7 +11,7 @@ resolve or persist.
     cxr app validation --edit      # `marimo edit` instead of `marimo run`
     cxr app validation export      # skip marimo; render the full Zhai figure
                                     # set from checkpoints/zhai_reproduction/
-                                    # (see `cxr remote check`) to figures/
+                                    # (see `cxr run --preset zhai --remote`) to figures/
 """
 
 import json

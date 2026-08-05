@@ -105,7 +105,9 @@ DEPRECATIONS: dict[str, Deprecation] = {
         # Remote namespace: `profile` here meant the performance profile. The row
         # sits on the leaf so the warning names a runnable command, not a group.
         _entry("remote profile pull", "cxr remote performance pull"),
-        _entry("remote check", "cxr material validate --remote"),
+        _entry("remote run", "cxr run --remote"),
+        _entry("remote validate", "cxr run --preset zhai --remote"),
+        _entry("remote check", "cxr run --preset zhai --remote"),
         _entry("remote rebrem", "cxr checkpoint recompute brem --remote"),
         _entry("remote reline", "cxr checkpoint recompute line --remote"),
         _entry("remote jobs", "cxr job list"),
@@ -131,7 +133,9 @@ DEPRECATIONS: dict[str, Deprecation] = {
 #: command computes it and calls `warn(path, replacement=...)` from its own
 #: callback. `DeprecatingGroup` leaves these alone rather than pre-empting them
 #: with the registry's generic replacement.
-SELF_WARNING: frozenset[str] = frozenset({"sweep show", "sweep set"})
+SELF_WARNING: frozenset[str] = frozenset(
+    {"remote validate", "remote check", "sweep show", "sweep set"}
+)
 
 
 def message(path: str, *, replacement: str | None = None) -> str:

@@ -189,6 +189,10 @@ def test_sweep_guard_blocks_local_scan(sweep_guard_module, command: str) -> None
 @pytest.mark.parametrize(
     "command",
     [
+        "uv run cxr run standard -m hopg --remote",
+        "uv run cxr run standard -m hopg --remote=qlmc",
+        "uv run cxr run standard -m hopg -R",
+        "uv run cxr run standard -m hopg -Rqlmc",
         "uv run cxr remote run standard -m hopg",
         "uv run cxr run --help",
         "echo 'uv run cxr run standard -m hopg'",

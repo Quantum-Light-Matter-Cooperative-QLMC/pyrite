@@ -15,19 +15,18 @@ Optional, dev-only tool: it is only useful if you have an ssh host configured
 
 Run, wait for SLURM, then pull:
 
-    cxr remote run standard -m mose2    # sync, submit, track, pull
-    cxr remote run standard -m mose2 --quick
-    cxr remote run standard -m mose2 --no-sync
-    cxr remote run sub_100keV --headless
+    cxr run standard -m mose2 --remote    # sync, submit, track, pull
+    cxr run standard -m mose2 --remote --quick
+    cxr run standard -m mose2 --remote --no-sync
+    cxr run sub_100keV --remote --detach
     cxr remote pull mose2 wse2          # fetch existing checkpoints (grid-filtered)
     cxr remote pull mose2 --full        # fetch the full, un-filtered checkpoint
     cxr remote rebrem mose2 --ne-brem 1000   # brem-only recompute of the box's
                                              # checkpoints (GPU), follow, pull back
     cxr remote sync                     # only push the current code
-    cxr remote check [--ne N] [--ne-brem N] [--ne-supp N] [--refresh]
-                     [--detached [--follow]] [--pull]
-                                    # run the Zhai + supplementary MC on the
-                                    # box, or pull its cache back
+    cxr run --preset zhai --remote [--ne N] [--ne-brem N] [--ne-supp N]
+                                      # run the Zhai + supplementary MC
+    cxr remote pull --preset zhai      # pull an existing Zhai cache
 
 Remote jobs survive SSH disconnects:
 
@@ -39,7 +38,7 @@ cxr remote status [JOBID] --attach  # (re)connect + track live (default: latest)
     cxr remote stop --all               # cancel every live SLURM job
     cxr remote pull mose2 wse2 mos2     # fetch the finished checkpoints (grid-filtered)
 
-`remote run --headless` returns after shipping code, writing a batch script
+`run --remote --detach` returns after shipping code, writing a batch script
 under <remote>/jobs/<jobid>/, and submitting it to SLURM. The batch job
 processes profile members with bounded concurrency, writing meta/state/log and
 its scheduler ID into the job dir.

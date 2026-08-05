@@ -268,7 +268,7 @@ def test_cached_model_spectra_cache_only_miss_never_computes(anchor, tmp_path, m
         lambda *_args, **_kwargs: pytest.fail("cache-only miss must not compute"),
     )
 
-    with pytest.raises(af.ZhaiCacheMiss, match="cxr remote validate"):
+    with pytest.raises(af.ZhaiCacheMiss, match="cxr run --preset zhai --remote"):
         af.cached_model_spectra(
             anchor,
             ne=12,
@@ -814,7 +814,7 @@ def test_supplementary_hbn_figure_rejects_incomplete_condition_set():
 
 def test_physics_source_tree_is_lf_only():
     """The Zhai cache key hashes raw bytes of every src/cxr_mc/**/*.py file
-    (_zhai_cache_key / _supplementary_cache_key); cxr remote check relies on
+    (_zhai_cache_key / _supplementary_cache_key); the remote Zhai preset relies on
     the box and the laptop hashing identical bytes for a pulled cache to be a
     hit. The repo's .gitattributes pins `* text=auto eol=lf`, so a CRLF file
     slipping into src/ would silently produce a different hash per platform

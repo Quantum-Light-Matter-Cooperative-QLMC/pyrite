@@ -84,10 +84,16 @@ def _segment_has_local_run(tokens: list[str]) -> bool:
     for i, tok in enumerate(tokens):
         if os.path.basename(tok) != "cxr":
             continue
-        for nxt in tokens[i + 1 :]:
+        trailing = tokens[i + 1 :]
+        for nxt in trailing:
             if nxt.startswith("-") or "=" in nxt:
                 continue
-            return nxt == "run"
+            if nxt != "run":
+                return False
+            return not any(
+                option == "--remote" or option.startswith("--remote=") or option.startswith("-R")
+                for option in trailing
+            )
         return False
     return False
 
@@ -131,7 +137,7 @@ def main() -> int:
         sys.stderr.write(
             "Blocked: `cxr run` runs a full Monte-Carlo sweep locally and "
             "OOMs/crashes WSL. Route it to the lab GPU box instead:\n"
-            "  cxr remote run [PROFILE] [-m MATERIAL]\n"
+            "  cxr run [PROFILE] [-m MATERIAL] --remote\n"
             "See the remote-gpu-jobs skill. On a host with a real accelerator, "
             "set CXR_LOCAL_SWEEP_OK=1 (ambient or inline) to run locally. If you "
             "truly must run locally without it, ask the user to run it themselves.\n"

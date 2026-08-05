@@ -4788,10 +4788,26 @@ def test_remote_check_no_sync_skips_sync(monkeypatch):
             "tmd_azimuth": 0.0,
             "refresh": False,
             "no_sync": True,
+            "dry_run": False,
         },
         "attach",
         "pull",
     ]
+
+
+@pytest.mark.parametrize(
+    ("mode", "dry_run"),
+    [("detach", False), ("dry_run", True)],
+)
+def test_remote_check_non_waiting_modes_skip_attach_and_pull(monkeypatch, mode, dry_run):
+    calls = []
+    monkeypatch.setattr(lifecycle, "start_zhai_queue", lambda **kw: calls.append(kw) or "j")
+    monkeypatch.setattr(viewer, "attach", lambda _jobid: pytest.fail("must not attach"))
+    monkeypatch.setattr(lifecycle, "pull_zhai_cache", lambda: pytest.fail("must not pull"))
+
+    assert remote.remote_check(**{mode: True}) == "j"
+
+    assert calls[0]["dry_run"] is dry_run
 
 
 def test_pull_zhai_cache_fetches_every_listed_file(monkeypatch, tmp_path):

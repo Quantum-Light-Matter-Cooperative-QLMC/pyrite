@@ -131,14 +131,15 @@ Review the exact batch script and `sbatch --parsable` submission command without
 contacting the lab box:
 
 ```bash
-cxr remote run standard -m hopg --dry-run
+cxr run standard -m hopg --remote --dry-run
 ```
 
-`cxr remote run standard -m hopg` syncs, submits, follows the SLURM job, and
-pulls the checkpoint. Add `--headless` to return after submission.
-Use `--chunk-minutes 0 --parallel-materials 3` only for workloads measured to
-fit concurrently. Use `cxr remote status`, `cxr remote logs --follow`, or
-`cxr remote status --attach` to monitor the allocation. Attached status shows an independent
+`cxr run standard -m hopg --remote` syncs, submits, follows the SLURM job, and
+pulls the checkpoint. Add `--detach` to return after submission. The hidden
+compatibility command retains advanced `--chunk-minutes` / `--parallel-materials`
+controls during migration; use concurrent materials only for workloads measured
+to fit. Use `cxr job status`, `cxr job logs --follow`, or `cxr job attach` to
+monitor the allocation. Attached status shows an independent
 case-progress bar for each material; `logs --follow` shows the raw shared job log.
 While pending, status ranks the target among all pending jobs in the configured
 SLURM partition by scheduler priority (descending, then numeric job ID) and
@@ -157,7 +158,7 @@ to approximate wall time using the submitted parallelism.
 Use `--perf` to enable resource sampling for the selected profile:
 
 ```bash
-cxr remote run sub_100keV --perf
+cxr run sub_100keV --remote --perf
 ```
 
 Each five-second NDJSON sample records host and process-tree CPU/RAM, CPU
@@ -174,7 +175,7 @@ progress in attached status. Fetch every remote job matching the catalog profile
 with:
 
 ```bash
-cxr remote profile pull sub_100keV
+cxr remote performance pull sub_100keV
 ```
 
 Pulled files land under `performance-profiles/NAME/<job>/<material>.ndjson`.
@@ -183,16 +184,17 @@ Use the
 validate sessions, derive phase/resource metrics, classify bottlenecks, and
 design controlled tuning runs.
 
-For a bursty, spectrum-dominated GPU run, add `--nsys --chunk-minutes 0` to a
+For a bursty, spectrum-dominated GPU run, add `--nsys` to a
 single-material, single-repetition performance submit. This runs an uncached
 job-local session under Nsight Systems and writes CUDA/NVTX/Python-stack trace
-artifacts beside the NDJSON. `cxr remote profile pull NAME` fetches the
+artifacts beside the NDJSON. `cxr remote performance pull NAME` fetches the
 `.nsys-rep`, `.sqlite`, and `.nsys-stats.txt` files too; see the playbook's
 Nsight section for the exact command and interpretation limits.
 
-`cxr remote stop ...` cancels an active allocation with `scancel`. `cxr remote
-check` follows the same submit-and-wait workflow for its validation calculation;
-`cxr remote check --detached` returns after submission.
+`cxr job stop ...` cancels an active allocation with `scancel`.
+`cxr run --preset zhai --remote` follows the same submit-and-wait workflow for
+the Zhai reproduction; add `--detach` to return after submission. Retrieve an
+existing cache with `cxr remote pull --preset zhai`.
 
 With no job id, `cxr remote status --attach`/`logs`/`status` resolve to the most
 recently active job. Profile submissions name their job after the profile

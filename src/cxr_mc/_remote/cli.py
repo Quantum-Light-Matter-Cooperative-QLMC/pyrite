@@ -8,6 +8,7 @@ from contextlib import redirect_stderr, redirect_stdout
 import click
 
 from ..cli import _completion as _cli_completion
+from ..cli import _deprecations
 from ..cli import json as cli_json
 from ..cli._core import (
     FINITE_FLOAT,
@@ -55,6 +56,8 @@ def remote_check(
     tmd_azimuth=0.0,
     refresh=False,
     no_sync=False,
+    detach=False,
+    dry_run=False,
 ):
     """Submit the Zhai reproduction through SLURM, follow it, then pull cache."""
     jobid = lifecycle.start_zhai_queue(
@@ -64,7 +67,10 @@ def remote_check(
         tmd_azimuth=tmd_azimuth,
         refresh=refresh,
         no_sync=no_sync,
+        dry_run=dry_run,
     )
+    if detach or dry_run:
+        return jobid
     if not viewer.attach(jobid):
         emit_diagnostic(
             "Zhai job is still running or its viewer disconnected; skipping automatic cache pull"
@@ -548,10 +554,10 @@ def _reject_all_with_values(command_name, all_, values):
         "over workflow defaults where offered.\n\n"
         "\b\n"
         "Examples:\n"
-        "  cxr remote run sub_100keV --dry-run\n"
-        "  cxr remote run compute_test_300keV -p\n"
-        "  cxr remote run standard -m hopg\n"
-        "  cxr remote status -vv"
+        "  cxr run sub_100keV --remote --dry-run\n"
+        "  cxr run compute_test_300keV --remote -p\n"
+        "  cxr run standard -m hopg --remote\n"
+        "  cxr job status -vv"
     ),
     no_args_is_help=False,
 )
@@ -965,6 +971,7 @@ def start_command(
     )
 
 
+start_command.hidden = True
 command.add_command(start_command)
 
 
@@ -1166,11 +1173,17 @@ def reap_command(min_age_minutes, yes):
     help=(
         "Fetch existing checkpoints from remote box.\n\n"
         "STEM is usually a bare material name, but MATERIAL@PROFILE selects the "
-        "checkpoint the box produced for that catalog profile (--profile on "
-        "`cxr remote run`) -- on-disk names never carry the profile, so this "
+        "checkpoint the box produced for that catalog profile (PROFILE on "
+        "`cxr run --remote`) -- on-disk names never carry the profile, so this "
         "reads each candidate's meta.json remotely and pulls the newest match; "
         "--hash pins a specific parameter-hash prefix when more than one exists."
     ),
+)
+@click.option(
+    "--preset",
+    type=click.Choice(("zhai",), case_sensitive=True),
+    default=None,
+    help="Fetch an existing reproduction cache instead of checkpoints.",
 )
 @click.argument(
     "material",
@@ -1232,7 +1245,10 @@ def reap_command(min_age_minutes, yes):
     help="With partial merge, insert records absent locally.",
 )
 @output_option
+@click.pass_context
 def pull_command(
+    ctx,
+    preset,
     material,
     all_,
     narrow_materials,
@@ -1250,6 +1266,32 @@ def pull_command(
 ):
     materials = list(material)
     narrowed = list(narrow_materials)
+    if preset == "zhai":
+        incompatible = {
+            "material": materials,
+            "all": all_,
+            "narrow_materials": narrowed,
+            "catalog_profile": catalog_profile,
+            "hash": hash_prefix,
+            "full": full_,
+            "drop_wide_brem": drop_wide_brem,
+            "downcast": downcast,
+            "level9": level9,
+            "no_sync": no_sync,
+            "brem_only": brem_only,
+            "line_only": line_only,
+            "force": force,
+            "output": (
+                ctx.get_parameter_source("json_output") is click.core.ParameterSource.COMMANDLINE
+            ),
+        }
+        selected = [name for name, value in incompatible.items() if value]
+        if selected:
+            raise click.UsageError(
+                "remote pull --preset zhai does not take checkpoint option(s): "
+                + ", ".join(selected)
+            )
+        return lifecycle.pull_zhai_cache()
     if catalog_profile is None:
         from ..materials import CATALOG
 
@@ -1468,7 +1510,11 @@ def sync_command():
     return _invoke_click(_cli_sync, _click_args("sync"))
 
 
-@click.command("validate", help="Run Zhai reproduction remotely or pull existing caches.")
+@click.command(
+    "validate",
+    hidden=True,
+    help="Run Zhai reproduction remotely or pull existing caches.",
+)
 @click.option(
     "--ne",
     type=POSITIVE_INT,
@@ -1516,11 +1562,19 @@ def sync_command():
     is_flag=True,
     help="Only fetch existing Zhai caches; mutually exclusive with --detached.",
 )
-def check_command(ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, detached, follow, pull):
+@click.pass_context
+def check_command(ctx, ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, detached, follow, pull):
     if follow and not detached:
         raise click.UsageError("--follow requires --detached")
     if pull and detached:
         raise click.UsageError("--pull and --detached are mutually exclusive")
+    path = f"remote {ctx.info_name}"
+    replacement = (
+        "cxr remote pull --preset zhai"
+        if pull
+        else "cxr run --preset zhai --remote" + (" --detach" if detached else "")
+    )
+    _deprecations.warn(path, replacement=replacement)
     return _invoke_click(
         _cli_check,
         _click_args(

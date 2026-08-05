@@ -399,7 +399,7 @@ def validate_catalog_profile(
 def resolve_profile_materials(catalog_profile: str, material: str | None = None) -> list[str]:
     """Resolve one run selection from a profile and optional material override.
 
-    Shared boundary contract for ``cxr run`` and ``cxr remote run``: ``-m``
+    Shared boundary contract for local and remote ``cxr run``: ``-m``
     selects one profile member; omitting it selects the profile's explicit
     ``materials`` membership, or the in-use manifest set (``mats_to_sim.toml``
     ``materials`` -- what ``--all`` loads) when membership is implicit, e.g.

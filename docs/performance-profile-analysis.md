@@ -1,6 +1,6 @@
 # Performance-profile analysis playbook
 
-Use this guide after collecting `cxr remote run PROFILE --perf` logs.
+Use this guide after collecting `cxr run PROFILE --remote --perf` logs.
 Goal: identify throughput constraint from measured phase and resource behavior,
 then test one change at a time. High CPU or GPU utilization is supporting
 evidence, not optimization target; compute-weighted throughput is target.
@@ -48,8 +48,8 @@ The performance-profile name selects an existing catalog profile; it is not an
 arbitrary experiment label. Pulled remote logs retain job separation:
 
 ```bash
-cxr remote run sub_100keV --perf --headless
-cxr remote profile pull sub_100keV
+cxr run sub_100keV --remote --perf --detach
+cxr remote performance pull sub_100keV
 ```
 
 Cached cases contain no new compute and must not be compared with uncached
@@ -82,7 +82,7 @@ cxr remote run compute_test_300keV -m mos2 \
   --chunk-minutes 0 \
   --headless
 
-cxr remote profile pull compute_test_300keV
+cxr remote performance pull compute_test_300keV
 cxr profile analyze compute_test_300keV --sample-period 1
 ```
 
@@ -125,7 +125,7 @@ cxr remote run compute_test_300keV -m mos2 \
   --chunk-minutes 0 \
   --headless
 
-cxr remote profile pull compute_test_300keV
+cxr remote performance pull compute_test_300keV
 ```
 
 `--nsys` requires exactly one material, one material process, one performance

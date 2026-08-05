@@ -1,9 +1,8 @@
 # CLI surface reshuffle (redesign D1-D2, output contract)
 
-Branch: `feature/cli-surface-reshuffle`, stacked on
-`feature/cli-vocab-controls`. It started at `7b6e588`; the owner-authored
-vocabulary verification commit `dada9b7` was merged as `0825dfd` while this
-slice was active.
+Branch: `feature/cli-surface-reshuffle`. The completed Slice 3 work was rebased
+cleanly onto `main` on 2026-08-05 after its original stacked development on
+`feature/cli-vocab-controls`.
 
 Slice 3 of
 [`docs/plans/cli-redesign-implementation-plan.md`](../../../docs/plans/cli-redesign-implementation-plan.md).
@@ -40,17 +39,17 @@ only owns the surface/output work assigned by the implementation plan.
 
 ## Acceptance
 
-- [ ] Canonical help exposes noun -> verb paths and hides retired spellings.
-- [ ] Every retired command/flag warns once and redirects without widening a
+- [x] Canonical help exposes noun -> verb paths and hides retired spellings.
+- [x] Every retired command/flag warns once and redirects without widening a
       destructive target.
-- [ ] `job` handles run, grid, recompute, and validation job records by kind.
-- [ ] `--remote` preserves existing local behavior when absent and selects the
+- [x] `job` handles run, grid, recompute, and validation job records by kind.
+- [x] `--remote` preserves existing local behavior when absent and selects the
       configured or explicit target when present.
-- [ ] `--wait` / `--detach` are uniform and mutually exclusive.
-- [ ] `-o json` emits exactly one versioned UTF-8 object plus newline, with no
+- [x] `--wait` / `--detach` are uniform and mutually exclusive.
+- [x] `-o json` emits exactly one versioned UTF-8 object plus newline, with no
       prose, color, prompt, or progress on stdout; human formats are not frozen
       automation schemas.
-- [ ] `docs/cli-reference.md`, `docs/cli-deprecations.md`, and
+- [x] `docs/cli-reference.md`, `docs/cli-deprecations.md`, and
       `tests/data/cli_contract.json` are regenerated deliberately.
 - [ ] Focused CLI/completion/remote/energy-grid tests, lint, typecheck, and
       relevant suites pass.
@@ -89,7 +88,7 @@ owner-authored base refresh, the full CLI suite passes: 1007 tests.
 - [x] Reused the existing remote run command callback and lifecycle rather than
       duplicating submission logic. Explicit local-only options fail with usage
       guidance when locality is remote.
-- [ ] Hide/warn `remote run` only after the remaining D2a execution paths have
+- [x] Hide/warn `remote run` only after the remaining D2a execution paths have
       canonical modifier homes, so the migration does not expose a half-retired
       namespace.
 
@@ -116,6 +115,27 @@ owner-authored base refresh, the full CLI suite passes: 1007 tests.
 - [x] Hid `energy-grid submit` as a D7 warning redirect after canonical parity.
 - [x] Focused energy-grid/deprecation/contract tests: 355 passed; full CLI suite
       1033 passed; lint, typecheck, reference, deprecation, and contract checks pass.
+
+### Remote Zhai preset
+
+- [x] Added canonical `cxr run --preset zhai -R[=TARGET]` with the reproduction's
+      electron-count, azimuth, refresh, sync, preview, wait, and detach controls.
+- [x] Kept default wait-and-pull behavior, failed-job handling, viewer-disconnect
+      handling, configured/explicit target scoping, and dry-run submission preview.
+- [x] Added `cxr remote pull --preset zhai` for detached cache retrieval and
+      rejected checkpoint selectors/options in that mode.
+- [x] Hid and registered warning compatibility paths for `remote validate`,
+      `remote check`, and `remote run`; pull-only legacy invocations name the
+      retrieval command in their warning.
+- [x] Updated current cache-miss diagnostics, validation-app guidance, repository
+      map, cluster guide, generated CLI reference/deprecations, and frozen contract.
+- [x] Focused CLI/Zhai/contract/guard suite: 764 passed; lint, generated checks,
+      and marimo check pass. The full CLI
+      suite reaches 1045 passed with one rebased-main failure in untouched
+      `transport._sample_cos_theta` (`logger.debug(...)` emits `Ellipsis`).
+- [ ] Repository-wide `ty` and strict Sphinx are blocked by rebased-main issues
+      outside this slice: CuPy JIT typing plus `geometry.py` narrowing errors,
+      and pre-existing autosummary/toctree warnings, respectively.
 
 ### Shared context precedence
 
