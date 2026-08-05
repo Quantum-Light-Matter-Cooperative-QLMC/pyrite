@@ -5,7 +5,7 @@ from __future__ import annotations
 import click
 from tomlkit.exceptions import ParseError
 
-from cxr_mc.cli import _catalog_io
+from cxr_mc.cli import _catalog_io, _deprecations
 from cxr_mc.cli import _completion as _cli_completion
 from cxr_mc.cli import json as cli_json
 from cxr_mc.cli._core import (
@@ -17,7 +17,6 @@ from cxr_mc.cli._core import (
     emit_json_result,
     emit_result,
 )
-from cxr_mc.cli import _deprecations
 from cxr_mc.cli._deprecations import DeprecatingGroup
 from cxr_mc.cli.commands import material
 

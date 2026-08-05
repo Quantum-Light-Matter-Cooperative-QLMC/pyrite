@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
+import pytest
 
 from cxr_mc.cli import command
-from cxr_mc.cli._deprecations import DEPRECATIONS
+from cxr_mc.cli._deprecations import DEPRECATIONS, SUPPORT_WINDOW_MINORS, _window, message
+from scripts.generate_cli_deprecations import build_deprecations
+from tests.helpers.cli import invoke
 
 
 def _resolve_command_path(root: click.Group, path: str) -> click.Command:
@@ -81,3 +86,80 @@ def test_every_hidden_command_is_covered_by_deprecations() -> None:
         assert _hidden_path_is_covered(path, child, child_ctx), (
             f"hidden compatibility command has no deprecation coverage: {' '.join(path)!r}"
         )
+
+
+def _replacement_command_path(replacement: str) -> str:
+    """Extract the Click command path from a documented replacement template."""
+    parts = replacement.split()
+
+    assert parts
+    assert parts[0] == "cxr"
+
+    command_parts = []
+
+    for part in parts[1:]:
+        if part.startswith("-"):
+            break
+        if part.isupper() or part.endswith(",..."):
+            break
+
+        command_parts.append(part)
+
+    return " ".join(command_parts)
+
+
+def test_every_replacement_names_a_live_non_deprecated_command() -> None:
+    for old_path, deprecation in DEPRECATIONS.items():
+        replacement_path = _replacement_command_path(deprecation.replacement)
+
+        assert replacement_path, f"{old_path!r} has no resolvable replacement command"
+
+        _resolve_command_path(command, replacement_path)
+
+        assert replacement_path not in DEPRECATIONS, (
+            f"{old_path!r} points to another deprecated command: {replacement_path!r}"
+        )
+
+
+@pytest.mark.parametrize("path", sorted(DEPRECATIONS))
+def test_each_deprecated_path_warns_exactly_once(path: str) -> None:
+    result = invoke(
+        command,
+        [*path.split(), "--zzz-not-a-flag"],
+    )
+
+    warning_lines = [line for line in result.stderr.splitlines() if "is deprecated" in line]
+
+    assert warning_lines == [message(path)]
+
+
+@pytest.mark.parametrize("path", sorted(DEPRECATIONS))
+def test_deprecated_path_help_does_not_warn(path: str) -> None:
+    result = invoke(
+        command,
+        [*path.split(), "--help"],
+    )
+
+    assert result.exit_code == 0
+    assert "is deprecated" not in result.stderr
+
+
+def test_deprecation_support_window() -> None:
+    for path, dep in DEPRECATIONS.items():
+        assert dep.remove_in == _window(dep.deprecated_in), (
+            f"{path!r} has remove_in={dep.remove_in!r}, "
+            f"expected {_window(dep.deprecated_in)!r} "
+            f"for a {SUPPORT_WINDOW_MINORS}-minor support window"
+        )
+
+
+def test_window_advances_minor_version() -> None:
+    assert _window("0.1.0") == "0.3.0"
+    assert _window("1.4.7") == "1.6.0"
+
+
+def test_generated_deprecation_docs_are_current() -> None:
+    expected = build_deprecations()
+    actual = Path("docs/cli-deprecations.md").read_text(encoding="utf-8")
+
+    assert actual == expected

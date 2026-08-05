@@ -17,7 +17,7 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command keeps
 | `cxr energy-grid status` | `cxr energy-grid job status` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid stop` | `cxr energy-grid job stop` | 0.1.0 | 0.3.0 |  |
 | `cxr profile add-material` | `cxr profile add NAME --materials MATERIAL,...` | 0.1.0 | 0.3.0 |  |
-| `cxr profile analyze` | `cxr performance analyze` | 0.1.0 | 0.3.0 |  |
+| `cxr profile analyze` | `cxr performance analyze NAME` | 0.1.0 | 0.3.0 |  |
 | `cxr profile members add` | `cxr profile add NAME --materials MATERIAL,...` | 0.1.0 | 0.3.0 |  |
 | `cxr profile members remove` | `cxr profile remove NAME --materials MATERIAL,...` | 0.1.0 | 0.3.0 |  |
 | `cxr profile members reset` | `cxr profile set NAME --all-materials` | 0.1.0 | 0.3.0 |  |
@@ -27,9 +27,9 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command keeps
 | `cxr rebrem` | `cxr checkpoint recompute brem` | 0.1.0 | 0.3.0 |  |
 | `cxr reline` | `cxr checkpoint recompute line` | 0.1.0 | 0.3.0 |  |
 | `cxr remote check` | `cxr material validate --remote` | 0.1.0 | 0.3.0 |  |
-| `cxr remote profile` | `cxr remote performance` | 0.1.0 | 0.3.0 |  |
+| `cxr remote profile pull` | `cxr remote performance pull` | 0.1.0 | 0.3.0 |  |
 | `cxr restore` | `cxr checkpoint restore` | 0.1.0 | 0.3.0 |  |
 | `cxr slim` | `cxr checkpoint slim` | 0.1.0 | 0.3.0 |  |
-| `cxr sweep set` | `cxr material set` | 0.1.0 | 0.3.0 |  |
+| `cxr sweep set` | `cxr material set` | 0.1.0 | 0.3.0 | The warning names the material and profile actually given. |
 | `cxr sweep show` | `cxr material show` | 0.1.0 | 0.3.0 | With no MATERIAL argument, use `cxr profile list`. |
 | `cxr union` | `cxr checkpoint merge` | 0.1.0 | 0.3.0 |  |

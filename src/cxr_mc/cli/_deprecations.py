@@ -122,6 +122,7 @@ def warn(path: str, *, replacement: str | None = None) -> None:
 #: Context-wide flag: one deprecated invocation emits exactly one diagnostic,
 #: even when a deprecated group and a deprecated leaf both resolve.
 WARNED_META_KEY = "cxr_mc.deprecation_warned"
+PENDING_WARNING_META_KEY = "cxr_mc_pending_deprecation"
 
 
 def invocation_path(ctx: click.Context) -> str:
@@ -146,8 +147,14 @@ def invocation_path(ctx: click.Context) -> str:
 def warn_command(ctx: click.Context, cmd_name: str) -> None:
     """Warn once if *cmd_name* resolved under *ctx* is a deprecated spelling."""
     path = " ".join(part for part in (invocation_path(ctx), cmd_name) if part)
-    if path not in DEPRECATIONS or path in SELF_WARNING or ctx.meta.get(WARNED_META_KEY):
+
+    if path not in DEPRECATIONS or ctx.meta.get(WARNED_META_KEY):
         return
+
+    if path in SELF_WARNING:
+        ctx.meta[PENDING_WARNING_META_KEY] = path
+        return
+
     ctx.meta[WARNED_META_KEY] = True
     warn(path)
 
@@ -172,3 +179,15 @@ class DeprecatingGroup(click.Group):
         if cmd_name is not None and not help_requested:
             warn_command(ctx, cmd_name)
         return cmd_name, command, remaining
+
+    def invoke(self, ctx: click.Context):
+        try:
+            return super().invoke(ctx)
+        except click.UsageError:
+            path = ctx.meta.pop(PENDING_WARNING_META_KEY, None)
+
+            if path is not None and not ctx.meta.get(WARNED_META_KEY):
+                ctx.meta[WARNED_META_KEY] = True
+                warn(path)
+
+            raise
