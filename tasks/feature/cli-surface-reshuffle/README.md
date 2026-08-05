@@ -73,6 +73,13 @@ case still invoke retired `--angles` while asserting empty stderr; another
 local-click case invokes retired analysis `--default` with the same assertion.
 The five failures introduced by the job-path warnings were corrected here.
 
+### Explicit app actions
+
+- [x] Added `app analysis launch`, `app viewer launch`, and
+      `app validation launch`; `export` remains the sibling action.
+- [x] Kept implicit app launches as D7 warning redirects, removing the
+      material-versus-subcommand ambiguity without breaking old invocations.
+
 ## Non-goals
 
 - No content-addressed store, artifact hash migration, checkpoint lockfile, or

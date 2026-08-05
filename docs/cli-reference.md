@@ -64,7 +64,7 @@ Usage: cxr [OPTIONS] COMMAND [ARGS]...
     cxr profile show sub_100keV
     cxr run sub_100keV -m hopg
     cxr remote run sub_100keV --dry-run
-    cxr app analysis
+    cxr app analysis launch
 
 Options:
   --version                    Show the version and exit.
@@ -197,6 +197,7 @@ Options:
 
 Commands:
   export  Render notebooks/analysis_app.py to static HTML.
+  launch  Launch notebooks/analysis_app.py with marimo run or edit.
 ```
 
 ## `cxr app analysis export`
@@ -210,6 +211,27 @@ Usage: cxr app analysis export [OPTIONS] [STEM]
 
 Options:
   -h, --help  Show this message and exit.
+```
+
+## `cxr app analysis launch`
+
+```text
+Usage: cxr app analysis launch [OPTIONS] [MATERIAL]
+
+  Launch notebooks/analysis_app.py with marimo run or edit.
+
+  MATERIAL overrides the persisted default for this run. --persist-default stores it for
+  later no-argument launches.
+
+Options:
+  -d, --save-default  Persist MATERIAL as default for future no-argument runs.
+  --watch             Reload app when source files change.
+  --smoke             Execute app once headlessly and exit.
+  --edit              Use `marimo edit` instead of `marimo run`.
+  --acp               Start local Claude and Codex ACP bridges.
+  --tunnel            Bind fixed port for SSH tunneling.
+  --no-token          Disable marimo auth token.
+  -h, --help          Show this message and exit.
 ```
 
 ## `cxr app viewer`
@@ -236,6 +258,7 @@ Options:
 
 Commands:
   export  Render the viewer as static HTML without starting marimo.
+  launch  Launch notebooks/trace_app.py with marimo run or edit.
 ```
 
 ## `cxr app viewer export`
@@ -248,6 +271,29 @@ Usage: cxr app viewer export [OPTIONS] [MATERIAL]
 Options:
   --stem TEXT  Output stem under results/ (without .html).
   -h, --help   Show this message and exit.
+```
+
+## `cxr app viewer launch`
+
+```text
+Usage: cxr app viewer launch [OPTIONS] [MATERIAL]
+
+  Launch notebooks/trace_app.py with marimo run or edit.
+
+  3D trajectory and crystal structure visualization.
+
+  MATERIAL overrides the persisted default for this run. --persist-default stores it for
+  later no-argument launches.
+
+Options:
+  -d, --save-default  Persist MATERIAL as default for future no-argument runs.
+  --watch             Reload app when source files change.
+  --smoke             Execute app once headlessly and exit.
+  --edit              Use `marimo edit` instead of `marimo run`.
+  --acp               Start local Claude and Codex ACP bridges.
+  --tunnel            Bind fixed port for SSH tunneling.
+  --no-token          Disable marimo auth token.
+  -h, --help          Show this message and exit.
 ```
 
 ## `cxr app validation`
@@ -266,6 +312,7 @@ Options:
 
 Commands:
   export  Write cached validation figures; never starts marimo.
+  launch  Launch the interactive validation application.
 ```
 
 ## `cxr app validation export`
@@ -281,6 +328,21 @@ Options:
   --ne-brem INTEGER   [default: 200]
   --ne-supp INTEGER   [default: 200]
   -h, --help          Show this message and exit.
+```
+
+## `cxr app validation launch`
+
+```text
+Usage: cxr app validation launch [OPTIONS]
+
+  Launch the interactive validation application.
+
+Options:
+  --watch     Pass marimo's --watch.
+  --edit      Use `marimo edit` instead of `marimo run`.
+  --acp       Start local Claude and Codex ACP bridges.
+  --tunnel    Use fixed port for SSH tunneling.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr checkpoint`

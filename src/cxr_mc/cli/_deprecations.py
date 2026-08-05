@@ -77,6 +77,11 @@ DEPRECATIONS: dict[str, Deprecation] = {
         # Config/validation spellings.
         _entry("check", "cxr material validate"),
         _entry("check-config", "cxr profile show"),
+        # D1: app actions are explicit leaves; implicit group launch remains a
+        # compatibility callback through the removal window.
+        _entry("app analysis", "cxr app analysis launch"),
+        _entry("app viewer", "cxr app viewer launch"),
+        _entry("app validation", "cxr app validation launch"),
         # Flat energy-grid job verbs, retired into the `job` subgroup.
         _entry("energy-grid attach", "cxr job attach"),
         _entry("energy-grid logs", "cxr job logs"),
@@ -284,6 +289,8 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         _flag("energy-grid defaults", "--set", "--save-default"),
         _flag("app analysis", "--default", "--save-default"),
         _flag("app viewer", "--default", "--save-default"),
+        _flag("app analysis launch", "--default", "--save-default"),
+        _flag("app viewer launch", "--default", "--save-default"),
     )
 }
 

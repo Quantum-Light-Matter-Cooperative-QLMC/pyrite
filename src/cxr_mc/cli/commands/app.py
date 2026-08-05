@@ -8,6 +8,7 @@ from importlib import import_module
 import click
 
 from .._core import LazyGroup
+from .._deprecations import warn_command
 
 _LEAVES = {
     "analysis": "cxr_mc.cli.app.analysis_command",
@@ -30,6 +31,21 @@ class AppGroup(LazyGroup):
             return super().get_command(ctx, cmd_name)
         loaded = _load(import_path)
         return loaded() if callable(loaded) and not isinstance(loaded, click.Command) else loaded
+
+    def resolve_command(
+        self, ctx: click.Context, args: list[str]
+    ) -> tuple[str | None, click.Command | None, list[str]]:
+        """Warn only for an implicit launch, not the canonical launch/export leaf."""
+        cmd_name, resolved, remaining = click.Group.resolve_command(self, ctx, args)
+        help_requested = any(arg in self.get_help_option_names(ctx) for arg in remaining)
+        explicit_leaf = (
+            isinstance(resolved, click.Group)
+            and bool(remaining)
+            and remaining[0] in resolved.commands
+        )
+        if cmd_name is not None and not help_requested and not explicit_leaf:
+            warn_command(ctx, cmd_name)
+        return cmd_name, resolved, remaining
 
 
 class LaunchLeafGroup(click.Group):
@@ -101,6 +117,9 @@ def _launch_leaf(name: str, launch_path: str, export_path: str) -> click.Group:
         no_args_is_help=False,
         context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
     )
+    canonical_launch = copy(launch)
+    canonical_launch.name = "launch"
+    leaf.add_command(canonical_launch)
     export = _load(export_path)
     if not isinstance(export, click.Command):
         raise TypeError(f"{export_path!r} did not resolve to a Click command")
@@ -132,19 +151,37 @@ def validation_command(
 ) -> None:
     """Launch validation app when no nested command is selected."""
     if ctx.invoked_subcommand is None:
-        check = _load("cxr_mc.check.command")
-        ctx.invoke(
-            check,
-            watch=watch,
-            edit=edit,
-            acp=acp,
-            tunnel=tunnel,
-            export_=False,
-            outdir="figures",
-            ne=20_000,
-            ne_brem=200,
-            ne_supp=200,
-        )
+        _launch_validation(ctx, watch=watch, edit=edit, acp=acp, tunnel=tunnel)
+
+
+@click.command("launch", help="Launch the interactive validation application.")
+@click.option("--watch", is_flag=True, help="Pass marimo's --watch.")
+@click.option("--edit", is_flag=True, help="Use `marimo edit` instead of `marimo run`.")
+@click.option("--acp", is_flag=True, help="Start local Claude and Codex ACP bridges.")
+@click.option("--tunnel", is_flag=True, help="Use fixed port for SSH tunneling.")
+@click.pass_context
+def validation_launch_command(
+    ctx: click.Context, watch: bool, edit: bool, acp: bool, tunnel: bool
+) -> None:
+    _launch_validation(ctx, watch=watch, edit=edit, acp=acp, tunnel=tunnel)
+
+
+def _launch_validation(
+    ctx: click.Context, *, watch: bool, edit: bool, acp: bool, tunnel: bool
+) -> None:
+    check = _load("cxr_mc.check.command")
+    ctx.invoke(
+        check,
+        watch=watch,
+        edit=edit,
+        acp=acp,
+        tunnel=tunnel,
+        export_=False,
+        outdir="figures",
+        ne=20_000,
+        ne_brem=200,
+        ne_supp=200,
+    )
 
 
 @click.command("export", help="Write cached validation figures; never starts marimo.")
@@ -172,4 +209,5 @@ def validation_export_command(
     )
 
 
+validation_command.add_command(validation_launch_command)
 validation_command.add_command(validation_export_command)

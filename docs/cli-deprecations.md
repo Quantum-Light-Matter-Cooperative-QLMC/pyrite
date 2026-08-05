@@ -10,6 +10,9 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 
 | Deprecated spelling | Replacement | Deprecated in | Remove in | Note |
 | --- | --- | --- | --- | --- |
+| `cxr app analysis` | `cxr app analysis launch` | 0.1.0 | 0.3.0 |  |
+| `cxr app validation` | `cxr app validation launch` | 0.1.0 | 0.3.0 |  |
+| `cxr app viewer` | `cxr app viewer launch` | 0.1.0 | 0.3.0 |  |
 | `cxr archive` | `cxr checkpoint archive` | 0.1.0 | 0.3.0 |  |
 | `cxr archives` | `cxr checkpoint list` | 0.1.0 | 0.3.0 |  |
 | `cxr check` | `cxr material validate` | 0.1.0 | 0.3.0 |  |
@@ -56,7 +59,9 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 | Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |
 | --- | --- | --- | --- | --- | --- |
 | `cxr app analysis` | `--default` | `--save-default` | 0.1.0 | 0.3.0 |  |
+| `cxr app analysis launch` | `--default` | `--save-default` | 0.1.0 | 0.3.0 |  |
 | `cxr app viewer` | `--default` | `--save-default` | 0.1.0 | 0.3.0 |  |
+| `cxr app viewer launch` | `--default` | `--save-default` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid apply` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid defaults` | `--azimuths` | `--azimuth` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid defaults` | `--set` | `--save-default` | 0.1.0 | 0.3.0 |  |

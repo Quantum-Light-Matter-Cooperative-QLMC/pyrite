@@ -40,8 +40,8 @@ def test_analysis_leaf_launches_and_export_dispatches(monkeypatch):
     monkeypatch.setattr("cxr_mc.export._export", lambda stem: launched.update(export=stem))
 
     runner = CliRunner()
-    launch = runner.invoke(cli.command, ["app", "analysis", "mose2"])
-    smoke = runner.invoke(cli.command, ["app", "analysis", "--smoke"])
+    launch = runner.invoke(cli.command, ["app", "analysis", "launch", "mose2"])
+    smoke = runner.invoke(cli.command, ["app", "analysis", "launch", "--smoke"])
     exported = runner.invoke(cli.command, ["app", "analysis", "export", "report"])
 
     assert launch.exit_code == 0
@@ -74,7 +74,7 @@ def test_validation_leaf_and_export_dispatch_without_cross_mode_flags(monkeypatc
     )
 
     runner = CliRunner()
-    launch = runner.invoke(cli.command, ["app", "validation", "--watch"])
+    launch = runner.invoke(cli.command, ["app", "validation", "launch", "--watch"])
     exported = runner.invoke(
         cli.command, ["app", "validation", "export", "--outdir", "out", "--ne", "11"]
     )
@@ -83,3 +83,19 @@ def test_validation_leaf_and_export_dispatch_without_cross_mode_flags(monkeypatc
     assert calls[0] == ("launch", {"edit": False, "watch": True})
     assert exported.exit_code == 0
     assert calls[1] == ("export", ("out",), {"ne": 11, "ne_brem": 200, "ne_supp": 200})
+
+
+def test_implicit_app_launch_warns_and_still_dispatches(monkeypatch):
+    launched = {}
+    monkeypatch.setattr(
+        analyze,
+        "_launch",
+        lambda material, **kwargs: launched.update(material=material, **kwargs),
+    )
+
+    result = CliRunner().invoke(cli.command, ["app", "analysis", "mose2"])
+
+    assert result.exit_code == 0
+    assert launched["material"] == "mose2"
+    assert "'cxr app analysis' is deprecated" in result.stderr
+    assert "use 'cxr app analysis launch'" in result.stderr

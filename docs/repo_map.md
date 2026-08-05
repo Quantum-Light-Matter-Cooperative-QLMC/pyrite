@@ -93,10 +93,13 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   (validation-study interface). Shared pieces: `notebooks/_design.py` (page
   chrome), `notebooks/_widgets.py` (`MaterialSelect` anywidget). Scan,
   analysis, and trace apps read per-material grids in `config.py`.
-- **`cxr app analysis [material]`** → `analyze:_cli`: launch or smoke-test analysis
-  app with explicit or persisted initial material; `cxr app analysis export` writes static HTML.
-- **`cxr app validation`** → `check:_cli`: launch validation app; `cxr app validation export`
-  writes cached literature-validation figures.
+- **`cxr app analysis launch [material]`** → `analyze:_cli`: launch or smoke-test
+  the analysis app with explicit or persisted initial material; `cxr app analysis
+  export` writes static HTML. The implicit launch form is a hidden-behavior
+  compatibility path and warns.
+- **`cxr app validation launch`** → `check:_cli`: launch the validation app;
+  `cxr app validation export` writes cached literature-validation figures. The
+  same explicit `launch|export` shape applies to `cxr app viewer`.
 - **`cxr remote ...`** → `remote:*`: optional SSH/SLURM lifecycle for lab GPU
   box. Execution/resource commands remain here during the D2a migration, while
   retired `jobs`, `status`, `logs`, and `stop` paths are hidden aliases of the
@@ -524,7 +527,7 @@ and remote command paths. Resolves preset settings and material photon grids;
 keeps a compatibility fallback for older branches.
 
 ### `analyze.py`
-`cxr app analysis` launcher for `notebooks/analysis_app.py`: persisted
+`cxr app analysis launch` owner for `notebooks/analysis_app.py`: persisted
 initial-material selection, smoke execution, edit/watch mode, ACP bridges,
 SSH-tunnel-friendly fixed-port launch.
 - Public: `material_menu`, `select_initial_material`, `face_menu`,
