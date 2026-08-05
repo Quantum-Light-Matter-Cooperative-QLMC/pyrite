@@ -103,7 +103,7 @@ def test_click_status_json_reuses_remote_machine_contract(monkeypatch):
 
     monkeypatch.setattr(_command.remote, "_cli_status", status)
 
-    result = invoke(energy_grid.command, ["job", "status", "job7", "--json"])
+    result = invoke(energy_grid.command, ["job", "status", "job7", "-o", "json"])
 
     assert_clean_result(result, stderr=message("energy-grid job status") + "\n")
     assert '"schema":"cxr.remote.status"' in result.stdout
@@ -361,18 +361,19 @@ def test_click_line_delete_dry_run_skips_prompt_and_confirms_via_kwarg(monkeypat
 
 def test_click_line_delete_dry_run_and_json_conflict():
     result = invoke(
-        energy_grid.command, ["line", "delete", "hopg", "--energy", "30", "--dry-run", "--json"]
+        energy_grid.command,
+        ["line", "delete", "hopg", "--energy", "30", "--dry-run", "-o", "json"],
     )
 
     assert result.exit_code == 2
-    assert "--dry-run and --json cannot be combined" in result.stderr
+    assert "--dry-run and --output json cannot be combined" in result.stderr
 
 
 def test_click_line_delete_json_requires_yes():
-    result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30", "--json"])
+    result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30", "-o", "json"])
 
     assert result.exit_code == 2
-    assert "--json requires --yes" in result.stderr
+    assert "--output json requires --yes" in result.stderr
 
 
 def test_click_line_delete_json_emits_one_envelope(monkeypatch):
@@ -381,7 +382,8 @@ def test_click_line_delete_json_emits_one_envelope(monkeypatch):
     )
 
     result = invoke(
-        energy_grid.command, ["line", "delete", "hopg", "--energy", "30", "--yes", "--json"]
+        energy_grid.command,
+        ["line", "delete", "hopg", "--energy", "30", "--yes", "-o", "json"],
     )
 
     assert_clean_result(result)
@@ -561,7 +563,7 @@ def test_click_defaults_explains_empty_angles(monkeypatch):
         ["defaults", "--set"],
         ["defaults", "--set", "--tilts", "5", "--clear", "azimuths"],
         ["defaults", "--reset", "--clear", "tilts"],
-        ["defaults", "--json", "--reset"],
+        ["defaults", "-o", "json", "--reset"],
     ],
 )
 def test_click_defaults_rejects_ambiguous_mutations(argv):

@@ -180,7 +180,7 @@ def _brem_cli_json(args):
     metavar="N",
     help="Atomically save after every N recomputed records.",
 )
-@_cli_core.json_option
+@_cli_core.output_option
 def brem_command(
     materials,
     all_,
@@ -380,7 +380,7 @@ def _line_cli_json(args):
     metavar="N",
     help="Atomically save after every N recomputed records.",
 )
-@_cli_core.json_option
+@_cli_core.output_option
 def line_command(
     materials,
     all_,

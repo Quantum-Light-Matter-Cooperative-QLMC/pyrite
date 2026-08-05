@@ -55,7 +55,7 @@ def test_list_text_and_json(tmp_path, monkeypatch):
     assert "standard: all materials (implicit), 1 material overrides" in text.stdout
     assert "sub_100keV: 1 materials, 0 material overrides" in text.stdout
 
-    machine = invoke(profile.command, ["list", "--json"])
+    machine = invoke(profile.command, ["list", "-o", "json"])
     assert_clean_result(machine)
     document = json.loads(machine.stdout)
     assert document["schema"] == "cxr.profile.list"
@@ -82,7 +82,7 @@ def test_show_and_bare_name_alias(tmp_path, monkeypatch):
     assert_clean_result(aliased)
     assert aliased.stdout == shown.stdout
 
-    machine = invoke(profile.command, ["show", "standard", "--json"])
+    machine = invoke(profile.command, ["show", "standard", "-o", "json"])
     assert_clean_result(machine)
     payload = json.loads(machine.stdout)["payload"]
     assert payload["materials"] is None
@@ -118,7 +118,7 @@ def test_show_create_and_set_round_trip_longitudinal_beam(tmp_path, monkeypatch)
     )
     assert_clean_result(created, stdout="created profile microtrain\n")
 
-    shown = invoke(profile.command, ["show", "microtrain", "--json"])
+    shown = invoke(profile.command, ["show", "microtrain", "-o", "json"])
     assert_clean_result(shown)
     beam = json.loads(shown.stdout)["payload"]["beam"]
     assert beam == {
@@ -175,7 +175,7 @@ def test_show_inherits_standard_detector_when_profile_block_is_absent(tmp_path, 
         + "solid_angle_sr = 0.066\n",
     )
 
-    shown = invoke(profile.command, ["show", "sub_100keV", "--json"])
+    shown = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
 
     assert_clean_result(shown)
     assert json.loads(shown.stdout)["payload"]["detector"] == {
@@ -259,7 +259,7 @@ def test_create_and_show_round_trip_detector_scalars(tmp_path, monkeypatch):
             "0.066",
         ],
     )
-    shown = invoke(profile.command, ["show", "zhai", "--json"])
+    shown = invoke(profile.command, ["show", "zhai", "-o", "json"])
 
     assert_clean_result(created, stdout="created profile zhai\n")
     assert_clean_result(shown)
@@ -649,11 +649,11 @@ def test_delete_blocked_by_energy_grid_store_referent(tmp_path, monkeypatch):
 def test_delete_json_requires_yes_and_reports_envelope(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    refused = invoke(profile.command, ["delete", "sub_100keV", "--json"])
+    refused = invoke(profile.command, ["delete", "sub_100keV", "-o", "json"])
     assert refused.exit_code == 2
-    assert "--json requires --yes" in refused.stderr
+    assert "--output json requires --yes" in refused.stderr
 
-    deleted = invoke(profile.command, ["delete", "sub_100keV", "--json", "-y"])
+    deleted = invoke(profile.command, ["delete", "sub_100keV", "-o", "json", "-y"])
     assert_clean_result(deleted)
     document = json.loads(deleted.stdout)
     assert document["schema"] == "cxr.profile.delete"

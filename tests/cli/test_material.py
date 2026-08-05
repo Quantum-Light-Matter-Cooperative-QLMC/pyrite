@@ -55,7 +55,7 @@ def test_show_default_profile_reports_effective_sources(tmp_path, monkeypatch):
 def test_show_nonstandard_profile_json(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(material.command, ["show", "hopg", "--profile", "survey", "--json"])
+    result = invoke(material.command, ["show", "hopg", "--profile", "survey", "-o", "json"])
 
     assert_clean_result(result)
     document = json.loads(result.stdout)
@@ -156,7 +156,7 @@ def test_unknown_names_report_actionable_errors(tmp_path, monkeypatch):
 def test_hidden_sweep_paths_warn_and_delegate(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
-    shown = invoke(sweep.command, ["show", "hopg", "--json"])
+    shown = invoke(sweep.command, ["show", "hopg", "-o", "json"])
     changed = invoke(
         sweep.command,
         ["set", "hopg", "--profile", "survey", "--azimuth", "100"],
@@ -195,7 +195,7 @@ def test_hidden_sweep_set_concatenates_repeated_range_options(tmp_path, monkeypa
 def test_hidden_sweep_show_without_material_preserves_overview(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(sweep.command, ["show", "--json"])
+    result = invoke(sweep.command, ["show", "-o", "json"])
 
     assert result.exit_code == 0
     document = json.loads(result.stdout)

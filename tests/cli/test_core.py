@@ -80,14 +80,14 @@ def test_lazy_group_rejects_non_command(monkeypatch):
     assert "resolved to non-command" in result.stderr
 
 
-def test_json_option_and_envelope_keep_stdout_machine_only():
+def test_output_option_and_envelope_keep_stdout_machine_only():
     @click.command()
-    @_cli_core.json_option
+    @_cli_core.output_option
     def command(json_output):
         if json_output:
             _cli_core.emit_json("cxr.test", {"value": 3})
 
-    result = invoke(command, ["--json"])
+    result = invoke(command, ["-o", "json"])
     assert_clean_result(
         result,
         stdout=(

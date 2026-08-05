@@ -14,7 +14,7 @@ def test_job_list_filters_canonical_kind_and_emits_json(monkeypatch):
         lambda: "run-1\t1\tFalse\tscan\thopg\trunning\ngrid-1\t2\tFalse\tenergy-grid\thbn\tdone\n",
     )
 
-    result = invoke(job.command, ["list", "--kind", "grid", "--json"])
+    result = invoke(job.command, ["list", "--kind", "grid", "-o", "json"])
 
     assert_clean_result(result)
     jobs = json.loads(result.stdout)["payload"]["jobs"]

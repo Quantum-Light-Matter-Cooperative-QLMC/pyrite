@@ -129,7 +129,7 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
 )
 @click.option("--progress-file", type=click.Path(path_type=Path), default=None, hidden=True)
 @click.option("--no-progress", is_flag=True, hidden=True)
-@_cli_core.json_option
+@_cli_core.output_option
 def command(
     material,
     energies,

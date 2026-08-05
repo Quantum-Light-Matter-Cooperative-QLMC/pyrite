@@ -15,7 +15,7 @@ from typing import Any
 
 import click
 
-from cxr_mc.cli._deprecations import DeprecatingGroup
+from cxr_mc.cli._deprecations import DeprecatingGroup, RetiredOption
 
 _COLOR_MODE: ContextVar[str] = ContextVar("cxr_cli_color_mode", default="auto")
 
@@ -420,13 +420,33 @@ def confirm_destructive(yes: bool, prompt: str) -> bool:
     return click.confirm(prompt, default=False, err=True)
 
 
-def json_option(function):
-    """Add explicit machine-output switch shared by JSON-capable commands."""
-    return click.option(
+OUTPUT_CHOICES = click.Choice(("table", "json", "wide"), case_sensitive=True)
+
+
+def _json_selected(_ctx, _param, value: str) -> bool:
+    return value == "json"
+
+
+def output_option(function):
+    """Add canonical human/machine output selection plus retired ``--json``."""
+    function = click.option(
         "--json",
-        "json_output",
+        cls=RetiredOption,
+        dest="json_output",
+        replacement="--output json",
         is_flag=True,
-        help="Emit one versioned JSON object on stdout.",
+        flag_value=True,
+    )(function)
+    return click.option(
+        "-o",
+        "--output",
+        "json_output",
+        type=OUTPUT_CHOICES,
+        default="table",
+        show_default=True,
+        is_eager=True,
+        callback=_json_selected,
+        help="Output format; only json is a stable automation contract.",
     )(function)
 
 

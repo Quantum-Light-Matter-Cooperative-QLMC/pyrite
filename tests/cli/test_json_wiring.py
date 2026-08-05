@@ -7,6 +7,7 @@ import pytest
 
 from cxr_mc import archive, blaze, energy_grid, recompute, remote, scan
 from cxr_mc._remote import lifecycle, viewer
+from cxr_mc.cli import command as root_command
 from cxr_mc.cli.commands import job as job_cli
 from cxr_mc.cli.commands import recompute as recompute_cli
 from tests.helpers.cli import invoke
@@ -27,7 +28,7 @@ def test_remote_jobs_json_is_one_sanitized_envelope(monkeypatch):
         lambda: "j1\t0042\tFalse\trebrem\thopg hbn\trunning\x1b[31m\n",
     )
 
-    document = _document(invoke(job_cli.command, ["list", "--json"]))
+    document = _document(invoke(job_cli.command, ["list", "-o", "json"]))
 
     assert document["schema"] == "cxr.remote.jobs"
     assert document["payload"]["jobs"][0]["scheduler_job_id"] == "0042"
@@ -48,6 +49,41 @@ def test_remote_jobs_human_output_accepts_six_field_transport(monkeypatch):
     assert "j1" in result.stdout
     assert "hopg, hbn" in result.stdout
     assert result.stderr == ""
+
+
+def test_output_selector_keeps_json_alias_compatible_and_hidden(monkeypatch):
+    monkeypatch.setattr(
+        viewer,
+        "jobs_raw",
+        lambda: "j1\t0042\tFalse\trun\thopg\tdone\n",
+    )
+
+    canonical = invoke(root_command, ["job", "list", "-o", "json"])
+    retired = invoke(root_command, ["job", "list", "--json"])
+    wide = invoke(root_command, ["job", "list", "-o", "wide"])
+    help_result = invoke(root_command, ["job", "list", "--help"])
+
+    assert canonical.exit_code == retired.exit_code == wide.exit_code == 0
+    assert canonical.stdout == retired.stdout
+    assert canonical.stderr == wide.stderr == ""
+    assert "warning: '--json' is deprecated" in retired.stderr
+    assert "use '--output json'" in retired.stderr
+    assert "-o, --output [table|json|wide]" in help_result.stdout
+    assert "--json" not in help_result.stdout
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["job", "list", "-o", "json", "--json"],
+        ["job", "list", "--json", "--output", "json"],
+    ],
+)
+def test_output_selector_conflicts_with_retired_json(argv):
+    result = invoke(root_command, argv)
+
+    assert result.exit_code == 2
+    assert "--json is the retired spelling of --output json; pass one, not both" in result.stderr
 
 
 def test_remote_status_json_fetches_full_detail(monkeypatch):
@@ -72,7 +108,7 @@ def test_remote_status_json_fetches_full_detail(monkeypatch):
 
     monkeypatch.setattr(viewer, "status_sections", status_sections)
 
-    document = _document(invoke(job_cli.command, ["status", "j1", "--json"]))
+    document = _document(invoke(job_cli.command, ["status", "j1", "-o", "json"]))
 
     assert seen == {"jobid": "j1", "detail": 2}
     assert document["schema"] == "cxr.remote.status"
@@ -87,7 +123,7 @@ def test_remote_jobs_runtime_failure_is_json_and_nonzero(monkeypatch):
         lambda: (_ for _ in ()).throw(SystemExit("ssh failed")),
     )
 
-    document = _document(invoke(job_cli.command, ["list", "--json"]), exit_code=1)
+    document = _document(invoke(job_cli.command, ["list", "-o", "json"]), exit_code=1)
 
     assert document["ok"] is False
     assert document["payload"] == {"jobs": []}
@@ -111,11 +147,11 @@ def test_line_grid_defaults_json_is_read_only(monkeypatch, tmp_path):
         },
     )
 
-    document = _document(invoke(energy_grid.command, ["defaults", "--json"]))
+    document = _document(invoke(energy_grid.command, ["defaults", "-o", "json"]))
 
     assert document["schema"] == "cxr.energy-grid.defaults"
     assert document["payload"]["source"] == "persisted"
-    result = invoke(energy_grid.command, ["defaults", "--set", "--json"])
+    result = invoke(energy_grid.command, ["defaults", "--set", "-o", "json"])
     assert result.exit_code == 2
     assert result.stdout == ""
 
@@ -138,7 +174,7 @@ E_grid_brem = { arange = { start = 0, stop = 10, step = 1 } }
     monkeypatch.setattr(energy_grid.apply, "_MATERIALS_TOML", catalog)
     monkeypatch.setattr(energy_grid.apply._provenance, "load", lambda: {})
 
-    document = _document(invoke(energy_grid.command, ["show", "hopg", "--json"]))
+    document = _document(invoke(energy_grid.command, ["show", "hopg", "-o", "json"]))
 
     assert document["schema"] == "cxr.energy-grid.show"
     material = document["payload"]["materials"][0]
@@ -154,7 +190,7 @@ def test_archives_json_retains_unreadable_entry(monkeypatch, tmp_path):
     (shelf / "bad.pkl").write_bytes(b"bad")
     monkeypatch.setattr(archive, "DEFAULT_ROOT", str(tmp_path))
 
-    document = _document(invoke(archive.archives_command, ["--json"]), exit_code=1)
+    document = _document(invoke(archive.archives_command, ["-o", "json"]), exit_code=1)
 
     assert document["schema"] == "cxr.archives"
     assert [item["label"] for item in document["payload"]["archives"]] == ["bad", "good"]
@@ -175,7 +211,7 @@ def test_run_json_suppresses_human_output_and_preserves_resumable_exit(
     monkeypatch.setattr(scan, "_run_material", run_material)
 
     document = _document(
-        invoke(scan.command, ["standard", "-m", "hopg", "--json"]), exit_code=exit_code
+        invoke(scan.command, ["standard", "-m", "hopg", "-o", "json"]), exit_code=exit_code
     )
 
     assert document["schema"] == "cxr.operation-summary"
@@ -190,7 +226,7 @@ def test_blaze_json_suppresses_human_output(monkeypatch):
     document = _document(
         invoke(
             blaze.command,
-            ["hopg", "--energy", "30", "--spacing", "1e-6", "--json"],
+            ["hopg", "--energy", "30", "--spacing", "1e-6", "-o", "json"],
         )
     )
 
@@ -213,7 +249,7 @@ def test_recompute_json_uses_status_for_partial_summary(monkeypatch, command, na
     monkeypatch.setattr(recompute, target, _driver)
 
     document = _document(
-        invoke(command, ["hopg", "hbn", "--json"]),
+        invoke(command, ["hopg", "hbn", "-o", "json"]),
         exit_code=75,
     )
 
@@ -238,7 +274,9 @@ def test_recompute_json_marks_low_level_exception_failed(monkeypatch, command, l
 
     monkeypatch.setattr(run, low_level, fail)
 
-    document = _document(invoke(command, ["hopg", "--profile", "standard", "--json"]), exit_code=1)
+    document = _document(
+        invoke(command, ["hopg", "--profile", "standard", "-o", "json"]), exit_code=1
+    )
 
     assert document["payload"]["completed_materials"] == []
     assert document["payload"]["failed_materials"] == ["hopg"]
@@ -258,7 +296,7 @@ def test_remote_pull_json_retains_success_when_one_item_fails(monkeypatch):
     monkeypatch.setattr(lifecycle, "pull", pull)
 
     document = _document(
-        invoke(remote.command, ["pull", "hopg", "hbn", "--json"]),
+        invoke(remote.command, ["pull", "hopg", "hbn", "-o", "json"]),
         exit_code=1,
     )
 

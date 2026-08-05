@@ -21,6 +21,7 @@ from cxr_mc.cli._core import (
     emit_json_result,
     emit_result,
     flatten_option_values,
+    output_option,
 )
 
 _RESET_CHOICES = click.Choice((*_catalog_io.RANGES, "all"), case_sensitive=False)
@@ -213,9 +214,7 @@ def command():
     shell_complete=_cli_completion.complete_profile,
     help="Resolve defaults and overrides under profile NAME.",
 )
-@click.option(
-    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
-)
+@output_option
 def show_command(material, profile_name, json_output):
     """Show MATERIAL's effective ranges and inherited/overridden sources."""
     return _show(material, profile_name, json_output)

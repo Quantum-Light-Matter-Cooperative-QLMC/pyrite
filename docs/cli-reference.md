@@ -36,9 +36,10 @@ verbs remain aliases.
 
 Automation contract: usage errors exit 2; runtime failures exit 1;
 interrupted viewers exit 130; resumable compute exits 75. Diagnostics,
-warnings, prompts, and progress use stderr. `--json` emits one UTF-8
+warnings, prompts, and progress use stderr. `-o/--output json` emits one UTF-8
 object plus newline with `schema`, `schema_version`, `ok`, `payload`,
-and `errors` fields and no human prose on stdout.
+and `errors` fields and no human prose on stdout. `table` is the human
+default; `wide` is human-only and not a stable automation contract.
 
 Destructive commands preview exact targets by default. In a TTY, accept the
 `[y/N]` prompt to execute; in non-interactive use, pass `-y/--yes`.
@@ -104,47 +105,50 @@ Usage: cxr run [OPTIONS] [PROFILE]
   data in <material>/; variants use identity-qualified stems.
 
 Options:
-  -m, --material MATERIAL      Run one member of PROFILE instead of its full membership.
-  --workers NUMBER             run_cases max_workers (default auto; 0 = serial, no
-                               transport pool).
-  --quick                      Use tiny smoke-test grid and write <material>_quick.pkl.
-  --n-families NUMBER          Override positive dominant reflection-family count.
-  --checkpoint-dir DIR         Read and write checkpoint pickles in DIR.  [default:
-                               checkpoints]
-  --max-minutes MINUTES        Soft wall-clock budget in minutes; exit 75 if resumable
-                               work remains.
-  -p, --perf                   Sample CPU pressure, RAM/swap, GPU clocks/VRAM, process-
-                               tree, phase timing, queue, case, worker, and chunk
-                               metrics for PROFILE's resolved membership into
-                               performance-profiles/PROFILE/<material>.ndjson
-                               (cxr.performance.v1). Combine with -m to profile a single
-                               member. Runs without shared-cache reads or writes unless
-                               --recompute is explicit.
-  -i, --perf-interval SECONDS  Performance-telemetry sampling interval; requires
-                               -p/--perf.  [default: 5.0]
-  --spec-chunk N               Pin line-spectrum segments per GPU chunk; requires
-                               -p/--perf.
-  --brem-chunk N               Pin bremsstrahlung segments per GPU chunk; requires
-                               -p/--perf.
-  --nsys                       Capture one uncached Nsight Systems CUDA/NVTX trace of
-                               the run (writes a .nsys-rep next to the perf log);
-                               defaults to the profile's full membership (-m narrows to
-                               one member). Requires -p/--perf.
-  --no-cache                   Neither read nor write the shared per-case checkpoint
-                               cache: an ephemeral run that recomputes every case and
-                               stores nothing shared.
-  --recompute                  Ignore cached cases and recompute fresh, but repopulate
-                               the shared per-case cache with the results.
-  --no-progress                Disable progress bars/dashboard.
-  -v, --verbose                Increase dashboard detail.
-  -R, --remote [TARGET]        Run through SLURM; bare uses the configured target,
-                               =TARGET overrides it.
-  --wait                       Wait for remote completion and pull results.
-  --detach                     Return after remote submission.
-  --fidelity [full|survey]     Named settings/grid-reduction policy. survey is
-                               provisional and reduced.  [default: full]
-  --json                       Emit one versioned JSON object on stdout.
-  -h, --help                   Show this message and exit.
+  -m, --material MATERIAL         Run one member of PROFILE instead of its full
+                                  membership.
+  --workers NUMBER                run_cases max_workers (default auto; 0 = serial, no
+                                  transport pool).
+  --quick                         Use tiny smoke-test grid and write
+                                  <material>_quick.pkl.
+  --n-families NUMBER             Override positive dominant reflection-family count.
+  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.  [default:
+                                  checkpoints]
+  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
+                                  resumable work remains.
+  -p, --perf                      Sample CPU pressure, RAM/swap, GPU clocks/VRAM,
+                                  process-tree, phase timing, queue, case, worker, and
+                                  chunk metrics for PROFILE's resolved membership into
+                                  performance-profiles/PROFILE/<material>.ndjson
+                                  (cxr.performance.v1). Combine with -m to profile a
+                                  single member. Runs without shared-cache reads or
+                                  writes unless --recompute is explicit.
+  -i, --perf-interval SECONDS     Performance-telemetry sampling interval; requires
+                                  -p/--perf.  [default: 5.0]
+  --spec-chunk N                  Pin line-spectrum segments per GPU chunk; requires
+                                  -p/--perf.
+  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk; requires
+                                  -p/--perf.
+  --nsys                          Capture one uncached Nsight Systems CUDA/NVTX trace of
+                                  the run (writes a .nsys-rep next to the perf log);
+                                  defaults to the profile's full membership (-m narrows
+                                  to one member). Requires -p/--perf.
+  --no-cache                      Neither read nor write the shared per-case checkpoint
+                                  cache: an ephemeral run that recomputes every case and
+                                  stores nothing shared.
+  --recompute                     Ignore cached cases and recompute fresh, but
+                                  repopulate the shared per-case cache with the results.
+  --no-progress                   Disable progress bars/dashboard.
+  -v, --verbose                   Increase dashboard detail.
+  -R, --remote [TARGET]           Run through SLURM; bare uses the configured target,
+                                  =TARGET overrides it.
+  --wait                          Wait for remote completion and pull results.
+  --detach                        Return after remote submission.
+  --fidelity [full|survey]        Named settings/grid-reduction policy. survey is
+                                  provisional and reduced.  [default: full]
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr setup`
@@ -430,24 +434,27 @@ Usage: cxr checkpoint recompute brem [OPTIONS] [MATERIALS]...
   records already at target unless --redo-all.
 
 Options:
-  -a, --all                 Recompute every checkpoint.
-  --fidelity [full|survey]  Override dataset fidelity; defaults to checkpoint metadata
-                            or full for legacy data.
-  --profile NAME            Catalog profile for legacy data; otherwise must match
-                            checkpoint metadata.
-  --ne-brem N               Bremsstrahlung electron count; overrides profile default.
-  --start EV                Wide-bremsstrahlung lower bound in eV; overrides profile.
-  --stop EV                 Wide-bremsstrahlung exclusive upper bound in eV; default
-                            follows beam energy.
-  --step EV                 Wide-bremsstrahlung grid spacing in eV; overrides profile
-                            default.
-  --redo-all                Recompute records already at target.
-  --checkpoint-dir DIR      Root containing component checkpoint directories to update.
-                            [default: checkpoints]
-  --save-every N            Atomically save after every N recomputed records.  [default:
-                            100]
-  --json                    Emit one versioned JSON object on stdout.
-  -h, --help                Show this message and exit.
+  -a, --all                       Recompute every checkpoint.
+  --fidelity [full|survey]        Override dataset fidelity; defaults to checkpoint
+                                  metadata or full for legacy data.
+  --profile NAME                  Catalog profile for legacy data; otherwise must match
+                                  checkpoint metadata.
+  --ne-brem N                     Bremsstrahlung electron count; overrides profile
+                                  default.
+  --start EV                      Wide-bremsstrahlung lower bound in eV; overrides
+                                  profile.
+  --stop EV                       Wide-bremsstrahlung exclusive upper bound in eV;
+                                  default follows beam energy.
+  --step EV                       Wide-bremsstrahlung grid spacing in eV; overrides
+                                  profile default.
+  --redo-all                      Recompute records already at target.
+  --checkpoint-dir DIR            Root containing component checkpoint directories to
+                                  update.  [default: checkpoints]
+  --save-every N                  Atomically save after every N recomputed records.
+                                  [default: 100]
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr checkpoint recompute line`
@@ -461,22 +468,26 @@ Usage: cxr checkpoint recompute line [OPTIONS] [MATERIALS]...
   records already at target unless --redo-all.
 
 Options:
-  -a, --all                 Recompute every checkpoint.
-  --fidelity [full|survey]  Override dataset fidelity; defaults to checkpoint metadata
-                            or full for legacy data.
-  --profile NAME            Catalog profile for legacy data; otherwise must match
-                            checkpoint metadata.
-  --line-ne N               Line-spectrum electron count; overrides profile default.
-  --start EV                Line-grid lower bound in eV; overrides profile.
-  --stop EV                 Line-grid exclusive upper bound in eV; overrides profile.
-  --line-step EV            Uniform line-grid spacing in eV; overrides profile grid.
-  --redo-all                Recompute records already at target.
-  --checkpoint-dir DIR      Root containing component checkpoint directories to update.
-                            [default: checkpoints]
-  --save-every N            Atomically save after every N recomputed records.  [default:
-                            100]
-  --json                    Emit one versioned JSON object on stdout.
-  -h, --help                Show this message and exit.
+  -a, --all                       Recompute every checkpoint.
+  --fidelity [full|survey]        Override dataset fidelity; defaults to checkpoint
+                                  metadata or full for legacy data.
+  --profile NAME                  Catalog profile for legacy data; otherwise must match
+                                  checkpoint metadata.
+  --line-ne N                     Line-spectrum electron count; overrides profile
+                                  default.
+  --start EV                      Line-grid lower bound in eV; overrides profile.
+  --stop EV                       Line-grid exclusive upper bound in eV; overrides
+                                  profile.
+  --line-step EV                  Uniform line-grid spacing in eV; overrides profile
+                                  grid.
+  --redo-all                      Recompute records already at target.
+  --checkpoint-dir DIR            Root containing component checkpoint directories to
+                                  update.  [default: checkpoints]
+  --save-every N                  Atomically save after every N recomputed records.
+                                  [default: 100]
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr checkpoint archive`
@@ -518,8 +529,9 @@ Usage: cxr checkpoint list [OPTIONS]
   List long-term checkpoint shelf.
 
 Options:
-  --json      Emit one versioned JSON object on stdout.
-  -h, --help  Show this message and exit.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr checkpoint merge`
@@ -869,25 +881,28 @@ Usage: cxr remote pull [OPTIONS] [PROFILE|STEM|MATERIAL@PROFILE]...
   exists.
 
 Options:
-  -a, --all                Pull every configured material.
-  -m, --material MATERIAL  Narrow positional PROFILE or --profile to MATERIAL;
-                           repeatable.
-  --profile NAME           Alias for positional PROFILE. Pull its explicit members, or
-                           the in-use manifest when membership is implicit;
-                           -m/--material narrows it.
-  --hash HEXPREFIX         Pin one MATERIAL@PROFILE selector to a parameter-hash prefix.
-  -f, --full               Default is grid-filtered; pull full unfiltered checkpoint.
-  --drop-wide-brem         With grid pull, drop wide-brem.
-  --downcast               With grid pull, downcast to float32.
-  --level9                 Recompress remotely at gzip level 9.
-  --no-sync                With grid pull, skip code sync.
-  --brem-only              Merge only brem arrays locally; mutually exclusive with
-                           --line-only.
-  --line-only              Merge only line spectra locally; mutually exclusive with
-                           --brem-only.
-  --force                  With partial merge, insert records absent locally.
-  --json                   Emit one versioned JSON object.
-  -h, --help               Show this message and exit.
+  -a, --all                       Pull every configured material.
+  -m, --material MATERIAL         Narrow positional PROFILE or --profile to MATERIAL;
+                                  repeatable.
+  --profile NAME                  Alias for positional PROFILE. Pull its explicit
+                                  members, or the in-use manifest when membership is
+                                  implicit; -m/--material narrows it.
+  --hash HEXPREFIX                Pin one MATERIAL@PROFILE selector to a parameter-hash
+                                  prefix.
+  -f, --full                      Default is grid-filtered; pull full unfiltered
+                                  checkpoint.
+  --drop-wide-brem                With grid pull, drop wide-brem.
+  --downcast                      With grid pull, downcast to float32.
+  --level9                        Recompress remotely at gzip level 9.
+  --no-sync                       With grid pull, skip code sync.
+  --brem-only                     Merge only brem arrays locally; mutually exclusive
+                                  with --line-only.
+  --line-only                     Merge only line spectra locally; mutually exclusive
+                                  with --brem-only.
+  --force                         With partial merge, insert records absent locally.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr remote rebrem`
@@ -1087,7 +1102,8 @@ Usage: cxr job list [OPTIONS]
 Options:
   --kind [run|grid|recompute|validate]
                                   Show only one submission kind.
-  --json                          Emit one versioned JSON object.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
   -h, --help                      Show this message and exit.
 ```
 
@@ -1111,9 +1127,11 @@ Usage: cxr job status [OPTIONS] [JOBID]
   Show one job snapshot; JOBID defaults to latest.
 
 Options:
-  -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
-  --json         Emit one versioned JSON object.
-  -h, --help     Show this message and exit.
+  -v, --verbose                   Add allocation detail; repeat for case progress and
+                                  recent logs.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr job stop`
@@ -1233,8 +1251,9 @@ Usage: cxr energy-grid brem show [OPTIONS] [MATERIAL]
   Show bremsstrahlung energy grids.
 
 Options:
-  --json      Emit one versioned JSON object on stdout.
-  -h, --help  Show this message and exit.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr energy-grid defaults`
@@ -1253,18 +1272,19 @@ Usage: cxr energy-grid defaults [OPTIONS]
   full|survey``.
 
 Options:
-  --json                    Emit one versioned JSON object on stdout (show mode only).
-  --save-default            Persist supplied values; otherwise only show defaults.
-  --clear FIELD             Reset one field to inherited/built-in behavior; repeatable.
-                            Fields: polar, azimuth, thickness, brem-step, energy,
-                            material.
-  --reset                   Reset every persistent derivation field to inherited/built-
-                            in behavior.
-  --polar DEG,...           Persistent derivation polar tilts in degrees [0, 90).
-  --azimuth DEG,...         Persistent azimuths in degrees [0, 360].
-  --thickness ANGSTROM,...  Persistent positive crystal thicknesses in angstrom.
-  --brem-step EV            Persistent derivation bremsstrahlung spacing in eV.
-  -h, --help                Show this message and exit.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  --save-default                  Persist supplied values; otherwise only show defaults.
+  --clear FIELD                   Reset one field to inherited/built-in behavior;
+                                  repeatable. Fields: polar, azimuth, thickness, brem-
+                                  step, energy, material.
+  --reset                         Reset every persistent derivation field to
+                                  inherited/built-in behavior.
+  --polar DEG,...                 Persistent derivation polar tilts in degrees [0, 90).
+  --azimuth DEG,...               Persistent azimuths in degrees [0, 360].
+  --thickness ANGSTROM,...        Persistent positive crystal thicknesses in angstrom.
+  --brem-step EV                  Persistent derivation bremsstrahlung spacing in eV.
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr energy-grid derive`
@@ -1331,11 +1351,13 @@ Usage: cxr energy-grid line delete [OPTIONS] MATERIAL
     cxr energy-grid line delete wse2 --energy 30 --energy 40
 
 Options:
-  --energy KEV  Beam energy in keV; repeat for multiple rows.  [required]
-  -y, --yes     Skip the confirmation prompt.
-  --dry-run     Print proposed diff; delete nothing.
-  --json        Emit one versioned JSON object on stdout.
-  -h, --help    Show this message and exit.
+  --energy KEV                    Beam energy in keV; repeat for multiple rows.
+                                  [required]
+  -y, --yes                       Skip the confirmation prompt.
+  --dry-run                       Print proposed diff; delete nothing.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr energy-grid line set`
@@ -1362,8 +1384,9 @@ Usage: cxr energy-grid line show [OPTIONS] [MATERIAL]
   Show coherent line-energy grids.
 
 Options:
-  --json      Emit one versioned JSON object on stdout.
-  -h, --help  Show this message and exit.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr energy-grid regen-golden`
@@ -1388,8 +1411,9 @@ Usage: cxr energy-grid show [OPTIONS] [MATERIAL]
   Show line and bremsstrahlung grids together.
 
 Options:
-  --json      Emit one versioned JSON object on stdout.
-  -h, --help  Show this message and exit.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr energy-grid submit`
@@ -1556,10 +1580,11 @@ Usage: cxr profile delete [OPTIONS] NAME
   ``[energy_grids.NAME]`` fallback bucket); referents are listed.
 
 Options:
-  -y, --yes   Skip the confirmation prompt.
-  --dry-run   Print proposed TOML diff; delete nothing.
-  --json      Emit one versioned JSON object on stdout.
-  -h, --help  Show this message and exit.
+  -y, --yes                       Skip the confirmation prompt.
+  --dry-run                       Print proposed TOML diff; delete nothing.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr profile list`
@@ -1570,8 +1595,9 @@ Usage: cxr profile list [OPTIONS]
   List catalog profiles with membership and override counts.
 
 Options:
-  --json      Emit one versioned JSON object on stdout.
-  -h, --help  Show this message and exit.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr profile remove`
@@ -1684,8 +1710,9 @@ Usage: cxr profile show [OPTIONS] NAME
   Show one profile's ranges, beam, detector, membership, and overrides.
 
 Options:
-  --json      Emit one versioned JSON object on stdout.
-  -h, --help  Show this message and exit.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr material`
@@ -1748,10 +1775,11 @@ Usage: cxr material show [OPTIONS] MATERIAL
   Show MATERIAL's effective ranges and inherited/overridden sources.
 
 Options:
-  --profile TEXT  Resolve defaults and overrides under profile NAME.  [default:
-                  standard]
-  --json          Emit one versioned JSON object on stdout.
-  -h, --help      Show this message and exit.
+  --profile TEXT                  Resolve defaults and overrides under profile NAME.
+                                  [default: standard]
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr material blaze`
@@ -1765,17 +1793,18 @@ Usage: cxr material blaze [OPTIONS] MATERIAL
   Repeat --energy/--spacing/--polar for multiple values.
 
 Options:
-  --energy E             Beam energies in keV (one or more).  [required]
-  --spacing S            Groove spacing(s) in meters (one, or one per energy).
-                         [required]
-  --polar A              Polar tilt values in degrees.  [0.0<x<90.0]
-  --workers NUMBER       run_cases max_workers (default auto; 0 = serial).
-  --checkpoint-dir DIR   Read and write blazed checkpoint pickles in DIR.  [default:
-                         checkpoints]
-  --max-minutes MINUTES  Soft wall-clock budget in minutes; exit 75 if resumable work
-                         remains.
-  --json                 Emit one versioned JSON object on stdout.
-  -h, --help             Show this message and exit.
+  --energy E                      Beam energies in keV (one or more).  [required]
+  --spacing S                     Groove spacing(s) in meters (one, or one per energy).
+                                  [required]
+  --polar A                       Polar tilt values in degrees.  [0.0<x<90.0]
+  --workers NUMBER                run_cases max_workers (default auto; 0 = serial).
+  --checkpoint-dir DIR            Read and write blazed checkpoint pickles in DIR.
+                                  [default: checkpoints]
+  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if
+                                  resumable work remains.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```
 
 ## `cxr material validate`

@@ -7,7 +7,7 @@ import click
 from ..._remote import cli as remote_cli
 from ..._remote import lifecycle, viewer
 from .. import _completion as _cli_completion
-from .._core import confirm_destructive, emit_result
+from .._core import confirm_destructive, emit_result, output_option
 
 
 def _invoke(handler, **values):
@@ -27,7 +27,7 @@ def command() -> None:
     default=None,
     help="Show only one submission kind.",
 )
-@click.option("--json", "json_output", is_flag=True, help="Emit one versioned JSON object.")
+@output_option
 def list_command(kind: str | None, json_output: bool):
     return _invoke(
         remote_cli._cli_jobs,
@@ -50,7 +50,7 @@ def list_command(kind: str | None, json_output: bool):
     count=True,
     help="Add allocation detail; repeat for case progress and recent logs.",
 )
-@click.option("--json", "json_output", is_flag=True, help="Emit one versioned JSON object.")
+@output_option
 def status_command(jobid: str | None, verbose: int, json_output: bool):
     return _invoke(
         remote_cli._cli_status,

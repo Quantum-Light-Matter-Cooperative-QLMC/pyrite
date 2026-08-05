@@ -206,7 +206,7 @@ def _remote_target(ctx, param, value):
 @click.option("--detach", is_flag=True, help="Return after remote submission.")
 @click.pass_context
 @_cli_core.fidelity_option()
-@_cli_core.json_option
+@_cli_core.output_option
 def command(
     ctx,
     catalog_profile,
@@ -246,7 +246,7 @@ def command(
         raise click.UsageError("--wait/--detach require -R/--remote")
     if remote_target is not None:
         if json_output:
-            raise click.UsageError("remote run does not yet support --json")
+            raise click.UsageError("remote run does not yet support --output json")
         local_only = {
             "n_families": "--n-families",
             "checkpoint_dir": "--checkpoint-dir",

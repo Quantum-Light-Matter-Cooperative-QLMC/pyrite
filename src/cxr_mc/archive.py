@@ -400,7 +400,7 @@ def restore_command(label, stem, force):
 
 
 @click.command("archives", help="List long-term checkpoint shelf.")
-@_cli_core.json_option
+@_cli_core.output_option
 def archives_command(json_output):
     if json_output:
         return _cli_core.invoke_legacy(_cli_archives, json_output=True)

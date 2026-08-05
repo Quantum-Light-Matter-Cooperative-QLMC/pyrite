@@ -2297,7 +2297,7 @@ def test_remote_attach_command_is_absent(capsys):
 def test_status_attach_rejects_json(monkeypatch):
     monkeypatch.setattr(viewer, "attach", lambda *_args: pytest.fail("must reject before attach"))
 
-    assert remote.main(["status", "--attach", "--json"]) == 2
+    assert remote.main(["status", "--attach", "-o", "json"]) == 2
 
 
 def test_implicit_job_selection_excludes_checkpoint_reservations(monkeypatch, tmp_path):

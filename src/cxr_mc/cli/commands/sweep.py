@@ -16,6 +16,7 @@ from cxr_mc.cli._core import (
     CLIError,
     emit_json_result,
     emit_result,
+    output_option,
 )
 from cxr_mc.cli._deprecations import DeprecatingGroup
 from cxr_mc.cli.commands import material
@@ -116,9 +117,7 @@ def command():
     hidden=True,
     shell_complete=_cli_completion.complete_profile,
 )
-@click.option(
-    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
-)
+@output_option
 def show_command(material_name, profile_name, json_output):
     """Deprecated; use ``cxr material show MATERIAL``."""
     if material_name is None:

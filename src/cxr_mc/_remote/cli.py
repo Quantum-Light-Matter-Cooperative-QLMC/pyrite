@@ -22,6 +22,7 @@ from ..cli._core import (
     fidelity_option,
     hidden_alias,
     invoke_legacy,
+    output_option,
     run,
 )
 from ..cli._deprecations import DeprecatingGroup
@@ -956,7 +957,7 @@ command.add_command(start_command)
 
 
 @command.command("jobs", hidden=True, help="List jobs with SLURM IDs, materials, and last events.")
-@click.option("--json", "json_output", is_flag=True, help="Emit one versioned JSON object.")
+@output_option
 def jobs_command(json_output):
     return _invoke_click(_cli_jobs, _click_args("jobs", json_output=json_output))
 
@@ -989,11 +990,11 @@ def jobs_command(json_output):
     is_flag=True,
     help="Continuously monitor the dashboard until interrupted; Ctrl-C detaches viewer only.",
 )
-@click.option("--json", "json_output", is_flag=True, help="Emit one versioned JSON object.")
+@output_option
 def status_command(jobid, verbose, attach, json_output):
     if attach and json_output:
         raise click.UsageError(
-            "--attach streams a live dashboard and cannot be combined with --json"
+            "--attach streams a live dashboard and cannot be combined with --output json"
         )
     return _invoke_click(
         _cli_status,
@@ -1218,7 +1219,7 @@ def reap_command(min_age_minutes, yes):
     is_flag=True,
     help="With partial merge, insert records absent locally.",
 )
-@click.option("--json", "json_output", is_flag=True, help="Emit one versioned JSON object.")
+@output_option
 def pull_command(
     material,
     all_,

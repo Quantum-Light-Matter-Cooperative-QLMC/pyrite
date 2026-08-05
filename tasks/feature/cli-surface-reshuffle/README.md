@@ -106,6 +106,18 @@ owner-authored base refresh, the full CLI suite passes: 1007 tests.
 - [x] Focused config/run/remote/check verification: 455 passed; full CLI suite
       1014 passed; lint, typecheck, reference, and frozen-contract checks pass.
 
+### Output selector
+
+- [x] Replaced every existing automation-bound `--json` boolean with the shared
+      `-o/--output table|json|wide` selector; `table` remains the human default
+      and `wide` is explicitly human/non-contractual.
+- [x] Kept hidden `--json` compatibility flags with D7 warnings, conflict
+      detection, registry rows, and generated deprecation documentation.
+- [x] Preserved existing versioned JSON envelopes, stdout purity, partial
+      failure, and resumable exit behavior under `-o json`.
+- [x] Focused output/deprecation verification: 291 passed; full CLI suite 1017
+      passed; lint, typecheck, reference, deprecation, and contract checks pass.
+
 ## Non-goals
 
 - No content-addressed store, artifact hash migration, checkpoint lockfile, or

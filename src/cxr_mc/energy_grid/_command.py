@@ -35,6 +35,7 @@ from cxr_mc.cli._core import (
     emit_json_result,
     emit_result,
     invoke_legacy,
+    output_option,
 )
 from cxr_mc.cli._deprecations import DeprecatingGroup, canonical_option
 from cxr_mc.energy_grid import apply, defaults, job
@@ -277,12 +278,7 @@ def submit_command(
     count=True,
     help="Add allocation detail; repeat for case progress and recent logs.",
 )
-@click.option(
-    "--json",
-    "json_output",
-    is_flag=True,
-    help="Emit one versioned JSON object on stdout.",
-)
+@output_option
 def status_command(jobid, verbose, json_output):
     """Show energy-grid job status. JOBID defaults to latest recorded job."""
     if json_output:
@@ -468,9 +464,7 @@ def set_command(material, energy, stop, num, start, note):
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed diff; delete nothing.")
-@click.option(
-    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
-)
+@output_option
 def delete_command(material, energies, yes, dry_run, json_output):
     """Delete MATERIAL's derived or manual line-grid rows; irreversible.
 
@@ -484,9 +478,11 @@ def delete_command(material, energies, yes, dry_run, json_output):
       cxr energy-grid line delete wse2 --energy 30 --energy 40
     """
     if dry_run and json_output:
-        raise click.UsageError("--dry-run and --json cannot be combined")
+        raise click.UsageError("--dry-run and --output json cannot be combined")
     if json_output and not yes:
-        raise click.UsageError("--json requires --yes; prompts are disabled in machine-output mode")
+        raise click.UsageError(
+            "--output json requires --yes; prompts are disabled in machine-output mode"
+        )
     if dry_run:
         try:
             apply.delete_line_grid(material, energies, dry_run=True)
@@ -544,12 +540,7 @@ def set_brem_command(material, stop, step, note):
 
 
 @command.command("defaults")
-@click.option(
-    "--json",
-    "json_output",
-    is_flag=True,
-    help="Emit one versioned JSON object on stdout (show mode only).",
-)
+@output_option
 @canonical_option(
     "--save-default",
     "set_values",
@@ -639,7 +630,7 @@ def defaults_command(
     if mutation_modes > 1:
         raise click.UsageError("--save-default, --clear, and --reset cannot be combined")
     if json_output and mutation_modes:
-        raise click.UsageError("--json is read-only and cannot be combined with mutations")
+        raise click.UsageError("--output json is read-only and cannot be combined with mutations")
     if set_values:
         defaults.update_defaults(
             tilts=tilts,
@@ -701,9 +692,7 @@ def _show(json_output, material, *, band=None):
 
 
 @command.command("show")
-@click.option(
-    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
-)
+@output_option
 @click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
 def show_command(json_output, material):
     """Show line and bremsstrahlung grids together."""
@@ -711,9 +700,7 @@ def show_command(json_output, material):
 
 
 @line_command.command("show")
-@click.option(
-    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
-)
+@output_option
 @click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
 def line_show_command(json_output, material):
     """Show coherent line-energy grids."""
@@ -721,9 +708,7 @@ def line_show_command(json_output, material):
 
 
 @brem_command.command("show")
-@click.option(
-    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
-)
+@output_option
 @click.argument("material", required=False, shell_complete=_cli_completion.complete_material)
 def brem_show_command(json_output, material):
     """Show bremsstrahlung energy grids."""

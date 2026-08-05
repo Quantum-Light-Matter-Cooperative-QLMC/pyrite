@@ -299,14 +299,23 @@
           },
           {
             "dest": "json_output",
-            "help": "Emit one versioned JSON object on stdout.",
+            "help": "Output format; only json is a stable automation contract.",
+            "option_strings": [
+              "-o",
+              "--output"
+            ],
+            "required": false
+          },
+          {
+            "dest": "_retired_json_output___json",
+            "help": "<SUPPRESS>",
             "option_strings": [
               "--json"
             ],
             "required": false
           }
         ],
-        "help": "Usage: cxr run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to the current configured profile (standard built-in) and\n  owns material membership, campaign ranges, and workload settings. Use\n  -m/--material to run one profile member instead of the full resolved\n  membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL      Run one member of PROFILE instead of its full\n                               membership.\n  --workers NUMBER             run_cases max_workers (default auto; 0 = serial,\n                               no transport pool).\n  --quick                      Use tiny smoke-test grid and write\n                               <material>_quick.pkl.\n  --n-families NUMBER          Override positive dominant reflection-family\n                               count.\n  --checkpoint-dir DIR         Read and write checkpoint pickles in DIR.\n                               [default: checkpoints]\n  --max-minutes MINUTES        Soft wall-clock budget in minutes; exit 75 if\n                               resumable work remains.\n  -p, --perf                   Sample CPU pressure, RAM/swap, GPU clocks/VRAM,\n                               process-tree, phase timing, queue, case, worker,\n                               and chunk metrics for PROFILE's resolved\n                               membership into performance-\n                               profiles/PROFILE/<material>.ndjson\n                               (cxr.performance.v1). Combine with -m to profile\n                               a single member. Runs without shared-cache reads\n                               or writes unless --recompute is explicit.\n  -i, --perf-interval SECONDS  Performance-telemetry sampling interval; requires\n                               -p/--perf.  [default: 5.0]\n  --spec-chunk N               Pin line-spectrum segments per GPU chunk;\n                               requires -p/--perf.\n  --brem-chunk N               Pin bremsstrahlung segments per GPU chunk;\n                               requires -p/--perf.\n  --nsys                       Capture one uncached Nsight Systems CUDA/NVTX\n                               trace of the run (writes a .nsys-rep next to the\n                               perf log); defaults to the profile's full\n                               membership (-m narrows to one member). Requires\n                               -p/--perf.\n  --no-cache                   Neither read nor write the shared per-case\n                               checkpoint cache: an ephemeral run that\n                               recomputes every case and stores nothing shared.\n  --recompute                  Ignore cached cases and recompute fresh, but\n                               repopulate the shared per-case cache with the\n                               results.\n  --no-progress                Disable progress bars/dashboard.\n  -v, --verbose                Increase dashboard detail.\n  -R, --remote [TARGET]        Run through SLURM; bare uses the configured\n                               target, =TARGET overrides it.\n  --wait                       Wait for remote completion and pull results.\n  --detach                     Return after remote submission.\n  --fidelity [full|survey]     Named settings/grid-reduction policy. survey is\n                               provisional and reduced.  [default: full]\n  --json                       Emit one versioned JSON object on stdout.\n  -h, --help                   Show this message and exit.\n",
+        "help": "Usage: cxr run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to the current configured profile (standard built-in) and\n  owns material membership, campaign ranges, and workload settings. Use\n  -m/--material to run one profile member instead of the full resolved\n  membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL         Run one member of PROFILE instead of its full\n                                  membership.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use tiny smoke-test grid and write\n                                  <material>_quick.pkl.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  -p, --perf                      Sample CPU pressure, RAM/swap, GPU\n                                  clocks/VRAM, process-tree, phase timing,\n                                  queue, case, worker, and chunk metrics for\n                                  PROFILE's resolved membership into\n                                  performance-profiles/PROFILE/<material>.ndjson\n                                  (cxr.performance.v1). Combine with -m to\n                                  profile a single member. Runs without shared-\n                                  cache reads or writes unless --recompute is\n                                  explicit.\n  -i, --perf-interval SECONDS     Performance-telemetry sampling interval;\n                                  requires -p/--perf.  [default: 5.0]\n  --spec-chunk N                  Pin line-spectrum segments per GPU chunk;\n                                  requires -p/--perf.\n  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk;\n                                  requires -p/--perf.\n  --nsys                          Capture one uncached Nsight Systems CUDA/NVTX\n                                  trace of the run (writes a .nsys-rep next to\n                                  the perf log); defaults to the profile's full\n                                  membership (-m narrows to one member).\n                                  Requires -p/--perf.\n  --no-cache                      Neither read nor write the shared per-case\n                                  checkpoint cache: an ephemeral run that\n                                  recomputes every case and stores nothing\n                                  shared.\n  --recompute                     Ignore cached cases and recompute fresh, but\n                                  repopulate the shared per-case cache with the\n                                  results.\n  --no-progress                   Disable progress bars/dashboard.\n  -v, --verbose                   Increase dashboard detail.\n  -R, --remote [TARGET]           Run through SLURM; bare uses the configured\n                                  target, =TARGET overrides it.\n  --wait                          Wait for remote completion and pull results.\n  --detach                        Return after remote submission.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
         "hidden": false,
         "path": "run",
         "subcommands": []
@@ -1009,14 +1018,23 @@
                   },
                   {
                     "dest": "json_output",
-                    "help": "Emit one versioned JSON object on stdout.",
+                    "help": "Output format; only json is a stable automation contract.",
+                    "option_strings": [
+                      "-o",
+                      "--output"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_json_output___json",
+                    "help": "<SUPPRESS>",
                     "option_strings": [
                       "--json"
                     ],
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr checkpoint recompute brem [OPTIONS] [MATERIALS]...\n\n  Recompute only brem backgrounds in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                 Recompute every checkpoint.\n  --fidelity [full|survey]  Override dataset fidelity; defaults to checkpoint\n                            metadata or full for legacy data.\n  --profile NAME            Catalog profile for legacy data; otherwise must\n                            match checkpoint metadata.\n  --ne-brem N               Bremsstrahlung electron count; overrides profile\n                            default.\n  --start EV                Wide-bremsstrahlung lower bound in eV; overrides\n                            profile.\n  --stop EV                 Wide-bremsstrahlung exclusive upper bound in eV;\n                            default follows beam energy.\n  --step EV                 Wide-bremsstrahlung grid spacing in eV; overrides\n                            profile default.\n  --redo-all                Recompute records already at target.\n  --checkpoint-dir DIR      Root containing component checkpoint directories to\n                            update.  [default: checkpoints]\n  --save-every N            Atomically save after every N recomputed records.\n                            [default: 100]\n  --json                    Emit one versioned JSON object on stdout.\n  -h, --help                Show this message and exit.\n",
+                "help": "Usage: cxr checkpoint recompute brem [OPTIONS] [MATERIALS]...\n\n  Recompute only brem backgrounds in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                       Recompute every checkpoint.\n  --fidelity [full|survey]        Override dataset fidelity; defaults to\n                                  checkpoint metadata or full for legacy data.\n  --profile NAME                  Catalog profile for legacy data; otherwise\n                                  must match checkpoint metadata.\n  --ne-brem N                     Bremsstrahlung electron count; overrides\n                                  profile default.\n  --start EV                      Wide-bremsstrahlung lower bound in eV;\n                                  overrides profile.\n  --stop EV                       Wide-bremsstrahlung exclusive upper bound in\n                                  eV; default follows beam energy.\n  --step EV                       Wide-bremsstrahlung grid spacing in eV;\n                                  overrides profile default.\n  --redo-all                      Recompute records already at target.\n  --checkpoint-dir DIR            Root containing component checkpoint\n                                  directories to update.  [default: checkpoints]\n  --save-every N                  Atomically save after every N recomputed\n                                  records.  [default: 100]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "checkpoint recompute brem",
                 "subcommands": []
@@ -1128,14 +1146,23 @@
                   },
                   {
                     "dest": "json_output",
-                    "help": "Emit one versioned JSON object on stdout.",
+                    "help": "Output format; only json is a stable automation contract.",
+                    "option_strings": [
+                      "-o",
+                      "--output"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_json_output___json",
+                    "help": "<SUPPRESS>",
                     "option_strings": [
                       "--json"
                     ],
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr checkpoint recompute line [OPTIONS] [MATERIALS]...\n\n  Recompute only line spectra in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                 Recompute every checkpoint.\n  --fidelity [full|survey]  Override dataset fidelity; defaults to checkpoint\n                            metadata or full for legacy data.\n  --profile NAME            Catalog profile for legacy data; otherwise must\n                            match checkpoint metadata.\n  --line-ne N               Line-spectrum electron count; overrides profile\n                            default.\n  --start EV                Line-grid lower bound in eV; overrides profile.\n  --stop EV                 Line-grid exclusive upper bound in eV; overrides\n                            profile.\n  --line-step EV            Uniform line-grid spacing in eV; overrides profile\n                            grid.\n  --redo-all                Recompute records already at target.\n  --checkpoint-dir DIR      Root containing component checkpoint directories to\n                            update.  [default: checkpoints]\n  --save-every N            Atomically save after every N recomputed records.\n                            [default: 100]\n  --json                    Emit one versioned JSON object on stdout.\n  -h, --help                Show this message and exit.\n",
+                "help": "Usage: cxr checkpoint recompute line [OPTIONS] [MATERIALS]...\n\n  Recompute only line spectra in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                       Recompute every checkpoint.\n  --fidelity [full|survey]        Override dataset fidelity; defaults to\n                                  checkpoint metadata or full for legacy data.\n  --profile NAME                  Catalog profile for legacy data; otherwise\n                                  must match checkpoint metadata.\n  --line-ne N                     Line-spectrum electron count; overrides\n                                  profile default.\n  --start EV                      Line-grid lower bound in eV; overrides\n                                  profile.\n  --stop EV                       Line-grid exclusive upper bound in eV;\n                                  overrides profile.\n  --line-step EV                  Uniform line-grid spacing in eV; overrides\n                                  profile grid.\n  --redo-all                      Recompute records already at target.\n  --checkpoint-dir DIR            Root containing component checkpoint\n                                  directories to update.  [default: checkpoints]\n  --save-every N                  Atomically save after every N recomputed\n                                  records.  [default: 100]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "checkpoint recompute line",
                 "subcommands": []
@@ -1204,14 +1231,23 @@
             "actions": [
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object on stdout.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr checkpoint list [OPTIONS]\n\n  List long-term checkpoint shelf.\n\nOptions:\n  --json      Emit one versioned JSON object on stdout.\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: cxr checkpoint list [OPTIONS]\n\n  List long-term checkpoint shelf.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "checkpoint list",
             "subcommands": []
@@ -1859,14 +1895,23 @@
           },
           {
             "dest": "json_output",
-            "help": "Emit one versioned JSON object on stdout.",
+            "help": "Output format; only json is a stable automation contract.",
+            "option_strings": [
+              "-o",
+              "--output"
+            ],
+            "required": false
+          },
+          {
+            "dest": "_retired_json_output___json",
+            "help": "<SUPPRESS>",
             "option_strings": [
               "--json"
             ],
             "required": false
           }
         ],
-        "help": "Usage: cxr rebrem [OPTIONS] [MATERIALS]...\n\n  Recompute only brem backgrounds in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                 Recompute every checkpoint.\n  --fidelity [full|survey]  Override dataset fidelity; defaults to checkpoint\n                            metadata or full for legacy data.\n  --profile NAME            Catalog profile for legacy data; otherwise must\n                            match checkpoint metadata.\n  --ne-brem N               Bremsstrahlung electron count; overrides profile\n                            default.\n  --start EV                Wide-bremsstrahlung lower bound in eV; overrides\n                            profile.\n  --stop EV                 Wide-bremsstrahlung exclusive upper bound in eV;\n                            default follows beam energy.\n  --step EV                 Wide-bremsstrahlung grid spacing in eV; overrides\n                            profile default.\n  --redo-all                Recompute records already at target.\n  --checkpoint-dir DIR      Root containing component checkpoint directories to\n                            update.  [default: checkpoints]\n  --save-every N            Atomically save after every N recomputed records.\n                            [default: 100]\n  --json                    Emit one versioned JSON object on stdout.\n  -h, --help                Show this message and exit.\n",
+        "help": "Usage: cxr rebrem [OPTIONS] [MATERIALS]...\n\n  Recompute only brem backgrounds in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                       Recompute every checkpoint.\n  --fidelity [full|survey]        Override dataset fidelity; defaults to\n                                  checkpoint metadata or full for legacy data.\n  --profile NAME                  Catalog profile for legacy data; otherwise\n                                  must match checkpoint metadata.\n  --ne-brem N                     Bremsstrahlung electron count; overrides\n                                  profile default.\n  --start EV                      Wide-bremsstrahlung lower bound in eV;\n                                  overrides profile.\n  --stop EV                       Wide-bremsstrahlung exclusive upper bound in\n                                  eV; default follows beam energy.\n  --step EV                       Wide-bremsstrahlung grid spacing in eV;\n                                  overrides profile default.\n  --redo-all                      Recompute records already at target.\n  --checkpoint-dir DIR            Root containing component checkpoint\n                                  directories to update.  [default: checkpoints]\n  --save-every N                  Atomically save after every N recomputed\n                                  records.  [default: 100]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
         "hidden": true,
         "path": "rebrem",
         "subcommands": []
@@ -1978,14 +2023,23 @@
           },
           {
             "dest": "json_output",
-            "help": "Emit one versioned JSON object on stdout.",
+            "help": "Output format; only json is a stable automation contract.",
+            "option_strings": [
+              "-o",
+              "--output"
+            ],
+            "required": false
+          },
+          {
+            "dest": "_retired_json_output___json",
+            "help": "<SUPPRESS>",
             "option_strings": [
               "--json"
             ],
             "required": false
           }
         ],
-        "help": "Usage: cxr reline [OPTIONS] [MATERIALS]...\n\n  Recompute only line spectra in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                 Recompute every checkpoint.\n  --fidelity [full|survey]  Override dataset fidelity; defaults to checkpoint\n                            metadata or full for legacy data.\n  --profile NAME            Catalog profile for legacy data; otherwise must\n                            match checkpoint metadata.\n  --line-ne N               Line-spectrum electron count; overrides profile\n                            default.\n  --start EV                Line-grid lower bound in eV; overrides profile.\n  --stop EV                 Line-grid exclusive upper bound in eV; overrides\n                            profile.\n  --line-step EV            Uniform line-grid spacing in eV; overrides profile\n                            grid.\n  --redo-all                Recompute records already at target.\n  --checkpoint-dir DIR      Root containing component checkpoint directories to\n                            update.  [default: checkpoints]\n  --save-every N            Atomically save after every N recomputed records.\n                            [default: 100]\n  --json                    Emit one versioned JSON object on stdout.\n  -h, --help                Show this message and exit.\n",
+        "help": "Usage: cxr reline [OPTIONS] [MATERIALS]...\n\n  Recompute only line spectra in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                       Recompute every checkpoint.\n  --fidelity [full|survey]        Override dataset fidelity; defaults to\n                                  checkpoint metadata or full for legacy data.\n  --profile NAME                  Catalog profile for legacy data; otherwise\n                                  must match checkpoint metadata.\n  --line-ne N                     Line-spectrum electron count; overrides\n                                  profile default.\n  --start EV                      Line-grid lower bound in eV; overrides\n                                  profile.\n  --stop EV                       Line-grid exclusive upper bound in eV;\n                                  overrides profile.\n  --line-step EV                  Uniform line-grid spacing in eV; overrides\n                                  profile grid.\n  --redo-all                      Recompute records already at target.\n  --checkpoint-dir DIR            Root containing component checkpoint\n                                  directories to update.  [default: checkpoints]\n  --save-every N                  Atomically save after every N recomputed\n                                  records.  [default: 100]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
         "hidden": true,
         "path": "reline",
         "subcommands": []
@@ -2052,14 +2106,23 @@
         "actions": [
           {
             "dest": "json_output",
-            "help": "Emit one versioned JSON object on stdout.",
+            "help": "Output format; only json is a stable automation contract.",
+            "option_strings": [
+              "-o",
+              "--output"
+            ],
+            "required": false
+          },
+          {
+            "dest": "_retired_json_output___json",
+            "help": "<SUPPRESS>",
             "option_strings": [
               "--json"
             ],
             "required": false
           }
         ],
-        "help": "Usage: cxr archives [OPTIONS]\n\n  List long-term checkpoint shelf.\n\nOptions:\n  --json      Emit one versioned JSON object on stdout.\n  -h, --help  Show this message and exit.\n",
+        "help": "Usage: cxr archives [OPTIONS]\n\n  List long-term checkpoint shelf.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
         "hidden": true,
         "path": "archives",
         "subcommands": []
@@ -2280,14 +2343,23 @@
             "actions": [
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote jobs [OPTIONS]\n\n  List jobs with SLURM IDs, materials, and last events.\n\nOptions:\n  --json      Emit one versioned JSON object.\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: cxr remote jobs [OPTIONS]\n\n  List jobs with SLURM IDs, materials, and last events.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": true,
             "path": "remote jobs",
             "subcommands": []
@@ -2603,14 +2675,23 @@
               },
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote pull [OPTIONS] [PROFILE|STEM|MATERIAL@PROFILE]...\n\n  Fetch existing checkpoints from remote box.\n\n  STEM is usually a bare material name, but MATERIAL@PROFILE selects the\n  checkpoint the box produced for that catalog profile (--profile on `cxr remote\n  run`) -- on-disk names never carry the profile, so this reads each candidate's\n  meta.json remotely and pulls the newest match; --hash pins a specific\n  parameter-hash prefix when more than one exists.\n\nOptions:\n  -a, --all                Pull every configured material.\n  -m, --material MATERIAL  Narrow positional PROFILE or --profile to MATERIAL;\n                           repeatable.\n  --profile NAME           Alias for positional PROFILE. Pull its explicit\n                           members, or the in-use manifest when membership is\n                           implicit; -m/--material narrows it.\n  --hash HEXPREFIX         Pin one MATERIAL@PROFILE selector to a parameter-hash\n                           prefix.\n  -f, --full               Default is grid-filtered; pull full unfiltered\n                           checkpoint.\n  --drop-wide-brem         With grid pull, drop wide-brem.\n  --downcast               With grid pull, downcast to float32.\n  --level9                 Recompress remotely at gzip level 9.\n  --no-sync                With grid pull, skip code sync.\n  --brem-only              Merge only brem arrays locally; mutually exclusive\n                           with --line-only.\n  --line-only              Merge only line spectra locally; mutually exclusive\n                           with --brem-only.\n  --force                  With partial merge, insert records absent locally.\n  --json                   Emit one versioned JSON object.\n  -h, --help               Show this message and exit.\n",
+            "help": "Usage: cxr remote pull [OPTIONS] [PROFILE|STEM|MATERIAL@PROFILE]...\n\n  Fetch existing checkpoints from remote box.\n\n  STEM is usually a bare material name, but MATERIAL@PROFILE selects the\n  checkpoint the box produced for that catalog profile (--profile on `cxr remote\n  run`) -- on-disk names never carry the profile, so this reads each candidate's\n  meta.json remotely and pulls the newest match; --hash pins a specific\n  parameter-hash prefix when more than one exists.\n\nOptions:\n  -a, --all                       Pull every configured material.\n  -m, --material MATERIAL         Narrow positional PROFILE or --profile to\n                                  MATERIAL; repeatable.\n  --profile NAME                  Alias for positional PROFILE. Pull its\n                                  explicit members, or the in-use manifest when\n                                  membership is implicit; -m/--material narrows\n                                  it.\n  --hash HEXPREFIX                Pin one MATERIAL@PROFILE selector to a\n                                  parameter-hash prefix.\n  -f, --full                      Default is grid-filtered; pull full unfiltered\n                                  checkpoint.\n  --drop-wide-brem                With grid pull, drop wide-brem.\n  --downcast                      With grid pull, downcast to float32.\n  --level9                        Recompress remotely at gzip level 9.\n  --no-sync                       With grid pull, skip code sync.\n  --brem-only                     Merge only brem arrays locally; mutually\n                                  exclusive with --line-only.\n  --line-only                     Merge only line spectra locally; mutually\n                                  exclusive with --brem-only.\n  --force                         With partial merge, insert records absent\n                                  locally.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "remote pull",
             "subcommands": []
@@ -3092,14 +3173,23 @@
               },
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote status [OPTIONS] [JOBID]\n\n  Show one job; use -v for allocation and -vv for logs.\n\n  By default prints one snapshot and exits. Use -a/--attach to continuously\n  monitor the same dashboard, reconnecting until the job is terminal; Ctrl-C\n  detaches the viewer only and the job keeps running.\n\nOptions:\n  -v, --verbose  Add allocation detail; repeat for case progress and recent\n                 logs.\n  -a, --attach   Continuously monitor the dashboard until interrupted; Ctrl-C\n                 detaches viewer only.\n  --json         Emit one versioned JSON object.\n  -h, --help     Show this message and exit.\n",
+            "help": "Usage: cxr remote status [OPTIONS] [JOBID]\n\n  Show one job; use -v for allocation and -vv for logs.\n\n  By default prints one snapshot and exits. Use -a/--attach to continuously\n  monitor the same dashboard, reconnecting until the job is terminal; Ctrl-C\n  detaches the viewer only and the job keeps running.\n\nOptions:\n  -v, --verbose                   Add allocation detail; repeat for case\n                                  progress and recent logs.\n  -a, --attach                    Continuously monitor the dashboard until\n                                  interrupted; Ctrl-C detaches viewer only.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": true,
             "path": "remote status",
             "subcommands": []
@@ -3276,14 +3366,23 @@
               },
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr job list [OPTIONS]\n\n  List jobs with scheduler IDs, kinds, materials, and states.\n\nOptions:\n  --kind [run|grid|recompute|validate]\n                                  Show only one submission kind.\n  --json                          Emit one versioned JSON object.\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: cxr job list [OPTIONS]\n\n  List jobs with scheduler IDs, kinds, materials, and states.\n\nOptions:\n  --kind [run|grid|recompute|validate]\n                                  Show only one submission kind.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "job list",
             "subcommands": []
@@ -3330,14 +3429,23 @@
               },
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr job status [OPTIONS] [JOBID]\n\n  Show one job snapshot; JOBID defaults to latest.\n\nOptions:\n  -v, --verbose  Add allocation detail; repeat for case progress and recent\n                 logs.\n  --json         Emit one versioned JSON object.\n  -h, --help     Show this message and exit.\n",
+            "help": "Usage: cxr job status [OPTIONS] [JOBID]\n\n  Show one job snapshot; JOBID defaults to latest.\n\nOptions:\n  -v, --verbose                   Add allocation detail; repeat for case\n                                  progress and recent logs.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "job status",
             "subcommands": []
@@ -3514,7 +3622,16 @@
                 "actions": [
                   {
                     "dest": "json_output",
-                    "help": "Emit one versioned JSON object on stdout.",
+                    "help": "Output format; only json is a stable automation contract.",
+                    "option_strings": [
+                      "-o",
+                      "--output"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_json_output___json",
+                    "help": "<SUPPRESS>",
                     "option_strings": [
                       "--json"
                     ],
@@ -3527,7 +3644,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr energy-grid brem show [OPTIONS] [MATERIAL]\n\n  Show bremsstrahlung energy grids.\n\nOptions:\n  --json      Emit one versioned JSON object on stdout.\n  -h, --help  Show this message and exit.\n",
+                "help": "Usage: cxr energy-grid brem show [OPTIONS] [MATERIAL]\n\n  Show bremsstrahlung energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid brem show",
                 "subcommands": []
@@ -3538,7 +3655,16 @@
             "actions": [
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object on stdout (show mode only).",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
@@ -3625,7 +3751,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr energy-grid defaults [OPTIONS]\n\n  Show, update, or clear persistent derivation inputs.\n\n  These values feed ``derive`` and ``submit`` when their matching options are\n  omitted. Geometry searches determine both line and bremsstrahlung upper\n  bounds; ``brem-step`` controls only applied bremsstrahlung spacing.\n\n  Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile\n  angles. These are not physical scan defaults and do not select scan\n  ``--fidelity full|survey``.\n\nOptions:\n  --json                    Emit one versioned JSON object on stdout (show mode\n                            only).\n  --save-default            Persist supplied values; otherwise only show\n                            defaults.\n  --clear FIELD             Reset one field to inherited/built-in behavior;\n                            repeatable. Fields: polar, azimuth, thickness, brem-\n                            step, energy, material.\n  --reset                   Reset every persistent derivation field to\n                            inherited/built-in behavior.\n  --polar DEG,...           Persistent derivation polar tilts in degrees [0,\n                            90).\n  --azimuth DEG,...         Persistent azimuths in degrees [0, 360].\n  --thickness ANGSTROM,...  Persistent positive crystal thicknesses in angstrom.\n  --brem-step EV            Persistent derivation bremsstrahlung spacing in eV.\n  -h, --help                Show this message and exit.\n",
+            "help": "Usage: cxr energy-grid defaults [OPTIONS]\n\n  Show, update, or clear persistent derivation inputs.\n\n  These values feed ``derive`` and ``submit`` when their matching options are\n  omitted. Geometry searches determine both line and bremsstrahlung upper\n  bounds; ``brem-step`` controls only applied bremsstrahlung spacing.\n\n  Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile\n  angles. These are not physical scan defaults and do not select scan\n  ``--fidelity full|survey``.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --save-default                  Persist supplied values; otherwise only show\n                                  defaults.\n  --clear FIELD                   Reset one field to inherited/built-in\n                                  behavior; repeatable. Fields: polar, azimuth,\n                                  thickness, brem-step, energy, material.\n  --reset                         Reset every persistent derivation field to\n                                  inherited/built-in behavior.\n  --polar DEG,...                 Persistent derivation polar tilts in degrees\n                                  [0, 90).\n  --azimuth DEG,...               Persistent azimuths in degrees [0, 360].\n  --thickness ANGSTROM,...        Persistent positive crystal thicknesses in\n                                  angstrom.\n  --brem-step EV                  Persistent derivation bremsstrahlung spacing\n                                  in eV.\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid defaults",
             "subcommands": []
@@ -3796,14 +3922,23 @@
                   },
                   {
                     "dest": "json_output",
-                    "help": "Emit one versioned JSON object on stdout.",
+                    "help": "Output format; only json is a stable automation contract.",
+                    "option_strings": [
+                      "-o",
+                      "--output"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_json_output___json",
+                    "help": "<SUPPRESS>",
                     "option_strings": [
                       "--json"
                     ],
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr energy-grid job status [OPTIONS] [JOBID]\n\n  Show energy-grid job status. JOBID defaults to latest recorded job.\n\nOptions:\n  -v, --verbose  Add allocation detail; repeat for case progress and recent\n                 logs.\n  --json         Emit one versioned JSON object on stdout.\n  -h, --help     Show this message and exit.\n",
+                "help": "Usage: cxr energy-grid job status [OPTIONS] [JOBID]\n\n  Show energy-grid job status. JOBID defaults to latest recorded job.\n\nOptions:\n  -v, --verbose                   Add allocation detail; repeat for case\n                                  progress and recent logs.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
                 "hidden": true,
                 "path": "energy-grid job status",
                 "subcommands": []
@@ -3882,14 +4017,23 @@
                   },
                   {
                     "dest": "json_output",
-                    "help": "Emit one versioned JSON object on stdout.",
+                    "help": "Output format; only json is a stable automation contract.",
+                    "option_strings": [
+                      "-o",
+                      "--output"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_json_output___json",
+                    "help": "<SUPPRESS>",
                     "option_strings": [
                       "--json"
                     ],
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr energy-grid line delete [OPTIONS] MATERIAL\n\n  Delete MATERIAL's derived or manual line-grid rows; irreversible.\n\n  The only way to remove bounds from the shared per-material derived-grid store\n  -- editing a profile's energies never deletes them. Refuses (as a catalog\n  validation failure) when a beam energy is still required by a profile's\n  ``energy_keV`` grid.\n\n  Example:\n    cxr energy-grid line delete wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV  Beam energy in keV; repeat for multiple rows.  [required]\n  -y, --yes     Skip the confirmation prompt.\n  --dry-run     Print proposed diff; delete nothing.\n  --json        Emit one versioned JSON object on stdout.\n  -h, --help    Show this message and exit.\n",
+                "help": "Usage: cxr energy-grid line delete [OPTIONS] MATERIAL\n\n  Delete MATERIAL's derived or manual line-grid rows; irreversible.\n\n  The only way to remove bounds from the shared per-material derived-grid store\n  -- editing a profile's energies never deletes them. Refuses (as a catalog\n  validation failure) when a beam energy is still required by a profile's\n  ``energy_keV`` grid.\n\n  Example:\n    cxr energy-grid line delete wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Skip the confirmation prompt.\n  --dry-run                       Print proposed diff; delete nothing.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid line delete",
                 "subcommands": []
@@ -3952,7 +4096,16 @@
                 "actions": [
                   {
                     "dest": "json_output",
-                    "help": "Emit one versioned JSON object on stdout.",
+                    "help": "Output format; only json is a stable automation contract.",
+                    "option_strings": [
+                      "-o",
+                      "--output"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "_retired_json_output___json",
+                    "help": "<SUPPRESS>",
                     "option_strings": [
                       "--json"
                     ],
@@ -3965,7 +4118,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr energy-grid line show [OPTIONS] [MATERIAL]\n\n  Show coherent line-energy grids.\n\nOptions:\n  --json      Emit one versioned JSON object on stdout.\n  -h, --help  Show this message and exit.\n",
+                "help": "Usage: cxr energy-grid line show [OPTIONS] [MATERIAL]\n\n  Show coherent line-energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid line show",
                 "subcommands": []
@@ -4015,7 +4168,16 @@
             "actions": [
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object on stdout.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
@@ -4028,7 +4190,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr energy-grid show [OPTIONS] [MATERIAL]\n\n  Show line and bremsstrahlung grids together.\n\nOptions:\n  --json      Emit one versioned JSON object on stdout.\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: cxr energy-grid show [OPTIONS] [MATERIAL]\n\n  Show line and bremsstrahlung grids together.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid show",
             "subcommands": []
@@ -4052,14 +4214,23 @@
               },
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object on stdout.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr energy-grid status [OPTIONS] [JOBID]\n\n  Show energy-grid job status. JOBID defaults to latest recorded job.\n\nOptions:\n  -v, --verbose  Add allocation detail; repeat for case progress and recent\n                 logs.\n  --json         Emit one versioned JSON object on stdout.\n  -h, --help     Show this message and exit.\n",
+            "help": "Usage: cxr energy-grid status [OPTIONS] [JOBID]\n\n  Show energy-grid job status. JOBID defaults to latest recorded job.\n\nOptions:\n  -v, --verbose                   Add allocation detail; repeat for case\n                                  progress and recent logs.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": true,
             "path": "energy-grid status",
             "subcommands": []
@@ -4320,14 +4491,23 @@
               },
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object on stdout.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr sweep show [OPTIONS] MATERIAL\n\n  Deprecated; use ``cxr material show MATERIAL``.\n\nOptions:\n  --json      Emit one versioned JSON object on stdout.\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: cxr sweep show [OPTIONS] MATERIAL\n\n  Deprecated; use ``cxr material show MATERIAL``.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "sweep show",
             "subcommands": []
@@ -4700,14 +4880,23 @@
               },
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object on stdout.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr profile delete [OPTIONS] NAME\n\n  Delete a profile; irreversible. 'standard' cannot be deleted.\n\n  Blocked while the shared energy-grid store still references the profile (an\n  ``[energy_grids.NAME]`` fallback bucket); referents are listed.\n\nOptions:\n  -y, --yes   Skip the confirmation prompt.\n  --dry-run   Print proposed TOML diff; delete nothing.\n  --json      Emit one versioned JSON object on stdout.\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: cxr profile delete [OPTIONS] NAME\n\n  Delete a profile; irreversible. 'standard' cannot be deleted.\n\n  Blocked while the shared energy-grid store still references the profile (an\n  ``[energy_grids.NAME]`` fallback bucket); referents are listed.\n\nOptions:\n  -y, --yes                       Skip the confirmation prompt.\n  --dry-run                       Print proposed TOML diff; delete nothing.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "profile delete",
             "subcommands": []
@@ -4716,14 +4905,23 @@
             "actions": [
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object on stdout.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr profile list [OPTIONS]\n\n  List catalog profiles with membership and override counts.\n\nOptions:\n  --json      Emit one versioned JSON object on stdout.\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: cxr profile list [OPTIONS]\n\n  List catalog profiles with membership and override counts.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "profile list",
             "subcommands": []
@@ -5249,14 +5447,23 @@
               },
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object on stdout.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr profile show [OPTIONS] NAME\n\n  Show one profile's ranges, beam, detector, membership, and overrides.\n\nOptions:\n  --json      Emit one versioned JSON object on stdout.\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: cxr profile show [OPTIONS] NAME\n\n  Show one profile's ranges, beam, detector, membership, and overrides.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "profile show",
             "subcommands": []
@@ -5366,14 +5573,23 @@
               },
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object on stdout.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr material show [OPTIONS] MATERIAL\n\n  Show MATERIAL's effective ranges and inherited/overridden sources.\n\nOptions:\n  --profile TEXT  Resolve defaults and overrides under profile NAME.  [default:\n                  standard]\n  --json          Emit one versioned JSON object on stdout.\n  -h, --help      Show this message and exit.\n",
+            "help": "Usage: cxr material show [OPTIONS] MATERIAL\n\n  Show MATERIAL's effective ranges and inherited/overridden sources.\n\nOptions:\n  --profile TEXT                  Resolve defaults and overrides under profile\n                                  NAME.  [default: standard]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "material show",
             "subcommands": []
@@ -5460,14 +5676,23 @@
               },
               {
                 "dest": "json_output",
-                "help": "Emit one versioned JSON object on stdout.",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
                 "option_strings": [
                   "--json"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr material blaze [OPTIONS] MATERIAL\n\n  Run one material's blazed-crystal MC sweep and write its checkpoint.\n\n  Writes checkpoints/<material>_blazed.pkl, separate from flat-face scan\n  checkpoints. Repeat --energy/--spacing/--polar for multiple values.\n\nOptions:\n  --energy E             Beam energies in keV (one or more).  [required]\n  --spacing S            Groove spacing(s) in meters (one, or one per energy).\n                         [required]\n  --polar A              Polar tilt values in degrees.  [0.0<x<90.0]\n  --workers NUMBER       run_cases max_workers (default auto; 0 = serial).\n  --checkpoint-dir DIR   Read and write blazed checkpoint pickles in DIR.\n                         [default: checkpoints]\n  --max-minutes MINUTES  Soft wall-clock budget in minutes; exit 75 if resumable\n                         work remains.\n  --json                 Emit one versioned JSON object on stdout.\n  -h, --help             Show this message and exit.\n",
+            "help": "Usage: cxr material blaze [OPTIONS] MATERIAL\n\n  Run one material's blazed-crystal MC sweep and write its checkpoint.\n\n  Writes checkpoints/<material>_blazed.pkl, separate from flat-face scan\n  checkpoints. Repeat --energy/--spacing/--polar for multiple values.\n\nOptions:\n  --energy E                      Beam energies in keV (one or more).\n                                  [required]\n  --spacing S                     Groove spacing(s) in meters (one, or one per\n                                  energy).  [required]\n  --polar A                       Polar tilt values in degrees.  [0.0<x<90.0]\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial).\n  --checkpoint-dir DIR            Read and write blazed checkpoint pickles in\n                                  DIR.  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "material blaze",
             "subcommands": []

@@ -24,6 +24,7 @@ from cxr_mc.cli._core import (
     emit_json_result,
     emit_result,
     flatten_option_values,
+    output_option,
 )
 from cxr_mc.cli._deprecations import DeprecatingGroup, canonical_option
 from cxr_mc.detectors.spec import DetectorSpec
@@ -429,9 +430,7 @@ def analyze_command(name, performance_dir, sample_period):
 
 
 @command.command("list")
-@click.option(
-    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
-)
+@output_option
 def list_command(json_output):
     """List catalog profiles with membership and override counts."""
     try:
@@ -472,9 +471,7 @@ def list_command(json_output):
 
 @command.command("show")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
-@click.option(
-    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
-)
+@output_option
 def show_command(name, json_output):
     """Show one profile's ranges, beam, detector, membership, and overrides."""
     try:
@@ -845,9 +842,7 @@ def rename_command(name, new_name, dry_run):
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; delete nothing.")
-@click.option(
-    "--json", "json_output", is_flag=True, help="Emit one versioned JSON object on stdout."
-)
+@output_option
 def delete_command(name, yes, dry_run, json_output):
     """Delete a profile; irreversible. 'standard' cannot be deleted.
 
@@ -855,9 +850,11 @@ def delete_command(name, yes, dry_run, json_output):
     (an ``[energy_grids.NAME]`` fallback bucket); referents are listed.
     """
     if dry_run and json_output:
-        raise click.UsageError("--dry-run and --json cannot be combined")
+        raise click.UsageError("--dry-run and --output json cannot be combined")
     if json_output and not yes:
-        raise click.UsageError("--json requires --yes; prompts are disabled in machine-output mode")
+        raise click.UsageError(
+            "--output json requires --yes; prompts are disabled in machine-output mode"
+        )
     if name == "standard":
         raise CLIError("cannot delete profile 'standard': the catalog schema requires it")
     try:

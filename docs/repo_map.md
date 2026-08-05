@@ -86,6 +86,10 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   and inspect the current profile and remote target. Both resolve through the
   shared per-call > `CXR_*` environment > config store > built-in precedence
   chain. The user store is written atomically under Click's platform config dir.
+- **`-o/--output table|json|wide`** → `cli._core.output_option`: shared output
+  selector on JSON-capable non-interactive commands. `table` is the human
+  default, `wide` is human-only, and only `json` carries the stable versioned
+  envelope contract. Hidden `--json` aliases warn through the D7 window.
 - **`cxr run [PROFILE] [-m MATERIAL] [--fidelity full|survey] [-R[=TARGET]]`** →
   local `scan:main` → `run.run_sweep`, or the existing SSH/SLURM submitter when
   `--remote` is present. An omitted profile uses the configured current profile;

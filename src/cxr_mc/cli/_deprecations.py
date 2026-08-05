@@ -291,6 +291,33 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         _flag("app viewer", "--default", "--save-default"),
         _flag("app analysis launch", "--default", "--save-default"),
         _flag("app viewer launch", "--default", "--save-default"),
+        # D5 output selection: JSON remains supported through the stable
+        # extensible output selector; the boolean spelling is retired.
+        _flag("run", "--json", "--output json"),
+        _flag("rebrem", "--json", "--output json"),
+        _flag("reline", "--json", "--output json"),
+        _flag("archives", "--json", "--output json"),
+        _flag("checkpoint list", "--json", "--output json"),
+        _flag("checkpoint recompute brem", "--json", "--output json"),
+        _flag("checkpoint recompute line", "--json", "--output json"),
+        _flag("remote jobs", "--json", "--output json"),
+        _flag("remote pull", "--json", "--output json"),
+        _flag("remote status", "--json", "--output json"),
+        _flag("job list", "--json", "--output json"),
+        _flag("job status", "--json", "--output json"),
+        _flag("energy-grid defaults", "--json", "--output json"),
+        _flag("energy-grid show", "--json", "--output json"),
+        _flag("energy-grid status", "--json", "--output json"),
+        _flag("energy-grid job status", "--json", "--output json"),
+        _flag("energy-grid line delete", "--json", "--output json"),
+        _flag("energy-grid line show", "--json", "--output json"),
+        _flag("energy-grid brem show", "--json", "--output json"),
+        _flag("sweep show", "--json", "--output json"),
+        _flag("profile delete", "--json", "--output json"),
+        _flag("profile list", "--json", "--output json"),
+        _flag("profile show", "--json", "--output json"),
+        _flag("material show", "--json", "--output json"),
+        _flag("material blaze", "--json", "--output json"),
     )
 }
 

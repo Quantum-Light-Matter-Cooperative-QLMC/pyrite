@@ -62,8 +62,14 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 | `cxr app analysis launch` | `--default` | `--save-default` | 0.1.0 | 0.3.0 |  |
 | `cxr app viewer` | `--default` | `--save-default` | 0.1.0 | 0.3.0 |  |
 | `cxr app viewer launch` | `--default` | `--save-default` | 0.1.0 | 0.3.0 |  |
+| `cxr archives` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr checkpoint list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr checkpoint recompute brem` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr checkpoint recompute line` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid apply` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
+| `cxr energy-grid brem show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid defaults` | `--azimuths` | `--azimuth` | 0.1.0 | 0.3.0 |  |
+| `cxr energy-grid defaults` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid defaults` | `--set` | `--save-default` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid defaults` | `--tilts` | `--polar` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid derive` | `--azimuths` | `--azimuth` | 0.1.0 | 0.3.0 |  |
@@ -71,13 +77,32 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 | `cxr energy-grid derive` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid derive` | `--set-default` | `--save-default` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid derive` | `--tilts` | `--polar` | 0.1.0 | 0.3.0 |  |
+| `cxr energy-grid job status` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr energy-grid line delete` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr energy-grid line show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr energy-grid show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr energy-grid status` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid submit` | `--azimuths` | `--azimuth` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid submit` | `--energies` | `--energy` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid submit` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid submit` | `--set-default` | `--save-default` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid submit` | `--tilts` | `--polar` | 0.1.0 | 0.3.0 |  |
+| `cxr job list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr job status` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr material blaze` | `--angles` | `--polar` | 0.1.0 | 0.3.0 |  |
+| `cxr material blaze` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr material show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr profile add` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `cxr profile create` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
+| `cxr profile delete` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr profile list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr profile remove` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `cxr profile set` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
+| `cxr profile show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr rebrem` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr reline` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr remote jobs` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr remote pull` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr remote status` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr run` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr sweep show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
