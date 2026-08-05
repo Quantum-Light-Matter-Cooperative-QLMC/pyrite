@@ -103,7 +103,11 @@ from .spectrum import (
     mc_spectrum,
     mc_spectrum_solid_angle,
 )
-from .spectrum_jit_kernel import SpectrumKernelConfig, run_reduction_kernel
+from .spectrum_jit_kernel import (
+    DEFAULT_SPECTRUM_KERNEL_CONFIG,
+    SpectrumKernelConfig,
+    run_reduction_kernel,
+)
 from .transport import (
     _NO_MOTT,
     A0_SQ_CM2,
@@ -171,6 +175,7 @@ __all__ = [
     # spectrum jit kernel
     "run_reduction_kernel",
     "SpectrumKernelConfig",
+    "DEFAULT_SPECTRUM_KERNEL_CONFIG",
     # spectrum
     "_SEG_ARRAYS",
     "_segments_in_layer",

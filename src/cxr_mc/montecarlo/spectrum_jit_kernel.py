@@ -20,6 +20,12 @@ class SpectrumKernelConfig:
     energies_per_block: int
 
 
+DEFAULT_SPECTRUM_KERNEL_CONFIG = SpectrumKernelConfig(
+    nthreads=512,
+    energies_per_block=3,
+)
+
+
 @jit.rawkernel()
 def _kernel_1e(
     E_r,

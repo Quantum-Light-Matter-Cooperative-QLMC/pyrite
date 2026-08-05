@@ -33,6 +33,8 @@ from .transport import TRANSPORT_ELEMENTS, beta_from_keV
 
 # ---- segment-sum CXR spectrum ------------------------------------------------
 _SEG_ARRAYS = ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "t0_ang", "elec_id", "layer")
+_USE_JIT_LINE_REDUCTION = True
+_JIT_LINE_BATCH_TARGET = 400_000
 
 
 def _sincsq_lineshape(a_width_j, E_grid, E_r_j):
@@ -834,7 +836,7 @@ def mc_spectrum(
         # a_width converts (E - E_res) to the sinc argument: P t_L = a_width(E - E_res).
         _nsys_push("cxr.lines.accum")
         pref = ALPHA_FS * om / (4.0 * xp.pi**2 * HBARC_EV_ANG) * t_L**2 * T_abs
-        weight = pref * A2 * wm
+        weight = pref * A2 * w
         targets = [(weight, spec)]
         if components:
             targets += [(pref * A2_pxr * wm, spec_pxr), (pref * A2_cbs * wm, spec_cbs)]
@@ -976,10 +978,66 @@ def mc_spectrum(
         else:
             L_esc_full = _escape_length(seg_r[:, 2], thickness, nz)[:, None]
 
+        # Experimental fused CUDA line reduction.
+        # Keep the existing CuPy/NumPy accumulation as the fallback for:
+        #   - CPU execution
+        #   - components=True
+        #   - sinc_cutoff support
+        #
+        # Lazy import is intentional: spectrum.py also supports NumPy CPU workers.
+        _use_jit_line_reduction = (
+            _USE_JIT_LINE_REDUCTION
+            and getattr(xp, "__name__", "") == "cupy"
+            and np.dtype(REAL) == np.dtype(np.float32)
+            and not components
+            and sinc_cutoff is None
+        )
+
+        if _use_jit_line_reduction:
+            from .spectrum_jit_kernel import (
+                DEFAULT_SPECTRUM_KERNEL_CONFIG,
+                run_reduction_kernel,
+            )
+
         n_seg = v_all.shape[0]
         seg_block = max(1, 1_000_000 // max(1, N_g))  # bound (n_block, N_g) temporaries
 
-        debug_captured = False
+        pending_E_r = []
+        pending_aw = []
+        pending_w = []
+        pending_n_lines = 0
+
+        def _flush_line_batch():
+            nonlocal pending_n_lines
+
+            if pending_n_lines == 0:
+                return
+
+            if len(pending_E_r) == 1:
+                E_r_batch = pending_E_r[0]
+                aw_batch = pending_aw[0]
+                w_batch = pending_w[0]
+            else:
+                E_r_batch = xp.concatenate(pending_E_r)
+                aw_batch = xp.concatenate(pending_aw)
+                w_batch = xp.concatenate(pending_w)
+
+            _nsys_push("cxr.lines.reduce")
+
+            spec[:] += run_reduction_kernel(
+                E_r_batch,
+                aw_batch,
+                w_batch,
+                E_grid,
+                config=DEFAULT_SPECTRUM_KERNEL_CONFIG,
+            )
+
+            _nsys_pop()
+
+            pending_E_r.clear()
+            pending_aw.clear()
+            pending_w.clear()
+            pending_n_lines = 0
 
         for s0 in range(0, n_seg, seg_block):
             sb = slice(s0, min(s0 + seg_block, n_seg))
@@ -1052,41 +1110,37 @@ def mc_spectrum(
                 continue
             E_r_f = E_res.reshape(-1)[gm]
             aw_f = a_width.reshape(-1)[gm]
-            targets = [(weight, spec)]
-            if components:
-                targets.append((pref * A2_pxr * WM, spec_pxr))
-                targets.append((pref * A2_cbs * WM, spec_cbs))
+            w_f = weight.reshape(-1)[gm]
+
             _nsys_push("cxr.lines.accum")
-            for w, tgt in targets:
-                w_f = w.reshape(-1)[gm]
-                if not debug_captured:
-                    print("N_L:", E_r_f.size)
-                    print("N_E:", E_grid.size)
-                    print("chunk:", chunk)
 
-                    print("E_r:", E_r_f.dtype, E_r_f.shape)
-                    print("aw :", aw_f.dtype, aw_f.shape)
-                    print("w  :", w_f.dtype, w_f.shape)
-                    print("E  :", E_grid.dtype, E_grid.shape)
-                    E_r_f_np = xp.asnumpy(E_r_f)
-                    aw_f_np = xp.asnumpy(aw_f)
-                    w_f_np = xp.asnumpy(w_f)
-                    E_grid_np = xp.asnumpy(E_grid)
-                    np.savez(
-                        "/tmp/line_accum_debug.npz",
-                        E_r_f_np=E_r_f_np,
-                        aw_f_np=aw_f_np,
-                        w_f_np=w_f_np,
-                        E_grid_np=E_grid_np,
-                    )
-                    debug_captured = True
-                for j0 in range(0, E_r_f.size, chunk):
-                    sl2 = slice(j0, min(j0 + chunk, E_r_f.size))
-                    S = _sincsq_lineshape(aw_f[sl2][:, None], E_grid[None, :], E_r_f[sl2][:, None])
-                    rhs = w_f[sl2] @ S
+            if _use_jit_line_reduction:
+                pending_E_r.append(E_r_f)
+                pending_aw.append(aw_f)
+                pending_w.append(w_f)
 
-                    tgt += rhs
-                    tgt += w_f[sl2] @ S
+                pending_n_lines += int(E_r_f.size)
+
+                if pending_n_lines >= _JIT_LINE_BATCH_TARGET:
+                    _flush_line_batch()
+
+            else:
+                # Existing accumulation retained as the CPU / compatibility fallback.
+                targets = [(weight, spec)]
+                if components:
+                    targets.append((pref * A2_pxr * WM, spec_pxr))
+                    targets.append((pref * A2_cbs * WM, spec_cbs))
+                for w, tgt in targets:
+                    w_f = w.reshape(-1)[gm]
+                    for j0 in range(0, E_r_f.size, chunk):
+                        sl2 = slice(j0, min(j0 + chunk, E_r_f.size))
+                        S = _sincsq_lineshape(
+                            aw_f[sl2][:, None], E_grid[None, :], E_r_f[sl2][:, None]
+                        )
+                        rhs = w_f[sl2] @ S
+
+                        tgt += rhs
+                        tgt += w_f[sl2] @ S
             _nsys_pop()
 
     if components:

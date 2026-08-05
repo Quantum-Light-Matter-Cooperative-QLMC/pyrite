@@ -1,19 +1,17 @@
 import cupy as xp
 import numpy as np
 
-from cxr_mc.montecarlo import SpectrumKernelConfig, run_reduction_kernel
+from cxr_mc.montecarlo import (
+    DEFAULT_SPECTRUM_KERNEL_CONFIG,
+    SpectrumKernelConfig,
+    run_reduction_kernel,
+)
 
 data = np.load("/tmp/line_accum_debug.npz")
 E_r = xp.asarray(data["E_r_f_np"])
 aw = xp.asarray(data["aw_f_np"])
 w = xp.asarray(data["w_f_np"])
 E_grid = xp.asarray(data["E_grid_np"])
-
-DEFAULT_SPECTRUM_KERNEL_CONFIG = SpectrumKernelConfig(
-    nthreads=512,
-    energies_per_block=3,
-)
-
 
 # warmup / force JIT compilation
 run_reduction_kernel(
