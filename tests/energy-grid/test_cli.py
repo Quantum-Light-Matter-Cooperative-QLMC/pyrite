@@ -4,6 +4,7 @@ import sys
 import pytest
 
 from cxr_mc import energy_grid
+from cxr_mc.cli import _core as _cli_core
 from cxr_mc.energy_grid import _command
 from tests.helpers.cli import assert_clean_result, invoke
 
@@ -125,23 +126,23 @@ def test_click_submit_with_invalid_azimuths_fails(monkeypatch):
         energy_grid.command,
         [
             "submit",
-            "--materials",
+            "--material",
             "diamond,wse2",
-            "--energies",
+            "--energy",
             "100,200",
-            "--tilts",
+            "--polar",
             "0,1.5",
-            "--azimuths",
+            "--azimuth",
             "45,90",
             "--thickness",
             "1000,2000",
-            "--set-default",
+            "--save-default",
         ],
     )
 
     assert result.exit_code != 0
     print(result.output)
-    assert "Invalid value for '--azimuths'" in result.output
+    assert "Invalid value for '--azimuth'" in result.output
     assert seen == {}
 
 
@@ -153,17 +154,17 @@ def test_click_submit_forwards_geometry_and_set_default(monkeypatch):
         energy_grid.command,
         [
             "submit",
-            "--materials",
+            "--material",
             "diamond,wse2",
-            "--energies",
+            "--energy",
             "100,200",
-            "--tilts",
+            "--polar",
             "0,1.5",
-            "--azimuths",
+            "--azimuth",
             "95,180,260",
             "--thickness",
             "1000,2000",
-            "--set-default",
+            "--save-default",
         ],
     )
 
@@ -203,7 +204,7 @@ def test_click_submit_routes_legacy_message_to_stderr(monkeypatch):
         lambda **_kwargs: (_ for _ in ()).throw(SystemExit("invalid material text")),
     )
 
-    result = invoke(energy_grid.command, ["submit", "--materials", "bad"])
+    result = invoke(energy_grid.command, ["submit", "--material", "bad"])
 
     assert result.exit_code == 1
     assert result.stdout == ""
@@ -429,13 +430,35 @@ def test_click_stop_previews_latest_and_yes_cancels(monkeypatch):
     monkeypatch.setattr(_command.remote, "_stop_jobid", lambda jobid: seen.update(jobid=jobid))
 
     preview = invoke(energy_grid.command, ["job", "stop", "--latest"])
-    confirmed = invoke(energy_grid.command, ["job", "stop", "--latest", "--yes"])
+    confirmed = invoke(energy_grid.command, ["job", "stop", "--latest", "-y"])
 
     assert_clean_result(
         preview,
-        stdout="would cancel remote job: job9\nre-run with --yes to cancel\n",
+        stdout=("would cancel remote job: job9\npreview only; re-run with -y/--yes to execute\n"),
     )
     assert_clean_result(confirmed)
+    assert seen == {"jobid": "job9"}
+
+
+def test_click_stop_prompts_on_tty(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(_cli_core, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(_command.remote, "_latest_jobid", lambda: "job9")
+    monkeypatch.setattr(_command.remote, "_stop_jobid", lambda jobid: seen.update(jobid=jobid))
+
+    declined = invoke(energy_grid.command, ["job", "stop", "--latest"], input="n\n")
+    accepted = invoke(energy_grid.command, ["job", "stop", "--latest"], input="y\n")
+
+    assert_clean_result(
+        declined,
+        stdout="would cancel remote job: job9\n",
+        stderr="Cancel this remote job? [y/N]: n\n",
+    )
+    assert_clean_result(
+        accepted,
+        stdout="would cancel remote job: job9\n",
+        stderr="Cancel this remote job? [y/N]: y\n",
+    )
     assert seen == {"jobid": "job9"}
 
 
@@ -575,9 +598,9 @@ def test_click_numeric_domains_fail_at_boundary(argv):
     ("argv", "exit_code", "stderr_text"),
     [
         (
-            ["energy-grid", "defaults", "--tilts", "5"],
+            ["energy-grid", "defaults", "--polar", "5"],
             2,
-            "--tilts require --set",
+            "--polar require --save-default",
         ),
         (
             ["energy-grid", "show", "not-a-material"],
@@ -609,9 +632,9 @@ def test_cli_failure_exit_and_stream_contract(argv, exit_code, stderr_text):
     ("argv", "exit_code", "stderr_text"),
     [
         (
-            ["defaults", "--tilts", "5"],
+            ["defaults", "--polar", "5"],
             2,
-            "--tilts require --set",
+            "--polar require --save-default",
         ),
         (
             ["show", "not-a-material"],

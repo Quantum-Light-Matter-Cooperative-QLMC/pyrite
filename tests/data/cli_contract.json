@@ -1059,12 +1059,13 @@
                 "dest": "yes",
                 "help": "Delete exact previewed stale records.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr checkpoint gc [OPTIONS]\n\n  Drop records obsolete under current scan profiles; preview unless --yes. With\n  neither selector, gc profile=standard.\n\nOptions:\n  --all           Prune current checkpoints for standard and every named catalog\n                  profile.\n  --profile NAME  Prune current full and survey checkpoints for catalog profile\n                  NAME.\n  --yes           Delete exact previewed stale records.\n  -h, --help      Show this message and exit.\n",
+            "help": "Usage: cxr checkpoint gc [OPTIONS]\n\n  Drop records obsolete under current scan profiles; preview unless --yes. With\n  neither selector, gc profile=standard.\n\nOptions:\n  --all           Prune current checkpoints for standard and every named catalog\n                  profile.\n  --profile NAME  Prune current full and survey checkpoints for catalog profile\n                  NAME.\n  -y, --yes       Delete exact previewed stale records.\n  -h, --help      Show this message and exit.\n",
             "hidden": false,
             "path": "checkpoint gc",
             "subcommands": []
@@ -1097,6 +1098,7 @@
                 "dest": "yes",
                 "help": "Delete exact previewed targets.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
@@ -1110,7 +1112,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr checkpoint rm [OPTIONS] [MATERIALS]...\n\n  Delete local checkpoint datasets; preview unless --yes.\n\n  Archived and retained active manifests remain CAS reachability roots.\n\nOptions:\n  --profile NAME        Delete active datasets owned by catalog profile NAME.\n  --all                 Delete every active dataset.\n  --yes                 Delete exact previewed targets.\n  --checkpoint-dir DIR  Checkpoint root containing active datasets, archives,\n                        and shared CAS blobs.  [default: checkpoints]\n  -h, --help            Show this message and exit.\n",
+            "help": "Usage: cxr checkpoint rm [OPTIONS] [MATERIALS]...\n\n  Delete local checkpoint datasets; preview unless --yes.\n\n  Archived and retained active manifests remain CAS reachability roots.\n\nOptions:\n  --profile NAME        Delete active datasets owned by catalog profile NAME.\n  --all                 Delete every active dataset.\n  -y, --yes             Delete exact previewed targets.\n  --checkpoint-dir DIR  Checkpoint root containing active datasets, archives,\n                        and shared CAS blobs.  [default: checkpoints]\n  -h, --help            Show this message and exit.\n",
             "hidden": false,
             "path": "checkpoint rm",
             "subcommands": []
@@ -1137,12 +1139,13 @@
                 "dest": "yes",
                 "help": "Delete exact previewed stale records.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr checkpoint prune [OPTIONS]\n\n  Drop records obsolete under current scan profiles; preview unless --yes. With\n  neither selector, gc profile=standard.\n\nOptions:\n  --all           Prune current checkpoints for standard and every named catalog\n                  profile.\n  --profile NAME  Prune current full and survey checkpoints for catalog profile\n                  NAME.\n  --yes           Delete exact previewed stale records.\n  -h, --help      Show this message and exit.\n",
+            "help": "Usage: cxr checkpoint prune [OPTIONS]\n\n  Drop records obsolete under current scan profiles; preview unless --yes. With\n  neither selector, gc profile=standard.\n\nOptions:\n  --all           Prune current checkpoints for standard and every named catalog\n                  profile.\n  --profile NAME  Prune current full and survey checkpoints for catalog profile\n                  NAME.\n  -y, --yes       Delete exact previewed stale records.\n  -h, --help      Show this message and exit.\n",
             "hidden": true,
             "path": "checkpoint prune",
             "subcommands": []
@@ -1175,6 +1178,7 @@
                 "dest": "yes",
                 "help": "Delete exact previewed targets.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
@@ -1188,7 +1192,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr checkpoint clear [OPTIONS] [MATERIALS]...\n\n  Delete local checkpoint datasets; preview unless --yes.\n\n  Archived and retained active manifests remain CAS reachability roots.\n\nOptions:\n  --profile NAME        Delete active datasets owned by catalog profile NAME.\n  --all                 Delete every active dataset.\n  --yes                 Delete exact previewed targets.\n  --checkpoint-dir DIR  Checkpoint root containing active datasets, archives,\n                        and shared CAS blobs.  [default: checkpoints]\n  -h, --help            Show this message and exit.\n",
+            "help": "Usage: cxr checkpoint clear [OPTIONS] [MATERIALS]...\n\n  Delete local checkpoint datasets; preview unless --yes.\n\n  Archived and retained active manifests remain CAS reachability roots.\n\nOptions:\n  --profile NAME        Delete active datasets owned by catalog profile NAME.\n  --all                 Delete every active dataset.\n  -y, --yes             Delete exact previewed targets.\n  --checkpoint-dir DIR  Checkpoint root containing active datasets, archives,\n                        and shared CAS blobs.  [default: checkpoints]\n  -h, --help            Show this message and exit.\n",
             "hidden": true,
             "path": "checkpoint clear",
             "subcommands": []
@@ -1345,6 +1349,7 @@
                 "dest": "yes",
                 "help": "Delete exact previewed profile directories.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
@@ -1358,7 +1363,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr performance prune [OPTIONS] [PROFILES]...\n\n  Delete explicitly selected local performance profiles; preview by default.\n\nOptions:\n  --all                        Select every local profile.\n  --yes                        Delete exact previewed profile directories.\n  --performance-dir DIRECTORY  [default: performance-profiles]\n  -h, --help                   Show this message and exit.\n",
+            "help": "Usage: cxr performance prune [OPTIONS] [PROFILES]...\n\n  Delete explicitly selected local performance profiles; preview by default.\n\nOptions:\n  --all                        Select every local profile.\n  -y, --yes                    Delete exact previewed profile directories.\n  --performance-dir DIRECTORY  [default: performance-profiles]\n  -h, --help                   Show this message and exit.\n",
             "hidden": true,
             "path": "performance prune",
             "subcommands": []
@@ -1383,6 +1388,7 @@
                 "dest": "yes",
                 "help": "Delete exact previewed profile directories.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
@@ -1396,7 +1402,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr performance rm [OPTIONS] [PROFILES]...\n\n  Delete explicitly selected local performance profiles; preview by default.\n\nOptions:\n  --all                        Select every local profile.\n  --yes                        Delete exact previewed profile directories.\n  --performance-dir DIRECTORY  [default: performance-profiles]\n  -h, --help                   Show this message and exit.\n",
+            "help": "Usage: cxr performance rm [OPTIONS] [PROFILES]...\n\n  Delete explicitly selected local performance profiles; preview by default.\n\nOptions:\n  --all                        Select every local profile.\n  -y, --yes                    Delete exact previewed profile directories.\n  --performance-dir DIRECTORY  [default: performance-profiles]\n  -h, --help                   Show this message and exit.\n",
             "hidden": false,
             "path": "performance rm",
             "subcommands": []
@@ -1946,12 +1952,13 @@
                 "dest": "yes",
                 "help": "Delete exact previewed targets; otherwise preview.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote clear [OPTIONS] [MATERIAL]...\n\n  Delete remote checkpoints; preview unless --yes.\n\nOptions:\n  --all           Empty remote checkpoints directory; takes no material\n                  arguments.\n  --profile NAME  Delete checkpoints belonging to catalog profile NAME.\n  --yes           Delete exact previewed targets; otherwise preview.\n  -h, --help      Show this message and exit.\n",
+            "help": "Usage: cxr remote clear [OPTIONS] [MATERIAL]...\n\n  Delete remote checkpoints; preview unless --yes.\n\nOptions:\n  --all           Empty remote checkpoints directory; takes no material\n                  arguments.\n  --profile NAME  Delete checkpoints belonging to catalog profile NAME.\n  -y, --yes       Delete exact previewed targets; otherwise preview.\n  -h, --help      Show this message and exit.\n",
             "hidden": true,
             "path": "remote clear",
             "subcommands": []
@@ -1986,12 +1993,13 @@
                 "dest": "yes",
                 "help": "Reclaim exactly what was previewed.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote gc [OPTIONS]\n\n  Reclaim remote records obsolete under current scan profiles and release\n  orphaned checkpoint reservations; preview unless --yes. Record selection\n  defaults to profile=standard.\n\nOptions:\n  --all                     Reclaim records for standard and every named catalog\n                            profile.\n  --profile NAME            Reclaim current full and survey records for catalog\n                            profile NAME.\n  --min-age-minutes NUMBER  Only release reservations at least this old.\n                            [default: 5.0]\n  --yes                     Reclaim exactly what was previewed.\n  -h, --help                Show this message and exit.\n",
+            "help": "Usage: cxr remote gc [OPTIONS]\n\n  Reclaim remote records obsolete under current scan profiles and release\n  orphaned checkpoint reservations; preview unless --yes. Record selection\n  defaults to profile=standard.\n\nOptions:\n  --all                     Reclaim records for standard and every named catalog\n                            profile.\n  --profile NAME            Reclaim current full and survey records for catalog\n                            profile NAME.\n  --min-age-minutes NUMBER  Only release reservations at least this old.\n                            [default: 5.0]\n  -y, --yes                 Reclaim exactly what was previewed.\n  -h, --help                Show this message and exit.\n",
             "hidden": false,
             "path": "remote gc",
             "subcommands": []
@@ -2068,12 +2076,13 @@
                     "dest": "yes",
                     "help": "Delete exact previewed directories.",
                     "option_strings": [
+                      "-y",
                       "--yes"
                     ],
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr remote performance prune [OPTIONS] [PROFILE]...\n\n  Delete selected terminal-job performance artifacts; preview by default.\n\nOptions:\n  --all       Select every remote profile.\n  --yes       Delete exact previewed directories.\n  -h, --help  Show this message and exit.\n",
+                "help": "Usage: cxr remote performance prune [OPTIONS] [PROFILE]...\n\n  Delete selected terminal-job performance artifacts; preview by default.\n\nOptions:\n  --all       Select every remote profile.\n  -y, --yes   Delete exact previewed directories.\n  -h, --help  Show this message and exit.\n",
                 "hidden": true,
                 "path": "remote performance prune",
                 "subcommands": []
@@ -2112,12 +2121,13 @@
                     "dest": "yes",
                     "help": "Delete exact previewed directories.",
                     "option_strings": [
+                      "-y",
                       "--yes"
                     ],
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr remote performance rm [OPTIONS] [PROFILE]...\n\n  Delete selected terminal-job performance artifacts; preview by default.\n\nOptions:\n  --all       Select every remote profile.\n  --yes       Delete exact previewed directories.\n  -h, --help  Show this message and exit.\n",
+                "help": "Usage: cxr remote performance rm [OPTIONS] [PROFILE]...\n\n  Delete selected terminal-job performance artifacts; preview by default.\n\nOptions:\n  --all       Select every remote profile.\n  -y, --yes   Delete exact previewed directories.\n  -h, --help  Show this message and exit.\n",
                 "hidden": false,
                 "path": "remote performance rm",
                 "subcommands": []
@@ -2168,12 +2178,13 @@
                 "dest": "yes",
                 "help": "Delete exact previewed stale records.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote prune [OPTIONS]\n\n  Drop remote records obsolete under current scan profiles; preview unless\n  --yes. Defaults to profile=standard.\n\nOptions:\n  --all           Prune current checkpoints for standard and every named catalog\n                  profile.\n  --profile NAME  Prune current full and survey checkpoints for catalog profile\n                  NAME.\n  --yes           Delete exact previewed stale records.\n  -h, --help      Show this message and exit.\n",
+            "help": "Usage: cxr remote prune [OPTIONS]\n\n  Drop remote records obsolete under current scan profiles; preview unless\n  --yes. Defaults to profile=standard.\n\nOptions:\n  --all           Prune current checkpoints for standard and every named catalog\n                  profile.\n  --profile NAME  Prune current full and survey checkpoints for catalog profile\n                  NAME.\n  -y, --yes       Delete exact previewed stale records.\n  -h, --help      Show this message and exit.\n",
             "hidden": true,
             "path": "remote prune",
             "subcommands": []
@@ -2200,12 +2211,13 @@
                 "dest": "yes",
                 "help": "Delete exact previewed directories.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote prune-jobs [OPTIONS]\n\n  Delete terminal (done/failed/cancelled) job directories; preview unless --yes.\n  Live jobs are always kept.\n\nOptions:\n  --all           Prune every terminal job directory.\n  --profile NAME  Prune the NAME / NAME-N job-directory family only.\n  --yes           Delete exact previewed directories.\n  -h, --help      Show this message and exit.\n",
+            "help": "Usage: cxr remote prune-jobs [OPTIONS]\n\n  Delete terminal (done/failed/cancelled) job directories; preview unless --yes.\n  Live jobs are always kept.\n\nOptions:\n  --all           Prune every terminal job directory.\n  --profile NAME  Prune the NAME / NAME-N job-directory family only.\n  -y, --yes       Delete exact previewed directories.\n  -h, --help      Show this message and exit.\n",
             "hidden": false,
             "path": "remote prune-jobs",
             "subcommands": []
@@ -2345,12 +2357,13 @@
                 "dest": "yes",
                 "help": "Release reservations; otherwise preview.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote reap [OPTIONS]\n\n  Release orphaned checkpoint reservations; preview unless --yes.\n\nOptions:\n  --min-age-minutes NUMBER  Only reap locks at least this old.  [default: 5.0]\n  --yes                     Release reservations; otherwise preview.\n  -h, --help                Show this message and exit.\n",
+            "help": "Usage: cxr remote reap [OPTIONS]\n\n  Release orphaned checkpoint reservations; preview unless --yes.\n\nOptions:\n  --min-age-minutes NUMBER  Only reap locks at least this old.  [default: 5.0]\n  -y, --yes                 Release reservations; otherwise preview.\n  -h, --help                Show this message and exit.\n",
             "hidden": true,
             "path": "remote reap",
             "subcommands": []
@@ -2573,12 +2586,13 @@
                 "dest": "yes",
                 "help": "Delete exact previewed targets; otherwise preview.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote rm [OPTIONS] [MATERIAL]...\n\n  Delete remote checkpoints; preview unless --yes.\n\nOptions:\n  --all           Empty remote checkpoints directory; takes no material\n                  arguments.\n  --profile NAME  Delete checkpoints belonging to catalog profile NAME.\n  --yes           Delete exact previewed targets; otherwise preview.\n  -h, --help      Show this message and exit.\n",
+            "help": "Usage: cxr remote rm [OPTIONS] [MATERIAL]...\n\n  Delete remote checkpoints; preview unless --yes.\n\nOptions:\n  --all           Empty remote checkpoints directory; takes no material\n                  arguments.\n  --profile NAME  Delete checkpoints belonging to catalog profile NAME.\n  -y, --yes       Delete exact previewed targets; otherwise preview.\n  -h, --help      Show this message and exit.\n",
             "hidden": false,
             "path": "remote rm",
             "subcommands": []
@@ -2847,12 +2861,13 @@
                 "dest": "yes",
                 "help": "Cancel exact previewed jobs; otherwise preview.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr remote stop [OPTIONS] [MATERIAL]...\n\n  cancel active SLURM job(s) by material, profile, or every live job.\n\nOptions:\n  -a, --all       Stop every live job.\n  --profile NAME  Stop live job(s) submitted with this catalog profile.\n  --yes           Cancel exact previewed jobs; otherwise preview.\n  -h, --help      Show this message and exit.\n",
+            "help": "Usage: cxr remote stop [OPTIONS] [MATERIAL]...\n\n  cancel active SLURM job(s) by material, profile, or every live job.\n\nOptions:\n  -a, --all       Stop every live job.\n  --profile NAME  Stop live job(s) submitted with this catalog profile.\n  -y, --yes       Cancel exact previewed jobs; otherwise preview.\n  -h, --help      Show this message and exit.\n",
             "hidden": false,
             "path": "remote stop",
             "subcommands": []
@@ -3392,12 +3407,13 @@
                     "dest": "yes",
                     "help": "Cancel exact previewed job; otherwise preview.",
                     "option_strings": [
+                      "-y",
                       "--yes"
                     ],
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr energy-grid job stop [OPTIONS] [JOBID]\n\n  Preview or stop one energy-grid job.\n\nOptions:\n  --latest    Target latest recorded job instead of JOBID.\n  --yes       Cancel exact previewed job; otherwise preview.\n  -h, --help  Show this message and exit.\n",
+                "help": "Usage: cxr energy-grid job stop [OPTIONS] [JOBID]\n\n  Preview or stop one energy-grid job.\n\nOptions:\n  --latest    Target latest recorded job instead of JOBID.\n  -y, --yes   Cancel exact previewed job; otherwise preview.\n  -h, --help  Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid job stop",
                 "subcommands": []
@@ -3647,12 +3663,13 @@
                 "dest": "yes",
                 "help": "Cancel exact previewed job; otherwise preview.",
                 "option_strings": [
+                  "-y",
                   "--yes"
                 ],
                 "required": false
               }
             ],
-            "help": "Usage: cxr energy-grid stop [OPTIONS] [JOBID]\n\n  Preview or stop one energy-grid job.\n\nOptions:\n  --latest    Target latest recorded job instead of JOBID.\n  --yes       Cancel exact previewed job; otherwise preview.\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: cxr energy-grid stop [OPTIONS] [JOBID]\n\n  Preview or stop one energy-grid job.\n\nOptions:\n  --latest    Target latest recorded job instead of JOBID.\n  -y, --yes   Cancel exact previewed job; otherwise preview.\n  -h, --help  Show this message and exit.\n",
             "hidden": true,
             "path": "energy-grid stop",
             "subcommands": []
@@ -5072,12 +5089,13 @@
             "dest": "yes",
             "help": "Delete exact previewed stale records.",
             "option_strings": [
+              "-y",
               "--yes"
             ],
             "required": false
           }
         ],
-        "help": "Usage: cxr prune [OPTIONS]\n\n  Drop records obsolete under current scan profiles; preview unless --yes. With\n  neither selector, gc profile=standard.\n\nOptions:\n  --all           Prune current checkpoints for standard and every named catalog\n                  profile.\n  --profile NAME  Prune current full and survey checkpoints for catalog profile\n                  NAME.\n  --yes           Delete exact previewed stale records.\n  -h, --help      Show this message and exit.\n",
+        "help": "Usage: cxr prune [OPTIONS]\n\n  Drop records obsolete under current scan profiles; preview unless --yes. With\n  neither selector, gc profile=standard.\n\nOptions:\n  --all           Prune current checkpoints for standard and every named catalog\n                  profile.\n  --profile NAME  Prune current full and survey checkpoints for catalog profile\n                  NAME.\n  -y, --yes       Delete exact previewed stale records.\n  -h, --help      Show this message and exit.\n",
         "hidden": true,
         "path": "prune",
         "subcommands": []

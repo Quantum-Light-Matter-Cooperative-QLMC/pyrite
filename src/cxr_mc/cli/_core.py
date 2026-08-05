@@ -404,6 +404,22 @@ def flatten_option_values(values: Sequence[Sequence[float]]) -> list[float] | No
     return [value for occurrence in values for value in occurrence]
 
 
+def _stdin_is_tty() -> bool:
+    stream = click.get_text_stream("stdin")
+    isatty = getattr(stream, "isatty", None)
+    return callable(isatty) and isatty()
+
+
+def confirm_destructive(yes: bool, prompt: str) -> bool:
+    """Authorize a previewed destructive action without prompting automation."""
+    if yes:
+        return True
+    if not _stdin_is_tty():
+        emit_result("preview only; re-run with -y/--yes to execute")
+        return False
+    return click.confirm(prompt, default=False, err=True)
+
+
 def json_option(function):
     """Add explicit machine-output switch shared by JSON-capable commands."""
     return click.option(

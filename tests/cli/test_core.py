@@ -96,6 +96,50 @@ def test_json_option_and_envelope_keep_stdout_machine_only():
     )
 
 
+def test_confirm_destructive_never_prompts_non_tty(monkeypatch):
+    monkeypatch.setattr(_cli_core, "_stdin_is_tty", lambda: False)
+
+    @click.command()
+    @click.option("-y", "--yes", is_flag=True)
+    def command(yes):
+        click.echo("would delete target")
+        if _cli_core.confirm_destructive(yes, "delete target?"):
+            click.echo("deleted target")
+
+    preview = invoke(command)
+    forced = invoke(command, ["-y"])
+
+    assert_clean_result(
+        preview,
+        stdout=("would delete target\npreview only; re-run with -y/--yes to execute\n"),
+    )
+    assert_clean_result(forced, stdout="would delete target\ndeleted target\n")
+
+
+def test_confirm_destructive_tty_defaults_no_and_accepts_yes(monkeypatch):
+    monkeypatch.setattr(_cli_core, "_stdin_is_tty", lambda: True)
+
+    @click.command()
+    def command():
+        click.echo("would delete target")
+        if _cli_core.confirm_destructive(False, "delete target?"):
+            click.echo("deleted target")
+
+    declined = invoke(command, input="n\n")
+    accepted = invoke(command, input="y\n")
+
+    assert_clean_result(
+        declined,
+        stdout="would delete target\n",
+        stderr="delete target? [y/N]: n\n",
+    )
+    assert_clean_result(
+        accepted,
+        stdout="would delete target\ndeleted target\n",
+        stderr="delete target? [y/N]: y\n",
+    )
+
+
 def test_run_maps_usage_runtime_resumable_and_interrupts(capsys):
     @click.command()
     @click.option("--mode", type=click.Choice(["runtime", "resume", "interrupt"]))

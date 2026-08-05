@@ -38,9 +38,9 @@ warnings, prompts, and progress use stderr. `--json` emits one UTF-8
 object plus newline with `schema`, `schema_version`, `ok`, `payload`,
 and `errors` fields and no human prose on stdout.
 
-Destructive remote stop commands preview exact job targets by default.
-Pass `--yes` to perform cancellation; `cxr energy-grid stop` additionally
-requires JOBID or explicit `--latest`.
+Destructive commands preview exact targets by default. In a TTY, accept the
+`[y/N]` prompt to execute; in non-interactive use, pass `-y/--yes`.
+`cxr energy-grid stop` additionally requires JOBID or explicit `--latest`.
 
 Commands below are authoritative for this version.
 
@@ -481,7 +481,7 @@ Options:
   --all           Prune current checkpoints for standard and every named catalog
                   profile.
   --profile NAME  Prune current full and survey checkpoints for catalog profile NAME.
-  --yes           Delete exact previewed stale records.
+  -y, --yes       Delete exact previewed stale records.
   -h, --help      Show this message and exit.
 ```
 
@@ -497,7 +497,7 @@ Usage: cxr checkpoint rm [OPTIONS] [MATERIALS]...
 Options:
   --profile NAME        Delete active datasets owned by catalog profile NAME.
   --all                 Delete every active dataset.
-  --yes                 Delete exact previewed targets.
+  -y, --yes             Delete exact previewed targets.
   --checkpoint-dir DIR  Checkpoint root containing active datasets, archives, and shared
                         CAS blobs.  [default: checkpoints]
   -h, --help            Show this message and exit.
@@ -610,7 +610,7 @@ Usage: cxr performance rm [OPTIONS] [PROFILES]...
 
 Options:
   --all                        Select every local profile.
-  --yes                        Delete exact previewed profile directories.
+  -y, --yes                    Delete exact previewed profile directories.
   --performance-dir DIRECTORY  [default: performance-profiles]
   -h, --help                   Show this message and exit.
 ```
@@ -667,7 +667,7 @@ Options:
   --profile NAME            Reclaim current full and survey records for catalog profile
                             NAME.
   --min-age-minutes NUMBER  Only release reservations at least this old.  [default: 5.0]
-  --yes                     Reclaim exactly what was previewed.
+  -y, --yes                 Reclaim exactly what was previewed.
   -h, --help                Show this message and exit.
 ```
 
@@ -742,7 +742,7 @@ Usage: cxr remote performance rm [OPTIONS] [PROFILE]...
 
 Options:
   --all       Select every remote profile.
-  --yes       Delete exact previewed directories.
+  -y, --yes   Delete exact previewed directories.
   -h, --help  Show this message and exit.
 ```
 
@@ -757,7 +757,7 @@ Usage: cxr remote prune-jobs [OPTIONS]
 Options:
   --all           Prune every terminal job directory.
   --profile NAME  Prune the NAME / NAME-N job-directory family only.
-  --yes           Delete exact previewed directories.
+  -y, --yes       Delete exact previewed directories.
   -h, --help      Show this message and exit.
 ```
 
@@ -852,7 +852,7 @@ Usage: cxr remote rm [OPTIONS] [MATERIAL]...
 Options:
   --all           Empty remote checkpoints directory; takes no material arguments.
   --profile NAME  Delete checkpoints belonging to catalog profile NAME.
-  --yes           Delete exact previewed targets; otherwise preview.
+  -y, --yes       Delete exact previewed targets; otherwise preview.
   -h, --help      Show this message and exit.
 ```
 
@@ -949,7 +949,7 @@ Usage: cxr remote stop [OPTIONS] [MATERIAL]...
 Options:
   -a, --all       Stop every live job.
   --profile NAME  Stop live job(s) submitted with this catalog profile.
-  --yes           Cancel exact previewed jobs; otherwise preview.
+  -y, --yes       Cancel exact previewed jobs; otherwise preview.
   -h, --help      Show this message and exit.
 ```
 
@@ -1206,7 +1206,7 @@ Usage: cxr energy-grid job stop [OPTIONS] [JOBID]
 
 Options:
   --latest    Target latest recorded job instead of JOBID.
-  --yes       Cancel exact previewed job; otherwise preview.
+  -y, --yes   Cancel exact previewed job; otherwise preview.
   -h, --help  Show this message and exit.
 ```
 

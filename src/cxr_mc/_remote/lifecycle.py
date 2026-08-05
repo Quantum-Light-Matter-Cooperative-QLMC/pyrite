@@ -8,6 +8,7 @@ import uuid
 from pathlib import Path
 
 from .. import archive
+from ..cli import _core as _cli_core
 from . import config, presentation, scripts, state, transport
 
 
@@ -135,11 +136,12 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
     if not existing:
         print(f"(nothing to clear for {label})")
         return
-    if not yes:
-        print("would delete on the box (re-run with --yes to delete):")
-        for f in existing:
-            print(f"  checkpoints/{f}")
+    print("would delete on the box:")
+    for f in existing:
+        print(f"  checkpoints/{f}")
+    if not _cli_core.confirm_destructive(yes, "Delete these remote checkpoints?"):
         return
+    return clear_remote(materials, yes=True, catalog_profile=catalog_profile)
 
 
 def clear_all_remote(yes=False):
@@ -184,10 +186,10 @@ def clear_all_remote(yes=False):
     if not existing:
         print("(nothing to clear: checkpoints/ holds no .pkl files)")
         return
-    if not yes:
-        print(f"would delete on the box (re-run with --yes to delete) -- {len(existing)} file(s):")
-        for f in existing:
-            print(f"  checkpoints/{f}")
+    print(f"would delete on the box -- {len(existing)} file(s):")
+    for f in existing:
+        print(f"  checkpoints/{f}")
+    if not _cli_core.confirm_destructive(yes, "Delete all remote checkpoint files?"):
         return
     transport._ssh_capture(
         f"cd {config.shell_remote_path('checkpoints')} 2>/dev/null || exit 0; "
@@ -239,6 +241,16 @@ def prune_remote(
     )
     if output:
         print(output)
+    if (
+        not yes
+        and "would prune" in output.lower()
+        and _cli_core.confirm_destructive(False, "Delete these stale remote checkpoint records?")
+    ):
+        return prune_remote(
+            all_profiles=all_profiles,
+            catalog_profile=catalog_profile,
+            yes=True,
+        )
 
 
 def prune_job_dirs(*, profile=None, all_jobs=False, yes=False):
@@ -274,9 +286,11 @@ def prune_job_dirs(*, profile=None, all_jobs=False, yes=False):
     else:
         candidates = [(r[1], r[2]) for r in records if r[0] == "WOULD-PRUNE"]
         if candidates:
-            print("would delete on the box (re-run with --yes to delete):")
+            print("would delete on the box:")
             for jid, st in candidates:
                 print(f"  jobs/{jid}  [{st}]")
+            if _cli_core.confirm_destructive(False, "Delete these terminal job directories?"):
+                return prune_job_dirs(profile=profile, all_jobs=all_jobs, yes=True)
         else:
             print(f"(no terminal job directories to prune for {scope})")
     if live_kept:
@@ -786,8 +800,7 @@ def prune_remote_performance(profiles=None, *, all_profiles=False, yes=False):
     print("would delete remote performance profiles:")
     for jobid, profile, files, size in selected:
         print(f"  {profile}/{jobid} ({files} artifact(s), {size} bytes)")
-    if not yes:
-        print("preview only; re-run with --yes to delete")
+    if not _cli_core.confirm_destructive(yes, "Delete these remote performance profiles?"):
         return
 
     after_live = {jobid for jobid, _quick, _materials in state._live_jobs()}
@@ -1210,11 +1223,10 @@ def stop_jobs(materials=None, all_jobs=False, *, yes=True, profile=None):
             raise SystemExit("no live job found for material(s): " + ", ".join(missing))
         jobids = sorted({jobid for jobid, _matched in matches})
 
-    if not yes:
-        print("would cancel remote job(s):")
-        for jobid in jobids:
-            print(f"  {jobid}")
-        print("re-run with --yes to cancel")
+    print("would cancel remote job(s):")
+    for jobid in jobids:
+        print(f"  {jobid}")
+    if not _cli_core.confirm_destructive(yes, "Cancel these remote jobs?"):
         return
 
     _stop_jobids(jobids)
@@ -1243,10 +1255,8 @@ def reap_reservations(min_age_minutes=5.0, yes=False):
         print("(no orphaned reservations to reap)")
         return
     for jobid, stems in sorted(orphans.items()):
-        verb = "releasing" if yes else "would release"
-        print(f"{verb} {jobid}: {len(stems)} orphan reservation(s) -> {', '.join(stems)}")
-    if not yes:
-        print("re-run with --yes to release them")
+        print(f"would release {jobid}: {len(stems)} orphan reservation(s) -> {', '.join(stems)}")
+    if not _cli_core.confirm_destructive(yes, "Release these orphaned reservations?"):
         return
     for jobid in sorted(orphans):
         transport._run(["ssh", "-n", config.remote_host(), scripts._reap_job_command(jobid)])

@@ -3,9 +3,9 @@
 Branch: `feature/cli-vocab-controls`, off `main` at `8671240`.
 Slice 5 of [`docs/plans/cli-redesign-implementation-plan.md`](../../../docs/plans/cli-redesign-implementation-plan.md).
 
-**Status: in progress, partially verified.** D5's focused profile/material/
-deprecation tests, lint, and typecheck pass; generated deprecation/reference/
-contract artifacts are current. D6 and full-suite verification remain.
+**Status: in progress, partially verified.** D5 and D6 focused tests, lint, and
+typecheck pass; generated deprecation/reference/contract artifacts are current.
+Full-suite verification remains.
 
 ## Ordering caveat (read first)
 
@@ -83,12 +83,10 @@ repeatable (`multiple=True`) works; `--help` shows only the canonical.
    documents repetition. Profile membership guidance and all five command
    deprecation rows now name canonical `--material`. Focused profile/material/
    deprecation tests pass; the generated command-deprecation table is current.
-2. **D6 destructive contract.** `--yes` exists on 32 commands but `-y` on only
-   14 — add the short spelling to the other 18. Then add the TTY `[y/N]`
-   prompt: destructive commands currently dead-end with "resubmit with --yes",
-   which D6 explicitly calls out. Non-TTY/CI must still require `--yes`.
-   Suggest one `confirm_destructive()` helper in `cli/_core.py` next to
-   `hidden_alias`.
+2. **D6 destructive contract — complete 2026-08-05.** Every live `--yes`
+   option also accepts `-y`. Preview-first destructive commands share one
+   TTY-only `[y/N]` confirmation helper; non-TTY/CI remains preview-only unless
+   `-y/--yes` is supplied. Contract and integration tests freeze both modes.
 3. **Tests — complete 2026-08-05.** `tests/cli/test_deprecations.py` now holds
    `DEPRECATED_FLAGS` to the live tree in both directions and freezes canonical
    silence, retired warnings/value flow, both conflict orders, repeatable

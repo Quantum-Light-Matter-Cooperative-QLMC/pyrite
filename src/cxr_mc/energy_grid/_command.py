@@ -31,6 +31,7 @@ from cxr_mc.cli._core import (
     TILT_CSV,
     TILT_CSV_TEXT,
     CLIError,
+    confirm_destructive,
     emit_json_result,
     emit_result,
     invoke_legacy,
@@ -327,7 +328,7 @@ def logs_command(jobid, follow):
 @click.command("stop")
 @click.argument("jobid", required=False, metavar="[JOBID]")
 @click.option("--latest", is_flag=True, help="Target latest recorded job instead of JOBID.")
-@click.option("--yes", is_flag=True, help="Cancel exact previewed job; otherwise preview.")
+@click.option("-y", "--yes", is_flag=True, help="Cancel exact previewed job; otherwise preview.")
 def stop_command(jobid, latest, yes):
     """Preview or stop one energy-grid job."""
     if jobid and latest:
@@ -337,9 +338,8 @@ def stop_command(jobid, latest, yes):
     resolved_jobid = jobid or remote._latest_jobid()
     if not resolved_jobid:
         raise CLIError("no jobs to stop")
-    if not yes:
-        emit_result(f"would cancel remote job: {resolved_jobid}")
-        emit_result("re-run with --yes to cancel")
+    emit_result(f"would cancel remote job: {resolved_jobid}")
+    if not confirm_destructive(yes, "Cancel this remote job?"):
         return 0
     remote._stop_jobid(resolved_jobid)
     return 0

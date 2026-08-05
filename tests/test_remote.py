@@ -4966,7 +4966,7 @@ def test_reap_reservations_dry_run_previews_without_releasing(monkeypatch, capsy
     out = capsys.readouterr().out
     assert "would release dead" in out
     assert "keeping live" in out
-    assert "re-run with --yes" in out
+    assert "preview only; re-run with -y/--yes to execute" in out
     assert runs == []
 
 

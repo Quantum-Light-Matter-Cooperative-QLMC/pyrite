@@ -1068,7 +1068,7 @@ def performance_pull_command(profile):
     metavar="[PROFILE]...",
 )
 @click.option("--all", "all_profiles", is_flag=True, help="Select every remote profile.")
-@click.option("--yes", is_flag=True, help="Delete exact previewed directories.")
+@click.option("-y", "--yes", is_flag=True, help="Delete exact previewed directories.")
 def performance_rm_command(profiles, all_profiles, yes):
     if all_profiles and profiles:
         raise click.UsageError("remote performance rm --all does not take PROFILE names")
@@ -1095,7 +1095,7 @@ def performance_rm_command(profiles, all_profiles, yes):
     metavar="NAME",
     help="Stop live job(s) submitted with this catalog profile.",
 )
-@click.option("--yes", is_flag=True, help="Cancel exact previewed jobs; otherwise preview.")
+@click.option("-y", "--yes", is_flag=True, help="Cancel exact previewed jobs; otherwise preview.")
 def stop_command(materials, all_, catalog_profile, yes):
     if all_ and materials:
         raise click.UsageError("stop --all does not take material names")
@@ -1123,7 +1123,7 @@ def stop_command(materials, all_, catalog_profile, yes):
     show_default=True,
     help="Only reap locks at least this old.",
 )
-@click.option("--yes", is_flag=True, help="Release reservations; otherwise preview.")
+@click.option("-y", "--yes", is_flag=True, help="Release reservations; otherwise preview.")
 def reap_command(min_age_minutes, yes):
     return _invoke_click(
         _cli_reap,
@@ -1290,7 +1290,9 @@ def pull_command(
     metavar="NAME",
     help="Delete checkpoints belonging to catalog profile NAME.",
 )
-@click.option("--yes", is_flag=True, help="Delete exact previewed targets; otherwise preview.")
+@click.option(
+    "-y", "--yes", is_flag=True, help="Delete exact previewed targets; otherwise preview."
+)
 def rm_command(materials, all_checkpoints, catalog_profile, yes):
     if all_checkpoints and materials:
         raise click.UsageError("rm --all takes no material argument")
@@ -1332,7 +1334,7 @@ def rm_command(materials, all_checkpoints, catalog_profile, yes):
     shell_complete=_cli_completion.complete_profile,
     help="Prune current full and survey checkpoints for catalog profile NAME.",
 )
-@click.option("--yes", is_flag=True, help="Delete exact previewed stale records.")
+@click.option("-y", "--yes", is_flag=True, help="Delete exact previewed stale records.")
 def prune_command(all_profiles, catalog_profile, yes):
     if all_profiles and catalog_profile is not None:
         raise click.UsageError("prune --all cannot be combined with --profile")
@@ -1376,7 +1378,7 @@ def prune_command(all_profiles, catalog_profile, yes):
     show_default=True,
     help="Only release reservations at least this old.",
 )
-@click.option("--yes", is_flag=True, help="Reclaim exactly what was previewed.")
+@click.option("-y", "--yes", is_flag=True, help="Reclaim exactly what was previewed.")
 def gc_command(all_profiles, catalog_profile, min_age_minutes, yes):
     """Run both reclamations the retired `prune` and `reap` spellings ran separately.
 
@@ -1416,7 +1418,7 @@ def gc_command(all_profiles, catalog_profile, min_age_minutes, yes):
     shell_complete=_cli_completion.complete_profile,
     help="Prune the NAME / NAME-N job-directory family only.",
 )
-@click.option("--yes", is_flag=True, help="Delete exact previewed directories.")
+@click.option("-y", "--yes", is_flag=True, help="Delete exact previewed directories.")
 def prune_jobs_command(all_jobs, catalog_profile, yes):
     if all_jobs == (catalog_profile is not None):
         raise click.UsageError("prune-jobs needs exactly one of --profile NAME or --all")

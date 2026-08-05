@@ -63,10 +63,23 @@ def _node_options(node):
     }
 
 
+def _nodes(node):
+    yield node
+    for child in node["subcommands"]:
+        yield from _nodes(child)
+
+
 def test_frozen_click_contract_records_current_tree():
     assert _FROZEN["schema_version"] == 1
     assert len(list(_help_cases(_FROZEN["root"]))) < 120
     assert len(_FROZEN["intentional_p0_corrections"]) == 10
+
+
+def test_every_yes_option_has_short_spelling():
+    for node in _nodes(_FROZEN["root"]):
+        for action in node["actions"]:
+            if "--yes" in action["option_strings"]:
+                assert "-y" in action["option_strings"], node["path"]
 
 
 @pytest.mark.parametrize(

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import click
 
-from .._core import CLIError, DeprecatingGroup, emit_result, hidden_alias
+from .._core import CLIError, DeprecatingGroup, confirm_destructive, emit_result, hidden_alias
 
 _PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 
@@ -129,7 +129,7 @@ def analyze_command(name, performance_dir, sample_period):
 @command.command("rm")
 @click.argument("profiles", nargs=-1, callback=_profile_names)
 @click.option("--all", "all_profiles", is_flag=True, help="Select every local profile.")
-@click.option("--yes", is_flag=True, help="Delete exact previewed profile directories.")
+@click.option("-y", "--yes", is_flag=True, help="Delete exact previewed profile directories.")
 @click.option(
     "--performance-dir",
     type=click.Path(path_type=Path, file_okay=False),
@@ -154,8 +154,7 @@ def rm_command(profiles, all_profiles, yes, performance_dir):
     emit_result("would delete local performance profiles:")
     for name in selected:
         emit_result(f"  {available[name]} ({len(snapshots[name])} artifact(s))")
-    if not yes:
-        emit_result("preview only; re-run with --yes to delete")
+    if not confirm_destructive(yes, "Delete these local performance profiles?"):
         return 0
     for name in selected:
         path = available[name]

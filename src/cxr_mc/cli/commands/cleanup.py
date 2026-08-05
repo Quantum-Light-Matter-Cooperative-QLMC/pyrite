@@ -34,7 +34,7 @@ from .. import _completion as _cli_completion
     shell_complete=_cli_completion.complete_profile,
     help="Prune current full and survey checkpoints for catalog profile NAME.",
 )
-@click.option("--yes", is_flag=True, help="Delete exact previewed stale records.")
+@click.option("-y", "--yes", is_flag=True, help="Delete exact previewed stale records.")
 def gc_command(all_profiles: bool, catalog_profile: str | None, yes: bool) -> None:
     if all_profiles and catalog_profile is not None:
         raise click.UsageError("gc --all cannot be combined with --profile")
@@ -59,7 +59,7 @@ def gc_command(all_profiles: bool, catalog_profile: str | None, yes: bool) -> No
     help="Delete active datasets owned by catalog profile NAME.",
 )
 @click.option("--all", "all_datasets", is_flag=True, help="Delete every active dataset.")
-@click.option("--yes", is_flag=True, help="Delete exact previewed targets.")
+@click.option("-y", "--yes", is_flag=True, help="Delete exact previewed targets.")
 @click.option(
     "--checkpoint-dir",
     default="checkpoints",

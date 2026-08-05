@@ -177,13 +177,11 @@ def prune_checkpoints(
         return 0
 
     root_label = root.name or str(root)
-    if not yes:
-        click.echo("would prune (re-run with --yes to delete):")
-        for target, kept, stale, before in changes:
-            after = sum(len(by_energy) for by_energy in kept.values())
-            click.echo(
-                f"  {root_label}/{target.stem}/: {stale} stale record(s) ({before} -> {after})"
-            )
+    click.echo("would prune:")
+    for target, kept, stale, before in changes:
+        after = sum(len(by_energy) for by_energy in kept.values())
+        click.echo(f"  {root_label}/{target.stem}/: {stale} stale record(s) ({before} -> {after})")
+    if not _cli_core.confirm_destructive(yes, "Delete these stale checkpoint records?"):
         return sum(change[2] for change in changes)
 
     for target, kept, stale, before in changes:
@@ -381,8 +379,10 @@ def clear_checkpoints(
     _cli_core.emit_result(f"newly unreachable CAS blobs: {len(blobs)}")
     for blob in blobs:
         _cli_core.emit_result(f"  {blob}")
-    if not yes:
-        _cli_core.emit_result("preview only; re-run with --yes to delete")
+    if not _cli_core.confirm_destructive(
+        yes,
+        "Delete these checkpoint datasets and newly unreachable CAS blobs?",
+    ):
         return 0
 
     _revalidate([*active.values(), *archived])
