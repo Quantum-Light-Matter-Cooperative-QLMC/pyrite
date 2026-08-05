@@ -5,6 +5,7 @@ import pytest
 
 from cxr_mc import energy_grid
 from cxr_mc.cli import _core as _cli_core
+from cxr_mc.cli._deprecations import message
 from cxr_mc.energy_grid import _command
 from tests.helpers.cli import assert_clean_result, invoke
 
@@ -87,7 +88,7 @@ def test_click_status_delegates_with_detail(monkeypatch):
 
     result = invoke(energy_grid.command, ["job", "status", "job7", "-vv"])
 
-    assert_clean_result(result)
+    assert_clean_result(result, stderr=message("energy-grid job status") + "\n")
     assert seen == {"jobid": "job7", "detail": 2}
 
 
@@ -104,7 +105,7 @@ def test_click_status_json_reuses_remote_machine_contract(monkeypatch):
 
     result = invoke(energy_grid.command, ["job", "status", "job7", "--json"])
 
-    assert_clean_result(result)
+    assert_clean_result(result, stderr=message("energy-grid job status") + "\n")
     assert '"schema":"cxr.remote.status"' in result.stdout
     assert seen == {"jobid": "job7", "verbose": 0, "json_output": True}
 
@@ -115,7 +116,11 @@ def test_click_follow_logs_propagates_remote_exit_status(monkeypatch, status):
 
     result = invoke(energy_grid.command, ["job", "logs", "--follow"])
 
-    assert_clean_result(result, exit_code=status)
+    assert_clean_result(
+        result,
+        exit_code=status,
+        stderr=message("energy-grid job logs") + "\n",
+    )
 
 
 def test_click_submit_with_invalid_azimuths_fails(monkeypatch):
@@ -435,8 +440,9 @@ def test_click_stop_previews_latest_and_yes_cancels(monkeypatch):
     assert_clean_result(
         preview,
         stdout=("would cancel remote job: job9\npreview only; re-run with -y/--yes to execute\n"),
+        stderr=message("energy-grid job stop") + "\n",
     )
-    assert_clean_result(confirmed)
+    assert_clean_result(confirmed, stderr=message("energy-grid job stop") + "\n")
     assert seen == {"jobid": "job9"}
 
 
@@ -452,12 +458,12 @@ def test_click_stop_prompts_on_tty(monkeypatch):
     assert_clean_result(
         declined,
         stdout="would cancel remote job: job9\n",
-        stderr="Cancel this remote job? [y/N]: n\n",
+        stderr=message("energy-grid job stop") + "\nCancel this remote job? [y/N]: n\n",
     )
     assert_clean_result(
         accepted,
         stdout="would cancel remote job: job9\n",
-        stderr="Cancel this remote job? [y/N]: y\n",
+        stderr=message("energy-grid job stop") + "\nCancel this remote job? [y/N]: y\n",
     )
     assert seen == {"jobid": "job9"}
 

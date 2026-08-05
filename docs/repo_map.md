@@ -98,12 +98,18 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 - **`cxr app validation`** → `check:_cli`: launch validation app; `cxr app validation export`
   writes cached literature-validation figures.
 - **`cxr remote ...`** → `remote:*`: optional SSH/SLURM lifecycle for lab GPU
-  box: run, status [--attach], logs, pull, stop, validation jobs. Canonical
-  submission and validation paths are `remote run` and `remote validate`;
+  box. Execution/resource commands remain here during the D2a migration, while
+  retired `jobs`, `status`, `logs`, and `stop` paths are hidden aliases of the
+  canonical top-level job lifecycle. Remote submission and validation paths
+  remain `remote run` and `remote validate` until the D2a modifier checkpoint;
   `remote gc` applies profile-aware checkpoint pruning under remote stem
   reservations and releases orphaned reservations, replacing the hidden
   `remote prune` and `remote reap` aliases; `remote rm` deletes remote
   checkpoints (hidden alias `remote clear`); `check` remains a hidden alias.
+- **`cxr job list|status|logs|attach|stop`** → `cli.commands.job`: one lifecycle
+  for run, grid, recompute, and validation jobs. `list --kind` normalizes legacy
+  submitter metadata to `run|grid|recompute|validate`; destructive stop targets
+  exactly one job ID, profile, or all live jobs.
 - **`cxr slim <checkpoint-dir> [--grid]`** → `slim:slim_checkpoint` →
   `results.slim_results`: shrink checkpoint pickle for transfer (drop
   wide-brem / float32 / filter configs; `--grid` keep only material's
@@ -465,7 +471,15 @@ One module per `cxr` subcommand group, holding only the Click layer.
 drivers; `energy_grid` registers the domain-owned implementation; `profile`
 owns named campaign defaults and membership; `material` owns effective-range
 inspection and per-profile overrides; `sweep` is hidden compatibility aliases
-only. Shared validated atomic TOML helpers stay in `cli/_catalog_io.py`.
+only. `job` owns the canonical remote asynchronous-job lifecycle and delegates
+transport/state operations to `_remote/`. Shared validated atomic TOML helpers
+stay in `cli/_catalog_io.py`.
+
+### `cli/commands/job.py`
+Canonical `cxr job list|status|logs|attach|stop` Click layer. Reuses the remote
+viewer, JSON envelope, completion, exit, confirmation, and lifecycle owners;
+normalizes persisted submitter names into the four public job kinds. Retired
+`remote` and `energy-grid` lifecycle spellings remain hidden warning aliases.
 
 ### `cli/commands/checkpoint.py`
 Canonical `cxr checkpoint` group. Lazily routes `slim`, component

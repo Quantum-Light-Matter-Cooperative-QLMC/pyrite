@@ -78,10 +78,14 @@ DEPRECATIONS: dict[str, Deprecation] = {
         _entry("check", "cxr material validate"),
         _entry("check-config", "cxr profile show"),
         # Flat energy-grid job verbs, retired into the `job` subgroup.
-        _entry("energy-grid attach", "cxr energy-grid job attach"),
-        _entry("energy-grid logs", "cxr energy-grid job logs"),
-        _entry("energy-grid status", "cxr energy-grid job status"),
-        _entry("energy-grid stop", "cxr energy-grid job stop"),
+        _entry("energy-grid attach", "cxr job attach"),
+        _entry("energy-grid logs", "cxr job logs"),
+        _entry("energy-grid status", "cxr job status"),
+        _entry("energy-grid stop", "cxr job stop"),
+        _entry("energy-grid job attach", "cxr job attach"),
+        _entry("energy-grid job logs", "cxr job logs"),
+        _entry("energy-grid job status", "cxr job status"),
+        _entry("energy-grid job stop", "cxr job stop"),
         # Profile membership and performance spellings.
         _entry("profile add-material", "cxr profile add NAME --material MATERIAL,..."),
         _entry("profile remove-material", "cxr profile remove NAME --material MATERIAL,..."),
@@ -96,6 +100,10 @@ DEPRECATIONS: dict[str, Deprecation] = {
         # sits on the leaf so the warning names a runnable command, not a group.
         _entry("remote profile pull", "cxr remote performance pull"),
         _entry("remote check", "cxr material validate --remote"),
+        _entry("remote jobs", "cxr job list"),
+        _entry("remote status", "cxr job status"),
+        _entry("remote logs", "cxr job logs"),
+        _entry("remote stop", "cxr job stop"),
         # D4 verb collapse in the remote namespace. `gc` runs both halves the
         # retired `prune` (obsolete records) and `reap` (orphaned reservations)
         # spellings ran separately, so both rows point at it.

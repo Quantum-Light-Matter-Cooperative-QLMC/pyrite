@@ -7,6 +7,7 @@ import pytest
 
 from cxr_mc import archive, blaze, energy_grid, recompute, remote, scan
 from cxr_mc._remote import lifecycle, viewer
+from cxr_mc.cli.commands import job as job_cli
 from cxr_mc.cli.commands import recompute as recompute_cli
 from tests.helpers.cli import invoke
 
@@ -26,7 +27,7 @@ def test_remote_jobs_json_is_one_sanitized_envelope(monkeypatch):
         lambda: "j1\t0042\tFalse\trebrem\thopg hbn\trunning\x1b[31m\n",
     )
 
-    document = _document(invoke(remote.command, ["jobs", "--json"]))
+    document = _document(invoke(job_cli.command, ["list", "--json"]))
 
     assert document["schema"] == "cxr.remote.jobs"
     assert document["payload"]["jobs"][0]["scheduler_job_id"] == "0042"
@@ -41,7 +42,7 @@ def test_remote_jobs_human_output_accepts_six_field_transport(monkeypatch):
         lambda: "j1\t0042\tFalse\trebrem\thopg hbn\trunning\n",
     )
 
-    result = invoke(remote.command, ["jobs"])
+    result = invoke(job_cli.command, ["list"])
 
     assert result.exit_code == 0
     assert "j1" in result.stdout
@@ -71,7 +72,7 @@ def test_remote_status_json_fetches_full_detail(monkeypatch):
 
     monkeypatch.setattr(viewer, "status_sections", status_sections)
 
-    document = _document(invoke(remote.command, ["status", "j1", "--json"]))
+    document = _document(invoke(job_cli.command, ["status", "j1", "--json"]))
 
     assert seen == {"jobid": "j1", "detail": 2}
     assert document["schema"] == "cxr.remote.status"
@@ -86,7 +87,7 @@ def test_remote_jobs_runtime_failure_is_json_and_nonzero(monkeypatch):
         lambda: (_ for _ in ()).throw(SystemExit("ssh failed")),
     )
 
-    document = _document(invoke(remote.command, ["jobs", "--json"]), exit_code=1)
+    document = _document(invoke(job_cli.command, ["list", "--json"]), exit_code=1)
 
     assert document["ok"] is False
     assert document["payload"] == {"jobs": []}

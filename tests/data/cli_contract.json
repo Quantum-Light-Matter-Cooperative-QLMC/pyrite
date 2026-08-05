@@ -96,7 +96,7 @@
         "required": false
       }
     ],
-    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Manage coherent X-ray radiation simulation campaigns.\n\n  Start with a named profile: it defines campaign ranges, workloads, and\n  material membership. Then run campaigns, inspect checkpoints, or open analysis\n  notebooks.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr setup\n    cxr profile list\n    cxr profile show sub_100keV\n    cxr run sub_100keV -m hopg\n    cxr remote run sub_100keV --dry-run\n    cxr app analysis\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  run          Run a profile's MC sweeps and write checkpoints.\n  setup        Detect GPU hardware and write CXR_MC_BACKEND to .env (first run).\n  app          Launch or export interactive analysis notebooks.\n  checkpoint   Inspect, transform, recompute, archive, and reclaim checkpoints.\n  completion   Manage cxr shell tab-completion.\n  performance  List, analyze, or delete compute-performance artifacts.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect, validate, edit, and blaze individual materials.\n",
+    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Manage coherent X-ray radiation simulation campaigns.\n\n  Start with a named profile: it defines campaign ranges, workloads, and\n  material membership. Then run campaigns, inspect checkpoints, or open analysis\n  notebooks.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr setup\n    cxr profile list\n    cxr profile show sub_100keV\n    cxr run sub_100keV -m hopg\n    cxr remote run sub_100keV --dry-run\n    cxr app analysis\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  run          Run a profile's MC sweeps and write checkpoints.\n  setup        Detect GPU hardware and write CXR_MC_BACKEND to .env (first run).\n  app          Launch or export interactive analysis notebooks.\n  checkpoint   Inspect, transform, recompute, archive, and reclaim checkpoints.\n  completion   Manage cxr shell tab-completion.\n  performance  List, analyze, or delete compute-performance artifacts.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  job          List, inspect, follow, or stop asynchronous remote jobs.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect, validate, edit, and blaze individual materials.\n",
     "hidden": false,
     "path": "",
     "subcommands": [
@@ -1838,7 +1838,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: cxr remote [OPTIONS] COMMAND [ARGS]...\n\n  [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n  Host, remote directory, and executable come from CXR_REMOTE_HOST,\n  CXR_REMOTE_DIR, and CXR_REMOTE_UV. Command-line options take precedence over\n  workflow defaults where offered.\n\n  Examples:\n    cxr remote run sub_100keV --dry-run\n    cxr remote run compute_test_300keV -p\n    cxr remote run standard -m hopg\n    cxr remote status -vv\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  gc           Reclaim remote records obsolete under current scan profiles...\n  jobs         List jobs with SLURM IDs, materials, and last events.\n  logs         Show a job diagnostic log; defaults to latest.\n  performance  List, pull, or delete remote performance artifacts.\n  prune-jobs   Delete terminal (done/failed/cancelled) job directories;...\n  pull         Fetch existing checkpoints from remote box.\n  rebrem       Recompute brem-only remotely, follow, and pull completed...\n  reline       Recompute line-only remotely, follow, and pull completed...\n  rm           Delete remote checkpoints; preview unless --yes.\n  run          Sync code, submit sweep(s), track progress, and pull...\n  status       Show one job; use -v for allocation and -vv for logs.\n  stop         cancel active SLURM job(s) by material, profile, or every...\n  sync         Push current code to remote box.\n  validate     Run Zhai reproduction remotely or pull existing caches.\n",
+        "help": "Usage: cxr remote [OPTIONS] COMMAND [ARGS]...\n\n  [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n  Host, remote directory, and executable come from CXR_REMOTE_HOST,\n  CXR_REMOTE_DIR, and CXR_REMOTE_UV. Command-line options take precedence over\n  workflow defaults where offered.\n\n  Examples:\n    cxr remote run sub_100keV --dry-run\n    cxr remote run compute_test_300keV -p\n    cxr remote run standard -m hopg\n    cxr remote status -vv\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  gc           Reclaim remote records obsolete under current scan profiles...\n  performance  List, pull, or delete remote performance artifacts.\n  prune-jobs   Delete terminal (done/failed/cancelled) job directories;...\n  pull         Fetch existing checkpoints from remote box.\n  rebrem       Recompute brem-only remotely, follow, and pull completed...\n  reline       Recompute line-only remotely, follow, and pull completed...\n  rm           Delete remote checkpoints; preview unless --yes.\n  run          Sync code, submit sweep(s), track progress, and pull...\n  sync         Push current code to remote box.\n  validate     Run Zhai reproduction remotely or pull existing caches.\n",
         "hidden": false,
         "path": "remote",
         "subcommands": [
@@ -2016,7 +2016,7 @@
               }
             ],
             "help": "Usage: cxr remote jobs [OPTIONS]\n\n  List jobs with SLURM IDs, materials, and last events.\n\nOptions:\n  --json      Emit one versioned JSON object.\n  -h, --help  Show this message and exit.\n",
-            "hidden": false,
+            "hidden": true,
             "path": "remote jobs",
             "subcommands": []
           },
@@ -2039,7 +2039,7 @@
               }
             ],
             "help": "Usage: cxr remote logs [OPTIONS] [JOBID]\n\n  Show a job diagnostic log; defaults to latest.\n\nOptions:\n  -f, --follow  Stream live; Ctrl-C disconnects viewer.\n  -h, --help    Show this message and exit.\n",
-            "hidden": false,
+            "hidden": true,
             "path": "remote logs",
             "subcommands": []
           },
@@ -2828,7 +2828,7 @@
               }
             ],
             "help": "Usage: cxr remote status [OPTIONS] [JOBID]\n\n  Show one job; use -v for allocation and -vv for logs.\n\n  By default prints one snapshot and exits. Use -a/--attach to continuously\n  monitor the same dashboard, reconnecting until the job is terminal; Ctrl-C\n  detaches the viewer only and the job keeps running.\n\nOptions:\n  -v, --verbose  Add allocation detail; repeat for case progress and recent\n                 logs.\n  -a, --attach   Continuously monitor the dashboard until interrupted; Ctrl-C\n                 detaches viewer only.\n  --json         Emit one versioned JSON object.\n  -h, --help     Show this message and exit.\n",
-            "hidden": false,
+            "hidden": true,
             "path": "remote status",
             "subcommands": []
           },
@@ -2868,7 +2868,7 @@
               }
             ],
             "help": "Usage: cxr remote stop [OPTIONS] [MATERIAL]...\n\n  cancel active SLURM job(s) by material, profile, or every live job.\n\nOptions:\n  -a, --all       Stop every live job.\n  --profile NAME  Stop live job(s) submitted with this catalog profile.\n  -y, --yes       Cancel exact previewed jobs; otherwise preview.\n  -h, --help      Show this message and exit.\n",
-            "hidden": false,
+            "hidden": true,
             "path": "remote stop",
             "subcommands": []
           },
@@ -2959,6 +2959,155 @@
             "help": "Usage: cxr remote validate [OPTIONS]\n\n  Run Zhai reproduction remotely or pull existing caches.\n\nOptions:\n  --ne NUMBER           Fig. 1c line electrons per energy.  [default: 20000]\n  --ne-brem NUMBER      Fig. 1c bremsstrahlung electrons per energy.  [default:\n                        200]\n  --ne-supp NUMBER      Supplementary electrons per polar-tilt spectrum.\n                        [default: 200]\n  --tmd-azimuth NUMBER  Exploratory TMD azimuth in degrees.  [default: 0.0]\n  --refresh             Recompute matching cache.\n  --no-sync             Skip code upload.\n  -d, --detached        Launch detached; mutually exclusive with --pull.\n  -f, --follow          Track detached job; requires --detached.\n  --pull                Only fetch existing Zhai caches; mutually exclusive with\n                        --detached.\n  -h, --help            Show this message and exit.\n",
             "hidden": false,
             "path": "remote validate",
+            "subcommands": []
+          }
+        ]
+      },
+      {
+        "actions": [],
+        "help": "Usage: cxr job [OPTIONS] COMMAND [ARGS]...\n\n  List, inspect, follow, or stop asynchronous remote jobs.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  attach  Monitor one job until terminal or interrupted.\n  list    List jobs with scheduler IDs, kinds, materials, and states.\n  logs    Show a job diagnostic log; JOBID defaults to latest.\n  status  Show one job snapshot; JOBID defaults to latest.\n  stop    Preview or stop one job, one profile's jobs, or all jobs.\n",
+        "hidden": false,
+        "path": "job",
+        "subcommands": [
+          {
+            "actions": [
+              {
+                "dest": "jobid",
+                "help": null,
+                "option_strings": [],
+                "required": false
+              },
+              {
+                "dest": "verbose",
+                "help": "Add allocation detail; repeat for case progress and recent logs.",
+                "option_strings": [
+                  "-v",
+                  "--verbose"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr job attach [OPTIONS] [JOBID]\n\n  Monitor one job until terminal or interrupted.\n\nOptions:\n  -v, --verbose  Add allocation detail; repeat for case progress and recent\n                 logs.\n  -h, --help     Show this message and exit.\n",
+            "hidden": false,
+            "path": "job attach",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "kind",
+                "help": "Show only one submission kind.",
+                "option_strings": [
+                  "--kind"
+                ],
+                "required": false
+              },
+              {
+                "dest": "json_output",
+                "help": "Emit one versioned JSON object.",
+                "option_strings": [
+                  "--json"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr job list [OPTIONS]\n\n  List jobs with scheduler IDs, kinds, materials, and states.\n\nOptions:\n  --kind [run|grid|recompute|validate]\n                                  Show only one submission kind.\n  --json                          Emit one versioned JSON object.\n  -h, --help                      Show this message and exit.\n",
+            "hidden": false,
+            "path": "job list",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "jobid",
+                "help": null,
+                "option_strings": [],
+                "required": false
+              },
+              {
+                "dest": "follow",
+                "help": "Stream until interrupted.",
+                "option_strings": [
+                  "-f",
+                  "--follow"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr job logs [OPTIONS] [JOBID]\n\n  Show a job diagnostic log; JOBID defaults to latest.\n\nOptions:\n  -f, --follow  Stream until interrupted.\n  -h, --help    Show this message and exit.\n",
+            "hidden": false,
+            "path": "job logs",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "jobid",
+                "help": null,
+                "option_strings": [],
+                "required": false
+              },
+              {
+                "dest": "verbose",
+                "help": "Add allocation detail; repeat for case progress and recent logs.",
+                "option_strings": [
+                  "-v",
+                  "--verbose"
+                ],
+                "required": false
+              },
+              {
+                "dest": "json_output",
+                "help": "Emit one versioned JSON object.",
+                "option_strings": [
+                  "--json"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr job status [OPTIONS] [JOBID]\n\n  Show one job snapshot; JOBID defaults to latest.\n\nOptions:\n  -v, --verbose  Add allocation detail; repeat for case progress and recent\n                 logs.\n  --json         Emit one versioned JSON object.\n  -h, --help     Show this message and exit.\n",
+            "hidden": false,
+            "path": "job status",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "jobid",
+                "help": null,
+                "option_strings": [],
+                "required": false
+              },
+              {
+                "dest": "all_",
+                "help": "Stop every live job.",
+                "option_strings": [
+                  "-a",
+                  "--all"
+                ],
+                "required": false
+              },
+              {
+                "dest": "profile",
+                "help": "Stop live jobs submitted for profile NAME.",
+                "option_strings": [
+                  "--profile"
+                ],
+                "required": false
+              },
+              {
+                "dest": "yes",
+                "help": "Stop exact previewed jobs.",
+                "option_strings": [
+                  "-y",
+                  "--yes"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr job stop [OPTIONS] [JOBID]\n\n  Preview or stop one job, one profile's jobs, or all jobs.\n\nOptions:\n  -a, --all       Stop every live job.\n  --profile NAME  Stop live jobs submitted for profile NAME.\n  -y, --yes       Stop exact previewed jobs.\n  -h, --help      Show this message and exit.\n",
+            "hidden": false,
+            "path": "job stop",
             "subcommands": []
           }
         ]
@@ -3315,7 +3464,7 @@
           },
           {
             "actions": [],
-            "help": "Usage: cxr energy-grid job [OPTIONS] COMMAND [ARGS]...\n\n  Inspect, follow, or stop remote energy-grid jobs.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  attach  Attach to energy-grid job progress.\n  logs    Print or follow energy-grid job logs.\n  status  Show energy-grid job status.\n  stop    Preview or stop one energy-grid job.\n",
+            "help": "Usage: cxr energy-grid job [OPTIONS] COMMAND [ARGS]...\n\n  Inspect, follow, or stop remote energy-grid jobs.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid job",
             "subcommands": [
@@ -3329,7 +3478,7 @@
                   }
                 ],
                 "help": "Usage: cxr energy-grid job attach [OPTIONS] [JOBID]\n\n  Attach to energy-grid job progress. JOBID defaults to latest recorded job.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
-                "hidden": false,
+                "hidden": true,
                 "path": "energy-grid job attach",
                 "subcommands": []
               },
@@ -3352,7 +3501,7 @@
                   }
                 ],
                 "help": "Usage: cxr energy-grid job logs [OPTIONS] [JOBID]\n\n  Print or follow energy-grid job logs. JOBID defaults to latest recorded job.\n\nOptions:\n  -f, --follow  Stream live; Ctrl-C disconnects viewer without stopping job.\n  -h, --help    Show this message and exit.\n",
-                "hidden": false,
+                "hidden": true,
                 "path": "energy-grid job logs",
                 "subcommands": []
               },
@@ -3383,7 +3532,7 @@
                   }
                 ],
                 "help": "Usage: cxr energy-grid job status [OPTIONS] [JOBID]\n\n  Show energy-grid job status. JOBID defaults to latest recorded job.\n\nOptions:\n  -v, --verbose  Add allocation detail; repeat for case progress and recent\n                 logs.\n  --json         Emit one versioned JSON object on stdout.\n  -h, --help     Show this message and exit.\n",
-                "hidden": false,
+                "hidden": true,
                 "path": "energy-grid job status",
                 "subcommands": []
               },
@@ -3414,7 +3563,7 @@
                   }
                 ],
                 "help": "Usage: cxr energy-grid job stop [OPTIONS] [JOBID]\n\n  Preview or stop one energy-grid job.\n\nOptions:\n  --latest    Target latest recorded job instead of JOBID.\n  -y, --yes   Cancel exact previewed job; otherwise preview.\n  -h, --help  Show this message and exit.\n",
-                "hidden": false,
+                "hidden": true,
                 "path": "energy-grid job stop",
                 "subcommands": []
               }

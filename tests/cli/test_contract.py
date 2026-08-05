@@ -71,7 +71,9 @@ def _nodes(node):
 
 def test_frozen_click_contract_records_current_tree():
     assert _FROZEN["schema_version"] == 1
-    assert len(list(_help_cases(_FROZEN["root"]))) < 120
+    # Slice 3 adds six canonical `job` help paths while retaining hidden
+    # compatibility paths in the frozen tree during the deprecation window.
+    assert len(list(_help_cases(_FROZEN["root"]))) < 130
     assert len(_FROZEN["intentional_p0_corrections"]) == 10
 
 

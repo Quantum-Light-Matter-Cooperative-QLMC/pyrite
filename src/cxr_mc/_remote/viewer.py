@@ -7,6 +7,7 @@ import time
 import tqdm  # noqa: F401 -- kept importable at module level for test monkeypatching
 
 from ..cli._dashboard import _KeyListener, _render_frame
+from ..cli.json import job_kind
 from . import config, lifecycle, presentation, scripts, state, transport
 
 
@@ -39,16 +40,20 @@ def jobs_raw():
     return transport._ssh_capture(_jobs_remote_command())
 
 
-def list_jobs():
+def list_jobs(kind=None):
     """Print every submitted job with identifying metadata, oldest first."""
     rows = []
     for line in jobs_raw().splitlines():
         fields = line.split("\t", 5)
         if len(fields) == 6:
-            jobid, scheduler_id, quick, _command, materials, state_ = fields
+            jobid, scheduler_id, quick, command, materials, state_ = fields
         elif len(fields) == 5:
             jobid, scheduler_id, quick, materials, state_ = fields
+            command = "scan" if quick in {"True", "False"} else None
         else:
+            continue
+        canonical_kind = job_kind(command)
+        if kind is not None and canonical_kind != kind:
             continue
         jobid, scheduler_id, quick, materials, state_ = (
             presentation._sanitize_terminal(value)
@@ -62,15 +67,26 @@ def list_jobs():
             "nsys": "Nsight",
             "nsys+cpu": "Nsight + CPU",
         }.get(quick, "?")
-        rows.append((jobid, scheduler_id, mode, materials.replace(" ", ", "), state_))
+        rows.append(
+            (
+                jobid,
+                scheduler_id,
+                canonical_kind or "?",
+                mode,
+                materials.replace(" ", ", "),
+                state_,
+            )
+        )
     if not rows:
         print(
-            f"No remote jobs on {config.remote_host()}. Start one with `cxr remote run [PROFILE]`."
+            f"No matching jobs on {config.remote_host()}. Start one with `cxr run [PROFILE] --remote`."
         )
         return
     print(
         presentation._style_states(
-            presentation._format_table(("JOB", "SLURM", "MODE", "MATERIALS", "LAST EVENT"), rows)
+            presentation._format_table(
+                ("JOB", "SLURM", "KIND", "MODE", "MATERIALS", "LAST EVENT"), rows
+            )
         )
     )
 

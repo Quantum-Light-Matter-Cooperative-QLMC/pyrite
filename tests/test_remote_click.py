@@ -7,6 +7,7 @@ import pytest
 
 from cxr_mc import remote
 from cxr_mc._remote import lifecycle, viewer
+from cxr_mc.cli._deprecations import message
 from tests.helpers.cli import assert_clean_result, invoke
 
 REMOTE_COMMANDS = (
@@ -530,7 +531,11 @@ def test_logs_click_propagates_follow_status(monkeypatch, status):
 
     result = invoke(remote.command, ["logs", "--follow"])
 
-    assert_clean_result(result, exit_code=status)
+    assert_clean_result(
+        result,
+        exit_code=status,
+        stderr=message("remote logs") + "\n",
+    )
 
 
 def test_remote_click_preserves_resumable_exit(monkeypatch):
@@ -538,7 +543,11 @@ def test_remote_click_preserves_resumable_exit(monkeypatch):
 
     result = invoke(remote.command, ["jobs"])
 
-    assert_clean_result(result, exit_code=75)
+    assert_clean_result(
+        result,
+        exit_code=75,
+        stderr=message("remote jobs") + "\n",
+    )
 
 
 def test_stop_previews_by_default_and_yes_executes(monkeypatch):
@@ -554,8 +563,8 @@ def test_stop_previews_by_default_and_yes_executes(monkeypatch):
     preview = invoke(remote.command, ["stop", "hopg"])
     confirmed = invoke(remote.command, ["stop", "hopg", "--yes"])
 
-    assert_clean_result(preview)
-    assert_clean_result(confirmed)
+    assert_clean_result(preview, stderr=message("remote stop") + "\n")
+    assert_clean_result(confirmed, stderr=message("remote stop") + "\n")
     assert calls == [(["hopg"], False, False, None), (["hopg"], False, True, None)]
 
 
@@ -570,7 +579,7 @@ def test_stop_profile_dispatches_and_rejects_combinations(monkeypatch):
     )
 
     ok = invoke(remote.command, ["stop", "--profile", "sub_100keV", "--yes"])
-    assert_clean_result(ok)
+    assert_clean_result(ok, stderr=message("remote stop") + "\n")
     assert calls == [([], False, True, "sub_100keV")]
 
     with_materials = invoke(remote.command, ["stop", "hopg", "--profile", "sub_100keV"])

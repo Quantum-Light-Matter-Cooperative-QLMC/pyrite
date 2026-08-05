@@ -80,6 +80,7 @@ Commands:
   completion   Manage cxr shell tab-completion.
   performance  List, analyze, or delete compute-performance artifacts.
   remote       Run and manage MC sweeps on a remote GPU host.
+  job          List, inspect, follow, or stop asynchronous remote jobs.
   energy-grid  Derive, submit, inspect, and apply photon-energy grids.
   profile      Manage named catalog campaigns and material membership.
   material     Inspect, validate, edit, and blaze individual materials.
@@ -637,8 +638,6 @@ Options:
 
 Commands:
   gc           Reclaim remote records obsolete under current scan profiles and...
-  jobs         List jobs with SLURM IDs, materials, and last events.
-  logs         Show a job diagnostic log; defaults to latest.
   performance  List, pull, or delete remote performance artifacts.
   prune-jobs   Delete terminal (done/failed/cancelled) job directories; preview...
   pull         Fetch existing checkpoints from remote box.
@@ -646,8 +645,6 @@ Commands:
   reline       Recompute line-only remotely, follow, and pull completed checkpoints.
   rm           Delete remote checkpoints; preview unless --yes.
   run          Sync code, submit sweep(s), track progress, and pull checkpoints.
-  status       Show one job; use -v for allocation and -vv for logs.
-  stop         cancel active SLURM job(s) by material, profile, or every live job.
   sync         Push current code to remote box.
   validate     Run Zhai reproduction remotely or pull existing caches.
 ```
@@ -669,30 +666,6 @@ Options:
   --min-age-minutes NUMBER  Only release reservations at least this old.  [default: 5.0]
   -y, --yes                 Reclaim exactly what was previewed.
   -h, --help                Show this message and exit.
-```
-
-## `cxr remote jobs`
-
-```text
-Usage: cxr remote jobs [OPTIONS]
-
-  List jobs with SLURM IDs, materials, and last events.
-
-Options:
-  --json      Emit one versioned JSON object.
-  -h, --help  Show this message and exit.
-```
-
-## `cxr remote logs`
-
-```text
-Usage: cxr remote logs [OPTIONS] [JOBID]
-
-  Show a job diagnostic log; defaults to latest.
-
-Options:
-  -f, --follow  Stream live; Ctrl-C disconnects viewer.
-  -h, --help    Show this message and exit.
 ```
 
 ## `cxr remote performance`
@@ -920,39 +893,6 @@ Options:
   -h, --help                   Show this message and exit.
 ```
 
-## `cxr remote status`
-
-```text
-Usage: cxr remote status [OPTIONS] [JOBID]
-
-  Show one job; use -v for allocation and -vv for logs.
-
-  By default prints one snapshot and exits. Use -a/--attach to continuously monitor the
-  same dashboard, reconnecting until the job is terminal; Ctrl-C detaches the viewer
-  only and the job keeps running.
-
-Options:
-  -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
-  -a, --attach   Continuously monitor the dashboard until interrupted; Ctrl-C detaches
-                 viewer only.
-  --json         Emit one versioned JSON object.
-  -h, --help     Show this message and exit.
-```
-
-## `cxr remote stop`
-
-```text
-Usage: cxr remote stop [OPTIONS] [MATERIAL]...
-
-  cancel active SLURM job(s) by material, profile, or every live job.
-
-Options:
-  -a, --all       Stop every live job.
-  --profile NAME  Stop live job(s) submitted with this catalog profile.
-  -y, --yes       Cancel exact previewed jobs; otherwise preview.
-  -h, --help      Show this message and exit.
-```
-
 ## `cxr remote sync`
 
 ```text
@@ -983,6 +923,89 @@ Options:
   --pull                Only fetch existing Zhai caches; mutually exclusive with
                         --detached.
   -h, --help            Show this message and exit.
+```
+
+## `cxr job`
+
+```text
+Usage: cxr job [OPTIONS] COMMAND [ARGS]...
+
+  List, inspect, follow, or stop asynchronous remote jobs.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  attach  Monitor one job until terminal or interrupted.
+  list    List jobs with scheduler IDs, kinds, materials, and states.
+  logs    Show a job diagnostic log; JOBID defaults to latest.
+  status  Show one job snapshot; JOBID defaults to latest.
+  stop    Preview or stop one job, one profile's jobs, or all jobs.
+```
+
+## `cxr job attach`
+
+```text
+Usage: cxr job attach [OPTIONS] [JOBID]
+
+  Monitor one job until terminal or interrupted.
+
+Options:
+  -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
+  -h, --help     Show this message and exit.
+```
+
+## `cxr job list`
+
+```text
+Usage: cxr job list [OPTIONS]
+
+  List jobs with scheduler IDs, kinds, materials, and states.
+
+Options:
+  --kind [run|grid|recompute|validate]
+                                  Show only one submission kind.
+  --json                          Emit one versioned JSON object.
+  -h, --help                      Show this message and exit.
+```
+
+## `cxr job logs`
+
+```text
+Usage: cxr job logs [OPTIONS] [JOBID]
+
+  Show a job diagnostic log; JOBID defaults to latest.
+
+Options:
+  -f, --follow  Stream until interrupted.
+  -h, --help    Show this message and exit.
+```
+
+## `cxr job status`
+
+```text
+Usage: cxr job status [OPTIONS] [JOBID]
+
+  Show one job snapshot; JOBID defaults to latest.
+
+Options:
+  -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
+  --json         Emit one versioned JSON object.
+  -h, --help     Show this message and exit.
+```
+
+## `cxr job stop`
+
+```text
+Usage: cxr job stop [OPTIONS] [JOBID]
+
+  Preview or stop one job, one profile's jobs, or all jobs.
+
+Options:
+  -a, --all       Stop every live job.
+  --profile NAME  Stop live jobs submitted for profile NAME.
+  -y, --yes       Stop exact previewed jobs.
+  -h, --help      Show this message and exit.
 ```
 
 ## `cxr energy-grid`
@@ -1152,61 +1175,6 @@ Usage: cxr energy-grid job [OPTIONS] COMMAND [ARGS]...
   Inspect, follow, or stop remote energy-grid jobs.
 
 Options:
-  -h, --help  Show this message and exit.
-
-Commands:
-  attach  Attach to energy-grid job progress.
-  logs    Print or follow energy-grid job logs.
-  status  Show energy-grid job status.
-  stop    Preview or stop one energy-grid job.
-```
-
-## `cxr energy-grid job attach`
-
-```text
-Usage: cxr energy-grid job attach [OPTIONS] [JOBID]
-
-  Attach to energy-grid job progress. JOBID defaults to latest recorded job.
-
-Options:
-  -h, --help  Show this message and exit.
-```
-
-## `cxr energy-grid job logs`
-
-```text
-Usage: cxr energy-grid job logs [OPTIONS] [JOBID]
-
-  Print or follow energy-grid job logs. JOBID defaults to latest recorded job.
-
-Options:
-  -f, --follow  Stream live; Ctrl-C disconnects viewer without stopping job.
-  -h, --help    Show this message and exit.
-```
-
-## `cxr energy-grid job status`
-
-```text
-Usage: cxr energy-grid job status [OPTIONS] [JOBID]
-
-  Show energy-grid job status. JOBID defaults to latest recorded job.
-
-Options:
-  -v, --verbose  Add allocation detail; repeat for case progress and recent logs.
-  --json         Emit one versioned JSON object on stdout.
-  -h, --help     Show this message and exit.
-```
-
-## `cxr energy-grid job stop`
-
-```text
-Usage: cxr energy-grid job stop [OPTIONS] [JOBID]
-
-  Preview or stop one energy-grid job.
-
-Options:
-  --latest    Target latest recorded job instead of JOBID.
-  -y, --yes   Cancel exact previewed job; otherwise preview.
   -h, --help  Show this message and exit.
 ```
 

@@ -345,13 +345,15 @@ def stop_command(jobid, latest, yes):
     return 0
 
 
-@click.group("job", no_args_is_help=True)
+@click.group("job", cls=DeprecatingGroup, no_args_is_help=True)
 def job_command():
     """Inspect, follow, or stop remote energy-grid jobs."""
 
 
 for _job_child in (status_command, attach_command, logs_command, stop_command):
-    job_command.add_command(_job_child)
+    _job_alias = copy(_job_child)
+    _job_alias.hidden = True
+    job_command.add_command(_job_alias)
 command.add_command(job_command)
 
 for _legacy_job_child in (status_command, attach_command, logs_command, stop_command):

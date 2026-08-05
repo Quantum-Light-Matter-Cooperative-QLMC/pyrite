@@ -364,10 +364,14 @@ def _cli_start(args):
 
 def _cli_jobs(args):
     if not args.json_output:
-        viewer.list_jobs()
+        kind = getattr(args, "kind", None)
+        if kind is None:
+            viewer.list_jobs()
+        else:
+            viewer.list_jobs(kind)
         return
     try:
-        result = cli_json.remote_jobs(viewer.jobs_raw())
+        result = cli_json.remote_jobs(viewer.jobs_raw(), kind=getattr(args, "kind", None))
     except (Exception, SystemExit) as exc:
         result = cli_json.failure("cxr.remote.jobs", {"jobs": []}, str(exc))
     emit_json_result(result)
@@ -943,7 +947,7 @@ def start_command(
 command.add_command(start_command)
 
 
-@command.command("jobs", help="List jobs with SLURM IDs, materials, and last events.")
+@command.command("jobs", hidden=True, help="List jobs with SLURM IDs, materials, and last events.")
 @click.option("--json", "json_output", is_flag=True, help="Emit one versioned JSON object.")
 def jobs_command(json_output):
     return _invoke_click(_cli_jobs, _click_args("jobs", json_output=json_output))
@@ -951,6 +955,7 @@ def jobs_command(json_output):
 
 @command.command(
     "status",
+    hidden=True,
     help=(
         "Show one job; use -v for allocation and -vv for logs.\n\n"
         "By default prints one snapshot and exits. Use -a/--attach to "
@@ -988,7 +993,7 @@ def status_command(jobid, verbose, attach, json_output):
     )
 
 
-@command.command("logs", help="Show a job diagnostic log; defaults to latest.")
+@command.command("logs", hidden=True, help="Show a job diagnostic log; defaults to latest.")
 @click.argument(
     "jobid",
     required=False,
@@ -1085,7 +1090,11 @@ def performance_rm_command(profiles, all_profiles, yes):
     )
 
 
-@command.command("stop", help="cancel active SLURM job(s) by material, profile, or every live job.")
+@command.command(
+    "stop",
+    hidden=True,
+    help="cancel active SLURM job(s) by material, profile, or every live job.",
+)
 @click.argument("materials", nargs=-1, metavar="[MATERIAL]...")
 @click.option("-a", "--all", "all_", is_flag=True, help="Stop every live job.")
 @click.option(

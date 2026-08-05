@@ -100,7 +100,20 @@ def _state_parts(value: object) -> tuple[str | None, str | None, bool]:
     return state, event, state in _TERMINAL_STATES
 
 
-def remote_jobs(raw: str) -> JsonResult:
+def job_kind(command: str | None) -> str | None:
+    """Map persisted submitter spellings onto the canonical job-kind vocabulary."""
+    if command in {"scan", "run"}:
+        return "run"
+    if command in {"grid", "derive", "energy-grid"}:
+        return "grid"
+    if command in {"rebrem", "reline", "recompute"}:
+        return "recompute"
+    if command in {"check", "validate", "zhai"}:
+        return "validate"
+    return command
+
+
+def remote_jobs(raw: str, *, kind: str | None = None) -> JsonResult:
     """Convert remote jobs output to structured records."""
     jobs: list[dict[str, object]] = []
     errors: list[dict[str, object]] = []
@@ -134,6 +147,9 @@ def remote_jobs(raw: str) -> JsonResult:
                 )
             )
             materials = [item for item in materials if item not in invalid]
+        canonical_kind = job_kind(command)
+        if kind is not None and canonical_kind != kind:
+            continue
         state, last_event, terminal = _state_parts(event_text)
         event_time = _utc_time(last_event.rsplit(maxsplit=1)[-1]) if last_event else None
         jobs.append(
@@ -141,6 +157,7 @@ def remote_jobs(raw: str) -> JsonResult:
                 "job_id": job_id,
                 "scheduler_job_id": _optional_text(scheduler_id),
                 "command": command,
+                "kind": canonical_kind,
                 "materials": materials,
                 "state": state,
                 "terminal": terminal,
