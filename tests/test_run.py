@@ -29,6 +29,13 @@ from cxr_mc.run import (
     repair_brem_wide,
     run_sweep,
 )
+from tests.helpers import (
+    fake_out,
+    fake_segments,
+    runner_transport_payload,
+    stub_run_cases,
+    tracking_run_cases_factory,
+)
 
 # ---------------------------------------------------------------------------
 # The load_checkpoint cache is module-global (functools.lru_cache) -- clear it
@@ -87,81 +94,6 @@ def _fake_case(
         brem_chunk=None,
     )
 
-
-def _fake_out(case):
-    E = np.arange(*case["E_grid"])
-    Eb = np.arange(*case["E_grid_brem"])
-    return dict(
-        E_grid=E,
-        spec=np.ones_like(E) * 0.1,
-        brem=np.ones_like(E) * 0.01,
-        E_grid_brem=Eb,
-        brem_wide=np.ones_like(Eb) * 0.001,
-        eta=0.05,
-    )
-
-
-def _stub_run_cases(
-    cases,
-    *,
-    max_workers=None,
-    progress=False,
-    callback=None,
-    should_stop=None,
-    keep_results=True,
-    on_timing=None,
-    on_activity=None,
-    transport_only=False,
-    **_unused,
-):
-    """Synchronous run_cases test double; performs no Monte Carlo."""
-
-    results = [None] * len(cases)
-
-    for i, case in enumerate(cases):
-        if should_stop is not None and should_stop():
-            break
-
-        if on_activity is not None:
-            on_activity(
-                {
-                    "phase": "serial_case",
-                    "case_index": i,
-                    "case": case,
-                    "in_flight_case_count": 1,
-                }
-            )
-
-        out = None if transport_only else _fake_out(case)
-
-        if on_timing is not None and out is not None:
-            on_timing(
-                {
-                    "case_index": i,
-                    "case": case,
-                    "transport_seconds": 0.0,
-                    "spectrum_seconds": 0.0,
-                    "driver_wait_seconds": 0.0,
-                }
-            )
-
-        if callback is not None:
-            callback(i, case, out)
-
-        if keep_results:
-            results[i] = out
-
-    if on_activity is not None:
-        on_activity(
-            {
-                "phase": "idle",
-                "case_index": None,
-                "case": None,
-                "in_flight_case_count": 0,
-            }
-        )
-
-    return results
 
 
 def test_transport_case_forwards_finite_footprint_to_shared_transport(monkeypatch):
@@ -275,7 +207,7 @@ def test_brem_for_case_forwards_finite_footprint(monkeypatch):
 
 def test_spectrum_case_forwards_groove_to_brem(monkeypatch):
     groove = object()
-    segments = _runner_segments()
+    segments = fake_segments()
     grid = np.array([1000.0, 2000.0])
     seen = []
 
@@ -291,12 +223,11 @@ def test_spectrum_case_forwards_groove_to_brem(monkeypatch):
 
     monkeypatch.setattr(runner, "mc_brem_spectrum", _brem)
     case = _fake_case("grooved", 30.0)
-    tp = dict(
+    tp = runner_transport_payload(
+        segments,
         E_grid=grid,
         E_brem=grid,
         n_hat=np.array([0.0, 0.0, -1.0]),
-        segs=segments,
-        segs_b=segments,
         groove=groove,
     )
 
@@ -309,7 +240,7 @@ def test_spectrum_case_forwards_groove_to_brem(monkeypatch):
 def test_brem_for_case_forwards_identical_groove_to_brem_rebuild(monkeypatch):
     case = _fake_case("grooved", 30.0, tilt_deg=45.0)
     case.update(tilt_azim_deg=180.0, groove_spacing_ang=20_000.0)
-    segments = _runner_segments()
+    segments = fake_segments()
     transported = []
     radiated = []
 
@@ -332,7 +263,7 @@ def test_brem_for_case_forwards_identical_groove_to_brem_rebuild(monkeypatch):
 
 def test_brem_wide_from_segments_forwards_groove_to_brem(monkeypatch):
     groove = object()
-    segments = _runner_segments()
+    segments = fake_segments()
     grid = np.array([1000.0, 2000.0])
     seen = []
 
@@ -622,7 +553,7 @@ def test_manifest_save_coerces_numpy_scalars_to_json_safe(tmp_path):
 
 
 def test_run_sweep_writes_manifest_alongside_checkpoint(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     cases = [
         _fake_case("cfg_a", 30.0),
         _fake_case("cfg_a", 45.0),
@@ -648,7 +579,7 @@ def test_run_sweep_reports_checkpoint_timing(tmp_path, monkeypatch):
         **kwargs,
     ):
         for i, case in enumerate(cases):
-            out = _fake_out(case)
+            out = fake_out(case)
 
             if on_timing is not None:
                 on_timing(
@@ -684,7 +615,7 @@ def test_run_sweep_reports_checkpoint_timing(tmp_path, monkeypatch):
 
 
 def test_run_sweep_persists_dataset_identity_in_manifest(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     identity = {
         "schema": "cxr.dataset-identity.v1",
         "material": "hopg",
@@ -718,7 +649,7 @@ def test_manifest_refresh_preserves_existing_dataset_identity(tmp_path):
 
 
 def test_run_sweep_refuses_resume_across_dataset_identities(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     case = _fake_case("cfg", 30.0)
     checkpoint = tmp_path / "hopg"
     old = {"profile": "full", "parameter_sha256": "a" * 64}
@@ -764,7 +695,7 @@ def test_cases_from_results_flat_list():
 
 
 def test_run_sweep_stores_all_cases(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     cases = [
         _fake_case("cfg_a", 30.0),
         _fake_case("cfg_a", 45.0),
@@ -778,7 +709,7 @@ def test_run_sweep_stores_all_cases(tmp_path, monkeypatch):
 
 
 def test_run_sweep_writes_checkpoint(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     run_sweep([_fake_case("cfg_a", 30.0)], {}, checkpoint_dir=str(tmp_path), progress=False)
     ckpt = tmp_path / "hopg"
     assert (ckpt / "line.pkl").exists()
@@ -788,7 +719,7 @@ def test_run_sweep_writes_checkpoint(tmp_path, monkeypatch):
 
 
 def test_run_sweep_consolidates_and_clears_shards(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     run_sweep([_fake_case("cfg_a", 30.0)], {}, checkpoint_dir=str(tmp_path), progress=False)
     # crash-safety shards are folded into the monolith and removed on a clean run
     assert not (tmp_path / "hopg" / "parts").exists()
@@ -839,7 +770,7 @@ def test_checkpoint_shards_win_over_stale_monolith(tmp_path):
 
 
 def test_run_sweep_splits_line_and_brem_fields(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     run_sweep([_fake_case("cfg_a", 30.0)], {}, checkpoint_dir=str(tmp_path), progress=False)
 
     line = _checkpoint_io.load(str(tmp_path / "hopg" / "line.pkl"))
@@ -854,7 +785,7 @@ def test_legacy_checkpoint_migrates_to_components_on_save(tmp_path, monkeypatch)
     existing = {"cfg_a": {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])}}}
     with open(tmp_path / "hopg.pkl", "wb") as f:
         pickle.dump(existing, f)
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
 
     run_sweep(
         [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 30.0)],
@@ -899,14 +830,10 @@ def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
         pickle.dump(existing, f)
 
     ran = []
-
-    def _tracking_run_cases(
-        cases, max_workers=None, progress=False, callback=None, should_stop=None, keep_results=True
-    ):
-        ran.extend(c["name"] for c in cases)
-        _stub_run_cases(cases, callback=callback)
-
-    monkeypatch.setattr("cxr_mc.run.run_cases", _tracking_run_cases)
+    monkeypatch.setattr(
+        "cxr_mc.run.run_cases",
+        tracking_run_cases_factory(ran),
+    )
     cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 30.0)]
     results = {}
     run_sweep(cases, results, checkpoint_dir=str(tmp_path), resume=True, progress=False)
@@ -919,29 +846,13 @@ def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def _tracking_run_cases_factory(ran):
-    def _tracking(
-        cases,
-        *,
-        callback=None,
-        **kwargs,
-    ):
-        ran.extend(case["name"] for case in cases)
-
-        return _stub_run_cases(
-            cases,
-            callback=callback,
-            **kwargs,
-        )
-
-    return _tracking
 
 def test_run_sweep_reuses_cases_across_stems_by_content_key(tmp_path, monkeypatch):
     """A case computed under one profile's stem is replayed under a DIFFERENT
     stem sharing the same material + content key, instead of recomputed."""
     from cxr_mc.profiles import case_content_key
 
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 45.0)]
 
     # Profile A run: populates the shared per-material CAS.
@@ -959,7 +870,7 @@ def test_run_sweep_reuses_cases_across_stems_by_content_key(tmp_path, monkeypatc
     # Profile B run: a different stem, same cases -> everything reused, run_cases
     # sees NOTHING to compute.
     ran = []
-    monkeypatch.setattr("cxr_mc.run.run_cases", _tracking_run_cases_factory(ran))
+    monkeypatch.setattr("cxr_mc.run.run_cases", tracking_run_cases_factory(ran))
     results_b = {}
     run_sweep(
         cases,
@@ -978,7 +889,7 @@ def test_run_sweep_reuses_cases_across_stems_by_content_key(tmp_path, monkeypatc
 def test_no_cache_neither_reads_nor_writes(tmp_path, monkeypatch):
     from cxr_mc.profiles import case_content_key
 
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0)]
     # Pre-populate the CAS from a normal run.
     run_sweep(
@@ -993,7 +904,7 @@ def test_no_cache_neither_reads_nor_writes(tmp_path, monkeypatch):
     assert before
 
     ran = []
-    monkeypatch.setattr("cxr_mc.run.run_cases", _tracking_run_cases_factory(ran))
+    monkeypatch.setattr("cxr_mc.run.run_cases", tracking_run_cases_factory(ran))
     run_sweep(
         cases,
         {},
@@ -1013,7 +924,7 @@ def test_no_cache_neither_reads_nor_writes(tmp_path, monkeypatch):
 def test_recompute_skips_read_but_repopulates(tmp_path, monkeypatch):
     from cxr_mc.profiles import case_content_key
 
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0)]
     run_sweep(
         cases,
@@ -1027,7 +938,7 @@ def test_recompute_skips_read_but_repopulates(tmp_path, monkeypatch):
     blob.unlink()  # remove so we can prove --recompute rewrites it
 
     ran = []
-    monkeypatch.setattr("cxr_mc.run.run_cases", _tracking_run_cases_factory(ran))
+    monkeypatch.setattr("cxr_mc.run.run_cases", tracking_run_cases_factory(ran))
     run_sweep(
         cases,
         {},
@@ -1046,7 +957,7 @@ def test_recompute_skips_read_but_repopulates(tmp_path, monkeypatch):
 def test_existing_checkpoint_seeds_shared_cache_on_resume(tmp_path, monkeypatch):
     from cxr_mc.profiles import case_content_key
 
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0)]
     stem = tmp_path / "hopg@legacy-000000000000"
     run_sweep(cases, {}, checkpoint_path=str(stem), progress=False)
@@ -1072,7 +983,7 @@ def test_invalid_cached_payload_falls_back_to_recompute(tmp_path, monkeypatch):
     blob.parent.mkdir(parents=True)
     _checkpoint_io.dump({"not": "a case payload"}, str(blob))
     ran = []
-    monkeypatch.setattr("cxr_mc.run.run_cases", _tracking_run_cases_factory(ran))
+    monkeypatch.setattr("cxr_mc.run.run_cases", tracking_run_cases_factory(ran))
 
     run_sweep(
         cases,
@@ -1094,7 +1005,7 @@ def test_cas_rejects_non_sha256_content_key(tmp_path):
 def test_content_key_fn_none_leaves_cas_inert(tmp_path, monkeypatch):
     """Without content_key_fn the CAS path is entirely dormant (byte-identical to
     the pre-feature per-stem-only behavior): no blobs, no cases.json."""
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0)]
     run_sweep(cases, {}, checkpoint_path=str(tmp_path / "hopg"), progress=False)
     assert not list((tmp_path / "hopg").glob("*/*.pkl"))  # no sharded CAS blobs
@@ -1104,7 +1015,7 @@ def test_content_key_fn_none_leaves_cas_inert(tmp_path, monkeypatch):
 
 
 def test_run_sweep_reports_initial_and_per_case_progress(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     cases = [
         _fake_case("cfg_a", 30.0),
         _fake_case("cfg_a", 45.0),
@@ -1124,7 +1035,7 @@ def test_run_sweep_reports_initial_and_per_case_progress(tmp_path, monkeypatch):
 
 
 def test_run_sweep_on_case_fires_with_each_finished_case(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 45.0)]
     seen = []
 
@@ -1144,7 +1055,7 @@ def test_run_sweep_progress_counts_cached_cases_on_resume(tmp_path, monkeypatch)
     existing = {"cfg_a": {30.0: {"case": cached_case, "spec": np.array([1.0])}}}
     with open(tmp_path / "hopg.pkl", "wb") as f:
         pickle.dump(existing, f)
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     progress = []
 
     run_sweep(
@@ -1167,7 +1078,7 @@ def test_run_sweep_on_cost_reports_cached_seed_and_per_case_totals(tmp_path, mon
     existing = {"cfg_a": {30.0: {"case": cached_case, "spec": np.array([1.0])}}}
     with open(tmp_path / "hopg.pkl", "wb") as f:
         pickle.dump(existing, f)
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     cost = []
 
     run_sweep(
@@ -1185,7 +1096,7 @@ def test_run_sweep_on_cost_reports_cached_seed_and_per_case_totals(tmp_path, mon
 
 
 def test_run_sweep_on_cost_never_fires_without_case_cost_fn(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     cost = []
 
     run_sweep(
@@ -1200,7 +1111,7 @@ def test_run_sweep_on_cost_never_fires_without_case_cost_fn(tmp_path, monkeypatc
 
 
 def test_run_sweep_on_chunk_fires_per_group(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     # same (crystal, thickness, tilt, omitted footprint) -> one group;
     # different tilt -> another
     c1 = _fake_case("cfg_a", 30.0, tilt_deg=30.0)
@@ -1217,7 +1128,7 @@ def test_run_sweep_on_chunk_fires_per_group(tmp_path, monkeypatch):
 
 def test_run_sweep_separates_finite_footprint_chunk_groups(tmp_path, monkeypatch):
     """Finite footprints need independent streaming groups at one tilt."""
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     narrow = _fake_case("narrow", 30.0, tilt_deg=30.0)
     wide = _fake_case("wide", 30.0, tilt_deg=30.0)
     narrow.update(crystal_width_mm=0.1, crystal_height_mm=0.2)
@@ -1236,7 +1147,7 @@ def test_run_sweep_resume_replays_cached_chunks(tmp_path, monkeypatch):
     existing = {"cfg_a": {30.0: {"case": case, "spec": np.array([1.0])}}}
     with open(tmp_path / "hopg.pkl", "wb") as f:
         pickle.dump(existing, f)
-    monkeypatch.setattr("cxr_mc.run.run_cases", _stub_run_cases)
+    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
     chunks = []
     run_sweep(
         [case],
@@ -1254,24 +1165,6 @@ def test_run_sweep_budget_stops_early_and_resumes(tmp_path, monkeypatch):
 
     clock = {"t": 0.0}
 
-    def fake_run_cases(
-        todo, max_workers=None, progress=True, callback=None, should_stop=None, keep_results=True
-    ):
-        for i, c in enumerate(todo):
-            if should_stop is not None and should_stop():
-                break
-            clock["t"] += 10.0  # each case takes 10 "seconds"
-            callback(i, c, {"out": c["name"]})
-        return []
-
-    monkeypatch.setattr(run_mod, "run_cases", fake_run_cases)
-    monkeypatch.setattr(
-        run_mod,
-        "store_result",
-        lambda results, case, out: results.setdefault(case["name"], {}).__setitem__(
-            case["E0_keV"], {"case": case}
-        ),
-    )
     cases = [
         {
             "name": f"cfg{i}",
@@ -1313,23 +1206,41 @@ def test_run_sweep_no_budget_returns_complete(tmp_path, monkeypatch):
     clock = {"t": 0.0}
 
     def fake_run_cases(
-        todo, max_workers=None, progress=True, callback=None, should_stop=None, keep_results=True
+        todo,
+        *,
+        callback=None,
+        should_stop=None,
+        keep_results=True,
+        **_unused,
     ):
-        for i, c in enumerate(todo):
+        results = [None] * len(todo)
+
+        for i, case in enumerate(todo):
             if should_stop is not None and should_stop():
                 break
-            clock["t"] += 10.0  # each case takes 10 "seconds"
-            callback(i, c, {"out": c["name"]})
-        return []
+
+            clock["t"] += 10.0
+            out = {"out": case["name"]}
+
+            if callback is not None:
+                callback(i, case, out)
+
+            if keep_results:
+                results[i] = out
+
+        return results
 
     monkeypatch.setattr(run_mod, "run_cases", fake_run_cases)
+
     monkeypatch.setattr(
         run_mod,
         "store_result",
         lambda results, case, out: results.setdefault(case["name"], {}).__setitem__(
-            case["E0_keV"], {"case": case}
+            case["E0_keV"],
+            {"case": case},
         ),
     )
+
     cases = [
         {
             "name": f"cfg{i}",
@@ -1340,17 +1251,19 @@ def test_run_sweep_no_budget_returns_complete(tmp_path, monkeypatch):
         }
         for i in range(4)
     ]
-    ckpt = tmp_path / "hopg.pkl"
 
     results = {}
+
     complete = run_mod.run_sweep(
         cases,
         results,
-        checkpoint_path=str(ckpt),
+        checkpoint_path=str(tmp_path / "hopg.pkl"),
         max_seconds=None,
     )
+
     assert complete is True
     assert len(results) == 4
+    assert clock["t"] == 40.0
 
 
 # ---------------------------------------------------------------------------

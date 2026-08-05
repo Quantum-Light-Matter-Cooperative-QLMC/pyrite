@@ -1227,7 +1227,7 @@ def _cpu_pool_workers(max_workers, n):
     Returns the worker count to use, >= 1.
     """
     if _N_CPUS is not None:
-        _max_allowed_workers = _N_CPUS * 4 // 5
+        _max_allowed_workers = _N_CPUS * 3 // 4
     else:
         _max_allowed_workers = 6
 

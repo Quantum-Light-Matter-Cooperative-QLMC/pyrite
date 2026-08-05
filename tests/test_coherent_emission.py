@@ -117,7 +117,7 @@ def _runner_case(*, coherent=False):
     }
 
 
-def _runner_tp(segs):
+def _runner_tp(segs, *, ne_lines=None, ne_brem=None):
     ne = int(segs["Ne"])
 
     return {
@@ -125,8 +125,8 @@ def _runner_tp(segs):
         "E_brem": E_GRID,
         "n_hat": KWARGS["n_hat"],
         "segs": segs,
-        "Ne_lines": ne,
-        "Ne_brem": ne,
+        "Ne_lines": ne if ne_lines is None else ne_lines,
+        "Ne_brem": ne if ne_brem is None else ne_brem,
         "groove": None,
     }
 
@@ -159,7 +159,7 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
     segs = _segments(2)
     tp = _runner_tp(segs, ne_lines=2, ne_brem=2)
 
-    case = _runner_case(cohere=True)
+    case = _runner_case(coherent=True)
     out = runner._spectrum_case_impl(case, tp)
 
     direct_incoherent = mc_spectrum(segs, E_GRID, coherent=False, **KWARGS)

@@ -145,7 +145,7 @@ def test_cpu_spectrum_backend_updates_active_itemsize() -> None:
         assert runner._GPU is False
         assert runner._spectrum_mod.xp is np
         assert runner._spectrum_mod.REAL is np.float64
-        assert runner._real_bytes() == 8
+        assert runner._real_itemsize() == 8
 
 
 import os

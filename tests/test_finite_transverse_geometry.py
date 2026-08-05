@@ -29,7 +29,7 @@ def test_first_prism_exit_reaches_each_finite_prism_face(
     origin, direction, expected_distance, expected_face
 ):
     distance, face = first_prism_exit(
-        np.array(origin),
+        np.array([origin]),
         np.array(direction),
         z_min_ang=0.0,
         z_max_ang=10.0,
@@ -37,8 +37,8 @@ def test_first_prism_exit_reaches_each_finite_prism_face(
         height_ang=10.0,
     )
 
-    assert distance == pytest.approx(expected_distance)
-    assert face == expected_face
+    assert distance[0] == pytest.approx(expected_distance)
+    assert face[0] == expected_face
 
 
 def test_first_prism_exit_selects_nearest_face_and_deterministic_corner():

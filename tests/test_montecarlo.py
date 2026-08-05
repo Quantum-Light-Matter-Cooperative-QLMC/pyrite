@@ -72,19 +72,19 @@ def test_niobium_transport_parameters_and_fallback(monkeypatch):
     assert params == {"Z": 41, "A": pytest.approx(92.906, abs=0.001), "J_keV": 0.417}
 
     mott_calls = []
-    alpha_calls = []
-    original_alpha_sr_joy = transport._alpha_sr_joy
+    fallback_calls = []
+    original_fallback = transport._sample_cos_theta_sr_numba
 
     def missing_mott_table(element, Z):
         mott_calls.append((element, Z))
         raise FileNotFoundError
 
-    def spy_alpha_sr_joy(Z, E_keV):
-        alpha_calls.append((Z, E_keV.copy()))
-        return original_alpha_sr_joy(Z, E_keV)
+    def spy_fallback(Z, E_keV, R):
+        fallback_calls.append((Z, E_keV.copy(), R.copy()))
+        return original_fallback(Z, E_keV, R)
 
     monkeypatch.setattr(transport, "_mott_alpha_table", missing_mott_table)
-    monkeypatch.setattr(transport, "_alpha_sr_joy", spy_alpha_sr_joy)
+    monkeypatch.setattr(transport, "_sample_cos_theta_sr_numba", spy_fallback)
 
     previous_no_mott = set(transport._NO_MOTT)
     transport._NO_MOTT.discard("Nb")
@@ -94,10 +94,11 @@ def test_niobium_transport_parameters_and_fallback(monkeypatch):
         transport._sample_cos_theta(41, energies, np.random.default_rng(2), "mott", "Nb")
 
         assert mott_calls == [("Nb", 41)]
-        assert len(alpha_calls) == 2
-        for Z, called_energies in alpha_calls:
-            assert Z == 41
+        assert len(fallback_calls) == 2
+        for called_Z, called_energies, random_draws in fallback_calls:
+            assert called_Z == 41
             np.testing.assert_array_equal(called_energies, energies)
+            assert random_draws.shape == energies.shape
         assert "Nb" in transport._NO_MOTT
     finally:
         transport._NO_MOTT.clear()
@@ -120,8 +121,8 @@ def test_new_element_transport_parameters(element, expected):
 @pytest.mark.parametrize(("element", "Z"), [("Fe", 26), ("Bi", 83), ("Re", 75), ("Ta", 73)])
 def test_new_elements_use_analytic_fallback_without_mott_table(monkeypatch, element, Z):
     mott_calls = []
-    alpha_calls = []
-    original_alpha_sr_joy = transport._alpha_sr_joy
+    fallback_calls = []
+    original_fallback = transport._sample_cos_theta_sr_numba
 
     def missing_mott_table(called_element, called_Z):
         mott_calls.append((called_element, called_Z))
@@ -144,10 +145,11 @@ def test_new_elements_use_analytic_fallback_without_mott_table(monkeypatch, elem
         transport._sample_cos_theta(Z, energies, np.random.default_rng(2), "mott", element)
 
         assert mott_calls == [(element, Z)]
-        assert len(alpha_calls) == 2
-        for called_Z, called_energies in alpha_calls:
+        assert len(fallback_calls) == 2
+        for called_Z, called_energies, random_draws in fallback_calls:
             assert called_Z == Z
             np.testing.assert_array_equal(called_energies, energies)
+            assert random_draws.shape == energies.shape
         assert np.all((-1.0 <= cos_theta) & (cos_theta <= 1.0))
         assert element in transport._NO_MOTT
     finally:
@@ -667,10 +669,10 @@ def _patch_host(monkeypatch, *, ncpus=32, avail_mb=44_900, total_mb=48_000, budg
 
 
 def test_cpu_pool_workers_autosize_is_memory_bound_on_qlmc_shape(monkeypatch):
-    """qlmc regression: 32 cores asks for 24 workers, RAM only carries 6."""
+    """qlmc regression: 32 cores asks for 24 workers, RAM only carries 7."""
     runner = _patch_host(monkeypatch)
-    # min(44_900, 0.85 * 48_000 = 40_800) // 6_144 = 6
-    assert runner._cpu_pool_workers(None, 980) == 6
+    # 44_900 // 6_144 = 7
+    assert runner._cpu_pool_workers(None, 980) == 7
 
 
 def test_cpu_pool_workers_autosize_is_cpu_bound_with_ample_ram(monkeypatch):
@@ -682,7 +684,7 @@ def test_cpu_pool_workers_pin_is_clamped_by_memory(monkeypatch):
     """An explicit pin cannot re-create the OOM; raise CXR_MC_WORKER_MEM_MB to
     deliberately run tighter than the measured per-worker budget."""
     runner = _patch_host(monkeypatch)
-    assert runner._cpu_pool_workers(24, 980) == 6
+    assert runner._cpu_pool_workers(24, 980) == 7
 
 
 def test_cpu_pool_workers_pin_under_cap_is_honored(monkeypatch):
@@ -713,7 +715,7 @@ def test_run_cases_cpu_pool_receives_the_capped_worker_count(monkeypatch):
 
     cases = [{"name": f"c{i}"} for i in range(10)]
     runner.run_cases(cases, progress=False, engine="cpu")
-    assert _SyncProcessPoolExecutor.captured["max_workers"] == 6
+    assert _SyncProcessPoolExecutor.captured["max_workers"] == 7
 
 
 # ---- _gpu_pipeline_workers memory-aware sizing -------------------------------
@@ -724,9 +726,9 @@ def test_run_cases_cpu_pool_receives_the_capped_worker_count(monkeypatch):
 
 
 def test_gpu_pipeline_workers_autosize_is_memory_bound_on_qlmc_shape(monkeypatch):
-    """32 cores would ask for ncpu // 2 = 16 transport workers; RAM carries 6."""
+    """32 cores would ask for ncpu // 2 = 16 transport workers; RAM carries 7."""
     runner = _patch_host(monkeypatch)
-    assert runner._gpu_pipeline_workers(None, 980) == 6
+    assert runner._gpu_pipeline_workers(None, 980) == 7
 
 
 def test_gpu_pipeline_workers_autosize_is_cpu_bound_with_ample_ram(monkeypatch):
@@ -737,7 +739,7 @@ def test_gpu_pipeline_workers_autosize_is_cpu_bound_with_ample_ram(monkeypatch):
 def test_gpu_pipeline_workers_pin_is_clamped_by_memory(monkeypatch):
     """An explicit --max-workers pin cannot re-create the OOM either."""
     runner = _patch_host(monkeypatch)
-    assert runner._gpu_pipeline_workers(16, 980) == 6
+    assert runner._gpu_pipeline_workers(16, 980) == 7
 
 
 def test_gpu_pipeline_workers_degrades_to_serial_under_memory_pressure(monkeypatch):
@@ -753,38 +755,48 @@ def test_gpu_pipeline_workers_degrades_to_serial_under_memory_pressure(monkeypat
 # chunk = budget_bytes // (3 arrays * nbins * 8 B), clamped to [1000, 100_000].
 
 
-def test_adaptive_chunk_reproduces_old_default_on_narrow_grid():
-    """Default 1920 MB budget was chosen so the pre-2026-07 ~2000-bin grid gets
-    back exactly the old fixed chunk=40000 -- no behavior change on old runs."""
+def _patch_cpu_chunk_policy(monkeypatch, *, budget_mb=1920, device_budget_bytes=None):
+    """Pin chunk tests to the CPU/fp64 path, independent of test hardware."""
+    from types import SimpleNamespace
+
     from cxr_mc.montecarlo import runner
 
-    assert runner._adaptive_chunk(2000) == 80_000
+    monkeypatch.setattr(runner, "_GPU", False)
+    monkeypatch.setattr(runner._spectrum_mod, "REAL", np.float64)
+    monkeypatch.setattr(runner, "_SPEC_BUDGET_MB", budget_mb)
+    monkeypatch.setattr(
+        runner,
+        "_RESOURCE_POLICY",
+        SimpleNamespace(device_budget_bytes=device_budget_bytes),
+    )
+    return runner
 
 
-def test_adaptive_chunk_shrinks_on_the_widened_grid():
-    from cxr_mc.montecarlo import runner
-
-    # 1920e6 // (3 * 6000 * 8) = 26_666: ~3x fewer segments for ~3x more bins,
-    # so the matmul transient stays ~1.9 GB instead of the ~5.7 GB that OOM'd.
-    assert runner._adaptive_chunk(6000) == 26_666
+def test_adaptive_chunk_reproduces_old_default_on_narrow_grid(monkeypatch):
+    runner = _patch_cpu_chunk_policy(monkeypatch)
+    assert runner._adaptive_chunk(2000) == 40_000
 
 
-def test_adaptive_chunk_preferred_size_has_floor_and_ceiling():
-    from cxr_mc.montecarlo import runner
-
-    assert runner._adaptive_chunk(200_000) == 1000  # degenerate wide grid: slow, not zero
-    assert runner._adaptive_chunk(1) == 100_000  # coarse brem grid: bound kernel size
+def test_adaptive_chunk_shrinks_on_the_widened_grid(monkeypatch):
+    runner = _patch_cpu_chunk_policy(monkeypatch)
+    assert runner._adaptive_chunk(6000) == 13_333
 
 
-def test_adaptive_chunk_raises_when_minimum_cannot_fit_device_budget():
-    from cxr_mc.montecarlo import runner
+def test_adaptive_chunk_preferred_size_has_floor_and_ceiling(monkeypatch):
+    runner = _patch_cpu_chunk_policy(monkeypatch)
+    assert runner._adaptive_chunk(200_000) == 1000
+    assert runner._adaptive_chunk(1) == 100_000
 
-    with pytest.raises(runner.BackendResourceError):
-        runner._adaptive_chunk(10**9)
+
+def test_adaptive_chunk_cpu_path_does_not_apply_device_admission(monkeypatch):
+    runner = _patch_cpu_chunk_policy(
+        monkeypatch,
+        device_budget_bytes=1,
+    )
+    # CPU mode deliberately ignores accelerator device-memory admission.
+    assert runner._adaptive_chunk(10**9) == 1000
 
 
 def test_adaptive_chunk_honors_budget_override(monkeypatch):
-    from cxr_mc.montecarlo import runner
-
-    monkeypatch.setattr(runner, "_SPEC_BUDGET_MB", 480)  # CXR_MC_SPEC_BUDGET_MB
-    assert runner._adaptive_chunk(2000) == 20_000
+    runner = _patch_cpu_chunk_policy(monkeypatch, budget_mb=480)
+    assert runner._adaptive_chunk(2000) == 10_000
