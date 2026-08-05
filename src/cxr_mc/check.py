@@ -25,7 +25,7 @@ from pathlib import Path
 import click
 
 from ._acp import running_acp
-from ._remote.config import HOST as REMOTE_HOST
+from ._remote.config import remote_host
 from .cli import _core as _cli_core
 
 NOTEBOOK = "notebooks/validation_app.py"
@@ -75,7 +75,7 @@ def probe_remote_zhai(timeout=5):
                 "BatchMode=yes",
                 "-o",
                 f"ConnectTimeout={int(timeout)}",
-                REMOTE_HOST,
+                remote_host(),
                 "true",
             ],
             capture_output=True,

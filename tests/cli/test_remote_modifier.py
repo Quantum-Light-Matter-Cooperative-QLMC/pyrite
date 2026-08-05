@@ -56,3 +56,41 @@ def test_remote_wait_detach_and_local_only_options_are_rejected():
     assert "local-only option(s): --checkpoint-dir" in local_only.stderr
     assert local_wait.exit_code == 2
     assert "--wait/--detach require -R/--remote" in local_wait.stderr
+
+
+def test_explicit_remote_wait_delegates_without_detaching(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(remote_cli, "_cli_start", lambda args: seen.update(vars(args)))
+
+    result = invoke(scan.command, ["standard", "--remote", "--wait"])
+
+    assert_clean_result(result)
+    assert seen["headless"] is False
+    assert seen["no_pull"] is False
+
+
+def test_invalid_remote_target_is_usage_error_and_restores_host(monkeypatch):
+    monkeypatch.setattr(remote_config, "HOST", "configured-box")
+
+    result = invoke(scan.command, ["standard", "--remote=bad host"])
+
+    assert result.exit_code == 2
+    assert "Invalid value for '-R' / '--remote'" in result.stderr
+    assert "expected host alias" in result.stderr
+    assert remote_config.remote_host() == "configured-box"
+
+
+def test_remote_optional_value_parses_around_profile(monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        remote_cli,
+        "_cli_start",
+        lambda args: seen.append((args.catalog_profile, remote_config.remote_host())),
+    )
+
+    before = invoke(scan.command, ["--remote=box-a", "standard"])
+    after = invoke(scan.command, ["standard", "--remote=box-b"])
+
+    assert_clean_result(before)
+    assert_clean_result(after)
+    assert seen == [("standard", "box-a"), ("standard", "box-b")]

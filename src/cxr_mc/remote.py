@@ -73,6 +73,8 @@ Override the box via env: CXR_REMOTE_HOST / CXR_REMOTE_DIR / CXR_REMOTE_UV.
 # ``remote.<name>`` at call time (as ``energy_grid/job.py`` does).
 # ---------------------------------------------------------------------------
 
+import os
+
 from ._remote import (
     cli,
     config,
@@ -85,7 +87,9 @@ from ._remote import (
 from .cli import _dashboard as _presentation
 
 # --- from config ------------------------------------------------------
-HOST = config.HOST
+# Compatibility snapshot only; subsystem calls resolve the effective host
+# dynamically through ``config.remote_host()``.
+HOST = os.environ.get("CXR_REMOTE_HOST", "qlmc")
 REMOTE_DIR = config.REMOTE_DIR
 REMOTE_UV = config.REMOTE_UV
 SLURM_PARTITION = config.SLURM_PARTITION

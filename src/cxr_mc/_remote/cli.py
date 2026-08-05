@@ -15,6 +15,7 @@ from ..cli._core import (
     NONNEGATIVE_INT,
     POSITIVE_FLOAT,
     POSITIVE_INT,
+    CLIError,
     emit_diagnostic,
     emit_json_result,
     emit_result,
@@ -687,8 +688,9 @@ def reline_command(
         "Sync code, submit sweep(s), track progress, and pull checkpoints.\n\n"
         "Use --headless to return after submission. Use --no-pull to track "
         "through completion without automatically pulling checkpoints.\n\n"
-        "PROFILE selects the catalog campaign and its material membership. "
-        "Use -m/--material to run one member only. Profiles without an explicit "
+        "PROFILE selects the catalog campaign and its material membership; when "
+        "omitted it uses the current configured profile (standard built-in). Use "
+        "-m/--material to run one member only. Profiles without an explicit "
         "membership run every in-use catalog material.\n\n"
         "A profile run names the job after PROFILE (NAME, then "
         "NAME-2 once a finished run holds the bare name) and refuses while "
@@ -698,7 +700,7 @@ def reline_command(
 @click.argument(
     "catalog_profile",
     required=False,
-    default="standard",
+    default=None,
     metavar="[PROFILE]",
     shell_complete=_cli_completion.complete_profile,
 )
@@ -855,7 +857,13 @@ def start_command(
     downcast,
     level9,
 ):
+    from ..cli import _config as cli_config
     from ..scan import resolve_profile_materials
+
+    try:
+        catalog_profile = cli_config.resolve("profile.current", catalog_profile).value
+    except cli_config.ConfigError as exc:
+        raise CLIError(str(exc)) from exc
 
     materials = resolve_profile_materials(catalog_profile, material)
     if cpu and cpu_only:

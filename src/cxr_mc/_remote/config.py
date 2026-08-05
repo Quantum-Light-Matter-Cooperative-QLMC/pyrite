@@ -6,7 +6,10 @@ import shlex
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 
-HOST = os.environ.get("CXR_REMOTE_HOST", "qlmc")
+# Compatibility override for tests and callers that historically patched this
+# module global. Normal resolution is dynamic so environment and store changes
+# made before an invocation are observed.
+HOST: str | None = None
 REMOTE_DIR = os.environ.get("CXR_REMOTE_DIR", "/home/aamador/dev/cxr-mc")
 REMOTE_UV = os.environ.get("CXR_REMOTE_UV", "/home/aamador/.local/bin/uv")
 REMOTE_GPU_VENDOR = os.environ.get("CXR_REMOTE_GPU_VENDOR", "nvidia")
@@ -69,15 +72,25 @@ def _reject_controls(field: str, value: str) -> None:
         )
 
 
-def remote_host() -> str:
-    """Return validated SSH-config host alias."""
-    value = HOST
-    if not isinstance(value, str) or _HOST_ALIAS_RE.fullmatch(value) is None:
-        raise SystemExit(
-            f"invalid CXR_REMOTE_HOST={value!r}: expected host alias containing only "
-            "letters, digits, dots, underscores, or hyphens, without a leading dash"
+def validate_remote_target(value: str) -> str:
+    """Validate and return one SSH-config host alias."""
+    if _HOST_ALIAS_RE.fullmatch(value) is None:
+        raise ValueError(
+            "expected host alias containing only letters, digits, dots, underscores, "
+            "or hyphens, without a leading dash"
         )
     return value
+
+
+def remote_host() -> str:
+    """Return the validated effective SSH-config host alias."""
+    from ..cli import _config as cli_config
+
+    try:
+        resolved = cli_config.resolve("remote.target", HOST)
+        return validate_remote_target(resolved.value)
+    except (ValueError, cli_config.ConfigError) as exc:
+        raise SystemExit(f"invalid CXR_REMOTE_HOST: {exc}") from exc
 
 
 @contextmanager

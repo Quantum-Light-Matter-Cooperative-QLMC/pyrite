@@ -8,6 +8,7 @@ import click
 
 from ... import scan as _scan
 from .. import _completion as _cli_completion
+from .. import _config as _cli_config
 from .. import _core as _cli_core
 
 _PERFORMANCE_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
@@ -31,13 +32,25 @@ def _performance_profile(ctx, param, value):
     return value
 
 
+def _remote_target(ctx, param, value):
+    if value in (None, "__configured__"):
+        return value
+    from ..._remote.config import validate_remote_target
+
+    try:
+        return validate_remote_target(value)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), ctx=ctx, param=param) from exc
+
+
 @click.command(
     "run",
     help=(
         "Run a catalog profile's MC sweeps and write checkpoints.\n\n"
-        "PROFILE defaults to standard and owns material membership, campaign "
-        "ranges, and workload settings. Use -m/--material to run one profile "
-        "member instead of the full resolved membership.\n\n"
+        "PROFILE defaults to the current configured profile (standard built-in) "
+        "and owns material membership, campaign ranges, and workload settings. "
+        "Use -m/--material to run one profile member instead of the full resolved "
+        "membership.\n\n"
         "Resumes compatible checkpoints in CHECKPOINTS. Full writes "
         "<material>.pkl-compatible data in <material>/; variants use "
         "identity-qualified stems."
@@ -46,7 +59,7 @@ def _performance_profile(ctx, param, value):
 @click.argument(
     "catalog_profile",
     required=False,
-    default="standard",
+    default=None,
     metavar="[PROFILE]",
     shell_complete=_cli_completion.complete_profile,
 )
@@ -185,6 +198,7 @@ def _performance_profile(ctx, param, value):
     is_flag=False,
     flag_value="__configured__",
     default=None,
+    callback=_remote_target,
     metavar="[TARGET]",
     help="Run through SLURM; bare uses the configured target, =TARGET overrides it.",
 )
@@ -222,6 +236,10 @@ def command(
     detach,
 ):
     """Click entry point for the staged root migration."""
+    try:
+        catalog_profile = _cli_config.resolve("profile.current", catalog_profile).value
+    except _cli_config.ConfigError as exc:
+        raise _cli_core.CLIError(str(exc)) from exc
     if wait and detach:
         raise click.UsageError("--wait and --detach are mutually exclusive")
     if remote_target is None and (wait or detach):

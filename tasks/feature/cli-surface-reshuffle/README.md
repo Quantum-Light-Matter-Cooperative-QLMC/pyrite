@@ -93,6 +93,19 @@ owner-authored base refresh, the full CLI suite passes: 1007 tests.
       canonical modifier homes, so the migration does not expose a half-retired
       namespace.
 
+### Shared context precedence
+
+- [x] Added `cxr config set|get|list` for `profile.current` and `remote.target`,
+      backed by an atomic per-user TOML store.
+- [x] Enforced one resolver order: per-call value > `CXR_PROFILE` /
+      `CXR_REMOTE_HOST` > config store > built-in `standard` / `qlmc`.
+- [x] Applied current-profile resolution to local and compatibility remote runs,
+      and remote-target resolution to all subsystem SSH calls.
+- [x] Corrected explicit invalid `--remote=TARGET` handling to Click usage exit 2
+      and froze option/positional parsing plus host restoration.
+- [x] Focused config/run/remote/check verification: 455 passed; full CLI suite
+      1014 passed; lint, typecheck, reference, and frozen-contract checks pass.
+
 ## Non-goals
 
 - No content-addressed store, artifact hash migration, checkpoint lockfile, or

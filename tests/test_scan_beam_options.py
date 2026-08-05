@@ -31,7 +31,8 @@ def test_run_help_keeps_beam_overrides_profile_owned():
     result = CliRunner().invoke(scan.command, ["--help"])
 
     assert result.exit_code == 0
-    assert "PROFILE defaults to standard" in result.output
+    assert "PROFILE defaults to the current configured profile" in result.output
+    assert "standard built-in" in result.output
     assert "--beam-" not in result.output
 
 

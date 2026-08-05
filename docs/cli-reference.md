@@ -14,8 +14,10 @@ removal versions.
 Remote lab defaults: `--chunk-minutes 10` runs one material at a time in
 self-resubmitting slices. `--chunk-minutes 0` selects one monolithic
 `UNLIMITED` allocation; that mode defaults to two parallel materials and
-accepts at most four. `CXR_REMOTE_HOST`, `CXR_REMOTE_DIR`, and
-`CXR_REMOTE_UV` override configured connection values.
+accepts at most four. Context-backed values use one precedence chain:
+per-call flag, then `CXR_*` environment, then `cxr config` store, then
+built-in default. `CXR_PROFILE` and `CXR_REMOTE_HOST` are the environment
+tiers for the current profile and remote target.
 `cxr remote run PROFILE` runs the profile membership; `-m MATERIAL`
 narrows it to one material and `-p/--perf` enables performance telemetry
 for that same profile.
@@ -78,6 +80,7 @@ Commands:
   app          Launch or export interactive analysis notebooks.
   checkpoint   Inspect, transform, recompute, archive, and reclaim checkpoints.
   completion   Manage cxr shell tab-completion.
+  config       Set and inspect current profile and remote-target defaults.
   performance  List, analyze, or delete compute-performance artifacts.
   remote       Run and manage MC sweeps on a remote GPU host.
   job          List, inspect, follow, or stop asynchronous remote jobs.
@@ -93,9 +96,9 @@ Usage: cxr run [OPTIONS] [PROFILE]
 
   Run a catalog profile's MC sweeps and write checkpoints.
 
-  PROFILE defaults to standard and owns material membership, campaign ranges, and
-  workload settings. Use -m/--material to run one profile member instead of the full
-  resolved membership.
+  PROFILE defaults to the current configured profile (standard built-in) and owns
+  material membership, campaign ranges, and workload settings. Use -m/--material to run
+  one profile member instead of the full resolved membership.
 
   Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-compatible
   data in <material>/; variants use identity-qualified stems.
@@ -625,6 +628,58 @@ Options:
   -h, --help               Show this message and exit.
 ```
 
+## `cxr config`
+
+```text
+Usage: cxr config [OPTIONS] COMMAND [ARGS]...
+
+  Set and inspect environment-scoped CLI defaults.
+
+  Values resolve in one order everywhere: per-call flag, CXR_* environment, config
+  store, then built-in default.
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  get   Print the effective value for KEY.
+  list  List effective values and the winning precedence source.
+  set   Persist VALUE for KEY.
+```
+
+## `cxr config get`
+
+```text
+Usage: cxr config get [OPTIONS] {profile.current|remote.target}
+
+  Print the effective value for KEY.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
+## `cxr config list`
+
+```text
+Usage: cxr config list [OPTIONS]
+
+  List effective values and the winning precedence source.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
+## `cxr config set`
+
+```text
+Usage: cxr config set [OPTIONS] {profile.current|remote.target} VALUE
+
+  Persist VALUE for KEY.
+
+Options:
+  -h, --help  Show this message and exit.
+```
+
 ## `cxr performance`
 
 ```text
@@ -905,8 +960,9 @@ Usage: cxr remote run [OPTIONS] [PROFILE]
   Use --headless to return after submission. Use --no-pull to track through completion
   without automatically pulling checkpoints.
 
-  PROFILE selects the catalog campaign and its material membership. Use -m/--material to
-  run one member only. Profiles without an explicit membership run every in-use catalog
+  PROFILE selects the catalog campaign and its material membership; when omitted it uses
+  the current configured profile (standard built-in). Use -m/--material to run one
+  member only. Profiles without an explicit membership run every in-use catalog
   material.
 
   A profile run names the job after PROFILE (NAME, then NAME-2 once a finished run holds

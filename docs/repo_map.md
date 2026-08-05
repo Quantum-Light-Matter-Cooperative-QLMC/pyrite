@@ -56,7 +56,7 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 
 - **`cxr` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
   lazy Click dispatch for `scan`, `blaze`, `export`, `analyze`, `validate`,
-  `catalog`, `checkpoint`, `remote`, `energy-grid`, `profile`, and `material`.
+  `catalog`, `checkpoint`, `config`, `remote`, `energy-grid`, `profile`, and `material`.
   Older flat checkpoint verbs (including `prune`), `check`, and `check-config`
   remain hidden compatibility aliases.
   Checked user-facing inventory:
@@ -82,11 +82,16 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   `cli.commands.cleanup:rm_command`: delete explicitly selected local datasets
   and the CAS blobs they alone kept reachable. Hidden compatibility alias:
   `cxr checkpoint clear`.
+- **`cxr config set|get|list`** → `cli.commands.config` + `cli._config`: persist
+  and inspect the current profile and remote target. Both resolve through the
+  shared per-call > `CXR_*` environment > config store > built-in precedence
+  chain. The user store is written atomically under Click's platform config dir.
 - **`cxr run [PROFILE] [-m MATERIAL] [--fidelity full|survey] [-R[=TARGET]]`** →
   local `scan:main` → `run.run_sweep`, or the existing SSH/SLURM submitter when
-  `--remote` is present. Bare `--remote` uses the configured target; an explicit
-  value is validated and scoped to that invocation. Remote runs accept uniform
-  `--wait` / `--detach`; local runs reject them. Local output is canonical
+  `--remote` is present. An omitted profile uses the configured current profile;
+  bare `--remote` uses the configured target; an explicit value is validated and
+  scoped to that invocation. Remote runs accept uniform `--wait` / `--detach`;
+  local runs reject them. Local output is canonical
   `checkpoints/<material>/{line,brem}.pkl` or an identity-qualified variant
   directory. Box shim: `python -m cxr_mc._entry.scan`.
 - **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
