@@ -71,7 +71,7 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
     help=(
         "Run one material's blazed-crystal MC sweep and write its checkpoint.\n\n"
         "Writes checkpoints/<material>_blazed.pkl, separate from flat-face scan "
-        "checkpoints. Repeat --energy/--spacing/--angles for multiple values."
+        "checkpoints. Repeat --energy/--spacing/--polar for multiple values."
     ),
 )
 @click.argument(

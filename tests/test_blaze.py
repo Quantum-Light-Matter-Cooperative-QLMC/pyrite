@@ -56,7 +56,7 @@ def test_spacing_required():
 
 def test_spacing_meters_converted_to_angstrom(monkeypatch):
     captured = _run_and_capture(
-        monkeypatch, [MATERIAL, "--energy", "30", "--spacing", "2e-6", "--angles", "25"]
+        monkeypatch, [MATERIAL, "--energy", "30", "--spacing", "2e-6", "--polar", "25"]
     )
     assert captured["cases"]
     assert all(c["groove_spacing_ang"] == 2.0e4 for c in captured["cases"])
@@ -68,7 +68,7 @@ def test_spacing_meters_converted_to_angstrom(monkeypatch):
 def test_pairing_equal_length_zips(monkeypatch):
     captured = _run_and_capture(
         monkeypatch,
-        [MATERIAL, "--energy", "30", "50", "--spacing", "2e-6", "3e-6", "--angles", "25"],
+        [MATERIAL, "--energy", "30", "50", "--spacing", "2e-6", "3e-6", "--polar", "25"],
     )
     pairs = {(c["E0_keV"], c["groove_spacing_ang"]) for c in captured["cases"]}
     assert pairs == {(30.0, 2.0e4), (50.0, 3.0e4)}
@@ -77,7 +77,7 @@ def test_pairing_equal_length_zips(monkeypatch):
 def test_pairing_single_spacing_broadcasts(monkeypatch):
     captured = _run_and_capture(
         monkeypatch,
-        [MATERIAL, "--energy", "30", "50", "--spacing", "2e-6", "--angles", "25"],
+        [MATERIAL, "--energy", "30", "50", "--spacing", "2e-6", "--polar", "25"],
     )
     pairs = {(c["E0_keV"], c["groove_spacing_ang"]) for c in captured["cases"]}
     assert pairs == {(30.0, 2.0e4), (50.0, 2.0e4)}
@@ -87,7 +87,7 @@ def test_pairing_length_mismatch_raises(monkeypatch):
     monkeypatch.setattr(blaze, "gate_cases_by_penetration", lambda cases, **kw: (cases, []))
     monkeypatch.setattr(blaze, "run_sweep", lambda *a, **kw: None)
     result = _invoke(
-        [MATERIAL, "--energy", "30", "50", "60", "--spacing", "2e-6", "3e-6", "--angles", "25"]
+        [MATERIAL, "--energy", "30", "50", "60", "--spacing", "2e-6", "3e-6", "--polar", "25"]
     )
     assert result.exit_code == 1
     assert "--energy takes 3 value(s) but --spacing takes 2" in result.stderr
@@ -98,7 +98,7 @@ def test_pairing_length_mismatch_raises(monkeypatch):
 
 def test_forced_geometry_on_every_case(monkeypatch):
     captured = _run_and_capture(
-        monkeypatch, [MATERIAL, "--energy", "30", "--spacing", "2e-6", "--angles", "25", "45"]
+        monkeypatch, [MATERIAL, "--energy", "30", "--spacing", "2e-6", "--polar", "25", "45"]
     )
     cases = captured["cases"]
     assert cases
@@ -112,17 +112,17 @@ def test_forced_geometry_on_every_case(monkeypatch):
         assert c["abs_layers"] is None
 
 
-# 4. Angles -------------------------------------------------------------------
+# 4. Polar angles -------------------------------------------------------------
 
 
-def test_angles_override_sets_tilt_grid(monkeypatch):
+def test_polar_override_sets_tilt_grid(monkeypatch):
     captured = _run_and_capture(
-        monkeypatch, [MATERIAL, "--energy", "30", "--spacing", "2e-6", "--angles", "25", "45"]
+        monkeypatch, [MATERIAL, "--energy", "30", "--spacing", "2e-6", "--polar", "25", "45"]
     )
     assert {c["tilt_deg"] for c in captured["cases"]} == {25.0, 45.0}
 
 
-def test_angles_omitted_uses_std_catalog_grid(monkeypatch):
+def test_polar_omitted_uses_std_catalog_grid(monkeypatch):
     captured = _run_and_capture(monkeypatch, [MATERIAL, "--energy", "30", "--spacing", "2e-6"])
     expected = set(np.atleast_1d(material_sweep(MATERIAL).tilt_deg).tolist())
     assert {c["tilt_deg"] for c in captured["cases"]} == expected
@@ -133,7 +133,7 @@ def test_angles_omitted_uses_std_catalog_grid(monkeypatch):
 
 def test_checkpoint_targets_blazed_stem_not_flat_face(monkeypatch):
     captured = _run_and_capture(
-        monkeypatch, [MATERIAL, "--energy", "30", "--spacing", "2e-6", "--angles", "25"]
+        monkeypatch, [MATERIAL, "--energy", "30", "--spacing", "2e-6", "--polar", "25"]
     )
     path = captured["checkpoint_path"]
     assert path is not None
@@ -148,7 +148,7 @@ def test_checkpoint_targets_blazed_stem_not_flat_face(monkeypatch):
 def test_case_names_encode_groove_spacing_and_stay_disjoint(monkeypatch):
     captured = _run_and_capture(
         monkeypatch,
-        [MATERIAL, "--energy", "30", "50", "--spacing", "2e-6", "3e-6", "--angles", "25"],
+        [MATERIAL, "--energy", "30", "50", "--spacing", "2e-6", "3e-6", "--polar", "25"],
     )
     names_2um = {c["name"] for c in captured["cases"] if c["E0_keV"] == 30.0}
     names_3um = {c["name"] for c in captured["cases"] if c["E0_keV"] == 50.0}

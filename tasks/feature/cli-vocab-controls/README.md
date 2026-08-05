@@ -3,9 +3,10 @@
 Branch: `feature/cli-vocab-controls`, off `main` at `8671240`.
 Slice 5 of [`docs/plans/cli-redesign-implementation-plan.md`](../../../docs/plans/cli-redesign-implementation-plan.md).
 
-**Status: in progress, partially verified.** D5 and D6 focused tests, lint, and
-typecheck pass; generated deprecation/reference/contract artifacts are current.
-Full-suite verification remains.
+**Status: complete.** D5 and D6 implementation, focused tests, generated
+deprecation/reference/contract artifacts, and the full verification matrix are
+current. The only core-suite failures are the four pre-existing CPU precision
+assumptions documented below.
 
 ## Ordering caveat (read first)
 
@@ -93,13 +94,17 @@ repeatable (`multiple=True`) works; `--help` shows only the canonical.
    values, hidden help, and a hyphenated retired flag. The registry check found
    and fixed short-option declarations naming `-d` instead of the canonical
    `--save-default`. Focused result: 76 passed; lint and typecheck pass.
-4. **Docs/contracts — complete for D5, refresh again after D6.**
+4. **Docs/contracts — complete 2026-08-05.**
    `scripts/generate_cli_deprecations.py` now renders both command and option
    tables. `docs/cli-deprecations.md`, `docs/cli-reference.md`, and
-   `tests/data/cli_contract.json` were regenerated after the D5 changes.
-5. **Verify.** lint, typecheck, then `test-suite cli` / `packaging` / `apps` /
-   `core`. Expect 4 pre-existing `test_adaptive_chunk_*` failures in
-   `tests/test_montecarlo.py` on CPU-only machines (hardcoded fp32
-   `_REAL_BYTES=4`); they are unrelated to this branch.
+   `tests/data/cli_contract.json` were regenerated after D5/D6 and the final
+   canonical-help cleanup.
+5. **Verify — complete 2026-08-05.** Lint and default-feature typecheck pass.
+   Suites: CLI 977 passed; packaging 190 passed; apps 273 passed; core 985
+   passed / 39 skipped, plus the 4 expected pre-existing
+   `test_adaptive_chunk_*` failures in `tests/test_montecarlo.py` on CPU-only
+   machines (hardcoded fp32 `_REAL_BYTES=4`). The core run's only additional
+   failure was a sandbox forkserver socket denial; its focused end-to-end test
+   passed outside the sandbox (1 passed, 66 deselected).
 
 `TODO.md` still has no entry for this slice; task status remains branch-local.

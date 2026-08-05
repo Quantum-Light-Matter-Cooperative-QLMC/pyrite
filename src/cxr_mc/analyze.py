@@ -8,7 +8,8 @@ dropdown start on" logic lives here as a pure, unit-testable helper
 calls it in a cell that runs before the dropdown cell.
 
 Precedence for the initial material: an explicit CLI material always wins; else
-the persisted default (:func:`get_default_material`, written by ``-d/--default``);
+the persisted default (:func:`get_default_material`, written by
+``-d/--save-default``);
 else ``"hopg"``.
 
 Two transports carry the resolved material into the marimo subprocess, since we
@@ -428,7 +429,7 @@ def _launch(
 
 def _cli(args):
     if args.default and args.material is None:
-        raise SystemExit("cxr app analysis -d/--default: no material given to persist")
+        raise SystemExit("cxr app analysis -d/--save-default: no material given to persist")
 
     if args.default:
         set_default_material(args.material)
@@ -476,7 +477,7 @@ def _cli(args):
 @click.option("--no-token", is_flag=True, help="Disable marimo auth token.")
 def command(material, persist_default, watch, smoke, edit, acp, tunnel, no_token):
     if persist_default and material is None:
-        raise click.UsageError("--default requires MATERIAL")
+        raise click.UsageError("--save-default requires MATERIAL")
     return _cli_core.invoke_legacy(
         _cli,
         material=material,

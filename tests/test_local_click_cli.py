@@ -143,7 +143,7 @@ def test_blaze_preserves_one_flag_many_values_syntax(monkeypatch):
             "40",
             "--spacing",
             "1e-6",
-            "--angles",
+            "--polar",
             "10",
             "20",
             "--workers",
@@ -178,7 +178,7 @@ def test_blaze_unknown_option_after_variadic_value_is_not_swallowed():
             analyze,
             analyze.command,
             "_cli",
-            ["hopg", "--default", "--smoke"],
+            ["hopg", "--save-default", "--smoke"],
             {"material": "hopg", "default": True, "smoke": True},
         ),
         (
@@ -279,7 +279,7 @@ def test_archive_click_dispatch(command, handler_name, argv, expected, monkeypat
     [
         (scan.command, ["standard", "-m", "hopg", "--workers", "-1"]),
         (blaze.command, ["hopg", "--energy", "0", "--spacing", "1e-6"]),
-        (blaze.command, ["hopg", "--energy", "30", "--spacing", "1e-6", "--angles", "90"]),
+        (blaze.command, ["hopg", "--energy", "30", "--spacing", "1e-6", "--polar", "90"]),
         (check.command, ["--ne", "0"]),
         (recompute_cli.brem_command, ["hopg", "--save-every", "0"]),
         (recompute_cli.line_command, ["hopg", "--line-step", "nan"]),
@@ -304,7 +304,7 @@ def test_slim_dataset_modes_are_mutually_exclusive():
     [
         (recompute_cli.brem_command, [], "needs material"),
         (recompute_cli.line_command, ["hopg", "--all"], "--all does not take"),
-        (analyze.command, ["--default"], "--default requires MATERIAL"),
+        (analyze.command, ["--save-default"], "--save-default requires MATERIAL"),
         (scan.command, ["standard", "-m", "not-a-material"], "not a configured material"),
     ],
 )

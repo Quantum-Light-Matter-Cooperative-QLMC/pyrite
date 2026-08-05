@@ -368,7 +368,7 @@ def test_default_flag_without_material_errors(tmp_path, monkeypatch):
     result = _invoke(["-d"])
     assert result.exit_code == 2
     assert result.stdout == ""
-    assert "--default requires MATERIAL" in result.stderr
+    assert "--save-default requires MATERIAL" in result.stderr
 
 
 def test_unknown_material_errors(tmp_path, monkeypatch):

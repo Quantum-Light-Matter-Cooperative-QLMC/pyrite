@@ -1702,7 +1702,7 @@ Usage: cxr material blaze [OPTIONS] MATERIAL
   Run one material's blazed-crystal MC sweep and write its checkpoint.
 
   Writes checkpoints/<material>_blazed.pkl, separate from flat-face scan checkpoints.
-  Repeat --energy/--spacing/--angles for multiple values.
+  Repeat --energy/--spacing/--polar for multiple values.
 
 Options:
   --energy E             Beam energies in keV (one or more).  [required]
