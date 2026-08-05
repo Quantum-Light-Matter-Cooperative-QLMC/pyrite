@@ -27,6 +27,7 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 | `cxr energy-grid logs` | `cxr job logs` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid status` | `cxr job status` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid stop` | `cxr job stop` | 0.1.0 | 0.3.0 |  |
+| `cxr energy-grid submit` | `cxr energy-grid derive --remote --detach` | 0.1.0 | 0.3.0 |  |
 | `cxr performance prune` | `cxr performance rm` | 0.1.0 | 0.3.0 |  |
 | `cxr profile add-material` | `cxr profile add NAME --material MATERIAL,...` | 0.1.0 | 0.3.0 |  |
 | `cxr profile analyze` | `cxr performance analyze NAME` | 0.1.0 | 0.3.0 |  |

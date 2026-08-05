@@ -133,6 +133,7 @@ def test_start_dry_run_threads_geometry_and_set_default(monkeypatch, capsys):
         azimuths="45,90",
         thickness="1000,2000",
         set_default=True,
+        brem_step=12.5,
         dry_run=True,
     )
 
@@ -141,6 +142,7 @@ def test_start_dry_run_threads_geometry_and_set_default(monkeypatch, capsys):
     assert "--azimuths 45,90" in script
     assert "--thickness 1000,2000" in script
     assert "--set-default" in script
+    assert "--brem-step 12.5" in script
 
 
 def _run_payload(tmp_path, monkeypatch, analysis_exit):
@@ -278,3 +280,15 @@ def test_metadata_records_brem_grid_stop():
         brem_grid_stop=40000.0,
     )
     assert "brem_grid_stop: 40000" in meta
+
+
+def test_metadata_records_explicit_brem_step():
+    meta = job._metadata(
+        "20260720-000000-abcdef01",
+        slice_minutes=10.0,
+        json_out="bounds.json",
+        energies=job.DEFAULT_ENERGIES,
+        grid_stop=20000.0,
+        brem_step=12.5,
+    )
+    assert "brem_step: 12.5" in meta

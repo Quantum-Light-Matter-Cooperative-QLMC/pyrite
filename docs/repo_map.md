@@ -101,6 +101,10 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   local runs reject them. Local output is canonical
   `checkpoints/<material>/{line,brem}.pkl` or an identity-qualified variant
   directory. Box shim: `python -m cxr_mc._entry.scan`.
+- **`cxr energy-grid derive [-R[=TARGET]]`** → `energy_grid._command` → local
+  derivation or the existing sliced SSH/SLURM grid job. Remote derivation waits
+  and pulls its JSON by default; `--detach` returns after submission. Hidden
+  compatibility alias: `cxr energy-grid submit`.
 - **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
   `notebooks/analysis_app.py` (checkpoint-driven 2D figures, Altair +
   matplotlib, lazy tabbed layout), `notebooks/trace_app.py` (3D trajectory

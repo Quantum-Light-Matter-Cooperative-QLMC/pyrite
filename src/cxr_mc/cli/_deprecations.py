@@ -91,6 +91,7 @@ DEPRECATIONS: dict[str, Deprecation] = {
         _entry("energy-grid job logs", "cxr job logs"),
         _entry("energy-grid job status", "cxr job status"),
         _entry("energy-grid job stop", "cxr job stop"),
+        _entry("energy-grid submit", "cxr energy-grid derive --remote --detach"),
         # Profile membership and performance spellings.
         _entry("profile add-material", "cxr profile add NAME --material MATERIAL,..."),
         _entry("profile remove-material", "cxr profile remove NAME --material MATERIAL,..."),

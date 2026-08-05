@@ -1,7 +1,7 @@
 """`cxr energy-grid` command group.
 
 Job verbs (``status``/``attach``/``logs``/``stop``) delegate to ``cxr_mc.remote``
-for output byte-identical to ``cxr remote``; ``derive``/``submit``/``apply``/
+for output byte-identical to ``cxr remote``; ``derive``/``apply``/
 ``line set``/``brem set``/``defaults``/``show``/``regen-golden`` call the package
 modules. Heavy modules (``derive``, ``golden``) import lazily inside handlers so
 ``cxr`` startup stays cheap.
@@ -32,10 +32,12 @@ from cxr_mc.cli._core import (
     TILT_CSV_TEXT,
     CLIError,
     confirm_destructive,
+    emit_diagnostic,
     emit_json_result,
     emit_result,
     invoke_legacy,
     output_option,
+    remote_option,
 )
 from cxr_mc.cli._deprecations import DeprecatingGroup, canonical_option
 from cxr_mc.energy_grid import apply, defaults, job
@@ -152,7 +154,7 @@ def _derive_options(function):
 def command():
     """Derive and manage per-material photon-energy grids.
 
-    ``derive`` and ``submit`` measure both coherent-line and bremsstrahlung
+    ``derive`` measures both coherent-line and bremsstrahlung
     upper bounds. ``defaults`` controls that diagnostic derivation only;
     ``apply`` writes validated bounds into the material catalog. Physical scan
     profile defaults belong to ``cxr profile``; per-material range overrides
@@ -166,7 +168,7 @@ def command():
     \b
     Examples:
       cxr energy-grid derive --material mose2,wse2 --energy 30,60
-      cxr energy-grid submit --material mose2 --dry-run
+      cxr energy-grid derive --material mose2 --remote --dry-run
       cxr energy-grid show mose2
     """
 
@@ -189,7 +191,26 @@ def brem_command():
     metavar="EV",
     help="Derivation bremsstrahlung spacing in eV; overrides persistent default.",
 )
+@click.option(
+    "--slice-minutes",
+    type=POSITIVE_FLOAT,
+    default=job.DEFAULT_SLICE_MINUTES,
+    show_default=True,
+    metavar="MINUTES",
+    help="Maximum duration of each self-resubmitting remote slice.",
+)
+@click.option("--no-sync", is_flag=True, help="Skip code upload before remote submission.")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Print remote batch script and submission command; do not connect or submit.",
+)
+@click.option("--wait", is_flag=True, help="Wait for remote completion and pull the result.")
+@click.option("--detach", is_flag=True, help="Return after remote submission.")
+@remote_option
+@click.pass_context
 def derive_command(
+    ctx,
     materials,
     energies,
     tilts,
@@ -197,8 +218,54 @@ def derive_command(
     thickness,
     set_default,
     brem_step,
+    slice_minutes,
+    no_sync,
+    dry_run,
+    wait,
+    detach,
+    remote_target,
 ):
-    """Derive line and bremsstrahlung energy-grid bounds locally."""
+    """Derive line and bremsstrahlung energy-grid bounds locally or remotely."""
+    if wait and detach:
+        raise click.UsageError("--wait and --detach are mutually exclusive")
+    remote_only = {
+        "wait": "--wait",
+        "detach": "--detach",
+        "slice_minutes": "--slice-minutes",
+        "no_sync": "--no-sync",
+        "dry_run": "--dry-run",
+    }
+    if remote_target is None:
+        explicit = [
+            flag
+            for parameter, flag in remote_only.items()
+            if ctx.get_parameter_source(parameter) is click.core.ParameterSource.COMMANDLINE
+        ]
+        if explicit:
+            raise click.UsageError(
+                f"remote-only option(s) require -R/--remote: {', '.join(explicit)}"
+            )
+        return _derive_local(
+            materials, energies, tilts, azimuths, thickness, set_default, brem_step
+        )
+    return _derive_remote(
+        materials=materials,
+        energies=energies,
+        tilts=tilts,
+        azimuths=azimuths,
+        thickness=thickness,
+        set_default=set_default,
+        brem_step=brem_step,
+        slice_minutes=slice_minutes,
+        no_sync=no_sync,
+        dry_run=dry_run,
+        detach=detach,
+        remote_target=remote_target,
+        persist_local=True,
+    )
+
+
+def _derive_local(materials, energies, tilts, azimuths, thickness, set_default, brem_step):
     from cxr_mc.energy_grid import derive
 
     argv = []
@@ -216,6 +283,78 @@ def derive_command(
     if set_default:
         argv.append("--set-default")
     return _invoke_callback(derive.main, argv)
+
+
+def _derive_remote(
+    *,
+    materials,
+    energies,
+    tilts,
+    azimuths,
+    thickness,
+    set_default,
+    brem_step,
+    slice_minutes,
+    no_sync,
+    dry_run,
+    detach,
+    remote_target,
+    persist_local,
+):
+    from cxr_mc._remote.config import override_remote_host
+
+    persisted = defaults.load_defaults()
+    if set_default and persist_local:
+        persisted = defaults.update_defaults(
+            materials=materials.split(",") if materials else None,
+            energies=[float(value) for value in energies.split(",")] if energies else None,
+            tilts=[float(value) for value in tilts.split(",")] if tilts else None,
+            azimuths=[float(value) for value in azimuths.split(",")] if azimuths else None,
+            thickness_ang=([float(value) for value in thickness.split(",")] if thickness else None),
+            brem_step_ev=brem_step,
+        )
+    resolved_materials = (
+        materials
+        or ",".join(str(value) for value in persisted["materials"])
+        or job.DEFAULT_MATERIALS
+    )
+    resolved_energies = (
+        energies
+        or ",".join(f"{float(value):g}" for value in persisted["energies"])
+        or job.DEFAULT_ENERGIES
+    )
+    resolved_tilts = tilts or ",".join(f"{float(value):g}" for value in persisted["tilts"])
+    resolved_azimuths = azimuths or ",".join(f"{float(value):g}" for value in persisted["azimuths"])
+    resolved_thickness = thickness or ",".join(
+        f"{float(value):g}" for value in persisted["thickness_ang"]
+    )
+    resolved_brem_step = brem_step if brem_step is not None else float(persisted["brem_step_ev"])
+    with override_remote_host(None if remote_target == "__configured__" else remote_target):
+        jobid = _invoke_callback(
+            job.start,
+            materials=resolved_materials,
+            energies=resolved_energies,
+            tilts=resolved_tilts or None,
+            azimuths=resolved_azimuths or None,
+            thickness=resolved_thickness or None,
+            set_default=set_default,
+            brem_step=resolved_brem_step,
+            slice_minutes=slice_minutes,
+            no_sync=no_sync,
+            dry_run=dry_run,
+        )
+        if dry_run or detach:
+            return 0
+        if not remote.attach(jobid):
+            emit_diagnostic(
+                "energy-grid derivation is still active or its viewer disconnected; "
+                "skipping automatic pull"
+            )
+            return 0
+        if not remote._job_succeeded(jobid):
+            raise CLIError("energy-grid derivation failed; skipping automatic pull")
+        emit_result(f"pulled {_pull_combined()}")
+    return 0
 
 
 @command.command("submit")
@@ -245,24 +384,25 @@ def submit_command(
     no_sync,
     dry_run,
 ):
-    """Submit sliced line and bremsstrahlung bound derivation remotely."""
-    persisted = defaults.load_defaults()
-    return _invoke_callback(
-        job.start,
-        materials=materials
-        or ",".join(str(value) for value in persisted["materials"])
-        or job.DEFAULT_MATERIALS,
-        energies=energies
-        or ",".join(f"{float(value):g}" for value in persisted["energies"])
-        or job.DEFAULT_ENERGIES,
+    """Submit remotely (deprecated: use ``derive --remote --detach``)."""
+    return _derive_remote(
+        materials=materials,
+        energies=energies,
         tilts=tilts,
         azimuths=azimuths,
         thickness=thickness,
         set_default=set_default,
+        brem_step=None,
         slice_minutes=slice_minutes,
         no_sync=no_sync,
         dry_run=dry_run,
+        detach=True,
+        remote_target="__configured__",
+        persist_local=False,
     )
+
+
+submit_command.hidden = True
 
 
 @click.command("status")
@@ -387,7 +527,7 @@ for _legacy_job_child in (status_command, attach_command, logs_command, stop_com
 def apply_command(json_path, materials, pull, force, regen_golden, dry_run):
     """Apply derived bounds to material catalog.
 
-    Consumes combined JSON from ``derive``/``submit``. Writes line bounds into
+    Consumes combined JSON from ``derive``. Writes line bounds into
     the shared per-material grid store, bremsstrahlung bounds into standard
     profile overrides, and adds derived beam energies to the standard profile.
     Catalog and provenance writes are atomic and validated.
@@ -604,7 +744,7 @@ def defaults_command(
 ):
     """Show, update, or clear persistent derivation inputs.
 
-    These values feed ``derive`` and ``submit`` when their matching options are
+    These values feed local and remote ``derive`` when matching options are
     omitted. Geometry searches determine both line and bremsstrahlung upper
     bounds; ``brem-step`` controls only applied bremsstrahlung spacing.
 

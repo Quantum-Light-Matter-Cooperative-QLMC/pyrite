@@ -105,6 +105,18 @@ owner-authored base refresh, the full CLI suite passes: 1007 tests.
 - [x] Focused remote modifier tests: 86 passed; full CLI suite 1026 passed;
       lint, typecheck, reference, deprecation, and contract checks pass.
 
+### Remote energy-grid modifier
+
+- [x] Added `-R/--remote[=TARGET]` and mutually exclusive `--wait` / `--detach`
+      to `energy-grid derive`, reusing the existing sliced grid-job submitter.
+- [x] Kept local derivation unchanged; remote derivation waits and pulls the
+      combined JSON by default, while `--detach` returns after submission.
+- [x] Resolved all persistent inputs locally before submission, including
+      `--brem-step`, and threaded them through the remote payload and metadata.
+- [x] Hid `energy-grid submit` as a D7 warning redirect after canonical parity.
+- [x] Focused energy-grid/deprecation/contract tests: 355 passed; full CLI suite
+      1033 passed; lint, typecheck, reference, deprecation, and contract checks pass.
+
 ### Shared context precedence
 
 - [x] Added `cxr config set|get|list` for `profile.current` and `remote.target`,

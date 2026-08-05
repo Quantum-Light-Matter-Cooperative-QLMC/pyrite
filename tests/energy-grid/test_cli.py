@@ -4,6 +4,7 @@ import sys
 import pytest
 
 from cxr_mc import energy_grid
+from cxr_mc._remote import config as remote_config
 from cxr_mc.cli import _core as _cli_core
 from cxr_mc.cli._deprecations import message
 from cxr_mc.energy_grid import _command
@@ -42,6 +43,7 @@ def test_click_group_exposes_full_line_grid_tree():
         "show",
         "regen-golden",
     )
+    assert energy_grid.command.commands["submit"].hidden is True
 
 
 @pytest.mark.parametrize(
@@ -173,7 +175,7 @@ def test_click_submit_forwards_geometry_and_set_default(monkeypatch):
         ],
     )
 
-    assert_clean_result(result)
+    assert_clean_result(result, stderr=message("energy-grid submit") + "\n")
     assert seen["materials"] == "diamond,wse2"
     assert seen["energies"] == "100,200"
     assert seen["tilts"] == "0,1.5"
@@ -197,7 +199,7 @@ def test_click_submit_uses_persistent_materials_and_energies(monkeypatch):
 
     result = invoke(energy_grid.command, ["submit", "--dry-run"])
 
-    assert_clean_result(result)
+    assert_clean_result(result, stderr=message("energy-grid submit") + "\n")
     assert seen["materials"] == "wse2,mose2"
     assert seen["energies"] == "40,60"
 
@@ -213,7 +215,7 @@ def test_click_submit_routes_legacy_message_to_stderr(monkeypatch):
 
     assert result.exit_code == 1
     assert result.stdout == ""
-    assert result.stderr == "Error: invalid material text\n"
+    assert result.stderr == (message("energy-grid submit") + "\nError: invalid material text\n")
     assert "Traceback" not in result.output
 
 
@@ -227,6 +229,112 @@ def test_click_derive_forwards_brem_step(monkeypatch):
 
     assert_clean_result(result)
     assert seen["argv"] == ["--brem-step", "12.5"]
+
+
+def test_click_derive_remote_waits_pulls_and_restores_target(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(remote_config, "HOST", "configured-box")
+    monkeypatch.setattr(
+        energy_grid.job,
+        "start",
+        lambda **kwargs: seen.update(kwargs, host=remote_config.remote_host()) or "job7",
+    )
+    monkeypatch.setattr(
+        _command.remote, "attach", lambda jobid: seen.update(attached=jobid) or True
+    )
+    monkeypatch.setattr(_command.remote, "_job_succeeded", lambda jobid: jobid == "job7")
+    monkeypatch.setattr(_command, "_pull_combined", lambda: "bounds.json")
+
+    result = invoke(
+        energy_grid.command,
+        ["derive", "--remote=box-a", "--wait", "--brem-step", "12.5"],
+    )
+
+    assert_clean_result(result, stdout="pulled bounds.json\n")
+    assert seen["host"] == "box-a"
+    assert seen["brem_step"] == 12.5
+    assert seen["attached"] == "job7"
+    assert remote_config.remote_host() == "configured-box"
+
+
+def test_click_derive_remote_detach_skips_attach(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        energy_grid.defaults,
+        "load_defaults",
+        lambda: {
+            **energy_grid.defaults.FALLBACK,
+            "tilts": [1.5],
+            "azimuths": [95.0],
+            "thickness_ang": [2000.0],
+            "brem_step_ev": 17.5,
+        },
+    )
+    monkeypatch.setattr(energy_grid.job, "start", lambda **kwargs: seen.update(kwargs) or "job7")
+    monkeypatch.setattr(
+        _command.remote,
+        "attach",
+        lambda _jobid: (_ for _ in ()).throw(AssertionError("must not attach")),
+    )
+
+    result = invoke(energy_grid.command, ["derive", "--remote", "--detach"])
+
+    assert_clean_result(result)
+    assert seen["dry_run"] is False
+    assert seen["tilts"] == "1.5"
+    assert seen["azimuths"] == "95"
+    assert seen["thickness"] == "2000"
+    assert seen["brem_step"] == 17.5
+
+
+def test_click_derive_remote_save_default_persists_locally(monkeypatch):
+    seen = {}
+    persisted = {
+        **energy_grid.defaults.FALLBACK,
+        "materials": ["mose2"],
+        "energies": [60.0],
+        "brem_step_ev": 12.5,
+    }
+    monkeypatch.setattr(energy_grid.defaults, "load_defaults", lambda: persisted)
+    monkeypatch.setattr(
+        energy_grid.defaults,
+        "update_defaults",
+        lambda **kwargs: seen.update(saved=kwargs) or persisted,
+    )
+    monkeypatch.setattr(
+        energy_grid.job, "start", lambda **kwargs: seen.update(job=kwargs) or "job7"
+    )
+
+    result = invoke(
+        energy_grid.command,
+        ["derive", "--remote", "--detach", "--material", "mose2", "--save-default"],
+    )
+
+    assert_clean_result(result)
+    assert seen["saved"]["materials"] == ["mose2"]
+    assert seen["job"]["set_default"] is True
+
+
+def test_click_derive_remote_failed_job_exits_nonzero(monkeypatch):
+    monkeypatch.setattr(energy_grid.job, "start", lambda **_kwargs: "job7")
+    monkeypatch.setattr(_command.remote, "attach", lambda _jobid: True)
+    monkeypatch.setattr(_command.remote, "_job_succeeded", lambda _jobid: False)
+
+    result = invoke(energy_grid.command, ["derive", "--remote"])
+
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert result.stderr == "Error: energy-grid derivation failed; skipping automatic pull\n"
+
+
+def test_click_derive_rejects_incompatible_locality_controls():
+    conflict = invoke(energy_grid.command, ["derive", "--remote", "--wait", "--detach"])
+    local_only = invoke(energy_grid.command, ["derive", "--dry-run"])
+
+    assert conflict.exit_code == 2
+    assert "--wait and --detach are mutually exclusive" in conflict.stderr
+    assert local_only.exit_code == 2
+    assert "remote-only option(s) require -R/--remote: --dry-run" in local_only.stderr
 
 
 @pytest.mark.parametrize("status", [1, 75, 130])

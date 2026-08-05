@@ -25,8 +25,8 @@ Python callers use `default_settings("survey")` and
 `material_sweep("mose2", profile="survey")`. `full` remains default for both.
 Explicit `material_sweep` overrides apply after profile resolution.
 
-`cxr energy-grid` is upstream of this choice. Its `derive` and `submit`
-commands measure catalog-ready line and bremsstrahlung bounds without a
+`cxr energy-grid` is upstream of this choice. `derive`, locally or with
+`--remote`, measures catalog-ready line and bremsstrahlung bounds without a
 fidelity setting, and `apply` stores those full bounds. Later
 `cxr run --fidelity survey` reduces the stored photon grids together with
 other sweep axes; `full` uses them unchanged.

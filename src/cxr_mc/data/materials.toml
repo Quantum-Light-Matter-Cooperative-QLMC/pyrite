@@ -242,7 +242,7 @@ materials = ["mos2"]
 [energy_grids.standard]
 line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } }, source = "derived" },
-  # 40/60 keV: provisional interpolated bounds, pending `cxr energy-grid submit`
+  # 40/60 keV: provisional interpolated bounds, pending `cxr energy-grid derive --remote`
   # rerun (issue: add-40-60kev-energies) -- replace stop/num via `cxr energy-grid apply` once derived values land.
   { energy_keV = 40.0, grid = { linspace = { start = 10.0, stop = 2800.0, num = 931, endpoint = true } }, source = "derived" },
   { energy_keV = 50.0, grid = { linspace = { start = 10.0, stop = 3000.0, num = 998, endpoint = true } }, source = "derived" },

@@ -3706,7 +3706,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: cxr energy-grid [OPTIONS] COMMAND [ARGS]...\n\n  Derive and manage per-material photon-energy grids.\n\n  ``derive`` and ``submit`` measure both coherent-line and bremsstrahlung upper\n  bounds. ``defaults`` controls that diagnostic derivation only; ``apply``\n  writes validated bounds into the material catalog. Physical scan profile\n  defaults belong to ``cxr profile``; per-material range overrides belong to\n  ``cxr material``.\n\n  Scan ``--fidelity full|survey`` is separate. It controls later simulation cost\n  and grid reduction; it never changes derivation or applied full bounds.\n\n  Command-line derivation values override persistent defaults for one run.\n\n  Examples:\n    cxr energy-grid derive --material mose2,wse2 --energy 30,60\n    cxr energy-grid submit --material mose2 --dry-run\n    cxr energy-grid show mose2\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  apply         Apply derived bounds to material catalog.\n  brem          Inspect or manually set bremsstrahlung energy grids.\n  defaults      Show, update, or clear persistent derivation inputs.\n  derive        Derive line and bremsstrahlung energy-grid bounds locally.\n  job           Inspect, follow, or stop remote energy-grid jobs.\n  line          Inspect or manually set coherent line-energy grids.\n  regen-golden  Regenerate or check material-catalog golden snapshot.\n  show          Show line and bremsstrahlung grids together.\n  submit        Submit sliced line and bremsstrahlung bound derivation...\n",
+        "help": "Usage: cxr energy-grid [OPTIONS] COMMAND [ARGS]...\n\n  Derive and manage per-material photon-energy grids.\n\n  ``derive`` measures both coherent-line and bremsstrahlung upper bounds.\n  ``defaults`` controls that diagnostic derivation only; ``apply`` writes\n  validated bounds into the material catalog. Physical scan profile defaults\n  belong to ``cxr profile``; per-material range overrides belong to ``cxr\n  material``.\n\n  Scan ``--fidelity full|survey`` is separate. It controls later simulation cost\n  and grid reduction; it never changes derivation or applied full bounds.\n\n  Command-line derivation values override persistent defaults for one run.\n\n  Examples:\n    cxr energy-grid derive --material mose2,wse2 --energy 30,60\n    cxr energy-grid derive --material mose2 --remote --dry-run\n    cxr energy-grid show mose2\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  apply         Apply derived bounds to material catalog.\n  brem          Inspect or manually set bremsstrahlung energy grids.\n  defaults      Show, update, or clear persistent derivation inputs.\n  derive        Derive line and bremsstrahlung energy-grid bounds locally...\n  job           Inspect, follow, or stop remote energy-grid jobs.\n  line          Inspect or manually set coherent line-energy grids.\n  regen-golden  Regenerate or check material-catalog golden snapshot.\n  show          Show line and bremsstrahlung grids together.\n",
         "hidden": false,
         "path": "energy-grid",
         "subcommands": [
@@ -3767,7 +3767,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr energy-grid apply [OPTIONS] JSON\n\n  Apply derived bounds to material catalog.\n\n  Consumes combined JSON from ``derive``/``submit``. Writes line bounds into the\n  shared per-material grid store, bremsstrahlung bounds into standard profile\n  overrides, and adds derived beam energies to the standard profile. Catalog and\n  provenance writes are atomic and validated.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    cxr energy-grid apply combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
+            "help": "Usage: cxr energy-grid apply [OPTIONS] JSON\n\n  Apply derived bounds to material catalog.\n\n  Consumes combined JSON from ``derive``. Writes line bounds into the shared\n  per-material grid store, bremsstrahlung bounds into standard profile\n  overrides, and adds derived beam energies to the standard profile. Catalog and\n  provenance writes are atomic and validated.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    cxr energy-grid apply combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid apply",
             "subcommands": []
@@ -3963,7 +3963,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr energy-grid defaults [OPTIONS]\n\n  Show, update, or clear persistent derivation inputs.\n\n  These values feed ``derive`` and ``submit`` when their matching options are\n  omitted. Geometry searches determine both line and bremsstrahlung upper\n  bounds; ``brem-step`` controls only applied bremsstrahlung spacing.\n\n  Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile\n  angles. These are not physical scan defaults and do not select scan\n  ``--fidelity full|survey``.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --save-default                  Persist supplied values; otherwise only show\n                                  defaults.\n  --clear FIELD                   Reset one field to inherited/built-in\n                                  behavior; repeatable. Fields: polar, azimuth,\n                                  thickness, brem-step, energy, material.\n  --reset                         Reset every persistent derivation field to\n                                  inherited/built-in behavior.\n  --polar DEG,...                 Persistent derivation polar tilts in degrees\n                                  [0, 90).\n  --azimuth DEG,...               Persistent azimuths in degrees [0, 360].\n  --thickness ANGSTROM,...        Persistent positive crystal thicknesses in\n                                  angstrom.\n  --brem-step EV                  Persistent derivation bremsstrahlung spacing\n                                  in eV.\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: cxr energy-grid defaults [OPTIONS]\n\n  Show, update, or clear persistent derivation inputs.\n\n  These values feed local and remote ``derive`` when matching options are\n  omitted. Geometry searches determine both line and bremsstrahlung upper\n  bounds; ``brem-step`` controls only applied bremsstrahlung spacing.\n\n  Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile\n  angles. These are not physical scan defaults and do not select scan\n  ``--fidelity full|survey``.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --save-default                  Persist supplied values; otherwise only show\n                                  defaults.\n  --clear FIELD                   Reset one field to inherited/built-in\n                                  behavior; repeatable. Fields: polar, azimuth,\n                                  thickness, brem-step, energy, material.\n  --reset                         Reset every persistent derivation field to\n                                  inherited/built-in behavior.\n  --polar DEG,...                 Persistent derivation polar tilts in degrees\n                                  [0, 90).\n  --azimuth DEG,...               Persistent azimuths in degrees [0, 360].\n  --thickness ANGSTROM,...        Persistent positive crystal thicknesses in\n                                  angstrom.\n  --brem-step EV                  Persistent derivation bremsstrahlung spacing\n                                  in eV.\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid defaults",
             "subcommands": []
@@ -4065,9 +4065,58 @@
                   "--brem-step"
                 ],
                 "required": false
+              },
+              {
+                "dest": "slice_minutes",
+                "help": "Maximum duration of each self-resubmitting remote slice.",
+                "option_strings": [
+                  "--slice-minutes"
+                ],
+                "required": false
+              },
+              {
+                "dest": "no_sync",
+                "help": "Skip code upload before remote submission.",
+                "option_strings": [
+                  "--no-sync"
+                ],
+                "required": false
+              },
+              {
+                "dest": "dry_run",
+                "help": "Print remote batch script and submission command; do not connect or submit.",
+                "option_strings": [
+                  "--dry-run"
+                ],
+                "required": false
+              },
+              {
+                "dest": "wait",
+                "help": "Wait for remote completion and pull the result.",
+                "option_strings": [
+                  "--wait"
+                ],
+                "required": false
+              },
+              {
+                "dest": "detach",
+                "help": "Return after remote submission.",
+                "option_strings": [
+                  "--detach"
+                ],
+                "required": false
+              },
+              {
+                "dest": "remote_target",
+                "help": "Run remotely; bare uses the configured target, =TARGET overrides it.",
+                "option_strings": [
+                  "-R",
+                  "--remote"
+                ],
+                "required": false
               }
             ],
-            "help": "Usage: cxr energy-grid derive [OPTIONS]\n\n  Derive line and bremsstrahlung energy-grid bounds locally.\n\nOptions:\n  --material KEY,...        Material keys; comma-separated. Omit to use\n                            persistent defaults.\n  --energy KEV,...          Beam energies in keV; comma-separated and positive.\n  --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.\n  --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.\n  --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and\n                            positive.\n  --save-default            Persist supplied geometry, energies, and materials\n                            as future defaults.\n  --brem-step EV            Derivation bremsstrahlung spacing in eV; overrides\n                            persistent default.\n  -h, --help                Show this message and exit.\n",
+            "help": "Usage: cxr energy-grid derive [OPTIONS]\n\n  Derive line and bremsstrahlung energy-grid bounds locally or remotely.\n\nOptions:\n  --material KEY,...        Material keys; comma-separated. Omit to use\n                            persistent defaults.\n  --energy KEV,...          Beam energies in keV; comma-separated and positive.\n  --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.\n  --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.\n  --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and\n                            positive.\n  --save-default            Persist supplied geometry, energies, and materials\n                            as future defaults.\n  --brem-step EV            Derivation bremsstrahlung spacing in eV; overrides\n                            persistent default.\n  --slice-minutes MINUTES   Maximum duration of each self-resubmitting remote\n                            slice.  [default: 10.0]\n  --no-sync                 Skip code upload before remote submission.\n  --dry-run                 Print remote batch script and submission command; do\n                            not connect or submit.\n  --wait                    Wait for remote completion and pull the result.\n  --detach                  Return after remote submission.\n  -R, --remote [TARGET]     Run remotely; bare uses the configured target,\n                            =TARGET overrides it.\n  -h, --help                Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid derive",
             "subcommands": []
@@ -4593,8 +4642,8 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr energy-grid submit [OPTIONS]\n\n  Submit sliced line and bremsstrahlung bound derivation remotely.\n\nOptions:\n  --material KEY,...        Material keys; comma-separated. Omit to use\n                            persistent defaults.\n  --energy KEV,...          Beam energies in keV; comma-separated and positive.\n  --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.\n  --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.\n  --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and\n                            positive.\n  --save-default            Persist supplied geometry, energies, and materials\n                            as future defaults.\n  --slice-minutes MINUTES   Maximum duration of each self-resubmitting remote\n                            slice.  [default: 10.0]\n  --no-sync                 Skip code upload before submission.\n  --dry-run                 Print batch script and submission command; do not\n                            connect or submit.\n  -h, --help                Show this message and exit.\n",
-            "hidden": false,
+            "help": "Usage: cxr energy-grid submit [OPTIONS]\n\n  Submit remotely (deprecated: use ``derive --remote --detach``).\n\nOptions:\n  --material KEY,...        Material keys; comma-separated. Omit to use\n                            persistent defaults.\n  --energy KEV,...          Beam energies in keV; comma-separated and positive.\n  --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.\n  --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.\n  --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and\n                            positive.\n  --save-default            Persist supplied geometry, energies, and materials\n                            as future defaults.\n  --slice-minutes MINUTES   Maximum duration of each self-resubmitting remote\n                            slice.  [default: 10.0]\n  --no-sync                 Skip code upload before submission.\n  --dry-run                 Print batch script and submission command; do not\n                            connect or submit.\n  -h, --help                Show this message and exit.\n",
+            "hidden": true,
             "path": "energy-grid submit",
             "subcommands": []
           }

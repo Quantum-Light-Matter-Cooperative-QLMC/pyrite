@@ -1123,10 +1123,10 @@ Usage: cxr energy-grid [OPTIONS] COMMAND [ARGS]...
 
   Derive and manage per-material photon-energy grids.
 
-  ``derive`` and ``submit`` measure both coherent-line and bremsstrahlung upper bounds.
-  ``defaults`` controls that diagnostic derivation only; ``apply`` writes validated
-  bounds into the material catalog. Physical scan profile defaults belong to ``cxr
-  profile``; per-material range overrides belong to ``cxr material``.
+  ``derive`` measures both coherent-line and bremsstrahlung upper bounds. ``defaults``
+  controls that diagnostic derivation only; ``apply`` writes validated bounds into the
+  material catalog. Physical scan profile defaults belong to ``cxr profile``; per-
+  material range overrides belong to ``cxr material``.
 
   Scan ``--fidelity full|survey`` is separate. It controls later simulation cost and
   grid reduction; it never changes derivation or applied full bounds.
@@ -1135,7 +1135,7 @@ Usage: cxr energy-grid [OPTIONS] COMMAND [ARGS]...
 
   Examples:
     cxr energy-grid derive --material mose2,wse2 --energy 30,60
-    cxr energy-grid submit --material mose2 --dry-run
+    cxr energy-grid derive --material mose2 --remote --dry-run
     cxr energy-grid show mose2
 
 Options:
@@ -1145,12 +1145,11 @@ Commands:
   apply         Apply derived bounds to material catalog.
   brem          Inspect or manually set bremsstrahlung energy grids.
   defaults      Show, update, or clear persistent derivation inputs.
-  derive        Derive line and bremsstrahlung energy-grid bounds locally.
+  derive        Derive line and bremsstrahlung energy-grid bounds locally or remotely.
   job           Inspect, follow, or stop remote energy-grid jobs.
   line          Inspect or manually set coherent line-energy grids.
   regen-golden  Regenerate or check material-catalog golden snapshot.
   show          Show line and bremsstrahlung grids together.
-  submit        Submit sliced line and bremsstrahlung bound derivation remotely.
 ```
 
 ## `cxr energy-grid apply`
@@ -1160,9 +1159,9 @@ Usage: cxr energy-grid apply [OPTIONS] JSON
 
   Apply derived bounds to material catalog.
 
-  Consumes combined JSON from ``derive``/``submit``. Writes line bounds into the shared
-  per-material grid store, bremsstrahlung bounds into standard profile overrides, and
-  adds derived beam energies to the standard profile. Catalog and provenance writes are
+  Consumes combined JSON from ``derive``. Writes line bounds into the shared per-
+  material grid store, bremsstrahlung bounds into standard profile overrides, and adds
+  derived beam energies to the standard profile. Catalog and provenance writes are
   atomic and validated.
 
   Manual line and bremsstrahlung overrides remain unchanged unless ``--force`` is
@@ -1231,7 +1230,7 @@ Usage: cxr energy-grid defaults [OPTIONS]
 
   Show, update, or clear persistent derivation inputs.
 
-  These values feed ``derive`` and ``submit`` when their matching options are omitted.
+  These values feed local and remote ``derive`` when matching options are omitted.
   Geometry searches determine both line and bremsstrahlung upper bounds; ``brem-step``
   controls only applied bremsstrahlung spacing.
 
@@ -1260,7 +1259,7 @@ Options:
 ```text
 Usage: cxr energy-grid derive [OPTIONS]
 
-  Derive line and bremsstrahlung energy-grid bounds locally.
+  Derive line and bremsstrahlung energy-grid bounds locally or remotely.
 
 Options:
   --material KEY,...        Material keys; comma-separated. Omit to use persistent
@@ -1274,6 +1273,15 @@ Options:
                             defaults.
   --brem-step EV            Derivation bremsstrahlung spacing in eV; overrides
                             persistent default.
+  --slice-minutes MINUTES   Maximum duration of each self-resubmitting remote slice.
+                            [default: 10.0]
+  --no-sync                 Skip code upload before remote submission.
+  --dry-run                 Print remote batch script and submission command; do not
+                            connect or submit.
+  --wait                    Wait for remote completion and pull the result.
+  --detach                  Return after remote submission.
+  -R, --remote [TARGET]     Run remotely; bare uses the configured target, =TARGET
+                            overrides it.
   -h, --help                Show this message and exit.
 ```
 
@@ -1382,31 +1390,6 @@ Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
-```
-
-## `cxr energy-grid submit`
-
-```text
-Usage: cxr energy-grid submit [OPTIONS]
-
-  Submit sliced line and bremsstrahlung bound derivation remotely.
-
-Options:
-  --material KEY,...        Material keys; comma-separated. Omit to use persistent
-                            defaults.
-  --energy KEV,...          Beam energies in keV; comma-separated and positive.
-  --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.
-  --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.
-  --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and
-                            positive.
-  --save-default            Persist supplied geometry, energies, and materials as future
-                            defaults.
-  --slice-minutes MINUTES   Maximum duration of each self-resubmitting remote slice.
-                            [default: 10.0]
-  --no-sync                 Skip code upload before submission.
-  --dry-run                 Print batch script and submission command; do not connect or
-                            submit.
-  -h, --help                Show this message and exit.
 ```
 
 ## `cxr profile`

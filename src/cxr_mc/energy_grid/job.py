@@ -73,6 +73,7 @@ def _slice_payload(
     energies,
     grid_stop,
     brem_grid_stop=DEFAULT_BREM_GRID_STOP,
+    brem_step=None,
     materials=DEFAULT_MATERIALS,
     tilts=None,
     azimuths=None,
@@ -103,6 +104,8 @@ def _slice_payload(
         f"--max-minutes {slice_minutes:g}",
         f"--materials {shlex.quote(materials)}",
     ]
+    if brem_step is not None:
+        command_parts.append(f"--brem-step {brem_step:g}")
     for flag, value in (
         ("tilts", tilts),
         ("azimuths", azimuths),
@@ -145,6 +148,7 @@ def _job_script(
     energies,
     grid_stop,
     brem_grid_stop=DEFAULT_BREM_GRID_STOP,
+    brem_step=None,
     materials=DEFAULT_MATERIALS,
     tilts=None,
     azimuths=None,
@@ -158,6 +162,7 @@ def _job_script(
         energies=energies,
         grid_stop=grid_stop,
         brem_grid_stop=brem_grid_stop,
+        brem_step=brem_step,
         materials=materials,
         tilts=tilts,
         azimuths=azimuths,
@@ -181,6 +186,7 @@ def _metadata(
     energies,
     grid_stop,
     brem_grid_stop=DEFAULT_BREM_GRID_STOP,
+    brem_step=None,
     materials=DEFAULT_MATERIALS,
 ):
     _reject_controls("jobid", jobid)
@@ -189,20 +195,20 @@ def _metadata(
         energies=energies,
         materials=materials,
     )
-    return "\n".join(
-        [
-            f"job: {jobid}",
-            "kind: line-grid-bounds",
-            f"slice_minutes: {slice_minutes:g}",
-            f"json_out: {json_out}",
-            f"energies: {energies}",
-            f"grid_stop: {grid_stop:g}",
-            f"brem_grid_stop: {brem_grid_stop:g}",
-            f"materials: {materials}",
-            "progress_dashboard: False",
-            "",
-        ]
-    )
+    fields = [
+        f"job: {jobid}",
+        "kind: line-grid-bounds",
+        f"slice_minutes: {slice_minutes:g}",
+        f"json_out: {json_out}",
+        f"energies: {energies}",
+        f"grid_stop: {grid_stop:g}",
+        f"brem_grid_stop: {brem_grid_stop:g}",
+        f"materials: {materials}",
+    ]
+    if brem_step is not None:
+        fields.append(f"brem_step: {brem_step:g}")
+    fields.extend(("progress_dashboard: False", ""))
+    return "\n".join(fields)
 
 
 def start(
@@ -212,6 +218,7 @@ def start(
     energies=DEFAULT_ENERGIES,
     grid_stop=DEFAULT_GRID_STOP,
     brem_grid_stop=DEFAULT_BREM_GRID_STOP,
+    brem_step=None,
     materials=DEFAULT_MATERIALS,
     tilts=None,
     azimuths=None,
@@ -232,6 +239,7 @@ def start(
         energies=energies,
         grid_stop=grid_stop,
         brem_grid_stop=brem_grid_stop,
+        brem_step=brem_step,
         materials=materials,
         tilts=tilts,
         azimuths=azimuths,
@@ -245,6 +253,7 @@ def start(
         energies=energies,
         grid_stop=grid_stop,
         brem_grid_stop=brem_grid_stop,
+        brem_step=brem_step,
         materials=materials,
     )
     upload = remote._write_job_script_command(jobdir, metadata)
@@ -270,6 +279,7 @@ def build_parser():
     start_parser.add_argument("--energies", default=DEFAULT_ENERGIES)
     start_parser.add_argument("--grid-stop", type=float, default=DEFAULT_GRID_STOP)
     start_parser.add_argument("--brem-grid-stop", type=float, default=DEFAULT_BREM_GRID_STOP)
+    start_parser.add_argument("--brem-step", type=float, default=None)
     start_parser.add_argument("--materials", default=DEFAULT_MATERIALS)
     start_parser.add_argument("--tilts", default=None)
     start_parser.add_argument("--azimuths", default=None)
@@ -292,6 +302,7 @@ def main(argv=None):
             energies=args.energies,
             grid_stop=args.grid_stop,
             brem_grid_stop=args.brem_grid_stop,
+            brem_step=args.brem_step,
             materials=args.materials,
             tilts=args.tilts,
             azimuths=args.azimuths,

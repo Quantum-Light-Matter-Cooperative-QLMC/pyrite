@@ -1,6 +1,6 @@
 """Tool-owned persistent defaults for `cxr energy-grid` (NOT the material catalog).
 
-Stored at src/cxr_mc/data/line_grid_defaults.toml so derive/submit read a single
+Stored at src/cxr_mc/data/line_grid_defaults.toml so local/remote derive read a single
 source of standing defaults that `--set-default` / `defaults --set` update. Empty
 `tilts`/`azimuths` mean "use each material's profile tilt_deg/tilt_azim_deg" --
 today's behavior -- so a missing file reproduces current output exactly.
