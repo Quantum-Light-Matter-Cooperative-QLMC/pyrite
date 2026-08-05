@@ -19,6 +19,22 @@ GENERAL_LATTICE = {
     "gamma": 76.0,
 }
 
+def _runner_segments():
+    return {
+        "r_mid": np.array([[0.0, 0.0, 10.0]]),
+        "v_hat": np.array([[0.0, 0.0, 1.0]]),
+        "L_ang": np.array([1.0]),
+        "E_keV": np.array([30.0]),
+        "t_ang": np.array([0.0]),
+        "elec_id": np.array([0]),
+        "layer": np.array([0]),
+        "Ne": 1,
+        "n_layers": 1,
+        "n_backscattered": 0,
+        "n_missed": 0,
+        "thickness_ang": 100.0,
+    }
+
 
 def test_surface_hkl_aligns_nonorthogonal_plane_normal_with_sample_z():
     surface_hkl = (2, 0, -1)
@@ -263,6 +279,8 @@ crystal = "mos2"
         tilt_deg=5.0,
         E_grid_line=grid,
         E_grid_brem=np.array([100.0]),
+        Ne=1,
+        elec_i=np.zeros(count, dtype=np.int64)
     )
     surface_case = build_cases(Sweep(**base), n_electrons=1, n_electrons_brem=1)[0]
     direct_case = build_cases(Sweep(**base, beam_uvw=(1, 0, 0)), n_electrons=1, n_electrons_brem=1)[

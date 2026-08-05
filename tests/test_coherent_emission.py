@@ -13,12 +13,14 @@ from cxr_mc.montecarlo import mc_spectrum
 from cxr_mc.montecarlo._backend import REAL
 
 E_GRID = np.arange(700.0, 1500.0)
+
 KWARGS = {
     "crystal": "hopg",
     "hkl_list": [(0, 0, 2)],
     "B_ang2": 0.8,
     "n_hat": np.array([1.0, 0.0, 0.01]),
 }
+
 RTOL = max(1e-12, 100.0 * float(np.finfo(REAL).eps))
 ATOL = 1e-8
 
@@ -37,6 +39,9 @@ def _segments(count=1):
         "thickness_ang": 10.0,
         "crystal_width_ang": 10.0,
         "crystal_height_ang": 10.0,
+        "n_backscattered": 0,
+        "n_missed": 0,
+        "n_layers": 1,
     }
 
 
@@ -101,23 +106,27 @@ def test_coherent_components_are_rejected():
         mc_spectrum(_segments(), E_GRID, coherent=True, components=True, **KWARGS)
 
 
-def _runner_case():
+def _runner_case(*, coherent=False):
     return {
         "crystal": "hopg",
         "hkl_list": KWARGS["hkl_list"],
         "B_ang2": KWARGS["B_ang2"],
         "composition": None,
         "E0_keV": 30.0,
+        "coherent_emission": coherent,
     }
 
 
 def _runner_tp(segs):
+    ne = int(segs["Ne"])
+
     return {
         "E_grid": E_GRID,
         "E_brem": E_GRID,
         "n_hat": KWARGS["n_hat"],
         "segs": segs,
-        "segs_b": segs,
+        "Ne_lines": ne,
+        "Ne_brem": ne,
         "groove": None,
     }
 
@@ -129,10 +138,10 @@ def test_runner_always_stores_incoherent_spec_and_omits_spec_coherent(monkeypatc
     import cxr_mc.montecarlo.runner as runner
 
     monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
-    segs = _segments(2)
-    segs.update(n_backscattered=0, n_missed=0)
 
-    out = runner._spectrum_case_impl(_runner_case(), _runner_tp(segs))
+    segs = _segments(2)
+    tp = _runner_tp(segs, ne_lines=2, ne_brem=2)
+    out = runner._spectrum_case_impl(_runner_case(), tp)
 
     assert "spec_coherent" not in out
     direct_incoherent = mc_spectrum(segs, E_GRID, coherent=False, **KWARGS)
@@ -148,11 +157,10 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
 
     monkeypatch.setattr(runner, "_brem_wide_from_segments", lambda *a, **k: np.zeros_like(E_GRID))
     segs = _segments(2)
-    segs.update(n_backscattered=0, n_missed=0)
+    tp = _runner_tp(segs, ne_lines=2, ne_brem=2)
 
-    case = _runner_case()
-    case["coherent_emission"] = True
-    out = runner._spectrum_case_impl(case, _runner_tp(segs))
+    case = _runner_case(cohere=True)
+    out = runner._spectrum_case_impl(case, tp)
 
     direct_incoherent = mc_spectrum(segs, E_GRID, coherent=False, **KWARGS)
     direct_coherent = mc_spectrum(segs, E_GRID, coherent=True, **KWARGS)

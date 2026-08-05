@@ -45,12 +45,6 @@ _TIMING = os.environ.get("CXR_MC_TIMING", "") not in ("", "0")
 _NSYS = os.environ.get("CXR_MC_NSYS", "") not in ("", "0")
 _N_CPUS = os.cpu_count()
 _TOTAL_MEM = psutil.virtual_memory().total // 1_000_000
-# Byte width of one spectrum-matmul intermediate element: fp32 on the GPU
-# (REAL == float32), fp64 on the CPU fallback. Sizing the adaptive chunk against
-# the ACTUAL element size instead of a hardcoded 8 lets the GPU path (4-byte
-# transients) hold twice the chunk the old float64 model allowed -- fewer matmul
-# iterations / kernel launches -- while the CPU path (8 bytes) is unchanged.
-_REAL_BYTES = np.dtype(REAL).itemsize
 
 
 def _env_chunk(name, default):
@@ -102,25 +96,43 @@ def _adaptive_chunk(nbins):
     uses _REAL_BYTES: 4 on the GPU (fp32) -> ~2x the chunk the old hardcoded 8
     allowed, 8 on the CPU (fp64) -> the original size bit-for-bit.
     """
+    itemsize = _real_itemsize()
     worker_intermediate_arrays = 3
-    per_row_bytes = worker_intermediate_arrays * nbins * _REAL_BYTES
-    requested = max(1000, min(1_000_000 * _SPEC_BUDGET_MB // per_row_bytes, 100_000))
+    per_row_bytes = worker_intermediate_arrays * nbins * itemsize
+
+    requested = max(
+        1000,
+        min(
+            1_000_000 * _SPEC_BUDGET_MB // per_row_bytes,
+            100_000,
+        ),
+    )
+
     return admitted_chunk(
         requested_chunk=requested,
         bins=nbins,
-        itemsize=_REAL_BYTES,
-        budget_bytes=_RESOURCE_POLICY.device_budget_bytes if _GPU else None,
+        itemsize=itemsize,
+        budget_bytes=(
+            _RESOURCE_POLICY.device_budget_bytes
+            if _GPU
+            else None
+        ),
     )
 
 
 def _admit_chunk(chunk, bins):
+    itemsize = _real_itemsize()
+
     return admitted_chunk(
         requested_chunk=int(chunk),
         bins=int(bins),
-        itemsize=_REAL_BYTES,
-        budget_bytes=_RESOURCE_POLICY.device_budget_bytes if _GPU else None,
+        itemsize=itemsize,
+        budget_bytes=(
+            _RESOURCE_POLICY.device_budget_bytes
+            if _GPU
+            else None
+        ),
     )
-
 
 def _nsys_range(message):
     """Return an NVTX range when the remote Nsight profiler is enabled."""
@@ -1086,6 +1098,8 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         out.update(out_pool)
     return out
 
+def _real_itemsize() -> int:
+    return np.dtype(_spectrum_mod.REAL).itemsize
 
 def _worker_init(force_cpu=False):
     """

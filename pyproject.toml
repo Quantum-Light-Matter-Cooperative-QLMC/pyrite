@@ -99,6 +99,8 @@ addopts = [
 markers = [
     "online: test fetches from an external structure database (COD/MP); skipped unless CXR_ONLINE_TESTS=1",
     "oracle: test requires the pinned optional independent-validation backend",
+    "hardware: requires specific physical hardware or device drivers",
+    "intel_sycl: requires a working Intel SYCL dpnp/dpctl backend",
 ]
 
 [tool.marimo.runtime]

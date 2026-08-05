@@ -135,3 +135,111 @@ def test_cpu_fallback_requires_host_ram_admission(monkeypatch):
 
     with pytest.raises(_backend.BackendResourceError, match="cannot admit CPU fallback"):
         runner._admit_cpu_fallback()
+
+def test_cpu_spectrum_backend_updates_active_itemsize() -> None:
+    import numpy as np
+
+    from cxr_mc.montecarlo import runner
+
+    with runner._cpu_spectrum_backend():
+        assert runner._GPU is False
+        assert runner._spectrum_mod.xp is np
+        assert runner._spectrum_mod.REAL is np.float64
+        assert runner._real_bytes() == 8
+
+
+import os
+import subprocess
+import sys
+import textwrap
+from types import SimpleNamespace
+
+pytestmark = [
+    pytest.mark.hardware,
+    pytest.mark.intel_sycl,
+]
+
+
+@pytest.mark.skipif(
+    os.environ.get("CXR_RUN_INTEL_SYCL_TESTS") != "1",
+    reason="set CXR_RUN_INTEL_SYCL_TESTS=1 to run Intel SYCL hardware tests",
+)
+def test_intel_machine_selects_sycl_backend() -> None:
+    script = textwrap.dedent(
+        """
+        import sys
+
+        import cxr_mc.config
+        from cxr_mc.montecarlo._backend import BACKEND
+
+        assert BACKEND.name == "sycl", (
+            f"Expected SYCL backend, got {BACKEND.name!r}. "
+            f"Fallback reason: {BACKEND.fallback_reason!r}"
+        )
+
+        assert not any(
+            name == "cupy"
+            or name.startswith("cupy.")
+            or name == "cupyx"
+            or name.startswith("cupyx.")
+            for name in sys.modules
+        )
+        """
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        env=os.environ.copy(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, (
+        "Intel SYCL backend test failed:\n"
+        f"stdout:\n{result.stdout}\n"
+        f"stderr:\n{result.stderr}"
+    )
+
+
+def test_nsys_helpers_are_noops_for_sycl(monkeypatch) -> None:
+    monkeypatch.setattr(runner, "_GPU", True)
+    monkeypatch.setattr(runner, "_NSYS", True)
+    monkeypatch.setattr(
+        runner,
+        "BACKEND",
+        SimpleNamespace(name="sycl"),
+    )
+
+    before = set(sys.modules)
+
+    with runner._nsys_range("test"):
+        pass
+
+    runner._nsys_push("test")
+    runner._nsys_pop()
+
+    newly_loaded = set(sys.modules) - before
+
+    assert "cupy" not in newly_loaded
+    assert "cupyx" not in newly_loaded
+    assert not any(name.startswith("cupy.") for name in newly_loaded)
+    assert not any(name.startswith("cupyx.") for name in newly_loaded)
+
+def test_cpu_spectrum_backend_restores_backend() -> None:
+    from cxr_mc.montecarlo import runner
+
+    original = (
+        runner._GPU,
+        runner._spectrum_mod.xp,
+        runner._spectrum_mod.REAL,
+    )
+
+    with runner._cpu_spectrum_backend():
+        pass
+
+    assert (
+        runner._GPU,
+        runner._spectrum_mod.xp,
+        runner._spectrum_mod.REAL,
+    ) == original

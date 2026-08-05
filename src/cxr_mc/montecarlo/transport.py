@@ -20,7 +20,6 @@ from numba import njit
 from .. import DATA_DIR
 from ..materials._transport_data import TRANSPORT_ELEMENTS
 from ..materials.attenuation import _normalize_composition
-from ._backend import _GPU
 from .geometry import (
     X_MAX,
     X_MIN,
@@ -33,10 +32,8 @@ from .geometry import (
 )
 from .groove import _first_surface_event_scalar_numba, entry_points
 
-if _GPU:
-    import cupy as xp
-else:
-    import numpy as np
+# No array-backend import is needed here.
+# Electron transport itself is NumPy/Numba CPU code.
 
 logger = logging.getLogger(__name__)
 
@@ -171,12 +168,7 @@ def _beta_array(E_keV):
     g = 1.0 + E_keV / 510.99895
     return (1.0 - 1.0 / (g * g)) ** 0.5
 
-
-if _GPU:
-    beta_from_keV = xp.fuse(kernel_name="beta_from_keV")(_beta_array)
-else:
-    beta_from_keV = _beta_array
-
+beta_from_keV = _beta_array
 
 @njit(cache=True)
 def beta_from_keV_scalar(E_i):

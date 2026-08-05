@@ -102,31 +102,156 @@ def _fake_out(case):
 
 
 def _stub_run_cases(
-    cases, max_workers=None, progress=False, callback=None, should_stop=None, keep_results=True
+    cases,
+    *,
+    max_workers=None,
+    progress=False,
+    callback=None,
+    should_stop=None,
+    keep_results=True,
+    on_timing=None,
+    on_activity=None,
+    transport_only=False,
+    **_unused,
 ):
-    """Replaces run_cases: fires the callback immediately, no real MC."""
+    """Synchronous run_cases test double; performs no Monte Carlo."""
+
+    results = [None] * len(cases)
+
     for i, case in enumerate(cases):
+        if should_stop is not None and should_stop():
+            break
+
+        if on_activity is not None:
+            on_activity(
+                {
+                    "phase": "serial_case",
+                    "case_index": i,
+                    "case": case,
+                    "in_flight_case_count": 1,
+                }
+            )
+
+        out = None if transport_only else _fake_out(case)
+
+        if on_timing is not None and out is not None:
+            on_timing(
+                {
+                    "case_index": i,
+                    "case": case,
+                    "transport_seconds": 0.0,
+                    "spectrum_seconds": 0.0,
+                    "driver_wait_seconds": 0.0,
+                }
+            )
+
         if callback is not None:
-            callback(i, case, _fake_out(case))
+            callback(i, case, out)
+
+        if keep_results:
+            results[i] = out
+
+    if on_activity is not None:
+        on_activity(
+            {
+                "phase": "idle",
+                "case_index": None,
+                "case": None,
+                "in_flight_case_count": 0,
+            }
+        )
+
+    return results
 
 
-def test_transport_case_forwards_finite_footprint_to_both_trajectories(monkeypatch):
+def test_transport_case_forwards_finite_footprint_to_shared_transport(monkeypatch):
     case = _fake_case("finite", 30.0)
-    case.update(crystal_width_mm=0.1, crystal_height_mm=0.2)
+    case.update(
+        crystal_width_mm=0.1,
+        crystal_height_mm=0.2,
+    )
+
     captured = []
 
     def _transport(*args, **kwargs):
-        captured.append(kwargs)
+        captured.append((args, kwargs))
         return {"transport": len(captured)}
+
+    monkeypatch.setattr(runner, "simulate_trajectories", _transport)
+
+    tp = runner._transport_case(case)
+
+    assert len(captured) == 1
+
+    args, kwargs = captured[0]
+
+    assert kwargs["crystal_width_mm"] == 0.1
+    assert kwargs["crystal_height_mm"] == 0.2
+
+    assert args[1] == max(case["Ne"], case["Ne_brem"])
+    assert tp["segs"] == {"transport": 1}
+    assert tp["Ne_lines"] == case["Ne"]
+    assert tp["Ne_brem"] == case["Ne_brem"]
+
+def test_transport_case_combines_line_and_brem_cutoffs(monkeypatch):
+    case = _fake_case("combined", 30.0)
+    case.update(
+        Ne=3,
+        Ne_brem=2,
+        E_cut_lines_keV=5.0,
+        E_cut_brem_keV=1.0,
+    )
+
+    captured = {}
+
+    def _transport(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return {"segments": True}
 
     monkeypatch.setattr(runner, "simulate_trajectories", _transport)
 
     runner._transport_case(case)
 
-    assert len(captured) == 2
-    assert all(call["crystal_width_mm"] == 0.1 for call in captured)
-    assert all(call["crystal_height_mm"] == 0.2 for call in captured)
+    np.testing.assert_array_equal(
+        captured["kwargs"]["E_cut_by_electrons"],
+        np.array(
+            [
+                1.0,  # shared line+brem electron: lower cutoff
+                1.0,  # shared line+brem electron
+                5.0,  # line-only electron
+            ]
+        ),
+    )
 
+    assert captured["args"][1] == 3
+
+def test_transport_case_handles_brem_only_electrons(monkeypatch):
+    case = _fake_case("combined", 30.0)
+    case.update(
+        Ne=2,
+        Ne_brem=4,
+        E_cut_lines_keV=5.0,
+        E_cut_brem_keV=1.0,
+    )
+
+    captured = {}
+
+    def _transport(*args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return {}
+
+    monkeypatch.setattr(runner, "simulate_trajectories", _transport)
+
+    runner._transport_case(case)
+
+    np.testing.assert_array_equal(
+        captured["kwargs"]["E_cut_by_electrons"],
+        np.array([1.0, 1.0, 1.0, 1.0]),
+    )
+
+    assert captured["args"][1] == 4
 
 def test_brem_for_case_forwards_finite_footprint(monkeypatch):
     case = _fake_case("finite", 30.0)
@@ -146,22 +271,6 @@ def test_brem_for_case_forwards_finite_footprint(monkeypatch):
     assert captured[0]["crystal_width_mm"] == pytest.approx(0.1)
     assert captured[0]["crystal_height_mm"] == pytest.approx(0.2)
 
-
-def _runner_segments():
-    return {
-        "r_mid": np.array([[0.0, 0.0, 10.0]]),
-        "v_hat": np.array([[0.0, 0.0, 1.0]]),
-        "L_ang": np.array([1.0]),
-        "E_keV": np.array([30.0]),
-        "t_ang": np.array([0.0]),
-        "elec_id": np.array([0]),
-        "layer": np.array([0]),
-        "Ne": 1,
-        "n_layers": 1,
-        "n_backscattered": 0,
-        "n_missed": 0,
-        "thickness_ang": 100.0,
-    }
 
 
 def test_spectrum_case_forwards_groove_to_brem(monkeypatch):
@@ -533,15 +642,29 @@ def test_run_sweep_writes_manifest_alongside_checkpoint(tmp_path, monkeypatch):
 def test_run_sweep_reports_checkpoint_timing(tmp_path, monkeypatch):
     def profile_run_cases(
         cases,
-        max_workers=None,
-        progress=False,
+        *,
         callback=None,
-        should_stop=None,
-        keep_results=True,
         on_timing=None,
+        **kwargs,
     ):
         for i, case in enumerate(cases):
-            callback(i, case, _fake_out(case))
+            out = _fake_out(case)
+
+            if on_timing is not None:
+                on_timing(
+                    {
+                        "case_index": i,
+                        "case": case,
+                        "transport_seconds": 0.01,
+                        "spectrum_seconds": 0.02,
+                        "driver_wait_seconds": 0.0,
+                    }
+                )
+
+            if callback is not None:
+                callback(i, case, out)
+
+        return [None] * len(cases)
 
     monkeypatch.setattr("cxr_mc.run.run_cases", profile_run_cases)
     timings = []
@@ -798,13 +921,20 @@ def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
 
 def _tracking_run_cases_factory(ran):
     def _tracking(
-        cases, max_workers=None, progress=False, callback=None, should_stop=None, keep_results=True
+        cases,
+        *,
+        callback=None,
+        **kwargs,
     ):
-        ran.extend(c["name"] for c in cases)
-        _stub_run_cases(cases, callback=callback)
+        ran.extend(case["name"] for case in cases)
+
+        return _stub_run_cases(
+            cases,
+            callback=callback,
+            **kwargs,
+        )
 
     return _tracking
-
 
 def test_run_sweep_reuses_cases_across_stems_by_content_key(tmp_path, monkeypatch):
     """A case computed under one profile's stem is replayed under a DIFFERENT
