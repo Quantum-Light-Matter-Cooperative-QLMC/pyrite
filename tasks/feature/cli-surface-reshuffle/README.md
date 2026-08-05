@@ -1,13 +1,15 @@
 # CLI surface reshuffle (redesign D1-D2, output contract)
 
 Branch: `feature/cli-surface-reshuffle`, stacked on
-`feature/cli-vocab-controls` at `7b6e588`.
+`feature/cli-vocab-controls`. It started at `7b6e588`; the owner-authored
+vocabulary verification commit `dada9b7` was merged as `0825dfd` while this
+slice was active.
 
 Slice 3 of
 [`docs/plans/cli-redesign-implementation-plan.md`](../../../docs/plans/cli-redesign-implementation-plan.md).
 The stacked base is deliberate: Slice 3 needs the landed D7 compatibility
-substrate and the local D5/D6 work that has not yet landed on `main`. The 17
-newer `main` commits are unrelated simulation work and are not merged here.
+substrate and the local D5/D6 work that has not yet landed on `main`. Newer
+`main` simulation commits remain unrelated and are not merged here.
 
 ## Scope and order
 
@@ -66,12 +68,9 @@ only owns the surface/output work assigned by the implementation plan.
 - [x] Focused lifecycle/contract verification: 405 passed; lint, typecheck, and
       packaging suite (196 passed) are green.
 
-The full CLI suite reaches 983 passing tests after this checkpoint. Its nine
-remaining failures predate this branch and come from the stacked Slice 5 base:
-seven `tests/test_blaze.py` cases and one `tests/test_local_click_cli.py` blaze
-case still invoke retired `--angles` while asserting empty stderr; another
-local-click case invokes retired analysis `--default` with the same assertion.
-The five failures introduced by the job-path warnings were corrected here.
+The first full CLI run reached 983 passing tests; its nine stacked-base failures
+were the retired-flag assertions completed by `dada9b7`. After merging that
+owner-authored base refresh, the full CLI suite passes: 1007 tests.
 
 ### Explicit app actions
 
