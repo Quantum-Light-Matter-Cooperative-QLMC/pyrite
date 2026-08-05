@@ -7,16 +7,18 @@ import click
 from ... import blaze as _blaze
 from .. import _completion as _cli_completion
 from .. import _core as _cli_core
+from .._deprecations import canonical_option
 
 
 class _BlazeCommand(click.Command):
     """Preserve one-or-more values after selected options."""
 
-    _variadic = frozenset({"--energy", "--spacing", "--angles"})
+    _variadic = frozenset({"--energy", "--spacing", "--polar", "--angles"})
     _option_names = frozenset(
         {
             "--energy",
             "--spacing",
+            "--polar",
             "--angles",
             "--workers",
             "--checkpoint-dir",
@@ -95,12 +97,14 @@ _EMISSION_ANGLE = click.FloatRange(min=0.0, max=90.0, min_open=True, max_open=Tr
     metavar="S",
     help="Groove spacing(s) in meters (one, or one per energy).",
 )
-@click.option(
-    "--angles",
+@canonical_option(
+    "--polar",
+    "angles",
     type=_EMISSION_ANGLE,
     multiple=True,
     default=None,
     metavar="A",
+    retired=["--angles"],
     help="Polar tilt values in degrees.",
 )
 @click.option(

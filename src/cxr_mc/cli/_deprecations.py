@@ -14,9 +14,12 @@ without a row and a row cannot outlive the alias it describes.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import click
+from click.core import ParameterSource
 
 SUPPORT_WINDOW_MINORS = 2
 
@@ -207,3 +210,172 @@ class DeprecatingGroup(click.Group):
                 warn(path)
 
             raise
+
+
+# --------------------------------------------------------------------------- #
+# Retired flag spellings (RFC D5)
+# --------------------------------------------------------------------------- #
+#
+# D5 fixes one canonical name per physical quantity. The retired spellings stay
+# accepted for the same support window as retired commands, so the machinery
+# below mirrors the command side: a registry that `docs/cli-deprecations.md` is
+# generated from, and a warning that names both the replacement and the release
+# that drops the old spelling.
+
+
+@dataclass(frozen=True)
+class DeprecatedFlag:
+    """One retired flag spelling on one command."""
+
+    command: str
+    flag: str
+    replacement: str
+    deprecated_in: str
+    remove_in: str
+    note: str = ""
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return (self.command, self.flag)
+
+
+def _flag(
+    command: str, flag: str, replacement: str, *, since: str = "0.1.0", note: str = ""
+) -> DeprecatedFlag:
+    return DeprecatedFlag(command, flag, replacement, since, _window(since), note)
+
+
+#: Keyed by ``(command path, retired flag)``. `tests/cli/test_deprecations.py`
+#: holds this registry to the live command tree in both directions, exactly as
+#: it does for `DEPRECATIONS`.
+DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
+    entry.key: entry
+    for entry in (
+        # D5: one canonical name per quantity. The singular spellings were
+        # already canonical on `material set`, `sweep set`, and `profile *`;
+        # these are the stragglers that kept the plural.
+        _flag("energy-grid derive", "--energies", "--energy"),
+        _flag("energy-grid derive", "--tilts", "--polar"),
+        _flag("energy-grid derive", "--azimuths", "--azimuth"),
+        _flag("energy-grid derive", "--materials", "--material"),
+        _flag("energy-grid submit", "--energies", "--energy"),
+        _flag("energy-grid submit", "--tilts", "--polar"),
+        _flag("energy-grid submit", "--azimuths", "--azimuth"),
+        _flag("energy-grid submit", "--materials", "--material"),
+        _flag("energy-grid defaults", "--tilts", "--polar"),
+        _flag("energy-grid defaults", "--azimuths", "--azimuth"),
+        _flag("energy-grid apply", "--materials", "--material"),
+        _flag("material blaze", "--angles", "--polar"),
+        _flag("profile create", "--materials", "--material"),
+        _flag("profile set", "--materials", "--material"),
+        _flag("profile add", "--materials", "--material"),
+        _flag("profile remove", "--materials", "--material"),
+        # D5 persist-as-default: one `--save-default` everywhere.
+        _flag("energy-grid derive", "--set-default", "--save-default"),
+        _flag("energy-grid submit", "--set-default", "--save-default"),
+        _flag("energy-grid defaults", "--set", "--save-default"),
+        _flag("app analysis", "--default", "--save-default"),
+        _flag("app viewer", "--default", "--save-default"),
+    )
+}
+
+
+def flag_message(command: str, flag: str, replacement: str) -> str:
+    """Render the canonical stderr warning for a retired flag spelling."""
+    entry = DEPRECATED_FLAGS.get((command, flag))
+    if entry is None:
+        return f"warning: '{flag}' is deprecated; use '{replacement}'"
+    return (
+        f"warning: '{entry.flag}' is deprecated and will be removed in "
+        f"{entry.remove_in}; use '{entry.replacement}'"
+    )
+
+
+def warn_flag(ctx: click.Context, flag: str, replacement: str) -> None:
+    """Emit the retired-flag warning for *flag* under *ctx* on stderr."""
+    click.echo(flag_message(invocation_path(ctx), flag, replacement), err=True)
+
+
+class RetiredOption(click.Option):
+    """Hidden option for a retired flag spelling that feeds the canonical slot.
+
+    The retired spelling keeps its own ``dest`` so the callback can tell it
+    apart from the canonical one -- sharing a ``dest`` makes Click store both
+    under the same parser key, which would warn even when only the canonical
+    spelling was given. The value is written straight into the canonical slot,
+    which the canonical option then leaves alone: Click only overwrites a slot
+    it has a recorded parameter source for, and writes from a callback have
+    none.
+
+    Supplying both spellings is a `UsageError` rather than a silent
+    last-one-wins, which is why `canonical_option` forces the canonical option
+    eager -- its parameter source has to be recorded before this callback runs.
+    """
+
+    def __init__(self, param_decls: Sequence[str], *, dest: str, replacement: str, **kwargs):
+        self.retired_flag = param_decls[0]
+        self.canonical_dest = dest
+        self.replacement = replacement
+        # The private name has to be a valid identifier: Click only treats a
+        # dash-free declaration as the parameter name when it is one, and
+        # otherwise files it as another option string -- which would land this
+        # option back on the canonical dest and defeat the whole point.
+        private = re.sub(r"\W", "_", f"_retired_{dest}_{self.retired_flag}")
+        super().__init__(
+            [*param_decls, private],
+            hidden=True,
+            expose_value=False,
+            callback=self._merge,
+            **kwargs,
+        )
+
+    def _merge(self, ctx: click.Context, param: click.Parameter, value):
+        if value is None or value == () or value is False:
+            return None
+        if ctx.get_parameter_source(self.canonical_dest) is ParameterSource.COMMANDLINE:
+            raise click.UsageError(
+                f"{self.retired_flag} is the retired spelling of {self.replacement}; "
+                f"pass one, not both"
+            )
+        warn_flag(ctx, self.retired_flag, self.replacement)
+        ctx.params[self.canonical_dest] = value
+        return None
+
+
+#: Keyword arguments that describe the *value* of an option, and so have to
+#: match between a canonical spelling and its retired aliases. Presentation-only
+#: ones (``help``, ``show_default``, ``shell_complete``) deliberately do not
+#: carry over, since the aliases are hidden.
+_VALUE_KWARGS = frozenset({"type", "multiple", "metavar", "nargs", "is_flag", "flag_value"})
+
+
+def canonical_option(*param_decls: str, retired: Sequence[str] = (), **kwargs):
+    """Declare a D5 canonical flag plus hidden aliases for its retired spellings.
+
+    Both halves are declared together so the canonical option cannot lose the
+    ``is_eager`` flag that `RetiredOption`'s conflict check depends on.
+    """
+    dest = _implied_dest(param_decls)
+    shared = {key: value for key, value in kwargs.items() if key in _VALUE_KWARGS}
+
+    def decorator(function):
+        for retired_flag in retired:
+            function = click.option(
+                retired_flag,
+                cls=RetiredOption,
+                dest=dest,
+                replacement=param_decls[0],
+                **shared,
+            )(function)
+        return click.option(*param_decls, is_eager=True, **kwargs)(function)
+
+    return decorator
+
+
+def _implied_dest(param_decls: Sequence[str]) -> str:
+    """The variable name Click will infer for *param_decls*."""
+    for decl in param_decls:
+        if not decl.startswith("-"):
+            return decl
+    longest = max((decl for decl in param_decls if decl.startswith("--")), key=len)
+    return longest.lstrip("-").replace("-", "_")

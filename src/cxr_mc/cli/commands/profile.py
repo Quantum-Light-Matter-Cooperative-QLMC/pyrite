@@ -24,7 +24,7 @@ from cxr_mc.cli._core import (
     emit_json_result,
     emit_result,
 )
-from cxr_mc.cli._deprecations import DeprecatingGroup
+from cxr_mc.cli._deprecations import DeprecatingGroup, canonical_option
 from cxr_mc.detectors.spec import DetectorSpec
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -500,10 +500,12 @@ def show_command(name, json_output):
 @_ne_cli_options
 @_beam_cli_options
 @_detector_cli_options
-@click.option(
-    "--materials",
+@canonical_option(
+    "--material",
+    "materials",
     metavar="KEY,...",
     shell_complete=_cli_completion.complete_material_csv,
+    retired=["--materials"],
     help="Set explicit initial membership (comma-separated material keys).",
 )
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
@@ -583,10 +585,12 @@ def create_command(
 @_ne_cli_options
 @_beam_cli_options
 @_detector_cli_options
-@click.option(
-    "--materials",
+@canonical_option(
+    "--material",
+    "materials",
     metavar="KEY,...",
     shell_complete=_cli_completion.complete_material_csv,
+    retired=["--materials"],
     help="Replace explicit membership with comma-separated material keys.",
 )
 @click.option(
@@ -713,10 +717,12 @@ def _merge_values(name, updates, *, add):
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @_range_cli_options
 @_ne_cli_options
-@click.option(
-    "--materials",
+@canonical_option(
+    "--material",
+    "materials",
     metavar="KEY,...",
     shell_complete=_cli_completion.complete_material_csv,
+    retired=["--materials"],
     help="Add comma-separated material keys to explicit membership.",
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
@@ -755,10 +761,12 @@ def add_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, mater
 @command.command("remove")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @_range_cli_options
-@click.option(
-    "--materials",
+@canonical_option(
+    "--material",
+    "materials",
     metavar="KEY,...",
     shell_complete=_cli_completion.complete_material_csv,
+    retired=["--materials"],
     help="Remove comma-separated material keys from explicit membership.",
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")

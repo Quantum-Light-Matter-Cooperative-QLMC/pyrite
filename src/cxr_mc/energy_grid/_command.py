@@ -35,14 +35,22 @@ from cxr_mc.cli._core import (
     emit_result,
     invoke_legacy,
 )
-from cxr_mc.cli._deprecations import DeprecatingGroup
+from cxr_mc.cli._deprecations import DeprecatingGroup, canonical_option
 from cxr_mc.energy_grid import apply, defaults, job
 
+#: ``--clear FIELD`` choices, mapped to persisted-defaults keys. D5 renamed the
+#: matching flags, so the canonical field names are the singular ones; the
+#: plurals stay accepted because they are values rather than flag spellings and
+#: `RetiredOption` does not reach them.
 _DEFAULT_FIELD_KEYS = {
-    "tilts": "tilts",
-    "azimuths": "azimuths",
+    "polar": "tilts",
+    "azimuth": "azimuths",
+    "energy": "energies",
+    "material": "materials",
     "thickness": "thickness_ang",
     "brem-step": "brem_step_ev",
+    "tilts": "tilts",
+    "azimuths": "azimuths",
     "energies": "energies",
     "materials": "materials",
 }
@@ -80,9 +88,17 @@ def _expected_failure(exc):
 
 
 def _derive_options(function):
-    function = click.option(
-        "--set-default",
+    """D5 canonical geometry/selection flags, with their retired plural spellings.
+
+    Destination names stay plural: they are the argv relay keys for the staged
+    argparse handlers in `derive`/`job`, which are internal and not part of the
+    surface D5 governs.
+    """
+    function = canonical_option(
+        "--save-default",
+        "set_default",
         is_flag=True,
+        retired=["--set-default"],
         help="Persist supplied geometry, energies, and materials as future defaults.",
     )(function)
     function = click.option(
@@ -91,27 +107,35 @@ def _derive_options(function):
         metavar="ANGSTROM,...",
         help="Crystal thicknesses in angstrom; comma-separated and positive.",
     )(function)
-    function = click.option(
-        "--azimuths",
+    function = canonical_option(
+        "--azimuth",
+        "azimuths",
         type=AZIMUTH_CSV_TEXT,
         metavar="DEG,...",
+        retired=["--azimuths"],
         help="Azimuths in degrees [0, 360]; comma-separated.",
     )(function)
-    function = click.option(
-        "--tilts",
+    function = canonical_option(
+        "--polar",
+        "tilts",
         type=TILT_CSV_TEXT,
         metavar="DEG,...",
+        retired=["--tilts"],
         help="Polar tilts in degrees [0, 90); comma-separated.",
     )(function)
-    function = click.option(
-        "--energies",
+    function = canonical_option(
+        "--energy",
+        "energies",
         type=ENERGY_CSV_TEXT,
         metavar="KEV,...",
+        retired=["--energies"],
         help="Beam energies in keV; comma-separated and positive.",
     )(function)
-    return click.option(
-        "--materials",
+    return canonical_option(
+        "--material",
+        "materials",
         metavar="KEY,...",
+        retired=["--materials"],
         help="Material keys; comma-separated. Omit to use persistent defaults.",
         shell_complete=_cli_completion.complete_material_csv,
     )(function)
@@ -139,8 +163,8 @@ def command():
 
     \b
     Examples:
-      cxr energy-grid derive --materials mose2,wse2 --energies 30,60
-      cxr energy-grid submit --materials mose2 --dry-run
+      cxr energy-grid derive --material mose2,wse2 --energy 30,60
+      cxr energy-grid submit --material mose2 --dry-run
       cxr energy-grid show mose2
     """
 
@@ -338,9 +362,11 @@ for _legacy_job_child in (status_command, attach_command, logs_command, stop_com
 
 @command.command("apply")
 @click.argument("json_path", required=False, metavar="JSON")
-@click.option(
-    "--materials",
+@canonical_option(
+    "--material",
+    "materials",
     metavar="KEY,...",
+    retired=["--materials"],
     help="Apply only listed material keys.",
     shell_complete=_cli_completion.complete_material_csv,
 )
@@ -374,7 +400,7 @@ def apply_command(json_path, materials, pull, force, regen_golden, dry_run):
 
     \b
     Example:
-      cxr energy-grid apply combined_line_grid_bounds.json --materials mose2,wse2
+      cxr energy-grid apply combined_line_grid_bounds.json --material mose2,wse2
     """
     path = _pull_combined() if pull else json_path
     if not path:
@@ -522,10 +548,11 @@ def set_brem_command(material, stop, step, note):
     is_flag=True,
     help="Emit one versioned JSON object on stdout (show mode only).",
 )
-@click.option(
-    "--set",
+@canonical_option(
+    "--save-default",
     "set_values",
     is_flag=True,
+    retired=["--set"],
     help="Persist supplied values; otherwise only show defaults.",
 )
 @click.option(
@@ -536,7 +563,7 @@ def set_brem_command(material, stop, step, note):
     metavar="FIELD",
     help=(
         "Reset one field to inherited/built-in behavior; repeatable. "
-        "Fields: tilts, azimuths, thickness, brem-step, energies, materials."
+        "Fields: polar, azimuth, thickness, brem-step, energy, material."
     ),
 )
 @click.option(
@@ -544,16 +571,20 @@ def set_brem_command(material, stop, step, note):
     is_flag=True,
     help="Reset every persistent derivation field to inherited/built-in behavior.",
 )
-@click.option(
-    "--tilts",
+@canonical_option(
+    "--polar",
+    "tilts",
     type=TILT_CSV,
     metavar="DEG,...",
+    retired=["--tilts"],
     help="Persistent derivation polar tilts in degrees [0, 90).",
 )
-@click.option(
-    "--azimuths",
+@canonical_option(
+    "--azimuth",
+    "azimuths",
     type=AZIMUTH_CSV,
     metavar="DEG,...",
+    retired=["--azimuths"],
     help="Persistent azimuths in degrees [0, 360].",
 )
 @click.option(
@@ -584,27 +615,27 @@ def defaults_command(
     omitted. Geometry searches determine both line and bremsstrahlung upper
     bounds; ``brem-step`` controls only applied bremsstrahlung spacing.
 
-    Empty ``tilts`` or ``azimuths`` mean inherit each material's catalog-profile
+    Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile
     angles. These are not physical scan defaults and do not select scan
     ``--fidelity full|survey``.
     """
     supplied = [
         flag
         for flag, value in (
-            ("--tilts", tilts),
-            ("--azimuths", azimuths),
+            ("--polar", tilts),
+            ("--azimuth", azimuths),
             ("--thickness", thickness),
             ("--brem-step", brem_step),
         )
         if value is not None
     ]
     if supplied and not set_values:
-        raise click.UsageError(f"{', '.join(supplied)} require --set")
+        raise click.UsageError(f"{', '.join(supplied)} require --save-default")
     if set_values and not supplied:
-        raise click.UsageError("--set requires at least one value option")
+        raise click.UsageError("--save-default requires at least one value option")
     mutation_modes = int(set_values) + bool(clear_fields) + int(reset)
     if mutation_modes > 1:
-        raise click.UsageError("--set, --clear, and --reset cannot be combined")
+        raise click.UsageError("--save-default, --clear, and --reset cannot be combined")
     if json_output and mutation_modes:
         raise click.UsageError("--json is read-only and cannot be combined with mutations")
     if set_values:

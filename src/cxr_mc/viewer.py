@@ -38,6 +38,7 @@ import click
 from ._acp import running_acp
 from .cli import _completion as _cli_completion
 from .cli import _core as _cli_core
+from .cli._deprecations import canonical_option
 
 NOTEBOOK = "notebooks/trace_app.py"
 TUNNEL_PORT = 2719
@@ -184,11 +185,12 @@ def _cli(args):
     type=_cli_completion.MATERIAL,
     shell_complete=_cli_completion.complete_material,
 )
-@click.option(
+@canonical_option(
     "-d",
-    "--default",
+    "--save-default",
     "persist_default",
     is_flag=True,
+    retired=["--default"],
     help="Persist MATERIAL as default for future no-argument runs.",
 )
 @click.option("--watch", is_flag=True, help="Reload app when source files change.")
