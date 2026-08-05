@@ -15,17 +15,10 @@ file. Edit and drop items on `main`.
 
 ## Active
 
-1. **Compute performance optimization.** Measure and improve stable remote
-   CPU/GPU/RAM/VRAM utilization without OOM, keeping the GPU fed where evidence
-   supports it. → `feature/compute-performance-optimization`;
-   [`tasks/feature/compute-performance-optimization/`](tasks/feature/compute-performance-optimization/).
+1. **Compute performance optimization.** Review cupyx.jit.rawkernel and Numba @njit
+   optimizations are optimally executed, and review any critical physics changes. Generate new bit-for-bit or toleranced validation for the new paths where necessary. Ensure that non-nvidia fallbacks are present and functional (current tests should already be confirming this, but double check).
 2. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-3. **Detector profiles and Zhai validation modernization.** Add profile-owned
-   detector geometry with a 90 degree standard default, then route maintained
-   Zhai/literature comparisons through current detector, Sweep, and case APIs.
-   → `feature/profile-observation-angle`;
-   [`tasks/feature/profile-observation-angle/`](tasks/feature/profile-observation-angle/).
-4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
+3. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
 
 ## P1 - top-priority back burner
 
@@ -49,42 +42,43 @@ file. Edit and drop items on `main`.
 
 ## P2 - medium-priority back burner
 
-1. **Portable GPU backends.** Add maintained non-NVIDIA accelerator support
-   behind a vendor-neutral backend contract while preserving CUDA and NumPy.
-   → `feature/portable-gpu-backends`;
-   [`tasks/feature/portable-gpu-backends/`](tasks/feature/portable-gpu-backends/).
-2. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+1. **Grazing grating — ALEX-s constants + hardware survey.** Research cited device constants and ~10 eV–4 keV CCD/grating landscape. → `docs/soft-xray-hardware-survey`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
+2. **Detector profiles and Zhai validation modernization.** Add profile-owned
+   detector geometry with a 90 degree standard default, then route maintained
+   Zhai/literature comparisons through current detector, Sweep, and case APIs.
+   → `feature/profile-observation-angle`;
+   [`tasks/feature/profile-observation-angle/`](tasks/feature/profile-observation-angle/).
 
 ## P3 - lower-priority / exploratory back burner
 
 1. **Parameter-space sampling review.** Design principled prioritization across high-dimensional sweep parameters. → `docs/parameter-space-sampling-review`.
 2. **Grazing grating — groove efficiency.** Replace `Grating.groove_efficiency` placeholder scalar with groove-profile model. → `feature/grating-groove-efficiency`; Design: [`docs/grazing-grating.md`](docs/grazing-grating.md).
 3. **pyelsepa / ELSEPA transport.** Maintain landed, validated adapter externally provisioned CI environment.
-4. **Material filters.** Model calibration-filter transmission between x-ray beam and detector. → `feature/material-filters`.
+4. **Material filters.** Model calibration-filter transmission between x-ray beam and detector..
 5. **Tab completion latency.** Shell completion for `cxr` often takes
    multiple seconds; likely SSH-bound remote completion timeout or
    process-startup overhead, not confirmed. → `feature/tab-completion-latency`;
    [`tasks/feature/tab-completion-latency/`](tasks/feature/tab-completion-latency/).
-6. **Add finite initial phase space (velocity vector spread) into 2D and 3D trajectory plots**
 
 ## Inbox - >user< to be triaged
 
-1. **Coherent-bunching parameter study.** Compare effects of longitudinal bunch
+1. **Add finite initial phase space (velocity vector spread, both longitudinal & transverse) into 2D and 3D trajectory plots**
+2. **Coherent-bunching parameter study.** Compare effects of longitudinal bunch
    length and transverse bunch size on coherent bunching while holding other
    bunch parameters fixed; explore tilted bunch fronts or other routes to
    coherent enhancement.
-2. **Cross-platform agent hooks.** Improve shell and operating-system support
-   beyond WSL, including a directory of hook scripts for more complex setup and
+3. **Cross-platform agent hooks.** Improve shell and operating-system support
+   beyond WSL/Ubuntu, including a directory of hook scripts for more complex setup and
    platform-specific handling.
-3. **Source-package organization.** Group related loose modules under
+4. **Source-package organization.** Group related loose modules under
    `src/cxr_mc/` into appropriately scoped subpackages after current structural
    work settles.
-4. **Local SLURM integration.** Make `cxr run` use the configured laptop-local
-   SLURM installation.
-5. **Local checkpoint clearing.** Add a local equivalent of `cxr remote clear`
-   for deleting local checkpoint pickles with matching behavior.
+5. **Local SLURM integration.** Make `cxr run` use the configured laptop-local
+   SLURM installation (and, if available, report GPU usage statistics), if it exists.
 6. **Evaluate refactoring `monteccarlo/runner.py` and `montecarlo/transport.py`**
-   into multiple smaller files, they are very long.
+   into multiple smaller files.
+7. **Add support for custom-defined remotes, or other standards for submitting remote computing tasks**.
+   This will require research of what the industry standards/best practices are here, and we may find that the best practices are to leave it up to user custom scripting. If there are good standards for implementing comprehensive integrated support for SSH and/or other options for submitting, to SLURM or otherwise, write up a report on what we should do, why & how. This would obviously require more in depth capabilities for user configurations of their remote(s) of choice.
 
 ## CLI backlog
 
@@ -95,16 +89,7 @@ not here.
 
 ### Bugs (fix + regression test)
 
-1. `energy-line` / energy-grid azimuth accepts 0–360° instead of the physical
-   `(90, 270)` limit.
-2. `cxr [remote] run -p` requires BOTH a single material AND a profile —
-   contradicts `run`'s own optional `-m`. Should accept profile, material, or
-   both.
-3. `cxr material` help text points to `cxr profile members`, which does not
-   exist (membership is `profile set/add/remove --materials`). Stale pointer.
-4. `cxr app analysis [MATERIAL] [COMMAND]` mixes an optional positional with a
-   subcommand at the same level — a material named `export` collides with the
-   `export` subcommand. (RFC D1 removes this structurally; live collision now.)
+None noted at the moment
 
 ### Ergonomics (ship anytime)
 
@@ -122,7 +107,8 @@ General UI items folded from the retired `TODO_UI.md`.
    given; otherwise show a well-formatted explanation, e.g. `Pulling "Standard
    Performance Profile for MoS2" [progress bar + absolute progress]`.
 2. Golden data should be an optional installable, e.g. `uv add cxr-mc[golden]`
-   or part of `uv add cxr-mc[all]`.
+   or part of `uv add cxr-mc[all]`. Same with validation scripts/app -- not
+   critically required.
 
 ## Long-term plans
 
@@ -143,3 +129,5 @@ Direction notes only; not prioritized backlog or active commitments.
 - **Custom detector tooling.** Extend the existing detector model with CLI
   tools for defining, loading, saving, and editing detector responses,
   geometries, and resolution for photon and charged-particle detectors.
+- **Support for atomic-scale (single-or-few alternating layer) heterostructures/superlattices**.
+  CTR and/or PXR/CBS may produce interesting interference results when layers alternate at the atomic-scale.
