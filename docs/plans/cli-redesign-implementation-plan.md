@@ -25,9 +25,18 @@ triage → dispatch flow; `TODO.md` stays authoritative for status.
 | 1 | command-home → `src/cxr_mc/cli/commands/` | pkg P1 | ✅ landed 2026-08-04 |
 | 2 | energy-grid module rename | pkg P2 | ✅ landed 2026-08-04 |
 | 3 | noun→verb, remote-as-modifier, `-o` contract | redesign D1–D3 | needs 1 ✅, Q2 ✅ — **start here** |
-| 4 | verb collapse **+** recompute/prune module fold | redesign D4 + pkg P3 | needs 3 |
-| 5 | vocab controls + deprecation rollout | redesign D5–D7 | needs 3 |
+| 4 | verb collapse **+** recompute/prune module fold | redesign D4 + pkg P3 | ✅ landed 2026-08-05 (ahead of 3, see below) |
+| 5 | vocab controls + deprecation rollout | redesign D5–D7 | D7 harness ✅ landed 2026-08-05; D5/D6 need 3 for `-o` and `--wait`/`--detach` |
 | 6 | content-addressed store, lockfile, gc | artifact RFC (phase 5) | needs 3–5 |
+
+Slices 4 and 5 are gated on 3 in this linearization, but the redesign RFC's own
+migration plan ([§4](../cli-redesign-rfc.md#4-migration-plan)) sequences the
+*additive* vocab work — D4/D5 canonical verbs and flags, plus the D7
+deprecation harness — as phase 1, ahead of the D1–D3 noun reshuffle, precisely
+because it changes no existing spelling. Slice 4 and the D7 harness landed on
+that basis, out of the order below. What genuinely needs slice 3 first is the
+`-o/--output` contract (its row above) and D6's `--wait`/`--detach`, which
+depend on the D2b job noun.
 
 ## Resolve first (blocking open questions)
 
