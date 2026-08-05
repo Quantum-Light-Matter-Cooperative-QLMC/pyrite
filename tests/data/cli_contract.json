@@ -489,7 +489,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr app analysis [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...\n\n  Launch notebooks/analysis_app.py with marimo run or edit.\n\n  MATERIAL overrides the persisted default for this run. --persist-default\n  stores it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n\nCommands:\n  export  Render notebooks/analysis_app.py to static HTML.\n  launch  Launch notebooks/analysis_app.py with marimo run or edit.\n",
+            "help": "Usage: cxr app analysis [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...\n\n  Launch notebooks/analysis_app.py with marimo run or edit.\n\n  MATERIAL overrides the persisted default for this run. --save-default stores\n  it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n\nCommands:\n  export  Render notebooks/analysis_app.py to static HTML.\n  launch  Launch notebooks/analysis_app.py with marimo run or edit.\n",
             "hidden": false,
             "path": "app analysis",
             "subcommands": [
@@ -581,7 +581,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr app analysis launch [OPTIONS] [MATERIAL]\n\n  Launch notebooks/analysis_app.py with marimo run or edit.\n\n  MATERIAL overrides the persisted default for this run. --persist-default\n  stores it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n",
+                "help": "Usage: cxr app analysis launch [OPTIONS] [MATERIAL]\n\n  Launch notebooks/analysis_app.py with marimo run or edit.\n\n  MATERIAL overrides the persisted default for this run. --save-default stores\n  it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n",
                 "hidden": false,
                 "path": "app analysis launch",
                 "subcommands": []
@@ -662,7 +662,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr app viewer [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...\n\n  Launch notebooks/trace_app.py with marimo run or edit.\n\n  3D trajectory and crystal structure visualization.\n\n  MATERIAL overrides the persisted default for this run. --persist-default\n  stores it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n\nCommands:\n  export  Render the viewer as static HTML without starting marimo.\n  launch  Launch notebooks/trace_app.py with marimo run or edit.\n",
+            "help": "Usage: cxr app viewer [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...\n\n  Launch notebooks/trace_app.py with marimo run or edit.\n\n  3D trajectory and crystal structure visualization.\n\n  MATERIAL overrides the persisted default for this run. --save-default stores\n  it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n\nCommands:\n  export  Render the viewer as static HTML without starting marimo.\n  launch  Launch notebooks/trace_app.py with marimo run or edit.\n",
             "hidden": false,
             "path": "app viewer",
             "subcommands": [
@@ -762,7 +762,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr app viewer launch [OPTIONS] [MATERIAL]\n\n  Launch notebooks/trace_app.py with marimo run or edit.\n\n  3D trajectory and crystal structure visualization.\n\n  MATERIAL overrides the persisted default for this run. --persist-default\n  stores it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n",
+                "help": "Usage: cxr app viewer launch [OPTIONS] [MATERIAL]\n\n  Launch notebooks/trace_app.py with marimo run or edit.\n\n  3D trajectory and crystal structure visualization.\n\n  MATERIAL overrides the persisted default for this run. --save-default stores\n  it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n",
                 "hidden": false,
                 "path": "app viewer launch",
                 "subcommands": []
@@ -4333,7 +4333,7 @@
                   },
                   {
                     "dest": "yes",
-                    "help": "Skip the confirmation prompt.",
+                    "help": "Delete the exact previewed rows.",
                     "option_strings": [
                       "-y",
                       "--yes"
@@ -4366,7 +4366,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr energy-grid line delete [OPTIONS] MATERIAL\n\n  Delete MATERIAL's derived or manual line-grid rows; irreversible.\n\n  The only way to remove bounds from the shared per-material derived-grid store\n  -- editing a profile's energies never deletes them. Refuses (as a catalog\n  validation failure) when a beam energy is still required by a profile's\n  ``energy_keV`` grid.\n\n  Example:\n    cxr energy-grid line delete wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Skip the confirmation prompt.\n  --dry-run                       Print proposed diff; delete nothing.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+                "help": "Usage: cxr energy-grid line delete [OPTIONS] MATERIAL\n\n  Delete MATERIAL's derived or manual line-grid rows; irreversible.\n\n  The only way to remove bounds from the shared per-material derived-grid store\n  -- editing a profile's energies never deletes them. Refuses (as a catalog\n  validation failure) when a beam energy is still required by a profile's\n  ``energy_keV`` grid.\n\n  Example:\n    cxr energy-grid line delete wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Delete the exact previewed rows.\n  --dry-run                       Print proposed diff; delete nothing.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid line delete",
                 "subcommands": []
@@ -5196,7 +5196,7 @@
               },
               {
                 "dest": "yes",
-                "help": "Skip the confirmation prompt.",
+                "help": "Delete the exact previewed profile.",
                 "option_strings": [
                   "-y",
                   "--yes"
@@ -5229,7 +5229,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr profile delete [OPTIONS] NAME\n\n  Delete a profile; irreversible. 'standard' cannot be deleted.\n\n  Blocked while the shared energy-grid store still references the profile (an\n  ``[energy_grids.NAME]`` fallback bucket); referents are listed.\n\nOptions:\n  -y, --yes                       Skip the confirmation prompt.\n  --dry-run                       Print proposed TOML diff; delete nothing.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: cxr profile delete [OPTIONS] NAME\n\n  Delete a profile; irreversible. 'standard' cannot be deleted.\n\n  Blocked while the shared energy-grid store still references the profile (an\n  ``[energy_grids.NAME]`` fallback bucket); referents are listed.\n\nOptions:\n  -y, --yes                       Delete the exact previewed profile.\n  --dry-run                       Print proposed TOML diff; delete nothing.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "profile delete",
             "subcommands": []

@@ -176,6 +176,13 @@ def test_deprecation_support_window() -> None:
             f"for a {SUPPORT_WINDOW_MINORS}-minor support window"
         )
 
+    for key, dep in DEPRECATED_FLAGS.items():
+        assert dep.remove_in == _window(dep.deprecated_in), (
+            f"{key!r} has remove_in={dep.remove_in!r}, "
+            f"expected {_window(dep.deprecated_in)!r} "
+            f"for a {SUPPORT_WINDOW_MINORS}-minor support window"
+        )
+
 
 def test_window_advances_minor_version() -> None:
     assert _window("0.1.0") == "0.3.0"

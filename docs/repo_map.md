@@ -339,7 +339,7 @@ catalog-profile resolution, and nsys re-exec. Click wiring is in
 
 ### `blaze.py`
 Headless blazed-crystal (sawtooth entrance face) sweep entry: `cxr material blaze <material>
---energy E [E...] --spacing S [S...] [--angles A [A...]]`. Mirrors `scan.py`'s
+--energy E [E...] --spacing S [S...] [--polar A [A...]]`. Mirrors `scan.py`'s
 parse args → build cases → `run_sweep` → checkpoint structure, but forces v1
 groove geometry (`theta_obs=90`, `tilt_azim=180`, no substrate/stack/footprint)
 per (energy, spacing) pair and writes to a dedicated

@@ -451,7 +451,7 @@ def _cli(args):
     "analyze",
     help=(
         f"Launch {NOTEBOOK} with marimo run or edit.\n\n"
-        "MATERIAL overrides the persisted default for this run. --persist-default "
+        "MATERIAL overrides the persisted default for this run. --save-default "
         "stores it for later no-argument launches."
     ),
 )

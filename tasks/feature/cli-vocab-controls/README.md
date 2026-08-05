@@ -1,26 +1,28 @@
 # CLI vocab controls + deprecation rollout (redesign D5–D7)
 
-Branch: `feature/cli-vocab-controls`, off `main` at `8671240`.
+Branch: `feature/cli-vocab-controls`; original work started at `8671240`, and
+the closure worktree was recreated from `main` at `ab76c6a`.
 Slice 5 of [`docs/plans/cli-redesign-implementation-plan.md`](../../../docs/plans/cli-redesign-implementation-plan.md).
 
-**Status: complete.** D5 and D6 implementation, focused tests, generated
-deprecation/reference/contract artifacts, and the full verification matrix are
-current. The only core-suite failures are the four pre-existing CPU precision
-assumptions documented below.
+**Status: complete; closure audit 2026-08-05.** D5 and D6 implementation,
+focused tests, generated deprecation/reference/contract artifacts, and the full
+verification matrix are current. Post-slice-3 audit corrected stale fidelity
+migration prose, fixed remaining preview-first destructive commands, and
+removed stale canonical-flag examples.
 
 ## Ordering caveat (read first)
 
-Slice 5 is gated on slice 3 (D1–D3) in the plan's table, and **slice 3 has not
-been implemented**. Slice 4 and the D7 harness landed ahead of it because the
+Slice 5 was gated on slice 3 (D1–D3) in the plan's original table. Slice 4 and
+the D7 harness landed ahead of it because the
 redesign RFC's own migration plan ([§4](../../../docs/cli-redesign-rfc.md))
 sequences the additive D4/D5 vocab work as phase 1, before the noun reshuffle.
-The same reasoning covers the D5 flag work here. Two parts of slice 5 genuinely
-do need slice 3 and are **out of scope on this branch**:
+The same reasoning covered the D5 flag work here. Slice 3 later landed the two
+dependent pieces:
 
-- **`-o/--output [table|json|wide]` replacing `--json`** — the plan assigns the
-  `-o` contract to slice 3's row, and `--json` is still live on 23 commands.
-- **D6 `--wait` / `--detach`** — needs the D2b unified `job` noun, which slice 3
-  introduces. No command has either flag today.
+- **`-o/--output [table|json|wide]` replacing `--json`** — owned by slice 3;
+  retired booleans remain hidden D7 aliases.
+- **D6 `--wait` / `--detach`** — canonical remote submitters now share the D2b
+  job lifecycle and mutually exclusive controls.
 
 ## Key design decision: how a retired flag spelling works
 
@@ -106,5 +108,16 @@ repeatable (`multiple=True`) works; `--help` shows only the canonical.
    machines (hardcoded fp32 `_REAL_BYTES=4`). The core run's only additional
    failure was a sandbox forkserver socket denial; its focused end-to-end test
    passed outside the sandbox (1 passed, 66 deselected).
+6. **Post-slice-3 closure audit — complete 2026-08-05.** Restored D6
+   preview-first behavior on `profile delete` and `energy-grid line delete`,
+   added fail-closed revalidation of previewed catalog state, corrected stale
+   D5 help/examples and fidelity documentation, and extended the removal-window
+   assertion to retired flags. Fresh focused result: 529 passed; lint,
+   deprecation/reference/contract generators, and `diff --check`
+   pass. Full CLI reaches 1047 passed with one unrelated failure in
+   `test_mott_missing_table_logs_debug_once`; the identical failure reproduces
+   on clean `main` (`transport.py` logs `Ellipsis`). Current-main typecheck and
+   strict Sphinx remain blocked by the pre-existing CuPy JIT/geometry diagnostics
+   and 28 autosummary/toctree/import warnings recorded by slice 3.
 
 `TODO.md` still has no entry for this slice; task status remains branch-local.

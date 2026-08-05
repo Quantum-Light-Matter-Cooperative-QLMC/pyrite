@@ -602,7 +602,7 @@ def set_command(material, energy, stop, num, start, note):
     required=True,
     help="Beam energy in keV; repeat for multiple rows.",
 )
-@click.option("-y", "--yes", "yes", is_flag=True, help="Skip the confirmation prompt.")
+@click.option("-y", "--yes", "yes", is_flag=True, help="Delete the exact previewed rows.")
 @click.option("--dry-run", is_flag=True, help="Print proposed diff; delete nothing.")
 @output_option
 def delete_command(material, energies, yes, dry_run, json_output):
@@ -631,14 +631,20 @@ def delete_command(material, energies, yes, dry_run, json_output):
         return 0
     if not yes:
         energy_list = ", ".join(f"{e:g}" for e in energies)
-        click.confirm(
+        try:
+            preview_original = Path(apply._MATERIALS_TOML).read_text(encoding="utf-8")
+            apply.delete_line_grid(material, energies, dry_run=True)
+        except (KeyError, ValueError, OSError) as exc:
+            _expected_failure(exc)
+        if not confirm_destructive(
+            False,
             f"delete {len(energies)} line-grid row(s) for {material} at {energy_list} keV? "
             "this cannot be undone",
-            err=True,
-            abort=True,
-        )
+        ):
+            return 0
     try:
-        deleted = apply.delete_line_grid(material, energies)
+        kwargs = {} if yes else {"expected_original": preview_original}
+        deleted = apply.delete_line_grid(material, energies, **kwargs)
     except (KeyError, ValueError, OSError) as exc:
         _expected_failure(exc)
     if json_output:

@@ -404,13 +404,17 @@ def test_click_set_expected_domain_failure_uses_stderr(monkeypatch, command_name
 
 
 def test_click_line_delete_confirmed_deletes_and_warns_stale_golden(monkeypatch):
-    seen = {}
+    calls = []
+    monkeypatch.setattr(_cli_core, "_stdin_is_tty", lambda: True)
+
+    def delete_line_grid(material, energies, **kwargs):
+        calls.append((material, list(energies), kwargs))
+        return [30.0, 100.0]
+
     monkeypatch.setattr(
         energy_grid.apply,
         "delete_line_grid",
-        lambda material, energies, **kw: (
-            seen.update(material=material, energies=list(energies)) or [30.0, 100.0]
-        ),
+        delete_line_grid,
     )
 
     result = invoke(
@@ -420,24 +424,53 @@ def test_click_line_delete_confirmed_deletes_and_warns_stale_golden(monkeypatch)
     )
 
     assert result.exit_code == 0
-    assert seen == {"material": "hopg", "energies": [30.0, 100.0]}
+    assert calls[0] == ("hopg", [30.0, 100.0], {"dry_run": True})
+    assert calls[1][0:2] == ("hopg", [30.0, 100.0])
+    assert isinstance(calls[1][2]["expected_original"], str)
+    assert len(calls) == 2
     assert "deleted hopg: 30, 100 keV" in result.stdout
     assert "cannot be undone" in result.stderr
     assert "golden is now stale" in result.stderr
 
 
 def test_click_line_delete_declined_confirmation_aborts(monkeypatch):
+    monkeypatch.setattr(_cli_core, "_stdin_is_tty", lambda: True)
+
+    def preview_only(_material, _energies, **kwargs):
+        if not kwargs.get("dry_run"):
+            pytest.fail("delete_line_grid must not execute when declined")
+        return [30.0]
+
     monkeypatch.setattr(
         energy_grid.apply,
         "delete_line_grid",
-        lambda *_a, **_kw: pytest.fail("delete_line_grid must not run when declined"),
+        preview_only,
     )
 
     result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30"], input="n\n")
 
-    assert result.exit_code == 1
+    assert result.exit_code == 0
     assert result.stdout == ""
-    assert "Aborted" in result.stderr
+    assert "cannot be undone" in result.stderr
+
+
+def test_click_line_delete_non_tty_previews_without_mutating(monkeypatch):
+    seen = []
+    monkeypatch.setattr(_cli_core, "_stdin_is_tty", lambda: False)
+
+    def preview_only(material, energies, **kwargs):
+        seen.append((material, list(energies), kwargs))
+        return [30.0]
+
+    monkeypatch.setattr(energy_grid.apply, "delete_line_grid", preview_only)
+
+    result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30"])
+
+    assert_clean_result(
+        result,
+        stdout="preview only; re-run with -y/--yes to execute\n",
+    )
+    assert seen == [("hopg", [30.0], {"dry_run": True})]
 
 
 def test_click_line_delete_yes_skips_prompt(monkeypatch):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from cxr_mc.cli import _catalog_io, profile
+from cxr_mc.cli import _catalog_io, _core, profile
 from tests.helpers.cli import assert_clean_result, invoke
 
 _CATALOG = """[profiles.standard]
@@ -740,18 +740,44 @@ def test_empty_updates_are_usage_errors(tmp_path, monkeypatch):
         assert expected in result.stderr
 
 
-def test_delete_requires_yes_and_removes_profile(tmp_path, monkeypatch):
+def test_delete_previews_non_tty_prompts_on_tty_and_yes_removes_profile(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
     original = catalog.read_text()
 
+    preview = invoke(profile.command, ["delete", "sub_100keV"])
+    assert preview.exit_code == 0
+    assert "-[profiles.sub_100keV]" in preview.stdout.replace(" ", "")
+    assert "preview only; re-run with -y/--yes to execute" in preview.stdout
+    assert preview.stderr == ""
+    assert catalog.read_text() == original
+
+    monkeypatch.setattr(_core, "_stdin_is_tty", lambda: True)
     declined = invoke(profile.command, ["delete", "sub_100keV"], input="n\n")
-    assert declined.exit_code == 1
+    assert declined.exit_code == 0
     assert "delete profile 'sub_100keV'" in declined.stderr
+    assert "-[profiles.sub_100keV]" in declined.stdout.replace(" ", "")
     assert catalog.read_text() == original
 
     deleted = invoke(profile.command, ["delete", "sub_100keV", "-y"])
     assert_clean_result(deleted, stdout="deleted profile sub_100keV\n")
     assert "[profiles.sub_100keV]" not in catalog.read_text()
+
+
+def test_delete_fails_closed_when_catalog_changes_after_preview(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    original = catalog.read_text()
+
+    def concurrent_edit(_yes, _prompt):
+        catalog.write_text(original + "\n# concurrent edit\n")
+        return True
+
+    monkeypatch.setattr(profile, "confirm_destructive", concurrent_edit)
+
+    result = invoke(profile.command, ["delete", "sub_100keV"])
+
+    assert result.exit_code == 1
+    assert "material catalog changed after preview; rerun command" in result.stderr
+    assert catalog.read_text().endswith("# concurrent edit\n")
 
 
 def test_delete_forbids_standard(tmp_path, monkeypatch):

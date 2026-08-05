@@ -387,7 +387,13 @@ def set_line_grid(material, energy, stop_eV, *, num=None, start_eV=None, note=No
     _warn_stale_golden()
 
 
-def delete_line_grid(material, energies, *, dry_run=False) -> list[float]:
+def delete_line_grid(
+    material,
+    energies,
+    *,
+    dry_run=False,
+    expected_original: str | None = None,
+) -> list[float]:
     """Delete rows at ENERGIES from ``energy_grids.MATERIAL``; irreversible.
 
     The only sanctioned way to remove derived/manual line-grid bounds
@@ -399,6 +405,8 @@ def delete_line_grid(material, energies, *, dry_run=False) -> list[float]:
     """
     wanted = {_positive_float(e, "energy") for e in energies}
     original = Path(_MATERIALS_TOML).read_text()
+    if expected_original is not None and original != expected_original:
+        raise ValueError("material catalog changed after preview; rerun command")
     document = tomlkit.parse(original)
     root = document.get("energy_grids", {})
     mat_table = root.get(material)

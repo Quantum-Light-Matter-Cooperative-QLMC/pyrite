@@ -24,9 +24,9 @@ triage → dispatch flow; `TODO.md` stays authoritative for status.
 | 0 | docs/TODO reorg | pkg P4/P5 | ✅ landed 2026-08-01 |
 | 1 | command-home → `src/cxr_mc/cli/commands/` | pkg P1 | ✅ landed 2026-08-04 |
 | 2 | energy-grid module rename | pkg P2 | ✅ landed 2026-08-04 |
-| 3 | noun→verb, remote-as-modifier, `-o` contract | redesign D1–D3 | needs 1 ✅, Q2 ✅ — **start here** |
+| 3 | noun→verb, remote-as-modifier, `-o` contract | redesign D1–D3 | ✅ landed 2026-08-05 |
 | 4 | verb collapse **+** recompute/prune module fold | redesign D4 + pkg P3 | ✅ landed 2026-08-05 (ahead of 3, see below) |
-| 5 | vocab controls + deprecation rollout | redesign D5–D7 | D7 harness ✅ landed 2026-08-05; D5/D6 need 3 for `-o` and `--wait`/`--detach` |
+| 5 | vocab controls + deprecation rollout | redesign D5–D7 | ✅ landed 2026-08-05; closure audit completed after 3 |
 | 6 | content-addressed store, lockfile, gc | artifact RFC (phase 5) | needs 3–5 |
 
 Slices 4 and 5 are gated on 3 in this linearization, but the redesign RFC's own

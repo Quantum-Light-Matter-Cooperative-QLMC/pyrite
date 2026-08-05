@@ -21,6 +21,7 @@ from cxr_mc.cli._core import (
     THICKNESS_CSV_RANGE,
     TILT_CSV_RANGE,
     CLIError,
+    confirm_destructive,
     emit_json_result,
     emit_result,
     flatten_option_values,
@@ -999,7 +1000,7 @@ def rename_command(name, new_name, dry_run):
 
 @command.command("delete")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
-@click.option("-y", "--yes", "yes", is_flag=True, help="Skip the confirmation prompt.")
+@click.option("-y", "--yes", "yes", is_flag=True, help="Delete the exact previewed profile.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; delete nothing.")
 @output_option
 def delete_command(name, yes, dry_run, json_output):
@@ -1037,19 +1038,22 @@ def delete_command(name, yes, dry_run, json_output):
             emit_json_result(cli_json.failure("cxr.profile.delete", {}, str(exc)))
             return 1
         raise CLIError(str(exc)) from None
+    del _catalog_io.profile_rows(document)[name]
     if dry_run:
-        del _catalog_io.profile_rows(document)[name]
         return _write(document, original, True, "")
     if not yes:
-        click.confirm(
+        _write(document, original, True, "")
+        if not confirm_destructive(
+            False,
             f"delete profile {name!r} (ranges, {n_overrides} material overrides)? "
             "this cannot be undone",
-            err=True,
-            abort=True,
-        )
-    del _catalog_io.profile_rows(document)[name]
+        ):
+            return 0
     proposed = tomlkit.dumps(document)
     try:
+        current = Path(_catalog_io._MATERIALS_TOML).read_text(encoding="utf-8")
+        if current != original:
+            raise ValueError("material catalog changed after preview; rerun command")
         _catalog_io.validate(_catalog_io._MATERIALS_TOML, proposed)
     except (OSError, ValueError, ParseError) as exc:
         if json_output:

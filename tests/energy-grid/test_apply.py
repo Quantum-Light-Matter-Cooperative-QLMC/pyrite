@@ -294,6 +294,19 @@ def test_delete_line_grid_dry_run_prints_diff_and_writes_nothing(tmp_path, monke
     assert "-  { energy_keV = 100.0" in capsys.readouterr().out
 
 
+def test_delete_line_grid_fails_closed_when_catalog_changed_after_preview(tmp_path, monkeypatch):
+    toml_path = tmp_path / "materials.toml"
+    toml_path.write_text(BASE_TOML)
+    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
+    toml_path.write_text(BASE_TOML + "\n# concurrent edit\n")
+
+    with pytest.raises(ValueError, match="catalog changed after preview"):
+        apply.delete_line_grid("hopg", [100.0], expected_original=BASE_TOML)
+
+    assert toml_path.read_text().endswith("# concurrent edit\n")
+
+
 def test_delete_line_grid_unknown_energy_errors_without_writes(tmp_path, monkeypatch):
     toml_path = tmp_path / "materials.toml"
     toml_path.write_text(BASE_TOML)

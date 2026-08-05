@@ -15,14 +15,13 @@ Run a survey with:
 cxr run standard -m mose2 --fidelity survey
 ```
 
-The older `--profile full|survey` spelling still works but is deprecated and
-warns; it collided with the catalog `[profiles.*]` concept (named scan-default
-campaigns, see `docs/cli-energy-grid-sweep-rework-plan.md`), which keeps the
-word *profile*. Fidelity (`--fidelity`) selects the grid-reduction policy;
-catalog profiles select scan-parameter ranges.
+`--profile full|survey` is not a compatibility spelling: `profile` is reserved
+for catalog `[profiles.*]` campaigns (see
+`docs/cli-energy-grid-sweep-rework-plan.md`). Fidelity (`--fidelity`) selects
+the grid-reduction policy; catalog profiles select scan-parameter ranges.
 
 Python callers use `default_settings("survey")` and
-`material_sweep("mose2", profile="survey")`. `full` remains default for both.
+`material_sweep("mose2", fidelity="survey")`. `full` remains default for both.
 Explicit `material_sweep` overrides apply after profile resolution.
 
 `cxr energy-grid` is upstream of this choice. `derive`, locally or with

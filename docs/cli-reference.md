@@ -207,7 +207,7 @@ Usage: cxr app analysis [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...
 
   Launch notebooks/analysis_app.py with marimo run or edit.
 
-  MATERIAL overrides the persisted default for this run. --persist-default stores it for
+  MATERIAL overrides the persisted default for this run. --save-default stores it for
   later no-argument launches.
 
 Options:
@@ -245,7 +245,7 @@ Usage: cxr app analysis launch [OPTIONS] [MATERIAL]
 
   Launch notebooks/analysis_app.py with marimo run or edit.
 
-  MATERIAL overrides the persisted default for this run. --persist-default stores it for
+  MATERIAL overrides the persisted default for this run. --save-default stores it for
   later no-argument launches.
 
 Options:
@@ -268,7 +268,7 @@ Usage: cxr app viewer [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...
 
   3D trajectory and crystal structure visualization.
 
-  MATERIAL overrides the persisted default for this run. --persist-default stores it for
+  MATERIAL overrides the persisted default for this run. --save-default stores it for
   later no-argument launches.
 
 Options:
@@ -307,7 +307,7 @@ Usage: cxr app viewer launch [OPTIONS] [MATERIAL]
 
   3D trajectory and crystal structure visualization.
 
-  MATERIAL overrides the persisted default for this run. --persist-default stores it for
+  MATERIAL overrides the persisted default for this run. --save-default stores it for
   later no-argument launches.
 
 Options:
@@ -1257,7 +1257,7 @@ Usage: cxr energy-grid line delete [OPTIONS] MATERIAL
 Options:
   --energy KEV                    Beam energy in keV; repeat for multiple rows.
                                   [required]
-  -y, --yes                       Skip the confirmation prompt.
+  -y, --yes                       Delete the exact previewed rows.
   --dry-run                       Print proposed diff; delete nothing.
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
@@ -1464,7 +1464,7 @@ Usage: cxr profile delete [OPTIONS] NAME
   ``[energy_grids.NAME]`` fallback bucket); referents are listed.
 
 Options:
-  -y, --yes                       Skip the confirmation prompt.
+  -y, --yes                       Delete the exact previewed profile.
   --dry-run                       Print proposed TOML diff; delete nothing.
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
