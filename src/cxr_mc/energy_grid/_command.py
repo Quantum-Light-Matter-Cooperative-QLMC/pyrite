@@ -35,6 +35,7 @@ from cxr_mc.cli._core import (
     emit_result,
     invoke_legacy,
 )
+from cxr_mc.cli._deprecations import DeprecatingGroup
 from cxr_mc.energy_grid import apply, defaults, job
 
 _DEFAULT_FIELD_KEYS = {
@@ -116,7 +117,12 @@ def _derive_options(function):
     )(function)
 
 
-@click.group(name="energy-grid", no_args_is_help=False)
+@click.group(
+    name="energy-grid",
+    cls=DeprecatingGroup,
+    no_args_is_help=False,
+    deprecation_prefix="energy-grid",
+)
 def command():
     """Derive and manage per-material photon-energy grids.
 

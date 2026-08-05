@@ -57,18 +57,6 @@ _COMMAND_HELP = {
     "check-config": "Validate a material catalog without starting simulation.",
 }
 
-_DEPRECATED_COMMANDS = {
-    "slim": "cxr checkpoint slim",
-    "rebrem": "cxr checkpoint recompute brem",
-    "reline": "cxr checkpoint recompute line",
-    "archive": "cxr checkpoint archive",
-    "restore": "cxr checkpoint restore",
-    "archives": "cxr checkpoint list",
-    "union": "cxr checkpoint merge",
-    "prune": "cxr checkpoint prune",
-}
-
-
 @click.command(
     cls=LazyGroup,
     lazy_commands=_COMMANDS,
@@ -86,7 +74,6 @@ _DEPRECATED_COMMANDS = {
         "check",
         "check-config",
     },
-    lazy_deprecated=_DEPRECATED_COMMANDS,
     no_args_is_help=False,
     context_settings={"help_option_names": ["-h", "--help"]},
 )

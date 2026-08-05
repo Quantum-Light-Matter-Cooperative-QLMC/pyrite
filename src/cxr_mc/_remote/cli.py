@@ -23,6 +23,7 @@ from ..cli._core import (
     invoke_legacy,
     run,
 )
+from ..cli._deprecations import DeprecatingGroup
 from ..scan import load_all_materials
 from . import config, lifecycle, presentation, scripts, state, transport, viewer
 
@@ -530,6 +531,8 @@ def _reject_all_with_values(command_name, all_, values):
 
 @click.group(
     "remote",
+    cls=DeprecatingGroup,
+    deprecation_prefix="remote",
     help=(
         "[dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n"
         "Host, remote directory, and executable come from CXR_REMOTE_HOST, "
@@ -999,7 +1002,12 @@ def logs_command(jobid, follow):
     return _invoke_click(_cli_logs, _click_args("logs", jobid=jobid, follow=follow))
 
 
-@command.group("profile", help="Manage named compute-performance logs.", hidden=True)
+@command.group(
+    "profile",
+    cls=DeprecatingGroup,
+    help="Manage named compute-performance logs.",
+    hidden=True,
+)
 def profile_command():
     pass
 
@@ -1017,10 +1025,6 @@ def profile_command():
     metavar="PERFORMANCE_PROFILE",
 )
 def profile_pull_command(profile):
-    emit_diagnostic(
-        "warning: 'cxr remote profile pull' is deprecated; "
-        "use 'cxr remote performance pull'"
-    )
     return _invoke_click(
         _cli_profile_pull,
         _click_args("profile pull", profile=profile),
