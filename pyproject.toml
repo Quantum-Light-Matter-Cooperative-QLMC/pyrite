@@ -69,7 +69,9 @@ build-backend = "hatchling.build"
 packages = ["src/cxr_mc"]
 
 [dependency-groups]
-dev = []
+dev = [
+    "pytest"
+]
 # Docs toolchain (Sphinx site). Not a default group, so `uv sync` and the Docker
 # image stay lean; build with `uv run --group docs sphinx-build ...`.
 docs = [
