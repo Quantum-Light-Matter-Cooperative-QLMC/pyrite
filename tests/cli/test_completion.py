@@ -152,11 +152,12 @@ def _callback(command, name):
 
 
 def test_local_commands_wire_material_checkpoint_archive_and_choice_completion():
-    from cxr_mc import analyze, archive, blaze, rebrem, reline, scan, slim
+    from cxr_mc import analyze, archive, blaze, scan, slim
+    from cxr_mc.cli.commands import recompute as recompute_cli
 
     for command in (scan.command, blaze.command, analyze.command):
         assert _callback(command, "material") is _cli_completion.complete_material
-    for command in (rebrem.command, reline.command):
+    for command in (recompute_cli.brem_command, recompute_cli.line_command):
         assert _callback(command, "materials") is _cli_completion.complete_checkpoint_stem
 
     assert _callback(slim.command, "checkpoint") is _cli_completion.complete_checkpoint

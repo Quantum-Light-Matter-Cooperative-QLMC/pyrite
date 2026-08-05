@@ -171,9 +171,7 @@ def test_material_comparison_selection_reports_exact_exclusion_reason():
 
     invalid_ratio = _record("Invalid ratio", 30.0, 150.0, peak=100.0)
     invalid_ratio["brem"] = np.zeros_like(invalid_ratio["brem"])
-    summary = material_comparison_summary(
-        {"scan": {30.0: invalid_ratio}}, default_settings()
-    )
+    summary = material_comparison_summary({"scan": {30.0: invalid_ratio}}, default_settings())
     point, reason = select_material_comparison(summary, select="line_brem_ratio")
     assert point is None
     assert reason == "nonfinite_ratio"

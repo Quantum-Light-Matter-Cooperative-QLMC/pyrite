@@ -25,11 +25,11 @@ def test_performance_list_reports_profiles_and_sizes(tmp_path):
     assert "baseline: 2 artifact(s), 6 bytes" in result.stdout
 
 
-def test_performance_prune_previews_then_deletes_explicit_profile(tmp_path):
+def test_performance_rm_previews_then_deletes_explicit_profile(tmp_path):
     root = tmp_path / "performance-profiles"
     selected = _profile(root, "baseline")
     retained = _profile(root, "keeper")
-    command = ["performance", "prune", "baseline", "--performance-dir", str(root)]
+    command = ["performance", "rm", "baseline", "--performance-dir", str(root)]
 
     preview = invoke(root_command, command)
 
@@ -45,17 +45,17 @@ def test_performance_prune_previews_then_deletes_explicit_profile(tmp_path):
     assert retained.exists()
 
 
-def test_performance_prune_requires_selection_and_rejects_traversal(tmp_path):
+def test_performance_rm_requires_selection_and_rejects_traversal(tmp_path):
     root = tmp_path / "performance-profiles"
     _profile(root, "baseline")
 
     missing = invoke(
         root_command,
-        ["performance", "prune", "--performance-dir", str(root)],
+        ["performance", "rm", "--performance-dir", str(root)],
     )
     traversal = invoke(
         root_command,
-        ["performance", "prune", "../baseline", "--performance-dir", str(root)],
+        ["performance", "rm", "../baseline", "--performance-dir", str(root)],
     )
 
     assert missing.exit_code == 2
@@ -64,12 +64,27 @@ def test_performance_prune_requires_selection_and_rejects_traversal(tmp_path):
     assert "letters, digits" in traversal.stderr
 
 
-def test_performance_prune_all_handles_empty_root(tmp_path):
+def test_performance_rm_all_handles_empty_root(tmp_path):
     root = tmp_path / "missing"
 
     result = invoke(
         root_command,
-        ["performance", "prune", "--all", "--performance-dir", str(root)],
+        ["performance", "rm", "--all", "--performance-dir", str(root)],
     )
 
     assert_clean_result(result, stdout="(nothing to prune)\n")
+
+
+def test_hidden_performance_prune_alias_warns_and_still_previews(tmp_path):
+    root = tmp_path / "performance-profiles"
+    (root / "baseline").mkdir(parents=True)
+    (root / "baseline" / "gpu.ndjson").write_text("{}\n")
+
+    result = invoke(
+        root_command,
+        ["performance", "prune", "baseline", "--performance-dir", str(root)],
+    )
+
+    assert result.exit_code == 0
+    assert result.stderr.count("is deprecated") == 1
+    assert "use 'cxr performance rm'" in result.stderr

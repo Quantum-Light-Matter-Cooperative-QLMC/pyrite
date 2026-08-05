@@ -96,6 +96,21 @@ class ResumableCLIError(CLIError):
     exit_code = 75
 
 
+def hidden_alias(group: click.Group, command: click.Command, name: str) -> click.Command:
+    """Register *command* under a retired *name* as a hidden alias on *group*.
+
+    The alias is a copy, so hiding the retired spelling never hides the
+    canonical one. Every alias registered here needs a matching row in
+    :mod:`cxr_mc.cli._deprecations`; `tests/cli/test_deprecations.py` enforces
+    that in both directions.
+    """
+    alias = copy(command)
+    alias.name = name
+    alias.hidden = True
+    group.add_command(alias)
+    return alias
+
+
 class LazyGroup(DeprecatingGroup):
     """Click group whose command objects import only when resolved."""
 

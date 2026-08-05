@@ -9,7 +9,7 @@ from pathlib import Path
 
 import click
 
-from .._core import CLIError, emit_result
+from .._core import CLIError, DeprecatingGroup, emit_result, hidden_alias
 
 _PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 
@@ -74,9 +74,9 @@ def analyze(name: str, performance_dir: Path, sample_period: float) -> int:
     return 0
 
 
-@click.group("performance", no_args_is_help=True)
+@click.group("performance", cls=DeprecatingGroup, no_args_is_help=True)
 def command():
-    """List, analyze, or prune local compute-performance artifacts."""
+    """List, analyze, or delete local compute-performance artifacts."""
 
 
 @command.command("list")
@@ -126,7 +126,7 @@ def analyze_command(name, performance_dir, sample_period):
     return analyze(name, performance_dir, sample_period)
 
 
-@command.command("prune")
+@command.command("rm")
 @click.argument("profiles", nargs=-1, callback=_profile_names)
 @click.option("--all", "all_profiles", is_flag=True, help="Select every local profile.")
 @click.option("--yes", is_flag=True, help="Delete exact previewed profile directories.")
@@ -136,12 +136,12 @@ def analyze_command(name, performance_dir, sample_period):
     default=Path("performance-profiles"),
     show_default=True,
 )
-def prune_command(profiles, all_profiles, yes, performance_dir):
+def rm_command(profiles, all_profiles, yes, performance_dir):
     """Delete explicitly selected local performance profiles; preview by default."""
     if all_profiles and profiles:
-        raise click.UsageError("performance prune --all does not take PROFILE names")
+        raise click.UsageError("performance rm --all does not take PROFILE names")
     if not all_profiles and not profiles:
-        raise click.UsageError("performance prune needs PROFILE name(s), or use --all")
+        raise click.UsageError("performance rm needs PROFILE name(s), or use --all")
     available = {path.name: path for path in _profile_dirs(performance_dir)}
     selected = sorted(available) if all_profiles else list(profiles)
     missing = [name for name in selected if name not in available]
@@ -169,3 +169,6 @@ def prune_command(profiles, all_profiles, yes, performance_dir):
         pass
     emit_result(f"deleted {len(selected)} local performance profile(s)")
     return 0
+
+
+hidden_alias(command, rm_command, "prune")

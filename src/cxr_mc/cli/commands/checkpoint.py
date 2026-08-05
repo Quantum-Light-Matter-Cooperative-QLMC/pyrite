@@ -13,8 +13,10 @@ _COMMANDS = {
     "restore": "cxr_mc.archive.restore_command",
     "list": "cxr_mc.archive.archives_command",
     "merge": "cxr_mc.archive.union_command",
-    "prune": "cxr_mc.prune.command",
-    "clear": "cxr_mc.checkpoint_cleanup.command",
+    "gc": "cxr_mc.cli.commands.cleanup.gc_command",
+    "rm": "cxr_mc.cli.commands.cleanup.rm_command",
+    "prune": "cxr_mc.cli.commands.cleanup.gc_command",
+    "clear": "cxr_mc.cli.commands.cleanup.rm_command",
 }
 
 _COMMAND_HELP = {
@@ -24,13 +26,15 @@ _COMMAND_HELP = {
     "restore": "Copy a shelved checkpoint back to active slot.",
     "list": "List long-term checkpoint shelf.",
     "merge": "Merge a shelved checkpoint into active slot.",
-    "prune": "Remove records obsolete under current scan profiles.",
-    "clear": "Delete local datasets and newly unreachable shared cases.",
+    "gc": "Reclaim records obsolete under current scan profiles.",
+    "rm": "Delete local datasets and newly unreachable shared cases.",
+    "prune": "Retired spelling of `gc`.",
+    "clear": "Retired spelling of `rm`.",
 }
 
 _RECOMPUTE_COMMANDS = {
-    "brem": "cxr_mc.rebrem.command",
-    "line": "cxr_mc.reline.command",
+    "brem": "cxr_mc.cli.commands.recompute.brem_command",
+    "line": "cxr_mc.cli.commands.recompute.line_command",
 }
 
 _RECOMPUTE_HELP = {
@@ -55,10 +59,11 @@ def recompute_command() -> None:
     cls=LazyGroup,
     lazy_commands=_COMMANDS,
     lazy_help=_COMMAND_HELP,
+    lazy_hidden={"prune", "clear"},
     no_args_is_help=True,
 )
 def command() -> None:
-    """Inspect, transform, recompute, archive, and prune local checkpoints.
+    """Inspect, transform, recompute, archive, and reclaim local checkpoints.
 
     Existing top-level paths such as ``cxr slim`` and ``cxr archive`` remain
     compatibility aliases.
@@ -68,8 +73,8 @@ def command() -> None:
       cxr checkpoint list
       cxr checkpoint archive hopg keeper
       cxr checkpoint recompute line hopg
-      cxr checkpoint prune --profile standard
-      cxr checkpoint clear --profile standard
+      cxr checkpoint gc --profile standard
+      cxr checkpoint rm --profile standard
     """
 
 

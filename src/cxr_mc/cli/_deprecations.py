@@ -53,7 +53,12 @@ DEPRECATIONS: dict[str, Deprecation] = {
         _entry("restore", "cxr checkpoint restore"),
         _entry("archives", "cxr checkpoint list"),
         _entry("union", "cxr checkpoint merge"),
-        _entry("prune", "cxr checkpoint prune"),
+        _entry("prune", "cxr checkpoint gc"),
+        # D4 verb collapse: `prune` (reclaim obsolete) became `gc`; `clear`
+        # (delete an explicit target) became `rm`.
+        _entry("checkpoint prune", "cxr checkpoint gc"),
+        _entry("checkpoint clear", "cxr checkpoint rm"),
+        _entry("performance prune", "cxr performance rm"),
         # Retired scan-range group. Each leaf has its own canonical spelling,
         # so the rows sit on the leaves rather than on the `sweep` group.
         _entry(
@@ -88,6 +93,17 @@ DEPRECATIONS: dict[str, Deprecation] = {
         # sits on the leaf so the warning names a runnable command, not a group.
         _entry("remote profile pull", "cxr remote performance pull"),
         _entry("remote check", "cxr material validate --remote"),
+        # D4 verb collapse in the remote namespace. `gc` runs both halves the
+        # retired `prune` (obsolete records) and `reap` (orphaned reservations)
+        # spellings ran separately, so both rows point at it.
+        _entry("remote clear", "cxr remote rm"),
+        _entry("remote prune", "cxr remote gc"),
+        _entry(
+            "remote reap",
+            "cxr remote gc",
+            note="`gc` also drops obsolete records; use `--min-age-minutes` as before.",
+        ),
+        _entry("remote performance prune", "cxr remote performance rm"),
     )
 }
 

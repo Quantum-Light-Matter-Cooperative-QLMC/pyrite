@@ -38,14 +38,14 @@ def _blob(root, material, key):
     return path
 
 
-def test_clear_preview_lists_datasets_and_newly_unreachable_blobs(tmp_path):
+def test_rm_preview_lists_datasets_and_newly_unreachable_blobs(tmp_path):
     key = "a" * 64
     dataset = _dataset(tmp_path, "hopg", "hopg", [key])
     blob = _blob(tmp_path, "hopg", key)
 
     result = invoke(
         root_command,
-        ["checkpoint", "clear", "hopg", "--checkpoint-dir", str(tmp_path)],
+        ["checkpoint", "rm", "hopg", "--checkpoint-dir", str(tmp_path)],
     )
 
     assert_clean_result(result)
@@ -56,7 +56,7 @@ def test_clear_preview_lists_datasets_and_newly_unreachable_blobs(tmp_path):
     assert blob.exists()
 
 
-def test_clear_deletes_selected_datasets_but_preserves_archive_reachable_blob(tmp_path):
+def test_rm_deletes_selected_datasets_but_preserves_archive_reachable_blob(tmp_path):
     retained_key = "a" * 64
     dropped_key = "b" * 64
     primary = _dataset(tmp_path, "hopg", "hopg", [retained_key])
@@ -73,7 +73,7 @@ def test_clear_deletes_selected_datasets_but_preserves_archive_reachable_blob(tm
 
     result = invoke(
         root_command,
-        ["checkpoint", "clear", "hopg", "--checkpoint-dir", str(tmp_path), "--yes"],
+        ["checkpoint", "rm", "hopg", "--checkpoint-dir", str(tmp_path), "--yes"],
     )
 
     assert_clean_result(result)
@@ -85,7 +85,7 @@ def test_clear_deletes_selected_datasets_but_preserves_archive_reachable_blob(tm
     assert not dropped_blob.exists()
 
 
-def test_clear_profile_selects_only_matching_dataset_identity(tmp_path):
+def test_rm_profile_selects_only_matching_dataset_identity(tmp_path):
     standard = _dataset(tmp_path, "hopg", "hopg", [], profile="standard")
     survey = _dataset(tmp_path, "hopg@survey", "hopg", [], profile="survey")
 
@@ -93,7 +93,7 @@ def test_clear_profile_selects_only_matching_dataset_identity(tmp_path):
         root_command,
         [
             "checkpoint",
-            "clear",
+            "rm",
             "--profile",
             "survey",
             "--checkpoint-dir",
@@ -107,7 +107,7 @@ def test_clear_profile_selects_only_matching_dataset_identity(tmp_path):
     assert not survey.exists()
 
 
-def test_clear_fails_closed_on_malformed_archive_manifest(tmp_path):
+def test_rm_fails_closed_on_malformed_archive_manifest(tmp_path):
     dataset = _dataset(tmp_path, "hopg", "hopg", [])
     archive = tmp_path / "archive" / "broken"
     archive.mkdir(parents=True)
@@ -116,7 +116,7 @@ def test_clear_fails_closed_on_malformed_archive_manifest(tmp_path):
 
     result = invoke(
         root_command,
-        ["checkpoint", "clear", "hopg", "--checkpoint-dir", str(tmp_path), "--yes"],
+        ["checkpoint", "rm", "hopg", "--checkpoint-dir", str(tmp_path), "--yes"],
     )
 
     assert result.exit_code == 1
@@ -124,17 +124,31 @@ def test_clear_fails_closed_on_malformed_archive_manifest(tmp_path):
     assert dataset.exists()
 
 
-def test_clear_requires_exactly_one_selector(tmp_path):
+def test_rm_requires_exactly_one_selector(tmp_path):
     missing = invoke(
         root_command,
-        ["checkpoint", "clear", "--checkpoint-dir", str(tmp_path)],
+        ["checkpoint", "rm", "--checkpoint-dir", str(tmp_path)],
     )
     conflicting = invoke(
         root_command,
-        ["checkpoint", "clear", "hopg", "--all", "--checkpoint-dir", str(tmp_path)],
+        ["checkpoint", "rm", "hopg", "--all", "--checkpoint-dir", str(tmp_path)],
     )
 
     assert missing.exit_code == 2
     assert conflicting.exit_code == 2
     assert "exactly one" in missing.stderr
     assert "exactly one" in conflicting.stderr
+
+
+def test_hidden_checkpoint_clear_alias_warns_and_still_previews(tmp_path):
+    _dataset(tmp_path, "hopg", "hopg", ["a" * 64])
+
+    result = invoke(
+        root_command,
+        ["checkpoint", "clear", "hopg", "--checkpoint-dir", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0
+    assert result.stderr.count("is deprecated") == 1
+    assert "use 'cxr checkpoint rm'" in result.stderr
+    assert "would delete local checkpoint datasets:" in result.stdout

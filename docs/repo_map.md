@@ -56,10 +56,9 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 
 - **`cxr` console script** → `cli:main` (`pyproject.toml [project.scripts]`),
   lazy Click dispatch for `scan`, `blaze`, `export`, `analyze`, `validate`,
-  `catalog`, `checkpoint`, `remote`, `energy-grid`, `profile`, `material`, and
-  `prune`.
-  Older flat checkpoint verbs, `check`, and `check-config` remain hidden
-  compatibility aliases.
+  `catalog`, `checkpoint`, `remote`, `energy-grid`, `profile`, and `material`.
+  Older flat checkpoint verbs (including `prune`), `check`, and `check-config`
+  remain hidden compatibility aliases.
   Checked user-facing inventory:
   [`docs/cli-reference.md`](cli-reference.md).
 - **`cxr profile ...`** → `cli.commands.profile`: manage named campaign defaults and
@@ -74,10 +73,15 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   hidden alias: `cxr check-config`.
 - **`cxr checkpoint ...`** → `cli.commands.checkpoint:command`: grouped local checkpoint
   shrink, component recompute, archive, restore, list, and merge operations.
-- **`cxr checkpoint prune [--all | --profile NAME] [--yes]`** →
-  `prune:command`: preview or atomically rewrite current named-profile
-  checkpoints, retaining only records whose full case payload exactly matches
-  current profile resolution. Hidden compatibility alias: `cxr prune`.
+- **`cxr checkpoint gc [--all | --profile NAME] [--yes]`** →
+  `cli.commands.cleanup:gc_command`: preview or atomically rewrite current
+  named-profile checkpoints, retaining only records whose full case payload
+  exactly matches current profile resolution. Hidden compatibility aliases:
+  `cxr checkpoint prune`, `cxr prune`.
+- **`cxr checkpoint rm [MATERIAL]... | --profile NAME | --all [--yes]`** →
+  `cli.commands.cleanup:rm_command`: delete explicitly selected local datasets
+  and the CAS blobs they alone kept reachable. Hidden compatibility alias:
+  `cxr checkpoint clear`.
 - **`cxr run [PROFILE] [-m MATERIAL] [--fidelity full|survey]`** → `scan:main` →
   `run.run_sweep` → write canonical `checkpoints/<material>/{line,brem}.pkl`
   or an identity-qualified variant directory. Box shim: `python -m cxr_mc._entry.scan`.
@@ -96,8 +100,10 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
 - **`cxr remote ...`** → `remote:*`: optional SSH/SLURM lifecycle for lab GPU
   box: run, status [--attach], logs, pull, stop, validation jobs. Canonical
   submission and validation paths are `remote run` and `remote validate`;
-  `remote prune` applies profile-aware checkpoint pruning under remote stem
-  reservations; `check` remains a hidden alias.
+  `remote gc` applies profile-aware checkpoint pruning under remote stem
+  reservations and releases orphaned reservations, replacing the hidden
+  `remote prune` and `remote reap` aliases; `remote rm` deletes remote
+  checkpoints (hidden alias `remote clear`); `check` remains a hidden alias.
 - **`cxr slim <checkpoint-dir> [--grid]`** → `slim:slim_checkpoint` →
   `results.slim_results`: shrink checkpoint pickle for transfer (drop
   wide-brem / float32 / filter configs; `--grid` keep only material's
@@ -433,7 +439,7 @@ Click wiring lives in `cli/commands/`; pure domain logic stays in its domain
 module.
 - Public: `main`.
 - Deps: lazy per-command imports from `cli.commands.*` (see `_COMMANDS`), plus
-  lazy `archive`, `check`, `prune`, `rebrem`, `reline`, `remote` for
+  lazy `archive`, `check`, `remote` for
   domain-owned groups not yet moved. Eager lightweight deps: `cli._core`,
   `__version__`.
 - The pre-move module paths (`cli/profile.py`, `cli/material.py`,
@@ -463,20 +469,40 @@ only. Shared validated atomic TOML helpers stay in `cli/_catalog_io.py`.
 
 ### `cli/commands/checkpoint.py`
 Canonical `cxr checkpoint` group. Lazily routes `slim`, component
-`recompute {brem,line}`, `archive`, `restore`, `list`, `merge`, and
-reachability-safe `clear` to existing checkpoint handlers while root-level
-legacy paths remain hidden aliases.
+`recompute {brem,line}`, `archive`, `restore`, `list`, `merge`, obsolete-record
+`gc`, and reachability-safe `rm` to existing checkpoint handlers. The retired
+`prune`/`clear` spellings and the root-level legacy paths remain hidden aliases.
 
 ### `checkpoint_cleanup.py`
-Local checkpoint dataset deletion and shared-CAS garbage collection. Selects
-datasets by material, profile, or all; previews exact dataset paths and blobs;
-treats active and archived manifests as reachability roots; revalidates retained
-manifests before mutation and fails closed on malformed or changed state.
+Checkpoint reclamation drivers: `prune_checkpoints` (drops records no longer
+reproducible under the current catalog scan profiles, rewriting each dataset
+atomically) and `clear_checkpoints` (deletes explicitly selected datasets plus
+the CAS blobs they alone kept reachable). Selects by material, profile, or all;
+previews exact dataset paths and blobs; treats active and archived manifests as
+reachability roots; revalidates retained manifests before mutation and fails
+closed on malformed or changed state. Folded from the retired `prune.py`.
+
+### `cli/commands/cleanup.py`
+Click layer for `cxr checkpoint gc` (`gc_command`) and `cxr checkpoint rm`
+(`rm_command`), owning selector validation only. The hidden top-level `cxr
+prune` alias resolves to `gc_command`.
 
 ### `cli/commands/performance.py`
 Canonical local performance-artifact lifecycle: inventory, analysis, and
-preview-by-default profile pruning. `profile analyze` remains a hidden warning
-alias. Revalidates selected file signatures before deletion.
+preview-by-default profile deletion (`rm`; the retired `prune` spelling stays a
+hidden alias). `profile analyze` remains a hidden warning alias. Revalidates selected file signatures before deletion.
+
+### `recompute.py`
+Checkpoint recompute drivers for the brem and line datasets:
+`rebrem_checkpoints` and `reline_checkpoints`. Enumerates checkpoint stems,
+resolves per-material identity and fidelity defaults, and delegates per-record
+repair to `run`. Folded from the retired `rebrem.py`/`reline.py`.
+
+### `cli/commands/recompute.py`
+Click layer for `cxr checkpoint recompute {brem,line}` (`brem_command`,
+`line_command`), including `--json` envelopes and the exclusive
+materials-or-`--all` selection contract. Hidden top-level `rebrem`/`reline`
+aliases resolve here.
 
 ### `recompute_defaults.py`
 Fidelity-aware line/bremsstrahlung recompute defaults shared by local, grouped,
@@ -539,7 +565,7 @@ and clear, remote validation jobs.
   - `viewer.py` — one-shot/attached status and logs rendering; attached status
     reuses one framed SSH stream across refreshes.
   - `cli.py` — Click wiring and subcommand dispatch, including canonical
-    `remote performance list|pull|prune` and performance-mode defaults.
+    `remote performance list|pull|rm` and performance-mode defaults.
   Names re-export as import-time snapshots; internal cross-module calls resolve
   through the owning submodule, so tests patch the owner (e.g.
   `transport._ssh_capture`), not the facade.

@@ -374,9 +374,7 @@ class _ProfileGroup(DeprecatingGroup):
         return items
 
 
-@click.group(
-    name="profile", cls=_ProfileGroup, no_args_is_help=True, deprecation_prefix="profile"
-)
+@click.group(name="profile", cls=_ProfileGroup, no_args_is_help=True, deprecation_prefix="profile")
 def command():
     """Manage catalog scan profiles (named campaign defaults).
 

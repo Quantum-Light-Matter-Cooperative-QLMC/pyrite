@@ -526,9 +526,7 @@ def _format_case_progress(records, materials=()):
         return "  No case progress reported yet. Use `cxr remote logs` for diagnostics."
     order = []
     for material in materials:
-        order.extend(
-            key for key, record in records.items() if record["material"] == material
-        )
+        order.extend(key for key, record in records.items() if record["material"] == material)
     order.extend(key for key in records if key not in order)
     labels = {}
     for key in order:
@@ -850,11 +848,8 @@ def _format_job_status(sections, detail):
     # per-material CASE PROGRESS block render at levels 0/1/2 alike; the log is
     # still only pulled (and legacy-parsed) at -vv.
     records = {} if diagnostic else _parse_progress_records(sections.get("PROGRESS", ""))
-    cpu_phase = (
-        fields.get("cpu_only") == "True"
-        or state_text.startswith(
-            ("profiling CPU", "completed CPU", "CPU profile failed", "done CPU", "FAILED CPU")
-        )
+    cpu_phase = fields.get("cpu_only") == "True" or state_text.startswith(
+        ("profiling CPU", "completed CPU", "CPU profile failed", "done CPU", "FAILED CPU")
     )
     phase_records = records
     if cpu_phase:
@@ -916,9 +911,7 @@ def _format_job_status(sections, detail):
             ]
         )
     else:
-        done_materials = sum(
-            1 for record in phase_records.values() if record["state"] == "done"
-        )
+        done_materials = sum(1 for record in phase_records.values() if record["state"] == "done")
         material_count = len([material for material in materials if material != "-"])
         roster = _format_material_roster(materials, include_count=False)
         material_summary = f"{done_materials}/{material_count} complete"

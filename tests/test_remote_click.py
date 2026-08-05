@@ -17,10 +17,12 @@ REMOTE_COMMANDS = (
     "status",
     "logs",
     "stop",
+    "gc",
     "reap",
     "pull",
     "profile",
     "performance",
+    "rm",
     "clear",
     "prune",
     "prune-jobs",
@@ -63,7 +65,7 @@ def test_remote_performance_commands_dispatch(monkeypatch):
 
     assert_clean_result(invoke(remote.command, ["performance", "list"]))
     assert_clean_result(invoke(remote.command, ["performance", "pull", "baseline"]))
-    assert_clean_result(invoke(remote.command, ["performance", "prune", "baseline", "--yes"]))
+    assert_clean_result(invoke(remote.command, ["performance", "rm", "baseline", "--yes"]))
 
     assert calls == [
         ("list",),
@@ -298,18 +300,68 @@ def test_remote_incompatible_click_inputs_are_usage_errors(argv, message):
     assert message in result.stderr
 
 
-def test_remote_prune_defaults_to_standard_preview(monkeypatch):
+def test_remote_gc_runs_both_reclamations_with_standard_defaults(monkeypatch):
     calls = []
     monkeypatch.setattr(
         lifecycle,
         "prune_remote",
-        lambda **kwargs: calls.append(kwargs),
+        lambda **kwargs: calls.append(("prune", kwargs)),
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "reap_reservations",
+        lambda **kwargs: calls.append(("reap", kwargs)),
+    )
+
+    result = invoke(remote.command, ["gc"])
+
+    assert_clean_result(result)
+    assert calls == [
+        ("prune", {"all_profiles": False, "catalog_profile": None, "yes": False}),
+        ("reap", {"min_age_minutes": 5.0, "yes": False}),
+    ]
+
+
+def test_hidden_remote_prune_alias_warns_and_reclaims_records_only(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "prune_remote",
+        lambda **kwargs: calls.append(("prune", kwargs)),
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "reap_reservations",
+        lambda **kwargs: pytest.fail("retired `prune` must not reap reservations"),
     )
 
     result = invoke(remote.command, ["prune"])
 
-    assert_clean_result(result)
-    assert calls == [{"all_profiles": False, "catalog_profile": None, "yes": False}]
+    assert result.exit_code == 0
+    assert result.stderr.count("is deprecated") == 1
+    assert "cxr remote gc" in result.stderr
+    assert calls == [("prune", {"all_profiles": False, "catalog_profile": None, "yes": False})]
+
+
+def test_hidden_remote_reap_alias_warns_and_releases_locks_only(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        lifecycle,
+        "reap_reservations",
+        lambda **kwargs: calls.append(("reap", kwargs)),
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "prune_remote",
+        lambda **kwargs: pytest.fail("retired `reap` must not prune records"),
+    )
+
+    result = invoke(remote.command, ["reap"])
+
+    assert result.exit_code == 0
+    assert result.stderr.count("is deprecated") == 1
+    assert "cxr remote gc" in result.stderr
+    assert calls == [("reap", {"min_age_minutes": 5.0, "yes": False})]
 
 
 @pytest.mark.parametrize("command_name", ["run", "rebrem", "reline"])
@@ -552,7 +604,7 @@ def test_clear_implicit_profile_uses_manifest_materials(monkeypatch):
         lambda materials, yes, **kwargs: calls.append((materials, yes, kwargs)),
     )
 
-    result = invoke(remote.command, ["clear", "--profile", "standard"])
+    result = invoke(remote.command, ["rm", "--profile", "standard"])
 
     assert_clean_result(result)
     assert calls == [(["hopg", "hbn"], False, {"catalog_profile": "standard"})]

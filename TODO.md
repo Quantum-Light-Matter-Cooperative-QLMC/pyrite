@@ -31,6 +31,12 @@ file. Edit and drop items on `main`.
    [`docs/plans/cli-redesign-implementation-plan.md`](docs/plans/cli-redesign-implementation-plan.md)
    slice 3. → `feature/cli-deprecation-substrate`;
    [`tasks/feature/cli-deprecation-substrate/`](tasks/feature/cli-deprecation-substrate/).
+6. **CLI verb collapse and module fold (RFC D4 / pkg P3).** Canonical
+   `gc`/`rm`/`recompute` lifecycle verbs; retire `rebrem.py`/`reline.py`/`prune.py`
+   into the checkpoint recompute/cleanup modules.
+   [`docs/plans/cli-redesign-implementation-plan.md`](docs/plans/cli-redesign-implementation-plan.md)
+   slice 4. → `feature/cli-verb-collapse-module-fold`;
+   [`tasks/feature/cli-verb-collapse-module-fold/`](tasks/feature/cli-verb-collapse-module-fold/).
 
 ## P1 - top-priority back burner
 

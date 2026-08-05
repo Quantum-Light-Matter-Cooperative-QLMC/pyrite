@@ -5,8 +5,9 @@ import pickle
 
 import pytest
 
-from cxr_mc import archive, blaze, energy_grid, rebrem, reline, remote, scan
+from cxr_mc import archive, blaze, energy_grid, recompute, remote, scan
 from cxr_mc._remote import lifecycle, viewer
+from cxr_mc.cli.commands import recompute as recompute_cli
 from tests.helpers.cli import invoke
 
 
@@ -197,21 +198,21 @@ def test_blaze_json_suppresses_human_output(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("module", "name"),
-    [(rebrem, "rebrem"), (reline, "reline")],
+    ("command", "name"),
+    [(recompute_cli.brem_command, "rebrem"), (recompute_cli.line_command, "reline")],
 )
-def test_recompute_json_uses_status_for_partial_summary(monkeypatch, module, name):
+def test_recompute_json_uses_status_for_partial_summary(monkeypatch, command, name):
     target = f"{name}_checkpoints"
 
-    def recompute(*_args, summary_status, **_kwargs):
+    def _driver(*_args, summary_status, **_kwargs):
         print("human progress")
         summary_status.update(hopg={"complete": True}, hbn={"complete": False})
         raise SystemExit(75)
 
-    monkeypatch.setattr(module, target, recompute)
+    monkeypatch.setattr(recompute, target, _driver)
 
     document = _document(
-        invoke(module.command, ["hopg", "hbn", "--json"]),
+        invoke(command, ["hopg", "hbn", "--json"]),
         exit_code=75,
     )
 
@@ -222,10 +223,13 @@ def test_recompute_json_uses_status_for_partial_summary(monkeypatch, module, nam
 
 
 @pytest.mark.parametrize(
-    ("module", "low_level"),
-    [(rebrem, "repair_checkpoint"), (reline, "reline_checkpoint")],
+    ("command", "low_level"),
+    [
+        (recompute_cli.brem_command, "repair_checkpoint"),
+        (recompute_cli.line_command, "reline_checkpoint"),
+    ],
 )
-def test_recompute_json_marks_low_level_exception_failed(monkeypatch, module, low_level):
+def test_recompute_json_marks_low_level_exception_failed(monkeypatch, command, low_level):
     from cxr_mc import run
 
     def fail(*_args, **_kwargs):
@@ -233,9 +237,7 @@ def test_recompute_json_marks_low_level_exception_failed(monkeypatch, module, lo
 
     monkeypatch.setattr(run, low_level, fail)
 
-    document = _document(
-        invoke(module.command, ["hopg", "--profile", "standard", "--json"]), exit_code=1
-    )
+    document = _document(invoke(command, ["hopg", "--profile", "standard", "--json"]), exit_code=1)
 
     assert document["payload"]["completed_materials"] == []
     assert document["payload"]["failed_materials"] == ["hopg"]

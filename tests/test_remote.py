@@ -412,7 +412,7 @@ def test_queue_script_cpu_flag_adds_cprofile_after_primary():
     # --performance-profile sampler that would clobber the GPU tick file.
     assert '--checkpoint-dir "$cpu_ckpt"' in script
     assert "cpu-profile-checkpoints" in script
-    assert "--performance-profile" not in script.split('printf \'%s\\n\' "cProfile')[1]
+    assert "--performance-profile" not in script.split("printf '%s\\n' \"cProfile")[1]
     assert "profiling CPU $m" in script
     assert "completed primary: $m" in script
     assert "FAILED CPU profile" in script
@@ -487,9 +487,7 @@ def test_queue_script_cpu_failure_is_terminal_and_keeps_primary_artifacts(
 ):
     fake_uv = tmp_path / "fake-uv"
     fake_uv.write_text(
-        "#!/usr/bin/env bash\n"
-        "case \" $* \" in *\" -m cProfile \"*) exit 9 ;; esac\n"
-        "exit 0\n",
+        '#!/usr/bin/env bash\ncase " $* " in *" -m cProfile "*) exit 9 ;; esac\nexit 0\n',
         encoding="utf-8",
     )
     fake_uv.chmod(0o755)
@@ -511,9 +509,7 @@ def test_queue_script_cpu_failure_is_terminal_and_keeps_primary_artifacts(
     result = subprocess.run(["bash"], input=script, capture_output=True, text=True)
 
     assert result.returncode != 0
-    assert (tmp_path / "jobs" / "j" / "state").read_text().startswith(
-        "FAILED CPU profile"
-    )
+    assert (tmp_path / "jobs" / "j" / "state").read_text().startswith("FAILED CPU profile")
     assert artifact.read_text() == "primary artifact\n"
 
 
@@ -628,8 +624,9 @@ def test_remote_performance_inventory_parses_artifact_totals(monkeypatch):
     monkeypatch.setattr(
         transport,
         "_ssh_capture",
-        lambda command: commands.append(command)
-        or "job-2\tbaseline\t3\t120\njob-1\tbaseline\t2\t80\n",
+        lambda command: (
+            commands.append(command) or "job-2\tbaseline\t3\t120\njob-1\tbaseline\t2\t80\n"
+        ),
     )
 
     inventory = lifecycle.remote_performance_inventory()
@@ -1295,9 +1292,7 @@ def test_run_rejects_explicit_nonzero_chunk_for_perf_reps(capsys):
 
 
 def test_run_nsys_implies_performance_profile(capsys):
-    result = remote.main(
-        ["run", "compute_test_300keV", "-m", "mos2", "--nsys", "--dry-run"]
-    )
+    result = remote.main(["run", "compute_test_300keV", "-m", "mos2", "--nsys", "--dry-run"])
 
     assert result is None
     output = capsys.readouterr().out
@@ -1451,9 +1446,7 @@ def test_headless_performance_run_prints_canonical_pull_hint(monkeypatch, capsys
     monkeypatch.setattr(lifecycle, "start_queue", lambda _mats, **_kwargs: "j")
     monkeypatch.setattr(viewer, "attach", lambda _jobid: pytest.fail("must not attach"))
 
-    remote.main(
-        ["run", "standard", "-m", "hopg", "--perf", "--headless", "--no-sync"]
-    )
+    remote.main(["run", "standard", "-m", "hopg", "--perf", "--headless", "--no-sync"])
 
     assert "cxr remote performance pull standard" in capsys.readouterr().out
 
@@ -1488,9 +1481,7 @@ def test_performance_no_pull_skips_all_artifact_pulls(monkeypatch):
         lambda *_args, **_kwargs: pytest.fail("--no-pull must not pull checkpoints"),
     )
 
-    remote.main(
-        ["run", "standard", "-m", "hopg", "--perf", "--no-pull", "--no-sync"]
-    )
+    remote.main(["run", "standard", "-m", "hopg", "--perf", "--no-pull", "--no-sync"])
 
 
 def test_successful_performance_run_auto_pulls_artifacts(monkeypatch):
@@ -3809,7 +3800,7 @@ def test_clear_all_reports_nothing_when_empty(monkeypatch, capsys):
 
 def test_prune_remote_refuses_while_any_job_is_live(monkeypatch):
     target = type("Target", (), {"stem": "hopg"})()
-    monkeypatch.setattr("cxr_mc.prune._targets", lambda *_args: [target])
+    monkeypatch.setattr("cxr_mc.checkpoint_cleanup._targets", lambda *_args: [target])
     monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", False, ["hopg"])])
     monkeypatch.setattr(
         transport,
@@ -3838,7 +3829,7 @@ def test_prune_checkpoint_command_reserves_runs_and_releases():
 def test_prune_remote_dispatches_exact_reserved_stems(monkeypatch, capsys):
     target = type("Target", (), {"stem": "hopg"})()
     commands = []
-    monkeypatch.setattr("cxr_mc.prune._targets", lambda *_args: [target])
+    monkeypatch.setattr("cxr_mc.checkpoint_cleanup._targets", lambda *_args: [target])
     monkeypatch.setattr(state, "_live_jobs", lambda: [])
     monkeypatch.setattr(state, "_reservation_holders", lambda stems: [])
     monkeypatch.setattr(

@@ -4,7 +4,6 @@ import io
 import sys
 import time
 from contextlib import redirect_stderr, redirect_stdout
-from copy import copy
 
 import click
 
@@ -20,6 +19,7 @@ from ..cli._core import (
     emit_json_result,
     emit_result,
     fidelity_option,
+    hidden_alias,
     invoke_legacy,
     run,
 )
@@ -313,9 +313,7 @@ def _cli_start(args):
         succeeded = state._job_succeeded(jobid)
         if succeeded or getattr(args, "cpu", False):
             if not succeeded:
-                emit_diagnostic(
-                    "CPU phase failed; pulling retained primary performance artifacts"
-                )
+                emit_diagnostic("CPU phase failed; pulling retained primary performance artifacts")
             lifecycle.pull_performance_profile(args.performance_profile)
         else:
             emit_diagnostic(
@@ -427,7 +425,7 @@ def _cli_reap(args):
 def _cli_clear(args):
     if args.catalog_profile is not None:
         if args.all_checkpoints or args.materials:
-            args._clear_parser.error("clear --profile takes no material arguments or --all")
+            args._clear_parser.error("rm --profile takes no material arguments or --all")
         membership = _profile_default_materials(args.catalog_profile)
         if membership is None:
             from ..materials import CATALOG
@@ -441,11 +439,11 @@ def _cli_clear(args):
         return
     if args.all_checkpoints:
         if args.materials:
-            args._clear_parser.error("clear --all takes no material argument")
+            args._clear_parser.error("rm --all takes no material argument")
         lifecycle.clear_all_remote(args.yes)
         return
     if not args.materials:
-        args._clear_parser.error("clear needs material(s), --profile, or --all")
+        args._clear_parser.error("rm needs material(s), --profile, or --all")
     lifecycle.clear_remote(args.materials, args.yes)
 
 
@@ -1031,7 +1029,11 @@ def profile_pull_command(profile):
     )
 
 
-@command.group("performance", help="List, pull, or prune remote performance artifacts.")
+@command.group(
+    "performance",
+    cls=DeprecatingGroup,
+    help="List, pull, or delete remote performance artifacts.",
+)
 def performance_command():
     pass
 
@@ -1054,7 +1056,7 @@ def performance_pull_command(profile):
 
 
 @performance_command.command(
-    "prune",
+    "rm",
     help="Delete selected terminal-job performance artifacts; preview by default.",
 )
 @click.argument(
@@ -1067,15 +1069,15 @@ def performance_pull_command(profile):
 )
 @click.option("--all", "all_profiles", is_flag=True, help="Select every remote profile.")
 @click.option("--yes", is_flag=True, help="Delete exact previewed directories.")
-def performance_prune_command(profiles, all_profiles, yes):
+def performance_rm_command(profiles, all_profiles, yes):
     if all_profiles and profiles:
-        raise click.UsageError("remote performance prune --all does not take PROFILE names")
+        raise click.UsageError("remote performance rm --all does not take PROFILE names")
     if not all_profiles and not profiles:
-        raise click.UsageError("remote performance prune needs PROFILE name(s), or use --all")
+        raise click.UsageError("remote performance rm needs PROFILE name(s), or use --all")
     return _invoke_click(
         _cli_performance_prune,
         _click_args(
-            "performance prune",
+            "performance rm",
             profiles=list(profiles),
             all_profiles=all_profiles,
             yes=yes,
@@ -1111,6 +1113,7 @@ def stop_command(materials, all_, catalog_profile, yes):
 
 @command.command(
     "reap",
+    hidden=True,
     help="Release orphaned checkpoint reservations; preview unless --yes.",
 )
 @click.option(
@@ -1232,9 +1235,7 @@ def pull_command(
             catalog_profile = "standard"
     if catalog_profile is not None:
         if all_:
-            emit_diagnostic(
-                "warning: pull profile already selects its materials; ignoring --all"
-            )
+            emit_diagnostic("warning: pull profile already selects its materials; ignoring --all")
             all_ = False
         if materials and narrowed:
             raise click.UsageError(
@@ -1274,7 +1275,7 @@ def pull_command(
     )
 
 
-@command.command("clear", help="Delete remote checkpoints; preview unless --yes.")
+@command.command("rm", help="Delete remote checkpoints; preview unless --yes.")
 @click.argument("materials", nargs=-1, metavar="[MATERIAL]...")
 @click.option(
     "--all",
@@ -1287,16 +1288,16 @@ def pull_command(
     "catalog_profile",
     default=None,
     metavar="NAME",
-    help="Clear checkpoints belonging to catalog profile NAME.",
+    help="Delete checkpoints belonging to catalog profile NAME.",
 )
 @click.option("--yes", is_flag=True, help="Delete exact previewed targets; otherwise preview.")
-def clear_command(materials, all_checkpoints, catalog_profile, yes):
+def rm_command(materials, all_checkpoints, catalog_profile, yes):
     if all_checkpoints and materials:
-        raise click.UsageError("clear --all takes no material argument")
+        raise click.UsageError("rm --all takes no material argument")
     if catalog_profile is not None and (all_checkpoints or materials):
-        raise click.UsageError("clear --profile takes no material arguments or --all")
+        raise click.UsageError("rm --profile takes no material arguments or --all")
     if not all_checkpoints and not materials and catalog_profile is None:
-        raise click.UsageError("clear needs material(s), --profile, or --all")
+        raise click.UsageError("rm needs material(s), --profile, or --all")
     return _invoke_click(
         _cli_clear,
         _click_args(
@@ -1311,6 +1312,7 @@ def clear_command(materials, all_checkpoints, catalog_profile, yes):
 
 @command.command(
     "prune",
+    hidden=True,
     help=(
         "Drop remote records obsolete under current scan profiles; preview "
         "unless --yes. Defaults to profile=standard."
@@ -1342,6 +1344,59 @@ def prune_command(all_profiles, catalog_profile, yes):
             catalog_profile=catalog_profile,
             yes=yes,
         ),
+    )
+
+
+@command.command(
+    "gc",
+    help=(
+        "Reclaim remote records obsolete under current scan profiles and release "
+        "orphaned checkpoint reservations; preview unless --yes. Record selection "
+        "defaults to profile=standard."
+    ),
+)
+@click.option(
+    "--all",
+    "all_profiles",
+    is_flag=True,
+    help="Reclaim records for standard and every named catalog profile.",
+)
+@click.option(
+    "--profile",
+    "catalog_profile",
+    default=None,
+    metavar="NAME",
+    shell_complete=_cli_completion.complete_profile,
+    help="Reclaim current full and survey records for catalog profile NAME.",
+)
+@click.option(
+    "--min-age-minutes",
+    type=NONNEGATIVE_FLOAT,
+    default=5.0,
+    show_default=True,
+    help="Only release reservations at least this old.",
+)
+@click.option("--yes", is_flag=True, help="Reclaim exactly what was previewed.")
+def gc_command(all_profiles, catalog_profile, min_age_minutes, yes):
+    """Run both reclamations the retired `prune` and `reap` spellings ran separately.
+
+    Each half previews unless ``--yes``, so the combined command keeps the
+    preview-then-confirm contract both retired spellings had.
+    """
+    if all_profiles and catalog_profile is not None:
+        raise click.UsageError("gc --all cannot be combined with --profile")
+    _invoke_click(
+        _cli_prune,
+        _click_args(
+            "gc",
+            all_profiles=all_profiles,
+            catalog_profile=catalog_profile,
+            yes=yes,
+        ),
+    )
+    return _invoke_click(
+        _cli_reap,
+        _click_args("gc", min_age_minutes=min_age_minutes, yes=yes),
     )
 
 
@@ -1452,10 +1507,9 @@ def check_command(ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, detached,
 
 
 command.add_command(check_command)
-_check_alias = copy(check_command)
-_check_alias.name = "check"
-_check_alias.hidden = True
-command.add_command(_check_alias)
+hidden_alias(command, check_command, "check")
+hidden_alias(command, rm_command, "clear")
+hidden_alias(performance_command, performance_rm_command, "prune")
 
 
 def main(argv=None):

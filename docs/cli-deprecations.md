@@ -12,10 +12,13 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command keeps
 | `cxr archives` | `cxr checkpoint list` | 0.1.0 | 0.3.0 |  |
 | `cxr check` | `cxr material validate` | 0.1.0 | 0.3.0 |  |
 | `cxr check-config` | `cxr profile show` | 0.1.0 | 0.3.0 |  |
+| `cxr checkpoint clear` | `cxr checkpoint rm` | 0.1.0 | 0.3.0 |  |
+| `cxr checkpoint prune` | `cxr checkpoint gc` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid attach` | `cxr energy-grid job attach` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid logs` | `cxr energy-grid job logs` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid status` | `cxr energy-grid job status` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid stop` | `cxr energy-grid job stop` | 0.1.0 | 0.3.0 |  |
+| `cxr performance prune` | `cxr performance rm` | 0.1.0 | 0.3.0 |  |
 | `cxr profile add-material` | `cxr profile add NAME --materials MATERIAL,...` | 0.1.0 | 0.3.0 |  |
 | `cxr profile analyze` | `cxr performance analyze NAME` | 0.1.0 | 0.3.0 |  |
 | `cxr profile members add` | `cxr profile add NAME --materials MATERIAL,...` | 0.1.0 | 0.3.0 |  |
@@ -23,11 +26,15 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command keeps
 | `cxr profile members reset` | `cxr profile set NAME --all-materials` | 0.1.0 | 0.3.0 |  |
 | `cxr profile members set` | `cxr profile set NAME --materials MATERIAL,...` | 0.1.0 | 0.3.0 |  |
 | `cxr profile remove-material` | `cxr profile remove NAME --materials MATERIAL,...` | 0.1.0 | 0.3.0 |  |
-| `cxr prune` | `cxr checkpoint prune` | 0.1.0 | 0.3.0 |  |
+| `cxr prune` | `cxr checkpoint gc` | 0.1.0 | 0.3.0 |  |
 | `cxr rebrem` | `cxr checkpoint recompute brem` | 0.1.0 | 0.3.0 |  |
 | `cxr reline` | `cxr checkpoint recompute line` | 0.1.0 | 0.3.0 |  |
 | `cxr remote check` | `cxr material validate --remote` | 0.1.0 | 0.3.0 |  |
+| `cxr remote clear` | `cxr remote rm` | 0.1.0 | 0.3.0 |  |
+| `cxr remote performance prune` | `cxr remote performance rm` | 0.1.0 | 0.3.0 |  |
 | `cxr remote profile pull` | `cxr remote performance pull` | 0.1.0 | 0.3.0 |  |
+| `cxr remote prune` | `cxr remote gc` | 0.1.0 | 0.3.0 |  |
+| `cxr remote reap` | `cxr remote gc` | 0.1.0 | 0.3.0 | `gc` also drops obsolete records; use `--min-age-minutes` as before. |
 | `cxr restore` | `cxr checkpoint restore` | 0.1.0 | 0.3.0 |  |
 | `cxr slim` | `cxr checkpoint slim` | 0.1.0 | 0.3.0 |  |
 | `cxr sweep set` | `cxr material set` | 0.1.0 | 0.3.0 | The warning names the material and profile actually given. |

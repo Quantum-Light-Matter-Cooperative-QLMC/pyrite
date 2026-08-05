@@ -76,9 +76,9 @@ Commands:
   run          Run a profile's MC sweeps and write checkpoints.
   setup        Detect GPU hardware and write CXR_MC_BACKEND to .env (first run).
   app          Launch or export interactive analysis notebooks.
-  checkpoint   Inspect, transform, recompute, archive, and prune checkpoints.
+  checkpoint   Inspect, transform, recompute, archive, and reclaim checkpoints.
   completion   Manage cxr shell tab-completion.
-  performance  List, analyze, or prune compute-performance artifacts.
+  performance  List, analyze, or delete compute-performance artifacts.
   remote       Run and manage MC sweeps on a remote GPU host.
   energy-grid  Derive, submit, inspect, and apply photon-energy grids.
   profile      Manage named catalog campaigns and material membership.
@@ -287,7 +287,7 @@ Options:
 ```text
 Usage: cxr checkpoint [OPTIONS] COMMAND [ARGS]...
 
-  Inspect, transform, recompute, archive, and prune local checkpoints.
+  Inspect, transform, recompute, archive, and reclaim local checkpoints.
 
   Existing top-level paths such as ``cxr slim`` and ``cxr archive`` remain compatibility
   aliases.
@@ -296,8 +296,8 @@ Usage: cxr checkpoint [OPTIONS] COMMAND [ARGS]...
     cxr checkpoint list
     cxr checkpoint archive hopg keeper
     cxr checkpoint recompute line hopg
-    cxr checkpoint prune --profile standard
-    cxr checkpoint clear --profile standard
+    cxr checkpoint gc --profile standard
+    cxr checkpoint rm --profile standard
 
 Options:
   -h, --help  Show this message and exit.
@@ -309,8 +309,8 @@ Commands:
   restore    Copy a shelved checkpoint back to active slot.
   list       List long-term checkpoint shelf.
   merge      Merge a shelved checkpoint into active slot.
-  prune      Remove records obsolete under current scan profiles.
-  clear      Delete local datasets and newly unreachable shared cases.
+  gc         Reclaim records obsolete under current scan profiles.
+  rm         Delete local datasets and newly unreachable shared cases.
 ```
 
 ## `cxr checkpoint slim`
@@ -469,13 +469,13 @@ Options:
   -h, --help        Show this message and exit.
 ```
 
-## `cxr checkpoint prune`
+## `cxr checkpoint gc`
 
 ```text
-Usage: cxr checkpoint prune [OPTIONS]
+Usage: cxr checkpoint gc [OPTIONS]
 
   Drop records obsolete under current scan profiles; preview unless --yes. With neither
-  selector, prune profile=standard.
+  selector, gc profile=standard.
 
 Options:
   --all           Prune current checkpoints for standard and every named catalog
@@ -485,10 +485,10 @@ Options:
   -h, --help      Show this message and exit.
 ```
 
-## `cxr checkpoint clear`
+## `cxr checkpoint rm`
 
 ```text
-Usage: cxr checkpoint clear [OPTIONS] [MATERIALS]...
+Usage: cxr checkpoint rm [OPTIONS] [MATERIALS]...
 
   Delete local checkpoint datasets; preview unless --yes.
 
@@ -563,7 +563,7 @@ Options:
 ```text
 Usage: cxr performance [OPTIONS] COMMAND [ARGS]...
 
-  List, analyze, or prune local compute-performance artifacts.
+  List, analyze, or delete local compute-performance artifacts.
 
 Options:
   -h, --help  Show this message and exit.
@@ -571,7 +571,7 @@ Options:
 Commands:
   analyze  Analyze NAME's logs into CSV, Markdown, and PNG artifacts.
   list     List local performance profiles with artifact counts and sizes.
-  prune    Delete explicitly selected local performance profiles; preview by default.
+  rm       Delete explicitly selected local performance profiles; preview by default.
 ```
 
 ## `cxr performance analyze`
@@ -601,10 +601,10 @@ Options:
   -h, --help                   Show this message and exit.
 ```
 
-## `cxr performance prune`
+## `cxr performance rm`
 
 ```text
-Usage: cxr performance prune [OPTIONS] [PROFILES]...
+Usage: cxr performance rm [OPTIONS] [PROFILES]...
 
   Delete explicitly selected local performance profiles; preview by default.
 
@@ -636,16 +636,15 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  clear        Delete remote checkpoints; preview unless --yes.
+  gc           Reclaim remote records obsolete under current scan profiles and...
   jobs         List jobs with SLURM IDs, materials, and last events.
   logs         Show a job diagnostic log; defaults to latest.
-  performance  List, pull, or prune remote performance artifacts.
-  prune        Drop remote records obsolete under current scan profiles; preview...
+  performance  List, pull, or delete remote performance artifacts.
   prune-jobs   Delete terminal (done/failed/cancelled) job directories; preview...
   pull         Fetch existing checkpoints from remote box.
-  reap         Release orphaned checkpoint reservations; preview unless --yes.
   rebrem       Recompute brem-only remotely, follow, and pull completed checkpoints.
   reline       Recompute line-only remotely, follow, and pull completed checkpoints.
+  rm           Delete remote checkpoints; preview unless --yes.
   run          Sync code, submit sweep(s), track progress, and pull checkpoints.
   status       Show one job; use -v for allocation and -vv for logs.
   stop         cancel active SLURM job(s) by material, profile, or every live job.
@@ -653,18 +652,23 @@ Commands:
   validate     Run Zhai reproduction remotely or pull existing caches.
 ```
 
-## `cxr remote clear`
+## `cxr remote gc`
 
 ```text
-Usage: cxr remote clear [OPTIONS] [MATERIAL]...
+Usage: cxr remote gc [OPTIONS]
 
-  Delete remote checkpoints; preview unless --yes.
+  Reclaim remote records obsolete under current scan profiles and release orphaned
+  checkpoint reservations; preview unless --yes. Record selection defaults to
+  profile=standard.
 
 Options:
-  --all           Empty remote checkpoints directory; takes no material arguments.
-  --profile NAME  Clear checkpoints belonging to catalog profile NAME.
-  --yes           Delete exact previewed targets; otherwise preview.
-  -h, --help      Show this message and exit.
+  --all                     Reclaim records for standard and every named catalog
+                            profile.
+  --profile NAME            Reclaim current full and survey records for catalog profile
+                            NAME.
+  --min-age-minutes NUMBER  Only release reservations at least this old.  [default: 5.0]
+  --yes                     Reclaim exactly what was previewed.
+  -h, --help                Show this message and exit.
 ```
 
 ## `cxr remote jobs`
@@ -696,15 +700,15 @@ Options:
 ```text
 Usage: cxr remote performance [OPTIONS] COMMAND [ARGS]...
 
-  List, pull, or prune remote performance artifacts.
+  List, pull, or delete remote performance artifacts.
 
 Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  list   List remote performance artifact directories.
-  prune  Delete selected terminal-job performance artifacts; preview by default.
-  pull   Fetch one profile's NDJSON, Nsight, and CPU-profile artifacts.
+  list  List remote performance artifact directories.
+  pull  Fetch one profile's NDJSON, Nsight, and CPU-profile artifacts.
+  rm    Delete selected terminal-job performance artifacts; preview by default.
 ```
 
 ## `cxr remote performance list`
@@ -715,19 +719,6 @@ Usage: cxr remote performance list [OPTIONS]
   List remote performance artifact directories.
 
 Options:
-  -h, --help  Show this message and exit.
-```
-
-## `cxr remote performance prune`
-
-```text
-Usage: cxr remote performance prune [OPTIONS] [PROFILE]...
-
-  Delete selected terminal-job performance artifacts; preview by default.
-
-Options:
-  --all       Select every remote profile.
-  --yes       Delete exact previewed directories.
   -h, --help  Show this message and exit.
 ```
 
@@ -742,20 +733,17 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
-## `cxr remote prune`
+## `cxr remote performance rm`
 
 ```text
-Usage: cxr remote prune [OPTIONS]
+Usage: cxr remote performance rm [OPTIONS] [PROFILE]...
 
-  Drop remote records obsolete under current scan profiles; preview unless --yes.
-  Defaults to profile=standard.
+  Delete selected terminal-job performance artifacts; preview by default.
 
 Options:
-  --all           Prune current checkpoints for standard and every named catalog
-                  profile.
-  --profile NAME  Prune current full and survey checkpoints for catalog profile NAME.
-  --yes           Delete exact previewed stale records.
-  -h, --help      Show this message and exit.
+  --all       Select every remote profile.
+  --yes       Delete exact previewed directories.
+  -h, --help  Show this message and exit.
 ```
 
 ## `cxr remote prune-jobs`
@@ -808,19 +796,6 @@ Options:
   -h, --help               Show this message and exit.
 ```
 
-## `cxr remote reap`
-
-```text
-Usage: cxr remote reap [OPTIONS]
-
-  Release orphaned checkpoint reservations; preview unless --yes.
-
-Options:
-  --min-age-minutes NUMBER  Only reap locks at least this old.  [default: 5.0]
-  --yes                     Release reservations; otherwise preview.
-  -h, --help                Show this message and exit.
-```
-
 ## `cxr remote rebrem`
 
 ```text
@@ -865,6 +840,20 @@ Options:
   --stop NUMBER             Line exclusive upper bound in eV.
   --line-step NUMBER        Explicit uniform line-grid spacing in eV.
   -h, --help                Show this message and exit.
+```
+
+## `cxr remote rm`
+
+```text
+Usage: cxr remote rm [OPTIONS] [MATERIAL]...
+
+  Delete remote checkpoints; preview unless --yes.
+
+Options:
+  --all           Empty remote checkpoints directory; takes no material arguments.
+  --profile NAME  Delete checkpoints belonging to catalog profile NAME.
+  --yes           Delete exact previewed targets; otherwise preview.
+  -h, --help      Show this message and exit.
 ```
 
 ## `cxr remote run`

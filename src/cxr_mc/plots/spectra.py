@@ -444,9 +444,7 @@ def select_material_comparison(
     candidates = quality_candidates
     if select == "line_brem_ratio":
         candidates = [
-            candidate
-            for candidate in candidates
-            if np.isfinite(candidate["line_brem_ratio"])
+            candidate for candidate in candidates if np.isfinite(candidate["line_brem_ratio"])
         ]
         if not candidates:
             return None, "nonfinite_ratio"

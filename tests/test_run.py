@@ -1503,7 +1503,7 @@ def test_repair_brem_wide_retune_skips_record_already_at_target():
 
 
 def test_rebrem_checkpoints_enumerates_pkls_and_passes_params(monkeypatch, tmp_path):
-    from cxr_mc.rebrem import rebrem_checkpoints
+    from cxr_mc.recompute import rebrem_checkpoints
 
     (tmp_path / "MoS2.pkl").write_bytes(b"")
     (tmp_path / "W_grooved.pkl").write_bytes(b"")
@@ -1529,7 +1529,7 @@ def test_rebrem_checkpoints_enumerates_pkls_and_passes_params(monkeypatch, tmp_p
 
 
 def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatch, tmp_path):
-    from cxr_mc import rebrem
+    from cxr_mc import recompute as rebrem
 
     for material in ("hopg", "hbn"):
         (tmp_path / f"{material}.pkl").write_bytes(b"")
@@ -1550,54 +1550,58 @@ def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
 
 
 def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
-    """`cxr rebrem` refuses no-selection and materials+--all; accepts either alone."""
-    from cxr_mc import rebrem
+    """`cxr checkpoint recompute brem` refuses no-selection and materials+--all;
+    accepts either alone."""
+    from cxr_mc import recompute
+    from cxr_mc.cli.commands.recompute import brem_command
 
     seen: list[Any] = []
-    monkeypatch.setattr(rebrem, "rebrem_checkpoints", lambda **kw: seen.append(kw) or {})
+    monkeypatch.setattr(recompute, "rebrem_checkpoints", lambda **kw: seen.append(kw) or {})
     runner = CliRunner()
 
-    neither = runner.invoke(rebrem.command, ["--ne-brem", "1000"], catch_exceptions=False)
-    both = runner.invoke(rebrem.command, ["MoS2", "--all"], catch_exceptions=False)
+    neither = runner.invoke(brem_command, ["--ne-brem", "1000"], catch_exceptions=False)
+    both = runner.invoke(brem_command, ["MoS2", "--all"], catch_exceptions=False)
     assert neither.exit_code == 2
     assert both.exit_code == 2
     assert "needs material name(s)" in neither.stderr
     assert "--all does not take material names" in both.stderr
     assert seen == []
 
-    material = runner.invoke(rebrem.command, ["MoS2"], catch_exceptions=False)
+    material = runner.invoke(brem_command, ["MoS2"], catch_exceptions=False)
     assert material.exit_code == 0
     assert material.stderr == ""
     assert seen[-1]["materials"] == ["MoS2"]
 
-    all_materials = runner.invoke(rebrem.command, ["-a"], catch_exceptions=False)
+    all_materials = runner.invoke(brem_command, ["-a"], catch_exceptions=False)
     assert all_materials.exit_code == 0
     assert all_materials.stderr == ""
     assert seen[-1]["materials"] is None
 
 
 def test_reline_cli_requires_materials_xor_all(monkeypatch):
-    """`cxr reline` preserves rebrem's exclusive material-selection contract."""
-    from cxr_mc import reline
+    """`cxr checkpoint recompute line` preserves brem's exclusive
+    material-selection contract."""
+    from cxr_mc import recompute
+    from cxr_mc.cli.commands.recompute import line_command
 
     seen: list[Any] = []
-    monkeypatch.setattr(reline, "reline_checkpoints", lambda **kw: seen.append(kw) or {})
+    monkeypatch.setattr(recompute, "reline_checkpoints", lambda **kw: seen.append(kw) or {})
     runner = CliRunner()
 
-    neither = runner.invoke(reline.command, [], catch_exceptions=False)
-    both = runner.invoke(reline.command, ["MoS2", "--all"], catch_exceptions=False)
+    neither = runner.invoke(line_command, [], catch_exceptions=False)
+    both = runner.invoke(line_command, ["MoS2", "--all"], catch_exceptions=False)
     assert neither.exit_code == 2
     assert both.exit_code == 2
     assert "needs material name(s)" in neither.stderr
     assert "--all does not take material names" in both.stderr
     assert seen == []
 
-    material = runner.invoke(reline.command, ["MoS2"], catch_exceptions=False)
+    material = runner.invoke(line_command, ["MoS2"], catch_exceptions=False)
     assert material.exit_code == 0
     assert material.stderr == ""
     assert seen[-1]["materials"] == ["MoS2"]
 
-    all_materials = runner.invoke(reline.command, ["-a"], catch_exceptions=False)
+    all_materials = runner.invoke(line_command, ["-a"], catch_exceptions=False)
     assert all_materials.exit_code == 0
     assert all_materials.stderr == ""
     assert seen[-1]["materials"] is None
@@ -1647,7 +1651,7 @@ def test_repair_brem_wide_max_seconds_stops_early(monkeypatch):
 
 
 def test_rebrem_checkpoints_progress_file_writes_dashboard_records(monkeypatch, tmp_path):
-    from cxr_mc.rebrem import rebrem_checkpoints
+    from cxr_mc.recompute import rebrem_checkpoints
 
     (tmp_path / "hopg.pkl").write_bytes(b"")
     progress = tmp_path / "hopg.json"
@@ -1672,7 +1676,7 @@ def test_rebrem_checkpoints_progress_file_writes_dashboard_records(monkeypatch, 
 
 
 def test_rebrem_checkpoints_progress_file_marks_failed_and_rejects_multi(monkeypatch, tmp_path):
-    from cxr_mc.rebrem import rebrem_checkpoints
+    from cxr_mc.recompute import rebrem_checkpoints
 
     (tmp_path / "hopg.pkl").write_bytes(b"")
     (tmp_path / "hbn.pkl").write_bytes(b"")
@@ -1847,7 +1851,7 @@ def test_repair_line_spec_max_seconds_stops_early(monkeypatch):
 
 def test_reline_checkpoints_forwards_flags(monkeypatch, tmp_path):
     import cxr_mc.run as run
-    from cxr_mc import reline
+    from cxr_mc import recompute as reline
 
     calls = []
     monkeypatch.setattr(
@@ -1880,7 +1884,7 @@ def test_reline_checkpoints_forwards_flags(monkeypatch, tmp_path):
 
 
 def test_reline_profile_defaults_match_for_explicit_materials_and_all(monkeypatch, tmp_path):
-    from cxr_mc import reline
+    from cxr_mc import recompute as reline
 
     for material in ("hopg", "hbn"):
         (tmp_path / f"{material}.pkl").write_bytes(b"")
@@ -1904,7 +1908,7 @@ def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(mon
     import json
 
     import cxr_mc.run as run
-    from cxr_mc import reline
+    from cxr_mc import recompute as reline
 
     stem = "hopg@sub_100keV-deadbeef0000"
     directory = tmp_path / stem
