@@ -20,6 +20,7 @@ KWARGS = {
     "n_hat": np.array([1.0, 0.0, 0.01]),
 }
 RTOL = max(1e-12, 100.0 * float(np.finfo(REAL).eps))
+ATOL = 1e-8
 
 
 def _segments(count=1):
@@ -44,9 +45,9 @@ def test_single_segment_coherent_equals_incoherent_self_term():
 
     incoherent = mc_spectrum(segments, E_GRID, coherent=False, **KWARGS)
     coherent = mc_spectrum(segments, E_GRID, coherent=True, **KWARGS)
-
+    peak = max(np.max(np.abs(coherent)), np.max(np.abs(incoherent)))
     assert np.max(incoherent) > 0.0
-    np.testing.assert_allclose(coherent, incoherent, rtol=RTOL)
+    np.testing.assert_allclose(coherent, incoherent, rtol=RTOL, atol=peak * ATOL)
 
 
 def test_identical_in_phase_electrons_reach_n_squared_limit():

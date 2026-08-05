@@ -288,10 +288,10 @@ def test_set_replaces_grid_and_membership(tmp_path, monkeypatch):
 def test_set_unknown_material_in_membership_errors(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(profile.command, ["set", "sub_100keV", "--materials", "unobtainium"])
+    result = invoke(profile.command, ["set", "sub_100keV", "--materials", "foobarium"])
 
     assert result.exit_code == 1
-    assert "unknown material: unobtainium" in result.stderr
+    assert "unknown material: foobarium" in result.stderr
 
 
 def test_set_on_standard_prompts_and_yes_skips(tmp_path, monkeypatch):
@@ -527,7 +527,7 @@ def test_members_path_warns_and_dispatches_compatibly(tmp_path, monkeypatch):
     assert result.exit_code == 0
     assert result.stdout == "updated profile sub_100keV membership\n"
     assert result.stderr.count("is deprecated") == 1
-    assert "cxr profile set sub_100keV --materials MATERIAL,..." in result.stderr
+    assert "cxr profile set NAME --materials MATERIAL,..." in result.stderr
     assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
 
 
@@ -662,14 +662,14 @@ def test_add_material_and_remove_material_roundtrip(tmp_path, monkeypatch):
 
     added = invoke(profile.command, ["add-material", "sub_100keV", "mose2", "hopg"])
     assert added.exit_code == 0
-    assert "use 'cxr profile add sub_100keV --materials MATERIAL,...'" in added.stderr
+    assert "use 'cxr profile add NAME --materials MATERIAL,...'" in added.stderr
     assert "added mose2" in added.stdout
     assert "already members: hopg" in added.stdout
     assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
 
     removed = invoke(profile.command, ["remove-material", "sub_100keV", "hopg", "diamond"])
     assert removed.exit_code == 0
-    assert "use 'cxr profile remove sub_100keV --materials MATERIAL,...'" in removed.stderr
+    assert "use 'cxr profile remove NAME --materials MATERIAL,...'" in removed.stderr
     assert "removed hopg" in removed.stdout
     assert "not members: diamond" in removed.stdout
     assert 'materials = ["mose2"]' in catalog.read_text()
@@ -698,10 +698,10 @@ def test_add_materials_explains_implicit_membership_is_already_all(tmp_path, mon
 def test_membership_verbs_reject_unknown_material(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(profile.command, ["add", "sub_100keV", "--materials", "unobtainium"])
+    result = invoke(profile.command, ["add", "sub_100keV", "--materials", "foobarium"])
 
     assert result.exit_code == 1
-    assert "unknown material: unobtainium" in result.stderr
+    assert "unknown material: foobarium" in result.stderr
 
 
 def test_add_material_all_seeds_implicit_membership(tmp_path, monkeypatch):
@@ -716,7 +716,7 @@ def test_add_material_all_seeds_implicit_membership(tmp_path, monkeypatch):
     result = invoke(profile.command, ["add-material", "standard", "--all", "-y"])
 
     assert result.exit_code == 0
-    assert "cxr profile add standard --materials MATERIAL,..." in result.stderr
+    assert "cxr profile add NAME --materials MATERIAL,..." in result.stderr
     assert "added hopg, mose2" in result.stdout
     assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
 
@@ -730,7 +730,7 @@ def test_add_material_all_extends_and_skips_existing_members(tmp_path, monkeypat
     result = invoke(profile.command, ["add-material", "sub_100keV", "--all"])
 
     assert result.exit_code == 0
-    assert "cxr profile add sub_100keV --materials MATERIAL,..." in result.stderr
+    assert "cxr profile add NAME --materials MATERIAL,..." in result.stderr
     assert "added mose2" in result.stdout
     assert "already members: hopg" in result.stdout
     assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
@@ -755,7 +755,7 @@ def test_add_material_short_all_flag(tmp_path, monkeypatch):
     result = invoke(profile.command, ["add-material", "sub_100keV", "-a"])
 
     assert result.exit_code == 0
-    assert "cxr profile add sub_100keV --materials MATERIAL,..." in result.stderr
+    assert "cxr profile add NAME --materials MATERIAL,..." in result.stderr
     assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
 
 

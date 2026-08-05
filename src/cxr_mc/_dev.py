@@ -23,6 +23,7 @@ Commands:
     check-skills validate the canonical skills and exact mirror
     bootstrap  configure per-clone local git state (TODO.md merge driver)
     verify     check skills, lint, type check, and test
+    cli-deprecations  write or --check docs/cli-deprecations.md
 """
 
 from __future__ import annotations
@@ -80,12 +81,12 @@ TEST_SUITE_PATTERNS = {
         "test_catalog_startup_errors.py",
         "test_check_config.py",
         "checkpoint/test_cli.py",
+        "checkpoint/test_gc.py",
         "cli/test_*.py",
         "energy-grid/test_cli.py",
         "test_local_click_cli.py",
         "test_local_dashboard.py",
         "test_output_noise.py",
-        "test_prune.py",
         "test_remote.py",
         "test_remote_click.py",
         "test_scan_*.py",
@@ -474,6 +475,22 @@ def cmd_regen_golden(args: argparse.Namespace) -> None:
     raise SystemExit(regen(check=getattr(args, "check", False)))
 
 
+def cmd_cli_deprecations(args: argparse.Namespace) -> None:
+    target = ROOT / "docs" / "cli-deprecations.md"
+    mode = "--check" if getattr(args, "check", False) else "--write"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "generate_cli_deprecations.py"),
+            mode,
+            str(target),
+        ],
+        cwd=ROOT,
+        check=False,
+    )
+    raise SystemExit(result.returncode)
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="cxr-dev")
     sub = ap.add_subparsers(dest="command", required=True)
@@ -512,6 +529,9 @@ def build_parser() -> argparse.ArgumentParser:
     regen_golden = sub.add_parser("regen-golden")
     regen_golden.add_argument("--check", action="store_true")
     regen_golden.set_defaults(func=cmd_regen_golden)
+    cli_deprecations = sub.add_parser("cli-deprecations")
+    cli_deprecations.add_argument("--check", action="store_true")
+    cli_deprecations.set_defaults(func=cmd_cli_deprecations)
     return ap
 
 

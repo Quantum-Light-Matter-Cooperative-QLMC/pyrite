@@ -12,12 +12,11 @@ from cxr_mc import (
     check,
     check_config,
     export,
-    rebrem,
-    reline,
     scan,
     slim,
     viewer,
 )
+from cxr_mc.cli.commands import recompute as recompute_cli
 from tests.helpers.cli import assert_clean_result, invoke
 
 LOCAL_COMMANDS = [
@@ -28,8 +27,8 @@ LOCAL_COMMANDS = [
     check.command,
     export.command,
     slim.command,
-    rebrem.command,
-    reline.command,
+    recompute_cli.brem_command,
+    recompute_cli.line_command,
     archive.archive_command,
     archive.restore_command,
     archive.archives_command,
@@ -197,16 +196,16 @@ def test_blaze_unknown_option_after_variadic_value_is_not_swallowed():
             {"checkpoint": "in.pkl", "line_only": True, "compresslevel": 6},
         ),
         (
-            rebrem,
-            rebrem.command,
-            "_cli",
+            recompute_cli,
+            recompute_cli.brem_command,
+            "_brem_cli",
             ["hopg", "w", "--ne-brem", "1000"],
             {"material": ["hopg", "w"], "all": False, "ne_brem": 1000},
         ),
         (
-            reline,
-            reline.command,
-            "_cli",
+            recompute_cli,
+            recompute_cli.line_command,
+            "_line_cli",
             ["--all", "--line-step", "5"],
             {"material": [], "all": True, "line_step": 5.0},
         ),
@@ -282,8 +281,8 @@ def test_archive_click_dispatch(command, handler_name, argv, expected, monkeypat
         (blaze.command, ["hopg", "--energy", "0", "--spacing", "1e-6"]),
         (blaze.command, ["hopg", "--energy", "30", "--spacing", "1e-6", "--angles", "90"]),
         (check.command, ["--ne", "0"]),
-        (rebrem.command, ["hopg", "--save-every", "0"]),
-        (reline.command, ["hopg", "--line-step", "nan"]),
+        (recompute_cli.brem_command, ["hopg", "--save-every", "0"]),
+        (recompute_cli.line_command, ["hopg", "--line-step", "nan"]),
     ],
 )
 def test_local_click_numeric_domains_are_usage_errors(command, argv):
@@ -303,8 +302,8 @@ def test_slim_dataset_modes_are_mutually_exclusive():
 @pytest.mark.parametrize(
     ("command", "argv", "message"),
     [
-        (rebrem.command, [], "needs material"),
-        (reline.command, ["hopg", "--all"], "--all does not take"),
+        (recompute_cli.brem_command, [], "needs material"),
+        (recompute_cli.line_command, ["hopg", "--all"], "--all does not take"),
         (analyze.command, ["--default"], "--default requires MATERIAL"),
         (scan.command, ["standard", "-m", "not-a-material"], "not a configured material"),
     ],

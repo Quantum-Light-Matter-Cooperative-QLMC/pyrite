@@ -58,7 +58,19 @@ if hasattr(xp, "fuse"):  # CuPy exposes fuse(); NumPy/dpnp do not -> eager fallb
 
 
 def _line_amp_sq_core(
-    chi_re, chi_im, u_re, u_im, v_dot_kg, g_dot_e, om, v_dot_e, vdg, k_dot_g, k_dot_v, gamma, detuning
+    chi_re,
+    chi_im,
+    u_re,
+    u_im,
+    v_dot_kg,
+    g_dot_e,
+    om,
+    v_dot_e,
+    vdg,
+    k_dot_g,
+    k_dot_v,
+    gamma,
+    detuning,
 ):
     """One polarization's |A|^2, |A_PXR|^2, |A_CBS|^2 (Zhai Eq. 13/14) as a single
     fused GPU kernel. Replaces the per-reflection storm of complex CuPy elementwise
@@ -1185,6 +1197,7 @@ def _brem_dsigma_dk(Z, T_keV, k_eV):
     """
     T_i = xp.asarray(T_keV, dtype=REAL)[:, None]
     k = xp.asarray(k_eV, dtype=REAL)[None, :] / 1e3  # keV
+    Z = REAL(Z)
     return _brem_dsigma_dk_core(T_i, k, Z)
 
 

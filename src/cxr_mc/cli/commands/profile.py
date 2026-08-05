@@ -24,6 +24,7 @@ from cxr_mc.cli._core import (
     emit_json_result,
     emit_result,
 )
+from cxr_mc.cli._deprecations import DeprecatingGroup
 from cxr_mc.detectors.spec import DetectorSpec
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
@@ -253,10 +254,6 @@ def _confirm_standard(name, action, yes, dry_run):
         )
 
 
-def _warn_compat(old, replacement):
-    click.echo(f"warning: '{old}' is deprecated; use '{replacement}'", err=True)
-
-
 def _write(document, original, dry_run, done_message):
     """Validate, then print a diff (dry-run) or atomically write the catalog."""
     try:
@@ -363,7 +360,7 @@ def _detector_table(profile):
     return detector
 
 
-class _ProfileGroup(click.Group):
+class _ProfileGroup(DeprecatingGroup):
     """``cxr profile NAME`` aliases ``cxr profile show NAME``."""
 
     def resolve_command(self, ctx, args):
@@ -377,7 +374,7 @@ class _ProfileGroup(click.Group):
         return items
 
 
-@click.group(name="profile", cls=_ProfileGroup, no_args_is_help=True)
+@click.group(name="profile", cls=_ProfileGroup, no_args_is_help=True, deprecation_prefix="profile")
 def command():
     """Manage catalog scan profiles (named campaign defaults).
 
@@ -421,10 +418,6 @@ def command():
 )
 def analyze_command(name, performance_dir, sample_period):
     """Deprecated compatibility alias for ``performance analyze``."""
-    _warn_compat(
-        f"cxr profile analyze {name}",
-        f"cxr performance analyze {name}",
-    )
     from cxr_mc.cli.commands.performance import analyze
 
     return analyze(name, performance_dir, sample_period)
@@ -975,7 +968,13 @@ def _remove_membership(document, name, requested):
     return removed, sorted(set(requested) - set(removed))
 
 
-@click.group("members", no_args_is_help=True, hidden=True)
+@click.group(
+    "members",
+    cls=DeprecatingGroup,
+    no_args_is_help=True,
+    hidden=True,
+    deprecation_prefix="profile members",
+)
 def members_command():
     """Set, extend, shrink, or reset profile-owned material membership."""
 
@@ -1011,10 +1010,6 @@ def _member_options(function):
 @_member_options
 def members_set_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
     """Replace NAME's explicit membership with MATERIAL keys."""
-    _warn_compat(
-        f"cxr profile members set {name}",
-        f"cxr profile set {name} --materials MATERIAL,...",
-    )
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
@@ -1037,10 +1032,6 @@ def members_set_command(name, materials, unverified_dw, high_energy_only, yes, d
 @_member_options
 def members_add_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
     """Extend NAME's explicit membership with MATERIAL keys."""
-    _warn_compat(
-        f"cxr profile members add {name}",
-        f"cxr profile add {name} --materials MATERIAL,...",
-    )
     try:
         original, document = _catalog_io.catalog_text()
         requested = _group_materials(
@@ -1066,10 +1057,6 @@ def members_add_command(name, materials, unverified_dw, high_energy_only, yes, d
 @_member_options
 def members_remove_command(name, materials, unverified_dw, high_energy_only, yes, dry_run):
     """Remove MATERIAL keys from NAME's explicit membership."""
-    _warn_compat(
-        f"cxr profile members remove {name}",
-        f"cxr profile remove {name} --materials MATERIAL,...",
-    )
     try:
         original, document = _catalog_io.catalog_text()
         requested = _group_materials(
@@ -1094,10 +1081,6 @@ def members_remove_command(name, materials, unverified_dw, high_energy_only, yes
 @_member_options
 def members_reset_command(name, yes, dry_run):
     """Restore NAME's implicit all-in-use material membership."""
-    _warn_compat(
-        f"cxr profile members reset {name}",
-        f"cxr profile set {name} --all-materials",
-    )
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
@@ -1165,10 +1148,6 @@ def add_material_command(name, materials, all_materials, yes, dry_run):
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     _confirm_standard(name, "change material membership of", yes, dry_run)
-    _warn_compat(
-        f"cxr profile add-material {name}",
-        f"cxr profile add {name} --materials MATERIAL,...",
-    )
     skipped = sorted(set(requested) - set(added))
     message = f"updated profile {name}: added {', '.join(added) or '(none)'}"
     if skipped:
@@ -1192,10 +1171,6 @@ def remove_material_command(name, materials, yes, dry_run):
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     _confirm_standard(name, "change material membership of", yes, dry_run)
-    _warn_compat(
-        f"cxr profile remove-material {name}",
-        f"cxr profile remove {name} --materials MATERIAL,...",
-    )
     message = f"updated profile {name}: removed {', '.join(removed) or '(none)'}"
     if missing:
         message += f"; not members: {', '.join(missing)}"

@@ -5,7 +5,7 @@ from __future__ import annotations
 import click
 from tomlkit.exceptions import ParseError
 
-from cxr_mc.cli import _catalog_io
+from cxr_mc.cli import _catalog_io, _deprecations
 from cxr_mc.cli import _completion as _cli_completion
 from cxr_mc.cli import json as cli_json
 from cxr_mc.cli._core import (
@@ -17,11 +17,8 @@ from cxr_mc.cli._core import (
     emit_json_result,
     emit_result,
 )
+from cxr_mc.cli._deprecations import DeprecatingGroup
 from cxr_mc.cli.commands import material
-
-
-def _warn(replacement):
-    click.echo(f"warning: 'cxr sweep' is deprecated; use '{replacement}'", err=True)
 
 
 def _overview_payload(document):
@@ -93,7 +90,13 @@ def _show_overview(json_output):
     return 0
 
 
-@click.group(name="sweep", no_args_is_help=True, hidden=True)
+@click.group(
+    name="sweep",
+    cls=DeprecatingGroup,
+    no_args_is_help=True,
+    hidden=True,
+    deprecation_prefix="sweep",
+)
 def command():
     """Compatibility aliases for retired scan-range commands."""
 
@@ -119,12 +122,12 @@ def command():
 def show_command(material_name, profile_name, json_output):
     """Deprecated; use ``cxr material show MATERIAL``."""
     if material_name is None:
-        _warn("cxr profile list")
+        _deprecations.warn("sweep show", replacement="cxr profile list")
         return _show_overview(json_output)
     replacement = f"cxr material show {material_name}"
     if profile_name != _catalog_io.DEFAULT_PROFILE:
         replacement += f" --profile {profile_name}"
-    _warn(replacement)
+    _deprecations.warn("sweep show", replacement=replacement)
     return material._show(material_name, profile_name, json_output, schema="cxr.sweep.show")
 
 
@@ -167,7 +170,7 @@ def set_command(
     replacement = f"cxr material set {material_name}"
     if profile_name != _catalog_io.DEFAULT_PROFILE:
         replacement += f" --profile {profile_name}"
-    _warn(replacement)
+    _deprecations.warn("sweep set", replacement=replacement)
     return material._set(
         material_name,
         profile_name,

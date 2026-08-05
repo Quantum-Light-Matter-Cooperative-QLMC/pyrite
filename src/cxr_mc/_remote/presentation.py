@@ -1,4 +1,5 @@
 """Formatting and progress rendering for :mod:`cxr_mc.remote`."""
+
 from ..cli._dashboard import (
     _FRAME_PREFIX,
     _FRAME_SECTIONS,
@@ -90,5 +91,5 @@ __all__ = [
     "_sanitize_terminal",
     "_sanitize_timing_fields",
     "_scheduler_fields",
-    "_style_states"
+    "_style_states",
 ]

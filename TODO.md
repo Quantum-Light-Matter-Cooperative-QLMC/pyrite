@@ -26,6 +26,17 @@ file. Edit and drop items on `main`.
    → `feature/profile-observation-angle`;
    [`tasks/feature/profile-observation-angle/`](tasks/feature/profile-observation-angle/).
 4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
+5. **CLI deprecation substrate (RFC D7).** Compatibility-warning harness for
+   retired/renamed `cxr` spellings, prerequisite for
+   [`docs/plans/cli-redesign-implementation-plan.md`](docs/plans/cli-redesign-implementation-plan.md)
+   slice 3. → `feature/cli-deprecation-substrate`;
+   [`tasks/feature/cli-deprecation-substrate/`](tasks/feature/cli-deprecation-substrate/).
+6. **CLI verb collapse and module fold (RFC D4 / pkg P3).** Canonical
+   `gc`/`rm`/`recompute` lifecycle verbs; retire `rebrem.py`/`reline.py`/`prune.py`
+   into the checkpoint recompute/cleanup modules.
+   [`docs/plans/cli-redesign-implementation-plan.md`](docs/plans/cli-redesign-implementation-plan.md)
+   slice 4. → `feature/cli-verb-collapse-module-fold`;
+   [`tasks/feature/cli-verb-collapse-module-fold/`](tasks/feature/cli-verb-collapse-module-fold/).
 
 ## P1 - top-priority back burner
 

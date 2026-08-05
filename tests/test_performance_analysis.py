@@ -241,7 +241,7 @@ def test_profile_analyze_cli(tmp_path):
 
     assert result.exit_code == 0
     assert result.stderr.count("is deprecated") == 1
-    assert "cxr performance analyze baseline" in result.stderr
+    assert "cxr performance analyze NAME" in result.stderr
     assert "analyzed 1 sessions (2 intervals)" in result.stdout
 
 

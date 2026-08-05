@@ -33,8 +33,7 @@ registries.
    cxr_mc.results
    cxr_mc.run
    cxr_mc.remote
-   cxr_mc.rebrem
-   cxr_mc.reline
+   cxr_mc.recompute
    cxr_mc.slim
    cxr_mc.sweep
    cxr_mc.validation_oracles

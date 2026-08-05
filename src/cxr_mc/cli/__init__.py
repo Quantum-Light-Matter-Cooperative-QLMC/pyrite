@@ -17,8 +17,8 @@ _COMMANDS = {
     "completion": "cxr_mc.cli.commands.completion.command",
     "performance": "cxr_mc.cli.commands.performance.command",
     "slim": "cxr_mc.cli.commands.slim.command",
-    "rebrem": "cxr_mc.rebrem.command",
-    "reline": "cxr_mc.reline.command",
+    "rebrem": "cxr_mc.cli.commands.recompute.brem_command",
+    "reline": "cxr_mc.cli.commands.recompute.line_command",
     "archive": "cxr_mc.archive.archive_command",
     "restore": "cxr_mc.archive.restore_command",
     "archives": "cxr_mc.archive.archives_command",
@@ -28,7 +28,7 @@ _COMMANDS = {
     "sweep": "cxr_mc.cli.commands.sweep.command",
     "profile": "cxr_mc.cli.commands.profile.command",
     "material": "cxr_mc.cli.commands.material.command",
-    "prune": "cxr_mc.prune.command",
+    "prune": "cxr_mc.cli.commands.cleanup.gc_command",
     "check": "cxr_mc.check.command",
     "check-config": "cxr_mc.cli.commands.check_config.command",
 }
@@ -37,9 +37,9 @@ _COMMAND_HELP = {
     "run": "Run a profile's MC sweeps and write checkpoints.",
     "setup": "Detect GPU hardware and write CXR_MC_BACKEND to .env (first run).",
     "app": "Launch or export interactive analysis notebooks.",
-    "checkpoint": "Inspect, transform, recompute, archive, and prune checkpoints.",
+    "checkpoint": "Inspect, transform, recompute, archive, and reclaim checkpoints.",
     "completion": "Manage cxr shell tab-completion.",
-    "performance": "List, analyze, or prune compute-performance artifacts.",
+    "performance": "List, analyze, or delete compute-performance artifacts.",
     "slim": "Shrink a checkpoint for transfer.",
     "rebrem": "Recompute bremsstrahlung arrays in local checkpoints.",
     "reline": "Recompute line spectra in local checkpoints.",
@@ -52,20 +52,9 @@ _COMMAND_HELP = {
     "sweep": "Compatibility aliases for retired scan-range commands.",
     "profile": "Manage named catalog campaigns and material membership.",
     "material": "Inspect, validate, edit, and blaze individual materials.",
-    "prune": "Drop checkpoint records obsolete under current scan profiles.",
+    "prune": "Retired spelling of `cxr checkpoint gc`.",
     "check": "Launch validation or export cached validation figures.",
     "check-config": "Validate a material catalog without starting simulation.",
-}
-
-_DEPRECATED_COMMANDS = {
-    "slim": "cxr checkpoint slim",
-    "rebrem": "cxr checkpoint recompute brem",
-    "reline": "cxr checkpoint recompute line",
-    "archive": "cxr checkpoint archive",
-    "restore": "cxr checkpoint restore",
-    "archives": "cxr checkpoint list",
-    "union": "cxr checkpoint merge",
-    "prune": "cxr checkpoint prune",
 }
 
 
@@ -86,7 +75,6 @@ _DEPRECATED_COMMANDS = {
         "check",
         "check-config",
     },
-    lazy_deprecated=_DEPRECATED_COMMANDS,
     no_args_is_help=False,
     context_settings={"help_option_names": ["-h", "--help"]},
 )

@@ -273,8 +273,6 @@ def _is_terminal_state(state):
     return state.startswith(("done", "FAILED", "cancelled"))
 
 
-
-
 # Cancel-keybinding sequence (item 5): a bare 'q'/single keystroke must never
 # tear down a live SLURM allocation, so cancelling is two DIFFERENT keys --
 # 'x' arms, 'y' confirms within the window below; anything else (including a
@@ -315,9 +313,7 @@ def _pull_attached_progress(jobid, sections):
     records = presentation._parse_progress_records(sections.get("PROGRESS", ""))
     materials = list(
         dict.fromkeys(
-            record["material"]
-            for record in records.values()
-            if record.get("phase") != "cpu"
+            record["material"] for record in records.values() if record.get("phase") != "cpu"
         )
     )
     if not materials:
@@ -373,9 +369,7 @@ def _live_status(jobid, detail):
                 if not sections:
                     print(presentation._sanitize_terminal(output, multiline=True), end="")
                     return False
-                state_ = presentation._sanitize_terminal(
-                    sections.get("STATE", ""), multiline=True
-                )
+                state_ = presentation._sanitize_terminal(sections.get("STATE", ""), multiline=True)
                 scheduler = presentation._scheduler_fields(sections.get("SQUEUE", ""))
                 live = scheduler.get("state", "") not in ("", "NOT_QUEUED")
 
@@ -412,9 +406,7 @@ def _live_status(jobid, detail):
                         cancel_hint=keys.active,
                     )
                     + "\n\n"
-                    + presentation._style_states(
-                        presentation._format_job_status(sections, detail)
-                    )
+                    + presentation._style_states(presentation._format_job_status(sections, detail))
                 )
                 _render_frame(frame, tty=tty)
                 if pull_requested:

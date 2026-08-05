@@ -203,7 +203,7 @@ def prune_remote(
     yes: bool = False,
 ):
     """Preview or prune stale records on box under exact stem reservations."""
-    from ..prune import _targets
+    from ..checkpoint_cleanup import _targets
 
     targets = _targets(all_profiles, catalog_profile)
     stems = [target.stem for target in targets]

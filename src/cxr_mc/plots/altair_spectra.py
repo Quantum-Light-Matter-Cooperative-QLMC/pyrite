@@ -254,8 +254,7 @@ def _decimate_frame(df, max_points):
     trace_cols = [
         c
         for c in df.columns
-        if c
-        not in {"energy_eV", "intensity", "_line_intensity", "_line_grid", "component"}
+        if c not in {"energy_eV", "intensity", "_line_intensity", "_line_grid", "component"}
     ]
     traces = list(df.groupby(trace_cols, sort=False, dropna=False))
     if not traces:
@@ -278,9 +277,7 @@ def _decimate_frame(df, max_points):
         line_positions = np.flatnonzero(basis["_line_grid"].to_numpy())
         tail_positions = np.flatnonzero(~basis["_line_grid"].to_numpy())
         if line_positions.size and tail_positions.size:
-            minimum_tail = min(
-                tail_positions.size, max(1, per_trace // _TAIL_BUDGET_DIVISOR)
-            )
+            minimum_tail = min(tail_positions.size, max(1, per_trace // _TAIL_BUDGET_DIVISOR))
             line_budget = min(line_positions.size, per_trace - minimum_tail)
             tail_budget = min(tail_positions.size, per_trace - line_budget)
         elif line_positions.size:
@@ -300,9 +297,7 @@ def _decimate_frame(df, max_points):
         idx = np.sort(np.concatenate([line_idx, tail_idx]))
         for component in components.values():
             frames.append(component.iloc[idx])
-    return pd.concat(frames, ignore_index=True).drop(
-        columns=["_line_intensity", "_line_grid"]
-    )
+    return pd.concat(frames, ignore_index=True).drop(columns=["_line_intensity", "_line_grid"])
 
 
 def _compact_component_frame(df):

@@ -1,10 +1,12 @@
-"""Checkpoint pruning: exact case identity, preview, and confirmed rewrite."""
+"""``checkpoint gc``: exact case identity, preview, and confirmed rewrite."""
 
 from __future__ import annotations
 
 import json
 
-from cxr_mc import _checkpoint_store, prune
+from cxr_mc import _checkpoint_store
+from cxr_mc import checkpoint_cleanup as cleanup
+from cxr_mc.cli.commands import cleanup as cleanup_cli
 from tests.helpers.cli import assert_clean_result, invoke
 
 
@@ -22,7 +24,7 @@ def _record(case):
 
 
 def _target():
-    return prune._Target(
+    return cleanup._Target(
         stem="hopg",
         material="hopg",
         fidelity="full",
@@ -42,18 +44,18 @@ def test_prune_preview_does_not_rewrite_and_yes_drops_exact_stale_cases(
         "old-angle": {30.0: _record(_case(tilt=5.0))},
     }
     _checkpoint_store.save("hopg", tmp_path, results)
-    monkeypatch.setattr(prune, "_targets", lambda *_args: [_target()])
+    monkeypatch.setattr(cleanup, "_targets", lambda *_args: [_target()])
     monkeypatch.setattr(
-        prune,
+        cleanup,
         "_current_case_keys",
-        lambda _selected: {("current", 30.0): prune._case_key(current)},
+        lambda _selected: {("current", 30.0): cleanup._case_key(current)},
     )
 
-    assert prune.prune_checkpoints(checkpoint_dir=tmp_path) == 2
+    assert cleanup.prune_checkpoints(checkpoint_dir=tmp_path) == 2
     assert set(_checkpoint_store.load("hopg", tmp_path)) == set(results)
     assert "would prune" in capsys.readouterr().out
 
-    assert prune.prune_checkpoints(checkpoint_dir=tmp_path, yes=True) == 2
+    assert cleanup.prune_checkpoints(checkpoint_dir=tmp_path, yes=True) == 2
     loaded = _checkpoint_store.load("hopg", tmp_path)
     assert set(loaded) == {"current"}
     assert set(loaded["current"]) == {30.0}
@@ -64,31 +66,31 @@ def test_prune_preview_does_not_rewrite_and_yes_drops_exact_stale_cases(
 
 def test_prune_leaves_custom_unselected_stems_untouched(monkeypatch, tmp_path, capsys):
     _checkpoint_store.save("custom-variant", tmp_path, {"old": {30.0: _record(_case())}})
-    monkeypatch.setattr(prune, "_targets", lambda *_args: [_target()])
+    monkeypatch.setattr(cleanup, "_targets", lambda *_args: [_target()])
 
-    assert prune.prune_checkpoints(checkpoint_dir=tmp_path, yes=True) == 0
+    assert cleanup.prune_checkpoints(checkpoint_dir=tmp_path, yes=True) == 0
 
     assert _checkpoint_store.checkpoint_exists("custom-variant", tmp_path)
     assert "no current checkpoints" in capsys.readouterr().out
 
 
-def test_prune_click_rejects_all_with_profile():
-    result = invoke(prune.command, ["--all", "--profile", "sub_100keV"])
+def test_gc_click_rejects_all_with_profile():
+    result = invoke(cleanup_cli.gc_command, ["--all", "--profile", "sub_100keV"])
 
     assert result.exit_code == 2
     assert result.stdout == ""
     assert "cannot be combined" in result.stderr
 
 
-def test_prune_click_defaults_to_standard(monkeypatch):
+def test_gc_click_defaults_to_standard(monkeypatch):
     calls = []
     monkeypatch.setattr(
-        prune,
+        cleanup,
         "prune_checkpoints",
         lambda **kwargs: calls.append(kwargs) or 0,
     )
 
-    result = invoke(prune.command, [])
+    result = invoke(cleanup_cli.gc_command, [])
 
     assert_clean_result(result)
     assert calls == [{"all_profiles": False, "catalog_profile": None, "yes": False}]
