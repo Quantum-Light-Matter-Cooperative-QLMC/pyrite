@@ -178,9 +178,23 @@ def _performance_profile(ctx, param, value):
 )
 @click.option("--no-progress", is_flag=True, help="Disable progress bars/dashboard.")
 @click.option("-v", "--verbose", count=True, help="Increase dashboard detail.")
+@click.option(
+    "-R",
+    "--remote",
+    "remote_target",
+    is_flag=False,
+    flag_value="__configured__",
+    default=None,
+    metavar="[TARGET]",
+    help="Run through SLURM; bare uses the configured target, =TARGET overrides it.",
+)
+@click.option("--wait", is_flag=True, help="Wait for remote completion and pull results.")
+@click.option("--detach", is_flag=True, help="Return after remote submission.")
+@click.pass_context
 @_cli_core.fidelity_option()
 @_cli_core.json_option
 def command(
+    ctx,
     catalog_profile,
     material,
     workers,
@@ -203,8 +217,60 @@ def command(
     no_progress,
     json_output,
     verbose,
+    remote_target,
+    wait,
+    detach,
 ):
     """Click entry point for the staged root migration."""
+    if wait and detach:
+        raise click.UsageError("--wait and --detach are mutually exclusive")
+    if remote_target is None and (wait or detach):
+        raise click.UsageError("--wait/--detach require -R/--remote")
+    if remote_target is not None:
+        if json_output:
+            raise click.UsageError("remote run does not yet support --json")
+        local_only = {
+            "n_families": "--n-families",
+            "checkpoint_dir": "--checkpoint-dir",
+            "max_minutes": "--max-minutes",
+            "performance_profile": "--performance-profile",
+            "performance_dir": "--performance-dir",
+            "no_cache": "--no-cache",
+            "recompute": "--recompute",
+            "progress_file": "--progress-file",
+            "progress_phase": "--progress-phase",
+            "no_progress": "--no-progress",
+            "verbose": "--verbose",
+        }
+        explicit_local = [
+            flag
+            for parameter, flag in local_only.items()
+            if ctx.get_parameter_source(parameter) is click.core.ParameterSource.COMMANDLINE
+        ]
+        if explicit_local:
+            raise click.UsageError(
+                f"remote run does not support local-only option(s): {', '.join(explicit_local)}"
+            )
+        from ..._remote import cli as remote_cli
+        from ..._remote import config as remote_config
+
+        target = None if remote_target == "__configured__" else remote_target
+        with remote_config.override_remote_host(target):
+            return ctx.invoke(
+                remote_cli.start_command,
+                catalog_profile=catalog_profile,
+                material=material,
+                fidelity=fidelity,
+                quick=quick,
+                workers=workers,
+                perf=perf,
+                performance_interval=performance_interval,
+                spec_chunk=spec_chunk,
+                brem_chunk=brem_chunk,
+                nsys=nsys,
+                headless=detach,
+                no_pull=False,
+            )
     if quick and fidelity != "full":
         raise click.UsageError("--quick cannot be combined with --fidelity survey")
     if perf and performance_profile is None:

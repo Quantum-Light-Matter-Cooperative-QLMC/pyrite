@@ -3,6 +3,7 @@
 import os
 import re
 import shlex
+from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 
 HOST = os.environ.get("CXR_REMOTE_HOST", "qlmc")
@@ -77,6 +78,22 @@ def remote_host() -> str:
             "letters, digits, dots, underscores, or hyphens, without a leading dash"
         )
     return value
+
+
+@contextmanager
+def override_remote_host(value: str | None):
+    """Temporarily apply one validated per-call remote target override."""
+    global HOST
+    if value is None:
+        yield
+        return
+    previous = HOST
+    HOST = value
+    try:
+        remote_host()
+        yield
+    finally:
+        HOST = previous
 
 
 def remote_dir() -> str:

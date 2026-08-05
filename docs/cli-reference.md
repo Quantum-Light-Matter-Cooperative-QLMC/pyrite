@@ -134,6 +134,10 @@ Options:
                                the shared per-case cache with the results.
   --no-progress                Disable progress bars/dashboard.
   -v, --verbose                Increase dashboard detail.
+  -R, --remote [TARGET]        Run through SLURM; bare uses the configured target,
+                               =TARGET overrides it.
+  --wait                       Wait for remote completion and pull results.
+  --detach                     Return after remote submission.
   --fidelity [full|survey]     Named settings/grid-reduction policy. survey is
                                provisional and reduced.  [default: full]
   --json                       Emit one versioned JSON object on stdout.

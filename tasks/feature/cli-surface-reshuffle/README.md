@@ -80,6 +80,20 @@ The five failures introduced by the job-path warnings were corrected here.
 - [x] Kept implicit app launches as D7 warning redirects, removing the
       material-versus-subcommand ambiguity without breaking old invocations.
 
+### Remote modifier (additive run checkpoint)
+
+- [x] Added `-R/--remote[=TARGET]` to canonical `cxr run`. Bare selection uses
+      the configured target; an explicit target is validated and restored after
+      the invocation.
+- [x] Added mutually exclusive `--wait` / `--detach`; remote default remains
+      wait-and-pull, while local runs reject both controls.
+- [x] Reused the existing remote run command callback and lifecycle rather than
+      duplicating submission logic. Explicit local-only options fail with usage
+      guidance when locality is remote.
+- [ ] Hide/warn `remote run` only after the remaining D2a execution paths have
+      canonical modifier homes, so the migration does not expose a half-retired
+      namespace.
+
 ## Non-goals
 
 - No content-addressed store, artifact hash migration, checkpoint lockfile, or

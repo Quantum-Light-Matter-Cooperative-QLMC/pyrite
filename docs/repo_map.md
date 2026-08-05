@@ -82,9 +82,13 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   `cli.commands.cleanup:rm_command`: delete explicitly selected local datasets
   and the CAS blobs they alone kept reachable. Hidden compatibility alias:
   `cxr checkpoint clear`.
-- **`cxr run [PROFILE] [-m MATERIAL] [--fidelity full|survey]`** → `scan:main` →
-  `run.run_sweep` → write canonical `checkpoints/<material>/{line,brem}.pkl`
-  or an identity-qualified variant directory. Box shim: `python -m cxr_mc._entry.scan`.
+- **`cxr run [PROFILE] [-m MATERIAL] [--fidelity full|survey] [-R[=TARGET]]`** →
+  local `scan:main` → `run.run_sweep`, or the existing SSH/SLURM submitter when
+  `--remote` is present. Bare `--remote` uses the configured target; an explicit
+  value is validated and scoped to that invocation. Remote runs accept uniform
+  `--wait` / `--detach`; local runs reject them. Local output is canonical
+  `checkpoints/<material>/{line,brem}.pkl` or an identity-qualified variant
+  directory. Box shim: `python -m cxr_mc._entry.scan`.
 - **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
   `notebooks/analysis_app.py` (checkpoint-driven 2D figures, Altair +
   matplotlib, lazy tabbed layout), `notebooks/trace_app.py` (3D trajectory
@@ -101,10 +105,12 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   `cxr app validation export` writes cached literature-validation figures. The
   same explicit `launch|export` shape applies to `cxr app viewer`.
 - **`cxr remote ...`** → `remote:*`: optional SSH/SLURM lifecycle for lab GPU
-  box. Execution/resource commands remain here during the D2a migration, while
+  box. Canonical profile submission is now `cxr run --remote`; the old
+  `remote run` path remains visible until the rest of the D2a execution verbs
+  migrate. Other execution/resource commands remain here during D2a, while
   retired `jobs`, `status`, `logs`, and `stop` paths are hidden aliases of the
-  canonical top-level job lifecycle. Remote submission and validation paths
-  remain `remote run` and `remote validate` until the D2a modifier checkpoint;
+  canonical top-level job lifecycle. Remote validation remains `remote validate`
+  until its owning execution verb migrates;
   `remote gc` applies profile-aware checkpoint pruning under remote stem
   reservations and releases orphaned reservations, replacing the hidden
   `remote prune` and `remote reap` aliases; `remote rm` deletes remote
