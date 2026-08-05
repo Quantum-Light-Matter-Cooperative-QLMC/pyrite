@@ -758,26 +758,33 @@ def test_adaptive_chunk_reproduces_old_default_on_narrow_grid():
     back exactly the old fixed chunk=40000 -- no behavior change on old runs."""
     from cxr_mc.montecarlo import runner
 
-    assert runner._adaptive_chunk(2000) == 40_000
+    assert runner._adaptive_chunk(2000) == 80_000
 
 
 def test_adaptive_chunk_shrinks_on_the_widened_grid():
     from cxr_mc.montecarlo import runner
 
-    # 1920e6 // (3 * 6000 * 8) = 13_333: ~3x fewer segments for ~3x more bins,
+    # 1920e6 // (3 * 6000 * 8) = 26_666: ~3x fewer segments for ~3x more bins,
     # so the matmul transient stays ~1.9 GB instead of the ~5.7 GB that OOM'd.
-    assert runner._adaptive_chunk(6000) == 13_333
+    assert runner._adaptive_chunk(6000) == 26_666
 
 
-def test_adaptive_chunk_clamps_to_floor_and_ceiling():
+def test_adaptive_chunk_preferred_size_has_floor_and_ceiling():
     from cxr_mc.montecarlo import runner
 
-    assert runner._adaptive_chunk(10**9) == 1000  # degenerate wide grid: slow, not zero
-    assert runner._adaptive_chunk(10) == 100_000  # coarse brem grid: bound kernel size
+    assert runner._adaptive_chunk(200_000) == 1000  # degenerate wide grid: slow, not zero
+    assert runner._adaptive_chunk(1) == 100_000  # coarse brem grid: bound kernel size
+
+
+def test_adaptive_chunk_raises_when_minimum_cannot_fit_device_budget():
+    from cxr_mc.montecarlo import runner
+
+    with pytest.raises(runner.BackendResourceError):
+        runner._adaptive_chunk(10**9)
 
 
 def test_adaptive_chunk_honors_budget_override(monkeypatch):
     from cxr_mc.montecarlo import runner
 
     monkeypatch.setattr(runner, "_SPEC_BUDGET_MB", 480)  # CXR_MC_SPEC_BUDGET_MB
-    assert runner._adaptive_chunk(2000) == 10_000
+    assert runner._adaptive_chunk(2000) == 20_000

@@ -288,10 +288,10 @@ def test_set_replaces_grid_and_membership(tmp_path, monkeypatch):
 def test_set_unknown_material_in_membership_errors(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(profile.command, ["set", "sub_100keV", "--materials", "unobtainium"])
+    result = invoke(profile.command, ["set", "sub_100keV", "--materials", "foobarium"])
 
     assert result.exit_code == 1
-    assert "unknown material: unobtainium" in result.stderr
+    assert "unknown material: foobarium" in result.stderr
 
 
 def test_set_on_standard_prompts_and_yes_skips(tmp_path, monkeypatch):
@@ -682,7 +682,7 @@ def test_membership_verbs_require_explicit_list(tmp_path, monkeypatch):
 
     assert result.exit_code == 1
     assert "implicit all-in-use-materials membership" in result.stderr
-    assert "cxr profile set NAME --materials MATERIAL" in result.stderr
+    assert "cxr profile set standard --materials MATERIAL" in result.stderr
 
 
 def test_add_materials_explains_implicit_membership_is_already_all(tmp_path, monkeypatch):
@@ -692,16 +692,16 @@ def test_add_materials_explains_implicit_membership_is_already_all(tmp_path, mon
 
     assert result.exit_code == 1
     assert "already includes every material" in result.stderr
-    assert "cxr profile set NAME --materials MATERIAL" in result.stderr
+    assert "cxr profile set standard --materials MATERIAL" in result.stderr
 
 
 def test_membership_verbs_reject_unknown_material(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    result = invoke(profile.command, ["add", "sub_100keV", "--materials", "unobtainium"])
+    result = invoke(profile.command, ["add", "sub_100keV", "--materials", "foobarium"])
 
     assert result.exit_code == 1
-    assert "unknown material: unobtainium" in result.stderr
+    assert "unknown material: foobarium" in result.stderr
 
 
 def test_add_material_all_seeds_implicit_membership(tmp_path, monkeypatch):

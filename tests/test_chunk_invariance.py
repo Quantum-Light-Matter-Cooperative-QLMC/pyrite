@@ -19,9 +19,17 @@ import numpy as np
 import pytest
 
 from cxr_mc.materials.crystal import CRYSTALS
-from cxr_mc.montecarlo import mc_brem_spectrum, mc_spectrum, simulate_trajectories
+from cxr_mc.montecarlo import (
+    _brem_dsigma_dk,
+    mc_brem_spectrum,
+    mc_spectrum,
+    simulate_trajectories,
+    spectrum,
+)
 from cxr_mc.montecarlo._backend import REAL
 from cxr_mc.montecarlo.runner import _env_chunk
+
+xp = spectrum.xp
 
 THETA = np.deg2rad(119.0)
 E0_KEV = 25.0
@@ -110,6 +118,17 @@ def test_finite_brem_spectrum_chunk_invariant(finite_side_segments):
     one_shot = mc_brem_spectrum(finite_side_segments, E_BREM, chunk=BIG_CHUNK, **kw)
     chunked = mc_brem_spectrum(finite_side_segments, E_BREM, chunk=1, **kw)
     _assert_chunk_invariant(one_shot, chunked)
+
+
+def test_brem_dsigma_gpu_scalar_z_preserves_real_precision():
+    dsig = _brem_dsigma_dk(
+        6,
+        np.array([30.0]),
+        np.array([700.0, 1000.0, 5000.0]),
+    )
+
+    assert dsig.dtype == REAL
+    assert xp.all(dsig > 0)
 
 
 # ---- the env-var override that drives the A1 spike ---------------------------

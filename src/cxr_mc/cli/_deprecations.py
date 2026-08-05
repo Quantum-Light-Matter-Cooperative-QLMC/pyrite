@@ -77,7 +77,7 @@ DEPRECATIONS: dict[str, Deprecation] = {
         # Profile membership and performance spellings.
         _entry("profile add-material", "cxr profile add NAME --materials MATERIAL,..."),
         _entry("profile remove-material", "cxr profile remove NAME --materials MATERIAL,..."),
-        _entry("profile analyze", "cxr performance analyze"),
+        _entry("profile analyze", "cxr performance analyze NAME"),
         # `profile members` stays reachable; `set/add/remove --materials` is
         # canonical, and each membership verb maps to a different one.
         _entry("profile members set", "cxr profile set NAME --materials MATERIAL,..."),
