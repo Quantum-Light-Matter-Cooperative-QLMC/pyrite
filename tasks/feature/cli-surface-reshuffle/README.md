@@ -93,6 +93,18 @@ owner-authored base refresh, the full CLI suite passes: 1007 tests.
       canonical modifier homes, so the migration does not expose a half-retired
       namespace.
 
+### Remote recompute modifiers
+
+- [x] Added `-R/--remote[=TARGET]` and mutually exclusive `--wait` / `--detach`
+      to `checkpoint recompute brem|line`, reusing the existing remote queue,
+      viewer, and component-pull orchestration.
+- [x] Kept local behavior unchanged when `--remote` is absent; reject remote-only
+      controls locally and local-only/JSON controls remotely with usage errors.
+- [x] Hid `remote rebrem|reline` as D7 warning redirects after their canonical
+      modifier homes became complete.
+- [x] Focused remote modifier tests: 86 passed; full CLI suite 1026 passed;
+      lint, typecheck, reference, deprecation, and contract checks pass.
+
 ### Shared context precedence
 
 - [x] Added `cxr config set|get|list` for `profile.current` and `remote.target`,

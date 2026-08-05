@@ -105,6 +105,8 @@ DEPRECATIONS: dict[str, Deprecation] = {
         # sits on the leaf so the warning names a runnable command, not a group.
         _entry("remote profile pull", "cxr remote performance pull"),
         _entry("remote check", "cxr material validate --remote"),
+        _entry("remote rebrem", "cxr checkpoint recompute brem --remote"),
+        _entry("remote reline", "cxr checkpoint recompute line --remote"),
         _entry("remote jobs", "cxr job list"),
         _entry("remote status", "cxr job status"),
         _entry("remote logs", "cxr job logs"),

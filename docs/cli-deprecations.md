@@ -46,6 +46,8 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 | `cxr remote profile pull` | `cxr remote performance pull` | 0.1.0 | 0.3.0 |  |
 | `cxr remote prune` | `cxr remote gc` | 0.1.0 | 0.3.0 |  |
 | `cxr remote reap` | `cxr remote gc` | 0.1.0 | 0.3.0 | `gc` also drops obsolete records; use `--min-age-minutes` as before. |
+| `cxr remote rebrem` | `cxr checkpoint recompute brem --remote` | 0.1.0 | 0.3.0 |  |
+| `cxr remote reline` | `cxr checkpoint recompute line --remote` | 0.1.0 | 0.3.0 |  |
 | `cxr remote status` | `cxr job status` | 0.1.0 | 0.3.0 |  |
 | `cxr remote stop` | `cxr job stop` | 0.1.0 | 0.3.0 |  |
 | `cxr restore` | `cxr checkpoint restore` | 0.1.0 | 0.3.0 |  |

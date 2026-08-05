@@ -266,7 +266,7 @@
           },
           {
             "dest": "remote_target",
-            "help": "Run through SLURM; bare uses the configured target, =TARGET overrides it.",
+            "help": "Run remotely; bare uses the configured target, =TARGET overrides it.",
             "option_strings": [
               "-R",
               "--remote"
@@ -315,7 +315,7 @@
             "required": false
           }
         ],
-        "help": "Usage: cxr run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to the current configured profile (standard built-in) and\n  owns material membership, campaign ranges, and workload settings. Use\n  -m/--material to run one profile member instead of the full resolved\n  membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL         Run one member of PROFILE instead of its full\n                                  membership.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use tiny smoke-test grid and write\n                                  <material>_quick.pkl.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  -p, --perf                      Sample CPU pressure, RAM/swap, GPU\n                                  clocks/VRAM, process-tree, phase timing,\n                                  queue, case, worker, and chunk metrics for\n                                  PROFILE's resolved membership into\n                                  performance-profiles/PROFILE/<material>.ndjson\n                                  (cxr.performance.v1). Combine with -m to\n                                  profile a single member. Runs without shared-\n                                  cache reads or writes unless --recompute is\n                                  explicit.\n  -i, --perf-interval SECONDS     Performance-telemetry sampling interval;\n                                  requires -p/--perf.  [default: 5.0]\n  --spec-chunk N                  Pin line-spectrum segments per GPU chunk;\n                                  requires -p/--perf.\n  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk;\n                                  requires -p/--perf.\n  --nsys                          Capture one uncached Nsight Systems CUDA/NVTX\n                                  trace of the run (writes a .nsys-rep next to\n                                  the perf log); defaults to the profile's full\n                                  membership (-m narrows to one member).\n                                  Requires -p/--perf.\n  --no-cache                      Neither read nor write the shared per-case\n                                  checkpoint cache: an ephemeral run that\n                                  recomputes every case and stores nothing\n                                  shared.\n  --recompute                     Ignore cached cases and recompute fresh, but\n                                  repopulate the shared per-case cache with the\n                                  results.\n  --no-progress                   Disable progress bars/dashboard.\n  -v, --verbose                   Increase dashboard detail.\n  -R, --remote [TARGET]           Run through SLURM; bare uses the configured\n                                  target, =TARGET overrides it.\n  --wait                          Wait for remote completion and pull results.\n  --detach                        Return after remote submission.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+        "help": "Usage: cxr run [OPTIONS] [PROFILE]\n\n  Run a catalog profile's MC sweeps and write checkpoints.\n\n  PROFILE defaults to the current configured profile (standard built-in) and\n  owns material membership, campaign ranges, and workload settings. Use\n  -m/--material to run one profile member instead of the full resolved\n  membership.\n\n  Resumes compatible checkpoints in CHECKPOINTS. Full writes <material>.pkl-\n  compatible data in <material>/; variants use identity-qualified stems.\n\nOptions:\n  -m, --material MATERIAL         Run one member of PROFILE instead of its full\n                                  membership.\n  --workers NUMBER                run_cases max_workers (default auto; 0 =\n                                  serial, no transport pool).\n  --quick                         Use tiny smoke-test grid and write\n                                  <material>_quick.pkl.\n  --n-families NUMBER             Override positive dominant reflection-family\n                                  count.\n  --checkpoint-dir DIR            Read and write checkpoint pickles in DIR.\n                                  [default: checkpoints]\n  --max-minutes MINUTES           Soft wall-clock budget in minutes; exit 75 if\n                                  resumable work remains.\n  -p, --perf                      Sample CPU pressure, RAM/swap, GPU\n                                  clocks/VRAM, process-tree, phase timing,\n                                  queue, case, worker, and chunk metrics for\n                                  PROFILE's resolved membership into\n                                  performance-profiles/PROFILE/<material>.ndjson\n                                  (cxr.performance.v1). Combine with -m to\n                                  profile a single member. Runs without shared-\n                                  cache reads or writes unless --recompute is\n                                  explicit.\n  -i, --perf-interval SECONDS     Performance-telemetry sampling interval;\n                                  requires -p/--perf.  [default: 5.0]\n  --spec-chunk N                  Pin line-spectrum segments per GPU chunk;\n                                  requires -p/--perf.\n  --brem-chunk N                  Pin bremsstrahlung segments per GPU chunk;\n                                  requires -p/--perf.\n  --nsys                          Capture one uncached Nsight Systems CUDA/NVTX\n                                  trace of the run (writes a .nsys-rep next to\n                                  the perf log); defaults to the profile's full\n                                  membership (-m narrows to one member).\n                                  Requires -p/--perf.\n  --no-cache                      Neither read nor write the shared per-case\n                                  checkpoint cache: an ephemeral run that\n                                  recomputes every case and stores nothing\n                                  shared.\n  --recompute                     Ignore cached cases and recompute fresh, but\n                                  repopulate the shared per-case cache with the\n                                  results.\n  --no-progress                   Disable progress bars/dashboard.\n  -v, --verbose                   Increase dashboard detail.\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --wait                          Wait for remote completion and pull results.\n  --detach                        Return after remote submission.\n  --fidelity [full|survey]        Named settings/grid-reduction policy. survey\n                                  is provisional and reduced.  [default: full]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
         "hidden": false,
         "path": "run",
         "subcommands": []
@@ -1017,6 +1017,55 @@
                     "required": false
                   },
                   {
+                    "dest": "remote_target",
+                    "help": "Run remotely; bare uses the configured target, =TARGET overrides it.",
+                    "option_strings": [
+                      "-R",
+                      "--remote"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "detach",
+                    "help": "Return after remote submission.",
+                    "option_strings": [
+                      "--detach"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "wait",
+                    "help": "Wait and pull remote results.",
+                    "option_strings": [
+                      "--wait"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "dry_run",
+                    "help": "Preview remote submission; do not connect.",
+                    "option_strings": [
+                      "--dry-run"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "no_sync",
+                    "help": "Skip remote code upload.",
+                    "option_strings": [
+                      "--no-sync"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "chunk_minutes",
+                    "help": "Remote self-resubmitting slice length; 0 uses one monolithic job.",
+                    "option_strings": [
+                      "--chunk-minutes"
+                    ],
+                    "required": false
+                  },
+                  {
                     "dest": "json_output",
                     "help": "Output format; only json is a stable automation contract.",
                     "option_strings": [
@@ -1034,7 +1083,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr checkpoint recompute brem [OPTIONS] [MATERIALS]...\n\n  Recompute only brem backgrounds in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                       Recompute every checkpoint.\n  --fidelity [full|survey]        Override dataset fidelity; defaults to\n                                  checkpoint metadata or full for legacy data.\n  --profile NAME                  Catalog profile for legacy data; otherwise\n                                  must match checkpoint metadata.\n  --ne-brem N                     Bremsstrahlung electron count; overrides\n                                  profile default.\n  --start EV                      Wide-bremsstrahlung lower bound in eV;\n                                  overrides profile.\n  --stop EV                       Wide-bremsstrahlung exclusive upper bound in\n                                  eV; default follows beam energy.\n  --step EV                       Wide-bremsstrahlung grid spacing in eV;\n                                  overrides profile default.\n  --redo-all                      Recompute records already at target.\n  --checkpoint-dir DIR            Root containing component checkpoint\n                                  directories to update.  [default: checkpoints]\n  --save-every N                  Atomically save after every N recomputed\n                                  records.  [default: 100]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+                "help": "Usage: cxr checkpoint recompute brem [OPTIONS] [MATERIALS]...\n\n  Recompute only brem backgrounds in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                       Recompute every checkpoint.\n  --fidelity [full|survey]        Override dataset fidelity; defaults to\n                                  checkpoint metadata or full for legacy data.\n  --profile NAME                  Catalog profile for legacy data; otherwise\n                                  must match checkpoint metadata.\n  --ne-brem N                     Bremsstrahlung electron count; overrides\n                                  profile default.\n  --start EV                      Wide-bremsstrahlung lower bound in eV;\n                                  overrides profile.\n  --stop EV                       Wide-bremsstrahlung exclusive upper bound in\n                                  eV; default follows beam energy.\n  --step EV                       Wide-bremsstrahlung grid spacing in eV;\n                                  overrides profile default.\n  --redo-all                      Recompute records already at target.\n  --checkpoint-dir DIR            Root containing component checkpoint\n                                  directories to update.  [default: checkpoints]\n  --save-every N                  Atomically save after every N recomputed\n                                  records.  [default: 100]\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --detach                        Return after remote submission.\n  --wait                          Wait and pull remote results.\n  --dry-run                       Preview remote submission; do not connect.\n  --no-sync                       Skip remote code upload.\n  --chunk-minutes MINUTES         Remote self-resubmitting slice length; 0 uses\n                                  one monolithic job.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "checkpoint recompute brem",
                 "subcommands": []
@@ -1145,6 +1194,55 @@
                     "required": false
                   },
                   {
+                    "dest": "remote_target",
+                    "help": "Run remotely; bare uses the configured target, =TARGET overrides it.",
+                    "option_strings": [
+                      "-R",
+                      "--remote"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "detach",
+                    "help": "Return after remote submission.",
+                    "option_strings": [
+                      "--detach"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "wait",
+                    "help": "Wait and pull remote results.",
+                    "option_strings": [
+                      "--wait"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "dry_run",
+                    "help": "Preview remote submission; do not connect.",
+                    "option_strings": [
+                      "--dry-run"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "no_sync",
+                    "help": "Skip remote code upload.",
+                    "option_strings": [
+                      "--no-sync"
+                    ],
+                    "required": false
+                  },
+                  {
+                    "dest": "chunk_minutes",
+                    "help": "Remote self-resubmitting slice length; 0 uses one monolithic job.",
+                    "option_strings": [
+                      "--chunk-minutes"
+                    ],
+                    "required": false
+                  },
+                  {
                     "dest": "json_output",
                     "help": "Output format; only json is a stable automation contract.",
                     "option_strings": [
@@ -1162,7 +1260,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr checkpoint recompute line [OPTIONS] [MATERIALS]...\n\n  Recompute only line spectra in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                       Recompute every checkpoint.\n  --fidelity [full|survey]        Override dataset fidelity; defaults to\n                                  checkpoint metadata or full for legacy data.\n  --profile NAME                  Catalog profile for legacy data; otherwise\n                                  must match checkpoint metadata.\n  --line-ne N                     Line-spectrum electron count; overrides\n                                  profile default.\n  --start EV                      Line-grid lower bound in eV; overrides\n                                  profile.\n  --stop EV                       Line-grid exclusive upper bound in eV;\n                                  overrides profile.\n  --line-step EV                  Uniform line-grid spacing in eV; overrides\n                                  profile grid.\n  --redo-all                      Recompute records already at target.\n  --checkpoint-dir DIR            Root containing component checkpoint\n                                  directories to update.  [default: checkpoints]\n  --save-every N                  Atomically save after every N recomputed\n                                  records.  [default: 100]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+                "help": "Usage: cxr checkpoint recompute line [OPTIONS] [MATERIALS]...\n\n  Recompute only line spectra in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                       Recompute every checkpoint.\n  --fidelity [full|survey]        Override dataset fidelity; defaults to\n                                  checkpoint metadata or full for legacy data.\n  --profile NAME                  Catalog profile for legacy data; otherwise\n                                  must match checkpoint metadata.\n  --line-ne N                     Line-spectrum electron count; overrides\n                                  profile default.\n  --start EV                      Line-grid lower bound in eV; overrides\n                                  profile.\n  --stop EV                       Line-grid exclusive upper bound in eV;\n                                  overrides profile.\n  --line-step EV                  Uniform line-grid spacing in eV; overrides\n                                  profile grid.\n  --redo-all                      Recompute records already at target.\n  --checkpoint-dir DIR            Root containing component checkpoint\n                                  directories to update.  [default: checkpoints]\n  --save-every N                  Atomically save after every N recomputed\n                                  records.  [default: 100]\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --detach                        Return after remote submission.\n  --wait                          Wait and pull remote results.\n  --dry-run                       Preview remote submission; do not connect.\n  --no-sync                       Skip remote code upload.\n  --chunk-minutes MINUTES         Remote self-resubmitting slice length; 0 uses\n                                  one monolithic job.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "checkpoint recompute line",
                 "subcommands": []
@@ -1894,6 +1992,55 @@
             "required": false
           },
           {
+            "dest": "remote_target",
+            "help": "Run remotely; bare uses the configured target, =TARGET overrides it.",
+            "option_strings": [
+              "-R",
+              "--remote"
+            ],
+            "required": false
+          },
+          {
+            "dest": "detach",
+            "help": "Return after remote submission.",
+            "option_strings": [
+              "--detach"
+            ],
+            "required": false
+          },
+          {
+            "dest": "wait",
+            "help": "Wait and pull remote results.",
+            "option_strings": [
+              "--wait"
+            ],
+            "required": false
+          },
+          {
+            "dest": "dry_run",
+            "help": "Preview remote submission; do not connect.",
+            "option_strings": [
+              "--dry-run"
+            ],
+            "required": false
+          },
+          {
+            "dest": "no_sync",
+            "help": "Skip remote code upload.",
+            "option_strings": [
+              "--no-sync"
+            ],
+            "required": false
+          },
+          {
+            "dest": "chunk_minutes",
+            "help": "Remote self-resubmitting slice length; 0 uses one monolithic job.",
+            "option_strings": [
+              "--chunk-minutes"
+            ],
+            "required": false
+          },
+          {
             "dest": "json_output",
             "help": "Output format; only json is a stable automation contract.",
             "option_strings": [
@@ -1911,7 +2058,7 @@
             "required": false
           }
         ],
-        "help": "Usage: cxr rebrem [OPTIONS] [MATERIALS]...\n\n  Recompute only brem backgrounds in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                       Recompute every checkpoint.\n  --fidelity [full|survey]        Override dataset fidelity; defaults to\n                                  checkpoint metadata or full for legacy data.\n  --profile NAME                  Catalog profile for legacy data; otherwise\n                                  must match checkpoint metadata.\n  --ne-brem N                     Bremsstrahlung electron count; overrides\n                                  profile default.\n  --start EV                      Wide-bremsstrahlung lower bound in eV;\n                                  overrides profile.\n  --stop EV                       Wide-bremsstrahlung exclusive upper bound in\n                                  eV; default follows beam energy.\n  --step EV                       Wide-bremsstrahlung grid spacing in eV;\n                                  overrides profile default.\n  --redo-all                      Recompute records already at target.\n  --checkpoint-dir DIR            Root containing component checkpoint\n                                  directories to update.  [default: checkpoints]\n  --save-every N                  Atomically save after every N recomputed\n                                  records.  [default: 100]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+        "help": "Usage: cxr rebrem [OPTIONS] [MATERIALS]...\n\n  Recompute only brem backgrounds in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                       Recompute every checkpoint.\n  --fidelity [full|survey]        Override dataset fidelity; defaults to\n                                  checkpoint metadata or full for legacy data.\n  --profile NAME                  Catalog profile for legacy data; otherwise\n                                  must match checkpoint metadata.\n  --ne-brem N                     Bremsstrahlung electron count; overrides\n                                  profile default.\n  --start EV                      Wide-bremsstrahlung lower bound in eV;\n                                  overrides profile.\n  --stop EV                       Wide-bremsstrahlung exclusive upper bound in\n                                  eV; default follows beam energy.\n  --step EV                       Wide-bremsstrahlung grid spacing in eV;\n                                  overrides profile default.\n  --redo-all                      Recompute records already at target.\n  --checkpoint-dir DIR            Root containing component checkpoint\n                                  directories to update.  [default: checkpoints]\n  --save-every N                  Atomically save after every N recomputed\n                                  records.  [default: 100]\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --detach                        Return after remote submission.\n  --wait                          Wait and pull remote results.\n  --dry-run                       Preview remote submission; do not connect.\n  --no-sync                       Skip remote code upload.\n  --chunk-minutes MINUTES         Remote self-resubmitting slice length; 0 uses\n                                  one monolithic job.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
         "hidden": true,
         "path": "rebrem",
         "subcommands": []
@@ -2022,6 +2169,55 @@
             "required": false
           },
           {
+            "dest": "remote_target",
+            "help": "Run remotely; bare uses the configured target, =TARGET overrides it.",
+            "option_strings": [
+              "-R",
+              "--remote"
+            ],
+            "required": false
+          },
+          {
+            "dest": "detach",
+            "help": "Return after remote submission.",
+            "option_strings": [
+              "--detach"
+            ],
+            "required": false
+          },
+          {
+            "dest": "wait",
+            "help": "Wait and pull remote results.",
+            "option_strings": [
+              "--wait"
+            ],
+            "required": false
+          },
+          {
+            "dest": "dry_run",
+            "help": "Preview remote submission; do not connect.",
+            "option_strings": [
+              "--dry-run"
+            ],
+            "required": false
+          },
+          {
+            "dest": "no_sync",
+            "help": "Skip remote code upload.",
+            "option_strings": [
+              "--no-sync"
+            ],
+            "required": false
+          },
+          {
+            "dest": "chunk_minutes",
+            "help": "Remote self-resubmitting slice length; 0 uses one monolithic job.",
+            "option_strings": [
+              "--chunk-minutes"
+            ],
+            "required": false
+          },
+          {
             "dest": "json_output",
             "help": "Output format; only json is a stable automation contract.",
             "option_strings": [
@@ -2039,7 +2235,7 @@
             "required": false
           }
         ],
-        "help": "Usage: cxr reline [OPTIONS] [MATERIALS]...\n\n  Recompute only line spectra in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                       Recompute every checkpoint.\n  --fidelity [full|survey]        Override dataset fidelity; defaults to\n                                  checkpoint metadata or full for legacy data.\n  --profile NAME                  Catalog profile for legacy data; otherwise\n                                  must match checkpoint metadata.\n  --line-ne N                     Line-spectrum electron count; overrides\n                                  profile default.\n  --start EV                      Line-grid lower bound in eV; overrides\n                                  profile.\n  --stop EV                       Line-grid exclusive upper bound in eV;\n                                  overrides profile.\n  --line-step EV                  Uniform line-grid spacing in eV; overrides\n                                  profile grid.\n  --redo-all                      Recompute records already at target.\n  --checkpoint-dir DIR            Root containing component checkpoint\n                                  directories to update.  [default: checkpoints]\n  --save-every N                  Atomically save after every N recomputed\n                                  records.  [default: 100]\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+        "help": "Usage: cxr reline [OPTIONS] [MATERIALS]...\n\n  Recompute only line spectra in existing checkpoints.\n\n  Pass MATERIALS or --all, never both. Updates checkpoint files in place and\n  skips records already at target unless --redo-all.\n\nOptions:\n  -a, --all                       Recompute every checkpoint.\n  --fidelity [full|survey]        Override dataset fidelity; defaults to\n                                  checkpoint metadata or full for legacy data.\n  --profile NAME                  Catalog profile for legacy data; otherwise\n                                  must match checkpoint metadata.\n  --line-ne N                     Line-spectrum electron count; overrides\n                                  profile default.\n  --start EV                      Line-grid lower bound in eV; overrides\n                                  profile.\n  --stop EV                       Line-grid exclusive upper bound in eV;\n                                  overrides profile.\n  --line-step EV                  Uniform line-grid spacing in eV; overrides\n                                  profile grid.\n  --redo-all                      Recompute records already at target.\n  --checkpoint-dir DIR            Root containing component checkpoint\n                                  directories to update.  [default: checkpoints]\n  --save-every N                  Atomically save after every N recomputed\n                                  records.  [default: 100]\n  -R, --remote [TARGET]           Run remotely; bare uses the configured target,\n                                  =TARGET overrides it.\n  --detach                        Return after remote submission.\n  --wait                          Wait and pull remote results.\n  --dry-run                       Preview remote submission; do not connect.\n  --no-sync                       Skip remote code upload.\n  --chunk-minutes MINUTES         Remote self-resubmitting slice length; 0 uses\n                                  one monolithic job.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
         "hidden": true,
         "path": "reline",
         "subcommands": []
@@ -2173,7 +2369,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: cxr remote [OPTIONS] COMMAND [ARGS]...\n\n  [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n  Host, remote directory, and executable come from CXR_REMOTE_HOST,\n  CXR_REMOTE_DIR, and CXR_REMOTE_UV. Command-line options take precedence over\n  workflow defaults where offered.\n\n  Examples:\n    cxr remote run sub_100keV --dry-run\n    cxr remote run compute_test_300keV -p\n    cxr remote run standard -m hopg\n    cxr remote status -vv\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  gc           Reclaim remote records obsolete under current scan profiles...\n  performance  List, pull, or delete remote performance artifacts.\n  prune-jobs   Delete terminal (done/failed/cancelled) job directories;...\n  pull         Fetch existing checkpoints from remote box.\n  rebrem       Recompute brem-only remotely, follow, and pull completed...\n  reline       Recompute line-only remotely, follow, and pull completed...\n  rm           Delete remote checkpoints; preview unless --yes.\n  run          Sync code, submit sweep(s), track progress, and pull...\n  sync         Push current code to remote box.\n  validate     Run Zhai reproduction remotely or pull existing caches.\n",
+        "help": "Usage: cxr remote [OPTIONS] COMMAND [ARGS]...\n\n  [dev] Push code and run or manage MC sweeps on a remote GPU box over SSH.\n\n  Host, remote directory, and executable come from CXR_REMOTE_HOST,\n  CXR_REMOTE_DIR, and CXR_REMOTE_UV. Command-line options take precedence over\n  workflow defaults where offered.\n\n  Examples:\n    cxr remote run sub_100keV --dry-run\n    cxr remote run compute_test_300keV -p\n    cxr remote run standard -m hopg\n    cxr remote status -vv\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  gc           Reclaim remote records obsolete under current scan profiles...\n  performance  List, pull, or delete remote performance artifacts.\n  prune-jobs   Delete terminal (done/failed/cancelled) job directories;...\n  pull         Fetch existing checkpoints from remote box.\n  rm           Delete remote checkpoints; preview unless --yes.\n  run          Sync code, submit sweep(s), track progress, and pull...\n  sync         Push current code to remote box.\n  validate     Run Zhai reproduction remotely or pull existing caches.\n",
         "hidden": false,
         "path": "remote",
         "subcommands": [
@@ -2809,10 +3005,18 @@
                   "--step"
                 ],
                 "required": false
+              },
+              {
+                "dest": "detach",
+                "help": "Return after remote submission.",
+                "option_strings": [
+                  "--detach"
+                ],
+                "required": false
               }
             ],
-            "help": "Usage: cxr remote rebrem [OPTIONS] [MATERIAL]...\n\n  Recompute brem-only remotely, follow, and pull completed checkpoints.\n\nOptions:\n  -a, --all                 Use every material in mats_to_sim.toml.\n  --redo-all                Recompute every record even when already at target.\n  --dry-run                 Print batch script and submission command; do not\n                            connect.\n  --no-sync                 Skip code upload.\n  --chunk-minutes NUMBER    Self-resubmitting SLURM slice length; 0 runs one\n                            monolithic job.  [default: 10.0]\n  --fidelity [full|survey]  Fidelity preset supplying omitted grid and electron\n                            defaults.  [default: full]\n  --ne-brem NUMBER          New brem electron count.\n  --start NUMBER            Brem lower bound in eV.\n  --stop NUMBER             Brem exclusive upper bound in eV.\n  --step NUMBER             Wide-brem grid spacing in eV.\n  -h, --help                Show this message and exit.\n",
-            "hidden": false,
+            "help": "Usage: cxr remote rebrem [OPTIONS] [MATERIAL]...\n\n  Recompute brem-only remotely, follow, and pull completed checkpoints.\n\nOptions:\n  -a, --all                 Use every material in mats_to_sim.toml.\n  --redo-all                Recompute every record even when already at target.\n  --dry-run                 Print batch script and submission command; do not\n                            connect.\n  --no-sync                 Skip code upload.\n  --chunk-minutes NUMBER    Self-resubmitting SLURM slice length; 0 runs one\n                            monolithic job.  [default: 10.0]\n  --fidelity [full|survey]  Fidelity preset supplying omitted grid and electron\n                            defaults.  [default: full]\n  --ne-brem NUMBER          New brem electron count.\n  --start NUMBER            Brem lower bound in eV.\n  --stop NUMBER             Brem exclusive upper bound in eV.\n  --step NUMBER             Wide-brem grid spacing in eV.\n  --detach                  Return after remote submission.\n  -h, --help                Show this message and exit.\n",
+            "hidden": true,
             "path": "remote rebrem",
             "subcommands": []
           },
@@ -2904,10 +3108,18 @@
                   "--line-step"
                 ],
                 "required": false
+              },
+              {
+                "dest": "detach",
+                "help": "Return after remote submission.",
+                "option_strings": [
+                  "--detach"
+                ],
+                "required": false
               }
             ],
-            "help": "Usage: cxr remote reline [OPTIONS] [MATERIAL]...\n\n  Recompute line-only remotely, follow, and pull completed checkpoints.\n\nOptions:\n  -a, --all                 Use every material in mats_to_sim.toml.\n  --redo-all                Recompute every record even when already at target.\n  --dry-run                 Print batch script and submission command; do not\n                            connect.\n  --no-sync                 Skip code upload.\n  --chunk-minutes NUMBER    Self-resubmitting SLURM slice length; 0 runs one\n                            monolithic job.  [default: 10.0]\n  --fidelity [full|survey]  Fidelity preset supplying omitted grid and electron\n                            defaults.  [default: full]\n  --line-ne NUMBER          New line electron count.\n  --start NUMBER            Line lower bound in eV.\n  --stop NUMBER             Line exclusive upper bound in eV.\n  --line-step NUMBER        Explicit uniform line-grid spacing in eV.\n  -h, --help                Show this message and exit.\n",
-            "hidden": false,
+            "help": "Usage: cxr remote reline [OPTIONS] [MATERIAL]...\n\n  Recompute line-only remotely, follow, and pull completed checkpoints.\n\nOptions:\n  -a, --all                 Use every material in mats_to_sim.toml.\n  --redo-all                Recompute every record even when already at target.\n  --dry-run                 Print batch script and submission command; do not\n                            connect.\n  --no-sync                 Skip code upload.\n  --chunk-minutes NUMBER    Self-resubmitting SLURM slice length; 0 runs one\n                            monolithic job.  [default: 10.0]\n  --fidelity [full|survey]  Fidelity preset supplying omitted grid and electron\n                            defaults.  [default: full]\n  --line-ne NUMBER          New line electron count.\n  --start NUMBER            Line lower bound in eV.\n  --stop NUMBER             Line exclusive upper bound in eV.\n  --line-step NUMBER        Explicit uniform line-grid spacing in eV.\n  --detach                  Return after remote submission.\n  -h, --help                Show this message and exit.\n",
+            "hidden": true,
             "path": "remote reline",
             "subcommands": []
           },

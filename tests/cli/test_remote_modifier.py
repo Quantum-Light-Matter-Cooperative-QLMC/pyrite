@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from cxr_mc._remote import cli as remote_cli
 from cxr_mc._remote import config as remote_config
+from cxr_mc.cli.commands import recompute as recompute_cli
 from cxr_mc.cli.commands import scan
 from tests.helpers.cli import assert_clean_result, invoke
 
@@ -94,3 +95,63 @@ def test_remote_optional_value_parses_around_profile(monkeypatch):
     assert_clean_result(before)
     assert_clean_result(after)
     assert seen == [("standard", "box-a"), ("standard", "box-b")]
+
+
+def test_recompute_remote_modifier_delegates_and_restores_target(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(remote_config, "HOST", "configured-box")
+    monkeypatch.setattr(
+        remote_cli,
+        "_cli_rebrem",
+        lambda args: seen.update(vars(args), host=remote_config.remote_host()),
+    )
+
+    result = invoke(
+        recompute_cli.brem_command,
+        ["hopg", "--remote=box-a", "--detach", "--ne-brem", "25"],
+    )
+
+    assert_clean_result(result)
+    assert seen["material"] == ["hopg"]
+    assert seen["ne_brem"] == 25
+    assert seen["detach"] is True
+    assert seen["host"] == "box-a"
+    assert remote_config.remote_host() == "configured-box"
+
+
+def test_recompute_bare_remote_waits_by_default(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(remote_config, "HOST", "configured-box")
+    monkeypatch.setattr(remote_cli, "_cli_reline", lambda args: seen.update(vars(args)))
+
+    result = invoke(recompute_cli.line_command, ["hopg", "--remote", "--wait"])
+
+    assert_clean_result(result)
+    assert seen["material"] == ["hopg"]
+    assert seen["detach"] is False
+    assert seen["chunk_minutes"] == 10.0
+
+
+def test_recompute_locality_controls_are_rejected_when_incompatible():
+    conflict = invoke(
+        recompute_cli.brem_command,
+        ["hopg", "--remote", "--wait", "--detach"],
+    )
+    local_remote_option = invoke(recompute_cli.line_command, ["hopg", "--no-sync"])
+    remote_local_option = invoke(
+        recompute_cli.line_command,
+        ["hopg", "--remote", "--checkpoint-dir", "elsewhere"],
+    )
+    remote_json = invoke(
+        recompute_cli.line_command,
+        ["hopg", "--remote", "-o", "json"],
+    )
+
+    assert conflict.exit_code == 2
+    assert "--wait and --detach are mutually exclusive" in conflict.stderr
+    assert local_remote_option.exit_code == 2
+    assert "remote-only option(s) require -R/--remote: --no-sync" in local_remote_option.stderr
+    assert remote_local_option.exit_code == 2
+    assert "local-only option(s): --checkpoint-dir" in remote_local_option.stderr
+    assert remote_json.exit_code == 2
+    assert "does not yet support --output json" in remote_json.stderr

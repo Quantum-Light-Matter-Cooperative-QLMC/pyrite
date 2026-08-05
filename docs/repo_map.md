@@ -73,6 +73,9 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   hidden alias: `cxr check-config`.
 - **`cxr checkpoint ...`** → `cli.commands.checkpoint:command`: grouped local checkpoint
   shrink, component recompute, archive, restore, list, and merge operations.
+  `checkpoint recompute brem|line -R[=TARGET]` reuses the remote SLURM
+  orchestrators with uniform `--wait` / `--detach`; hidden compatibility paths:
+  `remote rebrem`, `remote reline`.
 - **`cxr checkpoint gc [--all | --profile NAME] [--yes]`** →
   `cli.commands.cleanup:gc_command`: preview or atomically rewrite current
   named-profile checkpoints, retaining only records whose full case payload

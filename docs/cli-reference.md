@@ -140,8 +140,8 @@ Options:
                                   repopulate the shared per-case cache with the results.
   --no-progress                   Disable progress bars/dashboard.
   -v, --verbose                   Increase dashboard detail.
-  -R, --remote [TARGET]           Run through SLURM; bare uses the configured target,
-                                  =TARGET overrides it.
+  -R, --remote [TARGET]           Run remotely; bare uses the configured target, =TARGET
+                                  overrides it.
   --wait                          Wait for remote completion and pull results.
   --detach                        Return after remote submission.
   --fidelity [full|survey]        Named settings/grid-reduction policy. survey is
@@ -452,6 +452,14 @@ Options:
                                   update.  [default: checkpoints]
   --save-every N                  Atomically save after every N recomputed records.
                                   [default: 100]
+  -R, --remote [TARGET]           Run remotely; bare uses the configured target, =TARGET
+                                  overrides it.
+  --detach                        Return after remote submission.
+  --wait                          Wait and pull remote results.
+  --dry-run                       Preview remote submission; do not connect.
+  --no-sync                       Skip remote code upload.
+  --chunk-minutes MINUTES         Remote self-resubmitting slice length; 0 uses one
+                                  monolithic job.
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
@@ -485,6 +493,14 @@ Options:
                                   update.  [default: checkpoints]
   --save-every N                  Atomically save after every N recomputed records.
                                   [default: 100]
+  -R, --remote [TARGET]           Run remotely; bare uses the configured target, =TARGET
+                                  overrides it.
+  --detach                        Return after remote submission.
+  --wait                          Wait and pull remote results.
+  --dry-run                       Preview remote submission; do not connect.
+  --no-sync                       Skip remote code upload.
+  --chunk-minutes MINUTES         Remote self-resubmitting slice length; 0 uses one
+                                  monolithic job.
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
@@ -774,8 +790,6 @@ Commands:
   performance  List, pull, or delete remote performance artifacts.
   prune-jobs   Delete terminal (done/failed/cancelled) job directories; preview...
   pull         Fetch existing checkpoints from remote box.
-  rebrem       Recompute brem-only remotely, follow, and pull completed checkpoints.
-  reline       Recompute line-only remotely, follow, and pull completed checkpoints.
   rm           Delete remote checkpoints; preview unless --yes.
   run          Sync code, submit sweep(s), track progress, and pull checkpoints.
   sync         Push current code to remote box.
@@ -903,52 +917,6 @@ Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
   -h, --help                      Show this message and exit.
-```
-
-## `cxr remote rebrem`
-
-```text
-Usage: cxr remote rebrem [OPTIONS] [MATERIAL]...
-
-  Recompute brem-only remotely, follow, and pull completed checkpoints.
-
-Options:
-  -a, --all                 Use every material in mats_to_sim.toml.
-  --redo-all                Recompute every record even when already at target.
-  --dry-run                 Print batch script and submission command; do not connect.
-  --no-sync                 Skip code upload.
-  --chunk-minutes NUMBER    Self-resubmitting SLURM slice length; 0 runs one monolithic
-                            job.  [default: 10.0]
-  --fidelity [full|survey]  Fidelity preset supplying omitted grid and electron
-                            defaults.  [default: full]
-  --ne-brem NUMBER          New brem electron count.
-  --start NUMBER            Brem lower bound in eV.
-  --stop NUMBER             Brem exclusive upper bound in eV.
-  --step NUMBER             Wide-brem grid spacing in eV.
-  -h, --help                Show this message and exit.
-```
-
-## `cxr remote reline`
-
-```text
-Usage: cxr remote reline [OPTIONS] [MATERIAL]...
-
-  Recompute line-only remotely, follow, and pull completed checkpoints.
-
-Options:
-  -a, --all                 Use every material in mats_to_sim.toml.
-  --redo-all                Recompute every record even when already at target.
-  --dry-run                 Print batch script and submission command; do not connect.
-  --no-sync                 Skip code upload.
-  --chunk-minutes NUMBER    Self-resubmitting SLURM slice length; 0 runs one monolithic
-                            job.  [default: 10.0]
-  --fidelity [full|survey]  Fidelity preset supplying omitted grid and electron
-                            defaults.  [default: full]
-  --line-ne NUMBER          New line electron count.
-  --start NUMBER            Line lower bound in eV.
-  --stop NUMBER             Line exclusive upper bound in eV.
-  --line-step NUMBER        Explicit uniform line-grid spacing in eV.
-  -h, --help                Show this message and exit.
 ```
 
 ## `cxr remote rm`

@@ -106,6 +106,79 @@ def _brem_cli_json(args):
     _cli_core.emit_json_result(result, failure_exit=75 if resumable else 1)
 
 
+def _remote_controls(function):
+    function = click.option(
+        "--chunk-minutes",
+        type=_cli_core.NONNEGATIVE_FLOAT,
+        default=None,
+        metavar="MINUTES",
+        help="Remote self-resubmitting slice length; 0 uses one monolithic job.",
+    )(function)
+    function = click.option("--no-sync", is_flag=True, help="Skip remote code upload.")(function)
+    function = click.option(
+        "--dry-run", is_flag=True, help="Preview remote submission; do not connect."
+    )(function)
+    function = click.option("--wait", is_flag=True, help="Wait and pull remote results.")(function)
+    function = click.option("--detach", is_flag=True, help="Return after remote submission.")(
+        function
+    )
+    return _cli_core.remote_option(function)
+
+
+def _remote_requested(
+    ctx: click.Context,
+    *,
+    remote_target: str | None,
+    wait: bool,
+    detach: bool,
+    chunk_minutes: float | None,
+    no_sync: bool,
+    dry_run: bool,
+) -> bool:
+    if wait and detach:
+        raise click.UsageError("--wait and --detach are mutually exclusive")
+    remote_only = {
+        "wait": "--wait",
+        "detach": "--detach",
+        "chunk_minutes": "--chunk-minutes",
+        "no_sync": "--no-sync",
+        "dry_run": "--dry-run",
+    }
+    if remote_target is None:
+        explicit = [
+            flag
+            for parameter, flag in remote_only.items()
+            if ctx.get_parameter_source(parameter) is click.core.ParameterSource.COMMANDLINE
+        ]
+        if explicit:
+            raise click.UsageError(
+                f"remote-only option(s) require -R/--remote: {', '.join(explicit)}"
+            )
+        return False
+    return True
+
+
+def _reject_remote_local_options(ctx: click.Context, json_output: bool) -> None:
+    if json_output:
+        raise click.UsageError("remote recompute does not yet support --output json")
+    local_only = {
+        "catalog_profile": "--profile",
+        "checkpoint_dir": "--checkpoint-dir",
+        "progress_file": "--progress-file",
+        "max_minutes": "--max-minutes",
+        "save_every": "--save-every",
+    }
+    explicit = [
+        flag
+        for parameter, flag in local_only.items()
+        if ctx.get_parameter_source(parameter) is click.core.ParameterSource.COMMANDLINE
+    ]
+    if explicit:
+        raise click.UsageError(
+            f"remote recompute does not support local-only option(s): {', '.join(explicit)}"
+        )
+
+
 @click.command(
     "rebrem",
     help=(
@@ -180,8 +253,11 @@ def _brem_cli_json(args):
     metavar="N",
     help="Atomically save after every N recomputed records.",
 )
+@_remote_controls
+@click.pass_context
 @_cli_core.output_option
 def brem_command(
+    ctx,
     materials,
     all_,
     fidelity,
@@ -196,6 +272,12 @@ def brem_command(
     max_minutes,
     save_every,
     json_output,
+    remote_target,
+    wait,
+    detach,
+    chunk_minutes,
+    no_sync,
+    dry_run,
 ):
     if all_ and materials:
         raise click.UsageError("rebrem --all does not take material names")
@@ -203,6 +285,36 @@ def brem_command(
         raise click.UsageError("rebrem needs material name(s), or use --all")
     if start is not None and stop is not None and stop <= start:
         raise click.UsageError("rebrem --stop must be greater than --start")
+    if _remote_requested(
+        ctx,
+        remote_target=remote_target,
+        wait=wait,
+        detach=detach,
+        chunk_minutes=chunk_minutes,
+        no_sync=no_sync,
+        dry_run=dry_run,
+    ):
+        _reject_remote_local_options(ctx, json_output)
+        from ..._remote import cli as remote_cli
+        from ..._remote import config as remote_config
+
+        target = None if remote_target == "__configured__" else remote_target
+        with remote_config.override_remote_host(target):
+            return ctx.invoke(
+                remote_cli.rebrem_command,
+                material=materials,
+                all_=all_,
+                fidelity=fidelity or "full",
+                redo_all=redo_all,
+                dry_run=dry_run,
+                no_sync=no_sync,
+                chunk_minutes=10.0 if chunk_minutes is None else chunk_minutes,
+                ne_brem=ne_brem,
+                start=start,
+                stop=stop,
+                step=step,
+                detach=detach,
+            )
     handler = _brem_cli_json if json_output else _brem_cli
     return _cli_core.invoke_legacy(
         handler,
@@ -380,8 +492,11 @@ def _line_cli_json(args):
     metavar="N",
     help="Atomically save after every N recomputed records.",
 )
+@_remote_controls
+@click.pass_context
 @_cli_core.output_option
 def line_command(
+    ctx,
     materials,
     all_,
     fidelity,
@@ -396,6 +511,12 @@ def line_command(
     max_minutes,
     save_every,
     json_output,
+    remote_target,
+    wait,
+    detach,
+    chunk_minutes,
+    no_sync,
+    dry_run,
 ):
     if all_ and materials:
         raise click.UsageError("reline --all does not take material names")
@@ -403,6 +524,36 @@ def line_command(
         raise click.UsageError("reline needs material name(s), or use --all")
     if start is not None and stop is not None and stop <= start:
         raise click.UsageError("reline --stop must be greater than --start")
+    if _remote_requested(
+        ctx,
+        remote_target=remote_target,
+        wait=wait,
+        detach=detach,
+        chunk_minutes=chunk_minutes,
+        no_sync=no_sync,
+        dry_run=dry_run,
+    ):
+        _reject_remote_local_options(ctx, json_output)
+        from ..._remote import cli as remote_cli
+        from ..._remote import config as remote_config
+
+        target = None if remote_target == "__configured__" else remote_target
+        with remote_config.override_remote_host(target):
+            return ctx.invoke(
+                remote_cli.reline_command,
+                material=materials,
+                all_=all_,
+                fidelity=fidelity or "full",
+                redo_all=redo_all,
+                dry_run=dry_run,
+                no_sync=no_sync,
+                chunk_minutes=10.0 if chunk_minutes is None else chunk_minutes,
+                line_ne=line_ne,
+                start=start,
+                stop=stop,
+                line_step=line_step,
+                detach=detach,
+            )
     handler = _line_cli_json if json_output else _line_cli
     return _cli_core.invoke_legacy(
         handler,

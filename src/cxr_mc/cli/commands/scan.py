@@ -32,17 +32,6 @@ def _performance_profile(ctx, param, value):
     return value
 
 
-def _remote_target(ctx, param, value):
-    if value in (None, "__configured__"):
-        return value
-    from ..._remote.config import validate_remote_target
-
-    try:
-        return validate_remote_target(value)
-    except ValueError as exc:
-        raise click.BadParameter(str(exc), ctx=ctx, param=param) from exc
-
-
 @click.command(
     "run",
     help=(
@@ -191,17 +180,7 @@ def _remote_target(ctx, param, value):
 )
 @click.option("--no-progress", is_flag=True, help="Disable progress bars/dashboard.")
 @click.option("-v", "--verbose", count=True, help="Increase dashboard detail.")
-@click.option(
-    "-R",
-    "--remote",
-    "remote_target",
-    is_flag=False,
-    flag_value="__configured__",
-    default=None,
-    callback=_remote_target,
-    metavar="[TARGET]",
-    help="Run through SLURM; bare uses the configured target, =TARGET overrides it.",
-)
+@_cli_core.remote_option
 @click.option("--wait", is_flag=True, help="Wait for remote completion and pull results.")
 @click.option("--detach", is_flag=True, help="Return after remote submission.")
 @click.pass_context

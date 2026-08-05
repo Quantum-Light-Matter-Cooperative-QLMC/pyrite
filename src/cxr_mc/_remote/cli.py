@@ -173,6 +173,8 @@ def _cli_rebrem(args):
     )
     if args.dry_run:
         return
+    if getattr(args, "detach", False):
+        return
     if not viewer.attach(jobid):
         emit_diagnostic(
             "rebrem is still running or its viewer disconnected; skipping automatic pull"
@@ -204,6 +206,8 @@ def _cli_reline(args):
         chunk_minutes=args.chunk_minutes,
     )
     if args.dry_run:
+        return
+    if getattr(args, "detach", False):
         return
     if not viewer.attach(jobid):
         emit_diagnostic(
@@ -588,6 +592,7 @@ def _recompute_options(function):
 
 @command.command(
     "rebrem",
+    hidden=True,
     help="Recompute brem-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
@@ -596,6 +601,7 @@ def _recompute_options(function):
 @click.option("--start", type=NONNEGATIVE_FLOAT, default=None, help="Brem lower bound in eV.")
 @click.option("--stop", type=POSITIVE_FLOAT, default=None, help="Brem exclusive upper bound in eV.")
 @click.option("--step", type=POSITIVE_FLOAT, default=None, help="Wide-brem grid spacing in eV.")
+@click.option("--detach", is_flag=True, help="Return after remote submission.")
 def rebrem_command(
     material,
     all_,
@@ -608,6 +614,7 @@ def rebrem_command(
     start,
     stop,
     step,
+    detach,
 ):
     materials = list(material)
     _reject_all_with_values("rebrem", all_, materials)
@@ -628,12 +635,14 @@ def rebrem_command(
             chunk_minutes=chunk_minutes,
             no_sync=no_sync,
             dry_run=dry_run,
+            detach=detach,
         ),
     )
 
 
 @command.command(
     "reline",
+    hidden=True,
     help="Recompute line-only remotely, follow, and pull completed checkpoints.",
 )
 @_recompute_options
@@ -647,6 +656,7 @@ def rebrem_command(
     default=None,
     help="Explicit uniform line-grid spacing in eV.",
 )
+@click.option("--detach", is_flag=True, help="Return after remote submission.")
 def reline_command(
     material,
     all_,
@@ -659,6 +669,7 @@ def reline_command(
     start,
     stop,
     line_step,
+    detach,
 ):
     materials = list(material)
     _reject_all_with_values("reline", all_, materials)
@@ -679,6 +690,7 @@ def reline_command(
             chunk_minutes=chunk_minutes,
             no_sync=no_sync,
             dry_run=dry_run,
+            detach=detach,
         ),
     )
 

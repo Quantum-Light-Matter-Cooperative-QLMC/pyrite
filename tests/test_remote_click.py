@@ -402,8 +402,42 @@ def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
 
     result = invoke(remote.command, argv)
 
-    assert_clean_result(result)
+    if command_name == "run":
+        assert_clean_result(result)
+    else:
+        assert result.exit_code == 0
+        assert result.stderr.count("is deprecated") == 1
+        assert (
+            f"cxr checkpoint recompute {'brem' if command_name == 'rebrem' else 'line'} --remote"
+            in result.stderr
+        )
     assert calls[0]["fidelity"] == "survey"
+
+
+@pytest.mark.parametrize(
+    ("command_name", "starter"),
+    [
+        ("rebrem", "start_rebrem_queue"),
+        ("reline", "start_reline_queue"),
+    ],
+)
+def test_remote_recompute_detach_skips_viewer_and_pull(monkeypatch, command_name, starter):
+    monkeypatch.setattr(lifecycle, starter, lambda _materials, **_kwargs: "job")
+    monkeypatch.setattr(
+        viewer,
+        "attach",
+        lambda _jobid: pytest.fail("detached recompute must not attach"),
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "pull",
+        lambda *_args, **_kwargs: pytest.fail("detached recompute must not pull"),
+    )
+
+    result = invoke(remote.command, [command_name, "hopg", "--detach"])
+
+    assert result.exit_code == 0
+    assert result.stderr.count("is deprecated") == 1
 
 
 def test_run_profile_and_material_dispatch(monkeypatch):
