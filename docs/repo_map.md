@@ -105,6 +105,12 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   derivation or the existing sliced SSH/SLURM grid job. Remote derivation waits
   and pulls its JSON by default; `--detach` returns after submission. Hidden
   compatibility alias: `cxr energy-grid submit`.
+- **`cxr energy-grid add|rm|verify|gc`** → `energy_grid._command` → immutable
+  `energy-grid-artifacts/<first2>/<sha256>.json` objects plus mutable
+  `profiles.NAME.energy_grid_refs`. `add`/manual setters/rm create replacement
+  objects and repoint only the selected profile; `verify` checks bytes and refs;
+  `gc` reclaims unreachable objects after a 14-day grace window. Hidden D7
+  aliases: `apply` → `add`, `line delete` → `rm`.
 - **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
   `notebooks/analysis_app.py` (checkpoint-driven 2D figures, Altair +
   matplotlib, lazy tabbed layout), `notebooks/trace_app.py` (3D trajectory
@@ -306,7 +312,18 @@ compact grid encoding shared by sweep/runner (slice 2 renamed `line_grid/` +
   `__init__.py` is thin and exposes `command` lazily via `__getattr__` so
   hot-path `energy_grid.encoding` imports stay Click-free. Monkeypatch seams for
   `remote`/`cli_json`/`emit_json_result` live on `_command`, not the package.
+- `artifacts.py` freezes canonical `cxr.energy-grid-artifact.v1` identity bytes,
+  SHA-256 naming, sharded storage, atomic dedup publication, and corruption
+  checks. `gc.py` resolves profile/campaign-lock reachability, out-of-band orphan
+  ages, preview revalidation, and deletion.
 - Also: `derive`, `bounds`, `apply`, `defaults`, `provenance`, `golden`, `job`.
+
+### `campaign_lock.py`
+Deterministic `cxr.campaign-lock.v1` writer/reader. Each successfully completed
+dataset records its resolved profile, material, dataset identity, explicit
+energy-grid artifact hash (or legacy marker), beside checkpoint metadata as
+`cxr.lock.json`; incomplete runs emit no lock. Active and archived locks remain
+artifact-GC roots.
 
 ### `run.py`
 Checkpointed, resumable sweep driver plus cross-profile per-case CAS replay,
@@ -594,7 +611,9 @@ and clear, remote validation jobs.
   ◄ `cli`; plus `presentation`):
   - `config.py` — env-driven hosts/paths/SLURM constants.
   - `transport.py` — ssh/scp primitives, streamed downloads, hashing,
-    generated-cache-filtered code-tar sync, material checks.
+    generated-cache-filtered code-tar sync, material checks; one-round-trip
+    immutable energy-grid hash inventory skips remote objects already present
+    with matching content.
   - `scripts.py` — pure SLURM/shell string + command builders, job-id minting,
     per-allocation dependency-sync timing.
   - `state.py` — read-only job/reservation state queries over ssh; live-job

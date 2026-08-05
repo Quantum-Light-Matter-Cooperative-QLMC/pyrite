@@ -43,7 +43,7 @@ def test_help_documents_examples_units_side_effects_and_incompatibilities():
         ("remote", "pull"): ("--preset", "grid-filtered"),
         ("energy-grid",): ("cxr profile", "per-material range overrides", "Examples:"),
         ("energy-grid", "derive"): ("keV", "angstrom", "spacing in eV"),
-        ("energy-grid", "apply"): ("precedence", "write nothing"),
+        ("energy-grid", "add"): ("precedence", "immutable"),
         ("energy-grid", "job", "status"): ("latest recorded job", "repeat"),
     }
     for path, expected in cases.items():

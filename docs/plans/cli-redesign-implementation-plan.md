@@ -27,7 +27,7 @@ triage → dispatch flow; `TODO.md` stays authoritative for status.
 | 3 | noun→verb, remote-as-modifier, `-o` contract | redesign D1–D3 | ✅ landed 2026-08-05 |
 | 4 | verb collapse **+** recompute/prune module fold | redesign D4 + pkg P3 | ✅ landed 2026-08-05 (ahead of 3, see below) |
 | 5 | vocab controls + deprecation rollout | redesign D5–D7 | ✅ landed 2026-08-05; closure audit completed after 3 |
-| 6 | content-addressed store, lockfile, gc | artifact RFC (phase 5) | needs 3–5 |
+| 6 | content-addressed store, lockfile, gc | artifact RFC (phase 5) | implemented 2026-08-05 on `feature/cli-artifact-model`; unmerged, awaiting slice 5 landing on `main` |
 
 Slices 4 and 5 are gated on 3 in this linearization, but the redesign RFC's own
 migration plan ([§4](../cli-redesign-rfc.md#4-migration-plan)) sequences the

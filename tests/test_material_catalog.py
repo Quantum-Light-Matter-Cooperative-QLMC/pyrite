@@ -196,6 +196,104 @@ def test_energy_grids_store_may_hold_more_energies_than_a_material_needs(tmp_pat
     assert tuple(scan.E_grid_line_by_energy) == (25.0, 30.0)
 
 
+def _catalog_with_artifact_ref(digest: str) -> str:
+    text = _catalog_with_per_beam_line_grids().replace(_NO_FLAT_LINE_GRID, "")
+    return text.replace(
+        "[profiles.standard]\n",
+        f'[profiles.standard]\nenergy_grid_refs = {{ sample = "{digest}" }}\n',
+        1,
+    )
+
+
+def test_profile_artifact_ref_resolves_immutable_grid_and_brem(tmp_path):
+    from cxr_mc.energy_grid import artifacts
+    from cxr_mc.materials import load_material_catalog
+
+    identity = artifacts.artifact_identity(
+        "sample",
+        [
+            {"energy_keV": 25, "start_eV": 11, "stop_eV": 59, "num": 5},
+            {"energy_keV": 30, "start_eV": 12, "stop_eV": 72, "num": 4},
+            {"energy_keV": 40, "start_eV": 20, "stop_eV": 80, "num": 3},
+        ],
+        {"start_eV": 0, "stop_eV": 100, "step_eV": 20},
+        [25, 30, 40],
+    )
+    stored = artifacts.write_artifact(tmp_path / "energy-grid-artifacts", identity)
+    catalog = load_material_catalog(
+        _write_catalog(tmp_path, _catalog_with_artifact_ref(stored.digest))
+    )
+    scan = catalog.material("sample").scan
+
+    assert scan.energy_keV.tolist() == [25.0, 30.0, 40.0]
+    assert scan.E_grid_line_by_energy is not None
+    assert scan.E_grid_line_by_energy[25.0].tolist() == [11.0, 23.0, 35.0, 47.0, 59.0]
+    assert scan.E_grid_brem.tolist() == [0.0, 20.0, 40.0, 60.0, 80.0]
+    assert catalog.profile_energy_grid_ref("standard", "sample") == stored.digest
+    assert catalog.resolved_energy_grid_refs == {"sample": stored.digest}
+
+
+def test_profile_artifact_ref_matches_equivalent_legacy_resolution(tmp_path):
+    from cxr_mc.energy_grid import artifacts
+    from cxr_mc.materials import load_material_catalog
+
+    legacy_text = (
+        _catalog_with_per_beam_line_grids()
+        + "\n[profiles.standard.overrides.sample]\n"
+        + "E_grid_brem = { arange = { start = 0.0, stop = 100.0, step = 20.0 } }\n"
+    )
+    legacy = load_material_catalog(_write_catalog(tmp_path, legacy_text)).material("sample").scan
+    identity = artifacts.artifact_identity(
+        "sample",
+        [
+            {"energy_keV": 25, "start_eV": 10, "stop_eV": 58, "num": 17},
+            {"energy_keV": 30, "start_eV": 20, "stop_eV": 26, "num": 3},
+        ],
+        {"start_eV": 0, "stop_eV": 100, "step_eV": 20},
+        [25, 30],
+    )
+    stored = artifacts.write_artifact(tmp_path / "energy-grid-artifacts", identity)
+    artifact_text = legacy_text.replace(
+        "[profiles.standard]\n",
+        f'[profiles.standard]\nenergy_grid_refs = {{ sample = "{stored.digest}" }}\n',
+        1,
+    )
+    resolved = (
+        load_material_catalog(_write_catalog(tmp_path, artifact_text)).material("sample").scan
+    )
+
+    np.testing.assert_array_equal(resolved.energy_keV, legacy.energy_keV)
+    np.testing.assert_array_equal(resolved.E_grid_brem, legacy.E_grid_brem)
+    assert resolved.E_grid_line_by_energy is not None
+    assert legacy.E_grid_line_by_energy is not None
+    for energy in legacy.E_grid_line_by_energy:
+        np.testing.assert_array_equal(
+            resolved.E_grid_line_by_energy[energy], legacy.E_grid_line_by_energy[energy]
+        )
+
+
+def test_profile_artifact_ref_rejects_missing_or_wrong_material(tmp_path):
+    from cxr_mc.energy_grid import artifacts
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    missing = "a" * 64
+    with pytest.raises(MaterialConfigError, match="artifact .* is missing"):
+        load_material_catalog(_write_catalog(tmp_path, _catalog_with_artifact_ref(missing)))
+
+    identity = artifacts.artifact_identity(
+        "other",
+        [
+            {"energy_keV": 25, "start_eV": 10, "stop_eV": 60, "num": 6},
+            {"energy_keV": 30, "start_eV": 10, "stop_eV": 70, "num": 7},
+        ],
+        {"stop_eV": 100, "step_eV": 20},
+        [25, 30],
+    )
+    stored = artifacts.write_artifact(tmp_path / "energy-grid-artifacts", identity)
+    with pytest.raises(MaterialConfigError, match="does not match ref key"):
+        load_material_catalog(_write_catalog(tmp_path, _catalog_with_artifact_ref(stored.digest)))
+
+
 def _catalog_with_default_store_only(*, entries: str = PER_BEAM_ENTRIES) -> str:
     """Material "sample" has no ``[energy_grids.sample]`` entry of its own; it
     resolves against the shared default keyed by its profile's name

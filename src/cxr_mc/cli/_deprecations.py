@@ -92,6 +92,16 @@ DEPRECATIONS: dict[str, Deprecation] = {
         _entry("energy-grid job status", "cxr job status"),
         _entry("energy-grid job stop", "cxr job stop"),
         _entry("energy-grid submit", "cxr energy-grid derive --remote --detach"),
+        _entry(
+            "energy-grid apply",
+            "cxr energy-grid add",
+            note="The replacement creates an immutable artifact and repoints the resolved profile.",
+        ),
+        _entry(
+            "energy-grid line delete",
+            "cxr energy-grid rm",
+            note="The replacement repoints a profile; gc later reclaims unreachable bytes.",
+        ),
         # Profile membership and performance spellings.
         _entry("profile add-material", "cxr profile add NAME --material MATERIAL,..."),
         _entry("profile remove-material", "cxr profile remove NAME --material MATERIAL,..."),
@@ -284,6 +294,7 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         _flag("energy-grid submit", "--materials", "--material"),
         _flag("energy-grid defaults", "--tilts", "--polar"),
         _flag("energy-grid defaults", "--azimuths", "--azimuth"),
+        _flag("energy-grid add", "--materials", "--material"),
         _flag("energy-grid apply", "--materials", "--material"),
         _flag("material blaze", "--angles", "--polar"),
         _flag("profile create", "--materials", "--material"),
@@ -316,6 +327,7 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         _flag("energy-grid show", "--json", "--output json"),
         _flag("energy-grid status", "--json", "--output json"),
         _flag("energy-grid job status", "--json", "--output json"),
+        _flag("energy-grid rm", "--json", "--output json"),
         _flag("energy-grid line delete", "--json", "--output json"),
         _flag("energy-grid line show", "--json", "--output json"),
         _flag("energy-grid brem show", "--json", "--output json"),

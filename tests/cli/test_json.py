@@ -134,7 +134,7 @@ def test_line_grid_show_has_grids_brem_and_provenance():
 def test_line_grid_show_unknown_material_is_structured_failure():
     result = cli_json.line_grid_show({}, {}, {}, {}, selected="ghost")
 
-    assert result.payload == {"materials": []}
+    assert result.payload == {"profile": "standard", "materials": []}
     assert result.errors == (
         {
             "code": "unknown_material",

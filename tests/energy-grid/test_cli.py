@@ -1,5 +1,7 @@
 import subprocess
 import sys
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -18,7 +20,10 @@ CLICK_COMMANDS = (
     "attach",
     "logs",
     "stop",
-    "apply",
+    "add",
+    "rm",
+    "verify",
+    "gc",
     "line",
     "brem",
     "defaults",
@@ -38,12 +43,18 @@ def test_click_group_exposes_full_line_grid_tree():
         "attach",
         "logs",
         "stop",
+        "add",
         "apply",
+        "rm",
+        "verify",
+        "gc",
         "defaults",
         "show",
         "regen-golden",
     )
     assert energy_grid.command.commands["submit"].hidden is True
+    assert energy_grid.command.commands["apply"].hidden is True
+    assert energy_grid.command.commands["line"].commands["delete"].hidden is True
 
 
 @pytest.mark.parametrize(
@@ -53,7 +64,6 @@ def test_click_group_exposes_full_line_grid_tree():
         *((name,) for name in CLICK_COMMANDS),
         *((("job", name)) for name in ("status", "attach", "logs", "stop")),
         *(((band, name)) for band in ("line", "brem") for name in ("set", "show")),
-        ("line", "delete"),
     ],
 )
 def test_click_help_paths_are_clean(path):
@@ -348,18 +358,70 @@ def test_click_derive_preserves_nonzero_status(monkeypatch, status):
     assert_clean_result(result, exit_code=status)
 
 
-def test_click_apply_dispatches_with_pull_and_force(monkeypatch):
+def test_click_add_dispatches_with_pull_force_and_resolved_profile(monkeypatch):
     seen = {}
     monkeypatch.setattr(_command, "_pull_combined", lambda: "combined.json")
     monkeypatch.setattr(
-        energy_grid.apply, "apply_file", lambda path, **kw: seen.update(path=path, **kw)
+        energy_grid.apply, "add_file", lambda path, **kw: seen.update(path=path, **kw)
     )
 
-    result = invoke(energy_grid.command, ["apply", "--pull", "--force"])
+    result = invoke(energy_grid.command, ["add", "--pull", "--force", "--profile", "survey"])
 
     assert_clean_result(result)
     assert seen["path"] == "combined.json"
     assert seen["force"] is True
+    assert seen["profile"] == "survey"
+
+
+def test_click_apply_is_hidden_warning_alias_for_add(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        energy_grid.apply, "add_file", lambda path, **kw: seen.update(path=path, **kw)
+    )
+
+    result = invoke(energy_grid.command, ["apply", "bounds.json"])
+
+    assert result.exit_code == 0
+    assert result.stdout == ""
+    assert result.stderr == message("energy-grid apply") + "\n"
+    assert seen["path"] == "bounds.json"
+
+
+def test_click_apply_alias_adds_artifact_without_touching_legacy_payload(tmp_path, monkeypatch):
+    """The hidden alias runs the real artifact path, not the legacy rewriter."""
+    import json as _json
+    import tomllib
+
+    from cxr_mc.energy_grid import artifacts
+    from tests.helpers.energy_grid_catalog import BASE_TOML, COMBINED
+
+    toml_path = tmp_path / "materials.toml"
+    json_path = tmp_path / "combined.json"
+    toml_path.write_text(BASE_TOML)
+    json_path.write_text(_json.dumps(COMBINED))
+    monkeypatch.setattr(energy_grid.apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(
+        energy_grid.apply._provenance, "is_manual_brem", lambda *args, **kwargs: False
+    )
+    # BASE_TOML is a single-material stub, so skip the full-catalog re-parse the
+    # way the other add_file tests do; production still validates the real one.
+    monkeypatch.setattr(energy_grid.apply, "load_material_catalog", lambda path: None)
+
+    result = invoke(energy_grid.command, ["apply", str(json_path)])
+
+    assert result.exit_code == 0
+    assert result.stderr.startswith(message("energy-grid apply") + "\n")
+    parsed = tomllib.loads(toml_path.read_text())
+    digest = parsed["profiles"]["standard"]["energy_grid_refs"]["hopg"]
+    # Legacy scan payload -- grid rows, beam energies, brem override -- is a
+    # read-only compatibility seed; only the profile's refs may move.
+    assert parsed["energy_grids"] == tomllib.loads(BASE_TOML)["energy_grids"]
+    assert parsed["profiles"]["standard"]["energy_keV"] == {"values": [30.0, 100.0]}
+    assert parsed["profiles"]["standard"]["overrides"]["hopg"]["E_grid_brem"] == {
+        "arange": {"start": 0.0, "stop": 136500.0, "step": 25.0}
+    }
+    stored = artifacts.load_artifact(tmp_path / "energy-grid-artifacts", digest)
+    assert [row["stop_eV"] for row in stored.identity["line_rows"]] == [2700.0, 4600.0]
 
 
 @pytest.mark.parametrize(
@@ -370,12 +432,12 @@ def test_click_apply_dispatches_with_pull_and_force(monkeypatch):
         (OSError("cannot read bounds.json"), "cannot read bounds.json"),
     ],
 )
-def test_click_apply_expected_failures_use_stderr(monkeypatch, error, message):
+def test_click_add_expected_failures_use_stderr(monkeypatch, error, message):
     monkeypatch.setattr(
-        energy_grid.apply, "apply_file", lambda *_args, **_kwargs: (_ for _ in ()).throw(error)
+        energy_grid.apply, "add_file", lambda *_args, **_kwargs: (_ for _ in ()).throw(error)
     )
 
-    result = invoke(energy_grid.command, ["apply", "bounds.json"])
+    result = invoke(energy_grid.command, ["add", "bounds.json"])
 
     assert result.exit_code == 1
     assert result.stdout == ""
@@ -385,7 +447,7 @@ def test_click_apply_expected_failures_use_stderr(monkeypatch, error, message):
 
 @pytest.mark.parametrize("command_name", ["line", "brem"])
 def test_click_set_expected_domain_failure_uses_stderr(monkeypatch, command_name):
-    target = "set_line_grid" if command_name == "line" else "set_brem_grid"
+    target = "set_line_artifact" if command_name == "line" else "set_brem_artifact"
     monkeypatch.setattr(
         energy_grid.apply,
         target,
@@ -403,128 +465,196 @@ def test_click_set_expected_domain_failure_uses_stderr(monkeypatch, command_name
     assert "Traceback" not in result.output
 
 
-def test_click_line_delete_confirmed_deletes_and_warns_stale_golden(monkeypatch):
+def test_click_rm_confirmed_repoints_exact_preview(monkeypatch):
     calls = []
     monkeypatch.setattr(_cli_core, "_stdin_is_tty", lambda: True)
 
-    def delete_line_grid(material, energies, **kwargs):
+    def remove_line_rows(material, energies, **kwargs):
         calls.append((material, list(energies), kwargs))
-        return [30.0, 100.0]
+        return [30.0, 100.0], "d" * 64
 
     monkeypatch.setattr(
         energy_grid.apply,
-        "delete_line_grid",
-        delete_line_grid,
+        "remove_line_rows",
+        remove_line_rows,
     )
 
     result = invoke(
         energy_grid.command,
-        ["line", "delete", "hopg", "--energy", "30", "--energy", "100"],
+        ["rm", "hopg", "--energy", "30", "--energy", "100"],
         input="y\n",
     )
 
     assert result.exit_code == 0
-    assert calls[0] == ("hopg", [30.0, 100.0], {"dry_run": True})
+    assert calls[0] == (
+        "hopg",
+        [30.0, 100.0],
+        {"profile": "standard", "dry_run": True},
+    )
     assert calls[1][0:2] == ("hopg", [30.0, 100.0])
     assert isinstance(calls[1][2]["expected_original"], str)
     assert len(calls) == 2
-    assert "deleted hopg: 30, 100 keV" in result.stdout
-    assert "cannot be undone" in result.stderr
-    assert "golden is now stale" in result.stderr
+    assert "repointed standard/hopg" in result.stdout
+    assert "old artifact remains recoverable until gc" in result.stderr
 
 
-def test_click_line_delete_declined_confirmation_aborts(monkeypatch):
+def test_click_rm_declined_confirmation_aborts(monkeypatch):
     monkeypatch.setattr(_cli_core, "_stdin_is_tty", lambda: True)
 
     def preview_only(_material, _energies, **kwargs):
         if not kwargs.get("dry_run"):
-            pytest.fail("delete_line_grid must not execute when declined")
-        return [30.0]
+            pytest.fail("remove_line_rows must not execute when declined")
+        return [30.0], "d" * 64
 
     monkeypatch.setattr(
         energy_grid.apply,
-        "delete_line_grid",
+        "remove_line_rows",
         preview_only,
     )
 
-    result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30"], input="n\n")
+    result = invoke(energy_grid.command, ["rm", "hopg", "--energy", "30"], input="n\n")
 
     assert result.exit_code == 0
     assert result.stdout == ""
-    assert "cannot be undone" in result.stderr
+    assert "old artifact remains recoverable until gc" in result.stderr
 
 
-def test_click_line_delete_non_tty_previews_without_mutating(monkeypatch):
+def test_click_rm_non_tty_previews_without_mutating(monkeypatch):
     seen = []
     monkeypatch.setattr(_cli_core, "_stdin_is_tty", lambda: False)
 
     def preview_only(material, energies, **kwargs):
         seen.append((material, list(energies), kwargs))
-        return [30.0]
+        return [30.0], "d" * 64
 
-    monkeypatch.setattr(energy_grid.apply, "delete_line_grid", preview_only)
+    monkeypatch.setattr(energy_grid.apply, "remove_line_rows", preview_only)
 
-    result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30"])
+    result = invoke(energy_grid.command, ["rm", "hopg", "--energy", "30"])
 
     assert_clean_result(
         result,
         stdout="preview only; re-run with -y/--yes to execute\n",
     )
-    assert seen == [("hopg", [30.0], {"dry_run": True})]
+    assert seen == [("hopg", [30.0], {"profile": "standard", "dry_run": True})]
 
 
-def test_click_line_delete_yes_skips_prompt(monkeypatch):
+def test_click_rm_yes_skips_prompt(monkeypatch):
     monkeypatch.setattr(
-        energy_grid.apply, "delete_line_grid", lambda material, energies, **kw: [30.0]
+        energy_grid.apply,
+        "remove_line_rows",
+        lambda material, energies, **kw: ([30.0], "d" * 64),
     )
 
-    result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30", "--yes"])
+    result = invoke(energy_grid.command, ["rm", "hopg", "--energy", "30", "--yes"])
 
     assert result.exit_code == 0
-    assert "deleted hopg: 30 keV" in result.stdout
+    assert "repointed standard/hopg" in result.stdout
 
 
-def test_click_line_delete_dry_run_skips_prompt_and_confirms_via_kwarg(monkeypatch):
+def test_click_line_delete_is_hidden_warning_alias_for_rm(monkeypatch):
+    monkeypatch.setattr(
+        energy_grid.apply,
+        "remove_line_rows",
+        lambda material, energies, **kwargs: ([30.0], "d" * 64),
+    )
+
+    result = invoke(
+        energy_grid.command,
+        ["line", "delete", "hopg", "--energy", "30", "--yes"],
+    )
+
+    assert result.exit_code == 0
+    assert "repointed standard/hopg" in result.stdout
+    assert result.stderr == message("energy-grid line delete") + "\n"
+
+
+def test_click_verify_reports_integrity_and_failures(monkeypatch):
+    monkeypatch.setattr(
+        _command.artifact_gc,
+        "verify_artifacts",
+        lambda *args, **kwargs: SimpleNamespace(ok=True, inventory=("a",), roots=("a",), issues=()),
+    )
+    clean = invoke(energy_grid.command, ["verify"])
+    assert_clean_result(clean, stdout="verified 1 stored artifact(s); 1 reachable ref(s)\n")
+
+    issue = SimpleNamespace(digest="d" * 64, source="catalog", message="is missing")
+    monkeypatch.setattr(
+        _command.artifact_gc,
+        "verify_artifacts",
+        lambda *args, **kwargs: SimpleNamespace(
+            ok=False, inventory=(), roots=("d" * 64,), issues=(issue,)
+        ),
+    )
+    failed = invoke(energy_grid.command, ["verify"])
+    assert failed.exit_code == 1
+    assert "artifact verification failed" in failed.stderr
+    assert "is missing" in failed.stderr
+
+
+def test_click_gc_previews_non_tty_and_yes_executes_exact_plan(monkeypatch):
+    candidate = SimpleNamespace(path=Path("store/aa/artifact.json"), digest="a" * 64)
+    plan = SimpleNamespace(candidates=(candidate,), retained=("b" * 64,))
+    monkeypatch.setattr(_command.artifact_gc, "plan_gc", lambda *args, **kwargs: plan)
+    executed = []
+    monkeypatch.setattr(
+        _command.artifact_gc,
+        "execute_gc",
+        lambda selected: executed.append(selected) or (candidate.path,),
+    )
+    monkeypatch.setattr(_cli_core, "_stdin_is_tty", lambda: False)
+
+    preview = invoke(energy_grid.command, ["gc"])
+    confirmed = invoke(energy_grid.command, ["gc", "--prune-all", "-y"])
+
+    assert "would delete unreachable energy-grid artifacts" in preview.stdout
+    assert "preview only; re-run with -y/--yes to execute" in preview.stdout
+    assert executed == [plan]
+    assert "deleted 1 unreachable artifact(s)" in confirmed.stdout
+
+
+def test_click_rm_dry_run_skips_prompt_and_confirms_via_kwarg(monkeypatch):
     seen = {}
     monkeypatch.setattr(
         energy_grid.apply,
-        "delete_line_grid",
-        lambda material, energies, **kw: seen.update(kw) or [30.0],
+        "remove_line_rows",
+        lambda material, energies, **kw: seen.update(kw) or ([30.0], "d" * 64),
     )
 
-    result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30", "--dry-run"])
+    result = invoke(energy_grid.command, ["rm", "hopg", "--energy", "30", "--dry-run"])
 
     assert result.exit_code == 0
     assert result.stdout == ""
     assert result.stderr == ""
-    assert seen == {"dry_run": True}
+    assert seen == {"profile": "standard", "dry_run": True}
 
 
-def test_click_line_delete_dry_run_and_json_conflict():
+def test_click_rm_dry_run_and_json_conflict():
     result = invoke(
         energy_grid.command,
-        ["line", "delete", "hopg", "--energy", "30", "--dry-run", "-o", "json"],
+        ["rm", "hopg", "--energy", "30", "--dry-run", "-o", "json"],
     )
 
     assert result.exit_code == 2
     assert "--dry-run and --output json cannot be combined" in result.stderr
 
 
-def test_click_line_delete_json_requires_yes():
-    result = invoke(energy_grid.command, ["line", "delete", "hopg", "--energy", "30", "-o", "json"])
+def test_click_rm_json_requires_yes():
+    result = invoke(energy_grid.command, ["rm", "hopg", "--energy", "30", "-o", "json"])
 
     assert result.exit_code == 2
     assert "--output json requires --yes" in result.stderr
 
 
-def test_click_line_delete_json_emits_one_envelope(monkeypatch):
+def test_click_rm_json_emits_one_envelope(monkeypatch):
     monkeypatch.setattr(
-        energy_grid.apply, "delete_line_grid", lambda material, energies, **kw: [30.0]
+        energy_grid.apply,
+        "remove_line_rows",
+        lambda material, energies, **kw: ([30.0], "d" * 64),
     )
 
     result = invoke(
         energy_grid.command,
-        ["line", "delete", "hopg", "--energy", "30", "--yes", "-o", "json"],
+        ["rm", "hopg", "--energy", "30", "--yes", "-o", "json"],
     )
 
     assert_clean_result(result)
@@ -532,20 +662,25 @@ def test_click_line_delete_json_emits_one_envelope(monkeypatch):
     import json
 
     document = json.loads(result.stdout)
-    assert document["schema"] == "cxr.energy-grid.line-delete"
-    assert document["payload"] == {"material": "hopg", "deleted_energies_keV": [30.0]}
+    assert document["schema"] == "cxr.energy-grid.rm"
+    assert document["payload"] == {
+        "material": "hopg",
+        "profile": "standard",
+        "removed_energies_keV": [30.0],
+        "artifact_sha256": "d" * 64,
+    }
 
 
-def test_click_line_delete_expected_failure_uses_stderr(monkeypatch):
+def test_click_rm_expected_failure_uses_stderr(monkeypatch):
     monkeypatch.setattr(
         energy_grid.apply,
-        "delete_line_grid",
+        "remove_line_rows",
         lambda *_a, **_kw: (_ for _ in ()).throw(
             ValueError("no energy_grids entry for material: bad")
         ),
     )
 
-    result = invoke(energy_grid.command, ["line", "delete", "bad", "--energy", "30", "--yes"])
+    result = invoke(energy_grid.command, ["rm", "bad", "--energy", "30", "--yes"])
 
     assert result.exit_code == 1
     assert result.stdout == ""
@@ -791,7 +926,7 @@ def test_cli_failure_exit_and_stream_contract(argv, exit_code, stderr_text):
             "unknown material: not-a-material",
         ),
         (
-            ["apply"],
+            ["add"],
             2,
             "no JSON: pass a path or --pull",
         ),

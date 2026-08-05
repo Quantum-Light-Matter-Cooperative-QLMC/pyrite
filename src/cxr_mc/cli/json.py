@@ -332,6 +332,8 @@ def line_grid_show(
     *,
     selected: str | None = None,
     band: str | None = None,
+    profile: str = "standard",
+    artifact_refs: Mapping[str, str] | None = None,
 ) -> JsonResult:
     """Build structured line and bremsstrahlung grids from decoded TOML maps.
 
@@ -405,8 +407,19 @@ def line_grid_show(
                 }
         except (KeyError, TypeError, ValueError) as exc:
             errors.append(_error("invalid_brem_grid", str(exc), item=material))
-        output.append({"material": _text(material), "line_grids": lines, "brem_grid": brem_output})
-    return JsonResult("cxr.energy-grid.show", {"materials": output}, tuple(errors))
+        output.append(
+            {
+                "material": _text(material),
+                "artifact_sha256": _optional_text((artifact_refs or {}).get(material)),
+                "line_grids": lines,
+                "brem_grid": brem_output,
+            }
+        )
+    return JsonResult(
+        "cxr.energy-grid.show",
+        {"profile": _text(profile), "materials": output},
+        tuple(errors),
+    )
 
 
 def _provenance_record(value: object) -> dict[str, str | None]:

@@ -52,7 +52,7 @@ _COMMAND_HELP = {
     "union": "Merge a shelved checkpoint into an active slot.",
     "remote": "Run and manage MC sweeps on a remote GPU host.",
     "job": "List, inspect, follow, or stop asynchronous remote jobs.",
-    "energy-grid": "Derive, submit, inspect, and apply photon-energy grids.",
+    "energy-grid": "Derive, inspect, and manage immutable photon-energy-grid artifacts.",
     "sweep": "Compatibility aliases for retired scan-range commands.",
     "profile": "Manage named catalog campaigns and material membership.",
     "material": "Inspect, validate, edit, and blaze individual materials.",

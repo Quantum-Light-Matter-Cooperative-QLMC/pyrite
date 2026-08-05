@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from cxr_mc.cli import _catalog_io, _core, profile
+from cxr_mc.energy_grid import artifacts
 from tests.helpers.cli import assert_clean_result, invoke
 
 _CATALOG = """[profiles.standard]
@@ -47,6 +48,25 @@ def _catalog(tmp_path, monkeypatch, text=_CATALOG):
     return catalog
 
 
+def _artifact_ref_catalog(digest):
+    return _CATALOG.replace(
+        "\n[materials.hopg]",
+        f'\nenergy_grid_refs = {{ hopg = "{digest}" }}\n\n[materials.hopg]',
+    )
+
+
+def _artifact(tmp_path):
+    return artifacts.write_artifact(
+        tmp_path / "energy-grid-artifacts",
+        artifacts.artifact_identity(
+            "hopg",
+            [{"energy_keV": 30, "start_eV": 10, "stop_eV": 100, "num": 10}],
+            {"stop_eV": 1000, "step_eV": 10},
+            [30],
+        ),
+    )
+
+
 def test_list_text_and_json(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
@@ -64,6 +84,37 @@ def test_list_text_and_json(tmp_path, monkeypatch):
     assert standard["materials"] is None
     assert standard["overrides"] == ["hopg"]
     assert sub["materials"] == ["hopg"]
+
+
+def test_list_and_show_expose_energy_grid_refs(tmp_path, monkeypatch):
+    stored = _artifact(tmp_path)
+    _catalog(tmp_path, monkeypatch, _artifact_ref_catalog(stored.digest))
+
+    listed = invoke(profile.command, ["list"])
+    assert_clean_result(listed)
+    assert "standard: all materials (implicit), 1 material overrides, 0 energy-grid refs" in (
+        listed.stdout
+    )
+    assert "sub_100keV: 1 materials, 0 material overrides, 1 energy-grid refs" in listed.stdout
+
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert_clean_result(shown)
+    assert f"    hopg -> {stored.digest}" in shown.stdout
+
+    # A profile with no refs still resolves through the legacy catalog tables.
+    legacy = invoke(profile.command, ["show", "standard"])
+    assert_clean_result(legacy)
+    assert "energy grids: legacy catalog tables (no artifact refs)" in legacy.stdout
+
+    machine = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
+    assert_clean_result(machine)
+    assert json.loads(machine.stdout)["payload"]["energy_grid_refs"] == {"hopg": stored.digest}
+
+    listed_json = invoke(profile.command, ["list", "-o", "json"])
+    assert_clean_result(listed_json)
+    (standard, sub) = json.loads(listed_json.stdout)["payload"]["profiles"]
+    assert standard["energy_grid_refs"] == {}
+    assert sub["energy_grid_refs"] == {"hopg": stored.digest}
 
 
 def test_show_and_bare_name_alias(tmp_path, monkeypatch):
@@ -200,6 +251,20 @@ def test_create_clones_source_and_applies_range_overrides(tmp_path, monkeypatch)
     assert "tilt_deg = {values = [5.0]}" in text
     section = text.split("[profiles.sub_200keV]", 1)[1].split("\n[", 1)[0]
     assert "materials" not in section
+
+
+def test_create_clones_energy_grid_refs_without_copying_artifact_bytes(tmp_path, monkeypatch):
+    stored = _artifact(tmp_path)
+    catalog = _catalog(tmp_path, monkeypatch, _artifact_ref_catalog(stored.digest))
+    original_bytes = stored.path.read_bytes()
+
+    result = invoke(profile.command, ["create", "clone", "--from", "sub_100keV"])
+
+    assert_clean_result(result, stdout="created profile clone\n")
+    text = catalog.read_text()
+    section = text.split("[profiles.clone]", 1)[1].split("\n[", 1)[0]
+    assert f'energy_grid_refs={{hopg="{stored.digest}"}}' in section.replace(" ", "")
+    assert stored.path.read_bytes() == original_bytes
 
 
 def test_create_range_syntax_expands_stop_inclusive(tmp_path, monkeypatch):
@@ -801,6 +866,18 @@ def test_delete_blocked_by_energy_grid_store_referent(tmp_path, monkeypatch):
     assert catalog.read_text() == original
 
 
+def test_delete_ref_only_profile_orphans_but_does_not_delete_artifact_bytes(tmp_path, monkeypatch):
+    stored = _artifact(tmp_path)
+    catalog = _catalog(tmp_path, monkeypatch, _artifact_ref_catalog(stored.digest))
+    original_bytes = stored.path.read_bytes()
+
+    result = invoke(profile.command, ["delete", "sub_100keV", "-y"])
+
+    assert_clean_result(result, stdout="deleted profile sub_100keV\n")
+    assert "[profiles.sub_100keV]" not in catalog.read_text()
+    assert stored.path.read_bytes() == original_bytes
+
+
 def test_delete_json_requires_yes_and_reports_envelope(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
@@ -827,6 +904,21 @@ def test_rename_moves_profile_and_energy_grid_bucket(tmp_path, monkeypatch):
     assert "[profiles.sub100]" in text
     assert "[energy_grids.sub_100keV]" not in text
     assert "[energy_grids.sub100]" in text
+
+
+def test_rename_preserves_energy_grid_ref_digest(tmp_path, monkeypatch):
+    stored = _artifact(tmp_path)
+    catalog = _catalog(tmp_path, monkeypatch, _artifact_ref_catalog(stored.digest))
+    original_bytes = stored.path.read_bytes()
+
+    result = invoke(profile.command, ["rename", "sub_100keV", "sub100"])
+
+    assert_clean_result(result, stdout="renamed profile sub_100keV to sub100\n")
+    text = catalog.read_text()
+    assert "[profiles.sub_100keV]" not in text
+    section = text.split("[profiles.sub100]", 1)[1].split("\n[", 1)[0]
+    assert f'energy_grid_refs={{hopg="{stored.digest}"}}' in section.replace(" ", "")
+    assert stored.path.read_bytes() == original_bytes
 
 
 def test_rename_forbids_standard(tmp_path, monkeypatch):

@@ -128,6 +128,44 @@ def _sync_ignored(path: Path) -> bool:
     )
 
 
+_ENERGY_GRID_ARTIFACT_ROOT = Path("src/cxr_mc/data/energy-grid-artifacts")
+
+
+def _local_energy_grid_artifacts() -> dict[str, Path]:
+    """Return verified-name local immutable objects eligible for code sync."""
+    root = config.LOCAL_ROOT / _ENERGY_GRID_ARTIFACT_ROOT
+    if not root.is_dir():
+        return {}
+    found: dict[str, Path] = {}
+    for path in root.glob("[0-9a-f][0-9a-f]/*.json"):
+        match = re.fullmatch(r"([0-9a-f]{64})\.json", path.name)
+        if match is not None and match.group(1).startswith(path.parent.name):
+            digest = _local_sha256(path)
+            if digest is not None and digest == match.group(1):
+                found[digest] = path
+    return found
+
+
+def _remote_energy_grid_artifacts() -> frozenset[str]:
+    """Inventory remotely verified immutable objects in one SSH round trip."""
+    remote_root = f"{config.remote_dir().rstrip('/')}/{_ENERGY_GRID_ARTIFACT_ROOT.as_posix()}"
+    output = _ssh_capture(
+        f"if [ -d {config.shell_arg(remote_root)} ]; then "
+        f"find {config.shell_arg(remote_root)} -type f -name '*.json' -exec sha256sum {{}} +; fi"
+    )
+    verified: set[str] = set()
+    for line in output.splitlines():
+        match = re.fullmatch(r"([0-9a-fA-F]{64})\s+(.+)", line.strip())
+        if match is None:
+            raise SystemExit("invalid remote energy-grid artifact inventory")
+        actual = match.group(1).lower()
+        reported_path = match.group(2)
+        expected_path = f"{remote_root}/{actual[:2]}/{actual}.json"
+        if reported_path == expected_path:
+            verified.add(actual)
+    return frozenset(verified)
+
+
 def sync_code():
     """Tar SYNC_PATHS up (CRLF->LF normalized for text, via _add_to_tar) and
     extract them over the repo on the box. Generated interpreter/tool caches
@@ -139,6 +177,8 @@ def sync_code():
     `git pull` there isn't blocked. (The committed-state alternative -- `git push`
     from the laptop + `git fetch && git reset --hard origin/<branch>` on the box --
     would force a commit before every run, which this loop is built to avoid.)"""
+    local_artifacts = _local_energy_grid_artifacts()
+    remote_artifacts = _remote_energy_grid_artifacts() if local_artifacts else frozenset()
     with tempfile.TemporaryDirectory() as td:
         tarpath = os.path.join(td, "cxr_code.tgz")
         with tarfile.open(tarpath, "w:gz") as t:
@@ -151,6 +191,16 @@ def sync_code():
                         relative = f.relative_to(local)
                         if f.is_file() and not _sync_ignored(relative):
                             arc = (Path(p) / relative).as_posix()
+                            artifact_digest = (
+                                f.stem
+                                if Path(arc).is_relative_to(_ENERGY_GRID_ARTIFACT_ROOT)
+                                else None
+                            )
+                            if (
+                                artifact_digest in local_artifacts
+                                and artifact_digest in remote_artifacts
+                            ):
+                                continue
                             _add_to_tar(t, f, arc)
                 else:
                     _add_to_tar(t, local, p)

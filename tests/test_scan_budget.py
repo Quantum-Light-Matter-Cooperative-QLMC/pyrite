@@ -45,6 +45,7 @@ def test_scan_budget_incomplete_exits_75(monkeypatch, tmp_path):
     _stub_cases(monkeypatch)
     result = _invoke("hopg", 5.0, None, "--checkpoint-dir", str(tmp_path))
     assert result.exit_code == 75
+    assert list(tmp_path.rglob("cxr.lock.json")) == []
 
 
 def test_scan_budget_complete_exits_normally(monkeypatch, tmp_path):
@@ -52,6 +53,9 @@ def test_scan_budget_complete_exits_normally(monkeypatch, tmp_path):
     _stub_cases(monkeypatch)
     result = _invoke("hopg", 5.0, None, "--checkpoint-dir", str(tmp_path))
     assert result.exit_code == 0
+    locks = list(tmp_path.rglob("cxr.lock.json"))
+    assert len(locks) == 1
+    assert json.loads(locks[0].read_text())["profile"] == "standard"
 
 
 def test_scan_budget_writes_paused_progress_state(monkeypatch, tmp_path):

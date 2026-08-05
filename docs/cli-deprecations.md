@@ -19,11 +19,13 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 | `cxr check-config` | `cxr profile show` | 0.1.0 | 0.3.0 |  |
 | `cxr checkpoint clear` | `cxr checkpoint rm` | 0.1.0 | 0.3.0 |  |
 | `cxr checkpoint prune` | `cxr checkpoint gc` | 0.1.0 | 0.3.0 |  |
+| `cxr energy-grid apply` | `cxr energy-grid add` | 0.1.0 | 0.3.0 | The replacement creates an immutable artifact and repoints the resolved profile. |
 | `cxr energy-grid attach` | `cxr job attach` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid job attach` | `cxr job attach` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid job logs` | `cxr job logs` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid job status` | `cxr job status` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid job stop` | `cxr job stop` | 0.1.0 | 0.3.0 |  |
+| `cxr energy-grid line delete` | `cxr energy-grid rm` | 0.1.0 | 0.3.0 | The replacement repoints a profile; gc later reclaims unreachable bytes. |
 | `cxr energy-grid logs` | `cxr job logs` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid status` | `cxr job status` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid stop` | `cxr job stop` | 0.1.0 | 0.3.0 |  |
@@ -71,6 +73,7 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 | `cxr checkpoint list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr checkpoint recompute brem` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr checkpoint recompute line` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr energy-grid add` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid apply` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid brem show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid defaults` | `--azimuths` | `--azimuth` | 0.1.0 | 0.3.0 |  |
@@ -85,6 +88,7 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 | `cxr energy-grid job status` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid line delete` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid line show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr energy-grid rm` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid status` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr energy-grid submit` | `--azimuths` | `--azimuth` | 0.1.0 | 0.3.0 |  |

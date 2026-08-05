@@ -4,34 +4,7 @@ import tomllib
 import pytest
 
 from cxr_mc.energy_grid import apply
-
-BASE_TOML = """schema_version = 1
-
-[profiles.standard]
-energy_keV = { values = [30.0, 100.0] }
-
-[energy_grids.hopg]
-line_by_energy = [
-  { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2600.0, num = 864, endpoint = true } }, source = "derived" },
-  { energy_keV = 100.0, grid = { linspace = { start = 50.0, stop = 4600.0, num = 1518, endpoint = true } }, source = "derived" },
-]
-
-[profiles.standard.overrides.hopg]
-E_grid_brem = { arange = { start = 0.0, stop = 136500.0, step = 25.0 } }
-
-[materials.hopg]
-label = "HOPG"
-"""
-
-COMBINED = {
-    "hopg": {
-        "line_rows": [
-            {"energy_keV": 30.0, "start_eV": 10.0, "stop_eV": 2700.0, "num": 897},
-            {"energy_keV": 100.0, "start_eV": 50.0, "stop_eV": 4600.0, "num": 1518},
-        ],
-        "brem": {"stop_eV": 140000.0, "step_eV": 25.0, "raw_eV": 133000.0},
-    }
-}
+from tests.helpers.energy_grid_catalog import BASE_TOML, COMBINED
 
 
 class _NoManual:
@@ -134,6 +107,187 @@ def test_apply_file_writes_and_validates(tmp_path, monkeypatch, capsys):
     )
 
 
+def test_add_file_writes_deduplicated_artifact_and_only_repoints_profile(
+    tmp_path, monkeypatch, capsys
+):
+    from cxr_mc.energy_grid import artifacts
+
+    toml_path = tmp_path / "materials.toml"
+    json_path = tmp_path / "combined.json"
+    toml_path.write_text(BASE_TOML)
+    json_path.write_text(_json.dumps(COMBINED))
+    monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args, **kwargs: False)
+    monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
+
+    refs = apply.add_file(json_path, catalog_path=toml_path)
+    digest = refs["hopg"]
+    updated = toml_path.read_text()
+    parsed = tomllib.loads(updated)
+
+    assert parsed["profiles"]["standard"]["energy_grid_refs"] == {"hopg": digest}
+    assert parsed["profiles"]["standard"]["energy_keV"] == {"values": [30.0, 100.0]}
+    assert parsed["profiles"]["standard"]["overrides"]["hopg"]["E_grid_brem"] == {
+        "arange": {"start": 0.0, "stop": 136500.0, "step": 25.0}
+    }
+    assert parsed["energy_grids"] == tomllib.loads(BASE_TOML)["energy_grids"]
+    stored = artifacts.load_artifact(tmp_path / "energy-grid-artifacts", digest)
+    assert stored.identity["brem_grid"]["stop_eV"] == 140000.0
+    assert [row["stop_eV"] for row in stored.identity["line_rows"]] == [2700.0, 4600.0]
+
+    refs_again = apply.add_file(json_path, catalog_path=toml_path)
+    assert refs_again == refs
+    assert artifacts.inventory_artifacts(tmp_path / "energy-grid-artifacts") == (digest,)
+    assert "added hopg ->" in capsys.readouterr().out
+
+
+def test_add_file_dry_run_writes_no_artifact_or_catalog(tmp_path, monkeypatch, capsys):
+    toml_path = tmp_path / "materials.toml"
+    json_path = tmp_path / "combined.json"
+    toml_path.write_text(BASE_TOML)
+    json_path.write_text(_json.dumps(COMBINED))
+    monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args, **kwargs: False)
+
+    refs = apply.add_file(json_path, catalog_path=toml_path, dry_run=True)
+
+    assert set(refs) == {"hopg"}
+    assert toml_path.read_text() == BASE_TOML
+    assert not (tmp_path / "energy-grid-artifacts").exists()
+    assert "+energy_grid_refs" in capsys.readouterr().out
+
+
+def test_add_file_preserves_manual_row_from_referenced_artifact(tmp_path, monkeypatch):
+    from cxr_mc.energy_grid import artifacts
+
+    toml_path = tmp_path / "materials.toml"
+    json_path = tmp_path / "combined.json"
+    toml_path.write_text(BASE_TOML)
+    json_path.write_text(_json.dumps(COMBINED))
+    monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
+    monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        apply._provenance, "is_manual_line", lambda material, energy, **kwargs: False
+    )
+    first_ref = apply.add_file(json_path, catalog_path=toml_path)["hopg"]
+
+    changed = _json.loads(_json.dumps(COMBINED))
+    changed["hopg"]["line_rows"][0]["stop_eV"] = 2900.0
+    json_path.write_text(_json.dumps(changed))
+    monkeypatch.setattr(
+        apply._provenance,
+        "is_manual_line",
+        lambda material, energy, **kwargs: material == "hopg" and energy == 30.0,
+    )
+    second_ref = apply.add_file(json_path, catalog_path=toml_path)["hopg"]
+
+    assert second_ref == first_ref
+    stored = artifacts.load_artifact(tmp_path / "energy-grid-artifacts", second_ref)
+    rows = {row["energy_keV"]: row for row in stored.identity["line_rows"]}
+    assert rows[30.0]["stop_eV"] == 2700.0
+
+
+def test_remove_line_rows_repoints_artifact_without_deleting_legacy_rows(tmp_path, monkeypatch):
+    from cxr_mc.energy_grid import artifacts
+
+    toml_path = tmp_path / "materials.toml"
+    toml_path.write_text(BASE_TOML)
+    monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
+
+    removed, digest = apply.remove_line_rows(
+        "hopg", [30], catalog_path=toml_path, profile="standard"
+    )
+    parsed = tomllib.loads(toml_path.read_text())
+    stored = artifacts.load_artifact(tmp_path / "energy-grid-artifacts", digest)
+
+    assert removed == [30.0]
+    assert parsed["profiles"]["standard"]["energy_grid_refs"]["hopg"] == digest
+    assert [row["energy_keV"] for row in parsed["energy_grids"]["hopg"]["line_by_energy"]] == [
+        30.0,
+        100.0,
+    ]
+    assert [row["energy_keV"] for row in stored.identity["line_rows"]] == [100.0]
+
+
+def test_remove_line_rows_fails_closed_when_catalog_changed_after_preview(tmp_path):
+    toml_path = tmp_path / "materials.toml"
+    toml_path.write_text(BASE_TOML)
+    preview = toml_path.read_text()
+    toml_path.write_text(BASE_TOML + "\n# concurrent edit\n")
+
+    with pytest.raises(ValueError, match="changed after preview"):
+        apply.remove_line_rows("hopg", [30], catalog_path=toml_path, expected_original=preview)
+
+    assert not (tmp_path / "energy-grid-artifacts").exists()
+
+
+def test_set_line_artifact_repoints_ref_and_preserves_legacy_payload(tmp_path, monkeypatch):
+    from cxr_mc.energy_grid import artifacts
+
+    toml_path = tmp_path / "materials.toml"
+    toml_path.write_text(BASE_TOML)
+    original = tomllib.loads(BASE_TOML)
+    stamped = []
+    monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
+    monkeypatch.setattr(
+        apply._provenance,
+        "set_line",
+        lambda material, energy, source, note=None, **kwargs: stamped.append(
+            (material, energy, source, note, kwargs.get("profile"))
+        ),
+    )
+
+    digest = apply.set_line_artifact(
+        "hopg", 30, 2800, profile="standard", note="reviewed", catalog_path=toml_path
+    )
+
+    updated = tomllib.loads(toml_path.read_text())
+    stored = artifacts.load_artifact(tmp_path / "energy-grid-artifacts", digest)
+    row = next(row for row in stored.identity["line_rows"] if row["energy_keV"] == 30.0)
+    assert updated["profiles"]["standard"]["energy_grid_refs"] == {"hopg": digest}
+    assert updated["energy_grids"] == original["energy_grids"]
+    assert (
+        updated["profiles"]["standard"]["energy_keV"]
+        == original["profiles"]["standard"]["energy_keV"]
+    )
+    assert row == {"energy_keV": 30.0, "start_eV": 10.0, "stop_eV": 2800.0, "num": 864}
+    assert stamped == [("hopg", 30.0, "manual", "reviewed", "standard")]
+
+
+def test_set_brem_artifact_repoints_ref_and_preserves_profile_override(tmp_path, monkeypatch):
+    from cxr_mc.energy_grid import artifacts
+
+    toml_path = tmp_path / "materials.toml"
+    toml_path.write_text(BASE_TOML)
+    original = tomllib.loads(BASE_TOML)
+    stamped = []
+    monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
+    monkeypatch.setattr(
+        apply._provenance,
+        "set_brem",
+        lambda material, source, note=None, **kwargs: stamped.append(
+            (material, source, note, kwargs.get("profile"))
+        ),
+    )
+
+    digest = apply.set_brem_artifact(
+        "hopg", 150000, profile="standard", note="reviewed", catalog_path=toml_path
+    )
+
+    updated = tomllib.loads(toml_path.read_text())
+    stored = artifacts.load_artifact(tmp_path / "energy-grid-artifacts", digest)
+    assert updated["profiles"]["standard"]["energy_grid_refs"] == {"hopg": digest}
+    assert updated["energy_grids"] == original["energy_grids"]
+    assert (
+        updated["profiles"]["standard"]["overrides"]
+        == original["profiles"]["standard"]["overrides"]
+    )
+    assert stored.identity["brem_grid"] == {
+        "start_eV": 0.0,
+        "stop_eV": 150000.0,
+        "step_eV": 25.0,
+    }
+    assert stamped == [("hopg", "manual", "reviewed", "standard")]
+
+
 def test_apply_validation_failure_leaves_catalog_and_provenance_unchanged(tmp_path, monkeypatch):
     toml_path = tmp_path / "materials.toml"
     provenance_path = tmp_path / "line_grid_provenance.toml"
@@ -166,7 +320,7 @@ def test_apply_provenance_failure_rolls_back_both_files(tmp_path, monkeypatch):
     monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
     monkeypatch.setattr(apply._provenance, "PROVENANCE_PATH", provenance_path)
     monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
-    monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args: False)
+    monkeypatch.setattr(apply._provenance, "is_manual_brem", lambda *args, **kwargs: False)
     monkeypatch.setattr(
         apply._provenance,
         "set_brem",

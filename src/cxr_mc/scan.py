@@ -972,6 +972,18 @@ def _run_material(args, material, max_seconds=None):
         # that predate the budget feature and don't bother returning anything --
         # is read as complete; every other falsy return fails loud as incomplete.
         complete = True if result is None else bool(result)
+        if complete:
+            from .campaign_lock import write_lock
+            from .materials import CATALOG
+
+            catalog_profile = str(identity.get("catalog_profile", "standard"))
+            write_lock(
+                ckpt,
+                profile=catalog_profile,
+                material=material,
+                dataset_identity=identity,
+                energy_grid_digest=CATALOG.profile_energy_grid_ref(catalog_profile, material),
+            )
     except BaseException:
         with performance_lock:
             performance_state["state"] = "failed"

@@ -21,10 +21,13 @@ import os
 import sys
 import tempfile
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
+from typing import cast
 
 import tomlkit
 
+from cxr_mc.energy_grid import artifacts
 from cxr_mc.energy_grid import provenance as _provenance
 from cxr_mc.energy_grid.bounds import spacing_num
 
@@ -240,15 +243,388 @@ def apply_bounds(toml_text, combined, *, force=False, provenance_mod=_provenance
     return tomlkit.dumps(document), skipped
 
 
-def effective_brem(raw: dict, material: str):
+def effective_brem(raw: dict, material: str, profile: str = "standard"):
     """Effective ``E_grid_brem`` arange for MATERIAL: its own
-    ``profiles.standard.overrides`` entry, else the ``profiles.standard`` default."""
-    standard = raw.get("profiles", {}).get("standard", {})
-    override = standard.get("overrides", {}).get(material, {})
-    brem = override.get("E_grid_brem") or standard.get("E_grid_brem")
+    profile override, else that profile's default."""
+    selected = raw.get("profiles", {}).get(profile, {})
+    override = selected.get("overrides", {}).get(material, {})
+    brem = override.get("E_grid_brem") or selected.get("E_grid_brem")
     if not isinstance(brem, dict):
         return None
     return brem.get("arange")
+
+
+def _profile_row(document, profile: str):
+    profiles = document.get("profiles", {})
+    selected = profiles.get(profile) if isinstance(profiles, Mapping) else None
+    if selected is None:
+        raise ValueError(f"unknown profile {profile!r}")
+    return selected
+
+
+def _artifact_store_root(catalog_path: Path | str = _MATERIALS_TOML) -> Path:
+    return Path(catalog_path).parent / "energy-grid-artifacts"
+
+
+def _existing_artifact_rows(
+    document,
+    material: str,
+    profile: str,
+    *,
+    store_root: Path,
+) -> tuple[dict[float, dict], dict | None]:
+    """Return current ref/legacy identity inputs without mutating either store."""
+    selected = _profile_row(document, profile)
+    refs = selected.get("energy_grid_refs", {})
+    digest = refs.get(material) if isinstance(refs, Mapping) else None
+    if isinstance(digest, str):
+        identity = artifacts.load_artifact(store_root, digest).identity
+        rows = {
+            float(row["energy_keV"]): {
+                **row,
+                "source": (
+                    "manual"
+                    if _provenance.is_manual_line(
+                        material, float(row["energy_keV"]), profile=profile
+                    )
+                    else "derived"
+                ),
+            }
+            for row in cast("list[dict]", identity["line_rows"])
+        }
+        return rows, cast("dict", identity["brem_grid"])
+
+    grids_root = document.get("energy_grids", {})
+    own = grids_root.get(material) if isinstance(grids_root, Mapping) else None
+    fallback = grids_root.get(profile) if isinstance(grids_root, Mapping) else None
+    if fallback is None and isinstance(grids_root, Mapping):
+        fallback = grids_root.get(_DEFAULT_MATERIAL)
+    table = own if own is not None else fallback
+    rows = _existing_line_rows(table) if table is not None else {}
+    return rows, None
+
+
+def _set_profile_refs(document, profile: str, refs: dict[str, str]) -> None:
+    selected = _profile_row(document, profile)
+    table = selected.get("energy_grid_refs")
+    if table is None:
+        table = tomlkit.inline_table()
+        selected["energy_grid_refs"] = table
+    for material, digest in sorted(refs.items()):
+        table[material] = digest
+
+
+def add_file(
+    json_path,
+    *,
+    profile="standard",
+    materials=None,
+    force=False,
+    dry_run=False,
+    catalog_path=None,
+):
+    """Create immutable artifacts and atomically repoint one profile.
+
+    Legacy ``[energy_grids.*]`` and scan-range/override payloads are read as a
+    compatibility seed but never modified. Returns ``material -> digest``.
+    """
+    combined = _validated_combined(json.loads(Path(json_path).read_text()))
+    if materials:
+        wanted = set(materials.split(",") if isinstance(materials, str) else materials)
+        combined = {material: entry for material, entry in combined.items() if material in wanted}
+    if not combined:
+        raise ValueError("no selected energy-grid results to add")
+
+    path = Path(_MATERIALS_TOML if catalog_path is None else catalog_path)
+    original = path.read_text()
+    document = tomlkit.parse(original)
+    _profile_row(document, profile)
+    known_materials = document.get("materials", {})
+    unknown = sorted(set(combined) - set(known_materials))
+    if unknown:
+        raise ValueError(f"unknown material(s): {', '.join(unknown)}")
+
+    store_root = _artifact_store_root(path)
+    identities: dict[str, dict] = {}
+    skipped: list[str] = []
+    for material, entry in combined.items():
+        existing, stored_brem = _existing_artifact_rows(
+            document, material, profile, store_root=store_root
+        )
+        merged = dict(existing)
+        for row in entry["line_rows"]:
+            energy = float(row["energy_keV"])
+            if not force and existing.get(energy, {}).get("source") == "manual":
+                skipped.append(f"{material}:{energy:g}")
+                continue
+            merged[energy] = {**row, "source": "derived"}
+
+        raw = tomllib.loads(original)
+        current_brem = stored_brem or effective_brem(raw, material, profile)
+        if not force and _provenance.is_manual_brem(material, profile=profile):
+            if current_brem is None:
+                raise ValueError(f"{material}: manual brem provenance has no configured grid")
+            brem = {
+                "start_eV": float(current_brem.get("start", current_brem.get("start_eV", 0.0))),
+                "stop_eV": float(current_brem.get("stop", current_brem.get("stop_eV"))),
+                "step_eV": float(current_brem.get("step", current_brem.get("step_eV"))),
+            }
+            skipped.append(f"{material}:brem")
+        else:
+            brem = {"start_eV": 0.0, **entry["brem"]}
+
+        rows = [
+            {
+                "energy_keV": energy,
+                "start_eV": float(row["start_eV"]),
+                "stop_eV": float(row["stop_eV"]),
+                "num": int(row["num"]),
+            }
+            for energy, row in sorted(merged.items())
+        ]
+        identities[material] = artifacts.artifact_identity(
+            material,
+            rows,
+            brem,
+            [row["energy_keV"] for row in rows],
+        )
+
+    refs = {
+        material: artifacts.artifact_digest(identity) for material, identity in identities.items()
+    }
+    _set_profile_refs(document, profile, refs)
+    new_text = tomlkit.dumps(document)
+
+    if dry_run:
+        _print_diff(original, new_text)
+        return refs
+
+    for identity in identities.values():
+        artifacts.write_artifact(store_root, identity)
+    _validate_catalog_text(path, new_text)
+    if path.read_text() != original:
+        raise ValueError("material catalog changed while adding artifacts; rerun command")
+    _atomic_write(path, new_text)
+    if skipped:
+        print(
+            f"[energy-grid add] kept manual overrides: {', '.join(skipped)} "
+            "(use --force to replace)"
+        )
+    for material, digest in sorted(refs.items()):
+        print(f"added {material} -> {digest}")
+    _warn_stale_golden()
+    return refs
+
+
+def remove_line_rows(
+    material,
+    energies,
+    *,
+    profile="standard",
+    dry_run=False,
+    catalog_path=None,
+    expected_original: str | None = None,
+) -> tuple[list[float], str]:
+    """Repoint ``profile`` to a new artifact without selected line rows."""
+    wanted = {_positive_float(energy, "energy") for energy in energies}
+    path = Path(_MATERIALS_TOML if catalog_path is None else catalog_path)
+    original = path.read_text()
+    if expected_original is not None and original != expected_original:
+        raise ValueError("material catalog changed after preview; rerun command")
+    document = tomlkit.parse(original)
+    if material not in document.get("materials", {}):
+        raise ValueError(f"unknown material: {material}")
+    store_root = _artifact_store_root(path)
+    existing, stored_brem = _existing_artifact_rows(
+        document, material, profile, store_root=store_root
+    )
+    missing = sorted(wanted - set(existing))
+    if missing:
+        raise ValueError(f"{material} has no line-grid row at {missing} keV")
+    remaining = {energy: row for energy, row in existing.items() if energy not in wanted}
+    if not remaining:
+        raise ValueError("cannot remove every line-grid row; repoint profile before artifact gc")
+
+    raw = tomllib.loads(original)
+    current_brem = stored_brem or effective_brem(raw, material, profile)
+    if current_brem is None:
+        raise ValueError(f"{material} has no bremsstrahlung grid for profile {profile!r}")
+    brem = {
+        "start_eV": float(current_brem.get("start", current_brem.get("start_eV", 0.0))),
+        "stop_eV": float(current_brem.get("stop", current_brem.get("stop_eV"))),
+        "step_eV": float(current_brem.get("step", current_brem.get("step_eV"))),
+    }
+    rows = [
+        {
+            "energy_keV": energy,
+            "start_eV": float(row["start_eV"]),
+            "stop_eV": float(row["stop_eV"]),
+            "num": int(row["num"]),
+        }
+        for energy, row in sorted(remaining.items())
+    ]
+    identity = artifacts.artifact_identity(
+        material,
+        rows,
+        brem,
+        [row["energy_keV"] for row in rows],
+    )
+    digest = artifacts.artifact_digest(identity)
+    _set_profile_refs(document, profile, {material: digest})
+    new_text = tomlkit.dumps(document)
+    if dry_run:
+        _print_diff(original, new_text)
+        return sorted(wanted), digest
+
+    artifacts.write_artifact(store_root, identity)
+    _validate_catalog_text(path, new_text)
+    if path.read_text() != original:
+        raise ValueError("material catalog changed while removing rows; rerun command")
+    _atomic_write(path, new_text)
+    return sorted(wanted), digest
+
+
+def _current_identity_inputs(
+    document, original: str, material: str, profile: str, path: Path
+) -> tuple[dict[float, dict], dict]:
+    existing, stored_brem = _existing_artifact_rows(
+        document, material, profile, store_root=_artifact_store_root(path)
+    )
+    raw = tomllib.loads(original)
+    current_brem = stored_brem or effective_brem(raw, material, profile)
+    if not existing:
+        raise ValueError(f"{material} has no effective line-grid rows for profile {profile!r}")
+    if current_brem is None:
+        raise ValueError(f"{material} has no bremsstrahlung grid for profile {profile!r}")
+    brem = {
+        "start_eV": float(current_brem.get("start", current_brem.get("start_eV", 0.0))),
+        "stop_eV": float(current_brem.get("stop", current_brem.get("stop_eV"))),
+        "step_eV": float(current_brem.get("step", current_brem.get("step_eV"))),
+    }
+    return existing, brem
+
+
+def _repoint_identity(
+    path: Path, original: str, document, profile: str, material: str, identity: dict
+) -> str:
+    stored = artifacts.write_artifact(_artifact_store_root(path), identity)
+    _set_profile_refs(document, profile, {material: stored.digest})
+    new_text = tomlkit.dumps(document)
+    _validate_catalog_text(path, new_text)
+    if path.read_text() != original:
+        raise ValueError("material catalog changed while repointing artifact; rerun command")
+    _atomic_write(path, new_text)
+    return stored.digest
+
+
+def set_line_artifact(
+    material: str,
+    energy,
+    stop_eV,
+    *,
+    profile="standard",
+    num=None,
+    start_eV=None,
+    note=None,
+    catalog_path=None,
+) -> str:
+    """Set one manual line row by creating an immutable replacement artifact."""
+    path = Path(_MATERIALS_TOML if catalog_path is None else catalog_path)
+    original = path.read_text()
+    document = tomlkit.parse(original)
+    if material not in document.get("materials", {}):
+        raise ValueError(f"unknown material: {material}")
+    existing, brem = _current_identity_inputs(document, original, material, profile, path)
+    energy_value = _positive_float(energy, "energy")
+    current = existing.get(energy_value)
+    start = _positive_float(
+        start_eV
+        if start_eV is not None
+        else current["start_eV"]
+        if current is not None
+        else _line_start_eV(energy_value),
+        "start",
+    )
+    stop = _positive_float(stop_eV, "stop")
+    if stop <= start:
+        raise ValueError("stop must be greater than start")
+    count = (
+        _positive_int(num, "num")
+        if num is not None
+        else _positive_int(
+            current["num"] if current is not None else spacing_num(start, stop, 3.0),
+            "num",
+        )
+    )
+    existing[energy_value] = {
+        "energy_keV": energy_value,
+        "start_eV": start,
+        "stop_eV": stop,
+        "num": count,
+        "source": "manual",
+    }
+    rows = [
+        {key: row[key] for key in ("energy_keV", "start_eV", "stop_eV", "num")}
+        for _, row in sorted(existing.items())
+    ]
+    identity = artifacts.artifact_identity(
+        material, rows, brem, [row["energy_keV"] for row in rows]
+    )
+    provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
+    digest = _repoint_identity(path, original, document, profile, material, identity)
+    try:
+        _provenance.set_line(material, energy_value, "manual", note=note, profile=profile)
+    except BaseException:
+        _atomic_write(path, original)
+        _restore(_provenance.PROVENANCE_PATH, provenance_original)
+        raise
+    _warn_stale_golden()
+    return digest
+
+
+def set_brem_artifact(
+    material: str,
+    stop_eV,
+    *,
+    profile="standard",
+    step_eV=None,
+    note=None,
+    catalog_path=None,
+) -> str:
+    """Set manual brem bounds by creating an immutable replacement artifact."""
+    from cxr_mc.energy_grid.defaults import load_defaults
+
+    path = Path(_MATERIALS_TOML if catalog_path is None else catalog_path)
+    original = path.read_text()
+    document = tomlkit.parse(original)
+    if material not in document.get("materials", {}):
+        raise ValueError(f"unknown material: {material}")
+    existing, current_brem = _current_identity_inputs(document, original, material, profile, path)
+    stop = _positive_float(stop_eV, "stop")
+    step = _positive_float(
+        step_eV
+        if step_eV is not None
+        else current_brem.get("step_eV", load_defaults()["brem_step_ev"]),
+        "step",
+    )
+    brem = {"start_eV": float(current_brem["start_eV"]), "stop_eV": stop, "step_eV": step}
+    rows = [
+        {key: row[key] for key in ("energy_keV", "start_eV", "stop_eV", "num")}
+        for _, row in sorted(existing.items())
+    ]
+    identity = artifacts.artifact_identity(
+        material, rows, brem, [row["energy_keV"] for row in rows]
+    )
+    provenance_original = _snapshot(_provenance.PROVENANCE_PATH)
+    digest = _repoint_identity(path, original, document, profile, material, identity)
+    try:
+        _provenance.set_brem(material, "manual", note=note, profile=profile)
+    except BaseException:
+        _atomic_write(path, original)
+        _restore(_provenance.PROVENANCE_PATH, provenance_original)
+        raise
+    _warn_stale_golden()
+    return digest
 
 
 def _atomic_write(path, text):
@@ -455,31 +831,88 @@ def set_brem_grid(material, stop_eV, *, step_eV=None, note=None):
     _warn_stale_golden()
 
 
-def show(material=None, band=None) -> str:
+def resolved_show_inputs(
+    *, profile: str = "standard", catalog_path=None
+) -> tuple[dict, dict, dict[str, dict | None], dict[str, str]]:
+    """Resolve show payloads from explicit artifacts, then legacy fallback."""
+    path = Path(_MATERIALS_TOML if catalog_path is None else catalog_path)
+    raw = tomllib.loads(path.read_text())
+    profiles = raw.get("profiles", {})
+    if profile not in profiles:
+        raise ValueError(f"unknown profile: {profile}")
+    materials = raw.get("materials", {})
+    energy_grids = dict(raw.get("energy_grids", {}))
+    refs = dict(profiles[profile].get("energy_grid_refs", {}))
+    brem_by_material = {key: effective_brem(raw, key, profile) for key in materials}
+    store_root = _artifact_store_root(path)
+    for material, digest in refs.items():
+        if material not in materials:
+            raise ValueError(f"{profile}.energy_grid_refs has unknown material: {material}")
+        stored = artifacts.load_artifact(store_root, digest)
+        if stored.identity["material"] != material:
+            raise ValueError(
+                f"artifact {digest} material {stored.identity['material']!r} does not match {material!r}"
+            )
+        energy_grids[material] = {
+            "line_by_energy": [
+                {
+                    "energy_keV": row["energy_keV"],
+                    "grid": {
+                        "linspace": {
+                            "start": row["start_eV"],
+                            "stop": row["stop_eV"],
+                            "num": row["num"],
+                            "endpoint": True,
+                        }
+                    },
+                    "source": (
+                        "manual"
+                        if _provenance.is_manual_line(
+                            material, float(row["energy_keV"]), profile=profile
+                        )
+                        else "artifact"
+                    ),
+                }
+                for row in stored.identity["line_rows"]
+            ]
+        }
+        brem = stored.identity["brem_grid"]
+        brem_by_material[material] = {
+            "start": brem["start_eV"],
+            "stop": brem["stop_eV"],
+            "step": brem["step_eV"],
+        }
+    return raw, energy_grids, brem_by_material, refs
+
+
+def show(material=None, band=None, *, profile: str = "standard", catalog_path=None) -> str:
     """Render configured energy grids, every block headed by its band.
 
     ``band`` filters the output: ``"line"`` shows only line grids, ``"brem"``
     only bremsstrahlung, ``None`` (default) shows both side by side.
     """
-    raw = tomllib.loads(Path(_MATERIALS_TOML).read_text())
+    raw, energy_grids, brem_by_material, refs = resolved_show_inputs(
+        profile=profile, catalog_path=catalog_path
+    )
     mats = raw["materials"]
     if material is not None and material not in mats:
         raise ValueError(f"unknown material: {material}")
     keys = [material] if material else list(mats)
     show_line = band in (None, "line")
     show_brem = band in (None, "brem")
-    energy_grids = raw.get("energy_grids", {})
     default_block = energy_grids.get(_DEFAULT_MATERIAL, {})
     out = []
     for key in keys:
         out.append(f"=== {key} ===")
+        if key in refs:
+            out.append(f"  artifact: sha256:{refs[key]}  [profile {profile}]")
         if show_line:
             block = energy_grids.get(key, default_block)
             for item in block.get("line_by_energy", []):
                 e = float(item["energy_keV"])
                 g = item["grid"]["linspace"]
                 source = item.get("source", "derived")
-                note_rec = _provenance.get_line(key, e)
+                note_rec = _provenance.get_line(key, e, profile=profile)
                 note = note_rec.get("note") if note_rec else None
                 tag = f"manual: {note}" if source == "manual" and note else source
                 out.append(
@@ -487,9 +920,9 @@ def show(material=None, band=None) -> str:
                     f" x {g['num']} pts  [{tag}]"
                 )
         if show_brem:
-            brem = effective_brem(raw, key)
+            brem = brem_by_material.get(key)
             if brem:
-                rec = _provenance.get_brem(key)
+                rec = _provenance.get_brem(key, profile=profile)
                 tag = rec["source"] if rec else "derived"
                 out.append(
                     f"  brem grid: [{brem['start']:g}, {brem['stop']:g}] eV"

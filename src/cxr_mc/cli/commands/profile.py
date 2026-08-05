@@ -317,7 +317,16 @@ def _profile_payload(document, name):
             for material, row in overrides.items()
             if isinstance(row, dict) and row
         },
+        "energy_grid_refs": _energy_grid_refs(profile),
     }
+
+
+def _energy_grid_refs(profile):
+    """Return this profile's ``material -> artifact digest`` map, sorted."""
+    refs = profile.get("energy_grid_refs")
+    if not isinstance(refs, dict):
+        return {}
+    return {material: str(refs[material]) for material in sorted(refs)}
 
 
 def _emit_show(payload):
@@ -348,6 +357,13 @@ def _emit_show(payload):
     emit_result(f"  emission: {payload['emission'] or 'incoherent (default)'}")
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
+    refs = payload["energy_grid_refs"]
+    if not refs:
+        emit_result("  energy grids: legacy catalog tables (no artifact refs)")
+    else:
+        emit_result("  energy grids:")
+        for material, digest in refs.items():
+            emit_result(f"    {material} -> {digest}")
 
 
 def _clone_grid(value):
@@ -438,7 +454,7 @@ def analyze_command(name, performance_dir, sample_period):
 @command.command("list")
 @output_option
 def list_command(json_output):
-    """List catalog profiles with membership and override counts."""
+    """List catalog profiles with membership, override, and grid-ref counts."""
     try:
         _text, document = _catalog_io.catalog_text()
         profiles = _catalog_io.profile_rows(document)
@@ -453,6 +469,7 @@ def list_command(json_output):
                     for material, override in _catalog_io.profile_overrides(row).items()
                     if isinstance(override, dict) and override
                 ),
+                "energy_grid_refs": _energy_grid_refs(row),
             }
             for name, row in profiles.items()
         ]
@@ -471,7 +488,11 @@ def list_command(json_output):
             else f"{len(row['materials'])} materials"
         )
         override_count = len(row["overrides"] or [])
-        emit_result(f"{row['name']}: {membership}, {override_count} material overrides")
+        ref_count = len(row["energy_grid_refs"] or {})
+        emit_result(
+            f"{row['name']}: {membership}, {override_count} material overrides, "
+            f"{ref_count} energy-grid refs"
+        )
     return 0
 
 

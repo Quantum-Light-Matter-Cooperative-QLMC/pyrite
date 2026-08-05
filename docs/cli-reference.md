@@ -86,7 +86,7 @@ Commands:
   performance  List, analyze, or delete compute-performance artifacts.
   remote       Run and manage MC sweeps on a remote GPU host.
   job          List, inspect, follow, or stop asynchronous remote jobs.
-  energy-grid  Derive, submit, inspect, and apply photon-energy grids.
+  energy-grid  Derive, inspect, and manage immutable photon-energy-grid artifacts.
   profile      Manage named catalog campaigns and material membership.
   material     Inspect, validate, edit, and blaze individual materials.
 ```
@@ -1052,9 +1052,9 @@ Usage: cxr energy-grid [OPTIONS] COMMAND [ARGS]...
   Derive and manage per-material photon-energy grids.
 
   ``derive`` measures both coherent-line and bremsstrahlung upper bounds. ``defaults``
-  controls that diagnostic derivation only; ``apply`` writes validated bounds into the
-  material catalog. Physical scan profile defaults belong to ``cxr profile``; per-
-  material range overrides belong to ``cxr material``.
+  controls that diagnostic derivation only; ``add`` stores validated bounds and repoints
+  a profile. Physical scan profile defaults belong to ``cxr profile``; per-material
+  range overrides belong to ``cxr material``.
 
   Scan ``--fidelity full|survey`` is separate. It controls later simulation cost and
   grid reduction; it never changes derivation or applied full bounds.
@@ -1070,40 +1070,44 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  apply         Apply derived bounds to material catalog.
+  add           Add immutable derived-grid artifacts and repoint one profile.
   brem          Inspect or manually set bremsstrahlung energy grids.
   defaults      Show, update, or clear persistent derivation inputs.
   derive        Derive line and bremsstrahlung energy-grid bounds locally or remotely.
+  gc            Reclaim unreachable immutable artifacts after a 14-day grace window.
   job           Inspect, follow, or stop remote energy-grid jobs.
   line          Inspect or manually set coherent line-energy grids.
   regen-golden  Regenerate or check material-catalog golden snapshot.
+  rm            Remove line rows by repointing a profile to a new immutable artifact.
   show          Show line and bremsstrahlung grids together.
+  verify        Verify stored and profile/lock-referenced immutable artifacts.
 ```
 
-## `cxr energy-grid apply`
+## `cxr energy-grid add`
 
 ```text
-Usage: cxr energy-grid apply [OPTIONS] JSON
+Usage: cxr energy-grid add [OPTIONS] JSON
 
-  Apply derived bounds to material catalog.
+  Add immutable derived-grid artifacts and repoint one profile.
 
-  Consumes combined JSON from ``derive``. Writes line bounds into the shared per-
-  material grid store, bremsstrahlung bounds into standard profile overrides, and adds
-  derived beam energies to the standard profile. Catalog and provenance writes are
-  atomic and validated.
+  Consumes combined JSON from ``derive``. Artifact bytes are content-addressed and
+  immutable; only the resolved profile's ``energy_grid_refs`` move. Legacy grid tables,
+  scan ranges, and material overrides remain unchanged.
 
   Manual line and bremsstrahlung overrides remain unchanged unless ``--force`` is
   passed. This command does not run a scan and does not select ``full`` or ``survey``
   fidelity.
 
   Example:
-    cxr energy-grid apply combined_line_grid_bounds.json --material mose2,wse2
+    cxr energy-grid add combined_line_grid_bounds.json --material mose2,wse2
 
 Options:
   --material KEY,...  Apply only listed material keys.
   --pull              Fetch default combined JSON from remote host; takes precedence
                       over JSON.
   --force             Replace manually overridden rows; otherwise preserve them.
+  --profile NAME      Repoint profile NAME; precedence: flag > CXR_PROFILE > config
+                      store > standard.
   --regen-golden      Regenerate checked catalog snapshot after successful write.
   --dry-run           Print proposed diff; write nothing.
   -h, --help          Show this message and exit.
@@ -1120,7 +1124,7 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  set   Set one material bremsstrahlung grid and mark it as a manual override.
+  set   Set a bremsstrahlung grid by repointing an immutable artifact.
   show  Show bremsstrahlung energy grids.
 ```
 
@@ -1129,13 +1133,15 @@ Commands:
 ```text
 Usage: cxr energy-grid brem set [OPTIONS] MATERIAL
 
-  Set one material bremsstrahlung grid and mark it as a manual override.
+  Set a bremsstrahlung grid by repointing an immutable artifact.
 
 Options:
-  --stop EV    Bremsstrahlung grid upper bound in eV.  [required]
-  --step EV    Grid spacing in eV; preserve current value if omitted.
-  --note TEXT  Provenance note stored with manual override.
-  -h, --help   Show this message and exit.
+  --stop EV       Bremsstrahlung grid upper bound in eV.  [required]
+  --step EV       Grid spacing in eV; preserve current value if omitted.
+  --note TEXT     Provenance note stored with manual override.
+  --profile NAME  Repoint profile NAME; precedence: flag > CXR_PROFILE > config store >
+                  standard.
+  -h, --help      Show this message and exit.
 ```
 
 ## `cxr energy-grid brem show`
@@ -1148,6 +1154,8 @@ Usage: cxr energy-grid brem show [OPTIONS] [MATERIAL]
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
+  --profile NAME                  Resolve profile NAME; precedence: flag > CXR_PROFILE >
+                                  config store > standard.
   -h, --help                      Show this message and exit.
 ```
 
@@ -1213,6 +1221,22 @@ Options:
   -h, --help                Show this message and exit.
 ```
 
+## `cxr energy-grid gc`
+
+```text
+Usage: cxr energy-grid gc [OPTIONS]
+
+  Reclaim unreachable immutable artifacts after a 14-day grace window.
+
+Options:
+  --checkpoint-dir DIR  Checkpoint root whose active/archive campaign locks remain
+                        reachable.  [default: checkpoints]
+  --prune-all           Ignore the 14-day orphan grace window and select every
+                        unreachable artifact.
+  -y, --yes             Delete the exact revalidated preview.
+  -h, --help            Show this message and exit.
+```
+
 ## `cxr energy-grid job`
 
 ```text
@@ -1235,33 +1259,8 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  delete  Delete MATERIAL's derived or manual line-grid rows; irreversible.
-  set     Set one material line-grid row and mark it as a manual override.
-  show    Show coherent line-energy grids.
-```
-
-## `cxr energy-grid line delete`
-
-```text
-Usage: cxr energy-grid line delete [OPTIONS] MATERIAL
-
-  Delete MATERIAL's derived or manual line-grid rows; irreversible.
-
-  The only way to remove bounds from the shared per-material derived-grid store --
-  editing a profile's energies never deletes them. Refuses (as a catalog validation
-  failure) when a beam energy is still required by a profile's ``energy_keV`` grid.
-
-  Example:
-    cxr energy-grid line delete wse2 --energy 30 --energy 40
-
-Options:
-  --energy KEV                    Beam energy in keV; repeat for multiple rows.
-                                  [required]
-  -y, --yes                       Delete the exact previewed rows.
-  --dry-run                       Print proposed diff; delete nothing.
-  -o, --output [table|json|wide]  Output format; only json is a stable automation
-                                  contract.  [default: table]
-  -h, --help                      Show this message and exit.
+  set   Set one line-grid row by repointing an immutable artifact.
+  show  Show coherent line-energy grids.
 ```
 
 ## `cxr energy-grid line set`
@@ -1269,15 +1268,17 @@ Options:
 ```text
 Usage: cxr energy-grid line set [OPTIONS] MATERIAL
 
-  Set one material line-grid row and mark it as a manual override.
+  Set one line-grid row by repointing an immutable artifact.
 
 Options:
-  --energy KEV  Beam energy in keV.  [required]
-  --stop EV     Line-grid upper bound in eV.  [required]
-  --num N       Grid point count; preserve current value if omitted.
-  --start EV    Line-grid lower bound in eV; preserve current value if omitted.
-  --note TEXT   Provenance note stored with manual override.
-  -h, --help    Show this message and exit.
+  --energy KEV    Beam energy in keV.  [required]
+  --stop EV       Line-grid upper bound in eV.  [required]
+  --num N         Grid point count; preserve current value if omitted.
+  --start EV      Line-grid lower bound in eV; preserve current value if omitted.
+  --note TEXT     Provenance note stored with manual override.
+  --profile NAME  Repoint profile NAME; precedence: flag > CXR_PROFILE > config store >
+                  standard.
+  -h, --help      Show this message and exit.
 ```
 
 ## `cxr energy-grid line show`
@@ -1290,6 +1291,8 @@ Usage: cxr energy-grid line show [OPTIONS] [MATERIAL]
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
+  --profile NAME                  Resolve profile NAME; precedence: flag > CXR_PROFILE >
+                                  config store > standard.
   -h, --help                      Show this message and exit.
 ```
 
@@ -1307,6 +1310,31 @@ Options:
   -h, --help  Show this message and exit.
 ```
 
+## `cxr energy-grid rm`
+
+```text
+Usage: cxr energy-grid rm [OPTIONS] MATERIAL
+
+  Remove line rows by repointing a profile to a new immutable artifact.
+
+  Old artifact bytes remain recoverable until ``energy-grid gc`` reclaims them after its
+  grace window.
+
+  Example:
+    cxr energy-grid rm wse2 --energy 30 --energy 40
+
+Options:
+  --energy KEV                    Beam energy in keV; repeat for multiple rows.
+                                  [required]
+  -y, --yes                       Delete the exact previewed rows.
+  --dry-run                       Print proposed diff; delete nothing.
+  --profile NAME                  Repoint profile NAME; precedence: flag > CXR_PROFILE >
+                                  config store > standard.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
 ## `cxr energy-grid show`
 
 ```text
@@ -1317,7 +1345,22 @@ Usage: cxr energy-grid show [OPTIONS] [MATERIAL]
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation
                                   contract.  [default: table]
+  --profile NAME                  Resolve profile NAME; precedence: flag > CXR_PROFILE >
+                                  config store > standard.
   -h, --help                      Show this message and exit.
+```
+
+## `cxr energy-grid verify`
+
+```text
+Usage: cxr energy-grid verify [OPTIONS]
+
+  Verify stored and profile/lock-referenced immutable artifacts.
+
+Options:
+  --checkpoint-dir DIR  Checkpoint root whose campaign locks are reachability roots.
+                        [default: checkpoints]
+  -h, --help            Show this message and exit.
 ```
 
 ## `cxr profile`
@@ -1351,7 +1394,7 @@ Commands:
   add     Incrementally add values to profile grids, or emission modes.
   create  Create a new profile, cloning defaults from --from (standard).
   delete  Delete a profile; irreversible.
-  list    List catalog profiles with membership and override counts.
+  list    List catalog profiles with membership, override, and grid-ref counts.
   remove  Remove values from an existing profile's grids, or emission modes.
   rename  Rename profile NAME to NEW_NAME.
   set     Replace range grids, beam fields, detector scalars, or emission on a...
@@ -1476,7 +1519,7 @@ Options:
 ```text
 Usage: cxr profile list [OPTIONS]
 
-  List catalog profiles with membership and override counts.
+  List catalog profiles with membership, override, and grid-ref counts.
 
 Options:
   -o, --output [table|json|wide]  Output format; only json is a stable automation

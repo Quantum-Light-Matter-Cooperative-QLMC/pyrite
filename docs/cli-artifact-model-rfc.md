@@ -109,27 +109,25 @@ Deepest change in the redesign; land behind the stabilized parent surface
    redirects to `rm`/`gc`.
 5. Drop the compatibility shims per the parent's deprecation policy (D7).
 
-## 5. Open questions
+## 5. Resolved implementation questions
 
 1. **Lockfile** — ~~first cut, or follow-up?~~ **Resolved: first cut** (§3
    recommendation).
-2. **Hash inputs** — exact tuple that defines a grid/material artifact hash;
-   which fields are identity vs. annotation (e.g. provenance notes must *not*
-   change the hash). *Recommendation:* steal DVC's normalize-then-hash — define
-   one canonical byte serialization of the identity tuple, list the excluded
-   annotation fields explicitly, and **freeze both with a test** (à la the
-   existing `test_*_exports.py` guards). The hash-input tuple is a compatibility
-   contract the moment it ships: a silent change re-hashes every artifact and
-   invalidates every lockfile. Build on `profiles.dataset_identity`, which
-   already excludes annotation from the digest.
-3. **Checkpoint reachability** — are checkpoints roots for `gc`, or reclaimable
-   when their artifact is? (parent already treats archived checkpoints + active
-   manifests as CAS reachability roots — reconcile with that.) *Note:* the grace
-   window (§2) softens the blast radius of getting this wrong either way.
-4. **Migration reversibility** — is step 2 safely rollback-able if a repointed
-   profile misbehaves? *Note:* the grace window guarantees the pre-repoint
-   artifacts survive the rollback window; a repoint is reversible as long as `gc
-   --prune-all` has not run.
+2. **Hash inputs** — **Resolved:** canonical JSON schema
+   `cxr.energy-grid-artifact.v1` over the frozen ordered fields `schema`,
+   `material`, sorted `line_rows`, `brem_grid`, and sorted/deduplicated
+   `beam_energies_keV`. Provenance, notes, timestamps, ref names, and orphan
+   metadata are excluded annotations. Tests freeze both field sets and canonical
+   bytes.
+3. **Checkpoint reachability** — **Resolved:** active and archived completed-run
+   `cxr.lock.json`/legacy `*.lock.json` files are energy-grid artifact roots.
+   Existing checkpoint manifest and case-CAS reachability remains independent
+   and unchanged. A legacy checkpoint without a campaign lock adds no artifact
+   root.
+4. **Migration reversibility** — **Resolved:** repointing never mutates legacy
+   tables or old artifact bytes. Unreachable objects remain for 14 days by
+   default; `gc --prune-all` is the explicit destructive escape hatch. Legacy
+   tables remain read-only D7 fallback during the compatibility window.
 
 ## References
 

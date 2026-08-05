@@ -182,6 +182,50 @@ E_grid_brem = { arange = { start = 0, stop = 10, step = 1 } }
     assert material["brem_grid"]["step_eV"] == 1.0
 
 
+def test_line_grid_show_json_resolves_selected_profile_artifact(monkeypatch, tmp_path):
+    from cxr_mc.energy_grid import artifacts
+
+    identity = artifacts.artifact_identity(
+        "hopg",
+        [{"energy_keV": 30, "start_eV": 10, "stop_eV": 2800, "num": 900}],
+        {"start_eV": 0, "stop_eV": 150000, "step_eV": 25},
+        [30],
+    )
+    stored = artifacts.write_artifact(tmp_path / "energy-grid-artifacts", identity)
+    catalog = tmp_path / "materials.toml"
+    catalog.write_text(
+        f"""
+[materials.hopg]
+
+[energy_grids.hopg]
+line_by_energy = [
+  {{ energy_keV = 30, grid = {{ linspace = {{ start = 1, stop = 2, num = 3 }} }}, source = "derived" }},
+]
+
+[profiles.standard]
+E_grid_brem = {{ arange = {{ start = 0, stop = 10, step = 1 }} }}
+
+[profiles.campaign]
+energy_grid_refs = {{ hopg = "{stored.digest}" }}
+"""
+    )
+    monkeypatch.setattr(energy_grid.apply, "_MATERIALS_TOML", catalog)
+    monkeypatch.setattr(energy_grid.apply._provenance, "load", lambda: {})
+
+    document = _document(
+        invoke(
+            energy_grid.command,
+            ["show", "hopg", "--profile", "campaign", "-o", "json"],
+        )
+    )
+
+    assert document["payload"]["profile"] == "campaign"
+    material = document["payload"]["materials"][0]
+    assert material["artifact_sha256"] == stored.digest
+    assert material["line_grids"][0]["grid"]["stop_eV"] == 2800.0
+    assert material["brem_grid"]["stop_eV"] == 150000.0
+
+
 def test_archives_json_retains_unreadable_entry(monkeypatch, tmp_path):
     shelf = tmp_path / "archive"
     shelf.mkdir()

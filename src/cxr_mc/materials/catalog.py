@@ -22,6 +22,7 @@ import numpy as np
 
 from .. import DATA_DIR
 from ..detectors.spec import DetectorSpec
+from ..energy_grid import artifacts as _grid_artifacts
 from ._catalog_decode import (
     LineGridByEnergy,
     _direction,
@@ -209,6 +210,12 @@ class MaterialCatalog:
     #: "both"), keyed by profile; profiles with no emission key are absent (the
     #: active fidelity preset's emission stands unmodified).
     profile_emissions: Mapping[str, str] = MappingProxyType({})
+    #: Explicit immutable energy-grid artifact refs, keyed first by profile and
+    #: then material. Legacy ``[energy_grids.*]`` fallback rows are deliberately
+    #: absent: callers can distinguish migrated refs from compatibility input.
+    profile_energy_grid_refs: Mapping[str, Mapping[str, str]] = MappingProxyType({})
+    #: Verified refs used to resolve this catalog instance's selected profile.
+    resolved_energy_grid_refs: Mapping[str, str] = MappingProxyType({})
 
     def profile_beam(self, name: str) -> Mapping[str, object] | None:
         """Decoded ``[profiles.NAME.beam]`` distribution overrides, or ``None``
@@ -234,6 +241,16 @@ class MaterialCatalog:
         if name not in self.profile_names:
             raise KeyError(f"unknown profile {name!r}; have {list(self.profile_names)}")
         return self.profile_memberships.get(name)
+
+    def profile_energy_grid_ref(self, name: str, material: str) -> str | None:
+        """Return explicit immutable grid ref for ``name``/``material``.
+
+        ``None`` means the profile still resolves through the read-only legacy
+        catalog compatibility path; reads never materialize or repoint refs.
+        """
+        if name not in self.profile_names:
+            raise KeyError(f"unknown profile {name!r}; have {list(self.profile_names)}")
+        return self.profile_energy_grid_refs.get(name, {}).get(material)
 
     def crystal(self, key: str) -> CrystalSpec:
         """Return a crystal by key."""
@@ -893,7 +910,10 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         if row is None:
             continue
         errors.keys(
-            row, path, set(_SCAN_KEYS) | {"materials", "overrides", "beam", "detector", "emission"}
+            row,
+            path,
+            set(_SCAN_KEYS)
+            | {"materials", "overrides", "beam", "detector", "emission", "energy_grid_refs"},
         )
         has_ang = "thickness_ang" in row
         has_layers = "thickness_layers" in row
@@ -918,6 +938,20 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
             errors.add(f"{path}.emission", f"must be one of {_EMISSION_VALUES}")
         if "overrides" in row:
             _parse_profile_overrides(row["overrides"], f"{path}.overrides", errors)
+        refs = row.get("energy_grid_refs")
+        if refs is not None:
+            refs_table = _table(refs, f"{path}.energy_grid_refs", errors)
+            if refs_table is not None:
+                for material_key, digest in refs_table.items():
+                    if not isinstance(material_key, str) or not material_key:
+                        errors.add(
+                            f"{path}.energy_grid_refs", "material keys must be nonempty strings"
+                        )
+                    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                        errors.add(
+                            f"{path}.energy_grid_refs.{material_key}",
+                            "must be a 64-character lowercase SHA-256 digest",
+                        )
         row_out = dict(row)
         if "beam" in row_out:
             beam = _parse_profile_beam(row_out["beam"], f"{path}.beam", errors)
@@ -983,6 +1017,62 @@ def _material_elements(
     return elements
 
 
+def _artifact_line_grids(identity: Mapping[str, object]) -> LineGridByEnergy:
+    """Decode a verified v1 artifact's normalized line rows exactly."""
+    rows = cast("list[Mapping[str, Any]]", identity["line_rows"])
+    decoded: dict[float, np.ndarray] = {}
+    for row in rows:
+        energy = float(row["energy_keV"])
+        grid = np.linspace(
+            float(row["start_eV"]),
+            float(row["stop_eV"]),
+            int(row["num"]),
+            endpoint=True,
+        )
+        decoded[energy] = _readonly(grid)
+    return MappingProxyType(decoded)
+
+
+def _load_profile_artifacts(
+    source: Path,
+    profiles: Mapping[str, Mapping[str, object]],
+    profile_name: str,
+    errors: _Errors,
+) -> tuple[dict[str, tuple[str, Mapping[str, object]]], dict[str, Mapping[str, str]]]:
+    """Load and verify explicit refs; leave legacy fallback entirely read-only."""
+    all_refs: dict[str, Mapping[str, str]] = {}
+    for name, row in profiles.items():
+        raw_refs = row.get("energy_grid_refs")
+        if isinstance(raw_refs, Mapping):
+            refs = {
+                str(material): str(digest)
+                for material, digest in raw_refs.items()
+                if isinstance(material, str)
+                and isinstance(digest, str)
+                and re.fullmatch(r"[0-9a-f]{64}", digest) is not None
+            }
+            all_refs[name] = MappingProxyType(refs)
+
+    selected: dict[str, tuple[str, Mapping[str, object]]] = {}
+    store_root = source.parent / "energy-grid-artifacts"
+    for material, digest in all_refs.get(profile_name, {}).items():
+        path = f"profiles.{profile_name}.energy_grid_refs.{material}"
+        try:
+            stored = _grid_artifacts.load_artifact(store_root, digest)
+        except _grid_artifacts.ArtifactError as exc:
+            errors.add(path, str(exc))
+            continue
+        identity = stored.identity
+        if identity.get("material") != material:
+            errors.add(
+                path,
+                f"artifact material {identity.get('material')!r} does not match ref key",
+            )
+            continue
+        selected[material] = (digest, identity)
+    return selected, all_refs
+
+
 def _parse_materials(
     raw: object,
     crystals: Mapping[str, CrystalSpec],
@@ -990,6 +1080,8 @@ def _parse_materials(
     energy_grids: Mapping[str, LineGridByEnergy],
     errors: _Errors,
     profiles: Mapping[str, Mapping[str, object]],
+    profile_artifacts: Mapping[str, tuple[str, Mapping[str, object]]],
+    resolved_artifact_refs: dict[str, str],
     profile_name: str = "standard",
 ) -> dict[str, MaterialSpec]:
     table = _table(raw, "materials", errors)
@@ -1038,12 +1130,34 @@ def _parse_materials(
             values.pop("thickness_layers", None)
         values.update({name: override[name] for name in _SCAN_KEYS if name in override})
 
+        artifact = profile_artifacts.get(key)
+        artifact_line_grids = None
+        if artifact is not None:
+            digest, identity = artifact
+            artifact_energies = cast("list[float]", identity["beam_energies_keV"])
+            values["energy_keV"] = {"values": list(artifact_energies)}
+            brem = cast("Mapping[str, float]", identity["brem_grid"])
+            values["E_grid_brem"] = {
+                "arange": {
+                    "start": float(brem["start_eV"]),
+                    "stop": float(brem["stop_eV"]),
+                    "step": float(brem["step_eV"]),
+                }
+            }
+            values.pop("E_grid_line", None)
+            artifact_line_grids = _artifact_line_grids(identity)
+            resolved_artifact_refs[key] = digest
+
         scan = _scan(
             values,
             f"{path}.scan",
             crystals.get(str(crystal_key)),
             errors,
-            line_grid_store=energy_grids.get(key, default_line_grids),
+            line_grid_store=(
+                artifact_line_grids
+                if artifact_line_grids is not None
+                else energy_grids.get(key, default_line_grids)
+            ),
         )
         substrate = row.get("substrate")
         if substrate is not None and (
@@ -1082,6 +1196,14 @@ def _parse_materials(
                 if material_key not in table:
                     errors.add(
                         f"profiles.{profile_key}.overrides.{material_key}", "unknown material"
+                    )
+        profile_refs = profile_row.get("energy_grid_refs")
+        if isinstance(profile_refs, Mapping):
+            for material_key in profile_refs:
+                if material_key not in table:
+                    errors.add(
+                        f"profiles.{profile_key}.energy_grid_refs.{material_key}",
+                        "unknown material",
                     )
     for material_key in energy_grids:
         if material_key not in table and material_key not in profiles:
@@ -1183,9 +1305,13 @@ def _load_material_catalog_cached(
         if key not in raw:
             errors.add(key, "missing required table")
     profiles = _parse_profiles(raw.get("profiles"), errors)
+    profile_artifacts, profile_energy_grid_refs = _load_profile_artifacts(
+        source, profiles, profile, errors
+    )
     crystals = _parse_crystals(raw.get("crystals"), errors)
     media = _parse_media(raw.get("media"), errors)
     energy_grids = _parse_energy_grids(raw.get("energy_grids", {}), errors)
+    resolved_energy_grid_refs: dict[str, str] = {}
     materials = _parse_materials(
         raw.get("materials"),
         crystals,
@@ -1193,6 +1319,8 @@ def _load_material_catalog_cached(
         energy_grids,
         errors,
         profiles,
+        profile_artifacts,
+        resolved_energy_grid_refs,
         profile_name=profile,
     )
     if errors.items:
@@ -1229,6 +1357,8 @@ def _load_material_catalog_cached(
         profile_beams=MappingProxyType(profile_beams),
         profile_detectors=MappingProxyType(profile_detectors),
         profile_emissions=MappingProxyType(profile_emissions),
+        profile_energy_grid_refs=MappingProxyType(profile_energy_grid_refs),
+        resolved_energy_grid_refs=MappingProxyType(resolved_energy_grid_refs),
     )
 
 

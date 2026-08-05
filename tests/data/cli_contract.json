@@ -96,7 +96,7 @@
         "required": false
       }
     ],
-    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Manage coherent X-ray radiation simulation campaigns.\n\n  Start with a named profile: it defines campaign ranges, workloads, and\n  material membership. Then run campaigns, inspect checkpoints, or open analysis\n  notebooks.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr setup\n    cxr profile list\n    cxr profile show sub_100keV\n    cxr run sub_100keV -m hopg\n    cxr run sub_100keV --remote --dry-run\n    cxr app analysis launch\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  run          Run a profile's MC sweeps and write checkpoints.\n  setup        Detect GPU hardware and write CXR_MC_BACKEND to .env (first run).\n  app          Launch or export interactive analysis notebooks.\n  checkpoint   Inspect, transform, recompute, archive, and reclaim checkpoints.\n  completion   Manage cxr shell tab-completion.\n  config       Set and inspect current profile and remote-target defaults.\n  performance  List, analyze, or delete compute-performance artifacts.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  job          List, inspect, follow, or stop asynchronous remote jobs.\n  energy-grid  Derive, submit, inspect, and apply photon-energy grids.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect, validate, edit, and blaze individual materials.\n",
+    "help": "Usage: cxr [OPTIONS] COMMAND [ARGS]...\n\n  Manage coherent X-ray radiation simulation campaigns.\n\n  Start with a named profile: it defines campaign ranges, workloads, and\n  material membership. Then run campaigns, inspect checkpoints, or open analysis\n  notebooks.\n\n  Run ``cxr COMMAND --help`` for command options, units, defaults, and side\n  effects.\n\n  Examples:\n    cxr setup\n    cxr profile list\n    cxr profile show sub_100keV\n    cxr run sub_100keV -m hopg\n    cxr run sub_100keV --remote --dry-run\n    cxr app analysis launch\n\nOptions:\n  --version                    Show the version and exit.\n  --color [auto|always|never]  Color human output: auto for terminals, always,\n                               or never.  [default: auto]\n  -h, --help                   Show this message and exit.\n\nCommands:\n  run          Run a profile's MC sweeps and write checkpoints.\n  setup        Detect GPU hardware and write CXR_MC_BACKEND to .env (first run).\n  app          Launch or export interactive analysis notebooks.\n  checkpoint   Inspect, transform, recompute, archive, and reclaim checkpoints.\n  completion   Manage cxr shell tab-completion.\n  config       Set and inspect current profile and remote-target defaults.\n  performance  List, analyze, or delete compute-performance artifacts.\n  remote       Run and manage MC sweeps on a remote GPU host.\n  job          List, inspect, follow, or stop asynchronous remote jobs.\n  energy-grid  Derive, inspect, and manage immutable photon-energy-grid\n               artifacts.\n  profile      Manage named catalog campaigns and material membership.\n  material     Inspect, validate, edit, and blaze individual materials.\n",
     "hidden": false,
     "path": "",
     "subcommands": [
@@ -3778,7 +3778,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: cxr energy-grid [OPTIONS] COMMAND [ARGS]...\n\n  Derive and manage per-material photon-energy grids.\n\n  ``derive`` measures both coherent-line and bremsstrahlung upper bounds.\n  ``defaults`` controls that diagnostic derivation only; ``apply`` writes\n  validated bounds into the material catalog. Physical scan profile defaults\n  belong to ``cxr profile``; per-material range overrides belong to ``cxr\n  material``.\n\n  Scan ``--fidelity full|survey`` is separate. It controls later simulation cost\n  and grid reduction; it never changes derivation or applied full bounds.\n\n  Command-line derivation values override persistent defaults for one run.\n\n  Examples:\n    cxr energy-grid derive --material mose2,wse2 --energy 30,60\n    cxr energy-grid derive --material mose2 --remote --dry-run\n    cxr energy-grid show mose2\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  apply         Apply derived bounds to material catalog.\n  brem          Inspect or manually set bremsstrahlung energy grids.\n  defaults      Show, update, or clear persistent derivation inputs.\n  derive        Derive line and bremsstrahlung energy-grid bounds locally...\n  job           Inspect, follow, or stop remote energy-grid jobs.\n  line          Inspect or manually set coherent line-energy grids.\n  regen-golden  Regenerate or check material-catalog golden snapshot.\n  show          Show line and bremsstrahlung grids together.\n",
+        "help": "Usage: cxr energy-grid [OPTIONS] COMMAND [ARGS]...\n\n  Derive and manage per-material photon-energy grids.\n\n  ``derive`` measures both coherent-line and bremsstrahlung upper bounds.\n  ``defaults`` controls that diagnostic derivation only; ``add`` stores\n  validated bounds and repoints a profile. Physical scan profile defaults belong\n  to ``cxr profile``; per-material range overrides belong to ``cxr material``.\n\n  Scan ``--fidelity full|survey`` is separate. It controls later simulation cost\n  and grid reduction; it never changes derivation or applied full bounds.\n\n  Command-line derivation values override persistent defaults for one run.\n\n  Examples:\n    cxr energy-grid derive --material mose2,wse2 --energy 30,60\n    cxr energy-grid derive --material mose2 --remote --dry-run\n    cxr energy-grid show mose2\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  add           Add immutable derived-grid artifacts and repoint one profile.\n  brem          Inspect or manually set bremsstrahlung energy grids.\n  defaults      Show, update, or clear persistent derivation inputs.\n  derive        Derive line and bremsstrahlung energy-grid bounds locally...\n  gc            Reclaim unreachable immutable artifacts after a 14-day...\n  job           Inspect, follow, or stop remote energy-grid jobs.\n  line          Inspect or manually set coherent line-energy grids.\n  regen-golden  Regenerate or check material-catalog golden snapshot.\n  rm            Remove line rows by repointing a profile to a new immutable...\n  show          Show line and bremsstrahlung grids together.\n  verify        Verify stored and profile/lock-referenced immutable artifacts.\n",
         "hidden": false,
         "path": "energy-grid",
         "subcommands": [
@@ -3823,6 +3823,14 @@
                 "required": false
               },
               {
+                "dest": "catalog_profile",
+                "help": "Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                "option_strings": [
+                  "--profile"
+                ],
+                "required": false
+              },
+              {
                 "dest": "regen_golden",
                 "help": "Regenerate checked catalog snapshot after successful write.",
                 "option_strings": [
@@ -3839,8 +3847,78 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr energy-grid apply [OPTIONS] JSON\n\n  Apply derived bounds to material catalog.\n\n  Consumes combined JSON from ``derive``. Writes line bounds into the shared\n  per-material grid store, bremsstrahlung bounds into standard profile\n  overrides, and adds derived beam energies to the standard profile. Catalog and\n  provenance writes are atomic and validated.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    cxr energy-grid apply combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
+            "help": "Usage: cxr energy-grid add [OPTIONS] JSON\n\n  Add immutable derived-grid artifacts and repoint one profile.\n\n  Consumes combined JSON from ``derive``. Artifact bytes are content-addressed\n  and immutable; only the resolved profile's ``energy_grid_refs`` move. Legacy\n  grid tables, scan ranges, and material overrides remain unchanged.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    cxr energy-grid add combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --profile NAME      Repoint profile NAME; precedence: flag > CXR_PROFILE >\n                      config store > standard.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
             "hidden": false,
+            "path": "energy-grid add",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "json_path",
+                "help": null,
+                "option_strings": [],
+                "required": false
+              },
+              {
+                "dest": "materials",
+                "help": "Apply only listed material keys.",
+                "option_strings": [
+                  "--material"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_materials___materials",
+                "help": "<SUPPRESS>",
+                "option_strings": [
+                  "--materials"
+                ],
+                "required": false
+              },
+              {
+                "dest": "pull",
+                "help": "Fetch default combined JSON from remote host; takes precedence over JSON.",
+                "option_strings": [
+                  "--pull"
+                ],
+                "required": false
+              },
+              {
+                "dest": "force",
+                "help": "Replace manually overridden rows; otherwise preserve them.",
+                "option_strings": [
+                  "--force"
+                ],
+                "required": false
+              },
+              {
+                "dest": "catalog_profile",
+                "help": "Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                "option_strings": [
+                  "--profile"
+                ],
+                "required": false
+              },
+              {
+                "dest": "regen_golden",
+                "help": "Regenerate checked catalog snapshot after successful write.",
+                "option_strings": [
+                  "--regen-golden"
+                ],
+                "required": false
+              },
+              {
+                "dest": "dry_run",
+                "help": "Print proposed diff; write nothing.",
+                "option_strings": [
+                  "--dry-run"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr energy-grid apply [OPTIONS] JSON\n\n  Add immutable derived-grid artifacts and repoint one profile.\n\n  Consumes combined JSON from ``derive``. Artifact bytes are content-addressed\n  and immutable; only the resolved profile's ``energy_grid_refs`` move. Legacy\n  grid tables, scan ranges, and material overrides remain unchanged.\n\n  Manual line and bremsstrahlung overrides remain unchanged unless ``--force``\n  is passed. This command does not run a scan and does not select ``full`` or\n  ``survey`` fidelity.\n\n  Example:\n    cxr energy-grid add combined_line_grid_bounds.json --material mose2,wse2\n\nOptions:\n  --material KEY,...  Apply only listed material keys.\n  --pull              Fetch default combined JSON from remote host; takes\n                      precedence over JSON.\n  --force             Replace manually overridden rows; otherwise preserve them.\n  --profile NAME      Repoint profile NAME; precedence: flag > CXR_PROFILE >\n                      config store > standard.\n  --regen-golden      Regenerate checked catalog snapshot after successful\n                      write.\n  --dry-run           Print proposed diff; write nothing.\n  -h, --help          Show this message and exit.\n",
+            "hidden": true,
             "path": "energy-grid apply",
             "subcommands": []
           },
@@ -3860,7 +3938,7 @@
           },
           {
             "actions": [],
-            "help": "Usage: cxr energy-grid brem [OPTIONS] COMMAND [ARGS]...\n\n  Inspect or manually set bremsstrahlung energy grids.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  set   Set one material bremsstrahlung grid and mark it as a manual override.\n  show  Show bremsstrahlung energy grids.\n",
+            "help": "Usage: cxr energy-grid brem [OPTIONS] COMMAND [ARGS]...\n\n  Inspect or manually set bremsstrahlung energy grids.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  set   Set a bremsstrahlung grid by repointing an immutable artifact.\n  show  Show bremsstrahlung energy grids.\n",
             "hidden": false,
             "path": "energy-grid brem",
             "subcommands": [
@@ -3895,9 +3973,17 @@
                       "--note"
                     ],
                     "required": false
+                  },
+                  {
+                    "dest": "catalog_profile",
+                    "help": "Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                    "option_strings": [
+                      "--profile"
+                    ],
+                    "required": false
                   }
                 ],
-                "help": "Usage: cxr energy-grid brem set [OPTIONS] MATERIAL\n\n  Set one material bremsstrahlung grid and mark it as a manual override.\n\nOptions:\n  --stop EV    Bremsstrahlung grid upper bound in eV.  [required]\n  --step EV    Grid spacing in eV; preserve current value if omitted.\n  --note TEXT  Provenance note stored with manual override.\n  -h, --help   Show this message and exit.\n",
+                "help": "Usage: cxr energy-grid brem set [OPTIONS] MATERIAL\n\n  Set a bremsstrahlung grid by repointing an immutable artifact.\n\nOptions:\n  --stop EV       Bremsstrahlung grid upper bound in eV.  [required]\n  --step EV       Grid spacing in eV; preserve current value if omitted.\n  --note TEXT     Provenance note stored with manual override.\n  --profile NAME  Repoint profile NAME; precedence: flag > CXR_PROFILE > config\n                  store > standard.\n  -h, --help      Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid brem set",
                 "subcommands": []
@@ -3926,9 +4012,17 @@
                     "help": null,
                     "option_strings": [],
                     "required": false
+                  },
+                  {
+                    "dest": "catalog_profile",
+                    "help": "Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                    "option_strings": [
+                      "--profile"
+                    ],
+                    "required": false
                   }
                 ],
-                "help": "Usage: cxr energy-grid brem show [OPTIONS] [MATERIAL]\n\n  Show bremsstrahlung energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+                "help": "Usage: cxr energy-grid brem show [OPTIONS] [MATERIAL]\n\n  Show bremsstrahlung energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid brem show",
                 "subcommands": []
@@ -4194,6 +4288,39 @@
             "subcommands": []
           },
           {
+            "actions": [
+              {
+                "dest": "checkpoint_dir",
+                "help": "Checkpoint root whose active/archive campaign locks remain reachable.",
+                "option_strings": [
+                  "--checkpoint-dir"
+                ],
+                "required": false
+              },
+              {
+                "dest": "prune_all",
+                "help": "Ignore the 14-day orphan grace window and select every unreachable artifact.",
+                "option_strings": [
+                  "--prune-all"
+                ],
+                "required": false
+              },
+              {
+                "dest": "yes",
+                "help": "Delete the exact revalidated preview.",
+                "option_strings": [
+                  "-y",
+                  "--yes"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr energy-grid gc [OPTIONS]\n\n  Reclaim unreachable immutable artifacts after a 14-day grace window.\n\nOptions:\n  --checkpoint-dir DIR  Checkpoint root whose active/archive campaign locks\n                        remain reachable.  [default: checkpoints]\n  --prune-all           Ignore the 14-day orphan grace window and select every\n                        unreachable artifact.\n  -y, --yes             Delete the exact revalidated preview.\n  -h, --help            Show this message and exit.\n",
+            "hidden": false,
+            "path": "energy-grid gc",
+            "subcommands": []
+          },
+          {
             "actions": [],
             "help": "Usage: cxr energy-grid job [OPTIONS] COMMAND [ARGS]...\n\n  Inspect, follow, or stop remote energy-grid jobs.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
             "hidden": false,
@@ -4311,7 +4438,7 @@
           },
           {
             "actions": [],
-            "help": "Usage: cxr energy-grid line [OPTIONS] COMMAND [ARGS]...\n\n  Inspect or manually set coherent line-energy grids.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  delete  Delete MATERIAL's derived or manual line-grid rows; irreversible.\n  set     Set one material line-grid row and mark it as a manual override.\n  show    Show coherent line-energy grids.\n",
+            "help": "Usage: cxr energy-grid line [OPTIONS] COMMAND [ARGS]...\n\n  Inspect or manually set coherent line-energy grids.\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  set   Set one line-grid row by repointing an immutable artifact.\n  show  Show coherent line-energy grids.\n",
             "hidden": false,
             "path": "energy-grid line",
             "subcommands": [
@@ -4349,6 +4476,14 @@
                     "required": false
                   },
                   {
+                    "dest": "catalog_profile",
+                    "help": "Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                    "option_strings": [
+                      "--profile"
+                    ],
+                    "required": false
+                  },
+                  {
                     "dest": "json_output",
                     "help": "Output format; only json is a stable automation contract.",
                     "option_strings": [
@@ -4366,8 +4501,8 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr energy-grid line delete [OPTIONS] MATERIAL\n\n  Delete MATERIAL's derived or manual line-grid rows; irreversible.\n\n  The only way to remove bounds from the shared per-material derived-grid store\n  -- editing a profile's energies never deletes them. Refuses (as a catalog\n  validation failure) when a beam energy is still required by a profile's\n  ``energy_keV`` grid.\n\n  Example:\n    cxr energy-grid line delete wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Delete the exact previewed rows.\n  --dry-run                       Print proposed diff; delete nothing.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
-                "hidden": false,
+                "help": "Usage: cxr energy-grid line delete [OPTIONS] MATERIAL\n\n  Remove line rows by repointing a profile to a new immutable artifact.\n\n  Old artifact bytes remain recoverable until ``energy-grid gc`` reclaims them\n  after its grace window.\n\n  Example:\n    cxr energy-grid rm wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Delete the exact previewed rows.\n  --dry-run                       Print proposed diff; delete nothing.\n  --profile NAME                  Repoint profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+                "hidden": true,
                 "path": "energy-grid line delete",
                 "subcommands": []
               },
@@ -4418,9 +4553,17 @@
                       "--note"
                     ],
                     "required": false
+                  },
+                  {
+                    "dest": "catalog_profile",
+                    "help": "Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                    "option_strings": [
+                      "--profile"
+                    ],
+                    "required": false
                   }
                 ],
-                "help": "Usage: cxr energy-grid line set [OPTIONS] MATERIAL\n\n  Set one material line-grid row and mark it as a manual override.\n\nOptions:\n  --energy KEV  Beam energy in keV.  [required]\n  --stop EV     Line-grid upper bound in eV.  [required]\n  --num N       Grid point count; preserve current value if omitted.\n  --start EV    Line-grid lower bound in eV; preserve current value if omitted.\n  --note TEXT   Provenance note stored with manual override.\n  -h, --help    Show this message and exit.\n",
+                "help": "Usage: cxr energy-grid line set [OPTIONS] MATERIAL\n\n  Set one line-grid row by repointing an immutable artifact.\n\nOptions:\n  --energy KEV    Beam energy in keV.  [required]\n  --stop EV       Line-grid upper bound in eV.  [required]\n  --num N         Grid point count; preserve current value if omitted.\n  --start EV      Line-grid lower bound in eV; preserve current value if\n                  omitted.\n  --note TEXT     Provenance note stored with manual override.\n  --profile NAME  Repoint profile NAME; precedence: flag > CXR_PROFILE > config\n                  store > standard.\n  -h, --help      Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid line set",
                 "subcommands": []
@@ -4449,9 +4592,17 @@
                     "help": null,
                     "option_strings": [],
                     "required": false
+                  },
+                  {
+                    "dest": "catalog_profile",
+                    "help": "Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                    "option_strings": [
+                      "--profile"
+                    ],
+                    "required": false
                   }
                 ],
-                "help": "Usage: cxr energy-grid line show [OPTIONS] [MATERIAL]\n\n  Show coherent line-energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+                "help": "Usage: cxr energy-grid line show [OPTIONS] [MATERIAL]\n\n  Show coherent line-energy grids.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
                 "hidden": false,
                 "path": "energy-grid line show",
                 "subcommands": []
@@ -4500,6 +4651,70 @@
           {
             "actions": [
               {
+                "dest": "material",
+                "help": null,
+                "option_strings": [],
+                "required": true
+              },
+              {
+                "dest": "energies",
+                "help": "Beam energy in keV; repeat for multiple rows.",
+                "option_strings": [
+                  "--energy"
+                ],
+                "required": true
+              },
+              {
+                "dest": "yes",
+                "help": "Delete the exact previewed rows.",
+                "option_strings": [
+                  "-y",
+                  "--yes"
+                ],
+                "required": false
+              },
+              {
+                "dest": "dry_run",
+                "help": "Print proposed diff; delete nothing.",
+                "option_strings": [
+                  "--dry-run"
+                ],
+                "required": false
+              },
+              {
+                "dest": "catalog_profile",
+                "help": "Repoint profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                "option_strings": [
+                  "--profile"
+                ],
+                "required": false
+              },
+              {
+                "dest": "json_output",
+                "help": "Output format; only json is a stable automation contract.",
+                "option_strings": [
+                  "-o",
+                  "--output"
+                ],
+                "required": false
+              },
+              {
+                "dest": "_retired_json_output___json",
+                "help": "<SUPPRESS>",
+                "option_strings": [
+                  "--json"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr energy-grid rm [OPTIONS] MATERIAL\n\n  Remove line rows by repointing a profile to a new immutable artifact.\n\n  Old artifact bytes remain recoverable until ``energy-grid gc`` reclaims them\n  after its grace window.\n\n  Example:\n    cxr energy-grid rm wse2 --energy 30 --energy 40\n\nOptions:\n  --energy KEV                    Beam energy in keV; repeat for multiple rows.\n                                  [required]\n  -y, --yes                       Delete the exact previewed rows.\n  --dry-run                       Print proposed diff; delete nothing.\n  --profile NAME                  Repoint profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+            "hidden": false,
+            "path": "energy-grid rm",
+            "subcommands": []
+          },
+          {
+            "actions": [
+              {
                 "dest": "json_output",
                 "help": "Output format; only json is a stable automation contract.",
                 "option_strings": [
@@ -4521,9 +4736,17 @@
                 "help": null,
                 "option_strings": [],
                 "required": false
+              },
+              {
+                "dest": "catalog_profile",
+                "help": "Resolve profile NAME; precedence: flag > CXR_PROFILE > config store > standard.",
+                "option_strings": [
+                  "--profile"
+                ],
+                "required": false
               }
             ],
-            "help": "Usage: cxr energy-grid show [OPTIONS] [MATERIAL]\n\n  Show line and bremsstrahlung grids together.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: cxr energy-grid show [OPTIONS] [MATERIAL]\n\n  Show line and bremsstrahlung grids together.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  --profile NAME                  Resolve profile NAME; precedence: flag >\n                                  CXR_PROFILE > config store > standard.\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "energy-grid show",
             "subcommands": []
@@ -4718,6 +4941,22 @@
             "hidden": true,
             "path": "energy-grid submit",
             "subcommands": []
+          },
+          {
+            "actions": [
+              {
+                "dest": "checkpoint_dir",
+                "help": "Checkpoint root whose campaign locks are reachability roots.",
+                "option_strings": [
+                  "--checkpoint-dir"
+                ],
+                "required": false
+              }
+            ],
+            "help": "Usage: cxr energy-grid verify [OPTIONS]\n\n  Verify stored and profile/lock-referenced immutable artifacts.\n\nOptions:\n  --checkpoint-dir DIR  Checkpoint root whose campaign locks are reachability\n                        roots.  [default: checkpoints]\n  -h, --help            Show this message and exit.\n",
+            "hidden": false,
+            "path": "energy-grid verify",
+            "subcommands": []
           }
         ]
       },
@@ -4849,7 +5088,7 @@
       },
       {
         "actions": [],
-        "help": "Usage: cxr profile [OPTIONS] COMMAND [ARGS]...\n\n  Manage catalog scan profiles (named campaign defaults).\n\n  Profiles are named campaigns in ``[profiles.*]``. They own default ranges,\n  electron-count grids, beam policy, detector geometry, and optional material\n  membership. An absent ``materials`` key means all in-use materials. Membership\n  uses ``set|add|remove --material``; ``set --all-materials`` restores implicit\n  membership. Per-material range overrides are managed by ``cxr material``.\n  Energy grids are managed by ``cxr energy-grid``.\n\n  Examples:\n    cxr profile list\n    cxr profile show sub_100keV        (or: cxr profile sub_100keV)\n    cxr profile create sub_100keV --energy 30:100:10\n    cxr profile set sub_100keV --observation-angle 119\n    cxr profile add sub_100keV --energy 75\n    cxr profile set sub_100keV --material hopg,mose2\n    cxr profile rename sub_100keV sub100\n    cxr profile delete sub_100keV -y\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  add     Incrementally add values to profile grids.\n  create  Create a new profile, cloning defaults from --from (standard).\n  delete  Delete a profile; irreversible.\n  list    List catalog profiles with membership and override counts.\n  remove  Remove values from an existing profile's grids.\n  rename  Rename profile NAME to NEW_NAME.\n  set     Replace range grids, beam fields, or detector scalars on a profile.\n  show    Show one profile's ranges, beam, detector, membership, and...\n",
+        "help": "Usage: cxr profile [OPTIONS] COMMAND [ARGS]...\n\n  Manage catalog scan profiles (named campaign defaults).\n\n  Profiles are named campaigns in ``[profiles.*]``. They own default ranges,\n  electron-count grids, beam policy, detector geometry, and optional material\n  membership. An absent ``materials`` key means all in-use materials. Membership\n  uses ``set|add|remove --material``; ``set --all-materials`` restores implicit\n  membership. Per-material range overrides are managed by ``cxr material``.\n  Energy grids are managed by ``cxr energy-grid``.\n\n  Examples:\n    cxr profile list\n    cxr profile show sub_100keV        (or: cxr profile sub_100keV)\n    cxr profile create sub_100keV --energy 30:100:10\n    cxr profile set sub_100keV --observation-angle 119\n    cxr profile add sub_100keV --energy 75\n    cxr profile set sub_100keV --material hopg,mose2\n    cxr profile rename sub_100keV sub100\n    cxr profile delete sub_100keV -y\n\nOptions:\n  -h, --help  Show this message and exit.\n\nCommands:\n  add     Incrementally add values to profile grids.\n  create  Create a new profile, cloning defaults from --from (standard).\n  delete  Delete a profile; irreversible.\n  list    List catalog profiles with membership, override, and grid-ref...\n  remove  Remove values from an existing profile's grids.\n  rename  Rename profile NAME to NEW_NAME.\n  set     Replace range grids, beam fields, or detector scalars on a profile.\n  show    Show one profile's ranges, beam, detector, membership, and...\n",
         "hidden": false,
         "path": "profile",
         "subcommands": [
@@ -5254,7 +5493,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr profile list [OPTIONS]\n\n  List catalog profiles with membership and override counts.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
+            "help": "Usage: cxr profile list [OPTIONS]\n\n  List catalog profiles with membership, override, and grid-ref counts.\n\nOptions:\n  -o, --output [table|json|wide]  Output format; only json is a stable\n                                  automation contract.  [default: table]\n  -h, --help                      Show this message and exit.\n",
             "hidden": false,
             "path": "profile list",
             "subcommands": []
