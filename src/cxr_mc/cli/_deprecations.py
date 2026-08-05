@@ -356,6 +356,11 @@ def canonical_option(*param_decls: str, retired: Sequence[str] = (), **kwargs):
     ``is_eager`` flag that `RetiredOption`'s conflict check depends on.
     """
     dest = _implied_dest(param_decls)
+    replacement = max(
+        (decl for decl in param_decls if decl.startswith("--")),
+        key=len,
+        default=param_decls[0],
+    )
     shared = {key: value for key, value in kwargs.items() if key in _VALUE_KWARGS}
 
     def decorator(function):
@@ -364,7 +369,7 @@ def canonical_option(*param_decls: str, retired: Sequence[str] = (), **kwargs):
                 retired_flag,
                 cls=RetiredOption,
                 dest=dest,
-                replacement=param_decls[0],
+                replacement=replacement,
                 **shared,
             )(function)
         return click.option(*param_decls, is_eager=True, **kwargs)(function)

@@ -3,9 +3,9 @@
 Branch: `feature/cli-vocab-controls`, off `main` at `8671240`.
 Slice 5 of [`docs/plans/cli-redesign-implementation-plan.md`](../../../docs/plans/cli-redesign-implementation-plan.md).
 
-**Status: in progress, unverified.** No test run, lint, typecheck, doc
-regeneration, or commit has happened on this branch yet. Everything below under
-"Done" means "code written and imports cleanly", nothing stronger.
+**Status: in progress, partially verified.** Slice 3's focused deprecation tests,
+lint, and typecheck pass; no generated-doc refresh or full suite has happened
+yet. Other entries under "Done" remain unverified.
 
 ## Ordering caveat (read first)
 
@@ -92,11 +92,12 @@ of order; repeatable (`multiple=True`) works; `--help` shows only the canonical.
    which D6 explicitly calls out. Non-TTY/CI must still require `--yes`.
    Suggest one `confirm_destructive()` helper in `cli/_core.py` next to
    `hidden_alias`.
-3. **Tests.** `tests/cli/test_deprecations.py` currently holds `DEPRECATIONS`
-   to the live tree in both directions; extend it to do the same for
-   `DEPRECATED_FLAGS` by walking `command.params` for `RetiredOption`
-   instances. Add the six behaviours from the spike list above, including a
-   hyphenated flag name.
+3. **Tests — complete 2026-08-05.** `tests/cli/test_deprecations.py` now holds
+   `DEPRECATED_FLAGS` to the live tree in both directions and freezes canonical
+   silence, retired warnings/value flow, both conflict orders, repeatable
+   values, hidden help, and a hyphenated retired flag. The registry check found
+   and fixed short-option declarations naming `-d` instead of the canonical
+   `--save-default`. Focused result: 76 passed; lint and typecheck pass.
 4. **Docs/contracts.** `scripts/generate_cli_deprecations.py` only reads
    `DEPRECATIONS`; teach it the flag table. Then regenerate
    `docs/cli-deprecations.md`, `docs/cli-reference.md`, and

@@ -6,7 +6,15 @@ import click
 import pytest
 
 from cxr_mc.cli import command
-from cxr_mc.cli._deprecations import DEPRECATIONS, SUPPORT_WINDOW_MINORS, _window, message
+from cxr_mc.cli._deprecations import (
+    DEPRECATED_FLAGS,
+    DEPRECATIONS,
+    SUPPORT_WINDOW_MINORS,
+    RetiredOption,
+    _window,
+    canonical_option,
+    message,
+)
 from scripts.generate_cli_deprecations import build_deprecations
 from tests.helpers.cli import invoke
 
@@ -88,6 +96,22 @@ def test_every_hidden_command_is_covered_by_deprecations() -> None:
         )
 
 
+def test_retired_flag_registry_matches_live_command_tree() -> None:
+    root_ctx = click.Context(command, info_name="cxr")
+    live: dict[tuple[str, str], RetiredOption] = {}
+
+    for path, child, _child_ctx in _walk_commands(command, root_ctx):
+        for param in child.params:
+            if isinstance(param, RetiredOption):
+                key = (" ".join(path), param.retired_flag)
+                assert key not in live, f"duplicate retired flag: {key!r}"
+                live[key] = param
+
+    assert live.keys() == DEPRECATED_FLAGS.keys()
+    for key, param in live.items():
+        assert param.replacement == DEPRECATED_FLAGS[key].replacement
+
+
 def _replacement_command_path(replacement: str) -> str:
     """Extract the Click command path from a documented replacement template."""
     parts = replacement.split()
@@ -156,6 +180,64 @@ def test_deprecation_support_window() -> None:
 def test_window_advances_minor_version() -> None:
     assert _window("0.1.0") == "0.3.0"
     assert _window("1.4.7") == "1.6.0"
+
+
+@click.command()
+@canonical_option("-d", "--save-default", retired=("--set-default",), is_flag=True)
+@canonical_option("--material", retired=("--materials",), multiple=True)
+def _retired_flag_command(save_default: bool, material: tuple[str, ...]) -> None:
+    click.echo(f"save_default={save_default};material={','.join(material)}")
+
+
+def test_canonical_flags_are_silent_and_values_flow() -> None:
+    result = invoke(
+        _retired_flag_command,
+        ["--save-default", "--material", "hopg", "--material", "graphite"],
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout == "save_default=True;material=hopg,graphite\n"
+    assert result.stderr == ""
+
+
+def test_retired_flags_warn_and_repeatable_values_flow() -> None:
+    result = invoke(
+        _retired_flag_command,
+        ["--set-default", "--materials", "hopg", "--materials", "graphite"],
+    )
+
+    assert result.exit_code == 0
+    assert result.stdout == "save_default=True;material=hopg,graphite\n"
+    assert "warning: '--set-default' is deprecated; use '--save-default'" in result.stderr
+    assert "warning: '--materials' is deprecated; use '--material'" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--save-default", "--set-default"],
+        ["--set-default", "--save-default"],
+    ],
+)
+def test_canonical_and_retired_flags_conflict_in_either_order(argv: list[str]) -> None:
+    result = invoke(_retired_flag_command, argv)
+
+    assert result.exit_code == 2
+    assert (
+        "--set-default is the retired spelling of --save-default; pass one, not both"
+        in result.stderr
+    )
+
+
+def test_help_shows_only_canonical_flags() -> None:
+    result = invoke(_retired_flag_command, ["--help"])
+
+    assert result.exit_code == 0
+    assert "--save-default" in result.stdout
+    assert "--material TEXT" in result.stdout
+    assert "--set-default" not in result.stdout
+    assert "--materials" not in result.stdout
+    assert result.stderr == ""
 
 
 def test_generated_deprecation_docs_are_current() -> None:
