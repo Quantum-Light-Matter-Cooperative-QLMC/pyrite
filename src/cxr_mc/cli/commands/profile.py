@@ -23,6 +23,7 @@ from cxr_mc.cli._core import (
     CLIError,
     emit_json_result,
     emit_result,
+    flatten_option_values,
 )
 from cxr_mc.cli._deprecations import DeprecatingGroup, canonical_option
 from cxr_mc.detectors.spec import DetectorSpec
@@ -80,8 +81,12 @@ def _range_cli_options(function):
         function = click.option(
             flag,
             type=param_type,
+            multiple=True,
             metavar=f"{metavar} | START:STOP:STEP",
-            help=f"{help_text} Comma-separated, mixable with start:stop:step ranges.",
+            help=(
+                f"{help_text} Comma-separated, mixable with start:stop:step ranges; "
+                "repeat to combine."
+            ),
         )(function)
     return function
 
@@ -149,10 +154,10 @@ def _collect_updates(thickness, energy, polar, azimuth, ne_line=None, ne_brem=No
     return {
         label: value
         for label, value in {
-            "thickness": thickness,
-            "energy": energy,
-            "polar": polar,
-            "azimuth": azimuth,
+            "thickness": flatten_option_values(thickness),
+            "energy": flatten_option_values(energy),
+            "polar": flatten_option_values(polar),
+            "azimuth": flatten_option_values(azimuth),
             "ne_line": ne_line,
             "ne_brem": ne_brem,
         }.items()
@@ -381,7 +386,7 @@ def command():
     Profiles are named campaigns in ``[profiles.*]``. They own default ranges,
     electron-count grids, beam policy, detector geometry, and optional material
     membership. An absent ``materials`` key means all in-use materials.
-    Membership uses ``set|add|remove --materials``; ``set --all-materials``
+    Membership uses ``set|add|remove --material``; ``set --all-materials``
     restores implicit membership. Per-material
     range overrides are managed by ``cxr material``. Energy grids are managed
     by ``cxr energy-grid``.
@@ -393,7 +398,7 @@ def command():
       cxr profile create sub_100keV --energy 30:100:10
       cxr profile set sub_100keV --observation-angle 119
       cxr profile add sub_100keV --energy 75
-      cxr profile set sub_100keV --materials hopg,mose2
+      cxr profile set sub_100keV --material hopg,mose2
       cxr profile rename sub_100keV sub100
       cxr profile delete sub_100keV -y
     """
@@ -533,7 +538,7 @@ def create_command(
 
     Range options replace individual cloned grids; beam and detector options
     replace individual cloned fields. Overrides and material membership are not
-    cloned. Without --materials, the new profile starts with implicit all-in-use
+    cloned. Without --material, the new profile starts with implicit all-in-use
     membership and no per-material overrides.
     """
     _check_name(name)
@@ -640,7 +645,7 @@ def set_command(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr
     )
     if materials is not None and all_materials:
-        raise click.UsageError("--materials and --all-materials are mutually exclusive")
+        raise click.UsageError("--material and --all-materials are mutually exclusive")
     if (
         not updates
         and not beam_updates
@@ -911,7 +916,7 @@ def _membership_target(document, name):
         raise ValueError(
             f"profile {name!r} has implicit all-in-use-materials membership; "
             f"it already includes every material. To restrict it, use: "
-            f"cxr profile set {name} --materials MATERIAL,..."
+            f"cxr profile set {name} --material MATERIAL,..."
         )
     if not isinstance(materials, list):
         raise ValueError(f"profiles.{name}.materials must be an array of material keys")
@@ -921,7 +926,7 @@ def _membership_target(document, name):
 def _csv_materials(material_csv):
     requested = [key.strip() for key in material_csv.split(",") if key.strip()]
     if not requested:
-        raise ValueError("--materials requires at least one material key")
+        raise ValueError("--material requires at least one material key")
     return requested
 
 
@@ -1139,7 +1144,7 @@ def add_material_command(name, materials, all_materials, yes, dry_run):
             raise ValueError(
                 f"profile {name!r} has implicit all-in-use-materials membership; "
                 f"it already includes every material. To restrict it, use: "
-                f"cxr profile set {name} --materials MATERIAL,..."
+                f"cxr profile set {name} --material MATERIAL,..."
             )
         membership = list(existing) if isinstance(existing, list) else []
         requested = list(materials)

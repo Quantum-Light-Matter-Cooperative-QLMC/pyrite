@@ -143,10 +143,10 @@ def show_command(material_name, profile_name, json_output):
     hidden=True,
     shell_complete=_cli_completion.complete_profile,
 )
-@click.option("--thickness", type=THICKNESS_CSV_RANGE)
-@click.option("--energy", type=ENERGY_CSV_RANGE)
-@click.option("--polar", type=TILT_CSV_RANGE)
-@click.option("--azimuth", type=AZIMUTH_CSV_RANGE)
+@click.option("--thickness", type=THICKNESS_CSV_RANGE, multiple=True)
+@click.option("--energy", type=ENERGY_CSV_RANGE, multiple=True)
+@click.option("--polar", type=TILT_CSV_RANGE, multiple=True)
+@click.option("--azimuth", type=AZIMUTH_CSV_RANGE, multiple=True)
 @click.option(
     "--reset",
     "reset_keys",

@@ -3,9 +3,9 @@
 Branch: `feature/cli-vocab-controls`, off `main` at `8671240`.
 Slice 5 of [`docs/plans/cli-redesign-implementation-plan.md`](../../../docs/plans/cli-redesign-implementation-plan.md).
 
-**Status: in progress, partially verified.** Slice 3's focused deprecation tests,
-lint, and typecheck pass; no generated-doc refresh or full suite has happened
-yet. Other entries under "Done" remain unverified.
+**Status: in progress, partially verified.** D5's focused profile/material/
+deprecation tests, lint, and typecheck pass; generated deprecation/reference/
+contract artifacts are current. D6 and full-suite verification remain.
 
 ## Ordering caveat (read first)
 
@@ -49,11 +49,11 @@ the option back onto the canonical dest — reintroducing failure mode 1, but on
 for flags whose name contains a dash. Fixed with `re.sub(r"\W", "_", ...)`.
 Any future change here needs a flag with a hyphen in its name in the test set.
 
-Verified behaviour (scratch spikes, not yet committed as tests): canonical alone
-→ silent; retired alone → warning + value flows; both → `UsageError` regardless
-of order; repeatable (`multiple=True`) works; `--help` shows only the canonical.
+Verified behaviour (`tests/cli/test_deprecations.py`): canonical alone → silent;
+retired alone → warning + value flows; both → `UsageError` regardless of order;
+repeatable (`multiple=True`) works; `--help` shows only the canonical.
 
-## Done (written, not verified)
+## Implemented
 
 - `cli/_deprecations.py`: `DeprecatedFlag`, `DEPRECATED_FLAGS` registry (21
   rows), `flag_message`, `warn_flag`, `RetiredOption`, `canonical_option`,
@@ -76,16 +76,13 @@ of order; repeatable (`multiple=True`) works; `--help` shows only the canonical.
 
 ## Remaining
 
-1. **D5 leftovers.**
-   - Canonical range flags are not yet repeatable. `_range_cli_options` in
-     `cli/commands/profile.py` gives `--thickness/--energy/--polar/--azimuth`
-     CSV + `START:STOP:STEP` types but no `multiple=True`; D5 asks for
-     "singular, repeatable + `START:STOP:STEP`". Adding it means flattening
-     tuple-of-lists in `_collect_updates` and the `sweep set` / `material set`
-     equivalents.
-   - Existing `DEPRECATIONS` rows still name `--materials` as the canonical
-     replacement (e.g. `cxr profile add NAME --materials MATERIAL,...`, 7 rows).
-     These are now wrong and must be reworded to `--material`.
+1. **D5 leftovers — complete 2026-08-05.** Canonical
+   `--thickness/--energy/--polar/--azimuth` options are repeatable on all profile
+   range verbs and on canonical/compatibility material setters. Occurrences
+   flatten in argv order while retaining CSV + `START:STOP:STEP` support; help
+   documents repetition. Profile membership guidance and all five command
+   deprecation rows now name canonical `--material`. Focused profile/material/
+   deprecation tests pass; the generated command-deprecation table is current.
 2. **D6 destructive contract.** `--yes` exists on 32 commands but `-y` on only
    14 — add the short spelling to the other 18. Then add the TTY `[y/N]`
    prompt: destructive commands currently dead-end with "resubmit with --yes",
@@ -98,16 +95,13 @@ of order; repeatable (`multiple=True`) works; `--help` shows only the canonical.
    values, hidden help, and a hyphenated retired flag. The registry check found
    and fixed short-option declarations naming `-d` instead of the canonical
    `--save-default`. Focused result: 76 passed; lint and typecheck pass.
-4. **Docs/contracts.** `scripts/generate_cli_deprecations.py` only reads
-   `DEPRECATIONS`; teach it the flag table. Then regenerate
-   `docs/cli-deprecations.md`, `docs/cli-reference.md`, and
-   `tests/data/cli_contract.json` — the contract freeze **will** fail until
-   regenerated, since every touched command's help text changed.
+4. **Docs/contracts — complete for D5, refresh again after D6.**
+   `scripts/generate_cli_deprecations.py` now renders both command and option
+   tables. `docs/cli-deprecations.md`, `docs/cli-reference.md`, and
+   `tests/data/cli_contract.json` were regenerated after the D5 changes.
 5. **Verify.** lint, typecheck, then `test-suite cli` / `packaging` / `apps` /
    `core`. Expect 4 pre-existing `test_adaptive_chunk_*` failures in
    `tests/test_montecarlo.py` on CPU-only machines (hardcoded fp32
    `_REAL_BYTES=4`); they are unrelated to this branch.
 
-## Not started
-
-`TODO.md` has no entry for this slice yet, and no commit exists on the branch.
+`TODO.md` still has no entry for this slice; task status remains branch-local.

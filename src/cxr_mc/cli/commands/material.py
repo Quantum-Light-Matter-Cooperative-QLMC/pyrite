@@ -20,6 +20,7 @@ from cxr_mc.cli._core import (
     LazyGroup,
     emit_json_result,
     emit_result,
+    flatten_option_values,
 )
 
 _RESET_CHOICES = click.Choice((*_catalog_io.RANGES, "all"), case_sensitive=False)
@@ -108,8 +109,12 @@ def _range_options(function):
         function = click.option(
             flag,
             type=value_type,
+            multiple=True,
             metavar=f"{metavar} | START:STOP:STEP",
-            help=f"{help_text} Comma-separated, mixable with start:stop:step ranges.",
+            help=(
+                f"{help_text} Comma-separated, mixable with start:stop:step ranges; "
+                "repeat to combine."
+            ),
         )(function)
     return function
 
@@ -128,10 +133,10 @@ def _set(
     updates = {
         label: value
         for label, value in {
-            "thickness": thickness,
-            "energy": energy,
-            "polar": polar,
-            "azimuth": azimuth,
+            "thickness": flatten_option_values(thickness),
+            "energy": flatten_option_values(energy),
+            "polar": flatten_option_values(polar),
+            "azimuth": flatten_option_values(azimuth),
         }.items()
         if value is not None
     }

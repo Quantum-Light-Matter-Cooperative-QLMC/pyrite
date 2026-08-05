@@ -245,3 +245,8 @@ def test_generated_deprecation_docs_are_current() -> None:
     actual = Path("docs/cli-deprecations.md").read_text(encoding="utf-8")
 
     assert actual == expected
+    for entry in DEPRECATED_FLAGS.values():
+        assert (
+            f"| `cxr {entry.command}` | `{entry.flag}` | `{entry.replacement}` "
+            f"| {entry.deprecated_in} | {entry.remove_in} | {entry.note} |"
+        ) in actual

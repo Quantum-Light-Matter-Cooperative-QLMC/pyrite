@@ -185,14 +185,14 @@ Usage: cxr app analysis [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...
   later no-argument launches.
 
 Options:
-  -d, --default  Persist MATERIAL as default for future no-argument runs.
-  --watch        Reload app when source files change.
-  --smoke        Execute app once headlessly and exit.
-  --edit         Use `marimo edit` instead of `marimo run`.
-  --acp          Start local Claude and Codex ACP bridges.
-  --tunnel       Bind fixed port for SSH tunneling.
-  --no-token     Disable marimo auth token.
-  -h, --help     Show this message and exit.
+  -d, --save-default  Persist MATERIAL as default for future no-argument runs.
+  --watch             Reload app when source files change.
+  --smoke             Execute app once headlessly and exit.
+  --edit              Use `marimo edit` instead of `marimo run`.
+  --acp               Start local Claude and Codex ACP bridges.
+  --tunnel            Bind fixed port for SSH tunneling.
+  --no-token          Disable marimo auth token.
+  -h, --help          Show this message and exit.
 
 Commands:
   export  Render notebooks/analysis_app.py to static HTML.
@@ -224,14 +224,14 @@ Usage: cxr app viewer [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...
   later no-argument launches.
 
 Options:
-  -d, --default  Persist MATERIAL as default for future no-argument runs.
-  --watch        Reload app when source files change.
-  --smoke        Execute app once headlessly and exit.
-  --edit         Use `marimo edit` instead of `marimo run`.
-  --acp          Start local Claude and Codex ACP bridges.
-  --tunnel       Bind fixed port for SSH tunneling.
-  --no-token     Disable marimo auth token.
-  -h, --help     Show this message and exit.
+  -d, --save-default  Persist MATERIAL as default for future no-argument runs.
+  --watch             Reload app when source files change.
+  --smoke             Execute app once headlessly and exit.
+  --edit              Use `marimo edit` instead of `marimo run`.
+  --acp               Start local Claude and Codex ACP bridges.
+  --tunnel            Bind fixed port for SSH tunneling.
+  --no-token          Disable marimo auth token.
+  -h, --help          Show this message and exit.
 
 Commands:
   export  Render the viewer as static HTML without starting marimo.
@@ -1003,8 +1003,8 @@ Usage: cxr energy-grid [OPTIONS] COMMAND [ARGS]...
   Command-line derivation values override persistent defaults for one run.
 
   Examples:
-    cxr energy-grid derive --materials mose2,wse2 --energies 30,60
-    cxr energy-grid submit --materials mose2 --dry-run
+    cxr energy-grid derive --material mose2,wse2 --energy 30,60
+    cxr energy-grid submit --material mose2 --dry-run
     cxr energy-grid show mose2
 
 Options:
@@ -1039,16 +1039,16 @@ Usage: cxr energy-grid apply [OPTIONS] JSON
   fidelity.
 
   Example:
-    cxr energy-grid apply combined_line_grid_bounds.json --materials mose2,wse2
+    cxr energy-grid apply combined_line_grid_bounds.json --material mose2,wse2
 
 Options:
-  --materials KEY,...  Apply only listed material keys.
-  --pull               Fetch default combined JSON from remote host; takes precedence
-                       over JSON.
-  --force              Replace manually overridden rows; otherwise preserve them.
-  --regen-golden       Regenerate checked catalog snapshot after successful write.
-  --dry-run            Print proposed diff; write nothing.
-  -h, --help           Show this message and exit.
+  --material KEY,...  Apply only listed material keys.
+  --pull              Fetch default combined JSON from remote host; takes precedence
+                      over JSON.
+  --force             Replace manually overridden rows; otherwise preserve them.
+  --regen-golden      Regenerate checked catalog snapshot after successful write.
+  --dry-run           Print proposed diff; write nothing.
+  -h, --help          Show this message and exit.
 ```
 
 ## `cxr energy-grid brem`
@@ -1103,20 +1103,20 @@ Usage: cxr energy-grid defaults [OPTIONS]
   Geometry searches determine both line and bremsstrahlung upper bounds; ``brem-step``
   controls only applied bremsstrahlung spacing.
 
-  Empty ``tilts`` or ``azimuths`` mean inherit each material's catalog-profile angles.
+  Empty ``polar`` or ``azimuth`` mean inherit each material's catalog-profile angles.
   These are not physical scan defaults and do not select scan ``--fidelity
   full|survey``.
 
 Options:
   --json                    Emit one versioned JSON object on stdout (show mode only).
-  --set                     Persist supplied values; otherwise only show defaults.
+  --save-default            Persist supplied values; otherwise only show defaults.
   --clear FIELD             Reset one field to inherited/built-in behavior; repeatable.
-                            Fields: tilts, azimuths, thickness, brem-step, energies,
-                            materials.
+                            Fields: polar, azimuth, thickness, brem-step, energy,
+                            material.
   --reset                   Reset every persistent derivation field to inherited/built-
                             in behavior.
-  --tilts DEG,...           Persistent derivation polar tilts in degrees [0, 90).
-  --azimuths DEG,...        Persistent azimuths in degrees [0, 360].
+  --polar DEG,...           Persistent derivation polar tilts in degrees [0, 90).
+  --azimuth DEG,...         Persistent azimuths in degrees [0, 360].
   --thickness ANGSTROM,...  Persistent positive crystal thicknesses in angstrom.
   --brem-step EV            Persistent derivation bremsstrahlung spacing in eV.
   -h, --help                Show this message and exit.
@@ -1130,14 +1130,14 @@ Usage: cxr energy-grid derive [OPTIONS]
   Derive line and bremsstrahlung energy-grid bounds locally.
 
 Options:
-  --materials KEY,...       Material keys; comma-separated. Omit to use persistent
+  --material KEY,...        Material keys; comma-separated. Omit to use persistent
                             defaults.
-  --energies KEV,...        Beam energies in keV; comma-separated and positive.
-  --tilts DEG,...           Polar tilts in degrees [0, 90); comma-separated.
-  --azimuths DEG,...        Azimuths in degrees [0, 360]; comma-separated.
+  --energy KEV,...          Beam energies in keV; comma-separated and positive.
+  --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.
+  --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.
   --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and
                             positive.
-  --set-default             Persist supplied geometry, energies, and materials as future
+  --save-default            Persist supplied geometry, energies, and materials as future
                             defaults.
   --brem-step EV            Derivation bremsstrahlung spacing in eV; overrides
                             persistent default.
@@ -1310,14 +1310,14 @@ Usage: cxr energy-grid submit [OPTIONS]
   Submit sliced line and bremsstrahlung bound derivation remotely.
 
 Options:
-  --materials KEY,...       Material keys; comma-separated. Omit to use persistent
+  --material KEY,...        Material keys; comma-separated. Omit to use persistent
                             defaults.
-  --energies KEV,...        Beam energies in keV; comma-separated and positive.
-  --tilts DEG,...           Polar tilts in degrees [0, 90); comma-separated.
-  --azimuths DEG,...        Azimuths in degrees [0, 360]; comma-separated.
+  --energy KEV,...          Beam energies in keV; comma-separated and positive.
+  --polar DEG,...           Polar tilts in degrees [0, 90); comma-separated.
+  --azimuth DEG,...         Azimuths in degrees [0, 360]; comma-separated.
   --thickness ANGSTROM,...  Crystal thicknesses in angstrom; comma-separated and
                             positive.
-  --set-default             Persist supplied geometry, energies, and materials as future
+  --save-default            Persist supplied geometry, energies, and materials as future
                             defaults.
   --slice-minutes MINUTES   Maximum duration of each self-resubmitting remote slice.
                             [default: 10.0]
@@ -1337,9 +1337,9 @@ Usage: cxr profile [OPTIONS] COMMAND [ARGS]...
   Profiles are named campaigns in ``[profiles.*]``. They own default ranges, electron-
   count grids, beam policy, detector geometry, and optional material membership. An
   absent ``materials`` key means all in-use materials. Membership uses ``set|add|remove
-  --materials``; ``set --all-materials`` restores implicit membership. Per-material
-  range overrides are managed by ``cxr material``. Energy grids are managed by ``cxr
-  energy-grid``.
+  --material``; ``set --all-materials`` restores implicit membership. Per-material range
+  overrides are managed by ``cxr material``. Energy grids are managed by ``cxr energy-
+  grid``.
 
   Examples:
     cxr profile list
@@ -1347,7 +1347,7 @@ Usage: cxr profile [OPTIONS] COMMAND [ARGS]...
     cxr profile create sub_100keV --energy 30:100:10
     cxr profile set sub_100keV --observation-angle 119
     cxr profile add sub_100keV --energy 75
-    cxr profile set sub_100keV --materials hopg,mose2
+    cxr profile set sub_100keV --material hopg,mose2
     cxr profile rename sub_100keV sub100
     cxr profile delete sub_100keV -y
 
@@ -1378,21 +1378,24 @@ Usage: cxr profile add [OPTIONS] NAME
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
                                   Crystal thicknesses in angstrom. Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   --energy KEV,... | START:STOP:STEP
                                   Beam energies in keV. Comma-separated, mixable with
-                                  start:stop:step ranges.
+                                  start:stop:step ranges; repeat to combine.
   --polar DEG,... | START:STOP:STEP
                                   Polar tilts in degrees [0, 90). Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   --azimuth DEG,... | START:STOP:STEP
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   -l, --ne-line N,...             Line-spectrum transport electron counts; positive
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
-  --materials KEY,...             Add comma-separated material keys to explicit
+  --material KEY,...              Add comma-separated material keys to explicit
                                   membership.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
@@ -1408,7 +1411,7 @@ Usage: cxr profile create [OPTIONS] NAME
 
   Range options replace individual cloned grids; beam and detector options replace
   individual cloned fields. Overrides and material membership are not cloned. Without
-  --materials, the new profile starts with implicit all-in-use membership and no per-
+  --material, the new profile starts with implicit all-in-use membership and no per-
   material overrides.
 
 Options:
@@ -1416,16 +1419,19 @@ Options:
                                   defaults to standard.
   --thickness ANGSTROM,... | START:STOP:STEP
                                   Crystal thicknesses in angstrom. Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   --energy KEV,... | START:STOP:STEP
                                   Beam energies in keV. Comma-separated, mixable with
-                                  start:stop:step ranges.
+                                  start:stop:step ranges; repeat to combine.
   --polar DEG,... | START:STOP:STEP
                                   Polar tilts in degrees [0, 90). Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   --azimuth DEG,... | START:STOP:STEP
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   -l, --ne-line N,...             Line-spectrum transport electron counts; positive
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
@@ -1443,7 +1449,7 @@ Options:
                                   replacement.  [0.0<x<=180.0]
   --solid-angle SR                Detector solid angle in sr; scalar replacement.
                                   [0.0<x<=12.566370614359172]
-  --materials KEY,...             Set explicit initial membership (comma-separated
+  --material KEY,...              Set explicit initial membership (comma-separated
                                   material keys).
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
@@ -1491,17 +1497,20 @@ Usage: cxr profile remove [OPTIONS] NAME
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
                                   Crystal thicknesses in angstrom. Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   --energy KEV,... | START:STOP:STEP
                                   Beam energies in keV. Comma-separated, mixable with
-                                  start:stop:step ranges.
+                                  start:stop:step ranges; repeat to combine.
   --polar DEG,... | START:STOP:STEP
                                   Polar tilts in degrees [0, 90). Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   --azimuth DEG,... | START:STOP:STEP
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
-                                  mixable with start:stop:step ranges.
-  --materials KEY,...             Remove comma-separated material keys from explicit
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
+  --material KEY,...              Remove comma-separated material keys from explicit
                                   membership.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
@@ -1539,16 +1548,19 @@ Usage: cxr profile set [OPTIONS] NAME
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
                                   Crystal thicknesses in angstrom. Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   --energy KEV,... | START:STOP:STEP
                                   Beam energies in keV. Comma-separated, mixable with
-                                  start:stop:step ranges.
+                                  start:stop:step ranges; repeat to combine.
   --polar DEG,... | START:STOP:STEP
                                   Polar tilts in degrees [0, 90). Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   --azimuth DEG,... | START:STOP:STEP
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   -l, --ne-line N,...             Line-spectrum transport electron counts; positive
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
@@ -1566,7 +1578,7 @@ Options:
                                   replacement.  [0.0<x<=180.0]
   --solid-angle SR                Detector solid angle in sr; scalar replacement.
                                   [0.0<x<=12.566370614359172]
-  --materials KEY,...             Replace explicit membership with comma-separated
+  --material KEY,...              Replace explicit membership with comma-separated
                                   material keys.
   --all-materials                 Restore implicit membership in every in-use material.
   -y, --yes                       Skip the 'standard' confirmation prompt.
@@ -1618,16 +1630,19 @@ Options:
                                   standard]
   --thickness ANGSTROM,... | START:STOP:STEP
                                   Crystal thicknesses in angstrom. Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   --energy KEV,... | START:STOP:STEP
                                   Beam energies in keV. Comma-separated, mixable with
-                                  start:stop:step ranges.
+                                  start:stop:step ranges; repeat to combine.
   --polar DEG,... | START:STOP:STEP
                                   Polar tilts in degrees [0, 90). Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   --azimuth DEG,... | START:STOP:STEP
                                   Azimuth tilts in degrees [0, 360]. Comma-separated,
-                                  mixable with start:stop:step ranges.
+                                  mixable with start:stop:step ranges; repeat to
+                                  combine.
   --reset [thickness|energy|polar|azimuth|all]
                                   Remove one override; repeat, or use --reset all.
   -y, --yes                       Skip overwrite confirmation.
@@ -1663,7 +1678,7 @@ Options:
   --energy E             Beam energies in keV (one or more).  [required]
   --spacing S            Groove spacing(s) in meters (one, or one per energy).
                          [required]
-  --angles A             Polar tilt values in degrees.  [0.0<x<90.0]
+  --polar A              Polar tilt values in degrees.  [0.0<x<90.0]
   --workers NUMBER       run_cases max_workers (default auto; 0 = serial).
   --checkpoint-dir DIR   Read and write blazed checkpoint pickles in DIR.  [default:
                          checkpoints]

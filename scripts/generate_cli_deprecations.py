@@ -11,12 +11,12 @@ import argparse
 from pathlib import Path
 
 from cxr_mc import __version__
-from cxr_mc.cli._deprecations import DEPRECATIONS, SUPPORT_WINDOW_MINORS
+from cxr_mc.cli._deprecations import DEPRECATED_FLAGS, DEPRECATIONS, SUPPORT_WINDOW_MINORS
 
 
 def build_deprecations() -> str:
     lines = [
-        "# `cxr` deprecated command spellings",
+        "# `cxr` deprecations",
         "",
         f"Version: `{__version__}`",
         "",
@@ -24,13 +24,15 @@ def build_deprecations() -> str:
         "",
         (
             "Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` "
-            f"command keeps its old spelling working for a minimum of "
+            f"command or option keeps its old spelling working for a minimum of "
             f"{SUPPORT_WINDOW_MINORS} minor releases, warns on stderr naming the "
             "replacement, and is listed here with its removal target. See "
             "`docs/cli-reference.md` for the current command surface; regenerate "
             "this table with `python scripts/generate_cli_deprecations.py --write "
             "docs/cli-deprecations.md` or `cxr-dev cli-deprecations`."
         ),
+        "",
+        "## Commands",
         "",
         "| Deprecated spelling | Replacement | Deprecated in | Remove in | Note |",
         "| --- | --- | --- | --- | --- |",
@@ -40,6 +42,21 @@ def build_deprecations() -> str:
         lines.append(
             f"| `cxr {entry.path}` | `{entry.replacement}` | {entry.deprecated_in} "
             f"| {entry.remove_in} | {entry.note} |"
+        )
+    lines.extend(
+        (
+            "",
+            "## Options",
+            "",
+            "| Command | Deprecated option | Replacement | Deprecated in | Remove in | Note |",
+            "| --- | --- | --- | --- | --- | --- |",
+        )
+    )
+    for key in sorted(DEPRECATED_FLAGS):
+        entry = DEPRECATED_FLAGS[key]
+        lines.append(
+            f"| `cxr {entry.command}` | `{entry.flag}` | `{entry.replacement}` "
+            f"| {entry.deprecated_in} | {entry.remove_in} | {entry.note} |"
         )
     lines.append("")
     return "\n".join(lines)

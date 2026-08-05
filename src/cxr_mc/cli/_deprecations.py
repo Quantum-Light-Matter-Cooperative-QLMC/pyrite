@@ -83,14 +83,14 @@ DEPRECATIONS: dict[str, Deprecation] = {
         _entry("energy-grid status", "cxr energy-grid job status"),
         _entry("energy-grid stop", "cxr energy-grid job stop"),
         # Profile membership and performance spellings.
-        _entry("profile add-material", "cxr profile add NAME --materials MATERIAL,..."),
-        _entry("profile remove-material", "cxr profile remove NAME --materials MATERIAL,..."),
+        _entry("profile add-material", "cxr profile add NAME --material MATERIAL,..."),
+        _entry("profile remove-material", "cxr profile remove NAME --material MATERIAL,..."),
         _entry("profile analyze", "cxr performance analyze NAME"),
-        # `profile members` stays reachable; `set/add/remove --materials` is
+        # `profile members` stays reachable; `set/add/remove --material` is
         # canonical, and each membership verb maps to a different one.
-        _entry("profile members set", "cxr profile set NAME --materials MATERIAL,..."),
-        _entry("profile members add", "cxr profile add NAME --materials MATERIAL,..."),
-        _entry("profile members remove", "cxr profile remove NAME --materials MATERIAL,..."),
+        _entry("profile members set", "cxr profile set NAME --material MATERIAL,..."),
+        _entry("profile members add", "cxr profile add NAME --material MATERIAL,..."),
+        _entry("profile members remove", "cxr profile remove NAME --material MATERIAL,..."),
         _entry("profile members reset", "cxr profile set NAME --all-materials"),
         # Remote namespace: `profile` here meant the performance profile. The row
         # sits on the leaf so the warning names a runnable command, not a group.

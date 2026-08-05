@@ -82,6 +82,34 @@ def test_set_nonstandard_profile_override(tmp_path, monkeypatch):
     assert "energy_keV = {values = [70.0]}" in text
 
 
+def test_material_set_concatenates_repeated_range_options(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(
+        material.command,
+        [
+            "set",
+            "mose2",
+            "--profile",
+            "survey",
+            "--energy",
+            "40",
+            "--energy",
+            "50:70:20",
+        ],
+    )
+
+    assert_clean_result(result, stdout="updated profile survey, material mose2\n")
+    assert "energy_keV = {values = [40.0, 50.0, 70.0]}" in catalog.read_text()
+
+
+def test_material_range_help_documents_repeatability() -> None:
+    result = invoke(material.command, ["set", "--help"])
+
+    assert_clean_result(result)
+    assert " ".join(result.stdout.split()).count("repeat to combine") == 4
+
+
 def test_reset_preserves_non_range_override_siblings(tmp_path, monkeypatch):
     catalog = _catalog(tmp_path, monkeypatch)
 
@@ -140,6 +168,28 @@ def test_hidden_sweep_paths_warn_and_delegate(tmp_path, monkeypatch):
     assert changed.exit_code == 0
     assert "use 'cxr material set hopg --profile survey'" in changed.stderr
     assert "tilt_azim_deg = {values = [100.0]}" in catalog.read_text()
+
+
+def test_hidden_sweep_set_concatenates_repeated_range_options(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(
+        sweep.command,
+        [
+            "set",
+            "mose2",
+            "--profile",
+            "survey",
+            "--energy",
+            "40",
+            "--energy",
+            "50:70:20",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "use 'cxr material set mose2 --profile survey'" in result.stderr
+    assert "energy_keV = {values = [40.0, 50.0, 70.0]}" in catalog.read_text()
 
 
 def test_hidden_sweep_show_without_material_preserves_overview(tmp_path, monkeypatch):

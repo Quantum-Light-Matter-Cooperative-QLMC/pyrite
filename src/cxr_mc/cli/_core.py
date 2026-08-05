@@ -397,6 +397,13 @@ AZIMUTH_CSV_RANGE = _CSV(
 )
 
 
+def flatten_option_values(values: Sequence[Sequence[float]]) -> list[float] | None:
+    """Concatenate repeatable CSV/range option occurrences in argv order."""
+    if not values:
+        return None
+    return [value for occurrence in values for value in occurrence]
+
+
 def json_option(function):
     """Add explicit machine-output switch shared by JSON-capable commands."""
     return click.option(
