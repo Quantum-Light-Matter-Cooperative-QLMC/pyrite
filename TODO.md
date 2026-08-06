@@ -208,6 +208,22 @@ KeyError: 25.0
 2. Golden data should be an optional installable, e.g. `uv add cxr-mc[golden]`
    or part of `uv add cxr-mc[all]`. Same with validation scripts/app -- not
    critically required.
+3. Clarify that: 'gc' stands for garbage collection, rm stands for 'remove'.
+   the `gc` help message could be a little more detailed, as well. functionality
+   is a little unclear to me (if there is an identical case on both
+   'standard' and 'sub_100keV' profiles, does `gc --profile standard` end up
+   dropping the sub_100 keV cases too? I hope not.)
+
+## Performance Optimization Notes
+
+1. Running on remote box (with 5080, crazy CPU):
+   1. With --ne-line=20_000 on 'MoSe2' in particular (and maybe other heavy materials):
+      1. Transport takes absolutely forever (GPU at 0% for 10's of seconds straight)
+      2. CPU utilization is inconsistent, sometimes hitting 60-70% but often below 10% while GPU still at 0%
+      3. GPU extremely burst, will shoot to 100% for instant then back to 0%
+      4. Host RAM usage pretty high, but not saturated: usually sitting in the 50 - 80% range.
+      5. VRAM consistently in the 20 - 50 % range
+
 
 ## Long-term plans
 
