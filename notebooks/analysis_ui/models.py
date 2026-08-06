@@ -1,0 +1,61 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+from typing import Any, Literal
+
+ScaleType = Literal["linear", "log"]
+Domain = tuple[float, float] | None
+
+
+@dataclass(frozen=True)
+class AxisSpec:
+    """Validated axis configuration passed to plotting functions."""
+
+    x_domain: Domain
+    y_domain: Domain
+    x_type: ScaleType
+    y_type: ScaleType
+    warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class AxisPair:
+    narrow: AxisSpec
+    broad: AxisSpec
+
+
+@dataclass(frozen=True)
+class AnalysisContext:
+    """The currently loaded checkpoint and its selected emission view."""
+
+    selected_material: str | None
+    selected_face: str | None
+    selected_profile: str | None
+    checkpoint_stem: str | None
+    settings: Any
+    checkpoint_results: Any
+    results: Any
+    cases: Any
+    load_error: str | None = None
+
+    @property
+    def has_data(self) -> bool:
+        return bool(self.checkpoint_results)
+
+    def with_results(self, results: Any) -> "AnalysisContext":
+        return replace(self, results=results)
+
+    def title_for_face(self, chart: Any) -> Any:
+        if chart is None or self.selected_face != "blazed" or not hasattr(chart, "title"):
+            return chart
+        return chart.properties(title=f"{chart.title} (blazed)")
+
+
+@dataclass(frozen=True)
+class DimensionComparisonSpec:
+    varying_key: str
+    varying_label: str
+    varying_plural: str
+    pinned_angle_key: str
+    pinned_angle_label: str
+    description: str
