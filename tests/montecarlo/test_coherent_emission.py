@@ -170,3 +170,55 @@ def test_runner_dual_spectra_from_one_transport(monkeypatch):
     # The two kernels genuinely differ for this in-phase pair (n^2 build-up),
     # so `spec` is NOT silently the coherent array.
     assert not np.allclose(out["spec"], out["spec_coherent"], rtol=RTOL, atol=0.0)
+
+
+# ---- store_result: the transport payload must reach the checkpoint record ----
+def _store_case():
+    return {
+        "name": "coh",
+        "E0_keV": 30.0,
+        "theta_obs_rad": np.pi / 2,
+        "dtheta_obs_rad": 0.0,
+        "domega_sr": 1.0,
+    }
+
+
+def _store_out(*, coherent=False):
+    E = np.arange(50.0, 151.0, 1.0)
+    out = {
+        "E_grid": E,
+        "spec": np.exp(-0.5 * ((E - 100.0) / 3.0) ** 2),
+        "brem": np.full_like(E, 0.1),
+        "eta": 1.0,
+    }
+    if coherent:
+        out["spec_coherent"] = 2.0 * out["spec"]
+    return out
+
+
+def test_store_result_keeps_spec_coherent_from_transport():
+    """Regression: store_result built its record from a hardcoded field list that
+    never mentioned `spec_coherent`, so every emission coherent/both run stored
+    incoherent-only data no matter what the transport computed -- the analysis UI
+    then found Coherent/Both permanently disabled."""
+    from cxr_mc.results import store_result
+
+    out = _store_out(coherent=True)
+    results = {}
+    store_result(results, _store_case(), out)
+    record = results["coh"][30.0]
+
+    np.testing.assert_array_equal(record["spec_coherent"], out["spec_coherent"])
+    # and the incoherent array is untouched by the companion
+    np.testing.assert_array_equal(record["spec"], out["spec"])
+
+
+def test_store_result_omits_spec_coherent_for_incoherent_run():
+    """An incoherent transport grows no key at all, so presence stays the honest
+    gate every reader (emission_menu, the altair overlay, reline) tests on."""
+    from cxr_mc.results import store_result
+
+    results = {}
+    store_result(results, _store_case(), _store_out())
+
+    assert "spec_coherent" not in results["coh"][30.0]

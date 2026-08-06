@@ -150,6 +150,13 @@ def store_result(results, case, out):
         source_current_na=_pulse_current_na(case),
         case=case,
     )
+    # Coherent-kernel companion spectrum, present only for an emission
+    # "coherent"/"both" transport (runner attaches out["spec_coherent"] from the
+    # SAME segments as ``spec``). Conditional so an incoherent record grows no
+    # key at all -- every reader downstream (analyze.emission_menu, the altair
+    # overlay, run.repair_line_spec) gates on its presence.
+    if out.get("spec_coherent") is not None:
+        results[name][E0]["spec_coherent"] = out["spec_coherent"]
 
 
 def detected_background(r, settings, convolve=None):

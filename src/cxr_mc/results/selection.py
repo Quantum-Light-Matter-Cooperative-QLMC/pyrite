@@ -188,10 +188,13 @@ def select_thickness(results, thickness_ang):
 
 
 # record array fields, by size; the wide-brem pair is the largest (full-range grid)
-_RECORD_ARRAY_FIELDS = ("E_grid", "spec", "brem", "E_grid_brem", "brem_wide")
+_RECORD_ARRAY_FIELDS = ("E_grid", "spec", "brem", "E_grid_brem", "brem_wide", "spec_coherent")
 _WIDE_BREM_FIELDS = ("brem_wide", "E_grid_brem")
 
-LINE_RECORD_KEYS = ("spec", "E_grid")
+# ``spec_coherent`` is a line-dataset array (same grid, same segments as
+# ``spec``), so a --line-only projection/merge must carry it or a coherent
+# checkpoint silently degrades to incoherent-only on the wire.
+LINE_RECORD_KEYS = ("spec", "E_grid", "spec_coherent")
 BREM_RECORD_KEYS = ("brem_wide", "brem", "E_grid_brem")
 
 
@@ -238,6 +241,12 @@ def merge_dataset(local, incoming, dataset, force=False):
             for k in keys:
                 if k in inc:
                     r[k] = inc[k]
+            # An incoherent line payload overwrites ``spec``/``E_grid`` but carries
+            # no ``spec_coherent``; keeping the local one would pair a stale (and
+            # possibly wrong-length) coherent array with the incoming grid, so drop
+            # it -- same rule reline uses when a record has no coherent companion.
+            if dataset == "line" and "spec" in inc and "spec_coherent" not in inc:
+                r.pop("spec_coherent", None)
             bw, egb, eg = r.get("brem_wide"), r.get("E_grid_brem"), r.get("E_grid")
             if bw is not None and egb is not None and eg is not None:
                 r["brem"] = np.interp(
