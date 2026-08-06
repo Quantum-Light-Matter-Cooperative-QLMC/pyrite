@@ -260,6 +260,7 @@ E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
 detector = {observation_angle_deg = 90.0}
 n_electrons = {values = [20000]}
 emission = "both"
+materials = ["hopg"]
 [energy_grids.standard]
 line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } }, source = "derived" },

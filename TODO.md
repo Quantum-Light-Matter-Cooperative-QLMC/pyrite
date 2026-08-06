@@ -107,7 +107,8 @@ not here.
 
 ### Bugs (fix + regression test)
 
-None at the moment
+1. Running `cxr profile create <new_profile> --from <source_profile>` doesn't copy the
+   source profile's materials list. Fix this, and check if other aspects are copied properly.
 
 ### Ergonomics (ship anytime)
 
