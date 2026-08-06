@@ -139,7 +139,7 @@ def make_energy_controls(mo, results):
             "brem": mo.ui.checkbox(value=True, label="show brem background"),
             "axes": make_spectrum_axes(
                 mo,
-                narrow_auto=True,
+                narrow_auto=False,
                 narrow_xmax=3000.0,
                 broad_auto=False,
                 broad_xmax=30000.0,

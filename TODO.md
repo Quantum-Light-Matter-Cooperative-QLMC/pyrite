@@ -117,9 +117,14 @@ None at the moment
    (If on `both` and user `remove`'s `incoherent`, they explicitly get back `coherent`)
 2. `cxr` with no args should print help, like `-h/--help`.
 
-## UI backlog
+## Notebook backlog
 
-General UI items folded from the retired `TODO_UI.md`.
+1. Make it so 'narrow_auto' in make_axis controls from notebooks/analysis_ui/controls
+   auto-sets the x-axis lims according to the Min/Max x-values of the widest *line energy*
+   grid being plotted. Right now it goes off the brem grid, which makes it run to 10's or 100's
+   of keV, defeating the whole purpose of the *narrow* plot.
+
+## UI backlog
 
 1. Clean up raw printed ssh commands shipped to remote unless a verbose flag is
    given; otherwise show a well-formatted explanation, e.g. `Pulling "Standard
