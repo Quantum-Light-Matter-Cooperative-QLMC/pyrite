@@ -491,7 +491,7 @@ def test_remove_material_and_no_op_requires_option(tmp_path, monkeypatch):
 
     bare = invoke(profile.command, ["remove", "sub_100keV"])
     assert bare.exit_code == 2
-    assert "provide a range option" in bare.stderr
+    assert "provide a range, membership, or emission option" in bare.stderr
 
 
 def test_member_group_selectors_expand_in_catalog_order_and_support_dry_run(tmp_path, monkeypatch):
@@ -604,9 +604,9 @@ def test_empty_updates_are_usage_errors(tmp_path, monkeypatch):
         result = invoke(profile.command, [verb, "sub_100keV"])
         assert result.exit_code == 2
         expected = (
-            "provide a range, beam, detector, or membership option"
+            "provide a range, beam, detector, membership, or emission option"
             if verb == "set"
-            else "provide a range option"
+            else "provide a range, membership, or emission option"
         )
         assert expected in result.stderr
 

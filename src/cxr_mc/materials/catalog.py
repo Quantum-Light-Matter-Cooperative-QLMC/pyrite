@@ -49,6 +49,12 @@ _SCAN_KEYS = (
     "n_electrons_brem",
 )
 
+#: Valid ``[profiles.NAME].emission`` values. A plain ``str`` type (not
+#: ``results.store.EmissionMode``): importing ``results`` from ``materials``
+#: would cycle back through ``results/tables.py``'s ``from ..materials import
+#: CATALOG``.
+_EMISSION_VALUES = ("incoherent", "coherent", "both")
+
 
 class MaterialConfigError(ValueError):
     """One or more path-qualified material catalog errors."""
@@ -199,12 +205,22 @@ class MaterialCatalog:
     #: Explicit profile detector blocks. Missing selected-profile blocks inherit
     #: ``standard``; missing standard falls back to :class:`DetectorSpec`.
     profile_detectors: Mapping[str, DetectorSpec] = MappingProxyType({})
+    #: Explicit ``profiles.NAME.emission`` overrides ("incoherent"/"coherent"/
+    #: "both"), keyed by profile; profiles with no emission key are absent (the
+    #: active fidelity preset's emission stands unmodified).
+    profile_emissions: Mapping[str, str] = MappingProxyType({})
 
     def profile_beam(self, name: str) -> Mapping[str, object] | None:
         """Decoded ``[profiles.NAME.beam]`` distribution overrides, or ``None``
         when the profile carries no beam block (the ``standard`` beam default
         applies). Consumed by :func:`config.material_sweep` via ``beam_replace``."""
         return self.profile_beams.get(name)
+
+    def profile_emission(self, name: str) -> str | None:
+        """Explicit ``profiles.NAME.emission`` override, or ``None`` when the
+        profile carries no emission key. Consumed by :func:`scan._resolved_run`
+        to override the active fidelity preset's emission."""
+        return self.profile_emissions.get(name)
 
     def profile_detector(self, name: str) -> DetectorSpec:
         """Resolved detector for ``name`` with standard then legacy fallback."""
@@ -876,7 +892,9 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
         row = _table(value, path, errors)
         if row is None:
             continue
-        errors.keys(row, path, set(_SCAN_KEYS) | {"materials", "overrides", "beam", "detector"})
+        errors.keys(
+            row, path, set(_SCAN_KEYS) | {"materials", "overrides", "beam", "detector", "emission"}
+        )
         has_ang = "thickness_ang" in row
         has_layers = "thickness_layers" in row
         if has_ang == has_layers:
@@ -895,6 +913,9 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
             or not all(isinstance(item, str) for item in materials_list)
         ):
             errors.add(f"{path}.materials", "must be an array of material keys")
+        emission = row.get("emission")
+        if emission is not None and emission not in _EMISSION_VALUES:
+            errors.add(f"{path}.emission", f"must be one of {_EMISSION_VALUES}")
         if "overrides" in row:
             _parse_profile_overrides(row["overrides"], f"{path}.overrides", errors)
         row_out = dict(row)
@@ -1192,6 +1213,11 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("detector"), DetectorSpec)
     }
+    profile_emissions = {
+        name: cast(str, row["emission"])
+        for name, row in profiles.items()
+        if isinstance(row.get("emission"), str)
+    }
     return MaterialCatalog(
         schema_version=1,
         crystals=MappingProxyType(crystals),
@@ -1202,6 +1228,7 @@ def _load_material_catalog_cached(
         profile_memberships=MappingProxyType(profile_memberships),
         profile_beams=MappingProxyType(profile_beams),
         profile_detectors=MappingProxyType(profile_detectors),
+        profile_emissions=MappingProxyType(profile_emissions),
     )
 
 

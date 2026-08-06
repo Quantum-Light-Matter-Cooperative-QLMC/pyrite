@@ -570,10 +570,18 @@ def _resolved_run(args, material):
     catalog_profile = _effective_catalog_profile(args)
     settings = default_settings() if fidelity == "full" else default_settings(fidelity)
     # Emission (incoherent/coherent/both) is PROFILE-owned -- there is no CLI
-    # override flag. The resolved settings.emission (via the profile) drives the
-    # dataset_identity divergence key (profiles.dataset_identity) and the
-    # canonical_full collision guard below, so a coherent/both run never shares
-    # the plain incoherent <material> stem.
+    # override flag. A catalog_profile emission key (set via `cxr profile
+    # set/add/remove --emission/--coherent/--incoherent`) overrides the
+    # fidelity preset's emission; absent means the fidelity's own emission
+    # stands. The resolved settings.emission drives the dataset_identity
+    # divergence key (profiles.dataset_identity) and the canonical_full
+    # collision guard below, so a coherent/both run never shares the plain
+    # incoherent <material> stem.
+    from .materials import CATALOG
+
+    catalog_emission = CATALOG.profile_emission(catalog_profile)
+    if catalog_emission is not None:
+        settings = replace(settings, emission=catalog_emission)
     overrides = {}
     if getattr(args, "quick", False):
         # Resolve quick beam energies from the effective profile/material line

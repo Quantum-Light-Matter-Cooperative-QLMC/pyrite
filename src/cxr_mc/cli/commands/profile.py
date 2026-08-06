@@ -30,6 +30,9 @@ from cxr_mc.cli._deprecations import DeprecatingGroup, canonical_option
 from cxr_mc.detectors.spec import DetectorSpec
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+#: Mirrors ``materials.catalog._EMISSION_VALUES`` (kept local, not imported,
+#: to avoid coupling this CLI module to that private catalog constant).
+_EMISSION_VALUES = ("incoherent", "coherent", "both")
 
 _RANGE_OPTIONS = (
     ("thickness", "--thickness", THICKNESS_CSV_RANGE, "ANGSTROM,..."),
@@ -307,6 +310,7 @@ def _profile_payload(document, name):
         "materials": list(materials) if isinstance(materials, list) else None,
         "beam": beam_payload,
         "detector": {key: getattr(detector, key) for key, _label, _unit in _ACTIVE_DETECTOR_FIELDS},
+        "emission": profile.get("emission"),
         "overrides": {
             material: sorted(row)
             for material, row in overrides.items()
@@ -340,6 +344,7 @@ def _emit_show(payload):
         value = payload["detector"][key]
         display = "unspecified" if value is None else f"{value:g} {unit}"
         emit_result(f"    {label}: {display}")
+    emit_result(f"  emission: {payload['emission'] or 'incoherent (default)'}")
     for material, labels in payload["overrides"].items():
         emit_result(f"  {material}: overrides {', '.join(labels)}")
 
@@ -600,6 +605,11 @@ def create_command(
     is_flag=True,
     help="Restore implicit membership in every in-use material.",
 )
+@click.option(
+    "--emission",
+    type=click.Choice(_EMISSION_VALUES),
+    help="Replace the emission policy (incoherent/coherent/both).",
+)
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def set_command(
@@ -620,15 +630,18 @@ def set_command(
     solid_angle_sr,
     materials,
     all_materials,
+    emission,
     yes,
     dry_run,
 ):
-    """Replace range grids, beam fields, or detector scalars on a profile.
+    """Replace range grids, beam fields, detector scalars, or emission on a profile.
 
     NAME must already exist (create it with ``cxr profile create``); unknown
     names error with suggestions. Editing 'standard' prompts for confirmation
-    unless --yes is given; --dry-run never prompts. Detector scalars replace
-    supplied fields; unlike range grids, they are not accepted by add/remove.
+    unless --yes is given; --dry-run never prompts. Detector scalars and
+    emission replace supplied fields; unlike range grids, they are not
+    accepted by add/remove -- except emission, which add/remove also accept
+    via --coherent/--incoherent for incremental switching.
     """
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
     beam_updates = _collect_beam_updates(
@@ -649,8 +662,9 @@ def set_command(
         and not detector_updates
         and materials is None
         and not all_materials
+        and emission is None
     ):
-        raise click.UsageError("provide a range, beam, detector, or membership option")
+        raise click.UsageError("provide a range, beam, detector, membership, or emission option")
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
@@ -671,10 +685,19 @@ def set_command(
         )
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
-    if overwriting or beam_updates or detector_updates or materials is not None or all_materials:
+    if (
+        overwriting
+        or beam_updates
+        or detector_updates
+        or materials is not None
+        or all_materials
+        or emission is not None
+    ):
         action_fields = list(dict.fromkeys([*overwriting, *detector_labels]))
         if beam_updates:
             action_fields.append("beam")
+        if emission is not None:
+            action_fields.append("emission")
         _confirm_standard(name, f"set {', '.join(action_fields) or 'materials'} on", yes, dry_run)
     for label, values in updates.items():
         target[_catalog_key(label)] = _catalog_io.values_item(values)
@@ -687,6 +710,8 @@ def set_command(
         target["materials"] = material_keys
     elif all_materials:
         target.pop("materials", None)
+    if emission is not None:
+        target["emission"] = emission
     return _write(document, original, dry_run, f"updated profile {name}")
 
 
@@ -715,6 +740,78 @@ def _merge_values(name, updates, *, add):
     return original, document
 
 
+_EMISSION_DECODE = {
+    "incoherent": frozenset({"incoherent"}),
+    "coherent": frozenset({"coherent"}),
+    "both": frozenset({"incoherent", "coherent"}),
+}
+
+
+def _current_emission_modes(target):
+    """Decode a profile's stored ``emission`` value to a mode set; an absent
+    key is the empty set (no explicit override -- the active fidelity preset's
+    emission stands unmodified)."""
+    value = target.get("emission")
+    return set(_EMISSION_DECODE[value]) if value is not None else set()
+
+
+def _emission_label(modes):
+    """Canonical ``emission`` string for a mode set, or ``None`` when empty."""
+    if modes == {"incoherent", "coherent"}:
+        return "both"
+    if modes == {"incoherent"}:
+        return "incoherent"
+    if modes == {"coherent"}:
+        return "coherent"
+    return None
+
+
+def _apply_emission_add(target, coherent, incoherent):
+    """Union requested modes into ``target``'s emission; ``None`` if no-op.
+
+    Otherwise returns ``(label, added_modes, auto_both)`` -- ``auto_both`` is
+    set when the union pushed a single explicit mode to ``both``, so the
+    caller can log that switch explicitly rather than applying it silently.
+    """
+    current = _current_emission_modes(target)
+    requested = {
+        mode for mode, flag in (("coherent", coherent), ("incoherent", incoherent)) if flag
+    }
+    added = sorted(requested - current)
+    if not added:
+        return None
+    new_modes = current | requested
+    label = _emission_label(new_modes)
+    auto_both = label == "both" and _emission_label(current) != "both"
+    target["emission"] = label
+    return label, added, auto_both
+
+
+def _apply_emission_remove(name, target, coherent, incoherent):
+    """Subtract requested modes from ``target``'s emission; ``None`` if no-op.
+
+    Otherwise returns ``(label, removed_modes)``. Emptying the mode set
+    reverts to no explicit override (the ``emission`` key is dropped), same
+    as ``members reset`` reverting to implicit membership.
+    """
+    current = _current_emission_modes(target)
+    requested = {
+        mode for mode, flag in (("coherent", coherent), ("incoherent", incoherent)) if flag
+    }
+    if not requested:
+        return None
+    missing = sorted(requested - current)
+    if missing:
+        raise ValueError(f"profile {name} emission does not include: {', '.join(missing)}")
+    new_modes = current - requested
+    label = _emission_label(new_modes)
+    if label is None:
+        target.pop("emission", None)
+    else:
+        target["emission"] = label
+    return label, sorted(requested)
+
+
 @command.command("add")
 @click.argument("name", shell_complete=_cli_completion.complete_profile)
 @_range_cli_options
@@ -727,17 +824,38 @@ def _merge_values(name, updates, *, add):
     retired=["--materials"],
     help="Add comma-separated material keys to explicit membership.",
 )
+@click.option(
+    "--coherent", is_flag=True, help="Add coherent emission (unions with any existing mode)."
+)
+@click.option(
+    "--incoherent", is_flag=True, help="Add incoherent emission (unions with any existing mode)."
+)
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def add_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, materials, yes, dry_run):
-    """Incrementally add values to profile grids.
+def add_command(
+    name,
+    thickness,
+    energy,
+    polar,
+    azimuth,
+    ne_line,
+    ne_brem,
+    materials,
+    coherent,
+    incoherent,
+    yes,
+    dry_run,
+):
+    """Incrementally add values to profile grids, or emission modes.
 
     Incremental edit: ``cxr profile add sub_100keV --energy 75`` inserts 75 keV
-    without re-listing the grid. No prompt except on 'standard'.
+    without re-listing the grid. No prompt except on 'standard'. --coherent and
+    --incoherent union into the profile's emission mode set; a set that ends up
+    covering both modes auto-switches to 'both' (logged, not silent).
     """
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
-    if not updates and materials is None:
-        raise click.UsageError("provide a range option")
+    if not updates and materials is None and not coherent and not incoherent:
+        raise click.UsageError("provide a range, membership, or emission option")
     try:
         if updates:
             original, document = _merge_values(name, updates, add=True)
@@ -748,15 +866,31 @@ def add_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, mater
         if materials is not None:
             requested = _csv_materials(materials)
             added, skipped = _add_membership(document, name, requested)
+        emission_result = None
+        if coherent or incoherent:
+            target = _existing_profile(document, name)
+            emission_result = _apply_emission_add(target, coherent, incoherent)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
-    action = "add values to" if materials is None else "add materials to"
+    action_bits = []
+    if updates:
+        action_bits.append("values")
+    if materials is not None:
+        action_bits.append("materials")
+    if coherent or incoherent:
+        action_bits.append("emission")
+    action = f"add {'/'.join(action_bits) or 'materials'} to"
     _confirm_standard(name, action, yes, dry_run)
     message = f"updated profile {name}"
     if materials is not None:
         message += f": added {', '.join(added) or '(none)'}"
         if skipped:
             message += f"; already members: {', '.join(skipped)}"
+    if emission_result is not None:
+        label, added_modes, auto_both = emission_result
+        message += f"; emission: added {', '.join(added_modes)}"
+        if auto_both:
+            message += f" (auto-switched to '{label}')"
     return _write(document, original, dry_run, message)
 
 
@@ -771,17 +905,27 @@ def add_command(name, thickness, energy, polar, azimuth, ne_line, ne_brem, mater
     retired=["--materials"],
     help="Remove comma-separated material keys from explicit membership.",
 )
+@click.option("--coherent", is_flag=True, help="Remove coherent emission from the mode set.")
+@click.option("--incoherent", is_flag=True, help="Remove incoherent emission from the mode set.")
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
-def remove_command(name, thickness, energy, polar, azimuth, materials, yes, dry_run):
-    """Remove values from an existing profile's grids.
+def remove_command(
+    name, thickness, energy, polar, azimuth, materials, coherent, incoherent, yes, dry_run
+):
+    """Remove values from an existing profile's grids, or emission modes.
 
     Every listed grid value must be present; otherwise nothing is written.
     Catalog validation rejects removals that would empty a required grid.
+    --coherent/--incoherent subtract from the profile's emission mode set; a
+    requested mode not currently present errors. Emptying the set (e.g.
+    removing the sole explicit mode) drops the ``emission`` key entirely,
+    reverting to the fidelity preset's own default. Removing one mode from
+    'both' leaves the other explicit -- e.g. removing incoherent from 'both'
+    leaves 'coherent'.
     """
     updates = _collect_updates(thickness, energy, polar, azimuth)
-    if not updates and materials is None:
-        raise click.UsageError("provide a range option")
+    if not updates and materials is None and not coherent and not incoherent:
+        raise click.UsageError("provide a range, membership, or emission option")
     try:
         if updates:
             original, document = _merge_values(name, updates, add=False)
@@ -792,15 +936,30 @@ def remove_command(name, thickness, energy, polar, azimuth, materials, yes, dry_
         if materials is not None:
             requested = _csv_materials(materials)
             removed, missing = _remove_membership(document, name, requested)
+        emission_result = None
+        if coherent or incoherent:
+            target = _existing_profile(document, name)
+            emission_result = _apply_emission_remove(name, target, coherent, incoherent)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
-    action = "remove values from" if materials is None else "remove materials from"
+    action_bits = []
+    if updates:
+        action_bits.append("values")
+    if materials is not None:
+        action_bits.append("materials")
+    if coherent or incoherent:
+        action_bits.append("emission")
+    action = f"remove {'/'.join(action_bits) or 'materials'} from"
     _confirm_standard(name, action, yes, dry_run)
     message = f"updated profile {name}"
     if materials is not None:
         message += f": removed {', '.join(removed) or '(none)'}"
         if missing:
             message += f"; not members: {', '.join(missing)}"
+    if emission_result is not None:
+        label, removed_modes = emission_result
+        message += f"; emission: removed {', '.join(removed_modes)}"
+        message += f" (now '{label}')" if label is not None else " (no explicit emission left)"
     return _write(document, original, dry_run, message)
 
 
