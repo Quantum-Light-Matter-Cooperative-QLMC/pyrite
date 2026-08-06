@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd \"$(rtk git rev-parse --show-toplevel)\" && rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv sync --all-groups --extra nvidia",
+            "command": "cd \"$(rtk git rev-parse --show-toplevel)\" && rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv sync --all-groups",
             "timeout": 600,
             "statusMessage": "Syncing project dependencies"
           }
