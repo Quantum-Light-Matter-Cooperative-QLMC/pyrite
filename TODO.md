@@ -111,6 +111,79 @@ not here.
 1. Running `cxr profile create <new_profile> --from <source_profile>` doesn't copy the
    source profile's materials list. Fix this, and check if other aspects are copied properly.
 2. It seems that `cxr run -p --cpu/--cpu-only` capability has been removed. Must be re-added.
+3. Related to below: when user runs `cxr run <profile>`, but energy-grid bounds have
+   not been derived for that case:
+   1. Give them a suggestion on what to run. We could also add a flag that automatically runs
+      the derivation for their energy + mat before running their actual profile.
+   2. shorten up the lines that are spit out. currently, spits out list of ALL materials
+      in the entire repo (even ones marked non-standard in mats_to_sim.toml) which need to be
+      set up for this energy, along with a long boilerplate text string next to every material.
+4. Fix this bug related to above (seems we literally can't derive bounds for new energies right now):
+
+```(cxr-mc) ➜  cxr-mc git:(main) ✗ cxr energy-grid derive --energy 25,35
+
+...
+
+hopg cases: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10/10 [00:01<00:00,  8.31it/s]
+
+...
+
+hopg cases: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 1/1 [00:00<00:00,  5.93it/s]
+Traceback (most recent call last):
+  File "/home/alexa/dev/cxr-mc/.venv/bin/cxr", line 10, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "/home/alexa/dev/cxr-mc/src/cxr_mc/cli/__init__.py", line 110, in main
+    result = run(command, argv, prog_name="cxr")
+  File "/home/alexa/dev/cxr-mc/src/cxr_mc/cli/_core.py", line 551, in run
+    return command.main(
+           ~~~~~~~~~~~~^
+        args=None if argv is None else list(argv),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        prog_name=prog_name,
+        ^^^^^^^^^^^^^^^^^^^^
+        standalone_mode=False,
+        ^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+
+...
+
+  File "/home/alexa/dev/cxr-mc/src/cxr_mc/energy_grid/derive.py", line 725, in main
+    combined, complete = derive_all_materials(
+                         ~~~~~~~~~~~~~~~~~~~~^
+        materials,
+        ^^^^^^^^^^
+    ...<11 lines>...
+        brem_step_eV=brem_step_eV,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/alexa/dev/cxr-mc/src/cxr_mc/energy_grid/derive.py", line 550, in derive_all_materials
+    rows, material_complete = _run_one_material(
+                              ~~~~~~~~~~~~~~~~~^
+        material,
+        ^^^^^^^^^
+    ...<11 lines>...
+        thicknesses=thicknesses,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/alexa/dev/cxr-mc/src/cxr_mc/energy_grid/derive.py", line 489, in _run_one_material
+    rows, complete = derive_bounds(
+                     ~~~~~~~~~~~~~^
+        [material],
+        ^^^^^^^^^^^
+    ...<14 lines>...
+        thicknesses=thicknesses,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/alexa/dev/cxr-mc/src/cxr_mc/energy_grid/derive.py", line 390, in derive_bounds
+    start_eV = float(line_by_energy[energy_keV][0])
+                     ~~~~~~~~~~~~~~^^^^^^^^^^^^
+KeyError: 25.0
+```
 
 ### Ergonomics (ship anytime)
 
