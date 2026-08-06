@@ -181,6 +181,7 @@ def test_gpu_pipeline_reuses_successful_line_fallback(monkeypatch):
 
 
 def test_spectrum_case_emits_nsys_phase_ranges(monkeypatch):
+    from tests.helpers.segments import runner_transport_payload
     entered = []
 
     @contextmanager
@@ -206,14 +207,13 @@ def test_spectrum_case_emits_nsys_phase_ranges(monkeypatch):
         "L_ang": np.array([1.0]),
     }
     case = {"name": "heavy case", "crystal": "mos2", "E0_keV": 300.0}
-    tp = {
-        "E_grid": np.array([100.0, 200.0]),
-        "E_brem": np.array([100.0, 200.0]),
-        "n_hat": np.array([0.0, 0.0, 1.0]),
-        "segs": segments,
-        "segs_b": segments,
-        "groove": None,
-    }
+    tp = runner_transport_payload(
+        segs=segments,
+        E_grid=np.array([100.0, 200.0]),
+        E_brem=np.array([100.0, 200.0]),
+        n_hat=np.array([0.0, 0.0, 1.0]),
+        groove=None,
+    )
 
     runner._spectrum_case(case, tp)
 

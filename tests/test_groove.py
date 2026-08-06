@@ -635,6 +635,7 @@ def _brem_segments():
         "L_ang": np.array([800.0, 1200.0, 600.0]),
         "E_keV": np.array([30.0, 24.0, 18.0]),
         "Ne": 3,
+        "elec_id": np.array([0, 1, 2]),
         "thickness_ang": 1.0e5,
     }
 
@@ -660,6 +661,7 @@ def _independent_brem_with_escape(segments, grid, escape_ang, *, composition):
 
 
 def test_brem_groove_gain_matches_beer_lambert_escape():
+
     segments = _brem_segments()
     grid = np.linspace(700.0, 5000.0, 32)
     composition = [("C", 0.1136)]

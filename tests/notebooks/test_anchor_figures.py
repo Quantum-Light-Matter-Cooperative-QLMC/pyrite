@@ -21,9 +21,9 @@ _CHECKS = Path(__file__).resolve().parent.parent / "checks"
 if str(_CHECKS) not in sys.path:
     sys.path.insert(0, str(_CHECKS))
 
-import anchor_figures as af  # noqa: E402
+import anchor_figures as af
 
-from cxr_mc.detectors import DetectorSpec  # noqa: E402
+from cxr_mc.detectors import DetectorSpec
 
 
 @pytest.fixture(scope="module")

@@ -157,7 +157,7 @@ def test_claude_project_memory_imports_shared_instructions() -> None:
 
 def test_agent_session_start_syncs_optional_dependencies() -> None:
     root = Path(__file__).parents[1]
-    expected = "uv sync --all-groups --extra viz-render"
+    expected = "uv sync --all-groups"
     cache_prefix = "rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache"
     claude = json.loads((root / ".claude" / "settings.json").read_text())
     codex = json.loads((root / ".codex" / "hooks.json").read_text())
