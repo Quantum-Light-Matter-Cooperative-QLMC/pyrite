@@ -38,13 +38,18 @@ def resolve_resource_policy(backend: ArrayBackend, requested: str | None = None)
     if name == "auto":
         name = "conservative" if total is not None and total < 8 * GIB else "balanced"
     if name == "conservative":
+        # release_every=4: freeing the CuPy pool every case cost ~4% of GPU-phase
+        # wall on a 3060 Ti (8 GiB -> conservative), 20.96 s -> 20.16 s at n=90
+        # with FREE_EVERY=8. The per-case free is no longer load-bearing -- the
+        # pool cap (device_budget_bytes) plus the OOM chunk-halving retry catch
+        # growth -- so keep a cadence, just not every case. Half of balanced's 8.
         fraction, reserve, host_fraction, host_reserve, retries, release = (
             0.50,
             2 * GIB,
             0.60,
             4 * GIB,
             3,
-            1,
+            4,
         )
     elif name == "balanced":
         fraction, reserve, host_fraction, host_reserve, retries, release = (

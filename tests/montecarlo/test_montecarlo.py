@@ -6,6 +6,8 @@ Importing montecarlo prints a GPU/CPU banner and is otherwise CPU-only here; no
 
 full sweep is run (that lives in checks/)."""
 
+import warnings
+
 import numpy as np
 import pytest
 
@@ -657,7 +659,15 @@ def test_case_progress_label_names_single_material():
     assert runner._case_progress_label([{"crystal": "hopg"}, {"crystal": "hbn"}]) == ("mixed cases")
 
 
-def _patch_host(monkeypatch, *, ncpus=32, avail_mb=44_900, total_mb=48_000, budget_mb=6_144):
+def _patch_host(
+    monkeypatch,
+    *,
+    ncpus=32,
+    avail_mb=44_900,
+    total_mb=48_000,
+    budget_mb=6_144,
+    pipeline_budget_mb=1_536,
+):
     """Fake a host for _cpu_pool_workers; defaults reproduce qlmc's shape."""
     from cxr_mc.montecarlo import runner
 
@@ -665,6 +675,7 @@ def _patch_host(monkeypatch, *, ncpus=32, avail_mb=44_900, total_mb=48_000, budg
     monkeypatch.setattr(runner, "_available_mem_mb", lambda: avail_mb)
     monkeypatch.setattr(runner, "_TOTAL_MEM", total_mb)
     monkeypatch.setattr(runner, "_WORKER_MEM_MB", budget_mb)
+    monkeypatch.setattr(runner, "_PIPELINE_WORKER_MEM_MB", pipeline_budget_mb)
     return runner
 
 
@@ -725,10 +736,10 @@ def test_run_cases_cpu_pool_receives_the_capped_worker_count(monkeypatch):
 # the whole hopg scan (exit 1). The cap now binds this path too.
 
 
-def test_gpu_pipeline_workers_autosize_is_memory_bound_on_qlmc_shape(monkeypatch):
+def test_gpu_pipeline_workers_autosize_is_memory_bound(monkeypatch):
     """32 cores would ask for ncpu // 2 = 16 transport workers; RAM carries 7."""
-    runner = _patch_host(monkeypatch)
-    assert runner._gpu_pipeline_workers(None, 980) == 7
+    runner = _patch_host(monkeypatch, avail_mb=11_000, total_mb=16_000)
+    assert runner._gpu_pipeline_workers(None, 980) == 7  # 11_000 // 1_536
 
 
 def test_gpu_pipeline_workers_autosize_is_cpu_bound_with_ample_ram(monkeypatch):
@@ -736,10 +747,29 @@ def test_gpu_pipeline_workers_autosize_is_cpu_bound_with_ample_ram(monkeypatch):
     assert runner._gpu_pipeline_workers(None, 980) == 16  # ncpu // 2
 
 
-def test_gpu_pipeline_workers_pin_is_clamped_by_memory(monkeypatch):
-    """An explicit --max-workers pin cannot re-create the OOM either."""
-    runner = _patch_host(monkeypatch)
-    assert runner._gpu_pipeline_workers(16, 980) == 7
+def test_gpu_pipeline_workers_uses_the_transport_only_budget(monkeypatch):
+    """Transport-only workers must not be charged the full-case footprint.
+
+    24-core / 23.4 GB box: the shared 6144 MiB budget capped the pipeline at 2
+    workers while measured child RSS was 552-1033 MB."""
+    runner = _patch_host(monkeypatch, ncpus=24, avail_mb=16_687, total_mb=24_600)
+    assert runner._mem_worker_cap() == 2  # full-case budget, unchanged
+    assert runner._gpu_pipeline_workers(None, 980) == 10  # 16_687 // 1_536
+
+
+def test_gpu_pipeline_workers_pin_is_clamped_by_memory_and_warns(monkeypatch):
+    """An explicit --max-workers pin cannot re-create the OOM either -- but the
+    clamp is announced, not silent."""
+    runner = _patch_host(monkeypatch, avail_mb=11_000, total_mb=16_000)
+    with pytest.warns(RuntimeWarning, match="host RAM admits 7"):
+        assert runner._gpu_pipeline_workers(16, 980) == 7
+
+
+def test_gpu_pipeline_workers_pin_under_cap_is_silent(monkeypatch):
+    runner = _patch_host(monkeypatch, avail_mb=11_000, total_mb=16_000)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert runner._gpu_pipeline_workers(4, 980) == 4
 
 
 def test_gpu_pipeline_workers_degrades_to_serial_under_memory_pressure(monkeypatch):

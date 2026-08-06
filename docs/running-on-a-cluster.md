@@ -60,7 +60,10 @@ a process pool prepares CPU electron transport, so `--cpus-per-task` supplies
 those transport workers. For a **CPU-only** partition, drop `--gres` and the CUDA
 module; `run_cases` uses a full-case worker pool capped by both core count and
 available memory. Pass `--workers $SLURM_CPUS_PER_TASK` to request the allocation's
-CPU count; the memory cap still applies.
+CPU count; the memory cap still applies. The two pools carry different per-worker
+RAM budgets: `CXR_MC_WORKER_MEM_MB` (default 6144) for full-case CPU workers,
+`CXR_MC_PIPELINE_WORKER_MEM_MB` (default 1536) for the transport-only workers
+behind a GPU. A pinned `--workers` clamped by either budget now warns.
 
 ## 3. Several materials as a job array
 

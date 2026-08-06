@@ -179,6 +179,14 @@ _FREE_EVERY = _env_chunk("CXR_MC_FREE_EVERY", _RESOURCE_POLICY.release_every)
 # measured footprint from the 2026-07-18 OOM'd coarse run on qlmc: the killed
 # worker held ~5.5 GB anon-rss at 200 keV (ne=500, 30000 eV grid), rounded up.
 _WORKER_MEM_MB = _env_chunk("CXR_MC_WORKER_MEM_MB", 6144)
+# Per-worker host-RAM budget [MB] for the GPU-pipeline transport pool. These
+# workers run transport ONLY (the driver process owns all spectrum/GPU state),
+# so they are far smaller than the full-case CPU pool above: measured peak child
+# RSS 552-1033 MB on a 24-core box (hopg_coherent, Ne=10000, 864 line bins).
+# 1536 leaves ~50% headroom over the measured peak. Sharing _WORKER_MEM_MB
+# capped this pool at 2 workers on a 23.4 GB box and silently clamped explicit
+# --workers with it.
+_PIPELINE_WORKER_MEM_MB = _env_chunk("CXR_MC_PIPELINE_WORKER_MEM_MB", 1536)
 _FREE_WATERMARK_MB = _env_chunk(
     "CXR_MC_FREE_WATERMARK_MB", 0
 )  # ...or when reserved pool exceeds this; 0 = off
@@ -1153,14 +1161,17 @@ def _available_mem_mb():
     return psutil.virtual_memory().available // 1_000_000
 
 
-def _mem_worker_cap():
-    """Max workers host RAM allows at ``_WORKER_MEM_MB`` each.
+def _mem_worker_cap(per_worker_mb=None):
+    """Max workers host RAM allows at ``per_worker_mb`` each.
 
-    ``min(MemAvailable, 0.85 * MemTotal) // _WORKER_MEM_MB``. Binds BOTH worker
+    ``min(MemAvailable, 0.85 * MemTotal) // per_worker_mb``. Binds BOTH worker
     pools (full-case CPU pool and GPU-pipeline transport pool) so neither can
     oversubscribe host RAM and re-create the 2026-07-18 qlmc OOM, where the
-    kernel killed one worker and ``BrokenProcessPool`` lost the whole run."""
-    return min(_available_mem_mb(), int(_TOTAL_MEM * 0.9)) // _WORKER_MEM_MB
+    kernel killed one worker and ``BrokenProcessPool`` lost the whole run. The
+    two pools pass different budgets: ``_WORKER_MEM_MB`` for full-case workers
+    (transport + spectrum state), ``_PIPELINE_WORKER_MEM_MB`` for the much
+    smaller transport-only pipeline workers. Default is ``_WORKER_MEM_MB``."""
+    return min(_available_mem_mb(), int(_TOTAL_MEM * 0.9)) // (per_worker_mb or _WORKER_MEM_MB)
 
 
 def _admit_cpu_fallback():
@@ -1184,18 +1195,33 @@ def _admit_cpu_fallback():
 def _gpu_pipeline_workers(max_workers, n):
     """Size the GPU-pipeline transport pool (transport-only workers feeding the
     serial GPU). Auto = ~half the physical cores (transport is the tail); an
-    explicit request is honored. BOTH are then clamped by ``_mem_worker_cap()``
-    -- the transport pool spawns full worker processes just like the CPU pool,
-    so without the cap ``ncpu // 2`` workers OOM'd a worker at pool startup and
-    the first ``submit`` raised ``BrokenProcessPool`` (the CPU pool got this cap
-    in the 2026-07-18 fix; this path had been missing it). Returns the worker
-    count; the caller drops to serial below 2."""
+    explicit request is honored. BOTH are then clamped by
+    ``_mem_worker_cap(_PIPELINE_WORKER_MEM_MB)`` -- the transport pool spawns
+    full worker processes just like the CPU pool, so without the cap
+    ``ncpu // 2`` workers OOM'd a worker at pool startup and the first
+    ``submit`` raised ``BrokenProcessPool`` (the CPU pool got this cap in the
+    2026-07-18 fix; this path had been missing it). The budget is the
+    transport-only one, NOT the full-case ``_WORKER_MEM_MB``: these workers
+    never hold spectrum state, and charging them the full-case footprint capped
+    the pool at 2 on a 23.4 GB / 24-core box. Clamping an EXPLICIT request warns
+    rather than doing it silently. Returns the worker count; the caller drops to
+    serial below 2."""
+    cap = _mem_worker_cap(_PIPELINE_WORKER_MEM_MB)
     if max_workers is None:
         ncpu = _N_CPUS or 8
         nw = max(2, min(n, ncpu // 2))
     else:
         nw = min(max_workers, n)
-    return min(nw, _mem_worker_cap())
+        if cap < nw:
+            warnings.warn(
+                f"requested {max_workers} GPU-pipeline transport workers, "
+                f"host RAM admits {cap} at {_PIPELINE_WORKER_MEM_MB} MiB each; "
+                "raise CXR_MC_PIPELINE_WORKER_MEM_MB only if the measured "
+                "per-worker RSS is smaller than that budget",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+    return min(nw, cap)
 
 
 def _cpu_pool_workers(max_workers, n):
@@ -1285,7 +1311,9 @@ def runtime_plan(cases, max_workers=None, engine="auto"):
         "engine": resolved_engine,
         "requested_workers": max_workers,
         "effective_workers": workers,
-        "worker_memory_budget_mib": _WORKER_MEM_MB,
+        "worker_memory_budget_mib": (
+            _PIPELINE_WORKER_MEM_MB if resolved_engine == "gpu-pipeline" else _WORKER_MEM_MB
+        ),
         "backend": BACKEND.name,
         "backend_vendor": BACKEND.vendor,
         "backend_device": BACKEND.device.name,

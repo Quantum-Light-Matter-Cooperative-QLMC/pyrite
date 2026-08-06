@@ -277,7 +277,7 @@ because no case completed during one sample interval.
 | Evidence | Likely constraint | Next experiment |
 |---|---|---|
 | `gpu_feed_wait_fraction >= 0.25`, frequent `transport_wait`, falling in-flight count | CPU transport cannot feed GPU | Increase workers within measured RAM headroom |
-| Effective workers equal memory cap; max worker RSS far below `worker_memory_budget_mib` | Conservative worker admission | Test lower `CXR_MC_WORKER_MEM_MB` or explicit `--workers` |
+| Effective workers equal memory cap; max worker RSS far below `worker_memory_budget_mib` | Conservative worker admission | Test lower `CXR_MC_WORKER_MEM_MB` (`CXR_MC_PIPELINE_WORKER_MEM_MB` on the `gpu-pipeline` engine) or explicit `--workers` |
 | Low feed-wait, spectrum dominates, GPU busy | GPU spectrum compute | Test spectrum algorithm or safe chunk increase |
 | Low feed-wait, spectrum dominates, GPU below 20%, clocks active | Launch/synchronization or host work inside spectrum phase | Sweep `spec_chunk`/`brem_chunk`; profile spectrum internals if unchanged |
 | Low GPU utilization plus low clocks, low power, idle P-state during `spectrum` | Power-state, scheduling, or burst sampling | Compare longer cases; inspect GPU clock/throttle policy |
