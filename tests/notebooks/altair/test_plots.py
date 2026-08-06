@@ -315,3 +315,49 @@ def test_spectrum_chart_single_layer_without_brem():
 
 def test_spectrum_chart_none_on_empty():
     assert spectrum_chart({}, _settings()) is None
+
+
+def test_spectrum_frame_adds_line_component_without_touching_brem():
+    df = spectrum_frame([_record(30.0, -20.0, 0.0)], _settings(), include_line=True)
+    assert set(df["component"]) == {"total", "brem", "line"}
+    line = df[df.component == "line"]["intensity"].to_numpy()
+    total_no_line = spectrum_frame([_record(30.0, -20.0, 0.0)], _settings())
+    brem_only = total_no_line[total_no_line.component == "brem"]["intensity"].to_numpy()
+    total_only = total_no_line[total_no_line.component == "total"]["intensity"].to_numpy()
+    # total == line + brem, so the line-only trace equals total minus brem
+    # (atol covers float64 cancellation noise near the ~0 tail of the line).
+    np.testing.assert_allclose(line, total_only - brem_only, atol=1e-12)
+
+
+def test_spectrum_chart_adds_line_layer():
+    chart = spectrum_chart(_store(), _settings(), include_line=True)
+    assert len(chart.to_dict()["layer"]) == 3
+
+
+def test_spectrum_frame_coherent_overlay_absent_without_spec_coherent():
+    df = spectrum_frame([_record(30.0, -20.0, 0.0)], _settings(), include_coherent=True)
+    assert "coherent" not in set(df["component"])
+
+
+def test_spectrum_frame_coherent_overlay_present_with_spec_coherent():
+    rec = _record(30.0, -20.0, 0.0)
+    rec["spec_coherent"] = rec["spec"] * 2.0
+    df = spectrum_frame([rec], _settings(), include_coherent=True)
+    coherent = df[df.component == "coherent"]["intensity"].to_numpy()
+    line = spectrum_frame([rec], _settings(), include_line=True)
+    line = line[line.component == "line"]["intensity"].to_numpy()
+    # spec_coherent is exactly 2x spec, so its detected line is 2x too.
+    np.testing.assert_allclose(coherent, line * 2.0)
+
+
+def test_spectrum_chart_adds_coherent_layer_when_requested():
+    rec = _record(30.0, -20.0, 0.0)
+    rec["spec_coherent"] = rec["spec"] * 2.0
+    store_with_coherent = {"HOPG bulk": {30.0: rec}}
+
+    chart = spectrum_chart(store_with_coherent, _settings(), include_coherent=True)
+    assert len(chart.to_dict()["layer"]) == 3
+
+    # Without the flag, no coherent layer is emitted even when data has it.
+    chart_default = spectrum_chart(store_with_coherent, _settings())
+    assert len(chart_default.to_dict()["layer"]) == 2

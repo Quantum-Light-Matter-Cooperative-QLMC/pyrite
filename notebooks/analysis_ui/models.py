@@ -37,13 +37,18 @@ class AnalysisContext:
     results: Any
     cases: Any
     load_error: str | None = None
+    emission: str = "incoherent"
 
     @property
     def has_data(self) -> bool:
         return bool(self.checkpoint_results)
 
-    def with_results(self, results: Any) -> "AnalysisContext":
-        return replace(self, results=results)
+    @property
+    def show_both_emissions(self) -> bool:
+        return self.emission == "both"
+
+    def with_results(self, results: Any, *, emission: str | None = None) -> AnalysisContext:
+        return replace(self, results=results, emission=emission or self.emission)
 
     def title_for_face(self, chart: Any) -> Any:
         if chart is None or self.selected_face != "blazed" or not hasattr(chart, "title"):

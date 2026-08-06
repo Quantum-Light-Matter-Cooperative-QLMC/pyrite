@@ -135,6 +135,7 @@ def make_energy_controls(mo, results):
                 value=default_thickness,
                 label="crystal thickness",
             ),
+            "line": mo.ui.checkbox(value=False, label="show line spectrum"),
             "brem": mo.ui.checkbox(value=True, label="show brem background"),
             "axes": make_spectrum_axes(
                 mo,
@@ -197,6 +198,7 @@ def make_dimension_controls(mo, results, *, varying_key: str):
                 value=[f"{value:g} deg" for value in defaults],
                 label=varying_label,
             ),
+            "line": mo.ui.checkbox(value=False, label="show line spectrum"),
             "brem": mo.ui.checkbox(value=True, label="show brem background"),
             "axes": make_spectrum_axes(
                 mo,
@@ -261,6 +263,7 @@ def make_detector_controls(mo, results):
 def make_case_axes(mo):
     return mo.ui.dictionary(
         {
+            "line": mo.ui.checkbox(value=False, label="show line spectrum"),
             "brem": mo.ui.checkbox(value=True, label="show brem background"),
             "axes": make_spectrum_axes(
                 mo,

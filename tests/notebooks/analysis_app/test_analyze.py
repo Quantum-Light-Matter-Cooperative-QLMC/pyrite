@@ -578,6 +578,23 @@ def test_emission_menu_both_disabled_for_empty_results():
     assert all(row["disabled"] for row in rows)
 
 
+def test_emission_menu_both_enabled_only_with_both_spectra():
+    incoherent_only = {
+        row["value"]: row for row in analyze.emission_menu(_emission_records(coherent=False))
+    }
+    assert incoherent_only["both"]["disabled"] is True
+
+    both_present = {
+        row["value"]: row for row in analyze.emission_menu(_emission_records(coherent=True))
+    }
+    assert both_present["both"]["disabled"] is False
+
+
+def test_apply_emission_both_is_identity():
+    results = _emission_records(coherent=True)
+    assert analyze.apply_emission(results, "both") is results
+
+
 def test_pick_spectrum_routes_incoherent_and_coherent():
     import numpy as np
 

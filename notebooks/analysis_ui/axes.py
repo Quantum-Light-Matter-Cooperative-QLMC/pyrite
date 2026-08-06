@@ -54,7 +54,7 @@ def resolve_axis_spec(
 ) -> AxisSpec:
     x_log = bool(values.get("xlog", False))
     y_log = bool(values.get("ylog", False))
-    auto = bool(values.get("auto", True))
+    auto = bool(values.get("auto", False))
 
     x_domain, x_warnings = _resolved_domain(
         auto=auto,

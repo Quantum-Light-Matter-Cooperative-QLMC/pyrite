@@ -278,12 +278,13 @@ def profile_menu(material: str, checkpoint_dir: Path | str) -> tuple[MaterialMen
 
 def emission_menu(results) -> tuple[MaterialMenuRow, ...]:
     """Emission-view rows for a LOADED checkpoint's records: ``Incoherent`` (the
-    always-stored ``spec``) and ``Coherent`` (the ``spec_coherent`` a
-    ``coherent``/``both`` run also stored). ``Coherent`` is ``disabled`` unless at
-    least one loaded record carries a ``spec_coherent`` array, so an incoherent
-    checkpoint offers only the incoherent view. Mirrors :func:`face_menu`'s
-    ``disabled`` convention; gated on the stored spectra rather than the sidecar
-    so it reflects exactly what can be drawn."""
+    always-stored ``spec``), ``Coherent`` (the ``spec_coherent`` a
+    ``coherent``/``both`` run also stored), and ``Both`` (overlay both traces on
+    one chart). ``Coherent``/``Both`` are ``disabled`` unless at least one loaded
+    record carries a ``spec_coherent`` array, so an incoherent checkpoint offers
+    only the incoherent view. Mirrors :func:`face_menu`'s ``disabled`` convention;
+    gated on the stored spectra rather than the sidecar so it reflects exactly
+    what can be drawn."""
     has_incoherent = False
     has_coherent = False
     for by_energy in (results or {}).values():
@@ -295,6 +296,7 @@ def emission_menu(results) -> tuple[MaterialMenuRow, ...]:
     return (
         {"value": "incoherent", "label": "Incoherent", "disabled": not has_incoherent},
         {"value": "coherent", "label": "Coherent", "disabled": not has_coherent},
+        {"value": "both", "label": "Both", "disabled": not (has_incoherent and has_coherent)},
     )
 
 

@@ -158,7 +158,7 @@ def _scale(scale_type, domain=None):
     return alt.Scale(**kwargs) if kwargs else alt.Undefined
 
 
-def _record_frame(r, settings, *, include_brem, meta):
+def _record_frame(r, settings, *, include_brem, include_line=False, include_coherent=False, meta):
     E = np.asarray(r["E_grid"], dtype=float)
     line_det, brem_det = _line_brem(r, settings, convolve=False)
     line_det = np.asarray(line_det, dtype=float)
@@ -212,6 +212,43 @@ def _record_frame(r, settings, *, include_brem, meta):
                     "_line_grid": line_grid,
                     **meta,
                     "component": "brem",
+                }
+            )
+        )
+    if include_line:
+        frames.append(
+            pd.DataFrame(
+                {
+                    "energy_eV": total_E,
+                    "intensity": line_basis * r["scale"],
+                    "_line_intensity": line_basis * r["scale"],
+                    "_line_grid": line_grid,
+                    **meta,
+                    "component": "line",
+                }
+            )
+        )
+    if include_coherent and r.get("spec_coherent") is not None:
+        coherent_line, _ = _line_brem({**r, "spec": r["spec_coherent"]}, settings, convolve=False)
+        coherent_line = np.asarray(coherent_line, dtype=float)
+        # `total_E`'s tail (past the line grid) is brem-only; the coherent overlay
+        # has no signal there, so it zero-pads to share the SAME energy coordinates
+        # as `total`/`line` -- required by `_decimate_frame`'s per-trace grid check.
+        tail_len = total_E.size - E.size
+        coherent_basis = (
+            np.concatenate([coherent_line, np.zeros(tail_len, dtype=float)])
+            if tail_len > 0
+            else coherent_line
+        )
+        frames.append(
+            pd.DataFrame(
+                {
+                    "energy_eV": total_E,
+                    "intensity": coherent_basis * r["scale"],
+                    "_line_intensity": coherent_basis * r["scale"],
+                    "_line_grid": line_grid,
+                    **meta,
+                    "component": "coherent",
                 }
             )
         )
@@ -308,8 +345,14 @@ def _compact_component_frame(df):
     return compact
 
 
-def _fold_components(chart, include_brem):
-    components = ["total", "brem"] if include_brem else ["total"]
+def _fold_components(chart, include_brem, include_line=False, include_coherent=False):
+    components = ["total"]
+    if include_brem:
+        components.append("brem")
+    if include_line:
+        components.append("line")
+    if include_coherent:
+        components.append("coherent")
     return chart.transform_fold(components, as_=["component", "intensity"])
 
 
@@ -318,6 +361,8 @@ def spectrum_frame(
     settings,
     *,
     include_brem=True,
+    include_line=False,
+    include_coherent=False,
     collapse_azimuth=True,
     band="narrow",
     max_points=None,
@@ -348,7 +393,16 @@ def spectrum_frame(
                 "E0_keV": float(E0),
                 "azimuth_deg": az,
             }
-            frames.extend(_record_frame(r, settings, include_brem=include_brem, meta=meta))
+            frames.extend(
+                _record_frame(
+                    r,
+                    settings,
+                    include_brem=include_brem,
+                    include_line=include_line,
+                    include_coherent=include_coherent,
+                    meta=meta,
+                )
+            )
     if not frames:
         return pd.DataFrame(columns=_FRAME_COLUMNS)
     return _decimate_frame(pd.concat(frames, ignore_index=True), max_points)
@@ -360,6 +414,8 @@ def spectrum_chart(
     *,
     tilt_deg=None,
     include_brem=True,
+    include_line=False,
+    include_coherent=False,
     collapse_azimuth=True,
     x_domain=None,
     x_type="linear",
@@ -389,6 +445,8 @@ def spectrum_chart(
         recs,
         settings,
         include_brem=include_brem,
+        include_line=include_line,
+        include_coherent=include_coherent,
         collapse_azimuth=collapse_azimuth,
         band=band,
         max_points=max_points,
@@ -405,12 +463,25 @@ def spectrum_chart(
     )
 
     compact = _compact_component_frame(df)
-    base = _fold_components(alt.Chart(compact), include_brem).encode(
+    base = _fold_components(
+        alt.Chart(compact), include_brem, include_line, include_coherent
+    ).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
         y=alt.Y("intensity:Q", title="Intensity (Phs/eV/s/nA)", scale=y_scale),
         color=alt.Color("E0_keV:N", title="beam energy (keV)"),
         tooltip=["E0_keV:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
+    layers = _component_layers(base, include_brem, include_line, include_coherent)
+    return alt.layer(*layers).properties(width=width, height=height, title=title).interactive()
+
+
+def _component_layers(base, include_brem, include_line=False, include_coherent=False):
+    """Shared component -> mark-style layering for the three spectrum-chart
+    builders below: ``total`` is the incoherent (or checkpoint-default) line,
+    solid; ``brem`` and ``line`` are decomposition overlays of that SAME trace;
+    ``coherent`` overlays the checkpoint's ``spec_coherent`` line for a
+    ``both``-emission view, dashed so it stays visually distinct from ``total``
+    while sharing its hue color."""
     layers = [base.transform_filter(alt.datum.component == "total").mark_line(strokeWidth=1.4)]
     if include_brem:
         layers.append(
@@ -418,10 +489,32 @@ def spectrum_chart(
                 strokeWidth=0.7, strokeDash=[4, 3], opacity=0.7
             )
         )
-    return alt.layer(*layers).properties(width=width, height=height, title=title).interactive()
+    if include_line:
+        layers.append(
+            base.transform_filter(alt.datum.component == "line").mark_line(
+                strokeWidth=1.0, strokeDash=[1, 1], opacity=0.85
+            )
+        )
+    if include_coherent:
+        layers.append(
+            base.transform_filter(alt.datum.component == "coherent").mark_line(
+                strokeWidth=1.4, strokeDash=[6, 2]
+            )
+        )
+    return layers
 
 
-def _compare_frame(recs, settings, *, hue, include_brem=True, band="narrow", max_points=None):
+def _compare_frame(
+    recs,
+    settings,
+    *,
+    hue,
+    include_brem=True,
+    include_line=False,
+    include_coherent=False,
+    band="narrow",
+    max_points=None,
+):
     """Tidy long-form spectrum table for ``recs``, ONE row per (hue value, energy
     -grid point, component) -- the generalization of :func:`spectrum_frame` to an
     arbitrary case field (``hue``). Duplicate records sharing a ``hue`` value
@@ -444,7 +537,16 @@ def _compare_frame(recs, settings, *, hue, include_brem=True, band="narrow", max
             "tilt_deg": float(r["case"]["tilt_deg"]),
             "tilt_azim_deg": float(r["case"]["tilt_azim_deg"]),
         }
-        frames.extend(_record_frame(r, settings, include_brem=include_brem, meta=row_meta))
+        frames.extend(
+            _record_frame(
+                r,
+                settings,
+                include_brem=include_brem,
+                include_line=include_line,
+                include_coherent=include_coherent,
+                meta=row_meta,
+            )
+        )
     _columns = ["energy_eV", "intensity", "E0_keV", "tilt_deg", "tilt_azim_deg", "component"]
     if not frames:
         return pd.DataFrame(columns=_columns)
@@ -457,6 +559,8 @@ def compare_spectrum_chart(
     *,
     hue,
     include_brem=True,
+    include_line=False,
+    include_coherent=False,
     x_domain=None,
     x_type="linear",
     y_type="linear",
@@ -482,6 +586,8 @@ def compare_spectrum_chart(
         settings,
         hue=hue,
         include_brem=include_brem,
+        include_line=include_line,
+        include_coherent=include_coherent,
         band=band,
         max_points=max_points,
     )
@@ -498,23 +604,28 @@ def compare_spectrum_chart(
     hue_title = _COMPARE_HUE_FIELDS[hue]
 
     compact = _compact_component_frame(df)
-    base = _fold_components(alt.Chart(compact), include_brem).encode(
+    base = _fold_components(
+        alt.Chart(compact), include_brem, include_line, include_coherent
+    ).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
         y=alt.Y("intensity:Q", title="Intensity (Phs/eV/s/nA)", scale=y_scale),
         color=alt.Color(f"{hue}:N", title=hue_title),
         tooltip=[f"{hue}:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
-    layers = [base.transform_filter(alt.datum.component == "total").mark_line(strokeWidth=1.4)]
-    if include_brem:
-        layers.append(
-            base.transform_filter(alt.datum.component == "brem").mark_line(
-                strokeWidth=0.7, strokeDash=[4, 3], opacity=0.7
-            )
-        )
+    layers = _component_layers(base, include_brem, include_line, include_coherent)
     return alt.layer(*layers).properties(width=width, height=height, title=title).interactive()
 
 
-def _multi_case_frame(cases, settings, *, include_brem=True, band="narrow", max_points=None):
+def _multi_case_frame(
+    cases,
+    settings,
+    *,
+    include_brem=True,
+    include_line=False,
+    include_coherent=False,
+    band="narrow",
+    max_points=None,
+):
     """Tidy long-form spectrum table, ONE row per (case-basket entry, energy-grid
     point, component) -- the case-basket counterpart of :func:`_compare_frame`
     with its best-peak collapse removed: every ``(record, label)`` pair in
@@ -525,7 +636,14 @@ def _multi_case_frame(cases, settings, *, include_brem=True, band="narrow", max_
     frames = []
     for r, label in cases:
         frames.extend(
-            _record_frame(r, settings, include_brem=include_brem, meta={"label": str(label)})
+            _record_frame(
+                r,
+                settings,
+                include_brem=include_brem,
+                include_line=include_line,
+                include_coherent=include_coherent,
+                meta={"label": str(label)},
+            )
         )
     columns = ["energy_eV", "intensity", "label", "component"]
     if not frames:
@@ -538,6 +656,8 @@ def multi_case_spectrum_chart(
     settings,
     *,
     include_brem=True,
+    include_line=False,
+    include_coherent=False,
     x_domain=None,
     x_type="linear",
     y_type="linear",
@@ -559,7 +679,13 @@ def multi_case_spectrum_chart(
     if not cases:
         return None
     df = _multi_case_frame(
-        cases, settings, include_brem=include_brem, band=band, max_points=max_points
+        cases,
+        settings,
+        include_brem=include_brem,
+        include_line=include_line,
+        include_coherent=include_coherent,
+        band=band,
+        max_points=max_points,
     )
     if df.empty:
         return None
@@ -572,19 +698,15 @@ def multi_case_spectrum_chart(
     )
 
     compact = _compact_component_frame(df)
-    base = _fold_components(alt.Chart(compact), include_brem).encode(
+    base = _fold_components(
+        alt.Chart(compact), include_brem, include_line, include_coherent
+    ).encode(
         x=alt.X("energy_eV:Q", title="Photon energy (eV)", scale=x_scale),
         y=alt.Y("intensity:Q", title="Intensity (Phs/eV/s/nA)", scale=y_scale),
         color=alt.Color("label:N", title="case"),
         tooltip=["label:N", "energy_eV:Q", "intensity:Q", "component:N"],
     )
-    layers = [base.transform_filter(alt.datum.component == "total").mark_line(strokeWidth=1.4)]
-    if include_brem:
-        layers.append(
-            base.transform_filter(alt.datum.component == "brem").mark_line(
-                strokeWidth=0.7, strokeDash=[4, 3], opacity=0.7
-            )
-        )
+    layers = _component_layers(base, include_brem, include_line, include_coherent)
     return (
         alt.layer(*layers)
         .properties(width=width, height=height, title="Case comparison")

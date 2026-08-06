@@ -56,4 +56,5 @@ def load_context(material_widget, face_widget, profile_widget) -> AnalysisContex
 
 def select_emission(context: AnalysisContext, emission: str | None) -> AnalysisContext:
     selected = emission or "incoherent"
-    return context.with_results(apply_emission(context.checkpoint_results, selected))
+    resolved = apply_emission(context.checkpoint_results, selected)
+    return context.with_results(resolved, emission=selected)
