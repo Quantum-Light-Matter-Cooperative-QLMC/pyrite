@@ -78,3 +78,9 @@ def spacing_num(start_eV: float, stop_eV: float, target_spacing_eV: float = 3.0)
     closest to ``target_spacing_eV`` uniform spacing -- the convention already
     used by every ``E_grid_line_by_energy`` row in materials.toml."""
     return int(round((stop_eV - start_eV) / target_spacing_eV)) + 1
+
+
+def line_start_eV(energy_keV: float) -> float:
+    """Catalog convention for a line-grid row's ``start_eV`` when none is
+    already recorded: 10 eV floor at <=60 keV beam energy, 50 eV above."""
+    return 10.0 if float(energy_keV) <= 60.0 else 50.0

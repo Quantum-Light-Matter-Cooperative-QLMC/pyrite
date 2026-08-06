@@ -333,6 +333,34 @@ def test_missing_beam_energy_errors_without_default_store_coverage(tmp_path):
     assert any("requires E_grid_line" in error for error in caught.value.errors)
 
 
+def test_material_config_error_groups_identical_messages_across_materials(tmp_path):
+    # A profile-wide setting invalid for every material (no E_grid_line, no
+    # material store entry for the profile's beam energies) must not repeat
+    # one near-duplicate line per material (TODO.md Bugs #3).
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    text = _minimal_catalog(
+        material_rows="""
+[materials.sample_a]
+label = "sample_a"
+crystal = "mos2"
+
+[materials.sample_b]
+label = "sample_b"
+crystal = "mos2"
+"""
+    ).replace(_NO_FLAT_LINE_GRID, "")
+
+    with pytest.raises(MaterialConfigError) as caught:
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+    assert len(caught.value.errors) == 2
+    message = str(caught.value)
+    assert message.count("requires E_grid_line") == 1
+    assert "2 paths (materials.sample_a.scan, materials.sample_b.scan)" in message
+    assert "run `cxr energy-grid derive --energy 25.0,30.0 --material sample_a,sample_b`" in message
+
+
 def _catalog_with_two_profiles(tmp_path: Path) -> Path:
     """``narrowed`` restricts membership to "mos2"; ``standard`` (no
     ``materials`` row) allows every in-use material -- Phase 3 scan/submit

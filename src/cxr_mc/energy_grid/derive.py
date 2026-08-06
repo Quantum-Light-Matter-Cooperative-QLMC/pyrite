@@ -33,7 +33,7 @@ import numpy as np
 
 from cxr_mc.config import material_sweep
 from cxr_mc.energy_grid import defaults as lg_defaults
-from cxr_mc.energy_grid.bounds import coverage_energy, margined_stop, spacing_num
+from cxr_mc.energy_grid.bounds import coverage_energy, line_start_eV, margined_stop, spacing_num
 from cxr_mc.materials import CATALOG
 from cxr_mc.montecarlo.runner import run_cases
 from cxr_mc.sweep import _quantized_angles, build_cases
@@ -387,7 +387,12 @@ def derive_bounds(
             raise ValueError(
                 f"reference material {materials[0]!r} has no E_grid_line_by_energy configured"
             )
-        start_eV = float(line_by_energy[energy_keV][0])
+        # `energy_keV` may be a new beam energy not yet in the reference
+        # material's table (e.g. first-time `energy-grid derive --energy`
+        # for it); fall back to the catalog start_eV convention rather than
+        # requiring a pre-existing row.
+        existing_row = line_by_energy.get(energy_keV)
+        start_eV = float(existing_row[0]) if existing_row is not None else line_start_eV(energy_keV)
         stop_eV = margined_stop(driver.coverage_energy_eV, MARGIN, ROUND_TO_EV)
         num = spacing_num(start_eV, stop_eV, TARGET_SPACING_EV)
         brem_stop_eV = margined_stop(brem_driver.incoherent_coverage_energy_eV, MARGIN, ROUND_TO_EV)

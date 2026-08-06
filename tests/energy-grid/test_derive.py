@@ -81,6 +81,29 @@ def test_subset_resume_preserves_unrequested_checkpoint_rows(monkeypatch):
     assert [row["energy_keV"] for row in snapshots[-1]] == [30.0, 200.0]
 
 
+def test_new_energy_not_in_reference_table_falls_back_to_start_eV_convention(monkeypatch):
+    # `--energy 25` etc. (not one of hopg's existing E_grid_line_by_energy
+    # rows) must not KeyError on the missing table entry; it should fall back
+    # to the same start_eV convention `energy_grid.apply` uses for brand-new
+    # rows (10 eV floor at <=60 keV beam energy).
+    monkeypatch.setattr(
+        analyze,
+        "_scan_specs",
+        lambda *args, **kwargs: [analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0, 500.0, 0.5)],
+    )
+    monkeypatch.setattr(
+        analyze,
+        "_run_specs",
+        lambda *args, **kwargs: [analyze.Candidate("hopg", 1.0, 90.0, 1000.0, 1.0, 500.0, 0.5)],
+    )
+
+    rows, complete = analyze.derive_bounds(["hopg"], [25.0])
+
+    assert complete is True
+    assert rows[0]["energy_keV"] == 25.0
+    assert rows[0]["start_eV"] == analyze.line_start_eV(25.0) == 10.0
+
+
 def test_budget_expiry_returns_tempfail_without_starting_next_energy(monkeypatch):
     monkeypatch.setattr(
         analyze,

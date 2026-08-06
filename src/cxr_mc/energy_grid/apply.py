@@ -29,16 +29,12 @@ import tomlkit
 
 from cxr_mc.energy_grid import artifacts
 from cxr_mc.energy_grid import provenance as _provenance
+from cxr_mc.energy_grid.bounds import line_start_eV as _line_start_eV
 from cxr_mc.energy_grid.bounds import spacing_num
 
 _MATERIALS_TOML = Path(__file__).resolve().parent.parent / "data" / "materials.toml"
 _DEFAULT_MATERIAL = "standard"
 load_material_catalog = None
-
-
-def _line_start_eV(energy_keV: float) -> float:
-    # Matches the existing catalog convention: 10 eV floor at <=60 keV, 50 eV above.
-    return 10.0 if float(energy_keV) <= 60.0 else 50.0
 
 
 def _positive_float(value, field: str) -> float:

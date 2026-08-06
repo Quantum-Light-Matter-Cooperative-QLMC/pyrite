@@ -57,12 +57,71 @@ _SCAN_KEYS = (
 _EMISSION_VALUES = ("incoherent", "coherent", "both")
 
 
+_MISSING_LINE_GRID_RE = re.compile(
+    r"^requires E_grid_line, or an energy_grids store entry covering beam energies (\[.*\])$"
+)
+
+
+def _derive_hint(message: str, shown_paths: Sequence[str], *, truncated: bool) -> str | None:
+    """A ``cxr energy-grid derive`` suggestion for the shown materials when
+    ``message`` is the missing-line-grid error, else ``None`` (TODO.md Bugs
+    #3: point the user at the fix, not just the failure)."""
+    match = _MISSING_LINE_GRID_RE.match(message)
+    if match is None:
+        return None
+    energies = match.group(1).strip("[]").replace(" ", "")
+    materials = [
+        path.removeprefix("materials.").removesuffix(".scan")
+        for path in shown_paths
+        if path.startswith("materials.") and path.endswith(".scan")
+    ]
+    if not materials:
+        return None
+    material_arg = ",".join(materials) + (",..." if truncated else "")
+    return f"run `cxr energy-grid derive --energy {energies} --material {material_arg}`"
+
+
+def _grouped_error_lines(errors: Sequence[str], *, max_paths: int = 3) -> list[str]:
+    """Collapse identical-message errors across many material paths into one
+    summary line each. A profile-wide setting invalid for every material
+    (e.g. a beam energy with no material's line-grid store covering it)
+    otherwise repeats the same message once per material -- unreadable at
+    catalog scale (TODO.md Bugs #3)."""
+    grouped: dict[str, list[str]] = {}
+    order: list[str] = []
+    for entry in errors:
+        path, _, message = entry.partition(": ")
+        grouped.setdefault(message, []).append(path)
+        if message not in order:
+            order.append(message)
+    lines = []
+    for message in order:
+        paths = grouped[message]
+        shown = paths[:max_paths]
+        remainder = len(paths) - max_paths
+        truncated = remainder > 0
+        if len(paths) == 1:
+            line = f"{paths[0]}: {message}"
+        else:
+            shown_text = ", ".join(shown)
+            suffix = f", +{remainder} more" if truncated else ""
+            line = f"{len(paths)} paths ({shown_text}{suffix}): {message}"
+        hint = _derive_hint(message, shown, truncated=truncated)
+        if hint is not None:
+            line = f"{line} -- {hint}"
+        lines.append(line)
+    return lines
+
+
 class MaterialConfigError(ValueError):
     """One or more path-qualified material catalog errors."""
 
     def __init__(self, errors: Sequence[str]):
         self.errors = tuple(errors)
-        super().__init__("invalid material catalog:\n" + "\n".join(f"- {e}" for e in self.errors))
+        super().__init__(
+            "invalid material catalog:\n"
+            + "\n".join(f"- {e}" for e in _grouped_error_lines(self.errors))
+        )
 
 
 @dataclass(frozen=True)
