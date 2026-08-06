@@ -645,16 +645,15 @@ def mc_spectrum(
     # would be circular.
     from .runner import _nsys_pop, _nsys_push
 
-    def _accumulate(g_vec, chi_re, chi_im, u_re, u_im, wm):
+    def _accumulate(g_vec_d, e_s, e_p, chi_re, chi_im, u_re, u_im, wm):
         """Add one reflection's contribution for crystallite reciprocal vector
-        ``g_vec``, scaled by the mosaic-quadrature weight ``wm``, into spec /
-        spec_pxr / spec_cbs in place. The structure-factor tabulations (chi/u on
-        E_tab_g) are precomputed per reflection -- they depend on hkl and energy,
-        NOT on the mosaic orientation; everything else depends on g and so is
-        recomputed per orientation. wm = 1.0 for the perfect-crystal path."""
-        # sigma/pi polarization unit vectors: fixed once n_hat and g are fixed
-        e_s, e_p = _polarization_pair(n_hat, g_vec)
-        g_vec_d = xp.asarray(g_vec, dtype=REAL)
+        ``g_vec_d``, scaled by the mosaic-quadrature weight ``wm``, into spec /
+        spec_pxr / spec_cbs in place. Every argument is a DEVICE array uploaded
+        once by the caller's stacking prologue (row views): the structure-factor
+        tabulations (chi/u on E_tab_g) depend on hkl and energy only -- NOT on
+        the mosaic orientation -- while g and its sigma/pi polarization pair
+        (``e_s``, ``e_p``) vary per orientation. wm = 1.0 for the perfect-crystal
+        path."""
 
         # -- 1. per-segment resonance energy (Eq. 10) ---------------------------
         #   omega_res = v.g / (1 - v.n)   [1/Ang]   (>0 required to radiate)
@@ -711,8 +710,7 @@ def mc_spectrum(
         A2_pxr = xp.zeros(idx.size, dtype=REAL)
         A2_cbs = xp.zeros(idx.size, dtype=REAL)
         pol_A = []  # complex A = A_PXR + A_CBS per polarization (coherent path)
-        for e in (e_s, e_p):  # sum |A|^2 over both polarizations
-            e_d = xp.asarray(e, dtype=REAL)
+        for e_d in (e_s, e_p):  # sum |A|^2 over both polarizations
             g_dot_e = g_vec_d @ e_d  # scalar (e fixed per reflection)
             v_dot_e = _matvec3(v, e_d)
             if coherent:
@@ -754,10 +752,6 @@ def mc_spectrum(
         # geometric path is mosaic-independent; the optical depth uses E_r (the
         # orientation-shifted line energy), so it is recomputed per orientation.
         z_mid = seg_r[idx, 2]
-        finite_footprint = (
-            segments.get("crystal_width_ang") is not None
-            and segments.get("crystal_height_ang") is not None
-        )
         if groove is not None:
             # Blazed sawtooth entrance face: closed-form path to the working
             # facet (grooves shorten, never lengthen, the flat-face path). Takes
@@ -772,7 +766,11 @@ def mc_spectrum(
             L_esc = escape_distance_ang(seg_r[idx, 0], z_mid, groove)
             tau = L_esc * _mu_total_inv_ang(abs_comp, E_r)
         elif finite_footprint:
-            L_esc = _segment_escape_distance(segments, n_hat, xp=xp)[idx]
+            # the escape DISTANCE is g-independent, so it is computed once per
+            # case (L_esc_all, below the loop's stacking prologue) instead of per
+            # reflection/orientation; only the idx selection is per-g.
+            assert L_esc_all is not None  # set whenever finite_footprint and no groove
+            L_esc = L_esc_all[idx]
             if layers is None:
                 tau = L_esc * _interp1(E_r, E_tab_g, mu_tab_g)
             else:
@@ -939,29 +937,67 @@ def mc_spectrum(
         and segments.get("crystal_height_ang") is not None
     )
     if coherent or groove is not None or layers is not None:
-        for hkl in hkl_list:
+        # Stacking prologue: every host->device transfer this path needs is done
+        # ONCE per case here, not once per (reflection, orientation) inside the
+        # loop. Previously each pass re-uploaded the four chi/U tabulations plus
+        # g and its two polarization vectors -- ~90 xp.asarray calls per case,
+        # 15% of GPU-phase tottime on the 3060 Ti profile (hopg_coherent, 4
+        # reflections). The chi/U rows are keyed by REFLECTION (they do not
+        # depend on the mosaic orientation), the geometry rows by
+        # (reflection, orientation). Values are unchanged -- same CPU inputs,
+        # same float64 -> REAL cast, row views handed to _accumulate -- so the
+        # per-hkl path stays bit-for-bit.
+        _nsys_push("cxr.lines.tab")
+        g_rows, es_rows, ep_rows, wm_rows, hkl_of_row = [], [], [], [], []
+        cr_rows, ci_rows, ur_rows, ui_rows = [], [], [], []
+        orients = ((None, 1.0),) if mosaic_quad is None else mosaic_quad
+        for i_hkl, hkl in enumerate(hkl_list):
             # reciprocal vector in the sample frame: construction frame by default
             # ([001] along the slab normal), rotated if beam_uvw given
             g_vec, _g = reciprocal_g_vector(hkl, info["lattice"])
             if R_orient is not None:
                 g_vec = R_orient @ g_vec
-            # structure-factor couplings depend on hkl + tabulation energy only (NOT
-            # on the mosaic orientation), so tabulate once per reflection (CPU, a few
-            # ms) and reuse across the orientation quadrature; push real/imag to GPU.
-            _nsys_push("cxr.lines.tab")
             chi_tab = np.asarray(chi_g(crystal, hkl, E_tab, B_ang2, use_henke))
             u_tab = np.asarray(U_g(crystal, hkl, E_tab, B_ang2, use_henke))
-            chi_re = xp.asarray(chi_tab.real, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
-            chi_im = xp.asarray(chi_tab.imag, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
-            u_re = xp.asarray(u_tab.real, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
-            u_im = xp.asarray(u_tab.imag, dtype=REAL)  # type: ignore[reportAttributeAccessIssue]
-            _nsys_pop()
+            cr_rows.append(chi_tab.real)
+            ci_rows.append(chi_tab.imag)
+            ur_rows.append(u_tab.real)
+            ui_rows.append(u_tab.imag)
+            for R_m, wm in orients:  # None -> perfect crystal, one orientation, weight 1
+                gd = g_vec if R_m is None else R_m @ g_vec
+                e_s, e_p = _polarization_pair(n_hat, gd)
+                g_rows.append(gd)
+                es_rows.append(e_s)
+                ep_rows.append(e_p)
+                wm_rows.append(wm)
+                hkl_of_row.append(i_hkl)
+        G = xp.asarray(np.array(g_rows), dtype=REAL)  # (N_g, 3)
+        ES = xp.asarray(np.array(es_rows), dtype=REAL)
+        EP = xp.asarray(np.array(ep_rows), dtype=REAL)
+        CHI_RE = xp.asarray(np.array(cr_rows), dtype=REAL)  # (N_hkl, N_tab)
+        CHI_IM = xp.asarray(np.array(ci_rows), dtype=REAL)
+        U_RE = xp.asarray(np.array(ur_rows), dtype=REAL)
+        U_IM = xp.asarray(np.array(ui_rows), dtype=REAL)
+        # g-independent escape distance: one pass per case, sliced per g inside
+        # _accumulate (only the finite-footprint, non-grooved branch reads it).
+        L_esc_all = (
+            _segment_escape_distance(segments, n_hat, xp=xp)
+            if finite_footprint and groove is None
+            else None
+        )
+        _nsys_pop()
 
-            if mosaic_quad is None:  # perfect crystal: one orientation, weight 1
-                _accumulate(g_vec, chi_re, chi_im, u_re, u_im, 1.0)
-            else:  # incoherent average over the mosaic crystallite orientations
-                for R_m, wm in mosaic_quad:
-                    _accumulate(R_m @ g_vec, chi_re, chi_im, u_re, u_im, wm)
+        for i_row, (wm, i_hkl) in enumerate(zip(wm_rows, hkl_of_row, strict=True)):
+            _accumulate(
+                G[i_row],
+                ES[i_row],
+                EP[i_row],
+                CHI_RE[i_hkl],
+                CHI_IM[i_hkl],
+                U_RE[i_hkl],
+                U_IM[i_hkl],
+                wm,
+            )
     else:
         # ---- batched incoherent line accumulation (options A + B) -----------
         # Every reflection/orientation shares the segment geometry, so run the
