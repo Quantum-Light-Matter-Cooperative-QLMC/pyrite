@@ -412,14 +412,15 @@ Usage: cxr checkpoint slim [OPTIONS] CHECKPOINT
   pickle; input is never modified. --brem-only and --line-only are mutually exclusive.
 
 Options:
-  -o, --out TEXT       Transfer pickle path (default: <stem>.slim.pkl).
-  --grid               Keep only material's current-grid configs.
-  --drop-wide-brem     Drop full-range brem arrays.
-  --downcast           Store spectral arrays as float32.
-  --compresslevel 1-9  [default: 6; 1<=x<=9]
-  --brem-only          Keep only brem arrays; mutually exclusive with --line-only.
-  --line-only          Keep only line arrays; mutually exclusive with --brem-only.
-  -h, --help           Show this message and exit.
+  -o, --out TEXT        Transfer pickle path, or - for stdout (default:
+                        <stem>.slim.pkl).
+  --grid                Keep only material's current-grid configs.
+  --drop-wide-brem      Drop full-range brem arrays.
+  --downcast            Store spectral arrays as float32.
+  --compresslevel 1-22  zstd compression level.  [default: 3; 1<=x<=22]
+  --brem-only           Keep only brem arrays; mutually exclusive with --line-only.
+  --line-only           Keep only line arrays; mutually exclusive with --brem-only.
+  -h, --help            Show this message and exit.
 ```
 
 ## `cxr checkpoint recompute`
@@ -921,7 +922,7 @@ Options:
                                   checkpoint.
   --drop-wide-brem                With grid pull, drop wide-brem.
   --downcast                      With grid pull, downcast to float32.
-  --level9                        Recompress remotely at gzip level 9.
+  --level9                        Recompress remotely at max compression.
   --no-sync                       With grid pull, skip code sync.
   --brem-only                     Merge only brem arrays locally; mutually exclusive
                                   with --line-only.

@@ -849,7 +849,7 @@ def reline_command(
 @click.option(
     "--level9",
     is_flag=True,
-    help="Recompress completed checkpoints at gzip level 9 before automatic pull.",
+    help="Recompress completed checkpoints at max compression before automatic pull.",
 )
 def start_command(
     catalog_profile,
@@ -1227,7 +1227,7 @@ def reap_command(min_age_minutes, yes):
 )
 @click.option("--drop-wide-brem", is_flag=True, help="With grid pull, drop wide-brem.")
 @click.option("--downcast", is_flag=True, help="With grid pull, downcast to float32.")
-@click.option("--level9", is_flag=True, help="Recompress remotely at gzip level 9.")
+@click.option("--level9", is_flag=True, help="Recompress remotely at max compression.")
 @click.option("--no-sync", is_flag=True, help="With grid pull, skip code sync.")
 @click.option(
     "--brem-only",

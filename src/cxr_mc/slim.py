@@ -4,18 +4,22 @@ The GPU box writes one pickle per material holding the full union of every swept
 config at full resolution (``results.store_result``); pulling it to the viz
 laptop is gigabyte-scale and mostly stale for any single plot. This command
 writes a smaller pickle -- dropping the full-range bremsstrahlung arrays and/or
-downcasting the spectra to float32, and gzip-compressing the output (TODO P2 #8,
+downcasting the spectra to float32, and zstd-compressing the output (TODO P2 #8,
 see ``cxr_mc._checkpoint_io``) -- that still loads and plots exactly like the
 full one via ``run.load_checkpoint``.
 
     cxr slim checkpoints/hopg.pkl --drop-wide-brem --downcast
     cxr slim checkpoints/hopg.pkl -o hopg.slim.pkl --downcast
+    cxr slim checkpoints/hopg -o -            # stream to stdout (report on stderr)
 
 Value-based config filtering (keep only some tilts/energies) is available
 programmatically via ``results.slim_results(..., tilt_deg=..., E0_keV=...)``.
 """
 
+import contextlib
+import io
 import os
+import sys
 
 from . import _checkpoint_io, _checkpoint_store
 from .cli import _core as _cli_core
@@ -76,27 +80,46 @@ def _pct_smaller(before, after):
     return int(round(pct))
 
 
-def slim_checkpoint(
+def slim_checkpoint(in_path, out_path=None, **kwargs):
+    """Slim a checkpoint (see :func:`_slim_checkpoint`).
+
+    ``out_path="-"`` is pipe mode: the encoded artifact becomes this process's
+    stdout, so stdout is claimed here and every ordinary print in the slim path
+    (this module's report, plus anything ``slim_results`` emits) is redirected
+    to stderr for the whole call -- one stray print would otherwise corrupt the
+    byte stream a `cxr remote pull` is reading.
+    """
+    if out_path != "-":
+        return _slim_checkpoint(in_path, out_path, **kwargs)
+    pipe = sys.stdout.buffer
+    with contextlib.redirect_stdout(sys.stderr):
+        return _slim_checkpoint(in_path, out_path, pipe=pipe, **kwargs)
+
+
+def _slim_checkpoint(
     in_path,
     out_path=None,
     *,
+    pipe=None,
     grid=False,
     drop_wide_brem=False,
     downcast=False,
     dataset=None,
-    compresslevel=6,
+    compresslevel=None,
     **constraints,
 ):
     """Load a checkpoint, slim it (:func:`results.slim_results`), write a smaller
     pickle (atomic temp+replace), and report the size saved. ``out_path`` defaults
     to ``<stem>.slim<ext>``. ``grid`` keeps only the material's current-grid
     configs, inferring the material from the checkpoint stem (rejecting a
-    ``_quick`` stem). ``compresslevel`` is forwarded to
-    ``_checkpoint_io.dump`` -- with no other trimming flag it makes this call a
-    pure lossless recompress (e.g. gzip level 9 for a smaller `cxr remote pull`
-    transfer, independent of the level-6 default used while a sweep is still
-    writing checkpoints). Extra keyword args are case-field constraints passed
-    straight to ``slim_results``. Returns the slim results dict."""
+    ``_quick`` stem). With ``pipe`` set (``out_path="-"``, see
+    :func:`slim_checkpoint`) the artifact streams into that binary stream
+    instead of a file, with no temp. ``compresslevel`` is a zstd level forwarded to
+    ``_checkpoint_io`` (``None`` = its default); with no other trimming flag it
+    makes this call a pure lossless recompress (e.g. level 19 for a smaller
+    `cxr remote pull` transfer, independent of the level-3 default a live sweep
+    writes at). Extra keyword args are case-field constraints passed straight to
+    ``slim_results``. Returns the slim results dict."""
     # validate the stem before loading: the load is the expensive step, and a bad
     # --grid stem should fail in milliseconds, not after a gigabyte unpickle
     material = _grid_from_stem(in_path) if grid else None
@@ -126,10 +149,13 @@ def slim_checkpoint(
         else:
             root, ext = os.path.splitext(in_path)
             out_path = f"{root}.slim{ext or '.pkl'}"
-    tmp = out_path + ".tmp"
-    _checkpoint_io.dump(slim, tmp, compresslevel=compresslevel)
-    os.replace(tmp, out_path)  # atomic: never leave a half-written pickle
-    after = os.path.getsize(out_path)
+    if pipe is not None:
+        after = _dump_to_pipe(slim, pipe, compresslevel)
+    else:
+        tmp = out_path + ".tmp"
+        _checkpoint_io.dump(slim, tmp, compresslevel=compresslevel)
+        os.replace(tmp, out_path)  # atomic: never leave a half-written pickle
+        after = os.path.getsize(out_path)
     n_in = sum(len(v) for v in results.values())
     n_out = sum(len(v) for v in slim.values())
     print(
@@ -138,6 +164,30 @@ def slim_checkpoint(
         f"{_pct_smaller(before, after)}% smaller"
     )
     return slim
+
+
+class _CountingWriter(io.RawIOBase):
+    """Pass-through binary sink that totals the bytes it forwards."""
+
+    def __init__(self, stream):
+        self._stream = stream
+        self.total = 0
+
+    def writable(self):
+        return True
+
+    def write(self, data):
+        self._stream.write(data)
+        self.total += len(data)
+        return len(data)
+
+
+def _dump_to_pipe(slim, pipe, compresslevel):
+    """Stream the encoded artifact down ``pipe``; return the byte count."""
+    counter = _CountingWriter(pipe)
+    _checkpoint_io.dump_stream(slim, counter, compresslevel=compresslevel)
+    pipe.flush()
+    return counter.total
 
 
 def _cli(args):

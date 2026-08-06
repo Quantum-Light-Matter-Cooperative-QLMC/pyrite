@@ -4259,10 +4259,12 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
     assert len(transfers) == 1
     transfer_command, destination = transfers[0]
     assert "/checkpoints/hopg" in transfer_command
-    assert "--grid" in transfer_command and "--compresslevel 9" in transfer_command
-    assert "trap cleanup EXIT" in transfer_command
-    assert "trap 'exit 143' TERM" in transfer_command
-    assert '1>&2 && cat "$T"' in transfer_command
+    assert "--grid" in transfer_command
+    assert f"--compresslevel {_checkpoint_io.MAX_LEVEL}" in transfer_command
+    # Streamed straight down the ssh session's stdout: no box temp to trap-clean,
+    # so the box's compress pass overlaps the transfer.
+    assert transfer_command.endswith("-o -")
+    assert "cat " not in transfer_command
     assert destination == tmp_path / "checkpoints" / ".hopg.incoming.pkl"
     syntax = subprocess.run(["bash", "-n", "-c", transfer_command], capture_output=True, text=True)
     assert syntax.returncode == 0, syntax.stderr

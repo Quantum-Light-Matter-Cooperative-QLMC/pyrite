@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from cxr_mc import _checkpoint_io
 from cxr_mc.cli import _completion as _cli_completion
 
 
@@ -162,7 +163,10 @@ def test_local_commands_wire_material_checkpoint_archive_and_choice_completion()
 
     assert _callback(slim.command, "checkpoint") is _cli_completion.complete_checkpoint
     assert _values(_parameter(slim.command, "compresslevel").shell_complete(None, "")) == [
-        str(value) for value in range(1, 10)
+        str(value)
+        for value in sorted(
+            range(_checkpoint_io.LEVEL_RANGE[0], _checkpoint_io.LEVEL_RANGE[1] + 1), key=str
+        )
     ]
 
     assert _callback(archive.archive_command, "stem") is _cli_completion.complete_archive_stem

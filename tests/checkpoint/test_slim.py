@@ -100,20 +100,38 @@ def test_slim_checkpoint_default_out_path(tmp_path):
     assert (tmp_path / "hopg.slim.pkl").exists()
 
 
-def test_slim_checkpoint_compresslevel_9_is_lossless_and_no_larger(tmp_path):
-    """No trimming flag + --compresslevel 9 is a pure recompress: same content,
-    same or smaller bytes than the level-6 default -- what `cxr remote pull
+def test_slim_checkpoint_pipe_mode_writes_artifact_to_stdout_and_report_to_stderr(
+    tmp_path, capsysbinary
+):
+    """`cxr slim -o -` is what `cxr remote pull` streams: stdout must be the
+    artifact and nothing else, with every report on stderr."""
+    src = tmp_path / "hopg.pkl"
+    with open(src, "wb") as f:
+        pickle.dump(_results(), f)
+    reference = tmp_path / "hopg.slim.pkl"
+    slim_checkpoint(str(src), str(reference))
+    capsysbinary.readouterr()
+
+    slim_checkpoint(str(src), "-")
+    captured = capsysbinary.readouterr()
+    assert captured.out == reference.read_bytes()
+    assert b"slimmed" in captured.err
+
+
+def test_slim_checkpoint_max_compresslevel_is_lossless_and_no_larger(tmp_path):
+    """No trimming flag + a raised --compresslevel is a pure recompress: same
+    content, same or smaller bytes than the default -- what `cxr remote pull
     --level9` relies on."""
     res = _results()
     src = tmp_path / "hopg.pkl"
     with open(src, "wb") as f:
         pickle.dump(res, f)
-    level6 = tmp_path / "hopg.level6.pkl"
-    level9 = tmp_path / "hopg.level9.pkl"
-    slim_checkpoint(str(src), str(level6))
-    slim_checkpoint(str(src), str(level9), compresslevel=9)
-    assert level9.stat().st_size <= level6.stat().st_size
-    reloaded = _checkpoint_io.load(str(level9))
+    default = tmp_path / "hopg.default.pkl"
+    smallest = tmp_path / "hopg.max.pkl"
+    slim_checkpoint(str(src), str(default))
+    slim_checkpoint(str(src), str(smallest), compresslevel=_checkpoint_io.MAX_LEVEL)
+    assert smallest.stat().st_size <= default.stat().st_size
+    reloaded = _checkpoint_io.load(str(smallest))
     assert reloaded.keys() == res.keys()
     for name, by_E in res.items():
         for E0, record in by_E.items():

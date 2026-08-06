@@ -2,6 +2,7 @@
 
 import click
 
+from ... import _checkpoint_io
 from ... import slim as _slim
 from .. import _completion as _cli_completion
 from .. import _core as _cli_core
@@ -17,17 +18,25 @@ from .. import _core as _cli_core
     ),
 )
 @click.argument("checkpoint", shell_complete=_cli_completion.complete_checkpoint)
-@click.option("-o", "--out", default=None, help="Transfer pickle path (default: <stem>.slim.pkl).")
+@click.option(
+    "-o",
+    "--out",
+    default=None,
+    help="Transfer pickle path, or - for stdout (default: <stem>.slim.pkl).",
+)
 @click.option("--grid", is_flag=True, help="Keep only material's current-grid configs.")
 @click.option("--drop-wide-brem", is_flag=True, help="Drop full-range brem arrays.")
 @click.option("--downcast", is_flag=True, help="Store spectral arrays as float32.")
 @click.option(
     "--compresslevel",
-    type=click.IntRange(1, 9),
-    default=6,
+    type=click.IntRange(*_checkpoint_io.LEVEL_RANGE),
+    default=_checkpoint_io.DEFAULT_LEVEL,
     show_default=True,
-    metavar="1-9",
-    shell_complete=_cli_completion.choice_completer(range(1, 10)),
+    metavar=f"{_checkpoint_io.LEVEL_RANGE[0]}-{_checkpoint_io.LEVEL_RANGE[1]}",
+    help="zstd compression level.",
+    shell_complete=_cli_completion.choice_completer(
+        range(_checkpoint_io.LEVEL_RANGE[0], _checkpoint_io.LEVEL_RANGE[1] + 1)
+    ),
 )
 @click.option(
     "--brem-only",

@@ -4,6 +4,7 @@ import json
 import math
 import subprocess
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -1422,15 +1423,17 @@ def pull(
     (``--brem-only``/``--line-only``), since those require an existing local
     checkpoint to merge into and a freshly discovered stem would not have one.
 
-    With ``grid`` and/or ``level9``, prep on the box BEFORE the transfer via
-    ``cxr slim``: ``grid`` filters to just the material's current grid (plus the
-    optional byte trimmers), ``level9`` recompresses at gzip level 9 instead of
-    the level-6 default a live sweep writes at -- lossless, just smaller for the
-    wire. One SSH session creates a box temp, streams it into the local active
-    slot, and removes the temp with a remote EXIT trap. ``sync_code()`` runs
-    first (unless ``no_sync``) so the box rebuilds the grid from the same
-    ``config.py`` the laptop has, and has the ``--compresslevel`` flag at all
-    -- closing sync drift."""
+    Every pull runs the transfer through ``cxr slim`` on the box, which encodes
+    straight to that ssh session's stdout (``-o -``) -- the box's compress pass
+    overlaps the wire instead of staging a whole temp artifact on box disk
+    first. ``grid`` filters to just the material's current grid (plus the
+    optional byte trimmers); ``level9`` recompresses at the codec's maximum
+    level (:data:`_checkpoint_io.MAX_LEVEL`) instead of the default a live sweep
+    writes at -- lossless, just smaller for the wire, and only worth it on a
+    slow link, since the level costs far more box CPU than it saves bytes.
+    ``sync_code()`` runs first (unless ``no_sync``) so the box rebuilds the grid
+    from the same ``config.py`` the laptop has, and has the ``-o -`` and
+    ``--compresslevel`` flags at all -- closing sync drift."""
     if dataset not in (None, "brem", "line"):
         raise ValueError("dataset must be None, 'brem', or 'line'")
     stems = list(stems)
@@ -1498,21 +1501,33 @@ def pull(
             if downcast:
                 flags += " --downcast"
             if level9:
-                flags += " --compresslevel 9"
+                flags += f" --compresslevel {_checkpoint_io.MAX_LEVEL}"
             if dataset is not None:
                 flags += f" --{dataset}-only"
-            remote_tmp = f"/tmp/{stem}.{dataset or 'full'}.{uuid.uuid4().hex}.pkl"
             ckpt = config.remote_path("checkpoints", stem)
             incoming_local = dest / f".{stem}.incoming.pkl"
+            # `-o -` streams the encoded artifact straight down this ssh
+            # session's stdout (slim's own report goes to stderr), so the box's
+            # compress pass overlaps the transfer. The older write-temp-then-cat
+            # form serialized the two and staged a gigabyte-scale temp on box
+            # disk; a nonzero slim exit still fails the pull, because ssh
+            # propagates the remote command's status.
             remote_transfer = (
-                f"T={config.shell_word(remote_tmp)}; "
-                'cleanup() { rm -f -- "$T"; }; trap cleanup EXIT; '
-                "trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM; "
                 f"cd {config.shell_remote_dir()} && "
                 f"{config.shell_remote_uv()} run --no-sync cxr slim "
-                f'{config.shell_arg(ckpt)}{flags} -o "$T" 1>&2 && cat "$T"'
+                f"{config.shell_arg(ckpt)}{flags} -o -"
             )
+            # Timed so a slow pull is attributable: this covers box slim CPU +
+            # wire, the local decode+split below is what remains. If the rate
+            # here sits near the link speed the wire is the wall; if it sits far
+            # below it, the box's compress pass is.
+            started = time.monotonic()
             transport._ssh_download(remote_transfer, incoming_local)
+            elapsed = max(time.monotonic() - started, 1e-9)
+            transferred = incoming_local.stat().st_size / 1e6
+            print(
+                f"transferred {transferred:.1f} MB in {elapsed:.1f}s ({transferred / elapsed:.1f} MB/s)"
+            )
 
             incoming = _checkpoint_io.load(str(incoming_local))
             incoming_local.unlink(missing_ok=True)

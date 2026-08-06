@@ -6,6 +6,7 @@ import sys
 import pytest
 
 from cxr_mc import (
+    _checkpoint_io,
     analyze,
     archive,
     blaze,
@@ -193,7 +194,11 @@ def test_blaze_unknown_option_after_variadic_value_is_not_swallowed():
             slim.command,
             "_cli",
             ["in.pkl", "--line-only"],
-            {"checkpoint": "in.pkl", "line_only": True, "compresslevel": 6},
+            {
+                "checkpoint": "in.pkl",
+                "line_only": True,
+                "compresslevel": _checkpoint_io.DEFAULT_LEVEL,
+            },
         ),
         (
             recompute_cli,
