@@ -1165,6 +1165,29 @@ def test_run_sweep_budget_stops_early_and_resumes(tmp_path, monkeypatch):
 
     clock = {"t": 0.0}
 
+    def fake_run_cases(
+        todo,
+        *,
+        callback=None,
+        should_stop=None,
+        keep_results=True,
+        **_unused,
+    ):
+        for i, c in enumerate(todo):
+            if should_stop is not None and should_stop():
+                break
+            clock["t"] += 10.0  # each case takes 10 "seconds"
+            callback(i, c, {"out": c["name"]})
+        return []
+
+    monkeypatch.setattr(run_mod, "run_cases", fake_run_cases)
+    monkeypatch.setattr(
+        run_mod,
+        "store_result",
+        lambda results, case, out: results.setdefault(case["name"], {}).__setitem__(
+            case["E0_keV"], {"case": case}
+        ),
+    )
     cases = [
         {
             "name": f"cfg{i}",

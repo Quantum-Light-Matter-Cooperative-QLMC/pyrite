@@ -409,7 +409,10 @@ def _sample_cos_theta(Z, E_keV, rng, elastic_model, element):
             return 1.0 - 2.0 * alpha * R / (1.0 + alpha - R)
 
         except FileNotFoundError:
-            logger.debug(...)
+            logger.debug(
+                "no Mott transport table for %s; transport will use the analytic fallback",
+                element,
+            )
             _NO_MOTT.add(element)
 
     return _sample_cos_theta_sr_numba(Z, E_keV, R)

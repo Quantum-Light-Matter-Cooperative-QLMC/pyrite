@@ -327,7 +327,15 @@ def test_spectrum_case_passes_per_layer_azimuth(monkeypatch):
         Ne=1,
         n_layers=2,
     )
-    tp = dict(E_grid=E, E_brem=E, n_hat=np.array([0.0, 0.0, 1.0]), segs=segs, segs_b=segs)
+    tp = dict(
+        E_grid=E,
+        E_brem=E,
+        n_hat=np.array([0.0, 0.0, 1.0]),
+        segs=segs,
+        segs_b=segs,
+        Ne_lines=1,
+        Ne_brem=1,
+    )
     comp = [("Mo", 0.011)]
     case = dict(
         crystal="mose2",

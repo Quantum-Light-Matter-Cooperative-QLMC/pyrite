@@ -128,12 +128,12 @@ def test_new_elements_use_analytic_fallback_without_mott_table(monkeypatch, elem
         mott_calls.append((called_element, called_Z))
         raise FileNotFoundError
 
-    def spy_alpha_sr_joy(called_Z, E_keV):
-        alpha_calls.append((called_Z, E_keV.copy()))
-        return original_alpha_sr_joy(called_Z, E_keV)
+    def spy_fallback(Z, E_keV, R):
+        fallback_calls.append((Z, E_keV.copy(), R.copy()))
+        return original_fallback(Z, E_keV, R)
 
     monkeypatch.setattr(transport, "_mott_alpha_table", missing_mott_table)
-    monkeypatch.setattr(transport, "_alpha_sr_joy", spy_alpha_sr_joy)
+    monkeypatch.setattr(transport, "_sample_cos_theta_sr_numba", spy_fallback)
 
     previous_no_mott = set(transport._NO_MOTT)
     transport._NO_MOTT.discard(element)

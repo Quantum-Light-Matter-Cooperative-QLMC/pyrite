@@ -1348,13 +1348,13 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  add     Incrementally add values to profile grids.
+  add     Incrementally add values to profile grids, or emission modes.
   create  Create a new profile, cloning defaults from --from (standard).
   delete  Delete a profile; irreversible.
   list    List catalog profiles with membership and override counts.
-  remove  Remove values from an existing profile's grids.
+  remove  Remove values from an existing profile's grids, or emission modes.
   rename  Rename profile NAME to NEW_NAME.
-  set     Replace range grids, beam fields, or detector scalars on a profile.
+  set     Replace range grids, beam fields, detector scalars, or emission on a...
   show    Show one profile's ranges, beam, detector, membership, and overrides.
 ```
 
@@ -1363,10 +1363,12 @@ Commands:
 ```text
 Usage: cxr profile add [OPTIONS] NAME
 
-  Incrementally add values to profile grids.
+  Incrementally add values to profile grids, or emission modes.
 
   Incremental edit: ``cxr profile add sub_100keV --energy 75`` inserts 75 keV without
-  re-listing the grid. No prompt except on 'standard'.
+  re-listing the grid. No prompt except on 'standard'. --coherent and --incoherent union
+  into the profile's emission mode set; a set that ends up covering both modes auto-
+  switches to 'both' (logged, not silent).
 
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
@@ -1390,6 +1392,9 @@ Options:
                                   integers.
   --material KEY,...              Add comma-separated material keys to explicit
                                   membership.
+  --coherent                      Add coherent emission (unions with any existing mode).
+  --incoherent                    Add incoherent emission (unions with any existing
+                                  mode).
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
@@ -1484,10 +1489,15 @@ Options:
 ```text
 Usage: cxr profile remove [OPTIONS] NAME
 
-  Remove values from an existing profile's grids.
+  Remove values from an existing profile's grids, or emission modes.
 
   Every listed grid value must be present; otherwise nothing is written. Catalog
-  validation rejects removals that would empty a required grid.
+  validation rejects removals that would empty a required grid. --coherent/--incoherent
+  subtract from the profile's emission mode set; a requested mode not currently present
+  errors. Emptying the set (e.g. removing the sole explicit mode) drops the ``emission``
+  key entirely, reverting to the fidelity preset's own default. Removing one mode from
+  'both' leaves the other explicit -- e.g. removing incoherent from 'both' leaves
+  'coherent'.
 
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
@@ -1507,6 +1517,8 @@ Options:
                                   combine.
   --material KEY,...              Remove comma-separated material keys from explicit
                                   membership.
+  --coherent                      Remove coherent emission from the mode set.
+  --incoherent                    Remove incoherent emission from the mode set.
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
@@ -1533,12 +1545,13 @@ Options:
 ```text
 Usage: cxr profile set [OPTIONS] NAME
 
-  Replace range grids, beam fields, or detector scalars on a profile.
+  Replace range grids, beam fields, detector scalars, or emission on a profile.
 
   NAME must already exist (create it with ``cxr profile create``); unknown names error
   with suggestions. Editing 'standard' prompts for confirmation unless --yes is given;
-  --dry-run never prompts. Detector scalars replace supplied fields; unlike range grids,
-  they are not accepted by add/remove.
+  --dry-run never prompts. Detector scalars and emission replace supplied fields; unlike
+  range grids, they are not accepted by add/remove -- except emission, which add/remove
+  also accept via --coherent/--incoherent for incremental switching.
 
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
@@ -1576,6 +1589,9 @@ Options:
   --material KEY,...              Replace explicit membership with comma-separated
                                   material keys.
   --all-materials                 Restore implicit membership in every in-use material.
+  --emission [incoherent|coherent|both]
+                                  Replace the emission policy
+                                  (incoherent/coherent/both).
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.

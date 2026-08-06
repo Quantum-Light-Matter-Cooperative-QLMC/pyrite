@@ -141,7 +141,7 @@ def test_default_root_is_repo_anchored():
     from cxr_mc import run
 
     assert os.path.isabs(archive.DEFAULT_ROOT)
-    assert archive.DEFAULT_ROOT == run._DEFAULT_CHECKPOINT_DIR
+    assert archive.DEFAULT_ROOT == run.DEFAULT_CHECKPOINT_DIR
 
 
 def test_stem_from_label_strips_only_date_suffix():

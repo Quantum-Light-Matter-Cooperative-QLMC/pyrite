@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-APP = Path(__file__).parents[1] / "notebooks" / "trace_app.py"
+APP = Path(__file__).parents[2] / "notebooks" / "trace_app.py"
 
 
 def test_penetration_controls_read_the_active_material_scan() -> None:

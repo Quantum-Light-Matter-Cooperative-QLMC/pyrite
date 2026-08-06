@@ -19,6 +19,7 @@ GENERAL_LATTICE = {
     "gamma": 76.0,
 }
 
+
 def _runner_segments():
     return {
         "r_mid": np.array([[0.0, 0.0, 10.0]]),
@@ -223,6 +224,8 @@ def test_runner_forwards_surface_hkl_to_spectrum(monkeypatch):
         "n_hat": np.array([1.0, 0.0, 0.0]),
         "segs": segments,
         "segs_b": segments,
+        "Ne_lines": 1,
+        "Ne_brem": 1,
     }
 
     runner._spectrum_case(case, transport)
@@ -279,8 +282,6 @@ crystal = "mos2"
         tilt_deg=5.0,
         E_grid_line=grid,
         E_grid_brem=np.array([100.0]),
-        Ne=1,
-        elec_i=np.zeros(count, dtype=np.int64)
     )
     surface_case = build_cases(Sweep(**base), n_electrons=1, n_electrons_brem=1)[0]
     direct_case = build_cases(Sweep(**base, beam_uvw=(1, 0, 0)), n_electrons=1, n_electrons_brem=1)[
@@ -291,6 +292,7 @@ crystal = "mos2"
         "v_hat": np.array([[0.0, 0.0, 1.0]]),
         "L_ang": np.array([1000.0]),
         "E_keV": np.array([30.0]),
+        "elec_id": np.array([0], dtype=np.int64),
         "Ne": 1,
         "thickness_ang": 100.0,
     }
