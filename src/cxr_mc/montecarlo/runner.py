@@ -130,7 +130,7 @@ def _nsys_range(message):
     """Return an NVTX range when the remote Nsight profiler is enabled."""
     if not (_GPU and _NSYS and BACKEND.name == "cuda"):
         return nullcontext()
-    from cupyx.profiler import time_range  # ty: ignore[unresolved-import]
+    from cupyx.profiler import time_range
 
     return time_range(message)
 
@@ -143,7 +143,7 @@ def _nsys_push(message):
     single exit so the pop always runs. No-op off the profiled GPU path."""
     if not (_GPU and _NSYS and BACKEND.name == "cuda"):
         return
-    from cupy.cuda import nvtx  # ty: ignore[unresolved-import]
+    from cupy.cuda import nvtx
 
     nvtx.RangePush(message)
 
@@ -152,7 +152,7 @@ def _nsys_pop():
     """Close the range opened by the matching :func:`_nsys_push`."""
     if not (_GPU and _NSYS and BACKEND.name == "cuda"):
         return
-    from cupy.cuda import nvtx  # ty: ignore[unresolved-import]
+    from cupy.cuda import nvtx
 
     nvtx.RangePop()
 
@@ -1119,7 +1119,7 @@ def _worker_init(force_cpu=False):
     try:
         import ctypes
 
-        k32 = ctypes.WinDLL("kernel32", use_last_error=True)  # ty: ignore[unresolved-attribute]
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
         # typed signatures matter: the untyped pseudo-handle (-1) gets
         # truncated on 64-bit and the call silently fails
         k32.GetCurrentProcess.restype = ctypes.c_void_p

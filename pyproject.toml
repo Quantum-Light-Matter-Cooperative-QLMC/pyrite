@@ -116,6 +116,15 @@ formats = "ipynb,md:myst"
 [tool.ty.src]
 include = ["src"]
 
+[[tool.ty.overrides]]
+include = [
+    "src/cxr_mc/montecarlo/*_jit_kernel.py",
+    "src/cxr_mc/montecarlo/runner.py",
+]
+
+[tool.ty.overrides.rules]
+unresolved-attribute = "ignore"
+
 [tool.ruff]
 target-version = "py313"
 line-length = 100

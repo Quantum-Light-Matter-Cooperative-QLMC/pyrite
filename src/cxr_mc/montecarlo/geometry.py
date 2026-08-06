@@ -206,7 +206,7 @@ def first_prism_exit(
     s_zmin = _face_distance(z, dz, z_min_ang, dz < 0.0, xp)
     s_zmax = _face_distance(z, dz, z_max_ang, dz > 0.0, xp)
 
-    if width_ang is None:
+    if (width_ang is None) or (height_ang is None):
         # Only Z_MIN / Z_MAX are candidates.
         candidates = xp.stack(
             (

@@ -250,7 +250,7 @@ def _load_cupy(expected: str | None = None) -> CuPyBackend:
     try:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message=".*CUDA path could not be detected.*")
-            import cupy  # ty: ignore[unresolved-import]
+            import cupy
 
         return CuPyBackend(cupy, expected=expected)
     except BackendUnavailableError:
