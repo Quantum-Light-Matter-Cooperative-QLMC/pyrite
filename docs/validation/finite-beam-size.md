@@ -125,7 +125,7 @@ skip the block entirely — no RNG draw happens for either (not even a
 zero-variance draw that would still advance `beam_rng`, which doesn't matter
 here since `beam_rng` is independent, but it does mean the falsy-zero case is
 truly a no-op path, not a "draw with σ=0" path). Confirmed by inspection and
-by `tests/test_montecarlo.py::test_beam_fwhm_mm_zero_and_none_are_equivalent`,
+by `tests/montecarlo/test_montecarlo.py::test_beam_fwhm_mm_zero_and_none_are_equivalent`,
 which asserts `np.array_equal(none_segs["r_mid"], zero_segs["r_mid"])` — this
 is a real bit-for-bit check on the actual output array, not just a code-path
 inspection, and it passed.
@@ -198,11 +198,11 @@ Ran on `feature/finite-electron-beam-size` (already checked out, matches
 described branch):
 
 ```
-uv run pytest tests/test_montecarlo.py -k beam_fwhm -v
+uv run pytest tests/montecarlo/test_montecarlo.py -k beam_fwhm -v
 ...4 passed in 1.50s
 ```
 
-Read all four test bodies (`tests/test_montecarlo.py` lines 69–137):
+Read all four test bodies (`tests/montecarlo/test_montecarlo.py` lines 69–137):
 
 - `test_beam_fwhm_mm_zero_and_none_are_equivalent` — asserts
   `np.array_equal(none_segs["r_mid"], zero_segs["r_mid"])`. Directly tests the
@@ -262,7 +262,7 @@ implemented and independently confirmed (spawned `SeedSequence` child ⇒
 genuinely uncorrelated, non-state-sharing `Generator`). For an all-`None`
 footprint, a nonzero `beam_fwhm_mm` remains a no-op on the emitted spectrum by
 construction. The existing regression tests
-(`tests/test_montecarlo.py::test_beam_fwhm_mm_*`, 4/4 passing) genuinely
+(`tests/montecarlo/test_montecarlo.py::test_beam_fwhm_mm_*`, 4/4 passing) genuinely
 exercise these beam-size claims against the real code path, not a
 reimplementation.
 

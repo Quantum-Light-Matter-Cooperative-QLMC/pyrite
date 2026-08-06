@@ -106,8 +106,8 @@ Scope is `cxr remote run`; no local-run flag is added by this slice.
   `src/cxr_mc/_remote/viewer.py`, `src/cxr_mc/cli/_dashboard.py`
 - performance artifact lifecycle:
   `src/cxr_mc/cli/performance.py`, remote lifecycle helpers
-- profiler/script/CLI regressions: `tests/test_remote.py`,
-  `tests/test_remote_click.py`, CLI contract snapshot
+- profiler/script/CLI regressions: `tests/remote/test_remote.py`,
+  `tests/remote/test_click.py`, CLI contract snapshot
 
 ## Stepwise checklist
 

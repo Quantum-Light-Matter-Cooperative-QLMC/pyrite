@@ -235,7 +235,7 @@ def test_catalog_profile_changes_hash_and_stem_when_not_standard():
     # catalog profile's dataset never sets canonical_full=True (callers,
     # e.g. named_profile_stem/scan._resolved_run, withhold it) -- see
     # test_named_profile_stem_default_catalog_profile_stays_canonical and
-    # tests/test_material_catalog.py for that end-to-end contract.
+    # tests/materials/test_material_catalog.py for that end-to-end contract.
     assert variant_stem(other) != "hopg"
     # @-stem now carries the non-standard catalog_profile name as its label.
     assert variant_stem(other).startswith("hopg@sub_100keV-")

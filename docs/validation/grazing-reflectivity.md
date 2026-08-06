@@ -13,9 +13,9 @@ polarization-independent.
 **Code.** `src/cxr_mc/materials/crystal.py::optical_constants`,
 `src/cxr_mc/detectors/grating.py::Grating.reflectivity` (+ `Grating.throughput`,
 `disperse_spectrum(..., weight_by_throughput=)`).
-**Anchor.** `tests/test_crystallography.py::test_optical_constants_beta_matches_absorption_length`,
+**Anchor.** `tests/materials/test_crystallography.py::test_optical_constants_beta_matches_absorption_length`,
 `::test_optical_constants_delta_positive_off_edge`;
-`tests/test_grating.py::test_reflectivity_total_external_reflection_below_critical_angle`,
+`tests/detectors/test_grating.py::test_reflectivity_total_external_reflection_below_critical_angle`,
 `::test_reflectivity_asymptotic_falloff_above_critical_angle`,
 `::test_reflectivity_bounded_and_decreases_away_from_critical_angle`.
 **Source.** Als-Nielsen & McMorrow, *Elements of Modern X-ray Physics* 2nd ed.,

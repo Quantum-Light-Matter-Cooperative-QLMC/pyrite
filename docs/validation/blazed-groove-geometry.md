@@ -359,7 +359,7 @@ implemented laterally periodic model now agree. Example magnitude remains:
 - Independent numeric probe confirms the exact one-ulp valley event and
   materially out-of-band rejection described in §4.1.
 - Supplied remote evidence for the exact fix snapshot:
-  `tests/test_groove.py + tests/test_trajectories.py` — 34 passed; broader
+  `tests/montecarlo/test_groove.py + tests/plots/test_trajectories.py` — 34 passed; broader
   suite — 192 passed; typecheck and scoped Ruff clean.
 - No heavy Monte Carlo, GPU job, or external comparison was run.
 

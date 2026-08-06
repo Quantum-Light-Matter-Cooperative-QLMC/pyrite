@@ -26,7 +26,7 @@ Landed the 5 fixes from the perf review (see convo), uncommitted, on `main`.
 ## Test edits (interface follow-ons)
 
 - `tests/test_run.py`: run_cases fakes/stubs accept `keep_results`.
-- `tests/test_remote.py`: default assertions 2 -> 1; new assert on the
+- `tests/remote/test_remote.py`: default assertions 2 -> 1; new assert on the
   `CXR_MC_GPU_SHARE` export.
 
 ## Dropped

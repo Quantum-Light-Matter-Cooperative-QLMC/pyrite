@@ -22,7 +22,7 @@ simulation into an online service, or change the packaged catalog schema.
 
 - `tests/external_db_fixtures.py`: `MP_API_KEY` resolution, supported MP
   retrieval adapter, and query error classification.
-- `tests/test_crystal_external_db.py`: online-test gate and explicit
+- `tests/materials/test_crystal_external_db.py`: online-test gate and explicit
   credential/query failure behavior.
 - `scripts/refresh_external_cif.py`: reuse fixture resolution, preserve cached
   MP data when unavailable, and report actionable diagnostics.

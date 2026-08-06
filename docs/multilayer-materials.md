@@ -230,7 +230,7 @@ remains.
 
 - **Regression — DONE:** a one-layer stack reproduces the current `spec`/`brem`
   **bit-for-bit** (the hard anchor); `mosaic`/`tilt`/checkpoint paths unchanged.
-  `checks/multilayer_check.py` (check 1) + `tests/test_multilayer.py`.
+  `checks/multilayer_check.py` (check 1) + `tests/montecarlo/test_multilayer.py`.
 - **Film-on-vacuum == film-only — DONE:** an amorphous substrate adds no lines and, on a
   front (high-flux) exit, does not attenuate the film segments, so the result is the
   film-only spectrum **bit-for-bit**. `checks/multilayer_slice3_check.py` (check 3) +
@@ -241,7 +241,7 @@ remains.
   at a hard, isolated line (MoSe₂ (-1,0,3) ≈ 1438 eV → ~0.2 %).
   `checks/multilayer_validation_check.py` (A); the per-segment identity
   `τ_stack − τ_film = μ_sub·t_sub/|n̂_z|` is pinned in
-  `tests/test_multilayer.py::test_stack_tau_back_exit_substrate_closed_form`.
+  `tests/montecarlo/test_multilayer.py::test_stack_tau_back_exit_substrate_closed_form`.
 - **Depth-dose vs Kanaya-Okayama (phase A) — DONE:** the dose centroid is a sane fraction of
   R_KO and the maximum penetration `z_max ≈ R_KO`, following K-O's `E^1.67` energy scaling
   (carbon, 20→30 keV) and its `A/(Z^0.889 ρ)` material scaling (C vs Al), each to ~2 %.

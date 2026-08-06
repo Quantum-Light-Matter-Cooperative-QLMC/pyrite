@@ -45,7 +45,7 @@ FWHM, so a record computed with `mosaic=False` can be re-broadened at plot time.
   `materials.CATALOG` and `materials.crystal.load_crystals` surface it.
 - `sweep.Sweep(mosaic=…, mosaic_fwhm_deg=…)` → `build_cases` → `case["mosaic_fwhm_rad"]`.
 - `plots.plot_mosaic_comparison` — overlay grades from one record.
-- Tests: `tests/test_mosaic.py`.
+- Tests: `tests/montecarlo/test_mosaic.py`.
 
 **Model Limitations:**
 
@@ -135,7 +135,7 @@ lineshape.
   `mosaic_mc_*` case keys **and turns the analytic `store_result` term off** — the two
   routes are mutually exclusive (applying both double-counts the broadening).
 - Validation: `checks/mosaic_mc_check.py`; synthetic unit tests (quadrature +
-  wiring): `tests/test_mosaic_mc.py`. The completed scoping study was retired after
+  wiring): `tests/montecarlo/test_mosaic_mc.py`. The completed scoping study was retired after
   its decision was implemented; its conclusion is preserved above.
 
 ```python

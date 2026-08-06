@@ -126,11 +126,11 @@ unit unless noted):
 
 Using the worktree virtual environment, the following all passed:
 
-* `tests/test_finite_transverse_geometry.py`,
-  `tests/test_spectrum_escape_helpers.py`, `tests/test_multilayer.py`, and
-  `tests/test_chunk_invariance.py` with the finite/prism/layer selection:
+* `tests/montecarlo/test_finite_transverse_geometry.py`,
+  `tests/montecarlo/test_spectrum_escape_helpers.py`, `tests/montecarlo/test_multilayer.py`, and
+  `tests/montecarlo/test_chunk_invariance.py` with the finite/prism/layer selection:
   22 passed.
-* `tests/test_montecarlo.py` finite-footprint/all-missed/omitted-footprint
+* `tests/montecarlo/test_montecarlo.py` finite-footprint/all-missed/omitted-footprint
   selection: 8 passed.
 * `tests/test_sweep.py -k footprint`: 8 passed; and
   `tests/test_run.py -k finite_footprint`: 3 passed.

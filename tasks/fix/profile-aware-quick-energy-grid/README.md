@@ -36,9 +36,9 @@ quick-energy subset.
 - `src/cxr_mc/_remote/scripts.py`: keep the CPU cProfile phase's `--quick`,
   `--workers 0`, isolated checkpoint, no sampler, and 10-minute cap. Change
   only if command construction must expose the resolved quick selection.
-- `tests/test_local_click_cli.py` or a narrowly owned scan test: cover quick
+- `tests/cli/test_local_click_cli.py` or a narrowly owned scan test: cover quick
   resolution for profiles with and without 50 keV.
-- `tests/test_remote.py`: preserve generated-script CPU profiling contracts and
+- `tests/remote/test_remote.py`: preserve generated-script CPU profiling contracts and
   add coverage proving a profile without 50 keV can reach a valid bounded CPU
   command path.
 - `docs/cli-reference.md` and `tests/data/cli_contract.json`: regenerate only if

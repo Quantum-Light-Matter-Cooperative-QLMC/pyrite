@@ -233,7 +233,7 @@ def test_launch_treats_keyboard_interrupt_as_normal_marimo_exit():
 
 
 def test_validation_app_initializes_its_default_supplementary_study():
-    repo_dir = Path(__file__).resolve().parents[1]
+    repo_dir = Path(__file__).resolve().parents[2]
 
     completed = subprocess.run(
         [sys.executable, check.NOTEBOOK],
@@ -247,7 +247,7 @@ def test_validation_app_initializes_its_default_supplementary_study():
 
 
 def test_validation_app_centers_the_supplementary_figure():
-    repo_dir = Path(__file__).resolve().parents[1]
+    repo_dir = Path(__file__).resolve().parents[2]
     source = (repo_dir / check.NOTEBOOK).read_text(encoding="utf-8")
 
     assert "mo.center(figure)" in source
@@ -264,7 +264,7 @@ def test_validation_app_never_falls_back_to_heavy_local_cache_population():
 
 
 def test_validation_app_declares_evidence_tasks_and_authorities():
-    source = (Path(__file__).resolve().parents[1] / check.NOTEBOOK).read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[2] / check.NOTEBOOK).read_text(encoding="utf-8")
 
     for task in ("Anchors", "Reproductions", "Supplementary", "Provenance"):
         assert f'"{task}"' in source
@@ -291,7 +291,7 @@ def test_validation_app_declares_evidence_tasks_and_authorities():
 
 
 def test_validation_diagnostic_success_requires_interpretation():
-    source = (Path(__file__).resolve().parents[1] / check.NOTEBOOK).read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[2] / check.NOTEBOOK).read_text(encoding="utf-8")
 
     assert 'authority == "Diagnostic"' in source
     assert 'state = "Completed—interpret"' in source
@@ -300,7 +300,7 @@ def test_validation_diagnostic_success_requires_interpretation():
 
 
 def test_validation_oracle_distinguishes_missing_dependency_from_failed_comparison():
-    source = (Path(__file__).resolve().parents[1] / check.NOTEBOOK).read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[2] / check.NOTEBOOK).read_text(encoding="utf-8")
 
     skip_branch = 'authority == "Optional oracle" and "result: skip"'
     assert skip_branch in source
@@ -309,7 +309,7 @@ def test_validation_oracle_distinguishes_missing_dependency_from_failed_comparis
 
 
 def test_repository_default_save_names_mutated_setting_and_file():
-    source = (Path(__file__).resolve().parents[1] / check.NOTEBOOK).read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[2] / check.NOTEBOOK).read_text(encoding="utf-8")
 
     assert "Save repository default" in source
     assert "tmd_exploratory_azimuth_deg" in source

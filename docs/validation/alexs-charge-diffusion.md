@@ -119,7 +119,7 @@ note):
 
 ## 5. Test suite
 
-`uv run pytest tests/test_grating.py -k charge_cloud -v` → **4 passed**:
+`uv run pytest tests/detectors/test_grating.py -k charge_cloud -v` → **4 passed**:
 `test_charge_cloud_sigma_soft_photon_is_maximum_blur`,
 `test_charge_cloud_sigma_zero_when_absorbed_at_front`,
 `test_charge_cloud_sigma_positive_and_bounded_by_soft_limit`,

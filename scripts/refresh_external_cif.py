@@ -3,7 +3,7 @@
 Fetches each catalog crystal that carries a ``cod_id`` (and, when ``MP_API_KEY``
 is set, each ``mp_id``) from the external structure database and records its
 lattice parameters in ``tests/data/external_crystal_lattices.json``. That cached
-file is what the offline cross-check (``tests/test_crystal_external_db.py``)
+file is what the offline cross-check (``tests/materials/test_crystal_external_db.py``)
 diffs the local catalog against.
 
 Usage::

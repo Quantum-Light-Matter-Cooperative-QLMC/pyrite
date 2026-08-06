@@ -59,5 +59,5 @@ hash identically.
 - `src/cxr_mc/run.py`: replay/write, migration, and `cases.json` manifests.
 - `src/cxr_mc/scan.py`: CLI cache modes and performance defaults.
 - `tests/test_profiles.py`, `tests/test_run.py`,
-  `tests/test_local_click_cli.py`, and `tests/test_scan_beam_options.py`:
+  `tests/cli/test_local_click_cli.py`, and `tests/test_scan_beam_options.py`:
   identity, reuse, migration, flag, and forwarding regressions.

@@ -59,7 +59,7 @@ command-contract need; compute-kernel optimization owned by
   `tests/test_checkpoint_cli.py`: checkpoint ownership, local cleanup,
   recompute disposition, shared-case reachability, and compatibility aliases.
 - `src/cxr_mc/_remote/cli.py`, `_remote/lifecycle.py`, `_remote/scripts.py`,
-  `tests/test_remote.py`: cleanup nouns, performance-log pull/removal, mode
+  `tests/remote/test_remote.py`: cleanup nouns, performance-log pull/removal, mode
   validation, and automatic defaulting.
 - `src/cxr_mc/scan.py`: only if profile-owned performance selection or local
   performance-log lifecycle needs shared resolution; do not alter measurement

@@ -7,7 +7,7 @@ three-atom primitive hexagonal cell with `a = 3.62 A`, `c = 5.80 A`, Hf on
 **Code.** `src/cxr_mc/data/cifs/hfs2.cif` and
 `src/cxr_mc/data/materials.toml::[crystals.hfs2]`
 
-**Anchor.** `tests/test_crystallography.py::test_hfs2_structure_sane`
+**Anchor.** `tests/materials/test_crystallography.py::test_hfs2_structure_sane`
 
 **Sources.** 2D Semiconductors, *HfS2 Crystal* product data; Neal et al.,
 *npj 2D Materials and Applications* **5**, 45 (2021),
@@ -118,7 +118,7 @@ implemented coordinates or any checked result.
 Canonical anchor command:
 
 ```text
-uv run python scripts/dev.py test tests/test_crystallography.py -k test_hfs2_structure_sane
+uv run python scripts/dev.py test tests/materials/test_crystallography.py -k test_hfs2_structure_sane
 ```
 
 Result: `1 passed, 18 deselected`.

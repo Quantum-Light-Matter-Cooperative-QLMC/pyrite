@@ -43,7 +43,7 @@ _PROVENANCE = {
 }
 
 # n_families ranked reflection families serialized into the crystal physics block;
-# matches tests/test_material_catalog.py::test_catalog_matches_serialized_physics_for_every_crystal.
+# matches tests/materials/test_material_catalog.py::test_catalog_matches_serialized_physics_for_every_crystal.
 _PHYSICS_N_FAMILIES = 2
 _PHYSICS_E_REF_EV = 1000.0
 

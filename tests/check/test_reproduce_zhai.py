@@ -1,7 +1,7 @@
 """Tests for the cxr_mc._entry.reproduce_zhai shim (the box-invokable entry
 point for the remote Zhai preset, run as ``python -m cxr_mc._entry.reproduce_zhai``)
 -- argument parsing and CLI wiring only; the actual MC work is reproduce_all,
-tested in tests/test_anchor_figures.py."""
+tested in tests/notebooks/test_anchor_figures.py."""
 
 from pathlib import Path
 

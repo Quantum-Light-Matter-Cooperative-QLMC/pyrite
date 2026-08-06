@@ -182,8 +182,8 @@ actual run output.
   at 85°; spectra divide by `segments["Ne"]`, so misses stay in the
   normalization. Pass.
 - Repo anchors (corroboration only):
-  `tests/test_finite_transverse_geometry.py -k project_beam_entry` (5 passed)
-  and `tests/test_montecarlo.py -k grazing` (2 passed).
+  `tests/montecarlo/test_finite_transverse_geometry.py -k project_beam_entry` (5 passed)
+  and `tests/montecarlo/test_montecarlo.py -k grazing` (2 passed).
 
 ## 6. Verdict
 

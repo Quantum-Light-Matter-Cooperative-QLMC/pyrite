@@ -42,7 +42,7 @@ registry (`--write`/`--check`, mirrors `generate_cli_reference.py`).
   prefactor) that raised `AttributeError` on any NumPy-only backend since
   NumPy has no `.fuse`. Deleted; unrelated to D7 but blocked every CLI test
   and the reference-doc generator on this machine.
-- [x] Full verify: `cxr-dev lint` clean, `typecheck` clean, `test-suite cli` 942 passed, `test-suite packaging` 183 passed, `test-suite apps` 273 passed. `test-suite core` 984 passed / 39 skipped / 4 failed — the 4 failures (`test_adaptive_chunk_*` in `tests/test_montecarlo.py`) are pre-existing, unrelated to D7 or the `fused_prefactor` deletion: they hardcode a fp32 (`_REAL_BYTES=4`) chunk-size constant that only holds on a GPU backend, and this machine has none installed, so `REAL` resolves to fp64. Only visible now because the collection-blocking bug above previously aborted the whole file before these ran. Left unfixed as out of scope for this task.
+- [x] Full verify: `cxr-dev lint` clean, `typecheck` clean, `test-suite cli` 942 passed, `test-suite packaging` 183 passed, `test-suite apps` 273 passed. `test-suite core` 984 passed / 39 skipped / 4 failed — the 4 failures (`test_adaptive_chunk_*` in `tests/montecarlo/test_montecarlo.py`) are pre-existing, unrelated to D7 or the `fused_prefactor` deletion: they hardcode a fp32 (`_REAL_BYTES=4`) chunk-size constant that only holds on a GPU backend, and this machine has none installed, so `REAL` resolves to fp64. Only visible now because the collection-blocking bug above previously aborted the whole file before these ran. Left unfixed as out of scope for this task.
 
 ## Non-goals
 

@@ -104,7 +104,7 @@ repeatable (`multiple=True`) works; `--help` shows only the canonical.
 5. **Verify — complete 2026-08-05.** Lint and default-feature typecheck pass.
    Suites: CLI 977 passed; packaging 190 passed; apps 273 passed; core 985
    passed / 39 skipped, plus the 4 expected pre-existing
-   `test_adaptive_chunk_*` failures in `tests/test_montecarlo.py` on CPU-only
+   `test_adaptive_chunk_*` failures in `tests/montecarlo/test_montecarlo.py` on CPU-only
    machines (hardcoded fp32 `_REAL_BYTES=4`). The core run's only additional
    failure was a sandbox forkserver socket denial; its focused end-to-end test
    passed outside the sandbox (1 passed, 66 deselected).

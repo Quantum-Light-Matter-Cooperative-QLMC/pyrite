@@ -245,7 +245,7 @@ terms.
 Focused CPU result:
 
 ```text
-tests/test_coherent_emission.py: 5 passed in 1.81s
+tests/montecarlo/test_coherent_emission.py: 5 passed in 1.81s
 ```
 
 The tests anchor the self-term, coincident-electron scaling, corrected

@@ -141,9 +141,9 @@ and toctree issues. Do not classify unrelated new failures under that waiver.
      tests/cli/test_json.py \
      tests/cli/test_json_wiring.py \
      tests/cli/test_profile.py \
-     tests/test_material_catalog.py \
+     tests/materials/test_material_catalog.py \
      tests/test_campaign_lock.py \
-     tests/test_remote_artifact_sync.py \
+     tests/remote/test_artifact_sync.py \
      -k 'not standalone_module_entry_points_remain_available'
    ```
 

@@ -87,6 +87,6 @@ widened a destructive command.
 `cxr-dev format` reformatted 11 files carrying pre-existing format drift
 (`_remote/presentation.py`, `_remote/viewer.py`, `cli/_dashboard.py`,
 `cli/commands/profile.py`, `plots/altair_spectra.py`, `plots/spectra.py`,
-`tests/test_local_dashboard.py`, `tests/test_material_comparison.py`, and
+`tests/test_local_dashboard.py`, `tests/plots/test_material_comparison.py`, and
 others). Committed alongside this work at the owner's direction; formatting
 only, no behavior change.

@@ -89,7 +89,7 @@ def test_fetch_mp_lattice_surfaces_configured_key_failure_without_secret() -> No
 
 
 def test_refresh_retains_cached_entry_after_configured_mp_failure(monkeypatch) -> None:
-    script_path = Path(__file__).parents[1] / "scripts" / "refresh_external_cif.py"
+    script_path = Path(__file__).parents[2] / "scripts" / "refresh_external_cif.py"
     spec = importlib.util.spec_from_file_location("refresh_external_cif_test", script_path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

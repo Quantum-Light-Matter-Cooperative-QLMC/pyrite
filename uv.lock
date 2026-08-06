@@ -664,7 +664,6 @@ nvidia = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "pytest" },
     { name = "pytest-xdist" },
 ]
 docs = [
@@ -715,10 +714,7 @@ requires-dist = [
 provides-extras = ["external-db", "nvidia", "amd", "intel", "viz-render"]
 
 [package.metadata.requires-dev]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-xdist", specifier = ">=3.8.0" },
-]
+dev = [{ name = "pytest-xdist", specifier = ">=3.8.0" }]
 docs = [
     { name = "furo", specifier = ">=2024.8.6" },
     { name = "myst-parser", specifier = ">=4.0" },

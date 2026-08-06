@@ -30,7 +30,7 @@ be established against the user's checkpoints before changing semantics.
 - `src/cxr_mc/run.py` / `src/cxr_mc/analyze.py`: persistent analysis-cache
   plumbing only if the shared-summary design exposes an invalidation or
   concurrency defect.
-- `tests/test_material_comparison.py`, `tests/test_run.py`, and
+- `tests/plots/test_material_comparison.py`, `tests/test_run.py`, and
   `tests/test_analysis_app.py`: numerical selection, cache behavior, and app
   structure/regression coverage.
 

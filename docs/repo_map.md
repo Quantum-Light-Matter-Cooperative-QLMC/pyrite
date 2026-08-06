@@ -233,7 +233,7 @@ Simulation core: electron transport, segment-sum PXR+CBS line spectrum,
 bremsstrahlung, parallel case runner, detector-convolution helpers.
 Split from single module into submodules; **every public and internal name
 re-exported from package** — `from cxr_mc.montecarlo import X` unchanged
-(`tests/test_montecarlo_exports.py` freeze export set).
+(`tests/montecarlo/test_exports.py` freeze export set).
 - `_backend` — portable NumPy, CUDA/ROCm CuPy, and Intel dpnp/SYCL backend
   adapters; deterministic `CXR_MC_BACKEND` selection plus compatibility
   exports `xp`, `cp`, `REAL`, `_to_cpu`, `_GPU`.
@@ -372,7 +372,7 @@ a lazy `__getattr__`.
 Result records, derived line metrics, ranking/selection. Split from single
 module into submodules; **every public and internal name re-exported from
 package** — `from cxr_mc.results import X` unchanged
-(`tests/test_results_exports.py` freeze export set).
+(`tests/results/test_exports.py` freeze export set).
 - `store` — `{config_name: {E0_keV: record}}` store: `Settings` (dataclass),
   `store_result`, `detected_background`, `PER_NA`.
 - `selection` — subset/reduce store: `records`, `records_for_cases`,
@@ -389,7 +389,7 @@ package** — `from cxr_mc.results import X` unchanged
 ### `plots/` (package)
 All plotting — Matplotlib/Plotly. Split from single module into submodules by
 figure type; **every public and internal name re-exported from package** —
-`from cxr_mc.plots import X` unchanged (`tests/test_plots_exports.py`
+`from cxr_mc.plots import X` unchanged (`tests/plots/test_exports.py`
 freeze export set). Submodule DAG (leaf → driver):
 `_style → _common → _frames → sweeps → {spectra, detectors, trajectories} → interactive`.
 - `_style` — `COLORS`, `_ENERGY_PALETTE`, `energy_color` (per-energy colour map
@@ -425,7 +425,7 @@ freeze export set). Submodule DAG (leaf → driver):
   data prep with matplotlib path (`_common._line_brem`, `_frames` builders,
   `detectors`/`trajectories` internals) — physics identical, only renderer
   differ. Intentionally **NOT** re-exported from package (frozen export
-  guard) — import from submodule. Per-module guard tests: `tests/test_altair_*.py`.
+  guard) — import from submodule. Per-module guard tests: `tests/notebooks/altair/test_*.py`.
   - `altair_spectra` — intrinsic spectra: `spectrum_chart`, `spectrum_frame`,
     `compare_spectrum_chart` (overlay one line per E0/tilt/azimuth, for
     Energy/Polar-angle/Azimuthal comparison notebook tabs). Deps: `_common`,

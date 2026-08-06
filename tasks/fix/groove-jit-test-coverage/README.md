@@ -5,7 +5,7 @@ TODO scope: direct input, triaged 2026-08-05.
 
 ## Problem
 
-`tests/test_groove.py` has 8 failing tests that monkeypatch
+`tests/montecarlo/test_groove.py` has 8 failing tests that monkeypatch
 `_transport_module.first_surface_event` / `first_prism_exit`. Those module
 attributes no longer exist: commit `e338f3c` ("feat(JIT transport): full
 support for JIT transport") deleted the pure-Python
@@ -25,7 +25,7 @@ testing of this inner loop under the current njit design.
 
 ## Scope and owners
 
-- `tests/test_groove.py`: rewrite the 8 failing tests (listed below) as
+- `tests/montecarlo/test_groove.py`: rewrite the 8 failing tests (listed below) as
   black-box tests against `simulate_trajectories()` output, using real
   `groove_spec` / `n_atoms_per_ang3` / `E_cut_keV` / `layers` / beam-geometry
   combinations (seed=9, deterministic) that trigger each scenario, instead of
@@ -41,7 +41,7 @@ non-jit fallback path purely for testability (considered and rejected — see
 Decisions). No changes to `src/cxr_mc/montecarlo/groove.py` or `geometry.py`
 expected.
 
-## Tests to rewrite (`tests/test_groove.py`)
+## Tests to rewrite (`tests/montecarlo/test_groove.py`)
 
 Each must preserve its original intent, now via real triggering geometry
 instead of a mock:
@@ -81,17 +81,17 @@ instead of a mock:
       density, thickness, `E_cut_keV`, `max_steps`, and beam geometry that
       deterministically (`seed=9`) reproduces the event sequence the original
       mock forced. A scratch probe
-      (`/home/alexa/dev/cxr-mc/tests/test_groove.py`-adjacent, see prior
+      (`/home/alexa/dev/cxr-mc/tests/montecarlo/test_groove.py`-adjacent, see prior
       session's `probe_groove.py`) showed the existing `_one_electron_transport`
       default kwargs (straight-vertical beam, shallow spec) pass through with
       zero groove interaction — non-default geometry/kwargs are needed per
       scenario.
 - [ ] Rewrite each test body; keep the existing `_one_electron_transport`
       helper if still useful, otherwise adjust it.
-- [ ] Run `tests/test_groove.py` in full (not just the 8) to confirm no
+- [ ] Run `tests/montecarlo/test_groove.py` in full (not just the 8) to confirm no
       regression in the other 25 already-passing tests.
 - [ ] Run project lint/typecheck on the touched file.
-- [ ] Scoped diff review: only `tests/test_groove.py` should change unless a
+- [ ] Scoped diff review: only `tests/montecarlo/test_groove.py` should change unless a
       stop condition below is hit.
 
 ## Decisions and open questions

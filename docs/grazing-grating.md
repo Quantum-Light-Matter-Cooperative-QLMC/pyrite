@@ -22,7 +22,7 @@ response** (`qe_absorption`, `charge_cloud_sigma_um`, `energy_fwhm_eV`,
 `detected_image_physical`) with real (if device-constant-placeholder) QE,
 charge-sharing, and energy-resolution physics — all as a standalone forward
 model — nothing in the sweep/plot pipeline imports it yet. Cross-checked in
-`tests/test_grating.py`.
+`tests/detectors/test_grating.py`.
 
 | provided | meaning |
 | --- | --- |
