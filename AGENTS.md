@@ -22,19 +22,19 @@ prose keep required format.
 Use project runner; never bare `pytest`, `.venv/bin/python`, or path-hack imports.
 
 ```bash
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite core
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite cli
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite apps
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite packaging
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test path/to/test.py -k test_name
-CXR_ONLINE_TESTS=1 rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev lint
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev format
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev typecheck
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev nbstrip
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev verify
-rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev precommit
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite core
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite cli
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite apps
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite packaging
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test path/to/test.py -k test_name
+CXR_ONLINE_TESTS=1 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev lint
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev format
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev typecheck
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev nbstrip
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev verify
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev precommit
 ```
 
 If `uv run` cannot write project environment, add
