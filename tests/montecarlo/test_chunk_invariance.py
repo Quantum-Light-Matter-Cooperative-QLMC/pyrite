@@ -1,11 +1,12 @@
 """A1 chunk-size invariance gate (docs/acceleration-technique-evaluation.md, A1).
 
-The ``spec_chunk`` / ``brem_chunk`` knobs only bound how many trajectory segments
-go into each GPU matmul -- they must not change the physics. The only thing that
-moves when the chunk size changes is the float-summation reduction ORDER across
-the chunk loop, so the spectra agree to a float tolerance rather than bit-for-bit.
-This gate is what lets the A1 spike retune the chunk size for throughput without
-silently perturbing results.
+The ``spec_chunk`` / ``brem_chunk`` knobs are memory/performance controls, not
+physics controls.  Eager CPU/CuPy fallbacks use them to partition the segment
+reduction; optimized JIT reductions may bypass part or all of that dense-matrix
+chunking.  Either way, changing the requested chunk must not change the spectrum.
+Where the reduction order does move, equality is therefore tolerance-based rather
+than bit-for-bit.  This gate lets the implementation retune or replace chunked
+work without silently perturbing results.
 
 The tolerance must track the backend's accumulation precision, which
 ``montecarlo._backend.REAL`` selects at import: float64 on a CPU box (or under
@@ -78,6 +79,7 @@ def finite_side_segments():
         "L_ang": np.full(3, 10.0),
         "E_keV": np.full(3, 30.0),
         "t_ang": np.zeros(3),
+        "t0_ang": np.zeros(3),
         "elec_id": np.arange(3),
         "layer": np.zeros(3, dtype=int),
         "Ne": 3,
@@ -89,6 +91,26 @@ def finite_side_segments():
 
 def test_line_spectrum_chunk_invariant(segments):
     kw = dict(crystal="hopg", hkl_list=HKL, theta_obs_rad=THETA, B_ang2=B_002)
+    one_shot = mc_spectrum(segments, E_LINE, chunk=BIG_CHUNK, **kw)
+    chunked = mc_spectrum(segments, E_LINE, chunk=TINY_CHUNK, **kw)
+    _assert_chunk_invariant(one_shot, chunked)
+
+
+def test_coherent_line_spectrum_chunk_invariant(segments):
+    """Coherent field accumulation is invariant to the spectrum chunk request.
+
+    On the eager fallback this exercises a different partitioning of the complex
+    field sum.  On the CUDA JIT reduction the chunk may be bypassed entirely;
+    that is also a valid implementation as long as the public knob cannot alter
+    the physics result.
+    """
+    kw = dict(
+        crystal="hopg",
+        hkl_list=HKL,
+        theta_obs_rad=THETA,
+        B_ang2=B_002,
+        coherent=True,
+    )
     one_shot = mc_spectrum(segments, E_LINE, chunk=BIG_CHUNK, **kw)
     chunked = mc_spectrum(segments, E_LINE, chunk=TINY_CHUNK, **kw)
     _assert_chunk_invariant(one_shot, chunked)
@@ -107,6 +129,19 @@ def test_finite_line_spectrum_chunk_invariant(finite_side_segments):
         hkl_list=((0, 0, 2),),
         B_ang2=B_002,
         n_hat=np.array([1.0, 0.0, 0.01]),
+    )
+    one_shot = mc_spectrum(finite_side_segments, E_LINE, chunk=BIG_CHUNK, **kw)
+    chunked = mc_spectrum(finite_side_segments, E_LINE, chunk=1, **kw)
+    _assert_chunk_invariant(one_shot, chunked)
+
+
+def test_finite_coherent_line_spectrum_chunk_invariant(finite_side_segments):
+    kw = dict(
+        crystal="hopg",
+        hkl_list=((0, 0, 2),),
+        B_ang2=B_002,
+        n_hat=np.array([1.0, 0.0, 0.01]),
+        coherent=True,
     )
     one_shot = mc_spectrum(finite_side_segments, E_LINE, chunk=BIG_CHUNK, **kw)
     chunked = mc_spectrum(finite_side_segments, E_LINE, chunk=1, **kw)

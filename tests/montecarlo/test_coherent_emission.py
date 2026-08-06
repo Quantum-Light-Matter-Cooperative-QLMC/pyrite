@@ -22,7 +22,23 @@ KWARGS = {
 }
 
 RTOL = max(1e-12, 100.0 * float(np.finfo(REAL).eps))
+# The batched (n_seg, N_g) path intentionally reassociates a handful of float
+# operations relative to the legacy per-hkl reference.  Give that cross-path
+# comparison the same order-of-eps latitude as the chunk-invariance gate while
+# retaining a peak-scaled absolute floor for bins near an exact zero.
+BATCH_RTOL = max(1e-10, 500.0 * float(np.finfo(REAL).eps))
 ATOL = 1e-8
+
+
+def _assert_batch_close(actual, reference):
+    peak = float(max(np.max(np.abs(actual)), np.max(np.abs(reference))))
+    assert peak > 0.0
+    np.testing.assert_allclose(
+        actual,
+        reference,
+        rtol=BATCH_RTOL,
+        atol=BATCH_RTOL * 1e-2 * peak,
+    )
 
 
 def _segments(count=1):
@@ -99,6 +115,50 @@ def test_straight_trajectory_segments_are_in_phase_at_resonance(sinc_cutoff):
 
     assert one_segment[1] > 0.0
     np.testing.assert_allclose(two_segments[1], 4.0 * one_segment[1], rtol=RTOL)
+
+
+def test_batched_coherent_matches_legacy_per_hkl_reference():
+    """The new batched coherent setup must preserve the legacy per-hkl result.
+
+    ``sinc_cutoff=None`` selects the batched coherent route.  A deliberately
+    enormous finite cutoff selects the legacy per-hkl route, but its energy
+    window is far wider than this test grid, so no sinc tail is actually
+    removed.  The two calls therefore differ only in implementation/reduction
+    ordering, not in the modeled physics.
+    """
+    segments = _segments(2)
+
+    batched = mc_spectrum(segments, E_GRID, coherent=True, sinc_cutoff=None, **KWARGS)
+    legacy = mc_spectrum(segments, E_GRID, coherent=True, sinc_cutoff=1.0e6, **KWARGS)
+
+    _assert_batch_close(batched, legacy)
+
+
+def test_coherent_reflections_remain_incoherent_under_batching():
+    """Batching across g must not create cross-reflection field interference."""
+    segments = _segments(2)
+    energy_grid = np.arange(500.0, 3200.0, 2.0)
+    hkls = ((0, 0, 2), (0, 0, 4))
+
+    singles = []
+    for hkl in hkls:
+        spec = mc_spectrum(
+            segments,
+            energy_grid,
+            coherent=True,
+            **{**KWARGS, "hkl_list": [hkl]},
+        )
+        assert np.max(spec) > 0.0
+        singles.append(spec)
+
+    together = mc_spectrum(
+        segments,
+        energy_grid,
+        coherent=True,
+        **{**KWARGS, "hkl_list": list(hkls)},
+    )
+
+    _assert_batch_close(together, singles[0] + singles[1])
 
 
 def test_coherent_components_are_rejected():

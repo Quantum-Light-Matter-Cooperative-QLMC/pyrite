@@ -38,8 +38,10 @@ _USE_JIT_LINE_REDUCTION = True
 # numerical goldens, repeatability, and A/B timing on the supported GPUs.
 _USE_JIT_LINE_PROLOGUE = False
 _USE_JIT_COHERENT_REDUCTION = True
+_USE_JIT_COHERENT_STREAM = True
 _USE_JIT_BREM_REDUCTION = True
 _JIT_LINE_BATCH_TARGET = 400_000
+_JIT_COHERENT_PAIR_TARGET = 1_000_000
 
 
 def _sincsq_lineshape(a_width_j, E_grid, E_r_j):
@@ -1208,15 +1210,47 @@ def mc_spectrum(
             _prologue_u_re = U_RE.reshape(-1)
             _prologue_u_im = U_IM.reshape(-1)
 
-        # The coherent reduction kernel stays PER-(reflection, orientation) --
-        # its signature is unchanged. Squaring is intrinsically per-row (fields
-        # from different g must never mix before |.|^2), so a g-batched kernel
-        # would need a 2-D grid plus per-row line offsets to save N_g launches
-        # per case (4 on the profiled hopg_coherent shape). The launch storm this
-        # branch removes is in steps 1-6, not in the reduction; the row loop
-        # below therefore feeds the existing kernel from batched inputs.
+        # Coherent CUDA fast path: stream one bounded segment block at a time
+        # through a fused (segment, g) prologue and into persistent per-g complex
+        # field planes.  The field, not the intensity, is additive across segment
+        # blocks, so this is algebraically the coherent sum while avoiding the old
+        # all-lines ``coh_blocks`` retention, boolean compaction, row-count D2H
+        # sync, and per-g concatenate/slice pass.  The final kernel squares each g
+        # row independently and only then mosaic-weights/sums rows, so reflections
+        # and orientations remain incoherent.  Validation: coherent-line-hkl-batch
+        _use_jit_coherent_stream = (
+            coherent
+            and _USE_JIT_COHERENT_STREAM
+            and getattr(xp, "__name__", "") == "cupy"
+            and np.dtype(REAL) == np.dtype(np.float32)
+            and sinc_cutoff is None
+        )
+        if _use_jit_coherent_stream:
+            from .coherent_stream_jit_kernel import (
+                DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
+                allocate_coherent_fields,
+                finalize_coherent_fields,
+                run_coherent_field_accumulation_kernel,
+                run_coherent_prologue_kernel,
+            )
+
+            _coh_g = G.reshape(-1)
+            _coh_es = ES.reshape(-1)
+            _coh_ep = EP.reshape(-1)
+            _coh_chi_re = CHI_RE.reshape(-1)
+            _coh_chi_im = CHI_IM.reshape(-1)
+            _coh_u_re = U_RE.reshape(-1)
+            _coh_u_im = U_IM.reshape(-1)
+            _coh_phase_slope = xp.ascontiguousarray(d_all / HBARC_EV_ANG, dtype=REAL)
+            coherent_fields = allocate_coherent_fields(N_g, E_grid.size)
+        else:
+            coherent_fields = None
+
+        # Existing per-row coherent reducer remains the compatibility fallback for
+        # non-streaming coherent execution (e.g. disabling the experimental stage).
         _use_jit_coherent_reduction = (
             coherent
+            and not _use_jit_coherent_stream
             and _USE_JIT_COHERENT_REDUCTION
             and getattr(xp, "__name__", "") == "cupy"
             and np.dtype(REAL) == np.dtype(np.float32)
@@ -1228,15 +1262,14 @@ def mc_spectrum(
             )
 
         n_seg = v_all.shape[0]
-        seg_block = max(1, 1_000_000 // max(1, N_g))  # bound (n_block, N_g) temporaries
+        pair_target = _JIT_COHERENT_PAIR_TARGET if coherent else 1_000_000
+        seg_block = max(1, pair_target // max(1, N_g))  # bound (n_block, N_g) temporaries
 
-        # Line buffers for the coherent path. |sum_j|^2 is NOT additive over
-        # segment blocks, so unlike the incoherent flush these cannot be reduced
-        # incrementally: each row's kept lines are collected across all blocks
-        # and reduced once, after the loop. Peak footprint is 8 REAL values per
-        # kept (segment, g) pair.
-        coh_blocks = []  # per block: 8 g-major, mask-compacted line arrays
-        coh_counts = []  # per block: (N_g,) kept-line counts, device-side
+        # Compatibility-fallback buffers. The streaming RawKernel path above
+        # does not retain line records across segment blocks; these stay empty when
+        # it is active.
+        coh_blocks = []
+        coh_counts = []
 
         pending_E_r = []
         pending_aw = []
@@ -1278,6 +1311,50 @@ def mc_spectrum(
 
         for s0 in range(0, n_seg, seg_block):
             sb = slice(s0, min(s0 + seg_block, n_seg))
+
+            if _use_jit_coherent_stream:
+                _nsys_push("cxr.lines.coherent_prologue")
+                coh_line_data = run_coherent_prologue_kernel(
+                    v_all[sb].reshape(-1),
+                    denom_full[sb].reshape(-1),
+                    gamma_full[sb].reshape(-1),
+                    t_L_full[sb].reshape(-1),
+                    L_esc_full[sb].reshape(-1),
+                    line_electron[sb],
+                    seg_r[sb].reshape(-1),
+                    _coh_phase_slope[sb],
+                    _coh_g,
+                    _coh_es,
+                    _coh_ep,
+                    E_tab_g,
+                    _coh_chi_re,
+                    _coh_chi_im,
+                    _coh_u_re,
+                    _coh_u_im,
+                    mu_tab_g,
+                    lo_keep=lo_keep,
+                    hi_keep=hi_keep,
+                    hbarc=HBARC_EV_ANG,
+                    electron_mass_eV=M_E_EV,
+                    alpha_fs=ALPHA_FS,
+                    pref_c1=_PREF_C1,
+                    n_hat=n_hat,
+                    n_g=N_g,
+                    config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
+                )
+                _nsys_pop()
+                _nsys_push("cxr.lines.coherent_field")
+                run_coherent_field_accumulation_kernel(
+                    *coh_line_data,
+                    E_grid,
+                    fields=coherent_fields,
+                    n_g=N_g,
+                    n_seg=sb.stop - sb.start,
+                    config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
+                )
+                _nsys_pop()
+                del coh_line_data  # release scratch before the next block allocates
+                continue
 
             if _use_jit_line_prologue:
                 _nsys_push("cxr.lines.prologue")
@@ -1494,7 +1571,17 @@ def mc_spectrum(
         if _use_jit_line_reduction:
             _flush_line_batch()
 
-        if coherent:
+        if _use_jit_coherent_stream:
+            _nsys_push("cxr.lines.coherent_finalize")
+            finalize_coherent_fields(
+                coherent_fields,
+                WM.reshape(-1),
+                out=spec,
+                n_g=N_g,
+                config=DEFAULT_COHERENT_STREAM_KERNEL_CONFIG,
+            )
+            _nsys_pop()
+        elif coherent:
             # -- 7c. per-(reflection, orientation) coherent reduction ----------
             # Sum the phased complex field over ALL of ONE row's segments, square
             # it, and add |F_s|^2 + |F_p|^2 weighted by that row's mosaic weight.
