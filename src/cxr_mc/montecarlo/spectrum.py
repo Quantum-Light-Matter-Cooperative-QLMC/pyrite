@@ -34,6 +34,9 @@ from .transport import TRANSPORT_ELEMENTS, beta_from_keV
 # ---- segment-sum CXR spectrum ------------------------------------------------
 _SEG_ARRAYS = ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "t0_ang", "elec_id", "layer")
 _USE_JIT_LINE_REDUCTION = True
+# Staged behind an explicit opt-in until the new kernel passes CUDA compilation,
+# numerical goldens, repeatability, and A/B timing on the supported GPUs.
+_USE_JIT_LINE_PROLOGUE = False
 _USE_JIT_COHERENT_REDUCTION = True
 _USE_JIT_BREM_REDUCTION = True
 _JIT_LINE_BATCH_TARGET = 400_000
@@ -213,6 +216,102 @@ def _interp_gather1d(idx, frac, below, above, f):
     y = xp.where(below, f[0], y)
     y = xp.where(above, f[f.size - 1], y)
     return y
+
+
+_INTERP_GATHER_LINE_TABLES_F32 = None
+if hasattr(xp, "ElementwiseKernel"):
+    # A single launch gathers chi/U real+imag and mu for every (segment, g)
+    # pair.  Explicit round-to-nearest intrinsics prevent NVCC from contracting
+    # the old f0 + frac*(f1-f0) sequence into an FMA, preserving the accepted
+    # line-hkl-batch rounding for each interpolation blend.
+    _INTERP_GATHER_LINE_TABLES_F32 = xp.ElementwiseKernel(
+        "raw I idx, raw float32 frac, raw bool below, raw bool above, "
+        "raw float32 chi_re_tab, raw float32 chi_im_tab, "
+        "raw float32 u_re_tab, raw float32 u_im_tab, raw float32 mu_tab, "
+        "int32 n_g, int32 n_tab",
+        "float32 chi_re, float32 chi_im, float32 u_re, float32 u_im, float32 mu",
+        r"""
+        const long long bracket = (long long)idx[i];
+        const int g = (int)(i % (size_t)n_g);
+        const long long base = (long long)g * (long long)n_tab;
+        const long long lo = base + bracket - 1;
+        const long long hi = base + bracket;
+        const bool use_lo = below[i];
+        const bool use_hi = above[i];
+        const float f = frac[i];
+
+        float a0 = chi_re_tab[lo];
+        chi_re = use_lo ? chi_re_tab[base]
+                 : (use_hi ? chi_re_tab[base + n_tab - 1]
+                           : __fadd_rn(a0, __fmul_rn(f, __fsub_rn(chi_re_tab[hi], a0))));
+        a0 = chi_im_tab[lo];
+        chi_im = use_lo ? chi_im_tab[base]
+                 : (use_hi ? chi_im_tab[base + n_tab - 1]
+                           : __fadd_rn(a0, __fmul_rn(f, __fsub_rn(chi_im_tab[hi], a0))));
+        a0 = u_re_tab[lo];
+        u_re = use_lo ? u_re_tab[base]
+               : (use_hi ? u_re_tab[base + n_tab - 1]
+                         : __fadd_rn(a0, __fmul_rn(f, __fsub_rn(u_re_tab[hi], a0))));
+        a0 = u_im_tab[lo];
+        u_im = use_lo ? u_im_tab[base]
+               : (use_hi ? u_im_tab[base + n_tab - 1]
+                         : __fadd_rn(a0, __fmul_rn(f, __fsub_rn(u_im_tab[hi], a0))));
+
+        const long long mu_lo = bracket - 1;
+        a0 = mu_tab[mu_lo];
+        mu = use_lo ? mu_tab[0]
+             : (use_hi ? mu_tab[n_tab - 1]
+                       : __fadd_rn(a0, __fmul_rn(f, __fsub_rn(mu_tab[bracket], a0))));
+        """,
+        "cxr_interp_gather_line_tables_f32",
+    )
+
+
+def _interp_gather_line_tables(
+    idx,
+    frac,
+    below,
+    above,
+    chi_re_tab,
+    chi_im_tab,
+    u_re_tab,
+    u_im_tab,
+    mu_tab,
+):
+    """Gather every line-coupling table from one shared interpolation bracket."""
+    if (
+        _INTERP_GATHER_LINE_TABLES_F32 is not None
+        and idx.dtype.kind in "iu"
+        and frac.dtype == xp.float32
+        and chi_re_tab.dtype == xp.float32
+        and mu_tab.dtype == xp.float32
+    ):
+        n_g, n_tab = chi_re_tab.shape
+        flat = _INTERP_GATHER_LINE_TABLES_F32(
+            idx,
+            frac,
+            below,
+            above,
+            chi_re_tab,
+            chi_im_tab,
+            u_re_tab,
+            u_im_tab,
+            mu_tab,
+            np.int32(n_g),
+            np.int32(n_tab),
+            size=idx.size,
+        )
+        return tuple(value.reshape(idx.shape) for value in flat)
+
+    n_g = chi_re_tab.shape[0]
+    gcol = xp.arange(n_g)
+    return (
+        _interp_gather2d(idx, frac, below, above, chi_re_tab, gcol),
+        _interp_gather2d(idx, frac, below, above, chi_im_tab, gcol),
+        _interp_gather2d(idx, frac, below, above, u_re_tab, gcol),
+        _interp_gather2d(idx, frac, below, above, u_im_tab, gcol),
+        _interp_gather1d(idx, frac, below, above, mu_tab),
+    )
 
 
 def _line_kin_core(vx, vy, vz, gx, gy, gz, denom, nx, ny, nz):
@@ -1055,7 +1154,6 @@ def mc_spectrum(
         _nsys_pop()
 
         N_g = G.shape[0]
-        GCOL = xp.arange(N_g)  # hoisted table-column selector for _interp_gather2d
         gx, gy, gz = G[:, 0][None, :], G[:, 1][None, :], G[:, 2][None, :]  # (1, N_g)
         nx, ny, nz = float(n_hat[0]), float(n_hat[1]), float(n_hat[2])
 
@@ -1091,6 +1189,24 @@ def mc_spectrum(
                 DEFAULT_SPECTRUM_KERNEL_CONFIG,
                 run_reduction_kernel,
             )
+
+        _use_jit_line_prologue = _use_jit_line_reduction and _USE_JIT_LINE_PROLOGUE and not coherent
+        if _use_jit_line_prologue:
+            from .line_prologue_jit_kernel import (
+                DEFAULT_LINE_PROLOGUE_KERNEL_CONFIG,
+                run_line_prologue_kernel,
+            )
+
+            # C-order flattened views are constructed once; slicing v_all by
+            # complete rows below remains contiguous and needs no copy.
+            _prologue_g = G.reshape(-1)
+            _prologue_es = ES.reshape(-1)
+            _prologue_ep = EP.reshape(-1)
+            _prologue_wm = WM.reshape(-1)
+            _prologue_chi_re = CHI_RE.reshape(-1)
+            _prologue_chi_im = CHI_IM.reshape(-1)
+            _prologue_u_re = U_RE.reshape(-1)
+            _prologue_u_im = U_IM.reshape(-1)
 
         # The coherent reduction kernel stays PER-(reflection, orientation) --
         # its signature is unchanged. Squaring is intrinsically per-row (fields
@@ -1144,11 +1260,12 @@ def mc_spectrum(
 
             _nsys_push("cxr.lines.reduce")
 
-            spec[:] += run_reduction_kernel(
+            run_reduction_kernel(
                 E_r_batch,
                 aw_batch,
                 w_batch,
                 E_grid,
+                out=spec,
                 config=DEFAULT_SPECTRUM_KERNEL_CONFIG,
             )
 
@@ -1161,6 +1278,48 @@ def mc_spectrum(
 
         for s0 in range(0, n_seg, seg_block):
             sb = slice(s0, min(s0 + seg_block, n_seg))
+
+            if _use_jit_line_prologue:
+                _nsys_push("cxr.lines.prologue")
+                E_r_f, aw_f, w_f = run_line_prologue_kernel(
+                    v_all[sb].reshape(-1),
+                    denom_full[sb].reshape(-1),
+                    gamma_full[sb].reshape(-1),
+                    t_L_full[sb].reshape(-1),
+                    L_esc_full[sb].reshape(-1),
+                    line_electron[sb],
+                    _prologue_g,
+                    _prologue_es,
+                    _prologue_ep,
+                    _prologue_wm,
+                    E_tab_g,
+                    _prologue_chi_re,
+                    _prologue_chi_im,
+                    _prologue_u_re,
+                    _prologue_u_im,
+                    mu_tab_g,
+                    lo_keep=lo_keep,
+                    hi_keep=hi_keep,
+                    hbarc=HBARC_EV_ANG,
+                    electron_mass_eV=M_E_EV,
+                    alpha_fs=ALPHA_FS,
+                    pref_c1=_PREF_C1,
+                    n_hat=n_hat,
+                    config=DEFAULT_LINE_PROLOGUE_KERNEL_CONFIG,
+                )
+                _nsys_pop()
+                _nsys_push("cxr.lines.reduce")
+                run_reduction_kernel(
+                    E_r_f,
+                    aw_f,
+                    w_f,
+                    E_grid,
+                    out=spec,
+                    config=DEFAULT_SPECTRUM_KERNEL_CONFIG,
+                )
+                _nsys_pop()
+                continue
+
             vx = v_all[sb, 0][:, None]  # (nb, 1)F
             vy = v_all[sb, 1][:, None]
             vz = v_all[sb, 2][:, None]
@@ -1187,10 +1346,19 @@ def mc_spectrum(
             # so bracket ONCE (_interp_index) and gather per table -- kills the
             # fourfold-redundant searchsorted/clip. Bit-for-bit vs _batch_interp.
             _ix, _fr, _blw, _abv = _interp_index(E_res, E_tab_g)
-            chi_re = _interp_gather2d(_ix, _fr, _blw, _abv, CHI_RE, GCOL)
-            chi_im = _interp_gather2d(_ix, _fr, _blw, _abv, CHI_IM, GCOL)
-            u_re = _interp_gather2d(_ix, _fr, _blw, _abv, U_RE, GCOL) / M_E_EV
-            u_im = _interp_gather2d(_ix, _fr, _blw, _abv, U_IM, GCOL) / M_E_EV
+            chi_re, chi_im, u_re, u_im, mu = _interp_gather_line_tables(
+                _ix,
+                _fr,
+                _blw,
+                _abv,
+                CHI_RE,
+                CHI_IM,
+                U_RE,
+                U_IM,
+                mu_tab_g,
+            )
+            u_re = u_re / M_E_EV
+            u_im = u_im / M_E_EV
 
             if coherent:
                 # -- 5c. COMPLEX amplitude per polarization ---------------------
@@ -1220,7 +1388,6 @@ def mc_spectrum(
                 # UN-squared prefactor (its square is the incoherent ``pref``
                 # without t_L^2); the finite-time factor t_L sinc(.) and the
                 # phase exp[i(omega d_j - g.r_j)] are applied by the reduction.
-                mu = _interp_gather1d(_ix, _fr, _blw, _abv, mu_tab_g)
                 amp = xp.sqrt(ALPHA_FS * omega_res / _PREF_C1 * xp.exp(-(L_esc * mu)))
                 a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(omega_res)
                 good = keep & xp.isfinite(amp) & (amp > 0) & (t_L > 0)
@@ -1284,7 +1451,6 @@ def mc_spectrum(
             # mu(E_res) reuses the step-3 interp bracket (no fresh searchsorted);
             # _line_weight_core folds T_abs = exp(-L_esc mu) into the PXR
             # prefactor as one launch. a_width stays inline (needs ones_like).
-            mu = _interp_gather1d(_ix, _fr, _blw, _abv, mu_tab_g)
             pref = _line_weight_core(omega_res, t_L, L_esc, mu, ALPHA_FS, _PREF_C1)
             a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(omega_res)
             weight = pref * A2 * WM

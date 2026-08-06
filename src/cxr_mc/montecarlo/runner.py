@@ -646,7 +646,8 @@ def _brem_wide_from_segments(
 def _brem_for_case(case, E_brem):
     """Regenerate a case's bremsstrahlung background on ``E_brem`` from scratch:
     build the tilted geometry, transport ``Ne_brem`` electrons through the stack
-    (``layers=abs_layers``, same ``seed + 1`` offset as a live run), and sum brem
+    (``layers=abs_layers``, with the same seed as the shared live transport),
+    and sum brem
     per layer via :func:`_brem_wide_from_segments`. Returns ``brem_wide``.
 
     This is the brem half of run_case's transport + spectrum phases factored out
@@ -676,7 +677,7 @@ def _brem_for_case(case, E_brem):
         case["thickness_ang"],
         E_cut_by_electrons=E_cut_by_electrons,
         composition=case["composition"],
-        seed=case["seed"] + 1,
+        seed=case["seed"],
         beam_dir=beam,
         layers=abs_layers,
         **_beam_kwargs(case),

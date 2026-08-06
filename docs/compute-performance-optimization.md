@@ -9,6 +9,31 @@ hardware, workload, and numbers.
 - [Round 2 (2026-08-06)](#round-2-post-rawkernel-re-profile-2026-08-06) —
   re-profile after the `cupyx.jit.rawkernel` reductions landed; the eager
   prologue is now the constraint.
+- [Round 3 (2026-08-06)](#round-3-fused-line-prologue-implementation-2026-08-06)
+  — fused deterministic line prologue, combined interpolation gather, and the
+  measured brem launch adjustment.
+
+## Review verdict
+
+The central diagnosis is correct: after the line and brem reduction kernels
+landed, the next material GPU lever is the incoherent line prologue, not more
+Numba around transport and not CuPy's reduction autotuner. The checkpoint-shard
+design and the decision to keep transport on the CPU for now are also sound.
+
+Three corrections were made during implementation:
+
+1. `__fmaf_rn` does **not** reproduce a non-contracted
+   `f0 + frac * (f1 - f0)` sequence; it deliberately performs one rounding
+   after the multiply-add. Preserving the former blend requires separate
+   `__fsub_rn`, `__fmul_rn`, and `__fadd_rn` operations.
+2. Atomic survivor compaction makes output order scheduler-dependent. Since the
+   downstream float32 reduction is order-sensitive, the implementation keeps a
+   deterministic `(segment, g)` order and marks rejected pairs with zero
+   weights; the reduction skips those slots before evaluating `sin`.
+3. A 3x line-only speedup does not imply six transport workers. Using the
+   measured line+brem totals gives roughly two workers at `Ne=2000` and three at
+   `Ne=450`, before headroom. Re-profile the completed kernel before setting a
+   new default.
 
 ## Round 1 (2026-07-31)
 
@@ -184,8 +209,9 @@ gather+blend, eliminating all fancy indexing. Three interleaved A/B runs at
 | gather EK | 0.642 s | 0.607 s | 0.596 s |
 
 **−25% on the line phase**, reproducible. Not bit-for-bit: 4.8e-9 relative,
-from `nvcc` contracting `a + b*c` into an `fma`. Either force `__fmaf_rn` to
-keep it exact, or carry it as the same class of debt as
+from `nvcc` contracting `a + b*c` into an `fma`. Either force separate
+`__fsub_rn`/`__fmul_rn`/`__fadd_rn` operations to retain the former rounding,
+or carry it as the same class of debt as
 `Validation: line-amplitude-fusion` (ledger row + golden regen).
 
 Re-profiled with the gather EK in place (`Ne = 2000`, per rep, burn-in
@@ -198,12 +224,14 @@ compaction (`scan_naive` + `getitem_mask` + `bitwise_and` + `greater` +
 
 **Recommended next change:** one `cupyx.jit.rawkernel` covering the *whole*
 prologue — per `(segment, g)` pair compute kinematics → interpolation → both
-polarizations → weight, then compact survivors with an atomic counter straight
-into the existing `E_r`/`aw`/`w` buffers the reduction kernel already consumes.
-That collapses ~150 launches per seg-block to 1 and ~40 full-size temporaries
-to 3. Extrapolating the measured split, the line phase should go 0.83 s →
-0.25–0.30 s at `Ne = 2000` (≈3×). The gather EK is the cheap down-payment on
-the same code and can land first.
+polarizations → weight and feed the existing `E_r`/`aw`/`w` reduction interface.
+The original prototype proposed atomic survivor compaction; Round 3 instead
+uses deterministic fixed-order buffers with zero-weight rejection. That
+collapses the eager prologue to one launch per segment block and removes its
+full-size intermediates without introducing run-to-run ordering noise.
+Extrapolating the measured split, the earlier target was 0.83 s → 0.25–0.30 s
+at `Ne = 2000` (≈3×), but that remains a hypothesis until the implemented
+fixed-order variant is timed on the profiling hosts.
 
 ### Measured non-levers
 
@@ -251,8 +279,8 @@ engine hides it completely at two or more transport workers; the
 full-case `_WORKER_MEM_MB` budget) is what makes that reliably reachable. It
 becomes worth revisiting only when either
 
-1. the prologue rawkernel lands — a 3× faster GPU phase needs ≈6 transport
-   workers to stay fed; or
+1. the prologue rawkernel lands and a fresh end-to-end profile shows the
+   available 2–3 transport workers no longer keep the GPU fed; or
 2. a run is core-starved (single-core SLURM allocation, or an interactive
    single case, where transport is ~50% of wall).
 
@@ -277,8 +305,9 @@ patched `spectrum.py` source into the imported module before importing
 
 ### Suggested order
 
-1. Gather `ElementwiseKernel` (−25% on lines, small and isolated) — ledger row
-   and golden regen, or force `__fmaf_rn` for bit-exactness.
+1. Gather `ElementwiseKernel` (−25% on lines, small and isolated) — use separate
+   round-to-nearest arithmetic intrinsics if the existing blend order must be
+   retained.
 2. Full prologue rawkernel (est. ≈3× on lines) — the actual prize.
 3. Brem `energies_per_block` 2 → 3 (~2% of a case, bit-for-bit).
 4. Re-measure the pipeline balance; only then reconsider transport `prange` or
@@ -291,3 +320,81 @@ only — the coherent path was under concurrent work and deliberately left out.
 The prologue result is shared code and should generalize; the −25% and ≈3×
 figures are for this workload and should be re-measured on `qlmc` before being
 quoted as production numbers.
+
+## Round 3: fused line prologue implementation (2026-08-06)
+
+Implementation pass following the Round 2 review. No CUDA device was available
+in the editing environment, so this round records code structure and static
+verification only. Performance and GPU numerical validation remain release
+gates; none of the Round 2 estimates are promoted to measured results here.
+
+### What changed
+
+#### 1. Deterministic full line prologue (`line_prologue_jit_kernel.py`)
+
+The new float32 CUDA JIT kernel assigns one thread to each `(segment, g)` pair
+and evaluates, in one pass:
+
+- resonance and photon kinematics;
+- the shared energy bracket plus chi/U/mu interpolation;
+- both polarization amplitudes;
+- Beer-Lambert attenuation, finite-time width, and mosaic-weighted line weight.
+
+It emits three fixed-order arrays (`E_r`, `aw`, `w`). Rejected pairs retain
+their deterministic slot with `w=0`; no atomic counter or mask compaction is
+used. This costs three arrays of at most the existing one-million-pair block
+budget, but eliminates the roughly forty eager temporaries and preserves stable
+pair ordering. The path is staged behind `_USE_JIT_LINE_PROLOGUE = False` until
+the GPU release gates below pass. When opted in, it is further gated to the
+existing fast-path domain: CuPy, float32, incoherent, `components=False`,
+`sinc_cutoff=None`, and the single-slab absorber branch (finite transverse
+footprint remains supported). Every other case stays on the prior
+implementation.
+
+#### 2. Reduction kernel streaming (`spectrum_jit_kernel.py`)
+
+The line reduction kernels now load the weight first and skip zero-weight pairs
+before loading `E_r`/`aw` or evaluating `sin`. They can accumulate directly
+into a caller-provided output, avoiding one extra CuPy add launch per segment
+block. Fresh calls still allocate and return a zero-initialized spectrum, so
+the previous API remains valid. The impossible 2048-thread launch option was
+removed; CUDA blocks are capped at 1024 threads.
+
+#### 3. One-launch interpolation fallback (`spectrum.py`)
+
+The eager batched path now gathers chi/U real+imag and mu in one
+`ElementwiseKernel`. Separate round-to-nearest subtract, multiply, and add
+intrinsics retain the pre-existing interpolation operation order. This path is
+still useful for the coherent batch branch, which deliberately does not use the
+new incoherent prologue.
+
+#### 4. Brem launch setting (`brem_jit_kernel.py`)
+
+`DEFAULT_BREM_KERNEL_CONFIG.energies_per_block` changed from 2 to 3, the
+bit-for-bit launch-only improvement measured in Round 2. The thread count stays
+at 256, so the reduction tree is unchanged.
+
+#### 5. Shared-transport repair consistency (`runner.py`)
+
+The live runner already transports `max(Ne, Ne_brem)` once and selects the line
+and brem populations by electron id, so the earlier duplicate-transport concern
+has been resolved. The brem-only repair helper still used the obsolete
+`seed + 1` convention, however; it now uses `case["seed"]` to reproduce the
+shared live transport's brem population.
+
+### Required GPU verification
+
+Before enabling this in a release branch:
+
+1. Compile each JIT specialization on the minimum and current supported CuPy
+   versions.
+2. Compare the prologue's `E_r`, `aw`, and nonzero `w` against the eager path on
+   one-block synthetic inputs, edge-bracketing inputs, and full MoS2 cases.
+3. Run the line golden suite and repeated-run determinism checks. Record max
+   absolute error, max error/peak, significant-bin relative error, and integral
+   drift.
+4. Re-run the interleaved burn-in A/B harness at `Ne=450`, 2000, and 10000 on
+   both ALEX-DESKTOP and `qlmc`. Capture line wall time, kernel count, survivor
+   fraction, and fixed-order zero-slot overhead.
+5. Re-measure transport/GPU overlap before changing process counts or starting
+   a `prange`/CUDA transport project.
