@@ -21,4 +21,6 @@ case "$backend" in
     *) extra_args=() ;;
 esac
 
-exec rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv sync --all-groups "${extra_args[@]}"
+export UV_CACHE_DIR=/tmp/cxr-mc-uv-cache
+
+uv sync --all-groups "${extra_args[@]}"

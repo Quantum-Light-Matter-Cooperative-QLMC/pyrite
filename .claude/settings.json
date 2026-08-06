@@ -1,11 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr:*)",
-      "Bash(rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run marimo:*)",
-      "Bash(rtk git diff:*)",
-      "Bash(rtk git status:*)",
-      "Bash(rtk git add:*)",
       "Read(*)",
       "Write(*)",
       "Edit(*)"

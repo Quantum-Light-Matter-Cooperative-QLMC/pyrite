@@ -60,24 +60,7 @@ def _segments(command: str) -> list[list[str]]:
         segments[-1].append(token)
     return [segment for segment in segments if segment]
 
-
-def _leader(tokens: list[str]) -> str:
-    """Return effective command name through ``rtk env``/``env`` wrappers."""
-    index = 0
-    while index < len(tokens) and "=" in tokens[index]:
-        index += 1
-    if index < len(tokens) and os.path.basename(tokens[index]) == "rtk":
-        index += 1
-    if index < len(tokens) and os.path.basename(tokens[index]) == "env":
-        index += 1
-        while index < len(tokens) and (tokens[index].startswith("-") or "=" in tokens[index]):
-            index += 1
-    return os.path.basename(tokens[index]) if index < len(tokens) else ""
-
-
 def _segment_has_local_run(tokens: list[str]) -> bool:
-    if _leader(tokens) in READ_ONLY_LEADERS:
-        return False
     if any(token in ("-h", "--help") for token in tokens):
         return False
 
@@ -111,7 +94,6 @@ def _override_active(command: str) -> bool:
 
     Honors an ambient ``CXR_LOCAL_SWEEP_OK`` in the hook's environment and an
     inline ``CXR_LOCAL_SWEEP_OK=<truthy>`` assignment anywhere in the command
-    (covering bare ``VAR=1 cmd`` and ``rtk env``/``env VAR=1`` placement).
     """
     if _is_truthy(os.environ.get(_OVERRIDE_VAR)):
         return True
