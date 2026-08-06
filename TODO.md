@@ -74,13 +74,14 @@ file. Edit and drop items on `main`.
 
 ## Inbox - >user< to be triaged
 
-1. **User-defined crystal cuts.** Allow user to define cut plane for given crystal, e.g., [110] or similar.
+1. **Add capability to `--lock` and `--unlock` profiles to make them mutable/immutable
+2. **User-defined crystal cuts.** Allow user to define cut plane for given crystal, e.g., [110] or similar.
    If it is left undefined, cut should default to current default behavior.
-2. **Coherent-bunching parameter study.** Compare effects of longitudinal bunch
+3. **Coherent-bunching parameter study.** Compare effects of longitudinal bunch
    length and transverse bunch size on coherent bunching while holding other
    bunch parameters fixed; explore tilted bunch fronts or other routes to
    coherent enhancement.
-3. **Cross-platform agent hooks.** Improve shell and operating-system support
+4. **Cross-platform agent hooks.** Improve shell and operating-system support
    beyond WSL/Ubuntu, including a directory of hook scripts for more complex setup and
    platform-specific handling.
       1. Would be nice to add backend checking to install the right kind of
@@ -88,14 +89,14 @@ file. Edit and drop items on `main`.
          `uv sync --all-groups --extra nvidia`, whereas if computer has intel gpu, then
          `uv sync --all-groups --extra intel`, etc.
          )
-4. **Source-package organization.** Group related loose modules under
+5. **Source-package organization.** Group related loose modules under
    `src/cxr_mc/` into appropriately scoped subpackages after current structural
    work settles.
-5. **Local SLURM integration.** Make `cxr run` use the configured laptop-local
+6. **Local SLURM integration.** Make `cxr run` use the configured laptop-local
    SLURM installation (and, if available, report GPU usage statistics), if it exists.
-6. **Evaluate refactoring `monteccarlo/runner.py` and `montecarlo/transport.py`**
+7. **Evaluate refactoring `monteccarlo/runner.py` and `montecarlo/transport.py`**
    into multiple smaller files.
-7. **Add support for custom-defined remotes, or other standards for submitting remote computing tasks**.
+8. **Add support for custom-defined remotes, or other standards for submitting remote computing tasks**.
    This will require research of what the industry standards/best practices are here, and we may find that the best practices are to leave it up to user custom scripting. If there are good standards for implementing comprehensive integrated support for SSH and/or other options for submitting, to SLURM or otherwise, write up a report on what we should do, why & how. This would obviously require more in depth capabilities for user configurations of their remote(s) of choice.
 
 ## CLI backlog
@@ -109,6 +110,7 @@ not here.
 
 1. Running `cxr profile create <new_profile> --from <source_profile>` doesn't copy the
    source profile's materials list. Fix this, and check if other aspects are copied properly.
+2. It seems that `cxr run -p --cpu/--cpu-only` capability has been removed. Must be re-added.
 
 ### Ergonomics (ship anytime)
 
@@ -120,7 +122,7 @@ not here.
 
 ## Notebook backlog
 
-1. Make it so 'narrow_auto' in make_axis controls from notebooks/analysis_ui/controls
+1. Make it so 'narrow_auto' in make_axis_controls from notebooks/analysis_ui/controls
    auto-sets the x-axis lims according to the Min/Max x-values of the widest *line energy*
    grid being plotted. Right now it goes off the brem grid, which makes it run to 10's or 100's
    of keV, defeating the whole purpose of the *narrow* plot.
