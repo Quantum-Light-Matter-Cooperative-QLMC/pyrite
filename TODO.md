@@ -75,6 +75,11 @@ file. Edit and drop items on `main`.
 2. **Cross-platform agent hooks.** Improve shell and operating-system support
    beyond WSL/Ubuntu, including a directory of hook scripts for more complex setup and
    platform-specific handling.
+      1. Would be nice to add backend checking to install the right kind of
+         extras to the agent (e.g., if computer has nvidia gpu, run
+         `uv sync --all-groups --extra nvidia`, whereas if computer has intel gpu, then
+         `uv sync --all-groups --extra intel`, etc.
+         )
 3. **Source-package organization.** Group related loose modules under
    `src/cxr_mc/` into appropriately scoped subpackages after current structural
    work settles.
@@ -94,20 +99,7 @@ not here.
 
 ### Bugs (fix + regression test)
 
-1. `notebooks/analysis_app.py` does not recognize all checkpoints. Specifically, new 'hopg_coherent' profile/local checkpoint is not recognized. This was true for a profile which was run PURELY remotely, then pulled. Once I ran `cxr run hopg_coherent` locally, the program found the cached files and return immediately, but apparently also appended metadata/sidecar to the checkpoint which let `notebook/analysis_app.py` recognize it.
-2. Automatic pull after submitting job is broken:
-   
-```
-    ^
-  File "/home/aamador/dev/cxr-mc/src/cxr_mc/slim.py", line 114, in slim_checkpoint
-    results = _checkpoint_io.load(in_path)
-  File "/home/aamador/dev/cxr-mc/src/cxr_mc/_checkpoint_io.py", line 54, in load
-    with open(path, "rb") as f:
-         ~~~~^^^^^^^^^^^^
-FileNotFoundError: [Errno 2] No such file or directory: '/home/aamador/dev/cxr-mc/checkpoints/hopg@hopg_coherent-08724332799e'
-warning: could not pull checkpoint 'hopg@hopg_coherent-08724332799e': Command '['ssh', '-n', 'qlmc', 'T="/tmp/hopg@hopg_coherent-08724332799e.full.db5407697917413f88c2d4146658f441.pkl"; cleanup() { rm -f -- "$T"; }; trap cleanup EXIT; trap \'exit 129\' HUP; trap \'exit 130\' INT; trap \'exit 143\' TERM; cd "/home/aamador/dev/cxr-mc" && "/home/aamador/.local/bin/uv" run --no-sync cxr slim /home/aamador/dev/cxr-mc/checkpoints/hopg@hopg_coherent-08724332799e -o "$T" 1>&2 &&cat "$T"']' returned non-zero exit status 1.; continuing
-Error: remote pull failed for 1 of 1 requested checkpoint(s): hopg@hopg_coherent-08724332799e
-```
+None at the moment
 
 ### Ergonomics (ship anytime)
 

@@ -13,23 +13,17 @@ dependencies = [
     "marimo[recommended]>=0.23.11",
     "matplotlib>=3.11.0",
     "nbconvert>=7.17.1",
-    "nbqa>=1.9.1",
-    "nbstripout>=0.9.1",
     "numpy>=2.4.6",
     "pandas>=3.0.3",
     "pandoc>=2.4",
     "plotly>=6.0",
-    "pre-commit>=4.6.0",
-    "ruff>=0.15.19",
     "scipy>=1.17.1",
     "tabulate>=0.10.0",
-    "tqdm>=4.68.2",
     "tomlkit>=0.13",
     "vegafusion>=2.0.3",
     "vl-convert-python>=1.9.0.post1",
     "xraydb>=4.5.8",
     "psutil>=7.2.2",
-    "ty>=0.0.63",
     "kaleido>=1.3.0",
     "imageio>=2.37.4",
     "imageio-ffmpeg>=0.6.0",
@@ -52,10 +46,6 @@ intel = [
     "dpctl>=0.22.1",
     "dpnp>=0.20.0",
 ]
-# Offscreen prerendered viewer-animation path (src/cxr_mc/plots/render_trajectories.py).
-# Not a default dependency -- keeps `uv sync` lean; install with
-# `uv sync --extra viz-render`.
-viz-render = []
 
 [project.scripts]
 cxr = "cxr_mc.cli:main"
@@ -69,27 +59,42 @@ build-backend = "hatchling.build"
 packages = ["src/cxr_mc"]
 
 [dependency-groups]
-dev = [
+test = [
+    "pytest>=9.1.0",
     "pytest-xdist>=3.8.0",
+    "pytest-timeout>=2.4.0",
 ]
-# Docs toolchain (Sphinx site). Not a default group, so `uv sync` and the Docker
-# image stay lean; build with `uv run --group docs sphinx-build ...`.
+
+lint = [
+    "ruff>=0.15.19",
+    "ty>=0.0.63",
+    "pre-commit>=4.6.0",
+    "nbqa>=1.9.1",
+    "nbstripout>=0.9.1",
+]
+
 docs = [
     "sphinx>=8.2",
     "myst-parser>=4.0",
     "furo>=2024.8.6",
 ]
+
 # Independent crystallography oracle. Validation-only; never imported by the
 # production package unless an explicit oracle check is requested.
 oracle = [
     "Dans-Diffraction==3.4.0",
 ]
 
+
+dev = [
+    { include-group = "test" },
+    { include-group = "lint" },
+]
+
 [tool.pytest.ini_options]
 # Put src/ on the path so `import cxr_mc` resolves without requiring an install
 # (an editable install via `uv sync` also works). Tests stay CPU-only/fast -- the
 # heavy MC physics validation lives in checks/, not here.
-pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = [
     "-q",
@@ -154,6 +159,10 @@ indent-style = "space"
 
 [tool.uv]
 cache-dir = "/tmp/cxr-mc-uv-cache"
-
-[tool.uv.workspace]
-members = ["packages/cxr-mc-tests"]
+conflicts = [
+    [
+        { extra = "nvidia" },
+        { extra = "amd" },
+        { extra = "intel" },
+    ],
+]
