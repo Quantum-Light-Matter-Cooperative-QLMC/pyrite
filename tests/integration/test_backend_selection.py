@@ -136,6 +136,7 @@ def test_cpu_fallback_requires_host_ram_admission(monkeypatch):
     with pytest.raises(_backend.BackendResourceError, match="cannot admit CPU fallback"):
         runner._admit_cpu_fallback()
 
+
 def test_cpu_spectrum_backend_updates_active_itemsize() -> None:
     import numpy as np
 
@@ -196,9 +197,7 @@ def test_intel_machine_selects_sycl_backend() -> None:
     )
 
     assert result.returncode == 0, (
-        "Intel SYCL backend test failed:\n"
-        f"stdout:\n{result.stdout}\n"
-        f"stderr:\n{result.stderr}"
+        f"Intel SYCL backend test failed:\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     )
 
 
@@ -225,6 +224,7 @@ def test_nsys_helpers_are_noops_for_sycl(monkeypatch) -> None:
     assert "cupyx" not in newly_loaded
     assert not any(name.startswith("cupy.") for name in newly_loaded)
     assert not any(name.startswith("cupyx.") for name in newly_loaded)
+
 
 def test_cpu_spectrum_backend_restores_backend() -> None:
     from cxr_mc.montecarlo import runner

@@ -27,7 +27,9 @@ def _resolved_domain(
 
     if logarithmic and resolved_lower <= 0:
         if resolved_upper <= 0:
-            return None, (f"{axis_name}: log limits must include positive values; using automatic domain.",)
+            return None, (
+                f"{axis_name}: log limits must include positive values; using automatic domain.",
+            )
         # Scale the fallback to the requested upper limit, but retain a strict floor.
         resolved_lower = min(max(positive_floor, abs(resolved_upper) * 1e-9), resolved_upper / 10.0)
         warnings.append(

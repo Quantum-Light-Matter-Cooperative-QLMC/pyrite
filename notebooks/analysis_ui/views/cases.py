@@ -59,8 +59,7 @@ def render_case_comparison(
     )
 
     rows = [
-        {"label": entry["case"]["label"], "material": entry["case"]["material"]}
-        for entry in basket
+        {"label": entry["case"]["label"], "material": entry["case"]["material"]} for entry in basket
     ]
     parts = [picker_block]
     if len(basket) >= CASE_BASKET_CAP:

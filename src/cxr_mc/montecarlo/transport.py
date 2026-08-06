@@ -168,7 +168,9 @@ def _beta_array(E_keV):
     g = 1.0 + E_keV / 510.99895
     return (1.0 - 1.0 / (g * g)) ** 0.5
 
+
 beta_from_keV = _beta_array
+
 
 @njit(cache=True)
 def beta_from_keV_scalar(E_i):

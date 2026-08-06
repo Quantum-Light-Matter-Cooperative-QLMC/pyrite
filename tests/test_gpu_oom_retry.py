@@ -182,6 +182,7 @@ def test_gpu_pipeline_reuses_successful_line_fallback(monkeypatch):
 
 def test_spectrum_case_emits_nsys_phase_ranges(monkeypatch):
     from tests.helpers.segments import runner_transport_payload
+
     entered = []
 
     @contextmanager

@@ -68,9 +68,7 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
     )
 
     env = os.environ.copy()
-    env["PYTHONPATH"] = os.pathsep.join(
-        path for path in sys.path if path
-    )
+    env["PYTHONPATH"] = os.pathsep.join(path for path in sys.path if path)
 
     result = subprocess.run(
         [sys.executable, "-c", script],
@@ -80,10 +78,8 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
         check=False,
     )
 
-    assert result.returncode == 0, (
-        "CPU import path unexpectedly required CuPy:\n"
-        f"{result.stderr}"
-    )
+    assert result.returncode == 0, f"CPU import path unexpectedly required CuPy:\n{result.stderr}"
+
 
 def test_sincsq_lineshape_runs_on_cpu() -> None:
     import numpy as np
@@ -100,7 +96,9 @@ def test_sincsq_lineshape_runs_on_cpu() -> None:
     assert np.all(np.isfinite(result))
     assert result[1] == 1.0
 
+
 # tests/montecarlo/test_init_imports.py
+
 
 def test_config_import_does_not_require_cupy() -> None:
     script = textwrap.dedent(
@@ -146,9 +144,7 @@ def test_config_import_does_not_require_cupy() -> None:
     )
 
     env = os.environ.copy()
-    env["PYTHONPATH"] = os.pathsep.join(
-        path for path in sys.path if path
-    )
+    env["PYTHONPATH"] = os.pathsep.join(path for path in sys.path if path)
 
     result = subprocess.run(
         [sys.executable, "-c", script],

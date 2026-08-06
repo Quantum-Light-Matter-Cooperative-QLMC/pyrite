@@ -494,6 +494,135 @@ def test_remove_material_and_no_op_requires_option(tmp_path, monkeypatch):
     assert "provide a range, membership, or emission option" in bare.stderr
 
 
+def test_show_emission_defaults_to_incoherent(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert_clean_result(shown)
+    assert "emission: incoherent (default)" in shown.stdout
+
+    machine = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
+    assert_clean_result(machine)
+    assert json.loads(machine.stdout)["payload"]["emission"] is None
+
+
+def test_set_emission_replaces_and_reports_in_show(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["set", "sub_100keV", "--emission", "coherent"])
+
+    assert_clean_result(result, stdout="updated profile sub_100keV\n")
+    assert 'emission = "coherent"' in catalog.read_text()
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert "emission: coherent" in shown.stdout
+
+    replaced = invoke(profile.command, ["set", "sub_100keV", "--emission", "both"])
+    assert_clean_result(replaced, stdout="updated profile sub_100keV\n")
+    assert 'emission = "both"' in catalog.read_text()
+
+
+def test_set_emission_invalid_value_rejected(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["set", "sub_100keV", "--emission", "bogus"])
+
+    assert result.exit_code == 2
+    assert "not one of" in result.stderr.lower()
+
+
+def test_set_emission_on_standard_prompts(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    original = catalog.read_text()
+
+    declined = invoke(profile.command, ["set", "standard", "--emission", "coherent"], input="n\n")
+    assert declined.exit_code == 1
+    assert "profile 'standard'" in declined.stderr
+    assert catalog.read_text() == original
+
+    accepted = invoke(profile.command, ["set", "standard", "--emission", "coherent", "-y"])
+    assert_clean_result(accepted, stdout="updated profile standard\n")
+    assert 'emission = "coherent"' in catalog.read_text()
+
+
+def test_add_coherent_sets_explicit_mode(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["add", "sub_100keV", "--coherent"])
+
+    assert result.exit_code == 0
+    assert "emission: added coherent" in result.stdout
+    assert "auto-switched" not in result.stdout
+    assert 'emission = "coherent"' in catalog.read_text()
+
+
+def test_add_coherent_then_incoherent_auto_switches_to_both(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    invoke(profile.command, ["add", "sub_100keV", "--coherent"])
+    result = invoke(profile.command, ["add", "sub_100keV", "--incoherent"])
+
+    assert result.exit_code == 0
+    assert "emission: added incoherent (auto-switched to 'both')" in result.stdout
+    assert 'emission = "both"' in catalog.read_text()
+
+
+def test_add_both_flags_at_once_sets_both(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["add", "sub_100keV", "--coherent", "--incoherent"])
+
+    assert result.exit_code == 0
+    assert "emission: added coherent, incoherent (auto-switched to 'both')" in result.stdout
+    assert 'emission = "both"' in catalog.read_text()
+
+
+def test_add_emission_mode_already_present_is_a_no_op(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    invoke(profile.command, ["add", "sub_100keV", "--coherent"])
+    before = catalog.read_text()
+    result = invoke(profile.command, ["add", "sub_100keV", "--coherent"])
+
+    assert_clean_result(result, stdout="updated profile sub_100keV\n")
+    assert "emission" not in result.stdout
+    assert catalog.read_text() == before
+
+
+def test_remove_incoherent_from_both_leaves_coherent(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    invoke(profile.command, ["add", "sub_100keV", "--coherent", "--incoherent"])
+
+    result = invoke(profile.command, ["remove", "sub_100keV", "--incoherent"])
+
+    assert result.exit_code == 0
+    assert "emission: removed incoherent (now 'coherent')" in result.stdout
+    assert 'emission = "coherent"' in catalog.read_text()
+
+
+def test_remove_sole_emission_mode_drops_key_entirely(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    invoke(profile.command, ["add", "sub_100keV", "--coherent"])
+
+    result = invoke(profile.command, ["remove", "sub_100keV", "--coherent"])
+
+    assert result.exit_code == 0
+    assert "emission: removed coherent (no explicit emission left)" in result.stdout
+    assert "emission" not in catalog.read_text()
+    shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert "emission: incoherent (default)" in shown.stdout
+
+
+def test_remove_emission_mode_not_present_errors(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+    original = catalog.read_text()
+
+    result = invoke(profile.command, ["remove", "sub_100keV", "--coherent"])
+
+    assert result.exit_code == 1
+    assert "profile sub_100keV emission does not include: coherent" in result.stderr
+    assert catalog.read_text() == original
+
+
 def test_member_group_selectors_expand_in_catalog_order_and_support_dry_run(tmp_path, monkeypatch):
     from cxr_mc import scan
 

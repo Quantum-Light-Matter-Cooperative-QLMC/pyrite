@@ -11,7 +11,7 @@ from dataclasses import replace
 
 from click.testing import CliRunner
 
-from cxr_mc import scan
+from cxr_mc import materials, scan
 
 
 def _resolved_run(monkeypatch, argv, emission=None):
@@ -103,6 +103,27 @@ def test_help_no_longer_lists_coherent_incoherent():
     assert result.exit_code == 0
     assert "--coherent" not in result.output
     assert "--incoherent" not in result.output
+
+
+def test_catalog_profile_emission_key_reaches_resolved_settings(monkeypatch):
+    """End-to-end wiring check for ``CATALOG.profile_emission`` (set via ``cxr
+    profile set/add/remove --emission/--coherent/--incoherent``), as opposed to
+    the other tests in this module which inject the emission by monkeypatching
+    ``default_settings`` directly and never exercise the catalog lookup in
+    ``scan._resolved_run``."""
+    catalog = materials.CATALOG
+    coherent_catalog = replace(
+        catalog, profile_emissions={**catalog.profile_emissions, "standard": "coherent"}
+    )
+    monkeypatch.setattr(materials, "CATALOG", coherent_catalog)
+
+    settings, _sweep, identity, stem = _resolved_run(monkeypatch, [])
+
+    assert settings.emission == "coherent"
+    assert settings.coherent_emission is True
+    assert identity["resolved_parameters"].get("emission") == "coherent"
+    assert stem != "hopg"
+    assert stem.startswith("hopg@full-")
 
 
 def test_quick_run_is_incoherent_quick_stem(monkeypatch):

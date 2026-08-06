@@ -146,9 +146,7 @@ def render_energy_comparison(
         ]
         selected_charts = [chart for chart in selected_charts if chart is not None]
         parts.append(
-            mo.vstack(selected_charts)
-            if selected_charts
-            else mo.md("*No spectrum for that cell.*")
+            mo.vstack(selected_charts) if selected_charts else mo.md("*No spectrum for that cell.*")
         )
 
     return mo.vstack(parts)

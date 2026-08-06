@@ -23,7 +23,6 @@ from . import spectrum as _spectrum_mod
 from ._backend import (
     _GPU,
     BACKEND,
-    REAL,
     BackendResourceError,
     BackendUnavailableError,
 )
@@ -112,11 +111,7 @@ def _adaptive_chunk(nbins):
         requested_chunk=requested,
         bins=nbins,
         itemsize=itemsize,
-        budget_bytes=(
-            _RESOURCE_POLICY.device_budget_bytes
-            if _GPU
-            else None
-        ),
+        budget_bytes=(_RESOURCE_POLICY.device_budget_bytes if _GPU else None),
     )
 
 
@@ -127,12 +122,9 @@ def _admit_chunk(chunk, bins):
         requested_chunk=int(chunk),
         bins=int(bins),
         itemsize=itemsize,
-        budget_bytes=(
-            _RESOURCE_POLICY.device_budget_bytes
-            if _GPU
-            else None
-        ),
+        budget_bytes=(_RESOURCE_POLICY.device_budget_bytes if _GPU else None),
     )
+
 
 def _nsys_range(message):
     """Return an NVTX range when the remote Nsight profiler is enabled."""
@@ -1098,8 +1090,10 @@ def _spectrum_case_impl(case, tp, record_timing=False):
         out.update(out_pool)
     return out
 
+
 def _real_itemsize() -> int:
     return np.dtype(_spectrum_mod.REAL).itemsize
+
 
 def _worker_init(force_cpu=False):
     """

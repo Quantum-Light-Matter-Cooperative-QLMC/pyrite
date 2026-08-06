@@ -95,7 +95,6 @@ def _fake_case(
     )
 
 
-
 def test_transport_case_forwards_finite_footprint_to_shared_transport(monkeypatch):
     case = _fake_case("finite", 30.0)
     case.update(
@@ -124,6 +123,7 @@ def test_transport_case_forwards_finite_footprint_to_shared_transport(monkeypatc
     assert tp["segs"] == {"transport": 1}
     assert tp["Ne_lines"] == case["Ne"]
     assert tp["Ne_brem"] == case["Ne_brem"]
+
 
 def test_transport_case_combines_line_and_brem_cutoffs(monkeypatch):
     case = _fake_case("combined", 30.0)
@@ -158,6 +158,7 @@ def test_transport_case_combines_line_and_brem_cutoffs(monkeypatch):
 
     assert captured["args"][1] == 3
 
+
 def test_transport_case_handles_brem_only_electrons(monkeypatch):
     case = _fake_case("combined", 30.0)
     case.update(
@@ -185,6 +186,7 @@ def test_transport_case_handles_brem_only_electrons(monkeypatch):
 
     assert captured["args"][1] == 4
 
+
 def test_brem_for_case_forwards_finite_footprint(monkeypatch):
     case = _fake_case("finite", 30.0)
     case.update(crystal_width_mm=0.1, crystal_height_mm=0.2)
@@ -202,7 +204,6 @@ def test_brem_for_case_forwards_finite_footprint(monkeypatch):
     assert len(captured) == 1
     assert captured[0]["crystal_width_mm"] == pytest.approx(0.1)
     assert captured[0]["crystal_height_mm"] == pytest.approx(0.2)
-
 
 
 def test_spectrum_case_forwards_groove_to_brem(monkeypatch):
@@ -844,7 +845,6 @@ def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # Cross-profile content-addressable case reuse (--no-cache / --recompute gates)
 # ---------------------------------------------------------------------------
-
 
 
 def test_run_sweep_reuses_cases_across_stems_by_content_key(tmp_path, monkeypatch):

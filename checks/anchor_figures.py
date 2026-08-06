@@ -487,7 +487,11 @@ def single_segment_anchor(
         "L_ang": np.array([L_seg_ang]),
         "E_keV": np.array([E0_keV]),
         "Ne": 1,
-        "elec_id":np.array([0,]),
+        "elec_id": np.array(
+            [
+                0,
+            ]
+        ),
         "thickness_ang": anchor.thick_bulk_ang,
     }
     spec = mc_spectrum(

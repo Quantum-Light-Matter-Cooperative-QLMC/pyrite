@@ -11,10 +11,14 @@ app = marimo.App(width="full")
 with app.setup:
     import altair as alt
     import marimo as mo
-
     from _design import page_title, style_sheet
     from _widgets import MaterialSelect
-    from analysis_ui import DimensionComparisonSpec, load_context, resolve_axis_pair, select_emission
+    from analysis_ui import (
+        DimensionComparisonSpec,
+        load_context,
+        resolve_axis_pair,
+        select_emission,
+    )
     from analysis_ui.controls import (
         make_case_axes,
         make_detector_controls,
@@ -34,6 +38,7 @@ with app.setup:
         render_rankings,
         render_scans,
     )
+
     from cxr_mc.analyze import (
         analysis_checkpoint_manifest,
         emission_menu,
@@ -274,7 +279,9 @@ def _(context, detector_controls):
         "tilt_azim_deg": detector_values["azimuth"],
     }
     constraints = {key: value for key, value in constraints.items() if value is not None}
-    detector_results = select_results(context.results, **constraints) if constraints else context.results
+    detector_results = (
+        select_results(context.results, **constraints) if constraints else context.results
+    )
     return detector_results, detector_values
 
 
@@ -349,8 +356,7 @@ def _(case_picker_ui, context, set_case_basket):
 @app.cell
 def _(get_case_basket):
     _options = {
-        f"{index}: {entry['case']['label']}": index
-        for index, entry in enumerate(get_case_basket())
+        f"{index}: {entry['case']['label']}": index for index, entry in enumerate(get_case_basket())
     }
     case_remove_select_ui = mo.ui.multiselect(_options, label="remove from basket")
     return (case_remove_select_ui,)
@@ -388,9 +394,9 @@ def _():
         manifest = analysis_checkpoint_manifest(material_key)
         if manifest:
             energies.update(manifest["energies_keV"])
-    cross_material_energy_options = {
-        f"{energy:g} keV": energy for energy in sorted(energies)
-    } or {"— no data —": None}
+    cross_material_energy_options = {f"{energy:g} keV": energy for energy in sorted(energies)} or {
+        "— no data —": None
+    }
     compare_all_energies_ui = mo.ui.checkbox(value=True, label="Compare all beam energies")
     return compare_all_energies_ui, cross_material_energy_options
 
@@ -605,8 +611,7 @@ def _(
 ):
     if not context.has_data:
         detail = (
-            context.load_error
-            or "Run `cxr run standard -m <material>` to create a checkpoint."
+            context.load_error or "Run `cxr run standard -m <material>` to create a checkpoint."
         )
         view = mo.callout(
             mo.md(f"**No checkpoint data available.** {detail}"),

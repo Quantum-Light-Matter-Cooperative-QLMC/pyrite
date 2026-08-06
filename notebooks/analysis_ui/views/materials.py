@@ -33,7 +33,10 @@ def render_cross_material(
     )
     if materials_with_data < 2:
         return mo.vstack(
-            [description, mo.md("*Run `scan_app.py` for more materials to populate this comparison.*")]
+            [
+                description,
+                mo.md("*Run `scan_app.py` for more materials to populate this comparison.*"),
+            ]
         )
 
     summaries = {}
