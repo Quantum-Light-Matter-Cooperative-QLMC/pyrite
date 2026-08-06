@@ -352,7 +352,7 @@ def _(fmt_thickness, mo, records, res, sweep_values):
     _tilts = _sv.get("tilt_deg", [])
     _azim = _sv.get("tilt_azim_deg", [])
     _thk = _sv.get("thickness_ang", [])
-    _tilt_opts = {f"{t:g} deg": t for t in _tilts} or {"— no data —": None}
+    _tilt_opts = {f"{t:g} deg": t for t in _tilts[::-1]} or {"— no data —": None}
     detector_tilt_ui = mo.ui.dropdown(_tilt_opts, value=next(iter(_tilt_opts)), label="polar tilt")
 
     _azim_opts = {f"{a:g} °": a for a in _azim} or {"— no data —": None}
@@ -363,7 +363,7 @@ def _(fmt_thickness, mo, records, res, sweep_values):
         _thk_opts, value=list(_thk_opts)[-1], label="crystal thickness"
     )
 
-    detector_auto_ui = mo.ui.switch(value=True, label="Auto narrow domains")
+    detector_auto_ui = mo.ui.switch(value=False, label="Auto narrow domains")
     detector_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV)")
     detector_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV)")
     detector_ymin_ui = mo.ui.number(value=0.0, label="narrow y-min")
@@ -633,15 +633,15 @@ def _(fmt_thickness, mo, records, res, sweep_values):
 def _(mo):
     # Polar-angle comparison spectral controls.
     polar_brem_ui = mo.ui.checkbox(value=True, label="show brem background")
-    polar_auto_ui = mo.ui.switch(value=True, label="Auto narrow domain")
+    polar_auto_ui = mo.ui.switch(value=False, label="Auto narrow domain")
     polar_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV)")
-    polar_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV)")
+    polar_xmax_ui = mo.ui.number(value=3000.0, label="narrow x-max (eV)")
     polar_xlog_ui = mo.ui.switch(value=False, label="narrow log x")
     polar_ylog_ui = mo.ui.switch(value=False, label="narrow log y")
 
-    polar_broad_auto_ui = mo.ui.switch(value=True, label="Auto broad domain")
+    polar_broad_auto_ui = mo.ui.switch(value=False, label="Auto broad domain")
     polar_broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV)")
-    polar_broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV)")
+    polar_broad_xmax_ui = mo.ui.number(value=30000.0, label="broad x-max (eV)")
     polar_broad_xlog_ui = mo.ui.switch(value=False, label="broad log x")
     polar_broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
     return (
@@ -739,13 +739,13 @@ def _(mo):
 
     narrow_auto_ui = mo.ui.switch(value=True, label="Auto narrow domain")
     narrow_xmin_ui = mo.ui.number(value=0.0, label="narrow x-min (eV)")
-    narrow_xmax_ui = mo.ui.number(value=0.0, label="narrow x-max (eV)")
+    narrow_xmax_ui = mo.ui.number(value=3000.0, label="narrow x-max (eV)")
     narrow_xlog_ui = mo.ui.switch(value=False, label="narrow log x")
     ylog_ui = mo.ui.switch(value=False, label="narrow log y")
 
-    broad_auto_ui = mo.ui.switch(value=True, label="Auto broad domain")
+    broad_auto_ui = mo.ui.switch(value=False, label="Auto broad domain")
     broad_xmin_ui = mo.ui.number(value=0.0, label="broad x-min (eV)")
-    broad_xmax_ui = mo.ui.number(value=0.0, label="broad x-max (eV)")
+    broad_xmax_ui = mo.ui.number(value=30000.0, label="broad x-max (eV)")
     broad_xlog_ui = mo.ui.switch(value=False, label="broad log x")
     broad_ylog_ui = mo.ui.switch(value=True, label="broad log y")
     return (
