@@ -1468,10 +1468,27 @@ def pull(
     for stem in stems:
         local = dest / stem
         try:
-            from .. import _checkpoint_io, _checkpoint_store
+            from .. import _checkpoint_io, _checkpoint_store, profiles
             from ..profiles import identity_from_stem
             from ..results import merge_dataset
             from ..run import _manifest_save
+
+            # identity_from_stem(stem, dest) covers the bare-canonical/_quick
+            # stems and any re-pull with an already-registered local sidecar
+            # with no extra ssh call. It cannot, on a stem's FIRST pull,
+            # reconstruct a variant whose digest depends on state the catalog
+            # alone doesn't carry (a coherent/both emission run, a
+            # since-edited named profile -- see identity_from_stem's
+            # docstring) -- so for that one case only, fall back to the box's
+            # authoritative meta.json (one extra ssh round trip, gated on the
+            # variant-stem pattern so canonical/_quick/merge pulls never pay
+            # it -- see test_pull_quick_stem_does_not_resolve_survey_siblings
+            # and test_pull_dataset_merge_skips_survey_discovery).
+            resolved_identity = identity_from_stem(stem, dest)
+            if resolved_identity is None and profiles._VARIANT_STEM_RE.fullmatch(stem):
+                remote_meta = _remote_meta_json(stem)
+                if remote_meta is not None:
+                    resolved_identity = remote_meta[1].get("dataset_identity")
 
             flags = ""
             if grid:
@@ -1506,13 +1523,13 @@ def pull(
                 base = _checkpoint_store.load(stem, dest)
                 n_merged, n_skipped = merge_dataset(base, incoming, dataset, force=force)
                 _checkpoint_store.save(stem, dest, base, components=(dataset,))
-                _manifest_save(str(local), base, identity_from_stem(stem))
+                _manifest_save(str(local), base, resolved_identity)
                 print(
                     f"merged {dataset} ({n_merged} rec, skipped {n_skipped}) -> checkpoints/{stem}/"
                 )
             else:
                 _checkpoint_store.save(stem, dest, incoming)
-                _manifest_save(str(local), incoming, identity_from_stem(stem))
+                _manifest_save(str(local), incoming, resolved_identity)
                 label = "+".join(filter(None, ["grid" if grid else "", "level9" if level9 else ""]))
                 detail = f" ({label})" if label else ""
                 print(f"pulled{detail} -> checkpoints/{stem}/")
