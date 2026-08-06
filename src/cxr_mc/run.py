@@ -40,10 +40,10 @@ from .results import records, store_result, sweep_values
 
 # Anchored to the repo root (src/cxr_mc/run.py -> parents[2] = repo root) so
 # checkpoint lookup works regardless of the notebook's kernel cwd.
-_DEFAULT_CHECKPOINT_DIR = str(Path(__file__).resolve().parents[2] / "checkpoints")
+DEFAULT_CHECKPOINT_DIR = str(Path(__file__).resolve().parents[2] / "checkpoints")
 
 
-def checkpoint_path_for(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
+def checkpoint_path_for(material, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
     """Path to the per-material component checkpoint directory."""
     return os.path.join(checkpoint_dir, material)
 
@@ -211,7 +211,7 @@ def _load_checkpoint_cached(path, signature):
     return results
 
 
-def load_checkpoint(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
+def load_checkpoint(material, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
     """Load a per-material results checkpoint (``checkpoints/<material>.pkl``)
     written by :func:`run_sweep`, WITHOUT re-running anything -- this is how the
     visualization app (``notebooks/analysis_app.py``) gets its ``results`` after the
@@ -245,7 +245,7 @@ def _material_analysis_cache_path(path, key):
     return Path(path).parent / ".analysis-cache" / f"{Path(path).stem}-{digest}.pkl"
 
 
-def cached_material_analysis(material, analyze, key, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
+def cached_material_analysis(material, analyze, key, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
     """Persist ``analyze(load_checkpoint(material))`` per material, keyed on the
     checkpoint's ``(resolved path, mtime_ns, size)`` plus caller-supplied ``key``
     (e.g. selection parameters distinguishing what ``analyze`` computed).
@@ -380,7 +380,7 @@ def _save_recomputed_checkpoint(checkpoint_path, results, *, components):
     )
 
 
-def checkpoint_manifest(material, checkpoint_dir=_DEFAULT_CHECKPOINT_DIR):
+def checkpoint_manifest(material, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
     """Summary of a checkpoint's contents -- distinct beam energies, record
     count, and swept case fields -- WITHOUT unpickling the checkpoint itself.
 
@@ -439,7 +439,7 @@ def run_sweep(
     cases,
     results,
     *,
-    checkpoint_dir=_DEFAULT_CHECKPOINT_DIR,
+    checkpoint_dir=DEFAULT_CHECKPOINT_DIR,
     checkpoint_path=None,
     resume=True,
     max_workers=None,

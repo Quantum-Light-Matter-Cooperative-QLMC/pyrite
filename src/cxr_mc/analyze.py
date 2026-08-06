@@ -157,25 +157,25 @@ def _read_checkpoint_or_none(material: str, read):
 
 def load_analysis_checkpoint(material: str, checkpoint_dir: Path | str | None = None):
     """Load a checkpoint for analysis, tolerating an in-progress transfer."""
-    from .run import _DEFAULT_CHECKPOINT_DIR, load_checkpoint
+    from .run import DEFAULT_CHECKPOINT_DIR, load_checkpoint
 
-    root = _DEFAULT_CHECKPOINT_DIR if checkpoint_dir is None else checkpoint_dir
+    root = DEFAULT_CHECKPOINT_DIR if checkpoint_dir is None else checkpoint_dir
     return _read_checkpoint_or_none(material, lambda: load_checkpoint(material, root))
 
 
 def analysis_checkpoint_manifest(material: str, checkpoint_dir: Path | str | None = None):
     """Read/backfill an analysis manifest, skipping an in-progress transfer."""
-    from .run import _DEFAULT_CHECKPOINT_DIR, checkpoint_manifest
+    from .run import DEFAULT_CHECKPOINT_DIR, checkpoint_manifest
 
-    root = _DEFAULT_CHECKPOINT_DIR if checkpoint_dir is None else checkpoint_dir
+    root = DEFAULT_CHECKPOINT_DIR if checkpoint_dir is None else checkpoint_dir
     return _read_checkpoint_or_none(material, lambda: checkpoint_manifest(material, root))
 
 
 def cached_analysis(material: str, analyze, key, checkpoint_dir: Path | str | None = None):
     """Run cached cross-material analysis unless its checkpoint is mid-transfer."""
-    from .run import _DEFAULT_CHECKPOINT_DIR, cached_material_analysis
+    from .run import DEFAULT_CHECKPOINT_DIR, cached_material_analysis
 
-    root = _DEFAULT_CHECKPOINT_DIR if checkpoint_dir is None else checkpoint_dir
+    root = DEFAULT_CHECKPOINT_DIR if checkpoint_dir is None else checkpoint_dir
     return _read_checkpoint_or_none(
         material,
         lambda: cached_material_analysis(material, analyze, key, root),

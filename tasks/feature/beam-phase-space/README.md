@@ -55,6 +55,9 @@ it; it does not evolve a beam to get there.
 These are the substantive design risks. Items 1, 2 and 4 are the ones that
 change the plan.
 
+**Review status (user, 2026-08-05): 1-5 and 7 accepted as written and binding.
+6 accepted after clarification (see its note). 8 ruled out — no chirp model.**
+
 1. **Normalized, not geometric, emittance must be the stored input.**
    `energy_keV` is the primary swept axis and this repo spans 30 keV
    (`beta*gamma ~ 0.34`) to the REGAE-scale 3–5 MeV (`beta*gamma ~ 7`) case in
@@ -109,12 +112,32 @@ change the plan.
      as long as it is documented — they are diagnostics, not the spectrum — but
      it must not be mistaken for the sampled result being wrong.
 
-6. **Charge and rep rate are normalization, not phase space.** They belong in
-   `BeamSpec` (they do define the beam) but must never influence sampling. The
-   `BeamSpec` docstring already draws this line — macro-particle counts
-   (`n_electrons`) are numerics and stay out. Preserve that invariant, and add
-   a test that asserts changing `bunch_charge_pc` / `rep_rate_hz` leaves every
-   sampled array bit-for-bit identical.
+6. **Charge and rep rate are normalization, not phase space.** They answer
+   "how many electrons per second", not "where each electron is", so they are
+   the wrong kind of number to feed the sampler. Today they reach only
+   `beam_metrics.py` (diagnostics) and the CLI/profile plumbing — nothing under
+   `montecarlo/` reads them.
+
+   The risk is specific to this task: once emittance is a real input,
+   `BeamSpec` starts to look like a complete physical beam, and the obvious
+   "add realism" move is to derive MC statistics from charge — `Ne = Q/e`, or
+   weighting the incoherent sum by `N_phys`. A 1 pC bunch is 6.24e6 electrons
+   against ~300 macro-particles. Any such coupling changes the RNG draws (no
+   run stays bit-for-bit against `main`), risks double-counting against
+   downstream normalization, and wrecks runtime.
+
+   Worth a test rather than a docstring because coherent/superradiant emission
+   genuinely scales with `N_phys` (N^2 vs N), so a legitimate future path does
+   let charge enter the physics. The test pins today's contract — coherent path
+   off, `bunch_charge_pc` / `rep_rate_hz` bit-for-bit inert on every sampled
+   array (`initial_r_ang`, `initial_v_hat`, `t0_ang`, segment arrays, same
+   seed) — so when that changes it is a deliberate ledgered decision rather
+   than drift.
+
+   Noted separately: charge x rep-rate does **not** currently normalize the
+   spectrum to absolute flux; there is no photons/second anywhere, only the
+   diagnostics struct. Wiring an explicit absolute-flux multiplier is a real
+   missing feature and a separate backlog item, not part of this task.
 
 7. **State the reference plane.** At 1 pC in 200 fs at 30–100 keV, space charge
    is not negligible between a realistic source and the target. Since this task
@@ -122,11 +145,16 @@ change the plan.
    **at the crystal entrance**, so nobody plugs in gun-exit numbers and reads
    the output as physical.
 
-8. **Correlated vs independent spreads.** The `compressed` longitudinal policy
-   implies a chirp (`<t delta> != 0`). Adding `energy_spread_frac` as an
-   independent uncorrelated draw on top of it double-counts. Either resolve the
-   chirp from the longitudinal policy or require the two to be mutually
-   exclusive; do not sum them silently.
+8. **Chirp — RULED OUT (user, 2026-08-05).** The concern was that the
+   `compressed` longitudinal policy implies `<t delta> != 0`, which would
+   double-count against an independent `energy_spread_frac`. User ruling:
+   `compressed` is terminology only, not a chirp model. So
+   `energy_spread_frac` is sampled as an **independent, uncorrelated** draw
+   regardless of `long_shape`, and `<t delta>` is zero by construction.
+   `beam_metrics` will therefore report a longitudinal emittance of
+   `sigma_t * sigma_delta` with no correlation term. Record this as an explicit
+   assumption in the design note so a future chirp model is an additive change,
+   not a silent reinterpretation.
 
 ## Implementation path
 
@@ -182,20 +210,40 @@ Likely owners, in dependency order:
 - [ ] **K. Docs** — `docs/sweep-profiles.md` beam block reference,
       `docs/repo_map.md` pointer.
 
-## Decisions / open questions
+## Decisions
 
-1. Canonical parameterization: Twiss triplet per plane (recommended) vs
-   `(sigma, sigma')` pair vs keeping raw `divergence_mrad`. **Needs user call.**
-2. Chirp: resolved from the longitudinal policy, or an explicit signed field,
-   or mutually exclusive with `energy_spread_frac`? (critique 8)
-3. Do `divergence_mrad` / `energy_spread_frac` survive as public spellings, or
+Settled by user review, 2026-08-05. Binding — do not relitigate.
+
+1. **Canonical parameterization: Twiss triplet per plane**,
+   `(eps_n, beta_twiss_m, alpha_twiss)`. Normalized emittance is the stored
+   input; geometric is derived per case as `eps_n / (beta*gamma)`. Spot FWHM
+   remains the legacy convenience spelling, mapping to the zero-alpha waist,
+   and is mutually exclusive with the triplet (hard error, no silent
+   precedence).
+2. **Shape:** new `TransverseDistribution` frozen sub-object on `BeamSpec`,
+   mirroring `LongitudinalDistribution`. No further flat float fields.
+3. **No chirp model.** `<t delta> = 0` by construction; `energy_spread_frac` is
+   an independent uncorrelated draw for every `long_shape`, `compressed`
+   included. (critique 8)
+4. **Charge / rep-rate stay inert on sampling**, pinned by a bit-for-bit test.
+   Absolute-flux normalization is a separate backlog item. (critique 6)
+5. **Reference plane: crystal entrance face.** No space charge, no beamline
+   transport. Must be stated in the `BeamSpec` docstring. (critique 7)
+
+## Open questions
+
+1. Do `divergence_mrad` / `energy_spread_frac` survive as public spellings, or
    become derived read-only properties of the transverse distribution? They are
    already decoded and hashed, so retiring them is a deprecation, not a delete.
-4. Does any current profile or notebook set them today expecting an effect?
-   (Search says no, but confirm before changing semantics.)
-5. Is the finite crystal footprint / groove entry path affected by per-electron
+   Lean: keep `energy_spread_frac` (it is not a transverse quantity and has no
+   Twiss equivalent), demote `divergence_mrad` to a derived property.
+2. Is the finite crystal footprint / groove entry path affected by per-electron
    directions? `entry_points` and the prism-exit helper assume the shared
    `beam_dir` in places.
+
+Closed during triage: nothing under `src/cxr_mc/montecarlo/` reads
+`divergence_mrad` or `energy_spread_frac` today, and no shipped profile or
+notebook sets them, so activating them cannot silently change an existing run.
 
 ## Delegation slices
 
