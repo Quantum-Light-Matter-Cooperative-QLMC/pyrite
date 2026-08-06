@@ -1,7 +1,7 @@
 # Batched line path for `coherent_emission=True`
 
-Branch: `feature/coherent-line-batching` (not created yet — set up via
-`dispatch-task`/`triage` when work starts)
+Branch: `feature/coherent-line-batching`
+Worktree: `worktrees/coherent-line-batching`
 
 TODO scope: P1 Ready item "Batched coherent line accumulation."
 
