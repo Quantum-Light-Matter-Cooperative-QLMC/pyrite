@@ -35,6 +35,12 @@ file. Edit and drop items on `main`.
    space in the trajectory plots. The beam object and its profile plumbing
    already exist — this completes them. → `feature/beam-phase-space`;
    [`tasks/feature/beam-phase-space/`](tasks/feature/beam-phase-space/).
+3. **Batched coherent line accumulation.** `coherent_emission=True` opts out of
+   the batched `(n_seg, N_g)` line path and runs the legacy per-hkl loop: 38%
+   of GPU-phase tottime on a profiled `hopg_coherent` run, ~2.65x slower per
+   case than the batched branch. Physics-gated (reassociation → `Validation:`
+   id, ledger row, golden regen). → `feature/coherent-line-batching`;
+   [`tasks/feature/coherent-line-batching/`](tasks/feature/coherent-line-batching/).
 
 ### Gated
 
