@@ -239,6 +239,17 @@ tilt_azim_deg = {values = [160.0, 170.0, 180.0, 190.0, 200.0]}
 E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
 detector = {observation_angle_deg = 90.0}
 materials = ["mos2"]
+
+[profiles.hopg_coherent]
+thickness_ang = {values = [10000.0, 30000.0, 50000.0, 70000.0, 90000.0]}
+energy_keV = {values = [30.0, 40.0, 50.0, 60.0]}
+tilt_deg = {values = [5.0, 15.0, 25.0, 35.0, 45.0, 55.0, 65.0, 75.0, 85.0]}
+tilt_azim_deg = {values = [110.0, 180.0]}
+E_grid_brem = {arange = {start = 0.0, stop = 30000.0, step = 25.0}}
+detector = {observation_angle_deg = 90.0}
+n_electrons = {values = [10000]}
+emission = "both"
+materials = ["hopg"]
 [energy_grids.standard]
 line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 2500.0, num = 831, endpoint = true } }, source = "derived" },
