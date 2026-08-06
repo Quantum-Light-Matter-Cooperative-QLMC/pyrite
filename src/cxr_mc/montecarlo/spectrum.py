@@ -927,16 +927,16 @@ def mc_spectrum(
         _nsys_pop()
 
     # The batched path below runs the whole hkl set through steps 1-6 in one
-    # vectorized (n_seg, N_g) pass. It covers the coherent=False single-slab
-    # absorber (with or without a finite crystal footprint -- the escape
-    # DISTANCE is g-independent either way, so it hoists). The coherent path and
-    # the layered / grooved absorbers stay on the proven per-hkl _accumulate
-    # loop, bit-for-bit.
+    # vectorized (n_seg, N_g) pass. It covers the single-slab absorber (with or
+    # without a finite crystal footprint -- the escape DISTANCE is g-independent
+    # either way, so it hoists) for BOTH coherent and incoherent emission. The
+    # layered / grooved absorbers, and coherent runs that ask for sinc_cutoff
+    # windowing, stay on the proven per-hkl _accumulate loop, bit-for-bit.
     finite_footprint = (
         segments.get("crystal_width_ang") is not None
         and segments.get("crystal_height_ang") is not None
     )
-    if coherent or groove is not None or layers is not None:
+    if (coherent and sinc_cutoff is not None) or groove is not None or layers is not None:
         # Stacking prologue: every host->device transfer this path needs is done
         # ONCE per case here, not once per (reflection, orientation) inside the
         # loop. Previously each pass re-uploaded the four chi/U tabulations plus
@@ -999,7 +999,7 @@ def mc_spectrum(
                 wm,
             )
     else:
-        # ---- batched incoherent line accumulation (options A + B) -----------
+        # ---- batched line accumulation (options A + B) -----------------------
         # Every reflection/orientation shares the segment geometry, so run the
         # per-orientation block (steps 1-6) ONCE over an (n_seg, N_g) grid rather
         # than ~N_g separate _accumulate passes -- this collapses the tiny-kernel
@@ -1012,6 +1012,11 @@ def mc_spectrum(
         # (component dots, batched linear interp, union-order sinc matmul), same
         # rounding-level move the chunk-invariance rtol gate already covers.
         # LEDGER + REGEN REQUIRED before sign-off. Validation: line-hkl-batch
+        #
+        # coherent=True shares steps 1-6 verbatim and diverges only at step 5/7:
+        # it keeps the COMPLEX amplitude per polarization and defers the square
+        # to a per-(reflection, orientation) reduction, so reflections and mosaic
+        # orientations stay incoherent. Validation: coherent-line-hkl-batch
         e_lo = float(_to_cpu(E_grid[0]))
         e_hi = float(_to_cpu(E_grid[-1]))
         pad = 0.2 * (e_hi - e_lo)  # keep sinc tails that reach into the window
@@ -1087,8 +1092,35 @@ def mc_spectrum(
                 run_reduction_kernel,
             )
 
+        # The coherent reduction kernel stays PER-(reflection, orientation) --
+        # its signature is unchanged. Squaring is intrinsically per-row (fields
+        # from different g must never mix before |.|^2), so a g-batched kernel
+        # would need a 2-D grid plus per-row line offsets to save N_g launches
+        # per case (4 on the profiled hopg_coherent shape). The launch storm this
+        # branch removes is in steps 1-6, not in the reduction; the row loop
+        # below therefore feeds the existing kernel from batched inputs.
+        _use_jit_coherent_reduction = (
+            coherent
+            and _USE_JIT_COHERENT_REDUCTION
+            and getattr(xp, "__name__", "") == "cupy"
+            and np.dtype(REAL) == np.dtype(np.float32)
+        )
+        if _use_jit_coherent_reduction:
+            from .coherent_jit_kernel import (
+                DEFAULT_COHERENT_KERNEL_CONFIG,
+                run_coherent_reduction_kernel,
+            )
+
         n_seg = v_all.shape[0]
         seg_block = max(1, 1_000_000 // max(1, N_g))  # bound (n_block, N_g) temporaries
+
+        # Line buffers for the coherent path. |sum_j|^2 is NOT additive over
+        # segment blocks, so unlike the incoherent flush these cannot be reduced
+        # incrementally: each row's kept lines are collected across all blocks
+        # and reduced once, after the loop. Peak footprint is 8 REAL values per
+        # kept (segment, g) pair.
+        coh_blocks = []  # per block: 8 g-major, mask-compacted line arrays
+        coh_counts = []  # per block: (N_g,) kept-line counts, device-side
 
         pending_E_r = []
         pending_aw = []
@@ -1159,6 +1191,67 @@ def mc_spectrum(
             chi_im = _interp_gather2d(_ix, _fr, _blw, _abv, CHI_IM, GCOL)
             u_re = _interp_gather2d(_ix, _fr, _blw, _abv, U_RE, GCOL) / M_E_EV
             u_im = _interp_gather2d(_ix, _fr, _blw, _abv, U_IM, GCOL) / M_E_EV
+
+            if coherent:
+                # -- 5c. COMPLEX amplitude per polarization ---------------------
+                # Eq. (13) PXR + relativistic Eq. (14) CBS, the SAME expression
+                # tree the per-hkl coherent path evaluates, now on the
+                # (n_block, N_g) grid. Assumptions are inherited unchanged:
+                # amplitudes frozen at E_res across the narrow line, orthogonal
+                # polarizations add incoherently, kinematics from steps 1/4.
+                # Every operation here is elementwise, so this step introduces NO
+                # reduction of its own -- the batch debt is the shared steps
+                # 1/3/4 (component dots, gathered interp).
+                chi = chi_re + 1j * chi_im
+                eUg_over_m = u_re + 1j * u_im  # u_re/u_im already carry 1/M_E_EV
+                pol_A = []
+                for E_pol in (ES, EP):
+                    ex, ey, ez = E_pol[:, 0][None, :], E_pol[:, 1][None, :], E_pol[:, 2][None, :]
+                    g_dot_e = gx * ex + gy * ey + gz * ez  # (1, N_g)
+                    v_dot_e = vx * ex + vy * ey + vz * ez  # (nb, N_g)
+                    A_PXR = chi / detuning * (v_dot_kg * g_dot_e - omega_res**2 * v_dot_e)
+                    braced_ge = g_dot_e - vdg * v_dot_e
+                    braced_kg = k_dot_g - k_dot_v * vdg
+                    A_CBS = -eUg_over_m / (gamma * vdg) * (braced_ge + v_dot_e * braced_kg / vdg)
+                    pol_A.append(A_PXR + A_CBS)
+
+                # -- 6c. Beer-Lambert escape + field coefficients ---------------
+                # amp = sqrt(alpha omega / (4 pi^2 hbar c) * T_abs) is the
+                # UN-squared prefactor (its square is the incoherent ``pref``
+                # without t_L^2); the finite-time factor t_L sinc(.) and the
+                # phase exp[i(omega d_j - g.r_j)] are applied by the reduction.
+                mu = _interp_gather1d(_ix, _fr, _blw, _abv, mu_tab_g)
+                amp = xp.sqrt(ALPHA_FS * omega_res / _PREF_C1 * xp.exp(-(L_esc * mu)))
+                a_width = denom * t_L / (2.0 * HBARC_EV_ANG) * xp.ones_like(omega_res)
+                good = keep & xp.isfinite(amp) & (amp > 0) & (t_L > 0)
+                shape = omega_res.shape
+                # Flatten g-MAJOR so each row's kept lines land contiguously:
+                # one masked copy serves all N_g rows, and the per-row split is
+                # pure slicing. The row lengths stay ON DEVICE here and are
+                # fetched in a single sync after the block loop -- syncing per
+                # block drained the queue between blocks and cost more than the
+                # transfer itself.
+                gm = xp.ascontiguousarray(good.T).reshape(-1)
+                c_s, c_p = ((amp * t_L) * A_e for A_e in pol_A)
+                gxr, gyr, gzr = seg_r[sb, 0][:, None], seg_r[sb, 1][:, None], seg_r[sb, 2][:, None]
+                per_line = (
+                    E_res,
+                    a_width,
+                    (d_all[sb] / HBARC_EV_ANG)[:, None],  # phase slope vs E
+                    gxr * gx + gyr * gy + gzr * gz,  # g.r_j
+                    c_s.real,
+                    c_s.imag,
+                    c_p.real,
+                    c_p.imag,
+                )
+                coh_blocks.append(
+                    [
+                        xp.ascontiguousarray(xp.broadcast_to(f, shape).T).reshape(-1)[gm]
+                        for f in per_line
+                    ]
+                )
+                coh_counts.append(good.sum(axis=0))  # (N_g,), still on device
+                continue
 
             # -- 5. |A|^2 summed over both polarizations ------------------------
             A2 = xp.zeros_like(omega_res)
@@ -1234,6 +1327,65 @@ def mc_spectrum(
         # Flush the residual line batch even when it never reached the target.
         if _use_jit_line_reduction:
             _flush_line_batch()
+
+        if coherent:
+            # -- 7c. per-(reflection, orientation) coherent reduction ----------
+            # Sum the phased complex field over ALL of ONE row's segments, square
+            # it, and add |F_s|^2 + |F_p|^2 weighted by that row's mosaic weight.
+            # Rows are reduced independently, so reflections and mosaic
+            # orientations stay INCOHERENT (docs/crystal-mosaicity.md route 2)
+            # while the segment sum inside a row keeps its phase -- the defining
+            # property the per-hkl coherent path had, preserved verbatim.
+            # Limiting case: one row, one segment collapses to the incoherent
+            # self-term |A|^2 t_L^2 sinc^2 (test_coherent_emission.py).
+            _nsys_push("cxr.lines.accum")
+            # ONE sync for every block's row lengths, then pure slicing.
+            counts = _to_cpu(xp.stack(coh_counts)) if coh_blocks else np.zeros((0, N_g), int)
+            starts = np.concatenate(
+                [np.zeros((counts.shape[0], 1), counts.dtype), np.cumsum(counts, axis=1)], axis=1
+            )
+            for i_row in range(N_g):
+                blocks = [
+                    [f[int(starts[b, i_row]) : int(starts[b, i_row + 1])] for f in flat]
+                    for b, flat in enumerate(coh_blocks)
+                    if counts[b, i_row]
+                ]
+                if not blocks:
+                    continue
+                if len(blocks) == 1:
+                    E_r_i, aw_i, ps_i, gp_i, csr, csi, cpr, cpi = blocks[0]
+                else:
+                    E_r_i, aw_i, ps_i, gp_i, csr, csi, cpr, cpi = (
+                        xp.concatenate(parts) for parts in zip(*blocks, strict=True)
+                    )
+                wm_i = float(wm_rows[i_row])
+                if _use_jit_coherent_reduction:
+                    run_coherent_reduction_kernel(
+                        E_r_i,
+                        aw_i,
+                        ps_i,
+                        gp_i,
+                        csr,
+                        csi,
+                        cpr,
+                        cpi,
+                        E_grid,
+                        out=spec,
+                        mosaic_weight=wm_i,
+                        config=DEFAULT_COHERENT_KERNEL_CONFIG,
+                    )
+                    continue
+                f_s = xp.zeros(E_grid.size, dtype=cdtype)
+                f_p = xp.zeros(E_grid.size, dtype=cdtype)
+                for j0 in range(0, E_r_i.size, chunk):
+                    sl = slice(j0, min(j0 + chunk, E_r_i.size))
+                    x = aw_i[sl][:, None] * (E_grid[None, :] - E_r_i[sl][:, None]) / xp.pi
+                    ph = xp.exp(1j * (ps_i[sl][:, None] * E_grid[None, :] - gp_i[sl][:, None]))
+                    SP = xp.sinc(x).astype(cdtype) * ph
+                    f_s += (csr[sl] + 1j * csi[sl]) @ SP
+                    f_p += (cpr[sl] + 1j * cpi[sl]) @ SP
+                spec[:] += (xp.abs(f_s) ** 2 + xp.abs(f_p) ** 2) * wm_i
+            _nsys_pop()
 
     if components:
         return _to_cpu(spec / Ne), _to_cpu(spec_pxr / Ne), _to_cpu(spec_cbs / Ne)
