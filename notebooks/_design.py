@@ -64,7 +64,7 @@ def notebook_css() -> str:
   .cxr-title {{ max-width: {WIDTHS["prose"]}; margin: 0 0 1.25rem; }}
   .cxr-title__eyebrow {{
     color: var(--cxr-focus); font: 600 .75rem/1.2 "IBM Plex Mono", monospace;
-    letter-spacing: .14em; text-transform: uppercase;
+    letter-spacing: .14em;
   }}
   .cxr-title h1 {{
     font-family: {TYPOGRAPHY["display"]};

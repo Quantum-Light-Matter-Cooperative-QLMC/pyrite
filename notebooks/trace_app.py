@@ -78,7 +78,7 @@ def _(mo, page_title, style_sheet):
                 mo,
                 "3D trajectory and structure viewer",
                 "Watch electron cascades develop inside the crystal and inspect the lattice itself.",
-                eyebrow="Electron transport and radiation from crystalline materials",
+                eyebrow="PyRITE",
             ),
         ]
     )
@@ -188,7 +188,7 @@ def _(CATALOG, MATERIAL, fmt_thickness, mo):
     _azim_values = (100.0, 125.0, 140.0, 165.0, 180.0)
     penetration_azim_ui = mo.ui.dropdown(
         {f"{value:g} deg": value for value in _azim_values},
-        value=f"{_azim_values[0]:g} deg",
+        value=f"{180.0:g} deg",
         label="",
     )
     return (
@@ -739,7 +739,7 @@ def _(mo):
     crystal_na_ui = mo.ui.slider(1, 4, value=3, step=1, label="cells a")
     crystal_nb_ui = mo.ui.slider(1, 4, value=3, step=1, label="cells b")
     crystal_nc_ui = mo.ui.slider(1, 3, value=2, step=1, label="cells c")
-    crystal_bonds_ui = mo.ui.switch(value=False, label="show bonds")
+    crystal_bonds_ui = mo.ui.switch(value=True, label="show bonds")
     crystal_layers_ui = mo.ui.switch(value=False, label="color by layer")
     crystal_reciprocal_ui = mo.ui.slider(1, 8, value=1, step=1, label="reciprocal vectors")
     return (
