@@ -15,6 +15,7 @@ def render_cross_material(
     *,
     settings,
     analysis_checkpoint_manifest,
+    comparison_stem,
     compare_all_ui,
     energy_ui,
     compare_all: bool,
@@ -26,10 +27,17 @@ def render_cross_material(
         "Candidate lines with quality below 0.5 are rejected."
     )
     beam_energy = None if compare_all else energy
+    # A material's data may live under its own stem (a direct `<material>.pkl`)
+    # or under a named catalog_profile's stem; comparison_stem resolves either
+    # so a profile-only material still counts here, matching the material
+    # dropdown's own availability check.
+    stems = {
+        material_key: comparison_stem(material_key) for material_key in CATALOG.material_keys
+    }
     materials_with_data = sum(
         1
-        for material_key in CATALOG.material_keys
-        if (analysis_checkpoint_manifest(material_key) or {}).get("n_records", 0) > 0
+        for stem in stems.values()
+        if stem is not None and (analysis_checkpoint_manifest(stem) or {}).get("n_records", 0) > 0
     )
     if materials_with_data < 2:
         return mo.vstack(
@@ -40,9 +48,11 @@ def render_cross_material(
         )
 
     summaries = {}
-    for material_key in CATALOG.material_keys:
+    for material_key, stem in stems.items():
+        if stem is None:
+            continue
         summary = cached_analysis(
-            material_key,
+            stem,
             lambda results: material_comparison_summary(results, settings),
             (
                 "material_comparison_summary",

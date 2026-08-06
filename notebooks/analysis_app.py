@@ -41,6 +41,7 @@ with app.setup:
 
     from cxr_mc.analyze import (
         analysis_checkpoint_manifest,
+        comparison_stem,
         emission_menu,
         face_menu,
         get_default_material,
@@ -588,6 +589,7 @@ def _(compare_all_energies_ui, context, cross_material_energy_ui):
             mo,
             settings=context.settings,
             analysis_checkpoint_manifest=analysis_checkpoint_manifest,
+            comparison_stem=lambda material: comparison_stem(material, DEFAULT_CHECKPOINT_DIR),
             compare_all_ui=compare_all_energies_ui,
             energy_ui=cross_material_energy_ui,
             compare_all=compare_all,

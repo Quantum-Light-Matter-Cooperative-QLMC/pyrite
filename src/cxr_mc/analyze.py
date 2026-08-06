@@ -276,6 +276,20 @@ def profile_menu(material: str, checkpoint_dir: Path | str) -> tuple[MaterialMen
     return tuple(rows)
 
 
+def comparison_stem(material: str, checkpoint_dir: Path | str) -> str | None:
+    """The checkpoint stem cross-material comparison should read for ``material``.
+
+    :func:`profile_menu`'s canonical-first, newest-first ordering already picks
+    the right stem for a single-material dropdown; reuse it here so a material
+    with only a named ``catalog_profile`` checkpoint (no direct ``<material>.pkl``)
+    still counts as available -- :func:`analyze.analysis_checkpoint_manifest`
+    only ever checks the direct stem and would otherwise miss it. Returns
+    ``None`` if ``material`` has no checkpoint at all.
+    """
+    rows = profile_menu(material, checkpoint_dir)
+    return rows[0]["value"] if rows else None
+
+
 def emission_menu(results) -> tuple[MaterialMenuRow, ...]:
     """Emission-view rows for a LOADED checkpoint's records: ``Incoherent`` (the
     always-stored ``spec``), ``Coherent`` (the ``spec_coherent`` a
