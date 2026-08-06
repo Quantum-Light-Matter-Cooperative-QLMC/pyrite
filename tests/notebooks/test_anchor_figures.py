@@ -17,7 +17,7 @@ import pytest
 matplotlib.use("Agg")  # headless; no display in CI
 
 # anchor_figures lives in checks/, not on the package path -- add it.
-_CHECKS = Path(__file__).resolve().parent.parent / "checks"
+_CHECKS = Path(__file__).resolve().parent.parent.parent / "checks"
 if str(_CHECKS) not in sys.path:
     sys.path.insert(0, str(_CHECKS))
 
