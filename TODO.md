@@ -29,6 +29,12 @@ file. Edit and drop items on `main`.
    cache reuse, and correct or accurately report the ratio plot's unexpected
    material exclusions. → `fix/analysis-compare-loading-quality`;
    [`tasks/fix/analysis-compare-loading-quality/`](tasks/fix/analysis-compare-loading-quality/).
+2. **Beam phase space.** Activate the declared-inert `BeamSpec` transverse and
+   energy-spread fields: canonical Twiss/normalized-emittance parameterization,
+   per-electron injection sampling, profile decode, and finite initial phase
+   space in the trajectory plots. The beam object and its profile plumbing
+   already exist — this completes them. → `feature/beam-phase-space`;
+   [`tasks/feature/beam-phase-space/`](tasks/feature/beam-phase-space/).
 
 ### Gated
 
@@ -62,22 +68,21 @@ file. Edit and drop items on `main`.
 
 ## Inbox - >user< to be triaged
 
-1. **Add finite initial phase space (velocity vector spread, both longitudinal & transverse) into 2D and 3D trajectory plots**
-2. **Coherent-bunching parameter study.** Compare effects of longitudinal bunch
+1. **Coherent-bunching parameter study.** Compare effects of longitudinal bunch
    length and transverse bunch size on coherent bunching while holding other
    bunch parameters fixed; explore tilted bunch fronts or other routes to
    coherent enhancement.
-3. **Cross-platform agent hooks.** Improve shell and operating-system support
+2. **Cross-platform agent hooks.** Improve shell and operating-system support
    beyond WSL/Ubuntu, including a directory of hook scripts for more complex setup and
    platform-specific handling.
-4. **Source-package organization.** Group related loose modules under
+3. **Source-package organization.** Group related loose modules under
    `src/cxr_mc/` into appropriately scoped subpackages after current structural
    work settles.
-5. **Local SLURM integration.** Make `cxr run` use the configured laptop-local
+4. **Local SLURM integration.** Make `cxr run` use the configured laptop-local
    SLURM installation (and, if available, report GPU usage statistics), if it exists.
-6. **Evaluate refactoring `monteccarlo/runner.py` and `montecarlo/transport.py`**
+5. **Evaluate refactoring `monteccarlo/runner.py` and `montecarlo/transport.py`**
    into multiple smaller files.
-7. **Add support for custom-defined remotes, or other standards for submitting remote computing tasks**.
+6. **Add support for custom-defined remotes, or other standards for submitting remote computing tasks**.
    This will require research of what the industry standards/best practices are here, and we may find that the best practices are to leave it up to user custom scripting. If there are good standards for implementing comprehensive integrated support for SSH and/or other options for submitting, to SLURM or otherwise, write up a report on what we should do, why & how. This would obviously require more in depth capabilities for user configurations of their remote(s) of choice.
 
 ## CLI backlog
