@@ -490,7 +490,9 @@ def _beam_kwargs(case):
     """Beam phase-space kwargs a case dict forwards to ``simulate_trajectories``:
     the transverse spot (elliptical ``beam_fwhm_mm`` / ``beam_fwhm_y_mm``) and
     the legacy longitudinal bunch (``bunch_length_fs`` / ``long_shape`` /
-    ``long_offsets_fs``) or resolved ``longitudinal_distribution`` policy.
+    ``long_offsets_fs``) or resolved ``longitudinal_distribution`` policy, the
+    resolved ``transverse_distribution`` (Twiss) policy that replaces the spot,
+    and ``energy_spread_frac``.
     Absent keys default to the point-bunch isotropic beam, bit-for-bit with the
     pre-BeamSpec case dict."""
     return dict(
@@ -500,6 +502,8 @@ def _beam_kwargs(case):
         long_shape=case.get("long_shape", "gaussian"),
         long_offsets_fs=case.get("long_offsets_fs"),
         longitudinal_distribution=case.get("longitudinal_distribution"),
+        transverse_distribution=case.get("transverse_distribution"),
+        energy_spread_frac=case.get("energy_spread_frac"),
     )
 
 

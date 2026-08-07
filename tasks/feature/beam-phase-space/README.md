@@ -198,14 +198,23 @@ Likely owners, in dependency order:
       `src/cxr_mc/transverse.py`, mirroring `longitudinal.py`; `sweep.py` holds
       the `BeamSpec` field, the mutual-exclusion error, and
       `BeamSpec.with_transverse`.
-- [ ] **C. Transport sampling** — per-electron `v_hat` and initial energy from
+- [x] **C. Transport sampling** — per-electron `v_hat` and initial energy from
       the resolved distribution, on RNG children independent of the transport
       draws (follow `_sample_bunch_offsets` / `spawn(4)[3]` precedent so the
-      zero-spread limit is bit-for-bit).
-- [ ] **D. Limiting-case tests** — `eps_n -> 0` reproduces the collimated run
-      exactly; charge/rep-rate invariance test (critique 6). *Partial:* the
-      charge/rep-rate bit-for-bit test is in `tests/test_transverse.py`; the
-      `eps_n -> 0` vs `main` transport comparison is blocked on C.
+      zero-spread limit is bit-for-bit). Landed as `transverse_distribution` and
+      `energy_spread_frac` kwargs on `simulate_trajectories`, forwarded by
+      `runner._beam_kwargs`, on child streams `spawn(5)[4]` and `spawn(6)[5]`.
+      Slopes are referred to the beam axis via the new
+      `geometry.beam_frame_basis`, which is exactly `I` on axis; the
+      zero-divergence note on `project_beam_entry` is retired.
+- [x] **D. Limiting-case tests** — `eps_n -> 0` reproduces the collimated run
+      exactly; charge/rep-rate invariance test (critique 6). Delivered as two
+      tests rather than one: the *unset* policy is bit-for-bit with the
+      pre-BeamSpec run, while `eps_n -> 0` is a convergence test — a strictly
+      positive emittance cannot make `sqrt(eps*beta)` underflow to exactly zero,
+      so the four geometry arrays are bounded by `< 1e-100` (which at their
+      magnitudes of 0.3–4.8e4 means bit-for-bit anyway) and every other array,
+      scalar and tally is asserted exactly equal.
 - [x] **E. Round-trip test** — sample from a known `(eps_n, beta, alpha)` and
       recover it through `beam_metrics.sampled_beam_metrics` within MC error.
       This closes the input/output asymmetry and is the strongest single check.

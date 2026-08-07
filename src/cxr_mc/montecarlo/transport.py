@@ -20,6 +20,7 @@ from numba import njit
 from .. import DATA_DIR
 from ..materials._transport_data import TRANSPORT_ELEMENTS
 from ..materials.attenuation import _normalize_composition
+from ..transverse import resolved_from_mapping, sample_transverse
 from .geometry import (
     X_MAX,
     X_MIN,
@@ -27,6 +28,7 @@ from .geometry import (
     Y_MIN,
     Z_MAX,
     Z_MIN,
+    beam_frame_basis,
     project_beam_entry,
     validate_transverse_dimensions,
 )
@@ -1186,6 +1188,8 @@ def simulate_trajectories(
     long_shape="gaussian",
     long_offsets_fs=None,
     longitudinal_distribution=None,
+    transverse_distribution=None,
+    energy_spread_frac=None,
     crystal_width_mm=None,
     crystal_height_mm=None,
     tilt_polar_rad=0.0,
@@ -1262,6 +1266,30 @@ def simulate_trajectories(
     beam_fwhm_y_mm: optional y-plane spot FWHM [mm] for an ELLIPTICAL beam
     (decision 8). None -> equals beam_fwhm_mm (isotropic), which draws
     sigma_x == sigma_y and is bit-for-bit with the historical scalar-spot path.
+
+    transverse_distribution: the resolved Courant-Snyder policy, mutually
+    exclusive with the spot FWHMs above (a spot fixes <x^2> alone; a Twiss
+    triplet fixes <x^2>, <x x'> and <x'^2>, so accepting both would be
+    over-determined). It owns the entry positions AND the per-electron
+    directions: the drawn slopes (x', y') are dx/dz, dy/dz about the beam axis,
+    turned into unit vectors through geometry.beam_frame_basis, whose transverse
+    columns coincide with the lab x / y the spot uses. Until this key is set,
+    every direction is the shared beam_dir exactly, as before. Limiting case:
+    eps_n -> 0 gives sigma_position -> 0 and slopes -> 0, so positions and
+    directions both converge on the collimated point source; leaving the key
+    unset reproduces it BIT-FOR-BIT.
+    Validation: beam-phase-space-injection
+
+    energy_spread_frac: RMS *relative* energy spread. Each electron starts at
+    ``E0_keV * (1 + f * u)``, u ~ Normal(0, 1), drawn uncorrelated with the
+    arrival time (decision 3: no chirp model). None/0 -> the monoenergetic beam,
+    bit-for-bit. Raises rather than transporting a non-positive energy, which a
+    Gaussian permits only for a spread near unity.
+    Validation: beam-energy-spread-injection
+
+    Both draws use their own SeedSequence child streams (spawn(5)[4] and
+    spawn(6)[5], the indices after the bunch's spawn(4)[3]), so enabling either
+    never perturbs the free-path / scattering draws.
 
     bunch_length_fs, long_shape, long_offsets_fs, longitudinal_distribution:
     longitudinal bunch sampling. Each electron gets an arrival offset
@@ -1470,7 +1498,23 @@ def simulate_trajectories(
 
     rng = np.random.default_rng(seed)
     pos = np.zeros((Ne, 3))
-    if beam_fwhm_mm or beam_fwhm_y_mm:
+    transverse_slopes = None
+    if transverse_distribution is not None:
+        if beam_fwhm_mm or beam_fwhm_y_mm:
+            raise ValueError("transverse_distribution is incompatible with the spot FWHM fields")
+        # The Twiss policy owns BOTH transverse moments: positions here and the
+        # correlated slopes fed to `dirs` below. Splitting them across two
+        # sources would break the <x x'> correlation the emittance encodes.
+        # Its own child stream (spawn(5)[4], the next index after the bunch's
+        # spawn(4)[3]) keeps the main free-path / scattering draws untouched.
+        MM_TO_ANG = 1.0e7
+        resolved = resolved_from_mapping(transverse_distribution)
+        transverse_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(5)[4])
+        x_mm, x_prime, y_mm, y_prime = sample_transverse(resolved, Ne, transverse_rng)
+        transverse_slopes = (x_prime, y_prime)
+        offsets = np.stack((x_mm * MM_TO_ANG, y_mm * MM_TO_ANG), axis=1)
+        pos[:, :2] = project_beam_entry(offsets, tilt_polar_rad, tilt_azim_rad)
+    elif beam_fwhm_mm or beam_fwhm_y_mm:
         # independent child stream: does not consume from `rng`, so the main
         # transport draws (free path, scattering angle) are untouched -- see
         # the beam_fwhm_mm docstring paragraph above for the invariance this
@@ -1513,8 +1557,29 @@ def simulate_trajectories(
     beam_dir = beam_dir / np.linalg.norm(beam_dir)
     if beam_dir[2] <= 1e-6:
         raise ValueError("beam_dir must point into the slab (z component > 0)")
-    dirs = np.tile(beam_dir, (Ne, 1))
+    if transverse_slopes is None:
+        dirs = np.tile(beam_dir, (Ne, 1))
+    else:
+        # Slopes are dx/dz, dy/dz about the beam axis, so the per-electron
+        # direction is (x', y', 1) in the beam frame. Zero emittance gives
+        # exactly `beam_dir` back, which is what makes the collimated limit
+        # bit-for-bit rather than merely close.
+        x_prime, y_prime = transverse_slopes
+        basis = beam_frame_basis(beam_dir)
+        dirs = x_prime[:, None] * basis[:, 0] + y_prime[:, None] * basis[:, 1] + beam_dir
+        dirs /= np.linalg.norm(dirs, axis=1, keepdims=True)
     E_keV = np.full(Ne, float(E0_keV))
+    if energy_spread_frac:
+        # RMS *relative* deviation, uncorrelated with arrival time (decision 3:
+        # no chirp model). Its own child stream, spawn(6)[5], for the same
+        # reason as the transverse draw above.
+        spread_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(6)[5])
+        E_keV = E_keV * (1.0 + float(energy_spread_frac) * spread_rng.standard_normal(Ne))
+        if not np.all(E_keV > 0.0):
+            raise ValueError(
+                f"energy_spread_frac={energy_spread_frac} drew a non-positive electron "
+                "energy; the Gaussian spread model needs spread << 1"
+            )
     if finite_footprint:
         assert height_ang is not None
         alive = (np.abs(pos[:, 0]) <= width_ang / 2.0) & (np.abs(pos[:, 1]) <= height_ang / 2.0)

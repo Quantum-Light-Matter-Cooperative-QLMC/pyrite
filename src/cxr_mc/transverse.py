@@ -11,7 +11,9 @@ primary swept axis and geometric emittance is not invariant across it. See
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from scipy.constants import physical_constants
@@ -178,6 +180,22 @@ def _sample_plane(
     position = np.sqrt(emittance * beta_twiss) * u1
     slope = np.sqrt(emittance / beta_twiss) * (u2 - plane.alpha_twiss * u1)
     return position, slope
+
+
+def resolved_from_mapping(payload: Mapping[str, Any]) -> ResolvedTransverseDistribution:
+    """Rebuild a resolved distribution from its ``dataclasses.asdict`` form.
+
+    A case dict carries the resolution as plain data (it has to survive JSON
+    round-trips through the checkpoint store), but the sampler is written
+    against the dataclass so there is exactly one copy of the Courant-Snyder
+    algebra. This is the seam between the two.
+    """
+    return ResolvedTransverseDistribution(
+        beta_gamma=float(payload["beta_gamma"]),
+        x=ResolvedTransversePlane(**{k: float(v) for k, v in payload["x"].items()}),
+        y=ResolvedTransversePlane(**{k: float(v) for k, v in payload["y"].items()}),
+        provenance=str(payload.get("provenance", "")),
+    )
 
 
 def sample_transverse(

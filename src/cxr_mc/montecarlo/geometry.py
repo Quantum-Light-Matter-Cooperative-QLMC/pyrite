@@ -341,10 +341,14 @@ def project_beam_entry(offsets_uv, tilt_polar_rad, tilt_azim_rad=0.0):
     ``1/cos`` path-length yield enhancement.
 
     Source: elementary ray-plane intersection (no literature equation).
-    Assumptions: perfectly collimated lab beam (zero divergence); the sample
-    entrance face is the plane ``z = 0`` in the sample frame; an electron whose
-    projected entry lands outside the transverse footprint misses the sample
-    (handled by the caller, kept in ``Ne``).
+    Assumptions: the projection uses the NOMINAL beam axis, not each electron's
+    own direction. With a finite emittance the two differ, but the offsets are
+    specified at the entrance face itself (no drift length -- see
+    ``docs/beam-phase-space.md``), so the residual is second order in the
+    slope and negligible at mrad-scale divergence. The sample entrance face is
+    the plane ``z = 0`` in the sample frame; an electron whose projected entry
+    lands outside the transverse footprint misses the sample (handled by the
+    caller, kept in ``Ne``).
     Limiting case: ``tilt_polar_rad = 0`` gives ``R = I``, so ``p0 = (u, v)``
     exactly -- the untilted isotropic entry, bit-for-bit.
 
@@ -514,6 +518,29 @@ def _small_tilt_R(dx_rad, dy_rad):
     kx, ky = dx_rad / ang, dy_rad / ang
     K = np.array([[0.0, 0.0, ky], [0.0, 0.0, -kx], [-ky, kx, 0.0]])  # skew of axis
     return np.eye(3) + np.sin(ang) * K + (1.0 - np.cos(ang)) * (K @ K)
+
+
+def beam_frame_basis(beam_dir):
+    """Rotation carrying the lab axes onto the beam's own frame.
+
+    Columns 0 and 1 are the transverse basis vectors a per-electron slope pair
+    ``(x', y')`` is measured against; column 2 is ``beam_dir`` itself. The
+    rotation is the shortest arc from ``+z`` to ``beam_dir``, so an on-axis beam
+    returns exactly the identity and the transverse planes coincide with the lab
+    ``x`` / ``y`` the Gaussian spot already uses -- the two descriptions of the
+    same beam then agree axis for axis.
+
+    Limiting case: ``beam_dir = +z`` gives ``I`` bit-for-bit.
+    """
+    d = np.asarray(beam_dir, dtype=float)
+    d = d / np.linalg.norm(d)
+    sin_theta = float(np.hypot(d[0], d[1]))
+    if sin_theta < 1e-15:
+        return np.eye(3)
+    # Rotate about the axis perpendicular to both z and d, by the angle between
+    # them; _small_tilt_R takes that axis-angle as a rotation vector in the plane.
+    theta = float(np.arctan2(sin_theta, d[2]))
+    return _small_tilt_R(-d[1] * theta / sin_theta, d[0] * theta / sin_theta)
 
 
 def _mosaic_quadrature(fwhm_rad, nodes):

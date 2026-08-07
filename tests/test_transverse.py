@@ -1,14 +1,19 @@
 """Transverse phase-space policy: resolution, sampling, and inertness.
 
 Validation: beam-phase-space-injection
+Validation: beam-energy-spread-injection
 """
 
 from __future__ import annotations
+
+from dataclasses import asdict
 
 import numpy as np
 import pytest
 
 from cxr_mc.beam_metrics import sampled_beam_metrics
+from cxr_mc.montecarlo.geometry import beam_frame_basis
+from cxr_mc.montecarlo.transport import simulate_trajectories
 from cxr_mc.sweep import BeamSpec, Sweep, build_cases
 from cxr_mc.transverse import (
     TransverseDistribution,
@@ -146,3 +151,117 @@ def test_charge_and_rep_rate_stay_inert_on_the_sampler():
     repeat = sample_transverse(charged, 5_000, np.random.default_rng(3))
     for lhs, rhs in zip(baseline, repeat, strict=True):
         assert np.array_equal(lhs, rhs)
+
+
+def _transport(**beam):
+    """A small collimated-geometry transport run, varying only the beam block."""
+    return simulate_trajectories(
+        30.0,
+        64,
+        thickness_ang=2.0e4,
+        element="C",
+        n_atoms_per_ang3=0.1128,
+        seed=11,
+        **beam,
+    )
+
+
+def test_unset_policy_transport_is_bit_for_bit_with_the_collimated_run():
+    """No policy, no change: the default path must not move at all.
+
+    The draws live on their own RNG child streams, so an unset beam block has
+    to reproduce the pre-BeamSpec run EXACTLY, not to within Monte Carlo error.
+    """
+    baseline = _transport()
+    for key, expected in _transport(transverse_distribution=None).items():
+        actual = baseline[key]
+        if isinstance(expected, np.ndarray):
+            assert np.array_equal(actual, expected), key
+        else:
+            assert actual == expected, key
+
+
+def test_zero_emittance_transport_converges_to_the_collimated_run():
+    """The limiting case: eps_n -> 0 recovers the collimated beam.
+
+    Positions scale as sqrt(eps_n) and slopes as sqrt(eps_n), so neither can
+    reach exactly zero from a strictly positive emittance -- what is asserted
+    is that they shrink without bound while every array the transport actually
+    integrates comes back bit-for-bit, which is the physically meaningful half.
+    """
+    baseline = _transport()
+    tiny = TransverseDistribution(
+        normalized_emittance_x_mm_mrad=1.0e-300,
+        beta_twiss_x_m=0.5,
+        alpha_twiss_x=-0.8,
+    )
+    resolved = asdict(resolve_transverse_distribution(tiny, energy_keV=30.0))
+    collimated = _transport(transverse_distribution=resolved)
+    # The three geometry arrays inherit the vanishing offset; everything else,
+    # including every energy, length, clock and exit tally, is exact.
+    vanishing = ("initial_r_ang", "initial_v_hat", "r_mid", "v_hat")
+    for key in vanishing:
+        assert np.abs(collimated[key] - baseline[key]).max() < 1e-100, key
+    for key, expected in baseline.items():
+        if key in vanishing:
+            continue
+        actual = collimated[key]
+        if isinstance(expected, np.ndarray):
+            assert np.array_equal(actual, expected), key
+        else:
+            assert actual == expected, key
+
+
+def test_transport_directions_carry_the_sampled_slopes():
+    resolved = asdict(resolve_transverse_distribution(_POLICY, energy_keV=30.0))
+    out = _transport(transverse_distribution=resolved)
+    v_hat = out["initial_v_hat"]
+    assert np.allclose(np.linalg.norm(v_hat, axis=1), 1.0)
+    # A finite emittance must actually spread the directions; the collimated
+    # run has every row identical.
+    assert v_hat[:, 0].std() > 0.0
+    # Slopes are dx/dz about +z, so the RMS of v_x/v_z is the sampled sigma_x'.
+    slope_rms = float(np.sqrt(np.mean((v_hat[:, 0] / v_hat[:, 2]) ** 2)))
+    expected = resolve_transverse_distribution(_POLICY, energy_keV=30.0).x.sigma_slope_rad
+    assert slope_rms == pytest.approx(expected, rel=0.2)
+
+
+def test_transverse_policy_and_spot_fwhm_cannot_both_reach_transport():
+    resolved = asdict(resolve_transverse_distribution(_POLICY, energy_keV=30.0))
+    with pytest.raises(ValueError, match="incompatible"):
+        _transport(transverse_distribution=resolved, beam_fwhm_mm=1.0)
+
+
+def test_energy_spread_broadens_initial_energies_about_the_nominal():
+    baseline = _transport()
+    assert np.all(baseline["initial_E_keV"] == 30.0)
+    spread = _transport(energy_spread_frac=0.02)
+    energies = spread["initial_E_keV"]
+    assert energies.mean() == pytest.approx(30.0, rel=0.02)
+    assert energies.std() / 30.0 == pytest.approx(0.02, rel=0.35)
+
+
+def test_energy_spread_zero_is_bit_for_bit_monoenergetic():
+    baseline = _transport()
+    inert = _transport(energy_spread_frac=0.0)
+    for key, expected in baseline.items():
+        actual = inert[key]
+        if isinstance(expected, np.ndarray):
+            assert np.array_equal(actual, expected), key
+        else:
+            assert actual == expected, key
+
+
+def test_energy_spread_refuses_to_transport_a_non_positive_energy():
+    with pytest.raises(ValueError, match="non-positive electron energy"):
+        _transport(energy_spread_frac=5.0)
+
+
+def test_beam_frame_basis_is_identity_on_axis_and_maps_z_onto_the_beam():
+    assert np.array_equal(beam_frame_basis((0.0, 0.0, 1.0)), np.eye(3))
+    for direction in ((0.3, 0.0, 1.0), (-0.2, 0.5, 2.0)):
+        d = np.asarray(direction) / np.linalg.norm(direction)
+        basis = beam_frame_basis(d)
+        assert np.allclose(basis @ np.array([0.0, 0.0, 1.0]), d)
+        # Orthonormal, so the transverse columns stay perpendicular to the beam.
+        assert np.allclose(basis.T @ basis, np.eye(3))
