@@ -21,20 +21,10 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: uv sync --package cxr-mc-tests --locked
+        run: uv sync --all-groups --locked
 
       - name: Test ${{ matrix.suite }} suite
-        run: uv run --package cxr-mc-tests cxr-dev test-suite ${{ matrix.suite }}
-
-  package:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          python-version: "3.13"
-      - run: uv sync --package cxr-mc-tests --locked
-      - run: uv run --package cxr-mc-tests cxr-dev package-smoke
+        run: uv run cxr-dev test-suite ${{ matrix.suite }}
 
   full:
     runs-on: ubuntu-latest
@@ -43,7 +33,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.13"
-      - run: uv sync --package cxr-mc-tests --locked
+      - run: uv sync --all-groups --locked
 
       - name: Verify
-        run: uv run --package cxr-mc-tests cxr-dev verify
+        run: uv run cxr-dev verify
