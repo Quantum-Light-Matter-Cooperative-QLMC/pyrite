@@ -484,13 +484,19 @@ def _incident_beam_lines(data, length, *, R=_IDENTITY_R):
     arrow. Entry points are each electron's first-segment start; electrons whose
     Gaussian draw missed a finite crystal are already absent from ``data`` (dropped
     as ``n_missed`` by transport), so this never draws a particle that missed.
-    ``R`` (default identity) rotates the plotted points into the lab frame."""
+    ``R`` (default identity) rotates the plotted points into the lab frame.
+
+    Each stub runs back along that electron's OWN incident direction, not the
+    nominal axis: with a finite emittance the two differ by the sampled slope,
+    and drawing the nominal one would hide exactly the divergence the plot is
+    there to show. A collimated beam has every direction equal to the axis, so
+    this is the same picture as before wherever no phase space is set."""
     sid = np.asarray(data["elec_id"])
     start = np.asarray(data["start_xyz"], dtype=float)
-    _, first = np.unique(sid, return_index=True)  # one entry per electron
+    ids, first = np.unique(sid, return_index=True)  # one entry per electron
     entry = start[first]
-    beam = np.asarray(data["beam"], dtype=float)
-    beam = beam / np.linalg.norm(beam)
+    beam = np.asarray(data["initial_v_hat"], dtype=float)[ids]
+    beam = beam / np.linalg.norm(beam, axis=1, keepdims=True)
     upstream = entry - length * beam  # where each incoming ray starts, off the face
     n = len(entry)
     xyz = np.full((3 * n, 3), np.nan)  # start, entry, NaN per electron

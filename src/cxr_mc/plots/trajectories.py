@@ -133,6 +133,29 @@ def _beam_detector_basis(beam, n_hat):
     return e1, perp / np.linalg.norm(perp)
 
 
+def _beam_phase_space(case):
+    """The case's own beam phase space, for the transport behind a plot.
+
+    A trajectory plot that draws a point source for a beam the run treated as
+    having finite emittance, bunch length or energy spread is a picture of a
+    different beam than the one that made the spectrum. These keys are absent
+    unless a profile deliberately set them, so every case built before the beam
+    block existed still transports as the legacy point bunch, bit-for-bit.
+
+    The Gaussian spot (``beam_fwhm_mm``) is deliberately NOT included: it stays
+    under the caller's control, because the 2D cross-section wants a point
+    source and the 3D view supplies its own display width.
+    """
+    return dict(
+        bunch_length_fs=case.get("bunch_length_fs"),
+        long_shape=case.get("long_shape", "gaussian"),
+        long_offsets_fs=case.get("long_offsets_fs"),
+        longitudinal_distribution=case.get("longitudinal_distribution"),
+        transverse_distribution=case.get("transverse_distribution"),
+        energy_spread_frac=case.get("energy_spread_frac"),
+    )
+
+
 def _trajectory_data(
     case,
     Ne,
@@ -156,6 +179,11 @@ def _trajectory_data(
     entries landing off the crystal are dropped by transport (``n_missed``) and
     never appear as tracks.
 
+    The case's own beam phase space (Twiss policy, bunch, energy spread) rides
+    along via :func:`_beam_phase_space`, so a plot shows the beam the run used
+    rather than a point source standing in for it. A case that sets none of
+    those keys transports exactly as before.
+
     Multilayer/stacked materials (``case["abs_layers"]`` set -- film-on-substrate,
     e.g. mos2-on-sapphire) are transported through the FULL stack via
     ``layers=abs_layers``, matching the spectrum runner (`montecarlo.runner`);
@@ -164,6 +192,11 @@ def _trajectory_data(
     backscatter contribution and reporting only the film's thickness."""
     tilt_polar_rad = np.deg2rad(case.get("tilt_deg", 0.0))
     tilt_azim_rad = np.deg2rad(case.get("tilt_azim_deg", 0.0))
+    phase_space = _beam_phase_space(case)
+    if phase_space["transverse_distribution"] is not None:
+        # A Twiss policy fixes the spot size as well as the divergence, so the
+        # display FWHM would be a second, contradictory answer for <x^2>.
+        beam_fwhm_mm = None
     beam, n_hat = tilted_geometry(case["theta_obs_rad"], tilt_polar_rad, tilt_azim_rad)
     n_hat = -n_hat
     abs_layers = case.get("abs_layers")
@@ -183,6 +216,7 @@ def _trajectory_data(
         crystal_height_mm=crystal_height_mm,
         tilt_polar_rad=tilt_polar_rad,
         tilt_azim_rad=tilt_azim_rad,
+        **phase_space,
         # Blazed grooves (when the case carries the knob): electrons enter on the
         # relief facets, so the drawn tracks start at z in [0, groove depth) --
         # groove=None (the default for every ungrooved case) is bit-for-bit the
@@ -299,6 +333,37 @@ def _square_frame(frame):
     return (float(xlo), float(xhi), float(ylo), float(yhi))
 
 
+def _draw_incident_bundle(ax, data, length):
+    """Per-electron incident stubs, when the beam has a finite phase space.
+
+    The single red arrow says where the beam comes from; it cannot say that the
+    electrons arrive spread over a spot and over a range of angles. Each stub
+    runs ``length`` upstream from one electron's true entry point along that
+    electron's own initial direction, so the drawn bundle is the sampled
+    transverse phase space itself rather than an illustration of it.
+
+    Silently does nothing for a collimated point source -- every stub would lie
+    on the arrow already there -- which keeps every pre-BeamSpec panel pixel for
+    pixel unchanged.
+    """
+    from matplotlib.collections import LineCollection
+
+    if data.get("initial_r_ang") is None or data.get("initial_v_hat") is None:
+        return  # a hand-built panel payload (tests, notebooks) without transport
+    entry = np.asarray(data["initial_r_ang"], dtype=float) / data.get("u", 1.0)
+    directions = np.asarray(data["initial_v_hat"], dtype=float)
+    e1, e2 = _beam_detector_basis(data["beam"], data["detector"])
+    entry_2d = np.column_stack((entry @ e1, entry @ e2))
+    dir_2d = np.column_stack((directions @ e1, directions @ e2))
+    spread = float(np.ptp(entry_2d, axis=0).max() + np.ptp(dir_2d, axis=0).max())
+    if not spread > 0.0:
+        return
+    segments = np.stack((entry_2d - length * dir_2d, entry_2d), axis=1)
+    ax.add_collection(
+        LineCollection(segments.tolist(), colors="red", linewidths=0.6, alpha=0.55, zorder=3)
+    )
+
+
 def _draw_trajectory_panel(
     ax,
     data,
@@ -400,6 +465,7 @@ def _draw_trajectory_panel(
 
     # beam (red) + detector (green) arrows, anchored at the entry point
     aL = 0.16 * (xhi - xlo)
+    _draw_incident_bundle(ax, data, aL)
     ax.annotate(
         "",
         xy=(0.0, 0.0),

@@ -236,8 +236,16 @@ Likely owners, in dependency order:
       full kernel is measured against `S` end to end in
       `tests/montecarlo/test_beam_energy_spread_grid.py` (2.28% measured vs
       2.30% predicted for a 5% beam step).
-- [ ] **I. Trajectory plots** (absorbed Inbox 1) — 2D/3D plots show the finite
-      initial phase space; both longitudinal and transverse.
+- [x] **I. Trajectory plots** (absorbed Inbox 1) — 2D/3D plots show the finite
+      initial phase space; both longitudinal and transverse. `_trajectory_data`
+      forwards the case's beam block (`_beam_phase_space`: Twiss policy, bunch,
+      energy spread) into transport, so both the matplotlib cross-section and
+      the plotly volume draw the beam the run used. The spot FWHM stays the
+      caller's, since the 2D view wants a point source and the 3D view supplies
+      a display width; a Twiss policy on the case overrides that width, because
+      it already fixes `<x^2>`. New `_draw_incident_bundle` draws one incident
+      stub per electron in 2D, and the plotly stubs now follow each electron's
+      own direction instead of the nominal axis. Collimated cases are unchanged.
 - [ ] **J. Physics ledger** — source equation, assumptions, limiting case,
       `Validation: <id>`, ledger row for the new sampling. Fresh-context
       verification via `physics-validator`; only the human signs off.
