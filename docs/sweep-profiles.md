@@ -56,6 +56,16 @@ Both sub-tables join `parameter_sha256` only when they diverge from the inert
 defaults, so a profile that never sets them hashes exactly as it did before the
 keys existed and resumes into its existing checkpoints.
 
+The bundled `hopg_emittance_demo` is the worked example: a Courant-Snyder waist
+(`alpha_twiss_x = 0`) on the crystal entrance face at 0.1 mm·mrad normalized
+emittance and a 0.05 m beta function, plus a 0.1% energy spread, over hopg at 30
+and 100 keV. Because the stored emittance is normalized, that one block is the
+same physical beam at both energies -- 0.12 mm and 2.4 mrad RMS at 30 keV,
+shrinking as `1/sqrt(beta*gamma)` at 100 keV. A `beam.transverse` table clears
+the spot FWHM that a profile beam otherwise defaults to; the two spellings are
+mutually exclusive, and specifying both is an error rather than a precedence
+rule. `hopg_hbn_compressed_microbunch` is the longitudinal counterpart.
+
 Archive and restore copy the complete component directory, including identity
 metadata. Archive merge rejects two identity-bearing datasets whose resolved
 parameter hashes differ. Legacy checkpoints without identity remain readable

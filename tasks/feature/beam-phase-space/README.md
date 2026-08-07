@@ -221,9 +221,13 @@ Likely owners, in dependency order:
 - [ ] **F. Profile decode** — nested `beam.transverse` block, signed-key fix
       (critique 4), a demo profile in `materials.toml`, golden regen
       (`tests/data/material_catalog_golden.json`) via the `regen-golden` skill.
-      *Partial:* decode and the `_TRANSVERSE_SIGNED_KEYS` split are done and the
-      golden is unchanged (no shipped profile sets the block yet); the demo
-      profile and its golden regen are still open.
+      Done: decode, the `_TRANSVERSE_SIGNED_KEYS` split, and the bundled
+      `hopg_emittance_demo` (a waist at 0.1 mm·mrad / 0.05 m over hopg at 30 and
+      100 keV, with a 0.1% energy spread), pinned by
+      `tests/test_transverse.py::test_bundled_emittance_demo_profile_resolves_a_twiss_beam`.
+      The golden fixture is unchanged by design and `cxr energy-grid
+      regen-golden` is a no-op here: `material_catalog_golden.json` serializes
+      materials only, not profiles.
 - [x] **G. Identity hashing** — new keys join `parameter_sha256` only when they
       diverge from inert defaults; assert existing digests unchanged.
 - [x] **H. `E_grid_line` interaction** — verify a broadened line is not clipped;

@@ -153,6 +153,38 @@ def test_charge_and_rep_rate_stay_inert_on_the_sampler():
         assert np.array_equal(lhs, rhs)
 
 
+def test_bundled_emittance_demo_profile_resolves_a_twiss_beam():
+    """The shipped `hopg_emittance_demo` is the worked example of the block.
+
+    It also pins the one interaction a profile author cannot see from the TOML:
+    a `beam.transverse` table has to clear the spot FWHM that every profile beam
+    otherwise defaults to, or the profile could not build a single case.
+    """
+    from cxr_mc.config import material_sweep
+    from cxr_mc.materials import CATALOG
+
+    assert CATALOG.profile_materials("hopg_emittance_demo") == ("hopg",)
+    beam = material_sweep("hopg", profile="hopg_emittance_demo").beam
+    assert beam.transverse_fwhm_x_mm is None
+    assert beam.transverse_fwhm_y_mm is None
+    assert beam.transverse.normalized_emittance_x_mm_mrad == 0.1
+    assert beam.transverse.alpha_twiss_x == 0.0  # a waist on the entrance face
+    assert beam.energy_spread_frac == 0.001
+
+    cases = build_cases(material_sweep("hopg", profile="hopg_emittance_demo"))
+    assert [case["E0_keV"] for case in cases] == [30.0, 100.0]
+    for case in cases:
+        assert case["beam_fwhm_mm"] is None  # the policy owns <x^2>, not a spot
+        assert case["energy_spread_frac"] == 0.001
+    # One beam, two energies: the spot and divergence both shrink with beta*gamma
+    # because the STORED emittance is normalized.
+    low, high = (case["transverse_distribution"]["x"] for case in cases)
+    assert high["sigma_position_mm"] < low["sigma_position_mm"]
+    assert high["sigma_slope_rad"] < low["sigma_slope_rad"]
+    assert low["sigma_position_mm"] == pytest.approx(0.12, abs=0.01)
+    assert low["sigma_slope_rad"] * 1e3 == pytest.approx(2.4, abs=0.1)
+
+
 def _transport(**beam):
     """A small collimated-geometry transport run, varying only the beam block."""
     return simulate_trajectories(
