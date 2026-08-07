@@ -17,25 +17,38 @@ file. Edit and drop items on `main`.
 
 1. **Compute performance optimization.** Review cupyx.jit.rawkernel and Numba @njit
    optimizations are optimally executed, and review any critical physics changes. Generate new bit-for-bit or toleranced validation for the new paths where necessary. Ensure that non-nvidia fallbacks are present and functional (current tests should already be confirming this, but double check).
-2. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-3. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
+   1. Running on remote box:
+      1. With --ne-line=20_000 on 'MoSe2' in particular (and maybe other heavy materials):
+         1. Transport takes absolutely forever (GPU at 0% for 10's of seconds straight)
+         2. CPU utilization is inconsistent, sometimes hitting 60-70% but often below 10% while GPU still at 0%
+         3. GPU extremely burst, will shoot to 100% for instant then back to 0%
+         4. Host RAM usage pretty high, but not saturated: usually sitting in the 50 - 80% range.
+         5. VRAM consistently in the 20 - 50 % range
+2. **>user< Beam phase space.** Task list declares this finished aside from independent
+   rederivation/verification. User would like to add task list items to convert this
+   from simply a set of things added to profile piecemeal into its own independently
+   configurable object, akin to 'material' (e.g., with its own command, `cxr beam`, `cxr bunch`,
+   `cxr beamspec`, or similar) which is created, named, and modified via the CLI, and which is then
+   added to a profile with a flag, just like `cxr profile add/set/remove <profile> --material`.
+   So as to not blow up the task list yet further, the current tasklist for this task/item should
+   get finished up & closed out, then a new task doc written up for this primarily cli-oriented task.
+   → `feature/beam-phase-space`;
+   [`tasks/feature/beam-phase-space/`](tasks/feature/beam-phase-space/).
+3. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
 
 ## P1 - top-priority back burner
 
 ### Ready
 
-1. **Fix Analysis Compare loading and quality selection.** Analyze each
+1. **Add support for characteristic X-rays**
+2. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
+   factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
+3. **Fix Analysis Compare loading and quality selection.** Analyze each
    material checkpoint once for all three Compare plots, preserve persistent
    cache reuse, and correct or accurately report the ratio plot's unexpected
    material exclusions. → `fix/analysis-compare-loading-quality`;
    [`tasks/fix/analysis-compare-loading-quality/`](tasks/fix/analysis-compare-loading-quality/).
-2. **Beam phase space.** Activate the declared-inert `BeamSpec` transverse and
-   energy-spread fields: canonical Twiss/normalized-emittance parameterization,
-   per-electron injection sampling, profile decode, and finite initial phase
-   space in the trajectory plots. The beam object and its profile plumbing
-   already exist — this completes them. → `feature/beam-phase-space`;
-   [`tasks/feature/beam-phase-space/`](tasks/feature/beam-phase-space/).
-3. **Batched coherent line accumulation.** `coherent_emission=True` opts out of
+4. **Batched coherent line accumulation.** `coherent_emission=True` opts out of
    the batched `(n_seg, N_g)` line path and runs the legacy per-hkl loop: 38%
    of GPU-phase tottime on a profiled `hopg_coherent` run, ~2.65x slower per
    case than the batched branch. Physics-gated (reassociation → `Validation:`
@@ -49,7 +62,7 @@ file. Edit and drop items on `main`.
 
 ### Paused / on hold
 
-1. **High-energy electron/channeling support.** Evaluate `Geant4` or similar for REGAE@DESY-scale beams (3–5 MeV, 50 fs, 100 fC, 200–300 µm target diameter), JungFrau detector ~0.5–4.5 m from interaction point. USER QUESTION: What is rep rate?
+1. **High-energy electron/channeling support.** Start with REGAE@DESY-scale beams (3–5 MeV, 50 fs, 100 fC, 200–300 µm target diameter), JungFrau detector ~0.5–4.5 m from interaction point. USER QUESTION: What is rep rate?
 2. **Bent Crystals (After add channeling + relativistic electrons)**
 
 ## P2 - medium-priority back burner
@@ -74,7 +87,7 @@ file. Edit and drop items on `main`.
 
 ## Inbox - >user< to be triaged
 
-1. **Add capability to `--lock` and `--unlock` profiles to make them mutable/immutable
+1. **Add capability to `--lock` and `--unlock` profiles to make them mutable/immutable**
 2. **User-defined crystal cuts.** Allow user to define cut plane for given crystal, e.g., [110] or similar.
    If it is left undefined, cut should default to current default behavior.
 3. **Coherent-bunching parameter study.** Compare effects of longitudinal bunch
@@ -106,7 +119,7 @@ structural redesign (noun/verb ordering, artifact model, deprecation policy)
 lives in [`docs/cli-redesign-rfc.md`](docs/cli-redesign-rfc.md) and its sub-RFCs,
 not here.
 
-### Bugs (fix + regression test)
+## Bugs (fix + regression test)
 
 1. Running `cxr profile create <new_profile> --from <source_profile>` doesn't copy the
    source profile's materials list. Fix this, and check if other aspects are copied properly.
@@ -213,17 +226,6 @@ KeyError: 25.0
    is a little unclear to me (if there is an identical case on both
    'standard' and 'sub_100keV' profiles, does `gc --profile standard` end up
    dropping the sub_100 keV cases too? I hope not.)
-
-## Performance Optimization Notes
-
-1. Running on remote box (with 5080, crazy CPU):
-   1. With --ne-line=20_000 on 'MoSe2' in particular (and maybe other heavy materials):
-      1. Transport takes absolutely forever (GPU at 0% for 10's of seconds straight)
-      2. CPU utilization is inconsistent, sometimes hitting 60-70% but often below 10% while GPU still at 0%
-      3. GPU extremely burst, will shoot to 100% for instant then back to 0%
-      4. Host RAM usage pretty high, but not saturated: usually sitting in the 50 - 80% range.
-      5. VRAM consistently in the 20 - 50 % range
-
 
 ## Long-term plans
 
