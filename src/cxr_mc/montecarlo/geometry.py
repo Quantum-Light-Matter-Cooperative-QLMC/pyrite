@@ -531,6 +531,8 @@ def beam_frame_basis(beam_dir):
     same beam then agree axis for axis.
 
     Limiting case: ``beam_dir = +z`` gives ``I`` bit-for-bit.
+
+    Validation: beam-phase-space-injection
     """
     d = np.asarray(beam_dir, dtype=float)
     d = d / np.linalg.norm(d)

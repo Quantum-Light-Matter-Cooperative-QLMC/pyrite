@@ -218,7 +218,7 @@ Likely owners, in dependency order:
 - [x] **E. Round-trip test** — sample from a known `(eps_n, beta, alpha)` and
       recover it through `beam_metrics.sampled_beam_metrics` within MC error.
       This closes the input/output asymmetry and is the strongest single check.
-- [ ] **F. Profile decode** — nested `beam.transverse` block, signed-key fix
+- [x] **F. Profile decode** — nested `beam.transverse` block, signed-key fix
       (critique 4), a demo profile in `materials.toml`, golden regen
       (`tests/data/material_catalog_golden.json`) via the `regen-golden` skill.
       Done: decode, the `_TRANSVERSE_SIGNED_KEYS` split, and the bundled
@@ -253,6 +253,19 @@ Likely owners, in dependency order:
 - [ ] **J. Physics ledger** — source equation, assumptions, limiting case,
       `Validation: <id>`, ledger row for the new sampling. Fresh-context
       verification via `physics-validator`; only the human signs off.
+      *Partial:* two rows are filed at `filtered` --
+      `beam-phase-space-injection` (Courant-Snyder injection, anchored on
+      `transverse.py`, `montecarlo/transport.py::simulate_trajectories` and
+      `montecarlo/geometry.py::beam_frame_basis`) and
+      `beam-energy-spread-injection` (the Gaussian relative spread and the
+      `line_shift_fraction` grid bound) -- each with source equation,
+      assumptions, limiting cases and matching in-code `Validation:` markers;
+      every marker resolves to a row and back. What remains is the part that
+      must NOT be done by the implementer: an independent re-derivation in
+      fresh context via the `physics-validator` agent, writing
+      `docs/validation/beam-phase-space-injection.md` and
+      `docs/validation/beam-energy-spread-injection.md`. Only the human then
+      marks either `signed-off`.
       *Partial:* row `beam-phase-space-injection` is in the ledger at status
       `filtered`, with `Validation:` markers on both public functions in
       `transverse.py`; fresh-context verification and its write-up are open.
