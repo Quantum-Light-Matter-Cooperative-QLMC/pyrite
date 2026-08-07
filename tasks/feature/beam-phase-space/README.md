@@ -250,25 +250,28 @@ Likely owners, in dependency order:
       it already fixes `<x^2>`. New `_draw_incident_bundle` draws one incident
       stub per electron in 2D, and the plotly stubs now follow each electron's
       own direction instead of the nominal axis. Collimated cases are unchanged.
-- [ ] **J. Physics ledger** — source equation, assumptions, limiting case,
+- [x] **J. Physics ledger** — source equation, assumptions, limiting case,
       `Validation: <id>`, ledger row for the new sampling. Fresh-context
       verification via `physics-validator`; only the human signs off.
-      *Partial:* two rows are filed at `filtered` --
-      `beam-phase-space-injection` (Courant-Snyder injection, anchored on
-      `transverse.py`, `montecarlo/transport.py::simulate_trajectories` and
+      Two rows carry the new sampling -- `beam-phase-space-injection`
+      (Courant-Snyder injection, anchored on `transverse.py`,
+      `montecarlo/transport.py::simulate_trajectories` and
       `montecarlo/geometry.py::beam_frame_basis`) and
       `beam-energy-spread-injection` (the Gaussian relative spread and the
       `line_shift_fraction` grid bound) -- each with source equation,
       assumptions, limiting cases and matching in-code `Validation:` markers;
-      every marker resolves to a row and back. What remains is the part that
-      must NOT be done by the implementer: an independent re-derivation in
-      fresh context via the `physics-validator` agent, writing
-      `docs/validation/beam-phase-space-injection.md` and
-      `docs/validation/beam-energy-spread-injection.md`. Only the human then
-      marks either `signed-off`.
-      *Partial:* row `beam-phase-space-injection` is in the ledger at status
-      `filtered`, with `Validation:` markers on both public functions in
-      `transverse.py`; fresh-context verification and its write-up are open.
+      every marker resolves to a row and back.
+      Both were then re-derived independently by two separate fresh
+      `physics-validator` contexts (a different model from the implementer's),
+      which read only the ledger row and the derivation docstrings before
+      deriving, and wrote `docs/validation/beam-phase-space-injection.md` and
+      `docs/validation/beam-energy-spread-injection.md`. Both re-derivations
+      match term-for-term, with independent numerics: an `N = 2e7` NumPy Monte
+      Carlo reproducing the Courant-Snyder second moments, and `S(30 keV,
+      cos theta_obs = 0) ~ 0.4588` with `S -> 1/2` nonrelativistically. Both
+      rows moved `filtered` -> `rederived`.
+      **Open for the human only:** neither row is `signed-off`; that
+      transition is not an agent's to make.
 - [x] **K. Docs** — `docs/sweep-profiles.md` beam block reference,
       `docs/repo_map.md` pointer, `docs/cli-reference.md` regen (with L).
       Also `docs/index.md` toctree entry for the design note.
