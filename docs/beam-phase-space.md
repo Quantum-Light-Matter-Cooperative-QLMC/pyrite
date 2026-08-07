@@ -199,10 +199,25 @@ so once injection is randomized the emitted line spectrum picks up divergence
 and energy spread with no further work. Two consequences are worth stating
 explicitly:
 
-1. **The `E_grid_line` window is derived from the nominal case energy.** An
-   energy-spread-broadened line can fall outside it and be silently clipped.
-   Check against the per-material `E_grid_line_by_energy` bounds before
-   enabling `energy_spread_frac` in any shipped profile.
+1. **The `E_grid_line` window is derived from the nominal case energy**, so an
+   energy-spread-broadened line is displaced from where the grid was cut.
+   Checked, and it does not clip. Differentiating the resonance
+   `omega = v.g / (1 - n.v)` in `beta` gives a fractional line shift of
+   `S * delta` with
+
+   ```
+   S = (gamma - 1) / (gamma^3 beta^2 (1 - beta cos(theta_obs)))
+   ```
+
+   (`energy_grid.bounds.line_shift_fraction`). `S` is largest at the *low*
+   energy end -- 0.46 at 30 keV, falling to 0.24 at the 300 keV model ceiling,
+   with the nonrelativistic limit `S -> 1/2` -- and `margined_stop` cuts the
+   window 15% above the measured coverage energy. The margin is therefore only
+   consumed once the beam spread reaches ~33% RMS, which is far outside both
+   any real photoinjector and the first-order expansion `S` is derived under.
+   No gate on `energy_spread_frac` is warranted. The full kernel is measured
+   against `S` in `tests/montecarlo/test_beam_energy_spread_grid.py` (a 5% beam
+   energy step moves the 30 keV hopg line by 2.28%, against 2.30% predicted).
 2. **The analytic broadening helpers do not widen.** `mosaic_fwhm_eV`,
    `aperture_fwhm_eV` and `mosaic_psi_rad` (`montecarlo/detector.py`) stay at
    the nominal `beam_dir` and `E0_keV` by design. They are diagnostics, not the

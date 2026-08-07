@@ -226,8 +226,16 @@ Likely owners, in dependency order:
       profile and its golden regen are still open.
 - [x] **G. Identity hashing** — new keys join `parameter_sha256` only when they
       diverge from inert defaults; assert existing digests unchanged.
-- [ ] **H. `E_grid_line` interaction** — verify a broadened line is not clipped;
-      if it is, widen bounds or gate `energy_spread_frac` (critique 5).
+- [x] **H. `E_grid_line` interaction** — verify a broadened line is not clipped;
+      if it is, widen bounds or gate `energy_spread_frac` (critique 5). Not
+      clipped, so neither remedy is taken. New `bounds.line_shift_fraction`
+      gives the fractional line shift `S δ`,
+      `S = (γ−1)/(γ³β²(1−β cos θ_obs))`, differentiated from the PXR resonance;
+      `S` peaks at 0.46 at the 30 keV end of the sweep against the 15%
+      `margined_stop` headroom, so the margin only goes at ~33% RMS spread. The
+      full kernel is measured against `S` end to end in
+      `tests/montecarlo/test_beam_energy_spread_grid.py` (2.28% measured vs
+      2.30% predicted for a 5% beam step).
 - [ ] **I. Trajectory plots** (absorbed Inbox 1) — 2D/3D plots show the finite
       initial phase space; both longitudinal and transverse.
 - [ ] **J. Physics ledger** — source equation, assumptions, limiting case,

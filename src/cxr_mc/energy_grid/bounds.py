@@ -6,6 +6,9 @@ See docs/superpowers/specs/2026-07-16-line-grid-max-energy-design.md.
 """
 
 import numpy as np
+from scipy.constants import physical_constants
+
+_ELECTRON_REST_KEV = physical_constants["electron mass energy equivalent in MeV"][0] * 1.0e3
 
 
 class CoverageGridTooNarrow(ValueError):
@@ -71,6 +74,49 @@ def margined_stop(raw_energy_eV: float, margin: float = 0.15, round_to: float = 
     sample exactly."""
     margined = raw_energy_eV * (1.0 + margin)
     return float(np.ceil(margined / round_to) * round_to)
+
+
+def line_shift_fraction(
+    energy_keV: float,
+    energy_spread_frac: float,
+    cos_theta_obs: float = 0.0,
+) -> float:
+    """Fractional line-energy shift a relative beam energy spread produces.
+
+    The catalog's ``E_grid_line`` window is derived at the nominal case energy,
+    so a beam with ``energy_spread_frac`` set emits a line that is displaced
+    from where the grid was cut. This says by how much, in units of the line
+    energy, so it can be compared against the ``margined_stop`` headroom.
+
+    The PXR resonance (``montecarlo/spectrum.py::_line_kin_core``) is
+    ``omega = v.g / (1 - n.v)``, so at fixed reciprocal-lattice vector ``g`` and
+    observation direction ``n``, differentiating in ``beta`` at
+    ``n.v = beta cos(theta_obs)`` gives
+
+    ``domega/omega = (dbeta/beta) / (1 - beta cos(theta_obs))``
+
+    and the beam's *energy* deviation ``delta = dT/T`` enters through
+    ``gamma = 1 + T/m_e c^2``, ``dbeta/beta = (gamma - 1) delta / (gamma^3 beta^2)``.
+    The two combine into ``domega/omega = S delta`` with the returned ``S``
+    factored out.
+
+    Assumptions: first order in ``delta`` (the resonance is not linear in beta,
+    so this overestimates slightly at large spread), and a fixed emission
+    direction -- the spread is taken to move the line, not to redistribute it
+    over angle.
+
+    Limiting cases: ``delta -> 0`` gives no shift; the nonrelativistic
+    ``gamma -> 1`` limit gives ``S -> delta/2`` (``omega ~ beta``, and
+    ``beta ~ sqrt(T)``); at 90 degrees observation ``cos_theta_obs = 0`` drops
+    the Doppler denominator entirely.
+
+    Validation: beam-energy-spread-injection
+    """
+    gamma = 1.0 + float(energy_keV) / _ELECTRON_REST_KEV
+    beta_sq = 1.0 - 1.0 / gamma**2
+    doppler = 1.0 - np.sqrt(beta_sq) * float(cos_theta_obs)
+    sensitivity = (gamma - 1.0) / (gamma**3 * beta_sq * doppler)
+    return float(abs(sensitivity * float(energy_spread_frac)))
 
 
 def spacing_num(start_eV: float, stop_eV: float, target_spacing_eV: float = 3.0) -> int:

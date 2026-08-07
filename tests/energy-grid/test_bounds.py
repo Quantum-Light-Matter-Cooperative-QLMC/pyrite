@@ -4,6 +4,7 @@ import pytest
 from cxr_mc.energy_grid.bounds import (
     CoverageGridTooNarrow,
     coverage_energy,
+    line_shift_fraction,
     margined_stop,
     spacing_num,
 )
@@ -64,3 +65,55 @@ def test_margined_stop_rounds_up_past_round_to():
 )
 def test_spacing_num_matches_existing_catalog_grids(start_eV, stop_eV, expected_num):
     assert spacing_num(start_eV, stop_eV) == expected_num
+
+
+# ---- beam energy spread vs the derived line window ------------------------
+# Validation: beam-energy-spread-injection
+
+
+def test_line_shift_is_zero_without_spread():
+    assert line_shift_fraction(30.0, 0.0) == 0.0
+
+
+def test_line_shift_is_first_order_in_the_spread():
+    """domega/omega = S*delta, so doubling the spread doubles the shift."""
+    single = line_shift_fraction(30.0, 0.01)
+    assert line_shift_fraction(30.0, 0.02) == pytest.approx(2.0 * single)
+    # Sign-free: a beam is broadened in both directions by one sigma.
+    assert line_shift_fraction(30.0, -0.01) == single
+
+
+def test_line_shift_sensitivity_falls_toward_the_nonrelativistic_half():
+    """The gamma -> 1 limit is omega ~ beta ~ sqrt(T), so S -> 1/2.
+
+    Above it the sensitivity only decreases, which is why the 30 keV end of the
+    sweep -- not the 300 keV ceiling -- sets the worst case for grid width.
+    """
+    assert line_shift_fraction(1.0e-3, 1.0) == pytest.approx(0.5, rel=1e-5)
+    sensitivities = [line_shift_fraction(T, 1.0) for T in (30.0, 100.0, 300.0)]
+    assert sensitivities == sorted(sensitivities, reverse=True)
+    assert sensitivities[0] < 0.5
+
+
+def test_forward_observation_raises_the_sensitivity():
+    """The Doppler denominator 1 - beta*cos(theta) is what makes it geometric."""
+    side = line_shift_fraction(300.0, 0.01, cos_theta_obs=0.0)
+    forward = line_shift_fraction(300.0, 0.01, cos_theta_obs=1.0)
+    assert forward > side
+
+
+def test_catalog_margin_covers_any_plausible_beam_spread():
+    """The check task step H asks for: is a broadened line clipped?
+
+    `margined_stop` cuts the window 15% above the measured coverage energy, and
+    the spread displaces the line by S*delta of its own energy. At the 30 keV
+    worst case S = 0.46, so the margin is only consumed once the beam spread
+    passes ~33% RMS -- an order of magnitude beyond any real photoinjector. No
+    gate on `energy_spread_frac` is needed; a run that does set a spread that
+    large is already outside the first-order model this bound is derived under.
+    """
+    margin = margined_stop(1000.0, round_to=1.0) / 1000.0 - 1.0
+    worst = max(line_shift_fraction(T, 0.05, cos_theta_obs=0.0) for T in (30.0, 100.0, 300.0))
+    assert worst < margin
+    breakeven = margin / line_shift_fraction(30.0, 1.0)
+    assert breakeven > 0.3
