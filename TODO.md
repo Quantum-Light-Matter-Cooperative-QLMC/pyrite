@@ -24,16 +24,14 @@ file. Edit and drop items on `main`.
          3. GPU extremely burst, will shoot to 100% for instant then back to 0%
          4. Host RAM usage pretty high, but not saturated: usually sitting in the 50 - 80% range.
          5. VRAM consistently in the 20 - 50 % range
-2. **>user< Beam phase space.** Task list declares this finished aside from independent
-   rederivation/verification. User would like to add task list items to convert this
-   from simply a set of things added to profile piecemeal into its own independently
-   configurable object, akin to 'material' (e.g., with its own command, `cxr beam`, `cxr bunch`,
-   `cxr beamspec`, or similar) which is created, named, and modified via the CLI, and which is then
-   added to a profile with a flag, just like `cxr profile add/set/remove <profile> --material`.
-   So as to not blow up the task list yet further, the current tasklist for this task/item should
-   get finished up & closed out, then a new task doc written up for this primarily cli-oriented task.
-   → `feature/beam-phase-space`;
-   [`tasks/feature/beam-phase-space/`](tasks/feature/beam-phase-space/).
+2. **Named beam objects.** Promote the beam from an inline `[profiles.NAME.beam]`
+   block into a named `[beams.NAME]` catalog object with its own `cxr beam` noun,
+   attached to a profile by name. Primarily CLI; beam physics unchanged.
+   → `feature/named-beam-objects`;
+   [`tasks/feature/named-beam-objects/`](tasks/feature/named-beam-objects/).
+   Predecessor `feature/beam-phase-space` is complete and landed; its two ledger
+   rows (`beam-phase-space-injection`, `beam-energy-spread-injection`) are
+   `rederived` and await human `signed-off`.
 3. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
 
 ## P1 - top-priority back burner
@@ -131,80 +129,11 @@ not here.
    2. shorten up the lines that are spit out. currently, spits out list of ALL materials
       in the entire repo (even ones marked non-standard in mats_to_sim.toml) which need to be
       set up for this energy, along with a long boilerplate text string next to every material.
-4. Fix this bug related to above (seems we literally can't derive bounds for new energies right now):
 
-```(cxr-mc) ➜  cxr-mc git:(main) ✗ cxr energy-grid derive --energy 25,35
-
-...
-
-hopg cases: 100%|███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 10/10 [00:01<00:00,  8.31it/s]
-
-...
-
-hopg cases: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 1/1 [00:00<00:00,  5.93it/s]
-Traceback (most recent call last):
-  File "/home/alexa/dev/cxr-mc/.venv/bin/cxr", line 10, in <module>
-    sys.exit(main())
-             ~~~~^^
-  File "/home/alexa/dev/cxr-mc/src/cxr_mc/cli/__init__.py", line 110, in main
-    result = run(command, argv, prog_name="cxr")
-  File "/home/alexa/dev/cxr-mc/src/cxr_mc/cli/_core.py", line 551, in run
-    return command.main(
-           ~~~~~~~~~~~~^
-        args=None if argv is None else list(argv),
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        prog_name=prog_name,
-        ^^^^^^^^^^^^^^^^^^^^
-        standalone_mode=False,
-        ^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-
-...
-
-  File "/home/alexa/dev/cxr-mc/src/cxr_mc/energy_grid/derive.py", line 725, in main
-    combined, complete = derive_all_materials(
-                         ~~~~~~~~~~~~~~~~~~~~^
-        materials,
-        ^^^^^^^^^^
-    ...<11 lines>...
-        brem_step_eV=brem_step_eV,
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "/home/alexa/dev/cxr-mc/src/cxr_mc/energy_grid/derive.py", line 550, in derive_all_materials
-    rows, material_complete = _run_one_material(
-                              ~~~~~~~~~~~~~~~~~^
-        material,
-        ^^^^^^^^^
-    ...<11 lines>...
-        thicknesses=thicknesses,
-        ^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "/home/alexa/dev/cxr-mc/src/cxr_mc/energy_grid/derive.py", line 489, in _run_one_material
-    rows, complete = derive_bounds(
-                     ~~~~~~~~~~~~~^
-        [material],
-        ^^^^^^^^^^^
-    ...<14 lines>...
-        thicknesses=thicknesses,
-        ^^^^^^^^^^^^^^^^^^^^^^^^
-    )
-    ^
-  File "/home/alexa/dev/cxr-mc/src/cxr_mc/energy_grid/derive.py", line 390, in derive_bounds
-    start_eV = float(line_by_energy[energy_keV][0])
-                     ~~~~~~~~~~~~~~^^^^^^^^^^^^
-KeyError: 25.0
-```
 
 ### Ergonomics (ship anytime)
 
-1. Add `[coherent|incoherent|both]` to `cxr profile set` (and `add`). If a user
-   has individually added both, auto-switch to `both` — but make that switch
-   explicit/logged, not implicit magic. `remove` can also be used, does the opposite
-   (If on `both` and user `remove`'s `incoherent`, they explicitly get back `coherent`)
-2. `cxr` with no args should print help, like `-h/--help`.
+1. `cxr` with no args should print help, like `-h/--help`.
 
 ## Notebook backlog
 
