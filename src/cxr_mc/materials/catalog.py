@@ -794,7 +794,12 @@ _BEAM_POSITIVE_KEYS = frozenset(
     }
 )
 _BEAM_LONG_SHAPES = frozenset({"gaussian", "uniform"})
-_BEAM_KEYS = _BEAM_POSITIVE_KEYS | {"long_shape", "long_offsets_fs", "longitudinal"}
+_BEAM_KEYS = _BEAM_POSITIVE_KEYS | {
+    "long_shape",
+    "long_offsets_fs",
+    "longitudinal",
+    "transverse",
+}
 _DETECTOR_KEYS = frozenset(
     {
         "observation_angle_deg",
@@ -820,6 +825,21 @@ _LONGITUDINAL_KEYS = frozenset(
         "timing_jitter_fs",
     }
 )
+
+# alpha_twiss is legitimately negative -- a diverging beam past its waist -- so
+# the Twiss keys split into positive-magnitude and signed sets. Putting them all
+# in a positive-only set would reject valid profiles.
+_TRANSVERSE_POSITIVE_KEYS = frozenset(
+    {
+        "normalized_emittance_x_mm_mrad",
+        "beta_twiss_x_m",
+        "normalized_emittance_y_mm_mrad",
+        "beta_twiss_y_m",
+    }
+)
+_TRANSVERSE_SIGNED_KEYS = frozenset({"alpha_twiss_x", "alpha_twiss_y"})
+_TRANSVERSE_KEYS = _TRANSVERSE_POSITIVE_KEYS | _TRANSVERSE_SIGNED_KEYS
+_TRANSVERSE_REQUIRED_KEYS = ("normalized_emittance_x_mm_mrad", "beta_twiss_x_m")
 
 
 def _parse_longitudinal_policy(raw: object, path: str, errors: _Errors) -> dict[str, object] | None:
@@ -896,6 +916,37 @@ def _parse_longitudinal_policy(raw: object, path: str, errors: _Errors) -> dict[
     return out
 
 
+def _parse_transverse_policy(raw: object, path: str, errors: _Errors) -> dict[str, object] | None:
+    """Validate one declarative transverse Courant-Snyder policy.
+
+    The x-plane emittance and beta are required; the y-plane keys are optional
+    and mirror x when omitted. ``alpha_twiss_*`` is signed and only has to be
+    finite -- see :data:`_TRANSVERSE_SIGNED_KEYS`.
+    """
+    table = _table(raw, path, errors)
+    if table is None:
+        return None
+    errors.keys(table, path, set(_TRANSVERSE_KEYS))
+    out: dict[str, object] = {}
+    for key, value in table.items():
+        number = _number(value)
+        if key in _TRANSVERSE_SIGNED_KEYS:
+            if number is None:
+                errors.add(f"{path}.{key}", "must be a finite number")
+            else:
+                out[key] = number
+        elif key in _TRANSVERSE_POSITIVE_KEYS:
+            if number is None or number <= 0:
+                errors.add(f"{path}.{key}", "must be a finite positive number")
+            else:
+                out[key] = number
+    missing = [key for key in _TRANSVERSE_REQUIRED_KEYS if key not in out]
+    if missing:
+        errors.add(path, f"missing required {', '.join(missing)}")
+        return None
+    return out
+
+
 def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, object] | None:
     """Structurally validate a ``[profiles.NAME.beam]`` distribution block.
 
@@ -928,6 +979,10 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
             policy = _parse_longitudinal_policy(value, f"{path}.longitudinal", errors)
             if policy is not None:
                 out[key] = MappingProxyType(policy)
+        elif key == "transverse":
+            transverse = _parse_transverse_policy(value, f"{path}.transverse", errors)
+            if transverse is not None:
+                out[key] = MappingProxyType(transverse)
         elif key in _BEAM_POSITIVE_KEYS:
             number = _number(value)
             if number is None or number <= 0:

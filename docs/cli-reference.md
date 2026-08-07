@@ -1478,6 +1478,13 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
+  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad; replaces
+                                  the spot FWHM.  [x>0.0]
+  --twiss-beta M                  Courant-Snyder beta in m. Requires --emittance.
+                                  [x>0.0]
+  --twiss-alpha A                 Courant-Snyder alpha; negative diverges. Requires
+                                  --emittance.
+  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.  [x>0.0]
   --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.  [x>0.0]
   --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]
   --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]
@@ -1617,6 +1624,13 @@ Options:
                                   integers.
   -b, --ne-brem N,...             Bremsstrahlung transport electron counts; positive
                                   integers.
+  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad; replaces
+                                  the spot FWHM.  [x>0.0]
+  --twiss-beta M                  Courant-Snyder beta in m. Requires --emittance.
+                                  [x>0.0]
+  --twiss-alpha A                 Courant-Snyder alpha; negative diverges. Requires
+                                  --emittance.
+  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.  [x>0.0]
   --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.  [x>0.0]
   --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]
   --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]

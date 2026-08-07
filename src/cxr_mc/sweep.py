@@ -37,6 +37,7 @@ from .longitudinal import LongitudinalDistribution, resolve_longitudinal_distrib
 from .materials import CATALOG, LayerSpec
 from .materials._transport_data import TRANSPORT_ELEMENTS
 from .materials.crystal import dominant_reflections
+from .transverse import TransverseDistribution, resolve_transverse_distribution
 
 ScalarOrSeq = float | Sequence[float] | np.ndarray
 MATERIAL_LABELS = {key: material.label for key, material in CATALOG.materials.items()}
@@ -93,14 +94,30 @@ class BeamSpec:
     * ``rep_rate_hz`` / ``bunch_charge_pc`` -- pulsed-source rep rate and
       single-bunch charge; a detected-flux multiplier only, and the source of
       truth for average current ``I = bunch_charge_pc * rep_rate_hz``.
-    * ``divergence_mrad`` / ``energy_spread_frac`` -- FUTURE (x',y' and d RMS ->
-      full 6-D emittance). Inert defaults keep every current run bit-for-bit.
+    * ``transverse`` -- frozen declarative Courant-Snyder policy, the canonical
+      way to give the beam a finite emittance. Normalized emittance is stored
+      and the geometric value is derived per case, because geometric emittance
+      is not invariant across the swept ``energy_keV`` axis. Mutually exclusive
+      with the legacy spot FWHMs, which describe a zero-emittance waist.
+    * ``energy_spread_frac`` -- RMS relative energy deviation, sampled as an
+      independent uncorrelated draw (no chirp model: ``<t delta> = 0``).
+    * ``divergence_mrad`` -- DERIVED, read-only. The RMS slope at the case
+      energy, available once a ``transverse`` policy is set. It is not a stored
+      input: a fixed number here would be energy-independent, and the physical
+      RMS slope of one beam falls as ``1/sqrt(beta*gamma)``.
+
+    Reference plane: every field describes the beam **at the crystal entrance
+    face**. There is no space-charge model and no source-to-crystal beamline
+    transport, so gun-exit numbers must not be entered here and read as
+    physical. See ``docs/beam-phase-space.md``.
 
     Mean-vs-spread: each phase-space axis has a *mean* set elsewhere (energy mean
     = ``energy_keV``; direction mean = tilt geometry; position mean = origin) and
-    a *spread* owned here (``energy_spread_frac``, ``divergence_mrad``, the
+    a *spread* owned here (``energy_spread_frac``, the ``transverse`` policy, the
     transverse FWHMs). Macro-particle *counts* (``n_electrons``) are numerical
     sampling, NOT a beam property, and deliberately stay out of ``BeamSpec``.
+    Charge and rep rate are normalization, not phase space, and stay inert on
+    the sampler.
     """
 
     energy_keV: ScalarOrSeq = (30.0, 45.0, 60.0)
@@ -110,10 +127,23 @@ class BeamSpec:
     long_shape: str = "gaussian"
     long_offsets_fs: tuple[float, ...] | None = None
     longitudinal: LongitudinalDistribution | None = None
+    transverse: TransverseDistribution | None = None
     rep_rate_hz: float = 5000.0
     bunch_charge_pc: float = 1.0
     divergence_mrad: float | None = None
     energy_spread_frac: float | None = None
+
+    def derived_divergence_mrad(self, energy_keV: float) -> tuple[float, float] | None:
+        """Per-plane RMS slope [mrad] at ``energy_keV``, or ``None`` if collimated.
+
+        The canonical replacement for the legacy ``divergence_mrad`` input,
+        which cannot be right across a multi-energy sweep: at fixed normalized
+        emittance the physical RMS slope falls as ``1/sqrt(beta*gamma)``.
+        """
+        if self.transverse is None:
+            return None
+        resolved = resolve_transverse_distribution(self.transverse, energy_keV=energy_keV)
+        return (resolved.x.sigma_slope_rad * 1e3, resolved.y.sigma_slope_rad * 1e3)
 
     @classmethod
     def isotropic(cls, transverse_fwhm_mm: float | None = 1.0, **kw: Any) -> "BeamSpec":
@@ -121,6 +151,21 @@ class BeamSpec:
         return cls(
             transverse_fwhm_x_mm=transverse_fwhm_mm,
             transverse_fwhm_y_mm=transverse_fwhm_mm,
+            **kw,
+        )
+
+    @classmethod
+    def with_transverse(cls, transverse: TransverseDistribution, **kw: Any) -> "BeamSpec":
+        """Convenience ctor for a Courant-Snyder beam, clearing the legacy spot.
+
+        The spot FWHMs default to 1 mm, and they are mutually exclusive with a
+        ``transverse`` policy, so they have to be cleared explicitly. This does
+        that in one step rather than making every caller remember it.
+        """
+        return cls(
+            transverse=transverse,
+            transverse_fwhm_x_mm=None,
+            transverse_fwhm_y_mm=None,
             **kw,
         )
 
@@ -652,12 +697,29 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_em
         beam_case["rep_rate_hz"] = float(b.rep_rate_hz)
     if fwhm_y != fwhm_x:
         beam_case["beam_fwhm_y_mm"] = fwhm_y
+    if b.energy_spread_frac is not None:
+        beam_case["energy_spread_frac"] = float(b.energy_spread_frac)
     if b.longitudinal is not None and (
         b.bunch_length_fs is not None or b.long_offsets_fs is not None or b.long_shape != "gaussian"
     ):
         raise ValueError(
             "longitudinal policy is incompatible with legacy bunch_length_fs, "
             "long_shape, and long_offsets_fs fields"
+        )
+    if b.transverse is not None and (
+        b.transverse_fwhm_x_mm is not None
+        or b.transverse_fwhm_y_mm is not None
+        or b.divergence_mrad is not None
+    ):
+        # Spot FWHM, divergence and emittance are three numbers for two
+        # independent moments plus a correlation. Resolving that by precedence
+        # would hand back a plausible beam that is not the requested one, so it
+        # is an error. Note the FWHM fields DEFAULT to a 1 mm spot: a transverse
+        # policy has to clear them explicitly (BeamSpec.with_transverse does).
+        raise ValueError(
+            "transverse policy is incompatible with the legacy transverse_fwhm_x_mm, "
+            "transverse_fwhm_y_mm, and divergence_mrad fields; clear them "
+            "(they default to a 1 mm spot) or use BeamSpec.with_transverse"
         )
     if b.bunch_length_fs is not None or b.long_offsets_fs is not None:
         beam_case["long_shape"] = b.long_shape
@@ -764,6 +826,11 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_em
             name = f"{name} groove={sweep.groove_spacing_ang / 1e4:g}um"
         for i_e, E0 in enumerate(energies):
             line_case_grid = encode_energy_grid(line_grids[i_e])
+            resolved_transverse = None
+            if b.transverse is not None:
+                resolved_transverse = asdict(
+                    resolve_transverse_distribution(b.transverse, energy_keV=float(E0))
+                )
             resolved_longitudinal = None
             if b.longitudinal is not None:
                 crystal_spec = CATALOG.crystal(cp["crystal"])
@@ -798,6 +865,11 @@ def build_cases(sweep: Sweep, n_electrons=450, n_electrons_brem=100, coherent_em
                         **(
                             {"longitudinal_distribution": resolved_longitudinal}
                             if resolved_longitudinal is not None
+                            else {}
+                        ),
+                        **(
+                            {"transverse_distribution": resolved_transverse}
+                            if resolved_transverse is not None
                             else {}
                         ),
                         E_grid=line_case_grid,  # legacy key (== line grid)

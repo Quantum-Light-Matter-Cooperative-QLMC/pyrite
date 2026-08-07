@@ -43,6 +43,19 @@ compatibility. Survey runs and explicitly overridden full runs use
 historical `<material>_quick` stem but also records resolved identity. Thus
 variants cannot silently resume into each other.
 
+## Beam block
+
+A catalog profile's `[profiles.<name>.beam]` table decodes into `BeamSpec`. The
+nested `beam.longitudinal` and `beam.transverse` sub-tables carry the bunch and
+phase-space policies; `docs/beam-phase-space.md` is the reference for every key,
+its units, and the mutual exclusions between them. `cxr profile create` /
+`cxr profile edit` write the same keys from `--emittance`, `--twiss-beta`,
+`--twiss-alpha`, `--energy-spread`, and the legacy `--transverse-fwhm-mm`.
+
+Both sub-tables join `parameter_sha256` only when they diverge from the inert
+defaults, so a profile that never sets them hashes exactly as it did before the
+keys existed and resumes into its existing checkpoints.
+
 Archive and restore copy the complete component directory, including identity
 metadata. Archive merge rejects two identity-bearing datasets whose resolved
 parameter hashes differ. Legacy checkpoints without identity remain readable

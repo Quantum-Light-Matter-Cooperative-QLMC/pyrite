@@ -275,6 +275,24 @@ Turn `Sweep` definition into Cartesian product of `run_case` dicts.
   `fmt_thickness`, `pm` (±hkl expansion); `MATERIAL_LABELS` registry.
 - Deps: `materials` (`CATALOG`, `LayerSpec`), `materials.crystal`.
 
+### `longitudinal.py`
+Bunch-length policy on the input side of `BeamSpec`: named `long_shape` kinds
+resolved per case against the dominant basal reflection.
+- Public: `LongitudinalDistribution`, `ResolvedLongitudinalDistribution`,
+  `resolve_longitudinal_distribution`.
+- Deps: `materials.crystal`, NumPy, SciPy constants.
+
+### `transverse.py`
+Transverse phase-space policy on the input side of `BeamSpec`: a Courant-Snyder
+triplet `(eps_n, beta, alpha)` per plane, resolved per case (normalized
+emittance is the stored input, geometric is derived as `eps_n / (beta*gamma)`)
+and sampled into per-electron offsets and slopes. The `y` plane mirrors `x`
+unless set. See `docs/beam-phase-space.md`.
+- Public: `TransverseDistribution`, `ResolvedTransversePlane`,
+  `ResolvedTransverseDistribution`, `resolve_transverse_distribution`,
+  `sample_transverse`.
+- Deps: NumPy, SciPy constants.
+
 ### `beam_metrics.py`
 Pure diagnostics over sampled initial phase-space arrays: per-plane RMS size,
 geometric and normalized emittance, Twiss parameters, longitudinal RMS size and

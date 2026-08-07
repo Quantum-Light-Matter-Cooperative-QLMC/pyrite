@@ -1077,3 +1077,88 @@ def test_dry_run_writes_nothing_and_never_prompts(tmp_path, monkeypatch):
     assert_clean_result(standard)
 
     assert catalog.read_text() == original
+
+
+def test_create_writes_transverse_twiss_block(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch)
+
+    result = invoke(
+        profile.command,
+        [
+            "create",
+            "twiss",
+            "--emittance",
+            "1.0",
+            "--twiss-beta",
+            "0.5",
+            "--twiss-alpha",
+            "-0.8",
+            "--energy-spread",
+            "0.002",
+        ],
+    )
+
+    assert_clean_result(result, stdout="created profile twiss\n")
+    text = catalog.read_text().replace(" ", "")
+    assert "[profiles.twiss.beam.transverse]" in text
+    assert "normalized_emittance_x_mm_mrad=1.0" in text
+    assert "beta_twiss_x_m=0.5" in text
+    # A diverging beam past its waist is legitimate input, not a bad magnitude.
+    assert "alpha_twiss_x=-0.8" in text
+    assert "energy_spread_frac=0.002" in text
+
+
+def test_create_rejects_emittance_together_with_spot_fwhm(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    result = invoke(
+        profile.command,
+        [
+            "create",
+            "clash",
+            "--emittance",
+            "1.0",
+            "--twiss-beta",
+            "0.5",
+            "--transverse-fwhm-mm",
+            "1.0",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "--emittance replaces --transverse-fwhm-mm" in result.output
+
+
+def test_create_requires_beta_alongside_emittance(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["create", "partial", "--emittance", "1.0"])
+
+    assert result.exit_code == 2
+    assert "--emittance requires --twiss-beta" in result.output
+
+
+def test_create_rejects_twiss_without_emittance(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch)
+
+    result = invoke(profile.command, ["create", "orphan", "--twiss-alpha", "-0.5"])
+
+    assert result.exit_code == 2
+    assert "--twiss-beta and --twiss-alpha require --emittance" in result.output
+
+
+def test_set_transverse_retires_the_legacy_spot(tmp_path, monkeypatch):
+    """The two spellings are mutually exclusive at decode, so writing one
+    must remove the other or the edit leaves an unloadable profile."""
+    catalog = _catalog(tmp_path, monkeypatch)
+    invoke(profile.command, ["create", "spot", "--transverse-fwhm-mm", "2.0"])
+    assert "transverse_fwhm_mm" in catalog.read_text()
+
+    result = invoke(
+        profile.command,
+        ["set", "spot", "--emittance", "1.0", "--twiss-beta", "0.5"],
+    )
+
+    assert_clean_result(result)
+    section = catalog.read_text().split("[profiles.spot.beam]", 1)[1]
+    assert "transverse_fwhm_mm" not in section.split("\n[profiles.spot.beam.transverse]", 1)[0]

@@ -31,6 +31,7 @@ from .montecarlo import simulate_trajectories
 from .profiles import get_fidelity_preset
 from .results import Settings
 from .sweep import BeamSpec, Sweep, beam_replace
+from .transverse import TransverseDistribution
 
 # Override keys that address the beam (BeamSpec) rather than the Sweep itself,
 # so ``material_sweep(..., energy_keV=[30, 60])`` and the legacy scalar-spot
@@ -141,6 +142,14 @@ def material_sweep(
         longitudinal = beam_changes.get("longitudinal")
         if longitudinal is not None:
             beam_changes["longitudinal"] = LongitudinalDistribution(**dict(longitudinal))
+        transverse = beam_changes.get("transverse")
+        if transverse is not None:
+            beam_changes["transverse"] = TransverseDistribution(**dict(transverse))
+            # The spot FWHMs default to 1 mm and are mutually exclusive with a
+            # Courant-Snyder policy, so a profile that supplies one must clear
+            # the other -- otherwise every such profile would fail build_cases.
+            beam_changes.setdefault("transverse_fwhm_x_mm", None)
+            beam_changes.setdefault("transverse_fwhm_y_mm", None)
         beam = beam_replace(beam, **beam_changes)
     catalog_detector = _catalog(catalog_profile).profile_detector(catalog_profile)
     legacy_detector = {

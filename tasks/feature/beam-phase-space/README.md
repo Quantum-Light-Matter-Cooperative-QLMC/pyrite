@@ -172,6 +172,15 @@ Likely owners, in dependency order:
 - `src/cxr_mc/materials/catalog.py:691-704` — signed vs positive key sets,
   nested `[profiles.NAME.beam.transverse]` decode.
 - `src/cxr_mc/profiles.py:284-318` — divergence-only hashing for the new keys.
+- `src/cxr_mc/cli/commands/profile.py` — `_beam_cli_options` (`:98-130`),
+  `_collect_beam_updates` (`:183-211`), `_apply_beam_updates`, and the beam key
+  tuple at `:342`. This is the only place `cxr` exposes a beam surface today:
+  `--transverse-fwhm-mm`, `--rep-rate-hz`, `--bunch-charge-pc`,
+  `--longitudinal`, `--envelope-rms-fs`. The transverse block needs the same
+  treatment `--longitudinal` already got.
+- `src/cxr_mc/cli/commands/scan.py:453-459` and `:485-491` — every `beam_*`
+  kwarg is hardcoded `None`, so `cxr scan` reaches `scan.py`'s live
+  `beam_overrides` dict (`scan.py:610-618`) with nothing. See open question 3.
 - `src/cxr_mc/plots/trajectories.py:229` and `plots/plotly_trajectories.py` —
   the absorbed Inbox item; `initial_v_hat` is already returned and plumbed, it
   is simply degenerate today.
@@ -180,25 +189,33 @@ Likely owners, in dependency order:
 
 ## Checklist
 
-- [ ] **A. Design note.** Write `docs/beam-phase-space.md`: canonical
+- [x] **A. Design note.** Write `docs/beam-phase-space.md`: canonical
       parameterization, mutual-exclusion table, reference plane, normalized-vs-
       geometric convention, chirp decision (critique 8). Get it reviewed before
       code.
-- [ ] **B. `TransverseDistribution`** in `sweep.py` + per-case resolution.
-      Inert default is bit-for-bit legacy.
+- [x] **B. `TransverseDistribution`** in `sweep.py` + per-case resolution.
+      Inert default is bit-for-bit legacy. Landed as its own module,
+      `src/cxr_mc/transverse.py`, mirroring `longitudinal.py`; `sweep.py` holds
+      the `BeamSpec` field, the mutual-exclusion error, and
+      `BeamSpec.with_transverse`.
 - [ ] **C. Transport sampling** — per-electron `v_hat` and initial energy from
       the resolved distribution, on RNG children independent of the transport
       draws (follow `_sample_bunch_offsets` / `spawn(4)[3]` precedent so the
       zero-spread limit is bit-for-bit).
 - [ ] **D. Limiting-case tests** — `eps_n -> 0` reproduces the collimated run
-      exactly; charge/rep-rate invariance test (critique 6).
-- [ ] **E. Round-trip test** — sample from a known `(eps_n, beta, alpha)` and
+      exactly; charge/rep-rate invariance test (critique 6). *Partial:* the
+      charge/rep-rate bit-for-bit test is in `tests/test_transverse.py`; the
+      `eps_n -> 0` vs `main` transport comparison is blocked on C.
+- [x] **E. Round-trip test** — sample from a known `(eps_n, beta, alpha)` and
       recover it through `beam_metrics.sampled_beam_metrics` within MC error.
       This closes the input/output asymmetry and is the strongest single check.
 - [ ] **F. Profile decode** — nested `beam.transverse` block, signed-key fix
       (critique 4), a demo profile in `materials.toml`, golden regen
       (`tests/data/material_catalog_golden.json`) via the `regen-golden` skill.
-- [ ] **G. Identity hashing** — new keys join `parameter_sha256` only when they
+      *Partial:* decode and the `_TRANSVERSE_SIGNED_KEYS` split are done and the
+      golden is unchanged (no shipped profile sets the block yet); the demo
+      profile and its golden regen are still open.
+- [x] **G. Identity hashing** — new keys join `parameter_sha256` only when they
       diverge from inert defaults; assert existing digests unchanged.
 - [ ] **H. `E_grid_line` interaction** — verify a broadened line is not clipped;
       if it is, widen bounds or gate `energy_spread_frac` (critique 5).
@@ -207,8 +224,24 @@ Likely owners, in dependency order:
 - [ ] **J. Physics ledger** — source equation, assumptions, limiting case,
       `Validation: <id>`, ledger row for the new sampling. Fresh-context
       verification via `physics-validator`; only the human signs off.
-- [ ] **K. Docs** — `docs/sweep-profiles.md` beam block reference,
-      `docs/repo_map.md` pointer.
+      *Partial:* row `beam-phase-space-injection` is in the ledger at status
+      `filtered`, with `Validation:` markers on both public functions in
+      `transverse.py`; fresh-context verification and its write-up are open.
+- [x] **K. Docs** — `docs/sweep-profiles.md` beam block reference,
+      `docs/repo_map.md` pointer, `docs/cli-reference.md` regen (with L).
+      Also `docs/index.md` toctree entry for the design note.
+- [x] **L. CLI surface** — extend `_beam_cli_options` with the transverse
+      block, mirroring the `--longitudinal` / `--envelope-rms-fs` pair:
+      `--transverse` (kind), the Twiss triplet per plane, and
+      `--energy-spread`. Mutual exclusion with `--transverse-fwhm-mm` is a
+      `click.UsageError` in `_collect_beam_updates` (decision 1: hard error, no
+      silent precedence), matching the existing
+      `"--envelope-rms-fs requires --longitudinal"` style. Negative
+      `alpha_twiss` must pass the option type — do NOT use `FloatRange(min=0)`
+      like its neighbours (critique 4, same trap as `_BEAM_POSITIVE_KEYS`).
+      Add the new keys to the `:342` tuple and `_apply_beam_updates`. Follow the
+      `cli-ui-ux` skill; regenerate `docs/cli-reference.md`; preserve the
+      documented command/help/output/exit contracts.
 
 ## Decisions
 
@@ -241,6 +274,19 @@ Settled by user review, 2026-08-05. Binding — do not relitigate.
    directions? `entry_points` and the prism-exit helper assume the shared
    `beam_dir` in places.
 
+3. Should `cxr scan` regain per-run beam overrides, or does the beam stay
+   profile-only on that command? `scan.py:610-618` still builds a live
+   `beam_overrides` dict, but `cli/commands/scan.py:453-459` / `:485-491` feed
+   it `None` for all six keys, so the plumbing is reachable but unreached.
+   Lean: leave `scan` profile-only and put the transverse surface on
+   `cxr profile` alone (step L), so there is exactly one spelling — but that
+   makes the `scan.py` dict dead code that should then be deleted or flagged.
+   Decide before writing L; do not add flags to both.
+   **Status:** L shipped under the lean — the transverse flags are on
+   `cxr profile create` / `cxr profile edit` only, and `cxr scan` gained
+   nothing. Still needs a ruling on whether `scan.py:610-618` is deleted or
+   re-wired; nothing depends on the answer until then.
+
 Closed during triage: nothing under `src/cxr_mc/montecarlo/` reads
 `divergence_mrad` or `energy_spread_frac` today, and no shipped profile or
 notebook sets them, so activating them cannot silently change an existing run.
@@ -256,8 +302,11 @@ notebook sets them, so activating them cannot silently change an existing run.
 | Grid-bounds interaction | H | `implement-task` + `monte-carlo` |
 | Trajectory plots | I | `implement-task-lite` + `notebook-workflow` |
 | Ledger + docs | J, K | `physics-validation`, `documentation-maintenance` |
+| CLI surface | L | `implement-task` + `cli-ui-ux` |
 
 A is a blocking gate: C onward depends on the parameterization decision.
+L depends on B only (it edits the option layer, not the sampler) and can run in
+parallel with C–E.
 
 ## Acceptance checks
 
@@ -270,3 +319,8 @@ A is a blocking gate: C onward depends on the parameterization decision.
   `alpha_twiss`.
 - New physics carries a `Validation: <id>` marker and a ledger row;
   `physics-ledger-auditor` reports no orphans.
+- CLI: a transverse block set purely from `cxr profile` flags produces the same
+  `BeamSpec` as the equivalent TOML block; combining it with
+  `--transverse-fwhm-mm` exits non-zero with a usage error naming both flags;
+  a negative `alpha_twiss` is accepted; `docs/cli-reference.md` is regenerated
+  and no pre-existing command help/exit contract changed.

@@ -315,6 +315,8 @@ def dataset_identity(
             key = json.dumps(_jsonable(resolution), sort_keys=True, separators=(",", ":"))
             serialized.setdefault(key, _jsonable(resolution))
         resolved["longitudinal_resolutions"] = list(serialized.values())
+    if beam_payload["transverse"] is not None:
+        sweep_payload["transverse"] = beam_payload["transverse"]
     if beam_payload["rep_rate_hz"] != 5000.0:
         sweep_payload["rep_rate_hz"] = beam_payload["rep_rate_hz"]
     if beam_payload["bunch_charge_pc"] != 1.0:
