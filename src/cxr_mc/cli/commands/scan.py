@@ -14,12 +14,6 @@ from .. import _core as _cli_core
 _PERFORMANCE_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]*")
 
 
-def _beam_uvw(ctx, param, value):
-    if value is None:
-        return None
-    return _cli_core.BEAM_UVW.convert(value, param, ctx)
-
-
 def _performance_profile(ctx, param, value):
     if value is None:
         return None
@@ -451,12 +445,6 @@ def command(
             quick=quick,
             n_families=n_families,
             beam_uvw=None,
-            beam_transverse_fwhm_x_mm=None,
-            beam_transverse_fwhm_y_mm=None,
-            beam_bunch_length_fs=None,
-            beam_long_shape=None,
-            beam_rep_rate_hz=None,
-            beam_bunch_charge_pc=None,
             checkpoint_dir=checkpoint_dir,
             max_minutes=max_minutes,
             performance_profile=performance_profile,
@@ -483,12 +471,6 @@ def command(
         quick=quick,
         n_families=n_families,
         beam_uvw=None,
-        beam_transverse_fwhm_x_mm=None,
-        beam_transverse_fwhm_y_mm=None,
-        beam_bunch_length_fs=None,
-        beam_long_shape=None,
-        beam_rep_rate_hz=None,
-        beam_bunch_charge_pc=None,
         checkpoint_dir=checkpoint_dir,
         max_minutes=max_minutes,
         performance_profile=performance_profile,

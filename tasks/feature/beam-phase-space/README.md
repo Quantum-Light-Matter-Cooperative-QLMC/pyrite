@@ -282,10 +282,14 @@ Settled by user review, 2026-08-05. Binding — do not relitigate.
    `cxr profile` alone (step L), so there is exactly one spelling — but that
    makes the `scan.py` dict dead code that should then be deleted or flagged.
    Decide before writing L; do not add flags to both.
-   **Status:** L shipped under the lean — the transverse flags are on
-   `cxr profile create` / `cxr profile edit` only, and `cxr scan` gained
-   nothing. Still needs a ruling on whether `scan.py:610-618` is deleted or
-   re-wired; nothing depends on the answer until then.
+   **Resolved 2026-08-07 (user):** the beam is profile-owned, with no per-run
+   override path — "i don't want users manually set beam parameters every run".
+   L shipped accordingly: transverse flags on `cxr profile create` /
+   `cxr profile edit` only. The dead `beam_overrides` dict in `scan.py`, the six
+   `None` kwargs at both `cli/commands/scan.py` call sites, and the orphaned
+   `_beam_uvw` callback are deleted; `tests/test_scan_beam_options.py` already
+   pinned the flags as rejected. (`cxr run` is the runner command now; `scan.py`
+   survives as its backend.)
 
 Closed during triage: nothing under `src/cxr_mc/montecarlo/` reads
 `divergence_mrad` or `energy_spread_frac` today, and no shipped profile or

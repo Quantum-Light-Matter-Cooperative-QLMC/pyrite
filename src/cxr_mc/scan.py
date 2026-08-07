@@ -607,15 +607,11 @@ def _resolved_run(args, material):
         overrides["n_families"] = args.n_families
     if getattr(args, "beam_uvw", None) is not None:
         overrides["beam_uvw"] = tuple(args.beam_uvw)
-    beam_overrides = {
-        "transverse_fwhm_x_mm": getattr(args, "beam_transverse_fwhm_x_mm", None),
-        "transverse_fwhm_y_mm": getattr(args, "beam_transverse_fwhm_y_mm", None),
-        "bunch_length_fs": getattr(args, "beam_bunch_length_fs", None),
-        "long_shape": getattr(args, "beam_long_shape", None),
-        "rep_rate_hz": getattr(args, "beam_rep_rate_hz", None),
-        "bunch_charge_pc": getattr(args, "beam_bunch_charge_pc", None),
-    }
-    overrides.update({key: value for key, value in beam_overrides.items() if value is not None})
+    # The beam itself (spot, bunch, rep rate, charge, phase space) is
+    # profile-owned: there is no per-run override path. Set it once on a catalog
+    # profile with `cxr profile create/edit`, so every run that names the profile
+    # gets the same beam and the same dataset identity.
+    # See tests/test_scan_beam_options.py.
     sweep = (
         material_sweep(material, catalog_profile=catalog_profile, **overrides)
         if fidelity == "full"
@@ -623,10 +619,6 @@ def _resolved_run(args, material):
             material, fidelity=fidelity, catalog_profile=catalog_profile, **overrides
         )
     )
-    if getattr(args, "beam_long_shape", None) is not None and sweep.beam.bunch_length_fs is None:
-        raise click.UsageError(
-            "--beam-long-shape requires --beam-bunch-length-fs or a profile bunch"
-        )
 
     # High-energy-only materials (mats_to_sim.toml's high_energy_materials list,
     # pulled in via --include-high-energy or -A) are "only worthwhile to sim for

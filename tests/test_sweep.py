@@ -1096,24 +1096,21 @@ def test_scan_performance_profile_records_resolved_beam(monkeypatch, tmp_path):
         no_progress=True,
         performance_profile="standard",
         performance_dir=str(tmp_path / "performance"),
-        beam_transverse_fwhm_x_mm=0.25,
-        beam_transverse_fwhm_y_mm=0.5,
-        beam_bunch_length_fs=80.0,
-        beam_long_shape="uniform",
-        beam_rep_rate_hz=2500.0,
-        beam_bunch_charge_pc=2.0,
     )
 
     scan._run_material(args, "hopg")
 
+    # The beam the performance log records is the one the profile resolved --
+    # there is no per-run override path (tests/test_scan_beam_options.py), so
+    # these are the profile's own values, not anything the caller passed in.
     beam = observed["beam_parameters"]
     assert beam["energy_keV"] == [30, 50]
-    assert beam["transverse_fwhm_x_mm"] == 0.25
-    assert beam["transverse_fwhm_y_mm"] == 0.5
-    assert beam["bunch_length_fs"] == 80.0
-    assert beam["long_shape"] == "uniform"
-    assert beam["rep_rate_hz"] == 2500.0
-    assert beam["bunch_charge_pc"] == 2.0
+    assert beam["transverse_fwhm_x_mm"] == 1.0
+    assert beam["transverse_fwhm_y_mm"] == 1.0
+    assert beam["bunch_length_fs"] is None
+    assert beam["long_shape"] == "gaussian"
+    assert beam["rep_rate_hz"] == 5000.0
+    assert beam["bunch_charge_pc"] == 1.0
     context = observed["context"]()
     assert context["current"]["configuration"]
     assert context["active_case"]["configuration"]
