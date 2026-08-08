@@ -156,9 +156,6 @@ def test_claude_project_memory_imports_shared_instructions() -> None:
 
 
 def test_agent_session_start_syncs_optional_dependencies() -> None:
-    # "chore: remove rtk & tokensave hook calls" dropped the rtk wrapper from
-    # the Claude-side sync script (plain `export UV_CACHE_DIR=...`); Codex's
-    # hooks.json still wraps its sync command through `rtk env`.
     root = Path(__file__).parents[2]
     expected = "uv sync --all-groups"
     claude = json.loads((root / ".claude" / "settings.json").read_text())
@@ -171,15 +168,15 @@ def test_agent_session_start_syncs_optional_dependencies() -> None:
     assert "sync_local_backend.sh" in claude_command
     assert expected in claude_hook_script
     assert expected in codex_command
-    assert "export UV_CACHE_DIR=/tmp/cxr-mc-uv-cache" in claude_hook_script
-    assert "rtk env UV_CACHE_DIR=/tmp/cxr-mc-uv-cache" in codex_command
+    assert "UV_CACHE_DIR=/tmp/cxr-mc-uv-cache" in claude_hook_script
+    assert "UV_CACHE_DIR=/tmp/cxr-mc-uv-cache" in codex_command
 
 
 @pytest.mark.parametrize(
     "command",
     [
         "uv run cxr run standard -m hopg",
-        "rtk env UV_CACHE_DIR=/tmp/cache uv run cxr run standard -m hopg",
+        "UV_CACHE_DIR=/tmp/cache uv run cxr run standard -m hopg",
         "git status && uv run cxr run standard -m hopg",
         "(uv run cxr run standard -m hopg)",
     ],
@@ -210,7 +207,7 @@ def test_sweep_guard_allows_safe_commands(sweep_guard_module, command: str) -> N
     "command",
     [
         "CXR_LOCAL_SWEEP_OK=1 uv run cxr run standard -m hopg",
-        "rtk env CXR_LOCAL_SWEEP_OK=1 uv run cxr run standard -m hopg",
+        "CXR_LOCAL_SWEEP_OK=1 uv run cxr run standard -m hopg",
         "env CXR_LOCAL_SWEEP_OK=true uv run cxr run standard -m hopg",
     ],
 )
