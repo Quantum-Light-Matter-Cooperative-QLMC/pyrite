@@ -206,10 +206,25 @@ rather than merge.
       ever reads `catalog.profile_beam(name)` -- needed zero changes. Tests:
       `test_named_beam_reference_resolves_to_same_payload_as_inline_block`,
       `test_named_beam_renaming_does_not_change_resolved_payload`.
-- [ ] **C. `cxr beam` noun group** — `list`, `show`, `create`, `set`, `rename`,
+- [x] **C. `cxr beam` noun group** — `list`, `show`, `create`, `set`, `rename`,
       `delete`, with the shared option/validation helpers extracted from
       `profile.py`. `--dry-run` and the `-y` confirmation conventions match the
       existing `profile` / `material` commands. Follow `cli-ui-ux`.
+      Landed `7129dfb`: option/validation/writer helpers extracted into
+      `cli/commands/_beam_shared.py` (`beam_cli_options`,
+      `collect_beam_updates`, `write_beam_fields`, `apply_beam_updates`);
+      `profile.py` now imports them with zero behavior change. New
+      `cli/commands/beam.py` implements all six verbs on top of
+      `_catalog_io.beam_rows`/`beams_table`, matching `profile.py`'s
+      dry-run/atomic-write/validate and preview-then-confirm-delete flow;
+      `rename` cascades to every referencing profile's `beam = "NAME"`
+      string, `delete` is blocked while referenced. `beam` registered as a
+      visible noun in `cli/__init__.py`, plus a `cli/beam.py` compatibility
+      alias matching `profile.py`/`material.py`. Registered the new
+      retired `--json` flags (list/show/delete) in `cli/_deprecations.py`
+      and regenerated `docs/cli-deprecations.md` / `docs/cli-reference.md`.
+      20 new tests in `tests/cli/test_beam.py`, including a value-equality
+      check against a hand-written `[beams.NAME]` block.
 - [ ] **D. Profile attachment** — `cxr profile set <profile> --beam NAME`,
       `cxr profile remove <profile> --beam`, unknown-beam error, `--beam` in
       `cxr profile show` output and its JSON payload.
