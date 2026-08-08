@@ -177,7 +177,29 @@ Scope is `cxr remote run`; no local-run flag is added by this slice.
 
 ## Next slice: rawkernel/physics verification + MoSe2 stall
 
-Not started. Two parts of the same Active TODO item. Editing/dispatch
+**Status 2026-08-08: worked. Part A 5/6 items closed (item 4 partial),
+Part B 4/4 closed.** Headline outcomes:
+
+- `_USE_JIT_LINE_PROLOGUE` **stays `False`** — not because the numerics
+  failed (they passed comfortably) but because item 4's `ALEX-DESKTOP` arm is
+  unreachable, the measured win is ~1-3% of case wall time, and the line path
+  already carries four unledgered `Validation:` markers.
+- Round 3's fixed-order prologue is **not bit-for-bit** — confirmed by
+  measurement, mechanism identified (FMA contraction the eager gather kernel
+  explicitly blocks). Divergence is confined to `w`; `E_r` and `aw` are
+  bit-for-bit and the keep-mask agrees exactly.
+- The MoSe2 "stall" is **not a stall**: it is the pipeline-fill transient plus
+  compute-bound transport, scaling linearly in `n_seg`. Decision is
+  document-as-expected; no chunk or worker default changes.
+- Transport/GPU balance has **flipped since Round 2** — transport is now
+  2.4-3.4x the GPU phase on `qlmc` (RTX 5080) vs ~0.98x on `ALEX-DESKTOP`
+  (3060 Ti). Round 2's "two transport workers hide transport" no longer holds.
+
+All measurements below are on `qlmc` unless stated. Harness scripts were run
+from the remote scratch tree and removed afterwards; the box was returned to
+its original catalog (the temporary `stall_repro` profile was deleted).
+
+Two parts of the same Active TODO item. Editing/dispatch
 environment for this slice is an Intel-dGPU laptop with no CUDA device and no
 locally-visible SYCL device — Part A's CUDA compile/compare/golden/A-B-timing
 work is not runnable here at all and must go through `cxr remote` on
@@ -379,10 +401,61 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
       only confirms general backend fallback machinery, not the new prologue
       kernel specifically (it has no dedicated test either way).
 - [ ] If any of the above passes clean, flip `_USE_JIT_LINE_PROLOGUE = True`
-      as its own reviewed change with a `Validation:` id and ledger row
-      (Round 2 measured non-bit-for-bit `fma` contraction on the earlier
-      gather-EK prototype; confirm Round 3's fixed-order kernel's actual
-      bit-for-bit/tolerance status here, not by assumption).
+      as its own reviewed change with a `Validation:` id and ledger row.
+      **NOT FLIPPED. `_USE_JIT_LINE_PROLOGUE` remains `False`.** Three
+      independent reasons, in order of weight:
+
+      1. **The checklist is not clean: item 4 is only half done.** It requires
+         the interleaved A/B on *both* `ALEX-DESKTOP` and `qlmc`.
+         `ALEX-DESKTOP` is unreachable from this environment, so the second
+         arm does not exist. The gate says flip only if everything passes.
+      2. **The measured benefit does not justify the cost.** The prologue wins
+         4.2-8.9% of the *line phase*. Item 5 measured transport at 2.4-3.4x
+         the whole GPU phase on `qlmc`, so that is roughly **1-3% of case
+         wall time** — and the 6-case steady-state run above spent 30-34% of
+         its time waiting on transport, not on lines. Against that, flipping
+         permanently accepts a non-bit-for-bit change to `w` (max 7.97e-6
+         relative, 124 ULP) plus a `Validation:` id, a ledger row, and golden
+         regeneration.
+      3. **It would be the fifth unbacked physics claim on this code path.** A
+         ledger audit of `src/cxr_mc/montecarlo/` found the incoherent line
+         path already carries four `Validation:` markers with **no ledger
+         row**: `line-hkl-batch`, `line-amplitude-fusion`,
+         `line-gemv-elementwise`, and `line-absorption-tabulation` (the last
+         self-describes as "a Physics-METHOD change, not a reassociation").
+         No ledger row's `code` column names *any* of the five
+         `*_jit_kernel.py` modules, and those modules carry zero `Validation:`
+         markers. Adding a fifth claim on top of four unsettled ones deepens
+         debt that `AGENTS.md`'s physics governance exists to prevent. Those
+         four should land before a new one is stacked on them.
+
+      **The numerics themselves are not the blocker** — they passed
+      comfortably (items 2 and 3: exact keep-mask agreement, bit-for-bit `E_r`
+      and `aw`, significant-bin error ~170x inside the repo's own accepted
+      cross-path bound, and bitwise run-to-run determinism). Round 2's `fma`
+      question is now answered by measurement rather than assumption: **Round
+      3's fixed-order kernel is NOT bit-for-bit**, and the mechanism is
+      identified — the eager gather kernel blocks FMA contraction with
+      explicit `__fadd_rn`/`__fmul_rn`/`__fsub_rn` intrinsics, the prologue's
+      `_interp_row`/`_interp_shared` do not.
+
+      For whoever picks this up:
+      - Matching the eager kernel's rounding discipline (the `__f*_rn`
+        intrinsics, or compiling the prologue with `-fmad=false`) would remove
+        the `w` divergence, but **would not make the end-to-end spectrum
+        bit-for-bit**: the prologue feeds the reduction kernel all
+        `n_seg * N_g` fixed-order pairs while the eager path feeds compacted
+        survivors batched to `_JIT_LINE_BATCH_TARGET`, so each reduction
+        thread accumulates a different set in a different order. Tolerance,
+        not bit-for-bit, is the right frame for this change.
+      - Proposed identity if it is taken: `Validation: line-prologue-fusion`,
+        anchored on
+        `montecarlo/line_prologue_jit_kernel.py::run_line_prologue_kernel`,
+        status `filtered`, same class as `coherent-line-hkl-batch` (an
+        evaluation-order claim, no new equation), with the item 2/3 numbers
+        above as its `checks` column. It needs a real regression test too:
+        **no test references `_USE_JIT_LINE_PROLOGUE` or the prologue module
+        today.**
 
 ### B. MoSe2 / large `--ne-line` transport stall (TODO.md 2026-08-07)
 
@@ -527,9 +600,67 @@ compute or memory-pressure problem — but unconfirmed.
       transport result transfer — the transfer half is invisible to
       `transport_seconds_total` and to any transport-side NVTX range that
       might be added.
-- [ ] Decide fix vs. document as expected (compute-bound transport at very
-      high `Ne`) once attributed; do not change chunk defaults without a
-      controlled A/B per the "Broader optimization path" above.
+- [x] Decide fix vs. document as expected (compute-bound transport at very
+      high `Ne`) once attributed. **DECISION: DOCUMENT AS EXPECTED. No code
+      change, no default change.**
+
+      The single-case reproduction overstates the problem because one case
+      has nothing to overlap with. Steady-state measurement, 6 MoSe2 cases at
+      `ne_line = 20000` (2 polars x 3 azimuths, same 5 um / 30 keV):
+
+      | configuration | wall | `gpu_feed_wait_fraction` | GPU ticks at 0% | driver wait s | transport s | spectrum s |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | 1 case | 13.3 s | **0.530** | 17 / 29 | 6.98 | 3.45 | 6.20 |
+      | 6 cases, default workers (resolved 6) | 52.1 s | **0.344** | 17 / 48 | 17.86 | 23.06 | 33.99 |
+      | 6 cases, `--workers 6` | 49.9 s | **0.299** | 11 / 45 | 14.82 | 23.51 | 34.73 |
+
+      Two things settle it:
+      - **The zeros are one contiguous block at the start of the run, not a
+        recurring stall.** The 6-case GPU timeline is
+        `1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9 15 100 100 54 100 100 100 100 100 56 ...`
+        — 16 consecutive zero ticks while the pipeline fills, then the GPU
+        holds 100% with only brief inter-case dips. Per-case wall time falls
+        **22.6 s -> 6.7 s** over the six cases (the progress bar's own
+        `22.58s/it -> 6.73s/it`). The long GPU-0% window is the pipeline-fill
+        transient: the first case's transport must finish before any GPU work
+        can exist, and at `Ne = 20000` that first transport is ~8-20 s.
+      - **Feed-wait falls monotonically as cases become available to overlap**
+        (0.530 -> 0.344 -> 0.299), and across 6 cases
+        `transport_seconds_total` (23.06 s) now *exceeds*
+        `driver_wait_seconds_total` (17.86 s), i.e. transport is genuinely
+        running concurrently with GPU work. The `gpu-pipeline` engine is
+        behaving as designed.
+
+      Why "fix" is not warranted:
+      - Scaling is linear in `n_seg` with no discontinuity (item 2), so there
+        is no pathology to remove — only more work.
+      - Every suspected mechanism is measurably absent: zero OOM retries,
+        unchanged effective chunk, 4-42 ms checkpoint I/O, VRAM at 18.6%,
+        engine never demoted to serial.
+      - The default worker count already resolves to 6 here; forcing
+        `--workers 6` explicitly changed wall time only 52.1 s -> 49.9 s
+        (~4%), so there is no default worth changing. Per this task's own
+        non-goals and the "Broader optimization path" above, chunk/worker
+        defaults must not be changed without a controlled A/B, and the
+        measurement says such an A/B has nothing to win here.
+
+      Follow-ups worth opening separately (NOT done in this slice):
+      1. **Add NVTX ranges to `transport.py`.** `docs/compute-performance-optimization.md`
+         already claims `cxr.transport.line` / `cxr.transport.brem` exist;
+         they do not. Adding them would turn this multi-run diagnosis into a
+         single `nsys` capture.
+      2. **Correct `docs/performance-profile-analysis.md`**: it documents the
+         removed `cxr remote run ...` form and a `compute_test_300keV` profile
+         that is not in the catalog.
+      3. **Transport result transfer.** `driver_wait_seconds_total` was 2x
+         `transport_seconds_total` on the single case, i.e. roughly half the
+         idle window is returning the per-case segment payload from the worker
+         to the driver rather than computing it. Reducing that (payload dtype
+         or shared memory) is a real lever, but it is a separate task with its
+         own A/B and its own correctness surface.
+      4. Optionally document the expected fill transient in the user-facing
+         performance guide so "GPU at 0% for the first ~10-20 s at high
+         `--ne-line`" is not re-reported as a bug.
 
 ## Decisions and open questions
 
