@@ -186,14 +186,26 @@ rather than merge.
 
 ## Checklist
 
-- [ ] **A. Catalog schema** — `[beams.NAME]` parse and validation, reusing the
+- [x] **A. Catalog schema** — `[beams.NAME]` parse and validation, reusing the
       existing key sets and the signed/positive split
       (`_TRANSVERSE_SIGNED_KEYS`); unknown-name suggestions; both-spellings
       hard error. Round-trip test including a negative `alpha_twiss`.
-- [ ] **B. Reference resolution + identity** — profile `beam = "NAME"` resolves
+      Landed `64992f0`: `_parse_beams` reuses `_parse_profile_beam` verbatim
+      (plus optional `label`); unknown-beam error is a plain message (no
+      difflib -- matches the existing `_parse_materials` cross-reference
+      pattern, not the CLI-layer suggestion helper); both-spellings collide on
+      the same TOML `beam` key, so `tomllib`'s own duplicate-key rule rejects
+      them before catalog validation runs -- no bespoke check needed.
+- [x] **B. Reference resolution + identity** — profile `beam = "NAME"` resolves
       to the same payload as the inline block; resolve-then-hash so
       `parameter_sha256` is unchanged for equal values and invariant under
       rename (decision 3). Test both directions explicitly.
+      Landed `64992f0`: resolution happens entirely inside
+      `_load_material_catalog_cached` (name/label stripped before
+      `profile_beams` is built), so `profiles.py`'s hash payload -- which only
+      ever reads `catalog.profile_beam(name)` -- needed zero changes. Tests:
+      `test_named_beam_reference_resolves_to_same_payload_as_inline_block`,
+      `test_named_beam_renaming_does_not_change_resolved_payload`.
 - [ ] **C. `cxr beam` noun group** — `list`, `show`, `create`, `set`, `rename`,
       `delete`, with the shared option/validation helpers extracted from
       `profile.py`. `--dry-run` and the `-y` confirmation conventions match the
