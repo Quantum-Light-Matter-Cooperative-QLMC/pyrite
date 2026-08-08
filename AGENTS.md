@@ -23,10 +23,10 @@ Use project runner; never bare `pytest`, `.venv/bin/python`, or path-hack import
 
 ```bash
 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite core
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite cli
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite apps
-UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run --package cxr-mc-tests cxr-dev test-suite packaging
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite core
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite cli
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite apps
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite packaging
 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test path/to/test.py -k test_name
 CXR_ONLINE_TESTS=1 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev lint
