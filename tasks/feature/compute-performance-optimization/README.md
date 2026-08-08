@@ -2,10 +2,17 @@
 
 Branch: `feature/compute-performance-optimization`
 
-TODO scope: Active item "Compute performance optimization," plus locally
-adopted and reviewed Inbox item "CPU Performance Flag." Per the local-only
-triage override, its Inbox marker remains on authoritative `main:TODO.md` for
-later reconciliation on `main`.
+TODO scope: Active item "Compute performance optimization." The formerly
+adopted Inbox item "CPU Performance Flag" is implemented (below) and its
+marker is already dropped from `main:TODO.md`; reconciliation is done.
+
+Current open slice (2026-08-08): the Active item's own text — review whether
+the `cupyx.jit.rawkernel`/Numba `@njit` optimizations from
+[`docs/compute-performance-optimization.md`](../../../docs/compute-performance-optimization.md)
+Rounds 1-3 are optimally executed, review any critical physics changes they
+carry, add bit-for-bit/toleranced validation for the new paths, and confirm
+non-NVIDIA fallbacks. Plus fresh remote evidence of a transport-side stall on
+heavy materials at large `--ne-line`. See "Next slice" below.
 
 ## Goal
 
@@ -168,6 +175,70 @@ Scope is `cxr remote run`; no local-run flag is added by this slice.
 5. Preserve checkpoint correctness, resumability, physics outputs, seeds,
    grids, and fidelity across comparisons.
 
+## Next slice: rawkernel/physics verification + MoSe2 stall
+
+Not started. Two parts of the same Active TODO item.
+
+### A. Required GPU verification (gates enabling Round 3)
+
+`docs/compute-performance-optimization.md` Round 3 landed the fused line
+prologue (`line_prologue_jit_kernel.py`) behind `_USE_JIT_LINE_PROLOGUE =
+False` in `spectrum.py`, plus the brem launch-config change and the streamed
+reduction kernels — all still gated because no CUDA device was available
+while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
+`line_prologue` today (`rg` confirms zero hits under `tests/`). Round 3's own
+"Required GPU verification" list is the checklist:
+
+- [ ] Compile each JIT specialization on the minimum and current supported
+      CuPy versions.
+- [ ] Compare the prologue's `E_r`, `aw`, and nonzero `w` against the eager
+      path on one-block synthetic inputs, edge-bracketing inputs, and full
+      MoS2 cases.
+- [ ] Run the line golden suite and repeated-run determinism checks; record
+      max absolute error, max error/peak, significant-bin relative error, and
+      integral drift.
+- [ ] Re-run the interleaved burn-in A/B harness at `Ne=450`, 2000, and 10000
+      on both `ALEX-DESKTOP` and `qlmc`.
+- [ ] Re-measure transport/GPU overlap before touching process counts or
+      starting a `prange`/CUDA transport project.
+- [ ] Confirm the non-NVIDIA (CPU/NumPy, no CuPy) fallback path still runs
+      and is exercised by CI — `_USE_JIT_LINE_PROLOGUE` and the raw kernels
+      are CUDA/CuPy-only branches; the eager/CPU path must be untouched and
+      covered.
+- [ ] If any of the above passes clean, flip `_USE_JIT_LINE_PROLOGUE = True`
+      as its own reviewed change with a `Validation:` id and ledger row
+      (Round 2 measured non-bit-for-bit `fma` contraction on the earlier
+      gather-EK prototype; confirm Round 3's fixed-order kernel's actual
+      bit-for-bit/tolerance status here, not by assumption).
+
+### B. MoSe2 / large `--ne-line` transport stall (TODO.md 2026-08-07)
+
+Fresh remote-box symptom report, not yet reproduced or diagnosed:
+`--ne-line=20_000` on `MoSe2` (and possibly other heavy materials) —
+transport runs tens of seconds with GPU at 0%, CPU inconsistent (often
+<10%, sometimes 60-70%), GPU bursts to 100% instantaneously then drops to
+0%, host RAM 50-80%, VRAM 20-50%. Pattern reads as transport-side
+(CPU/Numba) serialization or scheduling stall feeding the GPU, not a GPU
+compute or memory-pressure problem — but unconfirmed.
+
+- [ ] Reproduce with `cxr remote run` at matched `--ne-line=20_000` on
+      `MoSe2`, `--perf` telemetry on, per `docs/performance-profile-analysis.md`.
+- [ ] Compare against a lighter material/`--ne-line` at the same profile to
+      isolate whether the stall scales with `n_seg` (as Round 2's linear
+      transport/lines/brem split predicts) or is a distinct discontinuity at
+      high segment counts (e.g., OOM-retry/chunk-halving churn, or `njit`
+      compilation/cache-eviction stalls under `numba` parallel dispatch).
+      `Sweep.spec_chunk`/`Sweep.brem_chunk` and the adaptive chunk/OOM-retry
+      path in `runner.py` are the first suspects for the observed GPU
+      100%-then-0% burstiness.
+- [ ] Attribute the "GPU 0% for 10s+" window to a specific phase (transport
+      `njit` compile/dispatch, checkpoint I/O, host-side chunk sizing) using
+      NVTX ranges per the Round 1/2 method, not by inference from utilization
+      alone.
+- [ ] Decide fix vs. document as expected (compute-bound transport at very
+      high `Ne`) once attributed; do not change chunk defaults without a
+      controlled A/B per the "Broader optimization path" above.
+
 ## Decisions and open questions
 
 Decided:
@@ -197,6 +268,14 @@ Open during implementation:
   runner/profiler target rather than orchestration.
 - Authority: task-local checkpoint commits only; no push, TODO editing, or
   remote mutation without explicit supervisor/user authority.
+
+**Next slice (rawkernel/physics verification + MoSe2 stall) delegation:**
+`lead-task` — crosses `montecarlo/` JIT kernels, physics validation, and
+remote profiling. Required: `physics-review`, `physics-validation`,
+`performance`, `remote-gpu-jobs`, `regression-testing`,
+`monte-carlo`/`scientific-library`. Part A touching `_USE_JIT_LINE_PROLOGUE`
+needs a `Validation:` id and ledger row per `AGENTS.md`; do not flip the flag
+without it.
 
 ## Acceptance checks
 
