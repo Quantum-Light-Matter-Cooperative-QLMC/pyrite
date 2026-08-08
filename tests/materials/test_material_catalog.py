@@ -16,7 +16,9 @@ def _write_catalog(tmp_path: Path, text: str) -> Path:
     return path
 
 
-def _minimal_catalog(*, crystal: str = "mos2", material_rows: str = "") -> str:
+def _minimal_catalog(
+    *, crystal: str = "mos2", material_rows: str = "", profile_extra: str = ""
+) -> str:
     return f"""
 schema_version = 1
 [profiles.standard]
@@ -26,6 +28,7 @@ tilt_deg = {{ linspace = {{ start = 0.0, stop = 80.0, num = 3, endpoint = false 
 tilt_azim_deg = 0.0
 E_grid_line = {{ arange = {{ start = 50.0, stop = 60.0, step = 2.0 }} }}
 E_grid_brem = 0.0
+{profile_extra}
 [crystals.{crystal}]
 cif = "cifs/{crystal}.cif"
 validation_id = "test-fixture"
@@ -479,6 +482,121 @@ def test_profile_beam_offsets_coerced_to_tuple_and_absent_profile_is_none(tmp_pa
     assert beam["long_offsets_fs"] == (-10.0, 0.0, 10.0)
     # A profile with no beam block -> None (the standard BeamSpec default applies).
     assert catalog.profile_beam("bogus") is None
+
+
+def _named_beam_catalog(*, beam_ref: str, beams_block: str) -> str:
+    """A minimal catalog whose ``standard`` profile attaches ``beam_ref`` by
+    name, plus whatever ``[beams.*]`` rows ``beams_block`` defines."""
+    return (
+        _minimal_catalog(
+            material_rows="""
+[materials.mos2]
+label = "mos2"
+crystal = "mos2"
+""",
+            profile_extra=f'beam = "{beam_ref}"',
+        )
+        + beams_block
+    )
+
+
+def test_named_beam_reference_resolves_to_same_payload_as_inline_block(tmp_path):
+    from cxr_mc.materials import load_material_catalog
+
+    ref_text = _named_beam_catalog(
+        beam_ref="rf_gun_200fs",
+        beams_block=(
+            '\n[beams.rf_gun_200fs]\nlabel = "RF gun, 200 fs"\n'
+            "transverse_fwhm_mm = 0.5\n"
+            "bunch_length_fs = 120.0\n"
+            'long_shape = "uniform"\n'
+            "rep_rate_hz = 1000.0\n"
+            "bunch_charge_pc = 2.5\n"
+        ),
+    )
+    inline_text = _catalog_with_standard_beam(
+        "\n[profiles.standard.beam]\n"
+        "transverse_fwhm_mm = 0.5\n"
+        "bunch_length_fs = 120.0\n"
+        'long_shape = "uniform"\n'
+        "rep_rate_hz = 1000.0\n"
+        "bunch_charge_pc = 2.5\n"
+    )
+    (tmp_path / "ref").mkdir()
+    (tmp_path / "inline").mkdir()
+    ref_catalog = load_material_catalog(_write_catalog(tmp_path / "ref", ref_text))
+    inline_catalog = load_material_catalog(_write_catalog(tmp_path / "inline", inline_text))
+
+    # Resolved payload is value-identical -- the name and label never leak into
+    # the payload config.material_sweep actually reads (decision 3).
+    assert ref_catalog.profile_beam("standard") == inline_catalog.profile_beam("standard")
+    assert "label" not in ref_catalog.profile_beam("standard")
+
+    # But the beam is independently visible as a named catalog object, label
+    # included.
+    assert ref_catalog.beam_keys == ("rf_gun_200fs",)
+    assert ref_catalog.beams["rf_gun_200fs"]["label"] == "RF gun, 200 fs"
+
+
+def test_named_beam_and_inline_block_together_is_a_decode_error(tmp_path):
+    """Decision 4: a profile cannot spell both ``beam = "NAME"`` and an inline
+    ``[profiles.NAME.beam]`` table. TOML's own duplicate-key rule (both
+    spellings share the ``beam`` key) rejects this before catalog validation
+    ever runs -- no bespoke mutual-exclusion check is needed."""
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    text = _named_beam_catalog(
+        beam_ref="rf_gun_200fs",
+        beams_block=(
+            "\n[beams.rf_gun_200fs]\nrep_rate_hz = 1000.0\n"
+            "\n[profiles.standard.beam]\nrep_rate_hz = 500.0\n"
+        ),
+    )
+    with pytest.raises(MaterialConfigError):
+        load_material_catalog(_write_catalog(tmp_path, text))
+
+
+def test_named_beam_unknown_reference_errors(tmp_path):
+    from cxr_mc.materials import MaterialConfigError, load_material_catalog
+
+    text = _named_beam_catalog(beam_ref="bogus", beams_block="")
+    with pytest.raises(MaterialConfigError) as caught:
+        load_material_catalog(_write_catalog(tmp_path, text))
+    assert "profiles.standard.beam: unknown beam 'bogus'" in "\n".join(caught.value.errors)
+
+
+def test_named_beam_round_trips_negative_alpha_twiss(tmp_path):
+    from cxr_mc.materials import load_material_catalog
+
+    text = _named_beam_catalog(
+        beam_ref="diverging",
+        beams_block=(
+            "\n[beams.diverging]\n"
+            "\n[beams.diverging.transverse]\n"
+            "normalized_emittance_x_mm_mrad = 0.1\n"
+            "beta_twiss_x_m = 0.05\n"
+            "alpha_twiss_x = -1.5\n"
+        ),
+    )
+    catalog = load_material_catalog(_write_catalog(tmp_path, text))
+    transverse = catalog.profile_beam("standard")["transverse"]
+    assert transverse["alpha_twiss_x"] == -1.5
+
+
+def test_named_beam_renaming_does_not_change_resolved_payload(tmp_path):
+    from cxr_mc.materials import load_material_catalog
+
+    def catalog_for(beam_key: str) -> object:
+        text = _named_beam_catalog(
+            beam_ref=beam_key,
+            beams_block=f"\n[beams.{beam_key}]\nrep_rate_hz = 1000.0\n",
+        )
+        (tmp_path / beam_key).mkdir()
+        return load_material_catalog(_write_catalog(tmp_path / beam_key, text))
+
+    first = catalog_for("lab_gun")
+    second = catalog_for("renamed_gun")
+    assert first.profile_beam("standard") == second.profile_beam("standard")
 
 
 def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(

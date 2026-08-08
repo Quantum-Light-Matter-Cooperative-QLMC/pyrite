@@ -275,6 +275,13 @@ class MaterialCatalog:
     profile_energy_grid_refs: Mapping[str, Mapping[str, str]] = MappingProxyType({})
     #: Verified refs used to resolve this catalog instance's selected profile.
     resolved_energy_grid_refs: Mapping[str, str] = MappingProxyType({})
+    #: Named ``[beams.*]`` catalog objects (distribution fields plus an optional
+    #: ``label``), keyed by beam name. A profile attaches one by name
+    #: (``profiles.NAME.beam = "beam-key"``); ``profile_beams`` below holds the
+    #: already-resolved, name-stripped payload every consumer actually reads.
+    beams: Mapping[str, Mapping[str, object]] = MappingProxyType({})
+    #: Every ``[beams.*]`` name defined by the source TOML.
+    beam_keys: tuple[str, ...] = ()
 
     def profile_beam(self, name: str) -> Mapping[str, object] | None:
         """Decoded ``[profiles.NAME.beam]`` distribution overrides, or ``None``
@@ -992,6 +999,41 @@ def _parse_profile_beam(raw: object, path: str, errors: _Errors) -> dict[str, ob
     return out or None
 
 
+def _parse_beams(raw: object, errors: _Errors) -> dict[str, Mapping[str, object]]:
+    """Parse ``[beams.NAME]`` named beam objects.
+
+    Same distribution fields as an inline ``[profiles.NAME.beam]`` block, plus
+    an optional ``label``, validated with the identical field parser
+    (:func:`_parse_profile_beam`) so a named beam and its equivalent inline
+    block decode to bit-identical payloads. ``label`` is display-only metadata
+    and never joins the resolved payload a profile reference produces (decision
+    3: only field *values* may affect ``parameter_sha256``, never the beam's
+    name or label).
+    """
+    table = _table(raw, "beams", errors)
+    if table is None:
+        return {}
+    out: dict[str, Mapping[str, object]] = {}
+    for key, value in table.items():
+        path = f"beams.{key}"
+        row = _table(value, path, errors)
+        if row is None:
+            continue
+        label = row.get("label")
+        if label is not None and (not isinstance(label, str) or not label.strip()):
+            errors.add(f"{path}.label", "must be a nonempty string")
+            label = None
+        fields = {k: v for k, v in row.items() if k != "label"}
+        beam = _parse_profile_beam(fields, path, errors)
+        if beam is None:
+            errors.add(path, "must define at least one beam field")
+            continue
+        if label is not None:
+            beam = {**beam, "label": label}
+        out[key] = MappingProxyType(beam)
+    return out
+
+
 def _parse_profile_detector(raw: object, path: str, errors: _Errors) -> DetectorSpec | None:
     """Validate one portable ``[profiles.NAME.detector]`` block."""
     table = _table(raw, path, errors)
@@ -1068,11 +1110,23 @@ def _parse_profiles(raw: object, errors: _Errors) -> dict[str, Mapping[str, obje
                         )
         row_out = dict(row)
         if "beam" in row_out:
-            beam = _parse_profile_beam(row_out["beam"], f"{path}.beam", errors)
-            if beam is not None:
-                row_out["beam"] = beam
+            beam_raw = row_out["beam"]
+            if isinstance(beam_raw, str):
+                # A bare string is a ``[beams.NAME]`` reference (decision 4);
+                # TOML's own duplicate-key rule already rejects a profile
+                # spelling both `beam = "NAME"` and an inline `[profiles.NAME.
+                # beam]` table under the same key, so no extra check is needed
+                # here. Resolved against `beams` once that table is parsed --
+                # see `_load_material_catalog_cached`.
+                if not beam_raw:
+                    errors.add(f"{path}.beam", "must be a nonempty beam name")
+                    del row_out["beam"]
             else:
-                del row_out["beam"]
+                beam = _parse_profile_beam(beam_raw, f"{path}.beam", errors)
+                if beam is not None:
+                    row_out["beam"] = beam
+                else:
+                    del row_out["beam"]
         if "detector" in row_out:
             detector = _parse_profile_detector(row_out["detector"], f"{path}.detector", errors)
             if detector is not None:
@@ -1410,7 +1464,7 @@ def _load_material_catalog_cached(
     errors.keys(
         raw,
         "catalog",
-        {"schema_version", "profiles", "crystals", "media", "materials", "energy_grids"},
+        {"schema_version", "profiles", "crystals", "media", "materials", "energy_grids", "beams"},
     )
     version = raw.get("schema_version")
     if type(version) is not int or version != 1:
@@ -1419,6 +1473,7 @@ def _load_material_catalog_cached(
         if key not in raw:
             errors.add(key, "missing required table")
     profiles = _parse_profiles(raw.get("profiles"), errors)
+    beams = _parse_beams(raw.get("beams", {}), errors)
     profile_artifacts, profile_energy_grid_refs = _load_profile_artifacts(
         source, profiles, profile, errors
     )
@@ -1445,11 +1500,24 @@ def _load_material_catalog_cached(
         for name, row in profiles.items()
         if isinstance(row.get("materials"), list)
     }
-    profile_beams = {
-        name: MappingProxyType(dict(cast("Mapping[str, object]", row["beam"])))
-        for name, row in profiles.items()
-        if isinstance(row.get("beam"), Mapping)
-    }
+    profile_beams: dict[str, Mapping[str, object]] = {}
+    for name, row in profiles.items():
+        beam_value = row.get("beam")
+        if isinstance(beam_value, str):
+            named_beam = beams.get(beam_value)
+            if named_beam is None:
+                errors.add(f"profiles.{name}.beam", f"unknown beam {beam_value!r}")
+                continue
+            # Resolve to values only -- the name itself must never reach a
+            # consumer (decision 3), and `label` is display metadata that never
+            # shaped the inline-block payload this replaces.
+            profile_beams[name] = MappingProxyType(
+                {k: v for k, v in named_beam.items() if k != "label"}
+            )
+        elif isinstance(beam_value, Mapping):
+            profile_beams[name] = MappingProxyType(dict(cast("Mapping[str, object]", beam_value)))
+    if errors.items:
+        raise MaterialConfigError(errors.items)
     profile_detectors = {
         name: cast("DetectorSpec", row["detector"])
         for name, row in profiles.items()
@@ -1473,6 +1541,8 @@ def _load_material_catalog_cached(
         profile_emissions=MappingProxyType(profile_emissions),
         profile_energy_grid_refs=MappingProxyType(profile_energy_grid_refs),
         resolved_energy_grid_refs=MappingProxyType(resolved_energy_grid_refs),
+        beams=MappingProxyType(beams),
+        beam_keys=tuple(beams),
     )
 
 
