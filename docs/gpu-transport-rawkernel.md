@@ -188,10 +188,64 @@ byte budget, so a bigger static default is not the fix (cap=4096 starves the GPU
 and hopg's optimum is 1024 against MoSe2's 2048); sizing capacity from a small
 probe batch is.
 
-Divergence itself remains the open question — threads in a warp run until the
-*last* electron in that warp terminates. Warp-divergence and occupancy from
-`nsys` / `ncu` are still to be collected, and they decide whether a
-persistent-thread work queue is worth adding.
+## Where the time actually goes
+
+Ne=16000, capacity 2048 so nothing replays, six launches per run. Kernel and
+device-compaction totals are from `nsys`; wall times are from unprofiled runs
+because `nsys` inflates host-side time several-fold. The kernel's own median
+launch duration is the same under both capacities (37.8 vs 37.9 ms for MoSe2),
+which is the cross-check that the device-side numbers are trustworthy.
+
+| | hopg | MoSe2 |
+| --- | --- | --- |
+| wall | 0.188 s | 0.927 s |
+| transport kernel | 0.050 s (27%) | 0.224 s (24%) |
+| device-side compaction | 0.005 s (3%) | 0.072 s (8%) |
+| device-to-host payload | 0.061 s (32%) | 0.146 s (16%) |
+| unattributed host-side remainder | 0.072 s (38%) | 0.485 s (52%) |
+
+The payload is 82 bytes per recorded segment — 0.46 GB for hopg, 1.15 GB for
+MoSe2 — moved over pageable memory at a measured 7.6–7.9 GB/s. The remainder is
+scratch allocation, mask construction, and NumPy assembly of the output arrays;
+it has not been attributed further, which is what NVTX ranges in `transport.py`
+would fix.
+
+**The kernel is no longer the bottleneck; the driver around it is.**
+
+## Occupancy and divergence
+
+`ncu` could not be used — GPU performance counters are admin-only on the box
+(`ERR_NVGPUCTRPERM`) and there is no passwordless sudo. Both quantities were
+obtained without counters instead.
+
+Occupancy comes from the CUDA occupancy API against the compiled module. The
+kernel uses **92 registers per thread** and 40 B of local memory, so it is
+register-limited to 640 of the 1536 threads an SM can hold — **41.7% theoretical
+occupancy**, flat for `nthreads` ≤ 128 and falling to 33.3% above it. Wall time
+tracks that exactly (MoSe2, medians: 1.08 s at 64, 1.12 s at 128, 1.27 s at 256,
+1.64 s at 512), so the default of 128 is already at the optimum.
+
+Divergence is computed exactly rather than sampled. Thread `i` owns electron
+`e_start + i`, so a warp covers a contiguous block of 32 electrons and costs its
+longest-lived member; the wasted fraction is `1 - sum(n) / (32 * max(n))` over
+each block, where `n` is the per-electron segment count the run already reports.
+
+| material | mean segments | p99 | max | warp-wasted | ceiling if removed |
+| --- | --- | --- | --- | --- | --- |
+| hopg | 353 | 406 | 448 | 11.9% | 1.14x |
+| MoSe2 | 879 | 1220 | 1274 | 27.4% | 1.38x |
+
+**This closes the persistent-thread work queue as an option.** Perfect load
+balancing would recover 27.4% of a kernel that is 24% of MoSe2's wall time —
+about 7% end to end, and half that for hopg — in exchange for a work-queue
+scheme that would break the index-addressed output slots the reproducibility
+guarantees rest on. Electron lifetimes are simply not spread widely enough:
+transport at fixed energy into a stopping slab has a fairly tight range
+distribution, so 32 neighbouring electrons finish at similar times.
+
+The ranking that follows is: keep segments on the device (attacks the D2H and
+most of the host remainder at once), then pinned host memory if they must come
+back, then nothing else on this list.
 
 ## Not done
 

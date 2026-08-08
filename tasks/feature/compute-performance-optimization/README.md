@@ -789,8 +789,51 @@ Open — needs a GPU session, in this order:
       by electron index, so a small first batch is just a smaller batch — so in
       the common case the fix costs nothing and removes the replay entirely.
       Expected to take MoSe2 Ne=16000 from 4.85x to ~7x with no tuning knob.
-- [ ] Warp divergence and occupancy from `nsys`/`ncu`; decides whether a
-      persistent-thread work queue is worth adding.
+- [x] Warp divergence and occupancy. **Done 2026-08-08.** `ncu` is unusable on
+      qlmc — GPU performance counters are admin-only (`ERR_NVGPUCTRPERM`) and
+      sudo needs a password; enabling them is a driver-param change on a shared
+      box and was not attempted. Both quantities were obtained without counters.
+
+      Occupancy, from the CUDA occupancy API: 92 registers/thread, 40 B local,
+      register-limited to 640 of 1536 threads/SM = **41.7%**, flat for
+      `nthreads` <= 128 and 33.3% above. Wall time tracks it (MoSe2 medians:
+      1.08 s at 64, 1.12 s at 128, 1.27 s at 256, 1.64 s at 512), so the
+      default 128 is already optimal — no change.
+
+      Divergence, computed exactly from the per-electron segment counts (a warp
+      owns 32 contiguous electrons and costs its longest-lived member):
+
+      | material | mean | p99 | max | warp-wasted | ceiling |
+      | --- | --- | --- | --- | --- | --- |
+      | hopg | 353 | 406 | 448 | 11.9% | 1.14x |
+      | mose2 | 879 | 1220 | 1274 | 27.4% | 1.38x |
+
+      **Verdict: the persistent-thread work queue is not worth adding.** Perfect
+      balancing recovers 27.4% of a kernel that is 24% of MoSe2's wall — ~7% end
+      to end, less for hopg — and would break the index-addressed output slots
+      the reproducibility guarantees rest on. Lifetimes at fixed energy in a
+      stopping slab are too tightly distributed for it to pay.
+
+- [ ] **Keep segments device-resident** — now the highest-value follow-up, and
+      the measurement that says so. Time budget at Ne=16000, cap=2048, six
+      launches (kernel/compaction from `nsys`, wall from unprofiled runs since
+      `nsys` inflates host time; kernel median is identical at both capacities,
+      37.8 vs 37.9 ms, which cross-checks the device numbers):
+
+      | | hopg | mose2 |
+      | --- | --- | --- |
+      | wall | 0.188 s | 0.927 s |
+      | transport kernel | 0.050 s (27%) | 0.224 s (24%) |
+      | device compaction | 0.005 s (3%) | 0.072 s (8%) |
+      | D2H payload | 0.061 s (32%) | 0.146 s (16%) |
+      | host-side remainder | 0.072 s (38%) | 0.485 s (52%) |
+
+      The kernel is no longer the bottleneck; the driver around it is. Payload
+      is 82 B/segment (0.46 GB hopg, 1.15 GB MoSe2) over pageable memory at a
+      measured 7.6-7.9 GB/s. The remainder is scratch allocation, mask
+      construction, and NumPy output assembly — unattributed, which is what
+      NVTX ranges in `transport.py` would fix. Pinned host memory is the cheap
+      partial; handing device arrays to the line/brem kernels is the real fix.
 
 Deliberately deferred: keeping segments on the device for the line/brem kernels
 (the change that would attack the transfer half of the MoSe2 idle window —
