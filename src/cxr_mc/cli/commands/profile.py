@@ -27,7 +27,7 @@ from cxr_mc.cli._core import (
     flatten_option_values,
     output_option,
 )
-from cxr_mc.cli._deprecations import DeprecatingGroup, canonical_option
+from cxr_mc.cli._deprecations import DeprecatingGroup, canonical_option, warn_flag
 from cxr_mc.cli.commands._beam_shared import (
     apply_beam_updates as _apply_beam_updates,
 )
@@ -223,7 +223,8 @@ def _profile_payload(document, name):
     materials = profile.get("materials")
     range_keys = [*_catalog_io.RANGES.items(), *_EXTRA_RANGES.items()]
     beam = profile.get("beam")
-    beam_payload = beam.unwrap() if hasattr(beam, "unwrap") else None
+    beam_ref = str(beam) if isinstance(beam, str) else None
+    beam_payload = beam.unwrap() if beam_ref is None and hasattr(beam, "unwrap") else None
     raw_detector = profile.get("detector")
     if not isinstance(raw_detector, dict):
         standard = profiles.get("standard", {})
@@ -238,6 +239,7 @@ def _profile_payload(document, name):
         ],
         "materials": list(materials) if isinstance(materials, list) else None,
         "beam": beam_payload,
+        "beam_ref": beam_ref,
         "detector": {key: getattr(detector, key) for key, _label, _unit in _ACTIVE_DETECTOR_FIELDS},
         "emission": profile.get("emission"),
         "overrides": {
@@ -265,7 +267,9 @@ def _emit_show(payload):
         emit_result("  materials: all in-use materials (implicit)")
     else:
         emit_result(f"  materials: {', '.join(payload['materials']) or '(none)'}")
-    if payload["beam"] is not None:
+    if payload["beam_ref"] is not None:
+        emit_result(f"  beam: {payload['beam_ref']} (named reference)")
+    elif payload["beam"] is not None:
         beam = payload["beam"]
         for key in (
             "transverse_fwhm_mm",
@@ -323,6 +327,60 @@ def _detector_table(profile):
     elif not isinstance(detector, dict):
         raise ValueError("profile detector must be a table")
     return detector
+
+
+def _unknown_beam(document, name):
+    """Raise with suggestions -- mirrors ``cxr beam``'s own unknown-name error
+    (``cli/commands/beam.py:_unknown_beam``) so both surfaces read the same."""
+    known = _catalog_io.beam_rows(document)
+    suggestions = difflib.get_close_matches(name, known, n=3, cutoff=0.5)
+    message = f"unknown beam: {name}"
+    if suggestions:
+        message += f". Did you mean: {', '.join(suggestions)}?"
+    message += f". Create it first with: cxr beam create {name}"
+    raise ValueError(message)
+
+
+#: The nine inline beam-distribution flags (`_beam_cli_options`), keyed by
+#: their `_collect_beam_updates` parameter name -> CLI spelling. Registered in
+#: `cli/_deprecations.DEPRECATED_FLAGS` under `SELF_WARNING_FLAGS`: the whole
+#: family moved to ``cxr beam``, so there is no same-command canonical flag to
+#: merge into via `RetiredOption` -- this module warns manually instead
+#: (decision 6, `tasks/feature/named-beam-objects`).
+_BEAM_FLAG_PARAMS = {
+    "transverse_fwhm_mm": "--transverse-fwhm-mm",
+    "rep_rate_hz": "--rep-rate-hz",
+    "bunch_charge_pc": "--bunch-charge-pc",
+    "longitudinal_kind": "--longitudinal",
+    "envelope_rms_fs": "--envelope-rms-fs",
+    "normalized_emittance_mm_mrad": "--emittance",
+    "beta_twiss_m": "--twiss-beta",
+    "alpha_twiss": "--twiss-alpha",
+    "energy_spread_frac": "--energy-spread",
+}
+
+
+def _warn_inline_beam_flags(ctx, **beam_flag_values):
+    for param_name, flag in _BEAM_FLAG_PARAMS.items():
+        if beam_flag_values.get(param_name) is not None:
+            warn_flag(ctx, flag, f"cxr beam create/set {flag}")
+
+
+def _apply_beam_updates_or_error(name, target, beam_updates):
+    """Apply inline beam-flag updates, or raise a clear error if ``target``
+    already carries a named ``beam = "NAME"`` reference -- writing inline
+    fields onto a string would silently detach it (decision 4: no silent
+    winner)."""
+    if not beam_updates:
+        return
+    existing = target.get("beam")
+    if isinstance(existing, str):
+        raise ValueError(
+            f"profile {name} has beam = {existing!r} (a named reference); "
+            f"edit it with 'cxr beam set {existing} ...', or replace the "
+            "reference with --beam NAME"
+        )
+    _apply_beam_updates(target, beam_updates)
 
 
 class _ProfileGroup(DeprecatingGroup):
@@ -465,6 +523,12 @@ def show_command(name, json_output):
 @_range_cli_options
 @_ne_cli_options
 @_beam_cli_options
+@click.option(
+    "--beam",
+    "beam_name",
+    metavar="NAME",
+    help="Attach a named [beams.NAME] reference; replaces the inline beam flags.",
+)
 @_detector_cli_options
 @canonical_option(
     "--material",
@@ -475,7 +539,9 @@ def show_command(name, json_output):
     help="Set explicit initial membership (comma-separated material keys).",
 )
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
+@click.pass_context
 def create_command(
+    ctx,
     name,
     source,
     thickness,
@@ -497,6 +563,7 @@ def create_command(
     polar_acceptance_deg,
     solid_angle_sr,
     materials,
+    beam_name,
     dry_run,
 ):
     """Create a new profile, cloning defaults from --from (standard).
@@ -504,7 +571,9 @@ def create_command(
     Range options replace individual cloned grids; beam and detector options
     replace individual cloned fields. Overrides and material membership are not
     cloned. Without --material, the new profile starts with implicit all-in-use
-    membership and no per-material overrides.
+    membership and no per-material overrides. --beam NAME attaches a named
+    [beams.NAME] reference and is mutually exclusive with the inline beam
+    flags, which are deprecated in its favor.
     """
     _check_name(name)
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
@@ -519,6 +588,21 @@ def create_command(
         alpha_twiss,
         energy_spread_frac,
     )
+    if beam_name is not None and beam_updates:
+        raise click.UsageError("--beam replaces the inline beam flags; pass only one")
+    if beam_updates:
+        _warn_inline_beam_flags(
+            ctx,
+            transverse_fwhm_mm=transverse_fwhm_mm,
+            rep_rate_hz=rep_rate_hz,
+            bunch_charge_pc=bunch_charge_pc,
+            longitudinal_kind=longitudinal_kind,
+            envelope_rms_fs=envelope_rms_fs,
+            normalized_emittance_mm_mrad=normalized_emittance_mm_mrad,
+            beta_twiss_m=beta_twiss_m,
+            alpha_twiss=alpha_twiss,
+            energy_spread_frac=energy_spread_frac,
+        )
     detector_updates = _collect_detector_updates(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr
     )
@@ -530,6 +614,8 @@ def create_command(
             raise ValueError(
                 f"profile {name!r} already exists; edit it with: cxr profile set {name}"
             )
+        if beam_name is not None and beam_name not in _catalog_io.beam_rows(document):
+            _unknown_beam(document, beam_name)
         if source_name not in profiles:
             raise ValueError(f"unknown source profile: {source_name}")
         source_row = profiles[source_name]
@@ -540,7 +626,10 @@ def create_command(
             target[key] = _clone_grid(value)
         for label, values in updates.items():
             target[_catalog_key(label)] = _catalog_io.values_item(values)
-        _apply_beam_updates(target, beam_updates)
+        if beam_name is not None:
+            target["beam"] = beam_name
+        else:
+            _apply_beam_updates_or_error(name, target, beam_updates)
         if detector_updates:
             detector = _detector_table(target)
             for key, value in detector_updates.items():
@@ -558,6 +647,12 @@ def create_command(
 @_range_cli_options
 @_ne_cli_options
 @_beam_cli_options
+@click.option(
+    "--beam",
+    "beam_name",
+    metavar="NAME",
+    help="Attach a named [beams.NAME] reference; replaces the inline beam flags.",
+)
 @_detector_cli_options
 @canonical_option(
     "--material",
@@ -579,7 +674,9 @@ def create_command(
 )
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
+@click.pass_context
 def set_command(
+    ctx,
     name,
     thickness,
     energy,
@@ -600,6 +697,7 @@ def set_command(
     polar_acceptance_deg,
     solid_angle_sr,
     materials,
+    beam_name,
     all_materials,
     emission,
     yes,
@@ -612,7 +710,9 @@ def set_command(
     unless --yes is given; --dry-run never prompts. Detector scalars and
     emission replace supplied fields; unlike range grids, they are not
     accepted by add/remove -- except emission, which add/remove also accept
-    via --coherent/--incoherent for incremental switching.
+    via --coherent/--incoherent for incremental switching. --beam NAME attaches
+    a named [beams.NAME] reference and is mutually exclusive with the inline
+    beam flags, which are deprecated in its favor.
     """
     updates = _collect_updates(thickness, energy, polar, azimuth, ne_line, ne_brem)
     beam_updates = _collect_beam_updates(
@@ -626,6 +726,21 @@ def set_command(
         alpha_twiss,
         energy_spread_frac,
     )
+    if beam_name is not None and beam_updates:
+        raise click.UsageError("--beam replaces the inline beam flags; pass only one")
+    if beam_updates:
+        _warn_inline_beam_flags(
+            ctx,
+            transverse_fwhm_mm=transverse_fwhm_mm,
+            rep_rate_hz=rep_rate_hz,
+            bunch_charge_pc=bunch_charge_pc,
+            longitudinal_kind=longitudinal_kind,
+            envelope_rms_fs=envelope_rms_fs,
+            normalized_emittance_mm_mrad=normalized_emittance_mm_mrad,
+            beta_twiss_m=beta_twiss_m,
+            alpha_twiss=alpha_twiss,
+            energy_spread_frac=energy_spread_frac,
+        )
     detector_updates = _collect_detector_updates(
         observation_angle_deg, polar_acceptance_deg, solid_angle_sr
     )
@@ -634,6 +749,7 @@ def set_command(
     if (
         not updates
         and not beam_updates
+        and beam_name is None
         and not detector_updates
         and materials is None
         and not all_materials
@@ -643,6 +759,8 @@ def set_command(
     try:
         original, document = _catalog_io.catalog_text()
         target = _existing_profile(document, name)
+        if beam_name is not None and beam_name not in _catalog_io.beam_rows(document):
+            _unknown_beam(document, beam_name)
         material_keys = None
         if materials is not None:
             material_keys = _validate_materials(document, _csv_materials(materials))
@@ -663,20 +781,27 @@ def set_command(
     if (
         overwriting
         or beam_updates
+        or beam_name is not None
         or detector_updates
         or materials is not None
         or all_materials
         or emission is not None
     ):
         action_fields = list(dict.fromkeys([*overwriting, *detector_labels]))
-        if beam_updates:
+        if beam_updates or beam_name is not None:
             action_fields.append("beam")
         if emission is not None:
             action_fields.append("emission")
         _confirm_standard(name, f"set {', '.join(action_fields) or 'materials'} on", yes, dry_run)
     for label, values in updates.items():
         target[_catalog_key(label)] = _catalog_io.values_item(values)
-    _apply_beam_updates(target, beam_updates)
+    if beam_name is not None:
+        target["beam"] = beam_name
+    else:
+        try:
+            _apply_beam_updates_or_error(name, target, beam_updates)
+        except ValueError as exc:
+            raise CLIError(str(exc)) from None
     if detector_updates:
         detector = _detector_table(target)
         for key, value in detector_updates.items():
@@ -882,10 +1007,26 @@ def add_command(
 )
 @click.option("--coherent", is_flag=True, help="Remove coherent emission from the mode set.")
 @click.option("--incoherent", is_flag=True, help="Remove incoherent emission from the mode set.")
+@click.option(
+    "--beam",
+    "detach_beam",
+    is_flag=True,
+    help="Detach the profile's beam (named reference or inline block).",
+)
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip the 'standard' confirmation prompt.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def remove_command(
-    name, thickness, energy, polar, azimuth, materials, coherent, incoherent, yes, dry_run
+    name,
+    thickness,
+    energy,
+    polar,
+    azimuth,
+    materials,
+    coherent,
+    incoherent,
+    detach_beam,
+    yes,
+    dry_run,
 ):
     """Remove values from an existing profile's grids, or emission modes.
 
@@ -899,8 +1040,8 @@ def remove_command(
     leaves 'coherent'.
     """
     updates = _collect_updates(thickness, energy, polar, azimuth)
-    if not updates and materials is None and not coherent and not incoherent:
-        raise click.UsageError("provide a range, membership, or emission option")
+    if not updates and materials is None and not coherent and not incoherent and not detach_beam:
+        raise click.UsageError("provide a range, membership, beam, or emission option")
     try:
         if updates:
             original, document = _merge_values(name, updates, add=False)
@@ -915,6 +1056,14 @@ def remove_command(
         if coherent or incoherent:
             target = _existing_profile(document, name)
             emission_result = _apply_emission_remove(name, target, coherent, incoherent)
+        removed_beam = None
+        if detach_beam:
+            target = _existing_profile(document, name)
+            existing_beam = target.get("beam")
+            if existing_beam is None:
+                raise ValueError(f"profile {name} has no beam to remove")
+            removed_beam = str(existing_beam) if isinstance(existing_beam, str) else "(inline)"
+            del target["beam"]
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     action_bits = []
@@ -924,6 +1073,8 @@ def remove_command(
         action_bits.append("materials")
     if coherent or incoherent:
         action_bits.append("emission")
+    if detach_beam:
+        action_bits.append("beam")
     action = f"remove {'/'.join(action_bits) or 'materials'} from"
     _confirm_standard(name, action, yes, dry_run)
     message = f"updated profile {name}"
@@ -935,6 +1086,8 @@ def remove_command(
         label, removed_modes = emission_result
         message += f"; emission: removed {', '.join(removed_modes)}"
         message += f" (now '{label}')" if label is not None else " (no explicit emission left)"
+    if removed_beam is not None:
+        message += f"; beam: detached {removed_beam}"
     return _write(document, original, dry_run, message)
 
 

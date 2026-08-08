@@ -105,11 +105,29 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 | `cxr material blaze` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr material show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr profile add` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
+| `cxr profile create` | `--bunch-charge-pc` | `cxr beam create/set --bunch-charge-pc` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile create` | `--emittance` | `cxr beam create/set --emittance` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile create` | `--energy-spread` | `cxr beam create/set --energy-spread` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile create` | `--envelope-rms-fs` | `cxr beam create/set --envelope-rms-fs` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile create` | `--longitudinal` | `cxr beam create/set --longitudinal` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
 | `cxr profile create` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
+| `cxr profile create` | `--rep-rate-hz` | `cxr beam create/set --rep-rate-hz` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile create` | `--transverse-fwhm-mm` | `cxr beam create/set --transverse-fwhm-mm` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile create` | `--twiss-alpha` | `cxr beam create/set --twiss-alpha` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile create` | `--twiss-beta` | `cxr beam create/set --twiss-beta` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
 | `cxr profile delete` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr profile list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr profile remove` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
+| `cxr profile set` | `--bunch-charge-pc` | `cxr beam create/set --bunch-charge-pc` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile set` | `--emittance` | `cxr beam create/set --emittance` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile set` | `--energy-spread` | `cxr beam create/set --energy-spread` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile set` | `--envelope-rms-fs` | `cxr beam create/set --envelope-rms-fs` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile set` | `--longitudinal` | `cxr beam create/set --longitudinal` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
 | `cxr profile set` | `--materials` | `--material` | 0.1.0 | 0.3.0 |  |
+| `cxr profile set` | `--rep-rate-hz` | `cxr beam create/set --rep-rate-hz` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile set` | `--transverse-fwhm-mm` | `cxr beam create/set --transverse-fwhm-mm` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile set` | `--twiss-alpha` | `cxr beam create/set --twiss-alpha` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
+| `cxr profile set` | `--twiss-beta` | `cxr beam create/set --twiss-beta` | 0.1.0 | 0.3.0 | Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`. |
 | `cxr profile show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr rebrem` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr reline` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |

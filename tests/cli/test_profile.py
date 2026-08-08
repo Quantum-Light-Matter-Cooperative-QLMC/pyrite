@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 from cxr_mc.cli import _catalog_io, _core, profile
+from cxr_mc.cli._deprecations import flag_message
 from cxr_mc.energy_grid import artifacts
 from tests.helpers.cli import assert_clean_result, invoke
 
@@ -36,6 +37,27 @@ _REFERENCED_CATALOG = (
 line_by_energy = [
   { energy_keV = 30.0, grid = { linspace = { start = 10.0, stop = 100.0, num = 10 } }, source = "derived" },
 ]
+"""
+)
+
+_BEAM_CATALOG = (
+    _CATALOG
+    + """
+[profiles.attached]
+materials = ["hopg"]
+thickness_ang = { values = [500.0] }
+energy_keV = { values = [40.0] }
+tilt_deg = { values = [10.0] }
+tilt_azim_deg = { values = [45.0] }
+beam = "rf_gun_200fs"
+
+[beams.rf_gun_200fs]
+label = "RF gun, 200 fs"
+rep_rate_hz = 1000.0
+bunch_charge_pc = 2.5
+
+[beams.other_beam]
+rep_rate_hz = 500.0
 """
 )
 
@@ -167,7 +189,20 @@ def test_show_create_and_set_round_trip_longitudinal_beam(tmp_path, monkeypatch)
             "200",
         ],
     )
-    assert_clean_result(created, stdout="created profile microtrain\n")
+    assert_clean_result(
+        created,
+        stdout="created profile microtrain\n",
+        stderr="".join(
+            flag_message("profile create", flag, replacement) + "\n"
+            for flag, replacement in (
+                ("--transverse-fwhm-mm", "cxr beam create/set --transverse-fwhm-mm"),
+                ("--rep-rate-hz", "cxr beam create/set --rep-rate-hz"),
+                ("--bunch-charge-pc", "cxr beam create/set --bunch-charge-pc"),
+                ("--longitudinal", "cxr beam create/set --longitudinal"),
+                ("--envelope-rms-fs", "cxr beam create/set --envelope-rms-fs"),
+            )
+        ),
+    )
 
     shown = invoke(profile.command, ["show", "microtrain", "-o", "json"])
     assert_clean_result(shown)
@@ -183,7 +218,17 @@ def test_show_create_and_set_round_trip_longitudinal_beam(tmp_path, monkeypatch)
         profile.command,
         ["set", "microtrain", "--longitudinal", "compressed", "--bunch-charge-pc", "1"],
     )
-    assert_clean_result(changed, stdout="updated profile microtrain\n")
+    assert_clean_result(
+        changed,
+        stdout="updated profile microtrain\n",
+        stderr="".join(
+            flag_message("profile set", flag, replacement) + "\n"
+            for flag, replacement in (
+                ("--bunch-charge-pc", "cxr beam create/set --bunch-charge-pc"),
+                ("--longitudinal", "cxr beam create/set --longitudinal"),
+            )
+        ),
+    )
     text = catalog.read_text()
     section = text.split("[profiles.microtrain.beam.longitudinal]", 1)[1].split("\n[", 1)[0]
     assert 'kind = "compressed"' in section
@@ -556,7 +601,7 @@ def test_remove_material_and_no_op_requires_option(tmp_path, monkeypatch):
 
     bare = invoke(profile.command, ["remove", "sub_100keV"])
     assert bare.exit_code == 2
-    assert "provide a range, membership, or emission option" in bare.stderr
+    assert "provide a range, membership, beam, or emission option" in bare.stderr
 
 
 def test_show_emission_defaults_to_incoherent(tmp_path, monkeypatch):
@@ -794,14 +839,14 @@ def test_add_on_standard_prompts(tmp_path, monkeypatch):
 def test_empty_updates_are_usage_errors(tmp_path, monkeypatch):
     _catalog(tmp_path, monkeypatch)
 
-    for verb in ("set", "add", "remove"):
+    expected_by_verb = {
+        "set": "provide a range, beam, detector, membership, or emission option",
+        "add": "provide a range, membership, or emission option",
+        "remove": "provide a range, membership, beam, or emission option",
+    }
+    for verb, expected in expected_by_verb.items():
         result = invoke(profile.command, [verb, "sub_100keV"])
         assert result.exit_code == 2
-        expected = (
-            "provide a range, beam, detector, membership, or emission option"
-            if verb == "set"
-            else "provide a range, membership, or emission option"
-        )
         assert expected in result.stderr
 
 
@@ -1098,7 +1143,19 @@ def test_create_writes_transverse_twiss_block(tmp_path, monkeypatch):
         ],
     )
 
-    assert_clean_result(result, stdout="created profile twiss\n")
+    assert_clean_result(
+        result,
+        stdout="created profile twiss\n",
+        stderr="".join(
+            flag_message("profile create", flag, replacement) + "\n"
+            for flag, replacement in (
+                ("--emittance", "cxr beam create/set --emittance"),
+                ("--twiss-beta", "cxr beam create/set --twiss-beta"),
+                ("--twiss-alpha", "cxr beam create/set --twiss-alpha"),
+                ("--energy-spread", "cxr beam create/set --energy-spread"),
+            )
+        ),
+    )
     text = catalog.read_text().replace(" ", "")
     assert "[profiles.twiss.beam.transverse]" in text
     assert "normalized_emittance_x_mm_mrad=1.0" in text
@@ -1159,6 +1216,148 @@ def test_set_transverse_retires_the_legacy_spot(tmp_path, monkeypatch):
         ["set", "spot", "--emittance", "1.0", "--twiss-beta", "0.5"],
     )
 
-    assert_clean_result(result)
+    assert_clean_result(
+        result,
+        stderr="".join(
+            flag_message("profile set", flag, replacement) + "\n"
+            for flag, replacement in (
+                ("--emittance", "cxr beam create/set --emittance"),
+                ("--twiss-beta", "cxr beam create/set --twiss-beta"),
+            )
+        ),
+    )
     section = catalog.read_text().split("[profiles.spot.beam]", 1)[1]
     assert "transverse_fwhm_mm" not in section.split("\n[profiles.spot.beam.transverse]", 1)[0]
+
+
+def test_set_attaches_named_beam_by_reference(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
+
+    result = invoke(profile.command, ["set", "sub_100keV", "--beam", "rf_gun_200fs"])
+    assert_clean_result(result, stdout="updated profile sub_100keV\n")
+
+    section = catalog.read_text().split("[profiles.sub_100keV]", 1)[1].split("\n[", 1)[0]
+    assert 'beam = "rf_gun_200fs"' in section
+
+    shown = invoke(profile.command, ["show", "sub_100keV", "-o", "json"])
+    assert_clean_result(shown)
+    payload = json.loads(shown.stdout)["payload"]
+    assert payload["beam_ref"] == "rf_gun_200fs"
+    assert payload["beam"] is None
+
+    text_shown = invoke(profile.command, ["show", "sub_100keV"])
+    assert_clean_result(text_shown)
+    assert "beam: rf_gun_200fs (named reference)" in text_shown.stdout
+
+
+def test_create_attaches_named_beam_by_reference(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
+
+    result = invoke(
+        profile.command,
+        ["create", "newprof", "--material", "hopg", "--beam", "rf_gun_200fs"],
+    )
+    assert_clean_result(result, stdout="created profile newprof\n")
+
+    shown = invoke(profile.command, ["show", "newprof", "-o", "json"])
+    assert_clean_result(shown)
+    assert json.loads(shown.stdout)["payload"]["beam_ref"] == "rf_gun_200fs"
+
+
+def test_set_unknown_beam_errors(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
+
+    result = invoke(profile.command, ["set", "sub_100keV", "--beam", "bogus"])
+
+    assert result.exit_code == 1
+    assert "unknown beam: bogus" in result.stderr
+    assert "Create it first with: cxr beam create bogus" in result.stderr
+
+
+def test_create_unknown_beam_errors(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
+
+    result = invoke(
+        profile.command,
+        ["create", "newprof", "--material", "hopg", "--beam", "bogus"],
+    )
+
+    assert result.exit_code == 1
+    assert "unknown beam: bogus" in result.stderr
+
+
+def test_set_beam_and_inline_flag_are_mutually_exclusive(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
+
+    result = invoke(
+        profile.command,
+        ["set", "sub_100keV", "--beam", "rf_gun_200fs", "--rep-rate-hz", "100"],
+    )
+
+    assert result.exit_code == 2
+    assert "--beam replaces the inline beam flags; pass only one" in result.stderr
+
+
+def test_create_beam_and_inline_flag_are_mutually_exclusive(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
+
+    result = invoke(
+        profile.command,
+        [
+            "create",
+            "newprof",
+            "--material",
+            "hopg",
+            "--beam",
+            "rf_gun_200fs",
+            "--rep-rate-hz",
+            "100",
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "--beam replaces the inline beam flags; pass only one" in result.stderr
+
+
+def test_set_inline_flag_onto_named_reference_errors(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
+
+    result = invoke(profile.command, ["set", "attached", "--rep-rate-hz", "100"])
+
+    assert result.exit_code == 1
+    assert "profile attached has beam = 'rf_gun_200fs' (a named reference)" in result.stderr
+    assert "cxr beam set rf_gun_200fs" in result.stderr
+
+
+def test_remove_beam_detaches_named_reference(tmp_path, monkeypatch):
+    catalog = _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
+
+    result = invoke(profile.command, ["remove", "attached", "--beam"])
+
+    assert_clean_result(result, stdout="updated profile attached; beam: detached rf_gun_200fs\n")
+    section = catalog.read_text().split("[profiles.attached]", 1)[1].split("\n[", 1)[0]
+    assert "beam" not in section
+
+    shown = invoke(profile.command, ["show", "attached", "-o", "json"])
+    assert_clean_result(shown)
+    payload = json.loads(shown.stdout)["payload"]
+    assert payload["beam_ref"] is None
+    assert payload["beam"] is None
+
+
+def test_remove_beam_when_absent_errors(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
+
+    result = invoke(profile.command, ["remove", "sub_100keV", "--beam"])
+
+    assert result.exit_code == 1
+    assert "profile sub_100keV has no beam to remove" in result.stderr
+
+
+def test_remove_bare_no_op_error_mentions_beam(tmp_path, monkeypatch):
+    _catalog(tmp_path, monkeypatch, _BEAM_CATALOG)
+
+    result = invoke(profile.command, ["remove", "sub_100keV"])
+
+    assert result.exit_code == 2
+    assert "provide a range, membership, beam, or emission option" in result.stderr

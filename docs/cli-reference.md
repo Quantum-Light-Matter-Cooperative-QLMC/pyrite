@@ -1455,7 +1455,8 @@ Usage: cxr profile create [OPTIONS] NAME
   Range options replace individual cloned grids; beam and detector options replace
   individual cloned fields. Overrides and material membership are not cloned. Without
   --material, the new profile starts with implicit all-in-use membership and no per-
-  material overrides.
+  material overrides. --beam NAME attaches a named [beams.NAME] reference and is
+  mutually exclusive with the inline beam flags, which are deprecated in its favor.
 
 Options:
   --from SOURCE                   Clone range, beam, and detector defaults from SOURCE;
@@ -1493,6 +1494,8 @@ Options:
                                   Replace the complete declarative longitudinal policy.
   --envelope-rms-fs FS            RMS duration for gaussian or microtrain longitudinal
                                   policy.  [x>0.0]
+  --beam NAME                     Attach a named [beams.NAME] reference; replaces the
+                                  inline beam flags.
   --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
                                   replacement.  [0.0<=x<=180.0]
   --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar
@@ -1571,6 +1574,8 @@ Options:
                                   membership.
   --coherent                      Remove coherent emission from the mode set.
   --incoherent                    Remove incoherent emission from the mode set.
+  --beam                          Detach the profile's beam (named reference or inline
+                                  block).
   -y, --yes                       Skip the 'standard' confirmation prompt.
   --dry-run                       Print proposed TOML diff; write nothing.
   -h, --help                      Show this message and exit.
@@ -1603,7 +1608,9 @@ Usage: cxr profile set [OPTIONS] NAME
   with suggestions. Editing 'standard' prompts for confirmation unless --yes is given;
   --dry-run never prompts. Detector scalars and emission replace supplied fields; unlike
   range grids, they are not accepted by add/remove -- except emission, which add/remove
-  also accept via --coherent/--incoherent for incremental switching.
+  also accept via --coherent/--incoherent for incremental switching. --beam NAME
+  attaches a named [beams.NAME] reference and is mutually exclusive with the inline beam
+  flags, which are deprecated in its favor.
 
 Options:
   --thickness ANGSTROM,... | START:STOP:STEP
@@ -1639,6 +1646,8 @@ Options:
                                   Replace the complete declarative longitudinal policy.
   --envelope-rms-fs FS            RMS duration for gaussian or microtrain longitudinal
                                   policy.  [x>0.0]
+  --beam NAME                     Attach a named [beams.NAME] reference; replaces the
+                                  inline beam flags.
   --observation-angle DEG         Detector observation angle in degrees [0, 180]; scalar
                                   replacement.  [0.0<=x<=180.0]
   --polar-acceptance DEG          Full detector polar acceptance span in degrees; scalar

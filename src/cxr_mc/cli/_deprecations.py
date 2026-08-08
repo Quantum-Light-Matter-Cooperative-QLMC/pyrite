@@ -275,12 +275,39 @@ def _flag(
     return DeprecatedFlag(command, flag, replacement, since, _window(since), note)
 
 
+#: The nine ``cxr profile create``/``cxr profile set`` inline beam-distribution
+#: flags (decision 6, `tasks/feature/named-beam-objects`): the whole family
+#: moved to ``cxr beam create``/``cxr beam set``, so there is no differently
+#: named canonical flag on the *same* command to merge into the way D5's
+#: renamed spellings do. Each flag keeps its own name and stays fully
+#: functional through the support window; the command body warns manually
+#: (`profile.py`'s `_warn_inline_beam_flags`) rather than through a
+#: `RetiredOption`, so these keys are also listed in `SELF_WARNING_FLAGS`
+#: below.
+_BEAM_FLAG_NAMES: tuple[str, ...] = (
+    "--envelope-rms-fs",
+    "--longitudinal",
+    "--bunch-charge-pc",
+    "--rep-rate-hz",
+    "--transverse-fwhm-mm",
+    "--energy-spread",
+    "--twiss-alpha",
+    "--twiss-beta",
+    "--emittance",
+)
+_BEAM_FLAG_NOTE = "Attach a named beam instead: `cxr profile set NAME --beam BEAM_NAME`."
+
 #: Keyed by ``(command path, retired flag)``. `tests/cli/test_deprecations.py`
 #: holds this registry to the live command tree in both directions, exactly as
 #: it does for `DEPRECATIONS`.
 DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
     entry.key: entry
     for entry in (
+        *(
+            _flag(command, flag, f"cxr beam create/set {flag}", note=_BEAM_FLAG_NOTE)
+            for command in ("profile create", "profile set")
+            for flag in _BEAM_FLAG_NAMES
+        ),
         # D5: one canonical name per quantity. The singular spellings were
         # already canonical on `material set`, `sweep set`, and `profile *`;
         # these are the stragglers that kept the plural.
@@ -342,6 +369,14 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         _flag("beam show", "--json", "--output json"),
     )
 }
+
+
+#: Keys in `DEPRECATED_FLAGS` with no live `RetiredOption` -- the command body
+#: calls `warn_flag` itself instead. Mirrors `SELF_WARNING`, one level down
+#: (flags rather than whole command paths).
+SELF_WARNING_FLAGS: frozenset[tuple[str, str]] = frozenset(
+    (command, flag) for command in ("profile create", "profile set") for flag in _BEAM_FLAG_NAMES
+)
 
 
 def flag_message(command: str, flag: str, replacement: str) -> str:
