@@ -119,22 +119,26 @@ def test_material_comparison_separates_overlapping_labels():
 
 
 def test_cross_material_tab_requests_new_comparisons():
-    source = Path("notebooks/analysis_app.py").read_text()
+    # render_cross_material (and its cached-summary/comparison wiring) moved
+    # out of app.py into analysis_ui/views/materials.py; the beam-energy UI
+    # widgets it's fed by stayed behind in app.py.
+    app_source = Path("notebooks/analysis_app.py").read_text()
+    view_source = Path("notebooks/analysis_ui/views/materials.py").read_text()
     # One cached summary per material feeds all three small selections.
-    assert '_comparison("quality_peak")' in source
-    assert '_comparison("peak")' in source
-    assert '_comparison("line_brem_ratio")' in source
-    assert "select=select" in source
-    assert "material_comparison_summary(_results, settings)" in source
-    assert "for _material_key, _summary in _summaries.items():" in source
-    assert "lambda _results: material_comparison_point" not in source
-    assert "min_line_eV" not in source
-    assert source.count("beam_energy_keV=_beam_energy") == 2
-    assert 'label="Compare all beam energies"' in source
-    assert 'label="beam energy"' in source
-    assert "cross_material_energy_options" in source
-    assert source.count("min_line_quality=0.5") == 2
-    assert "exclude_labels" not in source
+    assert 'comparison("quality_peak")' in view_source
+    assert 'comparison("peak")' in view_source
+    assert 'comparison("line_brem_ratio")' in view_source
+    assert "select=select" in view_source
+    assert "material_comparison_summary(results, settings)" in view_source
+    assert "for material_key, summary in summaries.items():" in view_source
+    assert "lambda results: material_comparison_point" not in view_source
+    assert "min_line_eV" not in view_source
+    assert view_source.count("beam_energy_keV=beam_energy") == 2
+    assert 'label="Compare all beam energies"' in app_source
+    assert 'label="beam energy"' in app_source
+    assert "cross_material_energy_options" in app_source
+    assert view_source.count("min_line_quality=0.5") == 2
+    assert "exclude_labels" not in view_source
 
 
 def test_shared_summary_selects_all_modes_without_recomputing_metrics(monkeypatch):

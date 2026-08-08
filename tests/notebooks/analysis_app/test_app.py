@@ -19,6 +19,8 @@ def _attribute_path(node: ast.AST) -> tuple[str, ...]:
 
 
 def test_no_checkpoint_state_displays_without_analysis_tabs() -> None:
+    # Checkpoint loading moved behind analysis_ui.load_context -> AnalysisContext;
+    # the app cell now branches on context.has_data instead of MATERIAL is None.
     source = APP.read_text()
     tree = ast.parse(source)
     display_cell = next(
@@ -26,45 +28,44 @@ def test_no_checkpoint_state_displays_without_analysis_tabs() -> None:
         for cell in tree.body
         if isinstance(cell, ast.FunctionDef)
         and any(
-            isinstance(node, ast.Constant)
-            and node.value
-            == "**No checkpoint data available.** Run `cxr run standard -m <material>` to create one."
+            isinstance(node, ast.Constant) and node.value == "**No checkpoint data available.** "
             for node in ast.walk(cell)
         )
     )
 
-    assert any(arg.arg == "MATERIAL" for arg in display_cell.args.args)
+    assert any(arg.arg == "context" for arg in display_cell.args.args)
     assert any(
-        isinstance(node, ast.Compare)
-        and isinstance(node.left, ast.Name)
-        and node.left.id == "MATERIAL"
-        and any(isinstance(op, ast.Is) for op in node.ops)
-        and any(
-            isinstance(value, ast.Constant) and value.value is None for value in node.comparators
-        )
+        isinstance(node, ast.UnaryOp)
+        and isinstance(node.op, ast.Not)
+        and isinstance(node.operand, ast.Attribute)
+        and node.operand.attr == "has_data"
         for node in ast.walk(display_cell)
     )
 
 
 def test_in_progress_checkpoint_uses_analysis_safe_reads() -> None:
+    # Safe-read logic (load_analysis_checkpoint + manifest lookup) moved out of
+    # app.py into analysis_ui.data.load_context; the app now delegates via
+    # load_context instead of reading checkpoints itself.
     source = APP.read_text()
+    data_source = (APP.parent / "analysis_ui" / "data.py").read_text()
 
-    assert "from cxr_mc.analyze import load_analysis_checkpoint" in source
-    assert "_loaded = load_analysis_checkpoint(_stem)" in source
-    assert "if _loaded is None:" in source
-    assert "from cxr_mc.analyze import analysis_checkpoint_manifest" in source
-    assert "from cxr_mc.analyze import cached_analysis" in source
+    assert "load_context" in source
+    assert "load_analysis_checkpoint" in data_source
+    assert "loaded = load_analysis_checkpoint(stem)" in data_source
+    assert "load_error" in data_source
 
 
 def test_thickness_controls_and_context_use_shared_human_units() -> None:
+    # fmt_thickness calls were consolidated out of app.py entirely into the
+    # shared analysis_ui control/view helpers; guard both that app.py no
+    # longer duplicates the logic and that the shared modules still call it.
     source = APP.read_text()
+    controls_source = (APP.parent / "analysis_ui" / "controls.py").read_text()
+    common_view_source = (APP.parent / "analysis_ui" / "views" / "common.py").read_text()
 
-    assert "fmt_thickness" in source
-    assert source.count("fmt_thickness(t)") == 5
-    # Context-rail summaries (each with their own fmt_thickness call) were
-    # dropped in the rail-free declutter, so the floor is lower than it used
-    # to be; this still guards against silently losing shared-unit calls.
-    assert source.count("fmt_thickness(") >= 10
+    assert "fmt_thickness" not in source
+    assert controls_source.count("fmt_thickness(") + common_view_source.count("fmt_thickness(") >= 4
 
 
 def test_all_ui_values_are_read_downstream_of_creation() -> None:
@@ -132,22 +133,35 @@ def test_material_and_face_select_labels_render_bold() -> None:
 
 
 def test_material_menu_cell_owns_checkpoint_directory_dependency() -> None:
-    tree = ast.parse(APP.read_text())
+    # DEFAULT_CHECKPOINT_DIR is now a single shared app.setup import (rather
+    # than each per-cell dependency re-importing/re-injecting it); menu cells
+    # reference the shared name directly instead of taking it as a cell arg.
+    source = APP.read_text()
+    tree = ast.parse(source)
 
-    menu_cell = next(
-        cell
-        for cell in tree.body
-        if isinstance(cell, ast.FunctionDef)
-        and any(arg.arg == "MaterialSelect" for arg in cell.args.args)
-    )
-
-    assert not any(arg.arg == "_DEFAULT_CHECKPOINT_DIR" for arg in menu_cell.args.args)
+    setup_block = next(node for node in tree.body if isinstance(node, ast.With))
     assert any(
         isinstance(node, ast.ImportFrom)
         and node.module == "cxr_mc.run"
-        and any(alias.name == "_DEFAULT_CHECKPOINT_DIR" for alias in node.names)
-        for node in menu_cell.body
+        and any(alias.name == "DEFAULT_CHECKPOINT_DIR" for alias in node.names)
+        for node in ast.walk(setup_block)
     )
+
+    menu_cells = [
+        cell
+        for cell in tree.body
+        if isinstance(cell, ast.FunctionDef)
+        and any(
+            isinstance(node, ast.Call) and _attribute_path(node.func)[-1] == "MaterialSelect"
+            for node in ast.walk(cell)
+        )
+    ]
+    assert menu_cells
+    for menu_cell in menu_cells:
+        assert not any(
+            arg.arg in ("DEFAULT_CHECKPOINT_DIR", "_DEFAULT_CHECKPOINT_DIR")
+            for arg in menu_cell.args.args
+        )
 
 
 def test_analysis_app_discovers_materials_directly_from_catalog() -> None:
@@ -213,19 +227,15 @@ def test_analysis_app_has_no_mojibake() -> None:
 
 
 def test_auto_domain_controls_replace_zero_sentinel_copy() -> None:
+    # The per-axis *_auto_ui widgets were consolidated into a single
+    # make_axis_controls("Auto {prefix} domain") switch factory shared across
+    # narrow/broad/polar/azimuth/detector axes.
     source = APP.read_text()
+    controls_source = (APP.parent / "analysis_ui" / "controls.py").read_text()
+    axes_source = (APP.parent / "analysis_ui" / "axes.py").read_text()
 
     assert "0 = auto" not in source
-    for name in (
-        "narrow_auto_ui",
-        "broad_auto_ui",
-        "polar_auto_ui",
-        "polar_broad_auto_ui",
-        "azim_auto_ui",
-        "azim_broad_auto_ui",
-        "detector_auto_ui",
-        "detector_broad_auto_ui",
-    ):
-        assert name in source
-    assert "if auto:" in source
-    assert "return None" in source
+    assert "0 = auto" not in controls_source
+    assert 'mo.ui.switch(value=auto, label=f"Auto {prefix} domain")' in controls_source
+    assert "if auto:" in axes_source
+    assert "return None" in axes_source

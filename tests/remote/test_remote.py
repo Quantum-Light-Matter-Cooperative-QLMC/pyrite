@@ -338,7 +338,7 @@ def test_queue_script_profiles_uncached_repetitions_with_fixed_runtime_knobs():
         ["mos2"],
         quick=False,
         workers=6,
-        performance_profile="compute_test_300keV",
+        performance_profile="sub_100keV",
         performance_repetitions=3,
         performance_interval=1.0,
         spec_chunk=20_000,
@@ -359,7 +359,7 @@ def test_queue_script_wraps_single_profile_session_with_nsys():
         ["mos2"],
         quick=False,
         workers=6,
-        performance_profile="compute_test_300keV",
+        performance_profile="sub_100keV",
         nsys=True,
     )
     metadata = scripts._queue_metadata(
@@ -367,7 +367,7 @@ def test_queue_script_wraps_single_profile_session_with_nsys():
         ["mos2"],
         False,
         6,
-        performance_profile="compute_test_300keV",
+        performance_profile="sub_100keV",
         nsys=True,
     )
 
@@ -397,8 +397,8 @@ def test_queue_script_cpu_flag_adds_cprofile_after_primary():
         ["mos2"],
         quick=False,
         workers=6,
-        catalog_profile="compute_test_300keV",
-        performance_profile="compute_test_300keV",
+        catalog_profile="sub_100keV",
+        performance_profile="sub_100keV",
         cpu=True,
     )
     # Serial NumPy pass under cProfile, after the primary performance run.
@@ -406,7 +406,7 @@ def test_queue_script_cpu_flag_adds_cprofile_after_primary():
     assert "env -u CXR_MC_NSYS CXR_MC_BACKEND=cpu" in script
     # Always the tiny --quick grid (representative call distribution in minutes,
     # not a >1h full-fidelity serial pass) with a hard --max-minutes backstop.
-    assert '_entry.scan "compute_test_300keV" -m "$m" --quick --workers 0' in script
+    assert '_entry.scan "sub_100keV" -m "$m" --quick --workers 0' in script
     assert "--max-minutes 10" in script
     # Fresh checkpoint dir (a cache hit would profile zero compute) and no
     # --performance-profile sampler that would clobber the GPU tick file.
@@ -428,8 +428,8 @@ def test_queue_script_nsys_alone_does_not_add_cpu_cprofile():
         ["mos2"],
         quick=False,
         workers=6,
-        catalog_profile="compute_test_300keV",
-        performance_profile="compute_test_300keV",
+        catalog_profile="sub_100keV",
+        performance_profile="sub_100keV",
         nsys=True,
     )
     assert "cProfile" not in script
@@ -442,8 +442,8 @@ def test_queue_script_cpu_only_has_no_primary_gpu_or_sampler_phase():
         ["mos2"],
         quick=False,
         workers=6,
-        catalog_profile="compute_test_300keV",
-        performance_profile="compute_test_300keV",
+        catalog_profile="sub_100keV",
+        performance_profile="sub_100keV",
         cpu_only=True,
     )
 
@@ -1244,7 +1244,7 @@ def test_run_rejects_perf_reps_without_perf(capsys):
     result = remote.main(
         [
             "run",
-            "compute_test_300keV",
+            "sub_100keV",
             "--perf-reps",
             "3",
             "--chunk-minutes",
@@ -1261,7 +1261,7 @@ def test_run_perf_reps_default_to_monolithic_mode(capsys):
     result = remote.main(
         [
             "run",
-            "compute_test_300keV",
+            "sub_100keV",
             "--perf",
             "--perf-reps",
             "3",
@@ -1277,7 +1277,7 @@ def test_run_rejects_explicit_nonzero_chunk_for_perf_reps(capsys):
     result = remote.main(
         [
             "run",
-            "compute_test_300keV",
+            "sub_100keV",
             "--perf",
             "--perf-reps",
             "3",
@@ -1292,11 +1292,11 @@ def test_run_rejects_explicit_nonzero_chunk_for_perf_reps(capsys):
 
 
 def test_run_nsys_implies_performance_profile(capsys):
-    result = remote.main(["run", "compute_test_300keV", "-m", "mos2", "--nsys", "--dry-run"])
+    result = remote.main(["run", "sub_100keV", "-m", "mos2", "--nsys", "--dry-run"])
 
     assert result is None
     output = capsys.readouterr().out
-    assert "performance_profile: compute_test_300keV" in output
+    assert "performance_profile: sub_100keV" in output
     assert "chunk_minutes: 0.0" in output
 
 
@@ -1304,7 +1304,7 @@ def test_run_rejects_nsys_in_chunked_mode(capsys):
     result = remote.main(
         [
             "run",
-            "compute_test_300keV",
+            "sub_100keV",
             "-m",
             "mos2",
             "--nsys",
@@ -1322,7 +1322,7 @@ def test_run_rejects_nsys_with_multiple_repetitions(capsys):
     result = remote.main(
         [
             "run",
-            "compute_test_300keV",
+            "sub_100keV",
             "-m",
             "mos2",
             "--perf-reps",
@@ -1359,7 +1359,7 @@ def test_run_performance_runtime_knobs_reach_monolithic_dry_run(capsys):
     result = remote.main(
         [
             "run",
-            "compute_test_300keV",
+            "sub_100keV",
             "--material",
             "mos2",
             "--perf",
@@ -1392,7 +1392,7 @@ def test_run_nsys_reaches_monolithic_dry_run(capsys):
     result = remote.main(
         [
             "run",
-            "compute_test_300keV",
+            "sub_100keV",
             "-m",
             "mos2",
             "-p",
@@ -1542,7 +1542,7 @@ def test_run_perf_reps_attach_but_skip_checkpoint_pull(monkeypatch, capsys):
     remote.main(
         [
             "run",
-            "compute_test_300keV",
+            "sub_100keV",
             "-m",
             "mos2",
             "--perf",

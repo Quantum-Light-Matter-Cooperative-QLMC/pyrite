@@ -82,19 +82,41 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
 
 
 def test_sincsq_lineshape_runs_on_cpu() -> None:
-    import numpy as np
+    # Import in-process picks up whatever backend this process already
+    # resolved (cuda, on a GPU-equipped host); force CPU explicitly via env
+    # so this exercises the NumPy path regardless of host hardware.
+    script = textwrap.dedent(
+        """
+        import numpy as np
 
-    from cxr_mc.montecarlo import spectrum
+        from cxr_mc.montecarlo import spectrum
 
-    result = spectrum._sincsq_lineshape(
-        np.array([1.0]),
-        np.array([0.0, 1.0, 2.0]),
-        np.array([1.0]),
+        assert spectrum.xp is np
+
+        result = spectrum._sincsq_lineshape(
+            np.array([1.0]),
+            np.array([0.0, 1.0, 2.0]),
+            np.array([1.0]),
+        )
+
+        assert isinstance(result, np.ndarray)
+        assert np.all(np.isfinite(result))
+        assert result[1] == 1.0
+        """
     )
 
-    assert isinstance(result, np.ndarray)
-    assert np.all(np.isfinite(result))
-    assert result[1] == 1.0
+    env = os.environ.copy()
+    env["CXR_MC_BACKEND"] = "cpu"
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, f"CPU sincsq path failed:\n{result.stderr}"
 
 
 # tests/montecarlo/test_init_imports.py

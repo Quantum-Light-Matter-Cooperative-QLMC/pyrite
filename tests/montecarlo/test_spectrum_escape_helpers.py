@@ -116,7 +116,8 @@ def test_finite_side_exit_layered_absorption_stays_in_emission_layer():
     layered_line = mc_spectrum(segments, np.arange(700.0, 1500.0), layers=layers, **line_kw)
     # GPU spectra accumulate in float32, so equivalent absorption paths can
     # differ by slightly more than NumPy's default 1e-7 relative tolerance.
-    np.testing.assert_allclose(layered_line, reference_line, rtol=2e-7)
+    # Observed drift on RTX 3060 Ti-class hardware reaches ~8e-6.
+    np.testing.assert_allclose(layered_line, reference_line, rtol=1e-5)
 
     brem_kw = dict(composition=carbon, n_hat=n_hat)
     reference_brem = mc_brem_spectrum(segments, np.arange(700.0, 5000.0, 50.0), **brem_kw)
