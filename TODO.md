@@ -152,7 +152,9 @@ not here.
    2. shorten up the lines that are spit out. currently, spits out list of ALL materials
       in the entire repo (even ones marked non-standard in mats_to_sim.toml) which need to be
       set up for this energy, along with a long boilerplate text string next to every material.
-
+4. Tab completion errors out when nvidia extras (cupy) aren't installed. This indicates we're
+   things upon tab completion that shouldn't be getting called (i.e., _backend.py). Maybe
+   explains *why* tab completion is so slow right now.
 
 ### Ergonomics (ship anytime)
 
