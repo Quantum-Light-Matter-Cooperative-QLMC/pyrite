@@ -12,7 +12,7 @@ delegation, physics changes, or scope discovery.
    `AGENTS.md`, supplied task section, named owners/tests, and required skills.
 2. Verify `TODO.md` equals `main:TODO.md`; never edit it. If owner/path is not
    explicit, invoke `repo-orientation` once; stop if still unclear.
-3. Use Tokensave for named symbols, impact, and affected tests. Preserve
+3. Use Serena or `rg` for named symbols, impact, and affected tests. Preserve
    unrelated changes.
 4. Make smallest complete change. Add focused regression test when behavior
    changes. Do not widen cleanup.

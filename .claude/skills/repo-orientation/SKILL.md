@@ -6,11 +6,11 @@ description: Use when locating code, choosing owners, assessing cxr-mc structure
 # Repo Orientation
 
 1. Read `docs/repo_map.md`.
-2. Use Tokensave for indexed search, callers/callees, dependencies, impact,
-   branch context, and affected tests.
-3. Query `.tokensave/tokensave.db` for unsupported structural queries.
-4. Use `rg` or direct reads for exact text, non-code, generated files, runtime
-   artifacts, and unindexed details.
+2. Use Serena for symbol-level search: definitions, references, callers/callees,
+   and dependencies.
+3. Use `rg` or direct reads for exact text, non-code, generated files, runtime
+   artifacts, branch context, and affected tests. `src/` is ~52k LOC; grep is
+   competitive for most questions.
 
 Prefer `src/cxr_mc/` implementations, `tests/` fast CPU checks, `checks/`
 physics anchors, and thin marimo apps. Legacy

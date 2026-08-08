@@ -18,7 +18,7 @@ Own milestone outcome, not unlimited repository scope.
 3. Resolve goal, non-goals, decisions, acceptance evidence, owning paths,
    dependency order, integration points, and risks. Record branch-specific
    detail in the task doc, durable landed decisions in `docs/`.
-4. Use Tokensave first. Invoke every matching domain skill. Require fresh
+4. Use Serena or `rg` for code navigation. Invoke every matching domain skill. Require fresh
    physics validation context for changed physics; route heavy compute through
    `remote-gpu-jobs`.
 

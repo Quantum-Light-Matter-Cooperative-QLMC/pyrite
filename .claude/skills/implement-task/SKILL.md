@@ -12,8 +12,8 @@ description: Use when implementing a coherent cxr-mc task checklist slice on its
    (`tasks/<branch-name>/README.md`), and required skills.
 2. Invoke `todo-sync` and verify TODO invariant. Do not edit TODO unless
    `todo-writer: yes`; preserve `>user<` text.
-3. Invoke `repo-orientation`; read `docs/repo_map.md`, then use Tokensave for
-   owners, helpers, callers/callees, impact, and affected tests. Use Context7
+3. Invoke `repo-orientation`; read `docs/repo_map.md`, then use Serena or `rg`
+   for owners, helpers, callers/callees, impact, and affected tests. Use Context7
    only for current external-library docs.
 4. Convert assigned slice into small acceptance checks. Respect task decisions
    and non-goals; stop for material design ambiguity.

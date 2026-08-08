@@ -136,6 +136,7 @@ design is sold on.
 - Read tool returned mangled / word-stripped source repeatedly. Fall back to
   `awk`/`cat` via Bash; confirm with `python3 -c "import ast; ast.parse(...)"`.
 - zsh: quote globs — `grep -rn pat src --include='*.py'`.
-- Prefix bash grep/rg with `TOKENSAVE_DISABLE_GREP_HOOK=1` for symbol patterns.
+- ~~Prefix bash grep/rg with `TOKENSAVE_DISABLE_GREP_HOOK=1`~~ — obsolete; the
+  grep hook and tokensave are both retired, plain `grep`/`rg` is fine.
 - `SendMessage` would not load via ToolSearch this session, so the running
   subagent could not be corrected mid-flight.

@@ -12,7 +12,7 @@ caller also assigns it to this agent.
 
 1. Read `main:TODO.md`, matching `tasks/<branch-name>/` (entry doc `README.md`),
    `git worktree list --porcelain`, branch status, and relevant instructions.
-2. Use `repo-orientation` and Tokensave to confirm owners, dependencies, and
+2. Use `repo-orientation` and Serena to confirm owners, dependencies, and
    affected tests. Exact paths and non-code text may use `rg` or direct reads.
 3. If item still contains `>user<`, invoke `triage`; stop for plan review.
 4. Stop on unrelated dirty state, missing/inaccessible worktree, ambiguous

@@ -21,7 +21,7 @@ and branch push; stop before dispatch.
    `git worktree list --porcelain`, and statuses. Do not retouch tasks already
    owned by a branch.
 2. For each task, preserve full intent and read every linked design doc. Use
-   `repo-orientation` and Tokensave when implementation ownership needs
+   `repo-orientation` and Serena when implementation ownership needs
    confirmation.
 3. For each task, derive `<branch-name>` (the full task branch name) and draft
    `tasks/<branch-name>/README.md` (slashes nest, e.g.

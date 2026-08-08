@@ -8,10 +8,11 @@ prose keep required format.
 ## Start here
 
 - Read `docs/repo_map.md` before source exploration.
-- Use Tokensave first for indexed code search, callers/callees, impact, and
-  affected tests. Query `.tokensave/tokensave.db` for unsupported structural
-  queries. Use `rg` or direct reads for exact text, non-code, generated files,
-  and unindexed details.
+- Use Serena for symbol-level navigation: definitions, references, callers, and
+  call sites across the CLI/domain boundary. Use `rg` or direct reads for exact
+  text, non-code, generated files, and anything faster to grep — `src/` is ~52k
+  LOC, so grep is competitive for most questions. Tokensave is retired here;
+  there is no `.tokensave/` index, so do not plan around one.
 - `README.md`: science/install/workflow. `docs/`: guides, design, validation.
   `TODO.md`: shared backlog.
 - Use Context7 only for current external-library docs. RTK filters verbose shell

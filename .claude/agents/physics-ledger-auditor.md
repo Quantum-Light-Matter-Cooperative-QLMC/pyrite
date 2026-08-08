@@ -37,8 +37,8 @@ alone marks `signed-off`). Read-only: report findings, edit nothing.
 
 ## How to find things
 
-- `Validation:` markers: `TOKENSAVE_DISABLE_GREP_HOOK=1 grep -rn "Validation:" src/cxr_mc/`
-- Symbols behind a `file::symbol` anchor: resolve with tokensave or a direct read.
+- `Validation:` markers: `grep -rn "Validation:" src/cxr_mc/`
+- Symbols behind a `file::symbol` anchor: resolve with Serena or a direct read.
 - Do not launch other agents; you are a single read-only pass.
 
 ## Output
