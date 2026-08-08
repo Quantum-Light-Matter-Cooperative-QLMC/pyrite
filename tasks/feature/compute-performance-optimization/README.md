@@ -662,6 +662,73 @@ compute or memory-pressure problem — but unconfirmed.
          performance guide so "GPU at 0% for the first ~10-20 s at high
          `--ne-line`" is not re-reported as a bug.
 
+## Next slice: GPU transport JIT module (started 2026-08-08)
+
+Opened on the trigger the perf doc's "GPU transport: not yet" section named:
+Part A item 5 measured transport at 2.4-3.4x the GPU phase for the TMDs and
+6-12x for hopg, compute-bound and linear in `n_seg`. Design and rationale live
+in `docs/gpu-transport-rawkernel.md`.
+
+Landed (CPU-verified only; no GPU was available in the authoring session):
+
+- [x] `transport.py`: counter-based per-electron RNG (SplitMix64 keyed by
+      `(seed, electron)`, indexed by draw counter). Pure integer arithmetic
+      plus one exact `uint64 -> double` conversion, so host and device agree
+      bit-for-bit. Explicit numba signatures are load-bearing — without them
+      numba unifies to int64, every `>>` becomes an arithmetic shift, and draws
+      silently lose their top bit (caught by moments, not by range checks).
+- [x] `transport.py`: `_transport_core_ungrooved_perelectron`, the executable
+      specification the CUDA kernel ports. Run-to-completion per electron,
+      slot addressing `i * cap + s`, no atomics.
+- [x] `transport.py`: `_run_per_electron_transport` — batching, capacity-growth
+      replay, mask compaction. Shared by both cores so the two cannot drift.
+- [x] `transport_jit_kernel.py`: the `cupyx.jit` port. fp64, textually
+      identical arithmetic, `while`-only control flow (no reliance on
+      transpiler `break`/`continue`), flattened arrays per house style.
+- [x] `simulate_trajectories(transport_core=...)`, default `"lockstep"`.
+      Default path is unchanged and still bit-for-bit — asserted by test.
+- [x] 27 CPU tests + 10 CUDA-gated tests in
+      `tests/montecarlo/test_transport_per_electron.py`. Core suite: 1106
+      passed, 51 skipped.
+
+Measured on CPU: per-electron core vs lockstep core agree on backscatter
+fraction, transmit fraction, segments/electron, mean segment length, mean
+segment energy, and mean depth across 8 seeds at Ne=3000 (all within 4 sigma;
+backscatter specifically 0.15367 +- 0.00156 vs 0.15429 +- 0.00140 over 12 seeds,
+Welch p=0.77). Results are invariant to batch size and to segment capacity
+including forced replays at cap=4.
+
+Not bit-for-bit, by construction and unavoidably:
+
+- Per-electron vs lockstep: differently-ordered streams, so different samples of
+  the same distribution.
+- CPU vs CUDA per trajectory: CUDA's `log`/`exp`/`pow`/`sin`/`cos` are a few ulp
+  from the host libm and transport is chaotic. Even the first segment passes
+  through `log`. Verifiable claims are identical RNG streams, identical control
+  flow/addressing, first-step agreement at `rtol=1e-12`, and aggregate agreement.
+
+Therefore: enabling either new core changes numerical output and needs a
+`Validation:` id, a physics ledger row, and a golden regen before the default
+moves. Not done, and the default was not moved.
+
+Open — needs a GPU session, in this order:
+
+- [ ] Compile each specialization on min and current pinned CuPy. Untested
+      transpiler assumptions: `**` (ast.Pow), `xp.abs`/`xp.log10` on device
+      scalars, int16 narrowing on store, zero-size `internal_bounds` as an arg.
+- [ ] Run the 10 CUDA-gated tests.
+- [ ] `Ne` sweep of transport wall time, GPU core vs CPU core, to find the
+      crossover and whether launch overhead dominates at low `Ne`. hopg's ~114
+      segments/electron and MoSe2's ~733 are different enough regimes that one
+      measurement will not cover both.
+- [ ] Warp divergence and occupancy from `nsys`/`ncu`; decides whether a
+      persistent-thread work queue is worth adding.
+
+Deliberately deferred: keeping segments on the device for the line/brem kernels
+(the change that would attack the transfer half of the MoSe2 idle window —
+follow-up 3 above), NVTX ranges in `transport.py` (follow-up 1), `numba.prange`
+over the per-electron core for the core-starved CPU case, and grooved transport.
+
 ## Decisions and open questions
 
 Decided:
