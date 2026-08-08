@@ -17,6 +17,12 @@ file. Edit and drop items on `main`.
 
 1. **Compute performance optimization.** Review cupyx.jit.rawkernel and Numba @njit
    optimizations are optimally executed, and review any critical physics changes. Generate new bit-for-bit or toleranced validation for the new paths where necessary. Ensure that non-nvidia fallbacks are present and functional (current tests should already be confirming this, but double check).
+   → `feature/compute-performance-optimization`;
+   [`tasks/feature/compute-performance-optimization/`](tasks/feature/compute-performance-optimization/).
+   Rounds 1-3 landed on `main` (see
+   [`docs/compute-performance-optimization.md`](docs/compute-performance-optimization.md));
+   Round 3's fused line prologue is implemented but gated off
+   (`_USE_JIT_LINE_PROLOGUE = False`) pending exactly this item's verification.
    1. Running on remote box:
       1. With --ne-line=20_000 on 'MoSe2' in particular (and maybe other heavy materials):
          1. Transport takes absolutely forever (GPU at 0% for 10's of seconds straight)
