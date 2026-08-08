@@ -52,7 +52,16 @@ file. Edit and drop items on `main`.
    case than the batched branch. Physics-gated (reassociation → `Validation:`
    id, ledger row, golden regen). → `feature/coherent-line-batching`;
    [`tasks/feature/coherent-line-batching/`](tasks/feature/coherent-line-batching/).
-5. **Repository and source-package structure cleanup.** Eight slices beyond the
+5. **Test coverage baseline and gap closure.** First full-suite `--cov` run
+   (2026-08-07): green, 74.2% line / 84.0% once the two compiled-code
+   measurement artifacts are removed (CuPy kernel modules never import on a
+   CPU-only env; `@njit` bodies bypass the tracer — `NUMBA_DISABLE_JIT=1` moves
+   `transport.py` 37→87%). Coverage config landed in `pyproject.toml`. Real
+   gaps: `plots/` figure builders (~734 stmts, worst 6.3%),
+   `montecarlo/_backend.py` fallback dispatch 69%, `energy_grid/apply.py` 78%.
+   → `chore/test-coverage-baseline`;
+   [`tasks/chore/test-coverage-baseline/`](tasks/chore/test-coverage-baseline/).
+6. **Repository and source-package structure cleanup.** Eight slices beyond the
    accepted structure RFC: installed-package path resolution (shipped code
    anchors on the developer checkout and the wheel omits the marimo apps),
    top-level module grouping, `cli/` alias-shim removal, CLI/domain

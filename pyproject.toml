@@ -108,6 +108,37 @@ markers = [
     "intel_sycl: requires a working Intel SYCL dpnp/dpctl backend",
 ]
 
+[tool.coverage.run]
+branch = true
+source = ["src/cxr_mc"]
+parallel = true
+# pytest-xdist workers each write their own data file; `coverage combine` (run
+# implicitly by pytest-cov) merges them.
+
+[tool.coverage.paths]
+# Map an installed/wheel copy back onto the checkout so combined runs from
+# different environments do not report the same module twice.
+source = ["src/cxr_mc", "*/site-packages/cxr_mc"]
+
+[tool.coverage.report]
+precision = 1
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+]
+# No `omit` for the compiled paths; read totals with the environment in mind
+# instead of hiding modules.
+#   - `montecarlo/*_jit_kernel.py` import `cupy` at module scope, so a CPU-only
+#     environment reports them 0% (never imported) and the project total drops
+#     ~7 points. With the `nvidia` extra installed their host-side code is
+#     measured; `cupyx.jit` device bodies stay untraceable regardless.
+#   - `@njit` bodies (`montecarlo/transport.py`, `geometry.py`, `groove.py`)
+#     run compiled and bypass the Python tracer. Run coverage with
+#     `NUMBA_DISABLE_JIT=1` to measure them (~2x wall clock; transport.py
+#     37% -> 87%).
+
 [tool.marimo.runtime]
 watcher_on_save = "autorun"
 
