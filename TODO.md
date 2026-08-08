@@ -52,6 +52,16 @@ file. Edit and drop items on `main`.
    case than the batched branch. Physics-gated (reassociation → `Validation:`
    id, ledger row, golden regen). → `feature/coherent-line-batching`;
    [`tasks/feature/coherent-line-batching/`](tasks/feature/coherent-line-batching/).
+5. **Repository and source-package structure cleanup.** Eight slices beyond the
+   accepted structure RFC: installed-package path resolution (shipped code
+   anchors on the developer checkout and the wheel omits the marimo apps),
+   top-level module grouping, `cli/` alias-shim removal, CLI/domain
+   misclassification, Monte Carlo mega-module splits, `plots/` backend
+   regrouping, working-tree hygiene, and repo-map DAG generation. Folds the
+   former Inbox source-package-organization and `runner.py`/`transport.py`
+   items. → `refactor/repo-structure-cleanup`;
+   [`tasks/refactor/repo-structure-cleanup/`](tasks/refactor/repo-structure-cleanup/);
+   design: [`docs/package-structure-rfc.md`](docs/package-structure-rfc.md).
 
 ### Gated
 
@@ -100,14 +110,9 @@ file. Edit and drop items on `main`.
          `uv sync --all-groups --extra nvidia`, whereas if computer has intel gpu, then
          `uv sync --all-groups --extra intel`, etc.
          )
-5. **Source-package organization.** Group related loose modules under
-   `src/cxr_mc/` into appropriately scoped subpackages after current structural
-   work settles.
-6. **Local SLURM integration.** Make `cxr run` use the configured laptop-local
+5. **Local SLURM integration.** Make `cxr run` use the configured laptop-local
    SLURM installation (and, if available, report GPU usage statistics), if it exists.
-7. **Evaluate refactoring `monteccarlo/runner.py` and `montecarlo/transport.py`**
-   into multiple smaller files.
-8. **Add support for custom-defined remotes, or other standards for submitting remote computing tasks**.
+6. **Add support for custom-defined remotes, or other standards for submitting remote computing tasks**.
    This will require research of what the industry standards/best practices are here, and we may find that the best practices are to leave it up to user custom scripting. If there are good standards for implementing comprehensive integrated support for SSH and/or other options for submitting, to SLURM or otherwise, write up a report on what we should do, why & how. This would obviously require more in depth capabilities for user configurations of their remote(s) of choice.
 
 ## CLI backlog

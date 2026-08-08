@@ -1,7 +1,7 @@
 # Beam phase space — activate the declared-inert fields
 
-Branch: `feature/beam-phase-space`
-Worktree: `worktrees/beam-phase-space`
+Branch: `feature/beam-phase-space` (landed and deleted)
+Worktree: removed after landing.
 TODO scope: direct `/triage` input (2026-08-05) plus absorbed Inbox item 1
 ("finite initial phase space ... into 2D and 3D trajectory plots").
 

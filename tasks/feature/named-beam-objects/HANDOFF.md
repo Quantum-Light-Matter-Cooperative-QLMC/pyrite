@@ -1,7 +1,9 @@
 # Handoff — feature/named-beam-objects
 
 2026-08-07, end of session. Branch/worktree unchanged from task doc header:
-`feature/named-beam-objects` / `worktrees/named-beam-objects`. Nothing pushed.
+`feature/named-beam-objects` / `../cxr-mc-worktrees/named-beam-objects`
+(relocated out of the repo directory 2026-08-07). Nothing pushed at the time of
+writing; the branch has since been pushed to `origin`.
 
 ## State
 

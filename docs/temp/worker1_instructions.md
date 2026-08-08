@@ -1,4 +1,4 @@
-Verify ledger claim `coherent-line-hkl-batch` in the worktree /home/alexa/dev/cxr-mc/worktrees/coherent-line-batching (branch feature/coherent-line-batching). Follow docs/validation/README.md.
+Verify ledger claim `coherent-line-hkl-batch` on branch `feature/coherent-line-batching`. That branch and its worktree no longer exist as of 2026-08-07 — create a worktree for it under `../cxr-mc-worktrees/` before starting. Follow docs/validation/README.md.
 
 Claim row: docs/physics-validation-ledger.md, "Core coherent physics" section, id `coherent-line-hkl-batch`, status `filtered`.
 Code: src/cxr_mc/montecarlo/spectrum.py::mc_spectrum, the batched (n_seg, N_g) branch, steps 5c/6c/7c (search for "Validation: coherent-line-hkl-batch" and "-- 5c." / "-- 7c.").

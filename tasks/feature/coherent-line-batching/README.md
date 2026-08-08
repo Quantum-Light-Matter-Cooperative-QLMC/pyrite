@@ -1,7 +1,7 @@
 # Batched line path for `coherent_emission=True`
 
-Branch: `feature/coherent-line-batching`
-Worktree: `worktrees/coherent-line-batching`
+Branch: `feature/coherent-line-batching` (not yet created)
+Worktree: none yet; task worktrees live under `../cxr-mc-worktrees/`.
 
 TODO scope: P1 Ready item "Batched coherent line accumulation."
 

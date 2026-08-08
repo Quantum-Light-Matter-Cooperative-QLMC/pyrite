@@ -4,7 +4,11 @@ Paused at user request on 2026-08-05. Work remains uncommitted and unpushed.
 
 ## Git state
 
-- Worktree: `/home/alexa/dev/cxr-mc/worktrees/cli-artifact-model`
+- Worktree: **gone as of 2026-08-07** — was
+  `<repo>/worktrees/cli-artifact-model`, which no longer exists; the
+  `feature/cli-artifact-model` branch is also absent locally and on `origin`.
+  Confirm what survived before resuming from this handoff. Task worktrees now
+  live under `../cxr-mc-worktrees/`.
 - Branch: `feature/cli-artifact-model`
 - Base: `feature/cli-vocab-controls` at `7b19402`
 - Slice 5 was not on `main`, so this branch intentionally starts from its

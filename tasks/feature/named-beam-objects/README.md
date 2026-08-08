@@ -1,7 +1,7 @@
 # Named beam objects — promote the beam to a first-class CLI noun
 
 Branch: `feature/named-beam-objects`
-Worktree: `worktrees/named-beam-objects`
+Worktree: `../cxr-mc-worktrees/named-beam-objects`
 TODO scope: Active item 2 `>user<` prose (2026-08-07), the follow-on to the
 closed-out [`feature/beam-phase-space`](../beam-phase-space/README.md) checklist.
 
