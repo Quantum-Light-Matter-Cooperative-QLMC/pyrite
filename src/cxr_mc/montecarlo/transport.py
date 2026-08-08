@@ -11,11 +11,12 @@ consumes the segment arrays returned here.
 import logging
 import os
 from collections.abc import Mapping
+from dataclasses import dataclass
 from functools import cache
 from typing import Any
 
 import numpy as np
-from numba import njit
+from numba import float64, int64, njit, uint64
 
 from .. import DATA_DIR
 from ..materials._transport_data import TRANSPORT_ELEMENTS
@@ -179,6 +180,73 @@ def beta_from_keV_scalar(E_i):
     g = 1.0 + E_i / 510.99895
     g_inv_square = 1.0 / (g * g)
     return (1.0 - g_inv_square) ** 0.5
+
+
+# ---- counter-based per-electron RNG -------------------------------------------
+# The lockstep core draws every random number from one shared `Generator`, so its
+# stream order is "step-major, electron-minor" and cannot be reproduced by
+# threads that run electrons to completion independently. The per-electron core
+# below and its CUDA port instead address randomness by (seed, electron, draw
+# index) through a SplitMix64 counter hash. Nothing is carried between draws, so
+# a stream is replayable: re-running a batch after a capacity overflow, changing
+# the batch size, or changing the CUDA launch geometry all give identical
+# numbers. That is what lets the GPU kernel be bit-for-bit against a CPU
+# reference rather than merely statistically similar.
+#
+# SplitMix64's finalizer is a bijection on 64 bits and passes BigCrush as a
+# counter-mode generator (Steele, Lea & Flood, OOPSLA 2014). Streams are keyed
+# through the same finalizer so adjacent electron ids do not produce correlated
+# sequences.
+
+_SM64_GOLDEN = np.uint64(0x9E3779B97F4A7C15)
+_SM64_MIX1 = np.uint64(0xBF58476D1CE4E5B9)
+_SM64_MIX2 = np.uint64(0x94D049BB133111EB)
+_SM64_S27 = np.uint64(27)
+_SM64_S30 = np.uint64(30)
+_SM64_S31 = np.uint64(31)
+_SM64_S11 = np.uint64(11)
+_SM64_ZERO = np.uint64(0)
+_SM64_ONE = np.uint64(1)
+# 2**-53: the same 53-bit mantissa scaling numpy's `random()` uses, so draws land
+# in [0, 1) with uniform spacing.
+_U53_SCALE = 1.0 / 9007199254740992.0
+
+
+# Signatures are explicit because numba otherwise unifies these expressions to
+# int64, which turns every `>>` into an arithmetic shift and silently biases the
+# generator (draws lose their top bit).
+@njit(uint64(uint64), cache=True)
+def _splitmix64(x):
+    """SplitMix64 finalizer, used here as a counter-based hash."""
+    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
+    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
+    return x ^ (x >> _SM64_S31)
+
+
+@njit(uint64(int64, int64), cache=True)
+def _stream_key_scalar(seed, elec_id):
+    """Per-electron stream key. Independent of batch size and launch geometry."""
+    return _splitmix64(np.uint64(seed) + _SM64_GOLDEN * (np.uint64(elec_id) + _SM64_ONE))
+
+
+@njit(float64(uint64, uint64), cache=True)
+def _stream_uniform_scalar(key, counter):
+    """Draw ``counter`` of the stream identified by ``key``, in [0, 1)."""
+    z = _splitmix64(key + _SM64_GOLDEN * (counter + _SM64_ONE))
+    return np.float64(z >> _SM64_S11) * _U53_SCALE
+
+
+def stream_keys(seed, Ne):
+    """Per-electron stream keys for ``[0, Ne)``, as consumed by both cores.
+
+    Keys are built on the host so the CUDA kernel needs no 64-bit integer casts
+    in device code, and so both cores provably address the same streams.
+    """
+    e = np.arange(Ne, dtype=np.uint64)
+    x = np.uint64(seed) + _SM64_GOLDEN * (e + _SM64_ONE)
+    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
+    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
+    return x ^ (x >> _SM64_S31)
 
 
 # ---- elastic scattering models ------------------------------------------------
@@ -1169,6 +1237,473 @@ def _transport_core_grooved(
     return nseg, nvac, n_back, n_trans, n_side
 
 
+# ---- per-electron transport core (GPU-portable reference) ---------------------
+
+# Exit classification, returned per electron instead of accumulated into shared
+# counters, so the host can total them in a fixed order.
+EXIT_ALIVE_OR_STOPPED = np.int8(0)
+EXIT_BACKSCATTERED = np.int8(1)
+EXIT_TRANSMITTED = np.int8(2)
+EXIT_SIDE = np.int8(3)
+
+
+@njit(cache=True)
+def _searchsorted_right_scalar(bounds, x, n):
+    """Scalar equivalent of ``np.searchsorted(bounds[:n], x, side="right")``."""
+    lo = 0
+    hi = n
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if bounds[mid] <= x:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
+
+
+@njit(cache=True)
+def _transport_core_ungrooved_perelectron(
+    e_start,
+    e_count,
+    cap,
+    stream_key,
+    alive,
+    max_steps,
+    n_layers,
+    internal_bounds,
+    elastic_model_code,
+    z_total,
+    finite_footprint,
+    width_ang,
+    height_ang,
+    clock,
+    pos,
+    dirs,
+    E_cut_by_electrons,
+    L_Js,
+    L_Zs,
+    L_ks,
+    L_coeffs,
+    L_ncm3,
+    L_nel,
+    L_top,
+    L_bot,
+    mott_has_table,
+    mott_start,
+    mott_len,
+    mott_logE_flat,
+    mott_logA_flat,
+    E_keV,
+    seg_dir,
+    seg_mid,
+    seg_len,
+    seg_E,
+    seg_t0,
+    seg_id,
+    seg_lay,
+    seg_count,
+    exit_code,
+):
+    """Run electrons ``[e_start, e_start + e_count)`` to completion, independently.
+
+    This is the executable specification of the CUDA transport kernel in
+    :mod:`transport_jit_kernel`: same arithmetic, same draw order, same output
+    addressing, one CPU iteration per CUDA thread. Keeping the two in one
+    algorithm lets the GPU port be checked bit-for-bit instead of statistically.
+
+    It is *not* bit-for-bit against :func:`_transport_core_ungrooved`. Both
+    consume the same physics, but the lockstep core interleaves one shared RNG
+    stream across electrons while this one gives each electron its own; the two
+    therefore realize different samples of the same distribution.
+
+    Segment ``s`` of local electron ``i`` is written to slot ``i * cap + s``, a
+    pure function of the electron index, so output does not depend on execution
+    order. ``seg_count[i]`` records the *true* segment count even when it exceeds
+    ``cap``; the caller must treat any such electron's slots as invalid and
+    replay the batch with a larger ``cap``. Replay is exact because the streams
+    are counter-addressed.
+
+    Per-layer element data is passed as ``(n_layers, max_elements)`` padded rows
+    with live lengths in ``L_nel``, the layout the CUDA kernel needs.
+    """
+    EPS = 1e-6
+
+    for i in range(e_count):
+        e = e_start + i
+        seg_count[i] = 0
+        exit_code[i] = EXIT_ALIVE_OR_STOPPED
+        if not alive[e]:
+            continue
+
+        key = stream_key[e]
+        draw = _SM64_ZERO
+        local_nseg = 0
+        E_cut_e = E_cut_by_electrons[e]
+
+        for _step in range(max_steps):
+            if n_layers == 1:
+                L = 0
+            else:
+                L = _searchsorted_right_scalar(internal_bounds, pos[e, 2], n_layers - 1)
+
+            n_el = L_nel[L]
+            z_top_L = L_top[L]
+            z_bot_L = L_bot[L]
+            E_j = E_keV[e]
+
+            # 1. Sample the next elastic-collision distance.
+            total_rate = 0.0
+            for i_el in range(n_el):
+                if elastic_model_code == 1:
+                    rate = _scatter_rates_mott_scalar(E_j, L_Zs[L, i_el], L_ncm3[L, i_el])
+                else:
+                    rate = _scatter_rates_sr_scalar(E_j, L_Zs[L, i_el], L_ncm3[L, i_el])
+                total_rate += rate
+
+            lam_ang = 1e8 / total_rate
+            R_step = _stream_uniform_scalar(key, draw)
+            draw += _SM64_ONE
+            step_j = -lam_ang * np.log(R_step)
+
+            # 2. Truncate the flight at this layer's z boundaries.
+            dx = dirs[e, 0]
+            dy = dirs[e, 1]
+            dz = dirs[e, 2]
+            px = pos[e, 0]
+            py = pos[e, 1]
+            pz = pos[e, 2]
+
+            cross_up_j = False
+            cross_dn_j = False
+            exit_side_j = False
+
+            if finite_footprint:
+                exit_distance, exit_face = _first_prism_exit_scalar(
+                    px, py, pz, dx, dy, dz, z_top_L, z_bot_L, width_ang, height_ang
+                )
+                if step_j > exit_distance:
+                    step_j = exit_distance
+                    cross_up_j = exit_face == Z_MIN
+                    cross_dn_j = exit_face == Z_MAX
+                    exit_side_j = exit_face >= X_MIN and exit_face <= Y_MAX
+            else:
+                if dz < 0.0:
+                    s_boundary = (pz - z_top_L) / (-dz)
+                    if step_j > s_boundary:
+                        step_j = s_boundary
+                        cross_up_j = True
+                elif dz > 0.0:
+                    s_boundary = (z_bot_L - pz) / dz
+                    if step_j > s_boundary:
+                        step_j = s_boundary
+                        cross_dn_j = True
+
+            exit_top_j = cross_up_j and z_top_L <= 0.0
+            exit_bot_j = cross_dn_j and z_bot_L >= z_total
+
+            # 3. Record the radiating material segment. Overflowing electrons
+            #    keep transporting so `seg_count` reports the capacity actually
+            #    needed for the replay.
+            dEds = 0.0
+            for i_el in range(n_el):
+                J = L_Js[L, i_el]
+                k = L_ks[L, i_el]
+                coeff = L_coeffs[L, i_el]
+                dEds += coeff * np.log(1.166 * (E_j + k * J) / J)
+            dEds = -7.85e-4 / E_j * dEds
+            beta_j = beta_from_keV_scalar(E_j)
+
+            if local_nseg < cap:
+                slot = i * cap + local_nseg
+                seg_dir[slot, 0] = dx
+                seg_dir[slot, 1] = dy
+                seg_dir[slot, 2] = dz
+                seg_mid[slot, 0] = px + 0.5 * step_j * dx
+                seg_mid[slot, 1] = py + 0.5 * step_j * dy
+                seg_mid[slot, 2] = pz + 0.5 * step_j * dz
+                seg_len[slot] = step_j
+                seg_E[slot] = E_j
+                seg_t0[slot] = clock[e]
+                seg_id[slot] = e
+                seg_lay[slot] = L
+            local_nseg += 1
+
+            # 4. Advance position, energy, and transport clock.
+            pos[e, 0] = px + step_j * dx
+            pos[e, 1] = py + step_j * dy
+            pos[e, 2] = pz + step_j * dz
+            E_keV[e] = E_j + dEds * step_j
+            clock[e] += step_j / beta_j
+
+            # 5. Exit, internal-boundary, or collision handling.
+            if exit_top_j:
+                exit_code[i] = EXIT_BACKSCATTERED
+            elif exit_bot_j:
+                exit_code[i] = EXIT_TRANSMITTED
+            elif exit_side_j:
+                exit_code[i] = EXIT_SIDE
+            if exit_top_j or exit_bot_j or exit_side_j or E_keV[e] < E_cut_e:
+                break
+
+            if cross_up_j or cross_dn_j:
+                pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS
+                continue
+
+            # A full flight ended in an elastic collision. Pick the element with
+            # probability proportional to n_i * sigma_i(E). Rates are recomputed
+            # rather than buffered so the kernel needs no per-thread local array.
+            if n_el == 1:
+                i_el = 0
+            else:
+                u = _stream_uniform_scalar(key, draw) * total_rate
+                draw += _SM64_ONE
+                cumulative = 0.0
+                i_el = n_el - 1
+                for k_el in range(n_el):
+                    if elastic_model_code == 1:
+                        rate = _scatter_rates_mott_scalar(E_j, L_Zs[L, k_el], L_ncm3[L, k_el])
+                    else:
+                        rate = _scatter_rates_sr_scalar(E_j, L_Zs[L, k_el], L_ncm3[L, k_el])
+                    cumulative += rate
+                    if cumulative > u:
+                        i_el = k_el
+                        break
+
+            Z_i = L_Zs[L, i_el]
+            if elastic_model_code == 1 and mott_has_table[L, i_el]:
+                log_alpha = _interp_mott_log_alpha_scalar(
+                    np.log10(E_keV[e] * 1e3),
+                    mott_logE_flat,
+                    mott_logA_flat,
+                    mott_start[L, i_el],
+                    mott_len[L, i_el],
+                )
+                alpha = 10.0**log_alpha
+            else:
+                alpha = _alpha_sr_joy_scalar(Z_i, E_keV[e])
+
+            cos_t = _sample_cos_theta_from_alpha(alpha, _stream_uniform_scalar(key, draw))
+            draw += _SM64_ONE
+            phi = 2.0 * np.pi * _stream_uniform_scalar(key, draw)
+            draw += _SM64_ONE
+            ndx, ndy, ndz = _rotate_direction_scalar(dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, phi)
+            dirs[e, 0] = ndx
+            dirs[e, 1] = ndy
+            dirs[e, 2] = ndz
+
+        seg_count[i] = local_nseg
+
+
+def pack_layer_tables(L_Js, L_Zs, L_ks, L_coeffs, L_ncm3):
+    """Pad the per-layer element lists into ``(n_layers, max_elements)`` rows.
+
+    The lockstep core indexes a Python list of ragged arrays, which neither the
+    per-electron core nor CUDA can do. Padding is zero-filled and never read:
+    ``L_nel`` bounds every element loop.
+    """
+    n_layers = len(L_Zs)
+    max_el = max(arr.size for arr in L_Zs)
+    Js = np.zeros((n_layers, max_el), dtype=np.float64)
+    Zs = np.zeros((n_layers, max_el), dtype=np.float64)
+    ks = np.zeros((n_layers, max_el), dtype=np.float64)
+    coeffs = np.zeros((n_layers, max_el), dtype=np.float64)
+    ncm3 = np.zeros((n_layers, max_el), dtype=np.float64)
+    nel = np.zeros(n_layers, dtype=np.int32)
+    for L in range(n_layers):
+        n = L_Zs[L].size
+        nel[L] = n
+        Js[L, :n] = L_Js[L]
+        Zs[L, :n] = L_Zs[L]
+        ks[L, :n] = L_ks[L]
+        coeffs[L, :n] = L_coeffs[L]
+        ncm3[L, :n] = L_ncm3[L]
+    return Js, Zs, ks, coeffs, ncm3, nel
+
+
+@dataclass(frozen=True)
+class PerElectronTransportConfig:
+    """Host-side batching policy for the per-electron cores.
+
+    Neither field changes results: ``seg_capacity`` only sets how many segment
+    slots each electron is given before an overflow forces a replay, and
+    ``scratch_budget_bytes`` only sets how many electrons share one launch.
+    Both exist because the CUDA path materializes a dense ``(batch, capacity)``
+    scratch grid, and that grid must fit in VRAM alongside the case's tables.
+    """
+
+    seg_capacity: int = 512
+    scratch_budget_bytes: int = 512 * 1024 * 1024
+    capacity_growth: int = 4
+    max_batch: int = 65536
+
+
+DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG = PerElectronTransportConfig()
+
+# float64 mid(3) + dir(3) + len + E + t0 = 9, int64 id, int16 layer.
+_SEG_SCRATCH_BYTES = 9 * 8 + 8 + 2
+
+
+def _batch_size(cap, config):
+    per_electron = cap * _SEG_SCRATCH_BYTES
+    n = int(config.scratch_budget_bytes // max(per_electron, 1))
+    return max(1, min(n, int(config.max_batch)))
+
+
+def _run_per_electron_transport(
+    core,
+    xp,
+    Ne,
+    seed,
+    max_steps,
+    max_segments,
+    n_layers,
+    internal_bounds,
+    elastic_model_code,
+    z_total,
+    finite_footprint,
+    width_ang,
+    height_ang,
+    alive,
+    clock,
+    pos,
+    dirs,
+    E_cut_by_electrons,
+    layer_tables,
+    L_top,
+    L_bot,
+    mott,
+    E_keV,
+    seg_dir,
+    seg_mid,
+    seg_len,
+    seg_E,
+    seg_t0,
+    seg_id,
+    seg_lay,
+    config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
+):
+    """Drive ``core`` over electron batches and compact the result.
+
+    ``core`` is either :func:`_transport_core_ungrooved_perelectron` or the CUDA
+    kernel launcher; ``xp`` is the matching array module. The two share this
+    driver so batching, capacity growth, and compaction cannot drift apart.
+
+    Output is electron-major and step-minor, which is a pure function of the
+    electron index rather than of execution order, so a run is reproducible
+    across batch sizes and (on CUDA) launch geometries.
+
+    Per-electron state and the material tables are moved to the device once and
+    stay there; only the compacted segments of each batch cross the bus. The
+    caller's ``seg_*`` buffers stay on the host because ``simulate_trajectories``
+    returns NumPy. Keeping the compacted segments on the device for the spectrum
+    kernels to consume directly is a separate, larger change.
+    """
+    on_device = xp is not np
+    to_dev = xp.asarray if on_device else (lambda a: a)
+    to_host = xp.asnumpy if on_device else (lambda a: a)
+
+    d_keys = to_dev(stream_keys(seed, Ne))
+    d_alive = to_dev(alive)
+    d_clock = to_dev(clock)
+    d_pos = to_dev(pos)
+    d_dirs = to_dev(dirs)
+    d_E = to_dev(E_keV)
+    d_E_cut = to_dev(E_cut_by_electrons)
+    d_bounds = to_dev(internal_bounds)
+    d_top = to_dev(L_top)
+    d_bot = to_dev(L_bot)
+    d_layers = tuple(to_dev(a) for a in layer_tables)
+    d_mott = tuple(to_dev(a) for a in mott)
+
+    cap = max(1, int(config.seg_capacity))
+    nseg = 0
+    n_back = n_trans = n_side = 0
+    e = 0
+    while e < Ne:
+        m = min(_batch_size(cap, config), Ne - e)
+        sl = slice(e, e + m)
+        # The core advances position/direction/energy/clock in place, so a
+        # capacity replay has to start from the same state it did.
+        snap = (d_pos[sl].copy(), d_dirs[sl].copy(), d_E[sl].copy(), d_clock[sl].copy())
+
+        while True:
+            scratch = _alloc_scratch(xp, m, cap)
+            seg_count = xp.zeros(m, dtype=xp.int64)
+            exit_code = xp.zeros(m, dtype=xp.int8)
+            core(
+                e,
+                m,
+                cap,
+                d_keys,
+                d_alive,
+                max_steps,
+                n_layers,
+                d_bounds,
+                elastic_model_code,
+                z_total,
+                finite_footprint,
+                width_ang,
+                height_ang,
+                d_clock,
+                d_pos,
+                d_dirs,
+                d_E_cut,
+                *d_layers,
+                d_top,
+                d_bot,
+                *d_mott,
+                d_E,
+                *scratch,
+                seg_count,
+                exit_code,
+            )
+            needed = int(seg_count.max())
+            if needed <= cap:
+                break
+            # Replay: the streams are counter-addressed, so the retry reproduces
+            # the discarded run exactly rather than resampling it.
+            cap = max(needed, cap * int(config.capacity_growth))
+            d_pos[sl], d_dirs[sl], d_E[sl], d_clock[sl] = snap
+            m = min(_batch_size(cap, config), Ne - e)
+            sl = slice(e, e + m)
+            snap = tuple(a[:m] for a in snap)
+
+        total = int(seg_count.sum())
+        if nseg + total > max_segments:
+            raise RuntimeError("segment buffer exhausted")
+        keep = xp.arange(cap)[None, :] < seg_count[:, None]
+        dst = slice(nseg, nseg + total)
+        s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch
+        seg_dir[dst] = to_host(s_dir.reshape(m, cap, 3)[keep])
+        seg_mid[dst] = to_host(s_mid.reshape(m, cap, 3)[keep])
+        seg_len[dst] = to_host(s_len.reshape(m, cap)[keep])
+        seg_E[dst] = to_host(s_E.reshape(m, cap)[keep])
+        seg_t0[dst] = to_host(s_t0.reshape(m, cap)[keep])
+        seg_id[dst] = to_host(s_id.reshape(m, cap)[keep])
+        seg_lay[dst] = to_host(s_lay.reshape(m, cap)[keep])
+        nseg += total
+
+        n_back += int((exit_code == EXIT_BACKSCATTERED).sum())
+        n_trans += int((exit_code == EXIT_TRANSMITTED).sum())
+        n_side += int((exit_code == EXIT_SIDE).sum())
+        e += m
+
+    return nseg, n_back, n_trans, n_side
+
+
+def _alloc_scratch(xp, m, cap):
+    n = m * cap
+    return (
+        xp.empty((n, 3), dtype=xp.float64),
+        xp.empty((n, 3), dtype=xp.float64),
+        xp.empty(n, dtype=xp.float64),
+        xp.empty(n, dtype=xp.float64),
+        xp.empty(n, dtype=xp.float64),
+        xp.empty(n, dtype=xp.int64),
+        xp.empty(n, dtype=xp.int16),
+    )
+
+
 def simulate_trajectories(
     E0_keV,
     Ne,
@@ -1196,6 +1731,8 @@ def simulate_trajectories(
     tilt_azim_rad=0.0,
     groove=None,
     E_cut_by_electrons=None,
+    transport_core="lockstep",
+    per_electron_config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -1352,6 +1889,27 @@ def simulate_trajectories(
     ``docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md``.
     Validation: blazed-groove-geometry
 
+    transport_core: which ungrooved core runs the electrons.
+      "lockstep" (default) -- the historical core: an outer step loop over an
+          inner electron loop, all draws taken from one shared Generator in
+          step-major order. BIT-FOR-BIT unchanged.
+      "per-electron" -- each electron runs to completion against its own
+          counter-addressed stream (see `_transport_core_ungrooved_perelectron`).
+      "cuda" -- the same algorithm as one CUDA thread per electron.
+
+    The two new cores are NOT bit-for-bit with "lockstep": they consume
+    differently-ordered random streams, so they realize a different sample of
+    the same distribution. "cuda" is in turn not bit-for-bit with
+    "per-electron", because CUDA's libm differs from the host's by a few ulp and
+    transport amplifies that over hundreds of scattering events. Selecting
+    either therefore changes numerical output and requires a `Validation:` id,
+    a ledger row, and a golden regen -- see `docs/gpu-transport-rawkernel.md`.
+    Grooved transport is rejected for both.
+
+    per_electron_config: batching policy for the two new cores
+    (:class:`PerElectronTransportConfig`). Segment capacity and scratch budget
+    only bound memory and replay behavior; neither changes results.
+
     Returns dict of per-segment arrays:
       "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
       "t_ang" (M,), "t0_ang" (M,) [per-electron bunch offset], "elec_id" (M,),
@@ -1391,6 +1949,11 @@ def simulate_trajectories(
 
     if elastic_model not in ("mott", "sr"):
         raise ValueError("elastic_model must be 'mott' or 'sr'")
+
+    if transport_core not in ("lockstep", "per-electron", "cuda"):
+        raise ValueError("transport_core must be 'lockstep', 'per-electron', or 'cuda'")
+    if transport_core != "lockstep" and groove is not None:
+        raise ValueError("grooved transport is only implemented for the lockstep core")
 
     if E_cut_by_electrons is None:
         E_cut_by_electrons = np.full(
@@ -1627,7 +2190,56 @@ def simulate_trajectories(
 
     elastic_model_code = 1 if elastic_model == "mott" else 0
 
-    if groove is None:
+    if groove is None and transport_core != "lockstep":
+        # Per-electron streams and run-to-completion ordering. Not bit-for-bit
+        # with the lockstep core -- see `_transport_core_ungrooved_perelectron`.
+        if transport_core == "cuda":
+            from .transport_jit_kernel import make_cuda_transport_core
+
+            core, core_xp = make_cuda_transport_core()
+        else:
+            core, core_xp = _transport_core_ungrooved_perelectron, np
+
+        nseg, n_back, n_trans, n_side = _run_per_electron_transport(
+            core,
+            core_xp,
+            Ne,
+            seed,
+            max_steps,
+            max_segments,
+            n_layers,
+            internal_bounds,
+            elastic_model_code,
+            z_total,
+            finite_footprint,
+            0.0 if width_ang is None else float(width_ang),
+            0.0 if height_ang is None else float(height_ang),
+            alive,
+            clock,
+            pos,
+            dirs,
+            E_cut_by_electrons,
+            pack_layer_tables(L_Js, L_Zs, L_ks, L_coeffs, L_ncm3),
+            L_top,
+            L_bot,
+            (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat),
+            E_keV,
+            seg_dir,
+            seg_mid,
+            seg_len,
+            seg_E,
+            seg_t0,
+            seg_id,
+            seg_lay,
+            config=per_electron_config,
+        )
+        nvac = 0
+        vac_start = np.empty((0, 3), dtype=float)
+        vac_end = np.empty((0, 3), dtype=float)
+        vac_E = np.empty(0, dtype=float)
+        vac_t0 = np.empty(0, dtype=float)
+        vac_id = np.empty(0, dtype=np.int64)
+    elif groove is None:
         nseg, n_back, n_trans, n_side = _transport_core_ungrooved(
             Ne,
             alive,

@@ -1,0 +1,330 @@
+"""Per-electron transport core and its CUDA port.
+
+The CPU tests here pin the properties the GPU port depends on: a counter-based
+RNG that is pure integer arithmetic, output slots addressed by electron index,
+and replay-exactness so a capacity overflow can be retried rather than
+resampled. The CUDA tests re-check the same properties on device and are skipped
+without a GPU.
+"""
+
+import numpy as np
+import pytest
+
+from cxr_mc.montecarlo.transport import (
+    PerElectronTransportConfig,
+    _splitmix64,
+    _stream_key_scalar,
+    _stream_uniform_scalar,
+    simulate_trajectories,
+    stream_keys,
+)
+
+SEGMENT_KEYS = ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "t0_ang", "elec_id", "layer")
+COUNT_KEYS = ("n_backscattered", "n_transmitted", "n_side_exited", "n_stopped", "n_missed")
+
+BASE_CASE = dict(
+    E0_keV=30.0,
+    Ne=120,
+    thickness_ang=5.0e4,
+    element="Si",
+    n_atoms_per_ang3=0.04996,
+    seed=11,
+)
+
+U64_MASK = (1 << 64) - 1
+
+
+def _reference_splitmix64(x):
+    """Independent pure-Python SplitMix64, from the published constants."""
+    x = ((x ^ (x >> 30)) * 0xBF58476D1CE4E5B9) & U64_MASK
+    x = ((x ^ (x >> 27)) * 0x94D049BB133111EB) & U64_MASK
+    return x ^ (x >> 31)
+
+
+def _reference_uniform(key, counter):
+    z = _reference_splitmix64((key + 0x9E3779B97F4A7C15 * (counter + 1)) & U64_MASK)
+    return (z >> 11) * 2.0**-53
+
+
+def _identical(a, b):
+    return all(np.array_equal(a[k], b[k]) for k in SEGMENT_KEYS) and all(
+        a[k] == b[k] for k in COUNT_KEYS
+    )
+
+
+def _run(**overrides):
+    case = dict(BASE_CASE)
+    case.update(overrides)
+    return simulate_trajectories(**case)
+
+
+# ---- counter-based RNG --------------------------------------------------------
+
+
+@pytest.mark.parametrize("x", [0, 1, 2, 3, 2**32 - 1, 2**63 + 7, 2**64 - 1])
+def test_splitmix64_matches_published_reference(x):
+    assert int(_splitmix64(np.uint64(x))) == _reference_splitmix64(x)
+
+
+def test_stream_keys_match_the_scalar_form():
+    keys = stream_keys(7, 512)
+    assert keys.dtype == np.uint64
+    assert [int(k) for k in keys] == [int(_stream_key_scalar(7, e)) for e in range(512)]
+
+
+def test_stream_uniform_matches_the_pure_python_reference():
+    # Integer-only until the final 2**-53 scaling, so host and device agree
+    # exactly; this pins the arithmetic the CUDA kernel reimplements.
+    for elec in (0, 1, 4095):
+        key = int(_stream_key_scalar(3, elec))
+        for counter in (0, 1, 2, 997, 10**6):
+            got = _stream_uniform_scalar(np.uint64(key), np.uint64(counter))
+            assert got == _reference_uniform(key, counter)
+
+
+def test_stream_draws_are_uniform_and_in_range():
+    key = np.uint64(_stream_key_scalar(0, 0))
+    draws = np.array([_stream_uniform_scalar(key, np.uint64(i)) for i in range(200_000)])
+    assert draws.min() >= 0.0
+    assert draws.max() < 1.0
+    # A signed-shift bug halves the range while leaving individual draws
+    # plausible, so assert the moments rather than the bounds alone.
+    assert abs(draws.mean() - 0.5) < 0.01
+    assert abs(draws.var() - 1.0 / 12.0) < 0.005
+
+
+def test_adjacent_electron_streams_are_uncorrelated():
+    n = 100_000
+    a, b = (
+        np.array(
+            [
+                _stream_uniform_scalar(np.uint64(_stream_key_scalar(0, elec)), np.uint64(i))
+                for i in range(n)
+            ]
+        )
+        for elec in (0, 1)
+    )
+    assert abs(np.corrcoef(a, b)[0, 1]) < 4.0 / np.sqrt(n)
+    assert abs(np.corrcoef(a[:-1], a[1:])[0, 1]) < 4.0 / np.sqrt(n)
+
+
+# ---- per-electron core --------------------------------------------------------
+
+
+def test_default_core_is_the_lockstep_core():
+    assert _identical(_run(), _run(transport_core="lockstep"))
+
+
+def test_per_electron_core_is_deterministic():
+    assert _identical(_run(transport_core="per-electron"), _run(transport_core="per-electron"))
+
+
+@pytest.mark.parametrize("capacity", [4, 37, 256, 4096])
+def test_capacity_replay_reproduces_the_discarded_run(capacity):
+    # An electron that overflows its slots forces the whole batch to replay.
+    # Counter-addressed streams make that replay exact, so every capacity --
+    # including ones far below the ~800 segments an electron actually needs --
+    # must give the same trajectories.
+    base = _run(transport_core="per-electron")
+    replayed = _run(
+        transport_core="per-electron",
+        per_electron_config=PerElectronTransportConfig(seg_capacity=capacity),
+    )
+    assert _identical(base, replayed)
+
+
+@pytest.mark.parametrize("budget", [1 << 18, 1 << 22, 1 << 27])
+def test_results_do_not_depend_on_batch_size(budget):
+    base = _run(transport_core="per-electron")
+    batched = _run(
+        transport_core="per-electron",
+        per_electron_config=PerElectronTransportConfig(scratch_budget_bytes=budget),
+    )
+    assert _identical(base, batched)
+
+
+def test_segments_are_electron_major_and_step_minor():
+    out = _run(transport_core="per-electron")
+    elec_id = out["elec_id"]
+    assert np.all(np.diff(elec_id) >= 0)
+    # Within one electron the clock only advances, which is the step ordering.
+    for e in np.unique(elec_id)[:20]:
+        t = out["t_ang"][elec_id == e]
+        assert np.all(np.diff(t) > 0)
+
+
+def test_per_electron_core_matches_lockstep_physics():
+    # The two cores realize different samples of the same distribution -- they
+    # cannot be compared trajectory by trajectory, only in aggregate.
+    case = dict(BASE_CASE)
+    case.update(Ne=3000)
+    seeds = range(1, 9)
+    lockstep = [simulate_trajectories(**{**case, "seed": s}) for s in seeds]
+    per_electron = [
+        simulate_trajectories(**{**case, "seed": s, "transport_core": "per-electron"})
+        for s in seeds
+    ]
+
+    def observable(runs, fn):
+        vals = np.array([fn(r) for r in runs])
+        return vals.mean(), vals.std(ddof=1) / np.sqrt(len(vals))
+
+    metrics = {
+        "backscatter fraction": lambda r: r["n_backscattered"] / r["Ne"],
+        "transmit fraction": lambda r: r["n_transmitted"] / r["Ne"],
+        "segments per electron": lambda r: r["L_ang"].size / r["Ne"],
+        "mean segment length": lambda r: r["L_ang"].mean(),
+        "mean segment energy": lambda r: r["E_keV"].mean(),
+        "mean depth": lambda r: r["r_mid"][:, 2].mean(),
+    }
+    for name, fn in metrics.items():
+        a, a_err = observable(lockstep, fn)
+        b, b_err = observable(per_electron, fn)
+        spread = np.hypot(a_err, b_err)
+        assert abs(a - b) < 4.0 * spread, f"{name}: {a} +-{a_err} vs {b} +-{b_err}"
+
+
+def test_multilayer_transport_reports_valid_layers():
+    out = _run(
+        transport_core="per-electron",
+        layers=[
+            (0.0, 1.0e4, [("C", 0.176)]),
+            (1.0e4, 5.0e4, [("W", 0.0632)]),
+        ],
+        elastic_model="sr",
+    )
+    assert out["n_layers"] == 2
+    assert set(np.unique(out["layer"])) <= {0, 1}
+    assert (out["layer"] == 1).any()
+
+
+def test_finite_footprint_counts_side_exits():
+    out = _run(
+        transport_core="per-electron",
+        crystal_width_mm=2.0e-4,
+        crystal_height_mm=2.0e-4,
+    )
+    assert out["n_side_exited"] > 0
+    assert out["n_backscattered"] + out["n_transmitted"] + out["n_side_exited"] <= out["Ne"]
+
+
+def test_compound_target_selects_between_elements():
+    out = _run(transport_core="per-electron", composition=[("Mo", 0.0186), ("Se", 0.0372)])
+    assert out["L_ang"].size > 0
+    assert np.all(np.isfinite(out["E_keV"]))
+
+
+def test_grooved_transport_rejects_the_per_electron_core():
+    from cxr_mc.montecarlo.groove import GrooveSpec
+
+    with pytest.raises(ValueError, match="grooved transport"):
+        _run(
+            transport_core="per-electron",
+            groove=GrooveSpec(spacing_ang=1.0e4, depth_ang=1.0e3, tilt_polar_rad=0.2),
+        )
+
+
+def test_unknown_transport_core_is_rejected():
+    with pytest.raises(ValueError, match="transport_core must be"):
+        _run(transport_core="opencl")
+
+
+# ---- CUDA port ----------------------------------------------------------------
+
+try:  # pragma: no cover - depends on the machine, not the branch
+    import cupy
+
+    _HAS_CUDA = cupy.cuda.runtime.getDeviceCount() > 0
+except Exception:
+    _HAS_CUDA = False
+
+requires_cuda = pytest.mark.skipif(not _HAS_CUDA, reason="no CUDA device")
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_launcher_signature_tracks_the_reference_core():
+    import inspect
+
+    from cxr_mc.montecarlo.transport import _transport_core_ungrooved_perelectron
+    from cxr_mc.montecarlo.transport_jit_kernel import run_transport_kernel
+
+    reference = list(inspect.signature(_transport_core_ungrooved_perelectron.py_func).parameters)
+    launcher = [
+        name
+        for name, p in inspect.signature(run_transport_kernel).parameters.items()
+        if p.kind is not p.KEYWORD_ONLY and name != "config"
+    ]
+    assert launcher == reference
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_cuda_core_is_deterministic():
+    assert _identical(_run(transport_core="cuda"), _run(transport_core="cuda"))
+
+
+@pytest.mark.hardware
+@requires_cuda
+@pytest.mark.parametrize("nthreads", [32, 128, 512])
+def test_cuda_results_do_not_depend_on_launch_geometry(nthreads, monkeypatch):
+    from cxr_mc.montecarlo import transport_jit_kernel as tjk
+
+    base = _run(transport_core="cuda")
+    monkeypatch.setattr(
+        tjk, "DEFAULT_TRANSPORT_KERNEL_CONFIG", tjk.TransportKernelConfig(nthreads=nthreads)
+    )
+    assert _identical(base, _run(transport_core="cuda"))
+
+
+@pytest.mark.hardware
+@requires_cuda
+@pytest.mark.parametrize("capacity", [4, 256, 4096])
+def test_cuda_capacity_replay_reproduces_the_discarded_run(capacity):
+    base = _run(transport_core="cuda")
+    replayed = _run(
+        transport_core="cuda",
+        per_electron_config=PerElectronTransportConfig(seg_capacity=capacity),
+    )
+    assert _identical(base, replayed)
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_cuda_first_step_agrees_with_the_cpu_reference():
+    # Both cores draw the same numbers and take the same branches, so the first
+    # recorded segment differs only by libm rounding (CUDA's log/pow are a few
+    # ulp from the host's). Later segments are not compared: transport is
+    # chaotic and amplifies that difference.
+    cpu = _run(transport_core="per-electron")
+    gpu = _run(transport_core="cuda")
+
+    cpu_first = np.flatnonzero(np.diff(cpu["elec_id"], prepend=-1))
+    gpu_first = np.flatnonzero(np.diff(gpu["elec_id"], prepend=-1))
+    assert np.array_equal(cpu["elec_id"][cpu_first], gpu["elec_id"][gpu_first])
+    np.testing.assert_allclose(cpu["L_ang"][cpu_first], gpu["L_ang"][gpu_first], rtol=1e-12)
+    np.testing.assert_allclose(cpu["E_keV"][cpu_first], gpu["E_keV"][gpu_first], rtol=1e-12)
+    np.testing.assert_allclose(cpu["r_mid"][cpu_first], gpu["r_mid"][gpu_first], rtol=1e-12)
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_cuda_matches_the_cpu_reference_in_aggregate():
+    case = dict(BASE_CASE)
+    case.update(Ne=3000)
+    seeds = range(1, 9)
+    cpu = [
+        simulate_trajectories(**{**case, "seed": s, "transport_core": "per-electron"})
+        for s in seeds
+    ]
+    gpu = [simulate_trajectories(**{**case, "seed": s, "transport_core": "cuda"}) for s in seeds]
+
+    for name, fn in {
+        "backscatter fraction": lambda r: r["n_backscattered"] / r["Ne"],
+        "segments per electron": lambda r: r["L_ang"].size / r["Ne"],
+        "mean segment energy": lambda r: r["E_keV"].mean(),
+    }.items():
+        a = np.array([fn(r) for r in cpu])
+        b = np.array([fn(r) for r in gpu])
+        spread = np.hypot(a.std(ddof=1), b.std(ddof=1)) / np.sqrt(len(a))
+        assert abs(a.mean() - b.mean()) < 4.0 * spread, name

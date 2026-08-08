@@ -1,0 +1,605 @@
+"""CUDA transport kernel: one thread owns one electron, start to finish.
+
+This is a direct port of
+:func:`cxr_mc.montecarlo.transport._transport_core_ungrooved_perelectron`. The
+two are maintained as one algorithm -- same draw order, same branch structure,
+same output addressing -- so the port is checkable against a CPU run instead of
+only against aggregate physics.
+
+Why a per-electron core exists at all: the production
+``_transport_core_ungrooved`` walks electrons in lockstep so that a single NumPy
+``Generator`` can serve them all, and that stream order cannot be reproduced by
+threads running independently. Randomness here is addressed instead by
+``(stream key, draw index)`` through a SplitMix64 counter hash, which is pure
+integer arithmetic and therefore identical on host and device. A GPU run is
+reproducible across launch geometry, batch size, and capacity replays.
+
+What is *not* bit-for-bit is everything downstream of a transcendental. CUDA's
+``log``/``exp``/``pow``/``sin``/``cos`` are accurate to a few ulp but are not the
+same implementations as the host libm, and transport amplifies a last-bit
+difference over hundreds of scattering events. The verifiable claims are:
+identical RNG streams, identical control flow and addressing, few-ulp agreement
+on a single step from identical inputs, and statistical agreement in aggregate.
+See ``docs/gpu-transport-rawkernel.md``.
+
+Grooved transport, and any path needing the lockstep core's exact stream, stay
+on the CPU.
+"""
+
+from dataclasses import dataclass
+
+import cupy as xp
+import numpy as np
+from cupyx import jit
+
+from .geometry import X_MAX, X_MIN, Y_MAX, Y_MIN, Z_MAX, Z_MIN
+
+F64_ZERO = np.float64(0.0)
+F64_HALF = np.float64(0.5)
+F64_ONE = np.float64(1.0)
+F64_TWO = np.float64(2.0)
+F64_TEN = np.float64(10.0)
+F64_EPS = np.float64(1e-6)
+F64_INF = np.float64(np.inf)
+F64_PI = np.float64(np.pi)
+
+U64_ZERO = np.uint64(0)
+U64_ONE = np.uint64(1)
+SM64_GOLDEN = np.uint64(0x9E3779B97F4A7C15)
+SM64_MIX1 = np.uint64(0xBF58476D1CE4E5B9)
+SM64_MIX2 = np.uint64(0x94D049BB133111EB)
+SM64_S27 = np.uint64(27)
+SM64_S30 = np.uint64(30)
+SM64_S31 = np.uint64(31)
+SM64_S11 = np.uint64(11)
+U53_SCALE = np.float64(1.0 / 9007199254740992.0)
+
+I32_ZERO = np.int32(0)
+I32_ONE = np.int32(1)
+I32_TWO = np.int32(2)
+I32_THREE = np.int32(3)
+
+# The side-exit test below is a range check, so it relies on the four lateral
+# faces being contiguous and below the two z faces.
+assert (X_MIN, X_MAX, Y_MIN, Y_MAX, Z_MIN, Z_MAX) == (0, 1, 2, 3, 4, 5)
+FACE_NONE = np.int32(-1)
+FACE_X_MIN = np.int32(X_MIN)
+FACE_X_MAX = np.int32(X_MAX)
+FACE_Y_MIN = np.int32(Y_MIN)
+FACE_Y_MAX = np.int32(Y_MAX)
+FACE_Z_MIN = np.int32(Z_MIN)
+FACE_Z_MAX = np.int32(Z_MAX)
+
+I8_ALIVE_OR_STOPPED = np.int8(0)
+I8_BACKSCATTERED = np.int8(1)
+I8_TRANSMITTED = np.int8(2)
+I8_SIDE = np.int8(3)
+
+
+@dataclass(frozen=True)
+class TransportKernelConfig:
+    """Launch geometry. Does not affect results -- output slots are addressed by
+    electron index, not by thread or block index."""
+
+    nthreads: int = 128
+
+
+DEFAULT_TRANSPORT_KERNEL_CONFIG = TransportKernelConfig()
+
+
+@jit.rawkernel(device=True)
+def _splitmix64(x):
+    x = (x ^ (x >> SM64_S30)) * SM64_MIX1
+    x = (x ^ (x >> SM64_S27)) * SM64_MIX2
+    return x ^ (x >> SM64_S31)
+
+
+@jit.rawkernel(device=True)
+def _stream_uniform(key, counter):
+    """Draw ``counter`` of stream ``key``, in [0, 1).
+
+    Integer-only until the final scaling, and the shifted value is below 2**53,
+    so the conversion to double is exact and matches the host bit-for-bit.
+    """
+    z = _splitmix64(key + SM64_GOLDEN * (counter + U64_ONE))
+    return (z >> SM64_S11) * U53_SCALE
+
+
+@jit.rawkernel(device=True)
+def _beta_from_keV(E_i):
+    g = F64_ONE + E_i / np.float64(510.99895)
+    g_inv_square = F64_ONE / (g * g)
+    return (F64_ONE - g_inv_square) ** F64_HALF
+
+
+@jit.rawkernel(device=True)
+def _rate_mott(E_i, Z_i, n_cm3_i):
+    """Browning total elastic cross section [cm^2] times number density."""
+    z17 = Z_i ** np.float64(1.7)
+    numerator = np.float64(3.0e-18) * z17
+    z_exp = np.float64(0.005) * z17
+    z_squared = np.float64(0.0007) * Z_i * Z_i
+    sqrt_E_i = xp.sqrt(E_i)
+    return numerator / (E_i + z_exp * sqrt_E_i + z_squared / sqrt_E_i) * n_cm3_i
+
+
+@jit.rawkernel(device=True)
+def _alpha_sr_joy(Z, E_keV):
+    return np.float64(3.4e-3) * Z ** np.float64(0.67) / E_keV
+
+
+@jit.rawkernel(device=True)
+def _rate_sr(E_i, Z_i, n_cm3_i):
+    a = _alpha_sr_joy(Z_i, E_i)
+    E_i_plus_511 = E_i + np.float64(511.0)
+    E_i_plus_1024 = E_i + np.float64(1024.0)
+    E_i_511_over_1024 = E_i_plus_511 / E_i_plus_1024
+    sig_i = (
+        np.float64(5.21e-21)
+        * (Z_i * Z_i)
+        / (E_i * E_i)
+        * np.float64(4.0)
+        * F64_PI
+        / (a * (F64_ONE + a))
+        * (E_i_511_over_1024 * E_i_511_over_1024)
+    )
+    return n_cm3_i * sig_i
+
+
+@jit.rawkernel(device=True)
+def _interp_mott_log_alpha(logE_eV, logE_flat, logA_flat, start, length):
+    """Linear interpolation with ``np.interp`` endpoint clamping."""
+    first = start
+    last = start + length - I32_ONE
+    if logE_eV <= logE_flat[first]:
+        return logA_flat[first]
+    if logE_eV >= logE_flat[last]:
+        return logA_flat[last]
+
+    lo = first
+    hi = last
+    while hi - lo > I32_ONE:
+        mid = (lo + hi) // I32_TWO
+        if logE_flat[mid] <= logE_eV:
+            lo = mid
+        else:
+            hi = mid
+
+    x0 = logE_flat[lo]
+    x1 = logE_flat[hi]
+    y0 = logA_flat[lo]
+    y1 = logA_flat[hi]
+    return y0 + (logE_eV - x0) * (y1 - y0) / (x1 - x0)
+
+
+@jit.rawkernel(device=True)
+def _searchsorted_right(bounds, x, n):
+    lo = I32_ZERO
+    hi = n
+    while lo < hi:
+        mid = (lo + hi) // I32_TWO
+        if bounds[mid] <= x:
+            lo = mid + I32_ONE
+        else:
+            hi = mid
+    return lo
+
+
+@jit.rawkernel()
+def _transport_kernel(
+    e_start,
+    e_count,
+    cap,
+    stream_key,
+    alive,
+    max_steps,
+    n_layers,
+    internal_bounds,
+    elastic_model_code,
+    z_total,
+    finite_footprint,
+    width_ang,
+    height_ang,
+    clock,
+    pos,
+    dirs,
+    E_cut_by_electrons,
+    L_Js,
+    L_Zs,
+    L_ks,
+    L_coeffs,
+    L_ncm3,
+    L_nel,
+    max_el,
+    L_top,
+    L_bot,
+    mott_has_table,
+    mott_start,
+    mott_len,
+    mott_logE_flat,
+    mott_logA_flat,
+    E_keV,
+    seg_dir,
+    seg_mid,
+    seg_len,
+    seg_E,
+    seg_t0,
+    seg_id,
+    seg_lay,
+    seg_count,
+    exit_code,
+):
+    """One electron per thread, run to completion.
+
+    ``pos``, ``dirs``, ``seg_dir`` and ``seg_mid`` are flattened C-order; the
+    per-layer element tables are ``(n_layers, max_el)`` flattened the same way,
+    with live lengths in ``L_nel``. Control flow uses only ``while`` with an
+    explicit ``running`` flag so nothing depends on ``break``/``continue``
+    support in the transpiler.
+    """
+    i = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
+    if i >= e_count:
+        return
+
+    seg_count[i] = I32_ZERO
+    exit_code[i] = I8_ALIVE_OR_STOPPED
+    e = e_start + i
+    if alive[e] == np.uint8(0):
+        return
+
+    e3 = e * I32_THREE
+    key = stream_key[e]
+    draw = U64_ZERO
+    local_nseg = I32_ZERO
+    E_cut_e = E_cut_by_electrons[e]
+
+    step = I32_ZERO
+    running = True
+    while running and step < max_steps:
+        step += I32_ONE
+
+        if n_layers == I32_ONE:
+            L = I32_ZERO
+        else:
+            L = _searchsorted_right(internal_bounds, pos[e3 + I32_TWO], n_layers - I32_ONE)
+
+        row = L * max_el
+        n_el = L_nel[L]
+        z_top_L = L_top[L]
+        z_bot_L = L_bot[L]
+        E_j = E_keV[e]
+
+        # 1. Sample the next elastic-collision distance.
+        total_rate = F64_ZERO
+        i_el = I32_ZERO
+        while i_el < n_el:
+            if elastic_model_code == I32_ONE:
+                total_rate += _rate_mott(E_j, L_Zs[row + i_el], L_ncm3[row + i_el])
+            else:
+                total_rate += _rate_sr(E_j, L_Zs[row + i_el], L_ncm3[row + i_el])
+            i_el += I32_ONE
+
+        lam_ang = np.float64(1e8) / total_rate
+        step_j = -lam_ang * xp.log(_stream_uniform(key, draw))
+        draw = draw + U64_ONE
+
+        # 2. Truncate the flight at this layer's z boundaries.
+        dx = dirs[e3]
+        dy = dirs[e3 + I32_ONE]
+        dz = dirs[e3 + I32_TWO]
+        px = pos[e3]
+        py = pos[e3 + I32_ONE]
+        pz = pos[e3 + I32_TWO]
+
+        cross_up_j = False
+        cross_dn_j = False
+        exit_side_j = False
+
+        if finite_footprint == I32_ONE:
+            # Nearest positive ray/prism intersection, inlined from
+            # `_first_prism_exit_scalar` (device functions return one value).
+            best_t = F64_INF
+            best_face = FACE_NONE
+            half_w = F64_HALF * width_ang
+            half_h = F64_HALF * height_ang
+            if dx < F64_ZERO:
+                t = (-half_w - px) / dx
+                if t > F64_ZERO and t < best_t:
+                    best_t = t
+                    best_face = FACE_X_MIN
+            if dx > F64_ZERO:
+                t = (half_w - px) / dx
+                if t > F64_ZERO and t < best_t:
+                    best_t = t
+                    best_face = FACE_X_MAX
+            if dy < F64_ZERO:
+                t = (-half_h - py) / dy
+                if t > F64_ZERO and t < best_t:
+                    best_t = t
+                    best_face = FACE_Y_MIN
+            if dy > F64_ZERO:
+                t = (half_h - py) / dy
+                if t > F64_ZERO and t < best_t:
+                    best_t = t
+                    best_face = FACE_Y_MAX
+            if dz < F64_ZERO:
+                t = (z_top_L - pz) / dz
+                if t > F64_ZERO and t < best_t:
+                    best_t = t
+                    best_face = FACE_Z_MIN
+            if dz > F64_ZERO:
+                t = (z_bot_L - pz) / dz
+                if t > F64_ZERO and t < best_t:
+                    best_t = t
+                    best_face = FACE_Z_MAX
+            if step_j > best_t:
+                step_j = best_t
+                cross_up_j = best_face == FACE_Z_MIN
+                cross_dn_j = best_face == FACE_Z_MAX
+                exit_side_j = best_face >= FACE_X_MIN and best_face <= FACE_Y_MAX
+        else:
+            if dz < F64_ZERO:
+                s_boundary = (pz - z_top_L) / (-dz)
+                if step_j > s_boundary:
+                    step_j = s_boundary
+                    cross_up_j = True
+            elif dz > F64_ZERO:
+                s_boundary = (z_bot_L - pz) / dz
+                if step_j > s_boundary:
+                    step_j = s_boundary
+                    cross_dn_j = True
+
+        exit_top_j = cross_up_j and z_top_L <= F64_ZERO
+        exit_bot_j = cross_dn_j and z_bot_L >= z_total
+
+        # 3. Record the radiating material segment. An electron that overflows
+        #    `cap` keeps transporting so `seg_count` reports the capacity the
+        #    replay needs.
+        dEds = F64_ZERO
+        i_el = I32_ZERO
+        while i_el < n_el:
+            J = L_Js[row + i_el]
+            k = L_ks[row + i_el]
+            coeff = L_coeffs[row + i_el]
+            dEds += coeff * xp.log(np.float64(1.166) * (E_j + k * J) / J)
+            i_el += I32_ONE
+        dEds = -np.float64(7.85e-4) / E_j * dEds
+        beta_j = _beta_from_keV(E_j)
+
+        if local_nseg < cap:
+            slot = i * cap + local_nseg
+            s3 = slot * I32_THREE
+            seg_dir[s3] = dx
+            seg_dir[s3 + I32_ONE] = dy
+            seg_dir[s3 + I32_TWO] = dz
+            seg_mid[s3] = px + F64_HALF * step_j * dx
+            seg_mid[s3 + I32_ONE] = py + F64_HALF * step_j * dy
+            seg_mid[s3 + I32_TWO] = pz + F64_HALF * step_j * dz
+            seg_len[slot] = step_j
+            seg_E[slot] = E_j
+            seg_t0[slot] = clock[e]
+            seg_id[slot] = e
+            seg_lay[slot] = L
+        local_nseg += I32_ONE
+
+        # 4. Advance position, energy, and transport clock.
+        pos[e3] = px + step_j * dx
+        pos[e3 + I32_ONE] = py + step_j * dy
+        pos[e3 + I32_TWO] = pz + step_j * dz
+        E_keV[e] = E_j + dEds * step_j
+        clock[e] += step_j / beta_j
+
+        # 5. Exit, internal-boundary, or collision handling.
+        if exit_top_j:
+            exit_code[i] = I8_BACKSCATTERED
+        elif exit_bot_j:
+            exit_code[i] = I8_TRANSMITTED
+        elif exit_side_j:
+            exit_code[i] = I8_SIDE
+
+        if exit_top_j or exit_bot_j or exit_side_j or E_keV[e] < E_cut_e:
+            running = False
+        elif cross_up_j or cross_dn_j:
+            if dirs[e3 + I32_TWO] > F64_ZERO:
+                pos[e3 + I32_TWO] += F64_EPS
+            else:
+                pos[e3 + I32_TWO] -= F64_EPS
+        else:
+            # A full flight ended in an elastic collision. Pick the element with
+            # probability proportional to n_i sigma_i(E). Rates are recomputed
+            # rather than buffered so no per-thread local array is needed; a
+            # recomputation that lands exactly on the sampled boundary could
+            # select a neighbouring element, which the CPU reference reproduces
+            # because it recomputes identically.
+            if n_el == I32_ONE:
+                sel = I32_ZERO
+            else:
+                u = _stream_uniform(key, draw) * total_rate
+                draw = draw + U64_ONE
+                cumulative = F64_ZERO
+                sel = n_el - I32_ONE
+                k_el = I32_ZERO
+                picked = False
+                while k_el < n_el:
+                    if elastic_model_code == I32_ONE:
+                        cumulative += _rate_mott(E_j, L_Zs[row + k_el], L_ncm3[row + k_el])
+                    else:
+                        cumulative += _rate_sr(E_j, L_Zs[row + k_el], L_ncm3[row + k_el])
+                    if cumulative > u and not picked:
+                        sel = k_el
+                        picked = True
+                    k_el += I32_ONE
+
+            Z_i = L_Zs[row + sel]
+            if elastic_model_code == I32_ONE and mott_has_table[row + sel] == np.uint8(1):
+                log_alpha = _interp_mott_log_alpha(
+                    xp.log10(E_keV[e] * np.float64(1e3)),
+                    mott_logE_flat,
+                    mott_logA_flat,
+                    mott_start[row + sel],
+                    mott_len[row + sel],
+                )
+                alpha = F64_TEN**log_alpha
+            else:
+                alpha = _alpha_sr_joy(Z_i, E_keV[e])
+
+            R_ang = _stream_uniform(key, draw)
+            draw = draw + U64_ONE
+            cos_t = F64_ONE - F64_TWO * alpha * R_ang / (F64_ONE + alpha - R_ang)
+            phi = F64_TWO * F64_PI * _stream_uniform(key, draw)
+            draw = draw + U64_ONE
+
+            # Inlined `_rotate_direction_scalar`: build an orthonormal frame
+            # about the current direction and rotate by (cos_t, phi).
+            odx = dirs[e3]
+            ody = dirs[e3 + I32_ONE]
+            odz = dirs[e3 + I32_TWO]
+            sin2 = F64_ONE - cos_t * cos_t
+            if sin2 < F64_ZERO:
+                sin2 = F64_ZERO
+            sin_t = xp.sqrt(sin2)
+            cos_phi = xp.cos(phi)
+            sin_phi = xp.sin(phi)
+            if xp.abs(odx) < np.float64(0.9):
+                refx = F64_ONE
+                refy = F64_ZERO
+            else:
+                refx = F64_ZERO
+                refy = F64_ONE
+            ux = -odz * refy
+            uy = odz * refx
+            uz = odx * refy - ody * refx
+            u_mag = xp.sqrt(ux * ux + uy * uy + uz * uz)
+            ux /= u_mag
+            uy /= u_mag
+            uz /= u_mag
+            wx = ody * uz - odz * uy
+            wy = odz * ux - odx * uz
+            wz = odx * uy - ody * ux
+            a_rot = sin_t * cos_phi
+            b_rot = sin_t * sin_phi
+            outx = cos_t * odx + a_rot * ux + b_rot * wx
+            outy = cos_t * ody + a_rot * uy + b_rot * wy
+            outz = cos_t * odz + a_rot * uz + b_rot * wz
+            mag = xp.sqrt(outx * outx + outy * outy + outz * outz)
+            dirs[e3] = outx / mag
+            dirs[e3 + I32_ONE] = outy / mag
+            dirs[e3 + I32_TWO] = outz / mag
+
+    seg_count[i] = local_nseg
+
+
+def run_transport_kernel(
+    e_start,
+    e_count,
+    cap,
+    stream_key,
+    alive,
+    max_steps,
+    n_layers,
+    internal_bounds,
+    elastic_model_code,
+    z_total,
+    finite_footprint,
+    width_ang,
+    height_ang,
+    clock,
+    pos,
+    dirs,
+    E_cut_by_electrons,
+    L_Js,
+    L_Zs,
+    L_ks,
+    L_coeffs,
+    L_ncm3,
+    L_nel,
+    L_top,
+    L_bot,
+    mott_has_table,
+    mott_start,
+    mott_len,
+    mott_logE_flat,
+    mott_logA_flat,
+    E_keV,
+    seg_dir,
+    seg_mid,
+    seg_len,
+    seg_E,
+    seg_t0,
+    seg_id,
+    seg_lay,
+    seg_count,
+    exit_code,
+    config=DEFAULT_TRANSPORT_KERNEL_CONFIG,
+):
+    """Launch one thread per electron over ``[e_start, e_start + e_count)``.
+
+    Signature matches :func:`_transport_core_ungrooved_perelectron` positionally
+    so ``_run_per_electron_transport`` can drive either. Flattening, dtype
+    narrowing, and scalar typing happen here rather than in the kernel.
+    """
+    nthreads = int(config.nthreads)
+    if nthreads not in (32, 64, 128, 256, 512, 1024):
+        raise ValueError("nthreads must be one of 32, 64, 128, 256, 512, 1024")
+    e_count = int(e_count)
+    if e_count == 0:
+        return
+
+    max_el = int(L_Zs.shape[1])
+    nblocks = (e_count + nthreads - 1) // nthreads
+    _transport_kernel(
+        (nblocks,),
+        (nthreads,),
+        (
+            np.int32(e_start),
+            np.int32(e_count),
+            np.int32(cap),
+            stream_key,
+            alive.astype(xp.uint8, copy=False),
+            np.int32(max_steps),
+            np.int32(n_layers),
+            internal_bounds,
+            np.int32(elastic_model_code),
+            np.float64(z_total),
+            np.int32(1 if finite_footprint else 0),
+            np.float64(width_ang),
+            np.float64(height_ang),
+            clock,
+            pos.reshape(-1),
+            dirs.reshape(-1),
+            E_cut_by_electrons,
+            L_Js.reshape(-1),
+            L_Zs.reshape(-1),
+            L_ks.reshape(-1),
+            L_coeffs.reshape(-1),
+            L_ncm3.reshape(-1),
+            L_nel.astype(xp.int32, copy=False),
+            np.int32(max_el),
+            L_top,
+            L_bot,
+            mott_has_table.reshape(-1).astype(xp.uint8, copy=False),
+            mott_start.reshape(-1).astype(xp.int32, copy=False),
+            mott_len.reshape(-1).astype(xp.int32, copy=False),
+            mott_logE_flat,
+            mott_logA_flat,
+            E_keV,
+            seg_dir.reshape(-1),
+            seg_mid.reshape(-1),
+            seg_len,
+            seg_E,
+            seg_t0,
+            seg_id,
+            seg_lay,
+            seg_count,
+            exit_code,
+        ),
+    )
+
+
+def make_cuda_transport_core(config=DEFAULT_TRANSPORT_KERNEL_CONFIG):
+    """Return ``(core, array_module)`` for ``_run_per_electron_transport``."""
+
+    def core(*args):
+        run_transport_kernel(*args, config=config)
+
+    return core, xp
