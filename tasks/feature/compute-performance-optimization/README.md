@@ -289,10 +289,85 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
       files pass locally (76 passed) where those paths exist. Note the test
       tree itself is not synced by `cxr remote sync` either and had to be
       copied to `qlmc` separately to run this at all.
-- [ ] Re-run the interleaved burn-in A/B harness at `Ne=450`, 2000, and 10000
-      on both `ALEX-DESKTOP` and `qlmc`.
-- [ ] Re-measure transport/GPU overlap before touching process counts or
-      starting a `prange`/CUDA transport project.
+- [~] Re-run the interleaved burn-in A/B harness at `Ne=450`, 2000, and 10000
+      on both `ALEX-DESKTOP` and `qlmc`. **PARTIAL: `qlmc` done, `ALEX-DESKTOP`
+      not reachable.** `ALEX-DESKTOP` is absent from `~/.ssh/config` (which
+      defines only `qlmc`) and from `known_hosts`, and this editing box is not
+      it (16 cores / 30 GiB / no NVIDIA driver, vs `ALEX-DESKTOP`'s 24 cores /
+      23.4 GiB / RTX 3060 Ti). There is no route to that box from this
+      environment, so its arm cannot be run here and remains open.
+
+      `qlmc` arm (2026-08-08), Round 2 method reproduced exactly: transport
+      once, 4 s GPU burn-in, explicit `Device().synchronize()` around each
+      timed call, 7 reps, 3 rounds with the arms interleaved across separate
+      processes. Workload: `mos2`, standard catalog profile, 30 keV,
+      thickness 2e4 A, tilt 45 deg, azimuth 180 deg, `N_g = 66`, 698 line
+      bins, 1201 brem bins, incoherent, `REAL = float32`.
+
+      | `Ne` | `n_seg` | base `lines_min` (3 rounds) | prologue `lines_min` (3 rounds) | best-vs-best |
+      | --- | --- | --- | --- | --- |
+      | 450 | 256,206 | 0.0292 / 0.0289 / 0.0293 | 0.0278 / 0.0277 / 0.0278 | **-4.2%** |
+      | 2000 | 1,138,773 | 0.0763 / 0.0760 / 0.0762 | 0.0717 / 0.0717 / 0.0717 | **-5.7%** |
+      | 10000 | 5,693,865 | 0.3360 / 0.3370 / 0.3353 | 0.3054 / 0.3056 / 0.3056 | **-8.9%** |
+
+      The win is real, monotonic in `Ne`, and far outside the noise (the
+      prologue arm's round-to-round spread is 0.07% at `Ne=10000` vs 0.5% for
+      base), but it is **much smaller than Round 2's extrapolated 3x**. Round 2
+      projected 0.83 s -> 0.25-0.30 s at `Ne=2000` from the measured phase
+      split; the delivered figure is ~6% at that `Ne`. Two reasons, both
+      measured here rather than assumed:
+      - Round 2's extrapolation was taken on `ALEX-DESKTOP` (RTX 3060 Ti) with
+        `N_g = 110`. On an RTX 5080 with `N_g = 66` the eager prologue is a
+        much smaller share of a much faster GPU phase, so removing it wins
+        less.
+      - The fixed-order design feeds **all** `n_seg * N_g` pairs to the
+        reduction kernel instead of the compacted survivors. At the measured
+        ~49% keep fraction that roughly doubles the reduction kernel's input
+        stream, which eats part of what the fused prologue saves.
+      Brem is unaffected as expected (0.1513-0.1563 s in both arms at
+      `Ne=10000`). Spectrum sums are identical within each arm across all
+      three rounds (determinism) and differ between arms only in the last few
+      digits (3.6586502832614e-06 base vs 3.6586501439145325e-06 prologue),
+      consistent with the ~1e-7 drift recorded above.
+- [x] Re-measure transport/GPU overlap before touching process counts or
+      starting a `prange`/CUDA transport project. **PASS — and the balance has
+      flipped since Round 2.** Single-process phase wall times on `qlmc`
+      (transport once, then min-of-3 timed GPU calls on the same segments;
+      same workload definition as item 4):
+
+      | material | `Ne` | `n_seg` | transport s | lines s | brem s | GPU phase s | **transport / GPU** | transport us/seg |
+      | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+      | mos2 | 450 | 255,273 | 0.127 | 0.0292 | 0.0077 | 0.0370 | **3.45** | 0.499 |
+      | mos2 | 2000 | 1,143,574 | 0.310 | 0.0777 | 0.0299 | 0.1076 | **2.88** | 0.271 |
+      | mos2 | 10000 | 5,693,865 | 1.273 | 0.3356 | 0.1564 | 0.4920 | **2.59** | 0.224 |
+      | mose2 | 500 | 369,522 | 0.145 | 0.0349 | 0.0102 | 0.0450 | **3.22** | 0.392 |
+      | mose2 | 2000 | 1,455,375 | 0.378 | 0.0939 | 0.0374 | 0.1313 | **2.88** | 0.260 |
+      | mose2 | 5000 | 3,640,419 | 0.867 | 0.2236 | 0.0996 | 0.3232 | **2.68** | 0.238 |
+      | mose2 | 10000 | 7,332,101 | 1.671 | 0.4341 | 0.2128 | 0.6469 | **2.58** | 0.228 |
+      | mose2 | 20000 | 14,662,634 | 3.153 | 0.8561 | 0.4296 | 1.2857 | **2.45** | 0.215 |
+      | hopg | 500 | 56,981 | 0.088 | 0.0049 | 0.0024 | 0.0074 | **11.98** | 1.551 |
+      | hopg | 2000 | 230,913 | 0.124 | 0.0070 | 0.0049 | 0.0118 | **10.51** | 0.538 |
+      | hopg | 10000 | 1,127,800 | 0.290 | 0.0226 | 0.0200 | 0.0426 | **6.80** | 0.257 |
+      | hopg | 20000 | 2,290,190 | 0.510 | 0.0441 | 0.0415 | 0.0856 | **5.96** | 0.223 |
+
+      Round 2 measured single-core transport at **≈0.98x** the whole GPU phase
+      on `ALEX-DESKTOP` (RTX 3060 Ti) and concluded that "the `gpu-pipeline`
+      engine hides transport completely at two or more transport workers".
+      **That conclusion no longer holds on `qlmc`.** On an RTX 5080 the GPU
+      phase shrank while single-core transport did not, so transport is now
+      **2.4-3.4x** the GPU phase for the TMDs and **6-12x** for hopg. Even
+      after scaling the line phase by `110/66` to match Round 2's `N_g`, the
+      mose2 `Ne=20000` ratio is still `3.153 / 1.857 = 1.70`.
+
+      Implication for the pending decisions this item was meant to gate:
+      keeping the GPU fed on `qlmc` needs roughly **3-4 concurrent transport
+      workers for TMDs and 6-12 for light materials**, not the two Round 2
+      implied. Conversely, further optimization of the *line* phase has
+      limited end-to-end value on this box — which is the main reason the
+      prologue's measured 4-9% line-phase win translates to very little
+      wall-clock benefit per case. A `prange`/CUDA transport project is now
+      better motivated than it was in Round 2, but process count is the
+      cheaper lever and should be measured first.
 - [x] Confirm the non-NVIDIA (CPU/NumPy, no CuPy) fallback path still runs
       and is exercised by CI — `_USE_JIT_LINE_PROLOGUE` and the raw kernels
       are CUDA/CuPy-only branches; the eager/CPU path must be untouched and
