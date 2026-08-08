@@ -394,20 +394,139 @@ transport runs tens of seconds with GPU at 0%, CPU inconsistent (often
 (CPU/Numba) serialization or scheduling stall feeding the GPU, not a GPU
 compute or memory-pressure problem — but unconfirmed.
 
-- [ ] Reproduce with `cxr remote run` at matched `--ne-line=20_000` on
+- [x] Reproduce with `cxr remote run` at matched `--ne-line=20_000` on
       `MoSe2`, `--perf` telemetry on, per `docs/performance-profile-analysis.md`.
-- [ ] Compare against a lighter material/`--ne-line` at the same profile to
-      isolate whether the stall scales with `n_seg` (as Round 2's linear
-      transport/lines/brem split predicts) or is a distinct discontinuity at
-      high segment counts (e.g., OOM-retry/chunk-halving churn, or `njit`
-      compilation/cache-eviction stalls under `numba` parallel dispatch).
-      `Sweep.spec_chunk`/`Sweep.brem_chunk` and the adaptive chunk/OOM-retry
-      path in `runner.py` are the first suspects for the observed GPU
-      100%-then-0% burstiness.
-- [ ] Attribute the "GPU 0% for 10s+" window to a specific phase (transport
+      **REPRODUCED (2026-08-08, `qlmc`).**
+
+      Two CLI corrections found while setting this up, both of which make the
+      checklist text as written unrunnable:
+      - `cxr remote run` no longer exists. `cxr remote` now exposes only
+        `gc | performance | prune-jobs | pull | rm | sync`; runs go through
+        `cxr run PROFILE -R/--remote`. `docs/performance-profile-analysis.md`
+        still documents the old `cxr remote run ...` form throughout, and its
+        example profile `compute_test_300keV` is not in the catalog either.
+      - `--ne-line` is not a `cxr run` flag. It is a **catalog edit** on
+        `cxr profile set PROFILE -l/--ne-line N`, which rewrites that
+        profile's `n_electrons` grid. So "running with `--ne-line=20_000`"
+        means the profile's electron count was changed and then run.
+
+      Reproduction used a scratch profile created **on `qlmc` only** (so the
+      git worktree keeps a clean `data/materials.toml`):
+      `cxr profile create stall_repro --from promising_low_ne` then
+      `cxr profile set stall_repro --thickness 50000 --energy 30 --polar 45
+      --azimuth 180 -l 20000 --material mose2`, then
+      `cxr run stall_repro -m mose2 -p -i 1 --checkpoint-dir /tmp/stall_ckpt`.
+      One case, MoSe2, 5 um, 30 keV, tilt 45 deg, azimuth 180 deg,
+      22 reflections, `emission = both`.
+
+      GPU utilization sampled independently at 0.5 s alongside the run:
+      ```
+      0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 24 66 24 100 100 100 100 100 100 100 41 0
+      ```
+      **~8.5 s of GPU at 0-1%, then a burst to 100% for ~3.5 s, then 0** —
+      the reported pattern, from a single case. Host CPU sat at 3.4-3.9% of
+      the 32-core box during the idle window while `process_cpu_percent` was
+      ~100%, i.e. exactly one core busy. That is the reported "CPU inconsistent,
+      often <10%". VRAM peaked at 18.6% and host RAM at 16.8% for one case;
+      the reporter's 50-80% RAM is consistent with more cases in flight
+      (`transport_prefetch_count = 4`) and/or several materials.
+      With the full `promising_low_ne` grid this one-case pattern repeats
+      **450 times per material** (5 thicknesses x 3 energies x 5 polars x
+      6 azimuths), which is what makes it read as a sustained stall.
+- [x] Compare against a lighter material/`--ne-line` at the same profile to
+      isolate whether the stall scales with `n_seg` or is a distinct
+      discontinuity at high segment counts. **RESULT: purely linear in
+      `n_seg`. No discontinuity. Not material-specific.** See the item-5 table
+      above for the full phase scan; the relevant reductions:
+
+      MoSe2 across a 40x span of `Ne` (500 -> 20000, `n_seg` 369 k -> 14.66 M):
+      from `Ne=2000` to `Ne=20000` the segment count grows **10.07x** while
+      transport grows **8.34x**, lines **9.12x**, and brem **11.5x**. The
+      transport/GPU ratio moves smoothly and *monotonically* from 3.22 to
+      2.45 with no step anywhere. Per-segment transport cost **falls**
+      monotonically (0.392 -> 0.215 us/seg) and flattens — that is fixed
+      `njit` compile cost amortizing over more segments, which is the exact
+      opposite signature of a compilation or cache-eviction stall that would
+      grow with segment count.
+
+      Cross-material at matched `Ne=20000`: per-segment transport cost is
+      **0.2226 us for hopg vs 0.2150 us for MoSe2 — within 3.5% of each
+      other.** MoSe2 is "heavy" only because it produces **733 segments per
+      electron vs hopg's 114** (14.66 M vs 2.29 M segments at the same
+      electron count). There is no material-specific slow path; there is only
+      more work. Note hopg's transport/GPU ratio is *worse* (5.96 vs 2.45)
+      because it has far fewer reflections, so its GPU phase is tiny.
+
+      The named first suspects are **ruled out by direct telemetry** on the
+      reproduction run: `gpu_oom_retry_count_total = 0`,
+      `line_gpu_oom_retries = 0`, `brem_gpu_oom_retries = 0`,
+      `generic_gpu_oom_retries = 0`, and
+      `effective_spec_chunk == attempted_spec_chunk == 100000` — no chunk
+      halving occurred at all, so `Sweep.spec_chunk`/`Sweep.brem_chunk` and
+      the adaptive chunk/OOM-retry path are not involved. VRAM peaked at
+      18.6%, nowhere near the pressure an OOM-retry loop implies (and
+      consistent with the reporter's own 20-50% VRAM observation).
+- [x] Attribute the "GPU 0% for 10s+" window to a specific phase (transport
       `njit` compile/dispatch, checkpoint I/O, host-side chunk sizing) using
       NVTX ranges per the Round 1/2 method, not by inference from utilization
-      alone.
+      alone. **ATTRIBUTED TO TRANSPORT — but not via NVTX, because the NVTX
+      ranges the method assumes do not exist.**
+
+      `docs/compute-performance-optimization.md` (Round 1 method section)
+      refers to `cxr.transport.line` / `cxr.transport.brem` ranges. **Those
+      ranges are not in the tree** — `transport.py` contains zero
+      `_nsys_push`/`_nsys_range` calls, and there is no NVTX range around the
+      transport wait or the worker result transfer either. Every existing
+      range (`cxr.spectrum_case:*`, `cxr.lines*`, `cxr.brem`,
+      `cxr.interpolate`) is on the GPU side, in `runner.py` and `spectrum.py`.
+      An `nsys` capture would therefore show the GPU-idle window only as an
+      *unlabelled gap*, which cannot discriminate the three candidate phases —
+      so NVTX alone could not have answered this item. That doc claim should
+      be corrected.
+
+      Used instead the shipped `cxr.performance.v1` activity labels, which
+      *do* carry per-tick phase identity (`on_activity` emits `transport_wait`
+      before the blocking `fut.result()` and `spectrum` after it). One-second
+      telemetry on the reproduction run:
+
+      | t (s) | phase | GPU % | box CPU % | process CPU % |
+      | --- | --- | --- | --- | --- |
+      | 1.04 | `transport_wait` | 1 | 0.0 | 1.0 |
+      | 2.09 | `transport_wait` | 0 | 3.5 | 101.8 |
+      | 3.13 | `transport_wait` | 0 | 3.7 | 98.9 |
+      | 4.16 | `transport_wait` | 0 | 3.5 | 100.7 |
+      | 5.20 | `transport_wait` | 0 | 3.8 | 99.9 |
+      | 6.25 | `transport_wait` | 0 | 3.9 | 123.9 |
+      | 7.30 | `spectrum` | 1 | 4.1 | 110.9 |
+      | 8.34 | `spectrum` | 66 | 3.4 | 100.3 |
+      | 9.40-12.51 | `spectrum` | 100 | ~3.5 | ~100 |
+
+      Terminal counters: `gpu_feed_wait_fraction = 0.5297`,
+      `driver_wait_seconds_total = 6.981 s`,
+      `transport_seconds_total = 3.454 s`,
+      `spectrum_seconds_total = 6.198 s`,
+      **`checkpoint_seconds_total = 0.0043 s`**, `engine = gpu-pipeline`,
+      `effective_workers = 2`.
+
+      Discriminating the three candidates the item names:
+      - **transport: OWNS the window.** Every GPU-0% tick is labelled
+        `transport_wait`, with exactly one core saturated.
+      - **checkpoint I/O: ruled out.** 4.3 ms total, 0.03% of a 13.3 s run.
+      - **host-side chunk sizing: ruled out.** Chunk never changed and zero
+        OOM retries fired (see the item above).
+      - **`njit` compile: ruled out as the *repeating* cause.** It is a
+        one-time cost, and the per-segment scan shows it amortizing away
+        (0.392 -> 0.215 us/seg) rather than growing.
+
+      One measured detail worth carrying forward: `driver_wait_seconds_total`
+      (6.98 s) is **twice** `transport_seconds_total` (3.45 s). The driver
+      blocked ~3.5 s longer than transport actually computed, which is the
+      cost of returning the full per-case segment payload from the worker
+      process to the driver (the segment dict is pickled through the pool
+      pipe). So the idle window is roughly half transport compute and half
+      transport result transfer — the transfer half is invisible to
+      `transport_seconds_total` and to any transport-side NVTX range that
+      might be added.
 - [ ] Decide fix vs. document as expected (compute-bound transport at very
       high `Ne`) once attributed; do not change chunk defaults without a
       controlled A/B per the "Broader optimization path" above.
