@@ -142,17 +142,27 @@ by `line_prologue_jit_kernel`. Per-layer element data is padded to
 
 ## Expected behaviour, and what is not yet measured
 
-Divergence is the open question. Threads in a warp run until the *last* electron
-in that warp terminates, and electron lifetimes vary widely — hopg's ~114
-segments/electron and MoSe2's ~733 are very different regimes. No throughput
-number is claimed here: this module has not been compiled or run on a GPU, only
-against its CPU reference. The first GPU session must establish, in this order:
+The kernel compiles and its tests pass on an RTX 5080 (driver 610.47, CuPy
+14.1.1, which is simultaneously the `cupy-cuda13x` floor and the current pin):
+37 tests in 54.81s, including determinism, invariance to `nthreads` 32/128/512,
+capacity replay at cap 4/256/4096, first-step agreement with the CPU reference
+at `rtol=1e-12`, and aggregate agreement.
 
-1. that each specialization compiles on the min and current pinned CuPy;
-2. that the 10 CUDA-gated tests pass;
-3. an `Ne` sweep of transport wall time against the CPU core, to find where the
+One porting note worth keeping. `cupyx.jit` follows C promotion in CUDA mode, so
+mixing the uint32 launch indices with a signed int32 scalar yields uint32 and
+then fails the `same_kind` cast of the signed operand. The index is made signed
+once at its source; the alternative — carrying uint32 through the whole kernel,
+as `line_prologue_jit_kernel` does — would have collided with the int32 layer
+tables and int8 exit codes.
+
+**Throughput is still unmeasured**, and divergence is the open question: threads
+in a warp run until the *last* electron in that warp terminates, and electron
+lifetimes vary widely — hopg's ~114 segments/electron and MoSe2's ~733 are very
+different regimes. No throughput number is claimed here. Still to establish:
+
+1. an `Ne` sweep of transport wall time against the CPU core, to find where the
    port pays off and whether launch overhead dominates at low `Ne`;
-4. warp-divergence and occupancy from `nsys` / `ncu`, which decide whether a
+2. warp-divergence and occupancy from `nsys` / `ncu`, which decide whether a
    persistent-thread work queue is worth adding.
 
 ## Not done

@@ -713,10 +713,23 @@ moves. Not done, and the default was not moved.
 
 Open — needs a GPU session, in this order:
 
-- [ ] Compile each specialization on min and current pinned CuPy. Untested
-      transpiler assumptions: `**` (ast.Pow), `xp.abs`/`xp.log10` on device
-      scalars, int16 narrowing on store, zero-size `internal_bounds` as an arg.
-- [ ] Run the 10 CUDA-gated tests.
+- [x] Compile each specialization on min and current pinned CuPy. **Done
+      2026-08-08** on qlmc (RTX 5080, driver 610.47, CuPy 14.1.1 — the
+      `cupy-cuda13x` floor and the current pin are the same version, so one run
+      covers both). One real defect found and fixed: `e = e_start + i` mixed the
+      int32 launcher scalar with the uint32 `blockIdx`/`threadIdx` product, and
+      `cupyx.jit` in CUDA mode promotes that to uint32 and then refuses the
+      `same_kind` cast of the signed operand (`TypeError: Cannot cast from
+      'int32' to uint32`). Fixed by making the thread index signed once at its
+      source. Every listed transpiler assumption held: `**` (ast.Pow),
+      `xp.abs`/`xp.log10` on device scalars, int16 narrowing on store, and
+      zero-size `internal_bounds` passed as an argument all transpile.
+- [x] Run the 10 CUDA-gated tests. **Done 2026-08-08**: 37 passed in 54.81s on
+      qlmc, all 10 CUDA tests included — determinism, launch-geometry
+      independence at nthreads 32/128/512, capacity replay at cap 4/256/4096,
+      first-step agreement with the CPU reference at `rtol=1e-12`, and aggregate
+      agreement. The two slow tests are CPU-side: the 8-seed lockstep comparison
+      (31.15s) and the CUDA-vs-CPU aggregate (14.61s).
 - [ ] `Ne` sweep of transport wall time, GPU core vs CPU core, to find the
       crossover and whether launch overhead dominates at low `Ne`. hopg's ~114
       segments/electron and MoSe2's ~733 are different enough regimes that one

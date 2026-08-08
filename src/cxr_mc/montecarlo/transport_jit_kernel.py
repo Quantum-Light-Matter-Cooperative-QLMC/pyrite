@@ -237,7 +237,11 @@ def _transport_kernel(
     explicit ``running`` flag so nothing depends on ``break``/``continue``
     support in the transpiler.
     """
-    i = jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x
+    # The launch indices are uint32, and every other index here is int32. In
+    # CUDA mode the transpiler promotes a mixed int32/uint32 expression to
+    # uint32, then refuses the `same_kind` cast of the signed operand, so the
+    # index is made signed once at its source rather than at each use.
+    i = np.int32(jit.blockIdx.x * jit.blockDim.x + jit.threadIdx.x)
     if i >= e_count:
         return
 
