@@ -164,7 +164,7 @@ def list_command(json_output):
         return 0
     for row in rows:
         label = f" ({row['label']})" if row["label"] else ""
-        emit_result(f"{row['name']}{label}: {len(row['referenced_by'])} profiles")
+        emit_result(f"{row['name']}{label}: {len(row['referenced_by'] or [])} profiles")
     return 0
 
 

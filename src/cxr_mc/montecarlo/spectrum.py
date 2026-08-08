@@ -1346,7 +1346,7 @@ def mc_spectrum(
                 _nsys_push("cxr.lines.coherent_field")
                 run_coherent_field_accumulation_kernel(
                     *coh_line_data,
-                    E_grid,
+                    E_grid,  # ty: ignore[too-many-positional-arguments]
                     fields=coherent_fields,
                     n_g=N_g,
                     n_seg=sb.stop - sb.start,

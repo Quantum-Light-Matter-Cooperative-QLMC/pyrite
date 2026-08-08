@@ -154,6 +154,9 @@ include = [
     "src/cxr_mc/montecarlo/runner.py",
 ]
 
+[tool.ty.analysis]
+allowed-unresolved-imports = ["cupy*", "cupy*.*"]
+
 [tool.ty.overrides.rules]
 unresolved-attribute = "ignore"
 
