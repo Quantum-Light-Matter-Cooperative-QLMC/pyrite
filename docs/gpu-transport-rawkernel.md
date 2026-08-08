@@ -155,15 +155,43 @@ once at its source; the alternative — carrying uint32 through the whole kernel
 as `line_prologue_jit_kernel` does — would have collided with the int32 layer
 tables and int8 exit codes.
 
-**Throughput is still unmeasured**, and divergence is the open question: threads
-in a warp run until the *last* electron in that warp terminates, and electron
-lifetimes vary widely — hopg's ~114 segments/electron and MoSe2's ~733 are very
-different regimes. No throughput number is claimed here. Still to establish:
+## Measured throughput
 
-1. an `Ne` sweep of transport wall time against the CPU core, to find where the
-   port pays off and whether launch overhead dominates at low `Ne`;
-2. warp-divergence and occupancy from `nsys` / `ncu`, which decide whether a
-   persistent-thread work queue is worth adding.
+RTX 5080, 30 keV into a stopping slab, catalog compositions, 3 repeats, medians,
+compile excluded. hopg runs 354 segments/electron here, MoSe2 880.
+
+| material | Ne | lockstep CPU | per-electron CPU | cuda | cuda vs lockstep |
+| --- | --- | --- | --- | --- | --- |
+| hopg | 250 | 0.020 s | 0.022 s | 0.018 s | 1.11x |
+| hopg | 1000 | 0.096 s | 0.091 s | 0.041 s | 2.32x |
+| hopg | 4000 | 0.404 s | 0.963 s | 0.099 s | 4.10x |
+| hopg | 16000 | 2.387 s | 4.416 s | 0.151 s | 15.86x |
+| mose2 | 250 | 0.039 s | 0.082 s | 0.086 s | 0.46x |
+| mose2 | 1000 | 0.163 s | 0.347 s | 0.102 s | 1.60x |
+| mose2 | 4000 | 0.766 s | 2.838 s | 0.187 s | 4.10x |
+| mose2 | 16000 | 6.154 s | 11.459 s | 1.269 s | 4.85x |
+
+The crossover is `Ne` ≈ 500–1000 for both materials, so launch overhead stops
+mattering below production sizes. The 450-electron default sits on it.
+
+Two results worth carrying forward. The per-electron core is *slower than
+lockstep on CPU* (0.27–1.05x): counter-addressed draws and worse locality cost
+more than the restructuring saves, so the win is the device, not the algorithm —
+which is what a `numba.prange` version would have to overcome. And lockstep's own
+cost per segment degrades with `Ne` (226 → 421 ns for hopg), so part of the
+headline 15.86x is the baseline getting worse.
+
+MoSe2's weaker 4.85x is not divergence. Its per-electron tail exceeds the default
+512-slot capacity, so the first batch — most of the run — completes, overflows,
+and replays at a larger capacity. Capacity and batch size trade against a fixed
+byte budget, so a bigger static default is not the fix (cap=4096 starves the GPU,
+and hopg's optimum is 1024 against MoSe2's 2048); sizing capacity from a small
+probe batch is.
+
+Divergence itself remains the open question — threads in a warp run until the
+*last* electron in that warp terminates. Warp-divergence and occupancy from
+`nsys` / `ncu` are still to be collected, and they decide whether a
+persistent-thread work queue is worth adding.
 
 ## Not done
 

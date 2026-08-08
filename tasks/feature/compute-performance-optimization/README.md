@@ -730,10 +730,65 @@ Open — needs a GPU session, in this order:
       first-step agreement with the CPU reference at `rtol=1e-12`, and aggregate
       agreement. The two slow tests are CPU-side: the 8-seed lockstep comparison
       (31.15s) and the CUDA-vs-CPU aggregate (14.61s).
-- [ ] `Ne` sweep of transport wall time, GPU core vs CPU core, to find the
-      crossover and whether launch overhead dominates at low `Ne`. hopg's ~114
-      segments/electron and MoSe2's ~733 are different enough regimes that one
-      measurement will not cover both.
+- [x] `Ne` sweep of transport wall time, GPU core vs CPU core. **Done
+      2026-08-08** on qlmc (RTX 5080, CuPy 14.1.1, NumPy 2.4.6, numba 0.65.1,
+      Python 3.14.6). Workload: 30 keV into a 1e6 Ang stopping slab, catalog
+      compositions from `build_cases(material_sweep(m))[0]`, `E_cut=5 keV`,
+      seed 1, 3 repeats, medians below, compile excluded by a warm-up call.
+      hopg runs 354 segments/electron and MoSe2 880 in this slab (not the 114 /
+      733 quoted from the earlier profile, which was a thinner, transmitting
+      case — the ratio between the two materials is what carries over).
+
+      | material | Ne | lockstep | per-electron CPU | cuda | cuda vs lockstep |
+      | --- | --- | --- | --- | --- | --- |
+      | hopg | 250 | 0.020 s | 0.022 s | 0.018 s | 1.11x |
+      | hopg | 1000 | 0.096 s | 0.091 s | 0.041 s | 2.32x |
+      | hopg | 4000 | 0.404 s | 0.963 s | 0.099 s | 4.10x |
+      | hopg | 16000 | 2.387 s | 4.416 s | 0.151 s | 15.86x |
+      | mose2 | 250 | 0.039 s | 0.082 s | 0.086 s | 0.46x |
+      | mose2 | 1000 | 0.163 s | 0.347 s | 0.102 s | 1.60x |
+      | mose2 | 4000 | 0.766 s | 2.838 s | 0.187 s | 4.10x |
+      | mose2 | 16000 | 6.154 s | 11.459 s | 1.269 s | 4.85x |
+
+      Three findings:
+
+      1. **Crossover is Ne ~ 500-1000 for both materials**, so launch overhead
+         stops mattering well below production `Ne`. The 450-electron default
+         sits right at it; `--ne-line=20000` is far past it.
+      2. **The CPU per-electron core is a regression, 0.27-1.05x of lockstep.**
+         The restructuring costs on CPU (counter-addressed SplitMix64 per draw
+         instead of batched `Generator` draws, and worse locality); the win is
+         entirely the device. The deferred `numba.prange` idea therefore starts
+         from a ~2x deficit and needs more than 2 cores just to break even.
+      3. **MoSe2's 4.85x at Ne=16000 is a capacity defect, not divergence** —
+         see the item below. Note also that lockstep's own ns/segment degrades
+         with `Ne` (226 -> 421 for hopg, 180 -> 433 for MoSe2), so part of the
+         15.86x is the CPU baseline getting worse, not the GPU getting better.
+
+- [ ] **Fix the first-batch capacity gamble** (found by the sweep above, not yet
+      implemented). `cap` starts at `config.seg_capacity` = 512 and is carried
+      across batches, but MoSe2's per-electron tail exceeds it, so batch 0 —
+      12787 of the 16000 electrons at that capacity — runs to completion,
+      overflows, and is replayed at cap=2048 with a batch of 3196. Roughly 80%
+      of the run is thrown away, once. Measured at Ne=16000, MoSe2:
+
+      | cap | budget | batch | median | ns/seg |
+      | --- | --- | --- | --- | --- |
+      | 512 (default) | 512 MB | 12787 | 1.981 s | 140.9 |
+      | 1024 | 512 MB | 6393 | 1.451 s | 103.2 |
+      | 2048 | 512 MB | 3196 | 0.927 s | 65.9 |
+      | 2048 | 4 GB | 25575 | 0.863 s | 61.3 |
+      | 4096 | 512 MB | 1598 | 1.368 s | 97.3 |
+
+      Raising the static default is the wrong fix: `cap` and `batch` trade off
+      against a fixed byte budget, so cap=4096 starves the GPU, and hopg's own
+      optimum is 1024 (0.153 s) against MoSe2's 2048. The right fix is to make
+      the first batch a small probe, read the true `seg_count.max()` it reports
+      even on overflow, and size `cap` from that before the full batches run.
+      Probe results are kept rather than discarded — output slots are addressed
+      by electron index, so a small first batch is just a smaller batch — so in
+      the common case the fix costs nothing and removes the replay entirely.
+      Expected to take MoSe2 Ne=16000 from 4.85x to ~7x with no tuning knob.
 - [ ] Warp divergence and occupancy from `nsys`/`ncu`; decides whether a
       persistent-thread work queue is worth adding.
 
