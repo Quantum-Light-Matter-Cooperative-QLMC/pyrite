@@ -177,7 +177,12 @@ Scope is `cxr remote run`; no local-run flag is added by this slice.
 
 ## Next slice: rawkernel/physics verification + MoSe2 stall
 
-Not started. Two parts of the same Active TODO item.
+Not started. Two parts of the same Active TODO item. Editing/dispatch
+environment for this slice is an Intel-dGPU laptop with no CUDA device and no
+locally-visible SYCL device — Part A's CUDA compile/compare/golden/A-B-timing
+work is not runnable here at all and must go through `cxr remote` on
+`qlmc`/`ALEX-DESKTOP` per `AGENTS.md`; only the non-NVIDIA-fallback spot check
+below is local.
 
 ### A. Required GPU verification (gates enabling Round 3)
 
@@ -201,10 +206,16 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
       on both `ALEX-DESKTOP` and `qlmc`.
 - [ ] Re-measure transport/GPU overlap before touching process counts or
       starting a `prange`/CUDA transport project.
-- [ ] Confirm the non-NVIDIA (CPU/NumPy, no CuPy) fallback path still runs
+- [x] Confirm the non-NVIDIA (CPU/NumPy, no CuPy) fallback path still runs
       and is exercised by CI — `_USE_JIT_LINE_PROLOGUE` and the raw kernels
       are CUDA/CuPy-only branches; the eager/CPU path must be untouched and
-      covered.
+      covered. Spot-checked 2026-08-08 on an Intel-dGPU laptop (no CUDA, no
+      visible SYCL device in this dev environment — `dpctl.get_devices()`
+      returns `[]`): `tests/integration/test_intel_sycl_backend.py` +
+      `test_backend_selection.py` are 11 passed / 1 skipped, i.e. backend
+      auto-probe already falls through past CUDA/SYCL to CPU cleanly. This
+      only confirms general backend fallback machinery, not the new prologue
+      kernel specifically (it has no dedicated test either way).
 - [ ] If any of the above passes clean, flip `_USE_JIT_LINE_PROLOGUE = True`
       as its own reviewed change with a `Validation:` id and ledger row
       (Round 2 measured non-bit-for-bit `fma` contraction on the earlier
