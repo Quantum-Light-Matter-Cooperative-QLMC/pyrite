@@ -225,12 +225,29 @@ rather than merge.
       and regenerated `docs/cli-deprecations.md` / `docs/cli-reference.md`.
       20 new tests in `tests/cli/test_beam.py`, including a value-equality
       check against a hand-written `[beams.NAME]` block.
-- [ ] **D. Profile attachment** — `cxr profile set <profile> --beam NAME`,
+- [x] **D. Profile attachment** — `cxr profile set <profile> --beam NAME`,
       `cxr profile remove <profile> --beam`, unknown-beam error, `--beam` in
       `cxr profile show` output and its JSON payload.
-- [ ] **E. Deprecate the inline flags** — the nine `_beam_cli_options` flags
+      Landed `7fd0043`: `--beam NAME` on `create`/`set` (mutually exclusive
+      with the nine inline flags), `_unknown_beam` mirrors `cxr beam`'s own
+      suggestion/creation-hint style, `remove --beam` is a flag (no value)
+      that detaches named or inline beams and errors if none is present.
+      `show` gains a `beam_ref` field (text + JSON) alongside the unchanged
+      `beam` inline-table field. Writing inline flags onto a profile that
+      already carries a named reference errors instead of silently
+      detaching it (decision 4). 14 new tests in `tests/cli/test_profile.py`.
+- [x] **E. Deprecate the inline flags** — the nine `_beam_cli_options` flags
       keep working, warn once naming `cxr beam`, and appear in the generated
       deprecation reference. `cxr-dev cli-deprecations` regenerated.
+      Landed `7fd0043`: the existing `RetiredOption`/`canonical_option`
+      substrate only merges a retired spelling into a *different* flag on
+      the *same* command, which doesn't fit "flag keeps its own spelling,
+      whole feature moved to an unrelated command" — added a
+      `SELF_WARNING_FLAGS` carve-out (flag-level analogue of the existing
+      `SELF_WARNING` command-path carve-out) to `cli/_deprecations.py`;
+      `profile.py` calls `warn_flag` manually, once per flag per
+      invocation. `docs/cli-deprecations.md` / `docs/cli-reference.md`
+      regenerated.
 - [ ] **F. Migrate shipped profiles** — five inline blocks become named beams;
       golden regen (`tests/data/material_catalog_golden.json`, via
       `cxr-dev regen-golden`) and a test pinning every migrated profile's
