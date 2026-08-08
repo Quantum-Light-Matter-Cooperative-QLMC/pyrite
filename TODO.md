@@ -61,7 +61,16 @@ file. Edit and drop items on `main`.
    `montecarlo/_backend.py` fallback dispatch 69%, `energy_grid/apply.py` 78%.
    → `chore/test-coverage-baseline`;
    [`tasks/chore/test-coverage-baseline/`](tasks/chore/test-coverage-baseline/).
-6. **Repository and source-package structure cleanup.** Eight slices beyond the
+6. **Physics boundary typing.** `typecheck` passes, but the physics packages are
+   the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`
+   6.6% (vs `materials` 59.8%); of 42 public re-exported functions, 2 are fully
+   annotated. Annotate the public boundary only, with unit-carrying aliases
+   (278 `_ang` / 228 `_rad` / 206 `_eV` names carry units in spelling alone) and
+   explicit `| None`. Not a blanket pass over array helpers; no stricter ty gate
+   (`--error all` is 51 diagnostics, mostly correlated-guard false positives).
+   → `chore/physics-boundary-typing`;
+   [`tasks/chore/physics-boundary-typing/`](tasks/chore/physics-boundary-typing/).
+7. **Repository and source-package structure cleanup.** Eight slices beyond the
    accepted structure RFC: installed-package path resolution (shipped code
    anchors on the developer checkout and the wheel omits the marimo apps),
    top-level module grouping, `cli/` alias-shim removal, CLI/domain
