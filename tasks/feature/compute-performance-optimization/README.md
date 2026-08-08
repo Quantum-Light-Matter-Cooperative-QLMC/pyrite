@@ -194,14 +194,101 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
 `line_prologue` today (`rg` confirms zero hits under `tests/`). Round 3's own
 "Required GPU verification" list is the checklist:
 
-- [ ] Compile each JIT specialization on the minimum and current supported
-      CuPy versions.
-- [ ] Compare the prologue's `E_r`, `aw`, and nonzero `w` against the eager
+- [x] Compile each JIT specialization on the minimum and current supported
+      CuPy versions. **PASS** (2026-08-08, `qlmc` = DESKTOP-QNIHO3D, RTX 5080
+      16 GiB, driver 610.47, SM 12.0, Python 3.14.6, CUDA runtime 13.2,
+      NVRTC 13.3, NumPy 2.4.6, Numba 0.65.1). *Minimum and current supported
+      CuPy are the same version*: `pyproject.toml` pins the NVIDIA extra to
+      `cupy-cuda13x[ctk]>=14.1.1`, and 14.1.1 is also the newest release on
+      PyPI (release tail: 13.6.0, 14.0.0, 14.0.1, 14.1.0, 14.1.1), so there is
+      exactly one supported CuPy for the CUDA path and it is the installed
+      one. The `amd` extra (`cupy>=13.4.0`, ROCm) is not testable on an NVIDIA
+      box and CuPy 13.x does not support CUDA 13, so it is out of scope here.
+      16/16 launch paths ran clean, and a `_cached_codes` audit over every
+      `_JitRawKernel` in the five kernel modules confirms **14/14 global
+      kernels hold a compiled specialization, 0 uncovered** (device=True
+      helpers are inlined and correctly show 0). The audit caught a real gap
+      on the first pass: `coherent_stream_jit_kernel._field_kernel_1e` is
+      unreachable from the production path because
+      `CoherentStreamKernelConfig` pins `energies_per_block=2`; it is now
+      driven explicitly. Harness: `verify_prologue.py compile`.
+- [x] Compare the prologue's `E_r`, `aw`, and nonzero `w` against the eager
       path on one-block synthetic inputs, edge-bracketing inputs, and full
-      MoS2 cases.
-- [ ] Run the line golden suite and repeated-run determinism checks; record
+      MoS2 cases. **PASS with a quantified, non-bit-for-bit `w`.** Method: the
+      reference is recomputed from `spectrum.py`'s *own* eager helpers
+      (`_line_kin_core`, `_interp_index`, `_interp_gather_line_tables`,
+      `_line_amp_sq_core`, `_line_weight_core`) assembled exactly as the
+      batched incoherent branch assembles them — not a reimplementation. For
+      the full-material cases the prologue is wrapped so **every production
+      launch** is checked pairwise against eager on identical inputs.
+
+      | case | pairs | kept | mask disagreements | `E_r` | `aw` | `w` max rel | `w` max ULP | `w` bitwise |
+      | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+      | one-block 256x1 | 256 | see note | 0 | bit-for-bit | bit-for-bit | — | — | — |
+      | one-block 64x4 | 256 | 63 | 0 | bit-for-bit | bit-for-bit | 2.83e-6 | 34 | 33/63 |
+      | edge-bracketing | 168 | 70 | 0 | bit-for-bit | bit-for-bit | 5.26e-7 | 8 | 56/70 |
+      | full MoS2 (Ne=200) | 7,661,016 | 3,767,496 | 0 | bit-for-bit | bit-for-bit | 7.97e-6 | 124 | 3,044,265 |
+      | full MoSe2 (Ne=200) | 9,260,658 | 4,567,449 | 0 | bit-for-bit | bit-for-bit | 7.82e-6 | 104 | 4,242,447 |
+
+      Key results:
+      - **Keep-mask agreement is exact everywhere** (0 kernel-only and 0
+        eager-only survivors across 17.2 M pairs), including the
+        edge-bracketing case that deliberately places `E_res` exactly on
+        `lo_keep`, `hi_keep`, the 10 eV floor, both `E_tab` endpoints, interior
+        bracket nodes, and outside both table ends. The kernel's negated
+        early-return branch is equivalent to the eager boolean mask.
+      - **`E_r` and `aw` are bit-for-bit identical** (0 ULP) on all 8.3 M
+        compared survivors.
+      - **`w` is NOT bit-for-bit**, max relative 7.97e-6 (~67 float32 eps),
+        max 124 ULP. This is the Round 2 `fma` finding reproduced on Round 3's
+        fixed-order kernel, and it was predicted by static audit before
+        measuring: the eager gather kernel
+        (`_INTERP_GATHER_LINE_TABLES_F32`) deliberately spells the blend with
+        `__fadd_rn`/`__fmul_rn`/`__fsub_rn` round-to-nearest intrinsics to
+        *prevent* NVCC contracting `f0 + frac*(f1-f0)` into an FMA, while
+        `line_prologue_jit_kernel._interp_row`/`_interp_shared` use plain
+        `cupyx.jit` arithmetic with no such guard. `_polarization_amplitude_sq`
+        is likewise FMA-contractible where `_line_amp_sq_core` is not.
+      - Divergence is confined to `w` exactly as that mechanism predicts:
+        `E_r` and `aw` never pass through an interpolated table value.
+      Harness: `verify_prologue.py numeric` / `verify_prologue.py material`.
+- [x] Run the line golden suite and repeated-run determinism checks; record
       max absolute error, max error/peak, significant-bin relative error, and
-      integral drift.
+      integral drift. **PASS.** Spectrum-level A/B on identical transported
+      segments (flag off vs on, same case, same seed):
+
+      | material | Ne | n_seg | bins | peak | max abs err | max err/peak | significant-bin max rel | integral drift |
+      | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+      | MoS2 | 200 | 116,076 | 698 | 3.352e-8 | 7.11e-15 | 2.12e-7 | 3.53e-7 | 5.00e-8 |
+      | MoSe2 | 200 | 140,313 | 598 | 2.773e-8 | 3.55e-15 | 1.28e-7 | 2.95e-7 | 4.07e-8 |
+
+      All bins are "significant" (>1e-3 of peak) in both cases. For scale, the
+      repo's own accepted cross-path latitude for the batched line path is
+      `BATCH_RTOL = 500 * eps_f32 = 5.96e-5`
+      (`tests/montecarlo/test_coherent_emission.py`); the measured
+      significant-bin error is ~170x tighter than that already-accepted bound.
+      **Determinism: 3 consecutive prologue runs on identical inputs were
+      bitwise identical (max repeat diff exactly 0.0)** for both materials —
+      the fixed-order zero-weight design does deliver the run-to-run
+      determinism it was chosen for, unlike the atomic-compaction alternative.
+      Observed keep fraction is ~49% for both materials, so the zero-padded
+      reduction input is only ~2x the compacted eager input, not the
+      order-of-magnitude blowup a low keep fraction would have caused.
+
+      Suite half of this item: `cxr-dev test-suite core` on `qlmc` (GPU
+      backend live, so the flag is actually reached) gives **identical results
+      with the flag off and on — 1075 passed, 3 failed, 42 skipped in both
+      arms, the same 3 tests**. The prologue changes zero test outcomes. Those
+      3 failures are `cxr remote sync` artifacts, not regressions: sync omits
+      `docs/` and `scripts/`, so
+      `test_refresh_retains_cached_entry_after_configured_mp_failure` cannot
+      import `scripts/refresh_external_cif.py`,
+      `test_bundled_crystal_validation_ids_are_ledgered` cannot open
+      `docs/physics-validation-ledger.md`, and the energy-grid golden
+      comparison lacks its checked-in inputs. Verified: the same three test
+      files pass locally (76 passed) where those paths exist. Note the test
+      tree itself is not synced by `cxr remote sync` either and had to be
+      copied to `qlmc` separately to run this at all.
 - [ ] Re-run the interleaved burn-in A/B harness at `Ne=450`, 2000, and 10000
       on both `ALEX-DESKTOP` and `qlmc`.
 - [ ] Re-measure transport/GPU overlap before touching process counts or
