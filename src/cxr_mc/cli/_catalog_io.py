@@ -80,6 +80,26 @@ def material_rows(document):
     return materials
 
 
+def beam_rows(document):
+    """Return ``[beams.*]`` rows, or ``{}`` -- unlike materials/profiles,
+    ``beams`` is an optional top-level table."""
+    beams = document.get("beams", {})
+    if not isinstance(beams, dict):
+        raise ValueError("catalog beams table must be a table")
+    return beams
+
+
+def beams_table(document):
+    """Return the writable top-level ``[beams]`` table, creating it if absent."""
+    beams = document.get("beams")
+    if beams is None:
+        beams = tomlkit.table()
+        document["beams"] = beams
+    elif not isinstance(beams, dict):
+        raise ValueError("catalog beams table must be a table")
+    return beams
+
+
 def profile_overrides(profile):
     overrides = profile.get("overrides", {})
     if not isinstance(overrides, dict):

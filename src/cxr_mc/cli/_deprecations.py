@@ -337,6 +337,9 @@ DEPRECATED_FLAGS: dict[tuple[str, str], DeprecatedFlag] = {
         _flag("profile show", "--json", "--output json"),
         _flag("material show", "--json", "--output json"),
         _flag("material blaze", "--json", "--output json"),
+        _flag("beam delete", "--json", "--output json"),
+        _flag("beam list", "--json", "--output json"),
+        _flag("beam show", "--json", "--output json"),
     )
 }
 

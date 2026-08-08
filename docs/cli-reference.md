@@ -89,6 +89,7 @@ Commands:
   energy-grid  Derive, inspect, and manage immutable photon-energy-grid artifacts.
   profile      Manage named catalog campaigns and material membership.
   material     Inspect, validate, edit, and blaze individual materials.
+  beam         Manage named beams, attachable to profiles by name.
 ```
 
 ## `cxr run`
@@ -1772,4 +1773,157 @@ Usage: cxr material validate [OPTIONS] [MANIFEST]
 
 Options:
   -h, --help  Show this message and exit.
+```
+
+## `cxr beam`
+
+```text
+Usage: cxr beam [OPTIONS] COMMAND [ARGS]...
+
+  Manage named beams (``[beams.*]``), attachable to profiles by name.
+
+  A named beam carries the same distribution fields as an inline
+  ``[profiles.NAME.beam]`` block, plus an optional display-only ``label``. Attach one to
+  a profile with ``cxr profile set NAME --beam BEAM``.
+
+  Examples:
+    cxr beam list
+    cxr beam show rf_gun_200fs
+    cxr beam create rf_gun_200fs --rep-rate-hz 1000 --bunch-charge-pc 2.5
+    cxr beam set rf_gun_200fs --energy-spread 0.001
+    cxr beam rename rf_gun_200fs lab_gun
+    cxr beam delete rf_gun_200fs -y
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  create  Create a new named beam NAME.
+  delete  Delete a named beam; irreversible.
+  list    List named beams with label and profile-reference counts.
+  rename  Rename beam NAME to NEW_NAME.
+  set     Update fields on an existing named beam NAME.
+  show    Show one named beam's fields.
+```
+
+## `cxr beam create`
+
+```text
+Usage: cxr beam create [OPTIONS] NAME
+
+  Create a new named beam NAME.
+
+  Requires at least one beam-field option; --label alone does not define a beam. Attach
+  the result to a profile with ``cxr profile set PROFILE --beam NAME``.
+
+Options:
+  --label TEXT                    Display-only description; never affects
+                                  parameter_sha256.
+  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad; replaces
+                                  the spot FWHM.  [x>0.0]
+  --twiss-beta M                  Courant-Snyder beta in m. Requires --emittance.
+                                  [x>0.0]
+  --twiss-alpha A                 Courant-Snyder alpha; negative diverges. Requires
+                                  --emittance.
+  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.  [x>0.0]
+  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.  [x>0.0]
+  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]
+  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]
+  --longitudinal [gaussian|microtrain|compressed]
+                                  Replace the complete declarative longitudinal policy.
+  --envelope-rms-fs FS            RMS duration for gaussian or microtrain longitudinal
+                                  policy.  [x>0.0]
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `cxr beam delete`
+
+```text
+Usage: cxr beam delete [OPTIONS] NAME
+
+  Delete a named beam; irreversible.
+
+  Blocked while any profile still references NAME via ``beam = "NAME"``; referents are
+  listed. Reattach or remove those profiles' ``--beam`` reference first.
+
+Options:
+  -y, --yes                       Delete the exact previewed beam.
+  --dry-run                       Print proposed TOML diff; delete nothing.
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `cxr beam list`
+
+```text
+Usage: cxr beam list [OPTIONS]
+
+  List named beams with label and profile-reference counts.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
+```
+
+## `cxr beam rename`
+
+```text
+Usage: cxr beam rename [OPTIONS] NAME NEW_NAME
+
+  Rename beam NAME to NEW_NAME.
+
+  NEW_NAME must not already exist. Any profile referencing NAME via ``beam = "NAME"`` is
+  updated to reference NEW_NAME, so renaming never orphans a profile.
+
+Options:
+  --dry-run   Print proposed TOML diff; write nothing.
+  -h, --help  Show this message and exit.
+```
+
+## `cxr beam set`
+
+```text
+Usage: cxr beam set [OPTIONS] NAME
+
+  Update fields on an existing named beam NAME.
+
+  NAME must already exist (create it with ``cxr beam create``); unknown names error with
+  suggestions.
+
+Options:
+  --label TEXT                    Display-only description; never affects
+                                  parameter_sha256.
+  --emittance MM_MRAD             Normalized transverse emittance in mm*mrad; replaces
+                                  the spot FWHM.  [x>0.0]
+  --twiss-beta M                  Courant-Snyder beta in m. Requires --emittance.
+                                  [x>0.0]
+  --twiss-alpha A                 Courant-Snyder alpha; negative diverges. Requires
+                                  --emittance.
+  --energy-spread FRAC            RMS relative energy spread, (E - <E>) / <E>.  [x>0.0]
+  --transverse-fwhm-mm MM         Circular Gaussian transverse FWHM in mm.  [x>0.0]
+  --rep-rate-hz HZ                Bunch repetition rate in Hz.  [x>0.0]
+  --bunch-charge-pc PC            Physical charge per bunch in pC.  [x>0.0]
+  --longitudinal [gaussian|microtrain|compressed]
+                                  Replace the complete declarative longitudinal policy.
+  --envelope-rms-fs FS            RMS duration for gaussian or microtrain longitudinal
+                                  policy.  [x>0.0]
+  -y, --yes                       Skip overwrite confirmation.
+  --dry-run                       Print proposed TOML diff; write nothing.
+  -h, --help                      Show this message and exit.
+```
+
+## `cxr beam show`
+
+```text
+Usage: cxr beam show [OPTIONS] NAME
+
+  Show one named beam's fields.
+
+Options:
+  -o, --output [table|json|wide]  Output format; only json is a stable automation
+                                  contract.  [default: table]
+  -h, --help                      Show this message and exit.
 ```

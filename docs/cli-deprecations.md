@@ -70,6 +70,9 @@ Per RFC D7 (`cli-redesign-rfc.md`), every renamed or retired `cxr` command or op
 | `cxr app viewer` | `--default` | `--save-default` | 0.1.0 | 0.3.0 |  |
 | `cxr app viewer launch` | `--default` | `--save-default` | 0.1.0 | 0.3.0 |  |
 | `cxr archives` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr beam delete` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr beam list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
+| `cxr beam show` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr checkpoint list` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr checkpoint recompute brem` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
 | `cxr checkpoint recompute line` | `--json` | `--output json` | 0.1.0 | 0.3.0 |  |
