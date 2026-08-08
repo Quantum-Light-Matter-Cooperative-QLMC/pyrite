@@ -49,11 +49,11 @@ SKILL_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 TEST_SUITE_PATTERNS = {
     "packaging": (
-        "test_agent_tooling.py",
+        "dev/test_agent_tooling.py",
         "cli/test_contract.py",
         "cli/test_reference.py",
         "detectors/test_package.py",
-        "test_dev.py",
+        "dev/test_dev.py",
         "materials/test_materials_package.py",
         "montecarlo/test_exports.py",
         "plots/test_exports.py",
@@ -72,23 +72,23 @@ TEST_SUITE_PATTERNS = {
         "notebooks/test_scan_app.py",
         "notebooks/test_trace_app.py",
         "plots/test_trajectories.py",
-        "test_validation_background.py",
+        "materials/test_validation_background.py",
         "notebooks/test_viewer.py",
     ),
     "cli": (
         "checkpoint/test_archive.py",
-        "test_blaze.py",
+        "cli/test_blaze.py",
         "materials/test_catalog_startup_errors.py",
         "check/test_config.py",
         "checkpoint/test_cli.py",
         "checkpoint/test_gc.py",
         "cli/test_*.py",
         "energy-grid/test_cli.py",
-        "test_local_dashboard.py",
-        "test_output_noise.py",
+        "scan/test_local_dashboard.py",
+        "montecarlo/test_output_noise.py",
         "remote/test_remote.py",
         "remote/test_click.py",
-        "test_scan_*.py",
+        "scan/test_scan_*.py",
         "checkpoint/test_slim.py",
     ),
 }
@@ -100,8 +100,8 @@ INTEGRATION_TESTS = (
     "montecarlo/test_exports.py",
     "remote/test_remote.py",
     "results/test_exports.py",
-    "test_run.py",
-    "test_sweep.py",
+    "scan/test_run.py",
+    "scan/test_sweep.py",
 )
 TEST_SUITE_NAMES = ("core", "cli", "apps", "packaging", "integration")
 

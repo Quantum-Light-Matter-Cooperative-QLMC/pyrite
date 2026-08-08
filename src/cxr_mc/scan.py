@@ -611,7 +611,7 @@ def _resolved_run(args, material):
     # profile-owned: there is no per-run override path. Set it once on a catalog
     # profile with `cxr profile create/edit`, so every run that names the profile
     # gets the same beam and the same dataset identity.
-    # See tests/test_scan_beam_options.py.
+    # See tests/scan/test_scan_beam_options.py.
     sweep = (
         material_sweep(material, catalog_profile=catalog_profile, **overrides)
         if fidelity == "full"

@@ -74,11 +74,11 @@ def test_test_forwards_pytest_selectors_and_arguments(dev_module, monkeypatch) -
     monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
 
     args = dev_module.build_parser().parse_args(
-        ["test", "tests/test_dev.py", "-k", "forward", "-vv"]
+        ["test", "tests/dev/test_dev.py", "-k", "forward", "-vv"]
     )
     args.func(args)
 
-    assert calls == [("-m", "pytest", "tests/test_dev.py", "-k", "forward", "-vv")]
+    assert calls == [("-m", "pytest", "tests/dev/test_dev.py", "-k", "forward", "-vv")]
 
 
 def test_test_forwards_pytest_arguments_when_option_comes_first(dev_module, monkeypatch) -> None:

@@ -18,7 +18,7 @@ def dev_module():
 
 @pytest.fixture
 def sweep_guard_module():
-    path = Path(__file__).parents[1] / ".claude" / "hooks" / "guard_local_sweep.py"
+    path = Path(__file__).parents[2] / ".claude" / "hooks" / "guard_local_sweep.py"
     spec = importlib.util.spec_from_file_location("cxr_mc_sweep_guard", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
@@ -150,7 +150,7 @@ def test_repository_skills_are_valid_and_exactly_mirrored(dev_module) -> None:
 
 
 def test_claude_project_memory_imports_shared_instructions() -> None:
-    claude_md = Path(__file__).parents[1] / "CLAUDE.md"
+    claude_md = Path(__file__).parents[2] / "CLAUDE.md"
 
     assert "@AGENTS.md" in claude_md.read_text(encoding="utf-8")
 
@@ -159,7 +159,7 @@ def test_agent_session_start_syncs_optional_dependencies() -> None:
     # "chore: remove rtk & tokensave hook calls" dropped the rtk wrapper from
     # the Claude-side sync script (plain `export UV_CACHE_DIR=...`); Codex's
     # hooks.json still wraps its sync command through `rtk env`.
-    root = Path(__file__).parents[1]
+    root = Path(__file__).parents[2]
     expected = "uv sync --all-groups"
     claude = json.loads((root / ".claude" / "settings.json").read_text())
     codex = json.loads((root / ".codex" / "hooks.json").read_text())
