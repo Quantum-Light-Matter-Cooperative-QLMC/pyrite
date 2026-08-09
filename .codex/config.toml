@@ -6,4 +6,3 @@ args = [
   "--project-from-cwd",
   "--add-mode=.serena/modes/cxr-tools.yml",
 ]
-cwd = ".."
