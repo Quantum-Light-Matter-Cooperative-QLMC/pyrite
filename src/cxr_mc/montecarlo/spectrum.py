@@ -98,8 +98,9 @@ def _line_amp_sq_core(
     NOT bit-for-bit vs the old complex expression -- the multiply/divide are
     reassociated (chi*(N/detuning) vs (chi/detuning)*N), so the line/PXR/CBS
     goldens move at float-rounding level.
-    LEDGER + REGEN REQUIRED: add a physics-ledger row and regenerate the affected
-    spectrum goldens (regen-golden) before this is signed off. Validation: line-amplitude-fusion
+    Ledgered `filtered` (measured reassociation envelope in the row); REGEN still
+    required -- regenerate the affected spectrum goldens (regen-golden) before this
+    is signed off. Validation: line-amplitude-fusion
     """
     f_pxr = (v_dot_kg * g_dot_e - om * om * v_dot_e) / detuning
     braced_ge = g_dot_e - vdg * v_dot_e
@@ -128,12 +129,14 @@ def _dot3_core(a0, a1, a2, b0, b1, b2):
     the ``kg.kg`` / ``v.kg`` einsums, ``r@g`` phase) were dispatched as ~6.3k
     ``internal::gemvx`` launches carrying ~24% of the 300 keV line-path GPU
     time. Spelled elementwise this fuses to a single CuPy kernel (no cuBLAS
-    handle, no launch) and runs bit-for-bit identical on NumPy.
+    handle, no launch) and runs bit-for-bit identical on NumPy at ``float32``
+    (measured; at NumPy ``float64`` the reference dispatches through BLAS and the
+    two differ by ~1e-10 relative).
 
     NOT bit-for-bit vs BLAS: the sum is reassociated to ``(a0*b0 + a1*b1) +
     a2*b2``, which differs from GEMV accumulation at float-rounding level.
-    LEDGER + REGEN REQUIRED: fold into the physics-ledger row and regenerate the
-    affected spectrum goldens (regen-golden) before sign-off.
+    Ledgered `filtered`; REGEN still required -- regenerate the affected spectrum
+    goldens (regen-golden) before sign-off.
     Validation: line-gemv-elementwise
     """
     return a0 * b0 + a1 * b1 + a2 * b2
@@ -737,14 +740,22 @@ def mc_spectrum(
     # evaluated exactly per (segment, reflection) via a CPU xraydb spline behind
     # a per-block _to_cpu sync -- the real GPU-starving cost (~59 s at ~9% GPU
     # utilisation). mu uses only f2 and is smoother between nodes than chi/U (no
-    # f1 edge cusp), so this is at least as accurate as the chi/U interpolation
-    # already accepted here. Applied to the single-slab and finite-footprint
+    # f1 edge cusp). Applied to the single-slab and finite-footprint
     # branches (coherent AND incoherent alike, so their single-segment
     # limiting-case identity still holds bit-for-bit); the layered _stack_tau
     # and grooved escape paths keep exact per-point mu.
     #
+    # CAUTION: the "smoother than chi/U, so at least as accurate" argument this
+    # comment used to make is MEASURABLY FALSE near an absorption edge, and using
+    # only f2 is why -- the edge jump is the whole of mu's variation, where in
+    # chi_g it rides on a smooth f0. Measured against exact per-point mu, the
+    # error is edge-localized but reaches 2.7e-1 within ~1 eV of hopg's C K-edge
+    # (283.7 eV) and 3.8e-2 at MoS2's S K-edge, versus 5.8e-5 for chi_g on the
+    # same grid. Median is 1.6e-6. See the ledger row for the full bound.
+    #
     # Physics-METHOD change (tabulated vs exact absorption), not a reassociation.
-    # LEDGER + REGEN + human sign-off REQUIRED. Validation: line-absorption-tabulation
+    # Ledgered `discrepancy`; REGEN + human sign-off still REQUIRED.
+    # Validation: line-absorption-tabulation
     mu_tab_g = xp.asarray(np.asarray(_mu_total_inv_ang(abs_comp, E_tab)), dtype=REAL)
 
     n_hat_d = xp.asarray(n_hat, dtype=REAL)  # detector dir is g-independent: hoist
@@ -1139,7 +1150,9 @@ def mc_spectrum(
         # NOT bit-for-bit vs the per-hkl loop: reassociates the float reductions
         # (component dots, batched linear interp, union-order sinc matmul), same
         # rounding-level move the chunk-invariance rtol gate already covers.
-        # LEDGER + REGEN REQUIRED before sign-off. Validation: line-hkl-batch
+        # Ledgered `filtered`; REGEN still required before sign-off, and the
+        # measured A/B against the per-hkl loop is float64 only (no CUDA device
+        # in the verifying environment). Validation: line-hkl-batch
         #
         # coherent=True shares steps 1-6 verbatim and diverges only at step 5/7:
         # it keeps the COMPLEX amplitude per polarization and defers the square
