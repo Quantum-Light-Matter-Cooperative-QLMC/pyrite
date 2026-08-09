@@ -20,3 +20,4 @@ Status values: `Proposed` · `Accepted` · `Superseded by ADR-NNNN` · `Deprecat
 | [0004](0004-package-and-repository-structure.md) | Package & repository structure | Accepted; P4/P5 superseded by ADR-0006 |
 | [0005](0005-energy-grid-schema-decisions.md) | Energy-grid schema decisions | Accepted |
 | [0006](0006-consolidate-agent-work-records.md) | Consolidate agent work records | Accepted |
+| [0007](0007-project-identity.md) | PyRITE project identity | Accepted |
