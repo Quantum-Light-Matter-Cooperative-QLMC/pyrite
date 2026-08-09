@@ -621,9 +621,12 @@ def mc_spectrum(
 
     with the UN-squared finite-time factor ``Q_j = t_L sinc(P t_L / pi)`` (whose
     modulus-square is the incoherent ``t_L^2 sinc^2``), the emission-time phase
-    ``omega t_abs,j`` (``t_abs = t_ang + t0_ang``, the segment age plus the
-    per-electron bunch offset, in Ang with c=1) and the far-field retardation
-    ``omega n_hat.r_j``. The reciprocal-harmonic spatial phase
+    ``omega t_abs,j`` (``t_abs = t_ang + L_ang/(2 beta) + t0_ang``: midpoint
+    transport age plus the per-electron bunch offset, in Ang with c=1) and the
+    far-field retardation ``omega n_hat.r_j``. Transport keeps ``t_ang`` as
+    segment-start age for compatibility; the midpoint correction pairs time
+    with the stored midpoint position under the same constant-velocity segment
+    assumption as the finite-time factor. The reciprocal-harmonic spatial phase
     ``g.r_j`` follows the repository's structure-factor convention
     ``S(g)=sum F exp(+i g.R)``, whose susceptibility harmonic is
     ``chi_g exp(-i g.r)``. Distinct reflections are spectrally separated, so
@@ -654,7 +657,7 @@ def mc_spectrum(
     coherent is mutually exclusive with components (the PXR/CBS split is
     ambiguous once the cross term ``A_PXR A_CBS*`` survives) -- v1 raises.
 
-    Validation: coherent-emission
+    Validation: coherent-emission, coherent-segment-midpoint-time
     """
     if coherent and components:
         raise ValueError(
@@ -760,6 +763,9 @@ def mc_spectrum(
     # coherent (phased) sum precompute: the per-segment retardation scalar
     # d_j = t_abs,j - n_hat.r_j [Ang, c=1] (emission-time phase minus far-field
     # retardation) and photon wavenumber k_gamma(E) = E / hbar c [1/Ang].
+    # ``t_ang`` remains segment-start age; add half the constant-velocity flight
+    # time so it describes the same midpoint as ``r_mid``. This one d_all feeds
+    # both coherent reduction routes. Validation: coherent-segment-midpoint-time.
     # Each reflection adds its spatial susceptibility phase -g.r_j inside
     # _accumulate. All-zero t0_ang leaves the physical trajectory phase.
     # Inert unless coherent=True.
@@ -767,7 +773,8 @@ def mc_spectrum(
         cdtype = xp.result_type(REAL, 1j)
         seg_t0 = xp.asarray(segments.get("t0_ang", np.zeros(seg_E.size)), dtype=REAL)
         seg_t = xp.asarray(segments.get("t_ang", np.zeros(seg_E.size)), dtype=REAL)
-        d_all = (seg_t + seg_t0) - _matvec3(seg_r, n_hat_d)
+        seg_t_mid = seg_t + 0.5 * seg_L / beta_all
+        d_all = (seg_t_mid + seg_t0) - _matvec3(seg_r, n_hat_d)
         omega_grid = E_grid / HBARC_EV_ANG
     # mosaic crystallite-orientation quadrature: None -> perfect crystal (default;
     # today's single-orientation result bit-for-bit). Otherwise a list of

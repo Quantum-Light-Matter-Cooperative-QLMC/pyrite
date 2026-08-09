@@ -61,9 +61,9 @@ remote GPU workflow; do not run a heavy/GPU sweep locally.
 
 - [x] A -- Specify segment-time compatibility and incomplete-history API;
       identify every result/count consumer before changing keys or exceptions.
-- [ ] B -- Add the constant-velocity one-flight versus two-subsegment coherent
+- [x] B -- Add the constant-velocity one-flight versus two-subsegment coherent
       field invariance regression, covering both coherent reduction routes.
-- [ ] C -- Correct coherent midpoint time in all spectrum paths and add a new
+- [x] C -- Correct coherent midpoint time in all spectrum paths and add a new
       `Validation: <id>` marker, ledger row, assumptions, and limiting case.
 - [ ] D -- Add a constructed cutoff-crossing regression; truncate the terminal
       flight consistently in lockstep, grooved, per-electron, and CUDA cores.
@@ -201,11 +201,28 @@ remote GPU workflow; do not run a heavy/GPU sweep locally.
 
 ## Next dispatchable slice
 
-B--C may proceed together: first add the constant-velocity coherent invariance
-regression, then derive midpoint time once in `mc_spectrum` before its coherent
-routes. D--F are also unblocked by the cutoff and termination contracts above,
-but should remain a later independently valid checkpoint because they touch all
-transport cores and failure behavior.
+D--F may proceed as the next checkpoint: add the cutoff-crossing regression and
+linear clipping in all four cores plus the population-specific spectrum
+adapter, then add explicit cutoff/step-limit termination and fail-closed input
+validation. Keep G's CPU/CUDA distribution and remote-GPU evidence separate.
+
+## Slice B--C outcome
+
+- `mc_spectrum` derives `seg_t_mid = seg_t + 0.5 * seg_L / beta_all` once;
+  both coherent reduction routes consume the resulting `d_all`. `t_ang`
+  remains segment-start age and the segment/device schema is unchanged.
+- The deterministic 30 keV HOPG regression independently evaluates the
+  centered complex field. A fixed reference emitter makes the formerly global
+  subdivision phase observable in the public spectrum. Before the fix, both
+  routes failed all 700 bins with up to about 96% relative error; afterward
+  both pass at backend-scaled reduction tolerances.
+- `Validation: coherent-segment-midpoint-time` owns the source equation, units,
+  assumptions, `L -> 0`, single-self-term, and one-flight/two-half limiting
+  cases. Its ledger status remains `unverified`; fresh-context validation is H.
+- Implementation-context physics review: `L/beta` is an Angstrom time-like
+  length, so `0.5 L/beta` matches `t_ang`; the sample-frame midpoint and time
+  use the same constant velocity; phase remains dimensionless; final `/Ne`
+  normalization and all incoherent paths are unchanged.
 
 ## Delegation slices and required skills
 

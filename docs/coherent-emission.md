@@ -14,8 +14,10 @@ E_tot(E, n_hat) = sum_j A_j Q_j(E) exp[i E(t_abs,j - n_hat.r_j)/(hbar c)]
 dN/(dE dOmega) proportional to |E_tot|^2
 ```
 
-where `t_abs = t_ang + t0_ang`, `Q_j` is the unsquared finite-segment sinc
-amplitude, and `t0_ang` carries each electron's longitudinal bunch offset.
+where `t_abs = t_ang + L_ang/(2 beta) + t0_ang`: transport's `t_ang` remains
+segment-start age, the half-flight term pairs time with `r_mid`, and `t0_ang`
+carries each electron's longitudinal bunch offset. `Q_j` is the unsquared
+finite-segment sinc amplitude.
 Polarizations, reciprocal vectors, and mosaic orientations still add
 incoherently. `components=True` is rejected because coherent PXR/CBS cross terms
 make a uniquely additive component split impossible.
@@ -24,6 +26,8 @@ Expected limits:
 
 - `--incoherent` and the default preserve the previous path bit-for-bit.
 - One segment gives the same self-term in both modes.
+- One straight constant-velocity flight is unchanged when represented by two
+  contiguous half-segments.
 - Identical in-phase emitters give the `N^2` intensity limit before
   per-electron normalization.
 - Randomized or sufficiently spread arrival phases should approach the

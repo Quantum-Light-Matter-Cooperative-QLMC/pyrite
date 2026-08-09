@@ -151,9 +151,11 @@ primary electron, reflection, polarization, and photon energy.
 
 For each segment:
 
-- reconstruct segment start from `r_mid`, `v_hat`, and `L_ang`;
-- use recorded `t_ang` as segment-start time;
-- apply phase `exp[i(omega*t_start - k·r_start)]`;
+- use stored `r_mid` as the representative position;
+- preserve recorded `t_ang` as segment-start time and derive the matching
+  midpoint time `t_mid = t_ang + L_ang/(2 beta)`;
+- apply the centered-segment phase `exp[i(omega*t_mid - k·r_mid)]` with the
+  centered finite-time integral;
 - apply absorption to field amplitude as `exp(-tau/2)`;
 - preserve PXR/CBS amplitude interference;
 - square only after summing the complete electron trajectory.

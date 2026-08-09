@@ -61,6 +61,58 @@ def _segments(count=1):
     }
 
 
+def _straight_flight_segments(*, split: bool, reference: bool = False):
+    """One constant-velocity flight, optionally split and paired with a reference."""
+    beta = float(beta_from_Ee(30e3))
+    length = 40.0
+    starts = np.array([0.0, 0.5 * length]) if split else np.array([0.0])
+    lengths = np.full(starts.size, length / starts.size)
+    elec_id = np.zeros(starts.size, dtype=int)
+    if reference:
+        starts = np.append(starts, 0.0)
+        lengths = np.append(lengths, length)
+        elec_id = np.append(elec_id, 1)
+    segments = _segments(starts.size)
+    segments.update(
+        r_mid=np.column_stack(
+            [
+                np.zeros(starts.size),
+                np.zeros(starts.size),
+                10.0 + starts + 0.5 * lengths,
+            ]
+        ),
+        L_ang=lengths,
+        t_ang=starts / beta,
+        elec_id=elec_id,
+        Ne=2 if reference else 1,
+        thickness_ang=100.0,
+        crystal_width_ang=10.0,
+        crystal_height_ang=10.0,
+    )
+    return segments
+
+
+def _constant_velocity_field(segments, energy_eV):
+    """Independent centered-segment integral, up to one common amplitude."""
+    n_hat = np.asarray(KWARGS["n_hat"], dtype=float)
+    n_hat /= np.linalg.norm(n_hat)
+    _, g_norm = reciprocal_g_vector((0, 0, 2), CRYSTALS["hopg"]["lattice"])
+    beta = float(beta_from_Ee(30e3))
+    omega = np.asarray(energy_eV) / HBARC_EV_ANG
+    omega_res = beta * g_norm / (1.0 - beta * n_hat[2])
+    fields = np.zeros(omega.shape, dtype=complex)
+    for r_mid, length, t_start in zip(
+        segments["r_mid"], segments["L_ang"], segments["t_ang"], strict=True
+    ):
+        duration = length / beta
+        t_mid = t_start + 0.5 * duration
+        detuning = 0.5 * (1.0 - beta * n_hat[2]) * (omega - omega_res)
+        finite_time = duration * np.sinc(detuning * duration / np.pi)
+        phase = omega * (t_mid - n_hat @ r_mid) - g_norm * r_mid[2]
+        fields += finite_time * np.exp(1j * phase)
+    return fields
+
+
 def test_single_segment_coherent_equals_incoherent_self_term():
     segments = _segments()
 
@@ -78,6 +130,42 @@ def test_identical_in_phase_electrons_reach_n_squared_limit():
     # Field doubles, intensity quadruples, then per-electron /Ne normalization
     # leaves twice the one-electron yield.
     np.testing.assert_allclose(pair, 2.0 * single, rtol=RTOL)
+
+
+@pytest.mark.parametrize("sinc_cutoff", [None, 1.0e6])
+def test_straight_flight_is_invariant_to_two_half_segments(sinc_cutoff):
+    """Validation: coherent-segment-midpoint-time.
+
+    A constant-velocity segment integral is independent of numerical
+    subdivision when each stored midpoint position is paired with midpoint
+    transport age.  ``None`` selects the batched route; a very large finite
+    cutoff selects the per-reflection route without removing this grid's tails.
+    """
+    single = _straight_flight_segments(split=False)
+    halves = _straight_flight_segments(split=True)
+    energy_grid = np.arange(1050.0, 1400.0, 0.5)
+
+    single_field = _constant_velocity_field(single, energy_grid)
+    halves_field = _constant_velocity_field(halves, energy_grid)
+    np.testing.assert_allclose(halves_field, single_field, rtol=1e-11, atol=1e-12)
+
+    single_with_reference = _straight_flight_segments(split=False, reference=True)
+    halves_with_reference = _straight_flight_segments(split=True, reference=True)
+    single_spectrum = mc_spectrum(
+        single_with_reference,
+        energy_grid,
+        coherent=True,
+        sinc_cutoff=sinc_cutoff,
+        **KWARGS,
+    )
+    halves_spectrum = mc_spectrum(
+        halves_with_reference,
+        energy_grid,
+        coherent=True,
+        sinc_cutoff=sinc_cutoff,
+        **KWARGS,
+    )
+    _assert_batch_close(halves_spectrum, single_spectrum)
 
 
 @pytest.mark.parametrize("sinc_cutoff", [None, 4.0])

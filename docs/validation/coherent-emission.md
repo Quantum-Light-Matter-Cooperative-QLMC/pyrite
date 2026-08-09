@@ -141,6 +141,9 @@ polarization intensities add outside it.
   historical finite-time factor.
 - **Single segment.** Only its self-term remains, exactly equal to incoherent
   accumulation.
+- **Straight-flight subdivision.** For constant velocity and amplitude, one
+  segment and contiguous subsegments integrate the same phase interval when
+  every `r_mid` is paired with `t_mid = t_ang + L_ang/(2 beta)`.
 - **Coincident in-phase emitters.** \(N\) equal fields give \(N^2\) intensity
   before the existing per-electron normalization.
 - **Decoherent phases.** Independent broad/random per-electron `t0_ang`
@@ -164,7 +167,8 @@ The corrected implementation computes
 
 ```text
 g_phase = r_mid @ g
-phase = exp(1j * ((t_ang + t0_ang - n_hat.r_mid) * omega_grid - g_phase))
+t_mid = t_ang + 0.5 * L_ang / beta
+phase = exp(1j * ((t_mid + t0_ang - n_hat.r_mid) * omega_grid - g_phase))
 ```
 
 in both the full-grid and `sinc_cutoff` branches. This is exactly
@@ -173,6 +177,13 @@ in both the full-grid and `sinc_cutoff` branches. This is exactly
 \exp\{i[\omega(t_{\rm abs}-\hat{\mathbf n}\cdot\mathbf r)
 -\mathbf g\cdot\mathbf r]\}.
 \]
+
+Here `t_ang` remains the segment-start transport age. The added half-flight
+time is required because `r_mid` is the segment-centre position and the real
+finite-time factor is the integral centered on that same event. Pairing
+`r_mid` with uncorrected `t_ang` shifts a segment field by
+`exp[-i omega L/(2 beta)]`; that shift depends on numerical segment length and
+therefore changes interference with other emitters after subdivision.
 
 Its resonance is
 \(\omega_{\rm res}=\mathbf v\cdot\mathbf g/
@@ -187,9 +198,13 @@ displacement \((\Delta t,\Delta\mathbf r)\) with
 \]
 
 at resonance. Sign and factor match exactly; there is no extra factor of two.
-The new parameterized regression verifies the resulting fourfold intensity
+The phase-stationarity regression verifies the resulting fourfold intensity
 for two equal segments at resonance for both `sinc_cutoff=None` and
-`sinc_cutoff=4.0`.
+`sinc_cutoff=4.0`. The subdivision regression independently evaluates the
+centered complex integral and embeds the split flight beside a fixed reference
+emitter so the formerly hidden global field-phase error becomes observable in
+the public spectrum. It covers the batched (`sinc_cutoff=None`) and
+per-reflection (`sinc_cutoff=1e6`) routes.
 
 Both sinc paths use
 
@@ -242,14 +257,15 @@ intra-electron coherence. The Gaussian factor
 \(\exp[-\omega^2\sigma_z^2]\) is correct specifically for inter-electron cross
 terms.
 
-Focused CPU result:
+Focused CPU result after the midpoint-time regression:
 
 ```text
-tests/montecarlo/test_coherent_emission.py: 5 passed in 1.81s
+tests/montecarlo/test_coherent_emission.py: 13 passed
 ```
 
 The tests anchor the self-term, coincident-electron scaling, corrected
-straight-trajectory phase for both sinc routes, and invalid component split.
+straight-trajectory phase and subdivision invariance for both sinc routes, and
+invalid component split.
 They do not numerically anchor the qualified decoherent limit above; its
 analytic characteristic-function limit matches the corrected claim.
 
