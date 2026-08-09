@@ -23,19 +23,6 @@ file. Edit and drop items on `main`.
    at hopg's C K-edge, unresolved). `beam-phase-space-injection` /
    `beam-energy-spread-injection` are `rederived` and await human
    `signed-off`.
-2. **Repository and source-package structure cleanup.** Eight slices beyond the
-   accepted structure RFC: installed-package path resolution (shipped code
-   anchors on the developer checkout and the wheel omits the marimo apps),
-   top-level module grouping, `cli/` alias-shim removal, CLI/domain
-   misclassification, Monte Carlo mega-module splits, `plots/` backend
-   regrouping, working-tree hygiene, and repo-map DAG generation. Folds the
-   former Inbox source-package-organization and `runner.py`/`transport.py`
-   items. Sequenced S3+S8 → S7 → S1 → S2/S4/S6 → S5; S3 (all 10 `cli/` alias
-   shims deleted) and S8's empty-dir leftover are done on the branch, S7
-   remainder is next.
-   → `refactor/repo-structure-cleanup`;
-   [`agentdocs/tasks/refactor/repo-structure-cleanup/`](agentdocs/tasks/refactor/repo-structure-cleanup/);
-   design: [`docs/package-structure-rfc.md`](docs/package-structure-rfc.md).
 
 ## P1 - top-priority back burner
 
@@ -54,11 +41,10 @@ file. Edit and drop items on `main`.
    one-time pipeline-fill transient, and the CUDA transport core is now the
    default above 1000 electrons. Round 5 ledgered the four line-path markers
    and deleted the dead `_USE_JIT_LINE_PROLOGUE` flag/module. What is left
-   needs a CUDA box and a CLI decision: the `--cpu`/`--cpu-only` profiler
-   stranded on the deprecated `cxr remote run` (flags ported to `cxr run -R`;
-   one authorized remote job to exercise them still owed), and the deferred
-   levers (NVTX in `transport.py`, `REAL` compaction, `gpu-pipeline` memory
-   sizing — sizing itself already fixed and awaiting hardware confirmation).
+   needs a CUDA box: one authorized remote job to exercise the ported
+   `cxr run -R --cpu`/`--cpu-only` profiler, plus hardware confirmation of the
+   deferred levers (NVTX in `transport.py`, `REAL` compaction, and
+   `gpu-pipeline` memory sizing; sizing itself is already fixed).
    Plan and open questions:
    → `feature/compute-performance-optimization`;
    [`agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md`](agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md).
@@ -144,12 +130,6 @@ file. Edit and drop items on `main`.
    multiple seconds; likely SSH-bound remote completion timeout or
    process-startup overhead, not confirmed. → `feature/tab-completion-latency`;
    [`agentdocs/tasks/feature/tab-completion-latency/`](agentdocs/tasks/feature/tab-completion-latency/).
-6. **`_USE_JIT_LINE_PROLOGUE`: delete or keep gated.** The flag
-   (`montecarlo/spectrum.py:39`) is `False` and its 347-line
-   `montecarlo/line_prologue_jit_kernel.py` is dead. Re-derived as worth
-   ~2.7-4.8% of case wall — decided not to flip it, since it would owe a fifth
-   physics claim on a path that already owes four. Left as is for now; the open
-   choice is deleting both or keeping the flag. No hardware needed either way.
 
 ## Inbox - >user< to be triaged
 
@@ -184,17 +164,13 @@ not here.
 
 1. Running `cxr profile create <new_profile> --from <source_profile>` doesn't copy the
    source profile's materials list. Fix this, and check if other aspects are copied properly.
-2. It seems that `cxr run -p --cpu/--cpu-only` capability has been removed. Must be re-added.
-3. Related to below: when user runs `cxr run <profile>`, but energy-grid bounds have
+2. Related to below: when user runs `cxr run <profile>`, but energy-grid bounds have
    not been derived for that case:
    1. Give them a suggestion on what to run. We could also add a flag that automatically runs
       the derivation for their energy + mat before running their actual profile.
    2. shorten up the lines that are spit out. currently, spits out list of ALL materials
       in the entire repo (even ones marked non-standard in mats_to_sim.toml) which need to be
       set up for this energy, along with a long boilerplate text string next to every material.
-4. Tab completion errors out when nvidia extras (cupy) aren't installed. This indicates we're
-   things upon tab completion that shouldn't be getting called (i.e., _backend.py). Maybe
-   explains *why* tab completion is so slow right now.
 
 ### Ergonomics (ship anytime)
 
