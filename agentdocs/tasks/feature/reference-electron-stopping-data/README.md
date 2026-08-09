@@ -67,6 +67,66 @@ run/checkpoint metadata.
 - **Open:** checkpoint/case identity and compatibility when stopping model
   version changes.
 
+## A--D gate investigation (2026-08-09)
+
+### Verified primary-source facts
+
+- NIST identifies ESTAR/PSTAR/ASTAR as **NIST Standard Reference Database
+  124**, DOI
+  [`10.18434/T4NC7P`](https://doi.org/10.18434/T4NC7P), with data content last
+  updated in July 2017. Treat that date and DOI as the candidate source version;
+  a fetched table without both is not provenance-complete.
+- The official ESTAR method page defines collision, radiative, and total mass
+  stopping powers in MeV cm^2/g. Total is the sum of the two components. User
+  energies span 1 keV--10 GeV, but NIST recommends restricting collision
+  stopping use to at least 10 keV because shell corrections are omitted.
+- NIST reports estimated collision-stopping uncertainties of 1--2% above
+  100 keV; from 10--100 keV, 2--3% for low-Z and 5--10% for high-Z media. At
+  1 keV it estimates about 10% error for low-Z media and expects ESTAR to
+  overestimate very-low-energy stopping. Radiative stopping is estimated at
+  5% uncertainty below 2 MeV. Therefore ESTAR cannot by itself set a defensible
+  1--10 keV acceptance target or splice policy.
+- ESTAR accepts density, elemental weight fractions, and a mean excitation
+  energy. Its default compound I-value uses a modified Bragg-additivity rule
+  with approximate binding and phase effects. An ESTAR compound result is thus
+  not interchangeable with elemental stopping-power mixing and must preserve
+  the exact composition, density, and I-value inputs.
+
+Primary sources:
+
+- [NIST SRD 124 record](https://doi.org/10.18434/T4NC7P)
+- [ESTAR description and method](https://physics.nist.gov/PhysRefData/Star/Text/method.html)
+- [NIST SRD/data licensing policy](https://www.nist.gov/open/copyright-fair-use-and-licensing-statements-srd-data-and-software)
+- [ESTAR-linked database disclaimer](https://www.nist.gov/physical-measurement-laboratory/database-disclaimer)
+
+### Redistribution decision and stop
+
+**Fail closed: do not package or commit ESTAR-derived tables yet.** NIST's
+official policy says SRD compilations are copyrighted by the U.S. Secretary of
+Commerce, all rights are reserved, and licensing information applies where an
+SRD is licensed. The SRD 124 record and its linked database disclaimer provide
+access and warranty terms but no express redistribution or derivative-data
+grant. The broader permission for non-SRD NIST data does not apply because the
+record explicitly classifies ESTAR as SRD 124. Free CGI access is not evidence
+of redistribution permission.
+
+This triggers the dispatched stop condition. PENELOPE/sbethe version and terms,
+the benchmark matrix, Joy--Luo bias measurements, and the packaged schema remain
+unresolved; no authoritative table was downloaded or retained. Continuing
+would also require a defensible low-energy and compound policy, which current
+ESTAR evidence does not supply.
+
+### Exact next dispatchable slice
+
+Obtain an explicit written NIST license/permission determination for
+redistributing generated SRD 124 stopping values in cxr-mc, including modified
+or interpolated subsets and required notices. Record the response or governing
+license text here. If redistribution is denied, limit ESTAR to an optional
+user-run validation oracle and select a separately redistributable production
+source. Only after that gate closes should A--D resume with official
+PENELOPE/sbethe terms, the 1--300 keV benchmark, Joy--Luo comparisons, and a
+versioned schema proposal.
+
 ## Delegation slices and required skills
 
 - A--D require `lead-task`, `repo-orientation`, `monte-carlo`,
