@@ -11,9 +11,11 @@ from pathlib import Path
 import tomlkit
 from tomlkit.exceptions import ParseError
 
-from ..paths import state_dir
+from .._compat import canonical_env_name, env_value
+from ..paths import legacy_state_dir, state_dir
 
 CONFIG_PATH = state_dir() / "config.toml"
+LEGACY_CONFIG_PATH = legacy_state_dir() / "config.toml"
 
 _SETTINGS = {
     "profile.current": ("CXR_PROFILE", "standard"),
@@ -37,16 +39,21 @@ def keys() -> tuple[str, ...]:
     return tuple(_SETTINGS)
 
 
+def _store_path_for_read() -> Path:
+    return CONFIG_PATH if CONFIG_PATH.exists() else LEGACY_CONFIG_PATH
+
+
 def _read_store() -> dict[str, object]:
-    if not CONFIG_PATH.exists():
+    path = _store_path_for_read()
+    if not path.exists():
         return {}
     try:
-        with CONFIG_PATH.open("rb") as stream:
+        with path.open("rb") as stream:
             loaded = tomllib.load(stream)
     except (OSError, tomllib.TOMLDecodeError) as exc:
-        raise ConfigError(f"cannot read {CONFIG_PATH}: {exc}") from exc
+        raise ConfigError(f"cannot read {path}: {exc}") from exc
     if not isinstance(loaded, dict):
-        raise ConfigError(f"invalid {CONFIG_PATH}: expected a TOML table")
+        raise ConfigError(f"invalid {path}: expected a TOML table")
     return loaded
 
 
@@ -66,21 +73,29 @@ def _stored_value(key: str, store: dict[str, object]) -> str | None:
 
 
 def resolve(key: str, per_call: str | None = None) -> ResolvedValue:
-    """Resolve per-call > environment > store > built-in for one context key."""
+    """Resolve per-call > PyRITE env > CXR env > stores > built-in."""
     try:
         env_name, default = _SETTINGS[key]
     except KeyError as exc:
         raise KeyError(f"unknown config key: {key}") from exc
     if per_call is not None:
         return ResolvedValue(per_call, "command line")
-    environment = os.environ.get(env_name)
+    environment = env_value(env_name)
     if environment is not None:
         if not environment:
-            raise ConfigError(f"{env_name} must be a non-empty string")
-        return ResolvedValue(environment, env_name)
+            raise ConfigError(
+                f"{canonical_env_name(env_name)}/{env_name} must be a non-empty string"
+            )
+        source = (
+            canonical_env_name(env_name)
+            if os.environ.get(canonical_env_name(env_name)) is not None
+            else env_name
+        )
+        return ResolvedValue(environment, source)
     stored = _stored_value(key, _read_store())
     if stored is not None:
-        return ResolvedValue(stored, "config store")
+        source = "config store" if CONFIG_PATH.exists() else "legacy config store"
+        return ResolvedValue(stored, source)
     return ResolvedValue(default, "built-in default")
 
 
@@ -89,11 +104,12 @@ def set_stored(key: str, value: str) -> None:
     if key not in _SETTINGS:
         raise KeyError(f"unknown config key: {key}")
     document = tomlkit.document()
-    if CONFIG_PATH.exists():
+    source_path = _store_path_for_read()
+    if source_path.exists():
         try:
-            document = tomlkit.parse(CONFIG_PATH.read_text(encoding="utf-8"))
+            document = tomlkit.parse(source_path.read_text(encoding="utf-8"))
         except (OSError, ParseError) as exc:
-            raise ConfigError(f"cannot read {CONFIG_PATH}: {exc}") from exc
+            raise ConfigError(f"cannot read {source_path}: {exc}") from exc
     section, name = key.split(".", 1)
     table = document.get(section)
     if table is None:

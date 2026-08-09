@@ -315,7 +315,7 @@ def _cli_start(args):
         if getattr(args, "performance_profile", None) is not None:
             emit_result(
                 "performance artifacts remain remote; pull after completion with: "
-                f"cxr remote performance pull {args.performance_profile}"
+                f"pyrite remote performance pull {args.performance_profile}"
             )
         return
     if not viewer.attach(jobid):
@@ -368,8 +368,8 @@ def _cli_start(args):
     )
     for stem in stems:
         print(
-            f"\ndone. checkpoints/{stem}/ is local; run `cxr app analysis {stem}` "
-            f"(or run `cxr app analysis export`) -- visualization and static-HTML export "
+            f"\ndone. checkpoints/{stem}/ is local; run `pyrite app analysis {stem}` "
+            f"(or run `pyrite app analysis export`) -- visualization and static-HTML export "
             "stay local."
         )
 
@@ -554,10 +554,10 @@ def _reject_all_with_values(command_name, all_, values):
         "over workflow defaults where offered.\n\n"
         "\b\n"
         "Examples:\n"
-        "  cxr run sub_100keV --remote --dry-run\n"
-        "  cxr run compute_test_300keV --remote -p\n"
-        "  cxr run standard -m hopg --remote\n"
-        "  cxr job status -vv"
+        "  pyrite run sub_100keV --remote --dry-run\n"
+        "  pyrite run compute_test_300keV --remote -p\n"
+        "  pyrite run standard -m hopg --remote\n"
+        "  pyrite job status -vv"
     ),
     no_args_is_help=False,
 )
@@ -1174,7 +1174,7 @@ def reap_command(min_age_minutes, yes):
         "Fetch existing checkpoints from remote box.\n\n"
         "STEM is usually a bare material name, but MATERIAL@PROFILE selects the "
         "checkpoint the box produced for that catalog profile (PROFILE on "
-        "`cxr run --remote`) -- on-disk names never carry the profile, so this "
+        "`pyrite run --remote`) -- on-disk names never carry the profile, so this "
         "reads each candidate's meta.json remotely and pulls the newest match; "
         "--hash pins a specific parameter-hash prefix when more than one exists."
     ),
@@ -1570,9 +1570,9 @@ def check_command(ctx, ne, ne_brem, ne_supp, tmd_azimuth, refresh, no_sync, deta
         raise click.UsageError("--pull and --detached are mutually exclusive")
     path = f"remote {ctx.info_name}"
     replacement = (
-        "cxr remote pull --preset zhai"
+        "pyrite remote pull --preset zhai"
         if pull
-        else "cxr run --preset zhai --remote" + (" --detach" if detached else "")
+        else "pyrite run --preset zhai --remote" + (" --detach" if detached else "")
     )
     _deprecations.warn(path, replacement=replacement)
     return _invoke_click(

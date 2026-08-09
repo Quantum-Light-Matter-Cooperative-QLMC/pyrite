@@ -19,6 +19,7 @@ from typing import Any
 import numpy as np
 import psutil
 
+from ..._compat import env_value, set_canonical_env
 from ...energy_grid.encoding import decode_energy_grid
 from .. import spectrum as _spectrum_mod
 from .._backend import (
@@ -43,8 +44,8 @@ from ..transport import resolve_transport_core, simulate_trajectories
 # are STRIPPED by _TimingAgg.collect before any result is stored/checkpointed, so
 # timing never leaks into the pickle. The flag is read at import so it applies in
 # every spawned transport worker too (env is inherited on spawn/forkserver).
-_TIMING = os.environ.get("CXR_MC_TIMING", "") not in ("", "0")
-_NSYS = os.environ.get("CXR_MC_NSYS", "") not in ("", "0")
+_TIMING = env_value("CXR_MC_TIMING", "") not in ("", "0")
+_NSYS = env_value("CXR_MC_NSYS", "") not in ("", "0")
 
 
 def _cgroup_cpu_quota():
@@ -237,7 +238,7 @@ _pool_peak_bytes = 0  # high-water reserved pool size, for the A2 operational wa
 # OutOfMemoryError before the driver hard-OOMs the process. Fraction of total
 # VRAM; <=0 disables the cap (no-op, original unbounded behaviour).
 _GPU_POOL_FRAC = float(
-    os.environ.get(
+    env_value(
         "CXR_MC_GPU_POOL_FRAC",
         (
             str(_RESOURCE_POLICY.device_budget_bytes / BACKEND.device.total_memory_bytes)
@@ -1223,9 +1224,9 @@ def _worker_init(force_cpu=False):
     the box. A no-op fork/spawn-local mutation: it never touches the driver
     process's globals. Harmless when _GPU is already False.
     """
-    inherited = os.environ.get("CXR_MC_TRANSPORT_CORE", "").strip().lower()
+    inherited = env_value("CXR_MC_TRANSPORT_CORE", "").strip().lower()
     if inherited in ("", "auto", "cuda"):
-        os.environ["CXR_MC_TRANSPORT_CORE"] = "lockstep"
+        set_canonical_env("CXR_MC_TRANSPORT_CORE", "lockstep")
     if force_cpu:
         global _GPU
 

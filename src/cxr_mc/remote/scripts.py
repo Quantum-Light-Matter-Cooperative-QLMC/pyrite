@@ -115,7 +115,7 @@ def _cpu_profile_block(catalog_profile, performance_profile, cpu_flags):
   mkdir -p "$(dirname "$cpu_prof_base")" "$cpu_ckpt"
   printf '%s\\n' "cProfile transport-only pass (serial CPU)">> "$JOBDIR/log"
   cpu_prof_rc=0
-  env -u CXR_MC_NSYS CXR_MC_BACKEND=cpu {config.shell_remote_uv()} run --no-sync python \\
+  env -u PYRITE_MC_NSYS PYRITE_MC_BACKEND=cpu {config.shell_remote_uv()} run --no-sync python \\
     -m cProfile -o "$cpu_prof_base.prof" \\
     -m cxr_mc._entry.scan {config.shell_word(catalog_profile)} -m "$m"{cpu_flags} --workers 0 --transport-only\\
     --max-minutes 10 \\
@@ -196,9 +196,9 @@ def _queue_script(
     )
     runtime_exports = ""
     if spec_chunk is not None:
-        runtime_exports += f"\nexport CXR_MC_SPEC_CHUNK={spec_chunk}"
+        runtime_exports += f"\nexport PYRITE_MC_SPEC_CHUNK={spec_chunk}"
     if brem_chunk is not None:
-        runtime_exports += f"\nexport CXR_MC_BREM_CHUNK={brem_chunk}"
+        runtime_exports += f"\nexport PYRITE_MC_BREM_CHUNK={brem_chunk}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     return f"""JOBDIR={config.shell_word(jobdir)}
@@ -211,7 +211,7 @@ total=${{#mats[@]}}
 parallel_materials={parallel_materials}
 # co-tenant scan processes share the one GPU; each divides its CuPy pool cap
 # (_GPU_POOL_FRAC) by this so N processes cap at FRAC total, not N*FRAC.
-export CXR_MC_GPU_SHARE={parallel_materials}
+export PYRITE_MC_GPU_SHARE={parallel_materials}
 performance_repetitions={performance_repetitions}{runtime_exports}
 nsys_enabled={int(bool(nsys))}
 cpu_enabled={int(bool(cpu))}
@@ -260,7 +260,7 @@ run_material() {{
         echo "ERROR: --nsys requested but nsys is unavailable on the worker" >> "$JOBDIR/log"
         scan_rc=127
       else
-        export CXR_MC_NSYS=1
+        export PYRITE_MC_NSYS=1
         # --wait=all lets nsys wait for the spawn worker tree to exit cleanly
         # (else --wait=primary SIGTERMs survivors -> leaked semaphores).
         nsys_cmd=(
@@ -274,8 +274,8 @@ run_material() {{
         )
         # nsys 2025.6.x Python stack-walkers SIGSEGV unwinding CPython 3.14's
         # frame layout, so they are off by default. Opt in with
-        # CXR_MC_NSYS_PYSTACK=1 only on a supported Python/nsys pair.
-        if [ -n "${{CXR_MC_NSYS_PYSTACK:-}}" ]; then
+        # PYRITE_MC_NSYS_PYSTACK=1 only on a supported Python/nsys pair.
+        if [ -n "${{PYRITE_MC_NSYS_PYSTACK:-}}" ]; then
           nsys_cmd+=(
             --python-sampling=true --python-sampling-frequency=200 \\
             --python-backtrace=cuda --cudabacktrace=sync,kernel,memory
@@ -399,9 +399,9 @@ def _chunked_queue_script(
             flags += f" --perf-interval {performance_interval:g}"
     runtime_exports = ""
     if spec_chunk is not None:
-        runtime_exports += f"\nexport CXR_MC_SPEC_CHUNK={spec_chunk}"
+        runtime_exports += f"\nexport PYRITE_MC_SPEC_CHUNK={spec_chunk}"
     if brem_chunk is not None:
-        runtime_exports += f"\nexport CXR_MC_BREM_CHUNK={brem_chunk}"
+        runtime_exports += f"\nexport PYRITE_MC_BREM_CHUNK={brem_chunk}"
     mats = " ".join(materials)  # safe: each token matched _SHELL_TOKEN_RE
     jobdir = config.remote_path(config.JOBS_SUBDIR, jobid)
     chunk_seconds = int(round(chunk_minutes * 60))
@@ -525,7 +525,7 @@ def _rebrem_queue_script(
 ):
     """CXR payload for a brem-only checkpoint recompute in a SLURM allocation.
 
-    One sequential ``cxr rebrem`` per material (brem is cheap; no in-allocation
+    One sequential ``pyrite rebrem`` per material (brem is cheap; no in-allocation
     parallelism needed), each writing the SAME per-material JSON progress
     record a scan does (``--progress-file``), so ``status``/``attach`` render
     the shared case-progress dashboard. The ``completed:``/``failed:`` log
@@ -547,7 +547,7 @@ for m in "${{mats[@]}}"; do
   n=$((n + 1))
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
-  if ! {config.shell_remote_uv()} run --no-sync cxr rebrem "$m"{flags} \
+  if ! {config.shell_remote_uv()} run --no-sync pyrite rebrem "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: rebrem failed for $m; continuing" >> "$JOBDIR/log"
@@ -579,7 +579,7 @@ def _rebrem_chunked_queue_script(
 ):
     """One SLURM slice of a self-resubmitting brem-only recompute chain.
 
-    Mirror of ``_reline_chunked_queue_script`` for ``cxr rebrem``: each slice
+    Mirror of ``_reline_chunked_queue_script`` for ``pyrite rebrem``: each slice
     resumes from checkpoint, does about ``chunk_minutes`` of work via ``cxr
     rebrem --max-minutes``, and either terminates the chain (all materials
     completed:/failed:) or self-resubmits with ``--nice=10000``. Exit-code
@@ -611,7 +611,7 @@ for m in "${{mats[@]}}"; do
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.shell_remote_uv()} run --no-sync cxr rebrem "$m"{flags} --max-minutes "$remaining_min" \
+  {config.shell_remote_uv()} run --no-sync pyrite rebrem "$m"{flags} --max-minutes "$remaining_min" \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
@@ -713,7 +713,7 @@ def _reline_queue_script(
     line_start_eV=None,
     line_stop_eV=None,
 ):
-    """CXR payload for a line-only checkpoint recompute (``cxr reline``) in a
+    """CXR payload for a line-only checkpoint recompute (``pyrite reline``) in a
     SLURM allocation. One sequential reline per material; each writes the same
     per-material JSON progress record a scan/rebrem does, and the
     ``completed:``/``failed:`` markers match so ``state._completed_materials``
@@ -734,7 +734,7 @@ for m in "${{mats[@]}}"; do
   n=$((n + 1))
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
-  if ! {config.shell_remote_uv()} run --no-sync cxr reline "$m"{flags} \
+  if ! {config.shell_remote_uv()} run --no-sync pyrite reline "$m"{flags} \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1
   then
     echo "WARNING: reline failed for $m; continuing" >> "$JOBDIR/log"
@@ -766,8 +766,8 @@ def _reline_chunked_queue_script(
 ):
     """One SLURM slice of a self-resubmitting line-only recompute chain.
 
-    Mirror of ``_chunked_queue_script`` for ``cxr reline``: each slice resumes
-    from checkpoint, does about ``chunk_minutes`` of work via ``cxr reline
+    Mirror of ``_chunked_queue_script`` for ``pyrite reline``: each slice resumes
+    from checkpoint, does about ``chunk_minutes`` of work via ``pyrite reline
     --max-minutes``, and either terminates the chain (all materials
     completed:/failed:) or self-resubmits with ``--nice=10000``. Exit-code
     contract per material: ``rc==0`` -> ``completed:``, ``rc==75`` -> leave
@@ -798,7 +798,7 @@ for m in "${{mats[@]}}"; do
   echo "running $m [$n/$total] since $(date -Is)" > "$JOBDIR/state"
   printf '\\n===== [%s/%s] %s  %s =====\\n' "$n" "$total" "$m" "$(date -Is)" >> "$JOBDIR/log"
   rc=0
-  {config.shell_remote_uv()} run --no-sync cxr reline "$m"{flags} --max-minutes "$remaining_min" \
+  {config.shell_remote_uv()} run --no-sync pyrite reline "$m"{flags} --max-minutes "$remaining_min" \
     --progress-file "$JOBDIR/progress/$m.json" >> "$JOBDIR/log" 2>&1 || rc=$?
   if [ "$rc" -eq 0 ]; then
     echo "completed: $m" >> "$JOBDIR/log"
@@ -929,7 +929,7 @@ def _slurm_batch_script(
     vendor = config.remote_gpu_vendor()
     if vendor != "nvidia":
         raise ValueError(
-            f"cxr remote lab-box scripts do not yet support {vendor}; "
+            f"pyrite remote lab-box scripts do not yet support {vendor}; "
             "use a site-specific SLURM template from docs/running-on-a-cluster.md"
         )
     reservation_stems = reservation_stems or []
@@ -1202,7 +1202,7 @@ def _prune_checkpoint_stems_command(
     catalog_profile: str | None = None,
     yes: bool = False,
 ) -> str:
-    """Reserve exact current stems while running ``cxr prune`` remotely."""
+    """Reserve exact current stems while running ``pyrite prune`` remotely."""
     transport._check_shell_tokens([jobid, *stems])
     if all_profiles and catalog_profile is not None:
         raise ValueError("all_profiles and catalog_profile are mutually exclusive")
@@ -1220,7 +1220,7 @@ def _prune_checkpoint_stems_command(
         f"{reserve}; "
         f"release_prune() {{ {release}; }}; trap release_prune EXIT; "
         f"cd {config.shell_remote_dir()} || exit $?; "
-        f"{config.shell_remote_uv()} run --no-sync cxr {command}"
+        f"{config.shell_remote_uv()} run --no-sync pyrite {command}"
     )
 
 

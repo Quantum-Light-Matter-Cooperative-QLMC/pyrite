@@ -1,23 +1,24 @@
 """Environment + configuration constants for the remote job subsystem."""
 
-import os
 import re
 import shlex
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 
+from .._compat import env_value
+
 # Compatibility override for tests and callers that historically patched this
 # module global. Normal resolution is dynamic so environment and store changes
 # made before an invocation are observed.
 HOST: str | None = None
-REMOTE_DIR = os.environ.get("CXR_REMOTE_DIR", "/home/aamador/dev/cxr-mc")
-REMOTE_UV = os.environ.get("CXR_REMOTE_UV", "/home/aamador/.local/bin/uv")
-REMOTE_GPU_VENDOR = os.environ.get("CXR_REMOTE_GPU_VENDOR", "nvidia")
+REMOTE_DIR = env_value("CXR_REMOTE_DIR", "/home/aamador/dev/pyrite")
+REMOTE_UV = env_value("CXR_REMOTE_UV", "/home/aamador/.local/bin/uv")
+REMOTE_GPU_VENDOR = env_value("CXR_REMOTE_GPU_VENDOR", "nvidia")
 SLURM_PARTITION = "gpu"
 SLURM_GPUS = 1
 SLURM_CPUS_PER_MATERIAL = 8
 SLURM_TIME = "UNLIMITED"
-# Default 1: the box has one GPU (SLURM_GPUS=1), and >1 co-tenant `cxr run`
+# Default 1: the box has one GPU (SLURM_GPUS=1), and >1 co-tenant `pyrite run`
 # processes time-slice the card while the runner's own CPU-pool/GPU pipeline
 # already overlaps the two phases -- contention for no throughput win, plus
 # VRAM-pool oversubscription. Opt in via parallel_materials; the queue script

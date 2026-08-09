@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 
+from .._compat import env_value
 from ._backend import ArrayBackend, BackendResourceError
 
 GIB = 1 << 30
@@ -28,7 +28,7 @@ class ResourcePolicy:
 def resolve_resource_policy(backend: ArrayBackend, requested: str | None = None) -> ResourcePolicy:
     """Resolve named policy using device size when ``requested='auto'``."""
 
-    requested = (requested or os.environ.get("CXR_MC_RESOURCE_POLICY", "auto")).strip().lower()
+    requested = (requested or env_value("CXR_MC_RESOURCE_POLICY", "auto")).strip().lower()
     if requested not in _VALID_POLICIES:
         raise BackendResourceError(
             f"CXR_MC_RESOURCE_POLICY must be one of {', '.join(_VALID_POLICIES)}; got {requested!r}"

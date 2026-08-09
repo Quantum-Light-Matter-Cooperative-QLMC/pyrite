@@ -1,11 +1,11 @@
 """Click wiring for ``cxr run``."""
 
-import os
 import re
 from pathlib import Path
 
 import click
 
+from ..._compat import set_canonical_env
 from ...runs import scan as _scan
 from .. import _completion as _cli_completion
 from .. import _config as _cli_config
@@ -435,9 +435,9 @@ def command(
     # forkserver) read it. Mirrors the remote job script's `export
     # CXR_MC_SPEC_CHUNK` / `CXR_MC_BREM_CHUNK`.
     if spec_chunk is not None:
-        os.environ["CXR_MC_SPEC_CHUNK"] = str(spec_chunk)
+        set_canonical_env("CXR_MC_SPEC_CHUNK", str(spec_chunk))
     if brem_chunk is not None:
-        os.environ["CXR_MC_BREM_CHUNK"] = str(brem_chunk)
+        set_canonical_env("CXR_MC_BREM_CHUNK", str(brem_chunk))
     if nsys:
         _scan._reexec_under_nsys(
             catalog_profile=catalog_profile,

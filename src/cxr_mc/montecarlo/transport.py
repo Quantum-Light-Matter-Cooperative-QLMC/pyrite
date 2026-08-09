@@ -19,6 +19,7 @@ import numpy as np
 from numba import float64, int64, njit, uint64
 
 from .. import DATA_DIR
+from .._compat import env_value
 from ..materials._transport_data import TRANSPORT_ELEMENTS
 from ..materials.attenuation import _normalize_composition
 from ..transverse import resolved_from_mapping, sample_transverse
@@ -1649,7 +1650,7 @@ def resolve_transport_core(requested, Ne, groove=None):
     bisecting a device/host difference.
     """
 
-    pinned = os.environ.get("CXR_MC_TRANSPORT_CORE", "").strip().lower()
+    pinned = env_value("CXR_MC_TRANSPORT_CORE", "").strip().lower()
     if pinned:
         if pinned not in TRANSPORT_CORES:
             raise ValueError(

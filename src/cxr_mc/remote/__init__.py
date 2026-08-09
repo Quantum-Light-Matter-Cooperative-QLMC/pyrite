@@ -1,4 +1,4 @@
-"""``cxr remote`` -- schedule heavy CXR scans on the lab GPU box, keep data-vis local.
+"""``pyrite remote`` -- schedule heavy CXR scans on the lab GPU box, keep data-vis local.
 
 The split this enables: the laptop holds the project and does all interactive
 analysis and static-HTML export, while
@@ -15,28 +15,28 @@ Optional, dev-only tool: it is only useful if you have an ssh host configured
 
 Run, wait for SLURM, then pull:
 
-    cxr run standard -m mose2 --remote    # sync, submit, track, pull
-    cxr run standard -m mose2 --remote --quick
-    cxr run standard -m mose2 --remote --no-sync
-    cxr run sub_100keV --remote --detach
-    cxr remote pull mose2 wse2          # fetch existing checkpoints (grid-filtered)
-    cxr remote pull mose2 --full        # fetch the full, un-filtered checkpoint
-    cxr remote rebrem mose2 --ne-brem 1000   # brem-only recompute of the box's
+    pyrite run standard -m mose2 --remote    # sync, submit, track, pull
+    pyrite run standard -m mose2 --remote --quick
+    pyrite run standard -m mose2 --remote --no-sync
+    pyrite run sub_100keV --remote --detach
+    pyrite remote pull mose2 wse2          # fetch existing checkpoints (grid-filtered)
+    pyrite remote pull mose2 --full        # fetch the full, un-filtered checkpoint
+    pyrite remote rebrem mose2 --ne-brem 1000   # brem-only recompute of the box's
                                              # checkpoints (GPU), follow, pull back
-    cxr remote sync                     # only push the current code
-    cxr run --preset zhai --remote [--ne N] [--ne-brem N] [--ne-supp N]
+    pyrite remote sync                     # only push the current code
+    pyrite run --preset zhai --remote [--ne N] [--ne-brem N] [--ne-supp N]
                                       # run the Zhai + supplementary MC
-    cxr remote pull --preset zhai      # pull an existing Zhai cache
+    pyrite remote pull --preset zhai      # pull an existing Zhai cache
 
 Remote jobs survive SSH disconnects:
 
-cxr remote status [JOBID] --attach  # (re)connect + track live (default: latest)
-    cxr remote jobs                     # list jobs on the box + their state
-    cxr remote status [JOBID] [-v|-vv]  # job summary; SLURM details; case progress
-    cxr remote logs [JOBID] --follow    # tail the remote log (live)
-    cxr remote stop mose2 wse2          # cancel live SLURM job(s) by material
-    cxr remote stop --all               # cancel every live SLURM job
-    cxr remote pull mose2 wse2 mos2     # fetch the finished checkpoints (grid-filtered)
+pyrite remote status [JOBID] --attach  # (re)connect + track live (default: latest)
+    pyrite remote jobs                     # list jobs on the box + their state
+    pyrite remote status [JOBID] [-v|-vv]  # job summary; SLURM details; case progress
+    pyrite remote logs [JOBID] --follow    # tail the remote log (live)
+    pyrite remote stop mose2 wse2          # cancel live SLURM job(s) by material
+    pyrite remote stop --all               # cancel every live SLURM job
+    pyrite remote pull mose2 wse2 mos2     # fetch the finished checkpoints (grid-filtered)
 
 `run --remote --detach` returns after shipping code, writing a batch script
 under <remote>/jobs/<jobid>/, and submitting it to SLURM. The batch job
@@ -50,7 +50,7 @@ finishes. To DISCONNECT, just Ctrl-C (or close the terminal / drop the link) --
 that tears down the viewer only, and the job runs to completion. Reconnect any
 time with `attach`/`status`/`logs`, then `pull` once state is `done`.
 
-Then locally: run ``cxr app analysis <material>`` or ``cxr app analysis export [stem]``.
+Then locally: run ``pyrite app analysis <material>`` or ``pyrite app analysis export [stem]``.
 
 Transport is ssh/scp only (uses the 'qlmc' host in ~/.ssh/config, cloudflared
 ProxyCommand and all) -- no rsync dependency, so it works from Windows Git Bash.
@@ -72,8 +72,7 @@ Override the box via env: CXR_REMOTE_HOST / CXR_REMOTE_DIR / CXR_REMOTE_UV.
 # ``remote.<name>`` at call time (as ``energy_grid/job.py`` does).
 # ---------------------------------------------------------------------------
 
-import os
-
+from .._compat import env_value
 from ..cli import dashboard as _presentation
 from . import (
     cli,
@@ -88,7 +87,7 @@ from . import (
 # --- from config ------------------------------------------------------
 # Compatibility snapshot only; subsystem calls resolve the effective host
 # dynamically through ``config.remote_host()``.
-HOST = os.environ.get("CXR_REMOTE_HOST", "qlmc")
+HOST = env_value("CXR_REMOTE_HOST", "qlmc")
 REMOTE_DIR = config.REMOTE_DIR
 REMOTE_UV = config.REMOTE_UV
 SLURM_PARTITION = config.SLURM_PARTITION

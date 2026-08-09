@@ -36,22 +36,28 @@ from pathlib import Path
 
 import click
 
+from .._compat import env_value
 from ..cli import _completion as _cli_completion
 from ..cli import _core as _cli_core
 from ..cli._deprecations import canonical_option
-from ..paths import app_dir, state_dir
+from ..paths import app_dir, atomic_write_text, legacy_state_dir, state_dir
 from ._acp import running_acp
 
 NOTEBOOK = str(app_dir() / "trace_app.py")
 TUNNEL_PORT = 2719
 
 _DEFAULT_FILE = state_dir() / "viewer-default"
+_CANONICAL_DEFAULT_FILE = _DEFAULT_FILE
+_LEGACY_DEFAULT_FILE = legacy_state_dir() / "viewer-default"
 
 
 def get_default_material():
     """The persisted default material, or None if never set / empty."""
     try:
-        text = _DEFAULT_FILE.read_text().strip()
+        path = _DEFAULT_FILE
+        if path == _CANONICAL_DEFAULT_FILE and not path.exists():
+            path = _LEGACY_DEFAULT_FILE
+        text = path.read_text().strip()
     except FileNotFoundError:
         return None
     return text or None
@@ -59,8 +65,7 @@ def get_default_material():
 
 def set_default_material(material):
     """Persist ``material`` as the default for future no-argument runs."""
-    _DEFAULT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _DEFAULT_FILE.write_text(material)
+    atomic_write_text(_DEFAULT_FILE, material)
 
 
 def initial_material(cli_args, persisted_default):
@@ -74,7 +79,7 @@ def initial_material(cli_args, persisted_default):
     cli_material = cli_args.get("material")
     if cli_material:
         return str(cli_material)
-    env_material = os.environ.get("CXR_VIEWER_INITIAL")
+    env_material = env_value("CXR_VIEWER_INITIAL")
     if env_material:
         return env_material
     if persisted_default:
@@ -136,7 +141,7 @@ def _launch(
     if tunnel:
         print(f"ssh -L {TUNNEL_PORT}:127.0.0.1:{TUNNEL_PORT} <your-pi-ssh-host>")
         print(f"http://127.0.0.1:{TUNNEL_PORT}")
-    env = {**os.environ, "CXR_VIEWER_INITIAL": material}
+    env = {**os.environ, "PYRITE_VIEWER_INITIAL": material}
     if smoke:
         with tempfile.TemporaryDirectory(prefix="cxr-mc-viewer-") as tmpdir:
             subprocess.run(

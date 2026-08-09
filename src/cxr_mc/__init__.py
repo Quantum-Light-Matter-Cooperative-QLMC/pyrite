@@ -10,8 +10,8 @@ See the README for the scientific overview and CLAUDE.md for working conventions
 """
 
 import logging
-import os
 
+from ._compat import env_value
 from .paths import data_dir
 
 __version__ = "0.1.0"
@@ -30,7 +30,7 @@ DATA_DIR = data_dir()
 # without touching the caller's root logging config.
 logger = logging.getLogger("cxr_mc")
 logger.addHandler(logging.NullHandler())
-if os.environ.get("CXR_MC_DEBUG"):
+if env_value("CXR_MC_DEBUG"):
     _handler = logging.StreamHandler()
     _handler.setFormatter(logging.Formatter("%(name)s: %(message)s"))
     logger.addHandler(_handler)

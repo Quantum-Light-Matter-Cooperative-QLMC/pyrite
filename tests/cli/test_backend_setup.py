@@ -162,28 +162,28 @@ def test_read_existing_backend_ignores_comments_and_unrelated_keys(tmp_path):
 def test_write_backend_creates_new_file(tmp_path):
     env = tmp_path / ".env"
     backend_setup.write_backend(env, "cpu")
-    assert env.read_text() == "CXR_MC_BACKEND=cpu\n"
+    assert env.read_text() == "PYRITE_MC_BACKEND=cpu\n"
 
 
 def test_write_backend_appends_preserving_existing_unrelated_lines(tmp_path):
     env = tmp_path / ".env"
     env.write_text("MP_API_KEY_ENV=abc\n")
     backend_setup.write_backend(env, "cuda")
-    assert env.read_text() == "MP_API_KEY_ENV=abc\nCXR_MC_BACKEND=cuda\n"
+    assert env.read_text() == "MP_API_KEY_ENV=abc\nPYRITE_MC_BACKEND=cuda\n"
 
 
 def test_write_backend_appends_after_line_missing_trailing_newline(tmp_path):
     env = tmp_path / ".env"
     env.write_text("MP_API_KEY_ENV=abc")
     backend_setup.write_backend(env, "cuda")
-    assert env.read_text() == "MP_API_KEY_ENV=abc\nCXR_MC_BACKEND=cuda\n"
+    assert env.read_text() == "MP_API_KEY_ENV=abc\nPYRITE_MC_BACKEND=cuda\n"
 
 
 def test_write_backend_overwrites_existing_key_in_place(tmp_path):
     env = tmp_path / ".env"
-    env.write_text("MP_API_KEY_ENV=abc\nCXR_MC_BACKEND=cuda\nOTHER=1\n")
+    env.write_text("MP_API_KEY_ENV=abc\nPYRITE_MC_BACKEND=cuda\nOTHER=1\n")
     backend_setup.write_backend(env, "cpu")
-    assert env.read_text() == "MP_API_KEY_ENV=abc\nCXR_MC_BACKEND=cpu\nOTHER=1\n"
+    assert env.read_text() == "MP_API_KEY_ENV=abc\nPYRITE_MC_BACKEND=cpu\nOTHER=1\n"
 
 
 # ---- `cxr setup` CLI integration ----
@@ -202,8 +202,8 @@ def test_setup_no_env_non_interactive_defaults_to_cpu(monkeypatch, tmp_path, cap
 
     assert cli.main(["setup"]) is None
 
-    assert env_path.read_text() == "CXR_MC_BACKEND=cpu\n"
-    assert "CXR_MC_BACKEND=cpu" in capsys.readouterr().out
+    assert env_path.read_text() == "PYRITE_MC_BACKEND=cpu\n"
+    assert "PYRITE_MC_BACKEND=cpu" in capsys.readouterr().out
 
 
 def test_setup_no_gpu_prints_no_install_instructions(monkeypatch, tmp_path, capsys):
@@ -229,10 +229,10 @@ def test_setup_detected_gpu_non_interactive_defaults_to_cpu_with_stderr_hint(
 
     assert cli.main(["setup"]) is None
 
-    assert env_path.read_text() == "CXR_MC_BACKEND=cpu\n"
+    assert env_path.read_text() == "PYRITE_MC_BACKEND=cpu\n"
     captured = capsys.readouterr()
     assert "non-interactive" in captured.err
-    assert "cxr setup -y" in captured.err
+    assert "pyrite setup -y" in captured.err
 
 
 def test_setup_yes_flag_accepts_top_detected_backend_without_prompt(monkeypatch, tmp_path, capsys):
@@ -246,7 +246,7 @@ def test_setup_yes_flag_accepts_top_detected_backend_without_prompt(monkeypatch,
 
     assert cli.main(["setup", "-y"]) is None
 
-    assert env_path.read_text() == "CXR_MC_BACKEND=cuda\n"
+    assert env_path.read_text() == "PYRITE_MC_BACKEND=cuda\n"
     assert "uv sync --extra nvidia" in capsys.readouterr().out
 
 
@@ -262,7 +262,7 @@ def test_setup_interactive_prompt_accept_writes_detected_backend(monkeypatch, tm
 
     assert cli.main(["setup"]) is None
 
-    assert env_path.read_text() == "CXR_MC_BACKEND=rocm\n"
+    assert env_path.read_text() == "PYRITE_MC_BACKEND=rocm\n"
     assert "CUPY_INSTALL_USE_HIP=1 uv sync --extra amd" in capsys.readouterr().out
 
 
@@ -278,7 +278,7 @@ def test_setup_interactive_prompt_decline_defaults_to_cpu(monkeypatch, tmp_path)
 
     assert cli.main(["setup"]) is None
 
-    assert env_path.read_text() == "CXR_MC_BACKEND=cpu\n"
+    assert env_path.read_text() == "PYRITE_MC_BACKEND=cpu\n"
 
 
 def test_setup_already_set_is_a_no_op(monkeypatch, tmp_path, capsys):
@@ -302,7 +302,7 @@ def test_setup_force_reruns_detection_and_overwrites(monkeypatch, tmp_path):
 
     assert cli.main(["setup", "--force"]) is None
 
-    assert env_path.read_text() == "CXR_MC_BACKEND=cpu\n"
+    assert env_path.read_text() == "PYRITE_MC_BACKEND=cpu\n"
 
 
 def test_setup_preserves_unrelated_env_content(monkeypatch, tmp_path):
@@ -313,7 +313,7 @@ def test_setup_preserves_unrelated_env_content(monkeypatch, tmp_path):
 
     assert cli.main(["setup"]) is None
 
-    assert env_path.read_text() == "MP_API_KEY_ENV=abc\nCXR_MC_BACKEND=cpu\n"
+    assert env_path.read_text() == "MP_API_KEY_ENV=abc\nPYRITE_MC_BACKEND=cpu\n"
 
 
 def test_repo_root_resolves_a_checkout_with_pyproject_toml():

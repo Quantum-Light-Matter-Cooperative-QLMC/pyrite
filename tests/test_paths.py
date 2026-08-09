@@ -2,7 +2,14 @@ from pathlib import Path
 
 from cxr_mc import DATA_DIR
 from cxr_mc.cli import _config
-from cxr_mc.paths import data_dir, state_dir, workspace_root
+from cxr_mc.paths import (
+    cache_dir,
+    data_dir,
+    legacy_state_dir,
+    state_dir,
+    user_data_dir,
+    workspace_root,
+)
 
 
 def test_data_dir_preserves_public_package_constant():
@@ -41,6 +48,15 @@ def test_workspace_root_uses_store_then_cwd(monkeypatch, tmp_path):
 
 def test_state_dir_matches_config_store_parent():
     assert state_dir() == _config.CONFIG_PATH.parent
+    assert state_dir().name == "pyrite"
+    assert legacy_state_dir().name == "cxr-mc"
+
+
+def test_platform_cache_and_data_use_pyrite(monkeypatch, tmp_path):
+    monkeypatch.setattr("cxr_mc.paths.user_cache_path", lambda *args, **kwargs: tmp_path / "cache")
+    monkeypatch.setattr("cxr_mc.paths.user_data_path", lambda *args, **kwargs: tmp_path / "data")
+    assert cache_dir() == tmp_path / "cache"
+    assert user_data_dir() == tmp_path / "data"
 
 
 def test_checkpoint_defaults_follow_workspace_root():

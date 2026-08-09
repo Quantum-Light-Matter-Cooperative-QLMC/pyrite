@@ -8,13 +8,14 @@ finally NumPy. Explicit accelerator requests fail instead of changing device.
 from __future__ import annotations
 
 import logging
-import os
 import warnings
 from dataclasses import dataclass
 from types import ModuleType
 from typing import Any
 
 import numpy as np
+
+from .._compat import env_value
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +194,7 @@ class SyclBackend(ArrayBackend):
     vendor = "intel"
 
     def __init__(self, dpnp: ModuleType, dpctl: ModuleType):
-        selector = os.environ.get("CXR_MC_SYCL_DEVICE")
+        selector = env_value("CXR_MC_SYCL_DEVICE")
         try:
             if selector:
                 devices = [dpctl.SyclDevice(selector)]
@@ -274,7 +275,7 @@ def _load_sycl() -> SyclBackend:
 def select_backend(requested: str | None = None) -> ArrayBackend:
     """Resolve requested backend; ``auto`` alone may fall back to NumPy."""
 
-    requested = (requested or os.environ.get("CXR_MC_BACKEND", "auto")).strip().lower()
+    requested = (requested or env_value("CXR_MC_BACKEND", "auto")).strip().lower()
     if requested not in _VALID_BACKENDS:
         raise BackendUnavailableError(
             f"CXR_MC_BACKEND must be one of {', '.join(_VALID_BACKENDS)}; got {requested!r}"
@@ -297,7 +298,7 @@ def select_backend(requested: str | None = None) -> ArrayBackend:
                 logger.debug("accelerator probe skipped: %s", error)
         if backend is None:
             return NumPyBackend(fallback_reason="accelerator_unavailable: " + "; ".join(failures))
-    if os.environ.get("CXR_FP64") == "1" and not backend.device.supports_fp64:
+    if env_value("CXR_FP64") == "1" and not backend.device.supports_fp64:
         if requested == "auto":
             logger.warning("%s lacks fp64; CXR_FP64=1 selects CPU NumPy", backend.device.name)
             return NumPyBackend(fallback_reason=f"unsupported_fp64: {backend.device.name}")
@@ -312,7 +313,7 @@ BACKEND = select_backend()
 xp = BACKEND.xp
 cp: ModuleType | None = BACKEND.cp if isinstance(BACKEND, CuPyBackend) else None
 _GPU = BACKEND.name != "cpu"
-REAL = xp.float32 if (_GPU and os.environ.get("CXR_FP64") != "1") else xp.float64
+REAL = xp.float32 if (_GPU and env_value("CXR_FP64") != "1") else xp.float64
 
 
 def _to_cpu(value: Any) -> np.ndarray:

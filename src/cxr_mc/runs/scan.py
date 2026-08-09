@@ -42,6 +42,7 @@ from typing import Any
 
 import click
 
+from .._compat import set_canonical_env
 from ..cli import _completion as _cli_completion
 from ..cli import _core as _cli_core
 from ..cli import dashboard as _dashboard
@@ -330,7 +331,7 @@ def _reexec_under_nsys(**kwargs):
         raise click.UsageError("--nsys requested but the nsys executable is not on PATH")
     argv, trace_base = _nsys_reexec_command(**kwargs)
     trace_base.parent.mkdir(parents=True, exist_ok=True)
-    os.environ["CXR_MC_NSYS"] = "1"
+    set_canonical_env("CXR_MC_NSYS", "1")
     os.execvp(argv[0], argv)
 
 
@@ -440,7 +441,7 @@ def run(args):
 
     if use_dashboard:
         args._job_records = job_records
-        os.environ["CXR_LOCAL_DASHBOARD"] = "1"
+        set_canonical_env("CXR_LOCAL_DASHBOARD", "1")
         detail = getattr(args, "verbose", 0)
         t = threading.Thread(
             target=_dashboard_loop, args=(args, materials, job_records, detail), daemon=True
@@ -465,8 +466,8 @@ def run(args):
                 _dashboard._format_job_status(sections, getattr(args, "verbose", 0))
             )
             _dashboard._render_frame(frame, tty=True)
-            if "CXR_LOCAL_DASHBOARD" in os.environ:
-                del os.environ["CXR_LOCAL_DASHBOARD"]
+            if "PYRITE_LOCAL_DASHBOARD" in os.environ:
+                del os.environ["PYRITE_LOCAL_DASHBOARD"]
 
 
 def _run_json(args):

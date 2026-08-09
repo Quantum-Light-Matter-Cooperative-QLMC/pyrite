@@ -7,6 +7,7 @@ from collections.abc import Sequence
 import click
 
 from .. import __version__
+from .._compat import warn_legacy_command
 from ._core import LazyGroup, color_option, run
 
 _COMMANDS = {
@@ -38,7 +39,7 @@ _COMMANDS = {
 
 _COMMAND_HELP = {
     "run": "Run a profile's MC sweeps and write checkpoints.",
-    "setup": "Detect GPU hardware and write CXR_MC_BACKEND to .env (first run).",
+    "setup": "Detect GPU hardware and write PYRITE_MC_BACKEND to .env (first run).",
     "app": "Launch or export interactive analysis notebooks.",
     "checkpoint": "Inspect, transform, recompute, archive, and reclaim checkpoints.",
     "completion": "Manage cxr shell tab-completion.",
@@ -84,7 +85,7 @@ _COMMAND_HELP = {
     no_args_is_help=False,
     context_settings={"help_option_names": ["-h", "--help"]},
 )
-@click.version_option(__version__, prog_name="cxr-mc", message="cxr-mc %(version)s")
+@click.version_option(__version__, prog_name="PyRITE", message="PyRITE %(version)s")
 @color_option
 def command() -> None:
     """Manage coherent X-ray radiation simulation campaigns.
@@ -108,7 +109,16 @@ def command() -> None:
 
 
 def main(argv: Sequence[str] | None = None):
-    """Run ``cxr`` while preserving project exit-code and stream contracts."""
+    """Run canonical ``pyrite`` preserving exit-code and stream contracts."""
+    result = run(command, argv, prog_name="pyrite")
+    if isinstance(result, int):
+        raise SystemExit(result)
+    return result
+
+
+def legacy_main(argv: Sequence[str] | None = None):
+    """Run the retained ``cxr`` compatibility executable."""
+    warn_legacy_command("cxr", "pyrite")
     result = run(command, argv, prog_name="cxr")
     if isinstance(result, int):
         raise SystemExit(result)

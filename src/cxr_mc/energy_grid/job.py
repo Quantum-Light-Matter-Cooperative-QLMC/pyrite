@@ -91,9 +91,9 @@ def _slice_payload(
     )
     jobdir = remote.remote_path(remote.JOBS_SUBDIR, jobid)
     command_parts = [
-        "CXR_MC_FREE_EVERY=40",
-        "CXR_MC_FREE_WATERMARK_MB=15000",
-        "CXR_MC_TIMING=1",
+        "PYRITE_MC_FREE_EVERY=40",
+        "PYRITE_MC_FREE_WATERMARK_MB=15000",
+        "PYRITE_MC_TIMING=1",
         remote.shell_remote_uv(),
         "run --no-sync python -m cxr_mc.energy_grid.derive",
         f"--grid-stop {grid_stop:g}",

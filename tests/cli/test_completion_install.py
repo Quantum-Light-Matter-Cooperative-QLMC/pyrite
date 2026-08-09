@@ -1,4 +1,4 @@
-"""``cxr completion install`` shell rc setup."""
+"""``pyrite completion install`` shell rc setup."""
 
 from __future__ import annotations
 
@@ -22,12 +22,12 @@ def test_writes_line_and_creates_missing_rc_file(tmp_path, monkeypatch):
     )
 
     assert_clean_result(result)
-    assert "Installed cxr completion" in result.stdout
+    assert "Installed pyrite completion" in result.stdout
     content = rc_file.read_text()
     assert content == (
-        "# >>> cxr shell completion >>>\n"
-        'eval "$(_CXR_COMPLETE=bash_source cxr)"\n'
-        "# <<< cxr shell completion <<<\n"
+        "# >>> pyrite shell completion >>>\n"
+        'eval "$(_PYRITE_COMPLETE=bash_source pyrite)"\n'
+        "# <<< pyrite shell completion <<<\n"
     )
 
 
@@ -43,9 +43,9 @@ def test_appends_after_existing_content_without_trailing_newline(tmp_path):
     assert_clean_result(result)
     assert rc_file.read_text() == (
         "export PATH=$PATH:/opt/bin\n"
-        "# >>> cxr shell completion >>>\n"
-        'eval "$(_CXR_COMPLETE=zsh_source cxr)"\n'
-        "# <<< cxr shell completion <<<\n"
+        "# >>> pyrite shell completion >>>\n"
+        'eval "$(_PYRITE_COMPLETE=zsh_source pyrite)"\n'
+        "# <<< pyrite shell completion <<<\n"
     )
 
 
@@ -64,7 +64,7 @@ def test_rerun_is_idempotent(tmp_path):
     assert_clean_result(first)
     assert_clean_result(second)
     assert "already installed" in second.stdout
-    assert rc_file.read_text().count("_CXR_COMPLETE=bash_source") == 1
+    assert rc_file.read_text().count("_PYRITE_COMPLETE=bash_source") == 1
 
 
 def test_dry_run_does_not_write(tmp_path):
@@ -88,9 +88,9 @@ def test_fish_uses_pipe_source_and_config_fish_default(monkeypatch, tmp_path):
     assert_clean_result(result)
     target = tmp_path / ".config" / "fish" / "config.fish"
     assert target.read_text() == (
-        "# >>> cxr shell completion >>>\n"
-        "_CXR_COMPLETE=fish_source cxr | source\n"
-        "# <<< cxr shell completion <<<\n"
+        "# >>> pyrite shell completion >>>\n"
+        "_PYRITE_COMPLETE=fish_source pyrite | source\n"
+        "# <<< pyrite shell completion <<<\n"
     )
 
 
@@ -119,7 +119,7 @@ def test_detects_shell_from_environment(tmp_path, monkeypatch):
     result = invoke(root_command, ["completion", "install", "--rc-file", str(rc_file)])
 
     assert_clean_result(result)
-    assert "_CXR_COMPLETE=zsh_source" in rc_file.read_text()
+    assert "_PYRITE_COMPLETE=zsh_source" in rc_file.read_text()
 
 
 def test_unsupported_shell_choice_is_usage_error():
@@ -144,7 +144,7 @@ def test_remove_managed_installation_and_preserve_other_content(tmp_path):
 
     assert_clean_result(installed)
     assert_clean_result(removed)
-    assert removed.stdout == f"Removed cxr completion from {rc_file}\n"
+    assert removed.stdout == f"Removed pyrite completion from {rc_file}\n"
     assert rc_file.read_text() == "export KEEP=1\n"
 
 

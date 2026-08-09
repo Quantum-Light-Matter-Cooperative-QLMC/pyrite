@@ -46,6 +46,8 @@ import yaml
 from cxr_mc.apps._acp import ACP_SERVERS, start_acp_servers, stop_acp_servers
 from cxr_mc.paths import workspace_root
 
+from ._compat import warn_legacy_command
+
 ROOT = workspace_root()
 AGENT_SKILLS_DIR = ROOT / ".agents" / "skills"
 CLAUDE_SKILLS_DIR = ROOT / ".claude" / "skills"
@@ -541,8 +543,8 @@ def cmd_cli_deprecations(args: argparse.Namespace) -> None:
         raise SystemExit(status)
 
 
-def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="cxr-dev")
+def build_parser(prog_name: str = "pyrite-dev") -> argparse.ArgumentParser:
+    ap = argparse.ArgumentParser(prog=prog_name)
     sub = ap.add_subparsers(dest="command", required=True)
 
     for name, fn in [
@@ -619,7 +621,7 @@ def build_parser() -> argparse.ArgumentParser:
     return ap
 
 
-def main(argv: list[str] | None = None) -> None:
+def main(argv: list[str] | None = None, *, prog_name: str = "pyrite-dev") -> None:
     raw_args = list(sys.argv[1:] if argv is None else argv)
     if raw_args and raw_args[0] in {"test", "verify"}:
         command = raw_args[0]
@@ -629,8 +631,14 @@ def main(argv: list[str] | None = None) -> None:
         pytest_args = rest[1:] if numba else rest
         func(argparse.Namespace(command=command, numba=numba, pytest_args=pytest_args))
         return
-    args = build_parser().parse_args(raw_args)
+    args = build_parser(prog_name).parse_args(raw_args)
     args.func(args)
+
+
+def legacy_main(argv: list[str] | None = None) -> None:
+    """Run the retained ``cxr-dev`` compatibility executable."""
+    warn_legacy_command("cxr-dev", "pyrite-dev")
+    main(argv, prog_name="cxr-dev")
 
 
 if __name__ == "__main__":

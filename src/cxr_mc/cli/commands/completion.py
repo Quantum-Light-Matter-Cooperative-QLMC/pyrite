@@ -1,4 +1,4 @@
-"""Install or remove cxr shell tab-completion in a shell rc/config file."""
+"""Install or remove PyRITE shell tab-completion in a shell rc/config file."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import click
 
 from .._core import CLIError, LazyGroup, emit_result, run
 
-PROG_NAME = "cxr"
+PROG_NAME = "pyrite"
 COMPLETE_VAR = f"_{PROG_NAME.upper()}_COMPLETE"
 
 # Click's shell_completion module natively speaks these three protocols only;
@@ -17,16 +17,19 @@ COMPLETE_VAR = f"_{PROG_NAME.upper()}_COMPLETE"
 # subclass, not just another entry here.
 _SHELL_SOURCE_MODE = {"bash": "bash_source", "zsh": "zsh_source", "fish": "fish_source"}
 SHELL_CHOICE = click.Choice(tuple(_SHELL_SOURCE_MODE), case_sensitive=True)
-_MANAGED_START = "# >>> cxr shell completion >>>"
-_MANAGED_END = "# <<< cxr shell completion <<<"
+_MANAGED_START = "# >>> pyrite shell completion >>>"
+_MANAGED_END = "# <<< pyrite shell completion <<<"
+_CXR_MANAGED_START = "# >>> cxr shell completion >>>"
+_CXR_MANAGED_END = "# <<< cxr shell completion <<<"
 _LEGACY_COMMENT = "# cxr shell completion"
 
 
-def _completion_line(shell: str) -> str:
+def _completion_line(shell: str, prog_name: str = PROG_NAME) -> str:
     mode = _SHELL_SOURCE_MODE[shell]
+    complete_var = f"_{prog_name.upper()}_COMPLETE"
     if shell == "fish":
-        return f"{COMPLETE_VAR}={mode} {PROG_NAME} | source"
-    return f'eval "$({COMPLETE_VAR}={mode} {PROG_NAME})"'
+        return f"{complete_var}={mode} {prog_name} | source"
+    return f'eval "$({complete_var}={mode} {prog_name})"'
 
 
 def _default_rc_file(shell: str) -> Path:
@@ -67,11 +70,15 @@ def _without_managed_completion(existing: str, line: str) -> tuple[str, bool]:
     index = 0
     while index < len(lines):
         current = lines[index].strip()
-        if (
-            current == _MANAGED_START
-            and index + 2 < len(lines)
-            and lines[index + 1].strip() == line
-            and lines[index + 2].strip() == _MANAGED_END
+        managed = {
+            (_MANAGED_START, _MANAGED_END, line),
+            (_CXR_MANAGED_START, _CXR_MANAGED_END, _completion_line_from_line(line, "cxr")),
+        }
+        if index + 2 < len(lines) and any(
+            current == start
+            and lines[index + 1].strip() == candidate
+            and lines[index + 2].strip() == end
+            for start, end, candidate in managed
         ):
             removed = True
             index += 3
@@ -79,7 +86,7 @@ def _without_managed_completion(existing: str, line: str) -> tuple[str, bool]:
         if (
             current == _LEGACY_COMMENT
             and index + 1 < len(lines)
-            and lines[index + 1].strip() == line
+            and lines[index + 1].strip() in {line, _completion_line_from_line(line, "cxr")}
         ):
             removed = True
             index += 2
@@ -87,6 +94,13 @@ def _without_managed_completion(existing: str, line: str) -> tuple[str, bool]:
         kept.append(lines[index])
         index += 1
     return "".join(kept), removed
+
+
+def _completion_line_from_line(line: str, prog_name: str) -> str:
+    """Translate a generated canonical line to one retained program spelling."""
+    return line.replace("_PYRITE_COMPLETE", f"_{prog_name.upper()}_COMPLETE").replace(
+        " pyrite", f" {prog_name}"
+    )
 
 
 def _target_options(function):
@@ -113,7 +127,7 @@ def _target_options(function):
 @click.command(
     "install",
     help=(
-        "Append cxr tab-completion setup to a shell rc/config file.\n\n"
+        "Append pyrite tab-completion setup to a shell rc/config file.\n\n"
         "Idempotent: rerunning skips a file that already contains the line. "
         "With no --shell, detects from $SHELL."
     ),
@@ -137,7 +151,7 @@ def install_command(shell: str | None, rc_file: Path | None, dry_run: bool) -> N
         raise CLIError(f"could not read {target}: {exc}") from None
 
     if any(candidate.strip() == line for candidate in existing.splitlines()):
-        emit_result(f"cxr completion already installed in {target}")
+        emit_result(f"pyrite completion already installed in {target}")
         return
 
     if dry_run:
@@ -152,14 +166,16 @@ def install_command(shell: str | None, rc_file: Path | None, dry_run: bool) -> N
     except OSError as exc:
         raise CLIError(f"could not write {target}: {exc}") from None
 
-    emit_result(f"Installed cxr completion in {target}\nRestart your shell or run: source {target}")
+    emit_result(
+        f"Installed pyrite completion in {target}\nRestart your shell or run: source {target}"
+    )
 
 
 @click.command(
     "remove",
     help=(
-        "Remove cxr tab-completion setup from a shell rc/config file.\n\n"
-        "Idempotent: only exact cxr-managed current or legacy blocks are removed. "
+        "Remove pyrite tab-completion setup from a shell rc/config file.\n\n"
+        "Idempotent: exact pyrite and retained cxr-managed blocks are removed. "
         "With no --shell, detects from $SHELL."
     ),
 )
@@ -174,16 +190,16 @@ def remove_command(shell: str | None, rc_file: Path | None, dry_run: bool) -> No
 
     proposed, removed = _without_managed_completion(existing, _completion_line(shell))
     if not removed:
-        emit_result(f"cxr completion not installed in {target}")
+        emit_result(f"pyrite completion not installed in {target}")
         return
     if dry_run:
-        emit_result(f"Would remove cxr completion from {target}")
+        emit_result(f"Would remove pyrite completion from {target}")
         return
     try:
         target.write_text(proposed)
     except OSError as exc:
         raise CLIError(f"could not write {target}: {exc}") from None
-    emit_result(f"Removed cxr completion from {target}")
+    emit_result(f"Removed pyrite completion from {target}")
 
 
 @click.group(

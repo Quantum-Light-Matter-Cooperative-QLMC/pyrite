@@ -17,6 +17,7 @@ dependencies = [
     "pandas>=3.0.3",
     "pandoc>=2.4",
     "plotly>=6.0",
+    "platformdirs>=4.9",
     "scipy>=1.17.1",
     "tabulate>=0.10.0",
     "tomlkit>=0.13",
@@ -48,8 +49,10 @@ intel = [
 ]
 
 [project.scripts]
-cxr = "cxr_mc.cli:main"
-cxr-dev = "cxr_mc._dev:main"
+pyrite = "cxr_mc.cli:main"
+pyrite-dev = "cxr_mc._dev:main"
+cxr = "cxr_mc.cli:legacy_main"
+cxr-dev = "cxr_mc._dev:legacy_main"
 
 [build-system]
 requires = ["hatchling"]

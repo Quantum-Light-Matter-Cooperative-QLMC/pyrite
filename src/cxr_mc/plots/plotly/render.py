@@ -13,7 +13,6 @@ importing this module never requires them.
 
 import hashlib
 import json
-import os
 from pathlib import Path
 
 from cxr_mc.plots.plotly.trajectories import (
@@ -21,6 +20,8 @@ from cxr_mc.plots.plotly.trajectories import (
     frame_reveal_fs,
     trajectory_volume_figure_from_data,
 )
+
+from ...paths import cache_dir, legacy_cache_dir
 
 _RENDER_SALT = "v2"  # bump on any change to the cache-key inputs or render format
 
@@ -151,18 +152,19 @@ def render_cache_key(
 
 
 def render_cache_dir():
-    """``~/.cache/cxr-mc/viewer-renders`` (honoring ``XDG_CACHE_HOME`` if set),
-    created if missing."""
-    base = os.environ.get("XDG_CACHE_HOME")
-    root = Path(base) if base else Path.home() / ".cache"
-    out = root / "cxr-mc" / "viewer-renders"
+    """Canonical platform-specific viewer-render cache, created if missing."""
+    out = cache_dir() / "viewer-renders"
     out.mkdir(parents=True, exist_ok=True)
     return out
 
 
 def cached_render_path(key, suffix=".mp4"):
     """Path a render for ``key`` should live at under :func:`render_cache_dir`."""
-    return render_cache_dir() / f"{key}{suffix}"
+    canonical = render_cache_dir() / f"{key}{suffix}"
+    if canonical.exists():
+        return canonical
+    legacy = legacy_cache_dir() / "viewer-renders" / f"{key}{suffix}"
+    return legacy if legacy.exists() else canonical
 
 
 def prune_render_cache(keep=20):

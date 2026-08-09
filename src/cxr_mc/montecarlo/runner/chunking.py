@@ -1,9 +1,8 @@
 """Spectrum chunk sizing and device-memory admission."""
 
-import os
-
 import numpy as np
 
+from ..._compat import env_value
 from .. import spectrum as _spectrum_mod
 from .._backend import _GPU, BACKEND
 from .._resources import admitted_chunk, resolve_resource_policy
@@ -16,7 +15,7 @@ def _env_chunk(name, default):
     the main GPU process; an explicit per-case ``spec_chunk``/``brem_chunk`` still
     wins. Unset / blank / non-positive / non-integer -> the memory-safe default."""
     try:
-        v = int(os.environ.get(name, ""))
+        v = int(env_value(name, ""))
     except (TypeError, ValueError):
         return default
     return v if v > 0 else default

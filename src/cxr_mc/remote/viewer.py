@@ -79,7 +79,7 @@ def list_jobs(kind=None):
         )
     if not rows:
         print(
-            f"No matching jobs on {config.remote_host()}. Start one with `cxr run [PROFILE] --remote`."
+            f"No matching jobs on {config.remote_host()}. Start one with `pyrite run [PROFILE] --remote`."
         )
         return
     print(
@@ -211,9 +211,9 @@ def tail_logs(jobid=None, follow=False):
 def _disconnect_hint(jobid):
     print(
         f"\n\nVIEWER DISCONNECTED · job {jobid} keeps running on {config.remote_host()}\n"
-        f"  Reconnect  cxr remote status {jobid} -a\n"
-        f"  Status     cxr remote status {jobid} -vv\n"
-        "  Stop       cxr remote stop <material>"
+        f"  Reconnect  pyrite remote status {jobid} -a\n"
+        f"  Status     pyrite remote status {jobid} -vv\n"
+        "  Stop       pyrite remote stop <material>"
     )
 
 
@@ -459,24 +459,26 @@ def _live_status(jobid, detail):
         except SystemExit as error:
             print(f"\nJOB {jobid} · CANCEL REQUEST FAILED\n  {error}")
         else:
-            print(f"\nJOB {jobid} · CANCELLED BY USER\n  Verify  cxr remote status {jobid} -vv")
+            print(f"\nJOB {jobid} · CANCELLED BY USER\n  Verify  pyrite remote status {jobid} -vv")
         return False
     if broken:
         print(
             f"\nJOB {jobid} · CHAIN STALLED\n"
             "  No live SLURM allocation for ~30 s; recorded state is not terminal.\n"
-            f"  Inspect  cxr remote status {jobid} -vv\n"
-            f"  Logs     cxr remote logs {jobid}"
+            f"  Inspect  pyrite remote status {jobid} -vv\n"
+            f"  Logs     pyrite remote logs {jobid}"
         )
         return False
-    print(f"\nJOB {jobid} · FINISHED\n  State   {state_}\n  Inspect cxr remote status {jobid} -vv")
+    print(
+        f"\nJOB {jobid} · FINISHED\n  State   {state_}\n  Inspect pyrite remote status {jobid} -vv"
+    )
     return True
 
 
 def attach(jobid=None, detail=0):
     """Live-track a job: re-render its ``status`` report at ``detail`` until terminal.
 
-    Equivalent to ``cxr remote status [-v|-vv]``, but the same report repaints
+    Equivalent to ``pyrite remote status [-v|-vv]``, but the same report repaints
     in place every ~2 s. Ctrl-C (or a dropped link) detaches the viewer only;
     the SLURM job keeps running unless cancelled via the 'x'/'y' keybinding
     (see :func:`_live_status`). Returns True once the job reaches a terminal
@@ -486,7 +488,7 @@ def attach(jobid=None, detail=0):
     defaulted = jobid is None
     jobid = jobid or state._latest_jobid()
     if not jobid:
-        raise SystemExit("no jobs to attach to (start one: cxr run [PROFILE] --remote)")
+        raise SystemExit("no jobs to attach to (start one: pyrite run [PROFILE] --remote)")
     transport._check_shell_tokens([jobid])
     if defaulted:
         current = state._job_state(jobid)
@@ -494,8 +496,8 @@ def attach(jobid=None, detail=0):
             print(
                 f"warning: no job id given; defaulting to {jobid}, which is not running "
                 f"(state: {current}).\n"
-                "  Live jobs   cxr remote jobs\n"
-                "  Monitor one cxr remote status <job-id> -a",
+                "  Live jobs   pyrite remote jobs\n"
+                "  Monitor one pyrite remote status <job-id> -a",
                 file=sys.stderr,
             )
     return _live_status(jobid, detail)

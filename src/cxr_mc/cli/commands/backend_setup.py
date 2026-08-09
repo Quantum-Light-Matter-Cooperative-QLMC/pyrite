@@ -1,4 +1,4 @@
-"""``cxr setup``: detect GPU hardware and persist ``CXR_MC_BACKEND`` in ``.env``.
+"""``pyrite setup``: detect GPU hardware and persist ``PYRITE_MC_BACKEND`` in ``.env``.
 
 Detection is OS-tooling only (``nvidia-smi``, ``rocm-smi``/``rocminfo``,
 ``clinfo``/``sycl-ls``/``lspci``, device nodes) and never assumes a vendor
@@ -20,7 +20,8 @@ import click
 
 from .. import _core as _cli_core
 
-_ENV_KEY = "CXR_MC_BACKEND"
+_ENV_KEY = "PYRITE_MC_BACKEND"
+_LEGACY_ENV_KEY = "CXR_MC_BACKEND"
 
 # Matches README.md's install table; printed as a follow-up instruction, never
 # run automatically (see agentdocs/tasks/feature/backend-autodetect/README.md decision 2).
@@ -133,36 +134,52 @@ def _interactive() -> bool:
 
 
 def read_existing_backend(env_path: Path) -> str | None:
-    """Return the current ``CXR_MC_BACKEND`` value in ``env_path``, if set."""
+    """Return canonical then legacy backend value from ``env_path``."""
     if not env_path.is_file():
         return None
+    values: dict[str, str] = {}
     for line in env_path.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
         if stripped.startswith("#") or "=" not in stripped:
             continue
         key, _, value = stripped.partition("=")
-        if key.strip() == _ENV_KEY:
-            return value.strip()
-    return None
+        if key.strip() in {_ENV_KEY, _LEGACY_ENV_KEY}:
+            values[key.strip()] = value.strip()
+    canonical = values.get(_ENV_KEY)
+    legacy = values.get(_LEGACY_ENV_KEY)
+    if canonical is not None:
+        if legacy is not None and legacy != canonical:
+            click.echo(
+                f"warning: {_ENV_KEY} and {_LEGACY_ENV_KEY} differ; using {_ENV_KEY}",
+                err=True,
+            )
+        return canonical
+    return legacy
 
 
 def write_backend(env_path: Path, backend: str) -> None:
-    """Create, in-place update, or append ``CXR_MC_BACKEND=<backend>`` in
-    ``env_path``. Preserves every other line untouched."""
+    """Write only ``PYRITE_MC_BACKEND``, migrating the legacy managed key."""
     if not env_path.is_file():
         env_path.write_text(f"{_ENV_KEY}={backend}\n", encoding="utf-8")
         return
 
     lines = env_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    managed_indexes: list[int] = []
     for index, line in enumerate(lines):
         stripped = line.strip()
         if stripped.startswith("#") or "=" not in stripped:
             continue
         key = stripped.partition("=")[0].strip()
-        if key == _ENV_KEY:
-            lines[index] = f"{_ENV_KEY}={backend}\n"
-            env_path.write_text("".join(lines), encoding="utf-8")
-            return
+        if key in {_ENV_KEY, _LEGACY_ENV_KEY}:
+            managed_indexes.append(index)
+
+    if managed_indexes:
+        first, *duplicates = managed_indexes
+        lines[first] = f"{_ENV_KEY}={backend}\n"
+        for index in reversed(duplicates):
+            del lines[index]
+        env_path.write_text("".join(lines), encoding="utf-8")
+        return
 
     if lines and not lines[-1].endswith("\n"):
         lines[-1] += "\n"
@@ -184,12 +201,12 @@ def _print_extra_instructions(backend: str) -> None:
 @click.command(
     "setup",
     help=(
-        "Detect installed GPU hardware and write CXR_MC_BACKEND to repo-root .env.\n\n"
+        "Detect installed GPU hardware and write PYRITE_MC_BACKEND to repo-root .env.\n\n"
         "Probes OS-level tooling only (nvidia-smi, rocm-smi/rocminfo, clinfo/sycl-ls/"
         "lspci) -- no vendor Python package (cupy, dpnp/dpctl) needs to be installed "
         "first. Prompts interactively to opt into an accelerator; defaults to cpu if "
         "none is detected, declined, or the session is non-interactive. A no-op once "
-        "CXR_MC_BACKEND is already set in .env, unless --force is given."
+        "PYRITE_MC_BACKEND or its CXR_MC_BACKEND alias is already set in .env, unless --force is given."
     ),
 )
 @click.option(
@@ -201,7 +218,7 @@ def _print_extra_instructions(backend: str) -> None:
 @click.option(
     "--force",
     is_flag=True,
-    help="Re-run detection and overwrite an existing CXR_MC_BACKEND value in .env.",
+    help="Re-run detection and write the canonical PYRITE_MC_BACKEND value in .env.",
 )
 def command(yes: bool, force: bool) -> None:
     env_path = _env_path()
@@ -218,7 +235,7 @@ def command(yes: bool, force: bool) -> None:
 
     chosen = "cpu"
     if not candidates:
-        click.echo("no supported GPU hardware detected; defaulting to CXR_MC_BACKEND=cpu.")
+        click.echo("no supported GPU hardware detected; defaulting to PYRITE_MC_BACKEND=cpu.")
     else:
         top = candidates[0]
         if yes:
@@ -235,7 +252,7 @@ def command(yes: bool, force: bool) -> None:
         else:
             click.echo(
                 f"detected {top.vendor} GPU ({top.reason}) but this session is "
-                "non-interactive; defaulting to CXR_MC_BACKEND=cpu. Re-run `cxr setup "
+                "non-interactive; defaulting to PYRITE_MC_BACKEND=cpu. Re-run `pyrite setup "
                 "-y` to accept it without a prompt.",
                 err=True,
             )

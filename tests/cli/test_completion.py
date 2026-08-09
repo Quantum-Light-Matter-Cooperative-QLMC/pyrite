@@ -180,8 +180,8 @@ def block_cupy(name, *args, **kwargs):
     return original_import(name, *args, **kwargs)
 
 builtins.__import__ = block_cupy
-from cxr_mc.cli import main
-main()
+from cxr_mc.cli import legacy_main
+legacy_main()
 """
     completed = subprocess.run(
         [sys.executable, "-c", code],

@@ -33,8 +33,8 @@ def _refuse_if_busy(materials, quick):
             "refusing to start: a live job is already producing the same "
             "checkpoint(s), and two runs writing one <stem>.pkl race on its "
             f".tmp and crash.\n{detail}\n"
-            "monitor it (cxr remote status <jobid> --attach) or stop it "
-            "(cxr remote stop <material>) first, or run different materials."
+            "monitor it (pyrite remote status <jobid> --attach) or stop it "
+            "(pyrite remote stop <material>) first, or run different materials."
         )
 
 
@@ -89,7 +89,7 @@ def clear_remote(materials, yes=False, catalog_profile="standard"):
         raise SystemExit(
             "refusing to clear: a live job is still producing one of these "
             f"checkpoints, and clearing it would race a running sweep.\n{detail}\n"
-            "stop it (cxr remote stop <material>) first, or wait for it to finish."
+            "stop it (pyrite remote stop <material>) first, or wait for it to finish."
         )
     if yes:
         outcome = transport._ssh_capture(
@@ -163,7 +163,7 @@ def clear_all_remote(yes=False):
         raise SystemExit(
             "refusing to clear --all: live job(s) are still producing checkpoints, "
             f"and clearing would race running sweeps.\n{detail}\n"
-            "stop them (cxr remote stop --all) first, or wait for them to finish."
+            "stop them (pyrite remote stop --all) first, or wait for them to finish."
         )
     _now, reservations = state._reservation_ledger()
     if reservations:
@@ -174,7 +174,7 @@ def clear_all_remote(yes=False):
             "refusing to clear --all: a checkpoint reservation is still active, which can "
             "belong to a submission whose SLURM outcome is not yet known.\n"
             f"{detail}\n"
-            "wait for submission to resolve, reap orphans (cxr remote reap), or stop the "
+            "wait for submission to resolve, reap orphans (pyrite remote reap), or stop the "
             "recorded job before clearing."
         )
     # list first (dry preview), then delete only under --yes. `|| true` keeps a
@@ -219,7 +219,7 @@ def prune_remote(
         raise SystemExit(
             "refusing remote prune: live job(s) are producing checkpoints.\n"
             f"{detail}\n"
-            "wait for completion, or stop them with cxr remote stop --all."
+            "wait for completion, or stop them with pyrite remote stop --all."
         )
     reservations = state._reservation_holders(stems)
     if reservations:
@@ -313,8 +313,8 @@ def _refuse_if_profile_live(catalog_profile):
         raise SystemExit(
             f"refusing to submit: profile {catalog_profile!r} already has a live job "
             f"({', '.join(clash)}); monitor it "
-            f"(cxr remote status {clash[0]} --attach) or stop it "
-            f"(cxr remote stop --profile {catalog_profile}) first."
+            f"(pyrite remote status {clash[0]} --attach) or stop it "
+            f"(pyrite remote stop --profile {catalog_profile}) first."
         )
 
 
@@ -543,9 +543,9 @@ def start_queue(
     # nobody can type; pull --profile resolves each member's MATERIAL@PROFILE
     # checkpoint remotely.
     pull_hint = (
-        f"cxr remote pull --profile {catalog_profile}"
+        f"pyrite remote pull --profile {catalog_profile}"
         if catalog_profile != "standard"
-        else f"cxr remote pull {' '.join(stems)}"
+        else f"pyrite remote pull {' '.join(stems)}"
     )
     print(
         f"\nJOB {jobid} · SUBMITTED\n"
@@ -578,14 +578,14 @@ def start_queue(
                         )
                     ),
                 ),
-                ("Monitor", f"cxr remote status {jobid} --attach"),
-                ("Status", f"cxr remote status {jobid} -vv"),
-                ("Logs", f"cxr remote logs {jobid} --follow"),
+                ("Monitor", f"pyrite remote status {jobid} --attach"),
+                ("Status", f"pyrite remote status {jobid} -vv"),
+                ("Logs", f"pyrite remote logs {jobid} --follow"),
                 *(
                     [
                         (
                             "Performance",
-                            f"cxr remote performance pull {performance_profile}",
+                            f"pyrite remote performance pull {performance_profile}",
                         )
                     ]
                     if performance_profile is not None
@@ -650,10 +650,10 @@ def start_zhai_queue(
                 ("SLURM", scheduler_id),
                 ("Host", config.remote_host()),
                 ("Workload", "Zhai reproduction"),
-                ("Monitor", f"cxr remote status {jobid} --attach"),
-                ("Status", f"cxr remote status {jobid} -vv"),
-                ("Logs", f"cxr remote logs {jobid} --follow"),
-                ("Pull", "cxr remote pull --preset zhai  (after completion)"),
+                ("Monitor", f"pyrite remote status {jobid} --attach"),
+                ("Status", f"pyrite remote status {jobid} -vv"),
+                ("Logs", f"pyrite remote logs {jobid} --follow"),
+                ("Pull", "pyrite remote pull --preset zhai  (after completion)"),
             ]
         )
     )
@@ -832,12 +832,12 @@ def start_rebrem_queue(
     brem_start_eV=None,
     brem_stop_eV=None,
 ):
-    """Submit a brem-only checkpoint recompute (``cxr rebrem``) to SLURM.
+    """Submit a brem-only checkpoint recompute (``pyrite rebrem``) to SLURM.
 
     Reserves the same ``<material>.pkl`` stems as a sweep -- rebrem rewrites
     those checkpoints in place, so it must not race a live scan of the same
     material (and vice versa). By default the recompute is chunked: each
-    ~chunk_minutes slice does bounded work via ``cxr rebrem --max-minutes`` and
+    ~chunk_minutes slice does bounded work via ``pyrite rebrem --max-minutes`` and
     self-resubmits with ``--nice=10000`` so the single-GPU box stays shareable
     at every slice boundary. Pass ``chunk_minutes=0`` for the original
     monolithic allocation. Returns the local job id."""
@@ -932,10 +932,10 @@ def start_rebrem_queue(
                         )
                     ),
                 ),
-                ("Monitor", f"cxr remote status {jobid} --attach"),
-                ("Status", f"cxr remote status {jobid} -vv"),
-                ("Logs", f"cxr remote logs {jobid} --follow"),
-                ("Pull", f"cxr remote pull {' '.join(stems)}  (after completion)"),
+                ("Monitor", f"pyrite remote status {jobid} --attach"),
+                ("Status", f"pyrite remote status {jobid} -vv"),
+                ("Logs", f"pyrite remote logs {jobid} --follow"),
+                ("Pull", f"pyrite remote pull {' '.join(stems)}  (after completion)"),
             ]
         )
     )
@@ -954,7 +954,7 @@ def start_reline_queue(
     line_start_eV=None,
     line_stop_eV=None,
 ):
-    """Submit a line-only checkpoint recompute (``cxr reline``) to SLURM.
+    """Submit a line-only checkpoint recompute (``pyrite reline``) to SLURM.
 
     Reserves the same ``<material>.pkl`` stems as a sweep/rebrem. By default the
     recompute is chunked: each ~chunk_minutes slice does bounded work via ``cxr
@@ -1053,10 +1053,10 @@ def start_reline_queue(
                         )
                     ),
                 ),
-                ("Monitor", f"cxr remote status {jobid} --attach"),
-                ("Status", f"cxr remote status {jobid} -vv"),
-                ("Logs", f"cxr remote logs {jobid} --follow"),
-                ("Pull", f"cxr remote pull {' '.join(stems)} --line-only  (after completion)"),
+                ("Monitor", f"pyrite remote status {jobid} --attach"),
+                ("Status", f"pyrite remote status {jobid} -vv"),
+                ("Logs", f"pyrite remote logs {jobid} --follow"),
+                ("Pull", f"pyrite remote pull {' '.join(stems)} --line-only  (after completion)"),
             ]
         )
     )
@@ -1267,7 +1267,7 @@ def reap_reservations(min_age_minutes=5.0, yes=False):
 def _resolve_survey_stems(stems):
     """Expand bare canonical-material stems to also include any matching
     identity-qualified survey checkpoint directories on the box
-    (``<material>--survey-<hash>/``), so ``cxr remote pull <material>`` finds
+    (``<material>--survey-<hash>/``), so ``pyrite remote pull <material>`` finds
     a survey checkpoint without the caller needing to know its hash suffix.
 
     On-disk names stay hash-based -- this only discovers them, via one remote
@@ -1423,7 +1423,7 @@ def pull(
     (``--brem-only``/``--line-only``), since those require an existing local
     checkpoint to merge into and a freshly discovered stem would not have one.
 
-    Every pull runs the transfer through ``cxr slim`` on the box, which encodes
+    Every pull runs the transfer through ``pyrite slim`` on the box, which encodes
     straight to that ssh session's stdout (``-o -``) -- the box's compress pass
     overlaps the wire instead of staging a whole temp artifact on box disk
     first. ``grid`` filters to just the material's current grid (plus the
@@ -1515,7 +1515,7 @@ def pull(
             # propagates the remote command's status.
             remote_transfer = (
                 f"cd {config.shell_remote_dir()} && "
-                f"{config.shell_remote_uv()} run --no-sync cxr slim "
+                f"{config.shell_remote_uv()} run --no-sync pyrite slim "
                 f"{config.shell_arg(ckpt)}{flags} -o -"
             )
             # Timed so a slow pull is attributable: this covers box slim CPU +
@@ -1582,7 +1582,7 @@ def pull_zhai_cache():
     )
     names = [Path(p).name for p in transport._ssh_capture(listing).split()]
     if not names:
-        print("(no zhai cache files on the box -- run `cxr run --preset zhai --remote` first)")
+        print("(no zhai cache files on the box -- run `pyrite run --preset zhai --remote` first)")
         return
     dest = config.LOCAL_ROOT / "checkpoints" / "zhai_reproduction"
     dest.mkdir(parents=True, exist_ok=True)

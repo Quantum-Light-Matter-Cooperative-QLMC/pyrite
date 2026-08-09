@@ -1,4 +1,4 @@
-"""cxr_mc.remote (``cxr remote``): material-name validation and the
+"""cxr_mc.remote (``pyrite remote``): material-name validation and the
 detached-queue runner generation.
 
 These are pure-string/logic checks (no ssh), so they run anywhere. The one
@@ -299,7 +299,7 @@ def test_queue_script_accepts_three_parallel_materials():
     )
 
     assert "parallel_materials=3" in script
-    assert "export CXR_MC_GPU_SHARE=3" in script  # co-tenants split the VRAM pool cap
+    assert "export PYRITE_MC_GPU_SHARE=3" in script  # co-tenants split the VRAM pool cap
     assert "wait -n" in script
 
 
@@ -346,8 +346,8 @@ def test_queue_script_profiles_uncached_repetitions_with_fixed_runtime_knobs():
         brem_chunk=10_000,
     )
 
-    assert "export CXR_MC_SPEC_CHUNK=20000" in script
-    assert "export CXR_MC_BREM_CHUNK=10000" in script
+    assert "export PYRITE_MC_SPEC_CHUNK=20000" in script
+    assert "export PYRITE_MC_BREM_CHUNK=10000" in script
     assert "performance_repetitions=3" in script
     assert "repetition<=performance_repetitions" in script
     assert '--checkpoint-dir "$JOBDIR/performance-checkpoints/$m/$repetition"' in script
@@ -373,16 +373,16 @@ def test_queue_script_wraps_single_profile_session_with_nsys():
     )
 
     assert "command -v nsys" in script
-    assert "export CXR_MC_NSYS=1" in script
+    assert "export PYRITE_MC_NSYS=1" in script
     assert "nsys profile" in script
     assert "--trace=cuda,nvtx,osrt" in script
     assert "--wait=all" in script
     # Python stack-walkers stay opt-in (SIGSEGV on CPython 3.14 under nsys
-    # 2025.6.x); gated behind CXR_MC_NSYS_PYSTACK, not on by default.
-    assert 'if [ -n "${CXR_MC_NSYS_PYSTACK:-}" ]; then' in script
+    # 2025.6.x); gated behind PYRITE_MC_NSYS_PYSTACK, not on by default.
+    assert 'if [ -n "${PYRITE_MC_NSYS_PYSTACK:-}" ]; then' in script
     assert "--python-backtrace=cuda" in script
     assert '--output="$trace_base"' in script
-    assert 'scan_launcher=("/home/aamador/dev/cxr-mc/.venv/bin/python")' in script
+    assert 'scan_launcher=("/home/aamador/dev/pyrite/.venv/bin/python")' in script
     assert '--checkpoint-dir "$JOBDIR/performance-checkpoints/$m/$repetition"' in script
     assert "nsys stats" in script
     assert "--report cuda_api_sum,cuda_gpu_kern_sum,cuda_kern_exec_sum,nvtx_sum" in script
@@ -404,7 +404,7 @@ def test_queue_script_cpu_flag_adds_cprofile_after_primary():
     )
     # Serial NumPy pass under cProfile, after the primary performance run.
     assert "-m cProfile -o " in script
-    assert "env -u CXR_MC_NSYS CXR_MC_BACKEND=cpu" in script
+    assert "env -u PYRITE_MC_NSYS PYRITE_MC_BACKEND=cpu" in script
     # Always the tiny --quick grid (representative call distribution in minutes,
     # not a >1h full-fidelity serial pass) with a hard --max-minutes backstop.
     assert '_entry.scan "sub_100keV" -m "$m" --quick --workers 0' in script
@@ -434,7 +434,7 @@ def test_queue_script_nsys_alone_does_not_add_cpu_cprofile():
         nsys=True,
     )
     assert "cProfile" not in script
-    assert "CXR_MC_BACKEND=cpu" not in script
+    assert "PYRITE_MC_BACKEND=cpu" not in script
 
 
 def test_queue_script_cpu_only_has_no_primary_gpu_or_sampler_phase():
@@ -449,7 +449,7 @@ def test_queue_script_cpu_only_has_no_primary_gpu_or_sampler_phase():
     )
 
     assert "-m cProfile -o " in script
-    assert "CXR_MC_BACKEND=cpu" in script
+    assert "PYRITE_MC_BACKEND=cpu" in script
     assert "--progress-phase cpu" in script
     assert "cpu_only_enabled=1" in script
     assert 'if [ "$cpu_only_enabled" -eq 0 ]; then' in script
@@ -1179,9 +1179,9 @@ def test_start_reports_the_submitted_slurm_job_id(monkeypatch, capsys):
     assert "· SUBMITTED" in output
     assert "SLURM" in output
     assert "48291" in output
-    assert "cxr remote status" in output
+    assert "pyrite remote status" in output
     assert "--attach" in output
-    assert "cxr remote attach" not in output
+    assert "pyrite remote attach" not in output
 
 
 def test_start_profile_submit_suggests_profile_pull_not_a_stem_wall(monkeypatch, capsys):
@@ -1193,8 +1193,8 @@ def test_start_profile_submit_suggests_profile_pull_not_a_stem_wall(monkeypatch,
     remote.start_queue(["hopg", "hbn", "mose2", "wse2"], no_sync=True, catalog_profile="sub_100keV")
 
     output = capsys.readouterr().out
-    assert "cxr remote pull --profile sub_100keV" in output
-    assert "cxr remote pull hopg--" not in output  # no hash-stem wall
+    assert "pyrite remote pull --profile sub_100keV" in output
+    assert "pyrite remote pull hopg--" not in output  # no hash-stem wall
 
 
 def test_start_standard_submit_suggests_stem_pull(monkeypatch, capsys):
@@ -1206,7 +1206,7 @@ def test_start_standard_submit_suggests_stem_pull(monkeypatch, capsys):
     remote.start_queue(["hopg"], no_sync=True)
 
     output = capsys.readouterr().out
-    assert "cxr remote pull hopg " in output
+    assert "pyrite remote pull hopg " in output
 
 
 def test_run_profile_uses_shipped_membership_without_material_option(capsys):
@@ -1385,8 +1385,8 @@ def test_run_performance_runtime_knobs_reach_monolithic_dry_run(capsys):
     assert "#SBATCH --cpus-per-task=6" in output
     assert "--perf-interval 1" in output
     assert "performance_repetitions=3" in output
-    assert "export CXR_MC_SPEC_CHUNK=20000" in output
-    assert "export CXR_MC_BREM_CHUNK=10000" in output
+    assert "export PYRITE_MC_SPEC_CHUNK=20000" in output
+    assert "export PYRITE_MC_BREM_CHUNK=10000" in output
 
 
 def test_run_nsys_reaches_monolithic_dry_run(capsys):
@@ -1412,7 +1412,7 @@ def test_run_nsys_reaches_monolithic_dry_run(capsys):
     output = capsys.readouterr().out
     assert "nsys profile" in output
     assert "nsys: True" in output
-    assert "export CXR_MC_NSYS=1" in output
+    assert "export PYRITE_MC_NSYS=1" in output
 
 
 def test_run_defaults_to_attach_and_pull(monkeypatch):
@@ -1449,7 +1449,7 @@ def test_headless_performance_run_prints_canonical_pull_hint(monkeypatch, capsys
 
     remote.main(["run", "standard", "-m", "hopg", "--perf", "--headless", "--no-sync"])
 
-    assert "cxr remote performance pull standard" in capsys.readouterr().out
+    assert "pyrite remote performance pull standard" in capsys.readouterr().out
 
 
 def test_run_no_pull_still_attaches(monkeypatch):
@@ -3823,8 +3823,8 @@ def test_prune_checkpoint_command_reserves_runs_and_releases():
 
     assert "for stem in hopg hopg--survey-deadbeef0000" in command
     assert "trap release_prune EXIT" in command
-    assert "run --no-sync cxr prune --profile standard --yes" in command
-    assert command.index("for stem in hopg") < command.index("run --no-sync cxr prune")
+    assert "run --no-sync pyrite prune --profile standard --yes" in command
+    assert command.index("for stem in hopg") < command.index("run --no-sync pyrite prune")
 
 
 def test_prune_remote_dispatches_exact_reserved_stems(monkeypatch, capsys):
@@ -3843,7 +3843,7 @@ def test_prune_remote_dispatches_exact_reserved_stems(monkeypatch, capsys):
 
     assert len(commands) == 1
     assert "for stem in hopg" in commands[0]
-    assert "cxr prune --profile standard" in commands[0]
+    assert "pyrite prune --profile standard" in commands[0]
     assert "would prune remote" in capsys.readouterr().out
 
 
@@ -4679,7 +4679,7 @@ def test_sync_paths_include_all_materials_manifest():
     assert "mats_to_sim.toml" in remote.SYNC_PATHS
 
 
-# ---- cxr remote check (Zhai GPU reproduction) ------------------------------
+# ---- pyrite remote check (Zhai GPU reproduction) ------------------------------
 def test_zhai_queue_script_has_ne_flags_and_meta():
     s = remote._zhai_queue_script(
         "20260101-000000",
@@ -5031,12 +5031,12 @@ def test_reap_job_command_releases_only_matching_owner(tmp_path):
     assert "reaped" in (monkeypatch_dir / "jobs" / "dead" / "state").read_text()
 
 
-# ---- cxr remote rebrem (brem-only checkpoint recompute) ---------------------
+# ---- pyrite remote rebrem (brem-only checkpoint recompute) ---------------------
 def test_rebrem_queue_script_flags_progress_and_markers():
     s = remote._rebrem_queue_script(
         "20260101-000000", ["hopg", "hbn"], ne_brem=1000, brem_step_eV=25.0, redo_all=True
     )
-    assert "cxr rebrem" in s
+    assert "pyrite rebrem" in s
     assert "--ne-brem 1000" in s and "--step 25" in s and "--redo-all" in s
     # per-material progress record feeds the shared plain/attached status dashboard
     assert '--progress-file "$JOBDIR/progress/$m.json"' in s
@@ -5078,7 +5078,7 @@ def test_rebrem_start_dry_run_prints_without_ssh_or_sync(monkeypatch, capsys):
     jobid = remote.start_rebrem_queue(["hopg"], ne_brem=1000, dry_run=True)
 
     out = capsys.readouterr().out
-    assert jobid in out and "cxr rebrem" in out
+    assert jobid in out and "pyrite rebrem" in out
 
 
 def test_rebrem_cli_submits_attaches_and_pulls_completed(monkeypatch):
@@ -5140,7 +5140,7 @@ def test_rebrem_chunked_queue_script_self_resubmits():
     s = scripts._rebrem_chunked_queue_script(
         "J1", ["mos2", "w"], ne_brem=1000, brem_step_eV=None, redo_all=False, chunk_minutes=10.0
     )
-    assert "cxr rebrem" in s
+    assert "pyrite rebrem" in s
     assert "--ne-brem 1000" in s
     assert "--max-minutes" in s
     assert "--nice=10000" in s
@@ -5153,19 +5153,19 @@ def test_rebrem_chunked_queue_script_self_resubmits():
 def test_reline_queue_script_and_metadata():
     from cxr_mc.remote import scripts
 
-    # Default remote reline is chunked like `cxr remote run`.
+    # Default remote reline is chunked like `pyrite remote run`.
     s = scripts._reline_chunked_queue_script(
         "J1", ["mos2", "w"], line_ne=40000, line_step_eV=None, redo_all=True, chunk_minutes=10.0
     )
-    assert "cxr reline" in s
+    assert "pyrite reline" in s
     assert "--line-ne 40000" in s
     assert "--redo-all" in s
     assert "--max-minutes" in s
     assert "--nice=10000" in s
     assert "--progress-file" in s
-    # The monolithic (chunk_minutes==0) path still runs `cxr reline` per material.
+    # The monolithic (chunk_minutes==0) path still runs `pyrite reline` per material.
     mono = scripts._reline_queue_script("J1", ["mos2", "w"], 40000, None, True)
-    assert "cxr reline" in mono and "--line-ne 40000" in mono and "--redo-all" in mono
+    assert "pyrite reline" in mono and "--line-ne 40000" in mono and "--redo-all" in mono
     assert "--progress-file" in mono
     meta = scripts._reline_queue_metadata("J1", ["mos2", "w"], 40000, None, True)
     assert "kind: reline" in meta

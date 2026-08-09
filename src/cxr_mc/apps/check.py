@@ -26,13 +26,15 @@ from pathlib import Path
 import click
 
 from ..cli import _core as _cli_core
-from ..paths import app_dir, state_dir
+from ..paths import app_dir, atomic_write_text, legacy_state_dir, state_dir
 from ..remote.config import remote_host
 from ._acp import running_acp
 
 NOTEBOOK = str(app_dir() / "validation_app.py")
 TUNNEL_PORT = 2718
 DEFAULTS_PATH = state_dir() / "validation-defaults.json"
+_CANONICAL_DEFAULTS_PATH = DEFAULTS_PATH
+_LEGACY_DEFAULTS_PATH = legacy_state_dir() / "validation-defaults.json"
 _PACKAGED_DEFAULTS_PATH = app_dir() / "validation_defaults.json"
 
 
@@ -40,7 +42,9 @@ def load_default_azimuth(path=DEFAULTS_PATH):
     """Load the user override or packaged exploratory TMD azimuth default."""
     resolved = Path(path)
     if resolved == DEFAULTS_PATH and not resolved.is_file():
-        resolved = _PACKAGED_DEFAULTS_PATH
+        resolved = (
+            _LEGACY_DEFAULTS_PATH if _LEGACY_DEFAULTS_PATH.is_file() else _PACKAGED_DEFAULTS_PATH
+        )
     data = json.loads(resolved.read_text(encoding="utf-8"))
     value = float(data["tmd_exploratory_azimuth_deg"])
     if not 0.0 <= value <= 180.0:
@@ -54,13 +58,10 @@ def save_default_azimuth(value, path=DEFAULTS_PATH):
     if not 0.0 <= value <= 180.0:
         raise ValueError("default azimuth must be between 0 and 180 degrees")
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(f"{path.suffix}.tmp")
-    temporary.write_text(
+    atomic_write_text(
+        path,
         json.dumps({"tmd_exploratory_azimuth_deg": value}, indent=2) + "\n",
-        encoding="utf-8",
     )
-    os.replace(temporary, path)
 
 
 def _remote_cli(*args):

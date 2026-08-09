@@ -6,6 +6,7 @@ from contextlib import nullcontext
 from time import perf_counter
 from typing import Any
 
+from ..._compat import env_value
 from ...energy_grid.encoding import decode_energy_grid
 from .._backend import BACKEND, BackendResourceError, BackendUnavailableError
 from . import (
@@ -230,7 +231,7 @@ def run_cases(
     def _maybe_bar(iterable):
         if not progress:
             return iterable
-        if os.environ.get("CXR_LOCAL_DASHBOARD") == "1":
+        if env_value("CXR_LOCAL_DASHBOARD") == "1":
             return iterable
         try:
             from tqdm.auto import tqdm
@@ -256,7 +257,7 @@ def run_cases(
         try:
             case_runtime_plan(cases[0])
         except BackendResourceError as error:
-            if engine != "auto" or os.environ.get("CXR_MC_BACKEND", "auto").lower() != "auto":
+            if engine != "auto" or env_value("CXR_MC_BACKEND", "auto").lower() != "auto":
                 raise
             _admit_cpu_fallback()
             fallback_reason = f"device_budget_infeasible: {error}"
@@ -457,10 +458,7 @@ def run_cases(
                         else _spectrum_case_retry(cases[i], tp, spec_chunk_cap=learned_spec_chunk)
                     )  # accelerator, THIS process only
                 except _GPU_OOM as error:
-                    if (
-                        engine != "auto"
-                        or os.environ.get("CXR_MC_BACKEND", "auto").lower() != "auto"
-                    ):
+                    if engine != "auto" or env_value("CXR_MC_BACKEND", "auto").lower() != "auto":
                         raise
                     _admit_cpu_fallback()
                     reason = f"accelerator_oom_retries_exhausted: {error}"
