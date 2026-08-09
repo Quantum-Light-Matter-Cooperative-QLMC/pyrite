@@ -34,9 +34,6 @@ from .transport import TRANSPORT_ELEMENTS, beta_from_keV
 # ---- segment-sum CXR spectrum ------------------------------------------------
 _SEG_ARRAYS = ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "t0_ang", "elec_id", "layer")
 _USE_JIT_LINE_REDUCTION = True
-# Staged behind an explicit opt-in until the new kernel passes CUDA compilation,
-# numerical goldens, repeatability, and A/B timing on the supported GPUs.
-_USE_JIT_LINE_PROLOGUE = False
 _USE_JIT_COHERENT_REDUCTION = True
 _USE_JIT_COHERENT_STREAM = True
 _USE_JIT_BREM_REDUCTION = True
@@ -1232,24 +1229,6 @@ def mc_spectrum(
                 run_reduction_kernel,
             )
 
-        _use_jit_line_prologue = _use_jit_line_reduction and _USE_JIT_LINE_PROLOGUE and not coherent
-        if _use_jit_line_prologue:
-            from .line_prologue_jit_kernel import (
-                DEFAULT_LINE_PROLOGUE_KERNEL_CONFIG,
-                run_line_prologue_kernel,
-            )
-
-            # C-order flattened views are constructed once; slicing v_all by
-            # complete rows below remains contiguous and needs no copy.
-            _prologue_g = G.reshape(-1)
-            _prologue_es = ES.reshape(-1)
-            _prologue_ep = EP.reshape(-1)
-            _prologue_wm = WM.reshape(-1)
-            _prologue_chi_re = CHI_RE.reshape(-1)
-            _prologue_chi_im = CHI_IM.reshape(-1)
-            _prologue_u_re = U_RE.reshape(-1)
-            _prologue_u_im = U_IM.reshape(-1)
-
         # Coherent CUDA fast path: stream one bounded segment block at a time
         # through a fused (segment, g) prologue and into persistent per-g complex
         # field planes.  The field, not the intensity, is additive across segment
@@ -1394,47 +1373,6 @@ def mc_spectrum(
                 )
                 _nsys_pop()
                 del coh_line_data  # release scratch before the next block allocates
-                continue
-
-            if _use_jit_line_prologue:
-                _nsys_push("cxr.lines.prologue")
-                E_r_f, aw_f, w_f = run_line_prologue_kernel(
-                    v_all[sb].reshape(-1),
-                    denom_full[sb].reshape(-1),
-                    gamma_full[sb].reshape(-1),
-                    t_L_full[sb].reshape(-1),
-                    L_esc_full[sb].reshape(-1),
-                    line_electron[sb],
-                    _prologue_g,
-                    _prologue_es,
-                    _prologue_ep,
-                    _prologue_wm,
-                    E_tab_g,
-                    _prologue_chi_re,
-                    _prologue_chi_im,
-                    _prologue_u_re,
-                    _prologue_u_im,
-                    mu_tab_g,
-                    lo_keep=lo_keep,
-                    hi_keep=hi_keep,
-                    hbarc=HBARC_EV_ANG,
-                    electron_mass_eV=M_E_EV,
-                    alpha_fs=ALPHA_FS,
-                    pref_c1=_PREF_C1,
-                    n_hat=n_hat,
-                    config=DEFAULT_LINE_PROLOGUE_KERNEL_CONFIG,
-                )
-                _nsys_pop()
-                _nsys_push("cxr.lines.reduce")
-                run_reduction_kernel(
-                    E_r_f,
-                    aw_f,
-                    w_f,
-                    E_grid,
-                    out=spec,
-                    config=DEFAULT_SPECTRUM_KERNEL_CONFIG,
-                )
-                _nsys_pop()
                 continue
 
             vx = v_all[sb, 0][:, None]  # (nb, 1)F
