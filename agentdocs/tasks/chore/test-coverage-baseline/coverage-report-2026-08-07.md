@@ -109,3 +109,28 @@ Compiled-code artifacts removed; these are genuinely unexercised.
 `__main__` guards, and no `omit` — with the two compiled-code caveats above
 written into the comments so a future reader does not misread the total.
 `uv run cxr-dev test --cov` now works with no extra flags.
+
+## Post-change measurement — 2026-08-09
+
+The completed coverage slices add public plotting smoke tests, backend fallback
+dispatch fakes, energy-grid artifact rollback coverage, and module-entry shim
+smoke tests. The unsupported legacy `_compile_nb.py` developer script is marked
+for file-level exclusion; it remains shown as 0% in this report's default run,
+so the directive needs a coverage-tool compatibility check before it is relied
+on for reporting.
+
+| Measurement | Result | Line coverage |
+| --- | --- | --- |
+| Default run (branch coverage on) | **2,790 passed, 57 skipped** | **75.9%** (17,531 / 22,457 stmts) |
+| `NUMBA_DISABLE_JIT=1` | Interrupted after five minutes at 59% | Not available |
+
+The default run was repeated outside the restricted sandbox; the prior
+`forkserver` UNIX-socket error did not recur. The Numba-disabled run advanced
+past that point, then stopped making progress in Monte Carlo transport.
+Interrupting it reported `src/cxr_mc/montecarlo/transport.py:551` rather than
+an environment permission error. This is a runtime-regression investigation,
+not a coverage-threshold decision.
+
+No `fail_under` was added to `verify`: the required Numba-disabled measurement
+is incomplete and totals still depend strongly on CPU-only versus GPU-enabled
+imports and JIT tracing behavior.
