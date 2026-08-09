@@ -169,7 +169,7 @@ def cmd_repo_map(_: argparse.Namespace) -> None:
         else:
             print(rel)
     print("Agent tooling:")
-    for rel in [".agents", ".claude"]:
+    for rel in [".agents", ".claude", "agentdocs"]:
         if (ROOT / rel).exists():
             print(f"  {rel}/")
     print()
@@ -460,7 +460,7 @@ def cmd_verify(args: argparse.Namespace) -> None:
     if not todo_merge_driver_configured():
         print(
             "warning: TODO.md merge driver not configured; "
-            "run `uv run cxr-dev bootstrap` (see tasks/README.md).",
+            "run `uv run cxr-dev bootstrap` (see agentdocs/README.md).",
             file=sys.stderr,
         )
     cmd_lint(args)

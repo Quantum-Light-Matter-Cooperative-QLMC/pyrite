@@ -1,6 +1,6 @@
 # 0004 — Package & repository structure
 
-- **Status:** Accepted — 2026-08-01 (P4/P5 landed; P1–P3 scheduled)
+- **Status:** Accepted — 2026-08-01 (P4/P5 superseded by ADR-0006)
 - **Date:** 2026-08-01
 - **Rationale:** [`docs/package-structure-rfc.md`](../package-structure-rfc.md)
 
@@ -23,6 +23,10 @@ ephemeral plans; multiple TODO surfaces bypassed the `TODO.md merge=ours` driver
   and fold the recompute/prune module sprawl with RFC D4's verb collapse.
 
 ## Consequences
+
+Document-location consequences below are historical and superseded by
+[ADR-0006](0006-consolidate-agent-work-records.md), which consolidates tracked
+agent work under `agentdocs/`.
 
 - Untracked agent scratch renamed `claudedocs/` → `agentdocs/` (agent-neutral;
   the tree already standardizes on `AGENTS.md`).

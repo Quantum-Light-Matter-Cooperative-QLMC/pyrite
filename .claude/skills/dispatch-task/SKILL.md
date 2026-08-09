@@ -11,7 +11,8 @@ hygiene.
 
 ## Inventory
 
-1. Invoke `todo-sync`. Read the matching `tasks/<branch-name>/README.md`,
+1. Invoke `todo-sync`. Read the matching
+   `agentdocs/tasks/<branch-name>/README.md`,
    worktree list, branch status, and relevant instructions.
 2. Invoke `repo-orientation` to confirm owners, dependencies, and tests.
 3. If item still contains `>user<`, invoke `triage`; stop for plan review.
@@ -37,8 +38,9 @@ delegation authority implicitly.
 Only when explicitly asked:
 
 1. Verify branch landed and identify durable task content.
-2. Promote durable content to `docs/`; remove the task directory; drop the
-   completed item's line from main's `TODO.md`.
+2. Promote durable content to its owner (`README.md`, `docs/`, ADR, source
+   documentation, or tests); remove the task directory; drop the completed
+   item's line from main's `TODO.md`.
 3. Commit and push authorized lifecycle changes.
 4. Hand physical worktree/ref removal to `repo-cleanup`; report its recovery
    SHAs.
@@ -71,7 +73,7 @@ Send explicit values; never rely on child inheriting supervisor context.
 ```text
 Worker skill:
 Task:
-Task doc (tasks/<branch-name>/README.md):
+Task doc (agentdocs/tasks/<branch-name>/README.md):
 Worktree:
 Branch:
 Slice / non-goals:

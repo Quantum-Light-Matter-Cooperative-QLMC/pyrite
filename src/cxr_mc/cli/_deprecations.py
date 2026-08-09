@@ -276,7 +276,7 @@ def _flag(
 
 
 #: The nine ``cxr profile create``/``cxr profile set`` inline beam-distribution
-#: flags (decision 6, `tasks/feature/named-beam-objects`): the whole family
+#: flags (decision 6, `agentdocs/tasks/feature/named-beam-objects`): the whole family
 #: moved to ``cxr beam create``/``cxr beam set``, so there is no differently
 #: named canonical flag on the *same* command to merge into the way D5's
 #: renamed spellings do. Each flag keeps its own name and stays fully

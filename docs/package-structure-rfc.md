@@ -1,5 +1,9 @@
 # RFC: package & repository structure
 
+> **2026-08-09 update:** ADR-0006 supersedes P4/P5's document-location
+> decision. Tracked agent work now lives only under `agentdocs/`; `docs/` is
+> reserved for durable project documentation.
+
 - **Status:** Accepted — 2026-08-01 (P4/P5 landed; P1–P3 scheduled)
 - **Author:** Alex Amador
 - **Created:** 2026-08-01
@@ -147,9 +151,9 @@ become the canonical verbs, retire `rebrem.py`/`reline.py`/`prune.py` into the
 checkpoint recompute/cleanup modules rather than leaving them as parallel entry
 points behind shims. Sequenced with the redesign, not ahead of it.
 
-### P4 — Split docs by lifetime; adopt ADRs
+### P4 — Split docs by lifetime; adopt ADRs (location superseded)
 
-**Landed 2026-08-01.**
+**Landed 2026-08-01; ephemeral-plan location superseded by ADR-0006.**
 
 - `docs/` root = durable reference + index only.
 - `docs/plans/` = tracked but ephemeral (`*-plan.md`, `*-handoff.md`); moved the
@@ -164,9 +168,9 @@ points behind shims. Sequenced with the redesign, not ahead of it.
 - Both `docs/plans/` and `docs/adr/` are excluded from the Sphinx site
   (`conf.py`) — dev-facing, not published reference.
 
-### P5 — Consolidate planning/memory surfaces
+### P5 — Consolidate planning/memory surfaces (superseded)
 
-**Landed 2026-08-01.**
+**Landed 2026-08-01; superseded by ADR-0006.**
 
 - Folded `TODO_CLI.md` and `TODO_UI.md` into `TODO.md` as `## CLI backlog` /
   `## UI backlog` sections, so the single `merge=ours`-protected file is the only

@@ -8,5 +8,5 @@
 # branch in, or the rebase base) instead of prompting for manual resolution.
 # The `ours` driver is `true` (a no-op that keeps the current version); it must
 # be registered in local git config via `uv run cxr-dev bootstrap`, otherwise
-# git silently falls back to a normal 3-way merge. See tasks/README.md.
+# git silently falls back to a normal 3-way merge. See agentdocs/README.md.
 TODO.md merge=ours

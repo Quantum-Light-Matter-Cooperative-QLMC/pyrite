@@ -60,8 +60,8 @@ If `uv run` cannot write project environment, add
   that setup on `main`, pushes `main` and the task branches, then stops for
   review.
 - Use `dispatch-task` to route backlog work. It resolves task worktree/branch,
-  owns approved setup/landed teardown, writes explicit authority/acceptance
-  handoff, then selects:
+  verifies approved setup, owns landed teardown, writes explicit
+  authority/acceptance handoff, then selects:
   `implement-task-lite` for small mechanical slices, `implement-task` for
   normal checklist slices, or `lead-task` for complex/integrating ownership.
 - Example model tiers: Haiku/Luna → lite; Sonnet/Terra → normal;
@@ -84,10 +84,12 @@ If `uv run` cannot write project environment, add
 
 `TODO.md` is authoritative on `main`; branch copies are disposable and
 auto-resolve to `main` on merge/rebase via the `TODO.md merge=ours` driver (run
-`uv run cxr-dev bootstrap` once per clone). Edit and drop items on `main`. Branch
-detail belongs in `tasks/<branch-name>/` (full task branch name; entry doc
-`README.md`); see `tasks/README.md`. `todo-sync` now only checks main's accuracy
-and that the driver is installed.
+`uv run cxr-dev bootstrap` once per clone). Edit and drop items on `main`.
+Tracked agent plans and handoffs live only in `agentdocs/`, outside the public
+documentation tree. Branch detail belongs in
+`agentdocs/tasks/<branch-name>/` (full task branch name; entry doc `README.md`);
+see `agentdocs/README.md`. `todo-sync` now only checks main's accuracy and that
+the driver is installed.
 
 New/edited physics requires source equation, assumptions, limiting case,
 `Validation: <id>`, and ledger row. Fresh context verifies it; only human marks

@@ -13,10 +13,10 @@ byte-equality across branches.
 
 1. Confirm the merge driver is installed in this clone:
    `git config --local --get merge.ours.driver` must print `true`. If missing,
-   run `uv run cxr-dev bootstrap` (see `tasks/README.md`). Without it, git falls
+   run `uv run cxr-dev bootstrap` (see `agentdocs/README.md`). Without it, git falls
    back to a normal 3-way merge and TODO.md conflicts return.
 2. Read `main:TODO.md` once. Verify it is accurate: one summary line per active
-   item with a branch and `tasks/<branch-name>/` pointer; `>user<` text
+   item with a branch and `agentdocs/tasks/<branch-name>/` pointer; `>user<` text
    preserved exactly until triaged.
 3. Report stale/missing pointers and merge-driver failures without editing.
    `triage` owns new pointers; `dispatch-task` retirement owns completed-item

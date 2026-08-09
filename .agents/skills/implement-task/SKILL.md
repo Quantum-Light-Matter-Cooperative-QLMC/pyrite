@@ -9,7 +9,7 @@ description: Use when implementing a coherent cxr-mc task checklist slice on its
 
 1. Confirm handoff, cwd, branch, worktree, status, merge state, and authority.
    Read `AGENTS.md`, `main:TODO.md`, matching task doc
-   (`tasks/<branch-name>/README.md`), and required skills. Activate Serena, read
+   (`agentdocs/tasks/<branch-name>/README.md`), and required skills. Activate Serena, read
    its manual, and inspect current config. If requested `one-shot` is absent on
    a shared server, retain the handoff's autonomous contract without changing
    project-wide modes.
@@ -37,7 +37,8 @@ description: Use when implementing a coherent cxr-mc task checklist slice on its
    broken state merely to save progress. Never amend/rewrite another worker's
    commits. Never push unless `push: yes`.
 6. Update assigned task checklist/decisions/remainder. Keep `TODO.md` summary
-   only; durable landed design belongs in `docs/`.
+   only; promote durable outcomes to their owner (`README.md`, `docs/`, ADR,
+   source documentation, or tests).
 
 ## Finish
 

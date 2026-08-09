@@ -66,13 +66,12 @@ root_doc = "index"
 # docs/README.md is the GitHub folder index (a pointer table); the Sphinx
 # landing page is index.md, so leave README.md out of the build.
 # Dev-facing docs kept in-repo but out of the published reference site: the ADR
-# log, ephemeral plans/handoffs, RFCs, and the energy-grid decision plan.
+# log, RFCs, and the energy-grid decision plan. Agent plans live outside docs/.
 exclude_patterns = [
     "_build",
     "Thumbs.db",
     ".DS_Store",
     "README.md",
-    "plans/*",
     "adr/*",
     "*-rfc.md",
     "*-plan.md",

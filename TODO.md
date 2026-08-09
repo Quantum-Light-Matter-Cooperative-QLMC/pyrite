@@ -8,8 +8,9 @@ future direction, not committed work.
 
 Branch copies are disposable and auto-resolve to `main` on merge/rebase
 (`.gitattributes` `TODO.md merge=ours` driver — run `uv run cxr-dev bootstrap`
-once per clone). Branch detail lives in `tasks/<branch-name>/` (entry doc
-`README.md`); workflow and merge rules: [`tasks/README.md`](tasks/README.md).
+once per clone). Branch detail lives in `agentdocs/tasks/<branch-name>/` (entry
+doc `README.md`); workflow and merge rules:
+[`agentdocs/README.md`](agentdocs/README.md).
 `>user<` marks untriaged user text that must remain until moved into a task
 file. Edit and drop items on `main`.
 
@@ -33,7 +34,7 @@ file. Edit and drop items on `main`.
    shims deleted) and S8's empty-dir leftover are done on the branch, S7
    remainder is next.
    → `refactor/repo-structure-cleanup`;
-   [`tasks/refactor/repo-structure-cleanup/`](tasks/refactor/repo-structure-cleanup/);
+   [`agentdocs/tasks/refactor/repo-structure-cleanup/`](agentdocs/tasks/refactor/repo-structure-cleanup/);
    design: [`docs/package-structure-rfc.md`](docs/package-structure-rfc.md).
 
 ## P1 - top-priority back burner
@@ -54,7 +55,7 @@ file. Edit and drop items on `main`.
    sizing — sizing itself already fixed and awaiting hardware confirmation).
    Plan and open questions:
    → `feature/compute-performance-optimization`;
-   [`tasks/feature/compute-performance-optimization/REMAINING.md`](tasks/feature/compute-performance-optimization/REMAINING.md).
+   [`agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md`](agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md).
 2. **Add support for characteristic X-rays**
 3. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
    factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
@@ -62,13 +63,11 @@ file. Edit and drop items on `main`.
    material checkpoint once for all three Compare plots, preserve persistent
    cache reuse, and correct or accurately report the ratio plot's unexpected
    material exclusions. → `fix/analysis-compare-loading-quality`;
-   [`tasks/fix/analysis-compare-loading-quality/`](tasks/fix/analysis-compare-loading-quality/).
-5. **Batched coherent line accumulation.** `coherent_emission=True` opts out of
-   the batched `(n_seg, N_g)` line path and runs the legacy per-hkl loop: 38%
-   of GPU-phase tottime on a profiled `hopg_coherent` run, ~2.65x slower per
-   case than the batched branch. Physics-gated (reassociation → `Validation:`
-   id, ledger row, golden regen). → `feature/coherent-line-batching`;
-   [`tasks/feature/coherent-line-batching/`](tasks/feature/coherent-line-batching/).
+   [`agentdocs/tasks/fix/analysis-compare-loading-quality/`](agentdocs/tasks/fix/analysis-compare-loading-quality/).
+5. **Validate batched coherent line accumulation.** The implementation and
+   `Validation: coherent-line-hkl-batch` ledger row landed; fresh-context
+   verification and human sign-off remain. → `feature/coherent-line-batching`;
+   [`agentdocs/tasks/feature/coherent-line-batching/`](agentdocs/tasks/feature/coherent-line-batching/).
 6. **Physics boundary typing.** `typecheck` passes, but the physics packages are
    the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`
    6.6% (vs `materials` 59.8%); of 42 public re-exported functions, 2 are fully
@@ -77,7 +76,7 @@ file. Edit and drop items on `main`.
    explicit `| None`. Not a blanket pass over array helpers; no stricter ty gate
    (`--error all` is 51 diagnostics, mostly correlated-guard false positives).
    → `chore/physics-boundary-typing`;
-   [`tasks/chore/physics-boundary-typing/`](tasks/chore/physics-boundary-typing/).
+   [`agentdocs/tasks/chore/physics-boundary-typing/`](agentdocs/tasks/chore/physics-boundary-typing/).
 
 ### Gated
 
@@ -96,7 +95,7 @@ file. Edit and drop items on `main`.
    detector geometry with a 90 degree standard default, then route maintained
    Zhai/literature comparisons through current detector, Sweep, and case APIs.
    → `feature/profile-observation-angle`;
-   [`tasks/feature/profile-observation-angle/`](tasks/feature/profile-observation-angle/).
+   [`agentdocs/tasks/feature/profile-observation-angle/`](agentdocs/tasks/feature/profile-observation-angle/).
 
 ## P3 - lower-priority / exploratory back burner
 
@@ -107,7 +106,7 @@ file. Edit and drop items on `main`.
 5. **Tab completion latency.** Shell completion for `cxr` often takes
    multiple seconds; likely SSH-bound remote completion timeout or
    process-startup overhead, not confirmed. → `feature/tab-completion-latency`;
-   [`tasks/feature/tab-completion-latency/`](tasks/feature/tab-completion-latency/).
+   [`agentdocs/tasks/feature/tab-completion-latency/`](agentdocs/tasks/feature/tab-completion-latency/).
 6. **`_USE_JIT_LINE_PROLOGUE`: delete or keep gated.** The flag
    (`montecarlo/spectrum.py:39`) is `False` and its 347-line
    `montecarlo/line_prologue_jit_kernel.py` is dead. Re-derived as worth

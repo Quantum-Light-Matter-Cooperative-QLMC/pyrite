@@ -10,7 +10,7 @@ Own milestone outcome, not unlimited repository scope.
 ## Establish control
 
 1. Read `AGENTS.md`; invoke `todo-sync` and `repo-orientation`. Confirm
-   `main:TODO.md`, task doc (`tasks/<branch-name>/README.md`), all
+   `main:TODO.md`, task doc (`agentdocs/tasks/<branch-name>/README.md`), all
    worktrees/branches, clean ownership, merge state, dependencies, and authority.
    Activate Serena, read its manual, and inspect current config. If requested
    `one-shot` is absent on a shared server, retain the handoff's autonomous

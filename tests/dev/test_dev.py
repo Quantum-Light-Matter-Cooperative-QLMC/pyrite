@@ -163,4 +163,7 @@ def test_repo_map_groups_present_vendor_directories_as_agent_tooling(dev_module,
     dev_module.cmd_repo_map(Namespace())
 
     output = capsys.readouterr().out
-    assert "Agent tooling:\n  .agents/\n  .claude/\n\nCanonical commands:" in output
+    assert (
+        "Agent tooling:\n  .agents/\n  .claude/\n  agentdocs/\n\nCanonical commands:"
+        in output
+    )

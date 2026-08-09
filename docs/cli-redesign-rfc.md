@@ -3,7 +3,7 @@
 - **Status:** Accepted — 2026-08-01
 - **Author:** Alex Amador
 - **Created:** 2026-08-01
-- **Supersedes/relates:** `TODO_CLI.md` (punch-list — folded into `TODO.md` `## CLI backlog`, 2026-08-01), `docs/cli-energy-grid-sweep-rework-plan.md`, `docs/plans/scan-config-cli-plan.md`
+- **Supersedes/relates:** `TODO_CLI.md` (punch-list — folded into `TODO.md` `## CLI backlog`, 2026-08-01), `docs/cli-energy-grid-sweep-rework-plan.md`, archived `agentdocs/archive/scan-config-cli-plan.md`
 - **Sub-RFC:** `docs/cli-artifact-model-rfc.md` (the content-addressed data-model change, split off — see D3)
 - **Companion:** `docs/package-structure-rfc.md` (package/repo reorg; its
   command-home consolidation is a prerequisite for this RFC — see §4 phase 0)

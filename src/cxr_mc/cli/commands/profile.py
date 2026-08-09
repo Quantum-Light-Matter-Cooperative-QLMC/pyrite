@@ -346,7 +346,7 @@ def _unknown_beam(document, name):
 #: `cli/_deprecations.DEPRECATED_FLAGS` under `SELF_WARNING_FLAGS`: the whole
 #: family moved to ``cxr beam``, so there is no same-command canonical flag to
 #: merge into via `RetiredOption` -- this module warns manually instead
-#: (decision 6, `tasks/feature/named-beam-objects`).
+#: (decision 6, `agentdocs/tasks/feature/named-beam-objects`).
 _BEAM_FLAG_PARAMS = {
     "transverse_fwhm_mm": "--transverse-fwhm-mm",
     "rep_rate_hz": "--rep-rate-hz",

@@ -9,7 +9,8 @@ Execute only supplied slice. No architecture, broad refactor, TODO ownership,
 delegation, physics changes, or scope discovery.
 
 1. Confirm cwd, branch, worktree, status, and handoff fields. Read
-   `AGENTS.md`, supplied task section, named owners/tests, and required skills.
+   `AGENTS.md`, supplied `agentdocs/tasks/<branch-name>/` task section, named
+   owners/tests, and required skills.
    Activate Serena, read its manual, and inspect current config. If requested
    `one-shot` is absent because the server is shared, follow this skill's
    autonomous completion contract; do not alter project-wide modes.

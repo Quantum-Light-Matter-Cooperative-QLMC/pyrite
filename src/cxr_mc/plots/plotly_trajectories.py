@@ -42,8 +42,8 @@ _IDENTITY_R = np.eye(3)
 
 # Zoomed-view camera eye. Direction matches the long-standing hand-tuned angle
 # (-0.8, 1.5, -0.4); norm is rescaled to 1.25 (down from that vector's own
-# ~1.75) so the fitted scene box from `_zoom_scene_ranges` fills the frame --
-# see docs/plans/viewer-camera-animation-plan.md workstream 1. Plotly's own default
+# ~1.75) so the fitted scene box from `_zoom_scene_ranges` fills the frame and
+# decoration traces do not inflate Plotly's default range. Plotly's own default
 # eye norm is 1.25*sqrt(3) ~= 2.17, for scale.
 _CAMERA_EYE_DIRECTION = np.array([-0.8, 1.5, -0.4])
 _CAMERA_EYE = tuple((_CAMERA_EYE_DIRECTION / np.linalg.norm(_CAMERA_EYE_DIRECTION) * 1.25).tolist())

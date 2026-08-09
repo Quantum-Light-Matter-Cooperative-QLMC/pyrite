@@ -5,6 +5,8 @@ Guides, references, and validation records. They complement:
 - [`../README.md`](../README.md) — user-facing overview, physics, install, validation.
 - [`../docs/repo_map.md`](repo_map.md) — canonical package ownership and dependency map.
 - [`../TODO.md`](../TODO.md) — the feature / patch backlog.
+- [`../agentdocs/`](../agentdocs/) — tracked agent task plans and handoffs;
+  never published project documentation.
 
 | Document | Topic | Status |
 |---|---|---|
@@ -24,14 +26,14 @@ Guides, references, and validation records. They complement:
 | [crystal-db-comparison.md](crystal-db-comparison.md) | Offline external-database lattice cross-check | implemented |
 | [debye-waller-audit.md](debye-waller-audit.md) | Thermal-displacement provenance and scalar/tensor model scope | in progress |
 
-## Planning & decisions
+## Decisions
 
-Split by lifetime (see [`package-structure-rfc.md`](package-structure-rfc.md)
-P4). These are dev-facing and excluded from the published site.
+These are dev-facing and excluded from the published site.
 
 - [`adr/`](adr/) — numbered architecture decision records (MADR-lite); the
   durable, greppable "why we decided X" log.
-- [`plans/`](plans/) — tracked but **ephemeral** plans and handoffs; superseded
-  by shipped code and the docs above.
 - `*-rfc.md` — long-form design rationale (surface, artifact model, structure);
   each accepted RFC gets an ADR stub.
+
+Agent-operational plans and handoffs belong only in
+[`../agentdocs/`](../agentdocs/), not under `docs/`.

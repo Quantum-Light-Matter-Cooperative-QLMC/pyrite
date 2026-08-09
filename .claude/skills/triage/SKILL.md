@@ -1,11 +1,11 @@
 ---
 name: triage
-description: Use when /triage is invoked with optional task-description text or user-marked backlog prose must become reviewable, committed, and pushed cxr-mc task plans, task branches/worktrees, and canonical TODO pointers before dispatch.
+description: Use when /triage is invoked with optional task-description text or user-marked backlog prose must become reviewable, tracked cxr-mc agent task records, task branches/worktrees, and canonical TODO pointers before dispatch.
 ---
 
 # Triage
 
-Convert task prose into reviewable, published work. Judgment plus setup commit
+Convert task prose into reviewable, tracked work. Judgment plus setup commit
 and branch push; stop before dispatch.
 
 ## Input
@@ -24,8 +24,8 @@ and branch push; stop before dispatch.
    `repo-orientation` and Serena when implementation ownership needs
    confirmation.
 3. For each task, derive `<branch-name>` (the full task branch name) and draft
-   `tasks/<branch-name>/README.md` (slashes nest, e.g.
-   `tasks/feature/oom-stage2/README.md`) with:
+   `agentdocs/tasks/<branch-name>/README.md` (slashes nest, e.g.
+   `agentdocs/tasks/feature/oom-stage2/README.md`) with:
 
    - problem and scope
    - implementation path and likely owners
@@ -35,21 +35,26 @@ and branch push; stop before dispatch.
      self-contained enough for Serena `one-shot`
    - acceptance checks
 
-4. Create each local task branch/worktree if absent. Stop on name collision,
-   unrelated dirty state, ambiguous intent, or missing design evidence.
-5. For each task, replace its existing marker or insert direct-input work as one
-   canonical `TODO.md` summary with branch and `tasks/<branch-name>/` pointers.
+4. For each task, replace its existing marker or insert direct-input work as one
+   canonical `TODO.md` summary with branch and
+   `agentdocs/tasks/<branch-name>/` pointers.
    Place it in the appropriate priority/state section. Edit only `main:TODO.md`;
    branch copies reconcile via the `merge=ours` driver — no cross-branch sync.
-6. Commit the setup on `main` in one commit: stage explicit paths only
-   (`TODO.md`, each new `tasks/<branch-name>/`); never `git add .`, never sweep
+5. Commit the setup on `main` in one commit: stage explicit paths only
+   (`TODO.md`, each new `agentdocs/tasks/<branch-name>/`); never `git add .`, never sweep
    unrelated dirty state. Use a `docs(tasks): triage <branch-name>`-style
    message.
+6. Create each new local task branch/worktree from that setup commit so the
+   worker's branch contains its task record. Stop on name collision, unrelated
+   dirty state, ambiguous intent, or missing design evidence; do not retouch a
+   branch that already owns work.
 7. Push `main` and each new task branch with upstream (`git push -u`). Verify
    remote refs before presenting.
 8. Show task docs, TODO diff, commit, pushed branches/worktrees, assumptions,
-   and open decisions for user review. Address feedback by amending the setup
-   commit and re-pushing.
+   and open decisions for user review. Address feedback with a follow-up setup
+   commit on `main`, then advance/recreate each still-unstarted task branch from
+   the reviewed commit and push it. Stop if implementation has begun; never
+   rewrite a worker's branch.
 
 Do not label a slice `one-shot` while a material decision remains open. Do not
 implement or dispatch. After approval, `dispatch-task` owns worker launch,

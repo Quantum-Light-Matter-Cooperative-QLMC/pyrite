@@ -7,6 +7,8 @@ and design notes in
 [`docs/`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc/tree/main/docs);
 backlog in
 [`TODO.md`](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/cxr-mc/blob/main/TODO.md).
+Tracked agent task records and cross-task plans live under `agentdocs/`, never
+under the public documentation tree.
 Print current top-level directory inventory:
 `uv run cxr-dev repo-map`.
 

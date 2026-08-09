@@ -254,10 +254,9 @@ jobs/
 # cxr analyze persisted default material
 .cxr-analyze-default
 
-# Ephemeral tool / assistant scratch output (agent-neutral name; the tree
-# standardizes on AGENTS.md, and non-Claude agents write here too)
+# Ephemeral tool / assistant scratch output. Tracked agent plans and task
+# records live in agentdocs/; use scratch/ or /tmp for disposable notes.
 /.playwright-mcp/
-/agentdocs/
 rule-tests/
 rules/
 utils/

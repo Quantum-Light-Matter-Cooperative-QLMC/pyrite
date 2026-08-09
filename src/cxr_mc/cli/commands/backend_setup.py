@@ -23,7 +23,7 @@ from .. import _core as _cli_core
 _ENV_KEY = "CXR_MC_BACKEND"
 
 # Matches README.md's install table; printed as a follow-up instruction, never
-# run automatically (see tasks/feature/backend-autodetect/README.md decision 2).
+# run automatically (see agentdocs/tasks/feature/backend-autodetect/README.md decision 2).
 _VENDOR_EXTRA_INSTALL = {
     "cuda": "uv sync --extra nvidia",
     "rocm": "CUPY_INSTALL_USE_HIP=1 uv sync --extra amd",
