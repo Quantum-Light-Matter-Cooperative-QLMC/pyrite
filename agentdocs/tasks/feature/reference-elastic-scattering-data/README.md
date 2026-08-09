@@ -35,12 +35,19 @@ also checks transport data availability.
 
 ## Checklist
 
-- [ ] A -- Resolve source/version/licensing/redistribution and write a
-      reproducible acquisition or generation record. No opaque copied tables.
-- [ ] B -- Define versioned offline schemas for total, transport, and DCS/CDF
-      data with unit and monotonicity validation.
-- [ ] C -- Compare current Browning totals with NIST totals across supported
-      elements and 1--300 keV; publish error surfaces and boundary behavior.
+- [x] A -- Source/version and redistribution gate resolved in
+      [`AC_GATE_REPORT.md`](AC_GATE_REPORT.md): current SRD 64 is Version 5.0
+      with 2002 data content; packaging is blocked pending written NIST
+      permission. A reproducible acquisition record cannot be completed before
+      that gate opens. No opaque tables were added.
+- [x] B -- Version-1 offline total/transport/DCS/CDF schema, units,
+      monotonicity, normalization, provenance, and endpoint requirements are
+      specified in [`AC_GATE_REPORT.md`](AC_GATE_REPORT.md). This is a contract
+      proposal, not authorization to package data or a runtime-model choice.
+- [ ] C -- Blocked by SRD redistribution terms and the lack of a documented
+      stable bulk API. The comparison grid, metrics, validity mask, and artifact
+      requirements are specified in [`AC_GATE_REPORT.md`](AC_GATE_REPORT.md),
+      but no NIST total values or error surfaces were committed.
 - [ ] D -- Integrate NIST total elastic rates into CPU paths and expose selected
       model/fallback/clamp metadata.
 - [ ] E -- Prototype direct DCS-CDF sampling versus a compact higher-moment
@@ -59,8 +66,14 @@ also checks transport data availability.
   its validity range.
 - **Decided:** missing data and fallbacks must be explicit and visible; silent
   clipping/fallback is not acceptable.
-- **Open/blocking:** NIST redistribution and reproducible data-acquisition
-  terms. Do not commit derived tables until provenance/licensing is resolved.
+- **Blocked:** NIST states SRD is copyrighted, all rights reserved, and may not
+  be reproduced/stored/transmitted without prior permission. Obtain written
+  permission covering cxr-mc redistribution before committing raw or derived
+  SRD 64 values. The current Version 5.0 interface has no documented stable
+  bulk API; see [`AC_GATE_REPORT.md`](AC_GATE_REPORT.md).
+- **Blocked/audit:** the five existing packaged NIST-shaped transport CSVs have
+  no task-local redistribution permission record. Do not extend this set until
+  the same permission audit is closed.
 - **Open:** full CDFs versus a validated compact surrogate; neither is
   `one-shot` until size/performance/accuracy evidence closes the choice.
 - **Open:** behavior below/above table endpoints and for catalog elements with
