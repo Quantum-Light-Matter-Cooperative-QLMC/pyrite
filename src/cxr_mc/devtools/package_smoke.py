@@ -1,4 +1,4 @@
-"""Build and install cxr-mc from wheel and editable source in clean uv venvs."""
+"""Build and install pyrite-xray from wheel and editable source in clean uv venvs."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from cxr_mc.paths import workspace_root
 
 ROOT = workspace_root()
 EXPECTED_EXTRAS = {"amd", "external-db", "intel", "nvidia"}
+PROJECT_VERSION = tomllib.loads((ROOT / "pyproject.toml").read_text())["project"]["version"]
 
 
 def _run(*args: str, cwd: Path) -> None:
@@ -41,6 +43,9 @@ def _inspect_wheel(wheel: Path) -> None:
         metadata = archive.read(metadata_name).decode()
         entry_points = archive.read(entry_points_name).decode()
 
+    assert metadata_name.startswith("pyrite_xray-")
+    assert "Name: pyrite-xray" in metadata.splitlines()
+    assert f"Version: {PROJECT_VERSION}" in metadata.splitlines()
     assert "cxr_mc/__init__.py" in names
     assert "cxr_mc/data/materials.toml" in names
     assert "cxr_mc/apps/analysis_app.py" in names
@@ -56,7 +61,7 @@ def _inspect_wheel(wheel: Path) -> None:
         if line.startswith("Provides-Extra: ")
     }
     assert extras == EXPECTED_EXTRAS
-    assert all(name.startswith(("cxr_mc/", "cxr_mc-")) for name in names)
+    assert all(name.startswith(("cxr_mc/", "pyrite_xray-")) for name in names)
 
 
 def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
@@ -66,7 +71,27 @@ def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
     _run(
         str(_python(venv)),
         "-c",
-        "import cxr_mc; assert (cxr_mc.DATA_DIR / 'materials.toml').is_file()",
+        (
+            "from importlib import util; from importlib.metadata import distribution, distributions; "
+            "import cxr_mc; dist = distribution('pyrite-xray'); "
+            "assert dist.metadata['Name'] == 'pyrite-xray'; "
+            "assert dist.version == cxr_mc.__version__; "
+            "assert 'cxr-mc' not in {item.metadata['Name'] for item in distributions()}; "
+            "assert (cxr_mc.DATA_DIR / 'materials.toml').is_file(); "
+            "assert util.find_spec('pyrite') is None; "
+            "assert util.find_spec('pyrite_xray') is None"
+        ),
+        cwd=root,
+    )
+    _run(
+        str(_python(venv)),
+        "-c",
+        (
+            "import pickle; from cxr_mc.campaign.sweep import Sweep; "
+            "payload = pickle.dumps(Sweep(material='hopg')); "
+            "assert b'cxr_mc.campaign.sweep' in payload; "
+            "assert type(pickle.loads(payload)) is Sweep"
+        ),
         cwd=root,
     )
     cxr = str(_script(venv, "cxr"))
@@ -93,15 +118,18 @@ def main() -> None:
     uv = shutil.which("uv")
     if uv is None:
         raise SystemExit("uv executable not found")
-    with tempfile.TemporaryDirectory(prefix="cxr-mc-package-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="pyrite-xray-package-") as tmp:
         work = Path(tmp)
         dist = work / "dist"
         _run(uv, "build", "--wheel", "--out-dir", str(dist), cwd=ROOT)
-        wheel = next(dist.glob("cxr_mc-*.whl"))
+        wheel = next(dist.glob("pyrite_xray-*.whl"))
         _inspect_wheel(wheel)
         _probe_install(uv, wheel, work, "wheel-venv")
         _probe_install(uv, ROOT, work, "editable-venv")
-    print("wheel and editable installs preserve imports, data, extras, cxr, and cxr-dev")
+    print(
+        "pyrite-xray wheel and editable installs preserve cxr_mc imports, data, extras, "
+        "cxr, and cxr-dev"
+    )
 
 
 if __name__ == "__main__":

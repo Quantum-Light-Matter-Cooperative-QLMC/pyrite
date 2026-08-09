@@ -10,9 +10,9 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 conflicts = [[
-    { package = "cxr-mc", extra = "amd" },
-    { package = "cxr-mc", extra = "intel" },
-    { package = "cxr-mc", extra = "nvidia" },
+    { package = "pyrite-xray", extra = "amd" },
+    { package = "pyrite-xray", extra = "intel" },
+    { package = "pyrite-xray", extra = "nvidia" },
 ]]
 
 [[package]]
@@ -45,7 +45,7 @@ dependencies = [
     { name = "jsonschema" },
     { name = "narwhals" },
     { name = "packaging" },
-    { name = "typing-extensions", marker = "python_full_version < '3.15' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "typing-extensions", marker = "python_full_version < '3.15' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/06/a1/5e6cc638a66da48cfc89a79c2f4810dfec00b63385f9b009ab1f069779bb/altair-6.2.2.tar.gz", hash = "sha256:a1ff9d9cfe81c75414641826312b9471780e19d39293ba0b012933f6b6cba0fe", size = 766606, upload-time = "2026-06-23T12:47:13.384Z" }
 wheels = [
@@ -303,7 +303,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "pycparser", marker = "implementation_name != 'PyPy' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -428,7 +428,7 @@ name = "click"
 version = "8.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/9b/98/518d8e5081007684232226f475082b30087d0f585e8457db087298259f49/click-8.4.1.tar.gz", hash = "sha256:918b5633eddf6b41c32d4f454bf0de810065c74e3f7dbf8ee5452f8be88d3e96", size = 353007, upload-time = "2026-05-22T04:08:37.769Z" }
 wheels = [
@@ -692,157 +692,7 @@ wheels = [
 
 [package.optional-dependencies]
 ctk = [
-    { name = "cuda-toolkit", extra = ["cublas", "cudart", "cufft", "curand", "cusolver", "cusparse", "nvrtc"], marker = "(extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra != 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia') or (extra != 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia')" },
-]
-
-[[package]]
-name = "cxr-mc"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "altair" },
-    { name = "anywidget" },
-    { name = "click" },
-    { name = "crystals" },
-    { name = "datashader" },
-    { name = "imageio" },
-    { name = "imageio-ffmpeg" },
-    { name = "kaleido" },
-    { name = "marimo", extra = ["recommended"] },
-    { name = "matplotlib" },
-    { name = "nbconvert" },
-    { name = "numpy" },
-    { name = "pandas" },
-    { name = "pandoc" },
-    { name = "plotly" },
-    { name = "psutil" },
-    { name = "scipy" },
-    { name = "tabulate" },
-    { name = "tomlkit" },
-    { name = "vegafusion" },
-    { name = "vl-convert-python" },
-    { name = "xraydb" },
-]
-
-[package.optional-dependencies]
-amd = [
-    { name = "cupy" },
-]
-external-db = [
-    { name = "mp-api" },
-]
-intel = [
-    { name = "dpctl" },
-    { name = "dpnp" },
-]
-nvidia = [
-    { name = "cupy-cuda13x", extra = ["ctk"], marker = "(extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra != 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia') or (extra != 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia')" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "grimp" },
-    { name = "import-linter" },
-    { name = "nbqa" },
-    { name = "nbstripout" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "pytest-timeout" },
-    { name = "pytest-xdist" },
-    { name = "ruff" },
-    { name = "ty" },
-]
-docs = [
-    { name = "furo" },
-    { name = "myst-parser" },
-    { name = "sphinx" },
-]
-lint = [
-    { name = "grimp" },
-    { name = "import-linter" },
-    { name = "nbqa" },
-    { name = "nbstripout" },
-    { name = "pre-commit" },
-    { name = "ruff" },
-    { name = "ty" },
-]
-oracle = [
-    { name = "dans-diffraction" },
-]
-test = [
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "pytest-timeout" },
-    { name = "pytest-xdist" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "altair", specifier = ">=6.2.2" },
-    { name = "anywidget", specifier = ">=0.9" },
-    { name = "click", specifier = ">=8.4.1" },
-    { name = "crystals", specifier = ">=1.7,<2" },
-    { name = "cupy", marker = "extra == 'amd'", specifier = ">=13.4.0" },
-    { name = "cupy-cuda13x", extras = ["ctk"], marker = "extra == 'nvidia'", specifier = ">=14.1.1" },
-    { name = "datashader", specifier = ">=0.19.1" },
-    { name = "dpctl", marker = "extra == 'intel'", specifier = ">=0.22.1" },
-    { name = "dpnp", marker = "extra == 'intel'", specifier = ">=0.20.0" },
-    { name = "imageio", specifier = ">=2.37.4" },
-    { name = "imageio-ffmpeg", specifier = ">=0.6.0" },
-    { name = "kaleido", specifier = ">=1.3.0" },
-    { name = "marimo", extras = ["recommended"], specifier = ">=0.23.11" },
-    { name = "matplotlib", specifier = ">=3.11.0" },
-    { name = "mp-api", marker = "extra == 'external-db'", specifier = ">=0.46" },
-    { name = "nbconvert", specifier = ">=7.17.1" },
-    { name = "numpy", specifier = ">=2.4.6" },
-    { name = "pandas", specifier = ">=3.0.3" },
-    { name = "pandoc", specifier = ">=2.4" },
-    { name = "plotly", specifier = ">=6.0" },
-    { name = "psutil", specifier = ">=7.2.2" },
-    { name = "scipy", specifier = ">=1.17.1" },
-    { name = "tabulate", specifier = ">=0.10.0" },
-    { name = "tomlkit", specifier = ">=0.13" },
-    { name = "vegafusion", specifier = ">=2.0.3" },
-    { name = "vl-convert-python", specifier = ">=1.9.0.post1" },
-    { name = "xraydb", specifier = ">=4.5.8" },
-]
-provides-extras = ["external-db", "nvidia", "amd", "intel"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "grimp", specifier = ">=3.12" },
-    { name = "import-linter", specifier = ">=2.9" },
-    { name = "nbqa", specifier = ">=1.9.1" },
-    { name = "nbstripout", specifier = ">=0.9.1" },
-    { name = "pre-commit", specifier = ">=4.6.0" },
-    { name = "pytest", specifier = ">=9.1.0" },
-    { name = "pytest-cov", specifier = ">=7.1.0" },
-    { name = "pytest-timeout", specifier = ">=2.4.0" },
-    { name = "pytest-xdist", specifier = ">=3.8.0" },
-    { name = "ruff", specifier = ">=0.15.19" },
-    { name = "ty", specifier = ">=0.0.63" },
-]
-docs = [
-    { name = "furo", specifier = ">=2024.8.6" },
-    { name = "myst-parser", specifier = ">=4.0" },
-    { name = "sphinx", specifier = ">=8.2" },
-]
-lint = [
-    { name = "grimp", specifier = ">=3.12" },
-    { name = "import-linter", specifier = ">=2.9" },
-    { name = "nbqa", specifier = ">=1.9.1" },
-    { name = "nbstripout", specifier = ">=0.9.1" },
-    { name = "pre-commit", specifier = ">=4.6.0" },
-    { name = "ruff", specifier = ">=0.15.19" },
-    { name = "ty", specifier = ">=0.0.63" },
-]
-oracle = [{ name = "dans-diffraction", specifier = "==3.4.0" }]
-test = [
-    { name = "pytest", specifier = ">=9.1.0" },
-    { name = "pytest-cov", specifier = ">=7.1.0" },
-    { name = "pytest-timeout", specifier = ">=2.4.0" },
-    { name = "pytest-xdist", specifier = ">=3.8.0" },
+    { name = "cuda-toolkit", extra = ["cublas", "cudart", "cufft", "curand", "cusolver", "cusparse", "nvrtc"], marker = "(extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra != 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia') or (extra != 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia')" },
 ]
 
 [[package]]
@@ -1503,14 +1353,14 @@ name = "ipython"
 version = "9.14.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
     { name = "decorator" },
     { name = "ipython-pygments-lexers" },
     { name = "jedi" },
     { name = "matplotlib-inline" },
-    { name = "pexpect", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'win32' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (sys_platform == 'win32' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'win32' and extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "pexpect", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'win32' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (sys_platform == 'win32' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'win32' and extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
     { name = "prompt-toolkit" },
-    { name = "psutil", marker = "sys_platform != 'emscripten' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "psutil", marker = "sys_platform != 'emscripten' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
     { name = "pygments" },
     { name = "stack-data" },
     { name = "traitlets" },
@@ -1970,25 +1820,25 @@ name = "marimo"
 version = "0.23.11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", marker = "sys_platform != 'emscripten' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "click", marker = "sys_platform != 'emscripten' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
     { name = "docutils" },
     { name = "itsdangerous" },
     { name = "jedi" },
-    { name = "loro", marker = "(sys_platform != 'android' and sys_platform != 'emscripten') or (sys_platform == 'android' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (sys_platform == 'android' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'android' and extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "loro", marker = "(sys_platform != 'android' and sys_platform != 'emscripten') or (sys_platform == 'android' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (sys_platform == 'android' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'android' and extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
     { name = "markdown" },
     { name = "msgspec" },
     { name = "narwhals" },
     { name = "packaging" },
-    { name = "psutil", marker = "(sys_platform != 'android' and sys_platform != 'emscripten') or (sys_platform == 'android' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (sys_platform == 'android' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'android' and extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "psutil", marker = "(sys_platform != 'android' and sys_platform != 'emscripten') or (sys_platform == 'android' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (sys_platform == 'android' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'android' and extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
     { name = "pygments" },
     { name = "pymdown-extensions" },
     { name = "python-multipart" },
     { name = "pyyaml" },
-    { name = "pyzmq", marker = "(python_full_version < '3.15' and sys_platform != 'emscripten') or (python_full_version >= '3.15' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (python_full_version >= '3.15' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (python_full_version >= '3.15' and extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
-    { name = "starlette", marker = "sys_platform != 'emscripten' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "pyzmq", marker = "(python_full_version < '3.15' and sys_platform != 'emscripten') or (python_full_version >= '3.15' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (python_full_version >= '3.15' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (python_full_version >= '3.15' and extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
+    { name = "starlette", marker = "sys_platform != 'emscripten' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
     { name = "tomlkit" },
-    { name = "uvicorn", marker = "sys_platform != 'emscripten' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
-    { name = "websockets", marker = "sys_platform != 'emscripten' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "uvicorn", marker = "sys_platform != 'emscripten' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
+    { name = "websockets", marker = "sys_platform != 'emscripten' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/56/e4b50516ae5ab7e6e14aae81e04cc49c36a97cdd01c2c213019dc84cd538/marimo-0.23.11.tar.gz", hash = "sha256:f32fc3095aa1e46d3b9cf9f67729b3e121eb91bffffb75f380e1449d83288878", size = 38616146, upload-time = "2026-06-25T20:04:37.585Z" }
 wheels = [
@@ -2744,7 +2594,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "python-dateutil" },
-    { name = "tzdata", marker = "sys_platform == 'emscripten' or sys_platform == 'win32' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "tzdata", marker = "sys_platform == 'emscripten' or sys_platform == 'win32' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f8/87/4341c6252d1c47b08768c3d25ac487362bf403f0313ddae4a2a26c9b1b4c/pandas-3.0.3.tar.gz", hash = "sha256:696a4a00a2a2a35d4e5deb3fc946641b96c944f02230e4f76137fe35d806c4fc", size = 4651414, upload-time = "2026-05-11T18:54:29.21Z" }
 wheels = [
@@ -2823,7 +2673,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'win32' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (sys_platform == 'win32' and extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (sys_platform == 'win32' and extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "ptyprocess", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'emscripten' and extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'win32' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (sys_platform == 'win32' and extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (sys_platform == 'win32' and extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -3383,11 +3233,161 @@ wheels = [
 ]
 
 [[package]]
+name = "pyrite-xray"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "altair" },
+    { name = "anywidget" },
+    { name = "click" },
+    { name = "crystals" },
+    { name = "datashader" },
+    { name = "imageio" },
+    { name = "imageio-ffmpeg" },
+    { name = "kaleido" },
+    { name = "marimo", extra = ["recommended"] },
+    { name = "matplotlib" },
+    { name = "nbconvert" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "pandoc" },
+    { name = "plotly" },
+    { name = "psutil" },
+    { name = "scipy" },
+    { name = "tabulate" },
+    { name = "tomlkit" },
+    { name = "vegafusion" },
+    { name = "vl-convert-python" },
+    { name = "xraydb" },
+]
+
+[package.optional-dependencies]
+amd = [
+    { name = "cupy" },
+]
+external-db = [
+    { name = "mp-api" },
+]
+intel = [
+    { name = "dpctl" },
+    { name = "dpnp" },
+]
+nvidia = [
+    { name = "cupy-cuda13x", extra = ["ctk"], marker = "(extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra != 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia') or (extra != 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia')" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "grimp" },
+    { name = "import-linter" },
+    { name = "nbqa" },
+    { name = "nbstripout" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-timeout" },
+    { name = "pytest-xdist" },
+    { name = "ruff" },
+    { name = "ty" },
+]
+docs = [
+    { name = "furo" },
+    { name = "myst-parser" },
+    { name = "sphinx" },
+]
+lint = [
+    { name = "grimp" },
+    { name = "import-linter" },
+    { name = "nbqa" },
+    { name = "nbstripout" },
+    { name = "pre-commit" },
+    { name = "ruff" },
+    { name = "ty" },
+]
+oracle = [
+    { name = "dans-diffraction" },
+]
+test = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+    { name = "pytest-timeout" },
+    { name = "pytest-xdist" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "altair", specifier = ">=6.2.2" },
+    { name = "anywidget", specifier = ">=0.9" },
+    { name = "click", specifier = ">=8.4.1" },
+    { name = "crystals", specifier = ">=1.7,<2" },
+    { name = "cupy", marker = "extra == 'amd'", specifier = ">=13.4.0" },
+    { name = "cupy-cuda13x", extras = ["ctk"], marker = "extra == 'nvidia'", specifier = ">=14.1.1" },
+    { name = "datashader", specifier = ">=0.19.1" },
+    { name = "dpctl", marker = "extra == 'intel'", specifier = ">=0.22.1" },
+    { name = "dpnp", marker = "extra == 'intel'", specifier = ">=0.20.0" },
+    { name = "imageio", specifier = ">=2.37.4" },
+    { name = "imageio-ffmpeg", specifier = ">=0.6.0" },
+    { name = "kaleido", specifier = ">=1.3.0" },
+    { name = "marimo", extras = ["recommended"], specifier = ">=0.23.11" },
+    { name = "matplotlib", specifier = ">=3.11.0" },
+    { name = "mp-api", marker = "extra == 'external-db'", specifier = ">=0.46" },
+    { name = "nbconvert", specifier = ">=7.17.1" },
+    { name = "numpy", specifier = ">=2.4.6" },
+    { name = "pandas", specifier = ">=3.0.3" },
+    { name = "pandoc", specifier = ">=2.4" },
+    { name = "plotly", specifier = ">=6.0" },
+    { name = "psutil", specifier = ">=7.2.2" },
+    { name = "scipy", specifier = ">=1.17.1" },
+    { name = "tabulate", specifier = ">=0.10.0" },
+    { name = "tomlkit", specifier = ">=0.13" },
+    { name = "vegafusion", specifier = ">=2.0.3" },
+    { name = "vl-convert-python", specifier = ">=1.9.0.post1" },
+    { name = "xraydb", specifier = ">=4.5.8" },
+]
+provides-extras = ["external-db", "nvidia", "amd", "intel"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "grimp", specifier = ">=3.12" },
+    { name = "import-linter", specifier = ">=2.9" },
+    { name = "nbqa", specifier = ">=1.9.1" },
+    { name = "nbstripout", specifier = ">=0.9.1" },
+    { name = "pre-commit", specifier = ">=4.6.0" },
+    { name = "pytest", specifier = ">=9.1.0" },
+    { name = "pytest-cov", specifier = ">=7.1.0" },
+    { name = "pytest-timeout", specifier = ">=2.4.0" },
+    { name = "pytest-xdist", specifier = ">=3.8.0" },
+    { name = "ruff", specifier = ">=0.15.19" },
+    { name = "ty", specifier = ">=0.0.63" },
+]
+docs = [
+    { name = "furo", specifier = ">=2024.8.6" },
+    { name = "myst-parser", specifier = ">=4.0" },
+    { name = "sphinx", specifier = ">=8.2" },
+]
+lint = [
+    { name = "grimp", specifier = ">=3.12" },
+    { name = "import-linter", specifier = ">=2.9" },
+    { name = "nbqa", specifier = ">=1.9.1" },
+    { name = "nbstripout", specifier = ">=0.9.1" },
+    { name = "pre-commit", specifier = ">=4.6.0" },
+    { name = "ruff", specifier = ">=0.15.19" },
+    { name = "ty", specifier = ">=0.0.63" },
+]
+oracle = [{ name = "dans-diffraction", specifier = "==3.4.0" }]
+test = [
+    { name = "pytest", specifier = ">=9.1.0" },
+    { name = "pytest-cov", specifier = ">=7.1.0" },
+    { name = "pytest-timeout", specifier = ">=2.4.0" },
+    { name = "pytest-xdist", specifier = ">=3.8.0" },
+]
+
+[[package]]
 name = "pytest"
 version = "9.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
     { name = "iniconfig" },
     { name = "packaging" },
     { name = "pluggy" },
@@ -3521,7 +3521,7 @@ name = "pyzmq"
 version = "27.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "implementation_name == 'pypy' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "cffi", marker = "implementation_name == 'pypy' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/04/0b/3c9baedbdf613ecaa7aa07027780b8867f57b6293b6ee50de316c9f3222b/pyzmq-27.1.0.tar.gz", hash = "sha256:ac0765e3d44455adb6ddbf4417dcce460fc40a05978c08efdf2948072f6db540", size = 281750, upload-time = "2025-09-08T23:10:18.157Z" }
 wheels = [
@@ -3983,7 +3983,7 @@ source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "alabaster" },
     { name = "babel" },
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
     { name = "docutils" },
     { name = "imagesize" },
     { name = "jinja2" },
@@ -4075,7 +4075,7 @@ name = "sqlalchemy"
 version = "2.0.51"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "greenlet", marker = "platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "greenlet", marker = "platform_machine == 'AMD64' or platform_machine == 'WIN32' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'ppc64le' or platform_machine == 'win32' or platform_machine == 'x86_64' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/02/f1/a7a892f18d4d224e6b26f706531eafccc41e37594d37d304786969ee13cb/sqlalchemy-2.0.51.tar.gz", hash = "sha256:804dccd8a4a6242c4e30ad961e540e18a588f6527202f2d6791b01845d59fdc9", size = 9912201, upload-time = "2026-06-15T15:41:20.012Z" }
@@ -4156,7 +4156,7 @@ name = "starlette"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "anyio", marker = "sys_platform != 'emscripten' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "anyio" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/e3/7c1dc7381d9f8ab7d854328ebfa884e62cb3f3d8549ddfd37c7814f42afa/starlette-1.3.1.tar.gz", hash = "sha256:05d0213193f2fbaae60e2ecb593b4add4262ad4e46536b54abe36f11a71724e0", size = 2703240, upload-time = "2026-06-12T09:23:11.602Z" }
 wheels = [
@@ -4342,7 +4342,7 @@ name = "tqdm"
 version = "4.68.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-intel') or (extra == 'extra-11-pyrite-xray-amd' and extra == 'extra-11-pyrite-xray-nvidia') or (extra == 'extra-11-pyrite-xray-intel' and extra == 'extra-11-pyrite-xray-nvidia')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/85/05/0d5260f1f1ca784f4a4a0def9cbe6affe587f5b4025328d446c3d67765f4/tqdm-4.68.2.tar.gz", hash = "sha256:89c230e8dbc67c7615c142487111222f878c77427ea09549960f62389e258add", size = 171923, upload-time = "2026-06-09T13:26:42.539Z" }
 wheels = [
@@ -4495,8 +4495,8 @@ name = "uvicorn"
 version = "0.49.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click", marker = "sys_platform != 'emscripten' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
-    { name = "h11", marker = "sys_platform != 'emscripten' or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-intel') or (extra == 'extra-6-cxr-mc-amd' and extra == 'extra-6-cxr-mc-nvidia') or (extra == 'extra-6-cxr-mc-intel' and extra == 'extra-6-cxr-mc-nvidia')" },
+    { name = "click" },
+    { name = "h11" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c4/1f/fa18009dea8469069cca78a4e877a008ab78f08b064bfc9ab891579077ff/uvicorn-0.49.0.tar.gz", hash = "sha256:ebf4271aa580d9de97f93192d4595176df6e91f9aae919ca73e4fc07df1e66a3", size = 91284, upload-time = "2026-06-03T22:01:30.448Z" }
 wheels = [

@@ -1,6 +1,7 @@
 """Package-layout and compatibility guards."""
 
-from importlib import import_module
+from importlib import import_module, util
+from importlib.metadata import distribution
 from pathlib import Path
 
 import pytest
@@ -33,6 +34,15 @@ _COMPAT_MODULES = {
     "validation_oracles": "validation.validation_oracles",
     "viewer": "apps.viewer",
 }
+
+
+def test_distribution_identity_keeps_cxr_mc_as_the_only_import_namespace() -> None:
+    installed = distribution("pyrite-xray")
+
+    assert installed.metadata["Name"] == "pyrite-xray"
+    assert installed.version == cxr_mc.__version__
+    assert util.find_spec("pyrite") is None
+    assert util.find_spec("pyrite_xray") is None
 
 
 def test_root_exports_stay_frozen() -> None:

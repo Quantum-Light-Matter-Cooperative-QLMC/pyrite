@@ -1,5 +1,5 @@
 [project]
-name = "cxr-mc"
+name = "pyrite-xray"
 version = "0.1.0"
 description = "Coherent X-ray radiation (PXR + coherent bremsstrahlung) from table-top electron beams in crystals"
 readme = "README.md"
