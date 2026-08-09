@@ -7,10 +7,11 @@ import os
 import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-ACP_STATE_PATH = ROOT / ".cache" / "acp-servers.json"
+from .paths import state_dir, workspace_root
+
+ROOT = workspace_root()
+ACP_STATE_PATH = state_dir() / "acp-servers.json"
 ACP_SERVERS = {
     "claude": ("@agentclientprotocol/claude-agent-acp", 3017),
     "codex": ("@agentclientprotocol/codex-acp", 3021),

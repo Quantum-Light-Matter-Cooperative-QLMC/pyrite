@@ -1707,7 +1707,7 @@
                 "required": true
               }
             ],
-            "help": "Usage: cxr config get [OPTIONS] {profile.current|remote.target}\n\n  Print the effective value for KEY.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: cxr config get [OPTIONS] {profile.current|remote.target|workspace.root}\n\n  Print the effective value for KEY.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
             "hidden": false,
             "path": "config get",
             "subcommands": []
@@ -1734,7 +1734,7 @@
                 "required": true
               }
             ],
-            "help": "Usage: cxr config set [OPTIONS] {profile.current|remote.target} VALUE\n\n  Persist VALUE for KEY.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
+            "help": "Usage: cxr config set [OPTIONS] {profile.current|remote.target|workspace.root}\n                      VALUE\n\n  Persist VALUE for KEY.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
             "hidden": false,
             "path": "config set",
             "subcommands": []

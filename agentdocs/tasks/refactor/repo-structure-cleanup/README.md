@@ -256,6 +256,15 @@ re-export.
 - [ ] `docs/package-structure-rfc.md` amended with S1–S8 as P6+ (or this doc
       cited from it) so the RFC stays the durable record
 
+### S1 checkpoint progress
+
+- 2026-08-09: added `cxr_mc.paths` and migrated checkpoint roots, completion,
+  developer tooling, ACP state, and analysis/viewer persisted defaults away
+  from checkout-derived paths. `workspace.root` now follows explicit argument
+  → `CXR_HOME` → config store → cwd; checkout-local cwd still resolves to the
+  existing `./checkpoints`. Packaged app/default/export resources remain for
+  the next S1 checkpoint, so S1 stays unchecked.
+
 ## Sequencing
 
 1. ~~**S3 + S8 empty dir**~~ — done 2026-08-09.

@@ -20,6 +20,7 @@ import click
 from click.shell_completion import CompletionItem
 
 from .. import DATA_DIR
+from ..paths import workspace_root
 
 MAX_LOCAL_CANDIDATES = 200
 MAX_REMOTE_CANDIDATES = 100
@@ -35,7 +36,7 @@ REMOTE_COMPLETION_TIMEOUT_SECONDS = 0.5
 # in local checkpoint-stem completion alongside legacy ``--<fidelity>-`` stems.
 _SAFE_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._@-]*")
 _DEFAULT_CHECKPOINT_ROOT = Path("checkpoints")
-_ARCHIVE_CHECKPOINT_ROOT = Path(__file__).resolve().parents[2] / "checkpoints"
+_ARCHIVE_CHECKPOINT_ROOT = workspace_root() / "checkpoints"
 
 Completion = Callable[[object, object, str], list[CompletionItem]]
 

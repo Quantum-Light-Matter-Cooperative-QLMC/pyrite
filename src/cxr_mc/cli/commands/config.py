@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
 
 from ..._remote.config import validate_remote_target
@@ -17,6 +19,8 @@ def _validated(key: str, value: str) -> str:
             return validate_remote_target(value)
         except ValueError as exc:
             raise click.BadParameter(str(exc), param_hint="VALUE") from exc
+    if key == "workspace.root":
+        return str(Path(value).expanduser().resolve())
     from ...materials import CATALOG
 
     if value not in CATALOG.profile_names:

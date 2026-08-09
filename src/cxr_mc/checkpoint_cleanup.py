@@ -21,9 +21,10 @@ import click
 from . import _checkpoint_store
 from .cli import _core as _cli_core
 from .materials import CATALOG
+from .paths import workspace_root
 from .profiles import _jsonable, named_profile_identity, named_profile_stem
 
-_DEFAULT_CHECKPOINT_DIR = str(Path(__file__).resolve().parents[2] / "checkpoints")
+_DEFAULT_CHECKPOINT_DIR = str(workspace_root() / "checkpoints")
 _FIDELITIES = ("full", "survey")
 
 

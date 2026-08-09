@@ -8,15 +8,17 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-import click
 import tomlkit
 from tomlkit.exceptions import ParseError
 
-CONFIG_PATH = Path(click.get_app_dir("cxr-mc")) / "config.toml"
+from ..paths import state_dir
+
+CONFIG_PATH = state_dir() / "config.toml"
 
 _SETTINGS = {
     "profile.current": ("CXR_PROFILE", "standard"),
     "remote.target": ("CXR_REMOTE_HOST", "qlmc"),
+    "workspace.root": ("CXR_HOME", "."),
 }
 
 

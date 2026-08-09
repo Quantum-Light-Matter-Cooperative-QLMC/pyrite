@@ -40,14 +40,12 @@ from ._acp import running_acp
 from .cli import _completion as _cli_completion
 from .cli import _core as _cli_core
 from .cli._deprecations import canonical_option
+from .paths import state_dir
 
 NOTEBOOK = "notebooks/trace_app.py"
 TUNNEL_PORT = 2719
 
-# Anchored to the repo root (src/cxr_mc/viewer.py -> parents[2] = repo root),
-# the same convention run.py uses for _DEFAULT_CHECKPOINT_DIR, so the persisted
-# default is found regardless of the caller's cwd.
-_DEFAULT_FILE = Path(__file__).resolve().parents[2] / ".cxr-viewer-default"
+_DEFAULT_FILE = state_dir() / "viewer-default"
 
 
 def get_default_material():
@@ -61,6 +59,7 @@ def get_default_material():
 
 def set_default_material(material):
     """Persist ``material`` as the default for future no-argument runs."""
+    _DEFAULT_FILE.parent.mkdir(parents=True, exist_ok=True)
     _DEFAULT_FILE.write_text(material)
 
 

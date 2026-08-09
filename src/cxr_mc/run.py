@@ -36,11 +36,10 @@ from pathlib import Path
 from . import _checkpoint_io, _checkpoint_store
 from .energy_grid.encoding import decode_energy_grid
 from .montecarlo import run_cases, runner
+from .paths import workspace_root
 from .results import records, store_result, sweep_values
 
-# Anchored to the repo root (src/cxr_mc/run.py -> parents[2] = repo root) so
-# checkpoint lookup works regardless of the notebook's kernel cwd.
-DEFAULT_CHECKPOINT_DIR = str(Path(__file__).resolve().parents[2] / "checkpoints")
+DEFAULT_CHECKPOINT_DIR = str(workspace_root() / "checkpoints")
 
 
 def checkpoint_path_for(material, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):

@@ -43,8 +43,9 @@ from pathlib import Path
 import yaml
 
 from cxr_mc._acp import ACP_SERVERS, start_acp_servers, stop_acp_servers
+from cxr_mc.paths import workspace_root
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = workspace_root()
 AGENT_SKILLS_DIR = ROOT / ".agents" / "skills"
 CLAUDE_SKILLS_DIR = ROOT / ".claude" / "skills"
 LEGACY_NOTEBOOK = ROOT / "checks" / "cxr_analysis_feranchuk.ipynb"

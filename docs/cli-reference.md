@@ -699,7 +699,7 @@ Commands:
 ## `cxr config get`
 
 ```text
-Usage: cxr config get [OPTIONS] {profile.current|remote.target}
+Usage: cxr config get [OPTIONS] {profile.current|remote.target|workspace.root}
 
   Print the effective value for KEY.
 
@@ -721,7 +721,7 @@ Options:
 ## `cxr config set`
 
 ```text
-Usage: cxr config set [OPTIONS] {profile.current|remote.target} VALUE
+Usage: cxr config set [OPTIONS] {profile.current|remote.target|workspace.root} VALUE
 
   Persist VALUE for KEY.
 

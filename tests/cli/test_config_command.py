@@ -33,9 +33,21 @@ def test_config_set_get_and_list_effective_values(monkeypatch, tmp_path):
             "KEY\tVALUE\tSOURCE\n"
             "profile.current\tsub_100keV\tconfig store\n"
             "remote.target\tbox-a\tconfig store\n"
+            "workspace.root\t.\tbuilt-in default\n"
         ),
     )
     assert path.is_file()
+
+
+def test_config_set_workspace_root_normalizes_path(monkeypatch, tmp_path):
+    _isolated_store(monkeypatch, tmp_path)
+    monkeypatch.chdir(tmp_path)
+
+    result = invoke(config_command.command, ["set", "workspace.root", "workspace"])
+
+    expected = tmp_path / "workspace"
+    assert_clean_result(result, stdout=f"workspace.root = {expected}\n")
+    assert _config.resolve("workspace.root").value == str(expected)
 
 
 def test_shared_precedence_is_call_environment_store_default(monkeypatch, tmp_path):

@@ -35,12 +35,9 @@ from . import _checkpoint_io, _checkpoint_store
 from .cli import _completion as _cli_completion
 from .cli import _core as _cli_core
 from .cli import json as cli_json
+from .paths import workspace_root
 
-# Anchored to the repo root (src/cxr_mc/archive.py -> parents[2] = repo root), the
-# same dir run.load_checkpoint reads, so `cxr archive` works from any cwd. Computed
-# here rather than imported from run to keep the montecarlo import chain (and its
-# GPU-detection banner) out of a plain archive command.
-DEFAULT_ROOT = str(Path(__file__).resolve().parents[2] / "checkpoints")
+DEFAULT_ROOT = str(workspace_root() / "checkpoints")
 ARCHIVE_SUBDIR = "archive"
 _DATE_SUFFIX_RE = re.compile(r"-\d{8}$")  # a trailing -YYYYMMDD default-label stamp
 

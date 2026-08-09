@@ -19,6 +19,11 @@ Print current top-level directory inventory:
   split; `uv run cxr-dev ...` needs no `--package` flag.
 - Stable `cxr-dev test-suite {core,cli,apps,packaging}` selectors partition all
   test modules; `integration` overlaps deliberately; `verify` remains full gate.
+- Runtime paths resolve through `cxr_mc.paths`: packaged read-only data stays
+  package-relative; workspace artifacts use explicit path > `CXR_HOME` >
+  `workspace.root` config > cwd; mutable user state uses Click's platform app
+  directory. Validation app resources are the remaining S1 checkout-derived
+  runtime paths until their package relocation.
 
 ## Dependency layers (leaf → driver)
 
