@@ -1041,12 +1041,20 @@ Open — needs a GPU session, in this order:
       residency fallback never fired. It is the case to watch, and the argument
       for the deferred `REAL` compaction on a smaller card.
 
-      No MoSe2 *pipeline* counterpart. I started one for completeness and it
-      never finished: 298 of 432 cases in 3714 s and decelerating under swap
-      (21 s/case at case 282, 34 s/case by 298, against 1154 s for the device
-      arm's full 432), then `qlmc` went unreachable. Not rerun — it is an
-      argument for the memory-sizing item in "Still open", not a timing, and the
-      hopg A/B already answers the engine question.
+      No MoSe2 *pipeline* counterpart. I started one for completeness and
+      **stopped it**: 319 of 432 cases in 5212 s, decelerating 21 → 34 → 71
+      s/case (device arm: 1154 s for all 432), peak tree RSS **50.3 GB** and
+      swap **12.9 GB** on a 45 GB box, load average 49–76, `qlmc` unreachable
+      over ssh for ~15 min. `SIGTERM`ed at case 319 — it is a shared box and
+      this was my optional extra, not the requested measurement. Not rerun.
+
+      It did return one clean result before I killed it: at MoSe2 scale the
+      pipeline *is* feed-starved, median `gpu_feed_wait_fraction` **0.569**
+      (max 0.671) against hopg's 0.103. The two materials fail the pipeline for
+      different reasons — hopg by per-case payload overhead, MoSe2 by a pool
+      that cannot stay ahead of the card. And it peaked at **9405 MiB VRAM vs
+      the resident arm's 6873**, so the pipeline does not even win on device
+      memory. Recorded under "Still open" in the round doc.
 
       Numerical agreement checked at sweep scale, and it is stronger than the
       ledger row claimed. Against a third arm running the CPU `per-electron`

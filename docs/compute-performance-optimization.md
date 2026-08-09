@@ -560,11 +560,23 @@ watch, and a smaller card would want `REAL` compaction at the join (below).
 - **The `gpu-pipeline` engine's memory sizing.** Running `promising`/mose2 on the
   pipeline arm drove `qlmc`'s 45 GB to 46.8 GB of tree RSS and 8 GB of swap.
   That arm was left running to get a pipeline-vs-device total for MoSe2 and
-  **never produced one**: it reached 298 of 432 cases in 3714 s while decelerating
-  (21 s/case at case 282, 34 s/case by case 298, against the device arm's 1154 s
-  for all 432), and the box went unreachable before it finished. Treat the
-  incomplete run as evidence about the memory behavior, not as a timing — the
-  measured MoSe2 numbers in this document are the device arm's.
+  **never produced one — I stopped it**. It reached 319 of 432 cases in 5212 s
+  while decelerating hard (21 s/case at case 282, 34 s/case by 298, 71 s/case by
+  319, against the device arm's 1154 s for all 432), driving peak tree RSS to
+  **50.3 GB and swap to 12.9 GB on a 45 GB box**, load average 49–76, and leaving
+  the machine unreachable over ssh for ~15 minutes. It was `SIGTERM`ed at case
+  319 rather than allowed to finish: it is a shared box. Treat those numbers as
+  evidence about memory behavior, not as a timing — the measured MoSe2 figures
+  elsewhere in this document are the device arm's.
+
+  The partial run does carry one clean result. At MoSe2 scale the pipeline is
+  genuinely **feed-starved**, which at hopg scale it was not: `gpu_feed_wait_fraction`
+  runs a median of **0.569** (max 0.671) against hopg's 0.103–0.110. So the two
+  materials fail the pipeline for different reasons — hopg by payload overhead at
+  11% feed-wait, MoSe2 by a transport pool that cannot keep 16 workers ahead of
+  the card once `n_seg` triples. It also holds *more* device memory than the
+  resident arm it was supposed to undercut: peak VRAM **9405 MiB vs 6873**, with
+  18 cases in flight throughout and 0 OOM retries.
   `_gpu_pipeline_workers`
   budgets *workers* (`_PIPELINE_WORKER_MEM_MB`) but nothing budgets the 18 cases
   in flight, each holding a host-side segment payload, and the worker count comes
