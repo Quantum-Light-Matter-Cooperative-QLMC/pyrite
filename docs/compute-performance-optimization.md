@@ -49,9 +49,10 @@ profile (189 cases) unless noted; see `performance-profiles/hopg_test-*/`.
 Profiling drove every change — no speculative optimization. Each candidate was
 isolated with `nsys` NVTX ranges (`cxr.lines`, `cxr.brem`,
 `cxr.lines.tab/accum`; **not** `cxr.transport.*` — this round claimed transport
-ranges that do not exist in the tree, so a transport-side gap in a capture is
-unlabelled and cannot discriminate phases on its own. Round 4's attribution used
-the `cxr.performance.v1` activity labels instead) plus `cuLaunchKernel` counts
+ranges that did not exist in the tree, so a transport-side gap in a capture was
+unlabelled and could not discriminate phases on its own. Round 4's attribution
+used the `cxr.performance.v1` activity labels instead; Round 5 added the real
+ranges) plus `cuLaunchKernel` counts
 from `nsys-stats.txt`, then verified bit-for-bit or tolerance-bounded against
 the golden suite before landing. See `docs/performance-profile-analysis.md` for
 the analysis playbook. Guiding rule: **GPU utilization is evidence, not the
@@ -539,11 +540,12 @@ watch, and a smaller card would want `REAL` compaction at the join (below).
 ### Corrections to earlier rounds
 
 - Round 1's method section credited NVTX ranges `cxr.transport.line` /
-  `cxr.transport.brem`. **They do not exist**; `transport.py` has no
+  `cxr.transport.brem`. **They did not exist**; `transport.py` pushed no
   `_nsys_push`/`_nsys_range` at all, so a transport-side gap in an `nsys`
-  capture is unlabelled. The MoSe2 attribution used the shipped
+  capture was unlabelled. The MoSe2 attribution used the shipped
   `cxr.performance.v1` activity labels, which do carry per-tick phase identity.
-  Adding real ranges is still open.
+  Round 5 added real ranges, under different names than Round 1 invented — see
+  that round below.
 - Round 2's "single-core transport is ≈1× the GPU phase, so two transport
   workers hide it" was measured on a 3060 Ti at `N_g = 110`. On an RTX 5080 at
   `N_g = 66` the GPU phase shrank and transport did not; the ratio flipped.
@@ -556,7 +558,8 @@ watch, and a smaller card would want `REAL` compaction at the join (below).
 
 ### Still open
 
-- NVTX ranges in `transport.py`.
+- NVTX ranges in `transport.py`. **Done in Round 5**; the rest of this list is
+  unchanged and Round 5 turns it into a sequenced plan.
 - **The `gpu-pipeline` engine's memory sizing.** Running `promising`/mose2 on the
   pipeline arm drove `qlmc`'s 45 GB to 46.8 GB of tree RSS and 8 GB of swap.
   That arm was left running to get a pipeline-vs-device total for MoSe2 and
@@ -594,3 +597,102 @@ watch, and a smaller card would want `REAL` compaction at the join (below).
   it starts from a deficit: the per-electron restructuring is **0.27–1.05×** of
   lockstep on the CPU, so it needs more than two cores just to break even.
 - Grooved transport, which stays on the lockstep core.
+
+## Round 5 (2026-08-09)
+
+Instrumentation, bookkeeping, and a plan. No kernel or numerical change: nothing
+in this round moves a spectrum.
+
+### What landed
+
+1. **NVTX ranges in `transport.py`**, closing the oldest correction in this
+   document. Round 1 credited `cxr.transport.line` / `cxr.transport.brem`, which
+   never existed; the real names are per *stage*, not per radiation channel,
+   because that is what the unattributed remainder needed splitting into.
+   `simulate_trajectories` pushes `cxr.transport.tables`, `.sample`, `.alloc`,
+   `.core`, `.output`; inside the CUDA driver, `.core` nests `.upload`,
+   `.scratch`, `.launch`, `.capsync`, `.compact`, `.exitcodes`, `.join`.
+   `.launch` and `.capsync` are deliberately split: on CUDA the core call
+   returns immediately, so `.launch` is host-side dispatch and the batch's
+   device time lands in the `seg_count.max()` read inside `.capsync`. Every
+   range is host-side wall clock, and all are no-ops off a profiled run
+   (`_nsys_push`/`_nsys_pop` from `runner.py`, imported lazily because `runner`
+   imports `transport`). The playbook is corrected in
+   [`performance-profile-analysis.md`](performance-profile-analysis.md).
+2. **The four orphan line-path `Validation:` markers are ledgered**:
+   `line-hkl-batch`, `line-amplitude-fusion`, `line-gemv-elementwise` (all
+   `filtered`) and `line-absorption-tabulation` (**`discrepancy`**). The last is
+   a real finding, not bookkeeping: the in-code justification that tabulated `μ`
+   is "at least as accurate as the chi/U interpolation already accepted here" is
+   measurably false near an absorption edge — hopg (002) at the C K-edge is off
+   `2.72e-01` against `5.82e-05` for `χ_g` on the same grid and points, because
+   `μ` depends on `f₂` alone so the edge jump is the whole of its variation.
+   Edge-localized and median `1.6e-6`, but it propagates to `exp(−μL_esc)` at
+   `5.23e-01` for `L_esc = 1e4 Å`. Resolutions are in the ledger row; none is
+   taken here.
+3. **`-c/--cpu` and `--cpu-only` on `cxr run -R/--remote`.** The CPU-profiling
+   phase existed only on `cxr remote run`, which is deprecated and hidden with
+   removal at 0.3.0, so the feature would have disappeared silently. Both flags
+   require `-R`, imply `--perf`, and forward to the same job machinery;
+   validation stays in `start_command`, unduplicated.
+
+### Is the gated line prologue still worth anything? (`_USE_JIT_LINE_PROLOGUE`)
+
+Re-derived rather than re-measured — **arithmetic on recorded numbers, not a new
+measurement**, because it needs a CUDA box. Round 3 measured the prologue at
+**4.2–8.9% of the line phase** (`Ne` 450 → 10000, mos2, `N_g = 66`, `qlmc`).
+
+Before Round 4, the single-process split at `Ne=10000` was transport 1.273 s,
+lines 0.3356 s, brem 0.1564 s — a 1.765 s case in which the line phase is
+**19.0%** and the prologue's best case is worth **1.7% of case wall**. Round 4's
+whole-case measurement (hopg, `Ne=16000`) is 0.265 s → 0.104 s with transport
+−73% and spectrum −43%. Applying those factors to the mos2 split gives transport
+0.344 s, lines 0.191 s, brem 0.089 s: the line phase's share of the case
+**roughly doubles, 19.0% → 30.6%**.
+
+What that does to the prologue depends on how its win scales:
+
+- If the win scales with the line phase, it is **~2.7% of case wall** (up from
+  1.7%).
+- If it is unchanged in absolute terms, **~4.8%** — but this is the optimistic
+  bound and probably wrong in the optimistic direction. The fused prologue's
+  saving is largely gather and launch overhead, and device-resident segments
+  already removed a chunk of exactly that.
+
+**Answer: yes, still low single digits, and the honest range moved up rather
+than down — roughly 1.6–2.8× its old share, not a different order of magnitude.**
+That does not change the recommendation: 2–5% of wall does not buy a fifth
+physics claim on a path that already owes four, one of which is a `discrepancy`.
+The gate on any flip is a re-measured interleaved A/B under the Round-4
+device-resident default, not this arithmetic.
+
+### Plan for the remaining levers
+
+Sequenced, because two of them are gated on the first:
+
+1. **Use the new NVTX ranges** on a `--nsys` capture of hopg and MoSe2 to split
+   the host-side remainder (38% of hopg's transport wall, 52% of MoSe2's) into
+   `.tables` / `.sample` / `.alloc` / `.scratch` / `.compact` / `.join`. This is
+   pure measurement and it decides the next two items. Needs one authorized
+   remote job.
+2. **`REAL` compaction at the join**, gated on (1) showing `.join` or `.compact`
+   is material. It roughly halves the 509 MB held / 1176 MB peak pool, at the
+   price of changing the dtype the function documents — so it is an API change,
+   not just a perf change, and wants the 16 GB-card MoSe2 case (peak 6873 MiB) as
+   its acceptance workload.
+3. **`gpu-pipeline` memory sizing.** The only correctness-adjacent item on this
+   list: a box can be driven into swap. Two independent defects, both cheap to
+   state and neither fixed by Round 4's flip — nothing budgets the ~18 cases in
+   flight (only workers are budgeted, via `_PIPELINE_WORKER_MEM_MB`), and worker
+   count comes from `os.cpu_count()`, which ignores a SLURM cgroup. Round 4
+   routed heavy runs off this path; everything still on it (no CUDA device,
+   `Ne ≤ 1000`, grooved) remains exposed. Fix the cgroup read first — it is
+   local, testable, and bounds the worst case on a cluster.
+4. **Grooved transport on the CUDA core.** Scope, not difficulty: grooved runs
+   still take the lockstep path.
+5. **`numba.prange` over the per-electron core — deferred**, by decision. It
+   starts from a 0.27–1.05× deficit against lockstep, so it needs more than two
+   cores just to break even.
+
+The missing MoSe2 pipeline arm stays deferred until (3), and should be rerun only
+with an explicit memory cap on a box that is not shared.

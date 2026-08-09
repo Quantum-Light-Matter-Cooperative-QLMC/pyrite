@@ -317,12 +317,13 @@ while implementing. No test references `_USE_JIT_LINE_PROLOGUE` or
       tree itself is not synced by `cxr remote sync` either and had to be
       copied to `qlmc` separately to run this at all.
 - [~] Re-run the interleaved burn-in A/B harness at `Ne=450`, 2000, and 10000
-      on both `ALEX-DESKTOP` and `qlmc`. **PARTIAL: `qlmc` done, `ALEX-DESKTOP`
-      not reachable.** `ALEX-DESKTOP` is absent from `~/.ssh/config` (which
-      defines only `qlmc`) and from `known_hosts`, and this editing box is not
-      it (16 cores / 30 GiB / no NVIDIA driver, vs `ALEX-DESKTOP`'s 24 cores /
-      23.4 GiB / RTX 3060 Ti). There is no route to that box from this
-      environment, so its arm cannot be run here and remains open.
+      on both `ALEX-DESKTOP` and `qlmc`. **PARTIAL: `qlmc` done; `ALEX-DESKTOP`
+      is not remotely runnable by design.** It is the user's home desktop (24
+      cores / 23.4 GiB / RTX 3060 Ti), not an ssh target — absent from
+      `~/.ssh/config` (which defines only `qlmc`) and from `known_hosts`, and
+      this editing box is not it (16 cores / 30 GiB / no NVIDIA driver). Its arm
+      is run **locally, while working at that machine** (confirmed 2026-08-09);
+      an agent on `qlmc` cannot close it and should not treat it as a blocker.
 
       `qlmc` arm (2026-08-08), Round 2 method reproduced exactly: transport
       once, 4 s GPU burn-in, explicit `Device().synchronize()` around each

@@ -129,11 +129,17 @@ cxr run mos2_heavy -m mos2 --remote \
 cxr remote performance pull mos2_heavy
 ```
 
-Every NVTX range in the tree is GPU-side (`cxr.spectrum_case:*`, `cxr.lines*`,
-`cxr.brem`, `cxr.interpolate`); `transport.py` pushes none. A capture therefore
-shows a transport-side wait only as an unlabelled gap, and attributing one needs
-the `cxr.performance.v1` activity labels (`transport_wait` vs `spectrum`), which
-carry per-tick phase identity. Do not expect `cxr.transport.*`.
+The spectrum-side ranges are `cxr.spectrum_case:*`, `cxr.lines*`, `cxr.brem`,
+and `cxr.interpolate`. `transport.py` now pushes its own: `cxr.transport.tables`
+(scattering/stopping table build), `.sample` (beam phase-space sampling),
+`.alloc` (output-buffer reservation), `.core` (the transport core itself), and
+`.output` (assembly of the returned arrays). Inside the CUDA per-electron driver
+`.core` nests further — `.upload`, `.scratch`, `.launch` (host-side dispatch
+only), `.capsync` (the `seg_count.max()` read, which is where the batch's device
+time actually lands), `.compact`, `.exitcodes`, and `.join`. Everything
+`transport.py` pushes is host-side wall clock, so a range that dwarfs `.launch`
+is host cost, not kernel cost. Per-tick phase identity still comes from the
+`cxr.performance.v1` activity labels (`transport_wait` vs `spectrum`).
 
 `--nsys` requires exactly one material, one material process, one performance
 repetition, and a monolithic allocation. It uses an isolated job-local
@@ -172,6 +178,25 @@ case with nested `cxr.lines`, `cxr.brem`, and `cxr.interpolate` ranges.
 
 Nsight instrumentation adds overhead. Use it to explain gaps, not as a
 throughput measurement or a replacement for the three-repetition comparison.
+
+### Capture a serial CPU cProfile pass
+
+Nsight attributes device work; it will not tell you which Python function owns a
+host-side range. For that, add a bounded single-process `cProfile` pass:
+
+```bash
+cxr run mos2_heavy -m mos2 --remote -c --detach     # primary run, then CPU pass
+cxr run mos2_heavy -m mos2 --remote --cpu-only --detach  # CPU pass only
+```
+
+Both flags require `-R/--remote` (heavy profiling stays off the workstation),
+imply `-p/--perf`, and force an unchunked session. `--cpu` runs the primary
+phase first and the CPU pass after it; `--cpu-only` starts no GPU or Nsight
+phase at all. `--cpu` and `--cpu-only` are mutually exclusive, and `--cpu-only`
+rejects `--nsys` and the GPU chunk pins, which have nothing to act on. The pass
+writes `<material>.cpu.prof` and `<material>.cpu.txt` beside the NDJSON, pulled
+by the same `cxr remote performance pull`. A CPU-phase failure fails the job;
+with `--cpu` the primary artifacts are still retained.
 
 ## Validate and normalize
 
