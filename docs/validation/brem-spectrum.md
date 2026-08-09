@@ -3,7 +3,7 @@
 Independent verification of the bremsstrahlung background spectrum.
 
 - **Claim id:** `brem-spectrum`
-- **Code:** `src/cxr_mc/montecarlo/spectrum.py::mc_brem_spectrum`
+- **Code:** `src/cxr_mc/montecarlo/spectrum/brem.py::mc_brem_spectrum`
   (cross-section in `::_brem_dsigma_dk`)
 - **Ledger source:** "bremsstrahlung background, Born + Elwert" — i.e. the
   Born-approximation Bethe–Heitler bremsstrahlung cross-section, energy

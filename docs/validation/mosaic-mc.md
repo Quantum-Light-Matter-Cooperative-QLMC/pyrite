@@ -3,7 +3,7 @@
 ## Claim
 
 - **ID:** `mosaic-mc`
-- **Symbol:** `montecarlo/spectrum.py::mc_spectrum` (`mosaic_route="mc"`)
+- **Symbol:** `montecarlo/spectrum/lines.py::mc_spectrum` (`mosaic_route="mc"`)
 - **Source:** Gaussian mosaic-block orientation average; product Gauss--Hermite quadrature.
 - **Intended quantity:** incoherent expectation of the full single-crystallite spectrum over two independent small tilts.
 
@@ -63,7 +63,7 @@ Follow-up applied after independent verification: both `mc_spectrum` and
 
 ## Verdict
 
-- **Claim**: `mosaic-mc` — `montecarlo/spectrum.py::mc_spectrum` — Gaussian mosaic-block intensity average by product Gauss--Hermite quadrature
+- **Claim**: `mosaic-mc` — `montecarlo/spectrum/lines.py::mc_spectrum` — Gaussian mosaic-block intensity average by product Gauss--Hermite quadrature
 - **Filters**: units `pass`; limits `pass`; signs/conventions `pass`
 - **Re-derivation**: `matches` — no divergent factor; normalization is exactly `1/pi`
 - **Verdict**: `rederived`

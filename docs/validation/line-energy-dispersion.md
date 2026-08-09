@@ -91,7 +91,7 @@ The sign comparison below is made under the repository's explicit
 
 ## Implementation comparison
 
-`src/cxr_mc/montecarlo/spectrum.py::mc_spectrum` computes, for each segment,
+`src/cxr_mc/montecarlo/spectrum/lines.py::mc_spectrum` computes, for each segment,
 
 ```python
 v_dot_g = v_all @ g_vec_d

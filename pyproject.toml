@@ -153,7 +153,8 @@ include = ["src"]
 [[tool.ty.overrides]]
 include = [
     "src/cxr_mc/montecarlo/*_jit_kernel.py",
-    "src/cxr_mc/montecarlo/runner.py",
+    "src/cxr_mc/montecarlo/runner/__init__.py",
+    "src/cxr_mc/montecarlo/spectrum/*_jit_kernel.py",
 ]
 
 [tool.ty.analysis]

@@ -65,7 +65,7 @@ phase cancels after squaring.
 
 ## Implementation and evidence
 
-`montecarlo/spectrum.py::mc_spectrum` derives one shared
+`montecarlo/spectrum/lines.py::mc_spectrum` derives one shared
 `seg_t_mid = seg_t + 0.5 * seg_L / beta_all` before constructing `d_all`. Both
 the batched coherent path (`sinc_cutoff=None`) and the per-reflection
 compatibility path consume that `d_all`.

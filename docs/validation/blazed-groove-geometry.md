@@ -4,7 +4,7 @@
 - **Anchors**:
   `src/cxr_mc/montecarlo/groove.py::{blazed_groove_spec,surface_depth_ang,in_material,first_surface_event,escape_distance_ang,entry_points}`;
   `src/cxr_mc/montecarlo/transport.py::simulate_trajectories`;
-  `src/cxr_mc/montecarlo/spectrum.py::{mc_spectrum,mc_brem_spectrum}`
+  `src/cxr_mc/montecarlo/spectrum/lines.py::mc_spectrum`; `src/cxr_mc/montecarlo/spectrum/brem.py::mc_brem_spectrum`
 - **Source**: elementary periodic ray–plane intersection (no literature
   equation)
 - **Verifier**: independent fresh context (did not write the implementation),

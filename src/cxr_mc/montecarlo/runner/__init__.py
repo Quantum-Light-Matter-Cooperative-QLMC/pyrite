@@ -10,8 +10,8 @@ workers.
 
 import os
 import sys
-import warnings
 from contextlib import contextmanager, nullcontext
+from functools import wraps
 from pathlib import Path
 from time import perf_counter
 from typing import Any
@@ -19,24 +19,21 @@ from typing import Any
 import numpy as np
 import psutil
 
-from ..energy_grid.encoding import decode_energy_grid
-from . import spectrum as _spectrum_mod
-from ._backend import (
+from ...energy_grid.encoding import decode_energy_grid
+from .. import spectrum as _spectrum_mod
+from .._backend import (
     _GPU,
     BACKEND,
-    BackendResourceError,
-    BackendUnavailableError,
 )
-from ._resources import admitted_chunk, resolve_resource_policy
-from .geometry import tilted_geometry
-from .groove import blazed_groove_spec
-from .spectrum import (
+from ..geometry import tilted_geometry
+from ..groove import blazed_groove_spec
+from ..spectrum import (
     _segments_in_layer,
     _segments_on_device,
     mc_brem_spectrum,
     mc_spectrum,
 )
-from .transport import resolve_transport_core, simulate_trajectories
+from ..transport import resolve_transport_core, simulate_trajectories
 
 # Opt-in Gate-0 phase profiling for the sweep-acceleration work (TODO P?/#numba;
 # see docs/acceleration-technique-evaluation.md). With CXR_MC_TIMING set (to
@@ -107,84 +104,61 @@ _N_CPUS = _usable_cpus()
 _TOTAL_MEM = psutil.virtual_memory().total // 1_000_000
 
 
-def _env_chunk(name, default):
-    """Chunk-size default, overridable via env for the A1 sweep-acceleration spike
-    (docs/acceleration-technique-evaluation.md, A1: sweep spec/brem chunk on the lab
-    box and read the GPU spectrum-phase time). Read once at import so it applies in
-    the main GPU process; an explicit per-case ``spec_chunk``/``brem_chunk`` still
-    wins. Unset / blank / non-positive / non-integer -> the memory-safe default."""
-    try:
-        v = int(os.environ.get(name, ""))
-    except (TypeError, ValueError):
-        return default
-    return v if v > 0 else default
-
-
-# Segments per spectrum matmul. 0 (the default) = size adaptively per call from
-# the energy-grid width via _adaptive_chunk; a positive CXR_MC_SPEC_CHUNK /
-# CXR_MC_BREM_CHUNK env value pins a fixed chunk (A1 sweep-accel spike), and an
-# explicit per-case spec_chunk/brem_chunk still wins over both.
-_RESOURCE_POLICY = resolve_resource_policy(BACKEND)
-_SPEC_CHUNK = _env_chunk("CXR_MC_SPEC_CHUNK", 0)
-_BREM_CHUNK = _env_chunk("CXR_MC_BREM_CHUNK", 0)
-# Transient-memory budget [MB] for one spectrum matmul. The chunk loops in
-# mc_spectrum / mc_brem_spectrum hold ~3 float64 (chunk, nbins) arrays at peak
-# (x, S = sinc(x)**2, and sinc's internal temporary), so transient bytes
-# ~= 3 * chunk * nbins * 8. Default 1920 MB reproduces the old fixed
-# chunk=40000 exactly on the pre-2026-07 ~2000-bin line grid.
-_POLICY_DEVICE_MB = (
-    _RESOURCE_POLICY.device_budget_bytes // (1 << 20)
-    if _RESOURCE_POLICY.device_budget_bytes is not None
-    else 1920
+from . import chunking as _chunking
+from .chunking import (
+    _BREM_CHUNK,
+    _RESOURCE_POLICY,
+    _SPEC_CHUNK,
 )
-_SPEC_BUDGET_MB = _env_chunk("CXR_MC_SPEC_BUDGET_MB", min(1920, _POLICY_DEVICE_MB))
+from .chunking import (
+    _SPEC_BUDGET_MB as _SPEC_BUDGET_MB,
+)
+
+_CHUNKING_NAMES = ("_env_chunk", "_adaptive_chunk", "_admit_chunk", "_real_itemsize")
+_CHUNKING_ORIGINALS = {name: getattr(_chunking, name) for name in _CHUNKING_NAMES}
 
 
-def _adaptive_chunk(nbins):
-    """Segments per spectrum matmul sized so the ~3 concurrent (chunk, nbins)
-    intermediates in the mc_spectrum / mc_brem_spectrum chunk loops fit in
-    _SPEC_BUDGET_MB.
-
-    Replaces the fixed defaults after the 2026-07-18 qlmc OOMs: widening the
-    line grid to 30000 eV grew nbins ~3x and silently tripled the per-matmul
-    transient (the fixed chunk had been tuned on the old narrow grid). Holding
-    the byte product constant instead means the chunk shrinks as the grid
-    widens and grows as it narrows. Chunking is mathematically exact (it only
-    partitions a sum over segments), so this changes memory/speed, not physics.
-
-    The transients (x, sinc(x), sinc(x)**2) are REAL-dtype, so the byte budget
-    uses _REAL_BYTES: 4 on the GPU (fp32) -> ~2x the chunk the old hardcoded 8
-    allowed, 8 on the CPU (fp64) -> the original size bit-for-bit.
-    """
-    itemsize = _real_itemsize()
-    worker_intermediate_arrays = 3
-    per_row_bytes = worker_intermediate_arrays * nbins * itemsize
-
-    requested = max(
-        1000,
-        min(
-            1_000_000 * _SPEC_BUDGET_MB // per_row_bytes,
-            100_000,
-        ),
-    )
-
-    return admitted_chunk(
-        requested_chunk=requested,
-        bins=nbins,
-        itemsize=itemsize,
-        budget_bytes=(_RESOURCE_POLICY.device_budget_bytes if _GPU else None),
-    )
+def _sync_chunking_globals():
+    namespace = globals()
+    for name, value in namespace.items():
+        if name.startswith("__") or name in _CHUNKING_NAMES:
+            continue
+        setattr(_chunking, name, value)
+    for name in _CHUNKING_NAMES:
+        value = namespace.get(name)
+        wrapper = namespace.get(f"_{name}_wrapper")
+        setattr(_chunking, name, _CHUNKING_ORIGINALS[name] if value is wrapper else value)
 
 
-def _admit_chunk(chunk, bins):
-    itemsize = _real_itemsize()
+def __env_chunk_wrapper(*args, **kwargs):
+    _sync_chunking_globals()
+    return _CHUNKING_ORIGINALS["_env_chunk"](*args, **kwargs)
 
-    return admitted_chunk(
-        requested_chunk=int(chunk),
-        bins=int(bins),
-        itemsize=itemsize,
-        budget_bytes=(_RESOURCE_POLICY.device_budget_bytes if _GPU else None),
-    )
+
+def __adaptive_chunk_wrapper(*args, **kwargs):
+    _sync_chunking_globals()
+    return _CHUNKING_ORIGINALS["_adaptive_chunk"](*args, **kwargs)
+
+
+def __admit_chunk_wrapper(*args, **kwargs):
+    _sync_chunking_globals()
+    return _CHUNKING_ORIGINALS["_admit_chunk"](*args, **kwargs)
+
+
+def __real_itemsize_wrapper(*args, **kwargs):
+    _sync_chunking_globals()
+    return _CHUNKING_ORIGINALS["_real_itemsize"](*args, **kwargs)
+
+
+_env_chunk = wraps(_CHUNKING_ORIGINALS["_env_chunk"])(__env_chunk_wrapper)
+_adaptive_chunk = wraps(_CHUNKING_ORIGINALS["_adaptive_chunk"])(__adaptive_chunk_wrapper)
+_admit_chunk = wraps(_CHUNKING_ORIGINALS["_admit_chunk"])(__admit_chunk_wrapper)
+_real_itemsize = wraps(_CHUNKING_ORIGINALS["_real_itemsize"])(__real_itemsize_wrapper)
+
+for _function in (_env_chunk, _adaptive_chunk, _admit_chunk, _real_itemsize):
+    _function.__module__ = __name__
+
+del _function
 
 
 def _nsys_range(message):
@@ -288,62 +262,41 @@ _GPU_OOM = BACKEND.oom_exceptions
 _pool_limit_set = False
 
 
-class _SpectrumPhaseOOM(Exception):
-    """Tag a catchable OOM with its owning spectrum phase."""
-
-    def __init__(self, phase, error):
-        super().__init__(str(error))
-        self.phase = phase
-        self.error = error
+from . import oom as _oom
+from .oom import _SpectrumPhaseOOM
 
 
-def _should_free(cases_since, every, reserved_bytes, watermark_mb):
-    """A2 free-cadence predicate (pure, no CuPy so it unit-tests without a GPU).
+def _sync_oom_globals():
+    for name, value in globals().items():
+        if name.startswith("__") or name in {
+            "_should_free",
+            "_maybe_free_pool",
+            "_ensure_pool_limit",
+        }:
+            continue
+        setattr(_oom, name, value)
 
-    Free the pool when ``every`` cases have elapsed since the last free, OR when
-    the reserved pool has crossed the watermark (``watermark_mb == 0`` -> the
-    watermark is off). The default (every=1, watermark off) fires every case."""
-    over_watermark = watermark_mb > 0 and reserved_bytes > watermark_mb * (1 << 20)
-    return cases_since >= every or over_watermark
+
+def _should_free(*args, **kwargs):
+    _sync_oom_globals()
+    return _oom._should_free(*args, **kwargs)
 
 
-def _maybe_free_pool():
-    """Return this case's GPU scratch to the device on the A2 cadence.
-
-    ``free_all_blocks()`` releases the CuPy pool's free blocks back to the card so
-    a long sweep can't let the reserved pool grow/fragment until it fills VRAM --
-    but it forces a device sync + full realloc, so A2 stretches how often it runs
-    (see :func:`_should_free`). The trigger reads ``total_bytes()`` (reserved), NOT
-    ``used_bytes()``: by the time control reaches this inter-case point the case's
-    CuPy temporaries are already dereferenced, so ``used_bytes()`` is ~0 and would
-    never trip -- ``total_bytes()`` is the footprint that actually grows. Default
-    (1 / off) reproduces the original per-case free exactly. Driver-process only,
-    so the module counter needs no lock."""
+def _maybe_free_pool(*args, **kwargs):
     global _cases_since_free, _pool_peak_bytes
-    stats = BACKEND.allocator_stats()
-    reserved = int((stats["reserved_mib"] or 0) * (1 << 20))
-    if reserved > _pool_peak_bytes:
-        _pool_peak_bytes = reserved
-    _cases_since_free += 1
-    if _should_free(_cases_since_free, _FREE_EVERY, reserved, _FREE_WATERMARK_MB):
-        BACKEND.release_memory()
-        _cases_since_free = 0
+    _sync_oom_globals()
+    result = _oom._maybe_free_pool(*args, **kwargs)
+    _cases_since_free = _oom._cases_since_free
+    _pool_peak_bytes = _oom._pool_peak_bytes
+    return result
 
 
-def _ensure_pool_limit():
-    """Set the CuPy pool fraction cap once per driver process.
-
-    No-op on a CPU box or when cap is disabled (`_GPU_POOL_FRAC <= 0`).
-    Idempotent: safe to call on every case; the module flag means the actual
-    `set_limit` runs once. Makes an over-budget alloc raise a catchable
-    OutOfMemoryError before the driver's own hard-OOM. The cap is divided by
-    `_GPU_POOL_SHARE` so co-tenant scan processes on one GPU sum to _GPU_POOL_FRAC
-    rather than oversubscribing it."""
+def _ensure_pool_limit(*args, **kwargs):
     global _pool_limit_set
-    if _pool_limit_set or not _GPU or _GPU_POOL_FRAC <= 0:
-        return
-    BACKEND.set_memory_limit(_GPU_POOL_FRAC / _GPU_POOL_SHARE)
-    _pool_limit_set = True
+    _sync_oom_globals()
+    result = _oom._ensure_pool_limit(*args, **kwargs)
+    _pool_limit_set = _oom._pool_limit_set
+    return result
 
 
 class _TimingAgg:
@@ -1242,10 +1195,6 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     return out
 
 
-def _real_itemsize() -> int:
-    return np.dtype(_spectrum_mod.REAL).itemsize
-
-
 def _worker_init(force_cpu=False):
     """
     Runs once in each worker process: drop to BELOW_NORMAL priority so the
@@ -1315,637 +1264,156 @@ def _cpu_spectrum_backend():
         _GPU, _spectrum_mod.xp, _spectrum_mod.REAL = previous
 
 
-def _available_mem_mb():
-    """Return available system memory in MB"""
-    return psutil.virtual_memory().available // 1_000_000
+from . import pool as _pool
+
+_POOL_NAMES = (
+    "_available_mem_mb",
+    "_mem_worker_cap",
+    "_admit_cpu_fallback",
+    "_pipeline_slot_cap",
+    "_gpu_pipeline_workers",
+    "_gpu_pipeline_prefetch",
+    "_cpu_pool_workers",
+    "_case_progress_label",
+)
+_POOL_ORIGINALS = {name: getattr(_pool, name) for name in _POOL_NAMES}
 
 
-def _mem_worker_cap(per_worker_mb=None):
-    """Max workers host RAM allows at ``per_worker_mb`` each.
-
-    ``min(MemAvailable, 0.85 * MemTotal) // per_worker_mb``. Binds BOTH worker
-    pools (full-case CPU pool and GPU-pipeline transport pool) so neither can
-    oversubscribe host RAM and re-create the 2026-07-18 qlmc OOM, where the
-    kernel killed one worker and ``BrokenProcessPool`` lost the whole run. The
-    two pools pass different budgets: ``_WORKER_MEM_MB`` for full-case workers
-    (transport + spectrum state), ``_PIPELINE_WORKER_MEM_MB`` for the much
-    smaller transport-only pipeline workers. Default is ``_WORKER_MEM_MB``."""
-    return min(_available_mem_mb(), int(_TOTAL_MEM * 0.9)) // (per_worker_mb or _WORKER_MEM_MB)
-
-
-def _admit_cpu_fallback():
-    """Require one policy-budgeted host worker before accelerator fallback."""
-
-    budget = min(
-        _available_mem_mb(),
-        max(
-            0,
-            int(_TOTAL_MEM * _RESOURCE_POLICY.host_fraction)
-            - _RESOURCE_POLICY.host_reserve_bytes // 1_000_000,
-        ),
-    )
-    if budget < _WORKER_MEM_MB:
-        raise BackendResourceError(
-            f"{_RESOURCE_POLICY.name} policy cannot admit CPU fallback: "
-            f"{budget} MiB budgeted, {_WORKER_MEM_MB} MiB required"
-        )
+def _sync_pool_globals():
+    namespace = globals()
+    for name, value in namespace.items():
+        if name.startswith("__") or name in _POOL_NAMES:
+            continue
+        setattr(_pool, name, value)
+    for name in _POOL_NAMES:
+        value = namespace.get(name)
+        wrapper = namespace.get(f"_{name}_wrapper")
+        setattr(_pool, name, _POOL_ORIGINALS[name] if value is wrapper else value)
 
 
-def _pipeline_slot_cap():
-    """Concurrent host-RAM residencies the GPU pipeline may hold.
-
-    A "slot" is one segment payload: either a transport worker building one, or
-    an in-flight case whose payload the driver is already holding. Both are
-    charged ``_PIPELINE_WORKER_MEM_MB``, because that budget IS the payload --
-    the measured 552-1033 MB child RSS is dominated by the segments the worker
-    just built, and the driver holds a copy of exactly those from the moment the
-    future completes until the case's spectrum phase runs."""
-    return _mem_worker_cap(_PIPELINE_WORKER_MEM_MB)
+def __available_mem_mb_wrapper(*args, **kwargs):
+    _sync_pool_globals()
+    return _POOL_ORIGINALS["_available_mem_mb"](*args, **kwargs)
 
 
-def _gpu_pipeline_workers(max_workers, n):
-    """Size the GPU-pipeline transport pool (transport-only workers feeding the
-    serial GPU). Auto = ~half the usable cores (transport is the tail); an
-    explicit request is honored. BOTH are then clamped by host RAM: the pool
-    spawns full worker processes just like the CPU pool, so without a cap
-    ``ncpu // 2`` workers OOM'd a worker at pool startup and the first
-    ``submit`` raised ``BrokenProcessPool`` (the CPU pool got this cap in the
-    2026-07-18 fix; this path had been missing it). The budget is the
-    transport-only one, NOT the full-case ``_WORKER_MEM_MB``: these workers
-    never hold spectrum state, and charging them the full-case footprint capped
-    the pool at 2 on a 23.4 GB / 24-core box.
-
-    The cap covers the ``nw + _PIPELINE_PREFETCH_AHEAD`` in-flight payloads too,
-    not just the ``nw`` workers -- ``2 * nw + _PIPELINE_PREFETCH_AHEAD`` slots in
-    total. Budgeting workers alone is what let the 2026-08-08 `promising`/mose2
-    pipeline arm run 16 workers with 18 cases in flight on a 45 GB box: 34 slots
-    at 1536 MiB is 52 GB, and measured peak tree RSS was 50.3 GB with 12.9 GB of
-    swap. Clamping an EXPLICIT request warns rather than doing it silently.
-    Returns the worker count; the caller drops to serial below 2."""
-    slots = _pipeline_slot_cap()
-    cap = max(0, (slots - _PIPELINE_PREFETCH_AHEAD) // 2)
-    if max_workers is None:
-        ncpu = _N_CPUS or 8
-        nw = max(2, min(n, ncpu // 2))
-    else:
-        nw = min(max_workers, n)
-        if cap < nw:
-            warnings.warn(
-                f"requested {max_workers} GPU-pipeline transport workers, "
-                f"host RAM admits {cap} once their in-flight segment payloads "
-                f"are charged too ({slots} slots at {_PIPELINE_WORKER_MEM_MB} "
-                "MiB each); raise CXR_MC_PIPELINE_WORKER_MEM_MB only if the "
-                "measured per-worker RSS is smaller than that budget",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-    return min(nw, cap)
+def __mem_worker_cap_wrapper(*args, **kwargs):
+    _sync_pool_globals()
+    return _POOL_ORIGINALS["_mem_worker_cap"](*args, **kwargs)
 
 
-def _gpu_pipeline_prefetch(nw, n):
-    """How many cases the GPU pipeline may hold in flight at once.
-
-    ``nw`` keeps every worker fed and ``_PIPELINE_PREFETCH_AHEAD`` covers the
-    handoff. ``_gpu_pipeline_workers`` already sized ``nw`` so this depth fits
-    the host budget, but the budget is re-read here because free memory moves
-    between the two calls -- and an unbudgeted depth is half of the 2026-08-08
-    swap incident."""
-    return max(1, min(nw + _PIPELINE_PREFETCH_AHEAD, max(1, _pipeline_slot_cap() - nw), n))
+def __admit_cpu_fallback_wrapper(*args, **kwargs):
+    _sync_pool_globals()
+    return _POOL_ORIGINALS["_admit_cpu_fallback"](*args, **kwargs)
 
 
-def _cpu_pool_workers(max_workers, n):
-    """Size the full-case CPU pool, capped so it cannot oversubscribe host RAM.
-
-    Each full-case worker holds transport AND spectrum state (unlike the GPU
-    pipeline's transport-only workers): ~5.5 GB anon-rss measured per worker at
-    200 keV on qlmc, where the uncapped ncpu*3//4 = 24-worker pool OOM'd the
-    45 GiB box (2026-07-18: kernel killed one worker, BrokenProcessPool lost
-    the whole run after swap-thrash had already crawled it).
-
-    max_workers: the caller's request -- None means size automatically from
-        core count (ncpu*3//4), an integer requests that many (0 is handled by
-        the caller, never seen here).
-    n: number of cases (never spawn more workers than cases).
-
-    The memory cap binds BOTH branches: even an explicit request is clamped to
-    min(MemAvailable, 0.85*MemTotal) // _WORKER_MEM_MB, so a pinned count can't
-    re-create the OOM. To deliberately run tighter than the measured budget,
-    raise CXR_MC_WORKER_MEM_MB -- that's the knob for "my workload is smaller
-    than the default assumes", not a bigger --max-workers.
-
-    Returns the worker count to use, >= 1.
-    """
-    if _N_CPUS is not None:
-        _max_allowed_workers = _N_CPUS * 3 // 4
-    else:
-        _max_allowed_workers = 6
-
-    worker_cap = _mem_worker_cap()
-    if max_workers is None:
-        max_workers = _max_allowed_workers
-    return max(1, min(max_workers, worker_cap, n))
+def __pipeline_slot_cap_wrapper(*args, **kwargs):
+    _sync_pool_globals()
+    return _POOL_ORIGINALS["_pipeline_slot_cap"](*args, **kwargs)
 
 
-def _case_progress_label(cases):
-    """Name a tqdm case bar by its material when the batch is homogeneous."""
-    materials = {case.get("crystal") for case in cases if case.get("crystal")}
-    return f"{next(iter(materials))} cases" if len(materials) == 1 else "mixed cases"
+def __gpu_pipeline_workers_wrapper(*args, **kwargs):
+    _sync_pool_globals()
+    return _POOL_ORIGINALS["_gpu_pipeline_workers"](*args, **kwargs)
 
 
-def case_runtime_plan(case):
-    """Return grid and chunk metrics for one concrete case."""
-    line_grid = decode_energy_grid(case.get("E_grid", []))
-    brem_grid = decode_energy_grid(case.get("E_grid_brem", []))
-    spec_chunk = (
-        _admit_chunk(
-            case.get("spec_chunk") or _SPEC_CHUNK or _adaptive_chunk(line_grid.size),
-            line_grid.size,
-        )
-        if line_grid.size
-        else None
-    )
-    brem_chunk = (
-        _admit_chunk(
-            case.get("brem_chunk") or _BREM_CHUNK or _adaptive_chunk(brem_grid.size),
-            brem_grid.size,
-        )
-        if brem_grid.size
-        else None
-    )
-    return {
-        "spec_chunk": spec_chunk,
-        "brem_chunk": brem_chunk,
-        "line_grid_bins": int(line_grid.size),
-        "brem_grid_bins": int(brem_grid.size),
-        "line_electrons": case.get("Ne"),
-        "brem_electrons": case.get("Ne_brem"),
-    }
+def __gpu_pipeline_prefetch_wrapper(*args, **kwargs):
+    _sync_pool_globals()
+    return _POOL_ORIGINALS["_gpu_pipeline_prefetch"](*args, **kwargs)
 
 
-def _cuda_transport_run(cases):
-    """Whether a whole run transports on the device.
-
-    All or nothing: a run is only taken off the transport pool when EVERY case
-    resolves to the CUDA core, since a mixed run would otherwise strand its
-    CPU-core cases in this process with nothing overlapping them. Sweeps hold Ne
-    fixed across the grid, so mixed runs are the exception, not the rule.
-    """
-
-    return bool(cases) and all(_case_transport_core(case) == "cuda" for case in cases)
+def __cpu_pool_workers_wrapper(*args, **kwargs):
+    _sync_pool_globals()
+    return _POOL_ORIGINALS["_cpu_pool_workers"](*args, **kwargs)
 
 
-def runtime_plan(cases, max_workers=None, engine="auto"):
-    """Resolve execution topology and representative chunk sizing for profiling."""
-    n = len(cases)
-    use_gpu = _GPU if engine == "auto" else engine == "gpu" and _GPU
-    cuda_transport = use_gpu and _cuda_transport_run(cases)
-    if n == 0 or max_workers == 0:
-        workers = 1
-        resolved_engine = "serial"
-    elif cuda_transport:
-        # run_cases keeps a device-transported run in one process; no pool.
-        workers = 1
-        resolved_engine = "serial"
-    elif use_gpu:
-        workers = max(1, _gpu_pipeline_workers(max_workers, n))
-        resolved_engine = "gpu-pipeline" if workers >= 2 else "serial"
-    else:
-        workers = _cpu_pool_workers(max_workers, n)
-        resolved_engine = "cpu-pool" if workers >= 2 else "serial"
-    representative = cases[0] if cases else {}
-    return {
-        "engine": resolved_engine,
-        "transport_core": _case_transport_core(representative),
-        "requested_workers": max_workers,
-        "effective_workers": workers,
-        "worker_memory_budget_mib": (
-            _PIPELINE_WORKER_MEM_MB if resolved_engine == "gpu-pipeline" else _WORKER_MEM_MB
-        ),
-        # Host-resident segment payloads the driver may hold at once. Budgeted
-        # against the same per-slot figure as the workers, so a profile can show
-        # the pipeline's whole host footprint before the run starts.
-        "transport_prefetch_depth": (
-            _gpu_pipeline_prefetch(workers, n) if resolved_engine == "gpu-pipeline" else None
-        ),
-        "backend": BACKEND.name,
-        "backend_vendor": BACKEND.vendor,
-        "backend_device": BACKEND.device.name,
-        "backend_fallback_reason": BACKEND.fallback_reason,
-        "resource_policy_requested": _RESOURCE_POLICY.requested,
-        "resource_policy": _RESOURCE_POLICY.name,
-        "device_memory_budget_mib": (
-            _RESOURCE_POLICY.device_budget_bytes / (1 << 20)
-            if _RESOURCE_POLICY.device_budget_bytes is not None
-            else None
-        ),
-        "device_memory_reserve_mib": (
-            _RESOURCE_POLICY.device_reserve_bytes / (1 << 20)
-            if _RESOURCE_POLICY.device_reserve_bytes is not None
-            else None
-        ),
-        "gpu_pool_fraction": _GPU_POOL_FRAC,
-        "gpu_pool_share": _GPU_POOL_SHARE,
-        "spectrum_budget_mib": _SPEC_BUDGET_MB,
-        **case_runtime_plan(representative),
-    }
+def __case_progress_label_wrapper(*args, **kwargs):
+    _sync_pool_globals()
+    return _POOL_ORIGINALS["_case_progress_label"](*args, **kwargs)
 
 
-def run_cases(
-    cases,
-    max_workers=None,
-    progress=True,
-    callback=None,
-    should_stop=None,
-    engine="auto",
-    keep_results=True,
-    on_timing=None,
-    on_activity=None,
-    transport_only=False,
+_available_mem_mb = wraps(_POOL_ORIGINALS["_available_mem_mb"])(__available_mem_mb_wrapper)
+_mem_worker_cap = wraps(_POOL_ORIGINALS["_mem_worker_cap"])(__mem_worker_cap_wrapper)
+_admit_cpu_fallback = wraps(_POOL_ORIGINALS["_admit_cpu_fallback"])(__admit_cpu_fallback_wrapper)
+_pipeline_slot_cap = wraps(_POOL_ORIGINALS["_pipeline_slot_cap"])(__pipeline_slot_cap_wrapper)
+_gpu_pipeline_workers = wraps(_POOL_ORIGINALS["_gpu_pipeline_workers"])(
+    __gpu_pipeline_workers_wrapper
+)
+_gpu_pipeline_prefetch = wraps(_POOL_ORIGINALS["_gpu_pipeline_prefetch"])(
+    __gpu_pipeline_prefetch_wrapper
+)
+_cpu_pool_workers = wraps(_POOL_ORIGINALS["_cpu_pool_workers"])(__cpu_pool_workers_wrapper)
+_case_progress_label = wraps(_POOL_ORIGINALS["_case_progress_label"])(__case_progress_label_wrapper)
+
+for _function in (
+    _available_mem_mb,
+    _mem_worker_cap,
+    _admit_cpu_fallback,
+    _pipeline_slot_cap,
+    _gpu_pipeline_workers,
+    _gpu_pipeline_prefetch,
+    _cpu_pool_workers,
+    _case_progress_label,
 ):
+    _function.__module__ = __name__
+
+del _function
+
+
+from . import scheduling as _scheduling
+
+_SCHEDULING_NAMES = ("case_runtime_plan", "_cuda_transport_run", "runtime_plan", "run_cases")
+_SCHEDULING_ORIGINALS = {name: getattr(_scheduling, name) for name in _SCHEDULING_NAMES}
+
+
+def _sync_scheduling_globals():
+    """Mirror compatibility-module overrides into the scheduling owner.
+
+    Existing callers and tests patch ``cxr_mc.montecarlo.runner`` internals.
+    Preserve that behavior while the implementation lives in ``scheduling``.
     """
-    Run a list of case dicts through run_case, results in input order.
-
-    GPU present, CPU transport (Ne at or below
-    transport.CUDA_TRANSPORT_MIN_ELECTRONS, or a grooved run): the transport is
-    PIPELINED across a worker pool while THIS process drives the spectrum/brem
-    serially on the single CUDA context -- the ~40% transport idle overlaps the
-    GPU work, with no device contention (multiple CUDA contexts are what crawled
-    the old max_workers>1). Workers run ONLY transport (pure CPU/numpy) and are
-    pinned to the lockstep core, never the GPU. Callbacks fire in input order as
-    each case's GPU phase finishes.
-
-    GPU present, device transport (every case resolves to the CUDA core): there
-    is nothing left to hide behind the GPU phase and nowhere to put a second
-    context, so the whole run stays in this process, serially, with each case's
-    segments kept device-resident for its spectrum kernels. This is the faster
-    arrangement whenever it applies -- transport is 4-16x the CPU core at these
-    electron counts, and the case never pays the round trip.
-
-    No GPU: cases run through a worker pool (or serially), completion order.
-
-    engine: which branch to run, independent of the hardware probe.
-        "auto" (default) -> the serial device-transport branch when every case
-            resolves to the CUDA core, else the GPU pipeline above if a GPU is
-            present, else the CPU pool below. Only the transport core changes
-            what a run computes (a different realization of the same
-            distribution, `Validation: gpu-transport-core`); the branch it picks
-            does not.
-        "gpu"  -> force the GPU pipeline. If no GPU is present, warns and
-            falls back to the CPU pool.
-        "cpu"  -> force the full-case CPU pool below even when a GPU is
-            present (e.g. a CPU-bound workload that would otherwise be
-            starved onto the GPU pipeline's half-core transport pool). Each
-            worker is forced onto the NumPy spectrum path (see
-            _worker_init's force_cpu), so no worker opens a CUDA context.
-        Anything else raises ValueError.
-    max_workers: None -> sized automatically (a few transport workers when a GPU
-        is present; ~3/4 of the CPUs otherwise). An integer pins the count; 0
-        runs everything serially in this process (debugging / safe fallback).
-        On the full-case CPU pool (no GPU, or engine="cpu") both auto and
-        pinned counts are additionally clamped by host RAM -- see
-        _cpu_pool_workers; per-worker budget via CXR_MC_WORKER_MEM_MB.
-    progress: tqdm bar over completed cases.
-    callback: callable(i, case, out) invoked in THIS process as each case
-        finishes; stream/checkpoint/plot without waiting for the batch.
-        Exceptions propagate and abort the run.
-    on_timing: optional callback(dict) invoked after each case with transport,
-        spectrum, GPU feed-wait, retry, and CuPy-pool metrics. Enables phase
-        timing without requiring CXR_MC_TIMING or printing its stderr report.
-    on_activity: optional callback(dict) invoked at driver phase transitions
-        with phase, case index, and in-flight work counts.
-    should_stop: optional callable() -> bool, checked before each new case
-        starts. Once it returns True, no new case is dispatched; work already
-        in flight drains normally (callbacks still fire for those cases), and
-        results for never-started cases stay None.
-    keep_results: True (default) retains every case's output in the returned
-        list -- bit-for-bit for callers that consume the return. False releases
-        each ``out`` right after its callback fires (results[i] = None), so a
-        long streaming sweep (``callback`` owns storage, return ignored) doesn't
-        pin every spectrum array in host RAM until the batch ends. The callback
-        still sees the live ``out``; only the retained list is dropped.
-
-    Crawl protections: workers run BELOW_NORMAL priority (_worker_init) and get
-    single-threaded BLAS (OMP/OPENBLAS/MKL_NUM_THREADS=1, inherited) -- N workers
-    x M BLAS threads is the classic oversubscription freeze.
-    """
-    if engine not in ("auto", "gpu", "cpu"):
-        raise ValueError(f"engine must be one of 'auto', 'gpu', 'cpu'; got {engine!r}")
-    use_gpu = _GPU if engine == "auto" else engine == "gpu"
-    if engine == "gpu" and not _GPU:
-        raise BackendUnavailableError(
-            "run_cases(engine='gpu') requested but no supported accelerator is available; "
-            "install cxr-mc[nvidia], cxr-mc[amd], or cxr-mc[intel], or use engine='auto'"
+    namespace = globals()
+    for name, value in namespace.items():
+        if name.startswith("__") or name in _SCHEDULING_NAMES:
+            continue
+        setattr(_scheduling, name, value)
+    for name in _SCHEDULING_NAMES:
+        value = namespace.get(name)
+        wrapper = namespace.get(f"_{name}_wrapper")
+        setattr(
+            _scheduling,
+            name,
+            _SCHEDULING_ORIGINALS[name] if value is wrapper else value,
         )
 
-    progress_label = _case_progress_label(cases)
 
-    def _maybe_bar(iterable):
-        if not progress:
-            return iterable
-        if os.environ.get("CXR_LOCAL_DASHBOARD") == "1":
-            return iterable
-        try:
-            from tqdm.auto import tqdm
+def _case_runtime_plan_wrapper(*args, **kwargs):
+    _sync_scheduling_globals()
+    return _SCHEDULING_ORIGINALS["case_runtime_plan"](*args, **kwargs)
 
-            return tqdm(iterable, total=len(cases), desc=progress_label)
-        except ImportError:
-            # tqdm.auto picks the widget bar inside Jupyter, and that bar
-            # raises ImportError AT CONSTRUCTION if ipywidgets is missing --
-            # fall back to the plain-text console bar before giving up.
-            try:
-                from tqdm import tqdm
 
-                return tqdm(iterable, total=len(cases), desc=progress_label)
-            except ImportError:
-                return iterable
+def __cuda_transport_run_wrapper(*args, **kwargs):
+    _sync_scheduling_globals()
+    return _SCHEDULING_ORIGINALS["_cuda_transport_run"](*args, **kwargs)
 
-    n = len(cases)
-    results: list[Any] = [None] * n
-    if n == 0:
-        return results
-    fallback_reason = None
-    if use_gpu:
-        try:
-            case_runtime_plan(cases[0])
-        except BackendResourceError as error:
-            if engine != "auto" or os.environ.get("CXR_MC_BACKEND", "auto").lower() != "auto":
-                raise
-            _admit_cpu_fallback()
-            fallback_reason = f"device_budget_infeasible: {error}"
-            warnings.warn(
-                f"{fallback_reason}; falling back to CPU NumPy",
-                RuntimeWarning,
-                stacklevel=2,
-            )
-            use_gpu = False
 
-    timing = _TimingAgg() if _TIMING or on_timing is not None else None
+def _runtime_plan_wrapper(*args, **kwargs):
+    _sync_scheduling_globals()
+    return _SCHEDULING_ORIGINALS["runtime_plan"](*args, **kwargs)
 
-    def _collect_timing(i, out, wait_seconds=None):
-        if timing is None:
-            for key in (
-                "_gpu_oom_retries",
-                "_line_gpu_oom_retries",
-                "_brem_gpu_oom_retries",
-                "_generic_gpu_oom_retries",
-                "_attempted_spec_chunk",
-                "_effective_spec_chunk",
-                "_attempted_brem_chunk",
-                "_effective_brem_chunk",
-                "_learned_spec_chunk",
-                "_backend_fallback_reason",
-            ):
-                out.pop(key, None)
-            return
-        metrics = timing.collect(out, wait_seconds=wait_seconds)
-        if on_timing is not None:
-            on_timing({"case_index": i, **metrics})
 
-    def _activity(phase, case_index=None, **metrics):
-        if on_activity is not None:
-            case = cases[case_index] if case_index is not None else None
-            on_activity(
-                {
-                    "phase": phase,
-                    "case_index": case_index,
-                    "case": case,
-                    **metrics,
-                }
-            )
+def _run_cases_wrapper(*args, **kwargs):
+    _sync_scheduling_globals()
+    return _SCHEDULING_ORIGINALS["run_cases"](*args, **kwargs)
 
-    def _serial(keep_segments_on_device=False):
-        force_cpu = not use_gpu and _GPU
-        with _cpu_spectrum_backend() if force_cpu else nullcontext():
-            for i in _maybe_bar(range(n)):
-                if should_stop is not None and should_stop():
-                    break
 
-                _activity("serial_case", i, in_flight_case_count=1)
+case_runtime_plan = wraps(_SCHEDULING_ORIGINALS["case_runtime_plan"])(_case_runtime_plan_wrapper)
+_cuda_transport_run = wraps(_SCHEDULING_ORIGINALS["_cuda_transport_run"])(
+    __cuda_transport_run_wrapper
+)
+runtime_plan = wraps(_SCHEDULING_ORIGINALS["runtime_plan"])(_runtime_plan_wrapper)
+run_cases = wraps(_SCHEDULING_ORIGINALS["run_cases"])(_run_cases_wrapper)
 
-                if transport_only:
-                    _transport_case(
-                        cases[i],
-                        record_timing=on_timing is not None,
-                    )
-                    out = None
-                elif keep_segments_on_device:
-                    out = run_case(
-                        cases[i],
-                        on_timing is not None,
-                        keep_segments_on_device=True,
-                    )
-                else:
-                    out = run_case(cases[i], True) if on_timing is not None else run_case(cases[i])
+for _function in (case_runtime_plan, _cuda_transport_run, runtime_plan, run_cases):
+    _function.__module__ = __name__
 
-                    if fallback_reason is not None:
-                        out["_backend_fallback_reason"] = fallback_reason
-
-                    _collect_timing(i, out)
-
-                results[i] = out
-
-                if callback is not None:
-                    callback(i, cases[i], out)
-
-                if not keep_results:
-                    results[i] = None
-
-        _activity("idle", in_flight_case_count=0)
-
-        if _TIMING and timing is not None:
-            timing.report("serial", nw=1)
-
-        return results
-
-    def _single_thread_blas():
-        for var in (
-            "OMP_NUM_THREADS",
-            "OPENBLAS_NUM_THREADS",
-            "MKL_NUM_THREADS",
-            "NUMEXPR_NUM_THREADS",
-        ):
-            os.environ[var] = "1"
-
-    # ---- GPU: pipeline CPU transport (worker pool) behind the serial GPU ------
-    if use_gpu:
-        if _cuda_transport_run(cases):
-            # Transport is on the same device as the spectrum, so the pipeline's
-            # premise -- CPU transport hidden behind GPU work -- is gone, and a
-            # worker pool would put N CUDA contexts on the one card. Run in this
-            # process instead, and let the segments stay where the kernel made
-            # them: the spectrum kernels read them in place.
-            return _serial(keep_segments_on_device=not transport_only)
-        if max_workers == 0:
-            return _serial()
-        # RAM-capped (_mem_worker_cap): an uncapped ncpu//2 transport pool OOM'd
-        # a worker at pool startup on the box -> BrokenProcessPool lost the run.
-        nw = _gpu_pipeline_workers(max_workers, n)
-        if nw < 2:
-            return _serial()
-        _ensure_pool_limit()
-        _single_thread_blas()
-        from concurrent.futures import ProcessPoolExecutor
-
-        prefetch = _gpu_pipeline_prefetch(nw, n)  # keep the transport pool ahead
-        with ProcessPoolExecutor(
-            max_workers=nw,
-            initializer=_worker_init,
-            **_process_pool_kwargs(),
-        ) as ex:
-            learned_spec_chunk = None
-
-            from threading import Event
-
-            transport_ready_times = {}
-            transport_ready_events = {}
-
-            def _submit_transport(i):
-                # Worker processes are pinned to the CPU core by _worker_init;
-                # none of them may open a CUDA context on the device this
-                # process is driving.
-                fut = (
-                    ex.submit(_transport_case, cases[i], True)
-                    if on_timing is not None
-                    else ex.submit(_transport_case, cases[i])
-                )
-
-                if timing is not None:
-                    ready = Event()
-                    transport_ready_events[i] = ready
-
-                    def _mark_ready(_fut, i=i, ready=ready):
-                        transport_ready_times[i] = perf_counter()
-                        ready.set()
-
-                    fut.add_done_callback(_mark_ready)
-
-                return fut
-
-            inflight = {i: _submit_transport(i) for i in range(min(prefetch, n))}
-            stopped = False
-            for i in _maybe_bar(range(n)):
-                if not stopped and should_stop is not None and should_stop():
-                    stopped = True
-                if stopped and i not in inflight:
-                    break
-                _activity(
-                    "transport_wait",
-                    i,
-                    in_flight_case_count=len(inflight),
-                    transport_prefetch_count=prefetch,
-                )
-                tw0 = perf_counter() if timing is not None else 0.0
-
-                fut = inflight.pop(i)
-                tp = fut.result()
-
-                wait_seconds = perf_counter() - tw0 if timing is not None else None
-
-                if timing is not None:
-                    # Future becomes "done" immediately before callbacks execute, so .result()
-                    # can theoretically wake a few microseconds before _mark_ready has run.
-                    # Wait for our callback stamp to exist.
-                    ready = transport_ready_events.pop(i)
-                    ready.wait()
-
-                j = i + prefetch
-                if j < n and not stopped:
-                    inflight[j] = _submit_transport(j)
-                _activity(
-                    "spectrum",
-                    i,
-                    in_flight_case_count=len(inflight),
-                    transport_prefetch_count=prefetch,
-                )
-                try:
-                    out = (
-                        _spectrum_case_retry(
-                            cases[i],
-                            tp,
-                            record_timing=True,
-                            spec_chunk_cap=learned_spec_chunk,
-                        )
-                        if on_timing is not None
-                        else _spectrum_case_retry(cases[i], tp, spec_chunk_cap=learned_spec_chunk)
-                    )  # accelerator, THIS process only
-                except _GPU_OOM as error:
-                    if (
-                        engine != "auto"
-                        or os.environ.get("CXR_MC_BACKEND", "auto").lower() != "auto"
-                    ):
-                        raise
-                    _admit_cpu_fallback()
-                    reason = f"accelerator_oom_retries_exhausted: {error}"
-                    warnings.warn(
-                        f"{reason}; rerunning spectrum phase on CPU NumPy",
-                        RuntimeWarning,
-                        stacklevel=2,
-                    )
-                    with _cpu_spectrum_backend():
-                        out = _spectrum_case(cases[i], tp, on_timing is not None)
-                    out["_backend_fallback_reason"] = reason
-                # The payload is dead here; holding it until the next iteration
-                # rebinds tp would put prefetch + 1 of them in the driver.
-                del tp
-                line_retries = out.get("_line_gpu_oom_retries", 0)
-                effective_spec_chunk = out.get("_effective_spec_chunk")
-                if line_retries and effective_spec_chunk is not None:
-                    learned_spec_chunk = (
-                        effective_spec_chunk
-                        if learned_spec_chunk is None
-                        else min(learned_spec_chunk, effective_spec_chunk)
-                    )
-                if learned_spec_chunk is not None:
-                    out["_learned_spec_chunk"] = learned_spec_chunk
-                _collect_timing(i, out, wait_seconds)
-                results[i] = out
-                if callback is not None:
-                    callback(i, cases[i], out)
-                if not keep_results:
-                    results[i] = None
-        _activity("idle", in_flight_case_count=0, transport_prefetch_count=prefetch)
-        if _TIMING and timing is not None:
-            timing.report("GPU-pipeline", nw=nw)
-        return results
-
-    # ---- no GPU: serial in-process, or a full-case worker pool ---------------
-    if max_workers == 0:
-        return _serial()
-    max_workers = _cpu_pool_workers(max_workers, n)
-    _single_thread_blas()
-    from concurrent.futures import ProcessPoolExecutor, as_completed
-
-    with ProcessPoolExecutor(
-        max_workers=max_workers,
-        initializer=_worker_init,
-        initargs=(not use_gpu and _GPU,),
-        **_process_pool_kwargs(),
-    ) as ex:
-        futures = {
-            # Workers run the spectrum on NumPy and the transport on the CPU
-            # core (_worker_init) -- a pool of CUDA contexts is what this pool
-            # exists to avoid.
-            (ex.submit(run_case, c, True) if on_timing is not None else ex.submit(run_case, c)): i
-            for i, c in enumerate(cases)
-        }
-        _activity("cpu_pool", in_flight_case_count=len(futures))
-        stopped = False
-        for fut in _maybe_bar(as_completed(futures)):
-            if fut.cancelled():
-                continue
-            i = futures[fut]
-            out = fut.result()
-            _collect_timing(i, out)
-            results[i] = out
-            if callback is not None:
-                callback(i, cases[i], out)
-            if not keep_results:
-                results[i] = None
-            if not stopped and should_stop is not None and should_stop():
-                stopped = True
-                for f in futures:
-                    f.cancel()
-    _activity("idle", in_flight_case_count=0)
-    if _TIMING and timing is not None:
-        timing.report("CPU-pool", nw=max_workers)
-    return results
+del _function

@@ -260,20 +260,25 @@ re-exported from package** — `from cxr_mc.montecarlo import X` unchanged
   See `docs/gpu-transport-rawkernel.md`. Deps: `_backend`, `transport`.
 - `geometry` — `tilted_geometry`, `detector_directions`, `_orientation_R`,
   `_small_tilt_R`, `_mosaic_quadrature`. Deps: `materials.crystal`.
-- `spectrum` — `mc_spectrum` (PXR+CBS, cross-stack self-absorption, exact mosaic
-  average), `mc_spectrum_solid_angle`, `mc_brem_spectrum`, `load_external_brem`.
-  Deps: `_backend`, `materials.attenuation`, `transport`, `geometry`, `materials.crystal`.
+- `spectrum/` — compatibility package for the former flat module. `lines.py`
+  owns `mc_spectrum` (PXR+CBS, cross-stack self-absorption, exact mosaic
+  average) and `mc_spectrum_solid_angle`; `brem.py` owns
+  `mc_brem_spectrum` and `load_external_brem`; `coherent.py` groups the
+  CUDA-only coherent-kernel surface. Line, brem, and coherent CUDA kernels are
+  colocated in this package and remain lazy on CPU. Deps: `_backend`,
+  `materials.attenuation`, `transport`, `geometry`, `materials.crystal`.
 - `detector` — `detector_efficiency`, `eds_fwhm_eV`, `aperture_fwhm_eV`,
   `mosaic_fwhm_eV`, `mosaic_psi_rad`, `convolve_detector`. Deps: `materials.attenuation`,
   `geometry`, `transport`, `materials.crystal`.
 - `montecarlo/groove.py` — blazed sawtooth entrance-face grooves (escape-path engineering): closed-form entry/escape, `Sweep.groove_spacing_ang` knob.
-- `runner` — `run_case`, `run_cases` (CPU transport pipelined behind one CUDA
-  spectrum context, or memory-capped full-case CPU pool), `_transport_case`,
-  `_spectrum_case`, `_worker_init`. `_spectrum_case` always stores the incoherent
-  `spec` and, when the profile emission includes coherent, a `spec_coherent` from
-  the SAME transport (one transport, two line kernels); `_line_pair_for_case`
-  mirrors this for `cxr reline`. Deps: `_backend`, `transport`, `geometry`,
-  `spectrum`.
+- `runner/` — compatibility package for the former flat module. `__init__.py`
+  owns per-case transport/spectrum phases and `_worker_init`; `scheduling.py`
+  owns `run_cases` and runtime-plan selection; `chunking.py` owns spectrum
+  chunk admission; `pool.py` owns host-memory and worker-pool sizing; `oom.py`
+  owns accelerator OOM tags, release cadence, and pool limits. `_spectrum_case`
+  always stores incoherent `spec` and, when requested, `spec_coherent` from the
+  same transport; `_line_pair_for_case` mirrors this for `cxr reline`. Deps:
+  `_backend`, `transport`, `geometry`, `spectrum`.
 - Deps: `materials.crystal`, `materials.attenuation`, `DATA_DIR`.
 
 ## Campaign, checkpoints & run drivers

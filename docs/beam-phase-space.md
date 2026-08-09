@@ -205,7 +205,7 @@ separate backlog item.
 
 ## Interaction with the line-energy grid
 
-`montecarlo/spectrum.py` consumes per-segment `v_hat` and per-segment `E_keV`,
+`montecarlo/spectrum/lines.py` consumes per-segment `v_hat` and per-segment `E_keV`,
 so once injection is randomized the emitted line spectrum picks up divergence
 and energy spread with no further work. Two consequences are worth stating
 explicitly:

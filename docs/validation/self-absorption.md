@@ -3,7 +3,7 @@
 ## Claim
 
 - **ID:** `self-absorption`
-- **Symbol:** `montecarlo/spectrum.py::mc_spectrum`
+- **Symbol:** `montecarlo/spectrum/lines.py::mc_spectrum`
 - **Source:** Beer--Lambert law
 - **Intended quantity:** photon survival probability from an emission point through a piecewise-homogeneous absorber stack.
 
@@ -57,7 +57,7 @@ Follow-up applied after independent verification: both `mc_spectrum` and
 
 ## Verdict
 
-- **Claim**: `self-absorption` — `montecarlo/spectrum.py::mc_spectrum` — Beer--Lambert piecewise path integral
+- **Claim**: `self-absorption` — `montecarlo/spectrum/lines.py::mc_spectrum` — Beer--Lambert piecewise path integral
 - **Filters**: units `pass`; limits `pass`; signs/conventions `pass`
 - **Re-derivation**: `matches` — no divergent term or convention
 - **Verdict**: `rederived`

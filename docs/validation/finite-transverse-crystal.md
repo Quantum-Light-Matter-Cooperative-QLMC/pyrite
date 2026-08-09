@@ -1,7 +1,7 @@
 # Independent validation: finite transverse crystal
 
 - **Claim**: `finite-transverse-crystal` —
-  `montecarlo/geometry.py::first_prism_exit`; `montecarlo/transport.py::simulate_trajectories`; `montecarlo/spectrum.py::{mc_spectrum,mc_brem_spectrum}` — rectangular-prism ray intersection + Beer--Lambert.
+  `montecarlo/geometry.py::first_prism_exit`; `montecarlo/transport.py::simulate_trajectories`; `montecarlo/spectrum/lines.py::mc_spectrum`; `montecarlo/spectrum/brem.py::mc_brem_spectrum` — rectangular-prism ray intersection + Beer--Lambert.
 - **Source and intended quantity**: The validated design defines the sample-frame
   prism `[-W/2,W/2] x [-H/2,H/2] x [z_min,z_max]`. The geometry helper returns
   the first strictly forward ray-boundary intersection. Transport stops at that

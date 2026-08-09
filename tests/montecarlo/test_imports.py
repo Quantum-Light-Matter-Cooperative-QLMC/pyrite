@@ -42,7 +42,7 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
         #
         # config
         # -> montecarlo
-        # -> spectrum_jit_kernel
+        # -> spectrum.line_jit_kernel
         #
         # The import should now finish using the CPU backend.
         importlib.import_module("cxr_mc.campaign.config")
@@ -58,9 +58,9 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
 
         # CUDA-only implementation modules must remain unloaded on CPU.
         cuda_modules = {
-            "cxr_mc.montecarlo.spectrum_jit_kernel",
-            "cxr_mc.montecarlo.coherent_jit_kernel",
-            "cxr_mc.montecarlo.brem_jit_kernel",
+            "cxr_mc.montecarlo.spectrum.line_jit_kernel",
+            "cxr_mc.montecarlo.spectrum.coherent_jit_kernel",
+            "cxr_mc.montecarlo.spectrum.brem_jit_kernel",
         }
 
         assert cuda_modules.isdisjoint(sys.modules)

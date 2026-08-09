@@ -7,7 +7,7 @@
 - **Anchors**: `montecarlo/transport.py::simulate_trajectories` (sampling),
   `energy_grid/bounds.py::line_shift_fraction` (closed form).
 - **Source cited**: PXR resonance condition used by the kernel,
-  `ω = v·g / (1 − n·v)` (`montecarlo/spectrum.py::_line_kin_core`), plus the
+  `ω = v·g / (1 − n·v)` (`montecarlo/spectrum/lines.py::_line_kin_core`), plus the
   standard relativistic relation between kinetic energy and speed.
 - **Assumptions stated**: standard Gaussian relative energy/momentum spread,
   no energy-position chirp; first order in `δ`; fixed emission direction
@@ -169,7 +169,7 @@ consistent with the docstring's stated Gaussian-model validity range
   term for term, to the independently re-derived `S` and `S·δ` above — same
   numerator `(γ−1)`, same `γ³β²` factor, same `(1 − β cos θ_obs)` Doppler
   denominator, no extra factors of 2, no sign inversion.
-- `montecarlo/spectrum.py::_line_kin_core` / its caller: uses
+- `montecarlo/spectrum/lines.py::_line_kin_core` / its caller: uses
   `denom = 1 − v·n` (i.e. `1 − n·v`) and `omega_res = v_dot_g/denom`,
   confirming the cited resonance convention `ω = v·g/(1 − n·v)` is in fact
   the one the derivation started from (not a mismatched sign or a `1+n·v`

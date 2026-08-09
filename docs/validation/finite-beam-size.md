@@ -78,10 +78,10 @@ For that branch, grepped `r_mid`/`seg_r`/`pos[:, 0|1|:2]` across all of
 `src/cxr_mc`:
 
 ```
-src/cxr_mc/montecarlo/spectrum.py:173:   seg_r = xp.asarray(segments["r_mid"], ...)
-src/cxr_mc/montecarlo/spectrum.py:283:   z_mid = seg_r[idx, 2]
-src/cxr_mc/montecarlo/spectrum.py:521:   seg_r = xp.asarray(segments["r_mid"], ...)
-src/cxr_mc/montecarlo/spectrum.py:524:   z_mid = seg_r[:, 2]
+src/cxr_mc/montecarlo/spectrum/lines.py:173:   seg_r = xp.asarray(segments["r_mid"], ...)
+src/cxr_mc/montecarlo/spectrum/lines.py:283:   z_mid = seg_r[idx, 2]
+src/cxr_mc/montecarlo/spectrum/lines.py:521:   seg_r = xp.asarray(segments["r_mid"], ...)
+src/cxr_mc/montecarlo/spectrum/lines.py:524:   z_mid = seg_r[:, 2]
 src/cxr_mc/montecarlo/transport.py: (definition + docstring only)
 src/cxr_mc/plots/mpl/trajectories.py:227: L, v, r = segs["L_ang"], segs["v_hat"], segs["r_mid"]
 ```

@@ -145,9 +145,10 @@ Outcome, correcting this section's original survey:
   `state.py`, and `poll.py`. Local and remote callers use the package facade,
   which preserves the internal dashboard surface.
 
-## S5 — Monte Carlo mega-modules
+## S5 — Monte Carlo mega-modules — **done 2026-08-09**
 
-`montecarlo/spectrum.py` 2026, `transport.py` 1788, `runner.py` 1709 lines.
+`montecarlo/spectrum/lines.py` 2026, `transport.py` 1788, and
+`montecarlo/runner/__init__.py` 1709 lines.
 Retires TODO Inbox #7, which asks only "evaluate"; the missing piece is a split
 axis:
 
@@ -163,6 +164,20 @@ Physics-gated by `AGENTS.md`: pure move, so golden artifacts and every
 invariance *is* the acceptance evidence. Sequence last; coordinate with
 `feature/compute-performance-optimization` and
 `feature/coherent-line-batching`, which are both live in these files.
+
+Outcome:
+
+- `runner/` now separates per-case phase composition (`__init__.py`), execution
+  planning/pipelines (`scheduling.py`), device chunk admission (`chunking.py`),
+  host/pool admission (`pool.py`), and accelerator OOM policy (`oom.py`). The
+  package facade preserves the former import and monkeypatch surface.
+- `spectrum/` now separates line physics (`lines.py`), brem physics and external
+  background loading (`brem.py`), and the CUDA coherent-kernel surface
+  (`coherent.py`). All four CUDA reduction modules are colocated with these
+  owners and stay lazy on CPU.
+- No transport, stochastic, numerical, equation, constant, or validation-state
+  change. `transport.py` remains intact because its split axis was explicitly
+  deferred rather than guessed during this move-only slice.
 
 ## S6 — `plots/` backend interleave
 
@@ -242,7 +257,7 @@ re-export.
 - [x] S2 subpackage grouping + `remote` fold, exports unchanged
 - [x] S3 delete 10 `cli/` alias shims (9 from original task + `beam.py` postdating named-beam-objects)
 - [x] S4 `profile.py` domain extraction; `cli/dashboard/` promotion
-- [ ] S5 `runner/` and `spectrum/` splits (golden + ledger invariant)
+- [x] S5 `runner/` and `spectrum/` splits (golden + ledger invariant)
 - [x] S6 `plots/{altair,mpl,plotly}/`
 - [x] S7 worktrees relocation (2026-08-07) + checkpoint lockfile tracking rule
       documented and the 5 stray locks untracked (2026-08-09); the
@@ -295,6 +310,24 @@ re-export.
   suite; lint; typecheck; CLI-reference freeze; repository-map generation; and
   explicit root/leaf help probes passed.
 
+### S5 checkpoint progress
+
+- 2026-08-09: split the runner and spectrum mega-modules into the owners listed
+  above, preserving `cxr_mc.montecarlo.runner`,
+  `cxr_mc.montecarlo.spectrum`, frozen package exports, callable owner names,
+  worker picklability, and CPU-lazy CuPy imports. Updated source references,
+  validation paths, autosummary discovery, ty overrides, and the generated
+  repository DAG.
+- Physics/Monte Carlo review: the sorted `Validation:` marker multisets match
+  `main` exactly; ledger normalization differs only where one former module
+  path is now two owner paths; CUDA kernel files are byte-identical moves; no
+  golden artifact changed; the complete Monte Carlo suite otherwise passed.
+- Evidence: `lint`, `typecheck`, repo-map `--write`/`--check`, strict Sphinx,
+  package/export/import and CLI contract/reference guards passed. The core
+  suite had one sandbox-only forkserver socket denial; its exact end-to-end CPU
+  multiprocessing regression passed with sandbox permission, and every other
+  core test passed.
+
 ### S6 checkpoint progress
 
 - 2026-08-09: regrouped all renderer implementations under
@@ -336,7 +369,8 @@ re-export.
 2. ~~**S7 remainder**~~ — done 2026-08-09.
 3. ~~**S1**~~ — done 2026-08-09.
 4. ~~**S2**~~, ~~**S4**~~, ~~**S6**~~, then ~~**S8 remainder**~~.
-5. **S5** last: physics-gated, and two live branches are editing those files.
+5. ~~**S5**~~ — done 2026-08-09; completed after the overlapping branches had
+   no divergent implementation commits from the shared base.
 
 ## Non-goals
 

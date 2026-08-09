@@ -4,7 +4,7 @@
 
 - Claim: `materials/crystal.py::U_g` returns the Fourier component of the
   periodic crystal potential (the coherent-bremsstrahlung / CBS coupling
-  amplitude), and `montecarlo/spectrum.py` assembles the coherent amplitude by
+  amplitude), and `montecarlo/spectrum/lines.py` assembles the coherent amplitude by
   combining the PXR term (`chi_g`) and the CBS term (`U_g`) with a relativistic
   factor carrying a `1/gamma` (or `1/gamma^2`) high-energy suppression.
 - Source: Feranchuk, Ulyanenkov, Harada, Spence, "Parametric x-ray radiation

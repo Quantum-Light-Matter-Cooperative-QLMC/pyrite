@@ -88,7 +88,7 @@ def line_shift_fraction(
     from where the grid was cut. This says by how much, in units of the line
     energy, so it can be compared against the ``margined_stop`` headroom.
 
-    The PXR resonance (``montecarlo/spectrum.py::_line_kin_core``) is
+    The PXR resonance (``montecarlo/spectrum/lines.py::_line_kin_core``) is
     ``omega = v.g / (1 - n.v)``, so at fixed reciprocal-lattice vector ``g`` and
     observation direction ``n``, differentiating in ``beta`` at
     ``n.v = beta cos(theta_obs)`` gives

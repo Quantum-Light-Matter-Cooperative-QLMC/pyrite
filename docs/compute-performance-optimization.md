@@ -76,7 +76,7 @@ Two dominant, unrelated levers surfaced on the `hopg` profile:
 
 ### What landed
 
-#### 1. Line-chain kernel fusion (`montecarlo/spectrum.py`)
+#### 1. Line-chain kernel fusion (`montecarlo/spectrum/lines.py`)
 
 Collapsed the batched incoherent line launch-storm into a handful of fused
 kernels, all **bit-for-bit** with the prior op-by-op path:

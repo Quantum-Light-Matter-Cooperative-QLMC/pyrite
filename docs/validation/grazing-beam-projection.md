@@ -3,7 +3,7 @@
 - **id**: `grazing-beam-projection`
 - **anchor**: `montecarlo/geometry.py::project_beam_entry`; wired through
   `montecarlo/transport.py::simulate_trajectories` (`tilt_polar_rad`/`tilt_azim_rad`)
-  and `montecarlo/runner.py::{_transport_case,_brem_for_case}`
+  and `montecarlo/runner/__init__.py::{_transport_case,_brem_for_case}`
 - **source**: elementary rectangular ray–plane intersection (no literature equation)
 - **verifier**: fresh context (did not write the implementation)
 
