@@ -136,11 +136,18 @@ landing.
 Evidence:
 
 - `uv run cxr-dev docs`: pass.
+- Fresh isolated `UV_PROJECT_ENVIRONMENT` + `uv run cxr-dev docs`: pass;
+  provisioned the 17 locked docs-group packages before building.
 - Direct `uv run --group docs sphinx-build -E -a -W --keep-going -b html ...`:
   pass.
 - `uv run cxr-dev test tests/dev/test_dev.py tests/dev/test_docs.py`: 26 pass.
 - `uv run cxr-dev lint`: pass.
 - `uv run cxr-dev typecheck`: pass.
+
+Checkpoint commits:
+
+- `1cf281e` — strict semantic documentation gate and pilot.
+- `efbbd7e` — provision docs dependencies in a fresh project environment.
 
 Deferred follow-up: resolve the 488 nitpicky Python-domain references and the
 116 inherited parse diagnostics incrementally; do not widen this completed
