@@ -128,7 +128,8 @@ landing.
   independently validated; only presentation changed. Rendered HTML contains
   three numbered/labeled equations, a numbered/captioned table, and resolved
   semantic references.
-- `cxr-dev docs` removes generated autosummary/build trees and runs the offline
+- `cxr-dev docs` provisions the locked `docs` dependency group, removes
+  generated autosummary/build trees, and runs the offline
   `-E -a -W --keep-going` HTML build. `--linkcheck` is explicit and excluded
   from offline gates.
 

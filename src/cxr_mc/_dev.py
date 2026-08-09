@@ -120,6 +120,11 @@ def run(*args: str, cwd: Path = ROOT, extra_env: dict[str, str] | None = None) -
     subprocess.run([sys.executable, *args], cwd=cwd, check=True, env=env)
 
 
+def run_uv(*args: str, cwd: Path = ROOT) -> None:
+    """Run a locked project tool, provisioning its explicit dependency group."""
+    subprocess.run(["uv", "run", *args], cwd=cwd, check=True)
+
+
 def cmd_acp_up(_: argparse.Namespace) -> None:
     processes = start_acp_servers()
     print("ACP bridges running:")
@@ -490,9 +495,10 @@ def cmd_docs(args: argparse.Namespace) -> None:
     _remove_path(docs_dir / "_autosummary")
     _remove_path(docs_dir / "_build")
     builder = "linkcheck" if getattr(args, "linkcheck", False) else "html"
-    run(
-        "-m",
-        "sphinx",
+    run_uv(
+        "--group",
+        "docs",
+        "sphinx-build",
         "-E",
         "-a",
         "-W",
