@@ -174,7 +174,7 @@ def _cli(args):
 @click.command(
     "viewer",
     help=(
-        f"Launch {NOTEBOOK} with marimo run or edit.\n\n"
+        "Launch the interactive 3D viewer with marimo run or edit.\n\n"
         "3D trajectory and crystal structure visualization.\n\n"
         "MATERIAL overrides the persisted default for this run. --save-default "
         "stores it for later no-argument launches."

@@ -466,7 +466,7 @@ def _cli(args):
 @click.command(
     "analyze",
     help=(
-        f"Launch {NOTEBOOK} with marimo run or edit.\n\n"
+        "Launch the interactive analysis application with marimo run or edit.\n\n"
         "MATERIAL overrides the persisted default for this run. --save-default "
         "stores it for later no-argument launches."
     ),

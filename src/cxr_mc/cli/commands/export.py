@@ -8,7 +8,7 @@ from ... import export as _export
 @click.command(
     "export",
     help=(
-        f"Render {_export.NOTEBOOK} to static HTML.\n\n"
+        "Render the analysis application to static HTML.\n\n"
         "Writes results/<stem>.html; STEM defaults to analysis."
     ),
 )

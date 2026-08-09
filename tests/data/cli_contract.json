@@ -489,7 +489,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr app analysis [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...\n\n  Launch notebooks/analysis_app.py with marimo run or edit.\n\n  MATERIAL overrides the persisted default for this run. --save-default stores\n  it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n\nCommands:\n  export  Render notebooks/analysis_app.py to static HTML.\n  launch  Launch notebooks/analysis_app.py with marimo run or edit.\n",
+            "help": "Usage: cxr app analysis [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...\n\n  Launch the interactive analysis application with marimo run or edit.\n\n  MATERIAL overrides the persisted default for this run. --save-default stores\n  it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n\nCommands:\n  export  Render the analysis application to static HTML.\n  launch  Launch the interactive analysis application with marimo run or edit.\n",
             "hidden": false,
             "path": "app analysis",
             "subcommands": [
@@ -502,7 +502,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr app analysis export [OPTIONS] [STEM]\n\n  Render notebooks/analysis_app.py to static HTML.\n\n  Writes results/<stem>.html; STEM defaults to analysis.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
+                "help": "Usage: cxr app analysis export [OPTIONS] [STEM]\n\n  Render the analysis application to static HTML.\n\n  Writes results/<stem>.html; STEM defaults to analysis.\n\nOptions:\n  -h, --help  Show this message and exit.\n",
                 "hidden": false,
                 "path": "app analysis export",
                 "subcommands": []
@@ -581,7 +581,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr app analysis launch [OPTIONS] [MATERIAL]\n\n  Launch notebooks/analysis_app.py with marimo run or edit.\n\n  MATERIAL overrides the persisted default for this run. --save-default stores\n  it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n",
+                "help": "Usage: cxr app analysis launch [OPTIONS] [MATERIAL]\n\n  Launch the interactive analysis application with marimo run or edit.\n\n  MATERIAL overrides the persisted default for this run. --save-default stores\n  it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n",
                 "hidden": false,
                 "path": "app analysis launch",
                 "subcommands": []
@@ -662,7 +662,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr app viewer [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...\n\n  Launch notebooks/trace_app.py with marimo run or edit.\n\n  3D trajectory and crystal structure visualization.\n\n  MATERIAL overrides the persisted default for this run. --save-default stores\n  it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n\nCommands:\n  export  Render the viewer as static HTML without starting marimo.\n  launch  Launch notebooks/trace_app.py with marimo run or edit.\n",
+            "help": "Usage: cxr app viewer [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...\n\n  Launch the interactive 3D viewer with marimo run or edit.\n\n  3D trajectory and crystal structure visualization.\n\n  MATERIAL overrides the persisted default for this run. --save-default stores\n  it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n\nCommands:\n  export  Render the viewer as static HTML without starting marimo.\n  launch  Launch the interactive 3D viewer with marimo run or edit.\n",
             "hidden": false,
             "path": "app viewer",
             "subcommands": [
@@ -762,7 +762,7 @@
                     "required": false
                   }
                 ],
-                "help": "Usage: cxr app viewer launch [OPTIONS] [MATERIAL]\n\n  Launch notebooks/trace_app.py with marimo run or edit.\n\n  3D trajectory and crystal structure visualization.\n\n  MATERIAL overrides the persisted default for this run. --save-default stores\n  it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n",
+                "help": "Usage: cxr app viewer launch [OPTIONS] [MATERIAL]\n\n  Launch the interactive 3D viewer with marimo run or edit.\n\n  3D trajectory and crystal structure visualization.\n\n  MATERIAL overrides the persisted default for this run. --save-default stores\n  it for later no-argument launches.\n\nOptions:\n  -d, --save-default  Persist MATERIAL as default for future no-argument runs.\n  --watch             Reload app when source files change.\n  --smoke             Execute app once headlessly and exit.\n  --edit              Use `marimo edit` instead of `marimo run`.\n  --acp               Start local Claude and Codex ACP bridges.\n  --tunnel            Bind fixed port for SSH tunneling.\n  --no-token          Disable marimo auth token.\n  -h, --help          Show this message and exit.\n",
                 "hidden": false,
                 "path": "app viewer launch",
                 "subcommands": []
@@ -804,7 +804,7 @@
                 "required": false
               }
             ],
-            "help": "Usage: cxr app validation [OPTIONS] COMMAND [ARGS]...\n\n  Launch notebooks/validation_app.py, or export cached validation figures.\n\nOptions:\n  --watch     Pass marimo's --watch.\n  --edit      Use `marimo edit` instead of `marimo run`.\n  --acp       Start local Claude and Codex ACP bridges.\n  --tunnel    Use fixed port for SSH tunneling.\n  -h, --help  Show this message and exit.\n\nCommands:\n  export  Write cached validation figures; never starts marimo.\n  launch  Launch the interactive validation application.\n",
+            "help": "Usage: cxr app validation [OPTIONS] COMMAND [ARGS]...\n\n  Launch the interactive validation application, or export cached figures.\n\nOptions:\n  --watch     Pass marimo's --watch.\n  --edit      Use `marimo edit` instead of `marimo run`.\n  --acp       Start local Claude and Codex ACP bridges.\n  --tunnel    Use fixed port for SSH tunneling.\n  -h, --help  Show this message and exit.\n\nCommands:\n  export  Write cached validation figures; never starts marimo.\n  launch  Launch the interactive validation application.\n",
             "hidden": false,
             "path": "app validation",
             "subcommands": [
@@ -6393,7 +6393,7 @@
             "required": false
           }
         ],
-        "help": "Usage: cxr check [OPTIONS]\n\n  Launch notebooks/validation_app.py, or export its cached validation figures.\n\n  --export skips marimo and writes figures to --outdir. Electron-count options\n  affect export mode only.\n\nOptions:\n  --watch           Pass marimo's --watch.\n  --edit            Use `marimo edit` instead of `marimo run`.\n  --acp             Start local Claude and Codex ACP bridges.\n  --tunnel          Use fixed port for SSH tunneling.\n  --export          Render cached figures instead of marimo.\n  --outdir DIR      With --export, output directory.  [default: figures]\n  --ne NUMBER       With --export, Fig. 1c line electrons per energy.  [default:\n                    20000]\n  --ne-brem NUMBER  With --export, Fig. 1c bremsstrahlung electrons per energy.\n                    [default: 200]\n  --ne-supp NUMBER  With --export, supplementary electrons per polar-tilt\n                    spectrum.  [default: 200]\n  -h, --help        Show this message and exit.\n",
+        "help": "Usage: cxr check [OPTIONS]\n\n  Launch the interactive validation application, or export its cached figures.\n\n  --export skips marimo and writes figures to --outdir. Electron-count options\n  affect export mode only.\n\nOptions:\n  --watch           Pass marimo's --watch.\n  --edit            Use `marimo edit` instead of `marimo run`.\n  --acp             Start local Claude and Codex ACP bridges.\n  --tunnel          Use fixed port for SSH tunneling.\n  --export          Render cached figures instead of marimo.\n  --outdir DIR      With --export, output directory.  [default: figures]\n  --ne NUMBER       With --export, Fig. 1c line electrons per energy.  [default:\n                    20000]\n  --ne-brem NUMBER  With --export, Fig. 1c bremsstrahlung electrons per energy.\n                    [default: 200]\n  --ne-supp NUMBER  With --export, supplementary electrons per polar-tilt\n                    spectrum.  [default: 200]\n  -h, --help        Show this message and exit.\n",
         "hidden": true,
         "path": "check",
         "subcommands": []

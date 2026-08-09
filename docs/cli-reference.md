@@ -211,7 +211,7 @@ Commands:
 ```text
 Usage: cxr app analysis [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...
 
-  Launch notebooks/analysis_app.py with marimo run or edit.
+  Launch the interactive analysis application with marimo run or edit.
 
   MATERIAL overrides the persisted default for this run. --save-default stores it for
   later no-argument launches.
@@ -227,8 +227,8 @@ Options:
   -h, --help          Show this message and exit.
 
 Commands:
-  export  Render notebooks/analysis_app.py to static HTML.
-  launch  Launch notebooks/analysis_app.py with marimo run or edit.
+  export  Render the analysis application to static HTML.
+  launch  Launch the interactive analysis application with marimo run or edit.
 ```
 
 ## `cxr app analysis export`
@@ -236,7 +236,7 @@ Commands:
 ```text
 Usage: cxr app analysis export [OPTIONS] [STEM]
 
-  Render notebooks/analysis_app.py to static HTML.
+  Render the analysis application to static HTML.
 
   Writes results/<stem>.html; STEM defaults to analysis.
 
@@ -249,7 +249,7 @@ Options:
 ```text
 Usage: cxr app analysis launch [OPTIONS] [MATERIAL]
 
-  Launch notebooks/analysis_app.py with marimo run or edit.
+  Launch the interactive analysis application with marimo run or edit.
 
   MATERIAL overrides the persisted default for this run. --save-default stores it for
   later no-argument launches.
@@ -270,7 +270,7 @@ Options:
 ```text
 Usage: cxr app viewer [OPTIONS] [MATERIAL] [COMMAND] [ARGS]...
 
-  Launch notebooks/trace_app.py with marimo run or edit.
+  Launch the interactive 3D viewer with marimo run or edit.
 
   3D trajectory and crystal structure visualization.
 
@@ -289,7 +289,7 @@ Options:
 
 Commands:
   export  Render the viewer as static HTML without starting marimo.
-  launch  Launch notebooks/trace_app.py with marimo run or edit.
+  launch  Launch the interactive 3D viewer with marimo run or edit.
 ```
 
 ## `cxr app viewer export`
@@ -309,7 +309,7 @@ Options:
 ```text
 Usage: cxr app viewer launch [OPTIONS] [MATERIAL]
 
-  Launch notebooks/trace_app.py with marimo run or edit.
+  Launch the interactive 3D viewer with marimo run or edit.
 
   3D trajectory and crystal structure visualization.
 
@@ -332,7 +332,7 @@ Options:
 ```text
 Usage: cxr app validation [OPTIONS] COMMAND [ARGS]...
 
-  Launch notebooks/validation_app.py, or export cached validation figures.
+  Launch the interactive validation application, or export cached figures.
 
 Options:
   --watch     Pass marimo's --watch.

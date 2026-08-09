@@ -139,7 +139,7 @@ def viewer_command() -> click.Group:
     "validation",
     invoke_without_command=True,
     no_args_is_help=False,
-    help="Launch notebooks/validation_app.py, or export cached validation figures.",
+    help="Launch the interactive validation application, or export cached figures.",
 )
 @click.option("--watch", is_flag=True, help="Pass marimo's --watch.")
 @click.option("--edit", is_flag=True, help="Use `marimo edit` instead of `marimo run`.")

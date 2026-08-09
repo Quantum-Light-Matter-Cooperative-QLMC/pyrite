@@ -231,7 +231,7 @@ def _cli(args):
 @click.command(
     "check",
     help=(
-        f"Launch {NOTEBOOK}, or export its cached validation figures.\n\n"
+        "Launch the interactive validation application, or export its cached figures.\n\n"
         "--export skips marimo and writes figures to --outdir. Electron-count "
         "options affect export mode only."
     ),
