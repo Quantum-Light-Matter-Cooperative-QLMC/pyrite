@@ -397,3 +397,88 @@ def test_cuda_matches_the_cpu_reference_in_aggregate():
         b = np.array([fn(r) for r in gpu])
         spread = np.hypot(a.std(ddof=1), b.std(ddof=1)) / np.sqrt(len(a))
         assert abs(a.mean() - b.mean()) < 4.0 * spread, name
+
+
+# ---- device-resident segments -------------------------------------------------
+
+DIAGNOSTIC_KEYS = ("initial_r_ang", "initial_v_hat", "initial_E_keV", "initial_t0_ang")
+
+
+@pytest.mark.parametrize("core", ["lockstep", "per-electron"])
+def test_device_residency_requires_the_cuda_core(core):
+    """Only the CUDA core produces segments anywhere but host memory, so asking
+    the others to leave them there is a mistake rather than a no-op."""
+    with pytest.raises(ValueError, match="keep_segments_on_device"):
+        _run(transport_core=core, keep_segments_on_device=True)
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_device_resident_segments_are_identical_to_the_host_run():
+    """Residency moves the payload; it must not touch a value. Same seed, same
+    core, same dtypes -- only where the arrays live differs."""
+    import cupy
+
+    host = _run(transport_core="cuda")
+    device = _run(transport_core="cuda", keep_segments_on_device=True)
+
+    assert host["L_ang"].size > 0
+    brought_down = {k: cupy.asnumpy(device[k]) for k in SEGMENT_KEYS}
+    for k in SEGMENT_KEYS:
+        assert brought_down[k].dtype == host[k].dtype, k
+    assert _identical(host, brought_down | {k: device[k] for k in COUNT_KEYS})
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_only_the_segments_stay_on_the_device():
+    """Per-electron diagnostics and the counts are not what the spectrum kernels
+    read, and keeping them on the device would only make them awkward."""
+    import cupy
+
+    device = _run(transport_core="cuda", keep_segments_on_device=True)
+
+    for k in SEGMENT_KEYS:
+        assert isinstance(device[k], cupy.ndarray), k
+    for k in DIAGNOSTIC_KEYS:
+        assert isinstance(device[k], np.ndarray), k
+    for k in COUNT_KEYS:
+        assert not isinstance(device[k], cupy.ndarray), k
+
+
+@pytest.mark.hardware
+@requires_cuda
+@pytest.mark.parametrize("capacity", [4, 4096])
+def test_device_residency_survives_batching_and_capacity_replay(capacity):
+    """The join replaces a preallocated buffer, so batch count and ordering are
+    exactly what it has to get right. A capacity of 4 forces replays and many
+    small batches; 4096 runs the whole thing in one."""
+    base = _run(transport_core="cuda")
+    joined = _run(
+        transport_core="cuda",
+        keep_segments_on_device=True,
+        per_electron_config=PerElectronTransportConfig(seg_capacity=capacity),
+    )
+
+    import cupy
+
+    assert _identical(base, dict(joined) | {k: cupy.asnumpy(joined[k]) for k in SEGMENT_KEYS})
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_device_resident_segments_carry_the_layer_index():
+    """Multilayer stacks are the one case where a downstream kernel slices the
+    segments by a field of their own, so the joined `layer` has to line up."""
+    import cupy
+
+    stack = {
+        "layers": [(0.0, 1.0e4, [("C", 0.176)]), (1.0e4, 5.0e4, [("W", 0.0632)])],
+        "elastic_model": "sr",
+    }
+    host = _run(transport_core="cuda", **stack)
+    device = _run(transport_core="cuda", keep_segments_on_device=True, **stack)
+
+    assert np.unique(host["layer"]).size == 2
+    for k in SEGMENT_KEYS:
+        assert np.array_equal(cupy.asnumpy(device[k]), host[k]), k

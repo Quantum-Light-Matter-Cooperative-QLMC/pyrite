@@ -1619,6 +1619,7 @@ def _run_per_electron_transport(
     seg_id,
     seg_lay,
     config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
+    keep_on_device=False,
 ):
     """Drive ``core`` over electron batches and compact the result.
 
@@ -1634,10 +1635,19 @@ def _run_per_electron_transport(
     transports.
 
     Per-electron state and the material tables are moved to the device once and
-    stay there; only the compacted segments of each batch cross the bus. The
-    caller's ``seg_*`` buffers stay on the host because ``simulate_trajectories``
-    returns NumPy. Keeping the compacted segments on the device for the spectrum
-    kernels to consume directly is a separate, larger change.
+    stay there; only the compacted segments of each batch cross the bus.
+
+    ``keep_on_device`` removes even that crossing. The compacted batches are
+    held in ``xp``'s own memory and joined with one ``concatenate``, which is
+    returned as an eighth value for the caller to hand out in place of its
+    ``seg_*`` buffers (those are then not allocated at all). Joining is what
+    sizes the output, because the segment total is not known until the last
+    batch has run; it costs one device-to-device pass over the payload -- against
+    the pageable host copy it replaces, that is roughly two orders of magnitude
+    of bandwidth -- and holds both copies of the payload while it runs.
+
+    Returns ``(nseg, n_back, n_trans, n_side, joined)``, where ``joined`` is
+    ``None`` unless ``keep_on_device``.
     """
     on_device = xp is not np
     to_dev = xp.asarray if on_device else (lambda a: a)
@@ -1655,6 +1665,9 @@ def _run_per_electron_transport(
     d_bot = to_dev(L_bot)
     d_layers = tuple(to_dev(a) for a in layer_tables)
     d_mott = tuple(to_dev(a) for a in mott)
+
+    out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
+    batches = []
 
     cap = max(1, int(config.seg_capacity))
     seen_max = 0
@@ -1717,15 +1730,25 @@ def _run_per_electron_transport(
         if nseg + total > max_segments:
             raise RuntimeError("segment buffer exhausted")
         keep = xp.arange(cap)[None, :] < seg_count[:, None]
-        dst = slice(nseg, nseg + total)
         s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch
-        seg_dir[dst] = to_host(s_dir.reshape(m, cap, 3)[keep])
-        seg_mid[dst] = to_host(s_mid.reshape(m, cap, 3)[keep])
-        seg_len[dst] = to_host(s_len.reshape(m, cap)[keep])
-        seg_E[dst] = to_host(s_E.reshape(m, cap)[keep])
-        seg_t0[dst] = to_host(s_t0.reshape(m, cap)[keep])
-        seg_id[dst] = to_host(s_id.reshape(m, cap)[keep])
-        seg_lay[dst] = to_host(s_lay.reshape(m, cap)[keep])
+        slots = (
+            s_dir.reshape(m, cap, 3),
+            s_mid.reshape(m, cap, 3),
+            s_len.reshape(m, cap),
+            s_E.reshape(m, cap),
+            s_t0.reshape(m, cap),
+            s_id.reshape(m, cap),
+            s_lay.reshape(m, cap),
+        )
+        if keep_on_device:
+            # No preallocation here: `max_segments` is Ne*max_steps rows, a bound
+            # no run comes near and no device would hold. The batch list is the
+            # buffer, and the join below sizes the output from what actually ran.
+            batches.append(tuple(a[keep] for a in slots))
+        else:
+            dst = slice(nseg, nseg + total)
+            for buf, a in zip(out_bufs, slots, strict=True):
+                buf[dst] = to_host(a[keep])
         nseg += total
 
         n_back += int((exit_code == EXIT_BACKSCATTERED).sum())
@@ -1739,7 +1762,17 @@ def _run_per_electron_transport(
         if seen_max > 0:
             cap = _capacity_for(seen_max, config)
 
-    return nseg, n_back, n_trans, n_side
+    joined = None
+    if keep_on_device:
+        # An empty run has no batch to take shapes and dtypes from; borrow them
+        # from a zero-length scratch, which is where they came from anyway.
+        empty = _alloc_scratch(xp, 0, 1)
+        joined = tuple(
+            xp.concatenate([b[i] for b in batches]) if batches else empty[i]
+            for i in range(len(out_bufs))
+        )
+
+    return nseg, n_back, n_trans, n_side, joined
 
 
 def _alloc_scratch(xp, m, cap):
@@ -1784,6 +1817,7 @@ def simulate_trajectories(
     E_cut_by_electrons=None,
     transport_core="lockstep",
     per_electron_config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
+    keep_segments_on_device=False,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -1961,6 +1995,25 @@ def simulate_trajectories(
     (:class:`PerElectronTransportConfig`). Segment capacity and scratch budget
     only bound memory and replay behavior; neither changes results.
 
+    keep_segments_on_device: return the eight per-segment arrays where the CUDA
+    core produced them instead of copying them to the host. Requires
+    ``transport_core="cuda"``; every other returned array (the incident
+    phase-space diagnostics, the groove-gap arrays) and every count stays NumPy,
+    since those are per-electron or scalar and no spectrum kernel reads them.
+    The VALUES are untouched -- same dtypes, same elements, same order -- so this
+    only moves the payload, and a run's segments are identical either way.
+
+    The point is the spectrum phase: a case's kernels then read the transport's
+    output in place rather than the transport pushing ~82 B/segment down and the
+    kernels pulling it back up. It follows that the caller's spectrum backend has
+    to be the same device (``CXR_MC_BACKEND`` resolving to CUDA). NumPy kernels
+    cannot consume these arrays; NumPy refuses the implicit conversion rather
+    than performing it silently, so the mismatch is an error, not a slow path.
+
+    Costs device memory: the segments are joined with one ``concatenate``, which
+    holds two copies of the payload while it runs, and the joined arrays then
+    stay resident for as long as the caller keeps the dict.
+
     Returns dict of per-segment arrays:
       "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
       "t_ang" (M,), "t0_ang" (M,) [per-electron bunch offset], "elec_id" (M,),
@@ -2005,6 +2058,8 @@ def simulate_trajectories(
         raise ValueError("transport_core must be 'lockstep', 'per-electron', or 'cuda'")
     if transport_core != "lockstep" and groove is not None:
         raise ValueError("grooved transport is only implemented for the lockstep core")
+    if keep_segments_on_device and transport_core != "cuda":
+        raise ValueError("keep_segments_on_device requires transport_core='cuda'")
 
     if E_cut_by_electrons is None:
         E_cut_by_electrons = np.full(
@@ -2231,13 +2286,21 @@ def simulate_trajectories(
     # conservative safety bound in ordinary runs; groove re-entry events can add
     # material segments without consuming it, so the compiled core raises a
     # clear buffer error if a pathological case exceeds this capacity.
-    seg_mid = np.empty((max_segments, 3), dtype=float)
-    seg_dir = np.empty((max_segments, 3), dtype=float)
-    seg_len = np.empty(max_segments, dtype=float)
-    seg_E = np.empty(max_segments, dtype=float)
-    seg_t0 = np.empty(max_segments, dtype=float)
-    seg_id = np.empty(max_segments, dtype=np.int64)
-    seg_lay = np.empty(max_segments, dtype=np.int16)
+    # A device-resident run fills none of them -- its batches are joined on the
+    # device instead -- so it reserves no rows.
+    n_rows = 0 if keep_segments_on_device else max_segments
+    seg_mid = np.empty((n_rows, 3), dtype=float)
+    seg_dir = np.empty((n_rows, 3), dtype=float)
+    seg_len = np.empty(n_rows, dtype=float)
+    seg_E = np.empty(n_rows, dtype=float)
+    seg_t0 = np.empty(n_rows, dtype=float)
+    seg_id = np.empty(n_rows, dtype=np.int64)
+    seg_lay = np.empty(n_rows, dtype=np.int16)
+
+    # Where the segments end up living, and so which array module assembles the
+    # output below. NumPy unless the run asked to keep them on the device.
+    seg_xp = np
+    dev_segs = None
 
     elastic_model_code = 1 if elastic_model == "mott" else 0
 
@@ -2250,8 +2313,10 @@ def simulate_trajectories(
             core, core_xp = make_cuda_transport_core()
         else:
             core, core_xp = _transport_core_ungrooved_perelectron, np
+        if keep_segments_on_device:
+            seg_xp = core_xp
 
-        nseg, n_back, n_trans, n_side = _run_per_electron_transport(
+        nseg, n_back, n_trans, n_side, dev_segs = _run_per_electron_transport(
             core,
             core_xp,
             Ne,
@@ -2283,6 +2348,7 @@ def simulate_trajectories(
             seg_id,
             seg_lay,
             config=per_electron_config,
+            keep_on_device=keep_segments_on_device,
         )
         nvac = 0
         vac_start = np.empty((0, 3), dtype=float)
@@ -2399,13 +2465,17 @@ def simulate_trajectories(
         vac_t0 = vac_t0_buf[:nvac]
         vac_id = vac_id_buf[:nvac]
 
-    r_mid = seg_mid[:nseg]
-    v_hat = seg_dir[:nseg]
-    L_ang = seg_len[:nseg]
-    E_seg = seg_E[:nseg]
-    t_ang = seg_t0[:nseg]
-    elec_id = seg_id[:nseg]
-    layer = seg_lay[:nseg]
+    if dev_segs is None:
+        r_mid = seg_mid[:nseg]
+        v_hat = seg_dir[:nseg]
+        L_ang = seg_len[:nseg]
+        E_seg = seg_E[:nseg]
+        t_ang = seg_t0[:nseg]
+        elec_id = seg_id[:nseg]
+        layer = seg_lay[:nseg]
+    else:
+        # Already sized to `nseg` by the join, in the scratch's field order.
+        v_hat, r_mid, L_ang, E_seg, t_ang, elec_id, layer = dev_segs
 
     vacuum_start_ang = vac_start
     vacuum_end_ang = vac_end
@@ -2413,7 +2483,10 @@ def simulate_trajectories(
     vacuum_t_ang = vac_t0
     vacuum_elec_id = vac_id
 
-    t0_ang = t0_electron[elec_id] if elec_id.size else np.empty(0, dtype=float)
+    # Per-segment, so it follows the segments: gathering on the device costs one
+    # Ne-sized upload of `t0_electron` and saves an nseg-sized download.
+    t0_by_electron = t0_electron if seg_xp is np else seg_xp.asarray(t0_electron)
+    t0_ang = t0_by_electron[elec_id] if elec_id.size else seg_xp.empty(0, dtype=float)
     vacuum_t0_ang = t0_electron[vacuum_elec_id] if vacuum_elec_id.size else np.empty(0, dtype=float)
 
     return {

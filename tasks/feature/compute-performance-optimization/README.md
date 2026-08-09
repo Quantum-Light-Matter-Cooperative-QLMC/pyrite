@@ -881,11 +881,59 @@ Open — needs a GPU session, in this order:
       `FileNotFoundError` on `docs/`, `scripts/`, `notebooks/` paths that
       `cxr remote sync` does not ship.
 
-- [ ] **Keep segments device-resident** — the remaining half, and still the
-      largest item on the list. Time budget at Ne=16000, cap=2048, six
-      launches (kernel/compaction from `nsys`, wall from unprofiled runs since
-      `nsys` inflates host time; kernel median is identical at both capacities,
-      37.8 vs 37.9 ms, which cross-checks the device numbers):
+- [x] **Keep segments device-resident.** **Done 2026-08-08.** The other half.
+      `simulate_trajectories(..., keep_segments_on_device=True)` returns the eight
+      per-segment arrays where the CUDA core made them; `_segments_on_device` then
+      only casts them to `REAL` in place, so the two fixes compose without either
+      knowing about the other. The driver stops copying each compacted batch into
+      the caller's host buffers and joins the batches with one `concatenate` —
+      which is also what sizes the output, since the segment total is not known
+      until the last batch has run, and `max_segments` (`Ne*max_steps`) is a bound
+      no run comes near and no device would hold. Requires `transport_core="cuda"`
+      and refuses anything else rather than silently doing nothing. Everything
+      per-electron or scalar — the incident phase-space diagnostics, the
+      groove-gap arrays, the counts — stays NumPy; no kernel reads those.
+
+      Whole case (CUDA transport + the three staged kernels), hopg, Ne=16000,
+      5.65M segments, RTX 5080; arms interleaved after a discarded warm-up round,
+      medians of 5:
+
+      | arm | transport | spectrum | total | D2H | H2D | PCIe |
+      | --- | --- | --- | --- | --- | --- | --- |
+      | download, then stage | 0.158 s | 0.108 s | 0.265 s | 464 MB | 284 MB | 0.105 s |
+      | device-resident | 0.042 s | 0.062 s | 0.104 s | 0 | 1.5 MB | 0.002 s |
+
+      −61% end to end: transport −73%, spectrum a further −43% on top of the
+      shared copy. Not one segment byte crosses the bus in either direction; the
+      1.5 MB left is energy tabulations. The spectrum arm's 0.108 s reproduces the
+      shared-copy measurement above exactly, which cross-checks the two runs.
+
+      Values are untouched — same dtypes, same elements, same order, and the
+      `REAL` cast still happens exactly once — so the spectra are bit-for-bit
+      identical to the downloading arm (asserted across arms in the benchmark).
+
+      The cost is device memory, measured one arm per process since the pool's
+      high-water mark is monotonic: peak pool 810 → 1176 MB, and 509 MB still held
+      when the call returns against 0 before. Peak grows by less than the payload
+      because the join runs while the batch scratch is being freed. MoSe2 is ~2.5x
+      hopg's segment count. The arrays are `float64`; compacting to `REAL` at the
+      join would nearly halve this, at the price of changing the dtype the
+      function documents — a separate decision.
+
+      Gated by 6 new tests. On CPU: the flag is refused for both non-CUDA cores.
+      On the box: device-resident output identical to the host run field by field
+      and dtype by dtype; only the segments are device arrays, diagnostics and
+      counts are not; identity survives batching and capacity replay at
+      `seg_capacity` 4 and 4096 (the join's ordering is the real risk); the
+      multilayer `layer` index lines up; and end to end, the kernels get the same
+      spectra from resident segments as from downloaded ones. Full local suite
+      2749 passed, lint/typecheck clean; on the GPU box the transport and staging
+      files run 61 tests with no skips, exit 0.
+
+      The budget this attacked, at Ne=16000, cap=2048, six launches
+      (kernel/compaction from `nsys`, wall from unprofiled runs since `nsys`
+      inflates host time; kernel median is identical at both capacities, 37.8 vs
+      37.9 ms, which cross-checks the device numbers):
 
       | | hopg | mose2 |
       | --- | --- | --- |
@@ -919,17 +967,21 @@ Open — needs a GPU session, in this order:
       Re-upload alone is 0.279 s, 80% of a transport (~0.12 s of it bus time at
       ~6 GB/s pageable; the rest is first-touch pool growth).
 
-      So there are two fixes, and the cheap one does not need transport at all:
+      So there were two fixes, and the cheap one did not need transport at all:
       **(a)** cache one device copy per case across the three spectrum kernels —
-      **done, see the item above**; **(b)** never come down, which is what is
-      left here. Pinned staging is *not* the cheap partial it looked like —
-      copying into a pinned buffer measured 3.8-4.0 GB/s against 6.1-6.3 GB/s
-      pageable, since the staging copy costs more than the overhead it removes.
-      It would only pay if the arrays were produced into pinned memory.
+      **done, see the item above**; **(b)** never come down — **done here**.
+      Pinned staging was *not* the cheap partial it looked like — copying into a
+      pinned buffer measured 3.8-4.0 GB/s against 6.1-6.3 GB/s pageable, since
+      the staging copy costs more than the overhead it removes. It would only
+      have paid if the arrays were produced into pinned memory, and residency
+      makes it moot.
 
-Deliberately deferred: keeping segments on the device end to end, NVTX ranges in
-`transport.py`, `numba.prange` over the per-electron core for the core-starved
-CPU case, and grooved transport.
+Deliberately deferred: putting the CUDA core in the live sweep (everything above
+is reachable only by asking for `transport_core="cuda"` explicitly, and switching
+the sweep changes numerical output, so it needs a `Validation:` id, a ledger row,
+and a golden regen), NVTX ranges in `transport.py`, compacting segments to `REAL`
+at the join, `numba.prange` over the per-electron core for the core-starved CPU
+case, and grooved transport.
 
 ## Decisions and open questions
 

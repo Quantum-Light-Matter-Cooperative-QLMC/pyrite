@@ -214,3 +214,49 @@ def test_a_case_reports_its_segment_counts_from_the_host_set(monkeypatch):
     assert out["n_segments"] == 6
     assert out["eta"] == 0.0
     assert out["hit_frac"] == 1.0
+
+
+# ---- composition with device-resident transport --------------------------------
+
+try:  # pragma: no cover - depends on the machine, not the branch
+    import cupy
+
+    _HAS_CUDA = cupy.cuda.runtime.getDeviceCount() > 0
+except Exception:
+    _HAS_CUDA = False
+
+requires_cuda = pytest.mark.skipif(not _HAS_CUDA, reason="no CUDA device")
+
+
+@pytest.mark.hardware
+@requires_cuda
+def test_device_resident_transport_feeds_the_kernels_the_same_spectra():
+    """The two halves compose: transport that never comes down, staged once, has
+    to give the kernels exactly what a downloaded-then-uploaded run gives them.
+    Staging is what makes it transparent -- it casts to REAL either way, and on
+    segments that are already device arrays it is the only copy in the path."""
+    from cxr_mc.montecarlo import simulate_trajectories
+
+    case = dict(
+        E0_keV=30.0,
+        Ne=200,
+        thickness_ang=5.0e4,
+        element="C",
+        n_atoms_per_ang3=0.1136,
+        seed=7,
+        transport_core="cuda",
+    )
+    host = simulate_trajectories(**case)
+    device = simulate_trajectories(**case, keep_segments_on_device=True)
+    assert host["L_ang"].size > 0
+    assert isinstance(device["L_ang"], cupy.ndarray)
+
+    for kernel, kwargs in (
+        (mc_spectrum, {**LINE_KWARGS, "E_grid": E_GRID}),
+        (mc_spectrum, {**LINE_KWARGS, "E_grid": E_GRID, "coherent": True}),
+        (mc_brem_spectrum, {**BREM_KWARGS, "E_grid": E_GRID}),
+    ):
+        grid = kwargs.pop("E_grid")
+        want = kernel(_segments_on_device(host), grid, **kwargs)
+        got = kernel(_segments_on_device(device), grid, **kwargs)
+        np.testing.assert_array_equal(_to_cpu(got), _to_cpu(want))

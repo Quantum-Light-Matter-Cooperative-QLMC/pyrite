@@ -287,14 +287,16 @@ guarantees rest on. Electron lifetimes are simply not spread widely enough:
 transport at fixed energy into a stopping slab has a fairly tight range
 distribution, so 32 neighbouring electrons finish at similar times.
 
-The ranking that follows is: keep segments on the device, which attacks the D2H,
-most of the host remainder, and the spectrum phase's re-upload at once. Pinned
-host memory is *not* the cheap partial it looked like — see the handoff section.
+The ranking that followed was: keep segments on the device, which attacks the D2H,
+most of the host remainder, and the spectrum phase's re-upload at once. That is
+done — see the handoff section. Pinned host memory was *not* the cheap partial it
+looked like, and is now moot.
 
 ## Not done
 
-- **Segments never leave the device.** See the next section — this is now the
-  largest measured item on the list.
+- **The live sweep still transports on the lockstep core.** Everything measured
+  here is reachable only by asking for `transport_core="cuda"` explicitly.
+  Switching the sweep changes numerical output and needs its own validation.
 - **NVTX ranges in `transport.py`.** `docs/compute-performance-optimization.md`
   already claims `cxr.transport.line` / `cxr.transport.brem` exist; they do not.
   Adding them is a prerequisite for attributing GPU transport phases in a single
@@ -306,13 +308,13 @@ host memory is *not* the cheap partial it looked like — see the handoff sectio
 
 ## The transport → spectrum handoff
 
-`simulate_trajectories` returns NumPy, so the CUDA core copies every segment down
-and each spectrum kernel copies what it needs straight back up with
+`simulate_trajectories` used to always return NumPy, so the CUDA core copied every
+segment down and each spectrum kernel copied what it needed straight back up with
 `xp.asarray(segments[k], dtype=REAL)`. `_spectrum_case` calls three such kernels
 over the *same* `segs` dict — one incoherent line sum, one coherent line sum when
 the profile asks for it, one brem sum per radiating layer — and none of them
-shared a device copy. The measurements below are that state; the first fix under
-them has since landed.
+shared a device copy. The measurements below are that state; both fixes under them
+have since landed.
 
 hopg, Ne=16000, 5.65M segments, RTX 5080, `REAL = float32`:
 
@@ -355,15 +357,47 @@ Two independent fixes, cheapest first:
    116 → 50 B/segment, the 48 B/segment union plus the two arrays the staging
    uploads whether or not this particular case reads them. The remaining 16
    copies are the energy tabulations, not segments.
-2. **Never come down.** Hand the compacted device arrays to the line/brem kernels
-   directly, which removes the 82 B/segment D2H and the last 50 B/segment of
-   upload. Larger, with its own correctness surface, and it has to keep the NumPy
-   return for CPU callers.
+2. **Never come down.** *Done.* `simulate_trajectories(...,
+   keep_segments_on_device=True)` returns the eight per-segment arrays where the
+   CUDA core made them, and staging then only casts them to `REAL` in place. The
+   driver stops copying each compacted batch into the caller's host buffers and
+   instead joins the batches with one `concatenate` — which is also what sizes the
+   output, since the segment total is not known until the last batch has run. It
+   requires `transport_core="cuda"` and refuses anything else rather than
+   pretending; the incident phase-space diagnostics, the groove-gap arrays, and
+   every count stay NumPy, because they are per-electron or scalar and no kernel
+   reads them.
+
+   Whole case — CUDA transport plus the three staged kernels — hopg, Ne=16000,
+   5.65M segments, arms interleaved after a discarded warm-up, medians of 5:
+
+   | arm | transport | spectrum | total | D2H | H2D | PCIe |
+   | --- | --- | --- | --- | --- | --- | --- |
+   | download, then stage | 0.158 s | 0.108 s | 0.265 s | 464 MB | 284 MB | 0.105 s |
+   | device-resident | 0.042 s | 0.062 s | 0.104 s | 0 | 1.5 MB | 0.002 s |
+
+   −61% end to end: transport −73%, spectrum a further −43% on top of the shared
+   copy. The bus goes quiet — the 1.5 MB left is energy tabulations, and not one
+   segment byte moves in either direction. Values are untouched: same dtypes, same
+   elements, same order, and the `REAL` cast still happens exactly once, so the
+   spectra are bit-for-bit identical to the downloading arm.
+
+   The cost is device memory. The segments now stay resident: peak pool 810 →
+   1176 MB, and 509 MB is still held when the call returns against 0 before. Peak
+   grows by less than the payload because the join runs while the batch scratch is
+   being freed. MoSe2's segment count is ~2.5× hopg's, so budget accordingly, and
+   note the arrays are `float64` — compacting to `REAL` at the join would nearly
+   halve this, at the price of changing the dtype the function documents.
 
 Pinned host staging is *not* a fix on the way up: copying into a pinned buffer
 first measured 3.8–4.0 GB/s against 6.1–6.3 GB/s pageable, because the staging
 copy costs more than the pageable-transfer overhead it removes. It would only pay
-if the arrays were produced into pinned memory in the first place.
+if the arrays were produced into pinned memory in the first place — which, with
+residency, is now moot.
+
+Neither fix puts the CUDA core in the live sweep: `run_case` still transports on
+the lockstep core, and switching it is a separate decision that changes numerical
+output and so needs a `Validation:` id, a ledger row, and a golden regen.
 
 ## Reproducing the CPU-side checks
 
