@@ -135,6 +135,11 @@ Options:
                                   the run (writes a .nsys-rep next to the perf log);
                                   defaults to the profile's full membership (-m narrows
                                   to one member). Requires -p/--perf.
+  -c, --cpu                       After the primary run, capture one bounded serial CPU
+                                  cProfile pass; implies --perf. Requires -R/--remote.
+  --cpu-only                      Capture only the bounded serial CPU cProfile pass;
+                                  starts no primary GPU/Nsight scan and implies --perf.
+                                  Requires -R/--remote.
   --no-cache                      Neither read nor write the shared per-case checkpoint
                                   cache: an ephemeral run that recomputes every case and
                                   stores nothing shared.

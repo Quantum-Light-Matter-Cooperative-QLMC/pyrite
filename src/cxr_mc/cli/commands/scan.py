@@ -150,6 +150,23 @@ def _performance_profile(ctx, param, value):
     ),
 )
 @click.option(
+    "-c",
+    "--cpu",
+    is_flag=True,
+    help=(
+        "After the primary run, capture one bounded serial CPU cProfile pass; "
+        "implies --perf. Requires -R/--remote."
+    ),
+)
+@click.option(
+    "--cpu-only",
+    is_flag=True,
+    help=(
+        "Capture only the bounded serial CPU cProfile pass; starts no primary "
+        "GPU/Nsight scan and implies --perf. Requires -R/--remote."
+    ),
+)
+@click.option(
     "--no-cache",
     is_flag=True,
     help=(
@@ -235,6 +252,8 @@ def command(
     spec_chunk,
     brem_chunk,
     nsys,
+    cpu,
+    cpu_only,
     no_cache,
     recompute,
     progress_file,
@@ -267,6 +286,8 @@ def command(
         raise click.UsageError("--wait/--detach require -R/--remote")
     if remote_target is None and (preset is not None or no_sync or dry_run):
         raise click.UsageError("--preset/--no-sync/--dry-run require -R/--remote")
+    if remote_target is None and (cpu or cpu_only):
+        raise click.UsageError("--cpu/--cpu-only require -R/--remote")
     zhai_parameters = {
         "ne": "--ne",
         "ne_brem": "--ne-brem",
@@ -299,6 +320,8 @@ def command(
                 "spec_chunk": "--spec-chunk",
                 "brem_chunk": "--brem-chunk",
                 "nsys": "--nsys",
+                "cpu": "--cpu",
+                "cpu_only": "--cpu-only",
                 "no_cache": "--no-cache",
                 "recompute": "--recompute",
                 "progress_file": "--progress-file",
@@ -375,6 +398,8 @@ def command(
                 spec_chunk=spec_chunk,
                 brem_chunk=brem_chunk,
                 nsys=nsys,
+                cpu=cpu,
+                cpu_only=cpu_only,
                 no_sync=no_sync,
                 dry_run=dry_run,
                 headless=detach,

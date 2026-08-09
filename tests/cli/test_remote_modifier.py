@@ -59,6 +59,41 @@ def test_remote_wait_detach_and_local_only_options_are_rejected():
     assert "--wait/--detach require -R/--remote" in local_wait.stderr
 
 
+def test_cpu_profile_flags_require_remote_and_reach_the_job(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(remote_cli, "_cli_start", lambda args: seen.update(vars(args)))
+
+    local_cpu = invoke(scan.command, ["standard", "--cpu"])
+    local_cpu_only = invoke(scan.command, ["standard", "--cpu-only"])
+    remote = invoke(scan.command, ["standard", "-m", "hopg", "--remote=box-a", "--cpu", "--detach"])
+
+    assert local_cpu.exit_code == 2
+    assert "--cpu/--cpu-only require -R/--remote" in local_cpu.stderr
+    assert local_cpu_only.exit_code == 2
+    assert "--cpu/--cpu-only require -R/--remote" in local_cpu_only.stderr
+    assert_clean_result(remote)
+    assert seen["cpu"] is True
+    assert seen["cpu_only"] is False
+    # --cpu implies --perf and an unchunked session; both are start_command's job.
+    assert seen["performance_profile"] == "standard"
+    assert seen["chunk_minutes"] == 0.0
+
+
+def test_cpu_profile_flag_conflicts_are_rejected_before_submission():
+    both = invoke(scan.command, ["standard", "--remote=box-a", "--cpu", "--cpu-only"])
+    with_nsys = invoke(scan.command, ["standard", "--remote=box-a", "--cpu-only", "--nsys"])
+    with_chunk = invoke(
+        scan.command, ["standard", "--remote=box-a", "--cpu-only", "--spec-chunk", "8"]
+    )
+
+    assert both.exit_code == 2
+    assert "--cpu and --cpu-only are mutually exclusive" in both.stderr
+    assert with_nsys.exit_code == 2
+    assert "--cpu-only cannot be combined with --nsys" in with_nsys.stderr
+    assert with_chunk.exit_code == 2
+    assert "--cpu-only cannot be combined with GPU chunk pins" in with_chunk.stderr
+
+
 def test_explicit_remote_wait_delegates_without_detaching(monkeypatch):
     seen = {}
     monkeypatch.setattr(remote_cli, "_cli_start", lambda args: seen.update(vars(args)))
