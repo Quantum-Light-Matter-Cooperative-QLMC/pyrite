@@ -1,6 +1,6 @@
 """Compile every code cell of the project notebooks to catch syntax errors.
 
-Run from the repo root: ``python src/_compile_nb.py``."""
+Run from the repo root: ``python src/_compile_nb.py``."""  # pragma: no cover
 
 import json
 import os

@@ -71,9 +71,11 @@ as the model for what *not* to stop at (it asserts module identity only).
       stamping failure. The remaining uncovered paths are CLI rendering,
       filesystem cleanup failures, and real Monte Carlo execution; the latter
       is deliberately replaced by deterministic runner fakes in the CPU suite.
-- [ ] G — Decide the entry-shim policy (`_compile_nb.py`, `_entry/scan.py`,
-      `cli/energy_grid.py`, `cli/__main__.py`): smoke-test or `pragma: no
-      cover` with a reason.
+- [x] G — Entry-shim policy: smoke-test the installed/module compatibility
+      surfaces (`_entry/scan.py`, `cli/energy_grid.py`, `cli/__main__.py`).
+      Mark `_compile_nb.py` no-cover: it is a legacy developer script whose
+      hard-coded notebook inventory no longer exists, not a supported runtime
+      entry point.
 - [ ] H — Re-measure; update the report with the after numbers. Decide then,
       not now, whether a `fail_under` belongs in `verify`.
 
