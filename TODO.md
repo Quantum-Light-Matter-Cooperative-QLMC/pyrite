@@ -29,7 +29,9 @@ file. Edit and drop items on `main`.
    misclassification, Monte Carlo mega-module splits, `plots/` backend
    regrouping, working-tree hygiene, and repo-map DAG generation. Folds the
    former Inbox source-package-organization and `runner.py`/`transport.py`
-   items. Sequenced S3+S8 → S7 → S1 → S2/S4/S6 → S5.
+   items. Sequenced S3+S8 → S7 → S1 → S2/S4/S6 → S5; S3 (all 10 `cli/` alias
+   shims deleted) and S8's empty-dir leftover are done on the branch, S7
+   remainder is next.
    → `refactor/repo-structure-cleanup`;
    [`tasks/refactor/repo-structure-cleanup/`](tasks/refactor/repo-structure-cleanup/);
    design: [`docs/package-structure-rfc.md`](docs/package-structure-rfc.md).
