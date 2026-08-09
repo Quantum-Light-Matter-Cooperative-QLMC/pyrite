@@ -74,6 +74,16 @@ also checks transport data availability.
 - **Blocked/audit:** the five existing packaged NIST-shaped transport CSVs have
   no task-local redistribution permission record. Do not extend this set until
   the same permission audit is closed.
+- **Blocked/alternatives:** no investigated alternative currently satisfies
+  both redistribution and accuracy gates. ELSEPA distributions are
+  noncommercial/restricted; Geant4 DPWA has the needed nominal coverage but
+  G4EMLOW data rights are not expressly established and its source warns about
+  results below a few hundred eV; PENELOPE requires authenticated access and
+  warns below about 1 keV. See
+  [`ALTERNATIVE_SOURCE_REPORT.md`](ALTERNATIVE_SOURCE_REPORT.md).
+- **Decided:** NIST SRD 64 may be designed as a user-supplied, local validation
+  oracle, not a production-data source. Do not retain raw or reconstructable
+  oracle outputs without permission.
 - **Open:** full CDFs versus a validated compact surrogate; neither is
   `one-shot` until size/performance/accuracy evidence closes the choice.
 - **Open:** behavior below/above table endpoints and for catalog elements with
@@ -92,6 +102,12 @@ also checks transport data availability.
 - G uses `regression-testing`, fresh-context `physics-validation`, and
   `run-cxr-mc`/`remote-gpu-jobs` for GPU evidence.
 - H uses `regen-golden` and `documentation-maintenance`.
+
+The next dispatchable qualification slice is gated on written G4EMLOW data and
+derived-output redistribution confirmation, or a broader written ELSEPA grant,
+plus an explicit physics decision for the low-energy accuracy claim. The exact
+request and qualification procedure are recorded in
+[`ALTERNATIVE_SOURCE_REPORT.md`](ALTERNATIVE_SOURCE_REPORT.md).
 
 ## Acceptance checks
 
