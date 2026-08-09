@@ -29,8 +29,13 @@ from ._backend import (
 from ._resources import admitted_chunk, resolve_resource_policy
 from .geometry import tilted_geometry
 from .groove import blazed_groove_spec
-from .spectrum import _segments_in_layer, mc_brem_spectrum, mc_spectrum
-from .transport import simulate_trajectories
+from .spectrum import (
+    _segments_in_layer,
+    _segments_on_device,
+    mc_brem_spectrum,
+    mc_spectrum,
+)
+from .transport import resolve_transport_core, simulate_trajectories
 
 # Opt-in Gate-0 phase profiling for the sweep-acceleration work (TODO P?/#numba;
 # see docs/acceleration-technique-evaluation.md). With CXR_MC_TIMING set (to
@@ -431,11 +436,22 @@ def _report_timing(agg, mode, nw):
     print("\n".join(lines), file=sys.stderr, flush=True)
 
 
-def run_case(case, record_timing=False):
+def run_case(case, record_timing=False, keep_segments_on_device=False, transport_core="auto"):
     """
     Worker for one (crystal, beam energy) Monte Carlo case: transport + line
     spectrum + bremsstrahlung. Module-level so it can be pickled into worker
     processes on Windows (notebook-defined functions cannot).
+
+    keep_segments_on_device: leave a CUDA-transported case's segments where the
+    kernel made them instead of round-tripping them through host RAM. Only legal
+    when transport and spectrum run in ONE process (device arrays cannot be
+    pickled back from a worker), so run_cases sets it on its serial branch alone.
+    Ignored unless the case's transport resolves to the CUDA core; falls back to
+    a downloading transport if the device cannot hold the resident payload.
+
+    transport_core: forwarded to :func:`_transport_case`. "auto" (default) lets
+    the case's electron count choose; a worker pool pins "lockstep" so no worker
+    process opens a CUDA context.
 
     case: a plain dict --
         required: crystal, composition, hkl_list, B_ang2, E0_keV, thickness_ang,
@@ -481,7 +497,12 @@ def run_case(case, record_timing=False):
     """
     return _spectrum_case(
         case,
-        _transport_case(case, record_timing),
+        _transport_case(
+            case,
+            record_timing,
+            transport_core=transport_core,
+            keep_segments_on_device=keep_segments_on_device,
+        ),
         record_timing,
     )
 
@@ -507,11 +528,39 @@ def _beam_kwargs(case):
     )
 
 
-def _transport_case(case, record_timing=False):
-    """CPU-only phase of run_case: the line + brem trajectory transport (pure
-    numpy, never touches the GPU). Returns the segments + geometry + grids the
-    spectrum phase consumes. run_cases farms this out to a worker pool so the
-    transport of upcoming cases overlaps the GPU work on the current one."""
+def _case_transport_core(case, requested="auto"):
+    """Resolve which transport core a case dict runs on.
+
+    Mirrors what ``simulate_trajectories`` will decide for this case: transport
+    covers both electron populations, so the count that matters is
+    ``max(Ne, Ne_brem)``, and a grooved entrance face stays on the lockstep core.
+    """
+
+    return resolve_transport_core(
+        requested,
+        max(case.get("Ne") or 0, case.get("Ne_brem") or 0),
+        groove=case.get("groove_spacing_ang"),
+    )
+
+
+def _transport_case(
+    case,
+    record_timing=False,
+    transport_core="auto",
+    keep_segments_on_device=False,
+):
+    """Transport phase of run_case: the line + brem trajectories. Returns the
+    segments + geometry + grids the spectrum phase consumes.
+
+    Runs on the CPU (pure numpy/numba) unless the case resolves to the CUDA core
+    -- see :func:`_case_transport_core`. run_cases farms the CPU core out to a
+    worker pool so the transport of upcoming cases overlaps the GPU work on the
+    current one; it pins ``transport_core="lockstep"`` when it does, because a
+    pool of worker processes must not each open a CUDA context on the one device
+    this process is already driving.
+
+    keep_segments_on_device: see :func:`run_case`. Requested only where transport
+    and spectrum share a process."""
     timed = _TIMING or record_timing
     t0 = perf_counter() if timed else 0.0
     if "E_grid_line" in case:
@@ -560,22 +609,41 @@ def _transport_case(case, record_timing=False):
     E_cut_by_electrons[brem_only_transport_mask] = E_cut_brem
     E_cut_by_electrons[combined_transport_mask] = min(E_cut_lines, E_cut_brem)
 
-    segs_all = simulate_trajectories(
-        case["E0_keV"],
-        Ne_transport,
-        case["thickness_ang"],
-        E_cut_by_electrons=E_cut_by_electrons,
-        composition=case["composition"],
-        seed=case["seed"],
-        beam_dir=beam,
-        layers=layers,
-        **beam_kw,
-        crystal_width_mm=case.get("crystal_width_mm"),
-        crystal_height_mm=case.get("crystal_height_mm"),
-        tilt_polar_rad=tilt_polar_rad,
-        tilt_azim_rad=tilt_azim_rad,
-        groove=groove,
-    )
+    core = _case_transport_core(case, transport_core)
+    resident = keep_segments_on_device and core == "cuda"
+
+    def _transport(keep):
+        return simulate_trajectories(
+            case["E0_keV"],
+            Ne_transport,
+            case["thickness_ang"],
+            E_cut_by_electrons=E_cut_by_electrons,
+            composition=case["composition"],
+            seed=case["seed"],
+            beam_dir=beam,
+            layers=layers,
+            **beam_kw,
+            crystal_width_mm=case.get("crystal_width_mm"),
+            crystal_height_mm=case.get("crystal_height_mm"),
+            tilt_polar_rad=tilt_polar_rad,
+            tilt_azim_rad=tilt_azim_rad,
+            groove=groove,
+            transport_core=core,
+            keep_segments_on_device=keep,
+        )
+
+    if resident:
+        try:
+            segs_all = _transport(True)
+        except _GPU_OOM:
+            # Residency holds the whole payload plus the join's second copy. The
+            # streams are counter-addressed, so replaying the same seed with the
+            # segments downloaded reproduces this run exactly -- the retry costs
+            # the bus, not the result.
+            BACKEND.release_memory()
+            segs_all = _transport(False)
+    else:
+        segs_all = _transport(False)
 
     tp: dict[str, Any] = dict(
         E_grid=E_grid,
@@ -853,6 +921,9 @@ def _line_pair_for_case(case, E_grid, *, want_coherent):
     keeps both arrays on that grid instead of leaving ``spec_coherent`` stale.
     Returns ``(spec, spec_coherent_or_None)``."""
     segs, n_hat, abs_layers, groove = _transport_lines_for_case(case)
+    # Both kernels read the same segments; stage one device copy as the live
+    # sweep does rather than uploading the pair separately.
+    segs = _segments_on_device(segs)
     Ne_lines = case["Ne"]
     spec = _lines_for_segments(
         segs,
@@ -982,6 +1053,12 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     t0 = perf_counter() if timed else 0.0
     E_grid, E_brem, n_hat = tp["E_grid"], tp["E_brem"], tp["n_hat"]
     segs = tp["segs"]
+    # Every kernel below runs over the SAME segments, and each would otherwise
+    # upload its own slice of them: a case pushes ~116 B/segment across the bus
+    # where the union of what it reads is ~48. Stage one device copy for the
+    # whole case and they all read it in place. `segs` itself stays host-side --
+    # the run summary at the bottom counts segments and backscatter on it.
+    segs_dev = _segments_on_device(segs)
     Ne_lines = tp["Ne_lines"]
     Ne_brem = tp["Ne_brem"]
     # optional film-on-substrate stack (None -> single slab, unchanged)
@@ -1007,7 +1084,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     with _nsys_range("cxr.lines"):
         try:
             spec = _lines_for_segments(
-                segs,
+                segs_dev,
                 E_grid,
                 case,
                 n_hat,
@@ -1019,7 +1096,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
 
             if want_coherent:
                 spec_coherent = _lines_for_segments(
-                    segs,
+                    segs_dev,
                     E_grid,
                     case,
                     n_hat,
@@ -1039,7 +1116,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     with _nsys_range("cxr.brem"):
         try:
             brem_wide = _brem_wide_from_segments(
-                segs,
+                segs_dev,
                 E_brem,
                 case,
                 n_hat,
@@ -1114,15 +1191,31 @@ def _worker_init(force_cpu=False):
     desktop stays responsive. Workers still use idle CPU at full speed; the
     OS just schedules interactive applications first.
 
+    Also keeps THIS process's transport off the device. Both pools run here, and
+    a worker that resolved `transport_core="auto"` onto the device would open
+    exactly the per-worker CUDA context the single-context design exists to
+    avoid -- and, in the transport pool, would then have to pickle its segments
+    back down anyway. The pin is an environment variable because it has to reach
+    every call site in the worker, including the ones that never see a run_cases
+    argument; it is process-local (spawn/fork copies the environment) and never
+    touches the driver's own resolution.
+
+    Only "cuda" and "auto" are redirected. An inherited CXR_MC_TRANSPORT_CORE
+    naming a CPU core is a deliberate choice that a worker can honor, and
+    overwriting it made the pin a no-op for every pooled run: a sweep pinned to
+    "per-electron" silently transported on lockstep instead, which a 2026-08-08
+    qlmc A/B caught only because the two arms came out bit-identical.
+
     force_cpu: when True (the engine="cpu" full-case pool), rebind THIS
     worker process's copy of runner._GPU and spectrum.xp/REAL to their CPU
     equivalents, so _spectrum_case (via mc_spectrum/mc_brem_spectrum) takes
     the NumPy path even when cupy is importable and a real GPU is present on
-    the box -- the per-worker CUDA context the single-context GPU-pipeline
-    design exists to avoid. A no-op fork/spawn-local mutation: it never
-    touches the driver process's globals. Harmless when _GPU is already
-    False.
+    the box. A no-op fork/spawn-local mutation: it never touches the driver
+    process's globals. Harmless when _GPU is already False.
     """
+    inherited = os.environ.get("CXR_MC_TRANSPORT_CORE", "").strip().lower()
+    if inherited in ("", "auto", "cuda"):
+        os.environ["CXR_MC_TRANSPORT_CORE"] = "lockstep"
     if force_cpu:
         global _GPU
 
@@ -1298,11 +1391,28 @@ def case_runtime_plan(case):
     }
 
 
+def _cuda_transport_run(cases):
+    """Whether a whole run transports on the device.
+
+    All or nothing: a run is only taken off the transport pool when EVERY case
+    resolves to the CUDA core, since a mixed run would otherwise strand its
+    CPU-core cases in this process with nothing overlapping them. Sweeps hold Ne
+    fixed across the grid, so mixed runs are the exception, not the rule.
+    """
+
+    return bool(cases) and all(_case_transport_core(case) == "cuda" for case in cases)
+
+
 def runtime_plan(cases, max_workers=None, engine="auto"):
     """Resolve execution topology and representative chunk sizing for profiling."""
     n = len(cases)
     use_gpu = _GPU if engine == "auto" else engine == "gpu" and _GPU
+    cuda_transport = use_gpu and _cuda_transport_run(cases)
     if n == 0 or max_workers == 0:
+        workers = 1
+        resolved_engine = "serial"
+    elif cuda_transport:
+        # run_cases keeps a device-transported run in one process; no pool.
         workers = 1
         resolved_engine = "serial"
     elif use_gpu:
@@ -1314,6 +1424,7 @@ def runtime_plan(cases, max_workers=None, engine="auto"):
     representative = cases[0] if cases else {}
     return {
         "engine": resolved_engine,
+        "transport_core": _case_transport_core(representative),
         "requested_workers": max_workers,
         "effective_workers": workers,
         "worker_memory_budget_mib": (
@@ -1357,19 +1468,31 @@ def run_cases(
     """
     Run a list of case dicts through run_case, results in input order.
 
-    GPU present (the usual path): the CPU transport is PIPELINED across a worker
-    pool while THIS process drives the spectrum/brem serially on the single CUDA
-    context -- the ~40% transport idle overlaps the GPU work, with no device
-    contention (multiple CUDA contexts are what crawled the old max_workers>1).
-    Workers run ONLY transport (pure CPU/numpy), never the GPU. Callbacks fire in
-    input order as each case's GPU phase finishes.
+    GPU present, CPU transport (Ne at or below
+    transport.CUDA_TRANSPORT_MIN_ELECTRONS, or a grooved run): the transport is
+    PIPELINED across a worker pool while THIS process drives the spectrum/brem
+    serially on the single CUDA context -- the ~40% transport idle overlaps the
+    GPU work, with no device contention (multiple CUDA contexts are what crawled
+    the old max_workers>1). Workers run ONLY transport (pure CPU/numpy) and are
+    pinned to the lockstep core, never the GPU. Callbacks fire in input order as
+    each case's GPU phase finishes.
+
+    GPU present, device transport (every case resolves to the CUDA core): there
+    is nothing left to hide behind the GPU phase and nowhere to put a second
+    context, so the whole run stays in this process, serially, with each case's
+    segments kept device-resident for its spectrum kernels. This is the faster
+    arrangement whenever it applies -- transport is 4-16x the CPU core at these
+    electron counts, and the case never pays the round trip.
 
     No GPU: cases run through a worker pool (or serially), completion order.
 
     engine: which branch to run, independent of the hardware probe.
-        "auto" (default) -> today's behaviour exactly: the GPU pipeline above
-            if a GPU is present, else the CPU pool below. Bit-for-bit
-            unchanged for every existing caller.
+        "auto" (default) -> the serial device-transport branch when every case
+            resolves to the CUDA core, else the GPU pipeline above if a GPU is
+            present, else the CPU pool below. Only the transport core changes
+            what a run computes (a different realization of the same
+            distribution, `Validation: gpu-transport-core`); the branch it picks
+            does not.
         "gpu"  -> force the GPU pipeline. If no GPU is present, warns and
             falls back to the CPU pool.
         "cpu"  -> force the full-case CPU pool below even when a GPU is
@@ -1493,7 +1616,7 @@ def run_cases(
                 }
             )
 
-    def _serial():
+    def _serial(keep_segments_on_device=False):
         force_cpu = not use_gpu and _GPU
         with _cpu_spectrum_backend() if force_cpu else nullcontext():
             for i in _maybe_bar(range(n)):
@@ -1508,6 +1631,12 @@ def run_cases(
                         record_timing=on_timing is not None,
                     )
                     out = None
+                elif keep_segments_on_device:
+                    out = run_case(
+                        cases[i],
+                        on_timing is not None,
+                        keep_segments_on_device=True,
+                    )
                 else:
                     out = run_case(cases[i], True) if on_timing is not None else run_case(cases[i])
 
@@ -1542,6 +1671,13 @@ def run_cases(
 
     # ---- GPU: pipeline CPU transport (worker pool) behind the serial GPU ------
     if use_gpu:
+        if _cuda_transport_run(cases):
+            # Transport is on the same device as the spectrum, so the pipeline's
+            # premise -- CPU transport hidden behind GPU work -- is gone, and a
+            # worker pool would put N CUDA contexts on the one card. Run in this
+            # process instead, and let the segments stay where the kernel made
+            # them: the spectrum kernels read them in place.
+            return _serial(keep_segments_on_device=not transport_only)
         if max_workers == 0:
             return _serial()
         # RAM-capped (_mem_worker_cap): an uncapped ncpu//2 transport pool OOM'd
@@ -1567,6 +1703,9 @@ def run_cases(
             transport_ready_events = {}
 
             def _submit_transport(i):
+                # Worker processes are pinned to the CPU core by _worker_init;
+                # none of them may open a CUDA context on the device this
+                # process is driving.
                 fut = (
                     ex.submit(_transport_case, cases[i], True)
                     if on_timing is not None
@@ -1683,6 +1822,9 @@ def run_cases(
         **_process_pool_kwargs(),
     ) as ex:
         futures = {
+            # Workers run the spectrum on NumPy and the transport on the CPU
+            # core (_worker_init) -- a pool of CUDA contexts is what this pool
+            # exists to avoid.
             (ex.submit(run_case, c, True) if on_timing is not None else ex.submit(run_case, c)): i
             for i, c in enumerate(cases)
         }

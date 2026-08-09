@@ -242,7 +242,15 @@ re-exported from package** — `from cxr_mc.montecarlo import X` unchanged
   `materials.crystal`.
 - `transport` — `simulate_trajectories` (multilayer-stack aware via `layers=`),
   `beta_from_keV`, scattering/stopping helpers; `TRANSPORT_ELEMENTS`
-  registry. Pure NumPy. Deps: `materials.attenuation`, `DATA_DIR`.
+  registry. NumPy/Numba, plus a device core: `resolve_transport_core` picks the
+  CUDA one above `CUDA_TRANSPORT_MIN_ELECTRONS` (1000) electrons on a CUDA box,
+  pinnable with `CXR_MC_TRANSPORT_CORE`. Deps: `materials.attenuation`,
+  `DATA_DIR`.
+- `transport_jit_kernel` — the `cupyx.jit` port of
+  `transport._transport_core_ungrooved_perelectron`: one thread per electron,
+  run to completion, output slots addressed by electron index. Same arithmetic
+  as the CPU core, so the two stay one algorithm.
+  See `docs/gpu-transport-rawkernel.md`. Deps: `_backend`, `transport`.
 - `geometry` — `tilted_geometry`, `detector_directions`, `_orientation_R`,
   `_small_tilt_R`, `_mosaic_quadrature`. Deps: `materials.crystal`.
 - `spectrum` — `mc_spectrum` (PXR+CBS, cross-stack self-absorption, exact mosaic

@@ -11,11 +11,12 @@ consumes the segment arrays returned here.
 import logging
 import os
 from collections.abc import Mapping
+from dataclasses import dataclass
 from functools import cache
 from typing import Any
 
 import numpy as np
-from numba import njit
+from numba import float64, int64, njit, uint64
 
 from .. import DATA_DIR
 from ..materials._transport_data import TRANSPORT_ELEMENTS
@@ -179,6 +180,73 @@ def beta_from_keV_scalar(E_i):
     g = 1.0 + E_i / 510.99895
     g_inv_square = 1.0 / (g * g)
     return (1.0 - g_inv_square) ** 0.5
+
+
+# ---- counter-based per-electron RNG -------------------------------------------
+# The lockstep core draws every random number from one shared `Generator`, so its
+# stream order is "step-major, electron-minor" and cannot be reproduced by
+# threads that run electrons to completion independently. The per-electron core
+# below and its CUDA port instead address randomness by (seed, electron, draw
+# index) through a SplitMix64 counter hash. Nothing is carried between draws, so
+# a stream is replayable: re-running a batch after a capacity overflow, changing
+# the batch size, or changing the CUDA launch geometry all give identical
+# numbers. That is what lets the GPU kernel be bit-for-bit against a CPU
+# reference rather than merely statistically similar.
+#
+# SplitMix64's finalizer is a bijection on 64 bits and passes BigCrush as a
+# counter-mode generator (Steele, Lea & Flood, OOPSLA 2014). Streams are keyed
+# through the same finalizer so adjacent electron ids do not produce correlated
+# sequences.
+
+_SM64_GOLDEN = np.uint64(0x9E3779B97F4A7C15)
+_SM64_MIX1 = np.uint64(0xBF58476D1CE4E5B9)
+_SM64_MIX2 = np.uint64(0x94D049BB133111EB)
+_SM64_S27 = np.uint64(27)
+_SM64_S30 = np.uint64(30)
+_SM64_S31 = np.uint64(31)
+_SM64_S11 = np.uint64(11)
+_SM64_ZERO = np.uint64(0)
+_SM64_ONE = np.uint64(1)
+# 2**-53: the same 53-bit mantissa scaling numpy's `random()` uses, so draws land
+# in [0, 1) with uniform spacing.
+_U53_SCALE = 1.0 / 9007199254740992.0
+
+
+# Signatures are explicit because numba otherwise unifies these expressions to
+# int64, which turns every `>>` into an arithmetic shift and silently biases the
+# generator (draws lose their top bit).
+@njit(uint64(uint64), cache=True)
+def _splitmix64(x):
+    """SplitMix64 finalizer, used here as a counter-based hash."""
+    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
+    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
+    return x ^ (x >> _SM64_S31)
+
+
+@njit(uint64(int64, int64), cache=True)
+def _stream_key_scalar(seed, elec_id):
+    """Per-electron stream key. Independent of batch size and launch geometry."""
+    return _splitmix64(np.uint64(seed) + _SM64_GOLDEN * (np.uint64(elec_id) + _SM64_ONE))
+
+
+@njit(float64(uint64, uint64), cache=True)
+def _stream_uniform_scalar(key, counter):
+    """Draw ``counter`` of the stream identified by ``key``, in [0, 1)."""
+    z = _splitmix64(key + _SM64_GOLDEN * (counter + _SM64_ONE))
+    return np.float64(z >> _SM64_S11) * _U53_SCALE
+
+
+def stream_keys(seed, Ne):
+    """Per-electron stream keys for ``[0, Ne)``, as consumed by both cores.
+
+    Keys are built on the host so the CUDA kernel needs no 64-bit integer casts
+    in device code, and so both cores provably address the same streams.
+    """
+    e = np.arange(Ne, dtype=np.uint64)
+    x = np.uint64(seed) + _SM64_GOLDEN * (e + _SM64_ONE)
+    x = (x ^ (x >> _SM64_S30)) * _SM64_MIX1
+    x = (x ^ (x >> _SM64_S27)) * _SM64_MIX2
+    return x ^ (x >> _SM64_S31)
 
 
 # ---- elastic scattering models ------------------------------------------------
@@ -1169,6 +1237,621 @@ def _transport_core_grooved(
     return nseg, nvac, n_back, n_trans, n_side
 
 
+# ---- per-electron transport core (GPU-portable reference) ---------------------
+
+# Exit classification, returned per electron instead of accumulated into shared
+# counters, so the host can total them in a fixed order.
+EXIT_ALIVE_OR_STOPPED = np.int8(0)
+EXIT_BACKSCATTERED = np.int8(1)
+EXIT_TRANSMITTED = np.int8(2)
+EXIT_SIDE = np.int8(3)
+
+
+@njit(cache=True)
+def _searchsorted_right_scalar(bounds, x, n):
+    """Scalar equivalent of ``np.searchsorted(bounds[:n], x, side="right")``."""
+    lo = 0
+    hi = n
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if bounds[mid] <= x:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
+
+
+@njit(cache=True)
+def _transport_core_ungrooved_perelectron(
+    e_start,
+    e_count,
+    cap,
+    stream_key,
+    alive,
+    max_steps,
+    n_layers,
+    internal_bounds,
+    elastic_model_code,
+    z_total,
+    finite_footprint,
+    width_ang,
+    height_ang,
+    clock,
+    pos,
+    dirs,
+    E_cut_by_electrons,
+    L_Js,
+    L_Zs,
+    L_ks,
+    L_coeffs,
+    L_ncm3,
+    L_nel,
+    L_top,
+    L_bot,
+    mott_has_table,
+    mott_start,
+    mott_len,
+    mott_logE_flat,
+    mott_logA_flat,
+    E_keV,
+    seg_dir,
+    seg_mid,
+    seg_len,
+    seg_E,
+    seg_t0,
+    seg_id,
+    seg_lay,
+    seg_count,
+    exit_code,
+):
+    """Run electrons ``[e_start, e_start + e_count)`` to completion, independently.
+
+    This is the executable specification of the CUDA transport kernel in
+    :mod:`transport_jit_kernel`: same arithmetic, same draw order, same output
+    addressing, one CPU iteration per CUDA thread. Keeping the two in one
+    algorithm lets the GPU port be checked bit-for-bit instead of statistically.
+
+    It is *not* bit-for-bit against :func:`_transport_core_ungrooved`. Both
+    consume the same physics, but the lockstep core interleaves one shared RNG
+    stream across electrons while this one gives each electron its own; the two
+    therefore realize different samples of the same distribution.
+
+    Segment ``s`` of local electron ``i`` is written to slot ``i * cap + s``, a
+    pure function of the electron index, so output does not depend on execution
+    order. ``seg_count[i]`` records the *true* segment count even when it exceeds
+    ``cap``; the caller must treat any such electron's slots as invalid and
+    replay the batch with a larger ``cap``. Replay is exact because the streams
+    are counter-addressed.
+
+    Per-layer element data is passed as ``(n_layers, max_elements)`` padded rows
+    with live lengths in ``L_nel``, the layout the CUDA kernel needs.
+    """
+    EPS = 1e-6
+
+    for i in range(e_count):
+        e = e_start + i
+        seg_count[i] = 0
+        exit_code[i] = EXIT_ALIVE_OR_STOPPED
+        if not alive[e]:
+            continue
+
+        key = stream_key[e]
+        draw = _SM64_ZERO
+        local_nseg = 0
+        E_cut_e = E_cut_by_electrons[e]
+
+        for _step in range(max_steps):
+            if n_layers == 1:
+                L = 0
+            else:
+                L = _searchsorted_right_scalar(internal_bounds, pos[e, 2], n_layers - 1)
+
+            n_el = L_nel[L]
+            z_top_L = L_top[L]
+            z_bot_L = L_bot[L]
+            E_j = E_keV[e]
+
+            # 1. Sample the next elastic-collision distance.
+            total_rate = 0.0
+            for i_el in range(n_el):
+                if elastic_model_code == 1:
+                    rate = _scatter_rates_mott_scalar(E_j, L_Zs[L, i_el], L_ncm3[L, i_el])
+                else:
+                    rate = _scatter_rates_sr_scalar(E_j, L_Zs[L, i_el], L_ncm3[L, i_el])
+                total_rate += rate
+
+            lam_ang = 1e8 / total_rate
+            R_step = _stream_uniform_scalar(key, draw)
+            draw += _SM64_ONE
+            step_j = -lam_ang * np.log(R_step)
+
+            # 2. Truncate the flight at this layer's z boundaries.
+            dx = dirs[e, 0]
+            dy = dirs[e, 1]
+            dz = dirs[e, 2]
+            px = pos[e, 0]
+            py = pos[e, 1]
+            pz = pos[e, 2]
+
+            cross_up_j = False
+            cross_dn_j = False
+            exit_side_j = False
+
+            if finite_footprint:
+                exit_distance, exit_face = _first_prism_exit_scalar(
+                    px, py, pz, dx, dy, dz, z_top_L, z_bot_L, width_ang, height_ang
+                )
+                if step_j > exit_distance:
+                    step_j = exit_distance
+                    cross_up_j = exit_face == Z_MIN
+                    cross_dn_j = exit_face == Z_MAX
+                    exit_side_j = exit_face >= X_MIN and exit_face <= Y_MAX
+            else:
+                if dz < 0.0:
+                    s_boundary = (pz - z_top_L) / (-dz)
+                    if step_j > s_boundary:
+                        step_j = s_boundary
+                        cross_up_j = True
+                elif dz > 0.0:
+                    s_boundary = (z_bot_L - pz) / dz
+                    if step_j > s_boundary:
+                        step_j = s_boundary
+                        cross_dn_j = True
+
+            exit_top_j = cross_up_j and z_top_L <= 0.0
+            exit_bot_j = cross_dn_j and z_bot_L >= z_total
+
+            # 3. Record the radiating material segment. Overflowing electrons
+            #    keep transporting so `seg_count` reports the capacity actually
+            #    needed for the replay.
+            dEds = 0.0
+            for i_el in range(n_el):
+                J = L_Js[L, i_el]
+                k = L_ks[L, i_el]
+                coeff = L_coeffs[L, i_el]
+                dEds += coeff * np.log(1.166 * (E_j + k * J) / J)
+            dEds = -7.85e-4 / E_j * dEds
+            beta_j = beta_from_keV_scalar(E_j)
+
+            if local_nseg < cap:
+                slot = i * cap + local_nseg
+                seg_dir[slot, 0] = dx
+                seg_dir[slot, 1] = dy
+                seg_dir[slot, 2] = dz
+                seg_mid[slot, 0] = px + 0.5 * step_j * dx
+                seg_mid[slot, 1] = py + 0.5 * step_j * dy
+                seg_mid[slot, 2] = pz + 0.5 * step_j * dz
+                seg_len[slot] = step_j
+                seg_E[slot] = E_j
+                seg_t0[slot] = clock[e]
+                seg_id[slot] = e
+                seg_lay[slot] = L
+            local_nseg += 1
+
+            # 4. Advance position, energy, and transport clock.
+            pos[e, 0] = px + step_j * dx
+            pos[e, 1] = py + step_j * dy
+            pos[e, 2] = pz + step_j * dz
+            E_keV[e] = E_j + dEds * step_j
+            clock[e] += step_j / beta_j
+
+            # 5. Exit, internal-boundary, or collision handling.
+            if exit_top_j:
+                exit_code[i] = EXIT_BACKSCATTERED
+            elif exit_bot_j:
+                exit_code[i] = EXIT_TRANSMITTED
+            elif exit_side_j:
+                exit_code[i] = EXIT_SIDE
+            if exit_top_j or exit_bot_j or exit_side_j or E_keV[e] < E_cut_e:
+                break
+
+            if cross_up_j or cross_dn_j:
+                pos[e, 2] += (1.0 if dirs[e, 2] > 0.0 else -1.0) * EPS
+                continue
+
+            # A full flight ended in an elastic collision. Pick the element with
+            # probability proportional to n_i * sigma_i(E). Rates are recomputed
+            # rather than buffered so the kernel needs no per-thread local array.
+            if n_el == 1:
+                i_el = 0
+            else:
+                u = _stream_uniform_scalar(key, draw) * total_rate
+                draw += _SM64_ONE
+                cumulative = 0.0
+                i_el = n_el - 1
+                for k_el in range(n_el):
+                    if elastic_model_code == 1:
+                        rate = _scatter_rates_mott_scalar(E_j, L_Zs[L, k_el], L_ncm3[L, k_el])
+                    else:
+                        rate = _scatter_rates_sr_scalar(E_j, L_Zs[L, k_el], L_ncm3[L, k_el])
+                    cumulative += rate
+                    if cumulative > u:
+                        i_el = k_el
+                        break
+
+            Z_i = L_Zs[L, i_el]
+            if elastic_model_code == 1 and mott_has_table[L, i_el]:
+                log_alpha = _interp_mott_log_alpha_scalar(
+                    np.log10(E_keV[e] * 1e3),
+                    mott_logE_flat,
+                    mott_logA_flat,
+                    mott_start[L, i_el],
+                    mott_len[L, i_el],
+                )
+                alpha = 10.0**log_alpha
+            else:
+                alpha = _alpha_sr_joy_scalar(Z_i, E_keV[e])
+
+            cos_t = _sample_cos_theta_from_alpha(alpha, _stream_uniform_scalar(key, draw))
+            draw += _SM64_ONE
+            phi = 2.0 * np.pi * _stream_uniform_scalar(key, draw)
+            draw += _SM64_ONE
+            ndx, ndy, ndz = _rotate_direction_scalar(dirs[e, 0], dirs[e, 1], dirs[e, 2], cos_t, phi)
+            dirs[e, 0] = ndx
+            dirs[e, 1] = ndy
+            dirs[e, 2] = ndz
+
+        seg_count[i] = local_nseg
+
+
+def pack_layer_tables(L_Js, L_Zs, L_ks, L_coeffs, L_ncm3):
+    """Pad the per-layer element lists into ``(n_layers, max_elements)`` rows.
+
+    The lockstep core indexes a Python list of ragged arrays, which neither the
+    per-electron core nor CUDA can do. Padding is zero-filled and never read:
+    ``L_nel`` bounds every element loop.
+    """
+    n_layers = len(L_Zs)
+    max_el = max(arr.size for arr in L_Zs)
+    Js = np.zeros((n_layers, max_el), dtype=np.float64)
+    Zs = np.zeros((n_layers, max_el), dtype=np.float64)
+    ks = np.zeros((n_layers, max_el), dtype=np.float64)
+    coeffs = np.zeros((n_layers, max_el), dtype=np.float64)
+    ncm3 = np.zeros((n_layers, max_el), dtype=np.float64)
+    nel = np.zeros(n_layers, dtype=np.int32)
+    for L in range(n_layers):
+        n = L_Zs[L].size
+        nel[L] = n
+        Js[L, :n] = L_Js[L]
+        Zs[L, :n] = L_Zs[L]
+        ks[L, :n] = L_ks[L]
+        coeffs[L, :n] = L_coeffs[L]
+        ncm3[L, :n] = L_ncm3[L]
+    return Js, Zs, ks, coeffs, ncm3, nel
+
+
+@dataclass(frozen=True)
+class PerElectronTransportConfig:
+    """Host-side batching policy for the per-electron cores.
+
+    No field changes results: ``seg_capacity`` only sets how many segment slots
+    each electron is given before an overflow forces a replay, and
+    ``scratch_budget_bytes`` only sets how many electrons share one launch.
+    Both exist because the CUDA path materializes a dense ``(batch, capacity)``
+    scratch grid, and that grid must fit in VRAM alongside the case's tables.
+
+    ``seg_capacity`` is only the *initial* guess, and the driver stops trusting it
+    as soon as it has a measurement. The cores report the true segment count even
+    for electrons that overflowed, so every batch -- including one that overflowed
+    and has to be replayed -- says exactly what the material needs, and ``cap`` is
+    reset to that running maximum times ``capacity_headroom``. Capacity trades
+    against batch size out of a fixed byte budget, so an over-provisioned ``cap``
+    costs launches just as an under-provisioned one costs replays.
+
+    ``probe_electrons`` shortens the first batch, which is otherwise most of the
+    run and is the one batch sized by the guess. Its segments are kept -- output
+    slots are addressed by electron index, so a short first batch is just a short
+    batch -- and it bounds what a wrong ``seg_capacity`` can cost to a probe rather
+    than a full batch. Set it to 0 to let the first batch run full width, which is
+    what a GPU run wants: there a batch costs about one electron lifetime whatever
+    its width, so a discarded batch and a probe cost the same launch.
+    """
+
+    seg_capacity: int = 512
+    scratch_budget_bytes: int = 512 * 1024 * 1024
+    capacity_headroom: float = 1.25
+    max_batch: int = 65536
+    probe_electrons: int = 1024
+
+
+DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG = PerElectronTransportConfig()
+
+TRANSPORT_CORES = ("auto", "lockstep", "per-electron", "cuda")
+
+# Electron count above which "auto" transports on the device. Measured crossover
+# is Ne ~ 500-1000 for both a light (hopg) and a heavy (MoSe2) material on an
+# RTX 5080: below it the launch and staging overhead outweighs the kernel, above
+# it the CUDA core pulls away monotonically (4.1x at Ne=4000, 4.9-15.9x at
+# Ne=16000). 1000 is the conservative end of that band, so no run that would
+# have been faster on the CPU core is moved off it. See
+# `docs/gpu-transport-rawkernel.md`.
+CUDA_TRANSPORT_MIN_ELECTRONS = 1000
+
+
+@cache
+def _cuda_transport_available():
+    """Whether this process can transport on the device.
+
+    Requires the resolved spectrum backend to BE the CUDA device (a ROCm or SYCL
+    backend has no `cupyx.jit` transport kernel, and a CPU backend has nowhere to
+    run one) and the kernel module to import. Cached: the backend is fixed at
+    import and a failed import will not start succeeding.
+    """
+
+    from ._backend import BACKEND
+
+    if BACKEND.name != "cuda":
+        return False
+    try:
+        from .transport_jit_kernel import make_cuda_transport_core  # noqa: F401
+    except Exception as error:  # pragma: no cover - needs a broken CuPy install
+        logger.warning("CUDA transport kernel unavailable, using the CPU core: %s", error)
+        return False
+    return True
+
+
+def resolve_transport_core(requested, Ne, groove=None):
+    """Resolve ``transport_core`` for a run of ``Ne`` electrons.
+
+    ``"auto"`` is the default and the only value that resolves: it takes the CUDA
+    core when this process has a CUDA device, the run is ungrooved, and
+    ``Ne > CUDA_TRANSPORT_MIN_ELECTRONS``; otherwise the lockstep CPU core. Every
+    explicit value is returned unchanged so a caller that names a core still gets
+    that core or an error, never a silent substitution.
+
+    ``CXR_MC_TRANSPORT_CORE`` overrides the *requested* value for the whole
+    process, which is how a run pins the historical CPU core (``=lockstep``)
+    without touching call sites -- reproducing a pre-existing result, or
+    bisecting a device/host difference.
+    """
+
+    pinned = os.environ.get("CXR_MC_TRANSPORT_CORE", "").strip().lower()
+    if pinned:
+        if pinned not in TRANSPORT_CORES:
+            raise ValueError(
+                f"CXR_MC_TRANSPORT_CORE must be one of {', '.join(TRANSPORT_CORES)}; got {pinned!r}"
+            )
+        requested = pinned
+    if requested not in TRANSPORT_CORES:
+        raise ValueError(f"transport_core must be one of {', '.join(TRANSPORT_CORES)}")
+    if requested != "auto":
+        return requested
+    if groove is not None or int(Ne) <= CUDA_TRANSPORT_MIN_ELECTRONS:
+        return "lockstep"
+    return "cuda" if _cuda_transport_available() else "lockstep"
+
+# float64 mid(3) + dir(3) + len + E + t0 = 9, int64 id, int16 layer.
+_SEG_SCRATCH_BYTES = 9 * 8 + 8 + 2
+
+
+def _batch_size(cap, config):
+    per_electron = cap * _SEG_SCRATCH_BYTES
+    n = int(config.scratch_budget_bytes // max(per_electron, 1))
+    return max(1, min(n, int(config.max_batch)))
+
+
+def _capacity_for(seen_max, config):
+    """Slots per electron given the largest segment count seen so far.
+
+    Never below ``seen_max`` whatever the headroom, so a replay is always given a
+    capacity that fits and the retry loop cannot fail to make progress.
+    """
+    return max(1, seen_max, int(np.ceil(seen_max * config.capacity_headroom)))
+
+
+def _batch_electrons(e, cap, Ne, config):
+    """How many electrons the batch starting at ``e`` covers.
+
+    Non-increasing in ``cap``, which a capacity replay relies on: the retry must
+    never need more electrons than the snapshot it restores.
+    """
+    n = min(_batch_size(cap, config), Ne - e)
+    if e == 0 and config.probe_electrons > 0:
+        n = min(n, int(config.probe_electrons))
+    return n
+
+
+def _run_per_electron_transport(
+    core,
+    xp,
+    Ne,
+    seed,
+    max_steps,
+    max_segments,
+    n_layers,
+    internal_bounds,
+    elastic_model_code,
+    z_total,
+    finite_footprint,
+    width_ang,
+    height_ang,
+    alive,
+    clock,
+    pos,
+    dirs,
+    E_cut_by_electrons,
+    layer_tables,
+    L_top,
+    L_bot,
+    mott,
+    E_keV,
+    seg_dir,
+    seg_mid,
+    seg_len,
+    seg_E,
+    seg_t0,
+    seg_id,
+    seg_lay,
+    config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
+    keep_on_device=False,
+):
+    """Drive ``core`` over electron batches and compact the result.
+
+    ``core`` is either :func:`_transport_core_ungrooved_perelectron` or the CUDA
+    kernel launcher; ``xp`` is the matching array module. The two share this
+    driver so batching, capacity growth, and compaction cannot drift apart.
+
+    Output is electron-major and step-minor, which is a pure function of the
+    electron index rather than of execution order, so a run is reproducible
+    across batch sizes and (on CUDA) launch geometries. That addressing is also
+    what lets the first batch be a short capacity probe: its segments land in the
+    same slots they would have anyway, so measuring costs only the electrons it
+    transports.
+
+    Per-electron state and the material tables are moved to the device once and
+    stay there; only the compacted segments of each batch cross the bus.
+
+    ``keep_on_device`` removes even that crossing. The compacted batches are
+    held in ``xp``'s own memory and joined with one ``concatenate``, which is
+    returned as an eighth value for the caller to hand out in place of its
+    ``seg_*`` buffers (those are then not allocated at all). Joining is what
+    sizes the output, because the segment total is not known until the last
+    batch has run; it costs one device-to-device pass over the payload -- against
+    the pageable host copy it replaces, that is roughly two orders of magnitude
+    of bandwidth -- and holds both copies of the payload while it runs.
+
+    Returns ``(nseg, n_back, n_trans, n_side, joined)``, where ``joined`` is
+    ``None`` unless ``keep_on_device``.
+    """
+    on_device = xp is not np
+    to_dev = xp.asarray if on_device else (lambda a: a)
+    to_host = xp.asnumpy if on_device else (lambda a: a)
+
+    d_keys = to_dev(stream_keys(seed, Ne))
+    d_alive = to_dev(alive)
+    d_clock = to_dev(clock)
+    d_pos = to_dev(pos)
+    d_dirs = to_dev(dirs)
+    d_E = to_dev(E_keV)
+    d_E_cut = to_dev(E_cut_by_electrons)
+    d_bounds = to_dev(internal_bounds)
+    d_top = to_dev(L_top)
+    d_bot = to_dev(L_bot)
+    d_layers = tuple(to_dev(a) for a in layer_tables)
+    d_mott = tuple(to_dev(a) for a in mott)
+
+    out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
+    batches = []
+
+    cap = max(1, int(config.seg_capacity))
+    seen_max = 0
+    nseg = 0
+    n_back = n_trans = n_side = 0
+    e = 0
+    while e < Ne:
+        m = _batch_electrons(e, cap, Ne, config)
+        sl = slice(e, e + m)
+        # The core advances position/direction/energy/clock in place, so a
+        # capacity replay has to start from the same state it did.
+        snap = (d_pos[sl].copy(), d_dirs[sl].copy(), d_E[sl].copy(), d_clock[sl].copy())
+
+        while True:
+            scratch = _alloc_scratch(xp, m, cap)
+            seg_count = xp.zeros(m, dtype=xp.int64)
+            exit_code = xp.zeros(m, dtype=xp.int8)
+            core(
+                e,
+                m,
+                cap,
+                d_keys,
+                d_alive,
+                max_steps,
+                n_layers,
+                d_bounds,
+                elastic_model_code,
+                z_total,
+                finite_footprint,
+                width_ang,
+                height_ang,
+                d_clock,
+                d_pos,
+                d_dirs,
+                d_E_cut,
+                *d_layers,
+                d_top,
+                d_bot,
+                *d_mott,
+                d_E,
+                *scratch,
+                seg_count,
+                exit_code,
+            )
+            needed = int(seg_count.max())
+            seen_max = max(seen_max, needed)
+            if needed <= cap:
+                break
+            # Replay: the streams are counter-addressed, so the retry reproduces
+            # the discarded run exactly rather than resampling it. `needed` is the
+            # true count, not a truncated one, so one replay always suffices; the
+            # headroom is for the batches after this one.
+            cap = _capacity_for(seen_max, config)
+            d_pos[sl], d_dirs[sl], d_E[sl], d_clock[sl] = snap
+            m = _batch_electrons(e, cap, Ne, config)
+            sl = slice(e, e + m)
+            snap = tuple(a[:m] for a in snap)
+
+        total = int(seg_count.sum())
+        if nseg + total > max_segments:
+            raise RuntimeError("segment buffer exhausted")
+        keep = xp.arange(cap)[None, :] < seg_count[:, None]
+        s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch
+        slots = (
+            s_dir.reshape(m, cap, 3),
+            s_mid.reshape(m, cap, 3),
+            s_len.reshape(m, cap),
+            s_E.reshape(m, cap),
+            s_t0.reshape(m, cap),
+            s_id.reshape(m, cap),
+            s_lay.reshape(m, cap),
+        )
+        if keep_on_device:
+            # No preallocation here: `max_segments` is Ne*max_steps rows, a bound
+            # no run comes near and no device would hold. The batch list is the
+            # buffer, and the join below sizes the output from what actually ran.
+            batches.append(tuple(a[keep] for a in slots))
+        else:
+            dst = slice(nseg, nseg + total)
+            for buf, a in zip(out_bufs, slots, strict=True):
+                buf[dst] = to_host(a[keep])
+        nseg += total
+
+        n_back += int((exit_code == EXIT_BACKSCATTERED).sum())
+        n_trans += int((exit_code == EXIT_TRANSMITTED).sum())
+        n_side += int((exit_code == EXIT_SIDE).sum())
+        e += m
+
+        # Re-size from what electrons actually needed rather than from the guess,
+        # in both directions: a tighter `cap` buys a proportionally larger batch
+        # out of the same byte budget.
+        if seen_max > 0:
+            cap = _capacity_for(seen_max, config)
+
+    joined = None
+    if keep_on_device:
+        # An empty run has no batch to take shapes and dtypes from; borrow them
+        # from a zero-length scratch, which is where they came from anyway.
+        empty = _alloc_scratch(xp, 0, 1)
+        joined = tuple(
+            xp.concatenate([b[i] for b in batches]) if batches else empty[i]
+            for i in range(len(out_bufs))
+        )
+
+    return nseg, n_back, n_trans, n_side, joined
+
+
+def _alloc_scratch(xp, m, cap):
+    n = m * cap
+    return (
+        xp.empty((n, 3), dtype=xp.float64),
+        xp.empty((n, 3), dtype=xp.float64),
+        xp.empty(n, dtype=xp.float64),
+        xp.empty(n, dtype=xp.float64),
+        xp.empty(n, dtype=xp.float64),
+        xp.empty(n, dtype=xp.int64),
+        xp.empty(n, dtype=xp.int16),
+    )
+
+
 def simulate_trajectories(
     E0_keV,
     Ne,
@@ -1196,6 +1879,9 @@ def simulate_trajectories(
     tilt_azim_rad=0.0,
     groove=None,
     E_cut_by_electrons=None,
+    transport_core="auto",
+    per_electron_config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
+    keep_segments_on_device=False,
 ):
     """
     Transport Ne electrons of energy E0_keV [keV] into a slab 0<=z<=thickness.
@@ -1352,6 +2038,54 @@ def simulate_trajectories(
     ``docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md``.
     Validation: blazed-groove-geometry
 
+    transport_core: which ungrooved core runs the electrons.
+      "auto" (default) -- the CUDA core when this process has a CUDA device, the
+          run is ungrooved, and Ne > CUDA_TRANSPORT_MIN_ELECTRONS (1000); the
+          lockstep core otherwise. See `resolve_transport_core`; pin the choice
+          for a whole process with `CXR_MC_TRANSPORT_CORE`.
+      "lockstep" -- the historical core: an outer step loop over an inner
+          electron loop, all draws taken from one shared Generator in step-major
+          order. BIT-FOR-BIT unchanged from before the other cores existed.
+      "per-electron" -- each electron runs to completion against its own
+          counter-addressed stream (see `_transport_core_ungrooved_perelectron`).
+      "cuda" -- the same algorithm as one CUDA thread per electron.
+
+    The two newer cores are NOT bit-for-bit with "lockstep": they consume
+    differently-ordered random streams, so they realize a different sample of
+    the same distribution. "cuda" is in turn not bit-for-bit with
+    "per-electron", because CUDA's libm differs from the host's by a few ulp and
+    transport amplifies that over hundreds of scattering events. What is
+    invariant is the physics: identical models, identical draw semantics, and
+    aggregate agreement across seeds (backscatter and transmit fractions,
+    segments per electron, mean segment length/energy/depth) -- so "auto"
+    changes a run's realization, not its distribution.
+    Validation: gpu-transport-core
+    Grooved transport is rejected for both new cores, so a grooved "auto" run
+    stays on the lockstep core rather than failing.
+
+    per_electron_config: batching policy for the two new cores
+    (:class:`PerElectronTransportConfig`). Segment capacity and scratch budget
+    only bound memory and replay behavior; neither changes results.
+
+    keep_segments_on_device: return the eight per-segment arrays where the CUDA
+    core produced them instead of copying them to the host. Requires
+    ``transport_core="cuda"``; every other returned array (the incident
+    phase-space diagnostics, the groove-gap arrays) and every count stays NumPy,
+    since those are per-electron or scalar and no spectrum kernel reads them.
+    The VALUES are untouched -- same dtypes, same elements, same order -- so this
+    only moves the payload, and a run's segments are identical either way.
+
+    The point is the spectrum phase: a case's kernels then read the transport's
+    output in place rather than the transport pushing ~82 B/segment down and the
+    kernels pulling it back up. It follows that the caller's spectrum backend has
+    to be the same device (``CXR_MC_BACKEND`` resolving to CUDA). NumPy kernels
+    cannot consume these arrays; NumPy refuses the implicit conversion rather
+    than performing it silently, so the mismatch is an error, not a slow path.
+
+    Costs device memory: the segments are joined with one ``concatenate``, which
+    holds two copies of the payload while it runs, and the joined arrays then
+    stay resident for as long as the caller keeps the dict.
+
     Returns dict of per-segment arrays:
       "r_mid" (M,3) [Ang], "v_hat" (M,3), "L_ang" (M,), "E_keV" (M,),
       "t_ang" (M,), "t0_ang" (M,) [per-electron bunch offset], "elec_id" (M,),
@@ -1391,6 +2125,16 @@ def simulate_trajectories(
 
     if elastic_model not in ("mott", "sr"):
         raise ValueError("elastic_model must be 'mott' or 'sr'")
+
+    requested_core = transport_core
+    transport_core = resolve_transport_core(transport_core, Ne, groove)
+    if transport_core != "lockstep" and groove is not None:
+        raise ValueError("grooved transport is only implemented for the lockstep core")
+    if keep_segments_on_device and transport_core != "cuda":
+        raise ValueError(
+            "keep_segments_on_device requires transport_core='cuda'; "
+            f"{requested_core!r} resolved to {transport_core!r}"
+        )
 
     if E_cut_by_electrons is None:
         E_cut_by_electrons = np.full(
@@ -1617,17 +2361,77 @@ def simulate_trajectories(
     # conservative safety bound in ordinary runs; groove re-entry events can add
     # material segments without consuming it, so the compiled core raises a
     # clear buffer error if a pathological case exceeds this capacity.
-    seg_mid = np.empty((max_segments, 3), dtype=float)
-    seg_dir = np.empty((max_segments, 3), dtype=float)
-    seg_len = np.empty(max_segments, dtype=float)
-    seg_E = np.empty(max_segments, dtype=float)
-    seg_t0 = np.empty(max_segments, dtype=float)
-    seg_id = np.empty(max_segments, dtype=np.int64)
-    seg_lay = np.empty(max_segments, dtype=np.int16)
+    # A device-resident run fills none of them -- its batches are joined on the
+    # device instead -- so it reserves no rows.
+    n_rows = 0 if keep_segments_on_device else max_segments
+    seg_mid = np.empty((n_rows, 3), dtype=float)
+    seg_dir = np.empty((n_rows, 3), dtype=float)
+    seg_len = np.empty(n_rows, dtype=float)
+    seg_E = np.empty(n_rows, dtype=float)
+    seg_t0 = np.empty(n_rows, dtype=float)
+    seg_id = np.empty(n_rows, dtype=np.int64)
+    seg_lay = np.empty(n_rows, dtype=np.int16)
+
+    # Where the segments end up living, and so which array module assembles the
+    # output below. NumPy unless the run asked to keep them on the device.
+    seg_xp = np
+    dev_segs = None
 
     elastic_model_code = 1 if elastic_model == "mott" else 0
 
-    if groove is None:
+    if groove is None and transport_core != "lockstep":
+        # Per-electron streams and run-to-completion ordering. Not bit-for-bit
+        # with the lockstep core -- see `_transport_core_ungrooved_perelectron`.
+        if transport_core == "cuda":
+            from .transport_jit_kernel import make_cuda_transport_core
+
+            core, core_xp = make_cuda_transport_core()
+        else:
+            core, core_xp = _transport_core_ungrooved_perelectron, np
+        if keep_segments_on_device:
+            seg_xp = core_xp
+
+        nseg, n_back, n_trans, n_side, dev_segs = _run_per_electron_transport(
+            core,
+            core_xp,
+            Ne,
+            seed,
+            max_steps,
+            max_segments,
+            n_layers,
+            internal_bounds,
+            elastic_model_code,
+            z_total,
+            finite_footprint,
+            0.0 if width_ang is None else float(width_ang),
+            0.0 if height_ang is None else float(height_ang),
+            alive,
+            clock,
+            pos,
+            dirs,
+            E_cut_by_electrons,
+            pack_layer_tables(L_Js, L_Zs, L_ks, L_coeffs, L_ncm3),
+            L_top,
+            L_bot,
+            (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat),
+            E_keV,
+            seg_dir,
+            seg_mid,
+            seg_len,
+            seg_E,
+            seg_t0,
+            seg_id,
+            seg_lay,
+            config=per_electron_config,
+            keep_on_device=keep_segments_on_device,
+        )
+        nvac = 0
+        vac_start = np.empty((0, 3), dtype=float)
+        vac_end = np.empty((0, 3), dtype=float)
+        vac_E = np.empty(0, dtype=float)
+        vac_t0 = np.empty(0, dtype=float)
+        vac_id = np.empty(0, dtype=np.int64)
+    elif groove is None:
         nseg, n_back, n_trans, n_side = _transport_core_ungrooved(
             Ne,
             alive,
@@ -1736,13 +2540,17 @@ def simulate_trajectories(
         vac_t0 = vac_t0_buf[:nvac]
         vac_id = vac_id_buf[:nvac]
 
-    r_mid = seg_mid[:nseg]
-    v_hat = seg_dir[:nseg]
-    L_ang = seg_len[:nseg]
-    E_seg = seg_E[:nseg]
-    t_ang = seg_t0[:nseg]
-    elec_id = seg_id[:nseg]
-    layer = seg_lay[:nseg]
+    if dev_segs is None:
+        r_mid = seg_mid[:nseg]
+        v_hat = seg_dir[:nseg]
+        L_ang = seg_len[:nseg]
+        E_seg = seg_E[:nseg]
+        t_ang = seg_t0[:nseg]
+        elec_id = seg_id[:nseg]
+        layer = seg_lay[:nseg]
+    else:
+        # Already sized to `nseg` by the join, in the scratch's field order.
+        v_hat, r_mid, L_ang, E_seg, t_ang, elec_id, layer = dev_segs
 
     vacuum_start_ang = vac_start
     vacuum_end_ang = vac_end
@@ -1750,7 +2558,10 @@ def simulate_trajectories(
     vacuum_t_ang = vac_t0
     vacuum_elec_id = vac_id
 
-    t0_ang = t0_electron[elec_id] if elec_id.size else np.empty(0, dtype=float)
+    # Per-segment, so it follows the segments: gathering on the device costs one
+    # Ne-sized upload of `t0_electron` and saves an nseg-sized download.
+    t0_by_electron = t0_electron if seg_xp is np else seg_xp.asarray(t0_electron)
+    t0_ang = t0_by_electron[elec_id] if elec_id.size else seg_xp.empty(0, dtype=float)
     vacuum_t0_ang = t0_electron[vacuum_elec_id] if vacuum_elec_id.size else np.empty(0, dtype=float)
 
     return {

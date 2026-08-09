@@ -32,6 +32,7 @@ external-bremsstrahlung-validation
 multilayer-materials
 atomic-data-sources
 relativistic-electron-transport
+gpu-transport-rawkernel
 channeling-radiation-physics
 ```
 
