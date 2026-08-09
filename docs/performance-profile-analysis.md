@@ -71,37 +71,39 @@ SECONDS` when collection did not use the default five-second interval.
 ### Repeat one uncached remote workload
 
 Run three comparable MoS2 sessions with one-second telemetry and a fixed
-six-worker allocation:
+six-worker allocation. Submissions go through `cxr run PROFILE -R/--remote`;
+`cxr remote run` still resolves but is deprecated and hidden (removal in 0.3.0,
+see [`cli-deprecations.md`](cli-deprecations.md)). The supported form has no
+repetition flag — submit once per repetition, waiting for each to finish, since
+one live job per named profile is allowed. `--perf-reps`, `--chunk-minutes`, and
+`--parallel-materials` exist only on the deprecated command:
 
 ```bash
-cxr remote run compute_test_300keV -m mos2 \
-  --perf \
-  --perf-reps 3 \
-  --perf-interval 1 \
+cxr run mos2_heavy -m mos2 --remote \
+  -p \
+  -i 1 \
   --workers 6 \
-  --chunk-minutes 0 \
-  --headless
+  --detach
 
-cxr remote performance pull compute_test_300keV
-cxr profile analyze compute_test_300keV --sample-period 1
+cxr remote performance pull mos2_heavy
+cxr profile analyze mos2_heavy --sample-period 1
 ```
 
-Repetition mode gives every session a separate job-local checkpoint root.
-Existing production checkpoints remain untouched, every repetition is
-uncached, and profiling checkpoints are not automatically pulled.
+`-p/--perf` runs without shared-cache reads or writes, so every repetition is
+uncached and existing production checkpoints stay untouched; profiling
+checkpoints are not automatically pulled. `PROFILE` must name a catalog profile
+(`cxr profile list`) — it is not a free-form experiment label.
 
 After the baseline completes, test a smaller line-spectrum chunk while keeping
 every other option fixed:
 
 ```bash
-cxr remote run compute_test_300keV -m mos2 \
-  --perf \
-  --perf-reps 3 \
-  --perf-interval 1 \
+cxr run mos2_heavy -m mos2 --remote \
+  -p \
+  -i 1 \
   --workers 6 \
   --spec-chunk 20000 \
-  --chunk-minutes 0 \
-  --headless
+  --detach
 ```
 
 Wait for the baseline job to finish before submitting the candidate: one live
@@ -116,17 +118,22 @@ capture CUDA API calls, kernels, NVTX phases, OS runtime activity, and native
 CPU samples for one full uncached session:
 
 ```bash
-cxr remote run compute_test_300keV -m mos2 \
-  --perf \
-  --perf-interval 1 \
+cxr run mos2_heavy -m mos2 --remote \
+  -p \
+  -i 1 \
   --workers 6 \
   --spec-chunk 20000 \
   --nsys \
-  --chunk-minutes 0 \
-  --headless
+  --detach
 
-cxr remote performance pull compute_test_300keV
+cxr remote performance pull mos2_heavy
 ```
+
+Every NVTX range in the tree is GPU-side (`cxr.spectrum_case:*`, `cxr.lines*`,
+`cxr.brem`, `cxr.interpolate`); `transport.py` pushes none. A capture therefore
+shows a transport-side wait only as an unlabelled gap, and attributing one needs
+the `cxr.performance.v1` activity labels (`transport_wait` vs `spectrum`), which
+carry per-tick phase identity. Do not expect `cxr.transport.*`.
 
 `--nsys` requires exactly one material, one material process, one performance
 repetition, and a monolithic allocation. It uses an isolated job-local
