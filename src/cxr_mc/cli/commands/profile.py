@@ -527,6 +527,7 @@ def show_command(name, json_output):
     "--beam",
     "beam_name",
     metavar="NAME",
+    shell_complete=_cli_completion.complete_beam,
     help="Attach a named [beams.NAME] reference; replaces the inline beam flags.",
 )
 @_detector_cli_options
@@ -651,6 +652,7 @@ def create_command(
     "--beam",
     "beam_name",
     metavar="NAME",
+    shell_complete=_cli_completion.complete_beam,
     help="Attach a named [beams.NAME] reference; replaces the inline beam flags.",
 )
 @_detector_cli_options

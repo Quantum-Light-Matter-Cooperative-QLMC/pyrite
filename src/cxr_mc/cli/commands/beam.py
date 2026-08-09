@@ -11,6 +11,7 @@ import tomlkit
 from tomlkit.exceptions import ParseError
 
 from cxr_mc.cli import _catalog_io
+from cxr_mc.cli import _completion as _cli_completion
 from cxr_mc.cli import json as cli_json
 from cxr_mc.cli._core import (
     CLIError,
@@ -169,7 +170,7 @@ def list_command(json_output):
 
 
 @command.command("show")
-@click.argument("name")
+@click.argument("name", shell_complete=_cli_completion.complete_beam)
 @output_option
 def show_command(name, json_output):
     """Show one named beam's fields."""
@@ -243,7 +244,7 @@ def create_command(
 
 
 @command.command("set")
-@click.argument("name")
+@click.argument("name", shell_complete=_cli_completion.complete_beam)
 @click.option("--label", help="Display-only description; never affects parameter_sha256.")
 @beam_cli_options
 @click.option("-y", "--yes", "yes", is_flag=True, help="Skip overwrite confirmation.")
@@ -302,7 +303,7 @@ def set_command(
 
 
 @command.command("rename")
-@click.argument("name")
+@click.argument("name", shell_complete=_cli_completion.complete_beam)
 @click.argument("new_name")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; write nothing.")
 def rename_command(name, new_name, dry_run):
@@ -331,7 +332,7 @@ def rename_command(name, new_name, dry_run):
 
 
 @command.command("delete")
-@click.argument("name")
+@click.argument("name", shell_complete=_cli_completion.complete_beam)
 @click.option("-y", "--yes", "yes", is_flag=True, help="Delete the exact previewed beam.")
 @click.option("--dry-run", is_flag=True, help="Print proposed TOML diff; delete nothing.")
 @output_option
