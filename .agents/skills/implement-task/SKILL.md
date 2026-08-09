@@ -9,12 +9,13 @@ description: Use when implementing a coherent cxr-mc task checklist slice on its
 
 1. Confirm handoff, cwd, branch, worktree, status, merge state, and authority.
    Read `AGENTS.md`, `main:TODO.md`, matching task doc
-   (`tasks/<branch-name>/README.md`), and required skills.
+   (`tasks/<branch-name>/README.md`), and required skills. Activate Serena, read
+   its manual, and inspect current config. If requested `one-shot` is absent on
+   a shared server, retain the handoff's autonomous contract without changing
+   project-wide modes.
 2. Invoke `todo-sync` and verify TODO invariant. Do not edit TODO unless
    `todo-writer: yes`; preserve `>user<` text.
-3. Invoke `repo-orientation`; read `docs/repo_map.md`, then use Serena or `rg`
-   for owners, helpers, callers/callees, impact, and affected tests. Use Context7
-   only for current external-library docs.
+3. Invoke `repo-orientation` for owners, helpers, call sites, impact, and tests.
 4. Convert assigned slice into small acceptance checks. Respect task decisions
    and non-goals; stop for material design ambiguity.
 
@@ -40,7 +41,8 @@ description: Use when implementing a coherent cxr-mc task checklist slice on its
 
 ## Finish
 
-Run `verifying-changes`; inspect final scoped diff and branch ahead count.
-Report results, checks, commits, remaining checklist, and blockers. Leave
-worktree on assigned branch. Stop on overlapping dirty work, TODO divergence,
-new authority need, or scope outside handoff.
+Run focused checks, then neighboring/runtime/broader checks proportional to
+risk. Inspect final scoped diff and branch ahead count. Report results, checks,
+commits, remaining checklist, and blockers. Leave worktree on assigned branch.
+Stop on overlapping dirty work, TODO inconsistency, new authority need, or scope
+outside handoff.

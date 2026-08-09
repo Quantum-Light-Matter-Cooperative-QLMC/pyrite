@@ -10,10 +10,14 @@ delegation, physics changes, or scope discovery.
 
 1. Confirm cwd, branch, worktree, status, and handoff fields. Read
    `AGENTS.md`, supplied task section, named owners/tests, and required skills.
-2. Verify `TODO.md` equals `main:TODO.md`; never edit it. If owner/path is not
-   explicit, invoke `repo-orientation` once; stop if still unclear.
-3. Use Serena or `rg` for named symbols, impact, and affected tests. Preserve
-   unrelated changes.
+   Activate Serena, read its manual, and inspect current config. If requested
+   `one-shot` is absent because the server is shared, follow this skill's
+   autonomous completion contract; do not alter project-wide modes.
+2. Treat main's `TODO.md` as authoritative; never edit or byte-compare the
+   disposable branch copy. If owner/path is not explicit, invoke
+   `repo-orientation` once; stop if still unclear.
+3. Follow `repo-orientation` for named symbols, impact, and affected tests.
+   Preserve unrelated changes.
 4. Make smallest complete change. Add focused regression test when behavior
    changes. Do not widen cleanup.
 5. Run named/focused checks. Never run heavy sweep locally; use

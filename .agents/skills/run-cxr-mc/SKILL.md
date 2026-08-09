@@ -20,6 +20,10 @@ interactive work. Smoke requires existing checkpoint and remains outside CI.
 Quick/survey scans still perform real Monte Carlo; route heavy work through
 `remote-gpu-jobs`.
 
+Own local runtime confirmation only. Unit/regression design belongs to
+`regression-testing`; remote submission and monitoring belong to
+`remote-gpu-jobs`.
+
 Full repository gate:
 
 ```bash

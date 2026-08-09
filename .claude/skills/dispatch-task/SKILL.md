@@ -1,19 +1,19 @@
 ---
 name: dispatch-task
-description: Use when assigning cxr-mc backlog implementation, completing approved task branch/worktree setup, tearing down a landed task, selecting a worker tier, or producing a complete handoff.
+description: Use when post-triage work needs approved task setup verification, worker selection/handoff, or landed task-record retirement; excludes implementation and general git cleanup.
 ---
 
 # Dispatch Task
 
-Route one owned implementation slice. Do not perform implementation unless
-caller also assigns it to this agent.
+Coordinate one approved task. `triage` owns initial planning/publication;
+worker skills own implementation; `repo-cleanup` owns generic worktree/ref
+hygiene.
 
 ## Inventory
 
-1. Read `main:TODO.md`, matching `tasks/<branch-name>/` (entry doc `README.md`),
-   `git worktree list --porcelain`, branch status, and relevant instructions.
-2. Use `repo-orientation` and Serena to confirm owners, dependencies, and
-   affected tests. Exact paths and non-code text may use `rg` or direct reads.
+1. Invoke `todo-sync`. Read the matching `tasks/<branch-name>/README.md`,
+   worktree list, branch status, and relevant instructions.
+2. Invoke `repo-orientation` to confirm owners, dependencies, and tests.
 3. If item still contains `>user<`, invoke `triage`; stop for plan review.
 4. Stop on unrelated dirty state, missing/inaccessible worktree, ambiguous
    backlog ownership, or TODO divergence.
@@ -23,14 +23,14 @@ caller also assigns it to this agent.
 ### Start approved task
 
 1. Verify reviewed task doc, one-line TODO pointer, branch, and worktree.
-2. Create/reuse missing branch/worktree; keep one TODO writer.
+2. Create/reuse the approved worktree if missing; do not redesign the plan.
 3. Verify triage's setup commit (task doc + `main:TODO.md` pointer) exists and
    `main` and the task branch are pushed with upstream. Branch `TODO.md` need
    not match main — the `merge=ours` driver reconciles it on merge/rebase.
 4. Dispatch only after clean status and remote setup verification.
 
-Direct user invocation authorizes TODO ownership. Setup commit and setup push
-belong to `triage`; do not grant worker push or TODO authority implicitly.
+Setup commit/push belongs to `triage`; do not grant worker push, TODO, or
+delegation authority implicitly.
 
 ### Retire landed task
 
@@ -38,11 +38,10 @@ Only when explicitly asked:
 
 1. Verify branch landed and identify durable task content.
 2. Promote durable content to `docs/`; remove the task directory; drop the
-   completed item's line from `TODO.md` on `main` (the authoritative writer —
-   the `merge=ours` driver discards an overlapping branch-side removal).
+   completed item's line from main's `TODO.md`.
 3. Commit and push authorized lifecycle changes.
-4. Remove worktree/branch only after clean-state and recovery checks. Report
-   deleted local/remote refs.
+4. Hand physical worktree/ref removal to `repo-cleanup`; report its recovery
+   SHAs.
 
 ## Select worker
 
@@ -59,6 +58,12 @@ handoff: `cli-ui-ux`, `notebook-workflow`, `physics-review`,
 `physics-validation`, `performance`, `documentation-maintenance`,
 `remote-gpu-jobs`, `regression-testing`, or `scientific-library`.
 
+For an approved, self-contained execution slice, request Serena `one-shot`.
+Modes are fixed at MCP startup: when the worker gets its own Serena server,
+start it with `--add-mode one-shot`; when workers share a server, put the same
+autonomous-completion contract in the handoff and do not edit project defaults.
+The mode changes prompting only; it grants no extra authority or approvals.
+
 ## Dispatch contract
 
 Send explicit values; never rely on child inheriting supervisor context.
@@ -73,6 +78,7 @@ Slice / non-goals:
 Done when:
 Required skills:
 Expected owners/tests:
+Serena execution: one-shot active | one-shot contract (shared server) | interactive
 Authority:
   commits: checkpoint | final | no
   push: yes | no

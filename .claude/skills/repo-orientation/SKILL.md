@@ -18,8 +18,8 @@ physics anchors, and thin marimo apps. Legacy
 README/TODO/docs unless task targets them.
 
 Find smallest owner and existing helper before editing. Prefer focused test over
-broad refactor. Context7 is only for current external-library docs; Headroom and
-RTK are not code indexes.
+broad refactor. Context7 is only for current external-library docs. Headroom
+shapes output; it is not a command or index. Do not use Tokensave or RTK.
 
 Regenerate repo inventory with `cxr-dev repo-map` after packages, entry
 points, or agent-tooling top-levels change.

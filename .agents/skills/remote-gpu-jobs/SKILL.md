@@ -7,11 +7,12 @@ description: Use when preparing sweeps, heavy Monte Carlo, or GPU-bound cxr-mc w
 
 Never run heavy sweep locally; WSL multiprocessing can OOM/crash.
 
-1. `cxr remote sync` when explicit sync needed; submit syncs by default.
-2. `cxr remote run [PROFILE]`; use `-m MATERIAL` for one profile member.
-3. Observe with `status`, `logs --follow`, or `attach`.
-4. `cxr remote pull <stems...>` after completion.
-5. `cxr remote stop <material>` to free box; later run resumes checkpoint.
+1. Run `cxr remote sync` only when an explicit standalone sync is needed;
+   submission syncs by default.
+2. Submit with `cxr run [PROFILE] --remote`; use `-m MATERIAL` for one member.
+3. Observe with `cxr job status`, `cxr job logs --follow`, or `cxr job attach`.
+4. Pull results with `cxr remote pull <profiles-or-stems...>`.
+5. Cancel with `cxr job stop <job-id>`; later submission resumes checkpoints.
 
 Default ~10-minute SLURM chunks (`--chunk-minutes`) provide scheduler yield
 points and checkpoint resume. `--chunk-minutes 0` monopolizes one allocation;

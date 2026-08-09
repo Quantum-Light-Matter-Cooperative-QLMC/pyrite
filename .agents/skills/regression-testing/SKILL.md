@@ -1,6 +1,6 @@
 ---
 name: regression-testing
-description: Use when designing fast regression tests for numerical, stochastic, plotting, checkpoint, or physics behavior in cxr-mc.
+description: Use when the task is to design or add a fast cxr-mc regression test for numerical, stochastic, plotting, checkpoint, or physics behavior; domain skills own implementation review.
 ---
 
 # Regression Testing
@@ -25,7 +25,8 @@ Report original symptom, pre-fix failure, seed/tolerance rationale, and focused
 command:
 
 ```bash
-uv run cxr-dev test tests/path/to/test.py -k test_name
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test \
+  tests/path/to/test.py -k test_name
 ```
 
 - Snapshotting a large array when a physical invariant is the real contract.

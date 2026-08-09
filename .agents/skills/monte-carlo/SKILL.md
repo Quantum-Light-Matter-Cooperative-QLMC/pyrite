@@ -1,6 +1,6 @@
 ---
 name: monte-carlo
-description: Use when adding or modifying stochastic kernels, RNG-dependent sampling, seeded tests, CPU/GPU parity, Monte Carlo transport, or transport benchmarks in cxr-mc.
+description: "Use when cxr-mc changes involve stochastic-kernel or RNG correctness: sampling, seed/stream behavior, Monte Carlo transport, and CPU/GPU reproducibility; use performance for benchmarks."
 ---
 
 # Monte Carlo
@@ -11,3 +11,7 @@ description: Use when adding or modifying stochastic kernels, RNG-dependent samp
 - New stochastic processes require regression tests with deterministic seeds.
 - Benchmark new kernels against the CPU baseline.
 - Keep CPU and GPU implementations numerically consistent.
+
+Own stochastic/RNG correctness only. Use `regression-testing` for general test
+design, `performance` for measurement protocol, and `physics-review` for model
+equations.

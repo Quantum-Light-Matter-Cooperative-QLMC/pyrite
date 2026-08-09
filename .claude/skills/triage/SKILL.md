@@ -31,7 +31,8 @@ and branch push; stop before dispatch.
    - implementation path and likely owners
    - stepwise checklist
    - decisions/open questions
-   - delegation slices and required skills
+   - delegation slices, required skills, and whether each reviewed slice is
+     self-contained enough for Serena `one-shot`
    - acceptance checks
 
 4. Create each local task branch/worktree if absent. Stop on name collision,
@@ -50,6 +51,6 @@ and branch push; stop before dispatch.
    and open decisions for user review. Address feedback by amending the setup
    commit and re-pushing.
 
-Do not implement or dispatch. After approval, `dispatch-task` owns worker
-handoff and eventual teardown.
-
+Do not label a slice `one-shot` while a material decision remains open. Do not
+implement or dispatch. After approval, `dispatch-task` owns worker launch,
+handoff, and eventual task-record retirement.

@@ -1,6 +1,6 @@
 ---
 name: scientific-library
-description: Use when writing or reviewing cxr-mc library code, especially simulation kernels, public APIs, vectorization, constants, typing, and scientific docstrings.
+description: "Use when deterministic cxr-mc library/API code needs work on vectorization, constants, typing, exports, or scientific docstrings; use monte-carlo or physics-review for those domain concerns."
 ---
 
 # Scientific Library
@@ -12,3 +12,7 @@ description: Use when writing or reviewing cxr-mc library code, especially simul
 - Avoid OOP unless stateful behavior is required.
 - Public APIs require docstrings and type hints.
 - Never duplicate physics constants; prefer `scipy.constants` or the project's constants module.
+
+Own library/API quality. Defer stochastic behavior to `monte-carlo`, physics
+claims to `physics-review`, benchmarks to `performance`, and CLI surfaces to
+`cli-ui-ux`.

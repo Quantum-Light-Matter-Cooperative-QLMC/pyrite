@@ -12,15 +12,18 @@ Own milestone outcome, not unlimited repository scope.
 1. Read `AGENTS.md`; invoke `todo-sync` and `repo-orientation`. Confirm
    `main:TODO.md`, task doc (`tasks/<branch-name>/README.md`), all
    worktrees/branches, clean ownership, merge state, dependencies, and authority.
+   Activate Serena, read its manual, and inspect current config. If requested
+   `one-shot` is absent on a shared server, retain the handoff's autonomous
+   contract without changing project-wide modes.
 2. If authorized as TODO writer, preserve invariant and `>user<` text. New-task
    setup requires task doc + synced TODO setup commit and upstream push before
    implementation. Otherwise never edit TODO.
 3. Resolve goal, non-goals, decisions, acceptance evidence, owning paths,
    dependency order, integration points, and risks. Record branch-specific
    detail in the task doc, durable landed decisions in `docs/`.
-4. Use Serena or `rg` for code navigation. Invoke every matching domain skill. Require fresh
-   physics validation context for changed physics; route heavy compute through
-   `remote-gpu-jobs`.
+4. Follow `repo-orientation` for navigation and invoke every matching domain
+   skill. Require fresh-context `physics-validation` for changed physics; route
+   heavy compute through `remote-gpu-jobs`.
 
 ## Execute
 
@@ -39,8 +42,8 @@ Own milestone outcome, not unlimited repository scope.
 
 ## Close milestone
 
-Invoke `verifying-changes`; run focused, neighboring, runtime, then broader
-checks proportional to risk. Update task checklist, decisions, remaining work,
-commits, and evidence. Report branch/worktree, commits/ahead count, checks,
-unresolved risks, and next slice. Do not mark task landed or delete branch/task
-file without confirmed integration and `todo-sync` closeout authority.
+Run focused, neighboring, runtime, then broader checks proportional to risk.
+Inspect the integrated diff and reconcile every delegated result from artifacts.
+Update task checklist, decisions, remainder, commits, and evidence. Report
+branch/worktree, ahead count, checks, risks, and next slice. Do not mark work
+landed or retire task state without confirmed integration and dispatch authority.
