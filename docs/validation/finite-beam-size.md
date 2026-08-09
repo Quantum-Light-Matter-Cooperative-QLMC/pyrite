@@ -83,7 +83,7 @@ src/cxr_mc/montecarlo/spectrum.py:283:   z_mid = seg_r[idx, 2]
 src/cxr_mc/montecarlo/spectrum.py:521:   seg_r = xp.asarray(segments["r_mid"], ...)
 src/cxr_mc/montecarlo/spectrum.py:524:   z_mid = seg_r[:, 2]
 src/cxr_mc/montecarlo/transport.py: (definition + docstring only)
-src/cxr_mc/plots/trajectories.py:104: L, v, r = segs["L_ang"], segs["v_hat"], segs["r_mid"]
+src/cxr_mc/plots/mpl/trajectories.py:227: L, v, r = segs["L_ang"], segs["v_hat"], segs["r_mid"]
 ```
 
 - `spectrum.py::mc_spectrum` (coherent PXR/CBS line spectrum): in the
@@ -102,7 +102,7 @@ src/cxr_mc/plots/trajectories.py:104: L, v, r = segs["L_ang"], segs["v_hat"], se
   branch likewise passes `z_mid = seg_r[:, 2]` to `_escape_length`/`_layer_dz`
   for self-absorption; the bremsstrahlung cross-section (`_brem_dsigma_dk`)
   depends only on `Z_i`, `seg_E`, `E_grid`.
-- `plots/trajectories.py` (the only other consumer of `r_mid`): uses the full
+- `plots/mpl/trajectories.py` (the only other consumer of `r_mid`): uses the full
   3-vector `r` for plotting trajectory projections (`start @ e1`, `start @
   e2`) — visualization only, not physics.
 

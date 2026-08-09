@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from cxr_mc.plots.altair_sweeps import heatmap_select_chart
-from cxr_mc.plots.sweeps import _HEATMAP_QUANTITIES as HEATMAP_QUANTITIES
+from cxr_mc.plots.altair.sweeps import heatmap_select_chart
+from cxr_mc.plots.mpl.sweeps import _HEATMAP_QUANTITIES as HEATMAP_QUANTITIES
 from cxr_mc.results import records
 
 

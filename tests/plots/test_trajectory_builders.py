@@ -14,7 +14,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pytest
 
-from cxr_mc.plots.trajectories import (
+from cxr_mc.plots.mpl.trajectories import (
     plot_electron_trajectories,
     plot_penetration_survival,
     plot_trajectory_grid,

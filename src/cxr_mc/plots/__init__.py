@@ -17,7 +17,7 @@ from ._style import (
     COLORS,
     energy_color,
 )
-from .detectors import (
+from .mpl.detectors import (
     SI_K_EDGE_EV,
     _domega_of,
     _draw_eaglexo_charge,
@@ -35,7 +35,7 @@ from .detectors import (
     plot_timepix_efficiency,
     plot_timepix_poisson,
 )
-from .interactive import (
+from .mpl.interactive import (
     _draw_chunk,
     _tilt_browser,
     browse,
@@ -43,7 +43,7 @@ from .interactive import (
     plot_chunk,
     stream_chunk,
 )
-from .spectra import (
+from .mpl.spectra import (
     MATERIAL_COMPARISON_SUMMARY_VERSION,
     _draw_by_energy,
     _draw_full_spectrum,
@@ -59,7 +59,7 @@ from .spectra import (
     plot_tilt_panel,
     select_material_comparison,
 )
-from .sweeps import (
+from .mpl.sweeps import (
     _AXIS_SPECS,
     _EXTRA_QUANTITIES,
     _FLUX_GATED,
@@ -76,7 +76,7 @@ from .sweeps import (
     plot_metric_vs,
     plot_scan,
 )
-from .trajectories import (
+from .mpl.trajectories import (
     _TRAJ_CMAP,
     C_ANG_PER_FS,
     _beam_detector_basis,

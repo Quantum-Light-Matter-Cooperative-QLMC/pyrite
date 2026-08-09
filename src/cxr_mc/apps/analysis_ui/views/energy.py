@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cxr_mc.plots.altair_spectra import spectrum_chart
+from cxr_mc.plots.altair.spectra import spectrum_chart
 from cxr_mc.results import records, select_results, sweep_values
 
 from ..controls import axes_panel

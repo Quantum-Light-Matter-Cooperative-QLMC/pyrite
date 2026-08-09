@@ -144,7 +144,7 @@ Gotchas / facts discovered (carry forward)
 Baseline noise (NOT regressions — ignore in all phases)
 
 - tests/test_line_grid_golden.py::test_installed_wheel_layout_fails_with_source_checkout_error fails on a clean tree (exit-code assertion).
-- ty check reports 5 pre-existing diagnostics: 3 tomlkit.exceptions submodule warnings in cli/sweep.py, 2 optional-dep unresolved-import (imageio.v3, kaleido) in plots/render_trajectories.py.
+- ty check reports 5 pre-existing diagnostics: 3 tomlkit.exceptions submodule warnings in cli/sweep.py, 2 optional-dep unresolved-import (imageio.v3, kaleido) in plots/plotly/render.py.
 
 ## WIP 2026-07-28 (test-suite debug session — suite green again, uncommitted)
 

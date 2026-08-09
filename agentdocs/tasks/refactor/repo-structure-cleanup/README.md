@@ -243,7 +243,7 @@ re-export.
 - [x] S3 delete 10 `cli/` alias shims (9 from original task + `beam.py` postdating named-beam-objects)
 - [x] S4 `profile.py` domain extraction; `cli/dashboard/` promotion
 - [ ] S5 `runner/` and `spectrum/` splits (golden + ledger invariant)
-- [ ] S6 `plots/{altair,mpl,plotly}/`
+- [x] S6 `plots/{altair,mpl,plotly}/`
 - [x] S7 worktrees relocation (2026-08-07) + checkpoint lockfile tracking rule
       documented and the 5 stray locks untracked (2026-08-09); the
       `performance-profiles`/`docs/_build`/`checkpoints` size bullet closed as
@@ -295,12 +295,27 @@ re-export.
   suite; lint; typecheck; CLI-reference freeze; repository-map generation; and
   explicit root/leaf help probes passed.
 
+### S6 checkpoint progress
+
+- 2026-08-09: regrouped all renderer implementations under
+  `plots/{altair,mpl,plotly}/`, leaving `_common`, `_frames`, and `_style` at
+  the renderer-neutral package root. Package exports and first-party callers
+  resolve to the backend-qualified implementations; all 12 former flat module
+  paths remain thin compatibility re-exports, including internal names used by
+  downstream callers.
+- Evidence: frozen package exports and flat-path compatibility guards, focused
+  plotting/Altair/material/detector checks, the apps suite, lint, typecheck,
+  and repository-map generation passed. Strict Sphinx imported and rendered
+  both canonical and compatibility plotting modules, then failed only on the
+  pre-existing stale `cxr_mc.montecarlo.line_prologue_jit_kernel` autosummary
+  entry.
+
 ## Sequencing
 
 1. ~~**S3 + S8 empty dir**~~ — done 2026-08-09.
 2. ~~**S7 remainder**~~ — done 2026-08-09.
 3. ~~**S1**~~ — done 2026-08-09.
-4. ~~**S2**~~, ~~**S4**~~, then **S6**, **S8 remainder**.
+4. ~~**S2**~~, ~~**S4**~~, ~~**S6**~~, then **S8 remainder**.
 5. **S5** last: physics-gated, and two live branches are editing those files.
 
 ## Non-goals

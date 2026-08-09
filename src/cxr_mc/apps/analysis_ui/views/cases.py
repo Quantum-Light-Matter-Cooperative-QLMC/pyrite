@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cxr_mc.plots.altair_spectra import multi_case_spectrum_chart
+from cxr_mc.plots.altair.spectra import multi_case_spectrum_chart
 
 from ..controls import axes_panel
 from .common import axis_warning_block

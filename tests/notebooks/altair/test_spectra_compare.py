@@ -1,4 +1,4 @@
-"""Guard tests for cxr_mc.plots.altair_spectra.compare_spectrum_chart -- the
+"""Guard tests for cxr_mc.plots.altair.spectra.compare_spectrum_chart -- the
 hue-generalized overlay chart backing the notebook's Polar-angle/Azimuthal
 comparison tabs (Energy comparison reuses the original spectrum_chart).
 
@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import altair as alt
 import numpy as np
 
-from cxr_mc.plots.altair_spectra import (
+from cxr_mc.plots.altair.spectra import (
     compare_spectrum_chart,
     multi_case_spectrum_chart,
     spectrum_chart,

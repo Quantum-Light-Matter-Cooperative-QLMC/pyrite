@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from cxr_mc.plots import plot_best_spectra
-from cxr_mc.plots.altair_spectra import spectrum_chart
-from cxr_mc.plots.altair_sweeps import metric_vs_chart, scan_charts
-from cxr_mc.plots.sweeps import _HEATMAP_QUANTITIES as HEATMAP_QUANTITIES
+from cxr_mc.plots.altair.spectra import spectrum_chart
+from cxr_mc.plots.altair.sweeps import metric_vs_chart, scan_charts
+from cxr_mc.plots.mpl.sweeps import _HEATMAP_QUANTITIES as HEATMAP_QUANTITIES
 from cxr_mc.results import records, select_results, sweep_values, top_geometries
 
 from .common import thickness_selector

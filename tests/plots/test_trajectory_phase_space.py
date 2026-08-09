@@ -11,7 +11,7 @@ from matplotlib.collections import LineCollection
 
 from cxr_mc.campaign.sweep import BeamSpec, Sweep, build_cases
 from cxr_mc.campaign.transverse import TransverseDistribution
-from cxr_mc.plots.trajectories import (
+from cxr_mc.plots.mpl.trajectories import (
     _beam_phase_space,
     _draw_incident_bundle,
     _trajectory_data,
@@ -123,7 +123,7 @@ def test_incident_bundle_tolerates_a_payload_without_transport():
 
 
 def test_plotly_incident_stubs_follow_each_electron_direction():
-    from cxr_mc.plots.plotly_trajectories import _incident_beam_lines
+    from cxr_mc.plots.plotly.trajectories import _incident_beam_lines
 
     data = _trajectory_data(_case(BeamSpec.with_transverse(_POLICY)), 40, 3)
     trace = _incident_beam_lines(data, 1.0)

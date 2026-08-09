@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import LineCollection
 
-from cxr_mc.plots.trajectories import _draw_trajectory_panel
+from cxr_mc.plots.mpl.trajectories import _draw_trajectory_panel
 
 
 def test_matplotlib_vacuum_legs_are_separate_faint_energy_collection():

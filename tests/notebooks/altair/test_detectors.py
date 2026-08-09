@@ -1,4 +1,4 @@
-"""Guard tests for the Altair detector renderers (cxr_mc.plots.altair_detectors).
+"""Guard tests for the Altair detector renderers (cxr_mc.plots.altair.detectors).
 
 Like test_altair_plots.py, these exercise only the NEW rendering layer on
 synthetic records (no GPU, no checkpoint), small enough to stay under Vega-Lite's
@@ -12,8 +12,8 @@ from types import SimpleNamespace
 import altair as alt
 import numpy as np
 
-from cxr_mc.plots import altair_detectors
-from cxr_mc.plots.altair_detectors import (
+from cxr_mc.plots.altair import detectors as altair_detectors
+from cxr_mc.plots.altair.detectors import (
     eaglexo_charge_chart,
     eaglexo_charge_frame,
     eaglexo_detected_chart,

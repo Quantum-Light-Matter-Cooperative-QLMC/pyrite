@@ -26,7 +26,7 @@ def test_crystal_view_defaults_to_one_ranked_reciprocal_vector() -> None:
 def test_penetration_view_uses_static_volume_figure_as_primary_track_plot() -> None:
     source = APP.read_text()
 
-    assert "from cxr_mc.plots.plotly_trajectories import (" in source
+    assert "from cxr_mc.plots.plotly.trajectories import (" in source
     assert "trajectory_volume_data," in source
     assert "trajectory_volume_figure_from_data," in source
     assert "trajectory_volume_animation" not in source
@@ -47,7 +47,7 @@ def test_penetration_view_uses_static_volume_figure_as_primary_track_plot() -> N
 def test_penetration_view_offers_prerendered_render_button() -> None:
     source = APP.read_text()
 
-    assert "from cxr_mc.plots.render_trajectories import (" in source
+    assert "from cxr_mc.plots.plotly.render import (" in source
     for name in (
         "cached_render_path,",
         "prune_render_cache,",

@@ -5,7 +5,7 @@ from cxr_mc.plots import (
     plot_eaglexo_efficiency,
     plot_timepix_efficiency,
 )
-from cxr_mc.plots.altair_detectors import (
+from cxr_mc.plots.altair.detectors import (
     eaglexo_charge_chart,
     eaglexo_detected_chart,
     timepix_detected_chart,

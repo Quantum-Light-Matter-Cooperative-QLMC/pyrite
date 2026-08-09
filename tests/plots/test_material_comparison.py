@@ -142,7 +142,7 @@ def test_cross_material_tab_requests_new_comparisons():
 
 
 def test_shared_summary_selects_all_modes_without_recomputing_metrics(monkeypatch):
-    import cxr_mc.plots.spectra as spectra
+    import cxr_mc.plots.mpl.spectra as spectra
 
     first = _record("First", 30.0, 150.0, peak=100.0)
     second = _record("Second", 60.0, 200.0, peak=10.0)

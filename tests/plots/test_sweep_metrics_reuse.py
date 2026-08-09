@@ -18,8 +18,8 @@ import numpy as np
 import pytest
 
 import cxr_mc.plots._common as _common
-from cxr_mc.plots.altair_sweeps import scan_charts
-from cxr_mc.plots.sweeps import plot_heatmaps, plot_scan
+from cxr_mc.plots.altair.sweeps import scan_charts
+from cxr_mc.plots.mpl.sweeps import plot_heatmaps, plot_scan
 
 N_RECORDS = 8  # 2 tilts x 2 azimuths x 2 beam energies (see _store)
 

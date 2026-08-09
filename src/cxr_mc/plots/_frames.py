@@ -1,7 +1,7 @@
 """_frames
 
 Renderer-neutral tidy-data builders for the parametric-sweep figures. Both
-:mod:`cxr_mc.plots.sweeps` (matplotlib) and :mod:`cxr_mc.plots.altair_sweeps`
+:mod:`cxr_mc.plots.mpl.sweeps` (matplotlib) and :mod:`cxr_mc.plots.altair.sweeps`
 (Altair) render FROM these builders -- the per-cell/per-point "reduce every
 swept case to its best record" reduction lives here exactly once. No
 matplotlib or Altair imports; renderers turn the returned ``pandas.DataFrame``
@@ -26,7 +26,7 @@ def _effective_x(recs, x, hue):
     """If ``x`` sweeps <2 values, substitute the first fallback knob that
     actually sweeps (and isn't the hue), so a 1-D scan/scan-frame is a
     meaningful curve instead of a vertical stack. Shared by
-    :func:`cxr_mc.plots.sweeps.plot_metric_vs` and :func:`metric_vs_frame`."""
+    :func:`cxr_mc.plots.mpl.sweeps.plot_metric_vs` and :func:`metric_vs_frame`."""
     if _ndistinct(recs, x) >= 2:
         return x
     return next(
@@ -63,7 +63,7 @@ def pick_hue(recs, x, y, panel, hue=None):
     return line_x, other
 
 
-# ---- axis/metric display registries (shared with cxr_mc.plots.sweeps) --------
+# ---- axis/metric display registries (shared with cxr_mc.plots.mpl.sweeps) --------
 # Per case field: (axis label, divide-to-display, display unit, value format).
 # Lets ANY swept knob be a heatmap/scan axis with sensible labels and units.
 _AXIS_SPECS = {
@@ -165,7 +165,7 @@ def heatmap_frame(
     Columns: ``x, y, panel, value, name, panel_raw``. ``name`` is the config
     name of the cell's best record and ``panel_raw`` its raw ``panel`` value --
     both carried so an interactive click on a cell (see
-    :func:`cxr_mc.plots.altair_sweeps.heatmap_select_chart`) maps back to an
+    :func:`cxr_mc.plots.altair.sweeps.heatmap_select_chart`) maps back to an
     exact geometry / parameter set. ``metrics`` is a precomputed
     ``_common._metrics_map`` for THESE records (computed here when omitted) --
     multi-quantity drivers pass one shared map instead of re-deriving it per

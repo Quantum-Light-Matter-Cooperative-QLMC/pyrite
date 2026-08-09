@@ -7,7 +7,7 @@ from cxr_mc.plots import (
     material_comparison_summary,
     select_material_comparison,
 )
-from cxr_mc.plots.altair_spectra import material_comparison_chart
+from cxr_mc.plots.altair.spectra import material_comparison_chart
 
 
 def render_cross_material(

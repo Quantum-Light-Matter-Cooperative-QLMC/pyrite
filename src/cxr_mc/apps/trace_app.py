@@ -30,20 +30,20 @@ def _():
     from cxr_mc.campaign.config import default_settings, trajectory_sweep
     from cxr_mc.campaign.sweep import build_cases, fmt_thickness
     from cxr_mc.materials import CATALOG
-    from cxr_mc.plots.altair_trajectories import (
+    from cxr_mc.plots.altair.trajectories import (
         penetration_survival_chart,
         trajectory_chart,
     )
-    from cxr_mc.plots.crystal_lattice import crystal_lattice_figure
-    from cxr_mc.plots.plotly_trajectories import (
-        trajectory_volume_data,
-        trajectory_volume_figure_from_data,
-    )
-    from cxr_mc.plots.render_trajectories import (
+    from cxr_mc.plots.plotly.crystal_lattice import crystal_lattice_figure
+    from cxr_mc.plots.plotly.render import (
         cached_render_path,
         prune_render_cache,
         render_cache_key,
         render_reveal_animation,
+    )
+    from cxr_mc.plots.plotly.trajectories import (
+        trajectory_volume_data,
+        trajectory_volume_figure_from_data,
     )
 
     return (
@@ -323,7 +323,7 @@ def _(mo):
     # The interactive Plotly frame animation is gone: the tab shows a static
     # full-reveal figure plus an
     # explicit Render button that produces a smooth, looping fixed-camera
-    # video via cxr_mc.plots.render_trajectories.render_reveal_animation.
+    # video via cxr_mc.plots.plotly.render.render_reveal_animation.
     # Rendering is a blocking multi-second-to-minutes kaleido/ffmpeg job, so
     # it stays opt-in behind a button rather than running on every rerun.
     penetration_render_frames_ui = mo.ui.slider(
@@ -515,7 +515,7 @@ def _(
 
         # Render button: prerender a smooth, looping fixed-camera video of the
         # SAME reveal sequence the old client-side animation played, offscreen
-        # via kaleido + ffmpeg (see cxr_mc.plots.render_trajectories). Cached
+        # via kaleido + ffmpeg (see cxr_mc.plots.plotly.render). Cached
         # under ~/.cache/cxr-mc/viewer-renders keyed on every parameter the
         # render depends on, so an unchanged parameter set short-circuits to
         # the existing file instead of re-rendering.

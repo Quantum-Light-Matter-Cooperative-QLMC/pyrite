@@ -10,7 +10,7 @@ import pytest
 
 from cxr_mc.materials import CATALOG
 from cxr_mc.materials.crystal import _direct_lattice_vectors
-from cxr_mc.plots.crystal_lattice import (
+from cxr_mc.plots.plotly.crystal_lattice import (
     _reciprocal_vector_data,
     crystal_atom_sites,
     crystal_bonds,

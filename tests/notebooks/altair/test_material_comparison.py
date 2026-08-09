@@ -1,11 +1,11 @@
-"""Guard tests for cxr_mc.plots.altair_spectra.material_comparison_chart -- the
+"""Guard tests for cxr_mc.plots.altair.spectra.material_comparison_chart -- the
 interactive counterpart of cxr_mc.plots.draw_material_comparison backing the
 notebook's "Compare" tab.
 """
 
 import altair as alt
 
-from cxr_mc.plots.altair_spectra import material_comparison_chart
+from cxr_mc.plots.altair.spectra import material_comparison_chart
 
 
 def _point(label, E0_keV=30.0, tilt_deg=10.0, tilt_azim_deg=20.0, line_eV=1.5e5, flux=1e8, q=0.8):

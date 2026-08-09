@@ -1,4 +1,4 @@
-"""Guard tests for the Altair sweep renderers (cxr_mc.plots.altair_sweeps).
+"""Guard tests for the Altair sweep renderers (cxr_mc.plots.altair.sweeps).
 
 Like test_altair_plots.py, these exercise only the NEW rendering layer on
 synthetic records (no GPU, no checkpoint), small enough to stay under Vega-Lite's
@@ -12,7 +12,7 @@ import altair as alt
 import numpy as np
 
 from cxr_mc.plots._frames import _value_label, heatmap_frame, metric_vs_frame
-from cxr_mc.plots.altair_sweeps import (
+from cxr_mc.plots.altair.sweeps import (
     heatmap_chart,
     heatmap_select_chart,
     metric_vs_chart,

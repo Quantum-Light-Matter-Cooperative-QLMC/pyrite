@@ -1,4 +1,4 @@
-"""Smoke tests for plots/detectors.py: every public figure builder called on a
+"""Smoke tests for plots/mpl/detectors.py: every public figure builder called on a
 small synthetic result, Agg backend, asserting a Figure with non-empty axes.
 Not a pixel/physics check -- ``tests/plots/test_exports.py`` documents why
 that's the wrong bar here; the point is exercising the drawing code paths
@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from cxr_mc.config import default_settings
-from cxr_mc.plots.detectors import (
+from cxr_mc.plots.mpl.detectors import (
     plot_eaglexo_charge,
     plot_eaglexo_charge_map,
     plot_eaglexo_detected,

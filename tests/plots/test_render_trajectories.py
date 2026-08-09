@@ -1,11 +1,11 @@
 """Cache-key and offscreen-render regression checks for
-``render_trajectories``."""
+``plots.plotly.render``."""
 
 import os
 
 import pytest
 
-from cxr_mc.plots.render_trajectories import (
+from cxr_mc.plots.plotly.render import (
     cached_render_path,
     prune_render_cache,
     render_cache_dir,

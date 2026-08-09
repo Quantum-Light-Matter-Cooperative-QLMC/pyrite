@@ -1,4 +1,4 @@
-"""Guard tests for the Altair trajectory renderers (cxr_mc.plots.altair_trajectories).
+"""Guard tests for the Altair trajectory renderers (cxr_mc.plots.altair.trajectories).
 
 The pure frame builders (survival_frame / tracks_frame) take already-simulated
 ``_trajectory_data`` dicts, so they're tested on synthetic data with NO Monte
@@ -10,7 +10,7 @@ integration smoke each exercises that plumbing on a real case. Charts'
 import altair as alt
 import numpy as np
 
-from cxr_mc.plots.altair_trajectories import (
+from cxr_mc.plots.altair.trajectories import (
     survival_frame,
     track_segments_frame,
     tracks_frame,
@@ -82,7 +82,7 @@ def test_track_segments_frame_no_cross_electron_bridge():
 
 
 def test_vacuum_segments_frame_stays_separate_from_radiating_tracks():
-    from cxr_mc.plots.altair_trajectories import vacuum_segments_frame
+    from cxr_mc.plots.altair.trajectories import vacuum_segments_frame
 
     data = {
         "px": np.array([0.0, 1.0]),
@@ -124,7 +124,7 @@ def _real_cases(material="hopg"):
 
 
 def test_penetration_survival_chart_builds_valid_spec():
-    from cxr_mc.plots.altair_trajectories import penetration_survival_chart
+    from cxr_mc.plots.altair.trajectories import penetration_survival_chart
 
     chart = penetration_survival_chart(_real_cases(), Ne=6, n_bins=20)
     assert isinstance(chart, alt.Chart)
@@ -132,7 +132,7 @@ def test_penetration_survival_chart_builds_valid_spec():
 
 
 def test_trajectory_chart_builds_valid_spec():
-    from cxr_mc.plots.altair_trajectories import trajectory_chart
+    from cxr_mc.plots.altair.trajectories import trajectory_chart
 
     chart = trajectory_chart(_real_cases()[0], Ne=6)
     assert isinstance(chart, alt.LayerChart)
@@ -145,7 +145,7 @@ def test_trajectory_chart_draws_tracks_as_rule_segments():
     ``color`` -- which Vega-Lite renders as nothing. A valid-spec/data test cannot
     catch this; the mark type is the property that distinguishes working from
     broken."""
-    from cxr_mc.plots.altair_trajectories import trajectory_chart
+    from cxr_mc.plots.altair.trajectories import trajectory_chart
 
     spec = trajectory_chart(_real_cases()[0], Ne=6).to_dict()
     track_layers = [
@@ -162,7 +162,7 @@ def test_trajectory_chart_draws_tracks_as_rule_segments():
 
 
 def test_penetration_survival_chart_none_on_empty():
-    from cxr_mc.plots.altair_trajectories import penetration_survival_chart
+    from cxr_mc.plots.altair.trajectories import penetration_survival_chart
 
     assert penetration_survival_chart([]) is None
 
@@ -190,7 +190,7 @@ def _mark_color(layer):
 
 
 def test_trajectory_chart_grooved_has_profile_layer():
-    from cxr_mc.plots.altair_trajectories import _GROOVE, trajectory_chart
+    from cxr_mc.plots.altair.trajectories import _GROOVE, trajectory_chart
 
     spec = trajectory_chart(_grooved_case(), Ne=8).to_dict()
     groove_layers = [layer for layer in spec["layer"] if _mark_color(layer) == _GROOVE]
@@ -200,14 +200,14 @@ def test_trajectory_chart_grooved_has_profile_layer():
 
 
 def test_trajectory_chart_ungrooved_has_no_profile_layer():
-    from cxr_mc.plots.altair_trajectories import _GROOVE, trajectory_chart
+    from cxr_mc.plots.altair.trajectories import _GROOVE, trajectory_chart
 
     spec = trajectory_chart(_real_cases()[0], Ne=8).to_dict()
     assert not [layer for layer in spec["layer"] if _mark_color(layer) == _GROOVE]
 
 
 def test_vacuum_legs_stay_separate_from_radiating_track_data():
-    from cxr_mc.plots.trajectories import _trajectory_data
+    from cxr_mc.plots.mpl.trajectories import _trajectory_data
 
     data = _trajectory_data(_grooved_case(), Ne=40, seed=42)
 
@@ -219,7 +219,7 @@ def test_vacuum_legs_stay_separate_from_radiating_track_data():
 
 
 def test_flat_trajectory_data_has_typed_empty_vacuum_arrays():
-    from cxr_mc.plots.trajectories import _trajectory_data
+    from cxr_mc.plots.mpl.trajectories import _trajectory_data
 
     data = _trajectory_data(_real_cases()[0], Ne=4, seed=7)
 
@@ -236,7 +236,7 @@ def test_flat_trajectory_data_has_typed_empty_vacuum_arrays():
 
 
 def test_trajectory_chart_draws_vacuum_as_separate_faint_rules(monkeypatch):
-    from cxr_mc.plots import altair_trajectories
+    from cxr_mc.plots.altair import trajectories as altair_trajectories
 
     data = {
         "px": np.array([0.0, 1.0]),

@@ -1,4 +1,4 @@
-"""Smoke tests for plots/interactive.py: the static-export path of ``browse``
+"""Smoke tests for plots/mpl/interactive.py: the static-export path of ``browse``
 for every ``kind``, the ipywidgets slider path (``_tilt_browser``), the Plotly
 click-through (``browse_plotly``), ``plot_chunk``, and ``stream_chunk``. Agg
 backend; asserts figures/traces get produced, not pixel content -- see
@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from cxr_mc.config import default_settings
-from cxr_mc.plots.interactive import (
+from cxr_mc.plots.mpl.interactive import (
     browse,
     browse_plotly,
     plot_chunk,

@@ -433,11 +433,14 @@ package** — `from cxr_mc.results import X` unchanged
 - Deps: `montecarlo`, `sweep`.
 
 ### `plots/` (package)
-All plotting — Matplotlib/Plotly. Split from single module into submodules by
-figure type; **every public and internal name re-exported from package** —
+Renderer-neutral data preparation plus backend packages under `mpl/`,
+`altair/`, and `plotly/`. **Every public and internal package export remains
+re-exported from `plots`** —
 `from cxr_mc.plots import X` unchanged (`tests/plots/test_exports.py`
-freeze export set). Submodule DAG (leaf → driver):
-`_style → _common → _frames → sweeps → {spectra, detectors, trajectories} → interactive`.
+freeze export set). Former flat submodule paths remain compatibility
+re-exports; first-party callers use the backend-qualified paths. Matplotlib
+submodule DAG (leaf → driver):
+`_style → _common → _frames → mpl.sweeps → {mpl.spectra, mpl.detectors, mpl.trajectories} → mpl.interactive`.
 - `_style` — `COLORS`, `_ENERGY_PALETTE`, `energy_color` (per-energy colour map
   consistent across every figure). Leaf; no sibling deps.
 - `_common` — shared figure plumbing: `_line_brem` (per-record line/brem split),
@@ -446,47 +449,51 @@ freeze export set). Submodule DAG (leaf → driver):
 - `_frames` — renderer-neutral tidy-data builders (`heatmap_frame`, `metric_vs_frame`,
   `scan_mode`, `pick_hue`, `_effective_x`/`_ndistinct`, axis/value-label registries
   `_AXIS_SPECS`/`_axis_disp`/`_value_label`/`_FLUX_GATED`): per-cell/per-point
-  best-record reduction shared by matplotlib `sweeps.py` and `altair_sweeps.py`. Leaf-most
+  best-record reduction shared by `mpl/sweeps.py` and `altair/sweeps.py`. Leaf-most
   of sweep-figure modules; no matplotlib/Altair imports. Deps: `_common`, `results`,
   `pandas`.
-- `spectra` — `plot_by_energy`, `plot_full_spectrum`, `plot_peak_vs_tilt`,
+- `mpl/spectra` — `plot_by_energy`, `plot_full_spectrum`, `plot_peak_vs_tilt`,
   `plot_mosaic_comparison`, `plot_best_spectra`, `plot_material_comparison`,
   `plot_tilt_panel`, `_draw_*` spectral drawers. Deps: `_style`, `_common`,
   `montecarlo`, `results`.
-- `sweeps` — `plot_heatmaps`, `facet_metric` (small-multiples over many knobs),
+- `mpl/sweeps` — `plot_heatmaps`, `facet_metric` (small-multiples over many knobs),
   `plot_metric_vs`, `plot_scan`; `_HEATMAP_QUANTITIES` / `_METRIC_LABELS`
   tables + axis helpers. Render from `_frames` tidy DataFrames, not re-derive
   best-record reduction inline. Deps: `_style`, `_frames`, `results`.
-- `detectors` — `plot_timepix_efficiency` / `_detected` / `_poisson`,
+- `mpl/detectors` — `plot_timepix_efficiency` / `_detected` / `_poisson`,
   `plot_eaglexo_efficiency` / `_detected` / `_charge` / `_charge_map`. Deps:
   `_style`, `_common`, `sweeps`, `results`, `detectors.timepix_response`, `detectors.eaglexo_response`.
-- `trajectories` — `plot_electron_trajectories`, `plot_trajectory_grid`,
+- `mpl/trajectories` — `plot_electron_trajectories`, `plot_trajectory_grid`,
   `plot_penetration_survival`, and transport initial-state arrays used by trace
   beam diagnostics. Deps: `_style`, `montecarlo`, `results`.
-- `interactive` — `browse`, `browse_plotly`, `stream_chunk`, `plot_chunk`
+- `mpl/interactive` — `browse`, `browse_plotly`, `stream_chunk`, `plot_chunk`
   (slider/streaming drivers dispatching to `spectra`/`detectors` drawers).
   Top of DAG. Deps: `_style`, `_common`, `spectra`, `detectors`.
-- `altair_*` — Altair/Vega-Lite renderers, interactive counterparts of
+- `altair/` — Altair/Vega-Lite renderers, interactive counterparts of
   matplotlib figures (marimo `analysis_app.py` use these first). Share exact
   data prep with matplotlib path (`_common._line_brem`, `_frames` builders,
   `detectors`/`trajectories` internals) — physics identical, only renderer
   differ. Intentionally **NOT** re-exported from package (frozen export
   guard) — import from submodule. Per-module guard tests: `tests/notebooks/altair/test_*.py`.
-  - `altair_spectra` — intrinsic spectra: `spectrum_chart`, `spectrum_frame`,
+  - `spectra` — intrinsic spectra: `spectrum_chart`, `spectrum_frame`,
     `compare_spectrum_chart` (overlay one line per E0/tilt/azimuth, for
     Energy/Polar-angle/Azimuthal comparison notebook tabs). Deps: `_common`,
     `results`.
-  - `altair_sweeps` — metric scans + parametric heatmaps: `metric_vs_chart`,
+  - `sweeps` — metric scans + parametric heatmaps: `metric_vs_chart`,
     `heatmap_chart`, `scan_charts` (auto heatmap-vs-lines, one shared metrics
     map across quantities). Deps: `_common`, `_frames`, `sweeps`, `results`.
-  - `altair_detectors` — Timepix3/Eagle XO spectral views:
+  - `detectors` — Timepix3/Eagle XO spectral views:
     `timepix_detected_chart`, `eaglexo_detected_chart`, `eaglexo_charge_chart`
-    (+ their `*_frame` builders). Deps: `_common`, `altair_spectra`,
+    (+ their `*_frame` builders). Deps: `_common`, `altair.spectra`,
     `detectors`, `detectors.eaglexo_response`.
-  - `altair_trajectories` — penetration views: `penetration_survival_chart`,
+  - `trajectories` — penetration views: `penetration_survival_chart`,
     `trajectory_chart` (+ `survival_frame`, `tracks_frame`,
     `track_segments_frame`); dense datashader raster stay on matplotlib.
-    Deps: `sweeps`, `trajectories`.
+    Deps: `mpl.sweeps`, `mpl.trajectories`.
+- `plotly/` — Plotly-specific interactive and rendered trajectory views.
+  `trajectories` builds 3D beam/crystal/track figures from shared
+  `mpl.trajectories` geometry; `crystal_lattice` renders unit-cell figures;
+  `render` owns cached animation export over the Plotly trajectory builder.
 - Deps: `montecarlo`, `results`, `detectors.timepix_response`, `detectors.eaglexo_response`.
 
 ## Detector forward models

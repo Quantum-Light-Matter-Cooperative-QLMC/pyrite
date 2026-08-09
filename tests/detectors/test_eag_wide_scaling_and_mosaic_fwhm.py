@@ -3,7 +3,7 @@
 import numpy as np
 
 from cxr_mc.detectors import eaglexo_response as eag
-from cxr_mc.plots.detectors import _eag_wide_brem, _eag_wide_charge
+from cxr_mc.plots.mpl.detectors import _eag_wide_brem, _eag_wide_charge
 from cxr_mc.results import line_fwhm_eV
 
 
