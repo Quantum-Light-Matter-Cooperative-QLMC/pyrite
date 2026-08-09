@@ -52,6 +52,19 @@ Profile labels stay in dataset identity and provenance but not per-case content
 identity. Two profiles reuse a case only when resolved inputs, including seed,
 hash identically.
 
+## Version control
+
+Nothing under `checkpoints/` is tracked except the `.gitkeep` files that hold
+`checkpoints/` and `checkpoints/archive/` open. Payloads (`*.pkl`), CAS blobs,
+`*meta.json`, `cases.json`, and `cxr.lock.json` are all local run output,
+reproducible from a profile plus seed, and are ignored.
+
+Five `cxr.lock.json` files were tracked between 2026-05 and 2026-08-09 without
+an intended rule; each was swept into an unrelated commit. They were untracked
+on 2026-08-09. A tracked lock is worse than no lock: it announces a completed
+dataset whose payload is ignored, so a fresh clone sees a GC root for blobs it
+does not have.
+
 ## Ownership and regression surface
 
 - `src/cxr_mc/profiles.py`: content-key schema and canonical hashing.

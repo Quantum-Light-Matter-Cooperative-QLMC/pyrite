@@ -171,7 +171,7 @@ invariance *is* the acceptance evidence. Sequence last; coordinate with
 "which backend renders X" is answerable from the tree. Public import paths
 re-export.
 
-## S7 — Working-tree hygiene
+## S7 — Working-tree hygiene — **done 2026-08-09**
 
 - ~~`worktrees/` is **3.6 GB inside the repo directory**~~ — **done 2026-08-07.**
   Relocated to `../cxr-mc-worktrees/` with `git worktree move`; the empty
@@ -180,12 +180,26 @@ re-export.
   `git worktree list --porcelain` rather than a hardcoded path, and
   `.worktreeinclude` lists bare filenames. Task docs repointed. The
   `.gitignore` `worktrees/` entry is kept as a guard against re-creation.
-- Same argument, lower stakes: `performance-profiles/` (69 MB),
-  `docs/_build` (41 MB), `checkpoints/` (93 MB).
-- `checkpoints/**/cxr.lock.json` is tracked for 5 datasets while `*.pkl`,
-  `*meta.json`, and `cases.json` are ignored. Probably deliberate provenance,
-  but nothing states the rule — document it in
-  `docs/checkpoint-case-store.md` or stop tracking them.
+- ~~Same argument, lower stakes: `performance-profiles/` (69 MB),
+  `docs/_build` (41 MB), `checkpoints/` (93 MB).~~ — **no action, 2026-08-09.**
+  The survey numbers no longer hold: in `/home/alex/dev/cxr-mc`,
+  `performance-profiles/` and `docs/_build/` do not exist and `checkpoints/` is
+  88 MB. All three are already gitignored, are regenerable, and are per-checkout
+  by nature, so relocation buys nothing. The 4.5 GB checkout is 4.4 GB `.venv`
+  (plus 25 MB `.serena`, 12 MB `.git`) — a tool-managed environment that must
+  stay checkout-local. The `worktrees/` case was different only because 3.6 GB
+  of *other checkouts* lived under a path the repo also walks.
+- ~~`checkpoints/**/cxr.lock.json` is tracked for 5 datasets~~ — **untracked
+  2026-08-09.** Not deliberate provenance: `git log --diff-filter=A` shows each
+  of the 5 swept into an unrelated commit (`9e726d2` materials/trace_app,
+  `be1bb63` JIT kernel rework, `f3bd000` docs). A tracked lock is actively
+  wrong, not merely undocumented — `campaign_lock` locks are artifact-GC roots
+  (`energy_grid/gc.py:186`), so a fresh clone inherits GC roots for `.pkl`
+  payloads that `.gitignore` withheld. `git rm --cached` on the 5,
+  `checkpoints/{*,**}/*.lock.json` added to `.gitignore` (the legacy sibling
+  `<stem>.lock.json` form from `campaign_lock.py:24` needs both patterns), and
+  the tracking rule written into `docs/checkpoint-case-store.md`. Files stay on
+  disk; no test or script reads the repo-local `checkpoints/` tree.
 
 ## S8 — Leftovers and generated-doc drift
 
@@ -228,8 +242,10 @@ re-export.
 - [ ] S4 `profile.py` domain extraction; `cli/dashboard/` promotion
 - [ ] S5 `runner/` and `spectrum/` splits (golden + ledger invariant)
 - [ ] S6 `plots/{altair,mpl,plotly}/`
-- [ ] S7 worktrees relocation + skill/`.worktreeinclude` updates + checkpoint
-      lockfile tracking rule documented
+- [x] S7 worktrees relocation (2026-08-07) + checkpoint lockfile tracking rule
+      documented and the 5 stray locks untracked (2026-08-09); the
+      `performance-profiles`/`docs/_build`/`checkpoints` size bullet closed as
+      no-action
 - [x] S8 empty-dir removal (`src/cxr_mc/line_grid/` confirmed deleted)
 - [ ] S8 repo-map DAG generator, `checks/`/`scripts/` ownership
 - [ ] `docs/repo_map.md` regenerated/updated per source-touching slice
@@ -239,11 +255,8 @@ re-export.
 ## Sequencing
 
 1. ~~**S3 + S8 empty dir**~~ — done 2026-08-09.
-2. **S7 remainder** — the worktrees relocation itself landed 2026-08-07; what
-   is left is the checkpoint-lockfile tracking rule and the
-   `performance-profiles/` / `docs/_build` / `checkpoints/` size question.
-   Next up.
-3. **S1** — the only correctness defect; before S2 so app modules move once,
+2. ~~**S7 remainder**~~ — done 2026-08-09.
+3. **S1** — next up; the only correctness defect. Before S2 so app modules move once,
    and before `feature/uv-workspace-split` designs members.
 4. **S2**, then **S4**, **S6**, **S8 remainder**.
 5. **S5** last: physics-gated, and two live branches are editing those files.
