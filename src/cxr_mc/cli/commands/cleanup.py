@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import click
 
-from ... import checkpoint_cleanup as _cleanup
 from .. import _completion as _cli_completion
 
 
@@ -38,6 +37,8 @@ from .. import _completion as _cli_completion
 def gc_command(all_profiles: bool, catalog_profile: str | None, yes: bool) -> None:
     if all_profiles and catalog_profile is not None:
         raise click.UsageError("gc --all cannot be combined with --profile")
+    from ... import checkpoint_cleanup as _cleanup
+
     _cleanup.prune_checkpoints(
         all_profiles=all_profiles,
         catalog_profile=catalog_profile,
@@ -75,6 +76,8 @@ def rm_command(materials, catalog_profile, all_datasets, yes, checkpoint_dir):
     selectors = int(bool(materials)) + int(catalog_profile is not None) + int(all_datasets)
     if selectors != 1:
         raise click.UsageError("rm needs exactly one of MATERIAL..., --profile NAME, or --all")
+    from ... import checkpoint_cleanup as _cleanup
+
     return _cleanup.clear_checkpoints(
         materials=tuple(materials),
         catalog_profile=catalog_profile,

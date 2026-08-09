@@ -9,7 +9,21 @@ Shell tab completion for `cxr` often takes multiple seconds to appear instead
 of the near-instant response expected of shell completion. User flags this as
 needing a fix without further diagnosis.
 
-## Investigation notes (not yet reproduced/measured)
+## Investigation notes
+
+Measured on the branch's installed `cxr` script, warm cache, five repetitions:
+
+- local `cxr run --profile` completion: 50–70 ms;
+- remote-job completion against the configured `qlmc` target: 110–200 ms
+  (that host failed fast, so this is not a stalled-SSH measurement).
+
+An injected missing-CuPy reproduction exposed a separate failure: completing
+`cxr checkpoint` caused `LazyGroup` to import `cli.commands.slim` and
+`cli.commands.cleanup`, whose eager domain imports reached
+`results` → `montecarlo._backend`. With `CXR_MC_BACKEND=cuda` and no CuPy
+installed, completion exited with a traceback. Both commands now defer their
+domain imports until invocation; a fresh-process regression test guards the
+completion path.
 
 Local completion providers themselves look cheap: `_material_keys`/
 `_profile_keys` (`src/cxr_mc/cli/_completion.py:66-80`) read
@@ -19,9 +33,9 @@ subcommand modules aren't imported just to list names. Two more likely
 sources of multi-second latency, neither confirmed yet:
 
 1. **Remote/SSH completion providers block per keystroke.**
-   `_completion.py` defines `REMOTE_COMPLETION_TIMEOUT_SECONDS = 1.5` and
-   `MAX_REMOTE_CANDIDATES = 100` for job/checkpoint completion that shells out
-   over SSH (see `test_job_completion_silences_lookup_failures`,
+   `_completion.py` defines `REMOTE_COMPLETION_TIMEOUT_SECONDS = 0.5` and
+   `MAX_REMOTE_CANDIDATES = 100` for job-ID completion that shells out over
+   SSH (see `test_job_completion_silences_lookup_failures`,
    `test_remote_checkpoint_completion_includes_variant_stems`,
    `tests/test_cli_completion.py`). If any completion path invoked
    (including non-`remote` subcommands, if the completion callback wiring is

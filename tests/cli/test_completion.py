@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -149,6 +151,46 @@ def test_remote_lookup_is_noninteractive_and_bounded(monkeypatch):
     assert recorded["kwargs"]["stdin"] is subprocess.DEVNULL
     assert recorded["kwargs"]["stderr"] is subprocess.DEVNULL
     assert recorded["kwargs"]["timeout"] == _cli_completion.REMOTE_COMPLETION_TIMEOUT_SECONDS
+
+
+def test_remote_lookup_timeout_stays_interactive():
+    # Regression guard: this is the wall-clock cap on an unresponsive/stalled
+    # SSH lookup for a single Tab press, independent of ssh's own
+    # ConnectTimeout (TCP connect only). Above ~0.5s a completion hang reads
+    # as multi-second to the user pressing Tab.
+    assert _cli_completion.REMOTE_COMPLETION_TIMEOUT_SECONDS <= 0.5
+
+
+def test_checkpoint_group_completion_does_not_import_gpu_backend():
+    """Completion stays usable when the selected accelerator package is absent."""
+    environment = os.environ | {
+        "CXR_MC_BACKEND": "cuda",
+        "_CXR_COMPLETE": "bash_complete",
+        "COMP_WORDS": "cxr checkpoint ",
+        "COMP_CWORD": "2",
+    }
+    code = """
+import builtins
+
+original_import = builtins.__import__
+
+def block_cupy(name, *args, **kwargs):
+    if name == 'cupy' or name.startswith('cupy.'):
+        raise ModuleNotFoundError("No module named 'cupy'")
+    return original_import(name, *args, **kwargs)
+
+builtins.__import__ = block_cupy
+from cxr_mc.cli import main
+main()
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_choice_completer_returns_prefix_matches():

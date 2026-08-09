@@ -23,7 +23,13 @@ from .. import DATA_DIR
 
 MAX_LOCAL_CANDIDATES = 200
 MAX_REMOTE_CANDIDATES = 100
-REMOTE_COMPLETION_TIMEOUT_SECONDS = 1.5
+# Governs worst-case latency for an interactive Tab press, not just the SSH
+# handshake: subprocess.run's timeout kills the ssh child on wall-clock alone,
+# so it bounds DNS/banner/auth stalls that ssh's own ConnectTimeout=1 (TCP
+# connect only) does not cover. Kept short because a failed lookup silently
+# degrades to no remote candidates -- cheap failure mode -- while 1.5s+ reads
+# as multi-second hang to the user.
+REMOTE_COMPLETION_TIMEOUT_SECONDS = 0.5
 
 # ``@`` is allowed so ``<material>@<label>-<digest>`` checkpoint @-stems surface
 # in local checkpoint-stem completion alongside legacy ``--<fidelity>-`` stems.

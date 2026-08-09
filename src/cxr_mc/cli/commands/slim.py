@@ -3,7 +3,6 @@
 import click
 
 from ... import _checkpoint_io
-from ... import slim as _slim
 from .. import _completion as _cli_completion
 from .. import _core as _cli_core
 
@@ -60,6 +59,11 @@ def command(
 ):
     if brem_only and line_only:
         raise click.UsageError("--brem-only and --line-only are mutually exclusive")
+    # Completion imports this command while enumerating the checkpoint group.
+    # Keep the results/Monte Carlo stack out of that path: it selects an
+    # accelerator backend and may require an optional GPU package.
+    from ... import slim as _slim
+
     return _cli_core.invoke_legacy(
         _slim._cli,
         checkpoint=checkpoint,
