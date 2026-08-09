@@ -255,5 +255,3 @@ remains.
 - **Measured-data — REMAINING:** quantitative comparison of the predicted broadened /
   substrate-attenuated line ratios against a real film-on-substrate spectrum (EDS / Timepix /
   Eagle XO). Data-dependent — no in-repo dataset yet.
-
----

@@ -102,6 +102,49 @@ grows beyond a single non-interactive check command.
 These open choices affect configuration and dependency shape, so this task is
 not a Serena one-shot until they are resolved.
 
+## Implementation outcome (2026-08-09)
+
+Status: implemented on `docs/improve-typesetting-quality`; awaiting review and
+landing.
+
+- Clean inventory, with the ignored autosummary tree rebuilt: 114 inherited
+  source-docstring `docutils` diagnostics, 2 generated-autosummary `docutils`
+  diagnostics, 1 maintained-prose trailing-transition diagnostic, and 488
+  nitpicky Python-domain reference diagnostics. The maintained-prose defect is
+  fixed.
+- The blanket `docutils` suppression is removed. A documentation-only Sphinx
+  filter suppresses exactly the 116 inherited autodoc/autosummary records and
+  checks their sorted aggregate SHA-256. New, removed, or changed inherited
+  diagnostics fail the build; maintained `docs/` diagnostics are never
+  filtered. `CXR_DOCS_SHOW_AUTODOC_WARNINGS=1` prints the full inherited set for
+  review.
+- Global nitpicky mode is deferred: its 488 unresolved Python-domain references
+  are a separate public-API/docstring cleanup, not a usable gate in this slice.
+  Ordinary broken semantic references remain warnings and therefore fail `-W`.
+- Native MyST roles/directives and linked citations/footnotes are sufficient;
+  no BibTeX dependency was added. Shared BibTeX ownership remains conditional
+  on future repeated-source use.
+- `docs/validation/finite-time-lineshape.md` is the pilot. It was already
+  independently validated; only presentation changed. Rendered HTML contains
+  three numbered/labeled equations, a numbered/captioned table, and resolved
+  semantic references.
+- `cxr-dev docs` removes generated autosummary/build trees and runs the offline
+  `-E -a -W --keep-going` HTML build. `--linkcheck` is explicit and excluded
+  from offline gates.
+
+Evidence:
+
+- `uv run cxr-dev docs`: pass.
+- Direct `uv run --group docs sphinx-build -E -a -W --keep-going -b html ...`:
+  pass.
+- `uv run cxr-dev test tests/dev/test_dev.py tests/dev/test_docs.py`: 26 pass.
+- `uv run cxr-dev lint`: pass.
+- `uv run cxr-dev typecheck`: pass.
+
+Deferred follow-up: resolve the 488 nitpicky Python-domain references and the
+116 inherited parse diagnostics incrementally; do not widen this completed
+typesetting/gate slice into a public-docstring rewrite.
+
 ## Delegation slices
 
 1. **Warning inventory and proposed boundary** — read-only, self-contained

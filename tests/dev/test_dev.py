@@ -69,6 +69,48 @@ def test_quality_commands_use_canonical_invocations(
     assert calls == [expected]
 
 
+@pytest.mark.parametrize(
+    ("linkcheck", "builder"),
+    [(False, "html"), (True, "linkcheck")],
+)
+def test_docs_cleans_generated_trees_and_runs_strict_build(
+    dev_module, monkeypatch, linkcheck: bool, builder: str
+) -> None:
+    removed = []
+    calls = []
+    monkeypatch.setattr(dev_module, "_remove_path", removed.append)
+    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+
+    dev_module.cmd_docs(Namespace(linkcheck=linkcheck))
+
+    docs = dev_module.ROOT / "docs"
+    assert removed == [docs / "_autosummary", docs / "_build"]
+    assert calls == [
+        (
+            "-m",
+            "sphinx",
+            "-E",
+            "-a",
+            "-W",
+            "--keep-going",
+            "-b",
+            builder,
+            str(docs),
+            str(docs / "_build" / builder),
+        )
+    ]
+
+
+def test_docs_parser_exposes_offline_and_linkcheck_modes(dev_module) -> None:
+    offline = dev_module.build_parser().parse_args(["docs"])
+    online = dev_module.build_parser().parse_args(["docs", "--linkcheck"])
+
+    assert offline.func is dev_module.cmd_docs
+    assert offline.linkcheck is False
+    assert online.func is dev_module.cmd_docs
+    assert online.linkcheck is True
+
+
 def test_test_forwards_pytest_selectors_and_arguments(dev_module, monkeypatch) -> None:
     calls = []
     monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))

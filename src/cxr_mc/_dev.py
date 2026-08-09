@@ -9,6 +9,7 @@ Commands:
     acp-up     start the Claude and Codex ACP WebSocket bridges
     acp-down   stop bridges started by acp-up
     repo-map   print a compact repo tree and the canonical commands
+    docs       clean, strict Sphinx build (optional external link check)
     lint       run Ruff over the repository
     format     run Ruff formatter
     typecheck  run ty
@@ -483,6 +484,26 @@ def cmd_imports(_: argparse.Namespace) -> None:
     subprocess.run(["lint-imports", "--no-cache"], cwd=ROOT, check=True)
 
 
+def cmd_docs(args: argparse.Namespace) -> None:
+    """Build all maintained and generated documentation from clean state."""
+    docs_dir = ROOT / "docs"
+    _remove_path(docs_dir / "_autosummary")
+    _remove_path(docs_dir / "_build")
+    builder = "linkcheck" if getattr(args, "linkcheck", False) else "html"
+    run(
+        "-m",
+        "sphinx",
+        "-E",
+        "-a",
+        "-W",
+        "--keep-going",
+        "-b",
+        builder,
+        str(docs_dir),
+        str(docs_dir / "_build" / builder),
+    )
+
+
 def cmd_verify(args: argparse.Namespace) -> None:
     cmd_check_skills(args)
     if not todo_merge_driver_configured():
@@ -550,6 +571,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="fail if the generated dependency region is stale",
     )
     repo_map.set_defaults(func=cmd_repo_map)
+    docs = sub.add_parser(
+        "docs",
+        help="clean and strictly build the Sphinx documentation",
+    )
+    docs.add_argument(
+        "--linkcheck",
+        action="store_true",
+        help="check external links (requires network access; excluded from offline gates)",
+    )
+    docs.set_defaults(func=cmd_docs)
     test = sub.add_parser("test")
     test.add_argument(
         "--numba",

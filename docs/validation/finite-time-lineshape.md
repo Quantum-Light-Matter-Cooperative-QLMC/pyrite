@@ -8,16 +8,19 @@ For real \(P\), \(T>0\), and angular phase with no hidden \(2\pi\), define
 Q(P,T)=\int_{-T/2}^{T/2}e^{i\,2Pt}\,dt.
 \]
 
-Direct integration gives
+Direct integration gives the finite-time amplitude in
+{eq}`eq-finite-time-amplitude`.
 
-\[
+```{math}
+:label: eq-finite-time-amplitude
+
 \begin{aligned}
 Q(P,T)
 &=\frac{e^{iPT}-e^{-iPT}}{i2P}\\
 &=\frac{\sin(PT)}{P}
 =T\frac{\sin(PT)}{PT}.
 \end{aligned}
-\]
+```
 
 The value at \(P=0\) is defined by continuity as \(Q(0,T)=T\). Therefore,
 verbatim from the independent result,
@@ -33,14 +36,17 @@ verbatim from the independent result,
 
 Here NumPy's normalized sinc is
 \(\operatorname{sinc}(u)=\sin(\pi u)/(\pi u)\). Its exact area and
-distributional normalization are
+distributional normalization are given by
+{eq}`eq-finite-time-normalization`.
 
-\[
+```{math}
+:label: eq-finite-time-normalization
+
 \int_{-\infty}^{\infty}|Q(P,T)|^2\,dP=\pi T,
 \qquad
 \frac{|Q(P,T)|^2}{\pi T}
 \xrightarrow[T\to\infty]{\mathcal D}\delta(P).
-\]
+```
 
 Equivalently,
 
@@ -135,12 +141,15 @@ The independently derived \(P\)-area therefore becomes
 \]
 
 Thus the energy-domain unit-area density and its delta limit are
+{eq}`eq-finite-time-energy-density`.
 
-\[
+```{math}
+:label: eq-finite-time-energy-density
+
 L_T^{(E)}(E)
 =\frac{|D|}{2\pi T\hbar c}|Q(P(E),T)|^2
 \xrightarrow[T\to\infty]{\mathcal D}\delta(E-E_{\rm res}),
-\]
+```
 
 or, equivalently,
 
@@ -165,11 +174,22 @@ separate `line-energy-dispersion` sign adjudication used to define the center
 
 ## Numerical spot check
 
-The required integration over \(P\in[-20/T,20/T]\) produced
+The required integration over \(P\in[-20/T,20/T]\) produced the values in
+{numref}`tbl-finite-time-spot-check`.
 
-```text
-T=10.0   integral=30.906233356297136   pi*T=31.41592653589793
-T=100.0  integral=309.0623335629714    pi*T=314.1592653589793
+```{list-table} Finite-window integration of the squared amplitude.
+:name: tbl-finite-time-spot-check
+:header-rows: 1
+
+* - $T$
+  - Numerical integral
+  - $\pi T$
+* - 10.0
+  - 30.906233356297136
+  - 31.41592653589793
+* - 100.0
+  - 309.0623335629714
+  - 314.1592653589793
 ```
 
 Each finite-window integral is 98.378% of \(\pi T\) (1.622% low from omitted

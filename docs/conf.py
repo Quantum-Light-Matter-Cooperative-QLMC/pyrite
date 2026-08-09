@@ -14,6 +14,9 @@ import os
 import sys
 import tempfile
 
+# Load small documentation-only extensions from this directory.
+sys.path.insert(0, os.path.dirname(__file__))
+
 # Keep autodoc imports deterministic and quiet without muting Sphinx warnings.
 os.environ.setdefault(
     "MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "cxr-mc-matplotlib")
@@ -38,6 +41,7 @@ version = __version__
 
 # -- Extensions --------------------------------------------------------------
 extensions = [
+    "_warning_baseline",  # exact boundary around inherited autodoc parse debt
     "myst_parser",  # render the docs/*.md design notes
     "sphinx.ext.autodoc",  # API docs from docstrings
     "sphinx.ext.autosummary",  # per-module summary tables + stub pages
@@ -62,18 +66,22 @@ autodoc_mock_imports = ["cupy", "cupyx", "cxr_mc.cli.__main__"]
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True
 
-# The package docstrings are plain text (inline math like |g|, indented parameter
-# blocks) rather than reStructuredText, so docutils emits cosmetic parse warnings
-# when autodoc renders them. Suppress that category — the pages still render fine
-# — instead of churning validated physics modules to satisfy an RST parser.
-suppress_warnings = ["docutils"]
-
 # -- MyST --------------------------------------------------------------------
 myst_enable_extensions = ["dollarmath", "amsmath", "deflist", "colon_fence"]
 myst_heading_anchors = 3
+myst_ref_domains = ["std"]
 
 # -- General -----------------------------------------------------------------
 root_doc = "index"
+numfig = True
+numfig_format = {
+    "figure": "Figure %s",
+    "table": "Table %s",
+    "code-block": "Listing %s",
+    "section": "Section %s",
+}
+math_numfig = True
+numfig_secnum_depth = 1
 # docs/README.md is the GitHub folder index (a pointer table); the Sphinx
 # landing page is index.md, so leave README.md out of the build.
 # Dev-facing docs kept in-repo but out of the published reference site: the ADR
