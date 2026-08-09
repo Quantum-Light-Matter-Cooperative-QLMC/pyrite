@@ -680,15 +680,15 @@ Landed (CPU-verified only; no GPU was available in the authoring session):
 - [x] `transport.py`: `_transport_core_ungrooved_perelectron`, the executable
       specification the CUDA kernel ports. Run-to-completion per electron,
       slot addressing `i * cap + s`, no atomics.
-- [x] `transport.py`: `_run_per_electron_transport` — batching, capacity-growth
+- [x] `transport.py`: `_run_per_electron_transport` — batching, measured-capacity
       replay, mask compaction. Shared by both cores so the two cannot drift.
 - [x] `transport_jit_kernel.py`: the `cupyx.jit` port. fp64, textually
       identical arithmetic, `while`-only control flow (no reliance on
       transpiler `break`/`continue`), flattened arrays per house style.
 - [x] `simulate_trajectories(transport_core=...)`, default `"lockstep"`.
       Default path is unchanged and still bit-for-bit — asserted by test.
-- [x] 27 CPU tests + 10 CUDA-gated tests in
-      `tests/montecarlo/test_transport_per_electron.py`. Core suite: 1106
+- [x] 34 CPU tests + 10 CUDA-gated tests in
+      `tests/montecarlo/test_transport_per_electron.py`. Core suite: 1113
       passed, 51 skipped.
 
 Measured on CPU: per-electron core vs lockstep core agree on backscatter
@@ -765,8 +765,8 @@ Open — needs a GPU session, in this order:
          with `Ne` (226 -> 421 for hopg, 180 -> 433 for MoSe2), so part of the
          15.86x is the CPU baseline getting worse, not the GPU getting better.
 
-- [ ] **Fix the first-batch capacity gamble** (found by the sweep above, not yet
-      implemented). `cap` starts at `config.seg_capacity` = 512 and is carried
+- [x] **Fix the first-batch capacity gamble.** **Done 2026-08-08.** `cap` started
+      at `config.seg_capacity` = 512 and was carried
       across batches, but MoSe2's per-electron tail exceeds it, so batch 0 —
       12787 of the 16000 electrons at that capacity — runs to completion,
       overflows, and is replayed at cap=2048 with a batch of 3196. Roughly 80%
@@ -782,13 +782,44 @@ Open — needs a GPU session, in this order:
 
       Raising the static default is the wrong fix: `cap` and `batch` trade off
       against a fixed byte budget, so cap=4096 starves the GPU, and hopg's own
-      optimum is 1024 (0.153 s) against MoSe2's 2048. The right fix is to make
-      the first batch a small probe, read the true `seg_count.max()` it reports
-      even on overflow, and size `cap` from that before the full batches run.
-      Probe results are kept rather than discarded — output slots are addressed
-      by electron index, so a small first batch is just a smaller batch — so in
-      the common case the fix costs nothing and removes the replay entirely.
-      Expected to take MoSe2 Ne=16000 from 4.85x to ~7x with no tuning knob.
+      optimum is 1024 (0.153 s) against MoSe2's 2048.
+
+      Two changes, both resting on the cores reporting the true `seg_count` even
+      for an electron that overflowed. **(1)** The replay used to jump to
+      `max(needed, 4 * cap)`; `needed` is exact, so one replay at `needed` always
+      suffices and the `4x` only over-provisioned. `capacity_growth` is replaced
+      by `capacity_headroom` (1.25) and `cap` is reset after *every* batch from
+      the running maximum, in both directions. **(2)** `probe_electrons` (1024)
+      shortens the first batch — the only one still sized by the guess. Its
+      segments are kept, so it is just a short batch.
+
+      Measured at Ne=16000, 3 repeats, medians; `full`/`probed` both start from
+      the unchanged default 512:
+
+      | material | arm | median | launches | electrons | settled cap |
+      | --- | --- | --- | --- | --- | --- |
+      | hopg | old default | 0.139 s | 2 | 16000 | 512 |
+      | hopg | tuned (1024) | 0.129 s | 2 | 16000 | 544 |
+      | hopg | full | 0.146 s | 2 | 16000 | 560 |
+      | hopg | probed | 0.150 s | 3 | 16000 | 560 |
+      | mose2 | old default | 0.727 s | 7 | 28787 | 2048 |
+      | mose2 | tuned (2048) | 0.467 s | 5 | 16000 | 1593 |
+      | mose2 | full | 0.491 s | 5 | 28787 | 1593 |
+      | mose2 | probed | 0.499 s | 6 | 17024 | 1593 |
+
+      MoSe2 −32% with no tuning, settling tighter (1593) than the hand-swept
+      optimum. **The probe is worth nothing on the GPU and a lot on the CPU**: a
+      GPU batch costs about one electron lifetime whatever its width (16000
+      electrons fit in one wave here), so a discarded batch and a probe cost the
+      same launch — the probe is a ~2% premium when the guess was already right.
+      On the serial CPU core a discarded batch costs its electrons: MoSe2 at
+      Ne=8000 goes 2.571 s -> 1.712 s (−33%), 9024 electrons instead of 16000.
+      Kept as one shared default rather than branching the shared driver.
+
+      7 new CPU tests: probe-invariance of the segments at four probe widths,
+      the replayed batch shrinking to the probe, and `cap` settling within
+      headroom of the true maximum with and without a probe. 44 pass on the GPU
+      box, 1113 in the core suite.
 - [x] Warp divergence and occupancy. **Done 2026-08-08.** `ncu` is unusable on
       qlmc — GPU performance counters are admin-only (`ERR_NVGPUCTRPERM`) and
       sudo needs a password; enabling them is a driver-param change on a shared
@@ -832,13 +863,38 @@ Open — needs a GPU session, in this order:
       is 82 B/segment (0.46 GB hopg, 1.15 GB MoSe2) over pageable memory at a
       measured 7.6-7.9 GB/s. The remainder is scratch allocation, mask
       construction, and NumPy output assembly — unattributed, which is what
-      NVTX ranges in `transport.py` would fix. Pinned host memory is the cheap
-      partial; handing device arrays to the line/brem kernels is the real fix.
+      NVTX ranges in `transport.py` would fix.
 
-Deliberately deferred: keeping segments on the device for the line/brem kernels
-(the change that would attack the transfer half of the MoSe2 idle window —
-follow-up 3 above), NVTX ranges in `transport.py` (follow-up 1), `numba.prange`
-over the per-electron core for the core-starved CPU case, and grooved transport.
+      The spectrum side was measured too (hopg, Ne=16000, 5.65M segments,
+      `REAL=float32`), by counting the bytes each kernel pushes back up:
+
+      | phase | wall | segment H2D | share |
+      | --- | --- | --- | --- |
+      | transport (cuda) | 0.348 s | — (82 B/seg down) | — |
+      | lines, incoherent | 0.364 s | 226 MB / 0.207 s | 57% |
+      | lines, coherent | 0.088 s | 271 MB / 0.046 s | 53% |
+      | brem | 0.069 s | 158 MB / 0.026 s | 38% |
+
+      Bytes account exactly: 40 B/seg incoherent (`r_mid`, `v_hat`, `L_ang`,
+      `E_keV`, `elec_id`), 48 coherent (adds `t_ang`, `t0_ang`), 28 brem. A case
+      therefore pushes **116 B/segment up** on top of the **82 B/segment pulled
+      down**, and `_spectrum_case` runs all three over the same `segs` dict
+      without sharing a device copy — 24 uploads whose union is 48 B/segment.
+      Re-upload alone is 0.279 s, 80% of a transport (~0.12 s of it bus time at
+      ~6 GB/s pageable; the rest is first-touch pool growth).
+
+      So there are two fixes, and the cheap one does not need transport at all:
+      **(a)** cache one device copy per case across the three spectrum kernels;
+      **(b)** never come down. Pinned staging is *not* the cheap partial it
+      looked like — copying into a pinned buffer measured 3.8-4.0 GB/s against
+      6.1-6.3 GB/s pageable, since the staging copy costs more than the overhead
+      it removes. It would only pay if the arrays were produced into pinned
+      memory.
+
+Deliberately deferred: sharing one device copy of the segments across a case's
+spectrum kernels, keeping segments on the device end to end, NVTX ranges in
+`transport.py`, `numba.prange` over the per-electron core for the core-starved
+CPU case, and grooved transport.
 
 ## Decisions and open questions
 

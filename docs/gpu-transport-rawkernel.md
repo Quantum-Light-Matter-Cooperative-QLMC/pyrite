@@ -185,8 +185,52 @@ MoSe2's weaker 4.85x is not divergence. Its per-electron tail exceeds the defaul
 512-slot capacity, so the first batch — most of the run — completes, overflows,
 and replays at a larger capacity. Capacity and batch size trade against a fixed
 byte budget, so a bigger static default is not the fix (cap=4096 starves the GPU,
-and hopg's optimum is 1024 against MoSe2's 2048); sizing capacity from a small
-probe batch is.
+and hopg's optimum is 1024 against MoSe2's 2048). See the next section: the run
+now measures the capacity it needs instead of being told.
+
+## Capacity, without a tuning knob
+
+The cores report the true segment count even for an electron that overflowed its
+slots, so every batch — including one that has to be replayed — says exactly what
+the material needs. Two changes use that.
+
+**Replay at the measured capacity, not a growth factor.** The replay used to jump
+to `max(needed, 4 * cap)`. Because `needed` is exact, one replay at `needed` always
+suffices, and the `4x` only over-provisioned: capacity trades against batch size
+out of a fixed byte budget, so an over-provisioned capacity costs launches exactly
+as an under-provisioned one costs replays. `cap` is now reset after every batch to
+the running maximum times `capacity_headroom` (1.25), in both directions.
+
+**A short first batch.** `probe_electrons` (default 1024) caps the width of the
+first batch, the one batch still sized by the initial guess. Its segments are
+kept — output slots are addressed by electron index, so a short first batch is
+just a short batch — which bounds what a wrong `seg_capacity` can cost.
+
+Ne=16000, 3 repeats, medians. `tuned` is the best a human got by sweeping the
+static capacity; `full` and `probed` both start from the unchanged default of 512.
+
+| material | arm | median | launches | electrons transported | settled cap |
+| --- | --- | --- | --- | --- | --- |
+| hopg | old static default | 0.139 s | 2 | 16000 | 512 |
+| hopg | tuned (cap 1024) | 0.129 s | 2 | 16000 | 544 |
+| hopg | full | 0.146 s | 2 | 16000 | 560 |
+| hopg | probed | 0.150 s | 3 | 16000 | 560 |
+| MoSe2 | old static default | 0.727 s | 7 | 28787 | 2048 |
+| MoSe2 | tuned (cap 2048) | 0.467 s | 5 | 16000 | 1593 |
+| MoSe2 | full | 0.491 s | 5 | 28787 | 1593 |
+| MoSe2 | probed | 0.499 s | 6 | 17024 | 1593 |
+
+MoSe2 goes from 0.727 s to 0.491 s (−32%) with no tuning, and lands on a tighter
+capacity (1593) than the hand-swept optimum, which is why it beats it on launches.
+
+**The probe buys nothing on the GPU and a great deal on the CPU.** A GPU batch
+costs about one electron lifetime whatever its width — 16000 electrons fit in one
+concurrent wave on this card — so a discarded full batch and a probe cost the same
+single launch, and the probe is a ~2% premium (one extra launch when the guess was
+already right, as for hopg). On the CPU per-electron core the loop is serial, so a
+discarded batch costs its electrons: MoSe2 at Ne=8000 goes 2.571 s → 1.712 s
+(−33%), transporting 9024 electrons instead of 16000. One shared driver, one
+default, priced on the arm that cares.
 
 ## Where the time actually goes
 
@@ -243,17 +287,14 @@ guarantees rest on. Electron lifetimes are simply not spread widely enough:
 transport at fixed energy into a stopping slab has a fairly tight range
 distribution, so 32 neighbouring electrons finish at similar times.
 
-The ranking that follows is: keep segments on the device (attacks the D2H and
-most of the host remainder at once), then pinned host memory if they must come
-back, then nothing else on this list.
+The ranking that follows is: keep segments on the device, which attacks the D2H,
+most of the host remainder, and the spectrum phase's re-upload at once. Pinned
+host memory is *not* the cheap partial it looked like — see the handoff section.
 
 ## Not done
 
-- **Segments never leave the device.** The driver copies each batch's compacted
-  segments back to host because `simulate_trajectories` returns NumPy. Handing
-  device arrays straight to the line/brem kernels is the change that would
-  recover the transfer half of the MoSe2 idle window, and it is a larger,
-  separate piece of work with its own correctness surface.
+- **Segments never leave the device.** See the next section — this is now the
+  largest measured item on the list.
 - **NVTX ranges in `transport.py`.** `docs/compute-performance-optimization.md`
   already claims `cxr.transport.line` / `cxr.transport.brem` exist; they do not.
   Adding them is a prerequisite for attributing GPU transport phases in a single
@@ -263,6 +304,48 @@ back, then nothing else on this list.
   case the perf doc flagged. Not wired up here.
 - **Grooved transport.**
 
+## The transport → spectrum handoff
+
+`simulate_trajectories` returns NumPy, so the CUDA core copies every segment down
+and each spectrum kernel copies what it needs straight back up with
+`xp.asarray(segments[k], dtype=REAL)`. `_spectrum_case` calls three such kernels
+over the *same* `segs` dict — one incoherent line sum, one coherent line sum when
+the profile asks for it, one brem sum per radiating layer — and none of them share
+a device copy.
+
+hopg, Ne=16000, 5.65M segments, RTX 5080, `REAL = float32`:
+
+| phase | wall | segment H2D | share of the call |
+| --- | --- | --- | --- |
+| transport (cuda core) | 0.348 s | — (82 B/seg *down*) | — |
+| lines, incoherent | 0.364 s | 226 MB / 0.207 s | 57% |
+| lines, coherent | 0.088 s | 271 MB / 0.046 s | 53% |
+| brem | 0.069 s | 158 MB / 0.026 s | 38% |
+
+The per-segment bytes account exactly: 40 B/segment for the incoherent lines
+(`r_mid`, `v_hat`, `L_ang`, `E_keV`, `elec_id`), 48 for the coherent sum (adds
+`t_ang`, `t0_ang`), 28 for brem. So a case pushes **116 B/segment up** on top of
+the **82 B/segment the transport pulled down**, for data that was on the device
+already. The re-upload alone is 0.279 s, 80% of a whole transport. Steady-state
+bandwidth is ~6 GB/s pageable; the incoherent call's 0.207 s is inflated by
+first-touch pool growth, so ~0.12 s of the 0.279 s is bus time and the rest is
+allocation.
+
+Two independent fixes, cheapest first:
+
+1. **Share one device copy across a case's kernels.** The three calls upload
+   overlapping arrays 24 times; their union is 48 B/segment uploaded once. This is
+   a caching change inside the spectrum phase and needs nothing from transport.
+2. **Never come down.** Hand the compacted device arrays to the line/brem kernels
+   directly, which removes the 82 B/segment D2H and all 116 B/segment of upload.
+   Larger, with its own correctness surface, and it has to keep the NumPy return
+   for CPU callers.
+
+Pinned host staging is *not* a fix on the way up: copying into a pinned buffer
+first measured 3.8–4.0 GB/s against 6.1–6.3 GB/s pageable, because the staging
+copy costs more than the pageable-transfer overhead it removes. It would only pay
+if the arrays were produced into pinned memory in the first place.
+
 ## Reproducing the CPU-side checks
 
 ```bash
@@ -270,4 +353,4 @@ UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test \
   tests/montecarlo/test_transport_per_electron.py
 ```
 
-27 CPU tests; the 10 CUDA tests skip without a device.
+34 CPU tests; the 10 CUDA tests skip without a device.

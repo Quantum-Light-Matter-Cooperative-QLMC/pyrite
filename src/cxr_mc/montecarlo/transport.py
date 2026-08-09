@@ -1524,17 +1524,34 @@ def pack_layer_tables(L_Js, L_Zs, L_ks, L_coeffs, L_ncm3):
 class PerElectronTransportConfig:
     """Host-side batching policy for the per-electron cores.
 
-    Neither field changes results: ``seg_capacity`` only sets how many segment
-    slots each electron is given before an overflow forces a replay, and
+    No field changes results: ``seg_capacity`` only sets how many segment slots
+    each electron is given before an overflow forces a replay, and
     ``scratch_budget_bytes`` only sets how many electrons share one launch.
     Both exist because the CUDA path materializes a dense ``(batch, capacity)``
     scratch grid, and that grid must fit in VRAM alongside the case's tables.
+
+    ``seg_capacity`` is only the *initial* guess, and the driver stops trusting it
+    as soon as it has a measurement. The cores report the true segment count even
+    for electrons that overflowed, so every batch -- including one that overflowed
+    and has to be replayed -- says exactly what the material needs, and ``cap`` is
+    reset to that running maximum times ``capacity_headroom``. Capacity trades
+    against batch size out of a fixed byte budget, so an over-provisioned ``cap``
+    costs launches just as an under-provisioned one costs replays.
+
+    ``probe_electrons`` shortens the first batch, which is otherwise most of the
+    run and is the one batch sized by the guess. Its segments are kept -- output
+    slots are addressed by electron index, so a short first batch is just a short
+    batch -- and it bounds what a wrong ``seg_capacity`` can cost to a probe rather
+    than a full batch. Set it to 0 to let the first batch run full width, which is
+    what a GPU run wants: there a batch costs about one electron lifetime whatever
+    its width, so a discarded batch and a probe cost the same launch.
     """
 
     seg_capacity: int = 512
     scratch_budget_bytes: int = 512 * 1024 * 1024
-    capacity_growth: int = 4
+    capacity_headroom: float = 1.25
     max_batch: int = 65536
+    probe_electrons: int = 1024
 
 
 DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG = PerElectronTransportConfig()
@@ -1547,6 +1564,27 @@ def _batch_size(cap, config):
     per_electron = cap * _SEG_SCRATCH_BYTES
     n = int(config.scratch_budget_bytes // max(per_electron, 1))
     return max(1, min(n, int(config.max_batch)))
+
+
+def _capacity_for(seen_max, config):
+    """Slots per electron given the largest segment count seen so far.
+
+    Never below ``seen_max`` whatever the headroom, so a replay is always given a
+    capacity that fits and the retry loop cannot fail to make progress.
+    """
+    return max(1, seen_max, int(np.ceil(seen_max * config.capacity_headroom)))
+
+
+def _batch_electrons(e, cap, Ne, config):
+    """How many electrons the batch starting at ``e`` covers.
+
+    Non-increasing in ``cap``, which a capacity replay relies on: the retry must
+    never need more electrons than the snapshot it restores.
+    """
+    n = min(_batch_size(cap, config), Ne - e)
+    if e == 0 and config.probe_electrons > 0:
+        n = min(n, int(config.probe_electrons))
+    return n
 
 
 def _run_per_electron_transport(
@@ -1590,7 +1628,10 @@ def _run_per_electron_transport(
 
     Output is electron-major and step-minor, which is a pure function of the
     electron index rather than of execution order, so a run is reproducible
-    across batch sizes and (on CUDA) launch geometries.
+    across batch sizes and (on CUDA) launch geometries. That addressing is also
+    what lets the first batch be a short capacity probe: its segments land in the
+    same slots they would have anyway, so measuring costs only the electrons it
+    transports.
 
     Per-electron state and the material tables are moved to the device once and
     stay there; only the compacted segments of each batch cross the bus. The
@@ -1616,11 +1657,12 @@ def _run_per_electron_transport(
     d_mott = tuple(to_dev(a) for a in mott)
 
     cap = max(1, int(config.seg_capacity))
+    seen_max = 0
     nseg = 0
     n_back = n_trans = n_side = 0
     e = 0
     while e < Ne:
-        m = min(_batch_size(cap, config), Ne - e)
+        m = _batch_electrons(e, cap, Ne, config)
         sl = slice(e, e + m)
         # The core advances position/direction/energy/clock in place, so a
         # capacity replay has to start from the same state it did.
@@ -1658,13 +1700,16 @@ def _run_per_electron_transport(
                 exit_code,
             )
             needed = int(seg_count.max())
+            seen_max = max(seen_max, needed)
             if needed <= cap:
                 break
             # Replay: the streams are counter-addressed, so the retry reproduces
-            # the discarded run exactly rather than resampling it.
-            cap = max(needed, cap * int(config.capacity_growth))
+            # the discarded run exactly rather than resampling it. `needed` is the
+            # true count, not a truncated one, so one replay always suffices; the
+            # headroom is for the batches after this one.
+            cap = _capacity_for(seen_max, config)
             d_pos[sl], d_dirs[sl], d_E[sl], d_clock[sl] = snap
-            m = min(_batch_size(cap, config), Ne - e)
+            m = _batch_electrons(e, cap, Ne, config)
             sl = slice(e, e + m)
             snap = tuple(a[:m] for a in snap)
 
@@ -1687,6 +1732,12 @@ def _run_per_electron_transport(
         n_trans += int((exit_code == EXIT_TRANSMITTED).sum())
         n_side += int((exit_code == EXIT_SIDE).sum())
         e += m
+
+        # Re-size from what electrons actually needed rather than from the guess,
+        # in both directions: a tighter `cap` buys a proportionally larger batch
+        # out of the same byte budget.
+        if seen_max > 0:
+            cap = _capacity_for(seen_max, config)
 
     return nseg, n_back, n_trans, n_side
 

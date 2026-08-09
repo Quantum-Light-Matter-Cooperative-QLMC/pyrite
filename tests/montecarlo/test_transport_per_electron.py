@@ -143,6 +143,75 @@ def test_results_do_not_depend_on_batch_size(budget):
     assert _identical(base, batched)
 
 
+@pytest.mark.parametrize("probe", [1, 8, 64, 100000])
+def test_capacity_probe_does_not_change_results(probe):
+    # The probe only shortens the first batch, and output slots are addressed by
+    # electron index, so probing must be invisible in the segments.
+    base = _run(transport_core="per-electron")
+    probed = _run(
+        transport_core="per-electron",
+        per_electron_config=PerElectronTransportConfig(
+            seg_capacity=8, scratch_budget_bytes=1 << 14, probe_electrons=probe
+        ),
+    )
+    assert _identical(base, probed)
+
+
+def _core_calls(monkeypatch, **config_kwargs):
+    """``(electrons, capacity)`` of every core call, replays included, and the run."""
+    from cxr_mc.montecarlo import transport as tr
+
+    seen = []
+    real = tr._alloc_scratch
+
+    def counting(xp, m, cap):
+        seen.append((m, cap))
+        return real(xp, m, cap)
+
+    monkeypatch.setattr(tr, "_alloc_scratch", counting)
+    try:
+        out = _run(
+            transport_core="per-electron",
+            per_electron_config=PerElectronTransportConfig(**config_kwargs),
+        )
+    finally:
+        monkeypatch.undo()
+    return seen, out
+
+
+# `seg_capacity=8` is far below what these electrons need, and the budget is wide
+# enough that without a probe the first batch is the whole run -- the shape that
+# makes an overflow expensive.
+_PROBE_BUDGET = dict(seg_capacity=8, scratch_budget_bytes=1 << 20)
+
+
+def test_capacity_probe_shrinks_the_replayed_batch(monkeypatch):
+    Ne = BASE_CASE["Ne"]
+    pinned, pinned_out = _core_calls(monkeypatch, probe_electrons=0, **_PROBE_BUDGET)
+    probed, probed_out = _core_calls(monkeypatch, probe_electrons=4, **_PROBE_BUDGET)
+
+    assert _identical(pinned_out, probed_out)
+    # Pinned, the whole run is gambled on `seg_capacity` and discarded; probed,
+    # only the probe is. Discarded electrons are the work the replay repeats.
+    assert pinned[0][0] == Ne
+    assert probed[0][0] == 4
+    assert sum(m for m, _ in pinned) == 2 * Ne
+    assert sum(m for m, _ in probed) < Ne + Ne // 4
+
+
+@pytest.mark.parametrize("probe", [0, 4])
+def test_capacity_is_sized_from_the_measurement(monkeypatch, probe):
+    # Once a batch has run, `cap` tracks the segments an electron actually needs
+    # rather than the guess it started from -- an over-provisioned capacity costs
+    # launches the same way an under-provisioned one costs replays.
+    calls, out = _core_calls(monkeypatch, probe_electrons=probe, **_PROBE_BUDGET)
+
+    assert calls[0][1] == 8
+    settled = calls[-1][1]
+    needed = int(np.bincount(out["elec_id"]).max())
+    assert needed <= settled <= int(np.ceil(1.25 * needed))
+
+
 def test_segments_are_electron_major_and_step_minor():
     out = _run(transport_core="per-electron")
     elec_id = out["elec_id"]
