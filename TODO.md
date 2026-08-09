@@ -15,50 +15,45 @@ file. Edit and drop items on `main`.
 
 ## Active
 
-1. **Compute performance optimization.** Review cupyx.jit.rawkernel and Numba @njit
-   optimizations are optimally executed, and review any critical physics changes. Generate new bit-for-bit or toleranced validation for the new paths where necessary. Ensure that non-nvidia fallbacks are present and functional (current tests should already be confirming this, but double check).
-   → `feature/compute-performance-optimization`;
-   [`tasks/feature/compute-performance-optimization/`](tasks/feature/compute-performance-optimization/).
-   Rounds 1-3 landed on `main` (see
-   [`docs/compute-performance-optimization.md`](docs/compute-performance-optimization.md));
-   Round 3's fused line prologue is implemented but gated off
-   (`_USE_JIT_LINE_PROLOGUE = False`) pending exactly this item's verification.
-   1. Running on remote box:
-      1. With --ne-line=20_000 on 'MoSe2' in particular (and maybe other heavy materials):
-         1. Transport takes absolutely forever (GPU at 0% for 10's of seconds straight)
-         2. CPU utilization is inconsistent, sometimes hitting 60-70% but often below 10% while GPU still at 0%
-         3. GPU extremely burst, will shoot to 100% for instant then back to 0%
-         4. Host RAM usage pretty high, but not saturated: usually sitting in the 50 - 80% range.
-         5. VRAM consistently in the 20 - 50 % range
-2. **Named beam objects.** Promote the beam from an inline `[profiles.NAME.beam]`
-   block into a named `[beams.NAME]` catalog object with its own `cxr beam` noun,
-   attached to a profile by name. Primarily CLI; beam physics unchanged.
-   → `feature/named-beam-objects`;
-   [`tasks/feature/named-beam-objects/`](tasks/feature/named-beam-objects/).
-   Predecessor `feature/beam-phase-space` is complete and landed; its two ledger
-   rows (`beam-phase-space-injection`, `beam-energy-spread-injection`) are
+1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
+   Four orphan markers on the incoherent line path are the current gap and block
+   a decision in P1's compute-performance item: `line-hkl-batch`,
+   `line-amplitude-fusion`, `line-gemv-elementwise`,
+   `line-absorption-tabulation` (all `montecarlo/spectrum.py`, no ledger row).
+   Also `beam-phase-space-injection` / `beam-energy-spread-injection` are
    `rederived` and await human `signed-off`.
-3. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
 
 ## P1 - top-priority back burner
 
 ### Ready
 
-1. **Add support for characteristic X-rays**
-2. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
+1. **Compute performance optimization — remainder.** Rounds 1-4 landed on `main`
+   (see
+   [`docs/compute-performance-optimization.md`](docs/compute-performance-optimization.md));
+   the MoSe2 `--ne-line=20000` report is closed as compute-bound transport plus a
+   one-time pipeline-fill transient, and the CUDA transport core is now the
+   default above 1000 electrons. What is left needs a CUDA box, a CLI decision,
+   and a ledger decision: the fate of the gated `_USE_JIT_LINE_PROLOGUE`, the
+   `--cpu`/`--cpu-only` profiler stranded on the deprecated `cxr remote run`,
+   and the deferred levers (NVTX in `transport.py`, `REAL` compaction,
+   `gpu-pipeline` memory sizing). Plan and open questions:
+   → `feature/compute-performance-optimization`;
+   [`tasks/feature/compute-performance-optimization/REMAINING.md`](tasks/feature/compute-performance-optimization/REMAINING.md).
+2. **Add support for characteristic X-rays**
+3. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
    factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
-3. **Fix Analysis Compare loading and quality selection.** Analyze each
+4. **Fix Analysis Compare loading and quality selection.** Analyze each
    material checkpoint once for all three Compare plots, preserve persistent
    cache reuse, and correct or accurately report the ratio plot's unexpected
    material exclusions. → `fix/analysis-compare-loading-quality`;
    [`tasks/fix/analysis-compare-loading-quality/`](tasks/fix/analysis-compare-loading-quality/).
-4. **Batched coherent line accumulation.** `coherent_emission=True` opts out of
+5. **Batched coherent line accumulation.** `coherent_emission=True` opts out of
    the batched `(n_seg, N_g)` line path and runs the legacy per-hkl loop: 38%
    of GPU-phase tottime on a profiled `hopg_coherent` run, ~2.65x slower per
    case than the batched branch. Physics-gated (reassociation → `Validation:`
    id, ledger row, golden regen). → `feature/coherent-line-batching`;
    [`tasks/feature/coherent-line-batching/`](tasks/feature/coherent-line-batching/).
-5. **Test coverage baseline and gap closure.** First full-suite `--cov` run
+6. **Test coverage baseline and gap closure.** First full-suite `--cov` run
    (2026-08-07): green, 74.2% line / 84.0% once the two compiled-code
    measurement artifacts are removed (CuPy kernel modules never import on a
    CPU-only env; `@njit` bodies bypass the tracer — `NUMBA_DISABLE_JIT=1` moves
@@ -67,7 +62,7 @@ file. Edit and drop items on `main`.
    `montecarlo/_backend.py` fallback dispatch 69%, `energy_grid/apply.py` 78%.
    → `chore/test-coverage-baseline`;
    [`tasks/chore/test-coverage-baseline/`](tasks/chore/test-coverage-baseline/).
-6. **Physics boundary typing.** `typecheck` passes, but the physics packages are
+7. **Physics boundary typing.** `typecheck` passes, but the physics packages are
    the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`
    6.6% (vs `materials` 59.8%); of 42 public re-exported functions, 2 are fully
    annotated. Annotate the public boundary only, with unit-carrying aliases
@@ -76,7 +71,7 @@ file. Edit and drop items on `main`.
    (`--error all` is 51 diagnostics, mostly correlated-guard false positives).
    → `chore/physics-boundary-typing`;
    [`tasks/chore/physics-boundary-typing/`](tasks/chore/physics-boundary-typing/).
-7. **Repository and source-package structure cleanup.** Eight slices beyond the
+8. **Repository and source-package structure cleanup.** Eight slices beyond the
    accepted structure RFC: installed-package path resolution (shipped code
    anchors on the developer checkout and the wheel omits the marimo apps),
    top-level module grouping, `cli/` alias-shim removal, CLI/domain
