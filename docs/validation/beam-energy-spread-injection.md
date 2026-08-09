@@ -202,7 +202,7 @@ independent derivation and the implementation.
   itself flip the ledger).
 - **Write-up**: `docs/validation/beam-energy-spread-injection.md`.
 - **Suggested ledger change**: none required by this re-derivation; existing
-  `filtered` status and cited anchor tests (`tests/test_transverse.py`,
+  `filtered` status and cited anchor tests (`tests/montecarlo/test_transverse.py`,
   `tests/energy-grid/test_bounds.py`, `tests/montecarlo/test_beam_energy_spread_grid.py`,
   all green locally) are consistent with promotion to `anchored` if a human
   wants to formalize that the cited tests already pin the reference values

@@ -525,9 +525,9 @@ Click wiring lives in `cli/commands/`; pure domain logic stays in its domain
 module.
 - Public: `main`.
 - Deps: lazy per-command imports from `cli.commands.*` (see `_COMMANDS`), plus
-  lazy `archive`, `check`, `remote` for
-  domain-owned groups not yet moved. Eager lightweight deps: `cli._core`,
-  `__version__`.
+  lazy checkpoint, app-validation, and remote owners reached through their
+  canonical packages or retained root compatibility facades. Eager lightweight
+  deps: `cli._core`, `__version__`.
 
 ### `cli/_deprecations.py`
 RFC D7 deprecation harness: frozen `Deprecation` registry keyed by command
@@ -538,7 +538,7 @@ path, `DeprecatingGroup(click.Group)` that warns once per invocation in
 - Public: `DEPRECATIONS`, `Deprecation`, `DeprecatingGroup`, `message`, `warn`,
   `invocation_path`, `SUPPORT_WINDOW_MINORS`.
 - Wired into `cli/_core.py` (`LazyGroup(DeprecatingGroup)`), `cli/commands/profile.py`,
-  `cli/commands/sweep.py`, `energy_grid/_command.py`, `_remote/cli.py`.
+  `cli/commands/sweep.py`, `energy_grid/_command.py`, `remote/cli.py`.
 
 ### `cli/commands/`
 One module per `cxr` subcommand group, holding only the Click layer.
@@ -548,7 +548,7 @@ owns named campaign defaults and membership; `material` owns effective-range
 inspection and per-profile overrides; `beam` owns named `[beams.*]` objects;
 `sweep` is hidden compatibility aliases
 only. `job` owns the canonical remote asynchronous-job lifecycle and delegates
-transport/state operations to `_remote/`. Shared validated atomic TOML helpers
+transport/state operations to `remote/`. Shared validated atomic TOML helpers
 stay in `cli/_catalog_io.py`.
 
 ### `cli/commands/beam.py`

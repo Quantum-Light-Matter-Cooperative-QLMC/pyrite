@@ -1,17 +1,9 @@
-# uv workspace and focused verification
+# Development environment and focused verification
 
-The repository is a two-member uv workspace with one publishable distribution:
-
-```text
-cxr-mc-tests (internal dependency/test tooling; never published)
-    └── cxr-mc (sole owner of cxr_mc/, packaged data, cxr, and cxr-dev)
-```
-
-`cxr-mc` remains the root/default project. `packages/cxr-mc-tests` is a
-non-package workspace member: it owns pytest dependencies and depends one way
-on `cxr-mc`. Both members share uv's single lockfile and environment. Selecting
-a member controls dependency installation; it does not provide dependency or
-import isolation.
+The repository has one uv project and one publishable distribution. The root
+project owns `src/cxr_mc/`, packaged data, `cxr`, `cxr-dev`, and the test suite.
+Contributor tools are dependency groups in the root `pyproject.toml`; there is
+no uv workspace split or separate test-tools package.
 
 ## Why source was not split across distributions
 
@@ -31,28 +23,24 @@ wheel. A third analysis/app member is deferred.
 ## Commands
 
 ```bash
-# Normal contributor setup: all workspace members and test tools.
+# Normal contributor setup: root package and contributor tools.
 uv sync --locked
 
-# Runtime/root-only environment, used by remote installations.
-uv sync --package cxr-mc --no-dev --locked
-
-# Explicit test-tool member path.
-uv sync --package cxr-mc-tests --locked
-uv run --package cxr-mc-tests cxr-dev test-suite core
+# Runtime-only environment, used by remote installations.
+uv sync --no-dev --locked
 
 # Stable domain partitions. Together these contain every tests/test_*.py once.
-uv run --package cxr-mc-tests cxr-dev test-suite core
-uv run --package cxr-mc-tests cxr-dev test-suite cli
-uv run --package cxr-mc-tests cxr-dev test-suite apps
-uv run --package cxr-mc-tests cxr-dev test-suite packaging
+uv run cxr-dev test-suite core
+uv run cxr-dev test-suite cli
+uv run cxr-dev test-suite apps
+uv run cxr-dev test-suite packaging
 
 # Additive cross-boundary sample and unchanged release gate.
-uv run --package cxr-mc-tests cxr-dev test-suite integration
-uv run --package cxr-mc-tests cxr-dev verify
+uv run cxr-dev test-suite integration
+uv run cxr-dev verify
 
 # Clean wheel and editable-install compatibility check.
-uv run --package cxr-mc-tests cxr-dev package-smoke
+uv run cxr-dev package-smoke
 ```
 
 Suite ownership uses deterministic filename rules in `cxr_mc._dev`. A
@@ -106,7 +94,5 @@ baseline, so the observed deltas are not attributed to workspace metadata. No
 speed or isolation claim follows from this report.
 
 Outside the restricted sandbox, `marimo check` passed for all four apps and
-`cxr app analysis --smoke` completed successfully. Strict Sphinx rendered the
-new page but the repository-wide `-W` build remains red on 11 existing warnings
-outside this change (including existing autosummary CLI invocation,
-highlighting, and cross-reference warnings).
+`cxr app analysis launch --smoke` completed successfully during the recorded
+measurement run.

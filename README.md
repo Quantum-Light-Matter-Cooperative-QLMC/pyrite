@@ -46,9 +46,9 @@ uv run cxr-dev bootstrap  # per-clone local git config (TODO.md merge driver)
 uv run cxr --help
 ```
 
-`uv sync` includes the internal test-tools workspace member. For runtime-only
-installation use `uv sync --package cxr-mc --no-dev`; focused contributor and
-CI commands are documented in
+`uv sync` installs the root distribution and contributor dependency groups.
+For a locked runtime-only installation use `uv sync --no-dev --locked`;
+focused contributor and CI commands are documented in
 [`docs/development-workspace.md`](docs/development-workspace.md).
 
 `cxr-dev bootstrap` is idempotent and only sets local git config that cannot be
@@ -94,13 +94,13 @@ bypass pre-allocation admission.
 uv run cxr run standard -m hopg --fidelity survey
 
 # Analyze existing checkpoint.
-uv run cxr app analysis hopg
+uv run cxr app analysis launch hopg
 
 # Interactive transport/lattice viewer; no checkpoint required.
 uv run marimo run src/cxr_mc/apps/trace_app.py
 
 # Validation dashboard.
-uv run cxr app validation
+uv run cxr app validation launch
 ```
 
 Main surfaces:

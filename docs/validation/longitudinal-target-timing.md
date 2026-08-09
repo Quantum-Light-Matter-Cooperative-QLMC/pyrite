@@ -139,7 +139,7 @@ The implementation now names the inverse-angstrom quantity
 ## Anchor and verdict
 
 Anchor:
-`tests/test_longitudinal_profiles.py::test_target_timing_uses_pinned_basal_reflection_and_h_over_e`.
+`tests/montecarlo/test_longitudinal_profiles.py::test_target_timing_uses_pinned_basal_reflection_and_h_over_e`.
 Its four parameterized cases pass. The test pins reflection selection,
 independent absolute-energy values, \(T=h/E_\gamma\), the `eta=0.9` form
 factor, and one-period spacing.

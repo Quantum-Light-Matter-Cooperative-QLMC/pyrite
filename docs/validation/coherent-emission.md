@@ -63,8 +63,8 @@ For a straight trajectory
 \[
 \Phi_{\mathbf g}(t)
 =\Phi_{\mathbf g,c}
-+[\omega(1-\hat{\mathbf n}\cdot\mathbf v)
--\mathbf g\cdot\mathbf v](t-t_c).
++\bigl\{\omega(1-\hat{\mathbf n}\cdot\mathbf v)
+-\mathbf g\cdot\mathbf v\bigr\}(t-t_c).
 \]
 
 Stationarity therefore gives

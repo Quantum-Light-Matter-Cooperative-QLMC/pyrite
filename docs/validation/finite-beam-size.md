@@ -198,7 +198,7 @@ Ran on `feature/finite-electron-beam-size` (already checked out, matches
 described branch):
 
 ```
-uv run pytest tests/montecarlo/test_montecarlo.py -k beam_fwhm -v
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test tests/montecarlo/test_montecarlo.py -k beam_fwhm -v
 ...4 passed in 1.50s
 ```
 

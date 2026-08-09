@@ -67,10 +67,11 @@ does not have.
 
 ## Ownership and regression surface
 
-- `src/cxr_mc/profiles.py`: content-key schema and canonical hashing.
-- `src/cxr_mc/_checkpoint_store.py`: sharded paths and atomic blob I/O.
-- `src/cxr_mc/run.py`: replay/write, migration, and `cases.json` manifests.
-- `src/cxr_mc/scan.py`: CLI cache modes and performance defaults.
-- `tests/test_profiles.py`, `tests/test_run.py`,
-  `tests/cli/test_local_click_cli.py`, and `tests/test_scan_beam_options.py`:
+- `src/cxr_mc/campaign/profiles.py`: content-key schema and canonical hashing.
+- `src/cxr_mc/checkpoints/_checkpoint_store.py`: sharded paths and atomic blob I/O.
+- `src/cxr_mc/runs/run.py`: replay/write, migration, and `cases.json` manifests.
+- `src/cxr_mc/runs/scan.py` and `src/cxr_mc/cli/commands/scan.py`: run policy
+  plus CLI cache modes and performance options.
+- `tests/materials/test_profiles.py`, `tests/scan/test_run.py`,
+  `tests/cli/test_local_click_cli.py`, and `tests/scan/test_scan_beam_options.py`:
   identity, reuse, migration, flag, and forwarding regressions.

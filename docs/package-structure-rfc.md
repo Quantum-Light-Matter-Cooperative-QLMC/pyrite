@@ -4,7 +4,7 @@
 > decision. Tracked agent work now lives only under `agentdocs/`; `docs/` is
 > reserved for durable project documentation.
 
-- **Status:** Accepted — 2026-08-01 (P1–P5 landed; P6 in progress)
+- **Status:** Accepted — 2026-08-01 (P1–P6 landed)
 - **Author:** Alex Amador
 - **Created:** 2026-08-01
 - **Companion:** `docs/cli-redesign-rfc.md` (surface) and its sub-RFC

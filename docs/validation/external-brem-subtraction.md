@@ -4,7 +4,7 @@ Independent verification of weighted external-background normalization and
 subtraction.
 
 - **Claim id:** `external-brem-subtraction`
-- **Code:** `src/cxr_mc/validation_background.py::fit_external_background`
+- **Code:** `src/cxr_mc/validation/validation_background.py::fit_external_background`
 - **Source:** weighted least squares through the origin. Zhai et al.,
   Supplementary Information S3, motivates numerical DTSA-II/PIXE
   bremsstrahlung subtraction but does not specify this fit.
@@ -145,7 +145,7 @@ uncertainty.
 
 ## 4. Anchors and traceability
 
-`tests/test_validation_background.py` passes all five tests. It covers exact
+`tests/materials/test_validation_background.py` passes all five tests. It covers exact
 scale recovery, zero sideband residual, formal scale uncertainty, fitted
 degrees of freedom, negative/underdetermined rejection, use of the existing
 external loader, a positive excluded coherent peak, and absolute no-rescale
@@ -155,7 +155,7 @@ tests.
 
 The implementation docstring contains
 `Validation: external-brem-subtraction`; the ledger row uses the same id and
-resolves to `validation_background.py::fit_external_background`. Source,
+resolves to `validation/validation_background.py::fit_external_background`. Source,
 scope, limits, anchors, and warning against claiming exact Zhai processing
 agree.
 

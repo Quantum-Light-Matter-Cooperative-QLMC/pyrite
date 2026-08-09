@@ -102,8 +102,8 @@ A/B validation before human sign-off.
 Run at minimum:
 
 ```text
-pytest tests/montecarlo/test_coherent_emission.py
-pytest tests/montecarlo/test_chunk_invariance.py
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test tests/montecarlo/test_coherent_emission.py
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test tests/montecarlo/test_chunk_invariance.py
 ```
 
 The updated coherent tests include:

@@ -1,7 +1,7 @@
 # Sampled beam phase-space metrics
 
 **Validation id:** `beam-phase-space-metrics`  
-**Code:** `beam_metrics.py::sampled_beam_metrics`;
+**Code:** `campaign/beam_metrics.py::sampled_beam_metrics`;
 `results/store.py::beam_current_na`  
 **Status:** rederived in fresh context on 2026-07-28
 

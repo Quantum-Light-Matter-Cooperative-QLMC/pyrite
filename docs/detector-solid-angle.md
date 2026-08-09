@@ -32,7 +32,7 @@ broadening. It is an excellent approximation for the **small** Timepix acceptanc
 
 `montecarlo.detector_directions()` + `montecarlo.mc_spectrum_solid_angle()` implement the
 face integral as an **opt-in tool**, validated in `checks/detector_solid_angle_check.py`
-and `tests/test_detector_solid_angle.py`:
+and `tests/detectors/test_solid_angle.py`:
 
 - `detector_directions(theta_obs, tilt, …, n_side, chip_mm, dist_mm, domega_sr)` lays the
   `n_side × n_side` grid on the flat chip facing the source and returns sample-frame `n̂_i`

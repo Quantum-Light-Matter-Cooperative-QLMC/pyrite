@@ -18,9 +18,9 @@ ephemeral plans; multiple TODO surfaces bypassed the `TODO.md merge=ours` driver
 - **P5 (accepted, landed 2026-08-01):** fold `TODO_CLI.md` / `TODO_UI.md` into
   `TODO.md` `## CLI backlog` / `## UI backlog`, so the single
   merge-driver-protected file is the only backlog on `main`.
-- **P1–P3 (accepted, scheduled):** one command home under `src/cxr_mc/cli/`
-  (redesign phase 0), rename the energy-grid module to match its surface term,
-  and fold the recompute/prune module sprawl with RFC D4's verb collapse.
+- **P1–P3 (accepted, landed 2026-08-09):** command wiring is under
+  `src/cxr_mc/cli/commands/`, the energy-grid package matches its surface term,
+  and recompute/cleanup implementations are grouped under their domain owners.
 
 ## Consequences
 
@@ -31,4 +31,4 @@ agent work under `agentdocs/`.
 - Untracked agent scratch renamed `claudedocs/` → `agentdocs/` (agent-neutral;
   the tree already standardizes on `AGENTS.md`).
 - `docs/plans/` and `docs/adr/` are excluded from the Sphinx site (dev-facing).
-- P1–P3 remain to be scheduled; P1 gates the CLI-surface redesign (ADR-0002).
+- P1–P3 landed with compatibility re-exports for former module paths.

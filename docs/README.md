@@ -11,13 +11,16 @@ Guides, references, and validation records. They complement:
 | Document | Topic | Status |
 |---|---|---|
 | [cli-reference.md](cli-reference.md) | Generated reference for every current `cxr` command | authoritative |
+| [cli-deprecations.md](cli-deprecations.md) | Generated compatibility and removal-window registry | authoritative |
 | [api.md](api.md) | Generated Python API reference | authoritative |
+| [development-workspace.md](development-workspace.md) | Single-project contributor environment and focused verification | guide |
 | [running-on-a-cluster.md](running-on-a-cluster.md) | Headless `cxr run` under SLURM (`sbatch` + job-array templates) | guide |
 | [performance-profile-analysis.md](performance-profile-analysis.md) | Analyze performance-profile NDJSON, classify bottlenecks, and design controlled tuning runs | guide |
 | [sweep-profiles.md](sweep-profiles.md) | Named full/survey fidelity policies, resolved provenance, and variant checkpoint identity | guide |
 | [checkpoint-case-store.md](checkpoint-case-store.md) | Cross-profile per-case CAS, manifests, cache modes, and compatibility | implemented |
 | [physics-validation-ledger.md](physics-validation-ledger.md) | Physics claim status and evidence | living ledger |
 | [coherent-emission.md](coherent-emission.md) | Optional phased segment/electron sum and validation boundary | experimental, unverified |
+| [coherent-streaming-rawkernel.md](coherent-streaming-rawkernel.md) | Streaming coherent GPU reduction design and evidence | implemented |
 | [crystal-mosaicity.md](crystal-mosaicity.md) | Analytic mosaic broadening and exact orientation averaging | implemented |
 | [detector-solid-angle.md](detector-solid-angle.md) | Default single-direction treatment and opt-in face integral | opt-in integral implemented |
 | [external-bremsstrahlung-validation.md](external-bremsstrahlung-validation.md) | Versioned external-background fixtures, comparison, fitting, and subtraction | implemented |

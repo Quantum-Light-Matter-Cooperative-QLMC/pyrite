@@ -1,6 +1,12 @@
 # CLI energy-grid / sweep / profile rework — triaged plan
 
-Status: approved direction (2026-07-26).
+Status: accepted historical decision source (2026-07-26); implementation landed.
+
+This file preserves the implementation-time rationale cited by source and
+tests. Paths, line numbers, TODO labels, and work-in-progress notes below are
+historical evidence, not a map of the current tree. Use
+[`repo_map.md`](repo_map.md) and [`cli-reference.md`](cli-reference.md) for the
+current package and command surfaces.
 
 ## Background (previously approved, partially landed)
 

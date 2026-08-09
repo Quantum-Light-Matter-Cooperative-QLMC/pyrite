@@ -17,6 +17,7 @@ performance-profile-analysis
 compute-performance-optimization
 sweep-profiles
 cli-reference
+cli-deprecations
 ```
 
 ```{toctree}
@@ -27,6 +28,7 @@ beam-phase-space
 checkpoint-case-store
 crystal-mosaicity
 coherent-emission
+coherent-streaming-rawkernel
 detector-solid-angle
 external-bremsstrahlung-validation
 multilayer-materials
@@ -69,6 +71,6 @@ validation/*
 :caption: API reference
 :maxdepth: 2
 
-   api
-   development-workspace
+api
+development-workspace
 ```

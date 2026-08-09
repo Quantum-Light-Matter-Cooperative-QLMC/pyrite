@@ -132,8 +132,8 @@ Using the worktree virtual environment, the following all passed:
   22 passed.
 * `tests/montecarlo/test_montecarlo.py` finite-footprint/all-missed/omitted-footprint
   selection: 8 passed.
-* `tests/test_sweep.py -k footprint`: 8 passed; and
-  `tests/test_run.py -k finite_footprint`: 3 passed.
+* `tests/scan/test_sweep.py -k footprint`: 8 passed; and
+  `tests/scan/test_run.py -k finite_footprint`: 3 passed.
 
 - **Filters**: units **pass**; limits **pass** (all-`None` legacy recovery,
   misses, lateral residence, and capped z-layer crossings); signs/conventions

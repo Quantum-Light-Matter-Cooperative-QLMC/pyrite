@@ -9,14 +9,25 @@ with::
 then open ``docs/_build/html/index.html``.
 """
 
+import logging
 import os
 import sys
+import tempfile
+
+# Keep autodoc imports deterministic and quiet without muting Sphinx warnings.
+os.environ.setdefault(
+    "MPLCONFIGDIR", os.path.join(tempfile.gettempdir(), "cxr-mc-matplotlib")
+)
 
 # Make the package importable for autodoc even from a non-installed checkout
 # (an editable ``uv sync`` also puts it on the path).
 sys.path.insert(0, os.path.abspath("../src"))
 
 from cxr_mc import __version__
+
+# Missing optional Mott tables are a documented runtime fallback, not a docs
+# build diagnostic; importing the full API otherwise logs one warning per element.
+logging.getLogger("cxr_mc.materials.catalog").setLevel(logging.ERROR)
 
 # -- Project -----------------------------------------------------------------
 project = "cxr-mc"
@@ -43,10 +54,10 @@ autodoc_default_options = {
     "members": True,
     "show-inheritance": True,
 }
-# cupy is the optional GPU dependency. Mock it so the docs build on any machine
-# (no CUDA wheel / no GPU required) and importing the MC modules never touches a
-# device; the package already falls back to CPU at runtime.
-autodoc_mock_imports = ["cupy"]
+# CuPy is optional. Mock both namespaces so the docs build without a CUDA wheel
+# or GPU and importing MC modules never touches a device. ``cli.__main__``
+# executes Click on import; recursive autosummary must inspect, not run, it.
+autodoc_mock_imports = ["cupy", "cupyx", "cxr_mc.cli.__main__"]
 
 napoleon_google_docstring = True
 napoleon_numpy_docstring = True

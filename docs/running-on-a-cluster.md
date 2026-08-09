@@ -96,7 +96,8 @@ The checkpoints are the only output you need off the cluster:
 rsync -avz login-node:~/cxr-mc/checkpoints/ ./checkpoints/
 ```
 
-Then run `cxr app analysis <material>` (the `src/cxr_mc/apps/analysis_app.py` marimo app) or
+Then run `cxr app analysis launch <material>` (the
+`src/cxr_mc/apps/analysis_app.py` marimo app) or
 run `cxr app analysis export` locally —
 all interactive visualization and static-HTML export stay on your workstation.
 
@@ -199,11 +200,11 @@ Nsight section for the exact command and interpretation limits.
 the Zhai reproduction; add `--detach` to return after submission. Retrieve an
 existing cache with `cxr remote pull --preset zhai`.
 
-With no job id, `cxr remote status --attach`/`logs`/`status` resolve to the most
-recently active job. Profile submissions name their job after the profile
+With no job id, `cxr job attach`, `cxr job logs`, and `cxr job status` resolve
+to the most recently active job. Profile submissions name their job after the profile
 (`sub_100keV`, then `sub_100keV-2` once the bare name is taken), so
 resubmitting a profile leaves the earlier, now-terminal jobs on the box.
-`status --attach` warns on stderr when it defaults to a job that is no longer running,
+`cxr job attach` warns on stderr when it defaults to a job that is no longer running,
 so a stale default never masks the live resubmission.
 
 `cxr remote prune-jobs` deletes terminal (done/failed/cancelled) job
