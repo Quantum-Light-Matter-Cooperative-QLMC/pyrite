@@ -394,7 +394,7 @@ def case_label(case, *, material_label=None, face=None, varying=None):
     line. ``varying=None`` (the default) shows every field -- the right choice
     for a single, standalone label. ``face="blazed"`` appends a trailing
     ``(blazed)`` marker (mirrors the checkpoint-stem convention in
-    :func:`cxr_mc.analyze.face_stem`); any other face is unmarked.
+    :func:`cxr_mc.apps.analyze.face_stem`); any other face is unmarked.
     """
     parts = []
     if material_label:

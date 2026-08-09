@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cxr_mc.sweep import fmt_thickness
+from cxr_mc.campaign.sweep import fmt_thickness
 
 
 def axis_warning_block(mo, axes):

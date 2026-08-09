@@ -9,13 +9,13 @@ import numpy as np
 import pytest
 from matplotlib.collections import LineCollection
 
+from cxr_mc.campaign.sweep import BeamSpec, Sweep, build_cases
+from cxr_mc.campaign.transverse import TransverseDistribution
 from cxr_mc.plots.trajectories import (
     _beam_phase_space,
     _draw_incident_bundle,
     _trajectory_data,
 )
-from cxr_mc.sweep import BeamSpec, Sweep, build_cases
-from cxr_mc.transverse import TransverseDistribution
 
 _POLICY = TransverseDistribution(
     normalized_emittance_x_mm_mrad=50.0,

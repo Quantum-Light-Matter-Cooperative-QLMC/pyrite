@@ -115,8 +115,8 @@ def test_vacuum_segments_frame_stays_separate_from_radiating_tracks():
 
 # ---- chart plumbing (small-Ne integration on a real case) --------------------
 def _real_cases(material="hopg"):
-    from cxr_mc.config import default_settings, trajectory_sweep
-    from cxr_mc.sweep import build_cases
+    from cxr_mc.campaign.config import default_settings, trajectory_sweep
+    from cxr_mc.campaign.sweep import build_cases
 
     s = default_settings()
     sweep = trajectory_sweep(material)
@@ -169,8 +169,8 @@ def test_penetration_survival_chart_none_on_empty():
 
 # ---- blazed groove profile overlay (Task 6) ----------------------------------
 def _grooved_case(spacing_ang=2.0e4, tilt_deg=45.0, energy=30.0, thickness_ang=2.0e5):
-    from cxr_mc.config import default_settings, trajectory_sweep
-    from cxr_mc.sweep import build_cases
+    from cxr_mc.campaign.config import default_settings, trajectory_sweep
+    from cxr_mc.campaign.sweep import build_cases
 
     s = default_settings()
     sweep = trajectory_sweep(

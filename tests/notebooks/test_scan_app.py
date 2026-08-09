@@ -12,7 +12,7 @@ def test_scan_app_discovers_ordered_material_labels_from_catalog() -> None:
     assert "from cxr_mc.materials import CATALOG" in source
     assert "CATALOG.material_keys" in source
     assert ".label" in source
-    assert "from cxr_mc.config import COLLAPSE_AZIMUTH, MATERIALS" not in source
+    assert "from cxr_mc.campaign.config import COLLAPSE_AZIMUTH, MATERIALS" not in source
     assert "data/materials.toml" in source
     assert "analysis app" in source
     assert "analysis notebook" not in source

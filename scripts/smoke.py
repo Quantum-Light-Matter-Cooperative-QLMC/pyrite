@@ -9,11 +9,11 @@ from pathlib import Path
 
 os.environ.setdefault("MPLBACKEND", "Agg")
 
-from cxr_mc.config import default_settings  # noqa: E402
+from cxr_mc.campaign.config import default_settings  # noqa: E402
 from cxr_mc.plots import plot_best_spectra  # noqa: E402
 from cxr_mc.plots.altair_spectra import spectrum_chart  # noqa: E402
 from cxr_mc.results import filter_results, records, top_geometries  # noqa: E402
-from cxr_mc.run import cases_from_results, load_checkpoint  # noqa: E402
+from cxr_mc.runs.run import cases_from_results, load_checkpoint  # noqa: E402
 
 
 def build_parser() -> argparse.ArgumentParser:

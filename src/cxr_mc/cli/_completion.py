@@ -252,7 +252,7 @@ def complete_archive_label(ctx: object, param: object, incomplete: str) -> list[
 
 def _query_remote_job_ids() -> Sequence[str]:
     """Read recent remote job-directory names with bounded, prompt-free SSH."""
-    from .._remote import config
+    from ..remote import config
 
     jobs_dir = config.remote_path(config.JOBS_SUBDIR)
     remote_command = (

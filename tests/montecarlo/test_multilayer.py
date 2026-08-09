@@ -10,14 +10,7 @@ from typing import Any
 import numpy as np
 import pytest
 
-from cxr_mc.montecarlo import (
-    _layer_dz,
-    _layer_path_length,
-    _mu_total_inv_ang,
-    _stack_tau,
-    simulate_trajectories,
-)
-from cxr_mc.sweep import (
+from cxr_mc.campaign.sweep import (
     BeamSpec,
     LayerSpec,
     Sweep,
@@ -27,6 +20,13 @@ from cxr_mc.sweep import (
     stack_layers,
     substrate_composition,
     substrate_radiator,
+)
+from cxr_mc.montecarlo import (
+    _layer_dz,
+    _layer_path_length,
+    _mu_total_inv_ang,
+    _stack_tau,
+    simulate_trajectories,
 )
 
 

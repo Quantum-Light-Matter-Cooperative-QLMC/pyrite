@@ -4,7 +4,7 @@ from pathlib import Path
 
 import click
 
-from ... import blaze as _blaze
+from ...runs import blaze as _blaze
 from .. import _completion as _cli_completion
 from .. import _core as _cli_core
 from .._deprecations import canonical_option

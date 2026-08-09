@@ -12,17 +12,6 @@ with app.setup:
     import altair as alt
     import marimo as mo
 
-    from cxr_mc.analyze import (
-        analysis_checkpoint_manifest,
-        comparison_stem,
-        emission_menu,
-        face_menu,
-        get_default_material,
-        initial_material,
-        material_menu,
-        profile_menu,
-        select_initial_material,
-    )
     from cxr_mc.apps._design import page_title, style_sheet
     from cxr_mc.apps._widgets import MaterialSelect
     from cxr_mc.apps.analysis_ui import (
@@ -50,6 +39,17 @@ with app.setup:
         render_rankings,
         render_scans,
     )
+    from cxr_mc.apps.analyze import (
+        analysis_checkpoint_manifest,
+        comparison_stem,
+        emission_menu,
+        face_menu,
+        get_default_material,
+        initial_material,
+        material_menu,
+        profile_menu,
+        select_initial_material,
+    )
     from cxr_mc.materials import CATALOG
     from cxr_mc.results import (
         case_label,
@@ -59,7 +59,7 @@ with app.setup:
         slim_case_record,
         sweep_values,
     )
-    from cxr_mc.run import DEFAULT_CHECKPOINT_DIR
+    from cxr_mc.runs.run import DEFAULT_CHECKPOINT_DIR
 
     try:
         alt.data_transformers.enable("vegafusion")

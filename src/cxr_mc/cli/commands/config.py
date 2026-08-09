@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from ..._remote.config import validate_remote_target
+from ...remote.config import validate_remote_target
 from .. import _config
 from .._core import CLIError
 

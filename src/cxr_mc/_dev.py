@@ -42,7 +42,7 @@ from pathlib import Path
 
 import yaml
 
-from cxr_mc._acp import ACP_SERVERS, start_acp_servers, stop_acp_servers
+from cxr_mc.apps._acp import ACP_SERVERS, start_acp_servers, stop_acp_servers
 from cxr_mc.paths import workspace_root
 
 ROOT = workspace_root()

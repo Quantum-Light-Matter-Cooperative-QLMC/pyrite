@@ -6,7 +6,7 @@ from pathlib import Path
 
 import click
 
-from ... import scan as _scan
+from ...runs import scan as _scan
 from .. import _completion as _cli_completion
 from .. import _config as _cli_config
 from .. import _core as _cli_core
@@ -342,8 +342,8 @@ def command(
                     "--preset zhai does not support normal-run option(s): "
                     + ", ".join(explicit_normal)
                 )
-            from ..._remote import cli as remote_cli
-            from ..._remote import config as remote_config
+            from ...remote import cli as remote_cli
+            from ...remote import config as remote_config
 
             target = None if remote_target == "__configured__" else remote_target
             with remote_config.override_remote_host(target):
@@ -381,8 +381,8 @@ def command(
             raise click.UsageError(
                 f"remote run does not support local-only option(s): {', '.join(explicit_local)}"
             )
-        from ..._remote import cli as remote_cli
-        from ..._remote import config as remote_config
+        from ...remote import cli as remote_cli
+        from ...remote import config as remote_config
 
         target = None if remote_target == "__configured__" else remote_target
         with remote_config.override_remote_host(target):

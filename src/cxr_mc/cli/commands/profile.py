@@ -1225,7 +1225,7 @@ def _group_materials(document, requested, *, unverified_dw, high_energy_only, al
     if unverified_dw or high_energy_only:
         # The run-selection manifest remains the owner of these operational
         # groups.  Import lazily: profile help must not load the run driver.
-        from cxr_mc.scan import load_manifest_groups
+        from cxr_mc.runs.scan import load_manifest_groups
 
         groups = load_manifest_groups()
         if unverified_dw:
@@ -1438,7 +1438,7 @@ def add_material_command(name, materials, all_materials, yes, dry_run):
         membership = list(existing) if isinstance(existing, list) else []
         requested = list(materials)
         if all_materials:
-            from cxr_mc.scan import load_all_materials
+            from cxr_mc.runs.scan import load_all_materials
 
             requested = [*requested, *load_all_materials()]
         known = _catalog_io.material_rows(document)

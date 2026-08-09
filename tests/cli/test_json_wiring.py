@@ -5,11 +5,13 @@ import pickle
 
 import pytest
 
-from cxr_mc import archive, blaze, energy_grid, recompute, remote, scan
-from cxr_mc._remote import lifecycle, viewer
+from cxr_mc import energy_grid, remote
+from cxr_mc.checkpoints import archive, recompute
 from cxr_mc.cli import command as root_command
 from cxr_mc.cli.commands import job as job_cli
 from cxr_mc.cli.commands import recompute as recompute_cli
+from cxr_mc.remote import lifecycle, viewer
+from cxr_mc.runs import blaze, scan
 from tests.helpers.cli import invoke
 
 
@@ -311,7 +313,7 @@ def test_recompute_json_uses_status_for_partial_summary(monkeypatch, command, na
     ],
 )
 def test_recompute_json_marks_low_level_exception_failed(monkeypatch, command, low_level):
-    from cxr_mc import run
+    from cxr_mc.runs import run
 
     def fail(*_args, **_kwargs):
         raise OSError("checkpoint failed")

@@ -302,7 +302,7 @@ def _derive_remote(
     remote_target,
     persist_local,
 ):
-    from cxr_mc._remote.config import override_remote_host
+    from cxr_mc.remote.config import override_remote_host
 
     persisted = defaults.load_defaults()
     if set_default and persist_local:

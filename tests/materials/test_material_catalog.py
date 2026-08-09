@@ -66,7 +66,7 @@ crystal = "mos2"
 
 
 def test_per_beam_line_grids_are_exact_read_only_and_projected(tmp_path, monkeypatch):
-    from cxr_mc import config
+    from cxr_mc.campaign import config
     from cxr_mc.materials import load_material_catalog
 
     catalog = load_material_catalog(_write_catalog(tmp_path, _catalog_with_per_beam_line_grids()))
@@ -417,7 +417,7 @@ crystal = "mos2"
 
 
 def test_profile_beam_block_decodes_and_reaches_material_sweep(tmp_path, monkeypatch):
-    from cxr_mc import config
+    from cxr_mc.campaign import config
     from cxr_mc.materials import load_material_catalog
 
     text = _catalog_with_standard_beam(
@@ -602,7 +602,7 @@ def test_named_beam_renaming_does_not_change_resolved_payload(tmp_path):
 def test_profile_detector_decodes_selected_profile_and_reaches_material_sweep(
     tmp_path, monkeypatch
 ):
-    from cxr_mc import config
+    from cxr_mc.campaign import config
     from cxr_mc.detectors import DetectorSpec
     from cxr_mc.materials import load_material_catalog
 
@@ -683,7 +683,7 @@ crystal = "mos2"
 
 
 def test_profile_longitudinal_policy_decodes_and_reaches_material_sweep(tmp_path, monkeypatch):
-    from cxr_mc import config
+    from cxr_mc.campaign import config
     from cxr_mc.materials import load_material_catalog
 
     text = _catalog_with_standard_beam(
@@ -780,7 +780,7 @@ def test_same_named_polytypes_keep_separate_checkpoints():
     checkpoint pickles -- otherwise a sweep over one polytype would clobber the
     other's results, since run_sweep names the pickle for ``case['crystal']``."""
     from cxr_mc.materials import CATALOG
-    from cxr_mc.run import checkpoint_path_for
+    from cxr_mc.runs.run import checkpoint_path_for
 
     # SiC polytypes: identical material name, different phase, different key.
     assert CATALOG.crystal("4h_sic").full_name == CATALOG.crystal("6h_sic").full_name
@@ -1016,8 +1016,8 @@ tilt_azim_deg = { logspace = { start = 0.0, stop = 2.0, num = 3, base = 2.0 } }
 
 
 def test_catalog_scalar_and_logspace_energy_grids_reach_runner_exactly(tmp_path, monkeypatch):
-    from cxr_mc import config
-    from cxr_mc import sweep as sweep_module
+    from cxr_mc.campaign import config
+    from cxr_mc.campaign import sweep as sweep_module
     from cxr_mc.materials import load_material_catalog
     from cxr_mc.montecarlo import runner
 

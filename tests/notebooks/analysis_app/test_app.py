@@ -142,7 +142,7 @@ def test_material_menu_cell_owns_checkpoint_directory_dependency() -> None:
     setup_block = next(node for node in tree.body if isinstance(node, ast.With))
     assert any(
         isinstance(node, ast.ImportFrom)
-        and node.module == "cxr_mc.run"
+        and node.module == "cxr_mc.runs.run"
         and any(alias.name == "DEFAULT_CHECKPOINT_DIR" for alias in node.names)
         for node in ast.walk(setup_block)
     )
@@ -169,7 +169,7 @@ def test_analysis_app_discovers_materials_directly_from_catalog() -> None:
 
     assert "from cxr_mc.materials import CATALOG" in source
     assert "MATERIAL_LABELS" not in source
-    assert "from cxr_mc.config import MATERIALS" not in source
+    assert "from cxr_mc.campaign.config import MATERIALS" not in source
 
 
 def test_analysis_app_uses_four_top_level_tabs_and_action_names() -> None:

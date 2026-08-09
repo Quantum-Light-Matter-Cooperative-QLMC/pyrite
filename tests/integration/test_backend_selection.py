@@ -449,7 +449,7 @@ def test_intel_machine_selects_sycl_backend() -> None:
         """
         import sys
 
-        import cxr_mc.config
+        import cxr_mc.campaign.config
         from cxr_mc.montecarlo._backend import BACKEND
 
         assert BACKEND.name == "sycl", (

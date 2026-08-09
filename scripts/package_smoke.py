@@ -78,7 +78,7 @@ def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
         str(_python(venv)),
         "-c",
         (
-            "from pathlib import Path; import cxr_mc, cxr_mc.run as run; "
+            "from pathlib import Path; import cxr_mc, cxr_mc.runs.run as run; "
             "site = Path(cxr_mc.__file__).resolve().parent; "
             "assert not Path(run.DEFAULT_CHECKPOINT_DIR).resolve().is_relative_to(site)"
         ),

@@ -14,9 +14,9 @@ import numpy as np
 import pytest
 from click.testing import CliRunner
 
-from cxr_mc import _checkpoint_io
+from cxr_mc.checkpoints import _checkpoint_io
 from cxr_mc.montecarlo import runner
-from cxr_mc.run import (
+from cxr_mc.runs.run import (
     _checkpoint_save,
     _load_checkpoint_cached,
     _manifest_save,
@@ -427,7 +427,7 @@ def test_cached_material_analysis_survives_process_cache_reset(tmp_path, monkeyp
 
     _material_analysis_cache.clear()  # model app exit + fresh process
     monkeypatch.setattr(
-        "cxr_mc.run.load_checkpoint",
+        "cxr_mc.runs.run.load_checkpoint",
         lambda *args, **kwargs: pytest.fail("persistent cache should avoid checkpoint reload"),
     )
 
@@ -554,7 +554,7 @@ def test_manifest_save_coerces_numpy_scalars_to_json_safe(tmp_path):
 
 
 def test_run_sweep_writes_manifest_alongside_checkpoint(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     cases = [
         _fake_case("cfg_a", 30.0),
         _fake_case("cfg_a", 45.0),
@@ -598,7 +598,7 @@ def test_run_sweep_reports_checkpoint_timing(tmp_path, monkeypatch):
 
         return [None] * len(cases)
 
-    monkeypatch.setattr("cxr_mc.run.run_cases", profile_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", profile_run_cases)
     timings = []
 
     run_sweep(
@@ -616,7 +616,7 @@ def test_run_sweep_reports_checkpoint_timing(tmp_path, monkeypatch):
 
 
 def test_run_sweep_persists_dataset_identity_in_manifest(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     identity = {
         "schema": "cxr.dataset-identity.v1",
         "material": "hopg",
@@ -650,7 +650,7 @@ def test_manifest_refresh_preserves_existing_dataset_identity(tmp_path):
 
 
 def test_run_sweep_refuses_resume_across_dataset_identities(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     case = _fake_case("cfg", 30.0)
     checkpoint = tmp_path / "hopg"
     old = {"profile": "full", "parameter_sha256": "a" * 64}
@@ -696,7 +696,7 @@ def test_cases_from_results_flat_list():
 
 
 def test_run_sweep_stores_all_cases(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     cases = [
         _fake_case("cfg_a", 30.0),
         _fake_case("cfg_a", 45.0),
@@ -710,7 +710,7 @@ def test_run_sweep_stores_all_cases(tmp_path, monkeypatch):
 
 
 def test_run_sweep_writes_checkpoint(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     run_sweep([_fake_case("cfg_a", 30.0)], {}, checkpoint_dir=str(tmp_path), progress=False)
     ckpt = tmp_path / "hopg"
     assert (ckpt / "line.pkl").exists()
@@ -720,15 +720,15 @@ def test_run_sweep_writes_checkpoint(tmp_path, monkeypatch):
 
 
 def test_run_sweep_consolidates_and_clears_shards(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     run_sweep([_fake_case("cfg_a", 30.0)], {}, checkpoint_dir=str(tmp_path), progress=False)
     # crash-safety shards are folded into the monolith and removed on a clean run
     assert not (tmp_path / "hopg" / "parts").exists()
 
 
 def test_checkpoint_load_recovers_unconsolidated_shards(tmp_path):
-    from cxr_mc import _checkpoint_store
-    from cxr_mc.run import _checkpoint_exists, _checkpoint_load
+    from cxr_mc.checkpoints import _checkpoint_store
+    from cxr_mc.runs.run import _checkpoint_exists, _checkpoint_load
 
     # simulate a sweep killed after writing a shard but before consolidation:
     # no line.pkl/brem.pkl monolith, only the parts directory
@@ -746,8 +746,8 @@ def test_checkpoint_load_recovers_unconsolidated_shards(tmp_path):
 
 
 def test_checkpoint_shards_win_over_stale_monolith(tmp_path):
-    from cxr_mc import _checkpoint_store
-    from cxr_mc.run import _checkpoint_load
+    from cxr_mc.checkpoints import _checkpoint_store
+    from cxr_mc.runs.run import _checkpoint_load
 
     # a monolith from a prior run holds cfg_a with an old spectrum
     stale = {"cfg_a": {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])}}}
@@ -771,7 +771,7 @@ def test_checkpoint_shards_win_over_stale_monolith(tmp_path):
 
 
 def test_run_sweep_splits_line_and_brem_fields(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     run_sweep([_fake_case("cfg_a", 30.0)], {}, checkpoint_dir=str(tmp_path), progress=False)
 
     line = _checkpoint_io.load(str(tmp_path / "hopg" / "line.pkl"))
@@ -786,7 +786,7 @@ def test_legacy_checkpoint_migrates_to_components_on_save(tmp_path, monkeypatch)
     existing = {"cfg_a": {30.0: {"case": _fake_case("cfg_a", 30.0), "spec": np.array([1.0])}}}
     with open(tmp_path / "hopg.pkl", "wb") as f:
         pickle.dump(existing, f)
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
 
     run_sweep(
         [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 30.0)],
@@ -801,7 +801,7 @@ def test_legacy_checkpoint_migrates_to_components_on_save(tmp_path, monkeypatch)
 
 
 def test_partial_component_save_fully_migrates_legacy_checkpoint(tmp_path):
-    from cxr_mc import _checkpoint_store
+    from cxr_mc.checkpoints import _checkpoint_store
 
     record = {
         "case": _fake_case("cfg_a", 30.0),
@@ -832,7 +832,7 @@ def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
 
     ran = []
     monkeypatch.setattr(
-        "cxr_mc.run.run_cases",
+        "cxr_mc.runs.run.run_cases",
         tracking_run_cases_factory(ran),
     )
     cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 30.0)]
@@ -850,9 +850,9 @@ def test_run_sweep_resume_skips_cached_cases(tmp_path, monkeypatch):
 def test_run_sweep_reuses_cases_across_stems_by_content_key(tmp_path, monkeypatch):
     """A case computed under one profile's stem is replayed under a DIFFERENT
     stem sharing the same material + content key, instead of recomputed."""
-    from cxr_mc.profiles import case_content_key
+    from cxr_mc.campaign.profiles import case_content_key
 
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 45.0)]
 
     # Profile A run: populates the shared per-material CAS.
@@ -870,7 +870,7 @@ def test_run_sweep_reuses_cases_across_stems_by_content_key(tmp_path, monkeypatc
     # Profile B run: a different stem, same cases -> everything reused, run_cases
     # sees NOTHING to compute.
     ran = []
-    monkeypatch.setattr("cxr_mc.run.run_cases", tracking_run_cases_factory(ran))
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", tracking_run_cases_factory(ran))
     results_b = {}
     run_sweep(
         cases,
@@ -887,9 +887,9 @@ def test_run_sweep_reuses_cases_across_stems_by_content_key(tmp_path, monkeypatc
 
 
 def test_no_cache_neither_reads_nor_writes(tmp_path, monkeypatch):
-    from cxr_mc.profiles import case_content_key
+    from cxr_mc.campaign.profiles import case_content_key
 
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0)]
     # Pre-populate the CAS from a normal run.
     run_sweep(
@@ -904,7 +904,7 @@ def test_no_cache_neither_reads_nor_writes(tmp_path, monkeypatch):
     assert before
 
     ran = []
-    monkeypatch.setattr("cxr_mc.run.run_cases", tracking_run_cases_factory(ran))
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", tracking_run_cases_factory(ran))
     run_sweep(
         cases,
         {},
@@ -922,9 +922,9 @@ def test_no_cache_neither_reads_nor_writes(tmp_path, monkeypatch):
 
 
 def test_recompute_skips_read_but_repopulates(tmp_path, monkeypatch):
-    from cxr_mc.profiles import case_content_key
+    from cxr_mc.campaign.profiles import case_content_key
 
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0)]
     run_sweep(
         cases,
@@ -938,7 +938,7 @@ def test_recompute_skips_read_but_repopulates(tmp_path, monkeypatch):
     blob.unlink()  # remove so we can prove --recompute rewrites it
 
     ran = []
-    monkeypatch.setattr("cxr_mc.run.run_cases", tracking_run_cases_factory(ran))
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", tracking_run_cases_factory(ran))
     run_sweep(
         cases,
         {},
@@ -955,9 +955,9 @@ def test_recompute_skips_read_but_repopulates(tmp_path, monkeypatch):
 
 
 def test_existing_checkpoint_seeds_shared_cache_on_resume(tmp_path, monkeypatch):
-    from cxr_mc.profiles import case_content_key
+    from cxr_mc.campaign.profiles import case_content_key
 
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0)]
     stem = tmp_path / "hopg@legacy-000000000000"
     run_sweep(cases, {}, checkpoint_path=str(stem), progress=False)
@@ -974,8 +974,8 @@ def test_existing_checkpoint_seeds_shared_cache_on_resume(tmp_path, monkeypatch)
 
 
 def test_invalid_cached_payload_falls_back_to_recompute(tmp_path, monkeypatch):
-    from cxr_mc import _checkpoint_io
-    from cxr_mc.profiles import case_content_key
+    from cxr_mc.campaign.profiles import case_content_key
+    from cxr_mc.checkpoints import _checkpoint_io
 
     cases = [_fake_case("cfg_a", 30.0)]
     key = case_content_key(cases[0])
@@ -983,7 +983,7 @@ def test_invalid_cached_payload_falls_back_to_recompute(tmp_path, monkeypatch):
     blob.parent.mkdir(parents=True)
     _checkpoint_io.dump({"not": "a case payload"}, str(blob))
     ran = []
-    monkeypatch.setattr("cxr_mc.run.run_cases", tracking_run_cases_factory(ran))
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", tracking_run_cases_factory(ran))
 
     run_sweep(
         cases,
@@ -996,7 +996,7 @@ def test_invalid_cached_payload_falls_back_to_recompute(tmp_path, monkeypatch):
 
 
 def test_cas_rejects_non_sha256_content_key(tmp_path):
-    from cxr_mc import _checkpoint_store
+    from cxr_mc.checkpoints import _checkpoint_store
 
     with pytest.raises(ValueError, match="64-character SHA-256"):
         _checkpoint_store.cas_blob_path("hopg", "../escape", tmp_path)
@@ -1005,7 +1005,7 @@ def test_cas_rejects_non_sha256_content_key(tmp_path):
 def test_content_key_fn_none_leaves_cas_inert(tmp_path, monkeypatch):
     """Without content_key_fn the CAS path is entirely dormant (byte-identical to
     the pre-feature per-stem-only behavior): no blobs, no cases.json."""
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0)]
     run_sweep(cases, {}, checkpoint_path=str(tmp_path / "hopg"), progress=False)
     assert not list((tmp_path / "hopg").glob("*/*.pkl"))  # no sharded CAS blobs
@@ -1015,7 +1015,7 @@ def test_content_key_fn_none_leaves_cas_inert(tmp_path, monkeypatch):
 
 
 def test_run_sweep_reports_initial_and_per_case_progress(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     cases = [
         _fake_case("cfg_a", 30.0),
         _fake_case("cfg_a", 45.0),
@@ -1035,7 +1035,7 @@ def test_run_sweep_reports_initial_and_per_case_progress(tmp_path, monkeypatch):
 
 
 def test_run_sweep_on_case_fires_with_each_finished_case(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     cases = [_fake_case("cfg_a", 30.0), _fake_case("cfg_b", 45.0)]
     seen = []
 
@@ -1055,7 +1055,7 @@ def test_run_sweep_progress_counts_cached_cases_on_resume(tmp_path, monkeypatch)
     existing = {"cfg_a": {30.0: {"case": cached_case, "spec": np.array([1.0])}}}
     with open(tmp_path / "hopg.pkl", "wb") as f:
         pickle.dump(existing, f)
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     progress = []
 
     run_sweep(
@@ -1078,7 +1078,7 @@ def test_run_sweep_on_cost_reports_cached_seed_and_per_case_totals(tmp_path, mon
     existing = {"cfg_a": {30.0: {"case": cached_case, "spec": np.array([1.0])}}}
     with open(tmp_path / "hopg.pkl", "wb") as f:
         pickle.dump(existing, f)
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     cost = []
 
     run_sweep(
@@ -1096,7 +1096,7 @@ def test_run_sweep_on_cost_reports_cached_seed_and_per_case_totals(tmp_path, mon
 
 
 def test_run_sweep_on_cost_never_fires_without_case_cost_fn(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     cost = []
 
     run_sweep(
@@ -1111,7 +1111,7 @@ def test_run_sweep_on_cost_never_fires_without_case_cost_fn(tmp_path, monkeypatc
 
 
 def test_run_sweep_on_chunk_fires_per_group(tmp_path, monkeypatch):
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     # same (crystal, thickness, tilt, omitted footprint) -> one group;
     # different tilt -> another
     c1 = _fake_case("cfg_a", 30.0, tilt_deg=30.0)
@@ -1128,7 +1128,7 @@ def test_run_sweep_on_chunk_fires_per_group(tmp_path, monkeypatch):
 
 def test_run_sweep_separates_finite_footprint_chunk_groups(tmp_path, monkeypatch):
     """Finite footprints need independent streaming groups at one tilt."""
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     narrow = _fake_case("narrow", 30.0, tilt_deg=30.0)
     wide = _fake_case("wide", 30.0, tilt_deg=30.0)
     narrow.update(crystal_width_mm=0.1, crystal_height_mm=0.2)
@@ -1147,7 +1147,7 @@ def test_run_sweep_resume_replays_cached_chunks(tmp_path, monkeypatch):
     existing = {"cfg_a": {30.0: {"case": case, "spec": np.array([1.0])}}}
     with open(tmp_path / "hopg.pkl", "wb") as f:
         pickle.dump(existing, f)
-    monkeypatch.setattr("cxr_mc.run.run_cases", stub_run_cases)
+    monkeypatch.setattr("cxr_mc.runs.run.run_cases", stub_run_cases)
     chunks = []
     run_sweep(
         [case],
@@ -1161,7 +1161,7 @@ def test_run_sweep_resume_replays_cached_chunks(tmp_path, monkeypatch):
 
 
 def test_run_sweep_budget_stops_early_and_resumes(tmp_path, monkeypatch):
-    from cxr_mc import run as run_mod
+    from cxr_mc.runs import run as run_mod
 
     clock = {"t": 0.0}
 
@@ -1224,7 +1224,7 @@ def test_run_sweep_budget_stops_early_and_resumes(tmp_path, monkeypatch):
 
 
 def test_run_sweep_no_budget_returns_complete(tmp_path, monkeypatch):
-    from cxr_mc import run as run_mod
+    from cxr_mc.runs import run as run_mod
 
     clock = {"t": 0.0}
 
@@ -1569,7 +1569,7 @@ def test_repair_brem_wide_retune_skips_record_already_at_target():
 
 
 def test_rebrem_checkpoints_enumerates_pkls_and_passes_params(monkeypatch, tmp_path):
-    from cxr_mc.recompute import rebrem_checkpoints
+    from cxr_mc.checkpoints.recompute import rebrem_checkpoints
 
     (tmp_path / "MoS2.pkl").write_bytes(b"")
     (tmp_path / "W_grooved.pkl").write_bytes(b"")
@@ -1580,7 +1580,7 @@ def test_rebrem_checkpoints_enumerates_pkls_and_passes_params(monkeypatch, tmp_p
         calls.append((path, kw))
         return {}
 
-    monkeypatch.setattr("cxr_mc.run.repair_checkpoint", _spy)
+    monkeypatch.setattr("cxr_mc.runs.run.repair_checkpoint", _spy)
     out = rebrem_checkpoints(checkpoint_dir=str(tmp_path), ne_brem=1000, brem_step_eV=25.0)
     assert sorted(out) == ["MoS2", "W_grooved"]
     assert all(kw["ne_brem"] == 1000 and kw["brem_step_eV"] == 25.0 for _, kw in calls)
@@ -1595,13 +1595,13 @@ def test_rebrem_checkpoints_enumerates_pkls_and_passes_params(monkeypatch, tmp_p
 
 
 def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatch, tmp_path):
-    from cxr_mc import recompute as rebrem
+    from cxr_mc.checkpoints import recompute as rebrem
 
     for material in ("hopg", "hbn"):
         (tmp_path / f"{material}.pkl").write_bytes(b"")
     calls = []
     monkeypatch.setattr(
-        "cxr_mc.run.repair_checkpoint",
+        "cxr_mc.runs.run.repair_checkpoint",
         lambda path, **kwargs: calls.append((Path(path).name, kwargs)) or {},
     )
 
@@ -1618,7 +1618,7 @@ def test_rebrem_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
 def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
     """`cxr checkpoint recompute brem` refuses no-selection and materials+--all;
     accepts either alone."""
-    from cxr_mc import recompute
+    from cxr_mc.checkpoints import recompute
     from cxr_mc.cli.commands.recompute import brem_command
 
     seen: list[Any] = []
@@ -1647,7 +1647,7 @@ def test_rebrem_cli_requires_materials_xor_all(monkeypatch):
 def test_reline_cli_requires_materials_xor_all(monkeypatch):
     """`cxr checkpoint recompute line` preserves brem's exclusive
     material-selection contract."""
-    from cxr_mc import recompute
+    from cxr_mc.checkpoints import recompute
     from cxr_mc.cli.commands.recompute import line_command
 
     seen: list[Any] = []
@@ -1717,7 +1717,7 @@ def test_repair_brem_wide_max_seconds_stops_early(monkeypatch):
 
 
 def test_rebrem_checkpoints_progress_file_writes_dashboard_records(monkeypatch, tmp_path):
-    from cxr_mc.recompute import rebrem_checkpoints
+    from cxr_mc.checkpoints.recompute import rebrem_checkpoints
 
     (tmp_path / "hopg.pkl").write_bytes(b"")
     progress = tmp_path / "hopg.json"
@@ -1730,7 +1730,7 @@ def test_rebrem_checkpoints_progress_file_writes_dashboard_records(monkeypatch, 
     def _snoop_write(path):
         states.append(json.loads(Path(path).read_text()))
 
-    monkeypatch.setattr("cxr_mc.run.repair_checkpoint", _spy)
+    monkeypatch.setattr("cxr_mc.runs.run.repair_checkpoint", _spy)
     rebrem_checkpoints(
         materials=["hopg"], checkpoint_dir=str(tmp_path), ne_brem=1000, progress_file=str(progress)
     )
@@ -1742,7 +1742,7 @@ def test_rebrem_checkpoints_progress_file_writes_dashboard_records(monkeypatch, 
 
 
 def test_rebrem_checkpoints_progress_file_marks_failed_and_rejects_multi(monkeypatch, tmp_path):
-    from cxr_mc.recompute import rebrem_checkpoints
+    from cxr_mc.checkpoints.recompute import rebrem_checkpoints
 
     (tmp_path / "hopg.pkl").write_bytes(b"")
     (tmp_path / "hbn.pkl").write_bytes(b"")
@@ -1756,7 +1756,7 @@ def test_rebrem_checkpoints_progress_file_marks_failed_and_rejects_multi(monkeyp
     def _boom(path, **kw):
         raise RuntimeError("kaput")
 
-    monkeypatch.setattr("cxr_mc.run.repair_checkpoint", _boom)
+    monkeypatch.setattr("cxr_mc.runs.run.repair_checkpoint", _boom)
     with pytest.raises(RuntimeError):
         rebrem_checkpoints(
             materials=["hopg"], checkpoint_dir=str(tmp_path), progress_file=str(progress)
@@ -1800,7 +1800,7 @@ def _line_record(E0=30.0, ne=200):
 def test_repair_line_spec_rewrites_spec_and_reinterp_brem_keeps_brem_wide(monkeypatch):
     import numpy as np
 
-    from cxr_mc import run
+    from cxr_mc.runs import run
 
     monkeypatch.setattr(
         run.runner,
@@ -1825,7 +1825,7 @@ def test_repair_line_spec_refreshes_both_spec_and_spec_coherent(monkeypatch):
     `spec` and grows no `spec_coherent`."""
     import numpy as np
 
-    from cxr_mc import run
+    from cxr_mc.runs import run
 
     def fake_pair(case, E_grid, *, want_coherent):
         spec = np.full(E_grid.shape, 5.0)
@@ -1849,7 +1849,7 @@ def test_repair_line_spec_refreshes_both_spec_and_spec_coherent(monkeypatch):
 
 
 def test_repair_line_spec_persists_profile_and_explicit_bounds(monkeypatch):
-    from cxr_mc import run
+    from cxr_mc.runs import run
 
     monkeypatch.setattr(
         run.runner,
@@ -1879,7 +1879,7 @@ def test_repair_line_spec_persists_profile_and_explicit_bounds(monkeypatch):
 def test_repair_line_spec_skips_at_target(monkeypatch):
     import numpy as np
 
-    from cxr_mc import run
+    from cxr_mc.runs import run
 
     monkeypatch.setattr(
         run.runner,
@@ -1895,7 +1895,7 @@ def test_repair_line_spec_skips_at_target(monkeypatch):
 def test_repair_line_spec_max_seconds_stops_early(monkeypatch):
     import numpy as np
 
-    from cxr_mc import run
+    from cxr_mc.runs import run
 
     monkeypatch.setattr(
         run.runner,
@@ -1916,8 +1916,8 @@ def test_repair_line_spec_max_seconds_stops_early(monkeypatch):
 
 
 def test_reline_checkpoints_forwards_flags(monkeypatch, tmp_path):
-    import cxr_mc.run as run
-    from cxr_mc import recompute as reline
+    import cxr_mc.runs.run as run
+    from cxr_mc.checkpoints import recompute as reline
 
     calls = []
     monkeypatch.setattr(
@@ -1950,13 +1950,13 @@ def test_reline_checkpoints_forwards_flags(monkeypatch, tmp_path):
 
 
 def test_reline_profile_defaults_match_for_explicit_materials_and_all(monkeypatch, tmp_path):
-    from cxr_mc import recompute as reline
+    from cxr_mc.checkpoints import recompute as reline
 
     for material in ("hopg", "hbn"):
         (tmp_path / f"{material}.pkl").write_bytes(b"")
     calls = []
     monkeypatch.setattr(
-        "cxr_mc.run.reline_checkpoint",
+        "cxr_mc.runs.run.reline_checkpoint",
         lambda path, material, **kwargs: calls.append((material, kwargs)) or {},
     )
 
@@ -1973,8 +1973,8 @@ def test_reline_profile_defaults_match_for_explicit_materials_and_all(monkeypatc
 def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(monkeypatch, tmp_path):
     import json
 
-    import cxr_mc.run as run
-    from cxr_mc import recompute as reline
+    import cxr_mc.runs.run as run
+    from cxr_mc.checkpoints import recompute as reline
 
     stem = "hopg@sub_100keV-deadbeef0000"
     directory = tmp_path / stem
@@ -2010,7 +2010,7 @@ def test_reline_resolves_variant_material_profile_and_fidelity_from_metadata(mon
 
 
 def test_recompute_legacy_ambiguous_stem_requires_explicit_profile(tmp_path):
-    from cxr_mc.recompute_defaults import dataset_context
+    from cxr_mc.checkpoints.recompute_defaults import dataset_context
 
     path = tmp_path / "old-derived-stem"
 
@@ -2025,7 +2025,7 @@ def test_recompute_legacy_ambiguous_stem_requires_explicit_profile(tmp_path):
 def test_recompute_rejects_profile_mismatch(tmp_path):
     import json
 
-    from cxr_mc.recompute_defaults import dataset_context
+    from cxr_mc.checkpoints.recompute_defaults import dataset_context
 
     path = tmp_path / "hopg@survey"
     path.mkdir()
@@ -2048,7 +2048,7 @@ def test_recompute_rejects_profile_mismatch(tmp_path):
 def test_recomputed_checkpoint_publishes_cas_before_component_and_manifest(monkeypatch, tmp_path):
     import json
 
-    import cxr_mc.run as run
+    import cxr_mc.runs.run as run
 
     checkpoint = tmp_path / "hopg@survey"
     checkpoint.mkdir()

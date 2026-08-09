@@ -2,7 +2,7 @@
 
 import click
 
-from ... import export as _export
+from ...apps import export as _export
 
 
 @click.command(

@@ -46,12 +46,7 @@ import numpy as np
 from tabulate import tabulate
 
 _HERE = Path(__file__).resolve().parent
-from cxr_mc._zhai import (  # noqa: E402
-    ZHAI_CACHE_FORMAT,
-    ZHAI_CACHE_SCHEMA,
-    ZHAI_DETECTOR,
-    detector_metadata,
-)
+from cxr_mc.campaign.sweep import BeamSpec, Sweep, build_cases  # noqa: E402
 from cxr_mc.detectors import DetectorSpec  # noqa: E402
 from cxr_mc.materials.crystal import (  # noqa: E402
     CRYSTALS,
@@ -70,8 +65,13 @@ from cxr_mc.montecarlo import (  # noqa: E402
     simulate_trajectories,
 )
 from cxr_mc.montecarlo.geometry import tilted_geometry  # noqa: E402
-from cxr_mc.sweep import BeamSpec, Sweep, build_cases  # noqa: E402
-from cxr_mc.validation_background import (  # noqa: E402
+from cxr_mc.validation._zhai import (  # noqa: E402
+    ZHAI_CACHE_FORMAT,
+    ZHAI_CACHE_SCHEMA,
+    ZHAI_DETECTOR,
+    detector_metadata,
+)
+from cxr_mc.validation.validation_background import (  # noqa: E402
     compare_external_background,
     subtract_external_background,
 )
@@ -710,7 +710,7 @@ def cached_model_spectra(
     Returns ``(model, cache_hit, path)``. Cache files are local generated
     artifacts under ``checkpoints/zhai_reproduction`` by default.
     """
-    from cxr_mc import _checkpoint_io
+    from cxr_mc.checkpoints import _checkpoint_io
 
     root = (
         Path(cache_dir)
@@ -882,7 +882,7 @@ def cached_coherent_spectra(
     cache_only: bool = False,
 ) -> tuple[dict[SupplementaryCondition, np.ndarray], bool, Path]:
     """Load or atomically cache one supplementary coherent-only condition set."""
-    from cxr_mc import _checkpoint_io
+    from cxr_mc.checkpoints import _checkpoint_io
 
     root = (
         Path(cache_dir)

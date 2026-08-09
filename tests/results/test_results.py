@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from scipy.signal import peak_widths
 
-from cxr_mc.config import default_settings
+from cxr_mc.campaign.config import default_settings
 from cxr_mc.plots import _common
 from cxr_mc.results import (
     Settings,

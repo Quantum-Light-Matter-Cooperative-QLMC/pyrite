@@ -4,7 +4,7 @@
 > decision. Tracked agent work now lives only under `agentdocs/`; `docs/` is
 > reserved for durable project documentation.
 
-- **Status:** Accepted — 2026-08-01 (P4/P5 landed; P1–P3 scheduled)
+- **Status:** Accepted — 2026-08-01 (P1–P5 landed; P6 in progress)
 - **Author:** Alex Amador
 - **Created:** 2026-08-01
 - **Companion:** `docs/cli-redesign-rfc.md` (surface) and its sub-RFC
@@ -182,6 +182,23 @@ points behind shims. Sequenced with the redesign, not ahead of it.
   `claudedocs/` → `agentdocs/` (agent-neutral; non-Claude agents write there
   too). The only structural fix needed was the TODO fan-out.
 
+### P6 — Group top-level domain modules
+
+The follow-up structure survey is owned by
+[`agentdocs/tasks/refactor/repo-structure-cleanup/`](../agentdocs/tasks/refactor/repo-structure-cleanup/).
+Its S2 decision groups implementations by responsibility:
+
+- `checkpoints/`: storage, archive, cleanup, recompute, and campaign locks;
+- `campaign/`: configuration, profiles, sweep construction, and beam phase space;
+- `runs/`: local run, scan, and blazed-sweep drivers;
+- `apps/`: launch/export support beside the packaged marimo assets;
+- `validation/` and `perf/`: validation adapters and performance tooling;
+- `remote/`: the former public facade and private `_remote/` implementation
+  combined as one public package.
+
+The old documented root module paths remain thin compatibility re-exports.
+`cxr_mc.__all__`, CLI behavior, and physics/numerical behavior remain unchanged.
+
 ---
 
 ## 4. Non-goals
@@ -190,8 +207,8 @@ points behind shims. Sequenced with the redesign, not ahead of it.
   `detectors/`) — out of scope; it is already well-factored.
 - **CLI surface** (noun/verb/flag) — owned by `cli-redesign-rfc.md`.
 - **Data model** (content-addressed store) — owned by `cli-artifact-model-rfc.md`.
-- **Public import paths** — no domain-module public API moves (frozen-export
-  guards must stay green); only command-wiring internals relocate.
+- **Public import removals** — P6 may establish grouped canonical paths, but the
+  documented root paths remain compatibility re-exports.
 
 ---
 

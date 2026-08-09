@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from cxr_mc.campaign.sweep import fmt_thickness
 from cxr_mc.results import records, sweep_values, thicknesses_by_energy
-from cxr_mc.sweep import fmt_thickness
 
 
 def _options(values: Sequence[float], unit: str = "") -> dict[str, float | None]:

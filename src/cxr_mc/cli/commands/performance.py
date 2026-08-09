@@ -49,7 +49,7 @@ def _signature(path: Path) -> tuple[tuple[str, int, int], ...]:
 
 def analyze(name: str, performance_dir: Path, sample_period: float) -> int:
     """Analyze one named performance profile and emit its artifact summary."""
-    from cxr_mc.performance_analysis import (
+    from cxr_mc.perf.performance_analysis import (
         PerformanceAnalysisError,
         analyze_performance_profile,
     )

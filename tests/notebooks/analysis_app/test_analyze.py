@@ -11,7 +11,7 @@ import sys
 import pytest
 from click.testing import CliRunner
 
-from cxr_mc import analyze
+from cxr_mc.apps import analyze
 from cxr_mc.materials import CATALOG
 
 
@@ -227,7 +227,7 @@ def test_profile_menu_empty_for_missing_material_or_dir(tmp_path):
 def test_analysis_reads_skip_partially_pulled_pickle(
     helper, run_name, args, monkeypatch, capsys, tmp_path
 ):
-    from cxr_mc import run
+    from cxr_mc.runs import run
 
     def incomplete(*_args):
         raise EOFError("Compressed file ended before the end-of-stream marker")
@@ -239,7 +239,7 @@ def test_analysis_reads_skip_partially_pulled_pickle(
 
 
 def test_analysis_read_preserves_complete_checkpoint(monkeypatch, tmp_path):
-    from cxr_mc import run
+    from cxr_mc.runs import run
 
     expected = {"hopg": {30.0: {"case": {}}}}
     monkeypatch.setattr(run, "load_checkpoint", lambda material, root: (material, root, expected))
@@ -248,7 +248,7 @@ def test_analysis_read_preserves_complete_checkpoint(monkeypatch, tmp_path):
 
 
 def test_load_analysis_checkpoint_skips_truncated_gzip(tmp_path, capsys):
-    from cxr_mc import _checkpoint_io
+    from cxr_mc.checkpoints import _checkpoint_io
 
     checkpoint = tmp_path / "hopg.pkl"
     _checkpoint_io.dump({"hopg": {}}, str(checkpoint))

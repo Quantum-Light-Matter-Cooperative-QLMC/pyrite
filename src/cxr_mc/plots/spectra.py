@@ -390,7 +390,7 @@ def material_comparison_summary(
     """Compute the small candidate summary shared by all material comparisons.
 
     The returned tuple contains only selection metrics and plot geometry, so it
-    is suitable for :func:`cxr_mc.run.cached_material_analysis`'s persistent
+    is suitable for :func:`cxr_mc.runs.run.cached_material_analysis`'s persistent
     artifact cache. Selection mode, beam-energy scope, and quality floor are
     deliberately applied later by :func:`select_material_comparison`; changing
     those controls therefore never reloads the checkpoint.
@@ -499,7 +499,7 @@ def draw_material_comparison(
     line_flux, quality, case)`` points -- the plotting half of
     :func:`plot_material_comparison`, split out so a caller that resolves
     :func:`material_comparison_point` per material through a cache (see
-    :func:`cxr_mc.run.cached_material_analysis`) can draw straight from cache
+    :func:`cxr_mc.runs.run.cached_material_analysis`) can draw straight from cache
     hits without touching any checkpoint. ``dropped`` lists labels with
     records but no candidate clearing the gate, printed the same way
     ``plot_material_comparison`` does. Labels are offset automatically when
@@ -595,7 +595,7 @@ def plot_material_comparison(
     selection) and :func:`draw_material_comparison` (plotting) -- split out so
     the analysis app's cross-material tab can cache the per-material
     selection by checkpoint identity (see
-    :func:`cxr_mc.run.cached_material_analysis`) instead of recomputing it,
+    :func:`cxr_mc.runs.run.cached_material_analysis`) instead of recomputing it,
     and re-unpickling every material's checkpoint, on every tab render."""
     pts = []
     dropped = {}

@@ -23,23 +23,23 @@ def _():
         scan_grid,
         style_sheet,
     )
-    from cxr_mc.config import (
+    from cxr_mc.campaign.config import (
         COLLAPSE_AZIMUTH,
         default_settings,
         format_penetration_watchdog_summary,
         gate_cases_by_penetration,
         material_sweep,
     )
-    from cxr_mc.materials import CATALOG
-    from cxr_mc.plots import stream_chunk
-    from cxr_mc.run import checkpoint_path_for, load_checkpoint, run_sweep
-    from cxr_mc.sweep import (
+    from cxr_mc.campaign.sweep import (
         build_cases,
         case_cost,
         geometry_table,
         scan_grid_rows,
         sweep_cost_weights,
     )
+    from cxr_mc.materials import CATALOG
+    from cxr_mc.plots import stream_chunk
+    from cxr_mc.runs.run import checkpoint_path_for, load_checkpoint, run_sweep
 
     return (
         COLLAPSE_AZIMUTH,

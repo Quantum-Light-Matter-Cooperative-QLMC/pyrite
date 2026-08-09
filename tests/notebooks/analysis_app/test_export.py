@@ -6,7 +6,7 @@ import datetime
 import sys
 from pathlib import Path
 
-from cxr_mc import export
+from cxr_mc.apps import export
 
 
 def test_export_targets_existing_notebook():

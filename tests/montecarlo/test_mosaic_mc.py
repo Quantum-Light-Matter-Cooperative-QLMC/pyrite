@@ -9,6 +9,7 @@ broadening, node convergence, yield change) lives in checks/mosaic_mc_check.py."
 import numpy as np
 import pytest
 
+from cxr_mc.campaign.sweep import BeamSpec, Sweep, build_cases
 from cxr_mc.montecarlo import (
     _mosaic_quadrature,
     _small_tilt_R,
@@ -17,7 +18,6 @@ from cxr_mc.montecarlo import (
     eds_fwhm_eV,
 )
 from cxr_mc.results import store_result
-from cxr_mc.sweep import BeamSpec, Sweep, build_cases
 
 E_GRID = np.arange(400.0, 1400.0, 1.0)
 

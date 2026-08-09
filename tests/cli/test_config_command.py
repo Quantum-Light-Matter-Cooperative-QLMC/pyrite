@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from cxr_mc._remote import config as remote_config
 from cxr_mc.cli import _config
 from cxr_mc.cli.commands import config as config_command
 from cxr_mc.cli.commands import scan
+from cxr_mc.remote import config as remote_config
 from tests.helpers.cli import assert_clean_result, invoke
 
 

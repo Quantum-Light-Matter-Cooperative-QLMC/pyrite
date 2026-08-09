@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import click
 
-from cxr_mc import archive
-from cxr_mc import checkpoint_cleanup as cleanup
+from cxr_mc.checkpoints import archive
+from cxr_mc.checkpoints import checkpoint_cleanup as cleanup
 from cxr_mc.cli import command as root_command
 from cxr_mc.cli.commands import checkpoint as checkpoint_cli
 from cxr_mc.cli.commands import recompute as recompute_cli

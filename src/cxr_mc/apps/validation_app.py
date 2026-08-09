@@ -18,8 +18,8 @@ def _():
 
     import marimo as mo
 
-    from cxr_mc import check as check_support
     from cxr_mc.apps import anchor_figures as af
+    from cxr_mc.apps import check as check_support
     from cxr_mc.apps._design import page_title, status_badge, style_sheet
     from cxr_mc.paths import workspace_root
 

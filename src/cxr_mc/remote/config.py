@@ -24,7 +24,7 @@ SLURM_TIME = "UNLIMITED"
 # exports CXR_MC_GPU_SHARE so co-tenant pool caps sum to CXR_MC_GPU_POOL_FRAC.
 DEFAULT_PARALLEL_MATERIALS = 1
 MAX_PARALLEL_MATERIALS = 4
-# repo root = three levels up from src/cxr_mc/_remote/config.py. remote.py orchestrates
+# repo root = three levels up from src/cxr_mc/remote/config.py. The package facade orchestrates
 # the *checkout* (it tars the working tree up to the box), so it resolves paths
 # against the repo root, not its own package dir.
 LOCAL_ROOT = Path(__file__).resolve().parents[3]

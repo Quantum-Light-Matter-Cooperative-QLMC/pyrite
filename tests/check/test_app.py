@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from cxr_mc import check
+from cxr_mc.apps import check
 from tests.helpers.cli import invoke
 
 
@@ -218,7 +218,7 @@ def test_launch_treats_keyboard_interrupt_as_normal_marimo_exit():
             sys.executable,
             "-c",
             (
-                "from cxr_mc import check; "
+                "from cxr_mc.apps import check; "
                 "check.subprocess.run = lambda *args, **kwargs: "
                 "(_ for _ in ()).throw(KeyboardInterrupt()); "
                 "check._launch()"

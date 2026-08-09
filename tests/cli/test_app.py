@@ -6,7 +6,8 @@ import importlib
 
 from click.testing import CliRunner
 
-from cxr_mc import analyze, check, cli, viewer
+from cxr_mc import cli
+from cxr_mc.apps import analyze, check, viewer
 
 
 def test_app_help_imports_only_the_group(monkeypatch):
@@ -37,7 +38,7 @@ def test_analysis_leaf_launches_and_export_dispatches(monkeypatch):
             launched.update(**kwargs),
         ),
     )
-    monkeypatch.setattr("cxr_mc.export._export", lambda stem: launched.update(export=stem))
+    monkeypatch.setattr("cxr_mc.apps.export._export", lambda stem: launched.update(export=stem))
 
     runner = CliRunner()
     launch = runner.invoke(cli.command, ["app", "analysis", "launch", "mose2"])

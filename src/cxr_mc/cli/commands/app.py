@@ -128,11 +128,11 @@ def _launch_leaf(name: str, launch_path: str, export_path: str) -> click.Group:
 
 
 def analysis_command() -> click.Group:
-    return _launch_leaf("analysis", "cxr_mc.analyze.command", "cxr_mc.export.command")
+    return _launch_leaf("analysis", "cxr_mc.apps.analyze.command", "cxr_mc.apps.export.command")
 
 
 def viewer_command() -> click.Group:
-    return _launch_leaf("viewer", "cxr_mc.viewer.command", "cxr_mc.viewer.export_command")
+    return _launch_leaf("viewer", "cxr_mc.apps.viewer.command", "cxr_mc.apps.viewer.export_command")
 
 
 @click.group(

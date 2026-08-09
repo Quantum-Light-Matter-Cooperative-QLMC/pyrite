@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cxr_mc.analyze import cached_analysis
+from cxr_mc.apps.analyze import cached_analysis
 from cxr_mc.materials import CATALOG
 from cxr_mc.plots import (
     MATERIAL_COMPARISON_SUMMARY_VERSION,

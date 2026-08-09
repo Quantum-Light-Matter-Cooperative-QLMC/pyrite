@@ -8,7 +8,7 @@ import time
 import uuid
 from pathlib import Path
 
-from .. import archive
+from ..checkpoints import archive
 from ..cli import _core as _cli_core
 from . import config, presentation, scripts, state, transport
 
@@ -206,7 +206,7 @@ def prune_remote(
     yes: bool = False,
 ):
     """Preview or prune stale records on box under exact stem reservations."""
-    from ..checkpoint_cleanup import _targets
+    from ..checkpoints.checkpoint_cleanup import _targets
 
     targets = _targets(all_profiles, catalog_profile)
     stems = [target.stem for target in targets]
@@ -1276,7 +1276,7 @@ def _resolve_survey_stems(stems):
     already fullmatches that regex) and ``_quick`` stems pass through
     unexpanded: a stem that already names an exact variant, or a quick smoke
     checkpoint, never has a survey sibling worth auto-discovering."""
-    from ..profiles import _VARIANT_STEM_RE
+    from ..campaign.profiles import _VARIANT_STEM_RE
 
     bare = {
         stem
@@ -1306,11 +1306,11 @@ def _split_profile_selector(stem):
     or ``None`` for a plain stem (no ``@``, or a full ``@``-stem).
 
     A resolved on-disk @-stem (``<material>@<label>-<digest>``, matching
-    :data:`~cxr_mc.profiles._VARIANT_STEM_RE`) is already an exact checkpoint,
+    :data:`~cxr_mc.campaign.profiles._VARIANT_STEM_RE`) is already an exact checkpoint,
     not a profile query, so it passes through literally -- only a bare
     ``MATERIAL@PROFILE`` with no digest tail is treated as a selector to
     resolve via meta.json."""
-    from ..profiles import _VARIANT_STEM_RE
+    from ..campaign.profiles import _VARIANT_STEM_RE
 
     if "@" not in stem or _VARIANT_STEM_RE.fullmatch(stem) is not None:
         return None
@@ -1348,7 +1348,7 @@ def _profile_pull_candidates(material):
     variant -- the stem name alone never carries the catalog profile, so this
     only narrows by material; :func:`resolve_profile_stem` reads each
     candidate's meta.json to filter by profile."""
-    from ..profiles import _VARIANT_STEM_RE
+    from ..campaign.profiles import _VARIANT_STEM_RE
 
     names = set(transport._ssh_capture(scripts._list_checkpoint_dirs_command()).split())
     candidates = [material] if material in names else []
@@ -1471,10 +1471,11 @@ def pull(
     for stem in stems:
         local = dest / stem
         try:
-            from .. import _checkpoint_io, _checkpoint_store, profiles
-            from ..profiles import identity_from_stem
+            from ..campaign import profiles
+            from ..campaign.profiles import identity_from_stem
+            from ..checkpoints import _checkpoint_io, _checkpoint_store
             from ..results import merge_dataset
-            from ..run import _manifest_save
+            from ..runs.run import _manifest_save
 
             # identity_from_stem(stem, dest) covers the bare-canonical/_quick
             # stems and any re-pull with an already-registered local sidecar

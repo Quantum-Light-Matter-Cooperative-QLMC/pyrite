@@ -1,6 +1,6 @@
 """Click wiring for ``cxr checkpoint recompute {brem,line}``.
 
-The drivers these call live in :mod:`cxr_mc.recompute`; this module owns only
+The drivers these call live in :mod:`cxr_mc.checkpoints.recompute`; this module owns only
 the command surface, per the command-home rule in
 `docs/package-structure-rfc.md` P1. The retired top-level ``cxr rebrem`` and
 ``cxr reline`` spellings resolve to the same commands through the deprecation
@@ -16,8 +16,8 @@ from pathlib import Path
 
 import click
 
-from ... import _checkpoint_store
-from ... import recompute as _recompute
+from ...checkpoints import _checkpoint_store
+from ...checkpoints import recompute as _recompute
 from .. import _completion as _cli_completion
 from .. import _core as _cli_core
 from .. import json as cli_json
@@ -295,8 +295,8 @@ def brem_command(
         dry_run=dry_run,
     ):
         _reject_remote_local_options(ctx, json_output)
-        from ..._remote import cli as remote_cli
-        from ..._remote import config as remote_config
+        from ...remote import cli as remote_cli
+        from ...remote import config as remote_config
 
         target = None if remote_target == "__configured__" else remote_target
         with remote_config.override_remote_host(target):
@@ -534,8 +534,8 @@ def line_command(
         dry_run=dry_run,
     ):
         _reject_remote_local_options(ctx, json_output)
-        from ..._remote import cli as remote_cli
-        from ..._remote import config as remote_config
+        from ...remote import cli as remote_cli
+        from ...remote import config as remote_config
 
         target = None if remote_target == "__configured__" else remote_target
         with remote_config.override_remote_host(target):

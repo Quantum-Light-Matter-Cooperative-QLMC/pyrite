@@ -31,12 +31,12 @@ from dataclasses import asdict, dataclass
 
 import numpy as np
 
-from cxr_mc.config import material_sweep
+from cxr_mc.campaign.config import material_sweep
+from cxr_mc.campaign.sweep import _quantized_angles, build_cases
 from cxr_mc.energy_grid import defaults as lg_defaults
 from cxr_mc.energy_grid.bounds import coverage_energy, line_start_eV, margined_stop, spacing_num
 from cxr_mc.materials import CATALOG
 from cxr_mc.montecarlo.runner import run_cases
-from cxr_mc.sweep import _quantized_angles, build_cases
 
 COVERAGE = 0.95
 MARGIN = 0.05

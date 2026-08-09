@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from cxr_mc._remote import lifecycle, viewer
 from cxr_mc.cli.commands import job
+from cxr_mc.remote import lifecycle, viewer
 from tests.helpers.cli import assert_clean_result, invoke
 
 

@@ -2,8 +2,8 @@ import tarfile
 
 import pytest
 
-from cxr_mc._remote import config, transport
 from cxr_mc.energy_grid import artifacts
+from cxr_mc.remote import config, transport
 
 
 def _identity(material: str, stop: float):

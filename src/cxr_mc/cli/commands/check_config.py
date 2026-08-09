@@ -4,7 +4,7 @@ from pathlib import Path
 
 import click
 
-from ... import check_config as _check_config
+from ...validation import check_config as _check_config
 from .. import _core as _cli_core
 
 

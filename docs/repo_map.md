@@ -24,6 +24,9 @@ Print current top-level directory inventory:
   `workspace.root` config > cwd; mutable user state uses Click's platform app
   directory. Marimo apps, validation figure builders, and reference data ship
   under `cxr_mc.apps`; standalone `checks/` scripts remain developer-only.
+- Root domain implementations are grouped under `campaign/`, `checkpoints/`,
+  `runs/`, `apps/`, `validation/`, `perf/`, and `remote/`. Former
+  documented root module paths are compatibility re-exports only.
 
 ## Dependency layers (leaf → driver)
 
@@ -41,15 +44,15 @@ materials.attenuation          (composition and Beer–Lambert helpers)
         │
 montecarlo                     (transport + radiation + detector helpers)
         │
-sweep ─────────────┐
+campaign.sweep ────┐
         │          │
-results ◄── montecarlo, sweep
-profiles ◄── results, sweep
-config  ◄── profiles, results, sweep
-run     ◄── montecarlo, results
-scan    ◄── config, run, sweep
+results ◄── montecarlo, campaign.sweep
+campaign.profiles ◄── results, campaign.sweep
+campaign.config ◄── campaign.profiles, results, campaign.sweep
+runs.run ◄── checkpoints, montecarlo, results
+runs.scan ◄── campaign.config, runs.run, campaign.sweep
 plots   ◄── montecarlo, results, detectors.timepix_response, detectors.eaglexo_response
-cli     ◄── analyze, archive, check, check_config, export, remote, scan, slim
+cli     ◄── apps, checkpoints, remote, runs, validation
                                   (the `cxr` console script)
 ```
 
@@ -99,7 +102,7 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   default, `wide` is human-only, and only `json` carries the stable versioned
   envelope contract. Hidden `--json` aliases warn through the D7 window.
 - **`cxr run [PROFILE] [-m MATERIAL] [--fidelity full|survey] [-R[=TARGET]]`** →
-  local `scan:main` → `run.run_sweep`, or the existing SSH/SLURM submitter when
+  local `runs.scan:main` → `runs.run.run_sweep`, or the existing SSH/SLURM submitter when
   `--remote` is present. An omitted profile uses the configured current profile;
   bare `--remote` uses the configured target; an explicit value is validated and
   scoped to that invocation. Remote runs accept uniform `--wait` / `--detach`;
@@ -204,7 +207,7 @@ optical constants — physics data layer under Monte Carlo.
   registry.
 - Deps: `materials.atomic`, `materials.catalog`, `materials._cif`.
 
-### `validation_oracles.py`
+### `validation/validation_oracles.py`
 Optional validation-only adapters for external crystallography/scattering
 comparators. Pinned `Dans_Diffraction` 3.4 backend builds or loads crystals,
 compares lattice parameters, reciprocal-vector magnitudes, and `|F_hkl|²`,
@@ -217,7 +220,7 @@ production physics stay in `materials/crystal.py`.
 - Deps: `materials.crystal`; imports `Dans_Diffraction` lazy, only when check
   ask.
 
-### `validation_background.py`
+### `validation/validation_background.py`
 Analysis-only external bremsstrahlung comparison, weighted sideband
 normalization, and experimental subtraction. External spectra stay in detected
 units and enter through `montecarlo.load_external_brem`.
@@ -276,9 +279,12 @@ re-exported from package** — `from cxr_mc.montecarlo import X` unchanged
   `spectrum`.
 - Deps: `materials.crystal`, `materials.attenuation`, `DATA_DIR`.
 
-## Sweep, config & drivers
+## Campaign, checkpoints & run drivers
 
-### `sweep.py`
+`campaign/` owns resolved campaign inputs; `checkpoints/` owns persistence,
+repair, archive, and lock lifecycles; `runs/` owns executable local drivers.
+
+### `campaign/sweep.py`
 Turn `Sweep` definition into Cartesian product of `run_case` dicts.
 - Public: `BeamSpec` (incident phase space and pulse properties), `Sweep`
   (dataclass of simulation knobs), `beam_replace`, `LayerSpec` (one stack layer:
@@ -288,14 +294,14 @@ Turn `Sweep` definition into Cartesian product of `run_case` dicts.
   `fmt_thickness`, `pm` (±hkl expansion); `MATERIAL_LABELS` registry.
 - Deps: `materials` (`CATALOG`, `LayerSpec`), `materials.crystal`.
 
-### `longitudinal.py`
+### `campaign/longitudinal.py`
 Bunch-length policy on the input side of `BeamSpec`: named `long_shape` kinds
 resolved per case against the dominant basal reflection.
 - Public: `LongitudinalDistribution`, `ResolvedLongitudinalDistribution`,
   `resolve_longitudinal_distribution`.
 - Deps: `materials.crystal`, NumPy, SciPy constants.
 
-### `transverse.py`
+### `campaign/transverse.py`
 Transverse phase-space policy on the input side of `BeamSpec`: a Courant-Snyder
 triplet `(eps_n, beta, alpha)` per plane, resolved per case (normalized
 emittance is the stored input, geometric is derived as `eps_n / (beta*gamma)`)
@@ -306,7 +312,7 @@ unless set. See `docs/beam-phase-space.md`.
   `sample_transverse`.
 - Deps: NumPy, SciPy constants.
 
-### `beam_metrics.py`
+### `campaign/beam_metrics.py`
 Pure diagnostics over sampled initial phase-space arrays: per-plane RMS size,
 geometric and normalized emittance, Twiss parameters, longitudinal RMS size and
 emittance, bunch charge, Gaussian-equivalent peak current, and average current.
@@ -314,7 +320,7 @@ emittance, bunch charge, Gaussian-equivalent peak current, and average current.
   `initial_state_metrics`.
 - Deps: NumPy, SciPy constants.
 
-### `config.py`
+### `campaign/config.py`
 Default settings/sweep builders shared by CLI and both notebooks; per-material
 scan grids project from immutable `materials.CATALOG`.
 - Public: `default_settings`, `material_grid`, `material_sweep`,
@@ -322,7 +328,7 @@ scan grids project from immutable `materials.CATALOG`.
 - Deps: `materials` (`CATALOG`, `MaterialSpec`), `results` (`Settings`),
   `profiles` (`get_fidelity_preset`), `sweep` (`Sweep`).
 
-### `profiles.py`
+### `campaign/profiles.py`
 Named `full`/provisional `survey` fidelity presets, deterministic serialization
 of resolved settings and sweeps, SHA-256 dataset identity, and variant checkpoint
 stem selection. `FidelityPreset.emission` (`incoherent`/`coherent`/`both`, with a
@@ -349,14 +355,14 @@ compact grid encoding shared by sweep/runner (slice 2 renamed `line_grid/` +
   ages, preview revalidation, and deletion.
 - Also: `derive`, `bounds`, `apply`, `defaults`, `provenance`, `golden`, `job`.
 
-### `campaign_lock.py`
+### `checkpoints/campaign_lock.py`
 Deterministic `cxr.campaign-lock.v1` writer/reader. Each successfully completed
 dataset records its resolved profile, material, dataset identity, explicit
 energy-grid artifact hash (or legacy marker), beside checkpoint metadata as
 `cxr.lock.json`; incomplete runs emit no lock. Active and archived locks remain
 artifact-GC roots.
 
-### `run.py`
+### `runs/run.py`
 Checkpointed, resumable sweep driver plus cross-profile per-case CAS replay,
 thin `cases.json` manifests, legacy seeding, and component loaders/repair.
 - Public: `run_sweep`, `load_checkpoint`, `checkpoint_path_for`,
@@ -364,7 +370,7 @@ thin `cases.json` manifests, legacy seeding, and component loaders/repair.
 - Deps: `_checkpoint_store`, `montecarlo` (`run_cases`), `results`
   (`store_result`).
 
-### `_checkpoint_store.py`
+### `checkpoints/_checkpoint_store.py`
 Component storage adapter: active datasets live under
 `checkpoints/<stem>/{line,brem}.pkl`, merge transparently into historical
 in-memory result records, and migrate legacy `checkpoints/<stem>.pkl` stores on
@@ -374,7 +380,7 @@ next save. Shared case blobs live at
   `cas_load`, `cas_save`, component/path helpers.
 - Deps: `_checkpoint_io`, NumPy.
 
-### `scan.py`
+### `runs/scan.py`
 Headless sweep driver: build cases → `run_sweep` → checkpoint; owns
 `--no-cache`/`--recompute` and performance-run cache defaults, manifest and
 catalog-profile resolution, and nsys re-exec. Click wiring is in
@@ -385,7 +391,7 @@ catalog-profile resolution, and nsys re-exec. Click wiring is in
   `resolve_profile_materials`.
 - Deps: `config`, `run`, `sweep`.
 
-### `blaze.py`
+### `runs/blaze.py`
 Headless blazed-crystal (sawtooth entrance face) sweep entry: `cxr material blaze <material>
 --energy E [E...] --spacing S [S...] [--polar A [A...]]`. Mirrors `scan.py`'s
 parse args → build cases → `run_sweep` → checkpoint structure, but forces v1
@@ -569,7 +575,7 @@ Canonical `cxr checkpoint` group. Lazily routes `slim`, component
 `gc`, and reachability-safe `rm` to existing checkpoint handlers. The retired
 `prune`/`clear` spellings and the root-level legacy paths remain hidden aliases.
 
-### `checkpoint_cleanup.py`
+### `checkpoints/checkpoint_cleanup.py`
 Checkpoint reclamation drivers: `prune_checkpoints` (drops records no longer
 reproducible under the current catalog scan profiles, rewriting each dataset
 atomically) and `clear_checkpoints` (deletes explicitly selected datasets plus
@@ -583,12 +589,17 @@ Click layer for `cxr checkpoint gc` (`gc_command`) and `cxr checkpoint rm`
 (`rm_command`), owning selector validation only. The hidden top-level `cxr
 prune` alias resolves to `gc_command`.
 
+### `perf/`
+Performance sample collection and analysis. `performance_profile.py` owns the
+append-only runtime logger; `performance_analysis.py` owns artifact loading,
+summaries, and comparisons.
+
 ### `cli/commands/performance.py`
 Canonical local performance-artifact lifecycle: inventory, analysis, and
 preview-by-default profile deletion (`rm`; the retired `prune` spelling stays a
 hidden alias). `profile analyze` remains a hidden warning alias. Revalidates selected file signatures before deletion.
 
-### `recompute.py`
+### `checkpoints/recompute.py`
 Checkpoint recompute drivers for the brem and line datasets:
 `rebrem_checkpoints` and `reline_checkpoints`. Enumerates checkpoint stems,
 resolves per-material identity and fidelity defaults, and delegates per-record
@@ -600,12 +611,12 @@ Click layer for `cxr checkpoint recompute {brem,line}` (`brem_command`,
 materials-or-`--all` selection contract. Hidden top-level `rebrem`/`reline`
 aliases resolve here.
 
-### `recompute_defaults.py`
+### `checkpoints/recompute_defaults.py`
 Fidelity-aware line/bremsstrahlung recompute defaults shared by local, grouped,
 and remote command paths. Resolves preset settings and material photon grids;
 keeps a compatibility fallback for older branches.
 
-### `analyze.py`
+### `apps/analyze.py`
 `cxr app analysis launch` owner for `src/cxr_mc/apps/analysis_app.py`: persisted
 initial-material selection, smoke execution, edit/watch mode, ACP bridges,
 SSH-tunnel-friendly fixed-port launch.
@@ -618,14 +629,14 @@ SSH-tunnel-friendly fixed-port launch.
   (Incoherent/Coherent), gated per checkpoint on the stored `spec`/`spec_coherent`
   and routing every spectrum read through the one `pick_spectrum`.
 
-### `check.py`
+### `apps/check.py`
 `cxr check` launcher for `src/cxr_mc/apps/validation_app.py` plus cached validation
 figure export, optional remote Zhai-job launch/status/pull helpers.
 - Public: `load_default_azimuth`, `save_default_azimuth`, `probe_remote_zhai`,
   `start_remote_zhai`, `remote_zhai_status`, `pull_remote_zhai`,
   `add_subparser`, `main`.
 
-### `_zhai.py`
+### `validation/_zhai.py`
 Canonical maintained Zhai detector geometry and cache-schema provenance shared
 by anchor figures, headless reproduction, validation-app export, and remote
 SLURM metadata. Heavy calculations remain in `src/cxr_mc/apps/anchor_figures.py`; app
@@ -635,17 +646,17 @@ and export consumers are cache-only and direct misses to
   `detector_metadata`.
 - Deps: `detectors.DetectorSpec`.
 
-### `check_config.py`
+### `validation/check_config.py`
 `cxr check-config` validate bundled material catalog or explicit full
 catalog without importing GPU-heavy CLI modules.
 - Public: `add_subparser`, `main`.
 
-### `remote.py` (facade over `_remote/`)
+### `remote/`
 Optional SSH/SLURM orchestration for configured lab box: sync, bounded and
 chunked submissions, progress/status/log viewers, checkpoint pulls, safe stop
 and clear, remote validation jobs.
 - Public CLI: `add_subparser`, `main`.
-- Thin re-export facade. Implementation split into `_remote/` submodules
+- The public package contains the former facade and implementation modules
   (acyclic: `config` ◄ `transport` ◄ `scripts` ◄ `state` ◄ `lifecycle`/`viewer`
   ◄ `cli`; plus `presentation`):
   - `config.py` — env-driven hosts/paths/SLURM constants.
@@ -669,19 +680,19 @@ and clear, remote validation jobs.
   through the owning submodule, so tests patch the owner (e.g.
   `transport._ssh_capture`), not the facade.
 
-### `export.py`
+### `apps/export.py`
 `cxr app analysis export` subcommand — `marimo export html` of `src/cxr_mc/apps/analysis_app.py`
 → `results/<stem>.html` (replace retired nbconvert-PDF path).
 - Public: `add_subparser`, `main`.
 
-### `slim.py`
+### `checkpoints/slim.py`
 `cxr slim` subcommand — shrink checkpoint pickle for transfer (drop
 full-range brem arrays, downcast spectra to float32, filter configs; `--grid`
 keep only material's current-grid configs).
 - Public: `slim_checkpoint`, `add_subparser`, `main`.
 - Deps: `results` (`slim_results`, `_grid_names`).
 
-### `archive.py`
+### `checkpoints/archive.py`
 `cxr archive`/`restore`/`archives`/`union` subcommands — durable local
 checkpoint shelf. Copy active slot `checkpoints/<stem>/` (including resolved
 dataset identity in `meta.json`) to/from
@@ -698,5 +709,5 @@ source archive intact by default (`--delete-archive` to remove).
 ### `__init__.py`
 Package root: expose `DATA_DIR` (packaged-data resolver) and `__version__`.
 
-### `_compile_nb.py`
+### `apps/_compile_nb.py`
 Internal notebook-compile helper; not public API.

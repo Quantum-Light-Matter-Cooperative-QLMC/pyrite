@@ -3,9 +3,9 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from cxr_mc import performance_profile
 from cxr_mc.energy_grid.encoding import encode_energy_grid
 from cxr_mc.montecarlo import runner
+from cxr_mc.perf import performance_profile
 
 
 def test_gpu_metrics_include_activity_clocks_and_pstate(monkeypatch):

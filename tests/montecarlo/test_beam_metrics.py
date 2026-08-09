@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
-from cxr_mc.beam_metrics import initial_state_metrics, sampled_beam_metrics
+from cxr_mc.campaign.beam_metrics import initial_state_metrics, sampled_beam_metrics
 
 
 def test_sampled_metrics_match_independent_second_moments_and_currents() -> None:

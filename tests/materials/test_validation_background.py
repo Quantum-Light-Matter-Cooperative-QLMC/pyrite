@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from cxr_mc.montecarlo import load_external_brem
-from cxr_mc.validation_background import (
+from cxr_mc.validation.validation_background import (
     compare_external_background,
     fit_external_background,
     subtract_external_background,

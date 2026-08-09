@@ -5,19 +5,11 @@ import sys
 
 import pytest
 
-from cxr_mc import (
-    _checkpoint_io,
-    analyze,
-    archive,
-    blaze,
-    check,
-    check_config,
-    export,
-    scan,
-    slim,
-    viewer,
-)
+from cxr_mc.apps import analyze, check, export, viewer
+from cxr_mc.checkpoints import _checkpoint_io, archive, slim
 from cxr_mc.cli.commands import recompute as recompute_cli
+from cxr_mc.runs import blaze, scan
+from cxr_mc.validation import check_config
 from tests.helpers.cli import assert_clean_result, invoke
 
 LOCAL_COMMANDS = [
@@ -418,7 +410,7 @@ def test_resolved_run_threads_catalog_profile_into_material_sweep(monkeypatch):
     remote profile runs still used standard-profile 250 keV cases."""
     import types
 
-    from cxr_mc.config import material_sweep as real_material_sweep
+    from cxr_mc.campaign.config import material_sweep as real_material_sweep
 
     calls = []
 
@@ -443,7 +435,7 @@ def test_standalone_click_usage_error_preserves_exit_and_streams():
         [
             sys.executable,
             "-m",
-            "cxr_mc.scan",
+            "cxr_mc.runs.scan",
             "standard",
             "-m",
             "hopg",

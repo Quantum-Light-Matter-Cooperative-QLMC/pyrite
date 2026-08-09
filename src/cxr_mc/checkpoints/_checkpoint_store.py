@@ -239,7 +239,7 @@ def signature(stem: str, root: str | os.PathLike[str]) -> tuple:
 
 # ---- per-case content-addressable store (CAS) --------------------------------
 # A shared per-material store of single-case blobs, addressed by
-# :func:`cxr_mc.profiles.case_content_key` and sharded git-style by the first two
+# :func:`cxr_mc.campaign.profiles.case_content_key` and sharded git-style by the first two
 # hex chars of the key (256 buckets -> bounded directory sizes). One blob holds
 # one case's raw transport ``out`` dict, so a case computed by any profile can be
 # replayed (``store_result``) by any other profile whose case hashes equal. The

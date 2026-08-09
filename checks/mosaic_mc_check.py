@@ -30,6 +30,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 import itertools
 
+from cxr_mc.campaign.sweep import crystal_params
 from cxr_mc.montecarlo import (
     mc_spectrum,
     mosaic_fwhm_eV,
@@ -37,7 +38,6 @@ from cxr_mc.montecarlo import (
     simulate_trajectories,
     tilted_geometry,
 )
-from cxr_mc.sweep import crystal_params
 
 E0_KEV = 30.0
 THETA_OBS = np.deg2rad(90.0)

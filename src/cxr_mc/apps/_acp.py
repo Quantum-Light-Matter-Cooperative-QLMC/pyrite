@@ -8,7 +8,7 @@ import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from .paths import state_dir, workspace_root
+from ..paths import state_dir, workspace_root
 
 ROOT = workspace_root()
 ACP_STATE_PATH = state_dir() / "acp-servers.json"

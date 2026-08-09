@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import click
 
-from ..._remote import cli as remote_cli
-from ..._remote import lifecycle, viewer
+from ...remote import cli as remote_cli
+from ...remote import lifecycle, viewer
 from .. import _completion as _cli_completion
 from .._core import confirm_destructive, emit_result, output_option
 

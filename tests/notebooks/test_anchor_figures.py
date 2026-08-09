@@ -207,7 +207,7 @@ def _synthetic_model(anchor):
 
 
 def test_cached_model_spectra_round_trip(anchor, tmp_path, monkeypatch):
-    from cxr_mc import _checkpoint_io
+    from cxr_mc.checkpoints import _checkpoint_io
 
     expected = _synthetic_model(anchor)
     calls = []
@@ -236,7 +236,7 @@ def test_cached_model_spectra_round_trip(anchor, tmp_path, monkeypatch):
 
 
 def test_cached_model_spectra_recomputes_pre_detector_payload(anchor, tmp_path, monkeypatch):
-    from cxr_mc import _checkpoint_io
+    from cxr_mc.checkpoints import _checkpoint_io
 
     expected = _synthetic_model(anchor)
     calls = []
@@ -696,7 +696,7 @@ def test_supplementary_overview_rejects_unknown_key():
 
 
 def test_reproduce_all_populates_every_cache_and_reuses_it(tmp_path, monkeypatch):
-    from cxr_mc import _checkpoint_io
+    from cxr_mc.checkpoints import _checkpoint_io
 
     calls = []
 

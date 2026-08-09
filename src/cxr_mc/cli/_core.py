@@ -453,7 +453,7 @@ def output_option(function):
 def _remote_target(ctx, param, value):
     if value in (None, "__configured__"):
         return value
-    from .._remote.config import validate_remote_target
+    from ..remote.config import validate_remote_target
 
     try:
         return validate_remote_target(value)

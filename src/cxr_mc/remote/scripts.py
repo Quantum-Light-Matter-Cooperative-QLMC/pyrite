@@ -4,7 +4,7 @@ import datetime
 import shlex
 import uuid
 
-from .._zhai import ZHAI_CACHE_SCHEMA, ZHAI_DETECTOR
+from ..validation._zhai import ZHAI_CACHE_SCHEMA, ZHAI_DETECTOR
 from . import config, transport
 
 
@@ -19,14 +19,14 @@ def _stems(materials, quick, fidelity="full", high_energy_min_kev=None, catalog_
     if high_energy_min_kev is None:
         if fidelity == "full" and catalog_profile == "standard":
             return list(materials)
-        from ..profiles import named_profile_stem
+        from ..campaign.profiles import named_profile_stem
 
         return [
             named_profile_stem(material, fidelity, catalog_profile=catalog_profile)
             for material in materials
         ]
-    from ..profiles import high_energy_floor_stem, named_profile_stem
-    from ..scan import load_manifest_groups
+    from ..campaign.profiles import high_energy_floor_stem, named_profile_stem
+    from ..runs.scan import load_manifest_groups
 
     tagged = set(load_manifest_groups(config.MATS_FILE).get("high_energy_materials", []))
     stems = []

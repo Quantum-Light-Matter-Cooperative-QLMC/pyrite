@@ -26,8 +26,9 @@ def _():
     except Exception:
         alt.data_transformers.disable_max_rows()
 
-    from cxr_mc.beam_metrics import initial_state_metrics
-    from cxr_mc.config import default_settings, trajectory_sweep
+    from cxr_mc.campaign.beam_metrics import initial_state_metrics
+    from cxr_mc.campaign.config import default_settings, trajectory_sweep
+    from cxr_mc.campaign.sweep import build_cases, fmt_thickness
     from cxr_mc.materials import CATALOG
     from cxr_mc.plots.altair_trajectories import (
         penetration_survival_chart,
@@ -44,7 +45,6 @@ def _():
         render_cache_key,
         render_reveal_animation,
     )
-    from cxr_mc.sweep import build_cases, fmt_thickness
 
     return (
         CATALOG,
@@ -92,7 +92,7 @@ def _(CATALOG, MaterialSelect, mo):
     # straight from the catalog's configured scan grids, so no checkpoint is
     # needed and no material is ever disabled. Same persisted/CLI default
     # resolution as analysis_app for a consistent landing selection.
-    from cxr_mc.analyze import get_default_material, initial_material
+    from cxr_mc.apps.analyze import get_default_material, initial_material
 
     _options = sorted(
         (

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from cxr_mc import _checkpoint_store
-from cxr_mc import checkpoint_cleanup as cleanup
+from cxr_mc.checkpoints import _checkpoint_store
+from cxr_mc.checkpoints import checkpoint_cleanup as cleanup
 from cxr_mc.cli.commands import cleanup as cleanup_cli
 from tests.helpers.cli import assert_clean_result, invoke
 

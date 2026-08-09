@@ -3,11 +3,11 @@
 import numpy as np
 import pytest
 
+from cxr_mc.campaign.sweep import BeamSpec, Sweep, build_cases, layer_radiator
 from cxr_mc.materials import LayerSpec, load_material_catalog
 from cxr_mc.materials.crystal import HBARC_EV_ANG
 from cxr_mc.montecarlo import beta_from_keV, mc_spectrum
 from cxr_mc.montecarlo.geometry import _orientation_R
-from cxr_mc.sweep import BeamSpec, Sweep, build_cases, layer_radiator
 
 GENERAL_LATTICE = {
     "system": "general",
@@ -116,7 +116,7 @@ def test_legacy_beam_orientation_is_numerically_frozen():
 
 
 def test_surface_orientation_reaches_case_and_explicit_sweep_beam_clears_it(monkeypatch):
-    import cxr_mc.sweep as sweep_module
+    import cxr_mc.campaign.sweep as sweep_module
 
     real = sweep_module.crystal_params("mose2")
     surface_params = {**real, "beam_uvw": None, "surface_hkl": (2, 0, -1)}
@@ -140,7 +140,7 @@ def test_surface_orientation_reaches_case_and_explicit_sweep_beam_clears_it(monk
 
 
 def test_explicit_layer_beam_override_clears_catalog_surface(monkeypatch):
-    import cxr_mc.sweep as sweep_module
+    import cxr_mc.campaign.sweep as sweep_module
 
     monkeypatch.setattr(
         sweep_module,
@@ -244,7 +244,7 @@ def test_orientation_rejects_conflicting_direct_and_reciprocal_contracts():
 
 
 def test_real_surface_catalog_case_changes_real_cpu_spectrum(tmp_path, monkeypatch):
-    import cxr_mc.sweep as sweep_module
+    import cxr_mc.campaign.sweep as sweep_module
 
     catalog_text = """
 schema_version = 1

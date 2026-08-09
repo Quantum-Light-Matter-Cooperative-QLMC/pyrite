@@ -1,12 +1,12 @@
 """Tests for config.gate_cases_by_penetration -- the pre-run penetration
 watchdog that drops thickness values a beam energy has already died in.
-These tests mock cxr_mc.config.simulate_trajectories so they exercise ONLY
+These tests mock cxr_mc.campaign.config.simulate_trajectories so they exercise ONLY
 the gating logic (grouping, cutoff detection, early-exit, reference-case
 selection), not real electron transport; test_gate_cases_by_penetration_
 drops_with_real_transport at the bottom of this file covers real physics.
 """
 
-from cxr_mc import config
+from cxr_mc.campaign import config
 
 
 def _case(E0_keV, thickness_ang, tilt_deg=0.0, composition="C", abs_layers=None):

@@ -9,7 +9,7 @@ import sys
 import pytest
 from click.testing import CliRunner
 
-from cxr_mc import viewer
+from cxr_mc.apps import viewer
 
 
 @pytest.fixture(autouse=True)

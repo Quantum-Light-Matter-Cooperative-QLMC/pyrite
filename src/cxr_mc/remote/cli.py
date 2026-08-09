@@ -27,7 +27,7 @@ from ..cli._core import (
     run,
 )
 from ..cli._deprecations import DeprecatingGroup
-from ..scan import load_all_materials
+from ..runs.scan import load_all_materials
 from . import config, lifecycle, presentation, scripts, state, transport, viewer
 
 
@@ -137,7 +137,7 @@ def _selected_materials(args, attribute):
 
 def _profile_default_materials(catalog_profile):
     """Resolve a profile's explicit membership or implicit in-use manifest."""
-    from ..scan import resolve_profile_materials
+    from ..runs.scan import resolve_profile_materials
 
     return resolve_profile_materials(catalog_profile)
 
@@ -147,7 +147,7 @@ def _profile_selected_materials(catalog_profile, materials):
     if not materials:
         return _profile_default_materials(catalog_profile)
 
-    from ..scan import validate_catalog_profile, validate_materials
+    from ..runs.scan import validate_catalog_profile, validate_materials
 
     validate_materials(materials)
     return validate_catalog_profile(catalog_profile, materials, intersect=False)
@@ -155,7 +155,7 @@ def _profile_selected_materials(catalog_profile, materials):
 
 def _start_selected(args):
     """Validate the profile-owned material selection prepared by ``remote run``."""
-    from ..scan import validate_catalog_profile
+    from ..runs.scan import validate_catalog_profile
 
     materials = list(getattr(args, "materials", None) or [])
     catalog_profile = getattr(args, "catalog_profile", "standard")
@@ -877,7 +877,7 @@ def start_command(
     level9,
 ):
     from ..cli import _config as cli_config
-    from ..scan import resolve_profile_materials
+    from ..runs.scan import resolve_profile_materials
 
     try:
         catalog_profile = cli_config.resolve("profile.current", catalog_profile).value

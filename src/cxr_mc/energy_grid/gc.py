@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 
-from cxr_mc import campaign_lock
+from cxr_mc.checkpoints import campaign_lock
 from cxr_mc.energy_grid import artifacts
 
 DEFAULT_GRACE = timedelta(days=14)

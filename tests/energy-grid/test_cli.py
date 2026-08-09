@@ -6,10 +6,10 @@ from types import SimpleNamespace
 import pytest
 
 from cxr_mc import energy_grid
-from cxr_mc._remote import config as remote_config
 from cxr_mc.cli import _core as _cli_core
 from cxr_mc.cli._deprecations import message
 from cxr_mc.energy_grid import _command
+from cxr_mc.remote import config as remote_config
 from tests.helpers.cli import assert_clean_result, invoke
 
 CLICK_COMMANDS = (

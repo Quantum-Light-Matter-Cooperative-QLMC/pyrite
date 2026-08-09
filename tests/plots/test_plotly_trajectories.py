@@ -38,9 +38,9 @@ def test_track_vertices_3d_separates_every_physical_segment():
 
 
 def test_trajectory_volume_figure_contains_volume_tracks_and_direction_arrows():
-    from cxr_mc.config import default_settings, trajectory_sweep
+    from cxr_mc.campaign.config import default_settings, trajectory_sweep
+    from cxr_mc.campaign.sweep import build_cases
     from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure
-    from cxr_mc.sweep import build_cases
 
     settings = default_settings()
     case = build_cases(
@@ -70,8 +70,8 @@ def _hopg_thin_slab_case():
     ``trajectory_volume_figure`` defaults) this mix produces BOTH backscattered
     (top-face) and transmitted (bottom-face) terminal segments, so it exercises
     both exit-path branches."""
-    from cxr_mc.config import default_settings, trajectory_sweep
-    from cxr_mc.sweep import build_cases
+    from cxr_mc.campaign.config import default_settings, trajectory_sweep
+    from cxr_mc.campaign.sweep import build_cases
 
     settings = default_settings()
     return build_cases(
@@ -322,8 +322,8 @@ def test_vacuum_trace_is_present_in_static_grooved_figure():
 def _hopg_grooved_case(spacing_ang=2.0e4, tilt_deg=45.0, energy=30.0, thickness_ang=2.0e5):
     """One grooved hopg case: azim=180, 0<tilt<90, theta_obs=90 -- the restricted
     geometry blazed_groove_spec / build_cases accept."""
-    from cxr_mc.config import default_settings, trajectory_sweep
-    from cxr_mc.sweep import build_cases
+    from cxr_mc.campaign.config import default_settings, trajectory_sweep
+    from cxr_mc.campaign.sweep import build_cases
 
     settings = default_settings()
     sweep = trajectory_sweep(
@@ -376,9 +376,9 @@ def test_grooved_case_draws_groove_profile_surface():
 
 
 def test_ungrooved_case_has_no_groove_profile_surface():
-    from cxr_mc.config import default_settings, trajectory_sweep
+    from cxr_mc.campaign.config import default_settings, trajectory_sweep
+    from cxr_mc.campaign.sweep import build_cases
     from cxr_mc.plots.plotly_trajectories import trajectory_volume_figure
-    from cxr_mc.sweep import build_cases
 
     settings = default_settings()
     case = build_cases(

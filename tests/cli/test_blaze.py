@@ -6,10 +6,10 @@ docs/superpowers/specs/2026-07-23-cxr-blaze-grooved-sweep-design.md)."""
 import numpy as np
 from click.testing import CliRunner
 
-from cxr_mc import blaze
-from cxr_mc.config import material_sweep
+from cxr_mc.campaign.config import material_sweep
+from cxr_mc.campaign.sweep import BeamSpec, Sweep, build_cases, fmt_thickness
 from cxr_mc.materials import CATALOG
-from cxr_mc.sweep import BeamSpec, Sweep, build_cases, fmt_thickness
+from cxr_mc.runs import blaze
 
 MATERIAL = "hopg"  # std tilt_deg grid [5,15,30,45,60,75,85] is groove-legal
 

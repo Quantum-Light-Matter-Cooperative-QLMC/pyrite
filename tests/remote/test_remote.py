@@ -16,7 +16,8 @@ from types import SimpleNamespace
 import pytest
 
 from cxr_mc import remote
-from cxr_mc._remote import (  # noqa: F401
+from cxr_mc.cli import _dashboard
+from cxr_mc.remote import (  # noqa: F401
     cli,
     config,
     lifecycle,
@@ -26,7 +27,6 @@ from cxr_mc._remote import (  # noqa: F401
     transport,
     viewer,
 )
-from cxr_mc.cli import _dashboard
 
 
 def test_check_materials_accepts_crystal_keys():
@@ -770,7 +770,7 @@ def test_status_formats_latest_performance_profile():
 
 
 def test_stems_predicts_qualified_stem_for_non_standard_catalog_profile(monkeypatch):
-    import cxr_mc.profiles as profiles_module
+    import cxr_mc.campaign.profiles as profiles_module
 
     assert scripts._stems(["mos2"], False) == ["mos2"]
 
@@ -787,7 +787,7 @@ def test_stems_predicts_qualified_stem_for_non_standard_catalog_profile(monkeypa
 
 
 def test_queue_script_and_stem_resolve_survey_profile():
-    from cxr_mc.profiles import named_profile_stem
+    from cxr_mc.campaign.profiles import named_profile_stem
 
     script = remote._queue_script("j", ["mos2"], quick=False, workers=None, fidelity="survey")
     assert "--fidelity survey" in script
@@ -3800,7 +3800,7 @@ def test_clear_all_reports_nothing_when_empty(monkeypatch, capsys):
 
 def test_prune_remote_refuses_while_any_job_is_live(monkeypatch):
     target = type("Target", (), {"stem": "hopg"})()
-    monkeypatch.setattr("cxr_mc.checkpoint_cleanup._targets", lambda *_args: [target])
+    monkeypatch.setattr("cxr_mc.checkpoints.checkpoint_cleanup._targets", lambda *_args: [target])
     monkeypatch.setattr(state, "_live_jobs", lambda: [("job1", False, ["hopg"])])
     monkeypatch.setattr(
         transport,
@@ -3829,7 +3829,7 @@ def test_prune_checkpoint_command_reserves_runs_and_releases():
 def test_prune_remote_dispatches_exact_reserved_stems(monkeypatch, capsys):
     target = type("Target", (), {"stem": "hopg"})()
     commands = []
-    monkeypatch.setattr("cxr_mc.checkpoint_cleanup._targets", lambda *_args: [target])
+    monkeypatch.setattr("cxr_mc.checkpoints.checkpoint_cleanup._targets", lambda *_args: [target])
     monkeypatch.setattr(state, "_live_jobs", lambda: [])
     monkeypatch.setattr(state, "_reservation_holders", lambda stems: [])
     monkeypatch.setattr(
@@ -4224,7 +4224,7 @@ def test_pull_level9_flag_defaults_off_and_wires_through(monkeypatch):
 def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkeypatch, tmp_path):
     import numpy as np
 
-    from cxr_mc import _checkpoint_io, _checkpoint_store
+    from cxr_mc.checkpoints import _checkpoint_io, _checkpoint_store
 
     payload = {
         "cfg": {
@@ -4272,7 +4272,7 @@ def test_component_pull_projects_transfer_pickle_and_installs_split_store(monkey
 
 # ---- pull resolves identity-qualified survey checkpoints for a bare material ----
 def test_resolve_survey_stems_discovers_matching_survey_dir(monkeypatch, capsys):
-    from cxr_mc.profiles import named_profile_stem
+    from cxr_mc.campaign.profiles import named_profile_stem
 
     survey_stem = named_profile_stem("hopg", "survey")
     monkeypatch.setattr(
@@ -4300,7 +4300,7 @@ def test_resolve_survey_stems_ignores_other_materials_and_profiles(monkeypatch):
 
 
 def test_resolve_survey_stems_does_not_duplicate_an_explicitly_requested_stem(monkeypatch):
-    from cxr_mc.profiles import named_profile_stem
+    from cxr_mc.campaign.profiles import named_profile_stem
 
     survey_stem = named_profile_stem("hopg", "survey")
     monkeypatch.setattr(transport, "_ssh_capture", lambda _command: f"{survey_stem}\n")
@@ -4333,7 +4333,7 @@ def test_split_profile_selector_treats_full_at_stem_as_literal():
     (``<material>@<label>-<digest>``). It is an exact checkpoint, not a
     MATERIAL@PROFILE query, so pull must pass it through literally rather than
     try to re-resolve ``<label>-<digest>`` as a catalog profile."""
-    from cxr_mc.profiles import named_profile_stem
+    from cxr_mc.campaign.profiles import named_profile_stem
 
     at_stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
     assert "@" in at_stem and at_stem != "hopg@sub_100keV"  # full stem, has digest tail
@@ -4346,7 +4346,7 @@ def test_check_shell_tokens_accepts_at_stems():
     """@-stems must survive the remote shell-token gate so pull/prune/slim can
     name them on the box (regression for the 2026-07-29 stem migration; ``@``
     was previously rejected by ``_SHELL_TOKEN_RE``)."""
-    from cxr_mc.profiles import named_profile_stem
+    from cxr_mc.campaign.profiles import named_profile_stem
 
     at_stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
     remote._check_shell_tokens([at_stem])  # must not raise
@@ -4432,7 +4432,7 @@ def test_pull_hash_requires_exactly_one_qualified_selector(monkeypatch, tmp_path
 def test_pull_resolves_profile_selector_to_the_predicted_stem(monkeypatch, tmp_path):
     import numpy as np
 
-    from cxr_mc import _checkpoint_io, _checkpoint_store
+    from cxr_mc.checkpoints import _checkpoint_io, _checkpoint_store
 
     monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
     resolved = []
@@ -4464,8 +4464,8 @@ def test_pull_resolves_profile_selector_to_the_predicted_stem(monkeypatch, tmp_p
 def test_pull_bare_material_also_pulls_matching_survey_checkpoint(monkeypatch, tmp_path, capsys):
     import numpy as np
 
-    from cxr_mc import _checkpoint_io, _checkpoint_store
-    from cxr_mc.profiles import named_profile_stem
+    from cxr_mc.campaign.profiles import named_profile_stem
+    from cxr_mc.checkpoints import _checkpoint_io, _checkpoint_store
 
     survey_stem = named_profile_stem("hopg", "survey")
     payload = {
@@ -4504,7 +4504,7 @@ def test_pull_bare_material_also_pulls_matching_survey_checkpoint(monkeypatch, t
 def test_pull_quick_stem_does_not_resolve_survey_siblings(monkeypatch, tmp_path):
     import numpy as np
 
-    from cxr_mc import _checkpoint_io
+    from cxr_mc.checkpoints import _checkpoint_io
 
     monkeypatch.setattr(config, "LOCAL_ROOT", tmp_path)
     monkeypatch.setattr(
@@ -5150,7 +5150,7 @@ def test_rebrem_chunked_queue_script_self_resubmits():
 
 
 def test_reline_queue_script_and_metadata():
-    from cxr_mc._remote import scripts
+    from cxr_mc.remote import scripts
 
     # Default remote reline is chunked like `cxr remote run`.
     s = scripts._reline_chunked_queue_script(
@@ -5174,8 +5174,8 @@ def test_reline_queue_script_and_metadata():
 def test_pull_dataset_merges_and_archives(monkeypatch, tmp_path):
     import numpy as np
 
-    from cxr_mc import _checkpoint_io
-    from cxr_mc._remote import lifecycle
+    from cxr_mc.checkpoints import _checkpoint_io
+    from cxr_mc.remote import lifecycle
 
     # local checkpoint with a line record
     ckpt = tmp_path / "checkpoints" / "mos2.pkl"
@@ -5215,7 +5215,7 @@ def test_pull_dataset_merges_and_archives(monkeypatch, tmp_path):
 
     lifecycle.pull(["mos2"], dataset="line")
 
-    from cxr_mc import _checkpoint_store
+    from cxr_mc.checkpoints import _checkpoint_store
 
     merged = _checkpoint_store.load("mos2", ckpt.parent)["n"][30.0]
     assert np.all(merged["spec"] == 7.0)  # line overwritten

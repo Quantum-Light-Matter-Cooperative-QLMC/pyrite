@@ -4,7 +4,7 @@ The split this enables: the laptop holds the project and does all interactive
 analysis and static-HTML export, while
 the lab box (an RTX 5080, ssh host 'qlmc') only does the GPU-heavy Monte-Carlo
 sweep. Every compute-producing subcommand ships the current code up, submits a
-one-GPU SLURM batch script there (see :mod:`cxr_mc.scan`), and pulls results into
+one-GPU SLURM batch script there (see :mod:`cxr_mc.runs.scan`), and pulls results into
 ./checkpoints
 -- so you never hand-ssh in or copy files, and the lab box needs no visualization
 toolchain.
@@ -59,7 +59,7 @@ Override the box via env: CXR_REMOTE_HOST / CXR_REMOTE_DIR / CXR_REMOTE_UV.
 
 # ---------------------------------------------------------------------------
 # Facade module. The remote-job subsystem is split into focused submodules
-# under ``cxr_mc._remote`` (config, transport, scripts, state, lifecycle,
+# under ``cxr_mc.remote`` (config, transport, scripts, state, lifecycle,
 # viewer, cli). This module re-exports their public and internal names so every
 # existing ``remote.<name>`` reference keeps working unchanged.
 #
@@ -74,7 +74,8 @@ Override the box via env: CXR_REMOTE_HOST / CXR_REMOTE_DIR / CXR_REMOTE_UV.
 
 import os
 
-from ._remote import (
+from ..cli import _dashboard as _presentation
+from . import (
     cli,
     config,
     lifecycle,
@@ -83,7 +84,6 @@ from ._remote import (
     transport,
     viewer,
 )
-from .cli import _dashboard as _presentation
 
 # --- from config ------------------------------------------------------
 # Compatibility snapshot only; subsystem calls resolve the effective host

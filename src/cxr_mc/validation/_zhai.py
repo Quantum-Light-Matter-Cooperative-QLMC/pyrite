@@ -6,7 +6,7 @@ from dataclasses import asdict
 from math import radians
 from typing import Any
 
-from .detectors import DetectorSpec
+from ..detectors import DetectorSpec
 
 ZHAI_CACHE_SCHEMA = 4
 ZHAI_CACHE_FORMAT = "cxr.zhai-cache.v4"

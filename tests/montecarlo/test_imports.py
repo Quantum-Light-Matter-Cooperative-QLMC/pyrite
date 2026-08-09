@@ -45,7 +45,7 @@ def test_cpu_import_path_does_not_require_cupy() -> None:
         # -> spectrum_jit_kernel
         #
         # The import should now finish using the CPU backend.
-        importlib.import_module("cxr_mc.config")
+        importlib.import_module("cxr_mc.campaign.config")
 
         from cxr_mc.montecarlo import _backend
         from cxr_mc.montecarlo import runner
@@ -149,7 +149,7 @@ def test_config_import_does_not_require_cupy() -> None:
 
         # This is the import chain that originally prevented CLI startup
         # and pytest discovery.
-        import cxr_mc.config
+        import cxr_mc.campaign.config
 
         from cxr_mc.montecarlo._backend import BACKEND
 

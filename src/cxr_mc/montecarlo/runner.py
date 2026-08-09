@@ -784,7 +784,7 @@ def _brem_for_case(case, E_brem):
     per layer via :func:`_brem_wide_from_segments`. Returns ``brem_wide``.
 
     This is the brem half of run_case's transport + spectrum phases factored out
-    so :func:`cxr_mc.run.repair_brem_wide` reuses the EXACT live-sweep path.
+    so :func:`cxr_mc.runs.run.repair_brem_wide` reuses the EXACT live-sweep path.
     Previously the repair rebuilt single-slab brem by hand -- ``layers=`` omitted,
     no per-layer sum, ``brem_chunk`` ignored -- silently dropping substrate
     backscatter/brem and cross-stack absorption on stacked/multilayer records."""
@@ -967,7 +967,7 @@ def _lines_for_case(case, E_grid, *, coherent=None):
     + per-layer line kernel via :func:`_lines_for_segments`). Returns one
     ``spec``. ``coherent`` overrides the kernel coherence (``None`` = derive from
     ``case["coherent_emission"]``). The line half of run_case's transport +
-    spectrum phases factored out so :func:`cxr_mc.run.repair_line_spec`
+    spectrum phases factored out so :func:`cxr_mc.runs.run.repair_line_spec`
     (``cxr reline``) reuses the EXACT live-sweep line path rather than
     re-deriving it by hand."""
     segs, n_hat, abs_layers, groove = _transport_lines_for_case(case)

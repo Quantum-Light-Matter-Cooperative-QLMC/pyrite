@@ -5,7 +5,7 @@ from datetime import timedelta
 
 import pytest
 
-from cxr_mc import campaign_lock
+from cxr_mc.checkpoints import campaign_lock
 from cxr_mc.energy_grid import artifacts, gc
 
 

@@ -6,8 +6,8 @@ import click
 import pytest
 
 from cxr_mc import remote
-from cxr_mc._remote import lifecycle, viewer
 from cxr_mc.cli._deprecations import message
+from cxr_mc.remote import lifecycle, viewer
 from tests.helpers.cli import assert_clean_result, invoke
 
 REMOTE_COMMANDS = (
@@ -544,7 +544,7 @@ def test_run_profile_with_membership_defaults_materials(monkeypatch):
 
 def test_run_profile_without_membership_uses_manifest_materials(monkeypatch):
     import cxr_mc.materials as materials_pkg
-    import cxr_mc.scan as scan
+    import cxr_mc.runs.scan as scan
 
     class _FakeCatalog:
         profile_names = ("standard", "sub_100keV")
@@ -680,7 +680,7 @@ def test_stop_profile_dispatches_and_rejects_combinations(monkeypatch):
 
 def test_clear_implicit_profile_uses_manifest_materials(monkeypatch):
     import cxr_mc.materials as materials_pkg
-    import cxr_mc.scan as scan
+    import cxr_mc.runs.scan as scan
 
     class _FakeCatalog:
         profile_names = ("standard",)
@@ -783,7 +783,7 @@ def test_pull_profile_qualifies_explicit_materials(monkeypatch):
 
 def test_pull_profile_without_membership_uses_manifest_materials(monkeypatch):
     import cxr_mc.materials as materials_pkg
-    import cxr_mc.scan as scan
+    import cxr_mc.runs.scan as scan
 
     class _FakeCatalog:
         profile_names = ("standard", "sub_100keV")

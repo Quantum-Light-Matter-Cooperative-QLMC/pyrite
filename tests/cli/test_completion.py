@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from cxr_mc import _checkpoint_io
+from cxr_mc.checkpoints import _checkpoint_io
 from cxr_mc.cli import _completion as _cli_completion
 
 
@@ -207,8 +207,10 @@ def _callback(command, name):
 
 
 def test_local_commands_wire_material_checkpoint_archive_and_choice_completion():
-    from cxr_mc import analyze, archive, blaze, scan, slim
+    from cxr_mc.apps import analyze
+    from cxr_mc.checkpoints import archive, slim
     from cxr_mc.cli.commands import recompute as recompute_cli
+    from cxr_mc.runs import blaze, scan
 
     for command in (scan.command, blaze.command, analyze.command):
         assert _callback(command, "material") is _cli_completion.complete_material
@@ -231,7 +233,7 @@ def test_local_commands_wire_material_checkpoint_archive_and_choice_completion()
 
 
 def test_remote_commands_wire_safe_completion_but_not_destructive_targets():
-    from cxr_mc._remote import cli
+    from cxr_mc.remote import cli
 
     command = cli.command.commands["run"]
     assert _callback(command, "catalog_profile") is _cli_completion.complete_profile

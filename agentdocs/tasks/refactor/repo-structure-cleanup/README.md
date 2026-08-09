@@ -241,7 +241,7 @@ re-export.
 ## Checklist
 
 - [x] S1 `paths.py` + apps into the distribution + package-smoke assertions
-- [ ] S2 subpackage grouping + `remote` fold, exports unchanged
+- [x] S2 subpackage grouping + `remote` fold, exports unchanged
 - [x] S3 delete 10 `cli/` alias shims (9 from original task + `beam.py` postdating named-beam-objects)
 - [ ] S4 `profile.py` domain extraction; `cli/dashboard/` promotion
 - [ ] S5 `runner/` and `spectrum/` splits (golden + ledger invariant)
@@ -252,8 +252,8 @@ re-export.
       no-action
 - [x] S8 empty-dir removal (`src/cxr_mc/line_grid/` confirmed deleted)
 - [ ] S8 repo-map DAG generator, `checks/`/`scripts/` ownership
-- [ ] `docs/repo_map.md` regenerated/updated per source-touching slice
-- [ ] `docs/package-structure-rfc.md` amended with S1–S8 as P6+ (or this doc
+- [x] `docs/repo_map.md` regenerated/updated per source-touching slice
+- [x] `docs/package-structure-rfc.md` amended with S1–S8 as P6+ (or this doc
       cited from it) so the RFC stays the durable record
 
 ### S1 checkpoint progress
@@ -271,12 +271,27 @@ re-export.
   editable installs execute analysis/viewer smoke launches from an external
   cwd, and assert checkpoint roots remain outside `site-packages`. S1 complete.
 
+### S2 checkpoint progress
+
+- 2026-08-09: grouped canonical implementations under `checkpoints/`,
+  `campaign/`, `runs/`, `apps/`, `validation/`, and `perf/`; folded the private
+  `_remote/` implementation and public facade into `remote/`. Existing public
+  root module paths remain thin compatibility re-exports, while private legacy
+  paths are removed. `cxr_mc.__all__` remains byte-identical.
+- Evidence: package-structure guards, CLI/apps/packaging suites, core suite,
+  focused multiprocessing rerun, lint, typecheck, CLI-reference freeze, repo
+  map generation, and wheel/editable package smoke passed. Strict Sphinx
+  imported the grouped API pages but remains blocked by pre-existing optional
+  CuPy and repository toctree/xref warnings. Marimo checks were skipped at user
+  direction after the checker hung; the umbrella verification run was stopped
+  at user direction after reaching 85% without failures.
+
 ## Sequencing
 
 1. ~~**S3 + S8 empty dir**~~ — done 2026-08-09.
 2. ~~**S7 remainder**~~ — done 2026-08-09.
 3. ~~**S1**~~ — done 2026-08-09.
-4. **S2**, then **S4**, **S6**, **S8 remainder**.
+4. ~~**S2**~~, then **S4**, **S6**, **S8 remainder**.
 5. **S5** last: physics-gated, and two live branches are editing those files.
 
 ## Non-goals

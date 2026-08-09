@@ -26,7 +26,7 @@ from tabulate import tabulate
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
-from cxr_mc.validation_oracles import (  # noqa: E402
+from cxr_mc.validation.validation_oracles import (  # noqa: E402
     DEFAULT_DANS_TOLERANCES,
     DansDiffractionUnavailableError,
     validate_dans_crystal,

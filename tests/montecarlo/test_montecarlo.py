@@ -13,13 +13,13 @@ import numpy as np
 import pytest
 
 import cxr_mc.montecarlo.transport as transport
+from cxr_mc.campaign.sweep import BeamSpec, crystal_params
 from cxr_mc.montecarlo import (
     TRANSPORT_ELEMENTS,
     _normalize_composition,
     mc_spectrum,
     simulate_trajectories,
 )
-from cxr_mc.sweep import BeamSpec, crystal_params
 
 
 def test_normalize_requires_material():
@@ -625,8 +625,8 @@ def test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum():
     doesn't break the worker, and that mc_spectrum/mc_brem_spectrum's xp/REAL
     (rebound by force_cpu) still produce a finite spectrum -- the design doc's
     Sec. 2 verification item, covered end-to-end rather than assumed."""
+    from cxr_mc.campaign.sweep import Sweep, build_cases
     from cxr_mc.montecarlo import runner
-    from cxr_mc.sweep import Sweep, build_cases
 
     sweep = Sweep(
         material="hopg",

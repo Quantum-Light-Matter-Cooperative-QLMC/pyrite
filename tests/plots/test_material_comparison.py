@@ -6,7 +6,7 @@ import numpy as np
 
 matplotlib.use("Agg")
 
-from cxr_mc.config import default_settings
+from cxr_mc.campaign.config import default_settings
 from cxr_mc.plots import (
     material_comparison_summary,
     plot_material_comparison,

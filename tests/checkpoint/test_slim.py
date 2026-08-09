@@ -7,11 +7,11 @@ from typing import Any
 import numpy as np
 import pytest
 
-from cxr_mc import _checkpoint_io
-from cxr_mc.config import default_settings, material_sweep
+from cxr_mc.campaign.config import default_settings, material_sweep
+from cxr_mc.campaign.sweep import build_cases
+from cxr_mc.checkpoints import _checkpoint_io
+from cxr_mc.checkpoints.slim import slim_checkpoint
 from cxr_mc.results import slim_results
-from cxr_mc.slim import slim_checkpoint
-from cxr_mc.sweep import build_cases
 
 
 def _record(tilt_deg: float, E0: float) -> dict[str, Any]:
@@ -174,8 +174,8 @@ def test_grid_keeps_only_current_grid_names():
 
 
 def test_grid_accepts_survey_profile_selector_and_variant_stem():
-    from cxr_mc.profiles import named_profile_stem
-    from cxr_mc.slim import _grid_from_stem
+    from cxr_mc.campaign.profiles import named_profile_stem
+    from cxr_mc.checkpoints.slim import _grid_from_stem
 
     keep = set(_grid_config_names("hopg", "survey")[:2])
     res = {name: {30.0: _record(0.0, 30.0)} for name in keep}
@@ -196,8 +196,8 @@ def test_grid_from_stem_resolves_catalog_profile_variant():
     3-tuple grid selector, and slim_results filters on that profile's grid --
     this is the path `cxr remote pull --profile` exercises on the box via
     `cxr slim --grid`."""
-    from cxr_mc.profiles import named_profile_stem
-    from cxr_mc.slim import _grid_from_stem
+    from cxr_mc.campaign.profiles import named_profile_stem
+    from cxr_mc.checkpoints.slim import _grid_from_stem
 
     stem = named_profile_stem("hopg", "full", catalog_profile="sub_100keV")
     selector = _grid_from_stem(f"checkpoints/{stem}")
@@ -256,7 +256,7 @@ def test_slim_checkpoint_grid_rejects_quick_stem(tmp_path):
 def test_pct_smaller_never_reports_negative_zero():
     """A slim that lands a hair LARGER (tiny checkpoint + float32 pickling
     overhead) must report '0% smaller', not the '-0%' float-format artifact."""
-    from cxr_mc.slim import _pct_smaller
+    from cxr_mc.checkpoints.slim import _pct_smaller
 
     assert str(_pct_smaller(100_004, 100_008)) == "0"  # -0.004% -> 0, not -0
     assert _pct_smaller(100, 37) == 63

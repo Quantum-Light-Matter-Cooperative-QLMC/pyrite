@@ -1,5 +1,5 @@
-from cxr_mc import scan
-from cxr_mc.scan import _build_sections
+from cxr_mc.runs import scan
+from cxr_mc.runs.scan import _build_sections
 
 
 class MockArgs:

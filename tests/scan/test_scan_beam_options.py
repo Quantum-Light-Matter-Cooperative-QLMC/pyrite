@@ -5,7 +5,7 @@ import os
 import pytest
 from click.testing import CliRunner
 
-from cxr_mc import scan
+from cxr_mc.runs import scan
 
 
 @pytest.mark.parametrize(

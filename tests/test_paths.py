@@ -44,8 +44,9 @@ def test_state_dir_matches_config_store_parent():
 
 
 def test_checkpoint_defaults_follow_workspace_root():
-    from cxr_mc import archive, checkpoint_cleanup, run
+    from cxr_mc.checkpoints import archive, checkpoint_cleanup
     from cxr_mc.cli import _completion
+    from cxr_mc.runs import run
 
     expected = workspace_root() / "checkpoints"
     assert Path(run.DEFAULT_CHECKPOINT_DIR) == expected

@@ -3,16 +3,16 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from cxr_mc.config import material_sweep
-from cxr_mc.longitudinal import (
+from cxr_mc.campaign.config import material_sweep
+from cxr_mc.campaign.longitudinal import (
     H_EV_FS,
     LongitudinalDistribution,
 )
+from cxr_mc.campaign.profiles import dataset_identity
+from cxr_mc.campaign.sweep import BeamSpec, Sweep, build_cases
 from cxr_mc.materials import CATALOG
 from cxr_mc.montecarlo.transport import C_ANG_PER_FS, _sample_bunch_offsets
-from cxr_mc.profiles import dataset_identity
 from cxr_mc.results import Settings
-from cxr_mc.sweep import BeamSpec, Sweep, build_cases
 
 
 def _campaign_cases(material: str, policy: LongitudinalDistribution):

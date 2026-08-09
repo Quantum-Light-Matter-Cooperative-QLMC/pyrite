@@ -11,15 +11,15 @@ from dataclasses import asdict
 import numpy as np
 import pytest
 
-from cxr_mc.beam_metrics import sampled_beam_metrics
-from cxr_mc.montecarlo.geometry import beam_frame_basis
-from cxr_mc.montecarlo.transport import simulate_trajectories
-from cxr_mc.sweep import BeamSpec, Sweep, build_cases
-from cxr_mc.transverse import (
+from cxr_mc.campaign.beam_metrics import sampled_beam_metrics
+from cxr_mc.campaign.sweep import BeamSpec, Sweep, build_cases
+from cxr_mc.campaign.transverse import (
     TransverseDistribution,
     resolve_transverse_distribution,
     sample_transverse,
 )
+from cxr_mc.montecarlo.geometry import beam_frame_basis
+from cxr_mc.montecarlo.transport import simulate_trajectories
 
 _POLICY = TransverseDistribution(
     normalized_emittance_x_mm_mrad=1.0,
@@ -160,7 +160,7 @@ def test_bundled_emittance_demo_profile_resolves_a_twiss_beam():
     a `beam.transverse` table has to clear the spot FWHM that every profile beam
     otherwise defaults to, or the profile could not build a single case.
     """
-    from cxr_mc.config import material_sweep
+    from cxr_mc.campaign.config import material_sweep
     from cxr_mc.materials import CATALOG
 
     assert CATALOG.profile_materials("hopg_emittance_demo") == ("hopg",)

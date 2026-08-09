@@ -116,7 +116,7 @@ def test_penetration_controls_offer_material_presets_and_bounded_manual_values()
 def test_thickness_controls_and_context_use_shared_human_units() -> None:
     source = APP.read_text()
 
-    assert "from cxr_mc.sweep import build_cases, fmt_thickness" in source
+    assert "from cxr_mc.campaign.sweep import build_cases, fmt_thickness" in source
     # The preset-thickness dropdown labels its options in human units.
     assert "fmt_thickness(value)" in source
     assert source.count("fmt_thickness(") >= 2
@@ -131,7 +131,7 @@ def test_penetration_ne_defaults_to_50() -> None:
 def test_penetration_view_surfaces_sampled_beam_diagnostics() -> None:
     source = APP.read_text()
 
-    assert "from cxr_mc.beam_metrics import initial_state_metrics" in source
+    assert "from cxr_mc.campaign.beam_metrics import initial_state_metrics" in source
     for key in ("initial_r_ang", "initial_v_hat", "initial_E_keV", "initial_t0_ang"):
         assert key in source
     assert "**Sampled beam**" in source

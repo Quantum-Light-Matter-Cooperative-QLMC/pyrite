@@ -21,18 +21,18 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
+from cxr_mc.campaign.sweep import (
+    Sweep,
+    build_cases,
+    crystal_params,
+    film_on_substrate_layers,
+)
 from cxr_mc.montecarlo import (
     mc_brem_spectrum,
     mc_spectrum,
     run_case,
     simulate_trajectories,
     tilted_geometry,
-)
-from cxr_mc.sweep import (
-    Sweep,
-    build_cases,
-    crystal_params,
-    film_on_substrate_layers,
 )
 
 cp = crystal_params("mose2")
