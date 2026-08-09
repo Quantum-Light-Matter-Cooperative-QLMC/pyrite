@@ -16,17 +16,44 @@
             "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/sync_local_backend.sh\""
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "serena-hooks activate --client=claude-code"
+          }
+        ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "shell": "bash",
-            "command": "cd \"$CLAUDE_PROJECT_DIR\" && f=.venv/Scripts/python.exe; [ -x \"$f\" ] || f=.venv/bin/python; [ -x \"$f\" ] || f=python3; \"$f\" .claude/hooks/guard_local_sweep.py",
-            "statusMessage": "Checking for local sweep"
+            "command": "serena-hooks remind --client=claude-code"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__serena__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "serena-hooks auto-approve --client=claude-code"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "serena-hooks cleanup --client=claude-code"
           }
         ]
       }

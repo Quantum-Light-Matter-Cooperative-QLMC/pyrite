@@ -1,6 +1,17 @@
 {
   "description": "Install locked project dependencies when Codex starts.",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "serena-hooks remind --client=codex"
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "startup|resume",
@@ -10,6 +21,20 @@
             "command": "cd \"$(git rev-parse --show-toplevel)\" && UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv sync --all-groups",
             "timeout": 600,
             "statusMessage": "Syncing project dependencies"
+          },
+          {
+            "type": "command",
+            "command": "serena-hooks activate --client=codex"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "serena-hooks cleanup --client=codex"
           }
         ]
       }
