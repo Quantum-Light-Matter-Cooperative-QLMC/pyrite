@@ -208,7 +208,7 @@ re-export.
 
 - [ ] S1 `paths.py` + apps into the distribution + package-smoke assertions
 - [ ] S2 subpackage grouping + `remote` fold, exports unchanged
-- [x] S3 delete 9 `cli/` alias shims
+- [x] S3 delete 10 `cli/` alias shims (9 from original task + `beam.py` postdating named-beam-objects)
 - [ ] S4 `profile.py` domain extraction; `cli/dashboard/` promotion
 - [ ] S5 `runner/` and `spectrum/` splits (golden + ledger invariant)
 - [ ] S6 `plots/{altair,mpl,plotly}/`
