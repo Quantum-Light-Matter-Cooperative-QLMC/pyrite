@@ -29,7 +29,12 @@ from ._backend import (
 from ._resources import admitted_chunk, resolve_resource_policy
 from .geometry import tilted_geometry
 from .groove import blazed_groove_spec
-from .spectrum import _segments_in_layer, mc_brem_spectrum, mc_spectrum
+from .spectrum import (
+    _segments_in_layer,
+    _segments_on_device,
+    mc_brem_spectrum,
+    mc_spectrum,
+)
 from .transport import simulate_trajectories
 
 # Opt-in Gate-0 phase profiling for the sweep-acceleration work (TODO P?/#numba;
@@ -853,6 +858,9 @@ def _line_pair_for_case(case, E_grid, *, want_coherent):
     keeps both arrays on that grid instead of leaving ``spec_coherent`` stale.
     Returns ``(spec, spec_coherent_or_None)``."""
     segs, n_hat, abs_layers, groove = _transport_lines_for_case(case)
+    # Both kernels read the same segments; stage one device copy as the live
+    # sweep does rather than uploading the pair separately.
+    segs = _segments_on_device(segs)
     Ne_lines = case["Ne"]
     spec = _lines_for_segments(
         segs,
@@ -982,6 +990,12 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     t0 = perf_counter() if timed else 0.0
     E_grid, E_brem, n_hat = tp["E_grid"], tp["E_brem"], tp["n_hat"]
     segs = tp["segs"]
+    # Every kernel below runs over the SAME segments, and each would otherwise
+    # upload its own slice of them: a case pushes ~116 B/segment across the bus
+    # where the union of what it reads is ~48. Stage one device copy for the
+    # whole case and they all read it in place. `segs` itself stays host-side --
+    # the run summary at the bottom counts segments and backscatter on it.
+    segs_dev = _segments_on_device(segs)
     Ne_lines = tp["Ne_lines"]
     Ne_brem = tp["Ne_brem"]
     # optional film-on-substrate stack (None -> single slab, unchanged)
@@ -1007,7 +1021,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     with _nsys_range("cxr.lines"):
         try:
             spec = _lines_for_segments(
-                segs,
+                segs_dev,
                 E_grid,
                 case,
                 n_hat,
@@ -1019,7 +1033,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
 
             if want_coherent:
                 spec_coherent = _lines_for_segments(
-                    segs,
+                    segs_dev,
                     E_grid,
                     case,
                     n_hat,
@@ -1039,7 +1053,7 @@ def _spectrum_case_impl(case, tp, record_timing=False):
     with _nsys_range("cxr.brem"):
         try:
             brem_wide = _brem_wide_from_segments(
-                segs,
+                segs_dev,
                 E_brem,
                 case,
                 n_hat,

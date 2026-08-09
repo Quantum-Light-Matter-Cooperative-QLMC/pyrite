@@ -310,8 +310,9 @@ host memory is *not* the cheap partial it looked like — see the handoff sectio
 and each spectrum kernel copies what it needs straight back up with
 `xp.asarray(segments[k], dtype=REAL)`. `_spectrum_case` calls three such kernels
 over the *same* `segs` dict — one incoherent line sum, one coherent line sum when
-the profile asks for it, one brem sum per radiating layer — and none of them share
-a device copy.
+the profile asks for it, one brem sum per radiating layer — and none of them
+shared a device copy. The measurements below are that state; the first fix under
+them has since landed.
 
 hopg, Ne=16000, 5.65M segments, RTX 5080, `REAL = float32`:
 
@@ -333,13 +334,31 @@ allocation.
 
 Two independent fixes, cheapest first:
 
-1. **Share one device copy across a case's kernels.** The three calls upload
-   overlapping arrays 24 times; their union is 48 B/segment uploaded once. This is
-   a caching change inside the spectrum phase and needs nothing from transport.
+1. **Share one device copy across a case's kernels.** *Done.* The three calls
+   uploaded overlapping arrays 24 times; their union is 48 B/segment uploaded
+   once. `_segments_on_device` stages that copy and `_spectrum_case` hands it to
+   all three kernels, which needs nothing from transport: every kernel already
+   reached for its arrays through `xp.asarray(..., dtype=REAL)`, and that returns
+   a device array of the right dtype untouched, so the kernels are unchanged and
+   the ones still called on host segments behave exactly as before. The cast to
+   `REAL` is the same one each kernel did, hoisted to happen once — the spectra
+   are bit-for-bit identical.
+
+   Same segment set, arms interleaved after a discarded warm-up, medians of 5:
+
+   | arm | three kernels | H2D | copies |
+   | --- | --- | --- | --- |
+   | per-kernel upload | 0.176 s | 656 MB / 0.113 s | 24 |
+   | one shared copy | 0.108 s | 283 MB / 0.047 s | 16 |
+
+   −39% on the spectrum phase, and the bytes land where the accounting predicted:
+   116 → 50 B/segment, the 48 B/segment union plus the two arrays the staging
+   uploads whether or not this particular case reads them. The remaining 16
+   copies are the energy tabulations, not segments.
 2. **Never come down.** Hand the compacted device arrays to the line/brem kernels
-   directly, which removes the 82 B/segment D2H and all 116 B/segment of upload.
-   Larger, with its own correctness surface, and it has to keep the NumPy return
-   for CPU callers.
+   directly, which removes the 82 B/segment D2H and the last 50 B/segment of
+   upload. Larger, with its own correctness surface, and it has to keep the NumPy
+   return for CPU callers.
 
 Pinned host staging is *not* a fix on the way up: copying into a pinned buffer
 first measured 3.8–4.0 GB/s against 6.1–6.3 GB/s pageable, because the staging

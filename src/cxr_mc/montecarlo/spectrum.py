@@ -365,6 +365,33 @@ def _segments_in_layer(segments, L):
     return out
 
 
+def _segments_on_device(segments):
+    """One backend copy of the segment arrays, to be shared by a case's kernels.
+
+    Each kernel reaches for what it needs with ``xp.asarray(segments[k],
+    dtype=REAL)``, so on an accelerator every call re-uploads its own slice of
+    the transport's output -- and a case runs the line sum (twice when it also
+    wants the coherent one) and the brem sum over the SAME segments, once per
+    layer. Staging the upload here turns those calls into no-ops: `xp.asarray`
+    hands back a device array that already carries the requested dtype without
+    copying it. The kernels therefore need not know whether their caller staged
+    or not, and the ones still called on host segments (the repair paths) behave
+    exactly as before.
+
+    Values are unchanged either way: this is the same cast to `REAL` the kernels
+    would each have done, hoisted to happen once.
+
+    On the CPU backend `xp` is NumPy and the arrays already carry the kernels'
+    dtype, so nothing is copied at all."""
+    out = dict(segments)
+    for k in _SEG_ARRAYS:
+        a = out.get(k)
+        if a is None:
+            continue
+        out[k] = xp.asarray(a, dtype=REAL) if a.dtype.kind == "f" else xp.asarray(a)
+    return out
+
+
 def _polarization_pair(k_hat, g_vec):
     n_plane = np.cross(k_hat, g_vec)
     npl = np.linalg.norm(n_plane)

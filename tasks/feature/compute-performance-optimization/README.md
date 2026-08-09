@@ -845,8 +845,44 @@ Open — needs a GPU session, in this order:
       the reproducibility guarantees rest on. Lifetimes at fixed energy in a
       stopping slab are too tightly distributed for it to pay.
 
-- [ ] **Keep segments device-resident** — now the highest-value follow-up, and
-      the measurement that says so. Time budget at Ne=16000, cap=2048, six
+- [x] **Share one device copy of the segments across a case's spectrum
+      kernels.** **Done 2026-08-08.** The cheap half of the handoff measurement
+      below, and it needed nothing from transport: every kernel already reached
+      for its segment arrays through `xp.asarray(segments[k], dtype=REAL)`, and
+      that returns a device array of the right dtype untouched. So
+      `_segments_on_device` stages one copy and `_spectrum_case` hands it to all
+      three kernels; the kernels are unchanged, and the callers that still pass
+      host segments (the reline/repair paths) behave exactly as before. The
+      `REAL` cast each kernel used to do independently now happens once, so the
+      spectra are bit-for-bit identical. `_line_pair_for_case` stages too — it
+      runs the same two kernels over one transport.
+
+      hopg, Ne=16000, 5.65M segments, RTX 5080; arms interleaved after a
+      discarded warm-up round so neither pays pool growth alone; medians of 5:
+
+      | arm | three kernels | H2D | copies |
+      | --- | --- | --- | --- |
+      | per-kernel upload | 0.176 s | 656 MB / 0.113 s | 24 |
+      | one shared copy | 0.108 s | 283 MB / 0.047 s | 16 |
+
+      −39% on the spectrum phase. Bytes land where the accounting predicted:
+      116 → 50 B/segment, i.e. the 48 B/segment union plus the two arrays the
+      staging uploads whether or not a given case reads them — small enough not
+      to be worth making the helper case-aware. The 16 remaining copies are
+      energy tabulations, not segments.
+
+      Gated by 9 tests in `tests/montecarlo/test_segment_staging.py`: identical
+      spectra from staged vs host segments (lines both coherences, and brem),
+      dtypes and scalar fields carried through, staging idempotent, layer
+      masking identical, and a case staging exactly once with all three kernels
+      handed that copy. Full local suite 2747 passed; on the GPU box those 9 run
+      against real CuPy arrays and `tests/montecarlo tests/detectors tests/scan`
+      exits 0. The remaining remote core-suite failures are all
+      `FileNotFoundError` on `docs/`, `scripts/`, `notebooks/` paths that
+      `cxr remote sync` does not ship.
+
+- [ ] **Keep segments device-resident** — the remaining half, and still the
+      largest item on the list. Time budget at Ne=16000, cap=2048, six
       launches (kernel/compaction from `nsys`, wall from unprofiled runs since
       `nsys` inflates host time; kernel median is identical at both capacities,
       37.8 vs 37.9 ms, which cross-checks the device numbers):
@@ -884,15 +920,14 @@ Open — needs a GPU session, in this order:
       ~6 GB/s pageable; the rest is first-touch pool growth).
 
       So there are two fixes, and the cheap one does not need transport at all:
-      **(a)** cache one device copy per case across the three spectrum kernels;
-      **(b)** never come down. Pinned staging is *not* the cheap partial it
-      looked like — copying into a pinned buffer measured 3.8-4.0 GB/s against
-      6.1-6.3 GB/s pageable, since the staging copy costs more than the overhead
-      it removes. It would only pay if the arrays were produced into pinned
-      memory.
+      **(a)** cache one device copy per case across the three spectrum kernels —
+      **done, see the item above**; **(b)** never come down, which is what is
+      left here. Pinned staging is *not* the cheap partial it looked like —
+      copying into a pinned buffer measured 3.8-4.0 GB/s against 6.1-6.3 GB/s
+      pageable, since the staging copy costs more than the overhead it removes.
+      It would only pay if the arrays were produced into pinned memory.
 
-Deliberately deferred: sharing one device copy of the segments across a case's
-spectrum kernels, keeping segments on the device end to end, NVTX ranges in
+Deliberately deferred: keeping segments on the device end to end, NVTX ranges in
 `transport.py`, `numba.prange` over the per-electron core for the core-starved
 CPU case, and grooved transport.
 
