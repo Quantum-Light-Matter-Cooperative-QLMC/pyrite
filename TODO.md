@@ -83,6 +83,14 @@ file. Edit and drop items on `main`.
    (`--error all` is 51 diagnostics, mostly correlated-guard false positives).
    → `chore/physics-boundary-typing`;
    [`agentdocs/tasks/chore/physics-boundary-typing/`](agentdocs/tasks/chore/physics-boundary-typing/).
+8. **PyRITE project conversion.** Rebrand `cxr-mc` as **PyRITE** — “a Python
+   toolkit for Radiation from Interactions and Transport of Electrons” — using
+   lowercase `pyrite` for the repository; settle a collision-safe distribution,
+   import, CLI, environment/config, persisted-data, and compatibility matrix,
+   then migrate packaging, public documentation, generated references, and
+   external repository metadata after the active structure cleanup lands.
+   → `chore/pyrite-rebrand`;
+   [`agentdocs/tasks/chore/pyrite-rebrand/`](agentdocs/tasks/chore/pyrite-rebrand/).
 
 ### Gated
 
