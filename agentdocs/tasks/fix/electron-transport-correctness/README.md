@@ -59,7 +59,7 @@ remote GPU workflow; do not run a heavy/GPU sweep locally.
 
 ## Checklist
 
-- [ ] A -- Specify segment-time compatibility and incomplete-history API;
+- [x] A -- Specify segment-time compatibility and incomplete-history API;
       identify every result/count consumer before changing keys or exceptions.
 - [ ] B -- Add the constant-velocity one-flight versus two-subsegment coherent
       field invariance regression, covering both coherent reduction routes.
@@ -82,14 +82,130 @@ remote GPU workflow; do not run a heavy/GPU sweep locally.
 - **Decided:** no below-cutoff portion may contribute to line or bremsstrahlung
   radiation.
 - **Decided:** `max_steps` exhaustion is not a physical stop and must be visible.
-- **Open:** preserve `t_ang` as start age and derive midpoint time downstream,
-  or add `t_mid_ang` now. Prefer the additive field if it reduces repeated
-  downstream arithmetic without forcing the Stage 1 schema prematurely.
-- **Open:** exact exception/config shape for explicitly permitted incomplete
-  histories. Resolve after inventorying internal and app callers.
-- **Open:** whether cutoff truncation uses the present left-endpoint stopping
-  rule exactly or a small local solve. Stage 0 must not silently implement the
-  broader midpoint/substep model owned by the controlled-propagation task.
+- **Decided (A): preserve `t_ang` as segment-start age; do not add
+  `t_mid_ang`.** `r_mid` remains the representative position and coherent
+  radiation derives its matching time once, before either reduction route, as
+  `t_ang + 0.5 * L_ang / beta_from_keV(E_keV)`. `t0_ang` remains an additive
+  per-electron absolute-time offset. This keeps trajectory ordering/reveal
+  semantics and the eight-array host/device staging contract unchanged. For
+  synthetic coherent inputs, absent `t_ang` retains the existing zero-start-age
+  compatibility default, after which the same midpoint correction applies.
+- **Decided (A): incomplete histories are errors, with no partial-result API.**
+  `simulate_trajectories` raises `RuntimeError` by default whenever any entered
+  electron exhausts `max_steps`; the stable message must include
+  `n_step_limited`, `Ne`, and `max_steps`. No current internal, app, check, or
+  checkpoint caller consumes partial trajectories, so do not add
+  `allow_incomplete` or attach recoverable segments to the exception. Internally
+  every core must distinguish cutoff-stop from step-limited termination. A
+  successful result adds `n_cutoff_stopped` and `n_step_limited == 0`, while
+  legacy `n_stopped` remains as an alias of `n_cutoff_stopped` rather than its
+  former residual count. Successful-count invariant:
+  `n_backscattered + n_transmitted + n_side_exited + n_missed + n_cutoff_stopped
+  == Ne`.
+- **Decided (A): Stage 0 uses the present left-endpoint stopping rule exactly.**
+  On a candidate material flight, hold `dEds(E_start)` and `beta(E_start)`
+  constant. If `E_start + dEds * L_candidate <= E_cut`, set
+  `L_cut = (E_cut - E_start) / dEds`, retain only `min(L_candidate, L_cut)`,
+  and recompute midpoint, endpoint energy, and clock from that length. A
+  geometry boundary wins an exact distance tie; otherwise the cutoff event
+  clears collision/boundary exit handling. This is an algebraic crossing under
+  the current rule, not the local solve, midpoint energy, or hazard substepping
+  owned by controlled propagation.
+- **Decided (A): population-specific cutoffs clip in the spectrum adapter.** A
+  shared line/bremsstrahlung transport uses the lower per-electron cutoff, so
+  the current start-energy masks can retain the below-cutoff tail of a segment
+  crossing the higher population cutoff. Before line or brem reduction,
+  `spectrum.py` must apply the same linear crossing rule using the segment's
+  layer composition, shorten `L_ang`, and move `r_mid` from the original
+  midpoint to the retained midpoint. The coherent midpoint time is derived
+  after this clipping. This adapter is a no-op when the segment does not cross
+  that consumer's cutoff and prevents either radiation path from recovering a
+  below-cutoff contribution.
+
+## Slice A consumer inventory and migration contract
+
+### Producers and internal adapters
+
+- `montecarlo/transport.py`: `_transport_core_ungrooved`,
+  `_transport_core_grooved`, `_transport_core_ungrooved_perelectron`,
+  `_run_per_electron_transport`, and `simulate_trajectories`. The lockstep and
+  grooved cores can classify remaining `alive` entered electrons as
+  step-limited; the per-electron driver must replace the collapsed
+  `EXIT_ALIVE_OR_STOPPED` code with distinct cutoff and step-limit codes.
+- `montecarlo/transport_jit_kernel.py`: `_transport_kernel`,
+  `run_transport_kernel`, and `make_cuda_transport_core` mirror the
+  per-electron exit-code and segment-buffer contract. CUDA parity remains G and
+  must use the remote GPU workflow.
+- `montecarlo/spectrum.py`: `_segments_in_layer` and `_segments_on_device`
+  preserve additive keys; `mc_spectrum` (incoherent, batched coherent, streamed
+  coherent, and per-reflection coherent paths) consumes `r_mid`, `v_hat`,
+  `L_ang`, `E_keV`, `t_ang`, `t0_ang`, `elec_id`, and `layer`;
+  `mc_brem_spectrum` consumes the same geometry/energy/length/identity subset.
+  Population cutoff clipping belongs here so live and repair paths cannot
+  diverge.
+- `montecarlo/runner.py`: `_transport_case`, `_brem_for_case`, and
+  `_transport_lines_for_case` call transport; `_lines_for_segments` and
+  `_brem_wide_from_segments` select population/layer segments; and
+  `_spectrum_case_impl` reduces transport diagnostics to `eta`, `hit_frac`, and
+  `n_segments`. All production/repair calls keep fail-closed defaults.
+
+### App, plotting, and validation/check consumers
+
+- `campaign/config.py::gate_cases_by_penetration` reads `n_transmitted`; its
+  watchdog must fail rather than treating an incomplete run as low survival.
+- `plots/trajectories.py::_trajectory_data` reconstructs segment starts and
+  endpoints, orders by start-age `t_ang`, and reads backscatter/transmission
+  counts. `plots/altair_trajectories.py` and
+  `plots/plotly_trajectories.py` consume that projected dataset indirectly.
+  Keeping `t_ang` start-based preserves track and reveal behavior.
+- `apps/anchor_figures.py::model_spectra` and `model_coherent_spectra` call
+  transport and read backscatter/transmission; `single_segment_anchor` supplies
+  a synthetic incoherent segment and needs no new time key.
+- Direct developer-check callers are `checks/detector_solid_angle_check.py`,
+  `checks/mosaic_mc_check.py`, `checks/multilayer_check.py`, and
+  `checks/multilayer_validation_check.py`; `multilayer_slice3_check.py`
+  consumes segment dictionaries passed by its caller. They remain fail-closed.
+
+### Results, checkpoints, and public compatibility
+
+- Raw segment dictionaries and transport termination counts do not cross the
+  result/checkpoint boundary. `runner._spectrum_case_impl` emits only spectra,
+  `eta`, `hit_frac`, and `n_segments`; `results/store.py::store_result` persists
+  spectra, `eta`, and `hit_frac`. `runs/run.py` CAS payloads likewise exclude
+  segments and termination counts. Therefore the new successful-result count
+  keys are additive only at the direct `simulate_trajectories` API.
+- `montecarlo/__init__.py` re-exports `simulate_trajectories`; no new public
+  exception or configuration symbol is required. Existing callers catching
+  `RuntimeError` remain compatible. `n_stopped` keeps its key and narrows to its
+  intended physical meaning.
+- Test helpers constructing segment dictionaries (`tests/helpers/segments.py`
+  plus local fixtures in coherent, staging, surface-orientation, multilayer,
+  GPU-retry, and anchor tests) need no `t_mid_ang`; coherent fixtures keep or
+  add explicit `t_ang` where phase matters.
+
+### Owner and test impact for B--F
+
+- B--C: `montecarlo/spectrum.py` and
+  `tests/montecarlo/test_coherent_emission.py`; cover both coherent reduction
+  routes with one-flight/two-half-flight complex-field and spectrum invariance.
+- D: all four transport cores plus the spectrum cutoff adapter;
+  `test_montecarlo.py`, `test_transport_per_electron.py`, `test_groove.py`, and
+  focused staging/CUDA-source parity assertions. Include a shared-transport case
+  whose line cutoff exceeds its transport cutoff.
+- E: transport cores/wrapper and count fixtures in `test_montecarlo.py`,
+  `test_transport_per_electron.py`, `test_transport_core_default.py`, and
+  `test_groove.py`. Force a one-step incomplete run and assert failure text;
+  separately prove cutoff stops preserve the successful-count invariant.
+- F: `simulate_trajectories` validation and `test_montecarlo.py`; finite positive
+  initial/cutoff energies and finite nonzero inward beam directions only.
+
+## Next dispatchable slice
+
+B--C may proceed together: first add the constant-velocity coherent invariance
+regression, then derive midpoint time once in `mc_spectrum` before its coherent
+routes. D--F are also unblocked by the cutoff and termination contracts above,
+but should remain a later independently valid checkpoint because they touch all
+transport cores and failure behavior.
 
 ## Delegation slices and required skills
 
