@@ -16,6 +16,8 @@ Commands:
     nbqa       lint notebooks with nbQA + Ruff
     nbstrip    strip notebook outputs in-place
     test       run pytest, forwarding selectors and arguments
+               (--numba disables JIT via NUMBA_DISABLE_JIT=1, must precede
+               other forwarded args, to measure @njit bodies under --cov)
     test-suite run one stable core/CLI/app/packaging/integration test suite
     package-smoke build and install clean wheel/editable environments
     smoke      exercise checkpoint loading and plotting
@@ -30,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import os
 import re
 import shutil
 import subprocess
@@ -110,8 +113,9 @@ class AgentToolingError(RuntimeError):
     """Raised when the portable skill tree is malformed or out of sync."""
 
 
-def run(*args: str, cwd: Path = ROOT) -> None:
-    subprocess.run([sys.executable, *args], cwd=cwd, check=True)
+def run(*args: str, cwd: Path = ROOT, extra_env: dict[str, str] | None = None) -> None:
+    env = {**os.environ, **extra_env} if extra_env else None
+    subprocess.run([sys.executable, *args], cwd=cwd, check=True, env=env)
 
 
 def cmd_acp_up(_: argparse.Namespace) -> None:
@@ -234,7 +238,11 @@ def cmd_nbstrip(_: argparse.Namespace) -> None:
 
 
 def cmd_test(args: argparse.Namespace) -> None:
-    run("-m", "pytest", *getattr(args, "pytest_args", []))
+    pytest_args = getattr(args, "pytest_args", [])
+    if getattr(args, "numba", False):
+        run("-m", "pytest", *pytest_args, extra_env={"NUMBA_DISABLE_JIT": "1"})
+    else:
+        run("-m", "pytest", *pytest_args)
 
 
 def test_files_for_suite(name: str, root: Path = ROOT) -> list[Path]:
@@ -512,6 +520,15 @@ def build_parser() -> argparse.ArgumentParser:
         sp = sub.add_parser(name)
         sp.set_defaults(func=fn)
     test = sub.add_parser("test")
+    test.add_argument(
+        "--numba",
+        action="store_true",
+        help=(
+            "set NUMBA_DISABLE_JIT=1 so @njit bodies (transport.py, geometry.py, "
+            "groove.py) are traced by coverage instead of running compiled; "
+            "must precede pytest_args, e.g. `cxr-dev test --numba --cov`"
+        ),
+    )
     test.add_argument("pytest_args", nargs=argparse.REMAINDER)
     test.set_defaults(func=cmd_test)
     test_suite = sub.add_parser("test-suite")
@@ -539,7 +556,10 @@ def main(argv: list[str] | None = None) -> None:
     if raw_args and raw_args[0] in {"test", "verify"}:
         command = raw_args[0]
         func = cmd_test if command == "test" else cmd_verify
-        func(argparse.Namespace(command=command, pytest_args=raw_args[1:]))
+        rest = raw_args[1:]
+        numba = bool(rest) and rest[0] == "--numba"
+        pytest_args = rest[1:] if numba else rest
+        func(argparse.Namespace(command=command, numba=numba, pytest_args=pytest_args))
         return
     args = build_parser().parse_args(raw_args)
     args.func(args)

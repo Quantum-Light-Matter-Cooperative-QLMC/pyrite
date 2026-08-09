@@ -61,6 +61,25 @@ exactly once, so a new test cannot silently disappear from focused coverage.
 The integration suite intentionally overlaps domain suites; it exercises public
 imports/data, exports, CLI contract, remote, sweep/run, and a headless app path.
 
+## Coverage
+
+```bash
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test --cov
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test --numba --cov
+```
+
+`--cov` is forwarded straight to `pytest-cov`, which reads
+`[tool.coverage.*]` in `pyproject.toml` for source/branch/report settings; any
+other `pytest-cov`/`coverage.py` flag (`--cov-report=html`, `-k`, ...) composes
+the same way. `--numba` must come before other forwarded arguments; it sets
+`NUMBA_DISABLE_JIT=1` so `@njit` bodies (`montecarlo/transport.py`,
+`geometry.py`, `groove.py`) run under the Python tracer instead of compiled,
+at roughly 2x wall clock. Read the resulting totals against the two
+compiled-code caveats documented next to `[tool.coverage.report]` in
+`pyproject.toml`: the CuPy kernel modules (`montecarlo/*_jit_kernel.py`)
+report 0% on any environment without the `nvidia` extra, and `@njit` bodies
+need `--numba` to be measured at all.
+
 ## Measurements (2026-08-01)
 
 Measured on this WSL worktree with uv 0.11.28, Python 3.14, warm cache, CPU

@@ -47,7 +47,7 @@ as the model for what *not* to stop at (it asserts module identity only).
       write the baseline report.
 - [x] B — Add `[tool.coverage.run|paths|report]` to `pyproject.toml`, caveats
       in comments.
-- [ ] C — `cxr-dev coverage` (or `test --coverage`) wrapping the documented
+- [x] C — `cxr-dev coverage` (or `test --coverage`) wrapping the documented
       invocation, including a `--numba` switch that sets `NUMBA_DISABLE_JIT=1`.
       Document in `AGENTS.md` canonical commands and `docs/`.
 - [ ] D — `plots/` smoke tests: call every public figure builder on a small

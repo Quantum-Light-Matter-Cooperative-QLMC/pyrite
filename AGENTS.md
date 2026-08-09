@@ -30,6 +30,8 @@ UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite apps
 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test-suite packaging
 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test path/to/test.py -k test_name
 CXR_ONLINE_TESTS=1 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test --cov
+UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test --numba --cov
 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev lint
 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev format
 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev typecheck

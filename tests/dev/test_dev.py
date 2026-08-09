@@ -90,6 +90,51 @@ def test_test_forwards_pytest_arguments_when_option_comes_first(dev_module, monk
     assert calls[0].pytest_args == ["-k", "forward", "-vv"]
 
 
+def test_main_strips_leading_numba_flag_before_pytest_args(dev_module, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(dev_module, "cmd_test", lambda args: calls.append(args))
+
+    dev_module.main(["test", "--numba", "--cov"])
+
+    assert calls[0].numba is True
+    assert calls[0].pytest_args == ["--cov"]
+
+
+def test_test_numba_sets_disable_jit_env_for_pytest_subprocess(dev_module, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(
+        dev_module, "run", lambda *args, **kwargs: calls.append((args, kwargs))
+    )
+
+    dev_module.cmd_test(Namespace(numba=True, pytest_args=["--cov"]))
+
+    assert calls == [(("-m", "pytest", "--cov"), {"extra_env": {"NUMBA_DISABLE_JIT": "1"}})]
+
+
+def test_test_without_numba_omits_extra_env_kwarg(dev_module, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+
+    dev_module.cmd_test(Namespace(numba=False, pytest_args=["-k", "forward"]))
+
+    assert calls == [("-m", "pytest", "-k", "forward")]
+
+
+def test_run_merges_extra_env_into_subprocess_environment(dev_module, monkeypatch) -> None:
+    captured = {}
+    monkeypatch.setattr(
+        dev_module.subprocess,
+        "run",
+        lambda args, cwd, check, env: captured.update(args=args, env=env),
+    )
+    monkeypatch.setenv("EXISTING_VAR", "kept")
+
+    dev_module.run("-m", "pytest", extra_env={"NUMBA_DISABLE_JIT": "1"})
+
+    assert captured["env"]["NUMBA_DISABLE_JIT"] == "1"
+    assert captured["env"]["EXISTING_VAR"] == "kept"
+
+
 def test_domain_suites_partition_every_test_module_once(dev_module) -> None:
     all_tests = set((dev_module.ROOT / "tests").rglob("test_*.py"))
     selected = [
