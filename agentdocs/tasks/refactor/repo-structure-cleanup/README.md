@@ -60,10 +60,14 @@ Path:
   Click platform dir the config store already uses). Replace all 14 anchors.
 - Move the marimo apps into the distribution: `notebooks/{analysis,scan,trace,validation}_app.py`,
   `analysis_ui/` (4490 LOC), `_design.py`, `_widgets.py`, `layouts/`,
-  `validation_defaults.json` → `cxr_mc/apps/`, added to packaged data. Keep
-  `notebooks/` as launch aliases or retire it; the marimo working-directory and
-  `watcher_on_save` workflow must survive (`AGENTS.md` still requires
-  `uv run marimo check <app.py>` after edits).
+  `validation_defaults.json` → `cxr_mc/apps/`, added to packaged data.
+  **Decided 2026-08-09 (user): `notebooks/` is retired on move, not kept as
+  launch aliases.** The marimo working-directory and `watcher_on_save` workflow
+  must still survive (`AGENTS.md` still requires `uv run marimo check <app.py>`
+  after edits) — against `src/cxr_mc/apps/*_app.py` as the new target. 30 files
+  outside `tasks/` reference `notebooks/`; `pyproject.toml:198`'s `B018` ruff
+  per-file ignore must follow the apps to their new path or every bare-last-line
+  marimo cell starts erroring.
 - Anything `check.py` loads from `checks/` at runtime moves into the package;
   `checks/` becomes dev-only.
 - Extend `scripts/package_smoke.py`: from a temp cwd outside the checkout, run
@@ -263,7 +267,12 @@ re-export.
 
 ## Non-goals
 
-- No CLI surface change (spelling, help, exit codes, output envelopes).
+- No CLI surface change (spelling, help, exit codes, output envelopes), with one
+  carve-out forced by S1's `notebooks/` retirement: ~10 help strings name the
+  app file by path ("Launch notebooks/analysis_app.py with marimo run or edit"),
+  frozen in `docs/cli-reference.md` and `tests/data/cli_contract.json`. Those
+  paths are already wrong for an installed wheel, so they are part of the S1
+  defect, not collateral. Resolution pending — see S1.
 - No physics or numerical behavior change; no ledger row edits.
 - No `tests/` layout work — owned by `refactor/test-refactoring`.
 - No public import-path removal; frozen-export guards stay green throughout.
