@@ -559,6 +559,12 @@ watch, and a smaller card would want `REAL` compaction at the join (below).
 - NVTX ranges in `transport.py`.
 - **The `gpu-pipeline` engine's memory sizing.** Running `promising`/mose2 on the
   pipeline arm drove `qlmc`'s 45 GB to 46.8 GB of tree RSS and 8 GB of swap.
+  That arm was left running to get a pipeline-vs-device total for MoSe2 and
+  **never produced one**: it reached 298 of 432 cases in 3714 s while decelerating
+  (21 s/case at case 282, 34 s/case by case 298, against the device arm's 1154 s
+  for all 432), and the box went unreachable before it finished. Treat the
+  incomplete run as evidence about the memory behavior, not as a timing — the
+  measured MoSe2 numbers in this document are the device arm's.
   `_gpu_pipeline_workers`
   budgets *workers* (`_PIPELINE_WORKER_MEM_MB`) but nothing budgets the 18 cases
   in flight, each holding a host-side segment payload, and the worker count comes

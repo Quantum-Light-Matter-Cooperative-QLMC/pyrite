@@ -1041,6 +1041,13 @@ Open — needs a GPU session, in this order:
       residency fallback never fired. It is the case to watch, and the argument
       for the deferred `REAL` compaction on a smaller card.
 
+      No MoSe2 *pipeline* counterpart. I started one for completeness and it
+      never finished: 298 of 432 cases in 3714 s and decelerating under swap
+      (21 s/case at case 282, 34 s/case by 298, against 1154 s for the device
+      arm's full 432), then `qlmc` went unreachable. Not rerun — it is an
+      argument for the memory-sizing item in "Still open", not a timing, and the
+      hopg A/B already answers the engine question.
+
       Numerical agreement checked at sweep scale, and it is stronger than the
       ledger row claimed. Against a third arm running the CPU `per-electron`
       core serially, the CUDA arm agrees to **0.000% on every field of all 144
