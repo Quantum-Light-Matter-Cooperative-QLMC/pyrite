@@ -6,6 +6,7 @@ Importing montecarlo prints a GPU/CPU banner and is otherwise CPU-only here; no
 
 full sweep is run (that lives in checks/)."""
 
+import pathlib
 import warnings
 
 import numpy as np
@@ -737,9 +738,11 @@ def test_run_cases_cpu_pool_receives_the_capped_worker_count(monkeypatch):
 
 
 def test_gpu_pipeline_workers_autosize_is_memory_bound(monkeypatch):
-    """32 cores would ask for ncpu // 2 = 16 transport workers; RAM carries 7."""
+    """32 cores would ask for ncpu // 2 = 16 transport workers; RAM carries 2."""
     runner = _patch_host(monkeypatch, avail_mb=11_000, total_mb=16_000)
-    assert runner._gpu_pipeline_workers(None, 980) == 7  # 11_000 // 1_536
+    # 11_000 // 1_536 = 7 slots, minus the 2 prefetched ahead, halved between
+    # each worker and the payload it hands the driver.
+    assert runner._gpu_pipeline_workers(None, 980) == 2
 
 
 def test_gpu_pipeline_workers_autosize_is_cpu_bound_with_ample_ram(monkeypatch):
@@ -754,19 +757,20 @@ def test_gpu_pipeline_workers_uses_the_transport_only_budget(monkeypatch):
     workers while measured child RSS was 552-1033 MB."""
     runner = _patch_host(monkeypatch, ncpus=24, avail_mb=16_687, total_mb=24_600)
     assert runner._mem_worker_cap() == 2  # full-case budget, unchanged
-    assert runner._gpu_pipeline_workers(None, 980) == 10  # 16_687 // 1_536
+    assert runner._pipeline_slot_cap() == 10  # 16_687 // 1_536
+    assert runner._gpu_pipeline_workers(None, 980) == 4  # (10 - 2) // 2
 
 
 def test_gpu_pipeline_workers_pin_is_clamped_by_memory_and_warns(monkeypatch):
     """An explicit --max-workers pin cannot re-create the OOM either -- but the
     clamp is announced, not silent."""
     runner = _patch_host(monkeypatch, avail_mb=11_000, total_mb=16_000)
-    with pytest.warns(RuntimeWarning, match="host RAM admits 7"):
-        assert runner._gpu_pipeline_workers(16, 980) == 7
+    with pytest.warns(RuntimeWarning, match="host RAM admits 2"):
+        assert runner._gpu_pipeline_workers(16, 980) == 2
 
 
 def test_gpu_pipeline_workers_pin_under_cap_is_silent(monkeypatch):
-    runner = _patch_host(monkeypatch, avail_mb=11_000, total_mb=16_000)
+    runner = _patch_host(monkeypatch, avail_mb=20_000, total_mb=24_000)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         assert runner._gpu_pipeline_workers(4, 980) == 4
@@ -776,6 +780,120 @@ def test_gpu_pipeline_workers_degrades_to_serial_under_memory_pressure(monkeypat
     """Cap rounds to 0/1 -> caller sees < 2 and drops to serial, never OOMs."""
     runner = _patch_host(monkeypatch, avail_mb=1_000, total_mb=1_000)
     assert runner._gpu_pipeline_workers(None, 980) < 2
+
+
+# ---- in-flight payload budgeting (2026-08-08 qlmc swap incident) -------------
+# Budgeting only the workers let promising/mose2 run 16 workers with 18 cases in
+# flight on a 45 GB box -- 34 host-resident segment payloads, peak tree RSS
+# 50.3 GB, 12.9 GB of swap, ssh unreachable for ~15 min. The driver holds one
+# payload per in-flight case, so they are charged like workers.
+
+
+def test_gpu_pipeline_holds_worker_and_prefetch_payloads_inside_the_budget(monkeypatch):
+    runner = _patch_host(monkeypatch, avail_mb=11_000, total_mb=16_000)
+    nw = runner._gpu_pipeline_workers(None, 980)
+    prefetch = runner._gpu_pipeline_prefetch(nw, 980)
+    assert prefetch == nw + 2
+    assert nw + prefetch <= runner._pipeline_slot_cap()
+
+
+def test_gpu_pipeline_prefetch_is_reclamped_when_memory_moved(monkeypatch):
+    """Sizing and the driver loop read the budget at different moments."""
+    runner = _patch_host(monkeypatch, avail_mb=11_000, total_mb=16_000)
+    monkeypatch.setattr(runner, "_available_mem_mb", lambda: 6_000)  # 3 slots left
+    assert runner._gpu_pipeline_prefetch(2, 980) == 1
+
+
+def test_gpu_pipeline_prefetch_never_exceeds_the_case_count(monkeypatch):
+    runner = _patch_host(monkeypatch, avail_mb=1_000_000, total_mb=1_000_000)
+    assert runner._gpu_pipeline_prefetch(16, 3) == 3
+
+
+def test_run_cases_pipeline_holds_no_more_than_the_budgeted_prefetch(monkeypatch):
+    """Wiring check: the driver loop must use the budgeted depth, not nw + 2.
+
+    Pinned to 6 workers against a 7-slot budget, so the two differ: the old
+    hard-coded nw + 2 would put 8 payloads in the driver, the budget allows 1."""
+    runner = _patch_host(monkeypatch, avail_mb=11_000, total_mb=16_000)
+    monkeypatch.setattr(runner, "_gpu_pipeline_workers", lambda *_args: 6)
+    monkeypatch.setattr(runner, "_GPU", True)
+    monkeypatch.setattr(runner, "_ensure_pool_limit", lambda: None)
+    monkeypatch.setattr(runner, "_process_pool_kwargs", lambda: {})
+    monkeypatch.setattr(runner, "_transport_case", lambda case: {"name": case["name"]})
+    monkeypatch.setattr(
+        runner, "_spectrum_case_retry", lambda case, tp, **_kw: {"name": tp["name"]}
+    )
+    monkeypatch.setattr("concurrent.futures.ProcessPoolExecutor", _SyncProcessPoolExecutor)
+
+    activity = []
+    cases = [{"name": f"c{i}", "Ne": 10} for i in range(12)]
+    runner.run_cases(cases, progress=False, on_activity=activity.append)
+
+    assert _SyncProcessPoolExecutor.captured["max_workers"] == 6
+    assert {event["transport_prefetch_count"] for event in activity} == {1}
+    assert max(event["in_flight_case_count"] for event in activity) == 1
+
+
+# ---- _usable_cpus: the allocation, not the machine ---------------------------
+# os.cpu_count() reports the box. Under the lab's --cpus-per-task=8 SLURM
+# allocation on a 32-core node it still returned 32, so the pipeline sized a
+# 16-worker pool into 8 CPUs -- the other half of the swap incident above.
+
+
+def test_usable_cpus_honors_the_affinity_mask(monkeypatch):
+    from cxr_mc.montecarlo import runner
+
+    monkeypatch.delenv("SLURM_CPUS_PER_TASK", raising=False)
+    monkeypatch.setattr(runner.os, "cpu_count", lambda: 32)
+    monkeypatch.setattr(runner.os, "sched_getaffinity", lambda _pid: set(range(8)))
+    monkeypatch.setattr(runner, "_cgroup_cpu_quota", lambda: None)
+    assert runner._usable_cpus() == 8
+
+
+def test_usable_cpus_honors_slurm_and_the_cgroup_quota(monkeypatch):
+    from cxr_mc.montecarlo import runner
+
+    monkeypatch.setattr(runner.os, "cpu_count", lambda: 32)
+    monkeypatch.setattr(runner.os, "sched_getaffinity", lambda _pid: set(range(32)))
+    monkeypatch.setattr(runner, "_cgroup_cpu_quota", lambda: 6)
+    monkeypatch.setenv("SLURM_CPUS_PER_TASK", "8")
+    assert runner._usable_cpus() == 6  # tightest limit wins
+    monkeypatch.setattr(runner, "_cgroup_cpu_quota", lambda: None)
+    assert runner._usable_cpus() == 8
+
+
+def test_usable_cpus_ignores_an_unparseable_slurm_value(monkeypatch):
+    from cxr_mc.montecarlo import runner
+
+    monkeypatch.setattr(runner.os, "cpu_count", lambda: 4)
+    monkeypatch.setattr(runner.os, "sched_getaffinity", lambda _pid: set(range(4)))
+    monkeypatch.setattr(runner, "_cgroup_cpu_quota", lambda: None)
+    monkeypatch.setenv("SLURM_CPUS_PER_TASK", "8(x2)")  # heterogeneous job syntax
+    assert runner._usable_cpus() == 4
+
+
+def test_cgroup_cpu_quota_reads_v2_then_v1(monkeypatch, tmp_path):
+    from cxr_mc.montecarlo import runner
+
+    (tmp_path / "proc").mkdir()
+    (tmp_path / "proc" / "self").mkdir()
+    (tmp_path / "proc" / "self" / "cgroup").write_text("0::/slurm/job_1\n")
+    leaf = tmp_path / "sys" / "slurm" / "job_1"
+    leaf.mkdir(parents=True)
+    (leaf / "cpu.max").write_text("800000 100000\n")
+    (tmp_path / "sys" / "cpu.max").write_text("max 100000\n")
+
+    def _path(*parts):
+        joined = "/".join(str(p) for p in parts)
+        joined = joined.replace("/proc/", f"{tmp_path}/proc/", 1)
+        joined = joined.replace("/sys/fs/cgroup", f"{tmp_path}/sys", 1)
+        return pathlib.Path(joined)
+
+    monkeypatch.setattr(runner, "Path", _path)
+    assert runner._cgroup_cpu_quota() == 8
+
+    (leaf / "cpu.max").write_text("max 100000\n")
+    assert runner._cgroup_cpu_quota() is None  # unquotaed -> no limit
 
 
 # ---- _adaptive_chunk grid-aware sizing (2026-07-18 OOM fix, part 2) ---------

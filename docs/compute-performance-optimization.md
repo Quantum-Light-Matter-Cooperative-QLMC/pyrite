@@ -581,12 +581,13 @@ watch, and a smaller card would want `REAL` compaction at the join (below).
   resident arm it was supposed to undercut: peak VRAM **9405 MiB vs 6873**, with
   18 cases in flight throughout and 0 OOM retries.
   `_gpu_pipeline_workers`
-  budgets *workers* (`_PIPELINE_WORKER_MEM_MB`) but nothing budgets the 18 cases
-  in flight, each holding a host-side segment payload, and the worker count comes
+  budgeted *workers* (`_PIPELINE_WORKER_MEM_MB`) but nothing budgeted the 18 cases
+  in flight, each holding a host-side segment payload, and the worker count came
   from `os.cpu_count()` — which ignores a SLURM cgroup, so a `--cpus-per-task=8`
-  allocation on this box still spawns 16. The flip routes the heavy runs away
+  allocation on this box still spawned 16. The flip routes the heavy runs away
   from this path rather than fixing it; anything still using the pipeline (no
-  GPU, `Ne ≤ 1000`, grooved) is still exposed.
+  GPU, `Ne ≤ 1000`, grooved) was still exposed. **Both defects fixed in Round 5**
+  — see that round below.
 - The host-side remainder of a transport call — scratch allocation, mask
   construction, output assembly — is now 38% of hopg's wall and 52% of MoSe2's.
   The kernel is no longer the bottleneck; the driver around it is.
@@ -680,19 +681,49 @@ Sequenced, because two of them are gated on the first:
    price of changing the dtype the function documents — so it is an API change,
    not just a perf change, and wants the 16 GB-card MoSe2 case (peak 6873 MiB) as
    its acceptance workload.
-3. **`gpu-pipeline` memory sizing.** The only correctness-adjacent item on this
-   list: a box can be driven into swap. Two independent defects, both cheap to
-   state and neither fixed by Round 4's flip — nothing budgets the ~18 cases in
-   flight (only workers are budgeted, via `_PIPELINE_WORKER_MEM_MB`), and worker
-   count comes from `os.cpu_count()`, which ignores a SLURM cgroup. Round 4
-   routed heavy runs off this path; everything still on it (no CUDA device,
-   `Ne ≤ 1000`, grooved) remains exposed. Fix the cgroup read first — it is
-   local, testable, and bounds the worst case on a cluster.
+3. **`gpu-pipeline` memory sizing. Done — taken out of sequence and fixed first,
+   because it is the only correctness-adjacent item on the list: a box can be
+   driven into swap.** Both defects are addressed; details below.
 4. **Grooved transport on the CUDA core.** Scope, not difficulty: grooved runs
    still take the lockstep path.
 5. **`numba.prange` over the per-electron core — deferred**, by decision. It
    starts from a 0.27–1.05× deficit against lockstep, so it needs more than two
    cores just to break even.
 
-The missing MoSe2 pipeline arm stays deferred until (3), and should be rerun only
-with an explicit memory cap on a box that is not shared.
+The missing MoSe2 pipeline arm stays deferred until (3) is confirmed on hardware,
+and should be rerun only with an explicit memory cap on a box that is not shared.
+
+### The `gpu-pipeline` host-memory fix
+
+Two independent defects, neither of them fixed by Round 4's flip.
+
+**The worker count was the machine's, not the allocation's.** `_N_CPUS` came from
+`os.cpu_count()`, so a `--cpus-per-task=8` SLURM allocation on a 32-core node
+still sized `ncpu // 2 = 16` transport workers. It now comes from `_usable_cpus()`
+— the tightest of `os.cpu_count()`, the CPU affinity mask, `SLURM_CPUS_PER_TASK`,
+and the cgroup CPU quota (v2 `cpu.max` at the process's own cgroup path, then v1
+`cpu.cfs_quota_us`/`cpu.cfs_period_us`). The same probe feeds the full-case CPU
+pool, which had the same blind spot.
+
+**Only the workers were budgeted.** The driver holds one host-resident segment
+payload per in-flight case, from the moment that case's future completes until its
+spectrum phase runs, and the depth was the hard-coded `nw + 2`. So the real
+residency is `2 * nw + 2`, not `nw`. Sizing now works in *slots* — a slot is one
+payload, whether a worker is building it or the driver is holding it — and
+`_pipeline_slot_cap()` divides the same host budget among all of them:
+`_gpu_pipeline_workers` admits `(slots - 2) // 2` workers, and
+`_gpu_pipeline_prefetch` re-reads the budget when the driver loop starts, since
+free memory moves between the two calls.
+
+The slot model is what the incident measured. 16 workers plus 18 in flight is 34
+slots; at the 1536 MiB per-slot budget that is 52 GB, against the observed 50.3 GB
+peak tree RSS on a 45 GB box. On that allocation the two fixes compound: 8 usable
+CPUs give 4 workers and 6 in flight, 10 slots, ~15 GB.
+
+The cost is fewer workers on a RAM-bound host — the 11 GB / 32-core shape drops
+from 7 to 2 — which is the intended trade: the pipeline's own A/B says its
+throughput was never worth 13 GB of RSS. Ample-RAM hosts are unchanged, still
+CPU-bound at `ncpu // 2`. `runtime_plan` now reports
+`transport_prefetch_depth` so a profile shows the whole host footprint before the
+run starts. Unverified on hardware: the numbers above are the model's, and the
+MoSe2 pipeline arm is the workload that would confirm them.

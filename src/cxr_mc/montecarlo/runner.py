@@ -12,6 +12,7 @@ import os
 import sys
 import warnings
 from contextlib import contextmanager, nullcontext
+from pathlib import Path
 from time import perf_counter
 from typing import Any
 
@@ -47,7 +48,62 @@ from .transport import resolve_transport_core, simulate_trajectories
 # every spawned transport worker too (env is inherited on spawn/forkserver).
 _TIMING = os.environ.get("CXR_MC_TIMING", "") not in ("", "0")
 _NSYS = os.environ.get("CXR_MC_NSYS", "") not in ("", "0")
-_N_CPUS = os.cpu_count()
+
+
+def _cgroup_cpu_quota():
+    """Whole CPUs this process's cgroup quota admits, or None if unquotaed.
+
+    cgroup v2 ``cpu.max`` ("<quota_us> <period_us>", or "max" when unset) at the
+    process's own cgroup path from /proc/self/cgroup, then at the root; then the
+    v1 ``cpu.cfs_quota_us`` / ``cpu.cfs_period_us`` pair. Floored, so a
+    fractional quota never rounds up into a core the scheduler will not give."""
+    relative = ""
+    try:
+        for line in Path("/proc/self/cgroup").read_text().splitlines():
+            if line.startswith("0::"):
+                relative = line[3:].strip().lstrip("/")
+                break
+    except OSError:
+        pass
+    for path in (Path("/sys/fs/cgroup", relative, "cpu.max"), Path("/sys/fs/cgroup/cpu.max")):
+        try:
+            quota, period = path.read_text().split()[:2]
+            if quota != "max" and int(period) > 0:
+                return max(1, int(quota) // int(period))
+        except (OSError, ValueError):
+            continue
+    try:
+        quota = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_quota_us").read_text())
+        period = int(Path("/sys/fs/cgroup/cpu/cpu.cfs_period_us").read_text())
+    except (OSError, ValueError):
+        return None
+    return max(1, quota // period) if quota > 0 and period > 0 else None
+
+
+def _usable_cpus():
+    """Logical CPUs this process may actually run on, or None if unknowable.
+
+    ``os.cpu_count()`` reports the MACHINE, not the allocation: inside a SLURM
+    ``--cpus-per-task=8`` cgroup on a 32-core box it still returns 32, so the
+    GPU pipeline sized a 16-worker pool into an 8-CPU allocation and helped
+    drive qlmc into swap (2026-08-08; see docs/compute-performance-optimization.md
+    "Still open"). Take the tightest of the machine count, the affinity mask,
+    ``SLURM_CPUS_PER_TASK``, and the cgroup quota. Read once at import, like the
+    rest of the host probe; workers inherit the value on spawn."""
+    limits = [os.cpu_count(), _cgroup_cpu_quota()]
+    try:
+        limits.append(len(os.sched_getaffinity(0)))
+    except AttributeError:  # not Linux
+        pass
+    try:
+        limits.append(int(os.environ["SLURM_CPUS_PER_TASK"]))
+    except (KeyError, ValueError):
+        pass
+    known = [limit for limit in limits if limit]
+    return min(known) if known else None
+
+
+_N_CPUS = _usable_cpus()
 _TOTAL_MEM = psutil.virtual_memory().total // 1_000_000
 
 
@@ -192,6 +248,11 @@ _WORKER_MEM_MB = _env_chunk("CXR_MC_WORKER_MEM_MB", 6144)
 # capped this pool at 2 workers on a 23.4 GB box and silently clamped explicit
 # --workers with it.
 _PIPELINE_WORKER_MEM_MB = _env_chunk("CXR_MC_PIPELINE_WORKER_MEM_MB", 1536)
+# Cases the GPU pipeline keeps in flight BEYOND its worker count, so a worker
+# always has the next case queued. Each in-flight case is a host-resident
+# segment payload the DRIVER holds, so it is charged against host RAM exactly
+# like a worker -- see _gpu_pipeline_workers.
+_PIPELINE_PREFETCH_AHEAD = 2
 _FREE_WATERMARK_MB = _env_chunk(
     "CXR_MC_FREE_WATERMARK_MB", 0
 )  # ...or when reserved pool exceeds this; 0 = off
@@ -1290,21 +1351,39 @@ def _admit_cpu_fallback():
         )
 
 
+def _pipeline_slot_cap():
+    """Concurrent host-RAM residencies the GPU pipeline may hold.
+
+    A "slot" is one segment payload: either a transport worker building one, or
+    an in-flight case whose payload the driver is already holding. Both are
+    charged ``_PIPELINE_WORKER_MEM_MB``, because that budget IS the payload --
+    the measured 552-1033 MB child RSS is dominated by the segments the worker
+    just built, and the driver holds a copy of exactly those from the moment the
+    future completes until the case's spectrum phase runs."""
+    return _mem_worker_cap(_PIPELINE_WORKER_MEM_MB)
+
+
 def _gpu_pipeline_workers(max_workers, n):
     """Size the GPU-pipeline transport pool (transport-only workers feeding the
-    serial GPU). Auto = ~half the physical cores (transport is the tail); an
-    explicit request is honored. BOTH are then clamped by
-    ``_mem_worker_cap(_PIPELINE_WORKER_MEM_MB)`` -- the transport pool spawns
-    full worker processes just like the CPU pool, so without the cap
+    serial GPU). Auto = ~half the usable cores (transport is the tail); an
+    explicit request is honored. BOTH are then clamped by host RAM: the pool
+    spawns full worker processes just like the CPU pool, so without a cap
     ``ncpu // 2`` workers OOM'd a worker at pool startup and the first
     ``submit`` raised ``BrokenProcessPool`` (the CPU pool got this cap in the
     2026-07-18 fix; this path had been missing it). The budget is the
     transport-only one, NOT the full-case ``_WORKER_MEM_MB``: these workers
     never hold spectrum state, and charging them the full-case footprint capped
-    the pool at 2 on a 23.4 GB / 24-core box. Clamping an EXPLICIT request warns
-    rather than doing it silently. Returns the worker count; the caller drops to
-    serial below 2."""
-    cap = _mem_worker_cap(_PIPELINE_WORKER_MEM_MB)
+    the pool at 2 on a 23.4 GB / 24-core box.
+
+    The cap covers the ``nw + _PIPELINE_PREFETCH_AHEAD`` in-flight payloads too,
+    not just the ``nw`` workers -- ``2 * nw + _PIPELINE_PREFETCH_AHEAD`` slots in
+    total. Budgeting workers alone is what let the 2026-08-08 `promising`/mose2
+    pipeline arm run 16 workers with 18 cases in flight on a 45 GB box: 34 slots
+    at 1536 MiB is 52 GB, and measured peak tree RSS was 50.3 GB with 12.9 GB of
+    swap. Clamping an EXPLICIT request warns rather than doing it silently.
+    Returns the worker count; the caller drops to serial below 2."""
+    slots = _pipeline_slot_cap()
+    cap = max(0, (slots - _PIPELINE_PREFETCH_AHEAD) // 2)
     if max_workers is None:
         ncpu = _N_CPUS or 8
         nw = max(2, min(n, ncpu // 2))
@@ -1313,13 +1392,25 @@ def _gpu_pipeline_workers(max_workers, n):
         if cap < nw:
             warnings.warn(
                 f"requested {max_workers} GPU-pipeline transport workers, "
-                f"host RAM admits {cap} at {_PIPELINE_WORKER_MEM_MB} MiB each; "
-                "raise CXR_MC_PIPELINE_WORKER_MEM_MB only if the measured "
-                "per-worker RSS is smaller than that budget",
+                f"host RAM admits {cap} once their in-flight segment payloads "
+                f"are charged too ({slots} slots at {_PIPELINE_WORKER_MEM_MB} "
+                "MiB each); raise CXR_MC_PIPELINE_WORKER_MEM_MB only if the "
+                "measured per-worker RSS is smaller than that budget",
                 RuntimeWarning,
                 stacklevel=2,
             )
     return min(nw, cap)
+
+
+def _gpu_pipeline_prefetch(nw, n):
+    """How many cases the GPU pipeline may hold in flight at once.
+
+    ``nw`` keeps every worker fed and ``_PIPELINE_PREFETCH_AHEAD`` covers the
+    handoff. ``_gpu_pipeline_workers`` already sized ``nw`` so this depth fits
+    the host budget, but the budget is re-read here because free memory moves
+    between the two calls -- and an unbudgeted depth is half of the 2026-08-08
+    swap incident."""
+    return max(1, min(nw + _PIPELINE_PREFETCH_AHEAD, max(1, _pipeline_slot_cap() - nw), n))
 
 
 def _cpu_pool_workers(max_workers, n):
@@ -1429,6 +1520,12 @@ def runtime_plan(cases, max_workers=None, engine="auto"):
         "effective_workers": workers,
         "worker_memory_budget_mib": (
             _PIPELINE_WORKER_MEM_MB if resolved_engine == "gpu-pipeline" else _WORKER_MEM_MB
+        ),
+        # Host-resident segment payloads the driver may hold at once. Budgeted
+        # against the same per-slot figure as the workers, so a profile can show
+        # the pipeline's whole host footprint before the run starts.
+        "transport_prefetch_depth": (
+            _gpu_pipeline_prefetch(workers, n) if resolved_engine == "gpu-pipeline" else None
         ),
         "backend": BACKEND.name,
         "backend_vendor": BACKEND.vendor,
@@ -1689,7 +1786,7 @@ def run_cases(
         _single_thread_blas()
         from concurrent.futures import ProcessPoolExecutor
 
-        prefetch = nw + 2  # keep the transport pool ahead
+        prefetch = _gpu_pipeline_prefetch(nw, n)  # keep the transport pool ahead
         with ProcessPoolExecutor(
             max_workers=nw,
             initializer=_worker_init,
@@ -1787,6 +1884,9 @@ def run_cases(
                     with _cpu_spectrum_backend():
                         out = _spectrum_case(cases[i], tp, on_timing is not None)
                     out["_backend_fallback_reason"] = reason
+                # The payload is dead here; holding it until the next iteration
+                # rebinds tp would put prefetch + 1 of them in the driver.
+                del tp
                 line_retries = out.get("_line_gpu_oom_retries", 0)
                 effective_spec_chunk = out.get("_effective_spec_chunk")
                 if line_retries and effective_spec_chunk is not None:
