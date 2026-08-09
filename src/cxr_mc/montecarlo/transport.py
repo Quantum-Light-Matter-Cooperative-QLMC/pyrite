@@ -1556,6 +1556,70 @@ class PerElectronTransportConfig:
 
 DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG = PerElectronTransportConfig()
 
+TRANSPORT_CORES = ("auto", "lockstep", "per-electron", "cuda")
+
+# Electron count above which "auto" transports on the device. Measured crossover
+# is Ne ~ 500-1000 for both a light (hopg) and a heavy (MoSe2) material on an
+# RTX 5080: below it the launch and staging overhead outweighs the kernel, above
+# it the CUDA core pulls away monotonically (4.1x at Ne=4000, 4.9-15.9x at
+# Ne=16000). 1000 is the conservative end of that band, so no run that would
+# have been faster on the CPU core is moved off it. See
+# `docs/gpu-transport-rawkernel.md`.
+CUDA_TRANSPORT_MIN_ELECTRONS = 1000
+
+
+@cache
+def _cuda_transport_available():
+    """Whether this process can transport on the device.
+
+    Requires the resolved spectrum backend to BE the CUDA device (a ROCm or SYCL
+    backend has no `cupyx.jit` transport kernel, and a CPU backend has nowhere to
+    run one) and the kernel module to import. Cached: the backend is fixed at
+    import and a failed import will not start succeeding.
+    """
+
+    from ._backend import BACKEND
+
+    if BACKEND.name != "cuda":
+        return False
+    try:
+        from .transport_jit_kernel import make_cuda_transport_core  # noqa: F401
+    except Exception as error:  # pragma: no cover - needs a broken CuPy install
+        logger.warning("CUDA transport kernel unavailable, using the CPU core: %s", error)
+        return False
+    return True
+
+
+def resolve_transport_core(requested, Ne, groove=None):
+    """Resolve ``transport_core`` for a run of ``Ne`` electrons.
+
+    ``"auto"`` is the default and the only value that resolves: it takes the CUDA
+    core when this process has a CUDA device, the run is ungrooved, and
+    ``Ne > CUDA_TRANSPORT_MIN_ELECTRONS``; otherwise the lockstep CPU core. Every
+    explicit value is returned unchanged so a caller that names a core still gets
+    that core or an error, never a silent substitution.
+
+    ``CXR_MC_TRANSPORT_CORE`` overrides the *requested* value for the whole
+    process, which is how a run pins the historical CPU core (``=lockstep``)
+    without touching call sites -- reproducing a pre-existing result, or
+    bisecting a device/host difference.
+    """
+
+    pinned = os.environ.get("CXR_MC_TRANSPORT_CORE", "").strip().lower()
+    if pinned:
+        if pinned not in TRANSPORT_CORES:
+            raise ValueError(
+                f"CXR_MC_TRANSPORT_CORE must be one of {', '.join(TRANSPORT_CORES)}; got {pinned!r}"
+            )
+        requested = pinned
+    if requested not in TRANSPORT_CORES:
+        raise ValueError(f"transport_core must be one of {', '.join(TRANSPORT_CORES)}")
+    if requested != "auto":
+        return requested
+    if groove is not None or int(Ne) <= CUDA_TRANSPORT_MIN_ELECTRONS:
+        return "lockstep"
+    return "cuda" if _cuda_transport_available() else "lockstep"
+
 # float64 mid(3) + dir(3) + len + E + t0 = 9, int64 id, int16 layer.
 _SEG_SCRATCH_BYTES = 9 * 8 + 8 + 2
 
@@ -1815,7 +1879,7 @@ def simulate_trajectories(
     tilt_azim_rad=0.0,
     groove=None,
     E_cut_by_electrons=None,
-    transport_core="lockstep",
+    transport_core="auto",
     per_electron_config=DEFAULT_PER_ELECTRON_TRANSPORT_CONFIG,
     keep_segments_on_device=False,
 ):
@@ -1975,21 +2039,29 @@ def simulate_trajectories(
     Validation: blazed-groove-geometry
 
     transport_core: which ungrooved core runs the electrons.
-      "lockstep" (default) -- the historical core: an outer step loop over an
-          inner electron loop, all draws taken from one shared Generator in
-          step-major order. BIT-FOR-BIT unchanged.
+      "auto" (default) -- the CUDA core when this process has a CUDA device, the
+          run is ungrooved, and Ne > CUDA_TRANSPORT_MIN_ELECTRONS (1000); the
+          lockstep core otherwise. See `resolve_transport_core`; pin the choice
+          for a whole process with `CXR_MC_TRANSPORT_CORE`.
+      "lockstep" -- the historical core: an outer step loop over an inner
+          electron loop, all draws taken from one shared Generator in step-major
+          order. BIT-FOR-BIT unchanged from before the other cores existed.
       "per-electron" -- each electron runs to completion against its own
           counter-addressed stream (see `_transport_core_ungrooved_perelectron`).
       "cuda" -- the same algorithm as one CUDA thread per electron.
 
-    The two new cores are NOT bit-for-bit with "lockstep": they consume
+    The two newer cores are NOT bit-for-bit with "lockstep": they consume
     differently-ordered random streams, so they realize a different sample of
     the same distribution. "cuda" is in turn not bit-for-bit with
     "per-electron", because CUDA's libm differs from the host's by a few ulp and
-    transport amplifies that over hundreds of scattering events. Selecting
-    either therefore changes numerical output and requires a `Validation:` id,
-    a ledger row, and a golden regen -- see `docs/gpu-transport-rawkernel.md`.
-    Grooved transport is rejected for both.
+    transport amplifies that over hundreds of scattering events. What is
+    invariant is the physics: identical models, identical draw semantics, and
+    aggregate agreement across seeds (backscatter and transmit fractions,
+    segments per electron, mean segment length/energy/depth) -- so "auto"
+    changes a run's realization, not its distribution.
+    Validation: gpu-transport-core
+    Grooved transport is rejected for both new cores, so a grooved "auto" run
+    stays on the lockstep core rather than failing.
 
     per_electron_config: batching policy for the two new cores
     (:class:`PerElectronTransportConfig`). Segment capacity and scratch budget
@@ -2054,12 +2126,15 @@ def simulate_trajectories(
     if elastic_model not in ("mott", "sr"):
         raise ValueError("elastic_model must be 'mott' or 'sr'")
 
-    if transport_core not in ("lockstep", "per-electron", "cuda"):
-        raise ValueError("transport_core must be 'lockstep', 'per-electron', or 'cuda'")
+    requested_core = transport_core
+    transport_core = resolve_transport_core(transport_core, Ne, groove)
     if transport_core != "lockstep" and groove is not None:
         raise ValueError("grooved transport is only implemented for the lockstep core")
     if keep_segments_on_device and transport_core != "cuda":
-        raise ValueError("keep_segments_on_device requires transport_core='cuda'")
+        raise ValueError(
+            "keep_segments_on_device requires transport_core='cuda'; "
+            f"{requested_core!r} resolved to {transport_core!r}"
+        )
 
     if E_cut_by_electrons is None:
         E_cut_by_electrons = np.full(

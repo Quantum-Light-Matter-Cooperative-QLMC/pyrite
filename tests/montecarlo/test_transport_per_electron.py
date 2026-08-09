@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from cxr_mc.montecarlo.transport import (
+    CUDA_TRANSPORT_MIN_ELECTRONS,
     PerElectronTransportConfig,
     _splitmix64,
     _stream_key_scalar,
@@ -111,7 +112,11 @@ def test_adjacent_electron_streams_are_uncorrelated():
 # ---- per-electron core --------------------------------------------------------
 
 
-def test_default_core_is_the_lockstep_core():
+def test_default_core_is_the_lockstep_core_below_the_cuda_threshold():
+    # BASE_CASE is 120 electrons, so "auto" resolves to the historical core on
+    # every box, GPU or not. The threshold policy itself lives in
+    # test_transport_core_default.py.
+    assert BASE_CASE["Ne"] <= CUDA_TRANSPORT_MIN_ELECTRONS
     assert _identical(_run(), _run(transport_core="lockstep"))
 
 

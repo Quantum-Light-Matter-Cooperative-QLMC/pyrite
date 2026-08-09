@@ -976,12 +976,61 @@ Open — needs a GPU session, in this order:
       have paid if the arrays were produced into pinned memory, and residency
       makes it moot.
 
-Deliberately deferred: putting the CUDA core in the live sweep (everything above
-is reachable only by asking for `transport_core="cuda"` explicitly, and switching
-the sweep changes numerical output, so it needs a `Validation:` id, a ledger row,
-and a golden regen), NVTX ranges in `transport.py`, compacting segments to `REAL`
-at the join, `numba.prange` over the per-electron core for the core-starved CPU
-case, and grooved transport.
+- [x] **Make the CUDA core the default above 1000 electrons.** **Done
+      2026-08-08**, on the user's instruction to implement the deferred item.
+      `transport_core="auto"` is now the default and `resolve_transport_core`
+      decides: the CUDA core when the process has a CUDA device, the run is
+      ungrooved, and `max(Ne, Ne_brem) > CUDA_TRANSPORT_MIN_ELECTRONS` (1000);
+      the lockstep core otherwise. Explicit values are never substituted, and
+      `CXR_MC_TRANSPORT_CORE` pins the whole process either way.
+
+      1000 is the measured crossover, conservative end: the device core is
+      0.46x the CPU one at Ne=250 on MoSe2 and 4.1x at Ne=4000, so nothing that
+      was faster on the CPU moves off it. The `--ne-line` default of 450 stays
+      on the CPU core; the 20000-electron runs that opened Part B do not.
+
+      The routing had to change with it. A device-transported run gives up the
+      `gpu-pipeline` engine — its premise is CPU transport hidden behind GPU
+      work, there is nothing left to hide, and a transport pool would put one
+      CUDA context per worker on the card this process already drives. Such a
+      run stays in the driver process, serially, and gets residency for free
+      (the same-process condition residency needs). The switch is all-or-nothing
+      across a run's cases; a mixed run keeps the pipeline rather than stranding
+      its CPU-core cases. Worker processes are pinned to lockstep in
+      `_worker_init` rather than at each submit — the pin then covers both pools
+      and every call site inside a worker, including ones that never see a
+      `run_cases` argument. `runtime_plan` reports the resolved core and the
+      serial engine, so telemetry does not claim a pipeline that is not running.
+      If the device cannot hold the resident payload, `_transport_case` catches
+      the OOM and replays with the segments downloaded — counter-addressed
+      streams make that replay exact, so it costs bus time, not the result.
+
+      Physics governance done rather than deferred: `Validation:
+      gpu-transport-core` on `simulate_trajectories`, with a ledger row
+      (`filtered`) carrying the aggregate-agreement, first-step, determinism,
+      and invariance evidence, and stating plainly that any pinned spectrum
+      above the threshold on a CUDA box must be regenerated.
+
+      23 new tests in `tests/montecarlo/test_transport_core_default.py`, none
+      needing a GPU — they patch the device probe, because what is under test is
+      the decision, not the kernel: threshold behavior including both boundary
+      sides, groove and no-device fallback, explicit values never substituted,
+      the env pin in both directions and its validation, `max(Ne, Ne_brem)`,
+      all-or-nothing across a run, `runtime_plan`'s reported engine and core,
+      the serial branch asking for residency and starting no pool, and
+      `transport_only` not asking for it. Full local suite green, lint and
+      typecheck clean.
+
+      **Not measured on hardware in this slice.** Every number above is from the
+      earlier GPU sessions; the flip itself has not been run on `qlmc`. What
+      wants measuring there: a whole-sweep A/B at `Ne=20000` (the serial device
+      arm against the pipeline arm, wall and feed-wait), and the device-memory
+      high-water mark for MoSe2, whose segment count is ~2.5x hopg's — the one
+      case where the OOM fallback could fire in production.
+
+Deliberately deferred: NVTX ranges in `transport.py`, compacting segments to
+`REAL` at the join, `numba.prange` over the per-electron core for the
+core-starved CPU case, and grooved transport.
 
 ## Decisions and open questions
 

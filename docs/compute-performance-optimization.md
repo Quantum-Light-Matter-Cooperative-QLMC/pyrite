@@ -12,6 +12,9 @@ hardware, workload, and numbers.
 - [Round 3 (2026-08-06)](#round-3-fused-line-prologue-implementation-2026-08-06)
   — fused deterministic line prologue, combined interpolation gather, and the
   measured brem launch adjustment.
+- [Round 4 (2026-08-08)](#round-4-gpu-transport-2026-08-08) — transport moves to
+  the device and stays there; the CUDA core becomes the default above 1000
+  electrons and the run gives up the transport pool to keep it.
 
 ## Review verdict
 
@@ -45,7 +48,10 @@ profile (189 cases) unless noted; see `performance-profiles/hopg_test-*/`.
 
 Profiling drove every change — no speculative optimization. Each candidate was
 isolated with `nsys` NVTX ranges (`cxr.lines`, `cxr.brem`,
-`cxr.transport.line/brem`, `cxr.lines.tab/accum`) plus `cuLaunchKernel` counts
+`cxr.lines.tab/accum`; **not** `cxr.transport.*` — this round claimed transport
+ranges that do not exist in the tree, so a transport-side gap in a capture is
+unlabelled and cannot discriminate phases on its own. Round 4's attribution used
+the `cxr.performance.v1` activity labels instead) plus `cuLaunchKernel` counts
 from `nsys-stats.txt`, then verified bit-for-bit or tolerance-bounded against
 the golden suite before landing. See `docs/performance-profile-analysis.md` for
 the analysis playbook. Guiding rule: **GPU utilization is evidence, not the
@@ -272,6 +278,10 @@ brem `energies_per_block` 2 → 3.
 
 ### GPU transport: not yet
 
+> **Superseded by [Round 4](#round-4-gpu-transport-2026-08-08).** Both revisit
+> conditions below were met and the port landed; the CUDA core is now the
+> default above 1000 electrons. The reasoning is kept as the Round 2 record.
+
 Not warranted now, and the reason is the pipeline rather than the kernel.
 Single-core transport is ≈1× the GPU phase per case, so the `gpu-pipeline`
 engine hides it completely at two or more transport workers; the
@@ -398,3 +408,101 @@ Before enabling this in a release branch:
    fraction, and fixed-order zero-slot overhead.
 5. Re-measure transport/GPU overlap before changing process counts or starting
    a `prange`/CUDA transport project.
+
+## Round 4: GPU transport (2026-08-08)
+
+The round Round 2 deferred. Its two revisit conditions — the prologue lands and
+a fresh profile shows the transport workers no longer keeping the GPU fed — were
+both recorded in Round 3's remeasurement: transport came out at **2.4–3.4× the
+whole GPU phase** for the TMDs and **6–12×** for hopg on an RTX 5080, linear in
+`n_seg`, with zero OOM retries and 4 ms of checkpoint I/O. Transport, not the
+line phase, was the constraint.
+
+Design, kernel structure, RNG, and the full measurement tables live in
+[`docs/gpu-transport-rawkernel.md`](gpu-transport-rawkernel.md). This is the
+summary and the verdict.
+
+### What landed
+
+1. **A per-electron transport core**, run-to-completion, each electron drawing
+   from its own counter-addressed SplitMix64 stream instead of one shared
+   step-major `Generator`. Written as an `njit` CPU function first — it is the
+   executable specification, so the port can be checked against it rather than
+   only against statistics.
+2. **The `cupyx.jit` port**: one thread per electron, textually identical
+   arithmetic, output slots addressed by electron index (`i * cap + s`), no
+   atomics. Same algorithm, two backends.
+3. **Measured segment capacity.** The cores report an electron's true segment
+   count even when it overflows its slots, so a batch that overflowed says
+   exactly what the material needs. `cap` is reset from the running maximum
+   after every batch, in both directions, and a short probe batch bounds what a
+   wrong initial guess can cost. MoSe2 at `Ne=16000`: **0.727 s → 0.467 s
+   (−32%)** with no tuning, settling tighter (1593) than the hand-swept optimum.
+4. **One device copy of the segments per case.** Every spectrum kernel reached
+   for its own slice with `xp.asarray(segments[k], dtype=REAL)`: 24 uploads,
+   116 B/segment, where the union of what they read is 48. Staging one copy for
+   the case is **−39% on the spectrum phase**, and bit-for-bit — it is the same
+   `REAL` cast, hoisted to happen once.
+5. **Device-resident segments.** `keep_segments_on_device=True` returns the eight
+   per-segment arrays where the kernel made them. Whole case, hopg, `Ne=16000`,
+   5.65 M segments: **0.265 s → 0.104 s (−61%)**, transport −73% and spectrum a
+   further −43%. 464 MB D2H and 284 MB H2D become **zero and 1.5 MB** — not one
+   segment byte crosses the bus. Costs device memory: peak pool 810 → 1176 MB.
+
+### The default, and what it costs
+
+`transport_core="auto"` now ships as the default and takes the CUDA core when
+the process has a CUDA device, the run is ungrooved, and `Ne > 1000`. The
+threshold is the measured crossover: below it the device core loses (0.46× at
+`Ne=250` on MoSe2), above it it wins monotonically — 4.1× at `Ne=4000`, 4.9–15.9×
+at `Ne=16000`. The `--ne-line` default of 450 is unaffected; the 20000-electron
+runs that started this whole investigation are not.
+
+A device-transported run **gives up the `gpu-pipeline` engine**, and this is the
+point rather than a concession: the pipeline exists to hide CPU transport behind
+GPU work, there is nothing left to hide, and a pool of worker processes would put
+N CUDA contexts on the card the driver is already using. Such a run stays in the
+driver process, serially, with the segments resident across the handoff. Workers
+are pinned to the lockstep core in `_worker_init`, so the pin holds for every
+call site inside a worker, in both pools.
+
+The cost is that this **changes numerical output**: per-electron streams are a
+different realization of the same distribution, and CUDA's libm differs from the
+host's by a few ulp on a chaotic trajectory. It is ledgered as
+`Validation: gpu-transport-core` (`filtered`) on aggregate agreement across
+seeds, first-step agreement at `rtol=1e-12`, bitwise repeat-run determinism, and
+invariance to batch size, launch geometry, and capacity replay. Any pinned
+spectrum taken above the threshold on a CUDA box has to be regenerated;
+`CXR_MC_TRANSPORT_CORE=lockstep` restores the old core process-wide.
+
+### Corrections to earlier rounds
+
+- Round 1's method section credited NVTX ranges `cxr.transport.line` /
+  `cxr.transport.brem`. **They do not exist**; `transport.py` has no
+  `_nsys_push`/`_nsys_range` at all, so a transport-side gap in an `nsys`
+  capture is unlabelled. The MoSe2 attribution used the shipped
+  `cxr.performance.v1` activity labels, which do carry per-tick phase identity.
+  Adding real ranges is still open.
+- Round 2's "single-core transport is ≈1× the GPU phase, so two transport
+  workers hide it" was measured on a 3060 Ti at `N_g = 110`. On an RTX 5080 at
+  `N_g = 66` the GPU phase shrank and transport did not; the ratio flipped.
+  Balance claims do not survive a GPU generation.
+- The MoSe2 `--ne-line=20000` "stall" is **not a stall**: it is the
+  pipeline-fill transient plus compute-bound transport, linear in `n_seg`, with
+  per-segment cost within 3.5% of hopg's. Feed-wait falls 0.530 → 0.299 as cases
+  become available to overlap. Documented as expected; no default was changed
+  for it — Round 4 removes the underlying cost instead.
+
+### Still open
+
+- NVTX ranges in `transport.py`.
+- The host-side remainder of a transport call — scratch allocation, mask
+  construction, output assembly — is now 38% of hopg's wall and 52% of MoSe2's.
+  The kernel is no longer the bottleneck; the driver around it is.
+- Compacting the resident segments to `REAL` at the join would nearly halve the
+  device memory they hold, at the price of changing the dtype the function
+  documents.
+- `numba.prange` over the per-electron core, for the core-starved CPU case. Note
+  it starts from a deficit: the per-electron restructuring is **0.27–1.05×** of
+  lockstep on the CPU, so it needs more than two cores just to break even.
+- Grooved transport, which stays on the lockstep core.

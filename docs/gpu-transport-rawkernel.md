@@ -292,11 +292,51 @@ most of the host remainder, and the spectrum phase's re-upload at once. That is
 done — see the handoff section. Pinned host memory was *not* the cheap partial it
 looked like, and is now moot.
 
+## Selecting the core
+
+`transport_core="auto"` is the default, and `resolve_transport_core` decides:
+the CUDA core when the process has a CUDA device, the run is ungrooved, and
+`Ne > CUDA_TRANSPORT_MIN_ELECTRONS` (1000); the lockstep CPU core otherwise. The
+count is the transport's own, `max(Ne, Ne_brem)` — one transport serves both
+populations. Every explicit `transport_core=` is honored verbatim, so a caller
+that names a core gets that core or an error, never a substitution;
+`CXR_MC_TRANSPORT_CORE` pins the choice for a whole process, which is how a run
+reproduces a pre-threshold result or bisects a host/device difference.
+
+**Why 1000.** The measured crossover is `Ne ≈ 500–1000` for both a light and a
+heavy material (see "Measured throughput"): below it the launch and staging
+overhead outweighs the kernel — at `Ne=250` MoSe2 the device core is *0.46×* the
+CPU one — and above it the device pulls away monotonically, 4.1× at `Ne=4000`
+and 4.9–15.9× at `Ne=16000`. 1000 is the conservative end of that band, so no
+run that would have been faster on the CPU core is moved off it. The `--ne-line`
+default of 450 stays on the CPU core; a 20000-electron run does not.
+
+**Where it runs.** A device-transported run gives up the `gpu-pipeline` engine:
+its premise is CPU transport hidden behind GPU work, and there is neither
+anything left to hide nor room for a second CUDA context on the card this
+process is already driving. `run_cases` therefore keeps such a run in the driver
+process, serially, and every worker process is pinned to the lockstep core in
+`_worker_init` — the pin covers both pools and every call site inside a worker.
+The switch is all-or-nothing across a run's cases, since a mixed run would
+strand its CPU-core cases in the driver with nothing overlapping them; sweeps
+hold `Ne` fixed across the grid, so mixed runs are the exception.
+
+Serial is also simply the faster arrangement once transport is on the device:
+the case pays one kernel instead of `n_seg`-proportional pipe traffic, and the
+segments then stay resident for the spectrum kernels (`keep_segments_on_device`,
+set on this branch alone — device arrays cannot be pickled out of a worker). If
+the device cannot hold the resident payload, `_transport_case` catches the OOM
+and replays the same seed with the segments downloaded: counter-addressed
+streams make that replay exact, so the fallback costs bus time, not the result.
+
+**What it changes.** The realization, not the distribution — see
+`Validation: gpu-transport-core` in the ledger, and "What is and is not
+bit-for-bit" above. A pinned spectrum taken at `Ne > 1000` on a CUDA box is not
+reproduced by the lockstep core and must be regenerated or compared
+statistically.
+
 ## Not done
 
-- **The live sweep still transports on the lockstep core.** Everything measured
-  here is reachable only by asking for `transport_core="cuda"` explicitly.
-  Switching the sweep changes numerical output and needs its own validation.
 - **NVTX ranges in `transport.py`.** `docs/compute-performance-optimization.md`
   already claims `cxr.transport.line` / `cxr.transport.brem` exist; they do not.
   Adding them is a prerequisite for attributing GPU transport phases in a single
@@ -395,15 +435,22 @@ copy costs more than the pageable-transfer overhead it removes. It would only pa
 if the arrays were produced into pinned memory in the first place — which, with
 residency, is now moot.
 
-Neither fix puts the CUDA core in the live sweep: `run_case` still transports on
-the lockstep core, and switching it is a separate decision that changes numerical
-output and so needs a `Validation:` id, a ledger row, and a golden regen.
+Both fixes are what the live sweep now gets: `run_case` transports on the CUDA
+core above the threshold in "Selecting the core", serially in the driver process,
+with the segments never leaving the device between transport and the three
+spectrum kernels.
 
 ## Reproducing the CPU-side checks
 
 ```bash
 UV_CACHE_DIR=/tmp/cxr-mc-uv-cache uv run cxr-dev test \
-  tests/montecarlo/test_transport_per_electron.py
+  tests/montecarlo/test_transport_per_electron.py \
+  tests/montecarlo/test_transport_core_default.py \
+  tests/montecarlo/test_segment_staging.py
 ```
 
-34 CPU tests; the 10 CUDA tests skip without a device.
+The kernel's own properties are in `test_transport_per_electron.py` (51 tests:
+36 run on the CPU, 15 skip without a device). The selection policy and the
+routing that follows from it are in `test_transport_core_default.py`, which
+patches the device probe and needs no GPU at all — what is under test there is
+the decision, not the kernel.
