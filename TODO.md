@@ -22,6 +22,17 @@ file. Edit and drop items on `main`.
    `line-absorption-tabulation` (all `montecarlo/spectrum.py`, no ledger row).
    Also `beam-phase-space-injection` / `beam-energy-spread-injection` are
    `rederived` and await human `signed-off`.
+2. **Repository and source-package structure cleanup.** Eight slices beyond the
+   accepted structure RFC: installed-package path resolution (shipped code
+   anchors on the developer checkout and the wheel omits the marimo apps),
+   top-level module grouping, `cli/` alias-shim removal, CLI/domain
+   misclassification, Monte Carlo mega-module splits, `plots/` backend
+   regrouping, working-tree hygiene, and repo-map DAG generation. Folds the
+   former Inbox source-package-organization and `runner.py`/`transport.py`
+   items. Sequenced S3+S8 → S7 → S1 → S2/S4/S6 → S5.
+   → `refactor/repo-structure-cleanup`;
+   [`tasks/refactor/repo-structure-cleanup/`](tasks/refactor/repo-structure-cleanup/);
+   design: [`docs/package-structure-rfc.md`](docs/package-structure-rfc.md).
 
 ## P1 - top-priority back burner
 
@@ -71,17 +82,6 @@ file. Edit and drop items on `main`.
    (`--error all` is 51 diagnostics, mostly correlated-guard false positives).
    → `chore/physics-boundary-typing`;
    [`tasks/chore/physics-boundary-typing/`](tasks/chore/physics-boundary-typing/).
-8. **Repository and source-package structure cleanup.** Eight slices beyond the
-   accepted structure RFC: installed-package path resolution (shipped code
-   anchors on the developer checkout and the wheel omits the marimo apps),
-   top-level module grouping, `cli/` alias-shim removal, CLI/domain
-   misclassification, Monte Carlo mega-module splits, `plots/` backend
-   regrouping, working-tree hygiene, and repo-map DAG generation. Folds the
-   former Inbox source-package-organization and `runner.py`/`transport.py`
-   items. → `refactor/repo-structure-cleanup`;
-   [`tasks/refactor/repo-structure-cleanup/`](tasks/refactor/repo-structure-cleanup/);
-   design: [`docs/package-structure-rfc.md`](docs/package-structure-rfc.md).
-
 ### Gated
 
 1. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
