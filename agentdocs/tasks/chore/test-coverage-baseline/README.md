@@ -78,6 +78,14 @@ as the model for what *not* to stop at (it asserts module identity only).
       entry point.
 - [ ] H — Re-measure; update the report with the after numbers. Decide then,
       not now, whether a `fail_under` belongs in `verify`.
+      Default full coverage reached completion under the sandbox and measured
+      75.9%, but the suite is not green: the existing
+      `test_run_cases_engine_cpu_end_to_end_returns_finite_spectrum` cannot
+      create its Python forkserver UNIX socket (`PermissionError: [Errno 1]`).
+      The Numba-disabled run reproduces that failure and then stalls in an
+      unrelated post-failure test under this sandbox. Re-run both full coverage
+      commands on a normal host before closing H;
+      no `fail_under` decision while that environment-specific failure remains.
 
 ## Decisions and open questions
 

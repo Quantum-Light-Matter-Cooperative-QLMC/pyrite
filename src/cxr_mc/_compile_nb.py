@@ -1,6 +1,7 @@
+# pragma: exclude file
 """Compile every code cell of the project notebooks to catch syntax errors.
 
-Run from the repo root: ``python src/_compile_nb.py``."""  # pragma: no cover
+Run from the repo root: ``python src/_compile_nb.py``."""
 
 import json
 import os
