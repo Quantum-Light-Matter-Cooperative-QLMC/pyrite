@@ -190,8 +190,8 @@ def remove_command(shell: str | None, rc_file: Path | None, dry_run: bool) -> No
     "completion",
     cls=LazyGroup,
     lazy_commands={
-        "install": "cxr_mc.cli.completion.install_command",
-        "remove": "cxr_mc.cli.completion.remove_command",
+        "install": "cxr_mc.cli.commands.completion.install_command",
+        "remove": "cxr_mc.cli.commands.completion.remove_command",
     },
     lazy_help={
         "install": "Append cxr tab-completion setup to a shell rc/config file.",

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 
-from cxr_mc.cli import _catalog_io, _core, profile
+from cxr_mc.cli import _catalog_io, _core
+from cxr_mc.cli.commands import profile
 from cxr_mc.cli._deprecations import flag_message
 from cxr_mc.energy_grid import artifacts
 from tests.helpers.cli import assert_clean_result, invoke

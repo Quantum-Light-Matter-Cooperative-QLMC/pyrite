@@ -11,9 +11,9 @@ from .._core import LazyGroup
 from .._deprecations import warn_command
 
 _LEAVES = {
-    "analysis": "cxr_mc.cli.app.analysis_command",
-    "viewer": "cxr_mc.cli.app.viewer_command",
-    "validation": "cxr_mc.cli.app.validation_command",
+    "analysis": "cxr_mc.cli.commands.app.analysis_command",
+    "viewer": "cxr_mc.cli.commands.app.viewer_command",
+    "validation": "cxr_mc.cli.commands.app.validation_command",
 }
 _HELP = {
     "analysis": "Launch or export the analysis app.",

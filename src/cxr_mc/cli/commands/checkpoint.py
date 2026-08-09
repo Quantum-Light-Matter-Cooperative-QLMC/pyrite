@@ -8,7 +8,7 @@ from .._core import LazyGroup, run
 
 _COMMANDS = {
     "slim": "cxr_mc.cli.commands.slim.command",
-    "recompute": "cxr_mc.cli.checkpoint.recompute_command",
+    "recompute": "cxr_mc.cli.commands.checkpoint.recompute_command",
     "archive": "cxr_mc.archive.archive_command",
     "restore": "cxr_mc.archive.restore_command",
     "list": "cxr_mc.archive.archives_command",

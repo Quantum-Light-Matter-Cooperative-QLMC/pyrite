@@ -6,7 +6,7 @@ import json
 import pytest
 
 from cxr_mc import performance_analysis
-from cxr_mc.cli import performance, profile
+from cxr_mc.cli.commands import performance, profile
 from tests.helpers.cli import assert_clean_result, invoke
 
 

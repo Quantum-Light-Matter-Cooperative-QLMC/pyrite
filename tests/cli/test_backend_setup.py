@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from cxr_mc import cli
-from cxr_mc.cli import backend_setup
+from cxr_mc.cli.commands import backend_setup
 
 # ---- hardware detection (mocked subprocess/tool presence, no real hardware) ----
 

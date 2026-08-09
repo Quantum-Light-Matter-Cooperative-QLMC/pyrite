@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 
 from cxr_mc import cli
-from cxr_mc.cli import _catalog_io, material, sweep
+from cxr_mc.cli import _catalog_io
+from cxr_mc.cli.commands import material, sweep
 from tests.helpers.cli import assert_clean_result, invoke
 
 _CATALOG = """[profiles.standard]

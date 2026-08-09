@@ -208,14 +208,14 @@ re-export.
 
 - [ ] S1 `paths.py` + apps into the distribution + package-smoke assertions
 - [ ] S2 subpackage grouping + `remote` fold, exports unchanged
-- [ ] S3 delete 9 `cli/` alias shims
+- [x] S3 delete 9 `cli/` alias shims
 - [ ] S4 `profile.py` domain extraction; `cli/dashboard/` promotion
 - [ ] S5 `runner/` and `spectrum/` splits (golden + ledger invariant)
 - [ ] S6 `plots/{altair,mpl,plotly}/`
 - [ ] S7 worktrees relocation + skill/`.worktreeinclude` updates + checkpoint
       lockfile tracking rule documented
-- [ ] S8 empty-dir removal, repo-map DAG generator, `checks/`/`scripts/`
-      ownership
+- [x] S8 empty-dir removal (`src/cxr_mc/line_grid/` confirmed deleted)
+- [ ] S8 repo-map DAG generator, `checks/`/`scripts/` ownership
 - [ ] `docs/repo_map.md` regenerated/updated per source-touching slice
 - [ ] `docs/package-structure-rfc.md` amended with S1–S8 as P6+ (or this doc
       cited from it) so the RFC stays the durable record

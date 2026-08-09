@@ -290,7 +290,7 @@ def test_line_grid_wires_safe_completion_but_not_stop_target():
 
 
 def test_profile_members_and_material_commands_wire_catalog_completion():
-    from cxr_mc.cli import material, profile
+    from cxr_mc.cli.commands import material, profile
 
     members = profile.command.commands["members"]
     for name in ("set", "add", "remove"):
@@ -306,7 +306,7 @@ def test_profile_members_and_material_commands_wire_catalog_completion():
 
 
 def test_beam_commands_wire_catalog_completion_but_not_create():
-    from cxr_mc.cli import beam, profile
+    from cxr_mc.cli.commands import beam, profile
 
     for name in ("show", "set", "rename", "delete"):
         assert _callback(beam.command.commands[name], "name") is _cli_completion.complete_beam

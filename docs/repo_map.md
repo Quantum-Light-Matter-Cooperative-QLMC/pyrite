@@ -517,11 +517,6 @@ module.
   lazy `archive`, `check`, `remote` for
   domain-owned groups not yet moved. Eager lightweight deps: `cli._core`,
   `__version__`.
-- The pre-move module paths (`cli/profile.py`, `cli/material.py`,
-  `cli/energy_grid.py`, `cli/checkpoint.py`, `cli/performance.py`,
-  `cli/sweep.py`, `cli/completion.py`, `cli/app.py`, `cli/backend_setup.py`)
-  survive as one-line `sys.modules` aliases onto `cli.commands.*`, so old
-  import paths and monkeypatch seams keep working.
 
 ### `cli/_deprecations.py`
 RFC D7 deprecation harness: frozen `Deprecation` registry keyed by command
