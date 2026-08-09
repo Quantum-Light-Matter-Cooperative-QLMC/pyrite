@@ -127,6 +127,73 @@ source. Only after that gate closes should A--D resume with official
 PENELOPE/sbethe terms, the 1--300 keV benchmark, Joy--Luo comparisons, and a
 versioned schema proposal.
 
+## Alternative-source license gate (2026-08-09)
+
+### Official PENELOPE record
+
+The current OECD Nuclear Energy Agency Data Bank record is
+[`PENELOPE2023`, NEA-1525/24](https://www.oecd-nea.org/tools/abstract/detail/nea-1525/),
+tested 2024-09-12. The record states that PENELOPE2023 retains the 2018
+physics and the same material data files. It transports electrons, positrons,
+and photons from 50 eV to 1 GeV, while warning that its interaction models are
+not expected to be accurate below about 1 keV. It covers arbitrary materials
+and models electron inelastic loss and bremsstrahlung as separate interaction
+classes. Those properties cover the requested 1--300 keV interval in principle,
+but the public abstract does not specify a standalone stopping-table export,
+its units, or a reproducible `sbethe` interface.
+
+The official distribution is controlled rather than public. The record requires
+an order/request for NEA-1525/24 and identifies the source repository as
+restricted. Following the linked repository or end-user route reaches the
+[NEA GitLab authentication page](https://git.oecd-nea.org/penelope/package/pensuite),
+which requires an official registered email and two-factor authentication for
+controlled content. The public record is OECD-copyrighted and supplies no
+license granting redistribution of the source, its material files, or generated
+tables. No controlled package, click-through terms, or numerical data were
+accessed.
+
+The public NEA abstract does not identify `sbethe` as an independently versioned
+or distributed product. The cited
+[`PENELOPE-2018` manual](https://doi.org/10.1787/32da5043-en) and restricted
+package are therefore the authoritative places to resolve whether `sbethe` is
+a bundled executable/subroutine, its inputs and output units, and whether its
+outputs may be redistributed. Direct unauthenticated access to the manual and
+package was unavailable during this audit. Treating `sbethe` as a separate
+open source would be unsupported.
+
+### Candidate decision matrix
+
+| Candidate | Version/provenance | Energy/components/materials | Reproduction path | Redistribution gate | Decision |
+|---|---|---|---|---|---|
+| ESTAR | NIST SRD 124, July 2017, DOI `10.18434/T4NC7P` | 1 keV--10 GeV; collision/radiative/total; elements and user materials, but >=10 keV recommended | Public CGI with exact composition, density, I-value, and energies | SRD rights reserved; no express table grant located | Validation oracle only unless NIST grants permission |
+| PENELOPE | NEA-1525/24 PENELOPE2023; 2018 physics/material files | 50 eV--1 GeV; inelastic and bremsstrahlung interactions; arbitrary materials; accuracy warning below about 1 keV | Controlled Fortran suite and material generator; exact compiler, inputs, and export procedure require package/manual access | Request, registered official email, 2FA, restricted repository; public page gives no redistribution grant | Technically plausible, legally and reproducibly blocked |
+| `sbethe` | No independently versioned public official record found | Not established from accessible primary material | Must be resolved inside the authoritative PENELOPE manual/package | Same controlled-access terms; independent license not established | Not a selectable source |
+
+None of these candidates presently closes the production-data gate. In
+particular, physical coverage is not equivalent to permission to package
+generated values, and PENELOPE's roughly 1 keV accuracy boundary does not by
+itself justify the endpoint uncertainty target or a compound/splice policy.
+
+### Required external/user decision
+
+Choose one of these mutually exclusive next steps:
+
+1. An eligible institutional user requests NEA-1525/24, accepts the governing
+   terms outside this workflow, and obtains written confirmation covering
+   redistribution of generated stopping tables and required notices. The next
+   task slice can then record, without committing controlled files, the exact
+   PENELOPE/`sbethe` version, hashes, compiler, material inputs, units, and
+   generator invocation.
+2. Keep PENELOPE and ESTAR as user-run validation oracles and authorize a new
+   source-gate slice restricted to publicly licensed generator implementations
+   (for example official Geant4 or EGSnrc releases). That slice must separately
+   audit code and bundled-data licenses, output-table rights, component export,
+   compound inputs, and 1 keV validity before proposing either source.
+
+Until one path is selected and its rights evidence recorded, do not define the
+production benchmark tolerance, compound/splice policy, packaged schema, or
+Joy--Luo bias against retained reference values.
+
 ## Delegation slices and required skills
 
 - A--D require `lead-task`, `repo-orientation`, `monte-carlo`,
