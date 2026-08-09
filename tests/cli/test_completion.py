@@ -46,6 +46,18 @@ def test_profile_completion_is_empty_when_catalog_read_fails(monkeypatch):
     _cli_completion._profile_keys.cache_clear()
 
 
+def test_beam_completion_reads_offline_catalog():
+    assert _values(_cli_completion.complete_beam(None, None, "gauss")) == ["gaussian_200fs"]
+
+
+def test_beam_completion_is_empty_when_catalog_read_fails(monkeypatch):
+    _cli_completion._beam_keys.cache_clear()
+    monkeypatch.setattr(_cli_completion, "DATA_DIR", Path("/missing"))
+    assert _cli_completion.complete_beam(None, None, "") == []
+    monkeypatch.undo()
+    _cli_completion._beam_keys.cache_clear()
+
+
 def test_checkpoint_completion_is_nonrecursive_and_excludes_unsafe_files(tmp_path):
     (tmp_path / "hopg.pkl").touch()
     (tmp_path / "not a candidate.pkl").touch()
@@ -249,3 +261,17 @@ def test_profile_members_and_material_commands_wire_catalog_completion():
         material_command = material.command.commands[name]
         assert _callback(material_command, "material") is _cli_completion.complete_material
         assert _callback(material_command, "profile_name") is _cli_completion.complete_profile
+
+
+def test_beam_commands_wire_catalog_completion_but_not_create():
+    from cxr_mc.cli import beam, profile
+
+    for name in ("show", "set", "rename", "delete"):
+        assert _callback(beam.command.commands[name], "name") is _cli_completion.complete_beam
+    assert _callback(beam.command.commands["create"], "name") is None
+    assert _callback(beam.command.commands["rename"], "new_name") is None
+
+    for name in ("create", "set"):
+        assert (
+            _callback(profile.command.commands[name], "beam_name") is _cli_completion.complete_beam
+        )

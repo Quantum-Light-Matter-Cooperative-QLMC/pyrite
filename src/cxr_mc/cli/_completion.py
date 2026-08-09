@@ -89,6 +89,25 @@ def _profile_keys() -> tuple[str, ...]:
     return tuple(key for key in profiles if _SAFE_TOKEN_RE.fullmatch(key))
 
 
+@lru_cache(maxsize=1)
+def _beam_keys() -> tuple[str, ...]:
+    """Read catalog ``[beams.*]`` keys without scientific imports."""
+    try:
+        with (DATA_DIR / "materials.toml").open("rb") as source:
+            beams = tomllib.load(source).get("beams", {})
+    except (OSError, tomllib.TOMLDecodeError):
+        return ()
+    if not isinstance(beams, dict):
+        return ()
+    return tuple(key for key in beams if _SAFE_TOKEN_RE.fullmatch(key))
+
+
+def complete_beam(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
+    """Complete one catalog ``[beams.*]`` name."""
+    del ctx, param
+    return _items(_beam_keys(), incomplete)
+
+
 def complete_profile(ctx: object, param: object, incomplete: str) -> list[CompletionItem]:
     """Complete one catalog ``[profiles.*]`` name."""
     del ctx, param
@@ -289,6 +308,7 @@ __all__ = [
     "choice_completer",
     "complete_archive_label",
     "complete_archive_stem",
+    "complete_beam",
     "complete_checkpoint",
     "complete_checkpoint_stem",
     "complete_job_id",
