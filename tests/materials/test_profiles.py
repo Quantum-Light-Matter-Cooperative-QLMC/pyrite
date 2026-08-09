@@ -168,6 +168,63 @@ def test_standard_detector_keeps_historical_payload_and_digest_bit_for_bit():
     assert sweep_payload["domega_sr"] is None
 
 
+@pytest.mark.parametrize(
+    ("catalog_profile", "material", "digest"),
+    [
+        (
+            "hopg_hbn_gaussian_200fs",
+            "hopg",
+            "5822690aeba1edf5bcea74ca53cd0504788bb6694dd9145f8af61016fd835865",
+        ),
+        (
+            "hopg_hbn_gaussian_200fs",
+            "hbn",
+            "c4c14c13bb588154984dc41f8563e9334a73686471cb82651ff853988f64364a",
+        ),
+        (
+            "hopg_hbn_microtrain_200fs",
+            "hopg",
+            "5ac000d15c7ac4315508e45d74851ec359a917f6986c6934c5ca5c8dff9cdb70",
+        ),
+        (
+            "hopg_hbn_microtrain_200fs",
+            "hbn",
+            "6a7c899190fc56618bb9e32bfb851a1567b552e0fa4990d252719055f178eaf4",
+        ),
+        (
+            "hopg_hbn_compressed_microbunch",
+            "hopg",
+            "230e7c1e58aaa127ff55bad3eea403ea7523f6d2f16660731af24f15af2235fc",
+        ),
+        (
+            "hopg_hbn_compressed_microbunch",
+            "hbn",
+            "08c8328a65eb3decbf53f84fca257bab9225a6d14b2b65944c5393fe020b7deb",
+        ),
+        (
+            "hopg_emittance_demo",
+            "hopg",
+            "6822cad824a6e6f0147e9a5aa675e77dfd7e12c010f844d67d73a68f6ef75180",
+        ),
+        (
+            "promising_low_ne",
+            "hopg",
+            "2232f2f65ad43ec50aee27cf89021b557e97bf17edc22d84a077a916551e4722",
+        ),
+    ],
+)
+def test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit(
+    catalog_profile, material, digest
+):
+    """Every shipped profile that carried an inline ``[profiles.NAME.beam]`` block
+    now carries ``beam = "NAME"`` instead. The reference resolves to values before
+    hashing, so these digests -- and therefore every existing checkpoint stem --
+    are the pre-migration ones."""
+    identity = named_profile_identity(material, catalog_profile=catalog_profile)
+
+    assert identity["parameter_sha256"] == digest
+
+
 def test_nondefault_detector_round_trips_cases_identity_and_stem():
     settings = default_settings()
     standard_sweep = material_sweep("hopg")
