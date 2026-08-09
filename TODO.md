@@ -111,6 +111,12 @@ file. Edit and drop items on `main`.
    multiple seconds; likely SSH-bound remote completion timeout or
    process-startup overhead, not confirmed. → `feature/tab-completion-latency`;
    [`tasks/feature/tab-completion-latency/`](tasks/feature/tab-completion-latency/).
+6. **`_USE_JIT_LINE_PROLOGUE`: delete or keep gated.** The flag
+   (`montecarlo/spectrum.py:39`) is `False` and its 347-line
+   `montecarlo/line_prologue_jit_kernel.py` is dead. Re-derived as worth
+   ~2.7-4.8% of case wall — decided not to flip it, since it would owe a fifth
+   physics claim on a path that already owes four. Left as is for now; the open
+   choice is deleting both or keeping the flag. No hardware needed either way.
 
 ## Inbox - >user< to be triaged
 
