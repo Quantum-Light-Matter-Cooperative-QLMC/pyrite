@@ -119,6 +119,12 @@ file. Edit and drop items on `main`.
    Zhai/literature comparisons through current detector, Sweep, and case APIs.
    → `feature/profile-observation-angle`;
    [`agentdocs/tasks/feature/profile-observation-angle/`](agentdocs/tasks/feature/profile-observation-angle/).
+3. **Documentation typesetting and quality gates.** Retain MyST while adding
+   semantic numbering/cross-reference rules, a representative scientific-doc
+   pilot, a first-class strict docs command, and a warning boundary that no
+   longer hides maintained-prose defects behind global `docutils` suppression.
+   → `docs/improve-typesetting-quality`;
+   [`agentdocs/tasks/docs/improve-typesetting-quality/`](agentdocs/tasks/docs/improve-typesetting-quality/).
 
 ## P3 - lower-priority / exploratory back burner
 
