@@ -15,19 +15,16 @@ def _():
     import subprocess
     import sys
     import time
-    from pathlib import Path
 
     import marimo as mo
-    from _design import page_title, status_badge, style_sheet
 
     from cxr_mc import check as check_support
+    from cxr_mc.apps import anchor_figures as af
+    from cxr_mc.apps._design import page_title, status_badge, style_sheet
+    from cxr_mc.paths import workspace_root
 
-    repo_dir = Path(__file__).resolve().parent.parent
+    repo_dir = workspace_root()
     checks_dir = repo_dir / "checks"
-    if str(checks_dir) not in sys.path:
-        sys.path.insert(0, str(checks_dir))
-
-    import anchor_figures as af
 
     def run_checks(filenames, force_cpu):
         """Run selected standalone checks and retain their complete console reports.
@@ -365,7 +362,7 @@ def _(mo):
 
     Reproduces the HOPG spectra and bulk-versus-film comparison from Zhai et al.,
     *Nature Communications* **16**, 11218 (2025). If
-    `checks/reference_data/zhai_fig1c.csv` is present, its digitized curves are
+    `src/cxr_mc/apps/reference_data/zhai_fig1c.csv` is present, its digitized curves are
     overlaid automatically. Use 20,000 line electrons and 200 bremsstrahlung
     electrons for publication-quality output. Results are cached locally by
     sample counts, experimental inputs, and implementation version.
@@ -619,7 +616,7 @@ def _(af, check_support, mo, supplementary_study_ui, supplementary_thickness_ui)
         value=check_support.load_default_azimuth(),
         label="Exploratory TMD azimuth (deg; unreported)",
     )
-    save_supplementary_azimuth_ui = mo.ui.run_button(label="Save repository default")
+    save_supplementary_azimuth_ui = mo.ui.run_button(label="Save user default")
     run_supplementary_ui = mo.ui.run_button(label="Load supplementary cache")
     refresh_supplementary_ui = mo.ui.checkbox(value=False, label="Remote recompute on prepare")
     supplementary_controls = mo.vstack(
@@ -638,8 +635,8 @@ def _(af, check_support, mo, supplementary_study_ui, supplementary_thickness_ui)
             ),
             mo.hstack([supplementary_ne_ui, refresh_supplementary_ui, run_supplementary_ui]),
             mo.md(
-                "`Save repository default` mutates `tmd_exploratory_azimuth_deg` in "
-                "`notebooks/validation_defaults.json`; the selected value is shown above."
+                "`Save user default` writes `tmd_exploratory_azimuth_deg` in "
+                "your cxr-mc user state directory; the selected value is shown above."
             )
             if _study.has_unreported_azimuth
             else mo.md("Reported orientations are provenance inputs and are not persisted here."),

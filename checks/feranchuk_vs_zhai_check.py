@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import argparse
 
-from anchor_figures import (
+from tabulate import tabulate
+
+from cxr_mc.apps.anchor_figures import (
     ZhaiAnchor,
     ZhaiCacheMiss,
     cached_model_spectra,
     feranchuk_line_flux,
 )
-from tabulate import tabulate
 
 
 def comparison_rows(anchor: ZhaiAnchor, model: dict) -> tuple[list[list], list[list]]:

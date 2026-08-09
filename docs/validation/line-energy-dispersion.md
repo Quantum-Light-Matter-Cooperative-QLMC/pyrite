@@ -123,7 +123,7 @@ coefficient. Consequently the exact difference is a single unresolved minus
 sign in the numerator; equivalence cannot be inferred merely because the
 reflection list may also contain `-hkl`.
 
-`checks/anchor_figures.py::line_energy_eV` independently repeats the production
+`src/cxr_mc/apps/anchor_figures.py::line_energy_eV` independently repeats the production
 choice as
 
 \[

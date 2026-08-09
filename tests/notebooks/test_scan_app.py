@@ -3,7 +3,7 @@
 import ast
 from pathlib import Path
 
-APP = Path(__file__).parents[2] / "notebooks" / "scan_app.py"
+APP = Path(__file__).parents[2] / "src" / "cxr_mc" / "apps" / "scan_app.py"
 
 
 def test_scan_app_discovers_ordered_material_labels_from_catalog() -> None:

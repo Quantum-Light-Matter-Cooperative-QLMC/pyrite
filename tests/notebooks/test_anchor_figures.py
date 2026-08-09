@@ -1,4 +1,4 @@
-"""Fast unit tests for checks/anchor_figures.py (the P1 #2 validation figures).
+"""Fast unit tests for src/cxr_mc/apps/anchor_figures.py (the P1 #2 validation figures).
 
 The heavy MC figure run lives in checks/; here we test only the cheap, pure
 pieces -- theory anchors, the reference-CSV loader, series matching, the
@@ -16,14 +16,13 @@ import pytest
 
 matplotlib.use("Agg")  # headless; no display in CI
 
-# anchor_figures lives in checks/, not on the package path -- add it.
-_CHECKS = Path(__file__).resolve().parent.parent.parent / "checks"
+from cxr_mc.apps import anchor_figures as af
+from cxr_mc.detectors import DetectorSpec
+
+_APP_RESOURCES = Path(af.__file__).resolve().parent
+_CHECKS = Path(__file__).resolve().parents[2] / "checks"
 if str(_CHECKS) not in sys.path:
     sys.path.insert(0, str(_CHECKS))
-
-import anchor_figures as af
-
-from cxr_mc.detectors import DetectorSpec
 
 
 @pytest.fixture(scope="module")
@@ -155,7 +154,7 @@ def test_reference_curve_loads_and_groups(tmp_path):
 
 def test_example_csv_is_valid_schema():
     """The shipped template parses under the documented schema."""
-    example = _CHECKS / "reference_data" / "zhai_fig1c.example.csv"
+    example = _APP_RESOURCES / "reference_data" / "zhai_fig1c.example.csv"
     ref = af.reference_curve(path=example)
     assert ref is not None and len(ref) == 4
 
@@ -365,7 +364,7 @@ def test_figure_spectra_smoke(anchor):
 
 def test_figure_spectra_with_reference_overlay(anchor):
     model = _synthetic_model(anchor)
-    ref = af.reference_curve(path=_CHECKS / "reference_data" / "zhai_fig1c.example.csv")
+    ref = af.reference_curve(path=_APP_RESOURCES / "reference_data" / "zhai_fig1c.example.csv")
     fig = af.figure_spectra(anchor, model, reference=ref)
     # detector panel gains scatter collections from the overlay
     assert len(fig.axes[2].collections) >= 1
@@ -819,12 +818,12 @@ def test_physics_source_tree_is_lf_only():
     hit. The repo's .gitattributes pins `* text=auto eol=lf`, so a CRLF file
     slipping into src/ would silently produce a different hash per platform
     and break that invariant with no visible error -- catch it here instead."""
-    repo_root = _CHECKS.parent
+    repo_root = Path(__file__).resolve().parents[2]
     offenders = [
         str(path.relative_to(repo_root))
         for path in [
             *sorted((repo_root / "src" / "cxr_mc").glob("**/*.py")),
-            repo_root / "checks" / "anchor_figures.py",
+            _APP_RESOURCES / "anchor_figures.py",
         ]
         if b"\r\n" in path.read_bytes()
     ]

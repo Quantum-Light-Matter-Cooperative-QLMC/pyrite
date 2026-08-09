@@ -1,5 +1,5 @@
 """``cxr export`` targets the marimo analysis app, not the retired Jupyter
-notebook (analysis.ipynb was replaced by notebooks/analysis_app.py in the
+notebook (analysis.ipynb was replaced by src/cxr_mc/apps/analysis_app.py in the
 marimo migration -- exporting must follow, via ``marimo export html``)."""
 
 import datetime

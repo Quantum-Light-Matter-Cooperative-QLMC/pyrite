@@ -1,4 +1,4 @@
-"""Headless CXR scan runner (the library twin of ``notebooks/scan_app.py``).
+"""Headless CXR scan runner (the library twin of ``src/cxr_mc/apps/scan_app.py``).
 
 Runs the Monte-Carlo CXR parameter sweep for one material and writes the
 per-material checkpoint (checkpoints/<material>.pkl). Use this to run sweeps
@@ -724,7 +724,7 @@ def _run_material(args, material, max_seconds=None):
     # (sweep.case_cost), so the exact cached vs. done split run_sweep already
     # tracks (identity, not just a count) lets `attach` render a percent that
     # tracks relative matmul work instead of a flat case count -- see
-    # notebooks/scan_app.py for the same cost-weighted meter run locally.
+    # src/cxr_mc/apps/scan_app.py for the same cost-weighted meter run locally.
     latest_cost = {}
     initial_done_cost = None
     progress_timer = _ProgressTimer(progress_file) if progress_file is not None else None

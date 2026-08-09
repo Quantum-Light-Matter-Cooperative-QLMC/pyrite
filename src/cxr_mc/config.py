@@ -3,8 +3,8 @@ config.py
 =============
 
 Shared run configuration for the CXR pipeline, imported by BOTH marimo apps so the
-scan runner (``notebooks/scan_app.py``) and visualization driver
-(``notebooks/analysis_app.py``) can never drift apart: they build the SAME
+scan runner (``src/cxr_mc/apps/scan_app.py``) and visualization driver
+(``src/cxr_mc/apps/analysis_app.py``) can never drift apart: they build the SAME
 :class:`results.Settings` and the SAME per-material :class:`sweep.Sweep`,
 so the visualization app is guaranteed to be looking at the checkpoint the runner
 wrote. Material identities and grids come from :data:`cxr_mc.materials.CATALOG`;
@@ -375,7 +375,7 @@ def format_penetration_watchdog_summary(
     material: str | None = None,
 ) -> str | None:
     """Format the ``gate_cases_by_penetration`` drop summary printed by both
-    ``cxr_mc.scan`` (CLI) and ``notebooks/scan_app.py`` (interactive) --
+    ``cxr_mc.scan`` (CLI) and ``src/cxr_mc/apps/scan_app.py`` (interactive) --
     shared here so the two call sites can't drift on how they compute
     ``dead_energies`` from ``dropped``.
 

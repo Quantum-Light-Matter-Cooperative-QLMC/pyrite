@@ -14,7 +14,7 @@ Done: `selection.py` (`case_label`, `case_table_rows`, `slim_case_record`),
 exports synced (`results/__init__.py`, `test_results_exports.py`), tests
 green (`test_results_selection.py` 14, `test_altair_spectra_compare.py` 17
 incl. `multi_case_spectrum_chart` cases). Notebook wiring in
-`notebooks/analysis_app.py`: basket state cell (`mo.state`), picker cell
+`src/cxr_mc/apps/analysis_app.py`: basket state cell (`mo.state`), picker cell
 (`case_picker_ui`), add/remove/clear button cells, narrow+broad spectral
 control cells (mirroring `polar_compare_tab`), and `case_compare_tab()`
 registered in the `Explore` accordion as "Compare any cases". `uvx marimo
@@ -48,7 +48,7 @@ materials and faces**, not just within the currently loaded checkpoint.
   point via `cached_analysis` + `material_comparison_point`; it never exposes
   individual spectra.
 - The app loads **one** material+face checkpoint at a time
-  (`load_analysis_checkpoint`, `notebooks/analysis_app.py:158-191`).
+  (`load_analysis_checkpoint`, `src/cxr_mc/apps/analysis_app.py:158-191`).
   Checkpoints are 120–240 MB pickles (see `checkpoints/`), so naive
   multi-checkpoint loading is a memory hazard, especially under WSL.
 
@@ -123,7 +123,7 @@ Rejected alternatives:
 - Start as a plain `mo.ui.table` (exact numbers, cheapest); a grouped bar
   chart per metric is an optional follow-up.
 
-### 2. Notebook wiring (`notebooks/analysis_app.py`)
+### 2. Notebook wiring (`src/cxr_mc/apps/analysis_app.py`)
 
 All widgets in top-level cells (marimo reactivity requirement, matching the
 existing tabs' comments).
@@ -145,7 +145,7 @@ existing tabs' comments).
   - Blazed-face entries get their `(blazed)` marking via the label (the
     per-chart `face_title` wrapper can't distinguish mixed-face baskets — the
     label carries the face instead).
-- **Register** in the tab dict (`notebooks/analysis_app.py:1741`): entry in
+- **Register** in the tab dict (`src/cxr_mc/apps/analysis_app.py:1741`): entry in
   the `Explore` accordion, `"Compare any cases": case_compare_tab`. Accordion,
   not nested `mo.ui.tabs` — nested tabs silently blank charts
   (marimo-team/marimo#6919, see `detectors_tab` comment).
@@ -161,7 +161,7 @@ existing tabs' comments).
   survive (regression against `_compare_frame`-style collapse); brem layer
   toggles; mixed-material labels render.
 - Notebook-level tests follow existing `tests/test_analysis_app.py`
-  patterns; run `uvx marimo check notebooks/analysis_app.py` and fix all
+  patterns; run `uvx marimo check src/cxr_mc/apps/analysis_app.py` and fix all
   findings.
 
 ### 4. Docs / hygiene

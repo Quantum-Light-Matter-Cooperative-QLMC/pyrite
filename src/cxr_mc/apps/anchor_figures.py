@@ -1,5 +1,5 @@
 """
-anchor_figures.py  (checks/)
+Packaged literature-validation figure builders.
 
 Publication validation figures: the Monte-Carlo model's PXR+CBS spectra
 overlaid against first-principles THEORY anchors, for the Zhai et al.,
@@ -28,10 +28,10 @@ plot the moment real data lands, with no code change.
 
 Backend module: the functions return plain data + matplotlib Figures; main()
 runs the (slow) MC, writes figures/, and prints the validation tables. The Zhai
-section of notebooks/validation_app.py is the thin interactive wrapper.
+section of src/cxr_mc/apps/validation_app.py is the thin interactive wrapper.
 
 Run (CPU-force on a box with the cupy wheel but no CUDA device):
-  uv run python -c "import sys;sys.modules['cupy']=None;sys.path.insert(0,'checks');import runpy;runpy.run_path('checks/anchor_figures.py',run_name='__main__')"
+  uv run python -c "import sys;sys.modules['cupy']=None;from cxr_mc.apps.anchor_figures import main;main()"
 """
 
 from __future__ import annotations
@@ -39,22 +39,13 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
 from tabulate import tabulate
 
-# checks/ siblings (feranchuk_spence) and ../src (cxr_mc) on the path,
-# regardless of CWD.
 _HERE = Path(__file__).resolve().parent
-for _p in (str(_HERE), str(_HERE.parent / "src")):
-    if _p not in sys.path:
-        sys.path.insert(0, _p)
-
-from feranchuk_spence import photons_per_electron  # noqa: E402
-
 from cxr_mc._zhai import (  # noqa: E402
     ZHAI_CACHE_FORMAT,
     ZHAI_CACHE_SCHEMA,
@@ -84,6 +75,8 @@ from cxr_mc.validation_background import (  # noqa: E402
     compare_external_background,
     subtract_external_background,
 )
+
+from .feranchuk_spence import photons_per_electron
 
 GRAPHITE_B_002 = 0.8  # graphite c-axis Debye-Waller B-factor [Ang^2], approx (Zhai SI)
 _EXTERNAL_BREM_V1 = _HERE / "reference_data" / "external_brem" / "v1"

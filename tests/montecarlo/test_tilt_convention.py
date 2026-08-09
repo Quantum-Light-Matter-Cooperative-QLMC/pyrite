@@ -11,7 +11,7 @@ convention-design.md):
 
 This module covers the convention itself (tilted_geometry) and the hook
 (_orientation_R / mc_spectrum); the grid-value flips in materials/registry.py /
-config.py / sweep.py / scan.py / checks/anchor_figures.py are covered by
+config.py / sweep.py / scan.py / src/cxr_mc/apps/anchor_figures.py are covered by
 their existing consumer tests (already updated to the positive convention).
 """
 

@@ -37,7 +37,7 @@ convention, it *is* Zhai's parametrization, evaluated at Zhai's angles.
 any call site. The spherical formula above was already Zhai's positive-θ
 convention; what changed (2026-07-11) is that the per-material scan grids
 (now in `data/materials.toml`, consumed through `config.py`, `sweep.py`, and `scan.py`, plus
-`checks/anchor_figures.py`) previously populated only the **negative** half
+`src/cxr_mc/apps/anchor_figures.py`) previously populated only the **negative** half
 of the polar range (`−85…0`, etc.) and a negative azimuth span (`−80…0`).
 Those grids simulated the mirror configuration — reciprocal vector tilted
 **away** from the detector — at a different intensity. In the reproduced

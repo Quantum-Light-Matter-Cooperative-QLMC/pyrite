@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from notebooks import _design
+from cxr_mc.apps import _design
 
 
 def test_design_tokens_are_complete_and_export_safe() -> None:

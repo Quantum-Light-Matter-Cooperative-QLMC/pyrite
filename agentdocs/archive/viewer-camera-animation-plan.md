@@ -3,7 +3,7 @@
 Archived historical plan. Shipped code and tests, not this file, define current
 behavior.
 
-Target: `notebooks/trace_app.py` penetration tab, backed by
+Target: `src/cxr_mc/apps/trace_app.py` penetration tab, backed by
 `src/cxr_mc/plots/plotly_trajectories.py`. Two independent workstreams.
 
 ## 1. Camera: fit default (zoomed) view onto data

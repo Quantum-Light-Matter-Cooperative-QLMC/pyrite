@@ -97,7 +97,7 @@ uv run cxr run standard -m hopg --fidelity survey
 uv run cxr app analysis hopg
 
 # Interactive transport/lattice viewer; no checkpoint required.
-uv run marimo run notebooks/trace_app.py
+uv run marimo run src/cxr_mc/apps/trace_app.py
 
 # Validation dashboard.
 uv run cxr app validation
@@ -108,10 +108,10 @@ Main surfaces:
 - `cxr`: run, analysis, validation, export, checkpoint, profile, material,
   and remote workflows. See generated
   [CLI reference](docs/cli-reference.md).
-- `notebooks/scan_app.py`: interactive sweep runner.
-- `notebooks/analysis_app.py`: checkpoint analysis.
-- `notebooks/trace_app.py`: trajectory/lattice viewer.
-- `notebooks/validation_app.py`: literature-validation studies.
+- `src/cxr_mc/apps/scan_app.py`: interactive sweep runner.
+- `src/cxr_mc/apps/analysis_app.py`: checkpoint analysis.
+- `src/cxr_mc/apps/trace_app.py`: trajectory/lattice viewer.
+- `src/cxr_mc/apps/validation_app.py`: literature-validation studies.
 - `src/cxr_mc/`: importable physics, results, plotting, and detector library.
 
 Full sweeps are heavy. Use [`cxr remote`](docs/running-on-a-cluster.md) for lab

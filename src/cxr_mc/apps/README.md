@@ -4,7 +4,7 @@ Place `analysis_app.py` beside the existing `_design.py` and `_widgets.py`, and 
 `analysis_ui/` package beside it:
 
 ```text
-notebooks/
+src/cxr_mc/apps/
 ├── analysis_app.py
 ├── _design.py
 ├── _widgets.py
@@ -29,7 +29,7 @@ notebooks/
 Run it as before:
 
 ```bash
-marimo run notebooks/analysis_app.py
+marimo run src/cxr_mc/apps/analysis_app.py
 ```
 
 ## Structure
@@ -41,4 +41,6 @@ marimo run notebooks/analysis_app.py
 - `interactive.py`: top-level Altair selection widgets that require the default transformer.
 - `views/`: ordinary Python rendering functions grouped by application section.
 
-The original uploaded file is included as `analysis_app_original.py` for comparison.
+These apps ship in the wheel and may be launched from any working directory via
+the `cxr app` commands. For edit/watch workflows, pass the packaged path shown
+above directly to marimo.

@@ -1,6 +1,6 @@
 # Validation status: Zhai supplementary coherent-emission studies
 
-**Scope.** `checks/anchor_figures.py::ZHAI_SUPPLEMENTARY_STUDIES` - the
+**Scope.** `src/cxr_mc/apps/anchor_figures.py::ZHAI_SUPPLEMENTARY_STUDIES` - the
 WSe2/MoSe2/h-BN/HOPG reproductions rendered by the validation app's "Zhai
 supplementary" section and `cxr check --export`.
 

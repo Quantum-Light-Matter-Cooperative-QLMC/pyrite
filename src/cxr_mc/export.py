@@ -1,13 +1,13 @@
 """Export the analysis app via ``cxr app analysis export`` and ``marimo export``.
 
 The Jupyter ``analysis.ipynb`` this used to render (via nbconvert webpdf) was
-replaced by the marimo app ``notebooks/analysis_app.py``; ``marimo export html``
+replaced by the marimo app ``src/cxr_mc/apps/analysis_app.py``; ``marimo export html``
 executes the app headlessly and writes a static HTML snapshot -- the shareable
 artifact that replaces the old PDF. The default output name carries today's
 date so successive exports are self-describing; pass an explicit stem to
 override: ``cxr app analysis export my_custom_name``.
 
-Run from the repo root (it reads ``notebooks/analysis_app.py`` and writes into
+Run from the repo root (it reads ``src/cxr_mc/apps/analysis_app.py`` and writes into
 ``results/``). The app's material dropdown defaults to hopg; the export renders
 whatever the app computes headlessly.
 """
@@ -17,8 +17,9 @@ import subprocess
 import sys
 
 from .cli import _core as _cli_core
+from .paths import app_dir
 
-NOTEBOOK = "notebooks/analysis_app.py"
+NOTEBOOK = str(app_dir() / "analysis_app.py")
 
 
 def _default_stem():

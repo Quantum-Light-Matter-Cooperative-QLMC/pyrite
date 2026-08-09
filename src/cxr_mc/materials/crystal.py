@@ -3,7 +3,7 @@ materials.crystal
 
 General-purpose X-ray crystallography / diffraction primitives, shared by the
 Monte-Carlo pipeline (montecarlo, sweep, the detector forward models) and the
-Feranchuk-Spence analytic checks (checks/feranchuk_spence.py). Nothing here is
+Feranchuk-Spence analytic checks (src/cxr_mc/apps/feranchuk_spence.py). Nothing here is
 specific to the Feranchuk amplitude framework -- it is the reusable layer above
 materials.atomic:
 

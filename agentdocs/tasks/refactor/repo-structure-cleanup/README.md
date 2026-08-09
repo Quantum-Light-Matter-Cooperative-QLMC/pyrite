@@ -240,7 +240,7 @@ re-export.
 
 ## Checklist
 
-- [ ] S1 `paths.py` + apps into the distribution + package-smoke assertions
+- [x] S1 `paths.py` + apps into the distribution + package-smoke assertions
 - [ ] S2 subpackage grouping + `remote` fold, exports unchanged
 - [x] S3 delete 10 `cli/` alias shims (9 from original task + `beam.py` postdating named-beam-objects)
 - [ ] S4 `profile.py` domain extraction; `cli/dashboard/` promotion
@@ -264,13 +264,18 @@ re-export.
   → `CXR_HOME` → config store → cwd; checkout-local cwd still resolves to the
   existing `./checkpoints`. Packaged app/default/export resources remain for
   the next S1 checkpoint, so S1 stays unchecked.
+- 2026-08-09: moved all four marimo apps, shared UI modules/layouts, validation
+  defaults, figure builders, and reference CSVs into `cxr_mc.apps`; retired
+  `notebooks/`; launchers now resolve absolute packaged paths. Validation
+  defaults use packaged read-only seed data plus mutable user state. Wheel and
+  editable installs execute analysis/viewer smoke launches from an external
+  cwd, and assert checkpoint roots remain outside `site-packages`. S1 complete.
 
 ## Sequencing
 
 1. ~~**S3 + S8 empty dir**~~ — done 2026-08-09.
 2. ~~**S7 remainder**~~ — done 2026-08-09.
-3. **S1** — next up; the only correctness defect. Before S2 so app modules move once,
-   and before `feature/uv-workspace-split` designs members.
+3. ~~**S1**~~ — done 2026-08-09.
 4. **S2**, then **S4**, **S6**, **S8 remainder**.
 5. **S5** last: physics-gated, and two live branches are editing those files.
 

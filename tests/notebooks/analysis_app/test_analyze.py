@@ -1,4 +1,4 @@
-"""``cxr analyze`` -- launches notebooks/analysis_app.py via marimo run/edit with
+"""``cxr analyze`` -- launches src/cxr_mc/apps/analysis_app.py via marimo run/edit with
 a chosen initial material. The initial-material resolution has to be a pure,
 unit-testable helper (:func:`analyze.initial_material`) because marimo apps
 can't be driven live in this environment; these tests exercise that helper and

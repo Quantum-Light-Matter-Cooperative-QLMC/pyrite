@@ -22,8 +22,8 @@ Print current top-level directory inventory:
 - Runtime paths resolve through `cxr_mc.paths`: packaged read-only data stays
   package-relative; workspace artifacts use explicit path > `CXR_HOME` >
   `workspace.root` config > cwd; mutable user state uses Click's platform app
-  directory. Validation app resources are the remaining S1 checkout-derived
-  runtime paths until their package relocation.
+  directory. Marimo apps, validation figure builders, and reference data ship
+  under `cxr_mc.apps`; standalone `checks/` scripts remain developer-only.
 
 ## Dependency layers (leaf → driver)
 
@@ -116,13 +116,13 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   objects and repoint only the selected profile; `verify` checks bytes and refs;
   `gc` reclaims unreachable objects after a 14-day grace window. Hidden D7
   aliases: `apply` → `add`, `line delete` → `rm`.
-- **Marimo apps**: `notebooks/scan_app.py` (sweep runner → checkpoint),
-  `notebooks/analysis_app.py` (checkpoint-driven 2D figures, Altair +
-  matplotlib, lazy tabbed layout), `notebooks/trace_app.py` (3D trajectory
+- **Marimo apps**: `src/cxr_mc/apps/scan_app.py` (sweep runner → checkpoint),
+  `src/cxr_mc/apps/analysis_app.py` (checkpoint-driven 2D figures, Altair +
+  matplotlib, lazy tabbed layout), `src/cxr_mc/apps/trace_app.py` (3D trajectory
   animation + crystal-lattice viewer; runs transport directly from catalog
-  scan grids, no checkpoint needed), `notebooks/validation_app.py`
-  (validation-study interface). Shared pieces: `notebooks/_design.py` (page
-  chrome), `notebooks/_widgets.py` (`MaterialSelect` anywidget). Scan,
+  scan grids, no checkpoint needed), `src/cxr_mc/apps/validation_app.py`
+  (validation-study interface). Shared pieces: `src/cxr_mc/apps/_design.py` (page
+  chrome), `src/cxr_mc/apps/_widgets.py` (`MaterialSelect` anywidget). Scan,
   analysis, and trace apps read per-material grids in `config.py`.
 - **`cxr app analysis launch [material]`** → `analyze:_cli`: launch or smoke-test
   the analysis app with explicit or persisted initial material; `cxr app analysis
@@ -606,7 +606,7 @@ and remote command paths. Resolves preset settings and material photon grids;
 keeps a compatibility fallback for older branches.
 
 ### `analyze.py`
-`cxr app analysis launch` owner for `notebooks/analysis_app.py`: persisted
+`cxr app analysis launch` owner for `src/cxr_mc/apps/analysis_app.py`: persisted
 initial-material selection, smoke execution, edit/watch mode, ACP bridges,
 SSH-tunnel-friendly fixed-port launch.
 - Public: `material_menu`, `select_initial_material`, `face_menu`,
@@ -619,7 +619,7 @@ SSH-tunnel-friendly fixed-port launch.
   and routing every spectrum read through the one `pick_spectrum`.
 
 ### `check.py`
-`cxr check` launcher for `notebooks/validation_app.py` plus cached validation
+`cxr check` launcher for `src/cxr_mc/apps/validation_app.py` plus cached validation
 figure export, optional remote Zhai-job launch/status/pull helpers.
 - Public: `load_default_azimuth`, `save_default_azimuth`, `probe_remote_zhai`,
   `start_remote_zhai`, `remote_zhai_status`, `pull_remote_zhai`,
@@ -628,7 +628,7 @@ figure export, optional remote Zhai-job launch/status/pull helpers.
 ### `_zhai.py`
 Canonical maintained Zhai detector geometry and cache-schema provenance shared
 by anchor figures, headless reproduction, validation-app export, and remote
-SLURM metadata. Heavy calculations remain in `checks/anchor_figures.py`; app
+SLURM metadata. Heavy calculations remain in `src/cxr_mc/apps/anchor_figures.py`; app
 and export consumers are cache-only and direct misses to
 `cxr run --preset zhai --remote`.
 - Internal: `ZHAI_DETECTOR`, `ZHAI_CACHE_SCHEMA`, `ZHAI_CACHE_FORMAT`,
@@ -670,7 +670,7 @@ and clear, remote validation jobs.
   `transport._ssh_capture`), not the facade.
 
 ### `export.py`
-`cxr app analysis export` subcommand — `marimo export html` of `notebooks/analysis_app.py`
+`cxr app analysis export` subcommand — `marimo export html` of `src/cxr_mc/apps/analysis_app.py`
 → `results/<stem>.html` (replace retired nbconvert-PDF path).
 - Public: `add_subparser`, `main`.
 

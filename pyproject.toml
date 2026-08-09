@@ -160,6 +160,14 @@ allowed-unresolved-imports = ["cupy*", "cupy*.*"]
 [tool.ty.overrides.rules]
 unresolved-attribute = "ignore"
 
+[[tool.ty.overrides]]
+include = ["src/cxr_mc/apps/**/*.py"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+invalid-return-type = "ignore"
+no-matching-overload = "ignore"
+
 [tool.ruff]
 target-version = "py313"
 line-length = 100
@@ -192,10 +200,10 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "*.ipynb" = ["F821"]  # cross-cell references are always undefined to static analysis
-# marimo notebooks (notebooks/*_app.py) display a cell's value as its bare last
+# marimo apps display a cell's value as its bare last
 # expression (e.g. a UI element on its own line) -- that's the framework's render
 # mechanism, not a useless statement.
-"notebooks/*_app.py" = ["B018"]
+"src/cxr_mc/apps/*_app.py" = ["B018"]
 
 [tool.ruff.format]
 quote-style = "double"

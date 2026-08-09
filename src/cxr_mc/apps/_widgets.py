@@ -1,7 +1,7 @@
 """Shared anywidget controls for the marimo apps.
 
 Imported by ``analysis_app.py`` and ``trace_app.py`` the same way ``_design``
-is: marimo runs apps with ``notebooks/`` on ``sys.path``, so a plain
+is: marimo runs apps with the script directory on ``sys.path``, so a plain
 ``from _widgets import MaterialSelect`` works in both.
 """
 

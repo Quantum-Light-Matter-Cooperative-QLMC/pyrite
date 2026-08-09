@@ -1,4 +1,4 @@
-"""``cxr app analysis`` -- launch the marimo analysis app (``notebooks/analysis_app.py``)
+"""``cxr app analysis`` -- launch the marimo analysis app (``src/cxr_mc/apps/analysis_app.py``)
 with a chosen initial material.
 
 Marimo apps in this environment can't be driven live (no browser/kernel access;
@@ -47,9 +47,9 @@ from ._acp import running_acp
 from .cli import _completion as _cli_completion
 from .cli import _core as _cli_core
 from .cli._deprecations import canonical_option
-from .paths import state_dir
+from .paths import app_dir, state_dir
 
-NOTEBOOK = "notebooks/analysis_app.py"
+NOTEBOOK = str(app_dir() / "analysis_app.py")
 TUNNEL_PORT = 2718
 
 _DEFAULT_FILE = state_dir() / "analysis-default"

@@ -13,6 +13,11 @@ def data_dir() -> Path:
     return Path(__file__).parent / "data"
 
 
+def app_dir() -> Path:
+    """Return the packaged marimo application and resource directory."""
+    return Path(__file__).parent / "apps"
+
+
 def workspace_root(explicit: str | PathLike[str] | None = None) -> Path:
     """Resolve explicit argument > ``CXR_HOME`` > config store > current directory."""
     from .cli._config import resolve

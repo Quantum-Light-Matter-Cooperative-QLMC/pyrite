@@ -213,8 +213,8 @@ def _load_checkpoint_cached(path, signature):
 def load_checkpoint(material, checkpoint_dir=DEFAULT_CHECKPOINT_DIR):
     """Load a per-material results checkpoint (``checkpoints/<material>.pkl``)
     written by :func:`run_sweep`, WITHOUT re-running anything -- this is how the
-    visualization app (``notebooks/analysis_app.py``) gets its ``results`` after the
-    scan-runner app (``notebooks/scan_app.py``) has produced them. Returns the
+    visualization app (``src/cxr_mc/apps/analysis_app.py``) gets its ``results`` after the
+    scan-runner app (``src/cxr_mc/apps/scan_app.py``) has produced them. Returns the
     ``{name: {E0: record}}`` store (empty dict if the checkpoint is missing).
 
     Reconstruct the sweep's case list straight from it with

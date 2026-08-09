@@ -13,7 +13,13 @@ from cxr_mc.validation_background import (
 )
 
 _FIXTURES = (
-    Path(__file__).resolve().parents[2] / "checks" / "reference_data" / "external_brem" / "v1"
+    Path(__file__).resolve().parents[2]
+    / "src"
+    / "cxr_mc"
+    / "apps"
+    / "reference_data"
+    / "external_brem"
+    / "v1"
 )
 _BREM = _FIXTURES / "zhai_fig3b_25kev_1mm_brem.csv"
 _EXPERIMENT = _FIXTURES / "zhai_fig3b_25kev_1mm_experiment.csv"

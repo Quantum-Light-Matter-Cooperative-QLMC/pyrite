@@ -1,4 +1,4 @@
-"""``cxr viewer`` -- launches notebooks/trace_app.py via marimo run/edit with
+"""``cxr viewer`` -- launches src/cxr_mc/apps/trace_app.py via marimo run/edit with
 a chosen initial material. The initial-material resolution has to be a pure,
 unit-testable helper (:func:`viewer.initial_material`) because marimo apps
 can't be driven live in this environment; these tests exercise that helper and

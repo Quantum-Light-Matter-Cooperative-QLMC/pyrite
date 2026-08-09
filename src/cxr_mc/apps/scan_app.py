@@ -15,8 +15,14 @@ def _():
     from pathlib import Path
 
     import marimo as mo
-    from _design import context_rail, directional_state, page_title, scan_grid, style_sheet
 
+    from cxr_mc.apps._design import (
+        context_rail,
+        directional_state,
+        page_title,
+        scan_grid,
+        style_sheet,
+    )
     from cxr_mc.config import (
         COLLAPSE_AZIMUTH,
         default_settings,

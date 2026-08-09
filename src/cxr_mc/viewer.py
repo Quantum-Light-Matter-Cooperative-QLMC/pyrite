@@ -1,4 +1,4 @@
-"""``cxr app viewer`` -- launch the marimo 3D visualization app (``notebooks/trace_app.py``)
+"""``cxr app viewer`` -- launch the marimo 3D visualization app (``src/cxr_mc/apps/trace_app.py``)
 with a chosen initial material.
 
 Marimo apps in this environment can't be driven live (no browser/kernel access;
@@ -40,9 +40,9 @@ from ._acp import running_acp
 from .cli import _completion as _cli_completion
 from .cli import _core as _cli_core
 from .cli._deprecations import canonical_option
-from .paths import state_dir
+from .paths import app_dir, state_dir
 
-NOTEBOOK = "notebooks/trace_app.py"
+NOTEBOOK = str(app_dir() / "trace_app.py")
 TUNNEL_PORT = 2719
 
 _DEFAULT_FILE = state_dir() / "viewer-default"

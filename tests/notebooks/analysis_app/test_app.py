@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-APP = Path(__file__).parents[3] / "notebooks" / "analysis_app.py"
+APP = Path(__file__).parents[3] / "src" / "cxr_mc" / "apps" / "analysis_app.py"
 
 
 def _attribute_path(node: ast.AST) -> tuple[str, ...]:
@@ -123,7 +123,7 @@ def test_material_and_face_select_labels_render_bold() -> None:
     # module now; both apps import it from there.
     widget_source = (APP.parent / "_widgets.py").read_text()
 
-    assert "from _widgets import MaterialSelect" in source
+    assert "from cxr_mc.apps._widgets import MaterialSelect" in source
     assert 'const labelText = document.createElement("strong");' in widget_source
     assert 'labelText.textContent = model.get("label");' in widget_source
     assert 'label="Material"' in source

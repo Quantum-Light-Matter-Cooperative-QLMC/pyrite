@@ -1,4 +1,4 @@
-"""``cxr app validation`` -- launch the marimo validation app (``notebooks/validation_app.py``),
+"""``cxr app validation`` -- launch the marimo validation app (``src/cxr_mc/apps/validation_app.py``),
 or render its figures in batch from cache.
 
 Unlike ``cxr app analysis``, this command takes no material argument -- the
@@ -14,6 +14,7 @@ resolve or persist.
                                     # (see `cxr run --preset zhai --remote`) to figures/
 """
 
+import importlib
 import json
 import os
 import re
@@ -27,15 +28,20 @@ import click
 from ._acp import running_acp
 from ._remote.config import remote_host
 from .cli import _core as _cli_core
+from .paths import app_dir, state_dir
 
-NOTEBOOK = "notebooks/validation_app.py"
+NOTEBOOK = str(app_dir() / "validation_app.py")
 TUNNEL_PORT = 2718
-DEFAULTS_PATH = Path(__file__).resolve().parents[2] / "notebooks" / "validation_defaults.json"
+DEFAULTS_PATH = state_dir() / "validation-defaults.json"
+_PACKAGED_DEFAULTS_PATH = app_dir() / "validation_defaults.json"
 
 
 def load_default_azimuth(path=DEFAULTS_PATH):
-    """Load the repository-wide exploratory TMD azimuth default."""
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    """Load the user override or packaged exploratory TMD azimuth default."""
+    resolved = Path(path)
+    if resolved == DEFAULTS_PATH and not resolved.is_file():
+        resolved = _PACKAGED_DEFAULTS_PATH
+    data = json.loads(resolved.read_text(encoding="utf-8"))
     value = float(data["tmd_exploratory_azimuth_deg"])
     if not 0.0 <= value <= 180.0:
         raise ValueError("default azimuth must be between 0 and 180 degrees")
@@ -198,10 +204,7 @@ def _launch(*, edit=False, watch=False, acp=False, tunnel=False):
 
 
 def _export(outdir="figures", ne=20_000, ne_brem=200, ne_supp=200):
-    checks_dir = Path(__file__).resolve().parents[2] / "checks"
-    if str(checks_dir) not in sys.path:
-        sys.path.insert(0, str(checks_dir))
-    import anchor_figures as af  # ty: ignore[unresolved-import]
+    af = importlib.import_module("cxr_mc.apps.anchor_figures")
 
     try:
         written = af.export_all_figures(

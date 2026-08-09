@@ -17,12 +17,11 @@ import numpy as np
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src"))
 
 
-from feranchuk_spence import (
+from cxr_mc.apps.feranchuk_spence import (
     amplitudes_PXR_CBS,
     delta_g,
     flux_per_second,
 )
-
 from cxr_mc.materials.crystal import (
     CRYSTALS,
     Z_TABLE,

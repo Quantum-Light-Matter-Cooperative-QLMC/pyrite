@@ -14,8 +14,9 @@ def _():
     import altair as alt
     import marimo as mo
     import numpy as np
-    from _design import page_title, style_sheet
-    from _widgets import MaterialSelect
+
+    from cxr_mc.apps._design import page_title, style_sheet
+    from cxr_mc.apps._widgets import MaterialSelect
 
     # penetration_survival_chart / trajectory_chart can exceed Vega-Lite's
     # default 5000-row cap; vegafusion (shipped with marimo[recommended])

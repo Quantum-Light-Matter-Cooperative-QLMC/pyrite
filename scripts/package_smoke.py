@@ -11,7 +11,7 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_EXTRAS = {"amd", "intel", "nvidia", "viz-render"}
+EXPECTED_EXTRAS = {"amd", "external-db", "intel", "nvidia"}
 
 
 def _run(*args: str, cwd: Path) -> None:
@@ -41,6 +41,11 @@ def _inspect_wheel(wheel: Path) -> None:
 
     assert "cxr_mc/__init__.py" in names
     assert "cxr_mc/data/materials.toml" in names
+    assert "cxr_mc/apps/analysis_app.py" in names
+    assert "cxr_mc/apps/trace_app.py" in names
+    assert "cxr_mc/apps/validation_app.py" in names
+    assert "cxr_mc/apps/validation_defaults.json" in names
+    assert "cxr_mc/apps/reference_data/external_brem/v1/zhai_fig3b_25kev_1mm_brem.csv" in names
     assert "cxr = cxr_mc.cli:main" in entry_points
     assert "cxr-dev = cxr_mc._dev:main" in entry_points
     extras = {
@@ -62,7 +67,23 @@ def _probe_install(uv: str, source: Path, root: Path, label: str) -> None:
         "import cxr_mc; assert (cxr_mc.DATA_DIR / 'materials.toml').is_file()",
         cwd=root,
     )
-    _run(str(_script(venv, "cxr")), "--help", cwd=root)
+    cxr = str(_script(venv, "cxr"))
+    env_home = root / f"{label}-workspace"
+    env_home.mkdir()
+    _run(cxr, "--help", cwd=root)
+    _run(cxr, "run", "--help", cwd=root)
+    _run(cxr, "app", "analysis", "launch", "--smoke", cwd=root)
+    _run(cxr, "app", "viewer", "launch", "--smoke", cwd=root)
+    _run(
+        str(_python(venv)),
+        "-c",
+        (
+            "from pathlib import Path; import cxr_mc, cxr_mc.run as run; "
+            "site = Path(cxr_mc.__file__).resolve().parent; "
+            "assert not Path(run.DEFAULT_CHECKPOINT_DIR).resolve().is_relative_to(site)"
+        ),
+        cwd=env_home,
+    )
     _run(str(_script(venv, "cxr-dev")), "--help", cwd=root)
 
 

@@ -1,5 +1,5 @@
 """Headless Zhai/supplementary Monte-Carlo cache populator -- thin ``python -m``
-shim over checks/anchor_figures.py::reproduce_all.
+shim over src/cxr_mc/apps/anchor_figures.py::reproduce_all.
 
 The remote box invokes ``python -m cxr_mc._entry.reproduce_zhai`` inside its
 uv-synced checkout. Populates checkpoints/zhai_reproduction/ for every cache the
@@ -14,17 +14,8 @@ to hit locally):
 """
 
 import argparse
-import sys
-from pathlib import Path
 
-# checks/ is not a package; it lives at the repo root alongside src/ (both are
-# synced to the box). The editable install puts this file at
-# <repo>/src/cxr_mc/_entry/, so parents[3] is the repo root.
-_CHECKS = str(Path(__file__).resolve().parents[3] / "checks")
-if _CHECKS not in sys.path:
-    sys.path.insert(0, _CHECKS)
-
-from anchor_figures import reproduce_all  # noqa: E402  # ty: ignore[unresolved-import]
+from ..apps.anchor_figures import reproduce_all
 
 
 def main(argv=None):

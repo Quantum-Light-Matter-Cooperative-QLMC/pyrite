@@ -11,33 +11,6 @@ app = marimo.App(width="full")
 with app.setup:
     import altair as alt
     import marimo as mo
-    from _design import page_title, style_sheet
-    from _widgets import MaterialSelect
-    from analysis_ui import (
-        DimensionComparisonSpec,
-        load_context,
-        resolve_axis_pair,
-        select_emission,
-    )
-    from analysis_ui.controls import (
-        make_case_axes,
-        make_detector_controls,
-        make_dimension_controls,
-        make_energy_controls,
-        make_heatmap_energy_control,
-        make_scan_thickness_control,
-    )
-    from analysis_ui.interactive import make_heatmap_widget, make_scan_heatmap_widgets
-    from analysis_ui.views import (
-        CASE_BASKET_CAP,
-        render_case_comparison,
-        render_cross_material,
-        render_detectors,
-        render_dimension_comparison,
-        render_energy_comparison,
-        render_rankings,
-        render_scans,
-    )
 
     from cxr_mc.analyze import (
         analysis_checkpoint_manifest,
@@ -49,6 +22,33 @@ with app.setup:
         material_menu,
         profile_menu,
         select_initial_material,
+    )
+    from cxr_mc.apps._design import page_title, style_sheet
+    from cxr_mc.apps._widgets import MaterialSelect
+    from cxr_mc.apps.analysis_ui import (
+        DimensionComparisonSpec,
+        load_context,
+        resolve_axis_pair,
+        select_emission,
+    )
+    from cxr_mc.apps.analysis_ui.controls import (
+        make_case_axes,
+        make_detector_controls,
+        make_dimension_controls,
+        make_energy_controls,
+        make_heatmap_energy_control,
+        make_scan_thickness_control,
+    )
+    from cxr_mc.apps.analysis_ui.interactive import make_heatmap_widget, make_scan_heatmap_widgets
+    from cxr_mc.apps.analysis_ui.views import (
+        CASE_BASKET_CAP,
+        render_case_comparison,
+        render_cross_material,
+        render_detectors,
+        render_dimension_comparison,
+        render_energy_comparison,
+        render_rankings,
+        render_scans,
     )
     from cxr_mc.materials import CATALOG
     from cxr_mc.results import (
@@ -653,7 +653,7 @@ def _(
             view,
             mo.md(
                 "*3D trajectory and crystal-structure views live in `trace_app.py` "
-                "(`marimo run notebooks/trace_app.py`).*"
+                "(`marimo run src/cxr_mc/apps/trace_app.py`).*"
             ),
         ]
     )

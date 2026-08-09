@@ -122,8 +122,8 @@ def test_cross_material_tab_requests_new_comparisons():
     # render_cross_material (and its cached-summary/comparison wiring) moved
     # out of app.py into analysis_ui/views/materials.py; the beam-energy UI
     # widgets it's fed by stayed behind in app.py.
-    app_source = Path("notebooks/analysis_app.py").read_text()
-    view_source = Path("notebooks/analysis_ui/views/materials.py").read_text()
+    app_source = Path("src/cxr_mc/apps/analysis_app.py").read_text()
+    view_source = Path("src/cxr_mc/apps/analysis_ui/views/materials.py").read_text()
     # One cached summary per material feeds all three small selections.
     assert 'comparison("quality_peak")' in view_source
     assert 'comparison("peak")' in view_source

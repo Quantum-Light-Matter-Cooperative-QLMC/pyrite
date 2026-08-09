@@ -31,9 +31,7 @@ def render_cross_material(
     # or under a named catalog_profile's stem; comparison_stem resolves either
     # so a profile-only material still counts here, matching the material
     # dropdown's own availability check.
-    stems = {
-        material_key: comparison_stem(material_key) for material_key in CATALOG.material_keys
-    }
+    stems = {material_key: comparison_stem(material_key) for material_key in CATALOG.material_keys}
     materials_with_data = sum(
         1
         for stem in stems.values()
