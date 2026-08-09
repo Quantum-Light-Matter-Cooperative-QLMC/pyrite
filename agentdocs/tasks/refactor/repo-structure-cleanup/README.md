@@ -100,12 +100,11 @@ non-goals still hold for `materials/`, `montecarlo/`, `results/`, `plots/`,
 
 Sequence after S1 so the app modules move exactly once.
 
-## S3 — Delete the `cli/` alias shims
+## S3 — Delete the `cli/` alias shims — **done 2026-08-09**
 
 `cli/{profile,sweep,checkpoint,energy_grid,material,app,performance,completion,backend_setup}.py`
-are 9 three-line `sys.modules[__name__] = _implementation` swaps left from RFC
-P1 (`feature/cli-command-home`). Zero references outside `cli/` across `src/`
-and `tests/`.
+were 9 three-line `sys.modules[__name__] = _implementation` swaps left from RFC
+P1 (`feature/cli-command-home`).
 
 They are internal wiring, not the `cxr` command surface, so the D7 two-minor
 deprecation window in `docs/cli-deprecations.md` does not apply. The
@@ -113,8 +112,25 @@ deprecation window in `docs/cli-deprecations.md` does not apply. The
 go-to-definition — `feature/cli-command-home` already had to repoint two
 modules at `cli.commands.*` to clear ty errors caused by them.
 
-Delete, update `docs/repo_map.md`'s `### cli/commands/` note. Resolves RFC §6
-open question 1 in favor of `cli/commands/`.
+Resolves RFC §6 open question 1 in favor of `cli/commands/`.
+
+Outcome, correcting this section's original survey:
+
+- 10 shims, not 9. `cli/beam.py` postdates the survey (added by
+  `feature/named-beam-objects`). `rg -n "sys.modules\[__name__\]" src/` now
+  returns nothing; that grep is the check for regrowth.
+- "Zero references" was wrong. Six lazy-import target strings inside `cli/`
+  pointed at the shim paths and had to be repointed at `cli.commands.*` first:
+  `cli/commands/completion.py:193-194`, `cli/commands/checkpoint.py:11`,
+  `cli/commands/app.py:14-16`. Because `cli/__init__` dispatches through
+  `LazyGroup`, a stale target string does not fail at import or on the parent
+  `--help` — only on the leaf invocation. Later slices that move CLI modules
+  must grep dotted strings, not just `import` statements, and must exercise a
+  leaf subcommand.
+- Seven test modules imported the shim paths and were repointed.
+- `docs/repo_map.md`'s alias note removed. Verified with `lint`, `typecheck`,
+  `test-suite cli` (1123 passed), and `--help` on each affected group plus one
+  leaf each.
 
 ## S4 — Two files misclassified as CLI wiring
 
@@ -173,8 +189,8 @@ re-export.
 
 ## S8 — Leftovers and generated-doc drift
 
-- `src/cxr_mc/line_grid/` is empty (only `__pycache__`) after the P2 rename —
-  delete.
+- ~~`src/cxr_mc/line_grid/` is empty (only `__pycache__`) after the P2 rename —
+  delete.~~ **Done** — already absent by 2026-08-09; no action was needed.
 - `docs/repo_map.md` is 40 KB of hand-maintained prose while
   `cxr-dev repo-map` generates only the top-level inventory. The
   dependency-layer DAG is the part that rots, and it is exactly the part a
@@ -222,8 +238,11 @@ re-export.
 
 ## Sequencing
 
-1. **S3 + S8 empty dir** — minutes, zero risk, unblocks static analysis.
-2. **S7** — relocation before any tree-wide refactor; every later slice greps.
+1. ~~**S3 + S8 empty dir**~~ — done 2026-08-09.
+2. **S7 remainder** — the worktrees relocation itself landed 2026-08-07; what
+   is left is the checkpoint-lockfile tracking rule and the
+   `performance-profiles/` / `docs/_build` / `checkpoints/` size question.
+   Next up.
 3. **S1** — the only correctness defect; before S2 so app modules move once,
    and before `feature/uv-workspace-split` designs members.
 4. **S2**, then **S4**, **S6**, **S8 remainder**.
