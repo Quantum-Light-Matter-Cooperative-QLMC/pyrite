@@ -249,7 +249,7 @@ re-export.
       `performance-profiles`/`docs/_build`/`checkpoints` size bullet closed as
       no-action
 - [x] S8 empty-dir removal (`src/cxr_mc/line_grid/` confirmed deleted)
-- [ ] S8 repo-map DAG generator, `checks/`/`scripts/` ownership
+- [x] S8 repo-map DAG generator, `checks/`/`scripts/` ownership
 - [x] `docs/repo_map.md` regenerated/updated per source-touching slice
 - [x] `docs/package-structure-rfc.md` amended with S1–S8 as P6+ (or this doc
       cited from it) so the RFC stays the durable record
@@ -310,12 +310,32 @@ re-export.
   pre-existing stale `cxr_mc.montecarlo.line_prologue_jit_kernel` autosummary
   entry.
 
+### S8 checkpoint progress
+
+- 2026-08-09: added a Grimp-generated, strongly-connected-component-condensed
+  package dependency DAG with `cxr-dev repo-map --write|--check`; wired the
+  freshness check and two import-linter boundary contracts into `cxr-dev
+  verify`. The generated graph records static cycles honestly and documents
+  lazy-dispatch blind spots rather than reproducing the former hand-maintained
+  layering claim.
+- Promoted package/plot smoke and CLI reference/deprecation generators into
+  importable `cxr_mc.devtools` owners. Root script paths remain thin wrappers.
+  Added `checks/README.md` validation-id ownership and `scripts/README.md`
+  maintenance/diagnostic ownership.
+- Evidence: both import contracts; repo-map write/check; focused devtool,
+  CLI-reference, and deprecation tests; packaging suite; lint; typecheck; and
+  strict Sphinx build pass. Full `cxr-dev verify` reached 100% with only the
+  sandbox-blocked forkserver regression failing (`PermissionError` binding its
+  Unix socket); that exact test passed when rerun with sandbox escalation. The
+  package smoke built and installed the wheel, then the marimo analysis export
+  hit the environment's disk quota; the packaging suite remains green.
+
 ## Sequencing
 
 1. ~~**S3 + S8 empty dir**~~ — done 2026-08-09.
 2. ~~**S7 remainder**~~ — done 2026-08-09.
 3. ~~**S1**~~ — done 2026-08-09.
-4. ~~**S2**~~, ~~**S4**~~, ~~**S6**~~, then **S8 remainder**.
+4. ~~**S2**~~, ~~**S4**~~, ~~**S6**~~, then ~~**S8 remainder**~~.
 5. **S5** last: physics-gated, and two live branches are editing those files.
 
 ## Non-goals

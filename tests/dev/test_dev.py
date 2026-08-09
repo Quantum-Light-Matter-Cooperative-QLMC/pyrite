@@ -167,41 +167,51 @@ def test_test_suite_forwards_stable_paths_and_pytest_arguments(dev_module, monke
 
 def test_verify_runs_checks_in_required_order(dev_module, monkeypatch) -> None:
     calls = []
-    for name in ("cmd_check_skills", "cmd_lint", "cmd_typecheck", "cmd_test"):
+    for name in (
+        "cmd_check_skills",
+        "cmd_imports",
+        "cmd_repo_map",
+        "cmd_lint",
+        "cmd_typecheck",
+        "cmd_test",
+    ):
         monkeypatch.setattr(dev_module, name, lambda _args, name=name: calls.append(name))
 
     dev_module.cmd_verify(Namespace(pytest_args=[]))
 
-    assert calls == ["cmd_check_skills", "cmd_lint", "cmd_typecheck", "cmd_test"]
+    assert calls == [
+        "cmd_check_skills",
+        "cmd_imports",
+        "cmd_repo_map",
+        "cmd_lint",
+        "cmd_typecheck",
+        "cmd_test",
+    ]
 
 
 def test_smoke_forwards_material_and_output_directory(dev_module, monkeypatch) -> None:
+    from cxr_mc.devtools import smoke
+
     calls = []
-    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+    monkeypatch.setattr(smoke, "main", lambda args: calls.append(args) or 0)
 
     args = dev_module.build_parser().parse_args(
         ["smoke", "--material", "hopg", "--output-dir", "/tmp/cxr-mc-smoke"]
     )
     args.func(args)
 
-    assert calls == [
-        (
-            str(dev_module.ROOT / "scripts" / "smoke.py"),
-            "--material",
-            "hopg",
-            "--output-dir",
-            "/tmp/cxr-mc-smoke",
-        )
-    ]
+    assert calls == [["--material", "hopg", "--output-dir", "/tmp/cxr-mc-smoke"]]
 
 
-def test_package_smoke_uses_repository_script(dev_module, monkeypatch) -> None:
+def test_package_smoke_uses_importable_devtool(dev_module, monkeypatch) -> None:
+    from cxr_mc.devtools import package_smoke
+
     calls = []
-    monkeypatch.setattr(dev_module, "run", lambda *args: calls.append(args))
+    monkeypatch.setattr(package_smoke, "main", lambda: calls.append(True))
 
     dev_module.cmd_package_smoke(Namespace())
 
-    assert calls == [(str(dev_module.ROOT / "scripts" / "package_smoke.py"),)]
+    assert calls == [True]
 
 
 def test_repo_map_groups_present_vendor_directories_as_agent_tooling(dev_module, capsys) -> None:
@@ -212,3 +222,32 @@ def test_repo_map_groups_present_vendor_directories_as_agent_tooling(dev_module,
         "Agent tooling:\n  .agents/\n  .claude/\n  agentdocs/\n\nCanonical commands:"
         in output
     )
+
+
+def test_repo_map_write_and_check_delegate_to_importable_generator(
+    dev_module, monkeypatch
+) -> None:
+    from cxr_mc.devtools import repo_map
+
+    calls = []
+    monkeypatch.setattr(
+        repo_map,
+        "write_or_check",
+        lambda *, root, check: calls.append((root, check)) or True,
+    )
+
+    dev_module.cmd_repo_map(Namespace(write=True, check=False))
+    dev_module.cmd_repo_map(Namespace(write=False, check=True))
+
+    assert calls == [(dev_module.ROOT, False), (dev_module.ROOT, True)]
+
+
+def test_repo_map_check_reports_stale_document(dev_module, monkeypatch, capsys) -> None:
+    from cxr_mc.devtools import repo_map
+
+    monkeypatch.setattr(repo_map, "write_or_check", lambda **_: False)
+
+    with pytest.raises(SystemExit, match="1"):
+        dev_module.cmd_repo_map(Namespace(write=False, check=True))
+
+    assert "cxr-dev repo-map --write" in capsys.readouterr().err

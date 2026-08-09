@@ -67,6 +67,8 @@ test = [
 ]
 
 lint = [
+    "grimp>=3.12",
+    "import-linter>=2.9",
     "ruff>=0.15.19",
     "ty>=0.0.63",
     "pre-commit>=4.6.0",
@@ -167,6 +169,47 @@ include = ["src/cxr_mc/apps/**/*.py"]
 invalid-argument-type = "ignore"
 invalid-return-type = "ignore"
 no-matching-overload = "ignore"
+
+[tool.importlinter]
+root_packages = ["cxr_mc"]
+exclude_type_checking_imports = true
+
+[[tool.importlinter.contracts]]
+id = "physics-core-stays-below-drivers"
+name = "Physics core stays below driver and rendering packages"
+type = "forbidden"
+source_modules = [
+    "cxr_mc.detectors",
+    "cxr_mc.materials",
+    "cxr_mc.montecarlo",
+]
+forbidden_modules = [
+    "cxr_mc.apps",
+    "cxr_mc.checkpoints",
+    "cxr_mc.cli",
+    "cxr_mc.perf",
+    "cxr_mc.plots",
+    "cxr_mc.remote",
+    "cxr_mc.runs",
+    "cxr_mc.validation",
+]
+allow_indirect_imports = true
+
+[[tool.importlinter.contracts]]
+id = "material-leaves-stay-independent"
+name = "Material leaves do not import higher material modules"
+type = "forbidden"
+source_modules = [
+    "cxr_mc.materials._cif",
+    "cxr_mc.materials._transport_data",
+    "cxr_mc.materials.atomic",
+]
+forbidden_modules = [
+    "cxr_mc.materials.attenuation",
+    "cxr_mc.materials.catalog",
+    "cxr_mc.materials.crystal",
+]
+allow_indirect_imports = true
 
 [tool.ruff]
 target-version = "py313"

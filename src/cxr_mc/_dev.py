@@ -142,7 +142,22 @@ def iter_notebooks() -> list[Path]:
     return [LEGACY_NOTEBOOK] if LEGACY_NOTEBOOK.is_file() else []
 
 
-def cmd_repo_map(_: argparse.Namespace) -> None:
+def cmd_repo_map(args: argparse.Namespace) -> None:
+    from cxr_mc.devtools import repo_map
+
+    write = getattr(args, "write", False)
+    check = getattr(args, "check", False)
+    if write or check:
+        current = repo_map.write_or_check(root=ROOT, check=check)
+        if not current:
+            print(
+                "repository map dependency graph changed; "
+                "regenerate with `cxr-dev repo-map --write`",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
+        return
+
     interesting = [
         "src/cxr_mc",
         "tests",
@@ -283,17 +298,17 @@ def cmd_test_suite(args: argparse.Namespace) -> None:
 
 
 def cmd_smoke(args: argparse.Namespace) -> None:
-    run(
-        str(ROOT / "scripts" / "smoke.py"),
-        "--material",
-        args.material,
-        "--output-dir",
-        args.output_dir,
-    )
+    from cxr_mc.devtools.smoke import main
+
+    status = main(["--material", args.material, "--output-dir", args.output_dir])
+    if status:
+        raise SystemExit(status)
 
 
 def cmd_package_smoke(_: argparse.Namespace) -> None:
-    run(str(ROOT / "scripts" / "package_smoke.py"))
+    from cxr_mc.devtools.package_smoke import main
+
+    main()
 
 
 def _frontmatter_fields(path: Path) -> dict[str, str]:
@@ -464,6 +479,10 @@ def cmd_bootstrap(_: argparse.Namespace) -> None:
     )
 
 
+def cmd_imports(_: argparse.Namespace) -> None:
+    subprocess.run(["lint-imports", "--no-cache"], cwd=ROOT, check=True)
+
+
 def cmd_verify(args: argparse.Namespace) -> None:
     cmd_check_skills(args)
     if not todo_merge_driver_configured():
@@ -472,6 +491,8 @@ def cmd_verify(args: argparse.Namespace) -> None:
             "run `uv run cxr-dev bootstrap` (see agentdocs/README.md).",
             file=sys.stderr,
         )
+    cmd_imports(args)
+    cmd_repo_map(argparse.Namespace(check=True, write=False))
     cmd_lint(args)
     cmd_typecheck(args)
     cmd_test(args)
@@ -484,19 +505,13 @@ def cmd_regen_golden(args: argparse.Namespace) -> None:
 
 
 def cmd_cli_deprecations(args: argparse.Namespace) -> None:
+    from cxr_mc.devtools.cli_deprecations import main
+
     target = ROOT / "docs" / "cli-deprecations.md"
     mode = "--check" if getattr(args, "check", False) else "--write"
-    result = subprocess.run(
-        [
-            sys.executable,
-            str(ROOT / "scripts" / "generate_cli_deprecations.py"),
-            mode,
-            str(target),
-        ],
-        cwd=ROOT,
-        check=False,
-    )
-    raise SystemExit(result.returncode)
+    status = main([mode, str(target)])
+    if status:
+        raise SystemExit(status)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -506,7 +521,6 @@ def build_parser() -> argparse.ArgumentParser:
     for name, fn in [
         ("acp-up", cmd_acp_up),
         ("acp-down", cmd_acp_down),
-        ("repo-map", cmd_repo_map),
         ("lint", cmd_lint),
         ("format", cmd_format),
         ("typecheck", cmd_typecheck),
@@ -520,6 +534,22 @@ def build_parser() -> argparse.ArgumentParser:
     ]:
         sp = sub.add_parser(name)
         sp.set_defaults(func=fn)
+    repo_map = sub.add_parser(
+        "repo-map",
+        help="print repository inventory or update its generated dependency graph",
+    )
+    repo_map_mode = repo_map.add_mutually_exclusive_group()
+    repo_map_mode.add_argument(
+        "--write",
+        action="store_true",
+        help="replace the generated dependency region in docs/repo_map.md",
+    )
+    repo_map_mode.add_argument(
+        "--check",
+        action="store_true",
+        help="fail if the generated dependency region is stale",
+    )
+    repo_map.set_defaults(func=cmd_repo_map)
     test = sub.add_parser("test")
     test.add_argument(
         "--numba",
