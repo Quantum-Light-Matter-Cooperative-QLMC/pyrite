@@ -41,7 +41,13 @@ file. Edit and drop items on `main`.
 
 ### Ready
 
-1. **Compute performance optimization — remainder.** Rounds 1-4 landed on `main`
+1. **Electron transport correctness.** Pair coherent midpoint position with
+   midpoint time, truncate cutoff-crossing flights, distinguish step-limited
+   histories from physical stops, and tighten transport input validation across
+   all CPU/CUDA cores. → `fix/electron-transport-correctness`;
+   [`agentdocs/tasks/fix/electron-transport-correctness/`](agentdocs/tasks/fix/electron-transport-correctness/);
+   review: [`docs/electron_transport_physics_recommendations.docx`](docs/electron_transport_physics_recommendations.docx).
+2. **Compute performance optimization — remainder.** Rounds 1-4 landed on `main`
    (see
    [`docs/compute-performance-optimization.md`](docs/compute-performance-optimization.md));
    the MoSe2 `--ne-line=20000` report is closed as compute-bound transport plus a
@@ -56,19 +62,19 @@ file. Edit and drop items on `main`.
    Plan and open questions:
    → `feature/compute-performance-optimization`;
    [`agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md`](agentdocs/tasks/feature/compute-performance-optimization/REMAINING.md).
-2. **Add support for characteristic X-rays**
-3. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
+3. **Add support for characteristic X-rays**
+4. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
    factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/debye-waller-audit.md`](docs/debye-waller-audit.md). >user<
-4. **Fix Analysis Compare loading and quality selection.** Analyze each
+5. **Fix Analysis Compare loading and quality selection.** Analyze each
    material checkpoint once for all three Compare plots, preserve persistent
    cache reuse, and correct or accurately report the ratio plot's unexpected
    material exclusions. → `fix/analysis-compare-loading-quality`;
    [`agentdocs/tasks/fix/analysis-compare-loading-quality/`](agentdocs/tasks/fix/analysis-compare-loading-quality/).
-5. **Validate batched coherent line accumulation.** The implementation and
+6. **Validate batched coherent line accumulation.** The implementation and
    `Validation: coherent-line-hkl-batch` ledger row landed; fresh-context
    verification and human sign-off remain. → `feature/coherent-line-batching`;
    [`agentdocs/tasks/feature/coherent-line-batching/`](agentdocs/tasks/feature/coherent-line-batching/).
-6. **Physics boundary typing.** `typecheck` passes, but the physics packages are
+7. **Physics boundary typing.** `typecheck` passes, but the physics packages are
    the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`
    6.6% (vs `materials` 59.8%); of 42 public re-exported functions, 2 are fully
    annotated. Annotate the public boundary only, with unit-carrying aliases
@@ -80,8 +86,25 @@ file. Edit and drop items on `main`.
 
 ### Gated
 
-1. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
-2. **Superradiant PXR/CBS validation.** Optional phased segment/electron sum is implemented but unverified; resolve phase convention and bunch-form-factor limits before scientific use. Design: [`docs/coherent-emission.md`](docs/coherent-emission.md).
+1. **Energy-controlled electron transport.** Introduce midpoint/integrated
+   energy and time, controlled energy-loss/hazard substeps, physical-flight
+   identity, and substep-invariant CXR/bremsstrahlung coupling. Gated on the
+   correctness task and schema/convergence decisions.
+   → `feature/energy-controlled-electron-transport`;
+   [`agentdocs/tasks/feature/energy-controlled-electron-transport/`](agentdocs/tasks/feature/energy-controlled-electron-transport/).
+2. **Reference elastic scattering data.** Replace out-of-range Browning totals
+   in `mott` mode with provenance-controlled NIST totals and adopt DCS CDFs or a
+   validated higher-moment surrogate. Gated on redistribution and model-form
+   decisions. → `feature/reference-elastic-scattering-data`;
+   [`agentdocs/tasks/feature/reference-elastic-scattering-data/`](agentdocs/tasks/feature/reference-elastic-scattering-data/).
+3. **Reference electron stopping data.** Package provenance-controlled
+   collisional/radiative stopping over 1--300 keV, retain Joy--Luo as an
+   explicit fallback, and expose model/fallback metadata. Gated on source,
+   redistribution, compound, and low-energy splice decisions.
+   → `feature/reference-electron-stopping-data`;
+   [`agentdocs/tasks/feature/reference-electron-stopping-data/`](agentdocs/tasks/feature/reference-electron-stopping-data/).
+4. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
+5. **Superradiant PXR/CBS validation.** Optional phased segment/electron sum is implemented but unverified; resolve phase convention and bunch-form-factor limits before scientific use. Design: [`docs/coherent-emission.md`](docs/coherent-emission.md).
 
 ### Paused / on hold
 
@@ -191,10 +214,13 @@ Direction notes only; not prioritized backlog or active commitments.
   navigating checkpoints, running commands and sweeps, editing profiles, and
   extending the progress dashboard.
 - **Broader physics scope.** Generalize beyond CXR with optional physics across
-  wider energy regimes. Possible directions include secondary-electron
-  emission, material ionization, high-energy interactions, electron coherence
-  and QED effects, coherent transition radiation, and transport of protons,
-  ions, or neutrons.
+  wider energy regimes. Possible directions include electron energy-loss
+  straggling and explicit hard inelastic events, consistent radiative stopping,
+  direction-dependent bremsstrahlung, channeling as a separate advanced model,
+  secondary-electron emission, material ionization, high-energy interactions,
+  electron coherence and QED effects, coherent transition radiation, and
+  transport of protons, ions, or neutrons. Near-term staging context:
+  [`docs/electron_transport_physics_recommendations.docx`](docs/electron_transport_physics_recommendations.docx).
 - **Complex geometry and interoperability.** Support multiple physical
   materials with arbitrary position, shape, and orientation; research
   interoperability with established simulation and PIC tools such as WarpX;
