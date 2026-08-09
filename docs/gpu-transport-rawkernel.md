@@ -251,8 +251,9 @@ which is the cross-check that the device-side numbers are trustworthy.
 The payload is 82 bytes per recorded segment — 0.46 GB for hopg, 1.15 GB for
 MoSe2 — moved over pageable memory at a measured 7.6–7.9 GB/s. The remainder is
 scratch allocation, mask construction, and NumPy assembly of the output arrays;
-it has not been attributed further, which is what NVTX ranges in `transport.py`
-would fix.
+it has not been attributed further. Round 5 added the NVTX ranges that split it
+(`cxr.transport.scratch` / `.compact` / `.join` and siblings); a capture using
+them is what closes this out.
 
 **The kernel is no longer the bottleneck; the driver around it is.**
 
@@ -351,10 +352,13 @@ at `Ne_brem=150`, `spec_coherent` median 8.20% / max 37.91% — all tracking
 
 ## Not done
 
-- **NVTX ranges in `transport.py`.** `docs/compute-performance-optimization.md`
-  already claims `cxr.transport.line` / `cxr.transport.brem` exist; they do not.
-  Adding them is a prerequisite for attributing GPU transport phases in a single
-  capture.
+- **A capture that uses the transport NVTX ranges.** Round 5 added them
+  (`cxr.transport.tables` / `.sample` / `.alloc` / `.core` / `.output`, with
+  `.upload` / `.scratch` / `.launch` / `.capsync` / `.compact` / `.exitcodes` /
+  `.join` nested inside the CUDA driver), replacing the `cxr.transport.line` /
+  `cxr.transport.brem` names Round 1 invented and never shipped. Nothing has
+  been profiled with them yet; that run is what attributes the host-side
+  remainder above.
 - **`numba.prange` over the per-electron core.** The same restructuring makes
   the CPU core trivially parallel, which is the cheap answer for the core-starved
   case the perf doc flagged. Not wired up here.

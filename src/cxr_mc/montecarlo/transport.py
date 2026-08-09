@@ -1620,6 +1620,7 @@ def resolve_transport_core(requested, Ne, groove=None):
         return "lockstep"
     return "cuda" if _cuda_transport_available() else "lockstep"
 
+
 # float64 mid(3) + dir(3) + len + E + t0 = 9, int64 id, int16 layer.
 _SEG_SCRATCH_BYTES = 9 * 8 + 8 + 2
 
@@ -1717,6 +1718,13 @@ def _run_per_electron_transport(
     to_dev = xp.asarray if on_device else (lambda a: a)
     to_host = xp.asnumpy if on_device else (lambda a: a)
 
+    # NVTX sub-ranges splitting this driver into upload / per-batch launch /
+    # capacity sync / compaction / join, so a capture attributes the transport
+    # phase instead of leaving it in the unlabelled host remainder. Lazy import:
+    # runner imports this module, so a top-level import would be circular.
+    from .runner import _nsys_pop, _nsys_push
+
+    _nsys_push("cxr.transport.upload")
     d_keys = to_dev(stream_keys(seed, Ne))
     d_alive = to_dev(alive)
     d_clock = to_dev(clock)
@@ -1729,6 +1737,7 @@ def _run_per_electron_transport(
     d_bot = to_dev(L_bot)
     d_layers = tuple(to_dev(a) for a in layer_tables)
     d_mott = tuple(to_dev(a) for a in mott)
+    _nsys_pop()
 
     out_bufs = (seg_dir, seg_mid, seg_len, seg_E, seg_t0, seg_id, seg_lay)
     batches = []
@@ -1746,9 +1755,12 @@ def _run_per_electron_transport(
         snap = (d_pos[sl].copy(), d_dirs[sl].copy(), d_E[sl].copy(), d_clock[sl].copy())
 
         while True:
+            _nsys_push("cxr.transport.scratch")
             scratch = _alloc_scratch(xp, m, cap)
             seg_count = xp.zeros(m, dtype=xp.int64)
             exit_code = xp.zeros(m, dtype=xp.int8)
+            _nsys_pop()
+            _nsys_push("cxr.transport.launch")
             core(
                 e,
                 m,
@@ -1776,7 +1788,14 @@ def _run_per_electron_transport(
                 seg_count,
                 exit_code,
             )
+            _nsys_pop()
+            # Split from the launch above because on CUDA the launch returns
+            # immediately: this read is where the batch's kernel time actually
+            # lands, so `launch` is host-side dispatch cost and `capsync` is the
+            # device.
+            _nsys_push("cxr.transport.capsync")
             needed = int(seg_count.max())
+            _nsys_pop()
             seen_max = max(seen_max, needed)
             if needed <= cap:
                 break
@@ -1793,6 +1812,7 @@ def _run_per_electron_transport(
         total = int(seg_count.sum())
         if nseg + total > max_segments:
             raise RuntimeError("segment buffer exhausted")
+        _nsys_push("cxr.transport.compact")
         keep = xp.arange(cap)[None, :] < seg_count[:, None]
         s_dir, s_mid, s_len, s_E, s_t0, s_id, s_lay = scratch
         slots = (
@@ -1814,10 +1834,13 @@ def _run_per_electron_transport(
             for buf, a in zip(out_bufs, slots, strict=True):
                 buf[dst] = to_host(a[keep])
         nseg += total
+        _nsys_pop()
 
+        _nsys_push("cxr.transport.exitcodes")
         n_back += int((exit_code == EXIT_BACKSCATTERED).sum())
         n_trans += int((exit_code == EXIT_TRANSMITTED).sum())
         n_side += int((exit_code == EXIT_SIDE).sum())
+        _nsys_pop()
         e += m
 
         # Re-size from what electrons actually needed rather than from the guess,
@@ -1828,6 +1851,7 @@ def _run_per_electron_transport(
 
     joined = None
     if keep_on_device:
+        _nsys_push("cxr.transport.join")
         # An empty run has no batch to take shapes and dtypes from; borrow them
         # from a zero-length scratch, which is where they came from anyway.
         empty = _alloc_scratch(xp, 0, 1)
@@ -1835,6 +1859,7 @@ def _run_per_electron_transport(
             xp.concatenate([b[i] for b in batches]) if batches else empty[i]
             for i in range(len(out_bufs))
         )
+        _nsys_pop()
 
     return nseg, n_back, n_trans, n_side, joined
 
@@ -2156,6 +2181,14 @@ def simulate_trajectories(
         if not np.all(np.isfinite(E_cut_by_electrons)):
             raise ValueError("E_cut_by_electrons must contain only finite values")
 
+    # NVTX ranges for the transport phase. Everything here is host-side, but a
+    # CUDA run's wall clock is not: Round 4 left a 38-52% unattributed remainder
+    # around the transport driver, and these are what a capture needs to split it
+    # into table build / beam sampling / buffer reservation / core / output.
+    # No-op off the profiled GPU path. Lazy import: runner imports this module.
+    from .runner import _nsys_pop, _nsys_push
+
+    _nsys_push("cxr.transport.tables")
     z_total = float(layers[-1][1])
     n_layers = len(layers)
     L_Zs = []
@@ -2239,7 +2272,9 @@ def simulate_trajectories(
     else:
         mott_logE_flat = np.empty(0, dtype=float)
         mott_logA_flat = np.empty(0, dtype=float)
+    _nsys_pop()
 
+    _nsys_push("cxr.transport.sample")
     rng = np.random.default_rng(seed)
     pos = np.zeros((Ne, 3))
     transverse_slopes = None
@@ -2356,7 +2391,9 @@ def simulate_trajectories(
     initial_r_ang = pos.copy()
     initial_v_hat = dirs.copy()
     initial_E_keV = E_keV.copy()
+    _nsys_pop()
 
+    _nsys_push("cxr.transport.alloc")
     # Preallocate fixed-capacity output buffers.  ``max_steps`` is already a
     # conservative safety bound in ordinary runs; groove re-entry events can add
     # material segments without consuming it, so the compiled core raises a
@@ -2371,6 +2408,7 @@ def simulate_trajectories(
     seg_t0 = np.empty(n_rows, dtype=float)
     seg_id = np.empty(n_rows, dtype=np.int64)
     seg_lay = np.empty(n_rows, dtype=np.int16)
+    _nsys_pop()
 
     # Where the segments end up living, and so which array module assembles the
     # output below. NumPy unless the run asked to keep them on the device.
@@ -2379,6 +2417,7 @@ def simulate_trajectories(
 
     elastic_model_code = 1 if elastic_model == "mott" else 0
 
+    _nsys_push("cxr.transport.core")
     if groove is None and transport_core != "lockstep":
         # Per-electron streams and run-to-completion ordering. Not bit-for-bit
         # with the lockstep core -- see `_transport_core_ungrooved_perelectron`.
@@ -2539,7 +2578,9 @@ def simulate_trajectories(
         vac_E = vac_E_buf[:nvac]
         vac_t0 = vac_t0_buf[:nvac]
         vac_id = vac_id_buf[:nvac]
+    _nsys_pop()
 
+    _nsys_push("cxr.transport.output")
     if dev_segs is None:
         r_mid = seg_mid[:nseg]
         v_hat = seg_dir[:nseg]
@@ -2563,6 +2604,7 @@ def simulate_trajectories(
     t0_by_electron = t0_electron if seg_xp is np else seg_xp.asarray(t0_electron)
     t0_ang = t0_by_electron[elec_id] if elec_id.size else seg_xp.empty(0, dtype=float)
     vacuum_t0_ang = t0_electron[vacuum_elec_id] if vacuum_elec_id.size else np.empty(0, dtype=float)
+    _nsys_pop()
 
     return {
         # Initial sampled phase space is diagnostic-only.  Keep per-electron
