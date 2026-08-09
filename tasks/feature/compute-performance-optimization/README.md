@@ -1021,12 +1021,41 @@ Open — needs a GPU session, in this order:
       `transport_only` not asking for it. Full local suite green, lint and
       typecheck clean.
 
-      **Not measured on hardware in this slice.** Every number above is from the
-      earlier GPU sessions; the flip itself has not been run on `qlmc`. What
-      wants measuring there: a whole-sweep A/B at `Ne=20000` (the serial device
-      arm against the pipeline arm, wall and feed-wait), and the device-memory
-      high-water mark for MoSe2, whose segment count is ~2.5x hopg's — the one
-      case where the OOM fallback could fire in production.
+- [x] **Measure the flip on `qlmc`.** **Done 2026-08-08.** Both arms run the
+      same `cxr run` and differ only in `CXR_MC_TRANSPORT_CORE` (unset vs
+      `lockstep`), fresh checkpoint dir per arm, one warm-up rep then three
+      interleaved reps. Full tables in
+      `docs/compute-performance-optimization.md` ("Verification: whole-sweep A/B
+      on qlmc").
+
+      `coh_test`/hopg, 72 cases, Ne=20000: **12.03 s vs 18.70 s** case loop
+      (1.55x), 13.88 vs 20.48 s wall, **11.8 vs 53.2 CPU core-seconds**, GPU
+      utilization 84% vs 37.5%, peak VRAM 2751 vs 5039 MiB, peak host RSS
+      **0.76 vs 12.7 GB**. Reps spread under 1%. Feed-wait in the pipeline arm is
+      only ~11%, so the win is not a starved pool: it is the 18 in-flight
+      host-side segment payloads that residency removes outright.
+
+      MoSe2 device-memory high-water (`promising`/mose2, 432 cases, Ne=15000,
+      thickness to 50000 A): peak **6873 MiB of 16303** (median 4215) against a
+      CuPy pool cap of 11412 MiB, **zero OOM retries**, host RSS 0.82 GB. The
+      residency fallback never fired. It is the case to watch, and the argument
+      for the deferred `REAL` compaction on a smaller card.
+
+      Numerical agreement checked at sweep scale, and it is stronger than the
+      ledger row claimed. Against a third arm running the CPU `per-electron`
+      core serially, the CUDA arm agrees to **0.000% on every field of all 144
+      (case, energy) records**, and its difference from lockstep is *exactly*
+      the CPU per-electron core's difference, digit for digit — the whole change
+      is the stream change, none of it the device. Size of that change:
+      `line.spec` median 0.43% / max 2.31% at Ne=20000, `brem` median 4.01% /
+      max 25.74% at Ne_brem=150. Ledger row updated with all of it.
+
+      That control also caught a defect in my own `_worker_init` pin: it
+      overwrote `CXR_MC_TRANSPORT_CORE` unconditionally, so a pooled run pinned
+      to `per-electron` silently transported on lockstep — the pin was a no-op
+      for every pooled run, which is exactly why the two arms first came out
+      bit-identical. Fixed to redirect only `auto` and `cuda` (the values that
+      would open a second CUDA context); 5 tests added.
 
 Deliberately deferred: NVTX ranges in `transport.py`, compacting segments to
 `REAL` at the join, `numba.prange` over the per-electron core for the

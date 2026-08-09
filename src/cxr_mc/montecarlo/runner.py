@@ -1191,14 +1191,20 @@ def _worker_init(force_cpu=False):
     desktop stays responsive. Workers still use idle CPU at full speed; the
     OS just schedules interactive applications first.
 
-    Also pins THIS process's transport to the lockstep CPU core. Both pools run
-    here, and a worker that resolved `transport_core="auto"` onto the device
-    would open exactly the per-worker CUDA context the single-context design
-    exists to avoid -- and, in the transport pool, would then have to pickle its
-    segments back down anyway. The pin is an environment variable because it has
-    to reach every call site in the worker, including the ones that never see a
-    run_cases argument; it is process-local (spawn/fork copies the environment)
-    and never touches the driver's own resolution.
+    Also keeps THIS process's transport off the device. Both pools run here, and
+    a worker that resolved `transport_core="auto"` onto the device would open
+    exactly the per-worker CUDA context the single-context design exists to
+    avoid -- and, in the transport pool, would then have to pickle its segments
+    back down anyway. The pin is an environment variable because it has to reach
+    every call site in the worker, including the ones that never see a run_cases
+    argument; it is process-local (spawn/fork copies the environment) and never
+    touches the driver's own resolution.
+
+    Only "cuda" and "auto" are redirected. An inherited CXR_MC_TRANSPORT_CORE
+    naming a CPU core is a deliberate choice that a worker can honor, and
+    overwriting it made the pin a no-op for every pooled run: a sweep pinned to
+    "per-electron" silently transported on lockstep instead, which a 2026-08-08
+    qlmc A/B caught only because the two arms came out bit-identical.
 
     force_cpu: when True (the engine="cpu" full-case pool), rebind THIS
     worker process's copy of runner._GPU and spectrum.xp/REAL to their CPU
@@ -1207,7 +1213,9 @@ def _worker_init(force_cpu=False):
     the box. A no-op fork/spawn-local mutation: it never touches the driver
     process's globals. Harmless when _GPU is already False.
     """
-    os.environ["CXR_MC_TRANSPORT_CORE"] = "lockstep"
+    inherited = os.environ.get("CXR_MC_TRANSPORT_CORE", "").strip().lower()
+    if inherited in ("", "auto", "cuda"):
+        os.environ["CXR_MC_TRANSPORT_CORE"] = "lockstep"
     if force_cpu:
         global _GPU
 

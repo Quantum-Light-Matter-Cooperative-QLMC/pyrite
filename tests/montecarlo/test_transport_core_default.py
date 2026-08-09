@@ -11,6 +11,8 @@ No GPU required: the device probe is patched, since what is under test is the
 decision, not the kernel (``test_transport_per_electron.py`` owns the kernel).
 """
 
+import os
+
 import pytest
 
 from cxr_mc.montecarlo import runner
@@ -105,6 +107,38 @@ def test_empty_env_pin_is_ignored(cuda, monkeypatch):
     cuda(True)
     monkeypatch.setenv("CXR_MC_TRANSPORT_CORE", "")
     assert resolve_transport_core("auto", 100_000) == "cuda"
+
+
+# ---- the pin a worker process gets -----------------------------------------
+
+
+@pytest.fixture
+def worker_init(monkeypatch):
+    """``_worker_init`` in-process, minus the renice it would otherwise apply to
+    the pytest process itself (``os.nice`` only goes one way for non-root)."""
+    monkeypatch.setattr(os, "nice", lambda _increment: 0, raising=False)
+
+    def run(inherited):
+        monkeypatch.setenv("CXR_MC_TRANSPORT_CORE", inherited)
+        runner._worker_init()
+        return os.environ["CXR_MC_TRANSPORT_CORE"]
+
+    return run
+
+
+@pytest.mark.parametrize("inherited", ["", "auto", "cuda"])
+def test_a_worker_is_kept_off_the_device(worker_init, inherited):
+    # One CUDA context per process: whatever a worker inherited, it must not be
+    # the one that resolves onto the card.
+    assert worker_init(inherited) == "lockstep"
+
+
+@pytest.mark.parametrize("inherited", ["lockstep", "per-electron"])
+def test_a_worker_honors_an_inherited_cpu_core(worker_init, inherited):
+    # Redirecting these too made the pin a no-op for every pooled run, so a sweep
+    # pinned to per-electron transported on lockstep and looked identical to one
+    # that had never been pinned at all.
+    assert worker_init(inherited) == inherited
 
 
 # ---- what a case resolves to ----------------------------------------------

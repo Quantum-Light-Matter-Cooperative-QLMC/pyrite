@@ -475,6 +475,67 @@ invariance to batch size, launch geometry, and capacity replay. Any pinned
 spectrum taken above the threshold on a CUDA box has to be regenerated;
 `CXR_MC_TRANSPORT_CORE=lockstep` restores the old core process-wide.
 
+### Verification: whole-sweep A/B on qlmc (2026-08-08)
+
+Everything above is a per-case or per-phase measurement. This is the flip itself,
+end to end, on `qlmc` (RTX 5080 16 GB, 32 logical cores, 45 GB RAM, idle box, no
+SLURM allocation so the pipeline arm gets every core it asks for). Both arms run
+the same `cxr run` invocation and differ only in `CXR_MC_TRANSPORT_CORE`: unset
+(so `auto` resolves to the CUDA core, serial in the driver, segments resident)
+against `lockstep` (the historical `gpu-pipeline` arm, 16 transport workers).
+Fresh checkpoint directory per arm — `--perf` already bypasses the shared cache,
+but a resumed arm would otherwise measure nothing. One warm-up rep per arm, then
+three interleaved reps.
+
+`coh_test` / hopg, 72 cases, `Ne=20000`, `Ne_brem=150`:
+
+| | device arm | pipeline arm |
+| --- | --- | --- |
+| case loop, 3 reps | 12.03 / 12.02 / 12.14 s | 18.64 / 18.70 / 18.78 s |
+| wall incl. startup | 13.88 s (median) | 20.48 s (median) |
+| engine / workers | serial, 1 | gpu-pipeline, 16 |
+| CPU burned | 11.8 core-s | 53.2 core-s |
+| GPU utilization | 84% median | 37.5% median |
+| GPU feed-wait | n/a | 0.103–0.110 |
+| peak VRAM | 2751 MiB | 5039 MiB |
+| peak host RSS (tree) | 0.76 GB | 12.7–13.4 GB |
+| cases in flight | 1 | 18 |
+
+**1.55× on the case loop, 1.48× on wall, for 4.5× less CPU and 17× less host
+memory.** The spread is under 1% across reps, so the difference is not close.
+
+The reason is not the one the design predicted. Feed-wait in the pipeline arm is
+only ~11% — the transport pool *does* keep up — yet the card sits at 37% median
+utilization against the device arm's 84%. What the pipeline pays for is
+everything around the overlap: 18 cases in flight, each holding a host-side
+segment payload (hence 13 GB of RSS), each uploading it before the spectrum
+kernels can touch it. The device arm never forms those payloads. Overlap was
+hiding a cost that residency removes outright.
+
+**Numerical agreement, at sweep scale.** Comparing the arms' 144 (case, energy)
+records field by field looked alarming at first — `brem` differing by up to 26%,
+`spec_coherent` by 38%. A third arm settles it. Run serially with the CPU
+`per-electron` core, the sweep matches the CUDA arm to **0.000% on every field**,
+and differs from lockstep by *exactly* the figures above, digit for digit. All of
+the change is the lockstep → per-electron stream change; none of it is the
+device. Sized against `1/√N`: `line.spec` median 0.43% / max 2.31% at
+`Ne=20000`, `brem` median 4.01% / max 25.74% at `Ne_brem=150`. Both arms are
+run-to-run bitwise reproducible, and serial-lockstep matches pipeline-lockstep
+exactly, so the engine does not enter the result.
+
+That control also caught a defect in the pin: `_worker_init` overwrote
+`CXR_MC_TRANSPORT_CORE` unconditionally, so a worker pool silently ran lockstep
+even when the run was pinned to `per-electron` — the pin was a no-op for every
+pooled run. It now redirects only `auto` and `cuda`, which are the values that
+would open a second CUDA context; a deliberate CPU core is honored.
+
+**MoSe2 device memory.** `promising` / mose2, 432 cases, `Ne=15000`, thickness to
+50000 Å — the heaviest resident payload in the catalog, ~2.5× hopg's segment
+count. Peak VRAM **6873 MiB of 16303** (median 4215), against a CuPy pool cap of
+11412 MiB, with **zero OOM retries** and host RSS of 0.82 GB. The residency
+fallback never fired; the margin on a 16 GB card is real but it is the case to
+watch, and a smaller card would want `REAL` compaction at the join (below).
+
 ### Corrections to earlier rounds
 
 - Round 1's method section credited NVTX ranges `cxr.transport.line` /
@@ -496,6 +557,15 @@ spectrum taken above the threshold on a CUDA box has to be regenerated;
 ### Still open
 
 - NVTX ranges in `transport.py`.
+- **The `gpu-pipeline` engine's memory sizing.** Running `promising`/mose2 on the
+  pipeline arm drove `qlmc`'s 45 GB to 46.8 GB of tree RSS and 8 GB of swap.
+  `_gpu_pipeline_workers`
+  budgets *workers* (`_PIPELINE_WORKER_MEM_MB`) but nothing budgets the 18 cases
+  in flight, each holding a host-side segment payload, and the worker count comes
+  from `os.cpu_count()` — which ignores a SLURM cgroup, so a `--cpus-per-task=8`
+  allocation on this box still spawns 16. The flip routes the heavy runs away
+  from this path rather than fixing it; anything still using the pipeline (no
+  GPU, `Ne ≤ 1000`, grooved) is still exposed.
 - The host-side remainder of a transport call — scratch allocation, mask
   construction, output assembly — is now 38% of hopg's wall and 52% of MoSe2's.
   The kernel is no longer the bottleneck; the driver around it is.

@@ -315,8 +315,11 @@ default of 450 stays on the CPU core; a 20000-electron run does not.
 its premise is CPU transport hidden behind GPU work, and there is neither
 anything left to hide nor room for a second CUDA context on the card this
 process is already driving. `run_cases` therefore keeps such a run in the driver
-process, serially, and every worker process is pinned to the lockstep core in
+process, serially, and every worker process is kept off the device in
 `_worker_init` — the pin covers both pools and every call site inside a worker.
+`_worker_init` redirects only `auto` and `cuda`; it used to overwrite the
+variable unconditionally, which made `CXR_MC_TRANSPORT_CORE=per-electron` a no-op
+in any pooled run.
 The switch is all-or-nothing across a run's cases, since a mixed run would
 strand its CPU-core cases in the driver with nothing overlapping them; sweeps
 hold `Ne` fixed across the grid, so mixed runs are the exception.
@@ -334,6 +337,17 @@ streams make that replay exact, so the fallback costs bus time, not the result.
 bit-for-bit" above. A pinned spectrum taken at `Ne > 1000` on a CUDA box is not
 reproduced by the lockstep core and must be regenerated or compared
 statistically.
+
+At sweep scale this is now measured rather than argued. Over `coh_test`/hopg —
+72 cases at `Ne=20000`, 144 (case, energy) records — the CUDA core and the CPU
+`per-electron` core agree to **0.000% on every recorded field**, and the
+difference against lockstep is *exactly* the difference the CPU per-electron core
+already produces. The port is not merely statistically indistinguishable from its
+specification; at production scale it reproduces it. The stream change itself is
+not small: `line.spec` median 0.43% / max 2.31%, `brem` median 4.01% / max 25.74%
+at `Ne_brem=150`, `spec_coherent` median 8.20% / max 37.91% — all tracking
+`1/√N` for their own population. See "Verification: whole-sweep A/B on qlmc" in
+[`docs/compute-performance-optimization.md`](compute-performance-optimization.md).
 
 ## Not done
 
