@@ -1,0 +1,7 @@
+description: Expose optional Serena tools useful to cxr-mc Codex workers
+prompt: ""
+excluded_tools: []
+included_optional_tools:
+  - get_diagnostics_for_symbol
+  - restart_language_server
+  - serena_info

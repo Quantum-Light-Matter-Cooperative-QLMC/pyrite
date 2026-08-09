@@ -1,5 +1,5 @@
 {
-  "description": "Install locked project dependencies when Codex starts.",
+  "description": "Prepare dependencies and Serena for Codex sessions and workers.",
   "hooks": {
     "PreToolUse": [
       {
@@ -22,6 +22,16 @@
             "timeout": 600,
             "statusMessage": "Syncing project dependencies"
           },
+          {
+            "type": "command",
+            "command": "serena-hooks activate --client=codex"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
           {
             "type": "command",
             "command": "serena-hooks activate --client=codex"

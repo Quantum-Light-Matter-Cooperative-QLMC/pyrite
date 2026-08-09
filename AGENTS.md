@@ -11,12 +11,12 @@ prose keep required format.
 - Use Serena for symbol-level navigation: definitions, references, callers, and
   call sites across the CLI/domain boundary. Use `rg` or direct reads for exact
   text, non-code, generated files, and anything faster to grep — `src/` is ~52k
-  LOC, so grep is competitive for most questions. Tokensave is retired here;
-  there is no `.tokensave/` index, so do not plan around one.
+  LOC, so grep is competitive for most questions.
 - `README.md`: science/install/workflow. `docs/`: guides, design, validation.
   `TODO.md`: shared backlog.
-- Use Context7 only for current external-library docs. RTK filters verbose shell
-  output; do not wrap already-small commands.
+- Use Context7 only for current external-library docs. Headroom shapes agent and
+  tool output; it is not a shell wrapper or code index. Do not use Tokensave or
+  RTK.
 
 ## Canonical commands
 
