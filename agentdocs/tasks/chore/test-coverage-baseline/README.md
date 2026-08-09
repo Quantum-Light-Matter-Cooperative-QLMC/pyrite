@@ -60,9 +60,12 @@ as the model for what *not* to stop at (it asserts module identity only).
       spot: `render_trajectories.py` 50.0% (untouched — its gap is
       `render_reveal_animation`'s missing-dependency error path, not a figure
       builder; out of D's scope). 2831 passed, 57 skipped, no new skips.
-- [ ] E — `montecarlo/_backend.py` fallback-dispatch tests (non-NVIDIA path);
-      coordinate with the Active "Compute performance optimization" item, which
-      already asks for exactly this confirmation.
+- [x] E — `montecarlo/_backend.py` fallback-dispatch tests (non-NVIDIA path).
+      CPU fakes now cover CuPy CUDA/ROCm probing and allocator behavior, SYCL
+      device selection/queue failures, loader error paths, backend selection,
+      and FP64 fallback; focused Numba-disabled coverage is 98.1%. The active
+      compute-performance remainder only needs CUDA-box profiling/CLI work, so
+      this CPU-only contract coverage does not overlap its remaining ownership.
 - [ ] F — `energy_grid/apply.py` + `derive.py` gap review; add tests or record
       why a branch is unreachable.
 - [ ] G — Decide the entry-shim policy (`_compile_nb.py`, `_entry/scan.py`,
