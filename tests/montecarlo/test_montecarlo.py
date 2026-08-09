@@ -315,7 +315,7 @@ def test_beam_fwhm_mm_matches_gaussian_sigma():
         100.0,
         composition=cp["composition"],
         seed=7,
-        max_steps=1,
+        max_steps=200,
         beam_fwhm_mm=fwhm_mm,
     )
     # first segment per electron carries the raw entry offset (before any
@@ -408,7 +408,7 @@ def test_grazing_incidence_projects_beam_off_finite_sample():
         composition=cp["composition"],
         seed=11,
         elastic_model="sr",
-        max_steps=1,
+        max_steps=200,
         beam_fwhm_mm=1.0,
         crystal_width_mm=5.0,
         crystal_height_mm=5.0,

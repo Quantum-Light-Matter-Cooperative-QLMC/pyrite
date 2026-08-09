@@ -365,6 +365,52 @@ def _segments_in_layer(segments, L):
     return out
 
 
+def _clip_segments_to_cutoff(segments, E_cut_keV, composition, layers=None):
+    """Clip terminal material flights to a population-specific energy floor.
+
+    Transport may be shared by radiation populations with different cutoffs.
+    Reapply the transport core's left-endpoint constant-stopping rule here so a
+    higher-cutoff consumer cannot recover radiation from the lower-cutoff tail.
+    Segment start time and energy remain unchanged; length and midpoint are
+    shortened from the original start point.
+    """
+    if E_cut_keV is None:
+        return segments
+
+    seg_E = xp.asarray(segments["E_keV"], dtype=REAL)
+    keep = seg_E >= REAL(E_cut_keV)
+    out = dict(segments)
+    for key in _SEG_ARRAYS:
+        if key in out:
+            out[key] = out[key][keep]
+
+    E = xp.asarray(out["E_keV"], dtype=REAL)
+    old_L = xp.asarray(out["L_ang"], dtype=REAL)
+    layer_index = xp.asarray(out["layer"])
+    stopping = xp.zeros_like(E)
+    layer_compositions = [composition] if layers is None else [item[2] for item in layers]
+    for index, comp in enumerate(layer_compositions):
+        total = xp.zeros_like(E)
+        for element, n_i in comp:
+            params = TRANSPORT_ELEMENTS[element]
+            Z = REAL(params["Z"])
+            J = REAL(params["J_keV"])
+            k = REAL(0.731 + 0.0688 * np.log10(float(Z)))
+            coeff = REAL((n_i / 0.602214076) * float(Z))
+            total += coeff * xp.log(REAL(1.166) * (E + k * J) / J)
+        layer_stopping = REAL(7.85e-4) * total / E
+        stopping = xp.where(layer_index == index, layer_stopping, stopping)
+
+    cutoff_L = (E - REAL(E_cut_keV)) / stopping
+    new_L = xp.minimum(old_L, xp.maximum(REAL(0.0), cutoff_L))
+    direction = xp.asarray(out["v_hat"], dtype=REAL)
+    old_mid = xp.asarray(out["r_mid"], dtype=REAL)
+    start = old_mid - REAL(0.5) * old_L[:, None] * direction
+    out["L_ang"] = new_L
+    out["r_mid"] = start + REAL(0.5) * new_L[:, None] * direction
+    return out
+
+
 def _segments_on_device(segments):
     """One backend copy of the segment arrays, to be shared by a case's kernels.
 
@@ -673,6 +719,7 @@ def mc_spectrum(
     info = CRYSTALS[crystal]
     n_atoms = len(info["basis"]) / info["V_cell"]
     abs_comp = _normalize_composition(absorber_element, n_atoms, composition)
+    segments = _clip_segments_to_cutoff(segments, E_cut_keV, abs_comp, layers)
 
     # crystal orientation: rotation applied to all reciprocal vectors
     R_orient = _orientation_R(
@@ -704,10 +751,6 @@ def mc_spectrum(
     seg_r = xp.asarray(segments["r_mid"], dtype=REAL)
     seg_elec_id = xp.asarray(segments["elec_id"])
     line_electron = seg_elec_id < Ne
-    if E_cut_keV is not None:
-        # See mc_brem_spectrum: shared dual-use electrons are transported to the
-        # LOWER of the two cutoffs, so restore this population's own floor.
-        line_electron = line_electron & (seg_E >= REAL(E_cut_keV))
     beta_all = beta_from_keV(seg_E)  # speed/c per segment
     v_all = beta_all[:, None] * seg_v  # velocity vectors (c=1)
 
@@ -1834,6 +1877,7 @@ def mc_brem_spectrum(
     Validation: brem-spectrum, finite-transverse-crystal, blazed-groove-geometry
     """
     comp = _normalize_composition(element, n_atoms_per_ang3, composition)
+    segments = _clip_segments_to_cutoff(segments, E_cut_keV, comp, layers)
     thickness = segments["thickness_ang"]
     if electron_limit is None:
         Ne = segments["Ne"]
@@ -1864,16 +1908,6 @@ def mc_brem_spectrum(
 
     seg_elec_id = xp.asarray(segments["elec_id"])
     brem_electron = seg_elec_id < Ne
-    if E_cut_keV is not None:
-        # Dual-use transport runs the shared electrons down to
-        # min(E_cut_lines, E_cut_brem), so segments below THIS population's own
-        # cutoff exist for the shared electrons but not for the brem-only ones.
-        # Drop them, or the ensemble mixes two cutoffs. Approximate at the
-        # boundary (the straddling segment is dropped whole rather than
-        # truncated), exact whenever the two cutoffs coincide.
-        brem_electron = brem_electron & (
-            xp.asarray(segments["E_keV"], dtype=REAL) >= REAL(E_cut_keV)
-        )
 
     seg_r = xp.asarray(segments["r_mid"], dtype=REAL)[brem_electron]
     seg_L = xp.asarray(segments["L_ang"], dtype=REAL)[brem_electron]

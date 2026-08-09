@@ -65,11 +65,11 @@ remote GPU workflow; do not run a heavy/GPU sweep locally.
       field invariance regression, covering both coherent reduction routes.
 - [x] C -- Correct coherent midpoint time in all spectrum paths and add a new
       `Validation: <id>` marker, ledger row, assumptions, and limiting case.
-- [ ] D -- Add a constructed cutoff-crossing regression; truncate the terminal
+- [x] D -- Add a constructed cutoff-crossing regression; truncate the terminal
       flight consistently in lockstep, grooved, per-electron, and CUDA cores.
-- [ ] E -- Add explicit cutoff-stop and step-limited termination states/counts;
+- [x] E -- Add explicit cutoff-stop and step-limited termination states/counts;
       raise by default when any history is incomplete.
-- [ ] F -- Add the review's input validation without changing valid runs.
+- [x] F -- Add the review's input validation without changing valid runs.
 - [ ] G -- Prove CPU-core parity with focused statistical/deterministic tests;
       verify CUDA behavior on the configured remote GPU.
 - [ ] H -- Update physics documentation/ledger and regenerate affected golden
@@ -201,10 +201,11 @@ remote GPU workflow; do not run a heavy/GPU sweep locally.
 
 ## Next dispatchable slice
 
-D--F may proceed as the next checkpoint: add the cutoff-crossing regression and
-linear clipping in all four cores plus the population-specific spectrum
-adapter, then add explicit cutoff/step-limit termination and fail-closed input
-validation. Keep G's CPU/CUDA distribution and remote-GPU evidence separate.
+G may proceed: prove aggregate CPU-core agreement across seeds and verify the
+per-electron/CUDA cutoff and termination behavior through the configured remote
+GPU workflow. The CUDA source now mirrors the CPU reference, but this checkpoint
+contains no runtime GPU evidence. Keep H's fresh-context physics validation and
+documentation/ledger closure separate.
 
 ## Slice B--C outcome
 
@@ -223,6 +224,30 @@ validation. Keep G's CPU/CUDA distribution and remote-GPU evidence separate.
   length, so `0.5 L/beta` matches `t_ang`; the sample-frame midpoint and time
   use the same constant velocity; phase remains dimensionless; final `/Ne`
   normalization and all incoherent paths are unchanged.
+
+## Slice D--F outcome
+
+- All four material cores now compute the exact left-endpoint crossing distance
+  before recording a terminal flight. The retained endpoint is set to the
+  electron cutoff, the shortened length drives midpoint and clock advance, and
+  an exact geometry-distance tie remains a geometry event. Grooved cutoff wins
+  only when strictly earlier than a layer/prism/facet event.
+- `spectrum._clip_segments_to_cutoff` applies the same algebra with the emitting
+  layer's composition before both line and bremsstrahlung reduction. It retains
+  segment-start energy/time and moves the midpoint along the retained prefix;
+  the coherent midpoint-time derivation therefore sees the clipped length.
+- Lockstep and grooved cores return cutoff and surviving-alive counts. The
+  per-electron CPU/CUDA contract uses distinct cutoff, step-limited, and
+  not-entered exit codes. `simulate_trajectories` raises the stable incomplete
+  history error before exposing segments, and successful dictionaries report
+  `n_cutoff_stopped`, `n_step_limited == 0`, and `n_stopped` as an alias.
+- Validation now rejects non-finite/non-positive initial or cutoff energies,
+  cutoffs not strictly below each sampled initial energy, and malformed,
+  non-finite, zero, or outward beam directions before transport.
+- Deterministic regressions cover exact terminal clipping in both ungrooved CPU
+  cores and the grooved/layered core, both spectrum entry points, explicit
+  incomplete-history failures, successful count semantics, validation, and
+  CUDA-source rule/code parity. CUDA runtime validation remains G.
 
 ## Delegation slices and required skills
 

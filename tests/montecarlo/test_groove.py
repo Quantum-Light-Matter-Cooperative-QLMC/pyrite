@@ -443,59 +443,62 @@ def _run_grooved(
     vac_id = np.empty(max_vac, dtype=np.int64)
 
     tp = float(spec.tilt_polar_rad)
-    nseg, nvac, n_back, n_trans, n_side = _transport_module._transport_core_grooved(
-        Ne,
-        alive,
-        max_steps,
-        max_segments,
-        max_vac,
-        n_layers,
-        internal_bounds,
-        0,
-        z_total,
-        finite_footprint,
-        0.0 if width_ang is None else float(width_ang),
-        0.0 if height_ang is None else float(height_ang),
-        float(spec.spacing_ang),
-        float(spec.depth_ang),
-        float(np.sin(tp)),
-        float(np.cos(tp)),
-        clock,
-        rng,
-        pos,
-        dirs,
-        E_cut_by_electrons,
-        L_Js,
-        L_Zs,
-        L_ks,
-        L_coeffs,
-        L_ncm3,
-        L_top,
-        L_bot,
-        mott_has_table,
-        mott_start,
-        mott_len,
-        mott_logE_flat,
-        mott_logA_flat,
-        E_keV,
-        seg_dir,
-        seg_mid,
-        seg_len,
-        seg_E,
-        seg_t0,
-        seg_id,
-        seg_lay,
-        vac_start,
-        vac_end,
-        vac_E,
-        vac_t0,
-        vac_id,
+    nseg, nvac, n_back, n_trans, n_side, n_cutoff, n_step_limited = (
+        _transport_module._transport_core_grooved(
+            Ne,
+            alive,
+            max_steps,
+            max_segments,
+            max_vac,
+            n_layers,
+            internal_bounds,
+            0,
+            z_total,
+            finite_footprint,
+            0.0 if width_ang is None else float(width_ang),
+            0.0 if height_ang is None else float(height_ang),
+            float(spec.spacing_ang),
+            float(spec.depth_ang),
+            float(np.sin(tp)),
+            float(np.cos(tp)),
+            clock,
+            rng,
+            pos,
+            dirs,
+            E_cut_by_electrons,
+            L_Js,
+            L_Zs,
+            L_ks,
+            L_coeffs,
+            L_ncm3,
+            L_top,
+            L_bot,
+            mott_has_table,
+            mott_start,
+            mott_len,
+            mott_logE_flat,
+            mott_logA_flat,
+            E_keV,
+            seg_dir,
+            seg_mid,
+            seg_len,
+            seg_E,
+            seg_t0,
+            seg_id,
+            seg_lay,
+            vac_start,
+            vac_end,
+            vac_E,
+            vac_t0,
+            vac_id,
+        )
     )
     return dict(
         n_backscattered=n_back,
         n_transmitted=n_trans,
         n_side_exited=n_side,
-        n_stopped=Ne - n_back - n_trans - n_side,
+        n_stopped=n_cutoff,
+        n_step_limited=n_step_limited,
         vacuum_start_ang=vac_start[:nvac],
         vacuum_end_ang=vac_end[:nvac],
         vacuum_E_keV=vac_E[:nvac],
@@ -533,6 +536,15 @@ def test_surface_cutoff_stops_before_vacuum_reentry():
     assert out["vacuum_start_ang"].shape == (0, 3)
     assert out["n_backscattered"] == 0
     assert out["n_stopped"] == 1
+    assert out["n_step_limited"] == 0
+    E_start = out["E_keV"][-1]
+    carbon = TRANSPORT_ELEMENTS["C"]
+    Z = carbon["Z"]
+    J = carbon["J_keV"]
+    k = 0.731 + 0.0688 * np.log10(Z)
+    coeff = 1e-4 / 0.602214076 * Z
+    stopping = 7.85e-4 / E_start * coeff * np.log(1.166 * (E_start + k * J) / J)
+    assert out["L_ang"][-1] == pytest.approx((E_start - 59.9995) / stopping)
 
 
 def test_permanent_surface_exit_counts_backscatter():

@@ -722,6 +722,7 @@ def _transport_core_ungrooved(
     n_back = 0
     n_trans = 0
     n_side = 0
+    n_cutoff = 0
     n_alive = int(alive.sum())
 
     # Reuse one small rate buffer for all events; only the first Z_arr.size
@@ -805,6 +806,17 @@ def _transport_core_ungrooved(
             # 3. Record the radiating material segment.
             dEds = _dEds_compound_scalar(J_arr, k_arr, coeff_arr, E_j)
             beta_j = beta_from_keV_scalar(E_j)
+            cutoff_j = False
+            cutoff_distance = (E_cut_e - E_j) / dEds
+            geometry_event = cross_up_j or cross_dn_j or exit_side_j
+            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+                step_j = cutoff_distance
+                cutoff_j = True
+                cross_up_j = False
+                cross_dn_j = False
+                exit_top_j = False
+                exit_bot_j = False
+                exit_side_j = False
 
             seg_dir[nseg, 0] = dx
             seg_dir[nseg, 1] = dy
@@ -823,17 +835,19 @@ def _transport_core_ungrooved(
             pos[e, 0] = px + step_j * dx
             pos[e, 1] = py + step_j * dy
             pos[e, 2] = pz + step_j * dz
-            E_keV[e] = E_j + dEds * step_j
+            E_keV[e] = E_cut_e if cutoff_j else E_j + dEds * step_j
             clock[e] += step_j / beta_j
 
             # 5. Exit, internal-boundary, or collision handling.
-            died_j = exit_top_j or exit_bot_j or exit_side_j or E_keV[e] < E_cut_e
+            died_j = exit_top_j or exit_bot_j or exit_side_j or cutoff_j
             if exit_top_j:
                 n_back += 1
             if exit_bot_j:
                 n_trans += 1
             if exit_side_j:
                 n_side += 1
+            if cutoff_j:
+                n_cutoff += 1
             if died_j:
                 alive[e] = False
                 n_alive -= 1
@@ -878,7 +892,7 @@ def _transport_core_ungrooved(
             dirs[e, 1] = dy
             dirs[e, 2] = dz
 
-    return nseg, n_back, n_trans, n_side
+    return nseg, n_back, n_trans, n_side, n_cutoff, int(alive.sum())
 
 
 @njit(cache=True)
@@ -950,6 +964,7 @@ def _transport_core_grooved(
     n_back = 0
     n_trans = 0
     n_side = 0
+    n_cutoff = 0
 
     zero_surface_events = np.zeros(Ne, dtype=np.int16)
     material_steps = np.zeros(Ne, dtype=np.int32)
@@ -1070,6 +1085,18 @@ def _transport_core_grooved(
             # 3. Record the radiating material segment.
             dEds = _dEds_compound_scalar(J_arr, k_arr, coeff_arr, E_j)
             beta_j = beta_from_keV_scalar(E_j)
+            cutoff_j = False
+            cutoff_distance = (E_cut_e - E_j) / dEds
+            geometry_event = cross_up_j or cross_dn_j or exit_side_j or surface_first
+            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+                step_j = cutoff_distance
+                cutoff_j = True
+                cross_up_j = False
+                cross_dn_j = False
+                exit_top_j = False
+                exit_bot_j = False
+                exit_side_j = False
+                surface_first = False
 
             seg_dir[nseg, 0] = dx
             seg_dir[nseg, 1] = dy
@@ -1088,11 +1115,10 @@ def _transport_core_grooved(
             pos[e, 0] = px + step_j * dx
             pos[e, 1] = py + step_j * dy
             pos[e, 2] = pz + step_j * dz
-            E_keV[e] = E_j + dEds * step_j
+            E_keV[e] = E_cut_e if cutoff_j else E_j + dEds * step_j
             clock[e] += step_j / beta_j
 
-            below_cut = E_keV[e] < E_cut_e
-            active_surface = surface_first and not below_cut
+            active_surface = surface_first and not cutoff_j
             reentered = False
 
             if not active_surface:
@@ -1173,13 +1199,15 @@ def _transport_core_grooved(
                     raise RuntimeError("repeated zero-length grooved surface events")
 
             # 6. Kill true exits / cutoff electrons and handle internal seams.
-            died_j = exit_top_j or exit_bot_j or exit_side_j or below_cut
+            died_j = exit_top_j or exit_bot_j or exit_side_j or cutoff_j
             if exit_top_j:
                 n_back += 1
             if exit_bot_j:
                 n_trans += 1
             if exit_side_j:
                 n_side += 1
+            if cutoff_j:
+                n_cutoff += 1
 
             if died_j:
                 alive[e] = False
@@ -1234,17 +1262,19 @@ def _transport_core_grooved(
                 if material_steps[e] >= max_steps:
                     n_eligible -= 1
 
-    return nseg, nvac, n_back, n_trans, n_side
+    return nseg, nvac, n_back, n_trans, n_side, n_cutoff, int(alive.sum())
 
 
 # ---- per-electron transport core (GPU-portable reference) ---------------------
 
 # Exit classification, returned per electron instead of accumulated into shared
 # counters, so the host can total them in a fixed order.
-EXIT_ALIVE_OR_STOPPED = np.int8(0)
+EXIT_CUTOFF_STOPPED = np.int8(0)
 EXIT_BACKSCATTERED = np.int8(1)
 EXIT_TRANSMITTED = np.int8(2)
 EXIT_SIDE = np.int8(3)
+EXIT_STEP_LIMITED = np.int8(4)
+EXIT_NOT_ENTERED = np.int8(5)
 
 
 @njit(cache=True)
@@ -1331,9 +1361,10 @@ def _transport_core_ungrooved_perelectron(
     for i in range(e_count):
         e = e_start + i
         seg_count[i] = 0
-        exit_code[i] = EXIT_ALIVE_OR_STOPPED
+        exit_code[i] = EXIT_NOT_ENTERED
         if not alive[e]:
             continue
+        exit_code[i] = EXIT_STEP_LIMITED
 
         key = stream_key[e]
         draw = _SM64_ZERO
@@ -1412,6 +1443,17 @@ def _transport_core_ungrooved_perelectron(
                 dEds += coeff * np.log(1.166 * (E_j + k * J) / J)
             dEds = -7.85e-4 / E_j * dEds
             beta_j = beta_from_keV_scalar(E_j)
+            cutoff_j = False
+            cutoff_distance = (E_cut_e - E_j) / dEds
+            geometry_event = cross_up_j or cross_dn_j or exit_side_j
+            if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+                step_j = cutoff_distance
+                cutoff_j = True
+                cross_up_j = False
+                cross_dn_j = False
+                exit_top_j = False
+                exit_bot_j = False
+                exit_side_j = False
 
             if local_nseg < cap:
                 slot = i * cap + local_nseg
@@ -1432,7 +1474,7 @@ def _transport_core_ungrooved_perelectron(
             pos[e, 0] = px + step_j * dx
             pos[e, 1] = py + step_j * dy
             pos[e, 2] = pz + step_j * dz
-            E_keV[e] = E_j + dEds * step_j
+            E_keV[e] = E_cut_e if cutoff_j else E_j + dEds * step_j
             clock[e] += step_j / beta_j
 
             # 5. Exit, internal-boundary, or collision handling.
@@ -1442,7 +1484,9 @@ def _transport_core_ungrooved_perelectron(
                 exit_code[i] = EXIT_TRANSMITTED
             elif exit_side_j:
                 exit_code[i] = EXIT_SIDE
-            if exit_top_j or exit_bot_j or exit_side_j or E_keV[e] < E_cut_e:
+            elif cutoff_j:
+                exit_code[i] = EXIT_CUTOFF_STOPPED
+            if exit_top_j or exit_bot_j or exit_side_j or cutoff_j:
                 break
 
             if cross_up_j or cross_dn_j:
@@ -1711,8 +1755,8 @@ def _run_per_electron_transport(
     the pageable host copy it replaces, that is roughly two orders of magnitude
     of bandwidth -- and holds both copies of the payload while it runs.
 
-    Returns ``(nseg, n_back, n_trans, n_side, joined)``, where ``joined`` is
-    ``None`` unless ``keep_on_device``.
+    Returns ``(nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited,
+    joined)``, where ``joined`` is ``None`` unless ``keep_on_device``.
     """
     on_device = xp is not np
     to_dev = xp.asarray if on_device else (lambda a: a)
@@ -1745,7 +1789,7 @@ def _run_per_electron_transport(
     cap = max(1, int(config.seg_capacity))
     seen_max = 0
     nseg = 0
-    n_back = n_trans = n_side = 0
+    n_back = n_trans = n_side = n_cutoff = n_step_limited = 0
     e = 0
     while e < Ne:
         m = _batch_electrons(e, cap, Ne, config)
@@ -1840,6 +1884,8 @@ def _run_per_electron_transport(
         n_back += int((exit_code == EXIT_BACKSCATTERED).sum())
         n_trans += int((exit_code == EXIT_TRANSMITTED).sum())
         n_side += int((exit_code == EXIT_SIDE).sum())
+        n_cutoff += int((exit_code == EXIT_CUTOFF_STOPPED).sum())
+        n_step_limited += int((exit_code == EXIT_STEP_LIMITED).sum())
         _nsys_pop()
         e += m
 
@@ -1861,7 +1907,7 @@ def _run_per_electron_transport(
         )
         _nsys_pop()
 
-    return nseg, n_back, n_trans, n_side, joined
+    return nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, joined
 
 
 def _alloc_scratch(xp, m, cap):
@@ -2123,11 +2169,16 @@ def simulate_trajectories(
       "vacuum_E_keV" (V,), "vacuum_t_ang" (V,), "vacuum_t0_ang" (V,),
       "vacuum_elec_id" (V,)
     and diagnostics: "n_backscattered", "n_transmitted", "n_side_exited",
-    "n_missed", "n_stopped", "n_layers".
+    "n_missed", "n_cutoff_stopped", "n_step_limited", "n_stopped" (the
+    compatibility alias of ``n_cutoff_stopped``), and "n_layers". Incomplete
+    histories raise ``RuntimeError`` rather than returning these arrays/counts.
 
     Validation: electron-transport, finite-beam-size, finite-transverse-crystal,
     grazing-beam-projection
     """
+    if not np.isfinite(E0_keV) or E0_keV <= 0.0:
+        raise ValueError("E0_keV must be finite and strictly positive")
+
     width_mm, height_mm = validate_transverse_dimensions(
         crystal_width_mm, crystal_height_mm, unit="mm"
     )
@@ -2178,8 +2229,8 @@ def simulate_trajectories(
                 f"E_cut_by_electrons must have shape ({Ne},), got {E_cut_by_electrons.shape}"
             )
 
-        if not np.all(np.isfinite(E_cut_by_electrons)):
-            raise ValueError("E_cut_by_electrons must contain only finite values")
+    if not np.all(np.isfinite(E_cut_by_electrons)) or not np.all(E_cut_by_electrons > 0.0):
+        raise ValueError("electron cutoff energies must be finite and strictly positive")
 
     # NVTX ranges for the transport phase. Everything here is host-side, but a
     # CUDA run's wall clock is not: Round 4 left a 38-52% unattributed remainder
@@ -2333,7 +2384,12 @@ def simulate_trajectories(
     if beam_dir is None:
         beam_dir = np.array([0.0, 0.0, 1.0])
     beam_dir = np.asarray(beam_dir, dtype=float)
-    beam_dir = beam_dir / np.linalg.norm(beam_dir)
+    if beam_dir.shape != (3,) or not np.all(np.isfinite(beam_dir)):
+        raise ValueError("beam_dir must be a finite three-vector")
+    beam_norm = np.linalg.norm(beam_dir)
+    if not np.isfinite(beam_norm) or beam_norm == 0.0:
+        raise ValueError("beam_dir must be nonzero")
+    beam_dir = beam_dir / beam_norm
     if beam_dir[2] <= 1e-6:
         raise ValueError("beam_dir must point into the slab (z component > 0)")
     if transverse_slopes is None:
@@ -2354,11 +2410,13 @@ def simulate_trajectories(
         # reason as the transverse draw above.
         spread_rng = np.random.default_rng(np.random.SeedSequence(seed).spawn(6)[5])
         E_keV = E_keV * (1.0 + float(energy_spread_frac) * spread_rng.standard_normal(Ne))
-        if not np.all(E_keV > 0.0):
+        if not np.all(np.isfinite(E_keV)) or not np.all(E_keV > 0.0):
             raise ValueError(
-                f"energy_spread_frac={energy_spread_frac} drew a non-positive electron "
-                "energy; the Gaussian spread model needs spread << 1"
+                f"energy_spread_frac={energy_spread_frac} drew a non-finite or non-positive "
+                "electron energy; the Gaussian spread model needs spread << 1"
             )
+    if not np.all(E_cut_by_electrons < E_keV):
+        raise ValueError("each electron cutoff energy must be below its initial energy")
     if finite_footprint:
         assert height_ang is not None
         alive = (np.abs(pos[:, 0]) <= width_ang / 2.0) & (np.abs(pos[:, 1]) <= height_ang / 2.0)
@@ -2430,39 +2488,41 @@ def simulate_trajectories(
         if keep_segments_on_device:
             seg_xp = core_xp
 
-        nseg, n_back, n_trans, n_side, dev_segs = _run_per_electron_transport(
-            core,
-            core_xp,
-            Ne,
-            seed,
-            max_steps,
-            max_segments,
-            n_layers,
-            internal_bounds,
-            elastic_model_code,
-            z_total,
-            finite_footprint,
-            0.0 if width_ang is None else float(width_ang),
-            0.0 if height_ang is None else float(height_ang),
-            alive,
-            clock,
-            pos,
-            dirs,
-            E_cut_by_electrons,
-            pack_layer_tables(L_Js, L_Zs, L_ks, L_coeffs, L_ncm3),
-            L_top,
-            L_bot,
-            (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat),
-            E_keV,
-            seg_dir,
-            seg_mid,
-            seg_len,
-            seg_E,
-            seg_t0,
-            seg_id,
-            seg_lay,
-            config=per_electron_config,
-            keep_on_device=keep_segments_on_device,
+        nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited, dev_segs = (
+            _run_per_electron_transport(
+                core,
+                core_xp,
+                Ne,
+                seed,
+                max_steps,
+                max_segments,
+                n_layers,
+                internal_bounds,
+                elastic_model_code,
+                z_total,
+                finite_footprint,
+                0.0 if width_ang is None else float(width_ang),
+                0.0 if height_ang is None else float(height_ang),
+                alive,
+                clock,
+                pos,
+                dirs,
+                E_cut_by_electrons,
+                pack_layer_tables(L_Js, L_Zs, L_ks, L_coeffs, L_ncm3),
+                L_top,
+                L_bot,
+                (mott_has_table, mott_start, mott_len, mott_logE_flat, mott_logA_flat),
+                E_keV,
+                seg_dir,
+                seg_mid,
+                seg_len,
+                seg_E,
+                seg_t0,
+                seg_id,
+                seg_lay,
+                config=per_electron_config,
+                keep_on_device=keep_segments_on_device,
+            )
         )
         nvac = 0
         vac_start = np.empty((0, 3), dtype=float)
@@ -2471,7 +2531,7 @@ def simulate_trajectories(
         vac_t0 = np.empty(0, dtype=float)
         vac_id = np.empty(0, dtype=np.int64)
     elif groove is None:
-        nseg, n_back, n_trans, n_side = _transport_core_ungrooved(
+        nseg, n_back, n_trans, n_side, n_cutoff, n_step_limited = _transport_core_ungrooved(
             Ne,
             alive,
             max_steps,
@@ -2525,7 +2585,7 @@ def simulate_trajectories(
         tp = float(groove.tilt_polar_rad)
         groove_st = float(np.sin(tp))
         groove_ct = float(np.cos(tp))
-        nseg, nvac, n_back, n_trans, n_side = _transport_core_grooved(
+        nseg, nvac, n_back, n_trans, n_side, n_cutoff, n_step_limited = _transport_core_grooved(
             Ne,
             alive,
             max_steps,
@@ -2580,6 +2640,12 @@ def simulate_trajectories(
         vac_id = vac_id_buf[:nvac]
     _nsys_pop()
 
+    if n_step_limited:
+        raise RuntimeError(
+            "incomplete electron transport: "
+            f"n_step_limited={n_step_limited}, Ne={Ne}, max_steps={max_steps}"
+        )
+
     _nsys_push("cxr.transport.output")
     if dev_segs is None:
         r_mid = seg_mid[:nseg]
@@ -2632,7 +2698,9 @@ def simulate_trajectories(
         "n_transmitted": n_trans,
         "n_side_exited": n_side,
         "n_missed": n_missed,
-        "n_stopped": int(Ne - n_back - n_trans - n_side - n_missed),
+        "n_cutoff_stopped": int(n_cutoff),
+        "n_step_limited": 0,
+        "n_stopped": int(n_cutoff),
         "Ne": Ne,
         "thickness_ang": z_total,
         "crystal_width_ang": width_ang,

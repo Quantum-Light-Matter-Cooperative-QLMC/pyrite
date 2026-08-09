@@ -70,10 +70,12 @@ FACE_Y_MAX = np.int32(Y_MAX)
 FACE_Z_MIN = np.int32(Z_MIN)
 FACE_Z_MAX = np.int32(Z_MAX)
 
-I8_ALIVE_OR_STOPPED = np.int8(0)
+I8_CUTOFF_STOPPED = np.int8(0)
 I8_BACKSCATTERED = np.int8(1)
 I8_TRANSMITTED = np.int8(2)
 I8_SIDE = np.int8(3)
+I8_STEP_LIMITED = np.int8(4)
+I8_NOT_ENTERED = np.int8(5)
 
 
 @dataclass(frozen=True)
@@ -246,10 +248,11 @@ def _transport_kernel(
         return
 
     seg_count[i] = I32_ZERO
-    exit_code[i] = I8_ALIVE_OR_STOPPED
+    exit_code[i] = I8_NOT_ENTERED
     e = e_start + i
     if alive[e] == np.uint8(0):
         return
+    exit_code[i] = I8_STEP_LIMITED
 
     e3 = e * I32_THREE
     key = stream_key[e]
@@ -369,6 +372,17 @@ def _transport_kernel(
             i_el += I32_ONE
         dEds = -np.float64(7.85e-4) / E_j * dEds
         beta_j = _beta_from_keV(E_j)
+        cutoff_j = False
+        cutoff_distance = (E_cut_e - E_j) / dEds
+        geometry_event = cross_up_j or cross_dn_j or exit_side_j
+        if cutoff_distance < step_j or (cutoff_distance == step_j and not geometry_event):
+            step_j = cutoff_distance
+            cutoff_j = True
+            cross_up_j = False
+            cross_dn_j = False
+            exit_top_j = False
+            exit_bot_j = False
+            exit_side_j = False
 
         if local_nseg < cap:
             slot = i * cap + local_nseg
@@ -390,7 +404,10 @@ def _transport_kernel(
         pos[e3] = px + step_j * dx
         pos[e3 + I32_ONE] = py + step_j * dy
         pos[e3 + I32_TWO] = pz + step_j * dz
-        E_keV[e] = E_j + dEds * step_j
+        if cutoff_j:
+            E_keV[e] = E_cut_e
+        else:
+            E_keV[e] = E_j + dEds * step_j
         clock[e] += step_j / beta_j
 
         # 5. Exit, internal-boundary, or collision handling.
@@ -400,8 +417,10 @@ def _transport_kernel(
             exit_code[i] = I8_TRANSMITTED
         elif exit_side_j:
             exit_code[i] = I8_SIDE
+        elif cutoff_j:
+            exit_code[i] = I8_CUTOFF_STOPPED
 
-        if exit_top_j or exit_bot_j or exit_side_j or E_keV[e] < E_cut_e:
+        if exit_top_j or exit_bot_j or exit_side_j or cutoff_j:
             running = False
         elif cross_up_j or cross_dn_j:
             if dirs[e3 + I32_TWO] > F64_ZERO:

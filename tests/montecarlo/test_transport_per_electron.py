@@ -23,7 +23,15 @@ from cxr_mc.montecarlo.transport import (
 )
 
 SEGMENT_KEYS = ("r_mid", "v_hat", "L_ang", "E_keV", "t_ang", "t0_ang", "elec_id", "layer")
-COUNT_KEYS = ("n_backscattered", "n_transmitted", "n_side_exited", "n_stopped", "n_missed")
+COUNT_KEYS = (
+    "n_backscattered",
+    "n_transmitted",
+    "n_side_exited",
+    "n_cutoff_stopped",
+    "n_step_limited",
+    "n_stopped",
+    "n_missed",
+)
 
 BASE_CASE = dict(
     E0_keV=30.0,
