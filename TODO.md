@@ -16,12 +16,12 @@ file. Edit and drop items on `main`.
 ## Active
 
 1. **Physics validation ledger.** Continue fresh-context re-derivations, add missing in-code `Validation: <id>` markers. Design: [`docs/physics-validation-ledger.md`](docs/physics-validation-ledger.md); method: [`docs/validation/README.md`](docs/validation/README.md).
-   Four orphan markers on the incoherent line path are the current gap and block
-   a decision in P1's compute-performance item: `line-hkl-batch`,
-   `line-amplitude-fusion`, `line-gemv-elementwise`,
-   `line-absorption-tabulation` (all `montecarlo/spectrum.py`, no ledger row).
-   Also `beam-phase-space-injection` / `beam-energy-spread-injection` are
-   `rederived` and await human `signed-off`.
+   The four incoherent-line-path markers are now ledgered (`line-hkl-batch`,
+   `line-amplitude-fusion`, `line-gemv-elementwise` `filtered`;
+   `line-absorption-tabulation` a `discrepancy` — tabulated `μ` off `2.72e-01`
+   at hopg's C K-edge, unresolved). `beam-phase-space-injection` /
+   `beam-energy-spread-injection` are `rederived` and await human
+   `signed-off`.
 2. **Repository and source-package structure cleanup.** Eight slices beyond the
    accepted structure RFC: installed-package path resolution (shipped code
    anchors on the developer checkout and the wheel omits the marimo apps),
@@ -43,11 +43,14 @@ file. Edit and drop items on `main`.
    [`docs/compute-performance-optimization.md`](docs/compute-performance-optimization.md));
    the MoSe2 `--ne-line=20000` report is closed as compute-bound transport plus a
    one-time pipeline-fill transient, and the CUDA transport core is now the
-   default above 1000 electrons. What is left needs a CUDA box, a CLI decision,
-   and a ledger decision: the fate of the gated `_USE_JIT_LINE_PROLOGUE`, the
-   `--cpu`/`--cpu-only` profiler stranded on the deprecated `cxr remote run`,
-   and the deferred levers (NVTX in `transport.py`, `REAL` compaction,
-   `gpu-pipeline` memory sizing). Plan and open questions:
+   default above 1000 electrons. Round 5 ledgered the four line-path markers
+   and deleted the dead `_USE_JIT_LINE_PROLOGUE` flag/module. What is left
+   needs a CUDA box and a CLI decision: the `--cpu`/`--cpu-only` profiler
+   stranded on the deprecated `cxr remote run` (flags ported to `cxr run -R`;
+   one authorized remote job to exercise them still owed), and the deferred
+   levers (NVTX in `transport.py`, `REAL` compaction, `gpu-pipeline` memory
+   sizing — sizing itself already fixed and awaiting hardware confirmation).
+   Plan and open questions:
    → `feature/compute-performance-optimization`;
    [`tasks/feature/compute-performance-optimization/REMAINING.md`](tasks/feature/compute-performance-optimization/REMAINING.md).
 2. **Add support for characteristic X-rays**
@@ -64,16 +67,7 @@ file. Edit and drop items on `main`.
    case than the batched branch. Physics-gated (reassociation → `Validation:`
    id, ledger row, golden regen). → `feature/coherent-line-batching`;
    [`tasks/feature/coherent-line-batching/`](tasks/feature/coherent-line-batching/).
-6. **Test coverage baseline and gap closure.** First full-suite `--cov` run
-   (2026-08-07): green, 74.2% line / 84.0% once the two compiled-code
-   measurement artifacts are removed (CuPy kernel modules never import on a
-   CPU-only env; `@njit` bodies bypass the tracer — `NUMBA_DISABLE_JIT=1` moves
-   `transport.py` 37→87%). Coverage config landed in `pyproject.toml`. Real
-   gaps: `plots/` figure builders (~734 stmts, worst 6.3%),
-   `montecarlo/_backend.py` fallback dispatch 69%, `energy_grid/apply.py` 78%.
-   → `chore/test-coverage-baseline`;
-   [`tasks/chore/test-coverage-baseline/`](tasks/chore/test-coverage-baseline/).
-7. **Physics boundary typing.** `typecheck` passes, but the physics packages are
+6. **Physics boundary typing.** `typecheck` passes, but the physics packages are
    the least annotated in the tree — `montecarlo` 4.6% of params, `detectors`
    6.6% (vs `materials` 59.8%); of 42 public re-exported functions, 2 are fully
    annotated. Annotate the public boundary only, with unit-carrying aliases
@@ -82,6 +76,7 @@ file. Edit and drop items on `main`.
    (`--error all` is 51 diagnostics, mostly correlated-guard false positives).
    → `chore/physics-boundary-typing`;
    [`tasks/chore/physics-boundary-typing/`](tasks/chore/physics-boundary-typing/).
+
 ### Gated
 
 1. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/crystal-mosaicity.md`](docs/crystal-mosaicity.md).
@@ -130,11 +125,11 @@ file. Edit and drop items on `main`.
 4. **Cross-platform agent hooks.** Improve shell and operating-system support
    beyond WSL/Ubuntu, including a directory of hook scripts for more complex setup and
    platform-specific handling.
-      1. Would be nice to add backend checking to install the right kind of
-         extras to the agent (e.g., if computer has nvidia gpu, run
-         `uv sync --all-groups --extra nvidia`, whereas if computer has intel gpu, then
-         `uv sync --all-groups --extra intel`, etc.
-         )
+   1. Would be nice to add backend checking to install the right kind of
+      extras to the agent (e.g., if computer has nvidia gpu, run
+      `uv sync --all-groups --extra nvidia`, whereas if computer has intel gpu, then
+      `uv sync --all-groups --extra intel`, etc.
+      )
 5. **Local SLURM integration.** Make `cxr run` use the configured laptop-local
    SLURM installation (and, if available, report GPU usage statistics), if it exists.
 6. **Add support for custom-defined remotes, or other standards for submitting remote computing tasks**.
@@ -177,8 +172,7 @@ not here.
 ## UI backlog
 
 1. Clean up raw printed ssh commands shipped to remote unless a verbose flag is
-   given; otherwise show a well-formatted explanation, e.g. `Pulling "Standard
-   Performance Profile for MoS2" [progress bar + absolute progress]`.
+   given; otherwise show a well-formatted explanation, e.g. `Pulling "Standard Performance Profile for MoS2" [progress bar + absolute progress]`.
 2. Golden data should be an optional installable, e.g. `uv add cxr-mc[golden]`
    or part of `uv add cxr-mc[all]`. Same with validation scripts/app -- not
    critically required.
