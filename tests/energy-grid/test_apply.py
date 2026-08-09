@@ -288,6 +288,36 @@ def test_set_brem_artifact_repoints_ref_and_preserves_profile_override(tmp_path,
     assert stamped == [("hopg", "manual", "reviewed", "standard")]
 
 
+@pytest.mark.parametrize(
+    ("setter", "call"),
+    [
+        ("set_line", lambda: apply.set_line_artifact("hopg", 30, 2800)),
+        ("set_brem", lambda: apply.set_brem_artifact("hopg", 150000)),
+    ],
+)
+def test_artifact_setters_restore_catalog_and_provenance_when_stamping_fails(
+    tmp_path, monkeypatch, setter, call
+):
+    toml_path = tmp_path / "materials.toml"
+    provenance_path = tmp_path / "line_grid_provenance.toml"
+    toml_path.write_text(BASE_TOML)
+    provenance_path.write_text("# existing provenance\n")
+    monkeypatch.setattr(apply, "_MATERIALS_TOML", toml_path)
+    monkeypatch.setattr(apply._provenance, "PROVENANCE_PATH", provenance_path)
+    monkeypatch.setattr(apply, "load_material_catalog", lambda path: None)
+    monkeypatch.setattr(
+        apply._provenance,
+        setter,
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("provenance write failed")),
+    )
+
+    with pytest.raises(OSError, match="provenance write failed"):
+        call()
+
+    assert toml_path.read_text() == BASE_TOML
+    assert provenance_path.read_text() == "# existing provenance\n"
+
+
 def test_apply_validation_failure_leaves_catalog_and_provenance_unchanged(tmp_path, monkeypatch):
     toml_path = tmp_path / "materials.toml"
     provenance_path = tmp_path / "line_grid_provenance.toml"

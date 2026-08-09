@@ -66,8 +66,11 @@ as the model for what *not* to stop at (it asserts module identity only).
       and FP64 fallback; focused Numba-disabled coverage is 98.1%. The active
       compute-performance remainder only needs CUDA-box profiling/CLI work, so
       this CPU-only contract coverage does not overlap its remaining ownership.
-- [ ] F — `energy_grid/apply.py` + `derive.py` gap review; add tests or record
-      why a branch is unreachable.
+- [x] F — `energy_grid/apply.py` + `derive.py` gap review. Added regression
+      coverage for both artifact setters' catalog/provenance rollback on a
+      stamping failure. The remaining uncovered paths are CLI rendering,
+      filesystem cleanup failures, and real Monte Carlo execution; the latter
+      is deliberately replaced by deterministic runner fakes in the CPU suite.
 - [ ] G — Decide the entry-shim policy (`_compile_nb.py`, `_entry/scan.py`,
       `cli/energy_grid.py`, `cli/__main__.py`): smoke-test or `pragma: no
       cover` with a reason.
