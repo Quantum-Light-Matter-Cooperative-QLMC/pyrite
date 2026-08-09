@@ -43,28 +43,66 @@ compatibility. Survey runs and explicitly overridden full runs use
 historical `<material>_quick` stem but also records resolved identity. Thus
 variants cannot silently resume into each other.
 
+## Named beams
+
+A beam is a catalog object of its own, a top-level `[beams.<name>]` table
+alongside `[materials.*]` and `[profiles.*]`, and a profile attaches one by name:
+
+```toml
+[beams.gaussian_200fs]
+label = "200 fs Gaussian bunch, 0.1 mm spot"
+transverse_fwhm_mm = 0.1
+rep_rate_hz = 5000.0
+bunch_charge_pc = 1.0
+
+[beams.gaussian_200fs.longitudinal]
+kind = "gaussian"
+envelope_rms_fs = 200.0
+
+[profiles.hopg_hbn_gaussian_200fs]
+beam = "gaussian_200fs"
+```
+
+`cxr beam list|show|create|set|rename|delete` manages the objects;
+`cxr profile set <profile> --beam NAME` attaches one and
+`cxr profile remove <profile> --beam` detaches it. `rename` rewrites every
+referencing profile, and `delete` is blocked while any profile still points at
+the beam, so a reference is never orphaned.
+
+The reference resolves to *values* before hashing, and `label` is stripped, so
+`parameter_sha256` -- and therefore every checkpoint stem -- depends on the beam
+the profile runs, not on what that beam is called. Two profiles sharing a beam
+share checkpoints; renaming a beam moves nothing.
+
+The older inline `[profiles.<name>.beam]` table still decodes and means exactly
+the same thing, but nothing writes it any more and all bundled profiles have
+been converted. A profile carrying both spellings fails to load.
+
 ## Beam block
 
-A catalog profile's `[profiles.<name>.beam]` table decodes into `BeamSpec`. The
-nested `beam.longitudinal` and `beam.transverse` sub-tables carry the bunch and
-phase-space policies; `docs/beam-phase-space.md` is the reference for every key,
-its units, and the mutual exclusions between them. `cxr profile create` /
-`cxr profile edit` write the same keys from `--emittance`, `--twiss-beta`,
-`--twiss-alpha`, `--energy-spread`, and the legacy `--transverse-fwhm-mm`.
+A beam table -- named or inline -- decodes into `BeamSpec`. The nested
+`longitudinal` and `transverse` sub-tables carry the bunch and phase-space
+policies; `docs/beam-phase-space.md` is the reference for every key, its units,
+and the mutual exclusions between them. `cxr beam create` / `cxr beam set` write
+the same keys from `--emittance`, `--twiss-beta`, `--twiss-alpha`,
+`--energy-spread`, and the legacy `--transverse-fwhm-mm`. The nine equivalent
+`cxr profile create` / `cxr profile set` flags still work and still write an
+inline block, but each warns once naming `cxr beam`.
 
 Both sub-tables join `parameter_sha256` only when they diverge from the inert
 defaults, so a profile that never sets them hashes exactly as it did before the
 keys existed and resumes into its existing checkpoints.
 
-The bundled `hopg_emittance_demo` is the worked example: a Courant-Snyder waist
+The bundled `emittance_demo` beam is the worked example: a Courant-Snyder waist
 (`alpha_twiss_x = 0`) on the crystal entrance face at 0.1 mm·mrad normalized
-emittance and a 0.05 m beta function, plus a 0.1% energy spread, over hopg at 30
-and 100 keV. Because the stored emittance is normalized, that one block is the
-same physical beam at both energies -- 0.12 mm and 2.4 mrad RMS at 30 keV,
-shrinking as `1/sqrt(beta*gamma)` at 100 keV. A `beam.transverse` table clears
-the spot FWHM that a profile beam otherwise defaults to; the two spellings are
-mutually exclusive, and specifying both is an error rather than a precedence
-rule. `hopg_hbn_compressed_microbunch` is the longitudinal counterpart.
+emittance and a 0.05 m beta function, plus a 0.1% energy spread, run by
+`hopg_emittance_demo` over hopg at 30 and 100 keV. Because the stored emittance
+is normalized, that one beam is the same physical beam at both energies -- 0.12
+mm and 2.4 mrad RMS at 30 keV, shrinking as `1/sqrt(beta*gamma)` at 100 keV. A
+`transverse` table clears the spot FWHM that a beam otherwise defaults to; the
+two spellings are mutually exclusive, and specifying both is an error rather
+than a precedence rule. The `compressed_microbunch` beam, run by
+`hopg_hbn_compressed_microbunch`, is the longitudinal counterpart.
 
 Archive and restore copy the complete component directory, including identity
 metadata. Archive merge rejects two identity-bearing datasets whose resolved

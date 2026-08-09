@@ -537,10 +537,23 @@ One module per `cxr` subcommand group, holding only the Click layer.
 `scan`/`blaze` command wiring split out of the fused `scan.py`/`blaze.py`
 drivers; `energy_grid` registers the domain-owned implementation; `profile`
 owns named campaign defaults and membership; `material` owns effective-range
-inspection and per-profile overrides; `sweep` is hidden compatibility aliases
+inspection and per-profile overrides; `beam` owns named `[beams.*]` objects;
+`sweep` is hidden compatibility aliases
 only. `job` owns the canonical remote asynchronous-job lifecycle and delegates
 transport/state operations to `_remote/`. Shared validated atomic TOML helpers
 stay in `cli/_catalog_io.py`.
+
+### `cli/commands/beam.py`
+Canonical `cxr beam list|show|create|set|rename|delete` Click layer over
+top-level `[beams.NAME]` catalog tables, attached to a profile by
+`beam = "NAME"`. `rename` cascades to every referencing profile and `delete` is
+blocked while a reference survives. Option parsing, validation, and TOML writing
+are shared with `cxr profile`'s retired inline beam flags via
+`cli/commands/_beam_shared.py`, so both surfaces validate identically. The
+reference resolves to values in `materials/catalog.py` before `profiles.py`
+hashes, so beam names never reach `parameter_sha256`. See
+[`docs/sweep-profiles.md`](sweep-profiles.md) and
+[`docs/beam-phase-space.md`](beam-phase-space.md).
 
 ### `cli/commands/job.py`
 Canonical `cxr job list|status|logs|attach|stop` Click layer. Reuses the remote
