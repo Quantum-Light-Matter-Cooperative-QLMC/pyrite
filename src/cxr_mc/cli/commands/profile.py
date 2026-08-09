@@ -11,6 +11,7 @@ import click
 import tomlkit
 from tomlkit.exceptions import ParseError
 
+from cxr_mc.campaign import profile_edit as _profile_edit
 from cxr_mc.cli import _catalog_io
 from cxr_mc.cli import _completion as _cli_completion
 from cxr_mc.cli import json as cli_json
@@ -29,15 +30,11 @@ from cxr_mc.cli._core import (
 )
 from cxr_mc.cli._deprecations import DeprecatingGroup, canonical_option, warn_flag
 from cxr_mc.cli.commands._beam_shared import (
-    apply_beam_updates as _apply_beam_updates,
-)
-from cxr_mc.cli.commands._beam_shared import (
     beam_cli_options as _beam_cli_options,
 )
 from cxr_mc.cli.commands._beam_shared import (
     collect_beam_updates as _collect_beam_updates,
 )
-from cxr_mc.detectors.spec import DetectorSpec
 
 _NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 #: Mirrors ``materials.catalog._EMISSION_VALUES`` (kept local, not imported,
@@ -52,16 +49,11 @@ _RANGE_OPTIONS = (
 )
 
 #: Electron-count profile settings (plan P2.4): single-value grids, sweepable.
-_EXTRA_RANGES = {"ne_line": "n_electrons", "ne_brem": "n_electrons_brem"}
-_ACTIVE_DETECTOR_FIELDS = (
-    ("observation_angle_deg", "observation angle", "deg"),
-    ("polar_acceptance_deg", "polar acceptance (full span)", "deg"),
-    ("solid_angle_sr", "solid angle", "sr"),
-)
+_ACTIVE_DETECTOR_FIELDS = _profile_edit.ACTIVE_DETECTOR_FIELDS
 
 
 def _catalog_key(label):
-    return _catalog_io.RANGES.get(label) or _EXTRA_RANGES[label]
+    return _profile_edit.catalog_key(label)
 
 
 def _ne_cli_options(function):
@@ -158,21 +150,11 @@ def _collect_detector_updates(observation_angle_deg, polar_acceptance_deg, solid
 
 
 def _unknown_profile(document, name):
-    profiles = _catalog_io.profile_rows(document)
-    suggestions = difflib.get_close_matches(name, profiles, n=3, cutoff=0.5)
-    message = f"unknown profile: {name}"
-    if suggestions:
-        message += f". Did you mean: {', '.join(suggestions)}?"
-    message += f". Create it first with: cxr profile create {name}"
-    raise ValueError(message)
+    return _profile_edit.unknown_profile(document, name)
 
 
 def _existing_profile(document, name):
-    """Return ``[profiles.NAME]`` or raise with suggestions (no silent create)."""
-    profiles = _catalog_io.profile_rows(document)
-    if name not in profiles:
-        _unknown_profile(document, name)
-    return profiles[name]
+    return _profile_edit.existing_profile(document, name)
 
 
 def _check_name(name):
@@ -217,46 +199,11 @@ def _write(document, original, dry_run, done_message):
 
 
 def _profile_payload(document, name):
-    profile = _existing_profile(document, name)
-    profiles = _catalog_io.profile_rows(document)
-    overrides = _catalog_io.profile_overrides(profile)
-    materials = profile.get("materials")
-    range_keys = [*_catalog_io.RANGES.items(), *_EXTRA_RANGES.items()]
-    beam = profile.get("beam")
-    beam_ref = str(beam) if isinstance(beam, str) else None
-    beam_payload = beam.unwrap() if beam_ref is None and hasattr(beam, "unwrap") else None
-    raw_detector = profile.get("detector")
-    if not isinstance(raw_detector, dict):
-        standard = profiles.get("standard", {})
-        raw_detector = standard.get("detector", {}) if isinstance(standard, dict) else {}
-    detector = DetectorSpec(**dict(raw_detector))
-    return {
-        "name": name,
-        "ranges": [
-            {"name": label, "catalog_key": key, "values": _catalog_io.range_values(profile, key)}
-            for label, key in range_keys
-            if key in profile
-        ],
-        "materials": list(materials) if isinstance(materials, list) else None,
-        "beam": beam_payload,
-        "beam_ref": beam_ref,
-        "detector": {key: getattr(detector, key) for key, _label, _unit in _ACTIVE_DETECTOR_FIELDS},
-        "emission": profile.get("emission"),
-        "overrides": {
-            material: sorted(row)
-            for material, row in overrides.items()
-            if isinstance(row, dict) and row
-        },
-        "energy_grid_refs": _energy_grid_refs(profile),
-    }
+    return _profile_edit.profile_payload(document, name)
 
 
 def _energy_grid_refs(profile):
-    """Return this profile's ``material -> artifact digest`` map, sorted."""
-    refs = profile.get("energy_grid_refs")
-    if not isinstance(refs, dict):
-        return {}
-    return {material: str(refs[material]) for material in sorted(refs)}
+    return _profile_edit.energy_grid_refs(profile)
 
 
 def _emit_show(payload):
@@ -307,38 +254,8 @@ def _emit_show(payload):
             emit_result(f"    {material} -> {digest}")
 
 
-def _clone_grid(value):
-    """Deep-copy a grid descriptor as inline TOML (values/arange/linspace/...)."""
-    plain = value.unwrap() if hasattr(value, "unwrap") else value
-    if isinstance(plain, dict):
-        table = tomlkit.inline_table()
-        for key, item in plain.items():
-            table[key] = _clone_grid(item)
-        return table
-    return tomlkit.item(plain)
-
-
 def _detector_table(profile):
-    """Return writable ``[profiles.NAME.detector]`` table."""
-    detector = profile.get("detector")
-    if detector is None:
-        detector = tomlkit.table()
-        profile["detector"] = detector
-    elif not isinstance(detector, dict):
-        raise ValueError("profile detector must be a table")
-    return detector
-
-
-def _unknown_beam(document, name):
-    """Raise with suggestions -- mirrors ``cxr beam``'s own unknown-name error
-    (``cli/commands/beam.py:_unknown_beam``) so both surfaces read the same."""
-    known = _catalog_io.beam_rows(document)
-    suggestions = difflib.get_close_matches(name, known, n=3, cutoff=0.5)
-    message = f"unknown beam: {name}"
-    if suggestions:
-        message += f". Did you mean: {', '.join(suggestions)}?"
-    message += f". Create it first with: cxr beam create {name}"
-    raise ValueError(message)
+    return _profile_edit.detector_table(profile)
 
 
 #: The nine inline beam-distribution flags (`_beam_cli_options`), keyed by
@@ -364,23 +281,6 @@ def _warn_inline_beam_flags(ctx, **beam_flag_values):
     for param_name, flag in _BEAM_FLAG_PARAMS.items():
         if beam_flag_values.get(param_name) is not None:
             warn_flag(ctx, flag, f"cxr beam create/set {flag}")
-
-
-def _apply_beam_updates_or_error(name, target, beam_updates):
-    """Apply inline beam-flag updates, or raise a clear error if ``target``
-    already carries a named ``beam = "NAME"`` reference -- writing inline
-    fields onto a string would silently detach it (decision 4: no silent
-    winner)."""
-    if not beam_updates:
-        return
-    existing = target.get("beam")
-    if isinstance(existing, str):
-        raise ValueError(
-            f"profile {name} has beam = {existing!r} (a named reference); "
-            f"edit it with 'cxr beam set {existing} ...', or replace the "
-            "reference with --beam NAME"
-        )
-    _apply_beam_updates(target, beam_updates)
 
 
 class _ProfileGroup(DeprecatingGroup):
@@ -610,34 +510,16 @@ def create_command(
     source_name = source or "standard"
     try:
         original, document = _catalog_io.catalog_text()
-        profiles = _catalog_io.profile_rows(document)
-        if name in profiles:
-            raise ValueError(
-                f"profile {name!r} already exists; edit it with: cxr profile set {name}"
-            )
-        if beam_name is not None and beam_name not in _catalog_io.beam_rows(document):
-            _unknown_beam(document, beam_name)
-        if source_name not in profiles:
-            raise ValueError(f"unknown source profile: {source_name}")
-        source_row = profiles[source_name]
-        target = tomlkit.table()
-        for key, value in source_row.items():
-            if key in ("materials", "overrides"):
-                continue
-            target[key] = _clone_grid(value)
-        for label, values in updates.items():
-            target[_catalog_key(label)] = _catalog_io.values_item(values)
-        if beam_name is not None:
-            target["beam"] = beam_name
-        else:
-            _apply_beam_updates_or_error(name, target, beam_updates)
-        if detector_updates:
-            detector = _detector_table(target)
-            for key, value in detector_updates.items():
-                detector[key] = value
-        if materials is not None:
-            target["materials"] = _validate_materials(document, _csv_materials(materials))
-        profiles[name] = target
+        _profile_edit.create_profile(
+            document,
+            name,
+            source_name,
+            updates=updates,
+            beam_name=beam_name,
+            beam_updates=beam_updates,
+            detector_updates=detector_updates,
+            materials=materials,
+        )
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     return _write(document, original, dry_run, f"created profile {name}")
@@ -760,23 +642,16 @@ def set_command(
         raise click.UsageError("provide a range, beam, detector, membership, or emission option")
     try:
         original, document = _catalog_io.catalog_text()
-        target = _existing_profile(document, name)
-        if beam_name is not None and beam_name not in _catalog_io.beam_rows(document):
-            _unknown_beam(document, beam_name)
-        material_keys = None
-        if materials is not None:
-            material_keys = _validate_materials(document, _csv_materials(materials))
-        overwriting = [label for label in updates if _catalog_key(label) in target]
-        existing_detector = target.get("detector", {})
-        detector_labels = [
-            label for key, label, _unit in _ACTIVE_DETECTOR_FIELDS if key in detector_updates
-        ]
-        overwriting.extend(
-            label
-            for key, label, _unit in _ACTIVE_DETECTOR_FIELDS
-            if key in detector_updates
-            and isinstance(existing_detector, dict)
-            and key in existing_detector
+        overwriting, detector_labels = _profile_edit.set_profile(
+            document,
+            name,
+            updates=updates,
+            beam_name=beam_name,
+            beam_updates=beam_updates,
+            detector_updates=detector_updates,
+            materials=materials,
+            all_materials=all_materials,
+            emission=emission,
         )
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
@@ -795,123 +670,21 @@ def set_command(
         if emission is not None:
             action_fields.append("emission")
         _confirm_standard(name, f"set {', '.join(action_fields) or 'materials'} on", yes, dry_run)
-    for label, values in updates.items():
-        target[_catalog_key(label)] = _catalog_io.values_item(values)
-    if beam_name is not None:
-        target["beam"] = beam_name
-    else:
-        try:
-            _apply_beam_updates_or_error(name, target, beam_updates)
-        except ValueError as exc:
-            raise CLIError(str(exc)) from None
-    if detector_updates:
-        detector = _detector_table(target)
-        for key, value in detector_updates.items():
-            detector[key] = value
-    if material_keys is not None:
-        target["materials"] = material_keys
-    elif all_materials:
-        target.pop("materials", None)
-    if emission is not None:
-        target["emission"] = emission
     return _write(document, original, dry_run, f"updated profile {name}")
 
 
 def _merge_values(name, updates, *, add):
-    """Read/mutate helper shared by ``add`` and ``remove``."""
     original, document = _catalog_io.catalog_text()
-    target = _existing_profile(document, name)
-    for label, values in updates.items():
-        key = _catalog_key(label)
-        if key not in target:
-            if not add:
-                raise ValueError(f"profile {name} has no {key} grid to remove values from")
-            existing = []
-        else:
-            existing = _catalog_io.range_values(target, key)
-        if add:
-            merged = sorted(set(existing) | set(values))
-        else:
-            missing = [value for value in values if value not in existing]
-            if missing:
-                raise ValueError(
-                    f"{label} values not present in profile {name}: {_catalog_io.display(missing)}"
-                )
-            merged = sorted(set(existing) - set(values))
-        target[key] = _catalog_io.values_item(merged)
+    _profile_edit.merge_values(document, name, updates, add=add)
     return original, document
 
 
-_EMISSION_DECODE = {
-    "incoherent": frozenset({"incoherent"}),
-    "coherent": frozenset({"coherent"}),
-    "both": frozenset({"incoherent", "coherent"}),
-}
-
-
-def _current_emission_modes(target):
-    """Decode a profile's stored ``emission`` value to a mode set; an absent
-    key is the empty set (no explicit override -- the active fidelity preset's
-    emission stands unmodified)."""
-    value = target.get("emission")
-    return set(_EMISSION_DECODE[value]) if value is not None else set()
-
-
-def _emission_label(modes):
-    """Canonical ``emission`` string for a mode set, or ``None`` when empty."""
-    if modes == {"incoherent", "coherent"}:
-        return "both"
-    if modes == {"incoherent"}:
-        return "incoherent"
-    if modes == {"coherent"}:
-        return "coherent"
-    return None
-
-
 def _apply_emission_add(target, coherent, incoherent):
-    """Union requested modes into ``target``'s emission; ``None`` if no-op.
-
-    Otherwise returns ``(label, added_modes, auto_both)`` -- ``auto_both`` is
-    set when the union pushed a single explicit mode to ``both``, so the
-    caller can log that switch explicitly rather than applying it silently.
-    """
-    current = _current_emission_modes(target)
-    requested = {
-        mode for mode, flag in (("coherent", coherent), ("incoherent", incoherent)) if flag
-    }
-    added = sorted(requested - current)
-    if not added:
-        return None
-    new_modes = current | requested
-    label = _emission_label(new_modes)
-    auto_both = label == "both" and _emission_label(current) != "both"
-    target["emission"] = label
-    return label, added, auto_both
+    return _profile_edit.apply_emission_add(target, coherent, incoherent)
 
 
 def _apply_emission_remove(name, target, coherent, incoherent):
-    """Subtract requested modes from ``target``'s emission; ``None`` if no-op.
-
-    Otherwise returns ``(label, removed_modes)``. Emptying the mode set
-    reverts to no explicit override (the ``emission`` key is dropped), same
-    as ``members reset`` reverting to implicit membership.
-    """
-    current = _current_emission_modes(target)
-    requested = {
-        mode for mode, flag in (("coherent", coherent), ("incoherent", incoherent)) if flag
-    }
-    if not requested:
-        return None
-    missing = sorted(requested - current)
-    if missing:
-        raise ValueError(f"profile {name} emission does not include: {', '.join(missing)}")
-    new_modes = current - requested
-    label = _emission_label(new_modes)
-    if label is None:
-        target.pop("emission", None)
-    else:
-        target["emission"] = label
-    return label, sorted(requested)
+    return _profile_edit.apply_emission_remove(name, target, coherent, incoherent)
 
 
 @command.command("add")
@@ -1111,17 +884,7 @@ def rename_command(name, new_name, dry_run):
         raise CLIError(f"profile {name!r} already named {new_name!r}")
     try:
         original, document = _catalog_io.catalog_text()
-        profiles = _catalog_io.profile_rows(document)
-        if new_name in profiles:
-            raise ValueError(f"profile {new_name!r} already exists")
-        target = _existing_profile(document, name)
-        del profiles[name]
-        profiles[new_name] = target
-        energy_grids = document.get("energy_grids")
-        if isinstance(energy_grids, dict) and name in energy_grids:
-            grid = energy_grids[name]
-            del energy_grids[name]
-            energy_grids[new_name] = grid
+        _profile_edit.rename_profile(document, name, new_name)
     except (OSError, ValueError, ParseError) as exc:
         raise CLIError(str(exc)) from None
     return _write(document, original, dry_run, f"renamed profile {name} to {new_name}")
@@ -1148,26 +911,12 @@ def delete_command(name, yes, dry_run, json_output):
         raise CLIError("cannot delete profile 'standard': the catalog schema requires it")
     try:
         original, document = _catalog_io.catalog_text()
-        target = _existing_profile(document, name)
-        referents = []
-        energy_grids = document.get("energy_grids", {})
-        if isinstance(energy_grids, dict) and name in energy_grids:
-            referents.append(
-                f"energy_grids.{name} (shared line-grid store; delete its rows with "
-                f"cxr energy-grid line delete {name} first)"
-            )
-        if referents:
-            raise ValueError(
-                f"cannot delete profile {name!r}; still referenced by:\n- " + "\n- ".join(referents)
-            )
-        overrides = _catalog_io.profile_overrides(target)
-        n_overrides = sum(1 for row in overrides.values() if isinstance(row, dict) and row)
+        n_overrides = _profile_edit.delete_profile(document, name)
     except (OSError, ValueError, ParseError) as exc:
         if json_output:
             emit_json_result(cli_json.failure("cxr.profile.delete", {}, str(exc)))
             return 1
         raise CLIError(str(exc)) from None
-    del _catalog_io.profile_rows(document)[name]
     if dry_run:
         return _write(document, original, True, "")
     if not yes:
@@ -1198,76 +947,33 @@ def delete_command(name, yes, dry_run, json_output):
 
 
 def _membership_target(document, name):
-    """Return the profile's explicit ``materials`` list or raise with guidance."""
-    target = _existing_profile(document, name)
-    materials = target.get("materials")
-    if materials is None:
-        raise ValueError(
-            f"profile {name!r} has implicit all-in-use-materials membership; "
-            f"it already includes every material. To restrict it, use: "
-            f"cxr profile set {name} --material MATERIAL,..."
-        )
-    if not isinstance(materials, list):
-        raise ValueError(f"profiles.{name}.materials must be an array of material keys")
-    return target, materials
+    return _profile_edit.membership_target(document, name)
 
 
 def _csv_materials(material_csv):
-    requested = [key.strip() for key in material_csv.split(",") if key.strip()]
-    if not requested:
-        raise ValueError("--material requires at least one material key")
-    return requested
+    return _profile_edit.csv_materials(material_csv)
 
 
 def _group_materials(document, requested, *, unverified_dw, high_energy_only, allow_unknown=False):
-    """Expand membership group selectors and return catalog-ordered material keys."""
-    requested = list(requested)
-    if unverified_dw or high_energy_only:
-        # The run-selection manifest remains the owner of these operational
-        # groups.  Import lazily: profile help must not load the run driver.
-        from cxr_mc.runs.scan import load_manifest_groups
-
-        groups = load_manifest_groups()
-        if unverified_dw:
-            requested.extend(groups["no_verified_dw"])
-        if high_energy_only:
-            requested.extend(groups["high_energy_materials"])
-    if not requested:
-        raise ValueError("provide MATERIAL keys, --unverified-dw, or --high-energy-only")
-    if allow_unknown:
-        known = _catalog_io.material_rows(document)
-        requested = list(dict.fromkeys(requested))
-        return [key for key in known if key in requested] + [
-            key for key in requested if key not in known
-        ]
-    return _validate_materials(document, requested)
+    return _profile_edit.group_materials(
+        document,
+        requested,
+        unverified_dw=unverified_dw,
+        high_energy_only=high_energy_only,
+        allow_unknown=allow_unknown,
+    )
 
 
 def _validate_materials(document, requested):
-    requested = set(requested)
-    known = _catalog_io.material_rows(document)
-    unknown = sorted(requested - set(known))
-    if unknown:
-        raise ValueError(f"unknown material: {', '.join(unknown)}")
-    return [key for key in known if key in requested]
+    return _profile_edit.validate_materials(document, requested)
 
 
 def _add_membership(document, name, requested):
-    """Extend explicit membership and return added and already-present keys."""
-    target, membership = _membership_target(document, name)
-    requested = _validate_materials(document, requested)
-    added = [key for key in requested if key not in membership]
-    target["materials"] = _validate_materials(document, [*membership, *requested])
-    return added, sorted(set(requested) - set(added))
+    return _profile_edit.add_membership(document, name, requested)
 
 
 def _remove_membership(document, name, requested):
-    """Shrink explicit membership and return removed and not-member keys."""
-    target, membership = _membership_target(document, name)
-    requested = list(dict.fromkeys(requested))
-    removed = [key for key in requested if key in membership]
-    target["materials"] = [key for key in membership if key not in removed]
-    return removed, sorted(set(requested) - set(removed))
+    return _profile_edit.remove_membership(document, name, requested)
 
 
 @click.group(

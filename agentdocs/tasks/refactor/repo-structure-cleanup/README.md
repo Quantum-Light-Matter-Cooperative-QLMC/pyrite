@@ -136,16 +136,14 @@ Outcome, correcting this section's original survey:
   `test-suite cli` (1123 passed), and `--help` on each affected group plus one
   leaf each.
 
-## S4 — Two files misclassified as CLI wiring
+## S4 — Two files misclassified as CLI wiring — **done 2026-08-09**
 
-- `cli/commands/profile.py` — 1461 lines / 56 KB, largest module in the CLI
-  layer. Most is profile *domain* logic (resolution, membership, per-material
-  overrides), not Click wiring. Push domain into the `campaign/profiles`
-  owner from S2; leave the command thin, per the RFC P1 rule it nominally
-  already follows.
-- `cli/_dashboard.py` — 1106 lines / 42 KB. A live TUI, not dispatcher
-  plumbing. Promote to `cli/dashboard/`, split render / state / poll.
-  Coordinate with `feature/local-run-dashboard`.
+- `cli/commands/profile.py` moved parsed-catalog validation and mutation into
+  `campaign/profile_edit.py`; the command retains Click declarations, output,
+  confirmation, and atomic persistence. The CLI contract remains unchanged.
+- `cli/_dashboard.py` became `cli/dashboard/`, split into `render.py`,
+  `state.py`, and `poll.py`. Local and remote callers use the package facade,
+  which preserves the internal dashboard surface.
 
 ## S5 — Monte Carlo mega-modules
 
@@ -243,7 +241,7 @@ re-export.
 - [x] S1 `paths.py` + apps into the distribution + package-smoke assertions
 - [x] S2 subpackage grouping + `remote` fold, exports unchanged
 - [x] S3 delete 10 `cli/` alias shims (9 from original task + `beam.py` postdating named-beam-objects)
-- [ ] S4 `profile.py` domain extraction; `cli/dashboard/` promotion
+- [x] S4 `profile.py` domain extraction; `cli/dashboard/` promotion
 - [ ] S5 `runner/` and `spectrum/` splits (golden + ledger invariant)
 - [ ] S6 `plots/{altair,mpl,plotly}/`
 - [x] S7 worktrees relocation (2026-08-07) + checkpoint lockfile tracking rule
@@ -286,12 +284,23 @@ re-export.
   direction after the checker hung; the umbrella verification run was stopped
   at user direction after reaching 85% without failures.
 
+### S4 checkpoint progress
+
+- 2026-08-09: extracted profile catalog mutation and validation into
+  `campaign/profile_edit.py`, leaving prompts, rendering, Click declarations,
+  and persistence in `cli/commands/profile.py`. Promoted the shared live
+  dashboard to `cli/dashboard/` and separated rendering, parsed state, and key
+  polling while preserving its internal facade for local and remote callers.
+- Evidence: focused profile, local-dashboard, and remote-dashboard tests; CLI
+  suite; lint; typecheck; CLI-reference freeze; repository-map generation; and
+  explicit root/leaf help probes passed.
+
 ## Sequencing
 
 1. ~~**S3 + S8 empty dir**~~ — done 2026-08-09.
 2. ~~**S7 remainder**~~ — done 2026-08-09.
 3. ~~**S1**~~ — done 2026-08-09.
-4. ~~**S2**~~, then **S4**, **S6**, **S8 remainder**.
+4. ~~**S2**~~, ~~**S4**~~, then **S6**, **S8 remainder**.
 5. **S5** last: physics-gated, and two live branches are editing those files.
 
 ## Non-goals

@@ -16,7 +16,8 @@ from types import SimpleNamespace
 import pytest
 
 from cxr_mc import remote
-from cxr_mc.cli import _dashboard
+from cxr_mc.cli import dashboard as _dashboard
+from cxr_mc.cli.dashboard import poll as dashboard_poll
 from cxr_mc.remote import (  # noqa: F401
     cli,
     config,
@@ -2437,7 +2438,7 @@ class _FakeKeyListener:
 
 
 def test_key_listener_inactive_when_stdin_is_not_a_tty(monkeypatch):
-    monkeypatch.setattr(_dashboard.sys.stdin, "isatty", lambda: False)
+    monkeypatch.setattr(dashboard_poll.sys.stdin, "isatty", lambda: False)
 
     listener = _dashboard._KeyListener()
 

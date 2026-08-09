@@ -44,7 +44,7 @@ import click
 
 from ..cli import _completion as _cli_completion
 from ..cli import _core as _cli_core
-from ..cli import _dashboard
+from ..cli import dashboard as _dashboard
 from ..cli import json as cli_json
 
 MATS_FILE = Path("mats_to_sim.toml")

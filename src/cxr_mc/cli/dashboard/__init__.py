@@ -1,6 +1,7 @@
-"""Formatting and progress rendering for :mod:`cxr_mc.remote`."""
+"""Shared live-job dashboard: polling, validated state, and rendering."""
 
-from ..cli.dashboard import (
+from .poll import _KeyListener
+from .render import (
     _FRAME_PREFIX,
     _FRAME_SECTIONS,
     _SHELL_TOKEN_RE,
@@ -50,6 +51,7 @@ from ..cli.dashboard import (
 __all__ = [
     "_FRAME_PREFIX",
     "_FRAME_SECTIONS",
+    "_KeyListener",
     "_SHELL_TOKEN_RE",
     "_STATE_COLORS",
     "_STATE_GLYPHS",

@@ -1,22 +1,18 @@
-"""Formatting and progress rendering for :mod:`cxr_mc.remote`."""
+"""Formatting and progress rendering for local and remote jobs."""
 
-import base64
 import json
 import math
-import queue
 import re
-import select
 import sys
 import textwrap
-import threading
-import unicodedata
 
-from . import _core as _cli_core
+from .. import _core as _cli_core
+from . import state as _state
 
 # ``@`` is permitted so ``<material>@<label>-<digest>`` checkpoint @-stems pass
 # the token check: it carries no shell meaning as a bare word (array expansion
 # needs ``${...[@]}``), and every stem still reaches remote commands quoted.
-_SHELL_TOKEN_RE = re.compile(r"^[A-Za-z0-9_@-]+$")
+_SHELL_TOKEN_RE = _state._SHELL_TOKEN_RE
 
 _STATE_COLORS = _cli_core.COLORS
 # Glyph carried beside every progress track so state is never color-alone
@@ -27,120 +23,16 @@ _TQDM_FRAME_RE = re.compile(
     r"(?P<percent>\d{1,3})%\|.*?\s(?P<completed>\d+)/(?P<total>\d+)\s+"
     r"\[(?P<timing>[^\]]*)\]"
 )
-_FRAME_PREFIX = "CXR_REMOTE_V1"
-_FRAME_SECTIONS = frozenset(
-    {
-        "JOB",
-        "META",
-        "STATE",
-        "SQUEUE",
-        "QUEUE",
-        "PROGRESS",
-        "PERFORMANCE",
-        "RESOURCES",
-        "LOG",
-    }
-)
-
-
-class _KeyListener:
-    """Background nonblocking single-keypress capture for dashboard loops.
-
-    A no-op (``active`` False, ``poll()`` always empty) unless stdin is an
-    interactive terminal. Cross-platform: POSIX uses ``termios``/``tty``
-    cbreak mode plus ``select``; Windows uses ``msvcrt``. Reads happen on a
-    daemon thread so blocking dashboard data reads remain responsive;
-    ``poll()`` drains every buffered key in order.
-    """
-
-    def __init__(self):
-        self.active = False
-        self._keys = queue.Queue()
-        self._stop_event = threading.Event()
-        self._restore = None
-        self._thread = None
-        if not sys.stdin.isatty():
-            return
-        try:
-            import msvcrt  # noqa: F401 -- Windows only; ImportError selects POSIX
-        except ImportError:
-            try:
-                import termios
-                import tty
-
-                fd = sys.stdin.fileno()
-                old = termios.tcgetattr(fd)
-                tty.setcbreak(fd)
-            except (OSError, ValueError, termios.error):
-                return
-            self._restore = lambda: termios.tcsetattr(fd, termios.TCSADRAIN, old)
-            self._thread = threading.Thread(target=self._poll_posix, args=(fd,), daemon=True)
-        else:
-            self._thread = threading.Thread(target=self._poll_windows, daemon=True)
-        self._thread.start()
-        self.active = True
-
-    def _poll_windows(self):
-        import msvcrt
-
-        while not self._stop_event.is_set():
-            if msvcrt.kbhit():  # ty: ignore[unresolved-attribute]
-                self._keys.put(msvcrt.getwch())  # ty: ignore[unresolved-attribute]
-            else:
-                self._stop_event.wait(0.1)
-
-    def _poll_posix(self, fd):
-        while not self._stop_event.is_set():
-            ready, _write, _exceptional = select.select([fd], [], [], 0.1)
-            if not ready:
-                continue
-            char = sys.stdin.read(1)
-            if char == "":
-                break
-            self._keys.put(char)
-
-    def poll(self):
-        """Return buffered keys oldest first."""
-        keys = []
-        while True:
-            try:
-                keys.append(self._keys.get_nowait())
-            except queue.Empty:
-                break
-        return keys
-
-    def stop(self):
-        self._stop_event.set()
-        if self._thread is not None:
-            self._thread.join(timeout=1)
-        if self._restore is not None:
-            self._restore()
+_FRAME_PREFIX = _state._FRAME_PREFIX
+_FRAME_SECTIONS = _state._FRAME_SECTIONS
 
 
 def _sanitize_terminal(value, *, multiline=False):
-    """Render untrusted remote text without terminal-control effects."""
-    clean = []
-    for character in str(value):
-        if character == "\n" and multiline:
-            clean.append(character)
-        elif character in "\r\n\t":
-            clean.append(" ")
-        elif unicodedata.category(character) in {"Cc", "Cf", "Cs"}:
-            clean.append("?")
-        else:
-            clean.append(character)
-    return "".join(clean)
+    return _state._sanitize_terminal(value, multiline=multiline)
 
 
 def _encode_sections(sections):
-    """Encode sections using same unambiguous wire format as remote shell."""
-    records = []
-    for name, payload in sections.items():
-        if name not in _FRAME_SECTIONS:
-            raise ValueError(f"unknown status section: {name}")
-        encoded = base64.b64encode(str(payload).encode()).decode("ascii")
-        records.append(f"{_FRAME_PREFIX}\t{name}\t{encoded}")
-    return "\n".join(records)
+    return _state._encode_sections(sections)
 
 
 def _format_table(headers, rows, *, indent=""):
@@ -222,13 +114,7 @@ def _format_material_roster(materials, *, include_count=True):
 
 
 def _metadata_fields(metadata):
-    """Parse the last value for each simple ``key: value`` metadata field."""
-    fields = {}
-    for line in metadata.splitlines():
-        key, separator, value = line.partition(": ")
-        if separator:
-            fields[_sanitize_terminal(key)] = _sanitize_terminal(value)
-    return fields
+    return _state._metadata_fields(metadata)
 
 
 def _mode_summary(metadata):
@@ -303,7 +189,7 @@ def _profile_summary(fields):
 
 
 def _material_label(material):
-    from ..materials import CATALOG
+    from ...materials import CATALOG
 
     spec = CATALOG.materials.get(material)
     return spec.label if spec is not None else material
@@ -727,103 +613,15 @@ def _clean_recent_log(log, *, limit=12):
 
 
 def _marked_sections(output):
-    """Decode versioned base64 sections from one remote round trip."""
-    sections = {}
-    for line in output.splitlines():
-        prefix, separator, remainder = line.partition("\t")
-        if prefix != _FRAME_PREFIX or not separator:
-            continue
-        name, separator, encoded = remainder.partition("\t")
-        if name not in _FRAME_SECTIONS or not separator:
-            continue
-        try:
-            payload = base64.b64decode(encoded, validate=True).decode("utf-8", errors="replace")
-        except (ValueError, UnicodeError):
-            continue
-        sections[name] = payload.strip()
-    return sections
+    return _state._marked_sections(output)
 
 
 def _scheduler_fields(payload):
-    fields = {}
-    for item in payload.split("|"):
-        key, separator, value = item.partition("=")
-        if separator:
-            fields[_sanitize_terminal(key)] = _sanitize_terminal(value)
-    return fields
+    return _state._scheduler_fields(payload)
 
 
 def _pending_queue_context(payload, target_job_id):
-    """Validated pending-priority snapshot for one partition cohort.
-
-    Wire format: one header declaring ``cohort_partition`` and deterministic
-    ``priority_desc_job_id_asc`` ordering, followed by scheduler rows. Rank is
-    recomputed here instead of trusting transport order. Missing/retired target
-    IDs and malformed rows produce no context rather than stale queue claims.
-    """
-    lines = payload.splitlines()
-    if not lines:
-        return None
-
-    def strict_fields(line):
-        fields = {}
-        for item in line.split("|"):
-            key, separator, value = item.partition("=")
-            key = _sanitize_terminal(key)
-            if not separator or not key or key in fields:
-                return None
-            fields[key] = _sanitize_terminal(value)
-        return fields
-
-    header = strict_fields(lines[0])
-    if header is None:
-        return None
-    partition = header.get("cohort_partition")
-    if (
-        not partition
-        or header.get("order") != "priority_desc_job_id_asc"
-        or not str(target_job_id).isdigit()
-    ):
-        return None
-    pending = []
-    for line in lines[1:]:
-        fields = strict_fields(line)
-        if fields is None:
-            continue
-        job_id = fields.get("job_id", "")
-        try:
-            priority = int(fields.get("priority", ""))
-        except ValueError:
-            continue
-        if (
-            not job_id.isdigit()
-            or fields.get("state", "").upper() != "PENDING"
-            or fields.get("partition") != partition
-            or priority < 0
-        ):
-            continue
-        pending.append(
-            {
-                "job_id": job_id,
-                "priority": priority,
-                "name": fields.get("name") or "-",
-                "user": fields.get("user") or "-",
-                "reason": fields.get("reason") or "-",
-            }
-        )
-    pending.sort(key=lambda item: (-int(item["priority"]), int(item["job_id"])))
-    target_index = next(
-        (index for index, item in enumerate(pending) if item["job_id"] == str(target_job_id)),
-        None,
-    )
-    if target_index is None or not pending:
-        return None
-    return {
-        "partition": partition,
-        "rank": target_index + 1,
-        "count": len(pending),
-        "top": pending[0],
-    }
+    return _state._pending_queue_context(payload, target_job_id)
 
 
 def _format_job_status(sections, detail):
@@ -1004,93 +802,19 @@ def _format_job_status(sections, detail):
 
 
 def _metadata_value(metadata, key):
-    prefix = f"{key}: "
-    values = [line[len(prefix) :] for line in metadata.splitlines() if line.startswith(prefix)]
-    return values[-1] if values else None
+    return _state._metadata_value(metadata, key)
 
 
 def _parse_progress_records(payload):
-    """Parse complete one-line JSON records, ignoring malformed snapshots."""
-    records = {}
-    for line in payload.splitlines():
-        try:
-            record = json.loads(line)
-        except (json.JSONDecodeError, TypeError):
-            continue
-        if not isinstance(record, dict):
-            continue
-        material = record.get("material")
-        total = record.get("total_cases")
-        cached = record.get("cached_cases")
-        completed = record.get("completed_new_cases")
-        state = record.get("state")
-        if not isinstance(material, str) or not _SHELL_TOKEN_RE.fullmatch(material):
-            continue
-        if not isinstance(total, int) or isinstance(total, bool):
-            continue
-        if not isinstance(cached, int) or isinstance(cached, bool):
-            continue
-        if not isinstance(completed, int) or isinstance(completed, bool):
-            continue
-        if total < 0 or cached < 0 or completed < 0 or cached + completed > total:
-            continue
-        if state not in {"running", "done", "failed", "paused"}:
-            continue
-        phase = record.get("phase")
-        if phase not in (None, "primary", "cpu"):
-            continue
-        _sanitize_cost_fields(record)
-        _sanitize_timing_fields(record)
-        key = material if phase in (None, "primary") else f"{material}:cpu"
-        records[key] = record
-    return records
+    return _state._parse_progress_records(payload)
 
 
 def _sanitize_cost_fields(record):
-    """Drop ``done_cost``/``total_cost`` in place unless both are sane numbers.
-
-    These are optional (only scan-kind jobs emit them; rebrem/reline/legacy
-    records simply lack the keys) and remote-sourced, so a malformed or
-    adversarial pair falls back to case-count weighting rather than corrupting
-    the compute-weighted bar."""
-    total_cost = record.get("total_cost")
-    done_cost = record.get("done_cost")
-    if "total_cost" not in record and "done_cost" not in record:
-        return
-    valid = (
-        isinstance(total_cost, (int, float))
-        and not isinstance(total_cost, bool)
-        and isinstance(done_cost, (int, float))
-        and not isinstance(done_cost, bool)
-        and math.isfinite(total_cost)
-        and math.isfinite(done_cost)
-        and 0 <= done_cost <= total_cost
-    )
-    if not valid:
-        record.pop("total_cost", None)
-        record.pop("done_cost", None)
+    return _state._sanitize_cost_fields(record)
 
 
 def _sanitize_timing_fields(record):
-    seconds = record.get("active_compute_seconds")
-    if not (
-        isinstance(seconds, (int, float))
-        and not isinstance(seconds, bool)
-        and math.isfinite(seconds)
-        and seconds >= 0
-    ):
-        record.pop("active_compute_seconds", None)
-    cases = record.get("measured_new_cases")
-    if not (isinstance(cases, int) and not isinstance(cases, bool) and cases >= 0):
-        record.pop("measured_new_cases", None)
-    cost = record.get("measured_new_cost")
-    if not (
-        isinstance(cost, (int, float))
-        and not isinstance(cost, bool)
-        and math.isfinite(cost)
-        and cost >= 0
-    ):
-        record.pop("measured_new_cost", None)
+    return _state._sanitize_timing_fields(record)
 
 
 def _render_frame(frame, *, tty):

@@ -339,6 +339,15 @@ distinct digests (incoherent unchanged, bit-for-bit).
   `dataset_identity`, `case_content_key`, `variant_stem`.
 - Deps: `results` (`Settings`), `sweep` (`Sweep`), NumPy.
 
+### `campaign/profile_edit.py`
+Domain operations over parsed catalog documents for profile creation, updates,
+membership, overrides, detector settings, beam references, emission policy,
+rename, and deletion. The Click layer owns prompts and persistence; this module
+owns validation and mutation semantics.
+- Public: intentionally internal to `cli.commands.profile`.
+- Deps: `detectors.spec` (`DetectorSpec`), `tomlkit` document/container types;
+  lazy `runs.scan` import for manifest-backed membership groups.
+
 ### `energy_grid/` (package)
 Photon-energy-grid derivation, bounds analysis, catalog application, and the
 compact grid encoding shared by sweep/runner (slice 2 renamed `line_grid/` +
@@ -550,6 +559,14 @@ inspection and per-profile overrides; `beam` owns named `[beams.*]` objects;
 only. `job` owns the canonical remote asynchronous-job lifecycle and delegates
 transport/state operations to `remote/`. Shared validated atomic TOML helpers
 stay in `cli/_catalog_io.py`.
+
+### `cli/dashboard/`
+Shared live terminal dashboard package used by local scans and remote jobs.
+`render.py` owns frame composition, `state.py` owns progress parsing and terminal
+sanitization, and `poll.py` owns non-blocking keyboard input. `__init__.py`
+preserves the former private import surface for existing internal callers.
+- Public: internal `_render_frame`, progress/state helpers, `_KeyListener`.
+- Deps: `rich`, CLI core emitters, campaign materials.
 
 ### `cli/commands/beam.py`
 Canonical `cxr beam list|show|create|set|rename|delete` Click layer over

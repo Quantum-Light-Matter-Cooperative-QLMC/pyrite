@@ -230,7 +230,7 @@ regenerates `docs/cli-reference.md` and must leave its freeze test green.
 ## 6. Open questions
 
 1. **P1 destination shape** — one flat `cli/` (many modules) or `cli/commands/`
-   sub-package to keep dispatcher plumbing (`_core`, `_dashboard`, `json`)
+   sub-package to keep dispatcher plumbing (`_core`, `dashboard/`, `json`)
    separate from command modules? (Recommend the latter once `cli/` exceeds ~20
    modules.)
 2. **P4 ephemeral home** — ~~`docs/plans/` vs untracked scratch?~~ **Resolved:

@@ -74,7 +74,7 @@ Override the box via env: CXR_REMOTE_HOST / CXR_REMOTE_DIR / CXR_REMOTE_UV.
 
 import os
 
-from ..cli import _dashboard as _presentation
+from ..cli import dashboard as _presentation
 from . import (
     cli,
     config,
