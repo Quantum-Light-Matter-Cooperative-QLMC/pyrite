@@ -50,9 +50,16 @@ as the model for what *not* to stop at (it asserts module identity only).
 - [x] C — `cxr-dev coverage` (or `test --coverage`) wrapping the documented
       invocation, including a `--numba` switch that sets `NUMBA_DISABLE_JIT=1`.
       Document in `AGENTS.md` canonical commands and `docs/`.
-- [ ] D — `plots/` smoke tests: call every public figure builder on a small
+- [x] D — `plots/` smoke tests: call every public figure builder on a small
       synthetic result with the Agg backend, assert a `Figure` and non-empty
-      axes. Target `plots/` ≥ 85%.
+      axes. Target `plots/` ≥ 85%. Landed: `tests/plots/test_detectors.py`,
+      `test_interactive.py`, `test_trajectory_builders.py`. `plots/` now 90.4%
+      aggregate (`detectors.py` 12.5%→94.2%, `interactive.py` 6.3%→94.6%,
+      `trajectories.py` 50.0%→94.8%, plus incidental gains to `spectra.py`
+      68.4% and `sweeps.py` 81.2% from the shared drawers). Remaining weak
+      spot: `render_trajectories.py` 50.0% (untouched — its gap is
+      `render_reveal_animation`'s missing-dependency error path, not a figure
+      builder; out of D's scope). 2831 passed, 57 skipped, no new skips.
 - [ ] E — `montecarlo/_backend.py` fallback-dispatch tests (non-NVIDIA path);
       coordinate with the Active "Compute performance optimization" item, which
       already asks for exactly this confirmation.
