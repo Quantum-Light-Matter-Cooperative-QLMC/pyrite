@@ -1,5 +1,9 @@
 # Named beam objects — promote the beam to a first-class CLI noun
 
+**Status 2026-08-09: COMPLETE.** All eight slices A-H landed; every acceptance
+check below is met. A-E landed on the task branch and are merged into `main`;
+F-H were done directly on `main`. Dropped from `TODO.md` Active.
+
 Branch: `feature/named-beam-objects`
 Worktree: `../cxr-mc-worktrees/named-beam-objects`
 TODO scope: Active item 2 `>user<` prose (2026-08-07), the follow-on to the
@@ -248,16 +252,45 @@ rather than merge.
       `profile.py` calls `warn_flag` manually, once per flag per
       invocation. `docs/cli-deprecations.md` / `docs/cli-reference.md`
       regenerated.
-- [ ] **F. Migrate shipped profiles** — five inline blocks become named beams;
+- [x] **F. Migrate shipped profiles** — five inline blocks become named beams;
       golden regen (`tests/data/material_catalog_golden.json`, via
       `cxr-dev regen-golden`) and a test pinning every migrated profile's
       `parameter_sha256` to its pre-migration value.
-- [ ] **G. Completion + JSON contracts** — `complete_beam`, beam rows in
+      Done 2026-08-09. **Four** inline blocks, not five -- the original count
+      included `promising_low_ne`, which had already been converted to
+      `beam = "default"` before this slice. New `[beams.gaussian_200fs]`,
+      `[beams.microtrain_200fs]`, `[beams.compressed_microbunch]`,
+      `[beams.emittance_demo]` (each with a `label`, stripped before hashing),
+      and the four profiles now carry `beam = "NAME"`. All 8
+      (profile, material) digests are bit-identical pre/post, pinned as literals
+      in `test_named_beam_migration_keeps_shipped_profile_digests_bit_for_bit`
+      (`tests/materials/test_profiles.py`), which also covers the
+      already-migrated `promising_low_ne`. `cxr-dev regen-golden` produced **no
+      diff**: `material_catalog_golden.json` carries crystal `beam_uvw`, not
+      beam objects, so a value-identical migration cannot move it.
+- [x] **G. Completion + JSON contracts** — `complete_beam`, beam rows in
       whatever `cxr` command inventory/JSON schema tests already cover
       `material`/`profile`.
-- [ ] **H. Docs** — `docs/sweep-profiles.md`, `docs/cli-reference.md` regen,
+      Done 2026-08-09. `_beam_keys`/`complete_beam` in `cli/_completion.py`
+      (same offline-`tomllib`, `lru_cache`, `_SAFE_TOKEN_RE` shape as
+      `complete_material`/`complete_profile`), exported in `__all__`, wired to
+      `cxr beam show|set|rename|delete`'s `NAME` and to `--beam` on
+      `cxr profile create|set`. `create`'s `NAME` and `rename`'s `NEW_NAME` stay
+      uncompleted, matching `cxr profile`. 3 tests in
+      `tests/cli/test_completion.py`. No JSON-contract change was needed: the
+      frozen `tests/data/cli_contract.json` and `docs/cli-reference.md` already
+      covered the `cxr beam` surface from slice C, and both pass `--check`.
+- [x] **H. Docs** — `docs/sweep-profiles.md`, `docs/cli-reference.md` regen,
       `docs/repo_map.md` pointer, and a short migration paragraph in
       `docs/beam-phase-space.md` pointing at the new spelling.
+      Done 2026-08-09. New "Named beams" section in `docs/sweep-profiles.md`
+      (storage shape, the six verbs, attach/detach, rename cascade and delete
+      block, resolve-then-hash, inline spelling still decoding); the following
+      "Beam block" section rewritten off the profile-only spelling. Migration
+      paragraph in `docs/beam-phase-space.md` stating explicitly that no key,
+      unit, exclusion, or digest changed. `cli/commands/beam.py` entry plus a
+      `beam` mention in the `cli/commands/` blurb in `docs/repo_map.md`.
+      `docs/cli-reference.md` needed no regen -- already current.
 
 ## Delegation
 
@@ -286,3 +319,20 @@ B is the gate: C-F all assume the identity rule is settled.
   exit contract changed.
 - No new physics claim: `physics-ledger-auditor` reports no orphans and no new
   ledger row.
+
+Verified 2026-08-09 on `main` after F-H:
+
+| check | result |
+| --- | --- |
+| full suite (`cxr-dev test`) | 2788 passed, 57 skipped |
+| `cxr-dev test-suite core` / `cli` | 1160 + 57 skipped / 1123 passed |
+| `cxr-dev lint`, `cxr-dev typecheck` | clean |
+| `generate_cli_reference.py --check` | pass, no regen needed |
+| `tests/cli/test_contract.py` | 139 passed |
+| `cxr-dev regen-golden` | no diff |
+| shipped `parameter_sha256` | all 8 bit-identical, pinned by test |
+| new `Validation:` markers or ledger rows | none added |
+
+The nine `cxr profile` beam flags remain the deprecated spelling on their
+published support window (slice E); retiring them is a separate, scheduled
+change, not leftover work from this task.

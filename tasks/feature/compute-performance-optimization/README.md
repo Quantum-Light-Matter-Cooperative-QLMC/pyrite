@@ -1,5 +1,10 @@
 # Compute performance optimization
 
+**Status 2026-08-09: Rounds 1-4 landed and merged; the remainder is planned but
+not started.** What is left needs a CUDA box, a CLI decision, and a
+physics-ledger decision — see [`REMAINING.md`](REMAINING.md), which is the
+current entry point. Everything below is the accumulated per-slice record.
+
 Branch: `feature/compute-performance-optimization`
 
 TODO scope: Active item "Compute performance optimization." The formerly

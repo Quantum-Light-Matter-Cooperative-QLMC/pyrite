@@ -1,5 +1,9 @@
 # Handoff — feature/named-beam-objects
 
+**Superseded 2026-08-09: the task is complete.** D-H all landed; see the task
+`README.md` status banner and the per-slice landed notes. Everything below is
+the 2026-08-07 snapshot, kept only as the record of where A-C stood.
+
 2026-08-07, end of session. Branch/worktree unchanged from task doc header:
 `feature/named-beam-objects` / `../cxr-mc-worktrees/named-beam-objects`
 (relocated out of the repo directory 2026-08-07). Nothing pushed at the time of
