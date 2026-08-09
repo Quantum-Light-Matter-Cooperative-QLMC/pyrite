@@ -7,6 +7,8 @@ resampled. The CUDA tests re-check the same properties on device and are skipped
 without a GPU.
 """
 
+import os
+
 import numpy as np
 import pytest
 
@@ -230,9 +232,14 @@ def test_segments_are_electron_major_and_step_minor():
 def test_per_electron_core_matches_lockstep_physics():
     # The two cores realize different samples of the same distribution -- they
     # cannot be compared trajectory by trajectory, only in aggregate.
+    # Keep the stronger sample for normal runs. With Numba disabled, every
+    # scalar transport step executes under the Python tracer; use the existing
+    # minimal case so the coverage measurement remains bounded while still
+    # comparing every aggregate observable below across independent seeds.
+    tracing_numba = os.environ.get("NUMBA_DISABLE_JIT") == "1"
     case = dict(BASE_CASE)
-    case.update(Ne=3000)
-    seeds = range(1, 9)
+    case.update(Ne=BASE_CASE["Ne"] if tracing_numba else 3000)
+    seeds = range(1, 5) if tracing_numba else range(1, 9)
     lockstep = [simulate_trajectories(**{**case, "seed": s}) for s in seeds]
     per_electron = [
         simulate_trajectories(**{**case, "seed": s, "transport_core": "per-electron"})

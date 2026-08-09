@@ -114,23 +114,32 @@ written into the comments so a future reader does not misread the total.
 
 The completed coverage slices add public plotting smoke tests, backend fallback
 dispatch fakes, energy-grid artifact rollback coverage, and module-entry shim
-smoke tests. The unsupported legacy `_compile_nb.py` developer script is marked
-for file-level exclusion; it remains shown as 0% in this report's default run,
-so the directive needs a coverage-tool compatibility check before it is relied
-on for reporting.
+smoke tests. The unsupported legacy `_compile_nb.py` developer script remains a
+visible 0% known gap; its source comment is not treated as a file-level omit by
+coverage.py, and no reporting omit was added just to move the total.
 
-| Measurement | Result | Line coverage |
-| --- | --- | --- |
-| Default run (branch coverage on) | **2,790 passed, 57 skipped** | **75.9%** (17,531 / 22,457 stmts) |
-| `NUMBA_DISABLE_JIT=1` | Interrupted after five minutes at 59% | Not available |
+| Measurement | Result | coverage.py total | Statement coverage |
+| --- | --- | --- | --- |
+| Default run (branch coverage on) | **2,854 passed, 57 skipped** | **75.9%** | **78.1%** (17,531 / 22,457 statements) |
+| `NUMBA_DISABLE_JIT=1` | **2,854 passed, 57 skipped** | **78.9%** | **81.0%** (18,191 / 22,457 statements) |
 
-The default run was repeated outside the restricted sandbox; the prior
-`forkserver` UNIX-socket error did not recur. The Numba-disabled run advanced
-past that point, then stopped making progress in Monte Carlo transport.
-Interrupting it reported `src/cxr_mc/montecarlo/transport.py:551` rather than
-an environment permission error. This is a runtime-regression investigation,
-not a coverage-threshold decision.
+The Numba-disabled stall was not a deadlock: collection reaches the aggregate
+lockstep/per-electron physics comparison at 59%, where disabling JIT made
+48,000 electrons execute scalar Python under the tracer. Coverage mode now uses
+the existing 120-electron minimal case and four fixed seeds while retaining all
+six aggregate observables; normal runs retain the stronger 3,000-electron,
+eight-seed sample. The focused comparison completes in 9.85 s. The full run
+completes in roughly 2.7 minutes on this host. One process-pool test cannot bind
+its forkserver UNIX socket in the restricted sandbox, but passes in the full
+unrestricted run.
 
-No `fail_under` was added to `verify`: the required Numba-disabled measurement
-is incomplete and totals still depend strongly on CPU-only versus GPU-enabled
-imports and JIT tracing behavior.
+The acceptance targets hold under `NUMBA_DISABLE_JIT=1`: `plots/` is **90.4%**
+(2,199 / 2,432 statements), `montecarlo/_backend.py` is **99.5%**, and
+`montecarlo/transport.py` is **88.5%**. The six unimported CuPy JIT modules now
+account for 1,707 zero-coverage statements on this CPU-only environment; no
+`*_jit_kernel.py` omit was added.
+
+No `fail_under` or coverage step was added to `verify`. Coverage remains an
+explicit workflow because totals depend strongly on CPU-only versus GPU-enabled
+imports and on whether JIT tracing is disabled; a stable gate needs a defined
+two-environment policy first.

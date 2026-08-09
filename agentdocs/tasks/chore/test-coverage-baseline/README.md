@@ -76,27 +76,31 @@ as the model for what *not* to stop at (it asserts module identity only).
       Mark `_compile_nb.py` no-cover: it is a legacy developer script whose
       hard-coded notebook inventory no longer exists, not a supported runtime
       entry point.
-- [ ] H — Re-measure; update the report with the after numbers. Decide then,
+- [x] H — Re-measure; update the report with the after numbers. Decide then,
       not now, whether a `fail_under` belongs in `verify`.
-      The unrestricted default run is green: 2,790 passed, 57 skipped, 75.9%
-      total (22,457 statements; 7,108 branches). The Numba-disabled run passes
-      the former forkserver failure but remains in Monte Carlo transport after
-      five minutes at 59%; interruption reports
-      `transport.py:551` rather than a sandbox error. Reproduce and bound that
-      runtime regression before closing H; no `fail_under` decision while the
-      required second measurement cannot complete.
+      The unrestricted default run is green: 2,854 passed, 57 skipped, 75.9%
+      total. The completed Numba-disabled run is also green: 2,854 passed, 57
+      skipped, 78.9% total / 81.0%
+      statements (18,191 / 22,457 statements; 7,108 branches). Its former 59%
+      stall was the 48,000-electron aggregate comparison in
+      `test_transport_per_electron.py`; coverage mode now retains all six
+      observables with the existing 120-electron minimal case and four fixed
+      seeds, while normal runs retain 3,000 electrons and eight seeds. Focused
+      coverage runtime is 9.85 s. No `fail_under` or `verify` wiring: keep both
+      coverage environments explicit until GPU/JIT-dependent totals have a
+      stable two-environment policy.
 
 ## Decisions and open questions
 
 - **Decided:** no `omit` for compiled modules; document instead.
-- **Open:** does a coverage run belong in `cxr-dev verify`? It costs ~2x if it
-  implies `NUMBA_DISABLE_JIT=1`. Leaning no — keep it an explicit command until
-  slices D–F land.
+- **Decided:** coverage stays an explicit `cxr-dev test --cov` workflow rather
+  than part of `cxr-dev verify`; the Numba-disabled measurement is materially
+  slower and measures a different execution mode.
 - **Open:** is a GPU-environment coverage run (with the `nvidia` extra) worth
   standing up, given `cupyx.jit` bodies stay unmeasurable either way? Only the
   host-side wrappers would be recovered.
-- **Open:** `fail_under` threshold, and whether it is per-package rather than
-  global — a global floor is hostage to which extras the runner installed.
+- **Decided:** no `fail_under` yet. A global floor is hostage to installed GPU
+  extras and JIT tracing; package floors need a defined CPU/GPU split first.
 
 ## Delegation slices and required skills
 
