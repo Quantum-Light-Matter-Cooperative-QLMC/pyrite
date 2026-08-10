@@ -37,7 +37,7 @@ from ..spectrum import (
 from ..transport import resolve_transport_core, simulate_trajectories
 
 # Opt-in Gate-0 phase profiling for the sweep-acceleration work (TODO P?/#numba;
-# see docs/acceleration-technique-evaluation.md). With CXR_MC_TIMING set (to
+# see docs/repo-design/compute/compute-performance-optimization.md). With CXR_MC_TIMING set (to
 # anything but "" / "0"), each phase records its own wall time onto the dict it
 # returns under a private "_t_*" key, and run_cases accumulates those (plus the
 # GPU-idle wait) and prints a per-phase summary + the pipeline verdict. The keys
@@ -423,7 +423,7 @@ def _report_timing(agg, mode, nw):
                 f"(median spectrum {np.median(sp) * 1e3:.1f} ms vs "
                 f"transport/nw {feed * 1e3:.1f} ms)"
             )
-        # Gate-0 verdict per docs/acceleration-technique-evaluation.md decision rule.
+        # Gate-0 verdict per docs/repo-design/compute/compute-performance-optimization.md.
         ref_idle = idle_ss if np.isfinite(idle_ss) else idle
         if ref_idle < 0.20:
             verdict = (

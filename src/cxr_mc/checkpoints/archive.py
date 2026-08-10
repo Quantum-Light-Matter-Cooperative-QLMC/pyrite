@@ -215,7 +215,7 @@ def _union_results(live, archived):
     winning on any (name, E0) collision.
 
     Records carry no run-id/timestamp (see
-    ``docs/superpowers/specs/2026-07-04-checkpoint-lifecycle-design.md``, "Out of
+    ``docs/repo-design/storage/checkpoint-case-store.md``, "Out of
     scope"), so there is no principled way to prefer one side over the other on
     overlap by recency -- the live checkpoint is what's currently in front of you
     (and, by default, the one just re-derived from the box), so it wins ties.

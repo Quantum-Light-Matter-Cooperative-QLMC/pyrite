@@ -581,7 +581,7 @@ def _reject_invalid_groove_geometry(
     groove_spacing_ang: float, sweep: "Sweep", tilts: np.ndarray, azimuths: np.ndarray, stack
 ) -> None:
     """Refuse case geometries the v1 blazed-groove entrance face cannot model
-    (docs/superpowers/plans/2026-07-23-blazed-groove-geometry.md). Grooves are
+    (docs/validation/geometry/blazed-groove-geometry.md). Grooves are
     a single-slab feature machined into one flat face at a fixed in-plane
     orientation (montecarlo.groove.blazed_groove_spec), so every case must sit
     at tilt_azim_deg == 180, 0 < tilt_deg < 90, and theta_obs_deg == 90, and no

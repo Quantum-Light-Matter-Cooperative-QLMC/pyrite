@@ -3,7 +3,7 @@ the standard profile's ``E_grid_line_by_energy`` in
 ``src/cxr_mc/data/materials.toml``, from simulated coherent-line intensity
 coverage rather than an undocumented cap.
 
-See docs/superpowers/specs/2026-07-16-line-grid-max-energy-design.md for the
+See docs/adr/0005-energy-grid-schema-decisions.md for the
 full method. Summary: for every requested material and standard beam energy,
 run a small-Ne diagnostic spectrum on a wide ``E_grid_line`` at the two
 smallest standard polar tilts (near tilt=0, where E_res is maximized) across
@@ -143,7 +143,7 @@ def _run_specs(specs, energy_keV, n_electrons, max_workers, engine):
     as ``specs`` (index-aligned, per its docstring), so zipping is safe.
 
     ``engine`` is threaded straight through to run_cases (see
-    docs/superpowers/specs/2026-07-18-regime-split-scheduling-design.md):
+    docs/repo-design/compute/compute-performance-optimization.md):
     the CPU-bound coarse regime can force the full-case CPU pool even on a
     GPU box, while the refine regime keeps "auto" (GPU pipeline, unchanged)."""
     cases = [

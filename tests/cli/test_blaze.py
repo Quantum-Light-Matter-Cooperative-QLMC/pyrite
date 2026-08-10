@@ -1,7 +1,7 @@
 """`cxr material blaze` blazed-crystal sweep driver: arg parsing, energy/spacing
 pairing, forced groove geometry, checkpoint naming, and the `build_cases`
 groove-tag guard (see
-docs/superpowers/specs/2026-07-23-cxr-blaze-grooved-sweep-design.md)."""
+docs/validation/geometry/blazed-groove-geometry.md)."""
 
 import numpy as np
 from click.testing import CliRunner

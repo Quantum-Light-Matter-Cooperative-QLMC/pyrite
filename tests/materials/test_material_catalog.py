@@ -735,7 +735,9 @@ def test_bundled_crystal_validation_ids_are_ledgered():
         for row in raw["crystals"].values()
         if isinstance(row.get("validation_id"), str) and row["validation_id"].strip()
     }
-    ledger = (Path(__file__).parents[2] / "docs" / "physics-validation-ledger.md").read_text()
+    ledger = (
+        Path(__file__).parents[2] / "docs" / "validation" / "physics-validation-ledger.md"
+    ).read_text()
 
     missing = sorted(
         validation_id for validation_id in validation_ids if f"| `{validation_id}` |" not in ledger

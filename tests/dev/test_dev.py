@@ -79,26 +79,33 @@ def test_docs_cleans_generated_trees_and_runs_strict_build(
     removed = []
     calls = []
     monkeypatch.setattr(dev_module, "_remove_path", removed.append)
-    monkeypatch.setattr(dev_module, "run_uv", lambda *args: calls.append(args))
+    monkeypatch.setattr(
+        "cxr_mc.devtools.docs_paths.check_doc_paths", lambda root: calls.append(("paths", root))
+    )
+    monkeypatch.setattr(dev_module, "run_uv", lambda *args, **kwargs: calls.append((args, kwargs)))
 
     dev_module.cmd_docs(Namespace(linkcheck=linkcheck))
 
     docs = dev_module.ROOT / "docs"
     assert removed == [docs / "_autosummary", docs / "_build"]
     assert calls == [
+        ("paths", dev_module.ROOT),
         (
-            "--group",
-            "docs",
-            "sphinx-build",
-            "-E",
-            "-a",
-            "-W",
-            "--keep-going",
-            "-b",
-            builder,
-            str(docs),
-            str(docs / "_build" / builder),
-        )
+            (
+                "--group",
+                "docs",
+                "sphinx-build",
+                "-E",
+                "-a",
+                "-W",
+                "--keep-going",
+                "-b",
+                builder,
+                str(docs),
+                str(docs / "_build" / builder),
+            ),
+            {"extra_env": {"PYRITE_MC_BACKEND": "cpu", "CXR_MC_BACKEND": "cpu"}},
+        ),
     ]
 
 

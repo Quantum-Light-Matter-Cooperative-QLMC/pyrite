@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-01
-- **Historical rationale:** retired `docs/cli-artifact-model-rfc.md` (recoverable from Git history)
+- **Historical rationale:** retired “CLI artifact-model RFC” (recoverable from Git history)
 
 ## Context
 

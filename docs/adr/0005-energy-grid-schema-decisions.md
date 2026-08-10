@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07 (recorded 2026-08-01)
-- **Historical rationale:** retired `docs/cli-energy-grid-sweep-rework-plan.md` (recoverable from Git history)
+- **Historical rationale:** retired “CLI energy-grid/sweep rework plan” (recoverable from Git history)
 
 ## Context
 
@@ -13,7 +13,7 @@ code and tests cite by number ("decision 2/3").
 ## Decision
 
 The original decisions were recorded in the now-retired
-`docs/cli-energy-grid-sweep-rework-plan.md`. That
+the retired CLI energy-grid/sweep rework plan. That
 document is a live decision source — cited across `materials/catalog.py`,
 `energy_grid/apply.py`, `cli/json.py`, and tests — so it stays in `docs/` root as
 reference rather than moving with ephemeral agent plans (now `agentdocs/`; see

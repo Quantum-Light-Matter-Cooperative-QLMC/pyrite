@@ -26,7 +26,7 @@ Explicit `material_sweep` overrides apply after profile resolution.
 
 `pyrite energy-grid` is upstream of this choice. `derive`, locally or with
 `--remote`, measures catalog-ready line and bremsstrahlung bounds without a
-fidelity setting, and `apply` stores those full bounds. Later
+fidelity setting, and `add` stores those full bounds. Later
 `pyrite run --fidelity survey` reduces the stored photon grids together with
 other sweep axes; `full` uses them unchanged.
 

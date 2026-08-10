@@ -122,9 +122,10 @@ def run(*args: str, cwd: Path = ROOT, extra_env: dict[str, str] | None = None) -
     subprocess.run([sys.executable, *args], cwd=cwd, check=True, env=env)
 
 
-def run_uv(*args: str, cwd: Path = ROOT) -> None:
+def run_uv(*args: str, cwd: Path = ROOT, extra_env: dict[str, str] | None = None) -> None:
     """Run a locked project tool, provisioning its explicit dependency group."""
-    subprocess.run(["uv", "run", *args], cwd=cwd, check=True)
+    env = {**os.environ, **extra_env} if extra_env else None
+    subprocess.run(["uv", "run", *args], cwd=cwd, check=True, env=env)
 
 
 def cmd_acp_up(_: argparse.Namespace) -> None:
@@ -493,6 +494,9 @@ def cmd_imports(_: argparse.Namespace) -> None:
 
 def cmd_docs(args: argparse.Namespace) -> None:
     """Build all maintained and generated documentation from clean state."""
+    from cxr_mc.devtools.docs_paths import check_doc_paths
+
+    check_doc_paths(ROOT)
     docs_dir = ROOT / "docs"
     _remove_path(docs_dir / "_autosummary")
     _remove_path(docs_dir / "_build")
@@ -509,6 +513,7 @@ def cmd_docs(args: argparse.Namespace) -> None:
         builder,
         str(docs_dir),
         str(docs_dir / "_build" / builder),
+        extra_env={"PYRITE_MC_BACKEND": "cpu", "CXR_MC_BACKEND": "cpu"},
     )
 
 

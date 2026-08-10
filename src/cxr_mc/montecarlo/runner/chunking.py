@@ -10,7 +10,7 @@ from .._resources import admitted_chunk, resolve_resource_policy
 
 def _env_chunk(name, default):
     """Chunk-size default, overridable via env for the A1 sweep-acceleration spike
-    (docs/acceleration-technique-evaluation.md, A1: sweep spec/brem chunk on the lab
+    (docs/repo-design/compute/compute-performance-optimization.md: sweep spec/brem chunk on the lab
     box and read the GPU spectrum-phase time). Read once at import so it applies in
     the main GPU process; an explicit per-case ``spec_chunk``/``brem_chunk`` still
     wins. Unset / blank / non-positive / non-integer -> the memory-safe default."""

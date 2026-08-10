@@ -1,4 +1,4 @@
-"""A2 CuPy memory-pool free-cadence predicate (docs/acceleration-technique-evaluation.md, A2).
+"""A2 CuPy memory-pool cadence predicate (docs/repo-design/compute/compute-performance-optimization.md).
 
 Pure-logic gate -- no GPU required. ``_should_free`` decides when
 ``_maybe_free_pool`` hands the pool back to the device: once every N cases, or as

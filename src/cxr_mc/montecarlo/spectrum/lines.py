@@ -645,7 +645,7 @@ def mc_spectrum(
     material interval. This differs from a scattered electron, whose arbitrary
     direction can leave one facet and re-enter through another. Source: exact
     periodic ray-plane intersections; see
-    ``docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md``.
+    ``docs/validation/geometry/blazed-groove-geometry.md``.
 
     Validation: blazed-groove-geometry
 

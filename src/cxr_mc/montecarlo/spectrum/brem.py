@@ -156,7 +156,7 @@ def mc_brem_spectrum(
     observation direction. Layers and other directions raise rather than
     silently using flat attenuation. Source: exact periodic ray-plane
     intersections; see
-    ``docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md``.
+    ``docs/validation/geometry/blazed-groove-geometry.md``.
     Limiting case: ``groove=None`` retains the original flat/prism path
     bit-for-bit; vanishing groove depth tends to the flat entrance-face path.
 

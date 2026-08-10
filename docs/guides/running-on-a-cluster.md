@@ -1,10 +1,12 @@
 # Running on a cluster (SLURM)
 
 `pyrite run [PROFILE] -m MATERIAL` is the headless entry point for one profile
-member. It writes `checkpoints/<material>/{line,brem}.pkl`, making it a clean
-fit for any batch scheduler without the optional lab-box helper below. Install
-once, submit one job per material, then pull checkpoints back for local
-analysis or static-HTML export.
+member. Canonical full runs write `checkpoints/<material>/{line,brem}.pkl`;
+survey and overridden runs use identity-qualified directories. This makes the
+command a clean fit for any batch scheduler without the optional lab-box helper
+below. Install once, submit one job per material, then pull checkpoints back for
+local analysis or static-HTML export. See [Sweep fidelity and dataset
+identity](sweep-profiles.md) for the complete naming contract.
 
 > The scripts below are **templates** — partition names, the CUDA module, account
 > strings, and resource limits are site-specific. Adapt them to your cluster.

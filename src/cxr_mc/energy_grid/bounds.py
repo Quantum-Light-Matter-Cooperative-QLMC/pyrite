@@ -2,7 +2,7 @@
 coherent-line spectrum into a coverage energy, and a coverage energy into a
 catalog-ready line-grid ``stop``/``num`` pair.
 
-See docs/superpowers/specs/2026-07-16-line-grid-max-energy-design.md.
+See docs/adr/0005-energy-grid-schema-decisions.md.
 """
 
 import numpy as np

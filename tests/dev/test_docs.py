@@ -9,6 +9,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from cxr_mc.devtools.docs_paths import StaleDocPath, check_doc_paths, find_stale_doc_paths
+
 
 @pytest.fixture(scope="module")
 def warning_baseline_module():
@@ -66,3 +68,27 @@ def test_changed_warning_fingerprint_emits_unsuppressed_failure(
         "type": "autodoc_baseline",
         "subtype": "changed",
     }
+
+
+def test_literal_documentation_path_check_reports_missing_target(tmp_path: Path) -> None:
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "current.md").write_text("current", encoding="utf-8")
+    source = tmp_path / "src" / "example.py"
+    source.parent.mkdir()
+    source.write_text(
+        '"""See ' + "docs/" + "current.md and " + "docs/" + 'retired-note.md."""\n',
+        encoding="utf-8",
+    )
+
+    assert find_stale_doc_paths(tmp_path) == [
+        StaleDocPath(Path("src/example.py"), 1, "docs/" + "retired-note.md")
+    ]
+    with pytest.raises(RuntimeError, match=r"src/example\.py:1: docs/" + r"retired-note\.md"):
+        check_doc_paths(tmp_path)
+
+
+def test_literal_documentation_path_check_ignores_agentdocs_substring(tmp_path: Path) -> None:
+    source = tmp_path / "example.md"
+    source.write_text("See agentdocs/README.md.\n", encoding="utf-8")
+
+    check_doc_paths(tmp_path)

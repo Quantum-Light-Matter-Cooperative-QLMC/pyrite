@@ -20,7 +20,7 @@ to satisfy them and does not relax them. The crystal keeps the default finite
 5x5 mm footprint (same as flat sweeps), so blazed records carry a real electron
 hit/miss fraction (``hit_frac``, shown in the analysis_app heatmap) rather than
 the trivial 1.0 of a laterally infinite slab. See
-``docs/superpowers/specs/2026-07-23-cxr-blaze-grooved-sweep-design.md``.
+``docs/validation/geometry/blazed-groove-geometry.md``.
 
 The ``if __name__ == "__main__"`` guard on the entry point is REQUIRED, not
 stylistic -- same process-pool re-import reason as ``scan.py``; see its

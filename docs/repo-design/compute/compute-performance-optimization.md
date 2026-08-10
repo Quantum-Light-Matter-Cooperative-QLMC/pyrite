@@ -55,7 +55,8 @@ unlabelled and could not discriminate phases on its own. Round 4's attribution
 used the `cxr.performance.v1` activity labels instead; Round 5 added the real
 ranges) plus `cuLaunchKernel` counts
 from `nsys-stats.txt`, then verified bit-for-bit or tolerance-bounded against
-the golden suite before landing. See `docs/performance-profile-analysis.md` for
+the golden suite before landing. See the [performance-profile analysis
+playbook](../../guides/performance-profile-analysis.md) for
 the analysis playbook. Guiding rule: **GPU utilization is evidence, not the
 target — compute-weighted wall time is.**
 

@@ -2107,7 +2107,7 @@ def simulate_trajectories(
     sampled uniformly over one groove period using an RNG stream independent of
     the main transport draws. None is a strict no-op -- BIT-FOR-BIT identical to
     the ungrooved slab. Source: exact periodic ray-plane intersections; see
-    ``docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md``.
+    ``docs/validation/geometry/blazed-groove-geometry.md``.
     Validation: blazed-groove-geometry
 
     transport_core: which ungrooved core runs the electrons.

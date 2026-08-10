@@ -122,7 +122,7 @@ def test_hbn_structure_sane():
     # AA' ("eclipsed") stacking: every atom has the OPPOSITE species directly
     # above/below it in the adjacent layer (same x,y; z shifted by 1/2). This is
     # what distinguishes bulk h-BN from graphite-like AB and pins the basis
-    # z-registry, not just the atom counts. See docs/validation/hbn-structure.md.
+    # z-registry, not just the atom counts. See docs/validation/materials/hbn-structure.md.
     site = {
         (round(p[0] % 1, 4), round(p[1] % 1, 4), round(p[2] % 1, 4)): el for el, p in info["basis"]
     }

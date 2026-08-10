@@ -1,4 +1,4 @@
-"""A1 chunk-size invariance gate (docs/acceleration-technique-evaluation.md, A1).
+"""A1 chunk-size invariance gate (docs/repo-design/compute/compute-performance-optimization.md).
 
 The ``spec_chunk`` / ``brem_chunk`` knobs are memory/performance controls, not
 physics controls.  Eager CPU/CuPy fallbacks use them to partition the segment

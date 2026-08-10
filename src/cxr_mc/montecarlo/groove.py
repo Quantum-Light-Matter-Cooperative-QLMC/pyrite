@@ -20,7 +20,7 @@ unit cell fixes the groove depth
 
 Source: elementary ray-plane intersection on a periodic sawtooth (no
 literature equation); facet-choice rationale in
-docs/superpowers/plans/2026-07-23-blazed-groove-geometry.md.
+docs/validation/geometry/blazed-groove-geometry.md.
 Assumptions: profile invariant along y; laterally infinite slab; photons
 travel straight along n_hat (incoherent Beer-Lambert transport -- no wave
 optics, consistent with mc_spectrum).
@@ -30,7 +30,7 @@ For arbitrary scattered-electron direction d, later facet crossings use
 physical only when ``s > 0`` and its depth lies in ``[0, h]``; a two-sided
 surface-predicate check distinguishes material-to-vacuum exits from
 vacuum-to-material re-entries. Exact event handling is specified in
-docs/superpowers/specs/2026-07-24-groove-aware-transport-design.md and is
+docs/validation/geometry/blazed-groove-geometry.md and is
 implemented below.
 """
 

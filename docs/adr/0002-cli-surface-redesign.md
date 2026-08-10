@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-01
-- **Historical rationale:** retired `docs/cli-redesign-rfc.md` (recoverable from Git history)
+- **Historical rationale:** retired “CLI redesign RFC” (recoverable from Git history)
 
 ## Context
 
