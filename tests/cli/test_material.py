@@ -165,9 +165,9 @@ def test_hidden_sweep_paths_warn_and_delegate(tmp_path, monkeypatch):
 
     assert shown.exit_code == 0
     assert json.loads(shown.stdout)["schema"] == "cxr.sweep.show"
-    assert "use 'cxr material show hopg'" in shown.stderr
+    assert "use 'pyrite material show hopg'" in shown.stderr
     assert changed.exit_code == 0
-    assert "use 'cxr material set hopg --profile survey'" in changed.stderr
+    assert "use 'pyrite material set hopg --profile survey'" in changed.stderr
     assert "tilt_azim_deg = {values = [100.0]}" in catalog.read_text()
 
 
@@ -189,7 +189,7 @@ def test_hidden_sweep_set_concatenates_repeated_range_options(tmp_path, monkeypa
     )
 
     assert result.exit_code == 0
-    assert "use 'cxr material set mose2 --profile survey'" in result.stderr
+    assert "use 'pyrite material set mose2 --profile survey'" in result.stderr
     assert "energy_keV = {values = [40.0, 50.0, 70.0]}" in catalog.read_text()
 
 
@@ -205,7 +205,7 @@ def test_hidden_sweep_show_without_material_preserves_overview(tmp_path, monkeyp
         "standard",
         "survey",
     ]
-    assert "use 'cxr profile list'" in result.stderr
+    assert "use 'pyrite profile list'" in result.stderr
 
 
 def test_root_and_group_help_expose_new_ownership_only():

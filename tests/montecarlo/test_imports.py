@@ -106,7 +106,7 @@ def test_sincsq_lineshape_runs_on_cpu() -> None:
     )
 
     env = os.environ.copy()
-    env["CXR_MC_BACKEND"] = "cpu"
+    env["PYRITE_MC_BACKEND"] = "cpu"
 
     result = subprocess.run(
         [sys.executable, "-c", script],

@@ -87,4 +87,4 @@ def test_hidden_performance_prune_alias_warns_and_still_previews(tmp_path):
 
     assert result.exit_code == 0
     assert result.stderr.count("is deprecated") == 1
-    assert "use 'cxr performance rm'" in result.stderr
+    assert "use 'pyrite performance rm'" in result.stderr

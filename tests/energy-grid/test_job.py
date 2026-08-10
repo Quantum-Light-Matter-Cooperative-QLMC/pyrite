@@ -24,9 +24,9 @@ def test_generated_slice_shell_has_fail_closed_handoff_contract():
     assert "FAILED (slice resubmission)" in shell
     assert '[ -f "$JOBDIR/STOP" ]' in shell
     assert "--max-minutes 10" in shell
-    assert "CXR_MC_FREE_EVERY=40" in shell
-    assert "CXR_MC_FREE_WATERMARK_MB=15000" in shell
-    assert "CXR_MC_TIMING=1" in shell
+    assert "PYRITE_MC_FREE_EVERY=40" in shell
+    assert "PYRITE_MC_FREE_WATERMARK_MB=15000" in shell
+    assert "PYRITE_MC_TIMING=1" in shell
     assert "python -m cxr_mc.energy_grid.derive" in shell
     assert "scripts/analyze_line_grid_bounds.py" not in shell
 

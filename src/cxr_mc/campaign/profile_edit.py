@@ -87,7 +87,7 @@ def unknown_profile(document, name):
     message = f"unknown profile: {name}"
     if suggestions:
         message += f". Did you mean: {', '.join(suggestions)}?"
-    message += f". Create it first with: cxr profile create {name}"
+    message += f". Create it first with: pyrite profile create {name}"
     raise ValueError(message)
 
 
@@ -172,7 +172,7 @@ def unknown_beam(document, name):
     message = f"unknown beam: {name}"
     if suggestions:
         message += f". Did you mean: {', '.join(suggestions)}?"
-    message += f". Create it first with: cxr beam create {name}"
+    message += f". Create it first with: pyrite beam create {name}"
     raise ValueError(message)
 
 
@@ -184,7 +184,7 @@ def apply_beam_updates(name, target, updates):
     if isinstance(existing, str):
         raise ValueError(
             f"profile {name} has beam = {existing!r} (a named reference); "
-            f"edit it with 'cxr beam set {existing} ...', or replace the "
+            f"edit it with 'pyrite beam set {existing} ...', or replace the "
             "reference with --beam NAME"
         )
     if existing is None:
@@ -290,7 +290,7 @@ def membership_target(document, name):
         raise ValueError(
             f"profile {name!r} has implicit all-in-use-materials membership; "
             "it already includes every material. To restrict it, use: "
-            f"cxr profile set {name} --material MATERIAL,..."
+            f"pyrite profile set {name} --material MATERIAL,..."
         )
     if not isinstance(materials, list):
         raise ValueError(f"profiles.{name}.materials must be an array of material keys")
@@ -367,7 +367,9 @@ def create_profile(
     """Create a profile row from a source row and validated CLI values."""
     profiles = profile_rows(document)
     if name in profiles:
-        raise ValueError(f"profile {name!r} already exists; edit it with: cxr profile set {name}")
+        raise ValueError(
+            f"profile {name!r} already exists; edit it with: pyrite profile set {name}"
+        )
     if beam_name is not None and beam_name not in beam_rows(document):
         unknown_beam(document, beam_name)
     if source_name not in profiles:
@@ -463,7 +465,7 @@ def delete_profile(document, name):
         raise ValueError(
             f"cannot delete profile {name!r}; still referenced by:\n- "
             f"energy_grids.{name} (shared line-grid store; delete its rows with "
-            f"cxr energy-grid line delete {name} first)"
+            f"pyrite energy-grid line delete {name} first)"
         )
     overrides = profile_overrides(target)
     n_overrides = sum(1 for row in overrides.values() if isinstance(row, dict) and row)

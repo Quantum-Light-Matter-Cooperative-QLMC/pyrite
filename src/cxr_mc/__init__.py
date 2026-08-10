@@ -14,7 +14,7 @@ import logging
 from ._compat import env_value
 from .paths import data_dir
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # Packaged data (materials.toml, cifs/, mott_transport_cross_sections/,
 # eaglexo_qe.csv, legacy atomic_scattering_factors/). Resolved relative to this
@@ -25,7 +25,7 @@ DATA_DIR = data_dir()
 # cxr_mc` (and every `cxr` CLI invocation, incl. each ProcessPoolExecutor
 # worker in montecarlo.runner) stays silent -- submodules log routine
 # noise (GPU/CPU backend probe, per-element Mott-table fallback) at DEBUG,
-# which propagates nowhere by default. Set CXR_MC_DEBUG=1 to see it: this
+# which propagates nowhere by default. Set PYRITE_MC_DEBUG=1 to see it: this
 # attaches our own StreamHandler at DEBUG on just the "cxr_mc" logger,
 # without touching the caller's root logging config.
 logger = logging.getLogger("cxr_mc")

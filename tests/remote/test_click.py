@@ -1,4 +1,4 @@
-"""Focused Click-contract tests for ``cxr remote``."""
+"""Focused Click-contract tests for ``pyrite remote``."""
 
 from __future__ import annotations
 
@@ -87,7 +87,7 @@ def test_legacy_remote_profile_pull_warns_once(monkeypatch):
     assert result.exit_code == 0
     assert result.stdout == ""
     assert result.stderr.count("is deprecated") == 1
-    assert "cxr remote performance pull" in result.stderr
+    assert "pyrite remote performance pull" in result.stderr
 
 
 def test_run_click_defaults_and_zero_meanings(monkeypatch):
@@ -268,7 +268,7 @@ def test_legacy_zhai_execution_aliases_warn_once(monkeypatch, name):
 
     assert result.exit_code == 0
     assert result.stderr.count("is deprecated") == 1
-    assert "cxr run --preset zhai --remote" in result.stderr
+    assert "pyrite run --preset zhai --remote" in result.stderr
 
 
 def test_legacy_zhai_pull_alias_warns_with_retrieval_replacement(monkeypatch):
@@ -278,7 +278,7 @@ def test_legacy_zhai_pull_alias_warns_with_retrieval_replacement(monkeypatch):
 
     assert result.exit_code == 0
     assert result.stderr.count("is deprecated") == 1
-    assert "cxr remote pull --preset zhai" in result.stderr
+    assert "pyrite remote pull --preset zhai" in result.stderr
 
 
 def test_legacy_zhai_detached_follow_warning_preserves_no_pull(monkeypatch):
@@ -288,7 +288,7 @@ def test_legacy_zhai_detached_follow_warning_preserves_no_pull(monkeypatch):
     result = invoke(remote.command, ["validate", "--detached", "--follow"])
 
     assert result.exit_code == 0
-    assert "cxr run --preset zhai --remote --detach" in result.stderr
+    assert "pyrite run --preset zhai --remote --detach" in result.stderr
 
 
 def test_pull_zhai_preset_dispatches_without_checkpoint_selection(monkeypatch):
@@ -390,7 +390,7 @@ def test_hidden_remote_prune_alias_warns_and_reclaims_records_only(monkeypatch):
 
     assert result.exit_code == 0
     assert result.stderr.count("is deprecated") == 1
-    assert "cxr remote gc" in result.stderr
+    assert "pyrite remote gc" in result.stderr
     assert calls == [("prune", {"all_profiles": False, "catalog_profile": None, "yes": False})]
 
 
@@ -411,7 +411,7 @@ def test_hidden_remote_reap_alias_warns_and_releases_locks_only(monkeypatch):
 
     assert result.exit_code == 0
     assert result.stderr.count("is deprecated") == 1
-    assert "cxr remote gc" in result.stderr
+    assert "pyrite remote gc" in result.stderr
     assert calls == [("reap", {"min_age_minutes": 5.0, "yes": False})]
 
 
@@ -458,7 +458,7 @@ def test_fidelity_dispatches_cleanly(monkeypatch, command_name):
         assert result.exit_code == 0
         assert result.stderr.count("is deprecated") == 1
         assert (
-            f"cxr checkpoint recompute {'brem' if command_name == 'rebrem' else 'line'} --remote"
+            f"pyrite checkpoint recompute {'brem' if command_name == 'rebrem' else 'line'} --remote"
             in result.stderr
         )
     assert calls[0]["fidelity"] == "survey"

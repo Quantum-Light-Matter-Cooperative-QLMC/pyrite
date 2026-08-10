@@ -161,12 +161,12 @@ def test_run_chunk_pins_exported_before_runtime_import(monkeypatch):
     seen = {}
 
     def capture(args):
-        seen["spec"] = os.environ.get("CXR_MC_SPEC_CHUNK")
-        seen["brem"] = os.environ.get("CXR_MC_BREM_CHUNK")
+        seen["spec"] = os.environ.get("PYRITE_MC_SPEC_CHUNK")
+        seen["brem"] = os.environ.get("PYRITE_MC_BREM_CHUNK")
 
     monkeypatch.setattr(scan, "run", capture)
-    monkeypatch.delenv("CXR_MC_SPEC_CHUNK", raising=False)
-    monkeypatch.delenv("CXR_MC_BREM_CHUNK", raising=False)
+    monkeypatch.delenv("PYRITE_MC_SPEC_CHUNK", raising=False)
+    monkeypatch.delenv("PYRITE_MC_BREM_CHUNK", raising=False)
     result = CliRunner().invoke(
         scan.command,
         ["sub_100keV", "-p", "--spec-chunk", "128", "--brem-chunk", "64"],

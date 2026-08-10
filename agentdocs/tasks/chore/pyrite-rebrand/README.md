@@ -46,9 +46,9 @@ Out of scope:
 
 ## Implementation path and likely owners
 
-Sequence after `refactor/repo-structure-cleanup` lands. That branch is actively
-splitting `montecarlo/runner.py` and `montecarlo/spectrum.py`; an import-package
-rename in parallel would create broad, artificial conflicts.
+The prerequisite `refactor/repo-structure-cleanup` landed before implementation
+started. The conversion therefore builds on its package boundaries without
+overlapping that completed refactor.
 
 1. Inventory identity-bearing surfaces and classify each as public canonical,
    compatibility alias, internal-only, persisted/on-disk, generated, or
@@ -122,7 +122,7 @@ Related accepted design constraints:
 - [ ] G — Execute the authenticated GitHub repository rename, update remotes and
       configured integrations, and verify old web/Git operations redirect. Do
       not reuse `cxr-mc` while the redirect is part of the compatibility plan.
-- [ ] H — Run focused compatibility probes and the full release gate; review a
+- [x] H — Run focused compatibility probes and the full release gate; review a
       scoped identity search so remaining `cxr-mc` / `cxr_mc` / `cxr` /
       `CXR_*` occurrences are intentional compatibility or historical records.
 
@@ -221,8 +221,17 @@ precedence, completion compatibility, canonical config/state/cache writes with
 legacy read-through, and stable persisted/wire identifiers. F updates current
 public and contributor surfaces, release metadata/version 0.2.0, generated CLI
 and repository references, app chrome, scripts, Docker/CI, and canonical skill
-mirrors. G remains an explicitly credentialed external step; H records the
-release-gate evidence after the F checkpoint.
+mirrors. G remains an explicitly credentialed external step. H completed after
+the F checkpoint: the full `pyrite-dev verify` gate and 232-test packaging suite
+passed. `package-smoke` validated clean wheel and editable installs, package
+metadata, `cxr_mc` imports and data, canonical `pyrite` / `pyrite-dev` entry
+points, warned legacy executables, and packaged app launch probes. Focused CLI,
+app, config, completion, remote-command, import, version, and transport-
+environment regressions passed. A final exact-text audit found no maintained
+old GitHub or GitHub Pages URLs; remaining old spellings are the RFC's retained
+import, protocol, compatibility, scientific, internal, or historical classes.
+The only full-suite warning was the pre-existing line-spectrum square-root
+runtime warning; no physics or numerical implementation changed.
 
 ## Delegation slices and required skills
 

@@ -1654,7 +1654,7 @@ def resolve_transport_core(requested, Ne, groove=None):
     if pinned:
         if pinned not in TRANSPORT_CORES:
             raise ValueError(
-                f"CXR_MC_TRANSPORT_CORE must be one of {', '.join(TRANSPORT_CORES)}; got {pinned!r}"
+                f"PYRITE_MC_TRANSPORT_CORE must be one of {', '.join(TRANSPORT_CORES)}; got {pinned!r}"
             )
         requested = pinned
     if requested not in TRANSPORT_CORES:

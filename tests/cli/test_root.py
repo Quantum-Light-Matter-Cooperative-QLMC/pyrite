@@ -16,7 +16,7 @@ def test_root_help_does_not_import_lazy_commands(monkeypatch, capsys):
         cli.main(["--help"])
     assert exc.value.code == 0
     captured = capsys.readouterr()
-    assert captured.out.startswith("Usage: cxr ")
+    assert captured.out.startswith("Usage: pyrite ")
     assert "run" in captured.out
     assert "scan" not in captured.out
     assert captured.err == ""
@@ -27,7 +27,7 @@ def test_root_version_preserves_public_text(capsys):
         cli.main(["--version"])
     assert exc.value.code == 0
     captured = capsys.readouterr()
-    assert captured.out == f"cxr-mc {cli.__version__}\n"
+    assert captured.out == f"PyRITE {cli.__version__}\n"
     assert captured.err == ""
 
 
@@ -90,4 +90,4 @@ def test_hidden_checkpoint_aliases_remain_callable(alias, capsys):
         cli.main([alias, "--help"])
 
     assert exc.value.code == 0
-    assert capsys.readouterr().out.startswith(f"Usage: cxr {alias} ")
+    assert capsys.readouterr().out.startswith(f"Usage: pyrite {alias} ")

@@ -85,7 +85,7 @@ def test_show_unknown_beam_suggests_and_points_to_create(tmp_path, monkeypatch):
     assert result.exit_code == 1
     assert "unknown beam: rf_gun_200f" in result.stderr
     assert "Did you mean: rf_gun_200fs" in result.stderr
-    assert "cxr beam create rf_gun_200f" in result.stderr
+    assert "pyrite beam create rf_gun_200f" in result.stderr
 
 
 def test_create_requires_at_least_one_beam_field(tmp_path, monkeypatch):
@@ -130,7 +130,7 @@ def test_create_existing_or_invalid_name_errors(tmp_path, monkeypatch):
 
     assert existing.exit_code == 1
     assert "already exists" in existing.stderr
-    assert "cxr beam set rf_gun_200fs" in existing.stderr
+    assert "pyrite beam set rf_gun_200fs" in existing.stderr
     assert invalid.exit_code == 2
     assert "invalid beam name" in invalid.stderr
 
@@ -317,7 +317,7 @@ crystal = "mos2"
 
 
 def test_create_matches_hand_written_toml_block_value_equality(tmp_path, monkeypatch):
-    """A beam built purely from ``cxr beam create`` flags must decode to the
+    """A beam built purely from ``pyrite beam create`` flags must decode to the
     same resolved ``BeamSpec`` payload as an equivalent hand-written
     ``[beams.NAME]`` block, negative ``alpha_twiss`` included."""
     from cxr_mc.materials import load_material_catalog

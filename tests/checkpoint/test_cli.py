@@ -68,5 +68,5 @@ def test_hidden_top_level_checkpoint_alias_warns_once(monkeypatch):
 
     assert result.exit_code == 0
     assert result.stderr.count("is deprecated") == 1
-    assert "use 'cxr checkpoint recompute line'" in result.stderr
+    assert "use 'pyrite checkpoint recompute line'" in result.stderr
     assert seen["material"] == ["hopg"]

@@ -2,7 +2,7 @@
 
 ``transport_core="auto"`` is the shipped default, so these pin the policy that
 decides for a caller: the electron count, the groove, whether this process has a
-CUDA device, and the ``CXR_MC_TRANSPORT_CORE`` pin. They also pin the routing
+CUDA device, and the ``PYRITE_MC_TRANSPORT_CORE`` pin. They also pin the routing
 that follows from it -- device transport stays in the driver process, and every
 worker pool is nailed to the CPU core, because the one thing the single-context
 design cannot survive is a pool of CUDA contexts.
@@ -85,7 +85,7 @@ def test_an_unknown_core_is_rejected():
 
 def test_env_pin_forces_the_cpu_core_above_the_threshold(cuda, monkeypatch):
     cuda(True)
-    monkeypatch.setenv("CXR_MC_TRANSPORT_CORE", "lockstep")
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_CORE", "lockstep")
     assert resolve_transport_core("auto", 100_000) == "lockstep"
 
 
@@ -93,19 +93,19 @@ def test_env_pin_overrides_an_explicit_request(cuda, monkeypatch):
     # The pin exists to reproduce a run without editing call sites, so it has to
     # win over the call site too.
     cuda(True)
-    monkeypatch.setenv("CXR_MC_TRANSPORT_CORE", "cuda")
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_CORE", "cuda")
     assert resolve_transport_core("lockstep", 10) == "cuda"
 
 
 def test_env_pin_is_validated(monkeypatch):
-    monkeypatch.setenv("CXR_MC_TRANSPORT_CORE", "gpu")
-    with pytest.raises(ValueError, match="CXR_MC_TRANSPORT_CORE"):
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_CORE", "gpu")
+    with pytest.raises(ValueError, match="PYRITE_MC_TRANSPORT_CORE"):
         resolve_transport_core("auto", 10)
 
 
 def test_empty_env_pin_is_ignored(cuda, monkeypatch):
     cuda(True)
-    monkeypatch.setenv("CXR_MC_TRANSPORT_CORE", "")
+    monkeypatch.setenv("PYRITE_MC_TRANSPORT_CORE", "")
     assert resolve_transport_core("auto", 100_000) == "cuda"
 
 
@@ -119,9 +119,9 @@ def worker_init(monkeypatch):
     monkeypatch.setattr(os, "nice", lambda _increment: 0, raising=False)
 
     def run(inherited):
-        monkeypatch.setenv("CXR_MC_TRANSPORT_CORE", inherited)
+        monkeypatch.setenv("PYRITE_MC_TRANSPORT_CORE", inherited)
         runner._worker_init()
-        return os.environ["CXR_MC_TRANSPORT_CORE"]
+        return os.environ["PYRITE_MC_TRANSPORT_CORE"]
 
     return run
 

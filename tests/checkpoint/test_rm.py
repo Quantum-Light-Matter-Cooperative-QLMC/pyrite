@@ -150,5 +150,5 @@ def test_hidden_checkpoint_clear_alias_warns_and_still_previews(tmp_path):
 
     assert result.exit_code == 0
     assert result.stderr.count("is deprecated") == 1
-    assert "use 'cxr checkpoint rm'" in result.stderr
+    assert "use 'pyrite checkpoint rm'" in result.stderr
     assert "would delete local checkpoint datasets:" in result.stdout

@@ -260,7 +260,7 @@ def test_validation_app_never_falls_back_to_heavy_local_cache_population():
     assert "af.reproduce_all(" not in source
     assert source.count("cache_only=True") >= 2
     assert "Heavy cache preparation was not started locally" in source
-    assert "cxr run --preset zhai --remote" in source
+    assert "pyrite run --preset zhai --remote" in source
 
 
 def test_validation_app_declares_evidence_tasks_and_authorities():

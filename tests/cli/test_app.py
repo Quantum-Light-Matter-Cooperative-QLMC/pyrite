@@ -98,5 +98,5 @@ def test_implicit_app_launch_warns_and_still_dispatches(monkeypatch):
 
     assert result.exit_code == 0
     assert launched["material"] == "mose2"
-    assert "'cxr app analysis' is deprecated" in result.stderr
-    assert "use 'cxr app analysis launch'" in result.stderr
+    assert "'pyrite app analysis' is deprecated" in result.stderr
+    assert "use 'pyrite app analysis launch'" in result.stderr

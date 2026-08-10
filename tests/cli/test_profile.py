@@ -196,11 +196,11 @@ def test_show_create_and_set_round_trip_longitudinal_beam(tmp_path, monkeypatch)
         stderr="".join(
             flag_message("profile create", flag, replacement) + "\n"
             for flag, replacement in (
-                ("--transverse-fwhm-mm", "cxr beam create/set --transverse-fwhm-mm"),
-                ("--rep-rate-hz", "cxr beam create/set --rep-rate-hz"),
-                ("--bunch-charge-pc", "cxr beam create/set --bunch-charge-pc"),
-                ("--longitudinal", "cxr beam create/set --longitudinal"),
-                ("--envelope-rms-fs", "cxr beam create/set --envelope-rms-fs"),
+                ("--transverse-fwhm-mm", "pyrite beam create/set --transverse-fwhm-mm"),
+                ("--rep-rate-hz", "pyrite beam create/set --rep-rate-hz"),
+                ("--bunch-charge-pc", "pyrite beam create/set --bunch-charge-pc"),
+                ("--longitudinal", "pyrite beam create/set --longitudinal"),
+                ("--envelope-rms-fs", "pyrite beam create/set --envelope-rms-fs"),
             )
         ),
     )
@@ -225,8 +225,8 @@ def test_show_create_and_set_round_trip_longitudinal_beam(tmp_path, monkeypatch)
         stderr="".join(
             flag_message("profile set", flag, replacement) + "\n"
             for flag, replacement in (
-                ("--bunch-charge-pc", "cxr beam create/set --bunch-charge-pc"),
-                ("--longitudinal", "cxr beam create/set --longitudinal"),
+                ("--bunch-charge-pc", "pyrite beam create/set --bunch-charge-pc"),
+                ("--longitudinal", "pyrite beam create/set --longitudinal"),
             )
         ),
     )
@@ -258,7 +258,7 @@ def test_show_unknown_profile_suggests_and_points_to_create(tmp_path, monkeypatc
     assert result.exit_code == 1
     assert "unknown profile: sub_100kv" in result.stderr
     assert "Did you mean: sub_100keV" in result.stderr
-    assert "cxr profile create sub_100kv" in result.stderr
+    assert "pyrite profile create sub_100kv" in result.stderr
 
 
 def test_show_inherits_standard_detector_when_profile_block_is_absent(tmp_path, monkeypatch):
@@ -394,7 +394,7 @@ def test_create_existing_or_invalid_name_errors(tmp_path, monkeypatch):
 
     assert existing.exit_code == 1
     assert "already exists" in existing.stderr
-    assert "cxr profile set standard" in existing.stderr
+    assert "pyrite profile set standard" in existing.stderr
     assert invalid.exit_code == 2
     assert "invalid profile name" in invalid.stderr
 
@@ -822,7 +822,7 @@ def test_members_path_warns_and_dispatches_compatibly(tmp_path, monkeypatch):
     assert result.exit_code == 0
     assert result.stdout == "updated profile sub_100keV membership\n"
     assert result.stderr.count("is deprecated") == 1
-    assert "cxr profile set NAME --material MATERIAL,..." in result.stderr
+    assert "pyrite profile set NAME --material MATERIAL,..." in result.stderr
     assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
 
 
@@ -1010,14 +1010,14 @@ def test_add_material_and_remove_material_roundtrip(tmp_path, monkeypatch):
 
     added = invoke(profile.command, ["add-material", "sub_100keV", "mose2", "hopg"])
     assert added.exit_code == 0
-    assert "use 'cxr profile add NAME --material MATERIAL,...'" in added.stderr
+    assert "use 'pyrite profile add NAME --material MATERIAL,...'" in added.stderr
     assert "added mose2" in added.stdout
     assert "already members: hopg" in added.stdout
     assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
 
     removed = invoke(profile.command, ["remove-material", "sub_100keV", "hopg", "diamond"])
     assert removed.exit_code == 0
-    assert "use 'cxr profile remove NAME --material MATERIAL,...'" in removed.stderr
+    assert "use 'pyrite profile remove NAME --material MATERIAL,...'" in removed.stderr
     assert "removed hopg" in removed.stdout
     assert "not members: diamond" in removed.stdout
     assert 'materials = ["mose2"]' in catalog.read_text()
@@ -1030,7 +1030,7 @@ def test_membership_verbs_require_explicit_list(tmp_path, monkeypatch):
 
     assert result.exit_code == 1
     assert "implicit all-in-use-materials membership" in result.stderr
-    assert "cxr profile set standard --material MATERIAL" in result.stderr
+    assert "pyrite profile set standard --material MATERIAL" in result.stderr
 
 
 def test_add_materials_explains_implicit_membership_is_already_all(tmp_path, monkeypatch):
@@ -1040,7 +1040,7 @@ def test_add_materials_explains_implicit_membership_is_already_all(tmp_path, mon
 
     assert result.exit_code == 1
     assert "already includes every material" in result.stderr
-    assert "cxr profile set standard --material MATERIAL" in result.stderr
+    assert "pyrite profile set standard --material MATERIAL" in result.stderr
 
 
 def test_membership_verbs_reject_unknown_material(tmp_path, monkeypatch):
@@ -1055,7 +1055,7 @@ def test_membership_verbs_reject_unknown_material(tmp_path, monkeypatch):
 def test_add_material_all_seeds_implicit_membership(tmp_path, monkeypatch):
     """--all seeds an implicit all-in-use profile straight from mats_to_sim.toml's
     verified list -- the escape hatch `test_membership_verbs_require_explicit_list`
-    otherwise requires (`cxr profile set NAME --material KEY,...`, typed by hand)."""
+    otherwise requires (`pyrite profile set NAME --material KEY,...`, typed by hand)."""
     from cxr_mc.runs import scan
 
     catalog = _catalog(tmp_path, monkeypatch)
@@ -1064,7 +1064,7 @@ def test_add_material_all_seeds_implicit_membership(tmp_path, monkeypatch):
     result = invoke(profile.command, ["add-material", "standard", "--all", "-y"])
 
     assert result.exit_code == 0
-    assert "cxr profile add NAME --material MATERIAL,..." in result.stderr
+    assert "pyrite profile add NAME --material MATERIAL,..." in result.stderr
     assert "added hopg, mose2" in result.stdout
     assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
 
@@ -1078,7 +1078,7 @@ def test_add_material_all_extends_and_skips_existing_members(tmp_path, monkeypat
     result = invoke(profile.command, ["add-material", "sub_100keV", "--all"])
 
     assert result.exit_code == 0
-    assert "cxr profile add NAME --material MATERIAL,..." in result.stderr
+    assert "pyrite profile add NAME --material MATERIAL,..." in result.stderr
     assert "added mose2" in result.stdout
     assert "already members: hopg" in result.stdout
     assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
@@ -1103,7 +1103,7 @@ def test_add_material_short_all_flag(tmp_path, monkeypatch):
     result = invoke(profile.command, ["add-material", "sub_100keV", "-a"])
 
     assert result.exit_code == 0
-    assert "cxr profile add NAME --material MATERIAL,..." in result.stderr
+    assert "pyrite profile add NAME --material MATERIAL,..." in result.stderr
     assert 'materials = ["hopg", "mose2"]' in catalog.read_text()
 
 
@@ -1150,10 +1150,10 @@ def test_create_writes_transverse_twiss_block(tmp_path, monkeypatch):
         stderr="".join(
             flag_message("profile create", flag, replacement) + "\n"
             for flag, replacement in (
-                ("--emittance", "cxr beam create/set --emittance"),
-                ("--twiss-beta", "cxr beam create/set --twiss-beta"),
-                ("--twiss-alpha", "cxr beam create/set --twiss-alpha"),
-                ("--energy-spread", "cxr beam create/set --energy-spread"),
+                ("--emittance", "pyrite beam create/set --emittance"),
+                ("--twiss-beta", "pyrite beam create/set --twiss-beta"),
+                ("--twiss-alpha", "pyrite beam create/set --twiss-alpha"),
+                ("--energy-spread", "pyrite beam create/set --energy-spread"),
             )
         ),
     )
@@ -1222,8 +1222,8 @@ def test_set_transverse_retires_the_legacy_spot(tmp_path, monkeypatch):
         stderr="".join(
             flag_message("profile set", flag, replacement) + "\n"
             for flag, replacement in (
-                ("--emittance", "cxr beam create/set --emittance"),
-                ("--twiss-beta", "cxr beam create/set --twiss-beta"),
+                ("--emittance", "pyrite beam create/set --emittance"),
+                ("--twiss-beta", "pyrite beam create/set --twiss-beta"),
             )
         ),
     )
@@ -1272,7 +1272,7 @@ def test_set_unknown_beam_errors(tmp_path, monkeypatch):
 
     assert result.exit_code == 1
     assert "unknown beam: bogus" in result.stderr
-    assert "Create it first with: cxr beam create bogus" in result.stderr
+    assert "Create it first with: pyrite beam create bogus" in result.stderr
 
 
 def test_create_unknown_beam_errors(tmp_path, monkeypatch):
@@ -1327,7 +1327,7 @@ def test_set_inline_flag_onto_named_reference_errors(tmp_path, monkeypatch):
 
     assert result.exit_code == 1
     assert "profile attached has beam = 'rf_gun_200fs' (a named reference)" in result.stderr
-    assert "cxr beam set rf_gun_200fs" in result.stderr
+    assert "pyrite beam set rf_gun_200fs" in result.stderr
 
 
 def test_remove_beam_detaches_named_reference(tmp_path, monkeypatch):

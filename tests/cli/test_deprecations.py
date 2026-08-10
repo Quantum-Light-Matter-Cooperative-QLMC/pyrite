@@ -119,7 +119,7 @@ def _replacement_command_path(replacement: str) -> str:
     parts = replacement.split()
 
     assert parts
-    assert parts[0] == "cxr"
+    assert parts[0] == "pyrite"
 
     command_parts = []
 
@@ -256,6 +256,6 @@ def test_generated_deprecation_docs_are_current() -> None:
     assert actual == expected
     for entry in DEPRECATED_FLAGS.values():
         assert (
-            f"| `cxr {entry.command}` | `{entry.flag}` | `{entry.replacement}` "
+            f"| `pyrite {entry.command}` | `{entry.flag}` | `{entry.replacement}` "
             f"| {entry.deprecated_in} | {entry.remove_in} | {entry.note} |"
         ) in actual
