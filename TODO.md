@@ -23,6 +23,10 @@ file. Edit and drop items on `main`.
    at hopg's C K-edge, unresolved). `beam-phase-space-injection` /
    `beam-energy-spread-injection` are `rederived` and await human
    `signed-off`.
+   1. **Rederivation Clean-up and Formatting.** Need a worker to go thru and clean up the math in
+      completed rederivations, just to make it human readable. Purely formatting, LateX, no logic change.
+      Needed to facilitate sign-off. Related - make a ruleset on LateX/MyST formatting that is handed
+      to fresh-context workers doing the rederivations.
 2. **Energy-controlled electron transport.** Inventory the current segment
    schema and add bounded per-flight diagnostics before selecting the controlled
    energy-loss/hazard propagation model. →
@@ -37,7 +41,7 @@ file. Edit and drop items on `main`.
    midpoint time, truncate cutoff-crossing flights, distinguish step-limited
    histories from physical stops, and tighten transport input validation across
    all CPU/CUDA cores. → `fix/electron-transport-correctness`;
-   [`agentdocs/tasks/fix/electron-transport-correctness/`](agentdocs/tasks/fix/electron-transport-correctness/).
+   [`agentdocs/tasks/fix/electron-transport-correctness/`](agentdocs/tasks/fix/electron-transport-correctness/).dir
 2. **Add support for characteristic X-rays**
 3. **Debye-Waller provenance and anisotropy audit.** Replace placeholder/reused `B_ang2`; evaluate scalar sensitivity, tensor
    factors, and DFPT value/complexity. → `feature/debye-waller-audit`; [`docs/validation/materials/debye-waller-audit.md`](docs/validation/materials/debye-waller-audit.md). >user<
@@ -69,7 +73,7 @@ file. Edit and drop items on `main`.
    → `feature/reference-electron-stopping-data`;
    [`agentdocs/tasks/feature/reference-electron-stopping-data/`](agentdocs/tasks/feature/reference-electron-stopping-data/).
 3. **Measured-data validation.** General experimental-simulation comparison & validation. Particularly: compare modeled broadened line widths vs measured HOPG rocking-curve / EDS dataset. Design: [`docs/physics/materials/crystal-mosaicity.md`](docs/physics/materials/crystal-mosaicity.md).
-5. **Superradiant PXR/CBS validation.** Optional phased segment/electron sum is implemented but unverified; resolve phase convention and bunch-form-factor limits before scientific use. Design: [`docs/physics/radiation-physics/coherent-emission.md`](docs/physics/radiation-physics/coherent-emission.md).
+4. **Superradiant PXR/CBS validation.** Optional phased segment/electron sum is implemented but unverified; resolve phase convention and bunch-form-factor limits before scientific use. Design: [`docs/physics/radiation-physics/coherent-emission.md`](docs/physics/radiation-physics/coherent-emission.md).
 
 ### Paused / on hold
 
