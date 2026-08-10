@@ -5,7 +5,7 @@ structure id (``cod_id`` / ``mp_id``) has its lattice ``(a, b, c, alpha, beta,
 gamma)`` diffed against the authoritative record. This catches silent drift or
 transcription error in the local CIFs.
 
-Scope is **geometry only** -- see ``docs/crystal-db-comparison.md``. It does NOT
+Scope is **geometry only** -- see ``docs/validation/materials/crystal-db-comparison.md``. It does NOT
 validate Debye-Waller factors (``issue_notes.md`` item #1): external databases
 do not carry a reliable isotropic B.
 

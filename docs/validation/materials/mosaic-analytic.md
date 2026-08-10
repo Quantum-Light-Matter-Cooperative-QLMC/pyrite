@@ -6,7 +6,7 @@
   Gaussian energy broadening
   `FWHM = E * abs(tan(psi)) * eta`.
 - Source: the resonance relation and kinematical mosaic-block derivation in
-  `docs/crystal-mosaicity.md`.
+  `docs/physics/materials/crystal-mosaicity.md`.
 - Signature: `mosaic_fwhm_eV(E_eV, psi_rad, mosaic_fwhm_rad)`; both angles are
   radians and the result is eV.
 

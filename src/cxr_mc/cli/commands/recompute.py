@@ -2,7 +2,7 @@
 
 The drivers these call live in :mod:`cxr_mc.checkpoints.recompute`; this module owns only
 the command surface, per the command-home rule in
-`docs/package-structure-rfc.md` P1. The retired top-level ``pyrite rebrem`` and
+`docs/adr/0004-package-and-repository-structure.md` P1. The retired top-level ``pyrite rebrem`` and
 ``pyrite reline`` spellings resolve to the same commands through the deprecation
 registry in :mod:`cxr_mc.cli._deprecations`.
 """

@@ -21,11 +21,11 @@ Allowed status values are:
 
 An ADR is intentionally short: it records the **decision**, the relevant context, and its consequences.
 
-Long-form rationale, alternatives, interface sketches, and implementation analysis belong in the corresponding `*-rfc.md` document under the repository-design documentation. The ADR should link to that document where applicable.
+Long-form rationale, alternatives, interface sketches, and implementation analysis may live in repository-design documentation while a decision is being developed. Accepted planning documents may be retired once the ADR is concise and self-contained; Git history preserves their point-in-time detail.
 
 In other words:
 
-* use an **RFC/design document** to explore what should be done;
+* use an **RFC/design document** to explore what should be done when extended analysis remains useful;
 * use an **ADR** to record what was ultimately decided.
 
 ## Decision records

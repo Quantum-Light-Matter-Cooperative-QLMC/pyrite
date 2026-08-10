@@ -344,7 +344,7 @@ def project_beam_entry(offsets_uv, tilt_polar_rad, tilt_azim_rad=0.0):
     Assumptions: the projection uses the NOMINAL beam axis, not each electron's
     own direction. With a finite emittance the two differ, but the offsets are
     specified at the entrance face itself (no drift length -- see
-    ``docs/beam-phase-space.md``), so the residual is second order in the
+    ``docs/physics/beam-transport/beam-phase-space.md``), so the residual is second order in the
     slope and negligible at mrad-scale divergence. The sample entrance face is
     the plane ``z = 0`` in the sample frame; an electron whose projected entry
     lands outside the transverse footprint misses the sample (handled by the
@@ -388,7 +388,7 @@ def detector_directions(
     with their solid-angle weights -- the geometry input to the solid-angle-
     INTEGRATED spectrum (mc_spectrum_solid_angle). This replaces the single-n_hat
     + flat-Omega + analytic aperture_fwhm_eV approximation
-    (docs/detector-solid-angle.md) with a first-principles tiling of the face.
+    (docs/physics/detectors/detector-solid-angle.md) with a first-principles tiling of the face.
 
     The central cell sits at polar angle ``theta_obs_rad`` (azimuth 0) in the lab
     and is mapped into the sample frame through the SAME tilt rotation as
@@ -551,7 +551,7 @@ def _mosaic_quadrature(fwhm_rad, nodes):
     1-D projection). Returns a list of (rotation matrix, weight) with weights
     summing to 1, used by mc_spectrum to INCOHERENTLY average a reflection's
     spectrum over crystallite orientations (the exact mosaic route,
-    docs/crystal-mosaicity.md (2)).
+    docs/physics/materials/crystal-mosaicity.md (2)).
 
     Returns None -- the perfect-crystal fast path, today's result bit-for-bit --
     when there is nothing to average: ``fwhm_rad`` falsy, or ``nodes`` <= 1 (the

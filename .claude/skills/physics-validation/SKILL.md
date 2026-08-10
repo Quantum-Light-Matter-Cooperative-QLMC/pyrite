@@ -5,7 +5,7 @@ description: Use when a ledgered PyRITE equation needs fresh-context independent
 
 # Physics Validation
 
-Read `docs/validation/README.md` completely and follow its independent-verifier
+Read `docs/validation/methodology.md` completely and follow its independent-verifier
 contract and report format. That document is the canonical specification.
 
 ## Independence boundary
@@ -18,10 +18,10 @@ contract and report format. That document is the canonical specification.
 
 ## Repository anchors
 
-- Ledger: `docs/physics-validation-ledger.md`
-- Derivations: `docs/validation/<id>.md`
+- Ledger: `docs/validation/physics-validation-ledger.md`
+- Derivations: ledgered `docs/validation/<domain>/<id>.md`
 - Fast anchors: `tests/`
 - Heavier or external comparisons: `checks/`
 
-Use the exact output contract in `docs/validation/README.md`; report a specific
+Use the exact output contract in `docs/validation/methodology.md`; report a specific
 term or convention for every discrepancy.

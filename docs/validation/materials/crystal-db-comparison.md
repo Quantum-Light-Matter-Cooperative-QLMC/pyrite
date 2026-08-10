@@ -1,4 +1,4 @@
-# Crystal database comparison — external-DB cross-check
+# Crystal database external cross-check
 
 ## Goal
 

@@ -141,7 +141,7 @@ does not change the sign adjudication. In the default, beam-aligned,
 default \(\mathbf g\) remains along \(+z\). Hence
 \(\mathbf v\cdot\mathbf g=\beta |g|\cos\alpha\), which is even in
 \(\alpha\), just like \(\mathbf v\cdot\hat{\mathbf n}\). The claim in
-`docs/tilt-convention.md` and the `tilted_geometry` docstring that opposite
+`docs/physics/geometry/tilt-convention.md` and the `tilted_geometry` docstring that opposite
 polar tilts differ in intensity *via* `v0.g` is therefore not valid in that
 stated scope. Full simulated intensities can still differ through transported
 trajectories, escape geometry, polarization/amplitudes, or a non-aligned

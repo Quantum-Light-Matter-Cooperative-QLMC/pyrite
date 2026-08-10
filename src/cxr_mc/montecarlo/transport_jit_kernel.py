@@ -20,7 +20,7 @@ same implementations as the host libm, and transport amplifies a last-bit
 difference over hundreds of scattering events. The verifiable claims are:
 identical RNG streams, identical control flow and addressing, few-ulp agreement
 on a single step from identical inputs, and statistical agreement in aggregate.
-See ``docs/gpu-transport-rawkernel.md``.
+See ``docs/repo-design/compute/gpu-transport-rawkernel.md``.
 
 Grooved transport, and any path needing the lockstep core's exact stream, stay
 on the CPU.

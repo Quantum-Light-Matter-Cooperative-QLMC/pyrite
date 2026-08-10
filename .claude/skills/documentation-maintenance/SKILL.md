@@ -11,7 +11,7 @@ Document behavior once at owning artifact:
 |---|---|
 | Science, install, primary workflow | `README.md` |
 | Guide, rationale, research note | `docs/*.md`; link from docs navigation |
-| CLI contract | Source help + generated `docs/cli-reference.md`; use `cli-ui-ux` |
+| CLI contract | Source help + generated `docs/repo-design/cli/cli-reference.md`; use `cli-ui-ux` |
 | Public API | Source docstring + `docs/api.md`; use `scientific-library` |
 | Ownership/entry point/dependency | `docs/repo_map.md`; use `repo-orientation` |
 | Physics claim | Derivation, validation record, ledger |

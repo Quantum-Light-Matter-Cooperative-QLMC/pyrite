@@ -930,7 +930,7 @@ def _slurm_batch_script(
     if vendor != "nvidia":
         raise ValueError(
             f"pyrite remote lab-box scripts do not yet support {vendor}; "
-            "use a site-specific SLURM template from docs/running-on-a-cluster.md"
+            "use a site-specific SLURM template from docs/guides/running-on-a-cluster.md"
         )
     reservation_stems = reservation_stems or []
     transport._check_shell_tokens([jobid, *reservation_stems])

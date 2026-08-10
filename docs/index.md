@@ -10,68 +10,12 @@ materials, detectors, and validation story, see the
 [project README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#readme).
 
 ```{toctree}
-:caption: Guides
-:maxdepth: 1
-
-running-on-a-cluster
-performance-profile-analysis
-compute-performance-optimization
-sweep-profiles
-cli-reference
-cli-deprecations
-```
-
-```{toctree}
-:caption: Design notes & decision records
-:maxdepth: 1
-
-beam-phase-space
-checkpoint-case-store
-crystal-mosaicity
-coherent-emission
-coherent-streaming-rawkernel
-detector-solid-angle
-external-bremsstrahlung-validation
-multilayer-materials
-atomic-data-sources
-relativistic-electron-transport
-gpu-transport-rawkernel
-channeling-radiation-physics
-```
-
-```{toctree}
-:caption: Research notes
-:maxdepth: 1
-
-nonrelativistic-pxr-cbs-material-survey
-parameter-space-sampling-review
-crystal-db-comparison
-debye-waller-audit
-```
-
-```{toctree}
-:caption: Reference
-:maxdepth: 1
-
-grazing-grating
-physics-validation-ledger
-repo_map
-tilt-convention
-units-evaluation
-```
-
-```{toctree}
-:caption: Physics validation
-:maxdepth: 1
-:glob:
-
-validation/*
-```
-
-```{toctree}
-:caption: API reference
 :maxdepth: 2
 
+guides/index
+physics/index
+validation/index
+repo-design/index
+adr/index
 api
-development-workspace
 ```

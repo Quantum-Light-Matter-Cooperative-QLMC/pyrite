@@ -1,4 +1,4 @@
-"""Exact Monte-Carlo crystal-mosaicity average (docs/crystal-mosaicity.md route 2):
+"""Exact Monte-Carlo crystal-mosaicity average (docs/physics/materials/crystal-mosaicity.md route 2):
 the Gauss-Hermite orientation quadrature, the tilt rotation, and the Sweep wiring
 that makes the MC and analytic routes mutually exclusive.
 

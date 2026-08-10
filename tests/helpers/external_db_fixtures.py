@@ -2,7 +2,7 @@
 
 Backs both the offline regression test (``test_crystal_external_db.py``) and the
 regeneration script (``scripts/refresh_external_cif.py``). See
-``docs/crystal-db-comparison.md`` for the design: this guards local crystal
+``docs/validation/materials/crystal-db-comparison.md`` for the design: this guards local crystal
 *lattice geometry* against silent drift by diffing each catalog entry against a
 pinned external record fetched once through COD's vendored ``crystals`` adapter
 or Materials Project's optional supported ``mp-api`` client.
@@ -207,7 +207,7 @@ def write_cached_lattices(entries: dict[str, dict[str, object]]) -> None:
         "_note": (
             "External lattice references for the crystal-DB cross-check. "
             "Regenerate with scripts/refresh_external_cif.py. Geometry only; "
-            "see docs/crystal-db-comparison.md."
+            "see docs/validation/materials/crystal-db-comparison.md."
         ),
         "crystals": {key: entries[key] for key in sorted(entries)},
     }

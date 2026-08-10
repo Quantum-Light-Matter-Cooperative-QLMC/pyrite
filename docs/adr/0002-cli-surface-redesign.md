@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-01
-- **Rationale:** [`docs/cli-redesign-rfc.md`](../cli-redesign-rfc.md)
+- **Historical rationale:** retired `docs/cli-redesign-rfc.md` (recoverable from Git history)
 
 ## Context
 
@@ -20,4 +20,4 @@ consolidation (ADR-0004 P1).
 ## Consequences
 
 - Breaking command changes gated behind the deprecation policy.
-- `docs/cli-reference.md` freeze test guards the migration.
+- `docs/repo-design/cli/cli-reference.md` freeze test guards the migration.

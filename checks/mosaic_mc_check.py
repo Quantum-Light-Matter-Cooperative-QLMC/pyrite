@@ -1,4 +1,4 @@
-"""Exact Monte-Carlo crystal-mosaicity validation (docs/crystal-mosaicity.md route 2).
+"""Exact Monte-Carlo crystal-mosaicity validation (docs/physics/materials/crystal-mosaicity.md route 2).
 
 mc_spectrum now averages the line spectrum over crystallite orientations via a 2-D
 Gauss-Hermite product quadrature (mosaic_fwhm_rad / mosaic_nodes). This is the

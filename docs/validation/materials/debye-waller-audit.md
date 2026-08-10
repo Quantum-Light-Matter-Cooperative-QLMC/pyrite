@@ -1,4 +1,4 @@
-# Debye-Waller provenance and anisotropy audit
+# Debye-Waller provenance and anisotropy validation audit
 
 This audit owns provenance and model-scope decisions for catalog
 `B_ang2` values. It does not treat a plausible numerical value, a database

@@ -6,8 +6,8 @@ Version: `0.2.0`
 
 Current command reference generated from live Click definitions. See
 [README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#readme) for scientific workflow,
-[cluster guide](running-on-a-cluster.md) for scheduler templates,
-[repository map](repo_map.md) for implementation ownership, and
+[cluster guide](../../guides/running-on-a-cluster.md) for scheduler templates,
+[repository map](../../repo_map.md) for implementation ownership, and
 [deprecations](cli-deprecations.md) for retired-spelling replacements and
 removal versions.
 

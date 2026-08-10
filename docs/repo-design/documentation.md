@@ -119,7 +119,7 @@ Long-lived descriptions of how the current system works belong in the appropriat
 
 Durable records of **why** an architectural choice was made belong in the [architecture decision records](../adr/index.md).
 
-Long-form `*-rfc.md` documents may contain the detailed rationale and alternatives for a design. An accepted RFC should have a corresponding ADR recording the resulting decision.
+Long-form RFC/design documents may contain detailed rationale and alternatives while a design is active. Once accepted, the ADR records the durable result; obsolete planning detail may be retired and remains available through Git history.
 
 Agent task plans and handoffs belong under `agentdocs/`, not under `docs/`.
 

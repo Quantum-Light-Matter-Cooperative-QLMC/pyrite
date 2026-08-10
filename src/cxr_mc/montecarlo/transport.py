@@ -1609,7 +1609,7 @@ TRANSPORT_CORES = ("auto", "lockstep", "per-electron", "cuda")
 # it the CUDA core pulls away monotonically (4.1x at Ne=4000, 4.9-15.9x at
 # Ne=16000). 1000 is the conservative end of that band, so no run that would
 # have been faster on the CPU core is moved off it. See
-# `docs/gpu-transport-rawkernel.md`.
+# `docs/repo-design/compute/gpu-transport-rawkernel.md`.
 CUDA_TRANSPORT_MIN_ELECTRONS = 1000
 
 

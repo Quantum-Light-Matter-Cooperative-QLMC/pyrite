@@ -9,7 +9,7 @@ crystals, plus detector-visible flux. Active question: expected line flux and
 enhancement at θ_obs = 90° for a 2×2 Timepix3 quad or Raptor Eagle XO CCD.
 
 Research code; absolute predictions remain bounded by
-[validation status](docs/physics-validation-ledger.md) and instrument inputs.
+[validation status](docs/validation/physics-validation-ledger.md) and instrument inputs.
 
 ## Physics
 
@@ -27,13 +27,13 @@ add segments/electrons incoherently; a profile's `emission` policy
 (`incoherent`/`coherent`/`both`) opts into an experimental phased sum using
 trajectory and bunch timing, where `both` runs one electron transport and stores
 the incoherent and coherent spectra side by side for comparison. That path is
-[unverified](docs/coherent-emission.md) and must not support scientific claims
+[unverified](docs/physics/radiation-physics/coherent-emission.md) and must not support scientific claims
 until its phase convention and bunch-form-factor limits are independently
 validated.
 
 Core conventions: beam along +z; detector at φ = 0; positive sample tilt points
 toward detector. At θ_obs = 90°, zero tilt self-absorbs photons traveling along
-slab faces. See [tilt convention](docs/tilt-convention.md) before geometry work.
+slab faces. See [tilt convention](docs/physics/geometry/tilt-convention.md) before geometry work.
 
 ## Install
 
@@ -108,14 +108,14 @@ Main surfaces:
 
 - `pyrite`: run, analysis, validation, export, checkpoint, profile, material,
   and remote workflows. See generated
-  [CLI reference](docs/cli-reference.md).
+  [CLI reference](docs/repo-design/cli/cli-reference.md).
 - `src/cxr_mc/apps/scan_app.py`: interactive sweep runner.
 - `src/cxr_mc/apps/analysis_app.py`: checkpoint analysis.
 - `src/cxr_mc/apps/trace_app.py`: trajectory/lattice viewer.
 - `src/cxr_mc/apps/validation_app.py`: literature-validation studies.
 - `src/cxr_mc/`: importable physics, results, plotting, and detector library.
 
-Full sweeps are heavy. Use [PyRITE's remote workflow](docs/running-on-a-cluster.md) for lab
+Full sweeps are heavy. Use [PyRITE's remote workflow](docs/guides/running-on-a-cluster.md) for lab
 GPU work or follow portable SLURM templates there.
 
 ## Data and outputs
@@ -137,19 +137,19 @@ Active checkpoints use
 Stored spectra are intrinsic unless a detector view applies downstream response.
 Timepix3 and Eagle XO geometry/QE are instrument-specific; never transfer
 counts or solid angle between setups. See
-[detector solid angle](docs/detector-solid-angle.md).
+[detector solid angle](docs/physics/detectors/detector-solid-angle.md).
 
 ## Validation and provenance
 
 Analytic core is cross-checked against Feranchuk et al. and Zhai et al. Model
 claims, assumptions, and evidence live in:
 
-- [validation ledger](docs/physics-validation-ledger.md)
-- [validation method and records](docs/validation/README.md)
-- [coherent-emission design and validation boundary](docs/coherent-emission.md)
-- [crystal mosaicity](docs/crystal-mosaicity.md)
-- [atomic data sources](docs/atomic-data-sources.md)
-- [detector solid-angle treatment](docs/detector-solid-angle.md)
+- [validation ledger](docs/validation/physics-validation-ledger.md)
+- [validation method and records](docs/validation/methodology.md)
+- [coherent-emission model and validation boundary](docs/physics/radiation-physics/coherent-emission.md)
+- [crystal mosaicity](docs/physics/materials/crystal-mosaicity.md)
+- [atomic data sources](docs/physics/atomic-physics/atomic-data-sources.md)
+- [detector solid-angle treatment](docs/physics/detectors/detector-solid-angle.md)
 
 Important open uncertainty: modeled mosaic broadening lacks measured HOPG
 line-width validation; Timepix3 hardware parameters still need final instrument
@@ -161,7 +161,7 @@ Eagle XO QE plus computed Timepix Si response.
 
 ## Repository guide
 
-- [documentation map](docs/README.md)
+- [documentation authoring and maintenance](docs/repo-design/documentation.md)
 - [package ownership and dependency map](docs/repo_map.md)
 - [Python API](docs/api.md)
 - [backlog](TODO.md)

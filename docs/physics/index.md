@@ -32,7 +32,6 @@ radiation-physics/external-bremsstrahlung-validation
 :maxdepth: 1
 :caption: Geometry and orientation
 
-geometry/multilayer-materials
 geometry/tilt-convention
 ```
 
@@ -49,7 +48,7 @@ detectors/grazing-grating
 :caption: Materials and crystallography
 
 materials/crystal-mosaicity
-materials/multilayer-materials.md
+materials/multilayer-materials
 ```
 
 ## How to use this section

@@ -6,7 +6,7 @@ sampled per-electron coordinates remain runtime data.
 
 The stored input is the *normalized* emittance, because ``energy_keV`` is the
 primary swept axis and geometric emittance is not invariant across it. See
-``docs/beam-phase-space.md``.
+``docs/physics/beam-transport/beam-phase-space.md``.
 """
 
 from __future__ import annotations

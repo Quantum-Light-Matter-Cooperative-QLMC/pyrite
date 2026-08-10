@@ -6,7 +6,7 @@
   `F(g,E) = f0(g) + f'(E) + i f''(E)`.
 - Sources: Waasmaier--Kirfel elastic form factors and Chantler/FFAST anomalous
   terms, exposed through xraydb; source mapping recorded in
-  `docs/atomic-data-sources.md`.
+  `docs/physics/atomic-physics/atomic-data-sources.md`.
 - Signature: `atomic_form_factor(element, g, E_eV,
   on_out_of_range="nan")` with `g` in inverse angstrom and energy in eV.
 

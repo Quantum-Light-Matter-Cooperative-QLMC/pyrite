@@ -8,13 +8,13 @@ Agreement with Zhai/Feranchuk is necessary but not sufficient — it can hide **
 
 ## The pieces
 
-- **The ledger** — [`docs/physics-validation-ledger.md`](../physics-validation-ledger.md) is the single source of truth: one row per atomic physics claim, keyed by a stable `id`, anchored on `file::symbol`. The unit of trust is the **equation, not the module**.
+- **The ledger** — [physics validation ledger](physics-validation-ledger.md) is the single source of truth: one row per atomic physics claim, keyed by a stable `id`, anchored on `file::symbol`. The unit of trust is the **equation, not the module**.
 - **In-code back-reference** — every annotated physics function carries a one-line `Validation: <id>` marker in its docstring, tying code↔ledger both ways. A physics `def` with no marker is an unledgered claim — find them with:
   ```bash
   # physics symbols missing a Validation: back-reference
   grep -L "Validation:" src/cxr_mc/{montecarlo,crystallography,atomic_form_factors}.py src/cxr_mc/detectors/{eaglexo_response,timepix_response}.py
   ```
-- **Re-derivation write-ups** — `docs/validation/<id>.md` holds each independent derivation, its diff against the implementation, and the adjudication. This is the audit trail and the seed of the paper's validation appendix.
+- **Re-derivation write-ups** — `docs/validation/<domain>/<id>.md` holds each independent derivation, its diff against the implementation, and the adjudication. Domain directories mirror the physics hierarchy where practical; the ledger is the location authority.
 - **Anchors** — regression tests (mostly under `checks/`) that pin a claim to a reference value with a tolerance.
 
 ### Optional external crystallography oracle
@@ -34,7 +34,7 @@ or human sign-off.
 
 ## Status lifecycle
 
-```{}
+```text
 unverified → filtered → rederived → anchored → signed-off
                   ↓          ↓          ↓
                        discrepancy  (any failed check — tracked loudly)
@@ -56,7 +56,7 @@ unverified → filtered → rederived → anchored → signed-off
 **Adversarial re-derivation** (the core of independent verification):
 
 1. Pick an `unverified`/`filtered` id.
-2. A **fresh context — ideally a different model — that has NOT seen the implementation** gets only `{the cited source, what the function should compute, its signature}` and writes the independent expression to `docs/validation/<id>.md`.
+2. A **fresh context — ideally a different model — that has NOT seen the implementation** gets only `{the cited source, what the function should compute, its signature}` and writes the independent expression to the domain path recorded in the ledger.
 3. Diff the independent expression against the code (symbolic/dimensional; numeric where possible).
 4. The author adjudicates → `signed-off` or `discrepancy`.
 
@@ -76,7 +76,7 @@ Follow this order:
 2. Apply cheap filters: dimensional consistency, limiting cases, and
    sign/symmetry/convention checks. A failure is immediately a `discrepancy`.
 3. Starting from the source and signature, derive the expression independently
-   in `docs/validation/<id>.md`. The derivation must precede inspection of the
+   in the ledgered `docs/validation/<domain>/<id>.md`. The derivation must precede inspection of the
    implementation body so the code cannot anchor the result.
 4. Read the implementation and compare it symbolically and dimensionally;
    compare at one or more numeric points when feasible. Use independent
@@ -84,7 +84,7 @@ Follow this order:
 5. Report the verdict and a suggested ledger edit. Never apply `signed-off`;
    that transition belongs to a human.
 
-The verifier may write only `docs/validation/<id>.md`. It must not modify the
+The verifier may write only the ledgered validation document. It must not modify the
 code under review. Missing `Validation:` markers or ledger rows are findings,
 not invitations to repair the implementation in the verification context.
 
@@ -97,7 +97,7 @@ Return this concise structure:
 - **Filters**: units `<pass/failure>`; limits `<pass/failure>`; signs/conventions `<pass/failure>`
 - **Re-derivation**: `matches` | `differs` — `<exact divergent term or convention>`
 - **Verdict**: `filtered` | `rederived` | `discrepancy`
-- **Write-up**: `docs/validation/<id>.md`
+- **Write-up**: `docs/validation/<domain>/<id>.md`
 - **Suggested ledger change**: `<proposed row edit or none; human applies it>`
 ```
 

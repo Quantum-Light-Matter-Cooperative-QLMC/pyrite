@@ -420,7 +420,7 @@ whole GPU phase** for the TMDs and **6–12×** for hopg on an RTX 5080, linear 
 line phase, was the constraint.
 
 Design, kernel structure, RNG, and the full measurement tables live in
-[`docs/gpu-transport-rawkernel.md`](gpu-transport-rawkernel.md). This is the
+[GPU transport implementation](../repo-design/compute/gpu-transport-rawkernel.md). This is the
 summary and the verdict.
 
 ### What landed

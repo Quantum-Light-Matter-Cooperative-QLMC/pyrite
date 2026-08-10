@@ -10,8 +10,6 @@ It is intended primarily for contributors and maintainers. User-facing instructi
 
 development-workspace
 documentation
-package-structure-rfc
-project-identity-rfc
 ../repo_map
 ```
 
@@ -47,7 +45,7 @@ parameter-space-sampling-review
 
 ## Architecture decision records
 
-Major architectural choices and their rationale are recorded separately as [architecture decision records](../adr/README.md).
+Major architectural choices and their rationale are recorded separately as [architecture decision records](../adr/index.md).
 
 Use an ADR when the important question is:
 

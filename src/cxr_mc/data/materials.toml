@@ -1393,7 +1393,7 @@ timing_jitter_fs = 0.0
 # above: photoinjector-scale numbers at a waist on the crystal entrance face
 # (alpha = 0), with the emittance NORMALIZED so one beam describes the same
 # beam at both 30 and 100 keV. The y-plane is omitted, which mirrors x for a
-# round beam. See docs/beam-phase-space.md.
+# round beam. See docs/physics/beam-transport/beam-phase-space.md.
 [beams.emittance_demo]
 label = "Courant-Snyder demo, 0.1 mm mrad normalized"
 rep_rate_hz = 5000.0

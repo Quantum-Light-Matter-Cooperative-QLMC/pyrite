@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07 (recorded 2026-08-01)
-- **Rationale:** [`docs/cli-energy-grid-sweep-rework-plan.md`](../cli-energy-grid-sweep-rework-plan.md)
+- **Historical rationale:** retired `docs/cli-energy-grid-sweep-rework-plan.md` (recoverable from Git history)
 
 ## Context
 

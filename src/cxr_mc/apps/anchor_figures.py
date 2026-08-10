@@ -1272,7 +1272,7 @@ def _supplementary_detected_spectrum(
     spectra are efficiency-corrected or their theory includes window
     transmission; applying our nominal Moxtek AP3.3-class QE model here is
     a modeling choice, and the residual normalization gap vs Zhai SI
-    Fig. S5b is tracked in docs/physics-validation-ledger.md (id
+    Fig. S5b is tracked in docs/validation/physics-validation-ledger.md (id
     `zhai-hbn-921-detected`).
     """
     peak_eV = float(study.E_grid[np.argmax(spectrum)])

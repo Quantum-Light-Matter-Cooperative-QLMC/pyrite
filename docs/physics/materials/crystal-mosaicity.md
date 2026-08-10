@@ -162,5 +162,5 @@ material_sweep("hopg", mosaic=True, mosaic_route="mc",
 - Validate the broadened **line widths against a measured HOPG rocking-curve / EDS
   dataset** — the headline reason the exact route exists.
 - Shares the "incoherently sum over a distribution of a direction" pattern with the
-  detector solid-angle integral ([detector-solid-angle.md](detector-solid-angle.md)): g
+  detector solid-angle integral ([detector solid angle](../detectors/detector-solid-angle.md)): g
   for mosaic, n̂ for the aperture. If ever combined, the cost is multiplicative (K × N_dir).

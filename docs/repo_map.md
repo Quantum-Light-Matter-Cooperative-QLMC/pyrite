@@ -66,7 +66,7 @@ Packaged data resolve via `cxr_mc.DATA_DIR` — imports work from any cwd.
   Older flat checkpoint verbs (including `prune`), `check`, and `check-config`
   remain hidden compatibility aliases.
   Checked user-facing inventory:
-  [`docs/cli-reference.md`](cli-reference.md).
+  [CLI reference](repo-design/cli/cli-reference.md).
 - **`pyrite profile ...`** → `cli.commands.profile`: manage named campaign defaults and
   profile-owned material membership through `profile members
   set|add|remove|reset`. An absent membership key means all in-use materials.
@@ -258,7 +258,7 @@ re-exported from package** — `from cxr_mc.montecarlo import X` unchanged
   `transport._transport_core_ungrooved_perelectron`: one thread per electron,
   run to completion, output slots addressed by electron index. Same arithmetic
   as the CPU core, so the two stay one algorithm.
-  See `docs/gpu-transport-rawkernel.md`. Deps: `_backend`, `transport`.
+  See `docs/repo-design/compute/gpu-transport-rawkernel.md`. Deps: `_backend`, `transport`.
 - `geometry` — `tilted_geometry`, `detector_directions`, `_orientation_R`,
   `_small_tilt_R`, `_mosaic_quadrature`. Deps: `materials.crystal`.
 - `spectrum/` — compatibility package for the former flat module. `lines.py`
@@ -309,7 +309,7 @@ Transverse phase-space policy on the input side of `BeamSpec`: a Courant-Snyder
 triplet `(eps_n, beta, alpha)` per plane, resolved per case (normalized
 emittance is the stored input, geometric is derived as `eps_n / (beta*gamma)`)
 and sampled into per-electron offsets and slopes. The `y` plane mirrors `x`
-unless set. See `docs/beam-phase-space.md`.
+unless set. See `docs/physics/beam-transport/beam-phase-space.md`.
 - Public: `TransverseDistribution`, `ResolvedTransversePlane`,
   `ResolvedTransverseDistribution`, `resolve_transverse_distribution`,
   `sample_transverse`.
@@ -530,7 +530,7 @@ resolution, Poisson counts).
 #### `grating.py`
 **Exploratory** grazing-incidence soft-X-ray grating spectrometer forward model
 (dispersion geometry, coating reflectivity, simple CCD pixel grid; not
-wired into pipeline). See [`docs/grazing-grating.md`](grazing-grating.md).
+wired into pipeline). See [grazing-grating model](physics/detectors/grazing-grating.md).
 - Public: `Grating`, `wavelength_angstrom`, `groove_spacing_angstrom`,
   `coating_number_density_per_ang3`, `detector_position_mm`, `disperse_spectrum`,
   `resolving_power`, `ALEXS_SENSORS`, `SimpleCCD`, `bin_to_pixels`.
@@ -553,7 +553,7 @@ RFC D7 deprecation harness: frozen `Deprecation` registry keyed by command
 path, `DeprecatingGroup(click.Group)` that warns once per invocation in
 `resolve_command` (before callbacks and `--help`), and
 `scripts/generate_cli_deprecations.py` regenerates
-[`docs/cli-deprecations.md`](cli-deprecations.md) from the registry.
+[CLI deprecations](repo-design/cli/cli-deprecations.md) from the registry.
 - Public: `DEPRECATIONS`, `Deprecation`, `DeprecatingGroup`, `message`, `warn`,
   `invocation_path`, `SUPPORT_WINDOW_MINORS`.
 - Wired into `cli/_core.py` (`LazyGroup(DeprecatingGroup)`), `cli/commands/profile.py`,
@@ -587,8 +587,8 @@ are shared with `pyrite profile`'s retired inline beam flags via
 `cli/commands/_beam_shared.py`, so both surfaces validate identically. The
 reference resolves to values in `materials/catalog.py` before `profiles.py`
 hashes, so beam names never reach `parameter_sha256`. See
-[`docs/sweep-profiles.md`](sweep-profiles.md) and
-[`docs/beam-phase-space.md`](beam-phase-space.md).
+[sweep profiles](guides/sweep-profiles.md) and
+[beam phase space](physics/beam-transport/beam-phase-space.md).
 
 ### `cli/commands/job.py`
 Canonical `pyrite job list|status|logs|attach|stop` Click layer. Reuses the remote

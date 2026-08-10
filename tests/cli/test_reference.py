@@ -11,7 +11,7 @@ from click.testing import CliRunner
 from cxr_mc.cli import command
 
 ROOT = Path(__file__).resolve().parents[2]
-REFERENCE = ROOT / "docs" / "cli-reference.md"
+REFERENCE = ROOT / "docs" / "repo-design" / "cli" / "cli-reference.md"
 
 
 def test_checked_cli_reference_is_current():

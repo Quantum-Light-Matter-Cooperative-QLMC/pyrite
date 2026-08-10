@@ -26,7 +26,7 @@ Commands:
     check-skills validate the canonical skills and exact mirror
     bootstrap  configure per-clone local git state (TODO.md merge driver)
     verify     check skills, lint, type check, and test
-    cli-deprecations  write or --check docs/cli-deprecations.md
+    cli-deprecations  write or --check docs/repo-design/cli/cli-deprecations.md
 """
 
 from __future__ import annotations
@@ -536,7 +536,7 @@ def cmd_regen_golden(args: argparse.Namespace) -> None:
 def cmd_cli_deprecations(args: argparse.Namespace) -> None:
     from cxr_mc.devtools.cli_deprecations import main
 
-    target = ROOT / "docs" / "cli-deprecations.md"
+    target = ROOT / "docs" / "repo-design" / "cli" / "cli-deprecations.md"
     mode = "--check" if getattr(args, "check", False) else "--write"
     status = main([mode, str(target)])
     if status:

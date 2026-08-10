@@ -2,8 +2,8 @@
 
 RFC D7 (`docs/cli-redesign-rfc.md`) asks every renamed or retired command to
 (a) keep working for a published support window, (b) warn on stderr naming its
-replacement, and (c) appear in `docs/cli-deprecations.md` with a removal
-target. This module owns (a) and (b); `docs/cli-deprecations.md` is generated
+replacement, and (c) appear in `docs/repo-design/cli/cli-deprecations.md` with a removal
+target. This module owns (a) and (b); that document is generated
 from `DEPRECATIONS` by ``cxr-dev cli-deprecations``.
 
 The support window is two minor releases: a spelling deprecated in 0.1.0 is
@@ -248,7 +248,7 @@ class DeprecatingGroup(click.Group):
 #
 # D5 fixes one canonical name per physical quantity. The retired spellings stay
 # accepted for the same support window as retired commands, so the machinery
-# below mirrors the command side: a registry that `docs/cli-deprecations.md` is
+# below mirrors the command side: a registry that the deprecation reference is
 # generated from, and a warning that names both the replacement and the release
 # that drops the old spelling.
 

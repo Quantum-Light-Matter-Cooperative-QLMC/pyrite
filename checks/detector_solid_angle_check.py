@@ -2,7 +2,7 @@
 detector_solid_angle_check.py  (checks/)
 
 Validate the solid-angle-integrated spectrum (montecarlo.detector_directions +
-mc_spectrum_solid_angle; docs/detector-solid-angle.md, TODO P2 #4):
+mc_spectrum_solid_angle; docs/physics/detectors/detector-solid-angle.md, TODO P2 #4):
 
   1. REGRESSION -- a 1-direction grid reproduces the single-angle ``spec * Omega``
      exactly (the design's n_side=1 anchor; max rel ~ 0).

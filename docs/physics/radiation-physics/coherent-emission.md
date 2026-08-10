@@ -47,9 +47,9 @@ independently establish the phase model. Before scientific use:
 2. reproduce the Gaussian bunch form factor and decoherent limit independently;
 3. anchor representative CPU/GPU cases and quantify complex-grid memory cost;
 4. obtain human sign-off through the
-   [physics validation workflow](validation/README.md).
+   [physics validation workflow](../../validation/methodology.md).
 
-Track status in the [`coherent-emission` ledger row](physics-validation-ledger.md).
+Track status in the [`coherent-emission` ledger row](../../validation/physics-validation-ledger.md).
 Emission is a profile policy (`incoherent`/`coherent`/`both`) rather than a
 transient CLI flag: `both` runs a **single** electron transport per case and
 stores both the incoherent `spec` and a `spec_coherent` from the same segments,

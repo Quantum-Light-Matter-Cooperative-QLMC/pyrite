@@ -106,7 +106,7 @@ def mosaic_fwhm_eV(E_eV, psi_rad, mosaic_fwhm_rad):
     The exact alternative is the per-orientation Gauss--Hermite sum inside
     mc_spectrum. psi is supplied by mosaic_psi_rad() at the nominal (unscattered)
     geometry. The derivation and model assumptions are documented in
-    ``docs/crystal-mosaicity.md``. The width vanishes for zero mosaic spread or
+    ``docs/physics/materials/crystal-mosaicity.md``. The width vanishes for zero mosaic spread or
     ``psi = 0`` and is even under ``psi -> -psi``.
 
     Validation: mosaic-analytic

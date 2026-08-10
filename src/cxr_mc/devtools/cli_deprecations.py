@@ -1,8 +1,8 @@
 """Generate or check the CLI deprecation table.
 
 Usage:
-    python scripts/generate_cli_deprecations.py --write docs/cli-deprecations.md
-    python scripts/generate_cli_deprecations.py --check docs/cli-deprecations.md
+    python scripts/generate_cli_deprecations.py --write docs/repo-design/cli/cli-deprecations.md
+    python scripts/generate_cli_deprecations.py --check docs/repo-design/cli/cli-deprecations.md
 """
 
 from __future__ import annotations
@@ -27,9 +27,9 @@ def build_deprecations() -> str:
             f"command or option keeps its old spelling working for a minimum of "
             f"{SUPPORT_WINDOW_MINORS} minor releases, warns on stderr naming the "
             "replacement, and is listed here with its removal target. See "
-            "`docs/cli-reference.md` for the current command surface; regenerate "
+            "`docs/repo-design/cli/cli-reference.md` for the current command surface; regenerate "
             "this table with `python scripts/generate_cli_deprecations.py --write "
-            "docs/cli-deprecations.md` or `pyrite-dev cli-deprecations`."
+            "docs/repo-design/cli/cli-deprecations.md` or `pyrite-dev cli-deprecations`."
         ),
         "",
         "## Commands",

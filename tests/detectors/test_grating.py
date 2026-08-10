@@ -87,7 +87,7 @@ def test_resolving_power_positive_and_rises_with_density():
     assert R_coarse > 0 and R_fine > R_coarse
 
 
-# ---- reflectivity / throughput (docs/grazing-grating.md phased-plan step 2) --
+# ---- reflectivity / throughput (docs/physics/detectors/grazing-grating.md phased-plan step 2) --
 
 
 def test_reflectivity_total_external_reflection_below_critical_angle():
@@ -152,11 +152,11 @@ def test_throughput_wiring_reduces_flux_vs_raw_geometry():
     assert flux_thr == pytest.approx(expected_flux, rel=0.02)
 
 
-# ---- simple CCD pixel binning (docs/grazing-grating.md phased-plan step 3) ---
+# ---- simple CCD pixel binning (docs/physics/detectors/grazing-grating.md phased-plan step 3) ---
 
 
 def test_alexs_sensor_formats_match_datasheet_geometry():
-    # greateyes ALEX-s 1k256 / 2k512 (docs/grazing-grating.md "Hardware targets")
+    # greateyes ALEX-s 1k256 / 2k512 (docs/physics/detectors/grazing-grating.md "Hardware targets")
     assert ALEXS_SENSORS["1k256"]["n_pix"] == 1024
     assert ALEXS_SENSORS["1k256"]["pixel_um"] == pytest.approx(26.0)
     assert ALEXS_SENSORS["2k512"]["n_pix"] == 2048
@@ -219,7 +219,7 @@ def test_bin_to_pixels_localizes_narrow_line_to_few_pixels():
     assert frac_in_top10 > 0.99
 
 
-# ---- combined forward-model entry (docs/grazing-grating.md phased-plan step 4) --
+# ---- combined forward-model entry (docs/physics/detectors/grazing-grating.md phased-plan step 4) --
 
 
 def test_detected_image_matches_manual_disperse_then_bin():

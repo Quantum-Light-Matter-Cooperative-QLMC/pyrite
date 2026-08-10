@@ -10,7 +10,7 @@
 - **Verifier**: independent fresh context (did not write the implementation),
   2026-07-24. Sections 1--3 were derived **before** reading implementation
   bodies (only the ledger row, module/function derivation docstrings, and
-  signatures were read first, per `docs/validation/README.md`).
+  signatures were read first, per the [validation methodology](../methodology.md)).
 
 ## 1. What is claimed
 

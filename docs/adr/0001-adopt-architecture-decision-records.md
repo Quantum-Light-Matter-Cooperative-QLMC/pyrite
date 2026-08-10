@@ -8,7 +8,7 @@
 
 "Why did we decide X" was scattered across `docs/*-rfc.md`, one-off plan files,
 and commit messages, with no durable, greppable decision log. See
-`docs/package-structure-rfc.md` §2.5.
+`docs/adr/0004-package-and-repository-structure.md` §2.5.
 
 ## Decision
 

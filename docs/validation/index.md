@@ -11,7 +11,7 @@ For a high-level view of validation coverage and current status, see the [physic
 :caption: Validation overview
 
 physics-validation-ledger
-validation
+methodology
 ```
 
 ```{toctree}
@@ -55,6 +55,8 @@ radiation-physics/self-absorption
 
 materials/2h-tas2-debye-waller-002
 materials/2ha-niobium-dichalcogenides
+materials/crystal-db-comparison
+materials/debye-waller-audit
 materials/hbn-structure
 materials/hfs2-structure
 materials/mosaic-analytic

@@ -73,7 +73,7 @@ SECONDS` when collection did not use the default five-second interval.
 Run three comparable MoS2 sessions with one-second telemetry and a fixed
 six-worker allocation. Submissions go through `pyrite run PROFILE -R/--remote`;
 `pyrite remote run` still resolves but is deprecated and hidden (removal in 0.3.0,
-see [`cli-deprecations.md`](cli-deprecations.md)). The supported form has no
+see the [CLI deprecation reference](../repo-design/cli/cli-deprecations.md)). The supported form has no
 repetition flag — submit once per repetition, waiting for each to finish, since
 one live job per named profile is allowed. `--perf-reps`, `--chunk-minutes`, and
 `--parallel-materials` exist only on the deprecated command:

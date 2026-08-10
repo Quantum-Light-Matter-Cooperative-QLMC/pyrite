@@ -82,7 +82,7 @@ been converted. A profile carrying both spellings fails to load.
 
 A beam table -- named or inline -- decodes into `BeamSpec`. The nested
 `longitudinal` and `transverse` sub-tables carry the bunch and phase-space
-policies; `docs/beam-phase-space.md` is the reference for every key, its units,
+policies; `docs/physics/beam-transport/beam-phase-space.md` is the reference for every key, its units,
 and the mutual exclusions between them. `pyrite beam create` / `pyrite beam set` write
 the same keys from `--emittance`, `--twiss-beta`, `--twiss-alpha`,
 `--energy-spread`, and the legacy `--transverse-fwhm-mm`. The nine equivalent

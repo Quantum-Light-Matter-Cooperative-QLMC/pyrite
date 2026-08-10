@@ -217,7 +217,7 @@ implemented correctly, so the phase convention is verified. `S(000) ≈ 114` mat
 
 ## 5. Finding: missing in-code `Validation:` marker
 
-Per `docs/validation/README.md`, every ledgered physics function must carry a
+Per the [validation methodology](../methodology.md), every ledgered physics function must carry a
 one-line `Validation: <id>` marker in its docstring. `materials/crystal.py` contains
 that marker only on `optical_constants` (`Validation: grazing-optical-constants`).
 `structure_factor` and `debye_waller` — the code for this claim — carry **no**

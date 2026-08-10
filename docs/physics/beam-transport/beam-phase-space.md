@@ -4,7 +4,7 @@ How PyRITE specifies the electron beam **as an input**, and how that
 specification becomes the per-electron initial conditions the Monte Carlo
 transports.
 
-Companion to [`docs/sweep-profiles.md`](sweep-profiles.md) (where the beam TOML
+Companion to the [sweep profiles guide](../../guides/sweep-profiles.md) (where the beam TOML
 block is documented) and the `beam-phase-space-metrics` ledger row (which
 covers the *output* side, `beam_metrics.sampled_beam_metrics`).
 
@@ -17,7 +17,7 @@ inline spelling still decodes and still means exactly this, and the nine
 the units, or the mutual exclusions changed with the move. Because a reference
 resolves to values before hashing, converting an inline block to a named beam
 leaves `parameter_sha256` bit-for-bit. See
-[`docs/sweep-profiles.md`](sweep-profiles.md) "Named beams".
+[sweep profiles guide](../../guides/sweep-profiles.md) under "Named beams".
 
 ## Reference plane
 
@@ -254,4 +254,4 @@ Space charge, source-to-crystal beamline transport, the coherent form factor,
 ## Validation
 
 `Validation: beam-phase-space-injection` — see the row in
-[`docs/physics-validation-ledger.md`](physics-validation-ledger.md).
+[physics validation ledger](../../validation/physics-validation-ledger.md).

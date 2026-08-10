@@ -1,6 +1,6 @@
 # Channeling radiation: physics implementation walkthrough
 
-Companion to [`relativistic-electron-transport.md`](relativistic-electron-transport.md).
+Companion to [relativistic electron transport](../beam-transport/relativistic-electron-transport.md).
 That document fixes the architecture (backends, data contracts, validation
 gates). This one works through the physics itself, step by step, in the order
 an implementation would build it: continuum potential → transverse quantum
@@ -259,7 +259,7 @@ Two consistency points with existing code:
   \hat{\mathbf{n}} / c$ is the *same object* as in the ledgered
   `line-energy-dispersion` row, which currently carries an unresolved
   numerator-sign discrepancy. The channeling implementation must adopt one
-  convention for $\hat{\mathbf{n}}$, the tilt sign (`docs/tilt-convention.md`),
+  convention for $\hat{\mathbf{n}}$, the tilt sign (`docs/physics/geometry/tilt-convention.md`),
   and the frequency sign, and add a cross-check test that the two modules
   agree on the denominator for the same geometry.
 - $\beta$ here is the *longitudinal* velocity. It differs from the total

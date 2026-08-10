@@ -80,16 +80,13 @@ numfig_format = {
 }
 math_numfig = True
 numfig_secnum_depth = 1
-# docs/README.md is the GitHub folder index (a pointer table); the Sphinx
-# landing page is index.md, so leave README.md out of the build.
-# Dev-facing docs kept in-repo but out of the published reference site: the ADR
-# log, RFCs, and the energy-grid decision plan. Agent plans live outside docs/.
+# Generated trees and temporary planning documents are not source documents.
+# ADRs are part of the published architecture hierarchy. Agent plans live
+# outside docs/.
 exclude_patterns = [
     "_build",
     "Thumbs.db",
     ".DS_Store",
-    "README.md",
-    "adr/*",
     "*-rfc.md",
     "*-plan.md",
 ]

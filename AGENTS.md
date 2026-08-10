@@ -51,7 +51,7 @@ If `uv run` cannot write project environment, add
 - Invoke matching repo skill for CLI, notebooks, Monte Carlo, performance,
   physics, docs, runtime, remote GPU, regression, catalog-golden, or TODO work.
 - CLI changes preserve documented command/help/output/exit contracts and
-  regenerate `docs/cli-reference.md`.
+  regenerate `docs/repo-design/cli/cli-reference.md`.
 - Heavy sweeps/GPU work use `pyrite remote`; never run locally.
 - Add imports with first use. Verify with smallest useful command.
 

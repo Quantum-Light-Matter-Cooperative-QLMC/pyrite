@@ -1,8 +1,8 @@
 """Generate or check the Click command reference.
 
 Usage:
-    python scripts/generate_cli_reference.py --write docs/cli-reference.md
-    python scripts/generate_cli_reference.py --check docs/cli-reference.md
+    python scripts/generate_cli_reference.py --write docs/repo-design/cli/cli-reference.md
+    python scripts/generate_cli_reference.py --check docs/repo-design/cli/cli-reference.md
 """
 
 from __future__ import annotations
@@ -69,8 +69,8 @@ def build_reference() -> str:
         "",
         "Current command reference generated from live Click definitions. See",
         "[README](https://github.com/Quantum-Light-Matter-Cooperative-QLMC/pyrite#readme) for scientific workflow,",
-        "[cluster guide](running-on-a-cluster.md) for scheduler templates,",
-        "[repository map](repo_map.md) for implementation ownership, and",
+        "[cluster guide](../../guides/running-on-a-cluster.md) for scheduler templates,",
+        "[repository map](../../repo_map.md) for implementation ownership, and",
         "[deprecations](cli-deprecations.md) for retired-spelling replacements and",
         "removal versions.",
         "",

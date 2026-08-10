@@ -17,11 +17,11 @@ theta_g = 90 deg - alpha of a few degrees) for usable reflectivity; that is a
 property of `alpha`, not a different equation.
 
 This module is standalone (nothing in the sweep/plot pipeline imports it yet);
-see docs/grazing-grating.md for the modality and the phased plan. Grazing-
+see docs/physics/detectors/grazing-grating.md for the modality and the phased plan. Grazing-
 incidence Fresnel reflectivity of the coating is modelled (`Grating.reflectivity`);
 groove-profile diffraction efficiency is NOT -- `Grating.groove_efficiency` is a
 placeholder scalar (a rigorous scalar/RCWA treatment is future work, see
-docs/grazing-grating.md).
+docs/physics/detectors/grazing-grating.md).
 
 `SimpleCCD` + `bin_to_pixels` (phased-plan step 3) rebin a dispersed profile
 onto a fixed pixel grid sized to the greateyes ALEX-s 1k256/2k512 formats --
@@ -105,13 +105,13 @@ class Grating:
     coating : reflective coating element symbol, one of `_COATING_DENSITY_G_CM3`
         (default "Au"). Confirmed for the McPherson 251MX's four gratings
         (120/300/1200/2400 g/mm all gold-coated per McPherson's own product
-        materials, see docs/grazing-grating.md "Hardware targets"); the exact
+        materials, see docs/physics/detectors/grazing-grating.md "Hardware targets"); the exact
         groove *profile* (laminar vs blazed) feeding a future groove-efficiency
         model is still McPherson-family-typical, not 251MX-confirmed.
     groove_efficiency : placeholder scalar diffraction efficiency in [0, 1],
         NOT a real groove-profile efficiency model (that needs a scalar or
         rigorous-coupled-wave (RCWA) treatment, out of scope here -- see
-        docs/grazing-grating.md "What is NOT modelled yet"). Default 1.0
+        docs/physics/detectors/grazing-grating.md "What is NOT modelled yet"). Default 1.0
         (i.e. no groove-efficiency penalty applied) is itself the placeholder.
         ### FILL IN once a groove-profile model or measured efficiency curve
         lands.
@@ -242,7 +242,7 @@ def disperse_spectrum(
 
 
 # ---- simple CCD: pixel binning of the dispersed profile (phased-plan step 3) --
-# greateyes ALEX-s, two interchangeable formats (docs/grazing-grating.md
+# greateyes ALEX-s, two interchangeable formats (docs/physics/detectors/grazing-grating.md
 # "Hardware targets"). n_pix / pixel_um are along the DISPERSION axis (the
 # sensor's long axis); active_mm is (dispersion, cross-dispersion) extent,
 # included for reference only (this simple model is 1-D, along dispersion).
@@ -270,7 +270,7 @@ class SimpleCCD:
     n_pix : number of pixels along the dispersion direction.
     pixel_mm : pixel pitch along the dispersion direction [mm].
 
-    Deliberately crude (phased-plan step 3, docs/grazing-grating.md): a fixed
+    Deliberately crude (phased-plan step 3, docs/physics/detectors/grazing-grating.md): a fixed
     array of equal-width bins with no QE, charge-sharing, or energy-resolution
     structure -- that comes later (step 5). Use `bin_to_pixels` to rebin a
     `disperse_spectrum` profile onto this grid.
@@ -308,7 +308,7 @@ def bin_to_pixels(position_mm, intensity_per_mm, ccd, center_mm=None):
     Each pixel's value is the integral of ``intensity_per_mm`` across the
     physical span (equivalently the polar-angle span, via the grating's flat-
     detector map) that pixel subtends -- no QE or charge-sharing yet (that is
-    step 5; see docs/grazing-grating.md "What is NOT modelled yet"). The
+    step 5; see docs/physics/detectors/grazing-grating.md "What is NOT modelled yet"). The
     integral is done on the cumulative-trapezoid of the (sorted) input curve,
     interpolated at the pixel edges, so it is exact for a piecewise-linear
     input and needs no assumption that ``position_mm`` already lies on a
@@ -356,7 +356,7 @@ def detected_image(
     Pure composition of the two already-validated pieces above -- no new physics
     equation and so no new ledger row/validator pass, same precedent as
     `SimpleCCD`/`bin_to_pixels` themselves being pure geometry (see
-    docs/grazing-grating.md phased-plan step 3's note on this).
+    docs/physics/detectors/grazing-grating.md phased-plan step 3's note on this).
 
     ``weight_by_throughput`` defaults to True HERE (unlike `disperse_spectrum`'s
     own default of False, kept for backward compatibility there): this function

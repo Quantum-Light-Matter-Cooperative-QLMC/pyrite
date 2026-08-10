@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-08-01
-- **Rationale:** [`docs/cli-artifact-model-rfc.md`](../cli-artifact-model-rfc.md)
+- **Historical rationale:** retired `docs/cli-artifact-model-rfc.md` (recoverable from Git history)
 
 ## Context
 

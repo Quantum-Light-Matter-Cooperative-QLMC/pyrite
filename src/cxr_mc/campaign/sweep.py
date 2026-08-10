@@ -109,7 +109,7 @@ class BeamSpec:
     Reference plane: every field describes the beam **at the crystal entrance
     face**. There is no space-charge model and no source-to-crystal beamline
     transport, so gun-exit numbers must not be entered here and read as
-    physical. See ``docs/beam-phase-space.md``.
+    physical. See ``docs/physics/beam-transport/beam-phase-space.md``.
 
     Mean-vs-spread: each phase-space axis has a *mean* set elsewhere (energy mean
     = ``energy_keV``; direction mean = tilt geometry; position mean = origin) and
@@ -427,7 +427,7 @@ class Sweep:
     #       (broadens PXR+CBS, captures the amplitude variation + asymmetric lineshape
     #       and the mosaic yield change); the analytic term is then suppressed so the
     #       broadening is not double-counted. Costs mosaic_nodes**2 x the line hot loop
-    #       (serial under CuPy). See docs/crystal-mosaicity.md.
+    #       (serial under CuPy). See docs/physics/materials/crystal-mosaicity.md.
     mosaic_route: str = "analytic"
     mosaic_nodes: int = 5  # Gauss-Hermite nodes/tilt-axis for mosaic_route="mc" (K=nodes^2)
     # film-on-substrate stack (optional; multilayer feature, docs/multilayer-materials.md).

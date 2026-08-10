@@ -596,7 +596,7 @@ def mc_spectrum(
     UNIFORM E_grid.
 
     mosaic_fwhm_rad / mosaic_nodes: the EXACT crystal-mosaicity route
-    (docs/crystal-mosaicity.md (2)). None / nodes<=1 (the default) is a perfect
+    (docs/physics/materials/crystal-mosaicity.md (2)). None / nodes<=1 (the default) is a perfect
     crystal -- today's single-orientation result bit-for-bit. Otherwise the
     spectrum is incoherently averaged over crystallite orientations drawn from a
     Gaussian mosaic of rocking-curve FWHM ``mosaic_fwhm_rad`` [rad], via a 2-D
@@ -819,7 +819,7 @@ def mc_spectrum(
     # mosaic crystallite-orientation quadrature: None -> perfect crystal (default;
     # today's single-orientation result bit-for-bit). Otherwise a list of
     # (rotation, weight) tilting g across the Gaussian mosaic cone, summed
-    # incoherently below (docs/crystal-mosaicity.md route 2).
+    # incoherently below (docs/physics/materials/crystal-mosaicity.md route 2).
     mosaic_quad = _mosaic_quadrature(mosaic_fwhm_rad, mosaic_nodes)
 
     # NVTX sub-ranges to split the coarse ``cxr.lines`` range into structure-
@@ -1611,7 +1611,7 @@ def mc_spectrum(
             # Sum the phased complex field over ALL of ONE row's segments, square
             # it, and add |F_s|^2 + |F_p|^2 weighted by that row's mosaic weight.
             # Rows are reduced independently, so reflections and mosaic
-            # orientations stay INCOHERENT (docs/crystal-mosaicity.md route 2)
+            # orientations stay INCOHERENT (docs/physics/materials/crystal-mosaicity.md route 2)
             # while the segment sum inside a row keeps its phase -- the defining
             # property the per-hkl coherent path had, preserved verbatim.
             # Limiting case: one row, one segment collapses to the incoherent
@@ -1690,7 +1690,7 @@ def mc_spectrum_solid_angle(
     resonance energy AND the amplitudes depend on n_hat, summing per-direction
     spectra yields the true, generally ASYMMETRIC integrated lineshape and the
     across-face intensity gradient -- the first-principles replacement for the
-    flat-Omega + analytic aperture_fwhm_eV pair (docs/detector-solid-angle.md). It
+    flat-Omega + analytic aperture_fwhm_eV pair (docs/physics/detectors/detector-solid-angle.md). It
     reuses the validated single-angle mc_spectrum, so a 1-direction grid
     reproduces ``spec * Omega`` exactly (the regression anchor).
 

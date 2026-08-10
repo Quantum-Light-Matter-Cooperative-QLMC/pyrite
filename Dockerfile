@@ -20,7 +20,7 @@
 #   COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 #
 # then keep the identical "app layer" below and run with `--gpus all` (the host
-# needs the NVIDIA Container Toolkit). See docs/running-on-a-cluster.md.
+# needs the NVIDIA Container Toolkit). See docs/guides/running-on-a-cluster.md.
 # ---------------------------------------------------------------------------
 
 # ---- base layer (the only part a GPU build changes) ----

@@ -1,5 +1,5 @@
 {
-  "_note": "External lattice references for the crystal-DB cross-check. Regenerate with scripts/refresh_external_cif.py. Geometry only; see docs/crystal-db-comparison.md.",
+  "_note": "External lattice references for the crystal-DB cross-check. Regenerate with scripts/refresh_external_cif.py. Geometry only; see docs/validation/materials/crystal-db-comparison.md.",
   "crystals": {
     "2h_tas2": {
       "source": "cod:9007815",

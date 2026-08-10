@@ -251,7 +251,7 @@ def test_help_shows_only_canonical_flags() -> None:
 
 def test_generated_deprecation_docs_are_current() -> None:
     expected = build_deprecations()
-    actual = Path("docs/cli-deprecations.md").read_text(encoding="utf-8")
+    actual = Path("docs/repo-design/cli/cli-deprecations.md").read_text(encoding="utf-8")
 
     assert actual == expected
     for entry in DEPRECATED_FLAGS.values():

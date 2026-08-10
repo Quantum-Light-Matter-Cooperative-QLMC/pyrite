@@ -25,7 +25,7 @@ materials = [
 
 # Materials whose crystal geometry has no confirmed cod_id/mp_id match against
 # an external database (COD/Materials Project) -- see
-# docs/crystal-db-comparison.md "no defensible match" / unresolved-MP-mismatch
+# docs/validation/materials/crystal-db-comparison.md "no defensible match" / unresolved-MP-mismatch
 # lists. Note: that cross-check covers lattice geometry only, not the
 # Debye-Waller B_ang2 value itself (docs/debye-waller-audit.md is separate).
 no_verified_dw = [
